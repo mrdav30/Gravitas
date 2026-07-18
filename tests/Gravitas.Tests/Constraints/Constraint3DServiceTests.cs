@@ -1323,7 +1323,7 @@ public sealed class Constraint3DServiceTests
         ScenarioBody<LSSphereCollider> driver = scenario.CreateSphere(Vector3d.Right * (Fixed64)3);
         scenario.Context.Constraints3D.RegisterJoint(CreateBallSocket(sleeping.Body, driver.Body));
         sleeping.Body.Sleep();
-        driver.Body.AddLinearImpulse(-Vector3d.Right * (Fixed64)16);
+        driver.Body.AddLinearImpulse(Vector3d.Left * Fixed64.Half * driver.Body.Mass);
 
         scenario.Context.Simulate();
         scenario.Context.LateSimulate();

@@ -203,23 +203,6 @@ public sealed class GravitasPhysicsServiceTests
     }
 
     [Fact]
-    public void AddLinearImpulse_ShouldUseOwningContextDeltaTime()
-    {
-        using GravitasWorldContext contextA = GravitasWorldContext.CreateOwned();
-        using GravitasWorldContext contextB = GravitasWorldContext.CreateOwned();
-        contextA.SetFrameRate(10);
-        contextB.SetFrameRate(100);
-        SolidBody bodyA = CreateInitializedBody(contextA);
-        SolidBody bodyB = CreateInitializedBody(contextB);
-
-        bodyA.AddLinearImpulse(Vector3d.Right);
-        bodyB.AddLinearImpulse(Vector3d.Right);
-
-        bodyA.LinearVelocity.X.Should().Be(Fixed64.One / (Fixed64)10);
-        bodyB.LinearVelocity.X.Should().Be(Fixed64.One / (Fixed64)100);
-    }
-
-    [Fact]
     public void Reset_ShouldClearContextLocalColliderTable()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();

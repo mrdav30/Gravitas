@@ -100,8 +100,17 @@ transform during `LateSimulate()`.
 | Solver angular mobility     | `CanRotate`, `EffectiveInverseInertiaTensor` |
 | Body-local COM              | `LocalCenterOfMassOffset`                    |
 | World COM                   | `WorldCenterOfMass`                          |
+| Immediate linear impulse    | `AddLinearImpulse(...)`                      |
+| Queued linear force         | `AddForce(...)`                              |
 | Immediate angular impulse   | `AddAngularImpulse(...)`                     |
-| Queued angular acceleration | `AddTorque(...)`                             |
+| Queued angular torque       | `AddTorque(...)`                             |
+
+Linear impulse uses mass-distance-per-time units and changes velocity
+immediately by `impulse * EffectiveInverseMass`. Angular impulse uses
+mass-distance-squared-per-time units and changes angular velocity immediately
+through `EffectiveInverseInertiaTensor`. Neither impulse API applies
+`DeltaTime` or advances pose. `AddForce(...)` and `AddTorque(...)` instead queue
+continuous inputs whose acceleration is integrated during the next fixed step.
 
 3D contact response uses full 3D COM-relative contact arms, `Fixed3x3` inverse
 inertia tensors, collider surface materials, normal impulses, tangent friction,
@@ -155,8 +164,15 @@ during `LateSimulate()` and project its X/Z position into authoritative
 | Solver yaw mobility           | `CanRotate`, `EffectiveInverseMomentOfInertia` |
 | Body-local COM                | `LocalCenterOfMassOffset`                      |
 | World COM                     | `WorldCenterOfMass`                            |
+| Immediate planar impulse      | `AddLinearImpulse(...)`                        |
+| Queued planar force           | `AddForce(...)`                                |
 | Immediate yaw impulse         | `AddAngularImpulse(...)`                       |
-| Queued yaw acceleration       | `AddTorque(...)`                               |
+| Queued yaw torque             | `AddTorque(...)`                               |
+
+Pure 2D impulse and continuous-force units match the 3D contract. Planar and
+yaw impulses change velocity immediately without applying `DeltaTime` or
+advancing pose; planar force and yaw torque are integrated during the next
+fixed step.
 
 `BodyFreezeAxes2D.PositionX` maps to world X. `BodyFreezeAxes2D.PositionY` maps
 to world Z, not world height. Fully position-frozen, kinematic, inactive,

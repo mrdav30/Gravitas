@@ -15,8 +15,8 @@ public sealed class CollisionWarmStartTests
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSSphereCollider> left = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
         ScenarioBody<LSSphereCollider> right = scenario.CreateSphere(new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
-        left.Body.AddLinearImpulse(new Vector3d((Fixed64)60, Fixed64.Zero, Fixed64.Zero));
-        right.Body.AddLinearImpulse(new Vector3d((Fixed64)(-60), Fixed64.Zero, Fixed64.Zero));
+        left.Body.AddLinearImpulse(Vector3d.Right * Fixed64.FromFraction(15, 8) * left.Body.Mass);
+        right.Body.AddLinearImpulse(Vector3d.Left * Fixed64.FromFraction(15, 8) * right.Body.Mass);
         CollisionPair pair = scenario.CreatePair(left.Collider, right.Collider);
         CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
         ulong contactId = pair.Manifold.PrimaryContact.ContactId;
@@ -33,8 +33,8 @@ public sealed class CollisionWarmStartTests
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSSphereCollider> left = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
         ScenarioBody<LSSphereCollider> right = scenario.CreateSphere(new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
-        left.Body.AddLinearImpulse(new Vector3d((Fixed64)60, Fixed64.Zero, Fixed64.Zero));
-        right.Body.AddLinearImpulse(new Vector3d((Fixed64)(-60), Fixed64.Zero, Fixed64.Zero));
+        left.Body.AddLinearImpulse(Vector3d.Right * Fixed64.FromFraction(15, 8) * left.Body.Mass);
+        right.Body.AddLinearImpulse(Vector3d.Left * Fixed64.FromFraction(15, 8) * right.Body.Mass);
         CollisionPair pair = scenario.CreatePair(left.Collider, right.Collider);
         CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
         ulong contactId = pair.Manifold.PrimaryContact.ContactId;

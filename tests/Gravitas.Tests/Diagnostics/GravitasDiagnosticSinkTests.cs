@@ -164,7 +164,7 @@ public sealed class GravitasDiagnosticSinkTests
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSSphereCollider> first = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
         ScenarioBody<LSSphereCollider> second = scenario.CreateSphere(new Vector3d(Fixed64.Half, Fixed64.Zero, Fixed64.Zero));
-        first.Body.AddLinearImpulse(new Vector3d((Fixed64)10, Fixed64.Zero, Fixed64.Zero));
+        first.Body.AddLinearImpulse(Vector3d.Right * Fixed64.FromFraction(5, 16) * first.Body.Mass);
         CollisionPair pair = scenario.CreatePair(first.Collider, second.Collider);
 
         scenario.Context.Diagnostics.Enable(eventCapacity: 16, drawCommandCapacity: 16);

@@ -80,7 +80,7 @@ public class MixedCollisionResponseBenchmarks
             origin + new Vector3d(Fixed64.FromFraction(-1, 4), Fixed64.Zero, Fixed64.Zero));
         SolidBody2D circle = CreateCircle2D(new Vector2d(origin.X, origin.Z));
         ApplyMaterialMode(sphere.Collider, circle.Collider);
-        sphere.Body.AddLinearImpulse(new Vector3d((Fixed64)30, Fixed64.Zero, Fixed64.Zero));
+        sphere.Body.AddLinearImpulse(Vector3d.Right * Fixed64.FromFraction(15, 16) * sphere.Body.Mass);
 
         if (!CollisionDetectionMixed.TryCollide(sphere.Collider, circle.Collider, out MixedContact contact))
             throw new InvalidOperationException("Unable to prepare a mixed response contact pair.");

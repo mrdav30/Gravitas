@@ -160,7 +160,7 @@ separate tuning knobs.
 non-kinematic body can sleep after linear and angular speed remain at or below
 explicit thresholds for `SleepFrameThreshold` fixed frames.
 
-Sleeping clears accumulated force, impulse, velocity, torque, acceleration, and
+Sleeping clears accumulated force, velocity, torque, acceleration, and
 pending position-correction state, but does not remove the collider from
 GridForge partitions.
 

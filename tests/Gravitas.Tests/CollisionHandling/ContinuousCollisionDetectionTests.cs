@@ -410,6 +410,7 @@ public sealed partial class ContinuousCollisionDetectionTests
         DisableGroundQueries(source.Body);
 
         source.Body.AddLinearImpulse(Vector3d.Right * (Fixed64)4);
+        scenario.Context.LateSimulate();
 
         source.Body.Position3d.Should().Be(Vector3d.Right * Fixed64.FromFraction(9, 2));
         source.Body.LinearVelocity.Should().Be(Vector3d.Right * (Fixed64)4);
@@ -1183,6 +1184,7 @@ public sealed partial class ContinuousCollisionDetectionTests
         body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
 
         body.AddLinearImpulse(new Vector3d((Fixed64)4, Fixed64.Zero, Fixed64.One));
+        scenario.Context.LateSimulate();
 
         body.LinearVelocity.X.Should().Be(Fixed64.Zero);
         body.LinearVelocity.Z.Should().Be(Fixed64.One);
@@ -2848,8 +2850,11 @@ public sealed partial class ContinuousCollisionDetectionTests
             JointCollisionPolicy.SuppressLinked));
     }
 
-    private static void ApplyFastImpulse(SolidBody body) =>
-        body.AddLinearImpulse(new Vector3d((Fixed64)4, Fixed64.Zero, Fixed64.Zero));
+    private static void ApplyFastImpulse(SolidBody body)
+    {
+        body.AddLinearImpulse(Vector3d.Right * (Fixed64)4 * body.Mass);
+        body.Context.LateSimulate();
+    }
 
     private static void DisableGroundQueries(SolidBody body)
     {

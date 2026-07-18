@@ -12,9 +12,14 @@ namespace Gravitas;
 
 public sealed partial class SolidBody2D
 {
+    /// <summary>
+    /// Queues a planar force in mass-distance-per-time-squared units for
+    /// integration during the next fixed step.
+    /// </summary>
+    /// <param name="force">The X/Z-plane force to apply.</param>
     public void AddForce(Vector2d force)
     {
-        Vector2d accelerationDelta = ProjectLinearMotion(force * InverseMass);
+        Vector2d accelerationDelta = ProjectLinearMotion(force * EffectiveInverseMass);
         if (accelerationDelta == Vector2d.Zero)
             return;
 
@@ -23,7 +28,8 @@ public sealed partial class SolidBody2D
     }
 
     /// <summary>
-    /// Accumulates planar torque for the next fixed step after applying the body's inverse moment of inertia.
+    /// Queues a yaw torque in mass-distance-squared-per-time-squared units for
+    /// integration during the next fixed step.
     /// </summary>
     /// <param name="torque">The signed yaw torque applied to the body.</param>
     public void AddTorque(Fixed64 torque)
@@ -37,7 +43,27 @@ public sealed partial class SolidBody2D
     }
 
     /// <summary>
-    /// Applies an immediate yaw-velocity change derived from the supplied angular impulse and inverse moment of inertia.
+    /// Applies an X/Z-plane linear impulse immediately as a velocity change.
+    /// The impulse is expressed in mass-distance-per-time units and does not
+    /// advance the fixed-step simulation or apply a time-step factor.
+    /// </summary>
+    /// <param name="impulse">The planar linear impulse to apply.</param>
+    public void AddLinearImpulse(Vector2d impulse)
+    {
+        Vector2d velocityDelta = ProjectLinearMotion(impulse * EffectiveInverseMass);
+        if (velocityDelta == Vector2d.Zero)
+            return;
+
+        Wake();
+        _linearVelocity += velocityDelta;
+        RefreshLinearSpeed();
+    }
+
+    /// <summary>
+    /// Applies an immediate yaw-velocity change derived from the supplied
+    /// angular impulse and inverse moment of inertia. The impulse is expressed
+    /// in mass-distance-squared-per-time units and does not apply a time-step
+    /// factor.
     /// </summary>
     /// <param name="impulse">The signed yaw impulse applied to the body.</param>
     public void AddAngularImpulse(Fixed64 impulse)

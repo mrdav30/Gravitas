@@ -53,7 +53,6 @@ public partial class SolidBody
         Fixed64 deltaTime = Context.DeltaTime;
         PhysicsEnvironment environment = Context.Environment;
         Vector3d predictedVelocity = _linearVelocity
-            + _impulseStore
             + (ProjectLinearMotion(_deltaAcceleration) * deltaTime);
         if (!IsGrounded && (_freezeAxes & BodyFreezeAxes3D.PositionY) != BodyFreezeAxes3D.PositionY)
             predictedVelocity.Y -= environment.Gravity * _gravityScale * deltaTime;

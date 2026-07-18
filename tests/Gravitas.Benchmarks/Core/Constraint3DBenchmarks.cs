@@ -167,7 +167,10 @@ public class Constraint3DBenchmarks
         }
 
         if (seedImpulse)
-            bodies[^1].AddLinearImpulse(new Vector3d((Fixed64)6, Fixed64.Zero, (Fixed64)2));
+            bodies[^1].AddLinearImpulse(new Vector3d(
+                Fixed64.FromFraction(3, 16),
+                Fixed64.Zero,
+                Fixed64.FromFraction(1, 16)) * bodies[^1].Mass);
     }
 
     private static void CreateMotorLine(

@@ -157,7 +157,7 @@ public sealed class Physics3DResponseHardeningTests
         scenario.Context.Diagnostics.Enable(eventCapacity: 128, drawCommandCapacity: 0);
 
         scenario.Context.Simulate();
-        first.Body.AddLinearImpulse(Vector3d.Right * (Fixed64)4);
+        first.Body.AddLinearImpulse(Vector3d.Right * Fixed64.FromFraction(1, 8) * first.Body.Mass);
         scenario.Context.LateSimulate();
 
         first.Collider.TryGetCollisionPair(second.Collider.Id, out CollisionHandling.CollisionPair? pair).Should().BeTrue();

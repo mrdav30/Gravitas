@@ -52,7 +52,7 @@ public sealed class Constraint3DStressTests
     {
         using GravitasWorldContext context = CreateHumanoidRagdollOnFloor(out SolidBody[] bodies, out Joint3D[] joints);
         bodies[0].Sleep();
-        bodies[^1].AddLinearImpulse(Vector3d.Right * (Fixed64)12);
+        bodies[^1].AddLinearImpulse(Vector3d.Right * Fixed64.FromFraction(3, 8) * bodies[^1].Mass);
 
         context.Simulate();
         context.LateSimulate();
@@ -192,7 +192,10 @@ public sealed class Constraint3DStressTests
                 JointCollisionPolicy.SuppressLinked));
         }
 
-        bodies[^1].AddLinearImpulse(new Vector3d((Fixed64)8, (Fixed64)2, (Fixed64)3));
+        bodies[^1].AddLinearImpulse(new Vector3d(
+            Fixed64.FromFraction(1, 4),
+            Fixed64.FromFraction(1, 16),
+            Fixed64.FromFraction(3, 32)) * bodies[^1].Mass);
         return scenario.Context;
     }
 
@@ -217,7 +220,7 @@ public sealed class Constraint3DStressTests
                 JointCollisionPolicy.SuppressLinked));
         }
 
-        bodies[^1].AddAngularImpulse(Vector3d.Forward * (Fixed64)5);
+        bodies[^1].AddAngularImpulse(Vector3d.Forward * Fixed64.FromFraction(5, 32));
         return scenario.Context;
     }
 

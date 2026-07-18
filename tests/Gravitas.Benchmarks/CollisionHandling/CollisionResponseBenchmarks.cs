@@ -10,6 +10,8 @@ namespace Gravitas.Benchmarks;
 [MemoryDiagnoser]
 public class CollisionResponseBenchmarks
 {
+    private static readonly Fixed64 StandardSpeed = Fixed64.FromFraction(15, 8);
+    private static readonly Fixed64 RestingSpeed = Fixed64.FromFraction(3, 32);
     private GravitasWorldContext _context;
     private CollisionPair[] _pairs;
 
@@ -82,7 +84,7 @@ public class CollisionResponseBenchmarks
         ScenarioBody<LSSphereCollider> sphere = CreateBody(
             new LSSphereCollider(),
             origin + new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.FromFraction(1, 4), Fixed64.Zero));
-        Push(sphere.Body, -60);
+        Push(sphere.Body, -StandardSpeed);
         return new CollisionPair(cuboid.Collider, sphere.Collider);
     }
 
@@ -92,8 +94,8 @@ public class CollisionResponseBenchmarks
         ScenarioBody<LSCuboidCollider> right = CreateBody(
             new LSCuboidCollider(),
             origin + new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
-        Push(left.Body, 60);
-        Push(right.Body, -60);
+        Push(left.Body, StandardSpeed);
+        Push(right.Body, -StandardSpeed);
         return new CollisionPair(left.Collider, right.Collider);
     }
 
@@ -106,7 +108,7 @@ public class CollisionResponseBenchmarks
         ScenarioBody<LSCuboidCollider> box = CreateBody(
             new LSCuboidCollider(),
             origin + new Vector3d(Fixed64.Zero, Fixed64.FromFraction(3, 4), Fixed64.Zero));
-        box.Body.AddLinearImpulse(new Vector3d(Fixed64.Zero, (Fixed64)(-3), Fixed64.Zero));
+        box.Body.AddLinearImpulse(Vector3d.Down * RestingSpeed * box.Body.Mass);
         return new CollisionPair(floor.Collider, box.Collider);
     }
 
@@ -119,7 +121,7 @@ public class CollisionResponseBenchmarks
         ScenarioBody<LSSphereCollider> sphere = CreateBody(
             new LSSphereCollider(),
             origin + new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
-        Push(sphere.Body, -60);
+        Push(sphere.Body, -StandardSpeed);
         return new CollisionPair(cylinder.Collider, sphere.Collider);
     }
 
@@ -133,7 +135,7 @@ public class CollisionResponseBenchmarks
         ScenarioBody<LSCuboidCollider> box = CreateBody(
             new LSCuboidCollider(),
             origin + new Vector3d(Fixed64.Zero, Fixed64.FromFraction(1, 4), Fixed64.Zero));
-        box.Body.AddLinearImpulse(new Vector3d(Fixed64.Zero, (Fixed64)(-3), Fixed64.Zero));
+        box.Body.AddLinearImpulse(Vector3d.Down * RestingSpeed * box.Body.Mass);
         return new CollisionPair(floor.Collider, box.Collider);
     }
 
@@ -151,7 +153,7 @@ public class CollisionResponseBenchmarks
         ScenarioBody<LSSphereCollider> sphere = CreateBody(
             new LSSphereCollider(),
             origin + new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
-        Push(sphere.Body, -60);
+        Push(sphere.Body, -StandardSpeed);
         return new CollisionPair(compound.Collider, sphere.Collider);
     }
 
@@ -192,9 +194,9 @@ public class CollisionResponseBenchmarks
             MeshColliderMode.Convex,
             MeshInertiaPolicy.SurfaceApproximation);
 
-    private static void Push(SolidBody body, int xImpulse)
+    private static void Push(SolidBody body, Fixed64 xVelocity)
     {
-        body.AddLinearImpulse(new Vector3d((Fixed64)xImpulse, Fixed64.Zero, Fixed64.Zero));
+        body.AddLinearImpulse(Vector3d.Right * xVelocity * body.Mass);
     }
 
     private void ApplyMaterialMode(CollisionPair pair)

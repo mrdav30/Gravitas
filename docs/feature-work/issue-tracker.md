@@ -44,17 +44,15 @@ records follow with their original discovery context.
 ### Ordered Queue
 
 1. **Gravitas:**
-   [3D Angular Impulse Scales Immediate Velocity By Frame Delta](#3d-angular-impulse-scales-immediate-velocity-by-frame-delta).
-2. **Gravitas:**
    [Rotational CCD Can Miss Contacts Between Bounded Pose Samples](#rotational-ccd-can-miss-contacts-between-bounded-pose-samples).
-3. **Gravitas:**
+2. **Gravitas:**
    [Convex Mesh Mode Accepts Disconnected Topology And Can Collide In Empty Bounds Space](#convex-mesh-mode-accepts-disconnected-topology-and-can-collide-in-empty-bounds-space).
-4. **Gravitas:**
+3. **Gravitas:**
    [Relative CCD Quadratic Saturation Can Miss Extreme-Range Crossings](#relative-ccd-quadratic-saturation-can-miss-extreme-range-crossings).
    Reuse the magnitude and normalization policy established by the resolved
    extreme-convex-sweep work when adding the separate scale-safe quadratic
    implementation.
-5. **Gravitas:**
+4. **Gravitas:**
    [3D CCD Handoff Callback Failure Can Abandon Queue Cleanup](#3d-ccd-handoff-callback-failure-can-abandon-queue-cleanup).
 
 ### Relative CCD Quadratic Saturation Can Miss Extreme-Range Crossings
@@ -75,27 +73,6 @@ crossings, endpoint-adjacent hits, misses, and mixed CCD routing at the chosen
 boundary. This is distinct from conservative proxy-radius saturation and does
 not block coverage convergence because ordinary supported ranges and the current
 uncovered closing-speed boundary remain independently testable.
-
-### 3D Angular Impulse Scales Immediate Velocity By Frame Delta
-
-**Discovered:** 2026-07-12  
-**Source:** 95%-to-100% coverage hardening, 2D/3D motion parity review  
-**Affected area:** `SolidBody.AddAngularImpulse(...)` units and frame-rate
-invariance
-
-The 3D angular-impulse API multiplies the supplied impulse by both inverse
-inertia and `GravitasWorldContext.DeltaTime` before changing angular velocity.
-Consequently, otherwise identical bodies receive different immediate angular
-velocity changes from the same impulse when their context frame rates differ.
-The 2D angular-impulse API and the usual physical impulse contract apply inverse
-inertia without a time-step factor. The adjacent 3D linear-impulse API uses the
-same time-step pattern and should be audited as part of the semantic decision.
-
-Resolve this as an explicit breaking API/units decision rather than removing the
-factor incidentally. Add cross-frame-rate regressions for immediate linear and
-angular impulse response, update XML/wiki unit documentation, and verify
-collision and constraint callers that may already compensate for the current
-scaling.
 
 ### Rotational CCD Can Miss Contacts Between Bounded Pose Samples
 
@@ -167,6 +144,47 @@ consumable nor replay-visible afterward. Keep the successful drain
 allocation-free and define counter behavior for the partially completed batch.
 
 ## Resolved Issues
+
+### 3D Angular Impulse Scaled Immediate Velocity By Frame Delta
+
+**Resolved:** 2026-07-18  
+**Source:** 95%-to-100% coverage hardening, 2D/3D motion parity review  
+**Affected area:** public force/impulse units, immediate body motion, and 2D/3D
+motion API parity
+
+RCA: both public 3D impulse methods multiplied their inverse-mass response by
+`DeltaTime`, treating instantaneous momentum transfer as a continuous force.
+`AddLinearImpulse(...)` additionally routed through the fixed-step velocity and
+pose update, so a host command could apply gravity and move, ground, or sweep a
+body before the next simulation phase. Collision, mixed-response, and
+constraint solvers already applied velocity deltas directly and did not
+compensate for this behavior.
+
+Fix: 3D linear and angular impulse now apply the physical frame-rate-invariant
+contracts `deltaVelocity = impulse * EffectiveInverseMass` and
+`deltaAngularVelocity = impulse * EffectiveInverseInertiaTensor`. They wake and
+refresh body motion immediately without advancing pose. Continuous force and
+torque remain queued acceleration inputs integrated during the next fixed step.
+The dead 3D pending-impulse store was removed from runtime, replay hashing, and
+serialization. Pure 2D gained the matching public `AddLinearImpulse(...)`
+contract, and force/torque admission in both dimensions now uses effective
+mobility so kinematic or otherwise immovable bodies do not retain stale inputs.
+
+Verification:
+
+- Added cross-frame-rate 2D/3D regressions for immediate linear and angular
+  impulse response plus a fixed-step boundary regression proving pose advances
+  exactly once during `LateSimulate()`.
+- Audited collision, CCD, constraint, diagnostics, and benchmark callers;
+  fixtures that encoded the old frame-scaled inputs now use explicit velocity
+  targets and true impulses, and CCD helpers advance through the lifecycle.
+- `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj -c Release
+  --no-restore` passed all 2,734 tests.
+- `dotnet build src/Gravitas/Gravitas.csproj -c Release --no-restore` passed for
+  `net8.0` and `netstandard2.1`; the benchmark project also built cleanly.
+- `ReleaseLean` remains deferred to the package-reference release gate because
+  the intentionally retained local GridForge project link exposes MemoryPack
+  interfaces without its package assembly in that configuration.
 
 ### SolidBody Point Transforms Used Collider Dimensions As Transform Scale
 

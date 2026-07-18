@@ -108,7 +108,7 @@ public sealed class SolidBodyCenterOfMassTests
             Fixed64.Zero,
             Fixed64.Zero));
         shifted.Body.LocalCenterOfMassOffset = Vector3d.Up * Fixed64.FromFraction(1, 4);
-        sphere.Body.AddLinearImpulse(new Vector3d((Fixed64)(-60), Fixed64.Zero, Fixed64.Zero));
+        sphere.Body.AddLinearImpulse(Vector3d.Left * Fixed64.FromFraction(15, 8) * sphere.Body.Mass);
         CollisionPair pair = scenario.CreatePair(shifted.Collider, sphere.Collider);
         pair.Manifold.SetContact(shifted.Collider.Center, sphere.Collider.Center, Fixed64.FromFraction(1, 10), Vector3d.Right);
 

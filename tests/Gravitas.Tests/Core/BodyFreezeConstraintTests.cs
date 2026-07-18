@@ -221,6 +221,7 @@ public sealed class BodyFreezeConstraintTests
         body.Sleep();
 
         body.AddForce(new Vector2d(Fixed64.One, (Fixed64)2));
+        body.AddLinearImpulse(new Vector2d(Fixed64.One, (Fixed64)2));
         body.AddAngularImpulse(Fixed64.One);
         body.AddTorque(Fixed64.One);
         body.ApplyCollisionLinearVelocityDelta(Vector2d.Right);

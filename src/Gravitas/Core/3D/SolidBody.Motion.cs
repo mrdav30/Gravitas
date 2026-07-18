@@ -49,7 +49,6 @@ public partial class SolidBody
         _angularAccelerationStore = Vector3d.Zero;
         _angularAcceleration = Vector3d.Zero;
         _angularSpeed = Fixed64.Zero;
-        _impulseStore = Vector3d.Zero;
     }
 
     private void ApplyFreezeConstraintsToMotion()
@@ -59,7 +58,6 @@ public partial class SolidBody
         _linearAccelerationStore = ProjectLinearMotion(_linearAccelerationStore);
         _deltaAcceleration = ProjectLinearMotion(_deltaAcceleration);
         _linearAcceleration = ProjectLinearMotion(_linearAcceleration);
-        _impulseStore = ProjectLinearMotion(_impulseStore);
         RefreshLinearMotionState(lastLinearVelocity);
 
         Vector3d lastAngularVelocity = _angularVelocity;
@@ -88,10 +86,15 @@ public partial class SolidBody
             context.MixedCollisions.Refresh3DColliderPartition(Collider);
     }
 
+    /// <summary>
+    /// Queues a torque in mass-distance-squared-per-time-squared units for
+    /// integration during the next fixed step.
+    /// </summary>
+    /// <param name="torque">The world-space torque to apply.</param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void AddTorque(Vector3d torque)
     {
-        Vector3d accelerationDelta = ProjectAngularMotion(torque * _inverseInertiaTensor);
+        Vector3d accelerationDelta = ProjectAngularMotion(torque * EffectiveInverseInertiaTensor);
         if (accelerationDelta == Vector3d.Zero)
             return;
 
@@ -100,10 +103,15 @@ public partial class SolidBody
         Context.Diagnostics.EmitTorqueDelta(this, torque);
     }
 
+    /// <summary>
+    /// Queues a force in mass-distance-per-time-squared units for integration
+    /// during the next fixed step.
+    /// </summary>
+    /// <param name="force">The world-space force to apply.</param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void AddForce(Vector3d force)
     {
-        Vector3d accelerationDelta = ProjectLinearMotion(force * InverseMass);
+        Vector3d accelerationDelta = ProjectLinearMotion(force * EffectiveInverseMass);
         if (accelerationDelta == Vector3d.Zero)
             return;
 
@@ -112,25 +120,35 @@ public partial class SolidBody
         Context.Diagnostics.EmitForceDelta(this, force, accelerationDelta);
     }
 
-    private Vector3d _impulseStore = Vector3d.Zero;
+    /// <summary>
+    /// Applies a world-space linear impulse immediately as a velocity change.
+    /// The impulse is expressed in mass-distance-per-time units and does not
+    /// advance the fixed-step simulation or apply a time-step factor.
+    /// </summary>
+    /// <param name="impulse">The world-space linear impulse to apply.</param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void AddLinearImpulse(Vector3d impulse)
     {
-        Vector3d velocityDelta = ProjectLinearMotion((impulse * InverseMass) * Context.DeltaTime);
+        Vector3d velocityDelta = ProjectLinearMotion(impulse * EffectiveInverseMass);
         if (velocityDelta == Vector3d.Zero)
             return;
 
         Wake();
-        _impulseStore += velocityDelta;
-        // testing immediate reaction for collisions...
-        UpdateLinearVelocity();
-        NonKinematicUpdate(_angularVelocity);
+        Vector3d lastVelocity = _linearVelocity;
+        _linearVelocity += velocityDelta;
+        RefreshLinearMotionState(lastVelocity);
     }
 
+    /// <summary>
+    /// Applies a world-space angular impulse immediately as an angular-velocity
+    /// change. The impulse is expressed in mass-distance-squared-per-time units
+    /// and does not apply a time-step factor.
+    /// </summary>
+    /// <param name="impulse">The world-space angular impulse to apply.</param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void AddAngularImpulse(Vector3d impulse)
     {
-        Vector3d velocityDelta = ProjectAngularMotion((impulse * _inverseInertiaTensor) * Context.DeltaTime);
+        Vector3d velocityDelta = ProjectAngularMotion(impulse * EffectiveInverseInertiaTensor);
         if (velocityDelta == Vector3d.Zero)
             return;
 
@@ -269,12 +287,10 @@ public partial class SolidBody
         PhysicsEnvironment environment = Context.Environment;
         Vector3d lastVelocity = _linearVelocity;
 
-        _linearVelocity += ProjectLinearMotion(_impulseStore + (_linearAccelerationStore * deltaTime));
-        // LinearVelocity = _impulseStore + (_linearAccelerationStore * deltaTime);
+        _linearVelocity += ProjectLinearMotion(_linearAccelerationStore * deltaTime);
 
         // Reset stores for the next frame
         _linearAccelerationStore = Vector3d.Zero;
-        _impulseStore = Vector3d.Zero;
 
         // Apply gravity only if not grounded
         if (!IsGrounded && (_freezeAxes & BodyFreezeAxes3D.PositionY) != BodyFreezeAxes3D.PositionY)

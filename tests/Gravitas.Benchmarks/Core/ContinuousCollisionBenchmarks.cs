@@ -67,6 +67,7 @@ public class ContinuousCollisionBenchmarks
     {
         ResetBody(_discreteBody);
         _discreteBody.AddLinearImpulse(FastImpulse);
+        _discreteContext.LateSimulate();
         return _discreteBody.Position3d;
     }
 
@@ -75,6 +76,7 @@ public class ContinuousCollisionBenchmarks
     {
         ResetBody(_continuousBody);
         _continuousBody.AddLinearImpulse(FastImpulse);
+        _continuousContext.LateSimulate();
         return _continuousBody.Position3d;
     }
 
@@ -94,6 +96,7 @@ public class ContinuousCollisionBenchmarks
     {
         ResetBody(_meshBody);
         _meshBody.AddLinearImpulse(FastImpulse);
+        _meshContext.LateSimulate();
         return _meshBody.Position3d;
     }
 

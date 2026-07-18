@@ -504,8 +504,11 @@ public sealed class ColliderLocalCollisionFilteringTests
         return collider;
     }
 
-    private static void ApplyFastImpulse(SolidBody body) =>
-        body.AddLinearImpulse(new Vector3d((Fixed64)4, Fixed64.Zero, Fixed64.Zero));
+    private static void ApplyFastImpulse(SolidBody body)
+    {
+        body.AddLinearImpulse(Vector3d.Right * (Fixed64)4 * body.Mass);
+        body.Context.LateSimulate();
+    }
 
     private static void DisableGroundQueries(SolidBody body)
     {
