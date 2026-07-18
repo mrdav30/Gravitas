@@ -10,8 +10,9 @@ using Gravitas.Colliders;
 using GridForge.Grids;
 using GridForge.Grids.Topology;
 using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-
+using System.Runtime.ExceptionServices;
 
 namespace Gravitas.CollisionHandling;
 
@@ -267,6 +268,7 @@ public partial class CollisionPair
         bool shouldRaiseTriggerA = isTriggerPair && ColliderTriggerEventPolicy.ShouldRaise(colliderA, colliderB);
         bool shouldRaiseTriggerB = isTriggerPair && ColliderTriggerEventPolicy.ShouldRaise(colliderB, colliderA);
         _notificationInProgress = true;
+        List<Exception>? notificationExceptions = null;
         try
         {
             if (isColliding)
@@ -301,39 +303,23 @@ public partial class CollisionPair
             }
             else
             {
-                if (_colliderANotified)
-                {
-                    colliderA.NotifyContact(
-                        colliderB,
-                        bodyB,
-                        isColliding: false,
-                        isChanged,
-                        allowInactive: true,
-                        registrationA,
-                        registrationB,
-                        isTriggerPair,
-                        shouldRaiseTriggerA);
-                }
-
-                if (_colliderBNotified && registrationB.IsCurrentLifetime)
-                {
-                    colliderB.NotifyContact(
-                        colliderA,
-                        bodyA,
-                        isColliding: false,
-                        isChanged,
-                        allowInactive: true,
-                        registrationB,
-                        registrationA,
-                        isTriggerPair,
-                        shouldRaiseTriggerB);
-                }
-
-                _colliderANotified = false;
-                _colliderBNotified = false;
+                NotifySeparation(
+                    registrationA,
+                    registrationB,
+                    bodyA,
+                    bodyB,
+                    isChanged,
+                    isTriggerPair,
+                    shouldRaiseTriggerA,
+                    shouldRaiseTriggerB);
             }
         }
-        finally
+        catch (Exception exception)
+        {
+            notificationExceptions = new List<Exception>(2) { exception };
+        }
+
+        try
         {
             EndNotification(
                 registrationA,
@@ -341,9 +327,17 @@ public partial class CollisionPair
                 isTriggerPair,
                 shouldRaiseTriggerA,
                 shouldRaiseTriggerB);
-            if (!_isColliding || (_colliderANotified && _colliderBNotified))
-                _isCollidingChanged = false;
         }
+        catch (Exception exception)
+        {
+            (notificationExceptions ??= new List<Exception>(2)).Add(exception);
+        }
+
+        if (!_isColliding || (_colliderANotified && _colliderBNotified))
+            _isCollidingChanged = false;
+
+        if (notificationExceptions != null)
+            ThrowNotificationExceptions(notificationExceptions);
     }
 
     private void EndNotification(
@@ -353,46 +347,100 @@ public partial class CollisionPair
         bool shouldRaiseTriggerA,
         bool shouldRaiseTriggerB)
     {
-        _notificationInProgress = false;
-        if (!_separationPending)
+        try
         {
-            ClearPendingNotificationState();
-            return;
-        }
+            if (!_separationPending)
+                return;
 
-        bool notifyB = _colliderBNotified;
-        SolidBody? bodyA = _pendingBodyA;
-        SolidBody? bodyB = _pendingBodyB;
-        ClearPendingNotificationState();
-        if (_colliderANotified)
-        {
-            registrationA.Collider.NotifyContact(
-                registrationB.Collider,
-                bodyB,
-                isColliding: false,
-                isChanged: true,
-                allowInactive: true,
+            SolidBody? bodyA = _pendingBodyA;
+            SolidBody? bodyB = _pendingBodyB;
+            ClearPendingNotificationState();
+            NotifySeparation(
                 registrationA,
                 registrationB,
-                isTriggerPair,
-                shouldRaiseTriggerA);
-        }
-        if (notifyB)
-        {
-            registrationB.Collider.NotifyContact(
-                registrationA.Collider,
                 bodyA,
-                isColliding: false,
+                bodyB,
                 isChanged: true,
-                allowInactive: true,
-                registrationB,
-                registrationA,
                 isTriggerPair,
+                shouldRaiseTriggerA,
                 shouldRaiseTriggerB);
         }
+        finally
+        {
+            ClearPendingNotificationState();
+            _notificationInProgress = false;
+        }
+    }
 
+    private void NotifySeparation(
+        in ColliderLifetimeToken registrationA,
+        in ColliderLifetimeToken registrationB,
+        SolidBody? bodyA,
+        SolidBody? bodyB,
+        bool isChanged,
+        bool isTriggerPair,
+        bool shouldRaiseTriggerA,
+        bool shouldRaiseTriggerB)
+    {
+        bool notifyA = _colliderANotified;
+        bool notifyB = _colliderBNotified;
         _colliderANotified = false;
         _colliderBNotified = false;
+
+        List<Exception>? notificationExceptions = null;
+        if (notifyA)
+        {
+            try
+            {
+                registrationA.Collider.NotifyContact(
+                    registrationB.Collider,
+                    bodyB,
+                    isColliding: false,
+                    isChanged,
+                    allowInactive: true,
+                    registrationA,
+                    registrationB,
+                    isTriggerPair,
+                    shouldRaiseTriggerA);
+            }
+            catch (Exception exception)
+            {
+                notificationExceptions = new List<Exception>(2) { exception };
+            }
+        }
+
+        if (notifyB && registrationB.IsCurrentLifetime)
+        {
+            try
+            {
+                registrationB.Collider.NotifyContact(
+                    registrationA.Collider,
+                    bodyA,
+                    isColliding: false,
+                    isChanged,
+                    allowInactive: true,
+                    registrationB,
+                    registrationA,
+                    isTriggerPair,
+                    shouldRaiseTriggerB);
+            }
+            catch (Exception exception)
+            {
+                (notificationExceptions ??= new List<Exception>(2)).Add(exception);
+            }
+        }
+
+        if (notificationExceptions != null)
+            ThrowNotificationExceptions(notificationExceptions);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void ThrowNotificationExceptions(List<Exception> exceptions)
+    {
+        if (exceptions.Count == 1)
+            ExceptionDispatchInfo.Capture(exceptions[0]).Throw();
+
+        throw new AggregateException(exceptions);
     }
 
     private void ClearPendingNotificationState()

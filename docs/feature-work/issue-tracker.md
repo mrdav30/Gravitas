@@ -44,18 +44,16 @@ records follow with their original discovery context.
 ### Ordered Queue
 
 1. **Gravitas:**
-   [3D Exit Callback Failure Can Duplicate Reentrant Separation Notifications](#3d-exit-callback-failure-can-duplicate-reentrant-separation-notifications).
-2. **Gravitas:**
    [CCD Handoff Dedupe Can Strand A Same-Frame Requeued Body](#ccd-handoff-dedupe-can-strand-a-same-frame-requeued-body).
-3. **Gravitas:**
+2. **Gravitas:**
    [SolidBody Point Transforms Use Collider Dimensions As Transform Scale](#solidbody-point-transforms-use-collider-dimensions-as-transform-scale).
-4. **Gravitas:**
+3. **Gravitas:**
    [3D Angular Impulse Scales Immediate Velocity By Frame Delta](#3d-angular-impulse-scales-immediate-velocity-by-frame-delta).
-5. **Gravitas:**
+4. **Gravitas:**
    [Rotational CCD Can Miss Contacts Between Bounded Pose Samples](#rotational-ccd-can-miss-contacts-between-bounded-pose-samples).
-6. **Gravitas:**
+5. **Gravitas:**
    [Convex Mesh Mode Accepts Disconnected Topology And Can Collide In Empty Bounds Space](#convex-mesh-mode-accepts-disconnected-topology-and-can-collide-in-empty-bounds-space).
-7. **Gravitas:**
+6. **Gravitas:**
    [Relative CCD Quadratic Saturation Can Miss Extreme-Range Crossings](#relative-ccd-quadratic-saturation-can-miss-extreme-range-crossings).
    Reuse the magnitude and normalization policy established by the resolved
    extreme-convex-sweep work when adding the separate scale-safe quadratic
@@ -163,33 +161,6 @@ fallback so invalid topology cannot create an empty-space contact. Add a
 regression that preserves valid open convex surfaces while rejecting or safely
 handling disconnected input without the AABB false-positive.
 
-### 3D Exit Callback Failure Can Duplicate Reentrant Separation Notifications
-
-**Discovered:** 2026-07-13  
-**Source:** 95%-to-100% coverage hardening, 3D collision-pair lifecycle review  
-**Affected area:** `CollisionPair.NotifyCollidersOfContact()`,
-`CollisionPair.EndNotification()`, and callback exception/reentrancy teardown
-
-If collider A's ordinary exit callback reentrantly deactivates a participant,
-the pair records pending separation. If that callback then throws, control skips
-the outer per-side admission-flag clears and enters `EndNotification()` with A
-still marked notified, so A can receive the same exit again. A second callback
-failure can mask the original exception and leave B or the admission flags
-incompletely cleaned. Deferred exits also run after `_notificationInProgress` is
-cleared, so a callback that captured the pair can reenter deactivation while
-admission state still exists.
-
-Resolve this as a dedicated lifecycle change: define at-most-once versus
-retryable callback semantics, snapshot and consume per-side admission before
-delegates when appropriate, keep cleanup exception-safe, define deterministic
-exception aggregation, and prevent direct pair reentry during deferred exits.
-Add regressions where A rebinds B and throws once during exit, and where a
-deferred exit deactivates its captured pair. Assert untouched rebound lifetimes,
-complete owner/holder cleanup, deterministic exception propagation, and no
-notifying-shell pool reuse. This does not block the coverage campaign because
-Task 65's retained A guard and centralized B lifetime admission are correct for
-nonthrowing callbacks and do not worsen this exception edge.
-
 ### CCD Handoff Dedupe Can Strand A Same-Frame Requeued Body
 
 **Discovered:** 2026-07-13  
@@ -219,6 +190,39 @@ does not block coverage convergence and is independent of the redundant
 active/dynamic-ID admission predicates removed in Task 67.
 
 ## Resolved Issues
+
+### 3D Exit Callback Failure Duplicated Reentrant Separation Notifications
+
+**Resolved:** 2026-07-18  
+**Source:** 95%-to-100% coverage hardening, 3D collision-pair lifecycle review  
+**Affected area:** `CollisionPair.NotifyCollidersOfContact()`,
+`CollisionPair.EndNotification()`, and callback exception/reentrancy teardown
+
+RCA: 3D separation flags remained admitted until after both user delegates
+returned. If collider A's exit callback reentrantly deactivated the pair and
+then threw, the outer flag clears were skipped and deferred cleanup saw A as
+still admitted. `EndNotification()` also cleared `_notificationInProgress`
+before invoking deferred exits, allowing a captured pair to recurse directly
+into the same separation. A repeated A failure could mask the original while B
+was skipped and notification state remained live.
+
+Fix: ordinary and deferred separation now share one A/B dispatcher that
+snapshots and consumes both admissions before invoking user code. Both
+still-current sides are attempted in stable A/B order even when A throws. One
+failure is rethrown with its original stack; multiple failures use
+`AggregateException` in callback order. Deferred exits retain the notification
+guard through dispatch, and final cleanup always clears pending state before
+the pair becomes reentrant again. Exception storage is allocated only after a
+delegate throws; the successful notification path remains allocation-free.
+
+Verification: RED regressions reproduced the duplicate A exit after B was
+rebound, direct captured-pair reentry from a deferred exit, skipped B dispatch,
+and first-callback short-circuiting. GREEN assertions prove at-most-once
+delivery, untouched rebound lifetime state, complete owner/holder cleanup,
+stable exception order, and no notifying-shell pool reuse. The focused 3D lifecycle
+suite passes `28/28`; full locally linked suites pass `2719/2719` in `Release`
+and `2680/2680` in `ReleaseLean`. Both configurations build `net8.0` and
+`netstandard2.1` package targets with zero warnings.
 
 ### Continuous-Collision Modes Accepted Undefined Enum Values
 

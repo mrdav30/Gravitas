@@ -688,6 +688,137 @@ public sealed class CollisionPairLifecycleHardeningTests
     }
 
     [Fact]
+    public void NotifyExit_WhenFirstCallbackRebindsSecondLifetimeAndThrows_ShouldConsumeAdmissionOnce()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        scenario.Context.Settings.PoolingEnabled = true;
+        ScenarioBody<LSSphereCollider> owner = scenario.CreateSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> support = scenario.CreateSphere(
+            new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero),
+            immovable: true);
+        Step(scenario.Context);
+        CollisionPair pair = GetPair(owner.Collider, support.Collider);
+        int ownerExits = 0;
+        int supportExits = 0;
+        bool rebind = true;
+        long supportLifetime = support.Collider.LifetimeVersion;
+        Vector3d reboundPosition = new((Fixed64)12, Fixed64.Zero, Fixed64.Zero);
+        owner.Collider.OnContactExit += _ =>
+        {
+            ownerExits++;
+            if (!rebind)
+                return;
+
+            rebind = false;
+            support.Body.Deactivate();
+            support.Body.Initialize(reboundPosition, FixedQuaternion.Identity);
+            throw new InvalidOperationException("owner exit failure");
+        };
+        support.Collider.OnContactExit += _ => supportExits++;
+        support.Body.ResetPosition(new Vector3d((Fixed64)8, Fixed64.Zero, Fixed64.Zero));
+        pair.UpdateCollisionDeferred();
+
+        Action notify = pair.NotifyCollidersOfContact;
+
+        notify.Should().Throw<InvalidOperationException>().WithMessage("owner exit failure");
+        ownerExits.Should().Be(1);
+        supportExits.Should().Be(0);
+        support.Body.Active.Should().BeTrue();
+        support.Collider.LifetimeVersion.Should().BeGreaterThan(supportLifetime);
+        support.Body.Position3d.Should().Be(reboundPosition);
+        pair.Active.Should().BeFalse();
+        owner.Collider.CollisionPairCount.Should().Be(0);
+        support.Collider.CollisionPairHolderCount.Should().Be(0);
+
+        ScenarioBody<LSSphereCollider> recursiveFirst = scenario.CreateSphere(new Vector3d((Fixed64)16, Fixed64.Zero, Fixed64.Zero));
+        ScenarioBody<LSSphereCollider> recursiveSecond = scenario.CreateSphere(
+            new Vector3d((Fixed64)16 + Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero),
+            immovable: true);
+        Step(scenario.Context);
+
+        GetPair(recursiveFirst.Collider, recursiveSecond.Collider).Should().NotBeSameAs(pair);
+    }
+
+    [Fact]
+    public void Simulate_WhenDeferredExitDeactivatesCapturedPair_ShouldNotReenterSeparation()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> owner = scenario.CreateSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> support = scenario.CreateSphere(
+            new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero),
+            immovable: true);
+        CollisionPair? pair = null;
+        int ownerExits = 0;
+        owner.Collider.OnContactEnter += _ =>
+        {
+            pair = GetPair(owner.Collider, support.Collider);
+            scenario.Context.Physics.FullDeactivateCollisionPair(pair);
+        };
+        owner.Collider.OnContactExit += _ =>
+        {
+            ownerExits++;
+            if (ownerExits == 1)
+                pair!.Deactivate();
+        };
+
+        Step(scenario.Context);
+
+        pair.Should().NotBeNull();
+        pair!.Active.Should().BeFalse();
+        ownerExits.Should().Be(1);
+        owner.Collider.CollisionPairCount.Should().Be(0);
+        owner.Collider.CollisionPairHolderCount.Should().Be(0);
+        support.Collider.CollisionPairCount.Should().Be(0);
+        support.Collider.CollisionPairHolderCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void NotifyExit_WhenBothCallbacksThrow_ShouldAggregateInPairOrderAndConsumeBothAdmissions()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> first = scenario.CreateSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> second = scenario.CreateSphere(
+            new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero),
+            immovable: true);
+        Step(scenario.Context);
+        CollisionPair pair = GetPair(first.Collider, second.Collider);
+        int colliderAExits = 0;
+        int colliderBExits = 0;
+        pair.ColliderA.OnContactExit += _ =>
+        {
+            colliderAExits++;
+            throw new InvalidOperationException("collider A exit failure");
+        };
+        pair.ColliderB.OnContactExit += _ =>
+        {
+            colliderBExits++;
+            throw new ArgumentException("collider B exit failure");
+        };
+        pair.ColliderB.Body!.ResetPosition(new Vector3d((Fixed64)8, Fixed64.Zero, Fixed64.Zero));
+        pair.UpdateCollisionDeferred();
+
+        Action notify = pair.NotifyCollidersOfContact;
+
+        AggregateException exception = notify.Should().Throw<AggregateException>().Which.Flatten();
+        exception.InnerExceptions.Should().HaveCount(2);
+        exception.InnerExceptions[0].Should().BeOfType<InvalidOperationException>()
+            .Which.Message.Should().Be("collider A exit failure");
+        exception.InnerExceptions[1].Should().BeOfType<ArgumentException>()
+            .Which.Message.Should().Be("collider B exit failure");
+        colliderAExits.Should().Be(1);
+        colliderBExits.Should().Be(1);
+
+        Action cleanup = () => scenario.Context.Physics.FullDeactivateCollisionPair(pair);
+
+        cleanup.Should().NotThrow();
+        colliderAExits.Should().Be(1);
+        colliderBExits.Should().Be(1);
+        pair.Active.Should().BeFalse();
+        pair.ColliderA.CollisionPairCount.Should().Be(0);
+        pair.ColliderB.CollisionPairHolderCount.Should().Be(0);
+    }
+
+    [Fact]
     public void Deactivate_WhenExitCallbackThrows_ShouldLeaveRetryableCleanupState()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
