@@ -216,7 +216,9 @@ contexts. These checks are core invariants.
 `SolidBody` is the 3D body model. It owns:
 
 - position, exposed as `Position3d`.
-- rotation and derived basis vectors.
+- normalized rotation and derived basis vectors. Public body admission and
+  replay population scale-safely normalize quaternions before publishing
+  runtime state; a zero quaternion resolves to identity.
 - visual interpolation buffers.
 - linear/angular velocity, acceleration, impulses, drag, friction, and
   restitution inputs.

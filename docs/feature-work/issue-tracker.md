@@ -44,53 +44,24 @@ records follow with their original discovery context.
 ### Ordered Queue
 
 1. **Gravitas:**
-   [Non-Unit Quaternion Admission Can Collapse Runtime Shape Axes](#non-unit-quaternion-admission-can-collapse-runtime-shape-axes).
-2. **Gravitas:**
    [Continuous-Collision Modes Accept Undefined Enum Values](#continuous-collision-modes-accept-undefined-enum-values).
-3. **Gravitas:**
+2. **Gravitas:**
    [3D Exit Callback Failure Can Duplicate Reentrant Separation Notifications](#3d-exit-callback-failure-can-duplicate-reentrant-separation-notifications).
-4. **Gravitas:**
+3. **Gravitas:**
    [CCD Handoff Dedupe Can Strand A Same-Frame Requeued Body](#ccd-handoff-dedupe-can-strand-a-same-frame-requeued-body).
-5. **Gravitas:**
+4. **Gravitas:**
    [SolidBody Point Transforms Use Collider Dimensions As Transform Scale](#solidbody-point-transforms-use-collider-dimensions-as-transform-scale).
-6. **Gravitas:**
+5. **Gravitas:**
    [3D Angular Impulse Scales Immediate Velocity By Frame Delta](#3d-angular-impulse-scales-immediate-velocity-by-frame-delta).
-7. **Gravitas:**
+6. **Gravitas:**
    [Rotational CCD Can Miss Contacts Between Bounded Pose Samples](#rotational-ccd-can-miss-contacts-between-bounded-pose-samples).
-8. **Gravitas:**
+7. **Gravitas:**
     [Convex Mesh Mode Accepts Disconnected Topology And Can Collide In Empty Bounds Space](#convex-mesh-mode-accepts-disconnected-topology-and-can-collide-in-empty-bounds-space).
-9. **Gravitas:**
+8. **Gravitas:**
     [Relative CCD Quadratic Saturation Can Miss Extreme-Range Crossings](#relative-ccd-quadratic-saturation-can-miss-extreme-range-crossings).
     Reuse the magnitude and normalization policy established by the resolved
     extreme-convex-sweep work when adding the separate scale-safe quadratic
     implementation.
-
-### Non-Unit Quaternion Admission Can Collapse Runtime Shape Axes
-
-**Discovered:** 2026-07-13  
-**Source:** 95%-to-100% coverage hardening, cone-bounds fallback review  
-**Affected area:** `SolidBody.Initialize(...)`, compound-part local rotations,
-collider bounds, partitioning, queries, and replay/load rotation admission
-
-Runtime body initialization and non-mesh compound-part authoring accept non-unit
-`FixedQuaternion` values. Some representable values collapse a rotated basis
-vector to exact zero; for example, an X-only quaternion whose squared X
-component is `Fixed64.Half` maps `Vector3d.Up` to zero. Cone bounds then use
-their deterministic Up-axis fallback, while other pose, normal, inertia, and
-debug geometry continues to consume the invalid quaternion directly. The
-fallback keeps bounds deterministic but cannot make the overall shape coherent.
-Dynamic cone initialization can subsequently reach grounding raycasts with a
-collapsed height and throw a deep `DivideByZeroException`, rather than rejecting
-the invalid rotation at admission.
-
-Resolve this at every public/authored/load rotation boundary with one explicit
-policy: reject non-unit rotations or normalize safely before publishing runtime
-state. Apply it consistently to standalone bodies, compound local rotations,
-host transforms, and replay population; preserve mesh rotation validation and
-add primitive/compound/replay regressions for zero, scaled, saturated, and
-near-unit quaternions. This does not block coverage convergence because Task 75
-pins the currently admitted fallback behavior without relying on it for valid
-rotations.
 
 ### Continuous-Collision Modes Accept Undefined Enum Values
 
@@ -272,6 +243,38 @@ does not block coverage convergence and is independent of the redundant
 active/dynamic-ID admission predicates removed in Task 67.
 
 ## Resolved Issues
+
+### Non-Unit Quaternion Admission Can Collapse Runtime Shape Axes
+
+**Resolved:** 2026-07-17  
+**Source:** 95%-to-100% coverage hardening, cone-bounds fallback review  
+**Affected area:** `SolidBody` rotation admission, compound-part local
+rotations, collider shape state, and replay/load population
+
+RCA: `FixedTransform` already scale-safely normalized host rotations, but
+`SolidBody.Initialize(...)`, public body rotation mutators, and Chronicler load
+wrote raw quaternions into authoritative body state. `CompoundColliderPart`
+likewise retained its raw local rotation. Operator-based shape transforms could
+therefore consume a collapsed axis while normalized basis helpers observed a
+different orientation, making bounds, normals, mass properties, queries, and
+diagnostics disagree.
+
+Fix: every public 3D body rotation admission and replay-load path now
+scale-safely normalizes before publishing authoritative or visual state.
+`CompoundColliderPart` normalizes its local rotation once at construction, so
+runtime parts and replay hashing share that exact stored orientation. Zero maps
+to identity, scaled and saturated inputs use FixedMathSharp's full-domain
+normalization, and already near-unit values retain their deterministic
+representation. Direct `PhysicsMesh` transform APIs remain intentionally
+strict and still reject non-normalized rotations; compound mesh parts reach
+that validation only after descriptor normalization.
+
+Verification: focused regressions cover zero, scaled, saturated, near-unit, and
+axis-collapsing quaternions across body initialization, public mutation, visual
+state, compound primitives, compound meshes, cone bounds, replay population,
+and direct mesh rejection. The full locally linked suites pass `2704/2704` in
+`Release` and `2665/2665` in `ReleaseLean`; Lean builds both `net8.0` and
+`netstandard2.1` and produces both packages with zero warnings.
 
 ### Registered Joints Can Outlive Their Body And Collider Lifetimes
 

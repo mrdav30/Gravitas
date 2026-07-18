@@ -194,7 +194,10 @@ body.Initialize(Vector3d.Zero, FixedQuaternion.Identity, isDynamic: true);
 
 Initialization binds the body and collider to `agent.Context`, allocates
 context-local body/collider IDs, calculates runtime shape data, and partitions
-the collider.
+the collider. `FixedTransform` and Gravitas body admission both preserve a
+normalized orientation invariant. Scaled or extreme finite quaternion inputs
+are scale-safely normalized, and a zero quaternion resolves to identity before
+runtime shape state is published.
 
 ### 2D Body
 

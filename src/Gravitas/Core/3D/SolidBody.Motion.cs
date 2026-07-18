@@ -196,10 +196,11 @@ public partial class SolidBody
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void SetRotation(FixedQuaternion quaternion)
     {
-        if (Rotation != quaternion)
+        FixedQuaternion normalizedRotation = quaternion.Normalized;
+        if (Rotation != normalizedRotation)
             Wake();
 
-        Rotation = quaternion;
+        Rotation = normalizedRotation;
     }
 
     private void ProcessMovable()

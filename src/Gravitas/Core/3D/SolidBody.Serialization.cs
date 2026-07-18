@@ -75,6 +75,7 @@ public partial class SolidBody
 
         if (chronicler.Mode == SerializationMode.Loading)
         {
+            _rotation = _rotation.Normalized;
             Active = active && Collider.Id >= 0;
             _freezeAxes = freezeAxes;
             _isKinematic = isKinematic;

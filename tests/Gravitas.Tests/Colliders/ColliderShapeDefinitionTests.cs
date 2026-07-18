@@ -77,7 +77,7 @@ public sealed class ColliderShapeDefinitionTests
     }
 
     [Fact]
-    public void ConeBounds_WithCollapsedNonUnitBodyRotation_ShouldUseDeterministicAxisFallback()
+    public void ConeBounds_WithCollapsedNonUnitBodyRotation_ShouldNormalizeBeforeBuildingShape()
     {
         Fixed64 component = FixedMath.Sqrt(Fixed64.Half);
         var collapsedRotation = new FixedQuaternion(
@@ -102,8 +102,10 @@ public sealed class ColliderShapeDefinitionTests
         body.UseManualGrounding();
         body.Initialize(Vector3d.Zero, collapsedRotation);
 
-        collider.BoundsMin.Should().Be(new Vector3d(-Fixed64.Half, Fixed64.Zero, -Fixed64.Half));
-        collider.BoundsMax.Should().Be(new Vector3d(Fixed64.Half, Fixed64.Zero, Fixed64.Half));
+        body.Rotation.Should().Be(collapsedRotation.Normalized);
+        collider.Axis.Should().Be(Vector3d.Down);
+        collider.BoundsMin.Should().Be(new Vector3d(-Fixed64.Half, -Fixed64.One, -Fixed64.Half));
+        collider.BoundsMax.Should().Be(new Vector3d(Fixed64.Half, Fixed64.One, Fixed64.Half));
     }
 
     [Fact]

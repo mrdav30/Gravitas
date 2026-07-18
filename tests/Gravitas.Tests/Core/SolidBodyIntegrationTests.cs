@@ -12,6 +12,43 @@ public sealed class SolidBodyIntegrationTests
 {
     private static readonly Fixed64 Tolerance = Fixed64.FromFraction(1, 1_000_000);
 
+    public static TheoryData<string, FixedQuaternion> RotationAdmissionCases => new()
+    {
+        { "zero", FixedQuaternion.Zero },
+        { "scaled", new FixedQuaternion(Fixed64.Zero, Fixed64.Zero, Fixed64.Zero, (Fixed64)2) },
+        { "saturated", new FixedQuaternion(Fixed64.MaxValue, Fixed64.MaxValue, Fixed64.MaxValue, Fixed64.MaxValue) },
+        { "near-unit", new FixedQuaternion(Fixed64.Epsilon, Fixed64.Zero, Fixed64.Zero, Fixed64.One) }
+    };
+
+    [Theory]
+    [MemberData(nameof(RotationAdmissionCases))]
+    public void PublicRotationAdmission_ShouldPublishOneNormalizedOrientation(
+        string _,
+        FixedQuaternion admittedRotation)
+    {
+        FixedQuaternion expected = admittedRotation.Normalized;
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero, admittedRotation);
+
+        body.Body.Rotation.Should().Be(expected);
+        body.Collider.Rotation.Should().Be(expected);
+        body.Body.RotationTransform.WorldRotation.Should().Be(expected);
+
+        body.Body.SetRotation(admittedRotation);
+        body.Body.Rotation.Should().Be(expected);
+
+        body.Body.UpdateRotation(admittedRotation, Fixed64.Zero);
+        body.Body.Rotation.Should().Be(expected);
+
+        body.Body.ResetPosition(Vector3d.Zero, admittedRotation);
+        body.Body.Rotation.Should().Be(expected);
+        body.Body.VisualRotation.Should().Be(expected);
+        body.Body.RotationTransform.WorldRotation.Should().Be(expected);
+
+        body.Body.SetVisualRotation(admittedRotation);
+        body.Body.VisualRotation.Should().Be(expected);
+    }
+
     [Fact]
     public void LateSimulate_ShouldIntegrateForceVelocityAndPosition()
     {

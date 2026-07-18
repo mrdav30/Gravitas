@@ -586,25 +586,26 @@ public sealed class PhysicsMeshScaleTests
     }
 
     [Fact]
-    public void CompoundWithNonNormalizedMeshPartRotation_ShouldRejectBeforeOwnerRegistration()
+    public void CompoundWithNonNormalizedMeshPartRotation_ShouldNormalizeBeforeOwnerRegistration()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        FixedQuaternion authoredRotation = new(Fixed64.Quarter, Fixed64.Zero, Fixed64.Zero, Fixed64.Half);
         LSMeshCollider cube = MeshTestFixtures.CreateConvexCube();
         var compound = new LSCompoundCollider(
             CompoundColliderPart.ConvexMesh(
                 cube.Mesh.LocalVertices.ToArray(),
                 cube.Mesh.Triangles.ToArray(),
                 Vector3d.Zero,
-                new FixedQuaternion(Fixed64.Quarter, Fixed64.Zero, Fixed64.Zero, Fixed64.Half),
+                authoredRotation,
                 Vector3d.One,
                 MeshInertiaPolicy.RequireClosedVolume));
 
-        Action initialize = () => compound.InitializeWithNoBody(new TestMatterAgent(context));
+        compound.InitializeWithNoBody(new TestMatterAgent(context));
 
-        initialize.Should().Throw<ArgumentException>().WithMessage("*normalized*");
-        compound.Id.Should().Be(-1);
-        compound.HasHostBinding.Should().BeFalse();
-        context.Physics.ColliderCount.Should().Be(0);
+        compound.Parts[0].LocalRotation.Should().Be(authoredRotation.Normalized);
+        compound.Id.Should().BeGreaterThanOrEqualTo(0);
+        compound.HasHostBinding.Should().BeTrue();
+        context.Physics.ColliderCount.Should().Be(1);
     }
 
     [Fact]

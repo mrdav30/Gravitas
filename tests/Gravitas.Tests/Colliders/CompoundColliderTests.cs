@@ -10,6 +10,43 @@ namespace Gravitas.Tests.Colliders;
 
 public sealed class CompoundColliderTests
 {
+    public static TheoryData<string, FixedQuaternion> RotationAdmissionCases => new()
+    {
+        { "zero", FixedQuaternion.Zero },
+        { "scaled", new FixedQuaternion(Fixed64.Zero, Fixed64.Zero, Fixed64.Zero, (Fixed64)2) },
+        { "saturated", new FixedQuaternion(Fixed64.MaxValue, Fixed64.MaxValue, Fixed64.MaxValue, Fixed64.MaxValue) },
+        { "near-unit", new FixedQuaternion(Fixed64.Epsilon, Fixed64.Zero, Fixed64.Zero, Fixed64.One) }
+    };
+
+    [Theory]
+    [MemberData(nameof(RotationAdmissionCases))]
+    public void CompoundPartRotationAdmission_ShouldPublishOneNormalizedOrientation(
+        string _,
+        FixedQuaternion admittedRotation)
+    {
+        FixedQuaternion expected = admittedRotation.Normalized;
+        CompoundColliderPart part = CompoundColliderPart.Cone(
+            Fixed64.Half,
+            (Fixed64)2,
+            Vector3d.Zero,
+            admittedRotation,
+            Vector3d.One);
+        var compound = new LSCompoundCollider(part);
+
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSCompoundCollider> body = scenario.CreateBody(
+            compound,
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            immovable: true);
+        var runtimePart = (LSConeCollider)body.Collider.GetPartCollider(0);
+
+        body.Collider.Parts[0].LocalRotation.Should().Be(expected);
+        runtimePart.CompoundLocalRotation.Should().Be(expected);
+        runtimePart.Rotation.Should().Be(expected);
+        runtimePart.Axis.IsNormalized().Should().BeTrue();
+    }
+
     [Fact]
     public void Initialize_WithUnderflowedPartWorldScale_ShouldRejectBeforeBinding()
     {

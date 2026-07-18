@@ -47,8 +47,10 @@ Runtime-owned state that should not be serialized:
 - 3D visual interpolation buffers and presentation-only rotation speed state.
 
 On load, bodies publish restored authoritative position and rotation into their
-existing host transform. 3D visual interpolation buffers reset from that
-authoritative state instead of being treated as replay truth.
+existing host transform. A restored 3D quaternion is scale-safely normalized
+before any runtime shape or host state observes it; a zero quaternion resolves
+to identity. 3D visual interpolation buffers reset from that authoritative
+state instead of being treated as replay truth.
 
 ## Recordable Types
 

@@ -614,13 +614,14 @@ public partial class SolidBody : IRecordable
         _lastGroundedPosition = _lastPosition = startPosition;
         _heightPosUnmarked = startPosition.Y;
 
+        FixedQuaternion normalizedRotation = startRotation.Normalized;
         _rotationChangedBuffer = true;
-        _rotation = startRotation;
+        _rotation = normalizedRotation;
 
         if (!IsKinematic)
         {
             _lastVisualPosition = _visualPosition = Position3d;
-            _visualRotation = startRotation;
+            _visualRotation = normalizedRotation;
             _lastVisualRotation = _visualRotation;
         }
 
@@ -713,7 +714,7 @@ public partial class SolidBody : IRecordable
         SetVisualPosition(resolvedPosition);
 
         Rotation = resolvedRotation;
-        SetVisualRotation(resolvedRotation);
+        StoreVisualRotation(resolvedRotation);
     }
 
 
@@ -771,7 +772,7 @@ public partial class SolidBody : IRecordable
             if (CanSetVisualPosition)
                 SetVisualPosition(Position3d);
             if (CanSetVisualRotation)
-                SetVisualRotation(_rotation);
+                StoreVisualRotation(_rotation);
         }
 
         if (CanSetVisualPosition)
@@ -857,10 +858,14 @@ public partial class SolidBody : IRecordable
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void SetVisualRotation(FixedQuaternion rot)
+    public void SetVisualRotation(FixedQuaternion rot) =>
+        StoreVisualRotation(rot.Normalized);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void StoreVisualRotation(FixedQuaternion rotation)
     {
         _lastVisualRotation = _visualRotation;
-        _visualRotation = rot;
+        _visualRotation = rotation;
     }
 
     public void UpdateRotation(FixedQuaternion targetRotation, Fixed64 bufferInterpolation)
@@ -869,7 +874,7 @@ public partial class SolidBody : IRecordable
         _rotationSpeed = Agent.IsInteracting
             ? InteractionRotationSpeed
             : DefaultRotationSpeed;
-        Rotation = targetRotation;
+        Rotation = targetRotation.Normalized;
     }
 
     /// <summary>
@@ -910,10 +915,11 @@ public partial class SolidBody : IRecordable
         _lastPosition = position;
         _lastVisualPosition = _visualPosition = position;
         SetPositionTransformWorldPosition(position);
-        Rotation = rotation;
+        FixedQuaternion normalizedRotation = rotation.Normalized;
+        Rotation = normalizedRotation;
 
-        _visualRotation = rotation;
-        SetRotationTransformWorldRotation(rotation);
+        _visualRotation = normalizedRotation;
+        SetRotationTransformWorldRotation(normalizedRotation);
 
         if (wasSleeping)
             RefreshPartitionAwakeState();

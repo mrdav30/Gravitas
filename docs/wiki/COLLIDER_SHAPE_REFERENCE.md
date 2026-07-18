@@ -77,6 +77,11 @@ Shape definitions should be used by importers, tooling, and offline-authored
 compound assets. Runtime collider shells own context binding, collider IDs,
 partition coordinates, pair state, events, and query stamps.
 
+`CompoundColliderPart` scale-safely normalizes its authored local rotation once
+at construction, with a zero quaternion resolving to identity. The stored value
+is therefore the single orientation consumed by bounds, mass properties,
+queries, diagnostics, and replay hashing.
+
 ## 3D Shape Families
 
 | Shape           | Runtime notes                                                                                                                                                                        |
@@ -206,6 +211,10 @@ triangle areas, total area, and selected mass properties. Invalid standalone
 meshes reject before collider registration. Compound owners prevalidate every
 mesh part before rebuilding any part, so a failed scale/rotation change cannot
 leave half-updated geometry.
+
+Direct `PhysicsMesh` transform APIs retain this strict validation contract.
+Compound-part authoring reaches the same mesh path only after
+`CompoundColliderPart` has normalized its stored local orientation.
 
 Source vertices, triangle indices, authored face normals, convex SAT edge
 topology, support topology, and the local triangle BVH are immutable and exposed

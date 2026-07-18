@@ -14,6 +14,36 @@ public sealed class SolidBodySerializationTests
 {
     public static TheoryData<GravitasSerializationTransport> Transports => GravitasSerializationTransportCases.All();
 
+    public static TheoryData<string, FixedQuaternion> RotationAdmissionCases => new()
+    {
+        { "zero", FixedQuaternion.Zero },
+        { "scaled", new FixedQuaternion(Fixed64.Zero, Fixed64.Zero, Fixed64.Zero, (Fixed64)2) },
+        { "saturated", new FixedQuaternion(Fixed64.MaxValue, Fixed64.MaxValue, Fixed64.MaxValue, Fixed64.MaxValue) },
+        { "near-unit", new FixedQuaternion(Fixed64.Epsilon, Fixed64.Zero, Fixed64.Zero, Fixed64.One) }
+    };
+
+    [Theory]
+    [MemberData(nameof(RotationAdmissionCases))]
+    public void RecordData_LoadingRotation_ShouldNormalizeBeforePublishingRuntimeState(
+        string _,
+        FixedQuaternion loadedRotation)
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
+        var chronicler = new InvalidRecordPayloadChronicler(new Dictionary<string, object>
+        {
+            ["Rotation"] = loadedRotation
+        });
+
+        body.Body.RecordData(chronicler);
+
+        FixedQuaternion expected = loadedRotation.Normalized;
+        body.Body.Rotation.Should().Be(expected);
+        body.Body.VisualRotation.Should().Be(expected);
+        body.Body.RotationTransform.WorldRotation.Should().Be(expected);
+        body.Collider.Rotation.Should().Be(expected);
+    }
+
     [Fact]
     public void RecordData_BeforeHostBinding_ShouldDeferShapeRebuildUntilInitialization()
     {

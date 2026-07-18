@@ -41,7 +41,7 @@ public readonly struct CompoundColliderPart
 
         Shape = shape;
         LocalOffset = localOffset;
-        LocalRotation = localRotation;
+        LocalRotation = localRotation.Normalized;
         LocalScale = localScale;
         _material = material ?? PhysicsMaterial.Default;
         _hasMaterial = material.HasValue;
@@ -63,7 +63,8 @@ public readonly struct CompoundColliderPart
 
     /// <summary>
     /// Gets the deterministic local rotation applied relative to the owning
-    /// compound collider.
+    /// compound collider. Authored values are scale-safely normalized; a zero
+    /// quaternion resolves to identity.
     /// </summary>
     public FixedQuaternion LocalRotation { get; }
 
