@@ -13,12 +13,14 @@ namespace Gravitas.Colliders;
 public enum MeshColliderMode : byte
 {
     /// <summary>
-    /// Mesh is intended to behave as a convex collision shape.
+    /// Mesh is validated as either one closed convex manifold shell or one open,
+    /// coplanar triangulation that fills a single convex polygon.
     /// </summary>
     Convex,
 
     /// <summary>
-    /// Mesh is allowed to be concave and should be treated as triangle collision data.
+    /// Mesh may contain arbitrary open or closed triangle surfaces and is treated as
+    /// authored triangle collision data rather than a support-mapped convex hull.
     /// </summary>
     Concave
 }

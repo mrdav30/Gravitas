@@ -298,19 +298,7 @@ public sealed class PhysicsMeshScaleTests
     [Fact]
     public void ScaledSupportTree_ShouldMatchAuthoredOrderBruteForce()
     {
-        var vertices = new Vector3d[40];
-        vertices[0] = Vector3d.Zero;
-        vertices[1] = Vector3d.Right;
-        vertices[2] = Vector3d.Up;
-        for (int i = 3; i < vertices.Length; i++)
-        {
-            vertices[i] = new Vector3d(
-                (Fixed64)(i - 20),
-                (Fixed64)((i * 7) % 11 - 5),
-                (Fixed64)((i * 13) % 17 - 8));
-        }
-
-        var mesh = new PhysicsMesh(vertices, new[] { 0, 1, 2 }, Vector3d.Zero, FixedQuaternion.Identity);
+        PhysicsMesh mesh = MeshTestFixtures.CreateConvexPolygonFan(40, (Fixed64)4).Mesh;
         mesh.UpdateTransform(
             new Vector3d((Fixed64)4, (Fixed64)(-3), (Fixed64)2),
             FixedQuaternion.FromEulerAnglesInDegrees((Fixed64)15, (Fixed64)25, (Fixed64)35),
@@ -668,19 +656,19 @@ public sealed class PhysicsMeshScaleTests
     }
 
     [Fact]
-    public void ScaleValidation_ShouldRejectUnusedVertexUnderflowAndTotalAreaSaturation()
+    public void ScaleValidation_ShouldRejectVertexUnderflowAndTotalAreaSaturation()
     {
         var mesh = new PhysicsMesh(
             new[]
             {
-                Vector3d.Zero,
+                new Vector3d(Fixed64.MinIncrement, Fixed64.Zero, Fixed64.Zero),
                 Vector3d.Right,
-                Vector3d.Up,
-                new Vector3d(Fixed64.MinIncrement, Fixed64.Zero, Fixed64.Zero)
+                Vector3d.Up
             },
             new[] { 0, 1, 2 },
             Vector3d.Zero,
-            FixedQuaternion.Identity);
+            FixedQuaternion.Identity,
+            MeshColliderMode.Concave);
         Action underflow = () => mesh.UpdateTransform(
             Vector3d.Zero,
             FixedQuaternion.Identity,
@@ -829,7 +817,8 @@ public sealed class PhysicsMeshScaleTests
             },
             new[] { 0, 1, 2, 3, 4, 5 },
             Vector3d.Zero,
-            FixedQuaternion.Identity);
+            FixedQuaternion.Identity,
+            MeshColliderMode.Concave);
 
     private static Vector3d[] CreateTetrahedronVertices() =>
         new[]

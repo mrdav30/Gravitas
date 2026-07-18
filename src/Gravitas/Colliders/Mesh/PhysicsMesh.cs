@@ -80,6 +80,12 @@ namespace Gravitas.Colliders
 
         public MeshColliderMode Mode { get; }
 
+        /// <summary>
+        /// Gets whether the complete exact-position-welded triangle topology is one
+        /// connected, consistently wound, closed two-manifold surface.
+        /// </summary>
+        public bool IsClosedSurface { get; private set; }
+
         private bool _faceNormalsValid;
         private readonly Vector3d[] _faceNormals;
         /// <summary>
@@ -184,15 +190,24 @@ namespace Gravitas.Colliders
             _triangleCount = triangles.Length / 3; // 3 vertices per triangle
             _triangleBVH = new SwiftFixedBVH<int>(2 * TriangleCount - 1);
             _faceNormals = new Vector3d[TriangleCount];
-            _convexSatEdgeVertexPairs = Mode == MeshColliderMode.Convex
-                ? CreateConvexSatEdgeVertexPairs(_localVertices, _triangles, _triangleCount)
-                : Array.Empty<int>();
-
             _scaledFaceAreas = new Fixed64[TriangleCount];
             _surfaceValidationFaceAreas = new Fixed64[TriangleCount];
             _scaledFaceNormals = new Vector3d[TriangleCount];
 
             _localBounds = CalculateBounds(_localVertices);
+            UpdateTransformation(position, rotation, Vector3d.One);
+
+            // Scale validation proves every vertex span and triangle cross product used
+            // by the exact topology predicates below is representable.
+            int[] topologyTriangles = CreateTopologyTriangles(_localVertices, _triangles);
+            _convexSatEdgeVertexPairs = Mode == MeshColliderMode.Convex
+                ? CreateConvexSatEdgeVertexPairs(_localVertices, topologyTriangles, _triangleCount)
+                : Array.Empty<int>();
+            if (Mode == MeshColliderMode.Concave)
+            {
+                IsClosedSurface = EvaluateClosedVolumeTopology(topologyTriangles, out _surfaceClosureValidationResult);
+            }
+
             if (Mode == MeshColliderMode.Convex && _localVertices.Length > SupportTreeVertexThreshold)
             {
                 _supportVertexIndices = CreateSupportVertexIndices(_localVertices.Length);
@@ -200,7 +215,6 @@ namespace Gravitas.Colliders
                 _supportTreeNodeCount = BuildSupportTreeNode(0, _localVertices.Length);
             }
 
-            UpdateTransformation(position, rotation, Vector3d.One);
             UpdateBounds();
         }
 
@@ -241,6 +255,7 @@ namespace Gravitas.Colliders
             int triangleCount = triangles.Length / 3;
             SwiftThrowHelper.ThrowIfArgumentOutOfRange(triangleCount > MaxTriangleCount, triangleCount, nameof(triangles), "Mesh exceeds the deterministic triangle limit.");
 
+            var referencedVertices = new bool[vertices.Length];
             for (int i = 0; i < triangleCount; i++)
             {
                 int index0 = triangles[i * 3];
@@ -258,7 +273,14 @@ namespace Gravitas.Colliders
 
                 Fixed64 area = CalculateTriangleArea(vertices[index0], vertices[index1], vertices[index0], vertices[index2]);
                 SwiftThrowHelper.ThrowIfArgument(area <= Fixed64.Epsilon, nameof(triangles), "Degenerate triangles are not supported.");
+
+                referencedVertices[index0] = true;
+                referencedVertices[index1] = true;
+                referencedVertices[index2] = true;
             }
+
+            for (int i = 0; i < referencedVertices.Length; i++)
+                SwiftThrowHelper.ThrowIfArgument(!referencedVertices[i], nameof(vertices), "Every mesh vertex must be referenced by at least one triangle.");
         }
 
         private static Fixed64 CalculateTriangleArea(
@@ -266,123 +288,6 @@ namespace Gravitas.Colliders
             Vector3d endEdgeA,
             Vector3d startEdgeB,
             Vector3d endEdgeB) => Vector3d.Cross(endEdgeA - startEdgeA, endEdgeB - startEdgeB).Magnitude * Fixed64.Half;
-
-        private static int[] CreateConvexSatEdgeVertexPairs(
-            Vector3d[] vertices,
-            int[] triangles,
-            int triangleCount)
-        {
-            var edgeUses = new EdgeUse[triangleCount * 3];
-            int edgeIndex = 0;
-            for (int i = 0; i < triangleCount; i++)
-            {
-                int triangleIndex = i * 3;
-                int index0 = triangles[triangleIndex];
-                int index1 = triangles[triangleIndex + 1];
-                int index2 = triangles[triangleIndex + 2];
-
-                edgeUses[edgeIndex++] = EdgeUse.Create(index0, index1, i);
-                edgeUses[edgeIndex++] = EdgeUse.Create(index1, index2, i);
-                edgeUses[edgeIndex++] = EdgeUse.Create(index2, index0, i);
-            }
-
-            Array.Sort(edgeUses, CompareEdgeUses);
-            int satEdgeCount = CountConvexSatEdges(edgeUses, vertices, triangles);
-            var edgeVertexPairs = new int[satEdgeCount * 2];
-            int pairIndex = 0;
-            for (int start = 0; start < edgeUses.Length;)
-            {
-                int end = FindEdgeUseGroupEnd(edgeUses, start);
-                if (ShouldIncludeConvexSatEdge(edgeUses, start, end, vertices, triangles))
-                {
-                    edgeVertexPairs[pairIndex++] = edgeUses[start].StartVertexIndex;
-                    edgeVertexPairs[pairIndex++] = edgeUses[start].EndVertexIndex;
-                }
-
-                start = end;
-            }
-
-            return edgeVertexPairs;
-        }
-
-        private static int CountConvexSatEdges(
-            EdgeUse[] edgeUses,
-            Vector3d[] vertices,
-            int[] triangles)
-        {
-            int count = 0;
-            for (int start = 0; start < edgeUses.Length;)
-            {
-                int end = FindEdgeUseGroupEnd(edgeUses, start);
-                if (ShouldIncludeConvexSatEdge(edgeUses, start, end, vertices, triangles))
-                    count++;
-
-                start = end;
-            }
-
-            return count;
-        }
-
-        private static int FindEdgeUseGroupEnd(EdgeUse[] edgeUses, int start)
-        {
-            long key = edgeUses[start].Key;
-            int end = start + 1;
-            while (end < edgeUses.Length && edgeUses[end].Key == key)
-                end++;
-
-            return end;
-        }
-
-        private static bool ShouldIncludeConvexSatEdge(
-            EdgeUse[] edgeUses,
-            int start,
-            int end,
-            Vector3d[] vertices,
-            int[] triangles)
-        {
-            if (end - start <= 1)
-                return true;
-
-            int edgeStart = edgeUses[start].StartVertexIndex;
-            int edgeEnd = edgeUses[start].EndVertexIndex;
-            Vector3d first = vertices[edgeStart];
-            Vector3d edge = vertices[edgeEnd] - first;
-            Vector3d firstOpposite = vertices[FindOppositeVertexIndex(
-                triangles,
-                edgeUses[start].TriangleIndex,
-                edgeStart,
-                edgeEnd)];
-            Vector3d firstFaceCross = Vector3d.Cross(edge, firstOpposite - first);
-            for (int i = start + 1; i < end; i++)
-            {
-                Vector3d nextOpposite = vertices[FindOppositeVertexIndex(
-                    triangles,
-                    edgeUses[i].TriangleIndex,
-                    edgeStart,
-                    edgeEnd)];
-                if (Vector3d.Dot(firstFaceCross, nextOpposite - first) != Fixed64.Zero)
-                    return true;
-            }
-
-            return false;
-        }
-
-        private static int FindOppositeVertexIndex(
-            int[] triangles,
-            int triangleIndex,
-            int edgeStart,
-            int edgeEnd)
-        {
-            int index = triangleIndex * 3;
-            int first = triangles[index];
-            if (first != edgeStart && first != edgeEnd)
-                return first;
-
-            int second = triangles[index + 1];
-            return second != edgeStart && second != edgeEnd
-                ? second
-                : triangles[index + 2];
-        }
 
         private static Vector3d CalculateLocalTriangleNormal(
             Vector3d[] vertices,
@@ -479,12 +384,16 @@ namespace Gravitas.Colliders
         /// Calculates solid closed-volume inertia for the supplied mass.
         /// This is a geometry/topology API; callers apply body mobility gates before requesting inertia.
         /// </summary>
-        private static int CompareEdgeUses(EdgeUse first, EdgeUse second) =>
-            first.Key < second.Key
-                ? -1
-                : first.Key > second.Key
-                    ? 1
-                    : 0;
+        private static int CompareEdgeUses(EdgeUse first, EdgeUse second)
+        {
+            if (first.Key != second.Key)
+                return first.Key < second.Key ? -1 : 1;
+
+            if (first.TriangleIndex == second.TriangleIndex)
+                return 0;
+
+            return first.TriangleIndex < second.TriangleIndex ? -1 : 1;
+        }
 
         public Fixed64 GetFrontalArea(Vector3d direction)
         {

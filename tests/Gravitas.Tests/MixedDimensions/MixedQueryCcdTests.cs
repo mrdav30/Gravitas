@@ -2953,7 +2953,7 @@ public sealed class MixedQueryCcdTests
                 new Vector3d(Fixed64.Zero, Fixed64.FromFraction(1, 4), (Fixed64)2)
             },
             new[] { 0, 1, 2, 3, 4, 5 },
-            MeshColliderMode.Convex,
+            MeshColliderMode.Concave,
             MeshInertiaPolicy.SurfaceApproximation);
         FixedQuaternion rotation = FixedQuaternion.FromEulerAnglesInDegrees(
             Fixed64.Zero,
@@ -5044,7 +5044,7 @@ public sealed class MixedQueryCcdTests
                 new Vector3d(Fixed64.One, Fixed64.One, Fixed64.Zero)
             },
             new[] { 0, 1, 2, 3, 4, 5, 6, 7, 8 },
-            MeshColliderMode.Convex,
+            MeshColliderMode.Concave,
             MeshInertiaPolicy.SurfaceApproximation);
     }
 
@@ -5061,7 +5061,7 @@ public sealed class MixedQueryCcdTests
                 new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.One)
             },
             new[] { 0, 1, 2, 3, 4, 5 },
-            MeshColliderMode.Convex,
+            MeshColliderMode.Concave,
             MeshInertiaPolicy.SurfaceApproximation);
     }
 

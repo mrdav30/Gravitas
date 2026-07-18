@@ -1533,7 +1533,7 @@ public sealed class CollisionDetectionShapePairTests
     }
 
     [Fact]
-    public void MeshSphere_WhenAcceptedMeshHasNoNearbyTriangle_ShouldUseBoundsSurfaceFallback()
+    public void MeshSphere_WithDisconnectedConcaveTriangles_ShouldNotUseBoundsAsSurface()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSMeshCollider> mesh = scenario.CreateBody(
@@ -1551,7 +1551,7 @@ public sealed class CollisionDetectionShapePairTests
                     new Vector3d((Fixed64)(-4), (Fixed64)(-3), (Fixed64)4)
                 },
                 new[] { 0, 1, 2, 3, 4, 5, 6, 7, 8 },
-                MeshColliderMode.Convex,
+                MeshColliderMode.Concave,
                 MeshInertiaPolicy.SurfaceApproximation),
             Vector3d.Zero,
             FixedQuaternion.Identity);
@@ -1559,14 +1559,9 @@ public sealed class CollisionDetectionShapePairTests
         Vector3d sphereCenter = boundsPoint + Vector3d.Right * Fixed64.FromFraction(1, 4);
         ScenarioBody<LSSphereCollider> sphere = scenario.CreateSphere(sphereCenter);
 
-        CollisionPair pair = AssertCollision(scenario, mesh.Collider, sphere.Collider, CollisionType.Mesh_Sphere);
-
         mesh.Collider.Bounds.ClosestPointOnSurface(sphereCenter).Should().Be(boundsPoint);
-        pair.Manifold.PrimaryContact.PointA.Should().Be(boundsPoint);
-        pair.Manifold.PrimaryContact.PointA.Should().NotBe(sphereCenter);
-        pair.Manifold.PrimaryContact.PointB.Should().Be(new Vector3d(Fixed64.FromFraction(15, 4), (Fixed64)4, (Fixed64)4));
-        pair.Manifold.PrimaryContact.Depth.Should().Be(Fixed64.FromFraction(1, 4));
-        pair.Manifold.PrimaryContact.Normal.Should().Be(Vector3d.Right);
+        Vector3d.Distance(boundsPoint, sphereCenter).Should().BeLessThan(sphere.Collider.ScaledRadius);
+        AssertNoCollision(scenario, mesh.Collider, sphere.Collider, CollisionType.Mesh_Sphere);
     }
 
     [Fact]

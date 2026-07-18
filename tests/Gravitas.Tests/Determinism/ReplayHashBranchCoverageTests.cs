@@ -1019,14 +1019,25 @@ public sealed partial class ReplayHashBranchCoverageTests
         Compound3DReplayVariant variant,
         PhysicsMaterial material)
     {
-        LSMeshCollider mesh = MeshTestFixtures.CreateConvexCube();
-        Vector3d[] vertices = mesh.Mesh.LocalVertices.ToArray();
+        Vector3d[] vertices =
+        {
+            Vector3d.Zero,
+            Vector3d.Right,
+            Vector3d.Up,
+            Vector3d.Forward
+        };
         if (variant == Compound3DReplayVariant.MeshVertex)
-            vertices[7] += new Vector3d(Fixed64.Zero, Fixed64.FromFraction(1, 4), Fixed64.Zero);
+            vertices[1] += Vector3d.Right * Fixed64.FromFraction(1, 4);
 
         return ColliderShapeDefinition.ConvexMesh(
             vertices,
-            mesh.Mesh.Triangles.ToArray(),
+            new[]
+            {
+                1, 2, 3,
+                0, 2, 1,
+                0, 1, 3,
+                0, 3, 2
+            },
             MeshInertiaPolicy.RequireClosedVolume,
             material);
     }

@@ -475,7 +475,7 @@ public sealed partial class GravitasQuery3DService
 
     private static Vector3d GetClosestSurfacePoint(LSCollider collider, Vector3d position)
     {
-        if (position == collider.Center)
+        if (position == collider.Center && collider is not LSMeshCollider)
             return collider.Center + Vector3d.Right * collider.ScaledRadius;
 
         return collider.ClosestPointOnSurface(position);

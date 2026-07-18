@@ -55,5 +55,10 @@ public enum MeshVolumeValidationResult
     /// <summary>
     /// The scaled center of mass or inertia moments exceed the representable fixed-point range.
     /// </summary>
-    NonRepresentableMassProperties = 8
+    NonRepresentableMassProperties = 8,
+
+    /// <summary>
+    /// At least one exact-position-welded vertex has multiple disconnected triangle fans.
+    /// </summary>
+    NonManifoldVertex = 9
 }

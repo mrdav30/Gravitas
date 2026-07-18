@@ -69,6 +69,38 @@ internal static class MeshTestFixtures
             mode,
             inertiaPolicy);
 
+    public static LSMeshCollider CreateConvexPolygonFan(
+        int boundaryVertexCount,
+        Fixed64 radius,
+        MeshInertiaPolicy inertiaPolicy = MeshInertiaPolicy.SurfaceApproximation)
+    {
+        if (boundaryVertexCount < 3)
+            throw new ArgumentOutOfRangeException(nameof(boundaryVertexCount));
+
+        var vertices = new Vector3d[boundaryVertexCount + 1];
+        var triangles = new int[boundaryVertexCount * 3];
+        vertices[0] = Vector3d.Zero;
+        for (int i = 0; i < boundaryVertexCount; i++)
+        {
+            Fixed64 angle = Fixed64.TwoPi * Fixed64.FromFraction(i, boundaryVertexCount);
+            vertices[i + 1] = new Vector3d(
+                FixedMath.Cos(angle) * radius,
+                FixedMath.Sin(angle) * radius,
+                Fixed64.Zero);
+
+            int triangleIndex = i * 3;
+            triangles[triangleIndex] = 0;
+            triangles[triangleIndex + 1] = i + 1;
+            triangles[triangleIndex + 2] = ((i + 1) % boundaryVertexCount) + 1;
+        }
+
+        return new LSMeshCollider(
+            vertices,
+            triangles,
+            MeshColliderMode.Convex,
+            inertiaPolicy);
+    }
+
     public static LSMeshCollider CreateInsideCorner(
         MeshColliderMode mode = MeshColliderMode.Concave,
         MeshInertiaPolicy inertiaPolicy = MeshInertiaPolicy.RequireClosedVolume)

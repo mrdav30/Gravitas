@@ -77,6 +77,21 @@ public sealed class MeshTriangleQueryAllocationTests
         results.Count.Should().BeGreaterThan(0);
     }
 
+    [Fact]
+    public void ClosestPointSearch_AfterWarmup_ShouldNotAllocate()
+    {
+        LSMeshCollider collider = MeshTestFixtures.CreateInsideCorner();
+        Vector3d queryPoint = new((Fixed64)20, (Fixed64)20, (Fixed64)20);
+        Vector3d expected = collider.ClosestPointOnSurface(queryPoint);
+        Vector3d actual = Vector3d.Zero;
+
+        long allocatedBytes = MeasureAllocatedBytes(() =>
+            actual = collider.ClosestPointOnSurface(queryPoint));
+
+        allocatedBytes.Should().Be(0);
+        actual.Should().Be(expected);
+    }
+
     private static long MeasureAllocatedBytes(Action action)
         => AllocationTestHelper.MeasureSinglePass(action);
 }

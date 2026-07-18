@@ -44,15 +44,13 @@ records follow with their original discovery context.
 ### Ordered Queue
 
 1. **Gravitas:**
-   [Convex Mesh Mode Accepts Disconnected Topology And Can Collide In Empty Bounds Space](#convex-mesh-mode-accepts-disconnected-topology-and-can-collide-in-empty-bounds-space).
-2. **Gravitas:**
    [Relative CCD Quadratic Saturation Can Miss Extreme-Range Crossings](#relative-ccd-quadratic-saturation-can-miss-extreme-range-crossings).
    Reuse the magnitude and normalization policy established by the resolved
    extreme-convex-sweep work when adding the separate scale-safe quadratic
    implementation.
-3. **Gravitas:**
+2. **Gravitas:**
    [3D CCD Handoff Callback Failure Can Abandon Queue Cleanup](#3d-ccd-handoff-callback-failure-can-abandon-queue-cleanup).
-4. **Gravitas:**
+3. **Gravitas:**
    [Rotational CCD Omits Dynamic And Mixed Targets](#rotational-ccd-omits-dynamic-and-mixed-targets).
 
 ### Relative CCD Quadratic Saturation Can Miss Extreme-Range Crossings
@@ -73,28 +71,6 @@ crossings, endpoint-adjacent hits, misses, and mixed CCD routing at the chosen
 boundary. This is distinct from conservative proxy-radius saturation and does
 not block coverage convergence because ordinary supported ranges and the current
 uncovered closing-speed boundary remain independently testable.
-
-### Convex Mesh Mode Accepts Disconnected Topology And Can Collide In Empty Bounds Space
-
-**Discovered:** 2026-07-11  
-**Source:** 95%-to-100% coverage hardening, mesh/sphere fallback review  
-**Affected area:** `PhysicsMesh` validation, `MeshColliderMode.Convex`, and
-convex mesh/sphere closest-surface fallback
-
-`PhysicsMesh.ValidateInput(...)` validates counts, indices, and nondegenerate
-triangles but does not validate the topology promised by
-`MeshColliderMode.Convex`. Disconnected triangles can therefore be accepted as a
-convex mesh. Near an empty corner of their combined AABB, the local triangle
-query can return no candidates and the convex mesh/sphere path falls back to the
-AABB surface, producing a contact where no authored triangle exists.
-
-Open convex surfaces are supported intentionally, so requiring every convex mesh
-to be a closed volume would reject valid floors and other planar assets. Resolve
-this with an explicit semantic decision: either validate a documented
-connected/convex open-or-closed topology contract, or change the empty-query
-fallback so invalid topology cannot create an empty-space contact. Add a
-regression that preserves valid open convex surfaces while rejecting or safely
-handling disconnected input without the AABB false-positive.
 
 ### 3D CCD Handoff Callback Failure Can Abandon Queue Cleanup
 
@@ -145,6 +121,56 @@ Add pure 2D, pure 3D, both mixed source directions, dynamic handoff, replay, and
 allocation regressions.
 
 ## Resolved Issues
+
+### Convex Mesh Mode Accepted Invalid Topology And Could Collide In Empty Bounds Space
+
+**Resolved:** 2026-07-18  
+**Source:** 95%-to-100% coverage hardening, mesh/sphere fallback review  
+**Affected area:** mesh topology admission, closed-surface identity, exact
+surface queries, collision dispatch, and full-domain fixed-point predicates
+
+RCA: `MeshColliderMode.Convex` was only a label. Disconnected, concave, folded,
+or otherwise invalid triangle sets could enter convex collision paths, while an
+empty local BVH query let mesh/sphere contacts substitute the mesh AABB for
+authored geometry. Saturating cross, triple-product, and squared-distance
+operations also could not prove topology or nearest-surface ordering over the
+full Q32.32 domain.
+
+Fix: `Convex` now admits exactly one connected closed convex two-manifold shell
+or one connected open coplanar triangulation that fills a single convex polygon.
+Construction uses a deterministic exact-position-welded topology view while
+preserving authored vertices and triangle order. It rejects unused vertices,
+duplicate faces, disconnected components or vertex links, edge
+non-manifoldness, inconsistent winding, reflex closed edges, and open folds,
+holes, or overlaps. `Concave` remains the explicit arbitrary open, closed, or
+disconnected surface mode. Both modes expose cached `IsClosedSurface` topology,
+including exact seam handling and pinched-vertex rejection.
+
+Closest-surface queries now seed an authored triangle, prove a conservative BVH
+search cube from that exact upper bound, and fall back to a stable full scan only
+when the bound is unrepresentable. Exact FixedMathSharp orientation,
+triple-product, and squared-distance predicates prevent saturation from changing
+validation or selection. Equal-distance winners use authored triangle index,
+including exact shared-feature hits with different normals. Mesh/sphere and
+circle queries no longer use AABB geometry, and the misleading public mesh
+point-named support helper was removed.
+
+Verification:
+
+- Added adversarial regressions for disconnected, duplicate, non-manifold,
+  pinched, reflex, folded, overlapping, holed, seam-welded, full-domain, global
+  nearest, and authored-tie cases across construction, collision, queries,
+  replay, scaling, and allocation contracts.
+- The final independent review reproduced and then approved the authored-index
+  exact-hit correction with no remaining findings.
+- The full Release suite passed all 2,771 tests. Instrumented focused coverage
+  reports 100% line and branch coverage for the new topology validator, mesh
+  core, mass properties, and mesh collision dispatch; uninstrumented allocation
+  regressions remain green.
+- Closed-mesh construction remains deterministic and construction-only. The
+  final `BuildAndValidateClosedVolume` means were `18.74 us`, `1.795 ms`, and
+  `7.246 ms` for subdivision levels `1`, `8`, and `16`, allocating `10.25 KB`,
+  `557.9 KB`, and `2,222.99 KB` respectively.
 
 ### Rotational CCD Could Miss Contacts Between Bounded Pose Samples
 

@@ -230,7 +230,7 @@ public sealed class LSMeshColliderQueryTests
     }
 
     [Fact]
-    public void SurfaceQueries_WhenBvhNeighborhoodIsEmpty_ShouldFallBackToBounds()
+    public void SurfaceQueries_WhenBvhNeighborhoodIsEmpty_ShouldScanAuthoredTriangles()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         LSMeshCollider mesh = CreateDisconnectedCornerMesh();
@@ -238,10 +238,164 @@ public sealed class LSMeshColliderQueryTests
             context,
             new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)));
         Vector3d queryPoint = new((Fixed64)20, (Fixed64)(-20), (Fixed64)20);
-        Vector3d expectedClosest = new((Fixed64)10, (Fixed64)(-10), (Fixed64)9);
+        Vector3d expectedClosest = new((Fixed64)10, (Fixed64)9, (Fixed64)9);
 
         mesh.ClosestPointOnSurface(queryPoint).Should().Be(expectedClosest);
-        mesh.GetNormalAtPoint(queryPoint).Should().Be(queryPoint.Normalized);
+        mesh.GetNormalAtPoint(queryPoint).Should().Be(Vector3d.Forward);
+    }
+
+    [Fact]
+    public void SurfaceQueries_WhenAllRoundedDistancesSaturate_ShouldKeepTheExactlyClosestTriangle()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        var mesh = new LSMeshCollider(
+            new[]
+            {
+                new Vector3d((Fixed64)(-9), (Fixed64)(-9), (Fixed64)(-9)),
+                new Vector3d((Fixed64)(-10), (Fixed64)(-9), (Fixed64)(-9)),
+                new Vector3d((Fixed64)(-9), (Fixed64)(-10), (Fixed64)(-9)),
+                new Vector3d((Fixed64)9, (Fixed64)9, (Fixed64)9),
+                new Vector3d((Fixed64)10, (Fixed64)9, (Fixed64)9),
+                new Vector3d((Fixed64)9, (Fixed64)10, (Fixed64)9)
+            },
+            new[] { 0, 1, 2, 3, 4, 5 },
+            MeshColliderMode.Concave,
+            MeshInertiaPolicy.SurfaceApproximation);
+        mesh.InitializeWithNoBody(new TestMatterAgent(
+            context,
+            new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)));
+        Vector3d queryPoint = new(Fixed64.MaxValue, Fixed64.MinValue, Fixed64.MaxValue);
+
+        Vector3d closest = mesh.ClosestPointOnSurface(queryPoint);
+
+        closest.X.Should().BeGreaterThan(Fixed64.Zero);
+        closest.Z.Should().Be((Fixed64)9);
+    }
+
+    [Fact]
+    public void ClosestPointOnSurface_WhenInitialBvhNeighborhoodOmitsCloserTriangle_ShouldExpandFromExactUpperBound()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        var mesh = new LSMeshCollider(
+            new[]
+            {
+                new Vector3d((Fixed64)4, Fixed64.Zero, Fixed64.Zero),
+                new Vector3d((Fixed64)4, (Fixed64)(-5), Fixed64.Zero),
+                new Vector3d((Fixed64)4, Fixed64.Zero, (Fixed64)(-5)),
+                new Vector3d((Fixed64)10, (Fixed64)5, (Fixed64)5),
+                new Vector3d(Fixed64.FromFraction(99, 10), (Fixed64)5, (Fixed64)5),
+                new Vector3d((Fixed64)10, Fixed64.FromFraction(49, 10), (Fixed64)5)
+            },
+            new[] { 0, 1, 2, 3, 4, 5 },
+            MeshColliderMode.Concave,
+            MeshInertiaPolicy.SurfaceApproximation);
+        mesh.InitializeWithNoBody(new TestMatterAgent(
+            context,
+            new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)));
+
+        Vector3d closest = mesh.ClosestPointOnSurface(
+            new Vector3d((Fixed64)11, Fixed64.Zero, Fixed64.Zero));
+
+        closest.Should().Be(new Vector3d((Fixed64)4, Fixed64.Zero, Fixed64.Zero));
+    }
+
+    [Fact]
+    public void ClosestPointOnSurface_WhenUpperBoundSaturates_ShouldUseFullAuthoredScan()
+    {
+        Fixed64 offset = new(1_500_000_000);
+        Vector3d nearby = new(offset, offset, Fixed64.Zero);
+        var mesh = new LSMeshCollider(
+            new[]
+            {
+                Vector3d.Zero,
+                Vector3d.Right,
+                Vector3d.Up,
+                nearby,
+                nearby + Vector3d.Right,
+                nearby + Vector3d.Up
+            },
+            new[] { 0, 1, 2, 3, 4, 5 },
+            MeshColliderMode.Concave,
+            MeshInertiaPolicy.RequireClosedVolume);
+
+        Vector3d closest = mesh.ClosestPointOnSurface(nearby + Vector3d.Forward);
+
+        closest.Should().Be(nearby);
+    }
+
+    [Fact]
+    public void SurfaceQueries_WhenFirstTriangleIsWithinEpsilon_ShouldContinueToLaterExactHit()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        Fixed64 nearOffset = -Fixed64.Epsilon;
+        var mesh = new LSMeshCollider(
+            new[]
+            {
+                new Vector3d(-Fixed64.One, -Fixed64.One, nearOffset),
+                new Vector3d(Fixed64.One, -Fixed64.One, nearOffset),
+                new Vector3d(Fixed64.Zero, Fixed64.One, nearOffset),
+                new Vector3d(-Fixed64.One, -Fixed64.One, Fixed64.Zero),
+                new Vector3d(Fixed64.One, -Fixed64.One, Fixed64.Zero),
+                new Vector3d(Fixed64.Zero, Fixed64.One, Fixed64.Zero)
+            },
+            new[] { 0, 1, 2, 3, 4, 5 },
+            MeshColliderMode.Concave,
+            MeshInertiaPolicy.SurfaceApproximation);
+        mesh.InitializeWithNoBody(new TestMatterAgent(
+            context,
+            new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)));
+
+        Vector3d closest = mesh.ClosestPointOnSurface(Vector3d.Zero);
+
+        closest.Should().Be(Vector3d.Zero);
+    }
+
+    [Fact]
+    public void GetNormalAtPoint_WithMultipleExactTriangles_ShouldUseLowestAuthoredTriangleIndex()
+    {
+        var mesh = new LSMeshCollider(
+            new[]
+            {
+                new Vector3d(-Fixed64.One, -Fixed64.One, (Fixed64)10),
+                new Vector3d(Fixed64.One, -Fixed64.One, (Fixed64)10),
+                new Vector3d(Fixed64.Zero, Fixed64.One, (Fixed64)10),
+                new Vector3d(-Fixed64.One, -Fixed64.One, Fixed64.Zero),
+                new Vector3d(Fixed64.One, -Fixed64.One, Fixed64.Zero),
+                new Vector3d(Fixed64.Zero, Fixed64.One, Fixed64.Zero),
+                new Vector3d(Fixed64.Zero, -Fixed64.One, -Fixed64.One),
+                new Vector3d(Fixed64.Zero, Fixed64.One, -Fixed64.One),
+                new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.One)
+            },
+            new[] { 0, 1, 2, 3, 4, 5, 6, 7, 8 },
+            MeshColliderMode.Concave,
+            MeshInertiaPolicy.RequireClosedVolume);
+
+        Vector3d normal = mesh.GetNormalAtPoint(Vector3d.Zero);
+
+        normal.Should().Be(Vector3d.Forward);
+    }
+
+    [Fact]
+    public void ClosestPointOnSurface_WithPointOnTriangle_ShouldReturnExactPoint()
+    {
+        LSMeshCollider mesh = CreateTriangleMesh();
+        Vector3d point = new(Fixed64.Quarter, Fixed64.Quarter, Fixed64.Zero);
+
+        Vector3d closest = mesh.ClosestPointOnSurface(point);
+
+        closest.Should().Be(point);
+    }
+
+    [Fact]
+    public void TryGetPlanarSurfaceNormal_ShouldReturnAuthoredTriangleNormal()
+    {
+        LSMeshCollider mesh = CreateTriangleMesh();
+        Vector3d point = new(Fixed64.Quarter, Fixed64.Quarter, Fixed64.One);
+
+        bool found = mesh.TryGetPlanarSurfaceNormal(point, out Vector3d normal);
+
+        found.Should().BeTrue();
+        normal.Should().Be(Vector3d.Forward);
     }
 
     [Fact]
@@ -351,7 +505,7 @@ public sealed class LSMeshColliderQueryTests
                 new Vector3d(Fixed64.Zero, Fixed64.One, (Fixed64)4)
             },
             new[] { 0, 1, 2, 3, 4, 5 },
-            MeshColliderMode.Convex,
+            MeshColliderMode.Concave,
             MeshInertiaPolicy.SurfaceApproximation);
 
     private static LSMeshCollider CreateDisconnectedCornerMesh() =>

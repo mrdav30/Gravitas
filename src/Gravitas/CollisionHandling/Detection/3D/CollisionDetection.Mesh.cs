@@ -27,13 +27,12 @@ public static partial class CollisionDetection
                 sphere,
                 pair.Context.CollisionScratch.MeshTriangleCandidatesA);
 
-        Vector3d closestPointOnMesh = meshCollider.TryFindClosestPointOnSurface(
+        meshCollider.FindClosestPointOnSurface(
             sphere.Center,
             pair.Context.CollisionScratch.MeshTriangleCandidatesA,
             out Vector3d closest,
-            out Vector3d surfaceNormal)
-                ? closest
-                : meshCollider.Bounds.ClosestPointOnSurface(sphere.Center);
+            out Vector3d surfaceNormal);
+        Vector3d closestPointOnMesh = closest;
         Vector3d penetrationVector = sphere.Center - closestPointOnMesh;
         Fixed64 distanceSquared = penetrationVector.MagnitudeSquared;
         if (distanceSquared > sphere.ScaledRadiusSqr)
@@ -384,9 +383,9 @@ public static partial class CollisionDetection
     /// <returns>true if the colliders intersect; otherwise, false.</returns>
     private static bool DoMeshesCheck(CollisionWorkItem pair)
     {
-        if (pair.ColliderA is LSMeshCollider meshA
-            && pair.ColliderB is LSMeshCollider meshB
-            && (meshA.Mode == MeshColliderMode.Concave || meshB.Mode == MeshColliderMode.Concave))
+        var meshA = (LSMeshCollider)pair.ColliderA;
+        var meshB = (LSMeshCollider)pair.ColliderB;
+        if (meshA.Mode == MeshColliderMode.Concave || meshB.Mode == MeshColliderMode.Concave)
         {
             return MeshTriangleContactGenerator.TryBuildMeshMeshManifold(
                 pair,
@@ -481,9 +480,7 @@ public static partial class CollisionDetection
 
     private static (Vector3d Point1, Vector3d Point2) FindInitialPointsOfContact(LSMeshCollider mesh1, LSMeshCollider mesh2)
     {
-        // Find the closest points on the actual mesh surface, not just the bounding box
-        Vector3d support1 = mesh1.GetSupportPoint(mesh2.Center);
-        Vector3d pointOfContactA = mesh1.ClosestPointOnSurface(support1);
+        Vector3d pointOfContactA = mesh1.ClosestPointOnSurface(mesh2.Center);
         return (pointOfContactA, mesh2.ClosestPointOnSurface(pointOfContactA));
     }
 

@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using FixedMathSharp.Bounds;
 using Gravitas.Queries;
 using SwiftCollections;
 using SwiftCollections.Query;
@@ -26,6 +27,12 @@ public class LSMeshCollider : LSCollider
     public PhysicsMesh Mesh { get; private set; }
 
     public MeshColliderMode Mode => Mesh.Mode;
+
+    /// <summary>
+    /// Gets whether the mesh's exact-position-welded triangle topology is one
+    /// connected, consistently wound, closed two-manifold surface.
+    /// </summary>
+    public bool IsClosedSurface => Mesh.IsClosedSurface;
 
     /// <summary>
     /// Determines how inertia is derived when this mesh collider is attached to a body with angular dynamics.
@@ -155,21 +162,49 @@ public class LSMeshCollider : LSCollider
 
     public override Vector3d ClosestPointOnSurface(Vector3d queryPoint)
     {
-        return TryFindClosestPointOnSurface(queryPoint, _triangleQueryBuffer, out Vector3d closest, out _)
-            ? closest
-            : Bounds.ClosestPointOnSurface(queryPoint);
+        FindClosestPointOnSurface(queryPoint, _triangleQueryBuffer, out Vector3d closest, out _);
+        return closest;
     }
 
-    public bool TryFindClosestPointOnSurface(
+    internal void FindClosestPointOnSurface(
         Vector3d queryPoint,
         SwiftList<int> triangleBuffer,
         out Vector3d closest,
         out Vector3d normal)
     {
-        Vector3d boundedPoint = Bounds.ClosestPointOnSurface(queryPoint);
-        FixedBoundVolume queryBounds = CreateQueryBounds(boundedPoint, GetMeshQueryHalfExtent());
+        closest = queryPoint;
+        normal = Vector3d.Zero;
+        int closestTriangleIndex = -1;
+        _ = KeepClosestPointOnTriangle(
+            0,
+            queryPoint,
+            ref closestTriangleIndex,
+            ref closest,
+            ref normal);
+        if (closest == queryPoint)
+            return;
+
+        if (!TryCreateClosestPointSearchBounds(queryPoint, closest, out FixedBoundVolume queryBounds))
+        {
+            FindClosestPointAcrossAllTriangles(
+                queryPoint,
+                1,
+                ref closestTriangleIndex,
+                ref closest,
+                ref normal);
+            return;
+        }
+
         Mesh.GetTrianglesInWorldBounds(queryBounds, triangleBuffer);
-        return TryFindClosestPointToTriangles(triangleBuffer, queryPoint, out closest, out normal);
+        for (int i = 0; i < triangleBuffer.Count; i++)
+        {
+            _ = KeepClosestPointOnTriangle(
+                triangleBuffer[i],
+                queryPoint,
+                ref closestTriangleIndex,
+                ref closest,
+                ref normal);
+        }
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -210,64 +245,96 @@ public class LSMeshCollider : LSCollider
         return definition.MeshInertiaPolicy;
     }
 
-    private bool TryFindClosestPointToTriangles(
-        SwiftList<int> indices,
+    private static bool TryCreateClosestPointSearchBounds(
         Vector3d point,
-        out Vector3d closest,
-        out Vector3d normal)
+        Vector3d closest,
+        out FixedBoundVolume bounds)
     {
-        Fixed64 minDistance = Fixed64.MaxValue;
-        closest = point;
-        normal = Vector3d.Zero;
-        bool found = false;
-
-        for (int i = 0; i < indices.Count; i++)
+        if (!Vector3d.TrySubtract(point, closest, out Vector3d delta)
+            || delta.X == Fixed64.MinValue
+            || delta.Y == Fixed64.MinValue
+            || delta.Z == Fixed64.MinValue)
         {
-            int index = indices[i]; // index of the triangle
-            Mesh.GetTriangleVertices(index, out Vector3d first, out Vector3d second, out Vector3d third);
-            Vector3d faceNormal = Mesh.GetFaceNormalWorld(index);
-            Vector3d pointOnTriangle = MeshUtils.ClosestPointOnTriangle(first, second, third, faceNormal, point);
-            Fixed64 distance = Vector3d.DistanceSquared(point, pointOnTriangle);
-            if (distance < minDistance)
+            bounds = default;
+            return false;
+        }
+
+        Vector3d absoluteDelta = Vector3d.Abs(delta);
+        Fixed64 halfExtent = absoluteDelta.X
+            + absoluteDelta.Y
+            + absoluteDelta.Z
+            + Fixed64.Epsilon;
+        if (halfExtent == Fixed64.MaxValue)
+        {
+            bounds = default;
+            return false;
+        }
+
+        Vector3d extents = Vector3d.One * halfExtent;
+        Vector3d min = point - extents;
+        Vector3d max = point + extents;
+        bounds = new FixedBoundVolume(min, max);
+        return true;
+    }
+
+    private void FindClosestPointAcrossAllTriangles(
+        Vector3d point,
+        int startTriangleIndex,
+        ref int closestTriangleIndex,
+        ref Vector3d closest,
+        ref Vector3d normal)
+    {
+        for (int i = startTriangleIndex; i < Mesh.TriangleCount; i++)
+        {
+            _ = KeepClosestPointOnTriangle(
+                i,
+                point,
+                ref closestTriangleIndex,
+                ref closest,
+                ref normal);
+        }
+    }
+
+    private bool KeepClosestPointOnTriangle(
+        int triangleIndex,
+        Vector3d point,
+        ref int closestTriangleIndex,
+        ref Vector3d closest,
+        ref Vector3d normal)
+    {
+        Mesh.GetTriangleVertices(triangleIndex, out Vector3d first, out Vector3d second, out Vector3d third);
+        Vector3d faceNormal = Mesh.GetFaceNormalWorld(triangleIndex);
+        Vector3d pointOnTriangle = new FixedTriangle(first, second, third).ClosestPoint(point);
+        if (closestTriangleIndex >= 0)
+        {
+            int distanceComparison = Vector3d.CompareDistanceSquared(
+                point,
+                pointOnTriangle,
+                point,
+                closest);
+            if (distanceComparison > 0
+                || (distanceComparison == 0 && triangleIndex >= closestTriangleIndex))
             {
-                minDistance = distance;
-                closest = pointOnTriangle;
-                normal = OrientNormalTowardPoint(faceNormal, point - pointOnTriangle);
-                found = true;
-                if (minDistance < Fixed64.Epsilon)
-                    break;
+                return false;
             }
         }
 
-        return found;
+        closestTriangleIndex = triangleIndex;
+        closest = pointOnTriangle;
+        normal = OrientNormalTowardPoint(faceNormal, point - pointOnTriangle);
+        return true;
     }
 
-    public override Vector3d GetNormalAtPoint(Vector3d point) =>
-        TryFindClosestPointOnSurface(point, _triangleQueryBuffer, out _, out Vector3d normal)
-            ? normal
-            : (point - Center).Normalized;
-
-    internal override bool TryGetPlanarSurfaceNormal(Vector3d point, out Vector3d normal) =>
-        TryFindClosestPointOnSurface(point, _triangleQueryBuffer, out _, out normal);
-
-    public Vector3d GetSupportPoint(Vector3d point)
+    public override Vector3d GetNormalAtPoint(Vector3d point)
     {
-        Vector3d closestPoint = Bounds.ClosestPointOnSurface(point);
-        Fixed64 minDistance = Fixed64.MaxValue;
-        Vector3d nearestPoint = closestPoint;
+        FindClosestPointOnSurface(point, _triangleQueryBuffer, out _, out Vector3d normal);
+        return normal;
+    }
 
-        // Iterate through all vertices of the mesh to find the closest point
-        for (int i = 0; i < Mesh.VertexCount; i++)
-        {
-            Vector3d worldVertex = Mesh.GetVertexWorld(i);
-            Fixed64 distance = Vector3d.DistanceSquared(worldVertex, point);
-            if (distance >= minDistance) continue;
-
-            minDistance = distance;
-            nearestPoint = worldVertex;
-        }
-
-        return nearestPoint;
+    internal override bool TryGetPlanarSurfaceNormal(Vector3d point, out Vector3d normal)
+    {
+        FindClosestPointOnSurface(point, _triangleQueryBuffer, out _, out normal);
+        return true;
     }
 
     public override bool ColliderOverlapsRay(RaycastSegmentWorker worker, ref SwiftList<Vector3d> outputIntersectionPoints)

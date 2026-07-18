@@ -56,6 +56,319 @@ public sealed class PhysicsMeshTests
     }
 
     [Fact]
+    public void Constructor_ConvexMode_ShouldRejectDisconnectedTriangleTopology()
+    {
+        Action create = () => _ = new PhysicsMesh(
+            new[]
+            {
+                Vector3d.Zero,
+                Vector3d.Right,
+                Vector3d.Up,
+                new Vector3d((Fixed64)4, Fixed64.Zero, Fixed64.Zero),
+                new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero),
+                new Vector3d((Fixed64)4, Fixed64.One, Fixed64.Zero)
+            },
+            new[] { 0, 1, 2, 3, 4, 5 },
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            MeshColliderMode.Convex);
+
+        create.Should().Throw<ArgumentException>()
+            .WithParameterName("triangles")
+            .WithMessage("*connected*");
+    }
+
+    [Fact]
+    public void Constructor_ConcaveMode_ShouldAllowDisconnectedTriangleTopology()
+    {
+        Action create = () => _ = new PhysicsMesh(
+            new[]
+            {
+                Vector3d.Zero,
+                Vector3d.Right,
+                Vector3d.Up,
+                new Vector3d((Fixed64)4, Fixed64.Zero, Fixed64.Zero),
+                new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero),
+                new Vector3d((Fixed64)4, Fixed64.One, Fixed64.Zero)
+            },
+            new[] { 0, 1, 2, 3, 4, 5 },
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            MeshColliderMode.Concave);
+
+        create.Should().NotThrow();
+    }
+
+    [Fact]
+    public void Constructor_ConvexMode_ShouldRejectBoundaryBranches()
+    {
+        Action create = () => _ = new PhysicsMesh(
+            new[]
+            {
+                Vector3d.Zero,
+                Vector3d.Right,
+                Vector3d.Up,
+                Vector3d.Left,
+                Vector3d.Down
+            },
+            new[] { 0, 1, 2, 0, 3, 4 },
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            MeshColliderMode.Convex);
+
+        create.Should().Throw<ArgumentException>()
+            .WithParameterName("triangles")
+            .WithMessage("*boundary loop*");
+    }
+
+    [Fact]
+    public void Constructor_ConvexMode_ShouldRejectConcavePlanarSurface()
+    {
+        Action create = () => _ = new PhysicsMesh(
+            new[]
+            {
+                new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.Zero),
+                new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.Zero),
+                new Vector3d((Fixed64)2, Fixed64.One, Fixed64.Zero),
+                new Vector3d(Fixed64.One, Fixed64.One, Fixed64.Zero),
+                new Vector3d(Fixed64.One, (Fixed64)2, Fixed64.Zero),
+                new Vector3d(Fixed64.Zero, (Fixed64)2, Fixed64.Zero)
+            },
+            new[]
+            {
+                0, 1, 3,
+                1, 2, 3,
+                0, 3, 5,
+                3, 4, 5
+            },
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            MeshColliderMode.Convex);
+
+        create.Should().Throw<ArgumentException>()
+            .WithParameterName("triangles")
+            .WithMessage("*convex boundary*");
+    }
+
+    [Fact]
+    public void Constructor_ConvexMode_ShouldRejectSelfOverlappingPlanarBoundary()
+    {
+        Action create = () => _ = new PhysicsMesh(
+            new[]
+            {
+                Vector3d.Zero,
+                new Vector3d(Fixed64.Zero, (Fixed64)3, Fixed64.Zero),
+                new Vector3d((Fixed64)2, (Fixed64)(-3), Fixed64.Zero),
+                new Vector3d((Fixed64)(-3), Fixed64.One, Fixed64.Zero),
+                new Vector3d((Fixed64)3, Fixed64.One, Fixed64.Zero),
+                new Vector3d((Fixed64)(-2), (Fixed64)(-3), Fixed64.Zero)
+            },
+            new[]
+            {
+                0, 1, 2,
+                0, 2, 3,
+                0, 3, 4,
+                0, 4, 5,
+                0, 5, 1
+            },
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            MeshColliderMode.Convex);
+
+        create.Should().Throw<ArgumentException>()
+            .WithParameterName("triangles")
+            .WithMessage("*convex boundary*");
+    }
+
+    [Fact]
+    public void Constructor_ConvexMode_ShouldRejectFoldedFillInsideConvexBoundary()
+    {
+        Action create = () => _ = new PhysicsMesh(
+            new[]
+            {
+                new Vector3d((Fixed64)3, Fixed64.One, Fixed64.Zero),
+                Vector3d.Zero,
+                new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.Zero),
+                new Vector3d((Fixed64)2, (Fixed64)2, Fixed64.Zero),
+                new Vector3d(Fixed64.Zero, (Fixed64)2, Fixed64.Zero)
+            },
+            new[]
+            {
+                0, 1, 2,
+                0, 2, 3,
+                0, 3, 4,
+                0, 4, 1
+            },
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            MeshColliderMode.Convex);
+
+        create.Should().Throw<ArgumentException>()
+            .WithParameterName("triangles")
+            .WithMessage("*without holes, overlap, or folds*");
+    }
+
+    [Fact]
+    public void IsClosedSurface_WithPinchedVertexLink_ShouldRejectClosedVolume()
+    {
+        Fixed64 half = Fixed64.Half;
+        var mesh = new PhysicsMesh(
+            new[]
+            {
+                new Vector3d(-half, -half, -half),
+                new Vector3d(half, -half, -half),
+                new Vector3d(-half, half, -half),
+                new Vector3d(half, half, -half),
+                new Vector3d(-half, -half, half),
+                new Vector3d(half, -half, half),
+                new Vector3d(-half, half, half),
+                new Vector3d(-half, -half, -half)
+            },
+            CubeTriangles(),
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            MeshColliderMode.Concave);
+
+        bool valid = mesh.TryGetClosedVolumeMassProperties(
+            out _,
+            out MeshVolumeValidationResult result);
+
+        mesh.IsClosedSurface.Should().BeFalse();
+        valid.Should().BeFalse();
+        result.Should().Be(MeshVolumeValidationResult.NonManifoldVertex);
+    }
+
+    [Fact]
+    public void Constructor_ConvexMode_ShouldRejectDentedClosedShell()
+    {
+        Vector3d[] vertices = CubeVertices();
+        vertices[7] = Vector3d.Zero;
+
+        Action create = () => _ = new PhysicsMesh(
+            vertices,
+            CubeTriangles(),
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            MeshColliderMode.Convex);
+
+        create.Should().Throw<ArgumentException>()
+            .WithParameterName("triangles")
+            .WithMessage("*reflex edges*");
+    }
+
+    [Fact]
+    public void Constructor_ConvexMode_ShouldRejectBentOpenSurface()
+    {
+        Action create = () => _ = new PhysicsMesh(
+            new[]
+            {
+                Vector3d.Zero,
+                Vector3d.Right,
+                Vector3d.Up,
+                new Vector3d(Fixed64.One, Fixed64.One, Fixed64.One)
+            },
+            new[] { 0, 1, 2, 1, 3, 2 },
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            MeshColliderMode.Convex);
+
+        create.Should().Throw<ArgumentException>()
+            .WithParameterName("triangles")
+            .WithMessage("*coplanar*");
+    }
+
+    [Fact]
+    public void Constructor_ConvexMode_ShouldRejectOneRawBentOpenSurface()
+    {
+        Fixed64 oneRaw = Fixed64.FromRaw(1);
+        Action create = () => _ = new PhysicsMesh(
+            new[]
+            {
+                Vector3d.Zero,
+                Vector3d.Right,
+                Vector3d.Up,
+                new Vector3d(Fixed64.One, Fixed64.One, oneRaw)
+            },
+            new[] { 0, 1, 2, 1, 3, 2 },
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            MeshColliderMode.Convex);
+
+        create.Should().Throw<ArgumentException>()
+            .WithParameterName("triangles")
+            .WithMessage("*coplanar*");
+    }
+
+    [Fact]
+    public void Constructor_ConvexMode_ShouldAllowCollinearBoundarySubdivisions()
+    {
+        Action create = () => _ = new PhysicsMesh(
+            new[]
+            {
+                Vector3d.Zero,
+                Vector3d.Right,
+                Vector3d.Right * 2,
+                new Vector3d((Fixed64)2, (Fixed64)2, Fixed64.Zero),
+                Vector3d.Up * 2
+            },
+            new[]
+            {
+                0, 1, 4,
+                1, 3, 4,
+                1, 2, 3
+            },
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            MeshColliderMode.Convex);
+
+        create.Should().NotThrow();
+    }
+
+    [Fact]
+    public void Constructor_ConvexMode_ShouldRejectInconsistentSharedEdgeWinding()
+    {
+        Action create = () => _ = new PhysicsMesh(
+            new[]
+            {
+                Vector3d.Zero,
+                Vector3d.Right,
+                Vector3d.Up,
+                Vector3d.Right + Vector3d.Up
+            },
+            new[] { 0, 1, 2, 1, 2, 3 },
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            MeshColliderMode.Convex);
+
+        create.Should().Throw<ArgumentException>()
+            .WithParameterName("triangles")
+            .WithMessage("*winding*");
+    }
+
+    [Theory]
+    [InlineData(MeshColliderMode.Convex)]
+    [InlineData(MeshColliderMode.Concave)]
+    public void Constructor_ShouldRejectUnreferencedVertices(MeshColliderMode mode)
+    {
+        Action create = () => _ = new PhysicsMesh(
+            new[]
+            {
+                Vector3d.Zero,
+                Vector3d.Right,
+                Vector3d.Up,
+                new Vector3d((Fixed64)100, (Fixed64)100, (Fixed64)100)
+            },
+            ValidTriangles(),
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            mode);
+
+        create.Should().Throw<ArgumentException>()
+            .WithParameterName("vertices")
+            .WithMessage("*referenced*");
+    }
+
+    [Fact]
     public void TriangleBVH_ShouldStoreTriangleBoundsAsMinMax()
     {
         var mesh = new PhysicsMesh(
@@ -70,7 +383,8 @@ public sealed class PhysicsMeshTests
             },
             new[] { 0, 1, 2, 3, 4, 5 },
             Vector3d.Zero,
-            FixedQuaternion.Identity);
+            FixedQuaternion.Identity,
+            MeshColliderMode.Concave);
         var hits = new SwiftList<int>();
 
         mesh.TriangleBVH.Query(
@@ -111,7 +425,8 @@ public sealed class PhysicsMeshTests
             },
             new[] { 0, 1, 2, 3, 4, 5 },
             Vector3d.Zero,
-            FixedQuaternion.Identity);
+            FixedQuaternion.Identity,
+            MeshColliderMode.Concave);
         var hits = new SwiftList<int>();
 
         mesh.TriangleBVH.Query(
@@ -134,10 +449,9 @@ public sealed class PhysicsMeshTests
     public void GetSupportVertexWorld_ShouldMatchStableWorldVertexScan()
     {
         PhysicsMesh mesh = MeshTestFixtures.CreateConvexCube().Mesh;
-        PhysicsMesh denseMesh = MeshTestFixtures.CreateSubdividedInsideCorner(
-            4,
-            MeshColliderMode.Convex,
-            MeshInertiaPolicy.SurfaceApproximation).Mesh;
+        PhysicsMesh denseMesh = MeshTestFixtures.CreateConvexPolygonFan(
+            40,
+            (Fixed64)4).Mesh;
         Vector3d[] directions =
         {
             Vector3d.Right,
@@ -174,20 +488,55 @@ public sealed class PhysicsMeshTests
     [Fact]
     public void GetSupportVertexWorld_WithAcceleratedExtremeTranslatedMesh_ShouldCompareLocalFeatures()
     {
-        PhysicsMesh mesh = MeshTestFixtures.CreateSubdividedInsideCorner(
-            4,
-            MeshColliderMode.Convex,
-            MeshInertiaPolicy.SurfaceApproximation).Mesh;
+        PhysicsMesh mesh = MeshTestFixtures.CreateConvexPolygonFan(
+            40,
+            (Fixed64)4).Mesh;
+        Vector3d direction = new Vector3d(Fixed64.One, Fixed64.One, Fixed64.Zero).Normalized;
+        Vector3d untranslatedSupport = mesh.GetSupportVertexWorld(direction);
         Fixed64 offset = new(2_000_000_000);
         mesh.UpdatePosition(
             new Vector3d(offset, offset, Fixed64.Zero),
             FixedQuaternion.Identity);
 
-        Vector3d support = mesh.GetSupportVertexWorld(
-            new Vector3d(Fixed64.One, Fixed64.One, Fixed64.Zero).Normalized);
+        Vector3d support = mesh.GetSupportVertexWorld(direction);
 
-        support.X.Should().Be(offset + (Fixed64)4);
-        support.Y.Should().Be(offset + (Fixed64)4);
+        support.Should().Be(untranslatedSupport + new Vector3d(offset, offset, Fixed64.Zero));
+    }
+
+    [Fact]
+    public void GetSupportVertexWorld_WithDenseFlatFace_ShouldUseStableAuthoredOrder()
+    {
+        const int verticesPerEdge = 10;
+        const int boundaryVertexCount = verticesPerEdge * 4;
+        var vertices = new Vector3d[boundaryVertexCount + 1];
+        var triangles = new int[boundaryVertexCount * 3];
+        vertices[0] = Vector3d.Zero;
+        for (int i = 0; i < boundaryVertexCount; i++)
+        {
+            Fixed64 edgeOffset = Fixed64.FromFraction(i % verticesPerEdge, verticesPerEdge) * 2;
+            vertices[i + 1] = (i / verticesPerEdge) switch
+            {
+                0 => new Vector3d(-Fixed64.One + edgeOffset, -Fixed64.One, Fixed64.Zero),
+                1 => new Vector3d(Fixed64.One, -Fixed64.One + edgeOffset, Fixed64.Zero),
+                2 => new Vector3d(Fixed64.One - edgeOffset, Fixed64.One, Fixed64.Zero),
+                _ => new Vector3d(-Fixed64.One, Fixed64.One - edgeOffset, Fixed64.Zero),
+            };
+
+            int triangleIndex = i * 3;
+            triangles[triangleIndex] = 0;
+            triangles[triangleIndex + 1] = i + 1;
+            triangles[triangleIndex + 2] = ((i + 1) % boundaryVertexCount) + 1;
+        }
+
+        var mesh = new PhysicsMesh(
+            vertices,
+            triangles,
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            MeshColliderMode.Convex);
+
+        mesh.GetSupportVertexWorld(Vector3d.Right)
+            .Should().Be(new Vector3d(Fixed64.One, -Fixed64.One, Fixed64.Zero));
     }
 
     [Fact]
@@ -225,6 +574,80 @@ public sealed class PhysicsMeshTests
 
         collider.Mode.Should().Be(MeshColliderMode.Concave);
         collider.Mesh.Mode.Should().Be(MeshColliderMode.Concave);
+        collider.IsClosedSurface.Should().BeFalse();
+    }
+
+    [Fact]
+    public void IsClosedSurface_ShouldDescribeAuthoredTopologyIndependentOfMode()
+    {
+        var closedConcave = new PhysicsMesh(
+            CubeVertices(),
+            CubeTriangles(),
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            MeshColliderMode.Concave);
+        var openConvex = new PhysicsMesh(
+            ValidVertices(),
+            ValidTriangles(),
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            MeshColliderMode.Convex);
+        var disconnectedConcave = new PhysicsMesh(
+            new[]
+            {
+                Vector3d.Zero,
+                Vector3d.Right,
+                Vector3d.Up,
+                new Vector3d((Fixed64)4, Fixed64.Zero, Fixed64.Zero),
+                new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero),
+                new Vector3d((Fixed64)4, Fixed64.One, Fixed64.Zero)
+            },
+            new[] { 0, 1, 2, 3, 4, 5 },
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            MeshColliderMode.Concave);
+
+        closedConcave.IsClosedSurface.Should().BeTrue();
+        openConvex.IsClosedSurface.Should().BeFalse();
+        disconnectedConcave.IsClosedSurface.Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(MeshColliderMode.Convex)]
+    [InlineData(MeshColliderMode.Concave)]
+    public void IsClosedSurface_WithExactPositionSeams_ShouldRecognizeClosedShell(MeshColliderMode mode)
+    {
+        CreateSeamedCube(out Vector3d[] vertices, out int[] triangles);
+
+        var mesh = new PhysicsMesh(
+            vertices,
+            triangles,
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            mode);
+
+        mesh.IsClosedSurface.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Constructor_ConvexMode_ShouldAcceptOpenPlanarSurfaceWithExactPositionSeam()
+    {
+        var mesh = new PhysicsMesh(
+            new[]
+            {
+                Vector3d.Zero,
+                Vector3d.Right,
+                Vector3d.Up,
+                Vector3d.Right,
+                Vector3d.Right + Vector3d.Up,
+                Vector3d.Up
+            },
+            new[] { 0, 1, 2, 3, 4, 5 },
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            MeshColliderMode.Convex);
+
+        mesh.IsClosedSurface.Should().BeFalse();
     }
 
     [Fact]
@@ -514,7 +937,12 @@ public sealed class PhysicsMeshTests
         int[] triangles,
         MeshVolumeValidationResult expectedResult)
     {
-        var mesh = new PhysicsMesh(vertices, triangles, Vector3d.Zero, FixedQuaternion.Identity);
+        var mesh = new PhysicsMesh(
+            vertices,
+            triangles,
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            MeshColliderMode.Concave);
 
         bool valid = mesh.TryGetClosedVolumeMassProperties(
             out MeshMassProperties properties,
@@ -642,6 +1070,19 @@ public sealed class PhysicsMeshTests
             0, 1, 4, 1, 5, 4,
             2, 6, 3, 3, 6, 7
         };
+
+    private static void CreateSeamedCube(out Vector3d[] vertices, out int[] triangles)
+    {
+        Vector3d[] cubeVertices = CubeVertices();
+        int[] cubeTriangles = CubeTriangles();
+        vertices = new Vector3d[cubeTriangles.Length];
+        triangles = new int[cubeTriangles.Length];
+        for (int i = 0; i < cubeTriangles.Length; i++)
+        {
+            vertices[i] = cubeVertices[cubeTriangles[i]];
+            triangles[i] = i;
+        }
+    }
 
     private static int[] CubeTrianglesWithDuplicateFace()
     {

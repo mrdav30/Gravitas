@@ -19,6 +19,7 @@ public partial class PhysicsMesh
     private bool _validatedClosedVolumeMassPropertiesValid;
     private Vector3d _validatedClosedVolumeMassPropertiesScale;
     private MeshMassProperties _validatedClosedVolumeMassProperties;
+    private MeshVolumeValidationResult _surfaceClosureValidationResult;
 
     internal int ClosedVolumeScaleEvaluationCount { get; private set; }
 
@@ -222,15 +223,21 @@ public partial class PhysicsMesh
 
     private bool ValidateClosedVolumeTopology(out MeshVolumeValidationResult result)
     {
+        result = _surfaceClosureValidationResult;
+        return IsClosedSurface;
+    }
+
+    private bool EvaluateClosedVolumeTopology(int[] triangles, out MeshVolumeValidationResult result)
+    {
         var triangleUses = new TriangleUse[_triangleCount];
         var edgeUses = new EdgeUse[_triangleCount * 3];
         int edgeIndex = 0;
         for (int i = 0; i < _triangleCount; i++)
         {
             int triangleIndex = i * 3;
-            int index0 = _triangles[triangleIndex];
-            int index1 = _triangles[triangleIndex + 1];
-            int index2 = _triangles[triangleIndex + 2];
+            int index0 = triangles[triangleIndex];
+            int index1 = triangles[triangleIndex + 1];
+            int index2 = triangles[triangleIndex + 2];
 
             triangleUses[i] = TriangleUse.Create(index0, index1, index2);
             edgeUses[edgeIndex++] = EdgeUse.Create(index0, index1, i);
@@ -278,6 +285,12 @@ public partial class PhysicsMesh
             }
 
             Union(parents, first.TriangleIndex, second.TriangleIndex);
+        }
+
+        if (!HasSingleVertexLinks(triangles, edgeUses))
+        {
+            result = MeshVolumeValidationResult.NonManifoldVertex;
+            return false;
         }
 
         int root = Find(parents, 0);

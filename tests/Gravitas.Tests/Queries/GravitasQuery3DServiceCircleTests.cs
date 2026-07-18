@@ -72,6 +72,29 @@ public sealed class GravitasQuery3DServiceCircleTests
     }
 
     [Fact]
+    public void OverlapCircleAll_AtOpenMeshBoundsCenter_ShouldUseAuthoredSurface()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        EnsureGrid(context);
+        LSMeshCollider mesh = MeshTestFixtures.CreateConvexQuadFloor();
+        mesh.InitializeWithNoBody(new TestMatterAgent(
+            context,
+            new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)));
+        var hits = new SwiftList<Physics3DHit>();
+
+        int count = context.Query3D.OverlapCircleAll(
+            Vector3d.Zero,
+            Fixed64.FromFraction(1, 16),
+            IncludeLayerZero,
+            hits);
+
+        count.Should().Be(1);
+        hits[0].Collider.Should().BeSameAs(mesh);
+        hits[0].Point.Should().Be(Vector3d.Zero);
+        hits[0].Distance.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
     public void OverlapCircle_ShouldReturnClosestLayerFilteredHit()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();

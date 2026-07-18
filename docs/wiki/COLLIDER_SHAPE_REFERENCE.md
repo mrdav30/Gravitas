@@ -203,6 +203,41 @@ swept-sphere queries test mesh triangle candidates and return the owning
 targets by testing only target triangles inside the source swept bounds and
 reducing hits back to the target owner.
 
+`MeshColliderMode.Convex` is an enforced geometry contract, not an optimization
+hint. Construction accepts either one connected, consistently wound, closed
+convex manifold shell or one connected, consistently wound, open coplanar
+triangulation that fills a single convex polygon. It rejects unused vertices,
+duplicate faces, disconnected components, non-manifold edges, inconsistent
+winding, disconnected vertex links, reflex closed edges, bent or folded open
+surfaces, holes, and overlapping open triangles. Exact-position duplicates are
+welded only in the temporary topology view so common hard-normal and UV seam
+exports validate without changing authored vertices, triangle order, or query
+tie-breaking.
+
+`MeshColliderMode.Concave` supports arbitrary nonconvex open surfaces, closed
+shells, and disconnected triangle surfaces. Both modes reject unreferenced
+vertices. `PhysicsMesh.IsClosedSurface` and `LSMeshCollider.IsClosedSurface`
+cache whether the complete exact-position-welded surface is one connected,
+consistently wound, closed two-manifold. The property describes topology only;
+`TryGetClosedVolumeMassProperties(...)` remains the richer volume and
+representability contract. `MeshVolumeValidationResult.NonManifoldVertex`
+distinguishes a pinched or disconnected vertex fan from an ordinary open edge.
+
+Mesh closest-surface queries always return a point on an authored triangle.
+They seed an exact upper-bound candidate, query the local triangle BVH inside a
+conservative cube that contains every point capable of improving that bound,
+and use a stable, allocation-free full triangle scan only when the bound cannot
+be represented. Broad-phase bounds are never substituted for mesh geometry,
+including mesh/sphere contacts and circle overlap queries. Full-domain
+FixedMathSharp triangle and squared-distance predicates preserve the closest
+authored candidate even when public Q32.32 distance values would saturate.
+
+This validation is intentionally breaking for assets that previously selected
+`Convex` despite violating its geometry contract. Author raw terrain, triangle
+soups, bent open surfaces, and nonconvex shells as `Concave`; use deterministic
+convex decomposition when a moving or support-mapped collider needs multiple
+convex parts.
+
 Runtime mesh points follow one explicit transform contract:
 `origin + rotation * (scale * sourcePoint)`. Rotation must be a normalized,
 representable quaternion. Scale must be strictly positive, diagonally applied,
