@@ -883,28 +883,30 @@ public partial class SolidBody : IRecordable
     }
 
     /// <summary>
-    /// Transforms position from local space to world space.
+    /// Transforms a point from body-local space to world space using the host transform's world scale.
     /// </summary>
-    /// <param name="point"></param>
-    /// <returns></returns>
-    public Vector3d TransformPoint(Vector3d point)
-    {
-        return Position3d + Rotation * Vector3d.Multiply(Collider.ScaledSize, point);
-    }
+    /// <param name="point">The body-local point.</param>
+    /// <returns>The corresponding world-space point.</returns>
+    public Vector3d TransformPoint(Vector3d point) =>
+        Position3d + Rotation * Vector3d.Multiply(Agent.Transform.LossyScale, point);
 
     /// <summary>
-    /// Transforms position from world space to local space.
+    /// Transforms a point from world space to body-local space using the host transform's world scale.
     /// </summary>
-    /// <param name="point"></param>
-    /// <returns></returns>
+    /// <param name="point">The world-space point.</param>
+    /// <returns>The corresponding body-local point.</returns>
+    /// <exception cref="InvalidOperationException">The host transform has a zero world-scale component.</exception>
     public Vector3d InverseTransformPoint(Vector3d point)
     {
-        // first negate position  (point - transform.position)
+        Vector3d scale = Agent.Transform.LossyScale;
+        SwiftThrowHelper.ThrowIfTrue(
+            scale.X == Fixed64.Zero || scale.Y == Fixed64.Zero || scale.Z == Fixed64.Zero,
+            nameof(Agent.Transform),
+            "Cannot inverse-transform a point when the host transform has a zero world-scale component.");
+
         Vector3d translated = point - Position3d;
-        // next negate the rotation (Quaternion.Inverse(rotation)
         Vector3d rotated = Rotation.Inverse() * translated;
-        // Finally, negate scaling by dividing 1 by the value
-        return Vector3d.Multiply(Vector3d.One / Collider.ScaledSize, rotated);
+        return Vector3d.Divide(rotated, scale);
     }
 
     public void ResetPosition(Vector3d position = default, FixedQuaternion rotation = default)

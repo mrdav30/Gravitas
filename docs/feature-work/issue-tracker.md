@@ -44,19 +44,17 @@ records follow with their original discovery context.
 ### Ordered Queue
 
 1. **Gravitas:**
-   [SolidBody Point Transforms Use Collider Dimensions As Transform Scale](#solidbody-point-transforms-use-collider-dimensions-as-transform-scale).
-2. **Gravitas:**
    [3D Angular Impulse Scales Immediate Velocity By Frame Delta](#3d-angular-impulse-scales-immediate-velocity-by-frame-delta).
-3. **Gravitas:**
+2. **Gravitas:**
    [Rotational CCD Can Miss Contacts Between Bounded Pose Samples](#rotational-ccd-can-miss-contacts-between-bounded-pose-samples).
-4. **Gravitas:**
+3. **Gravitas:**
    [Convex Mesh Mode Accepts Disconnected Topology And Can Collide In Empty Bounds Space](#convex-mesh-mode-accepts-disconnected-topology-and-can-collide-in-empty-bounds-space).
-5. **Gravitas:**
+4. **Gravitas:**
    [Relative CCD Quadratic Saturation Can Miss Extreme-Range Crossings](#relative-ccd-quadratic-saturation-can-miss-extreme-range-crossings).
    Reuse the magnitude and normalization policy established by the resolved
    extreme-convex-sweep work when adding the separate scale-safe quadratic
    implementation.
-6. **Gravitas:**
+5. **Gravitas:**
    [3D CCD Handoff Callback Failure Can Abandon Queue Cleanup](#3d-ccd-handoff-callback-failure-can-abandon-queue-cleanup).
 
 ### Relative CCD Quadratic Saturation Can Miss Extreme-Range Crossings
@@ -121,24 +119,6 @@ an intervening contact, while preserving fixed work bounds and deterministic
 target ordering. Add shifted narrow-window regressions plus 2D/3D parity and
 allocation checks.
 
-### SolidBody Point Transforms Use Collider Dimensions As Transform Scale
-
-**Discovered:** 2026-07-12  
-**Source:** 95%-to-100% coverage hardening, 3D compound `ScaledSize` review  
-**Affected area:** `SolidBody.TransformPoint(...)`,
-`SolidBody.InverseTransformPoint(...)`, and collider size semantics
-
-The generic point-transform helpers multiply and divide by
-`Collider.ScaledSize`. For primitive colliders that value includes authored
-shape dimensions as well as host scale, so a local point is incorrectly scaled
-by the collider's geometry. The old compound override made the mismatch worse by
-returning a world-axis-aligned bounds size and then rotating it again.
-
-The compound override has been removed rather than preserving a false local size
-contract. Resolve the generic helpers against the host transform's actual scale,
-define zero-scale inverse behavior, and add primitive/compound round-trip tests
-across non-unit authored sizes, nonuniform host scale, and rotation.
-
 ### Convex Mesh Mode Accepts Disconnected Topology And Can Collide In Empty Bounds Space
 
 **Discovered:** 2026-07-11  
@@ -187,6 +167,38 @@ consumable nor replay-visible afterward. Keep the successful drain
 allocation-free and define counter behavior for the partially completed batch.
 
 ## Resolved Issues
+
+### SolidBody Point Transforms Used Collider Dimensions As Transform Scale
+
+**Resolved:** 2026-07-18  
+**Source:** 95%-to-100% coverage hardening, 3D compound `ScaledSize` review  
+**Affected area:** `SolidBody.TransformPoint(...)`,
+`SolidBody.InverseTransformPoint(...)`, host transform scale, and collider size
+semantics
+
+RCA: both public point helpers used `Collider.ScaledSize`, which combines a
+primitive's authored shape dimensions with host scale. A local point was
+therefore enlarged by the collision geometry before rotation and translation.
+The inverse compounded the mismatch and relied on component-wise vector
+division, whose zero-divisor contract silently returns zero for that component
+even though a zero-scale transform has no inverse.
+
+Fix: both helpers retain the body's authoritative position and rotation but now
+read scale exclusively from `Agent.Transform.LossyScale`. The inverse rejects
+any zero world-scale component with `InvalidOperationException` before applying
+the inverse rotation and component division. This keeps the implementation
+allocation-free and avoids constructing or inverting a matrix per call. A 2D
+parity audit found no `SolidBody2D` point-transform API or equivalent
+shape-dimension conversion path, so no speculative 2D surface was added.
+
+Verification: RED tests reproduced primitive geometry leaking into a rotated,
+nonuniformly scaled point and the silent singular inverse. Primitive and
+compound round trips now use only host scale, while the singular inverse fails
+explicitly. Focused regressions pass `3/3`, the complete `SolidBodyIntegrationTests`
+surface passes `23/23`, and full locally linked suites pass `2731/2731` in
+`Release` and `2692/2692` in `ReleaseLean`. Both configurations build the
+`net8.0` and `netstandard2.1` package targets with zero warnings. Both modified
+methods report 100% line and branch coverage.
 
 ### CCD Handoff Dedupe Could Strand A Same-Frame Requeued Body
 

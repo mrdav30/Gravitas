@@ -269,6 +269,13 @@ were reflected. Initialization and runtime rebuild reject invalid scale before
 changing body registration, shape, or partition state; the host's local scale
 remains untouched so an adapter or authoring tool can correct it explicitly.
 
+`SolidBody.TransformPoint(...)` and `InverseTransformPoint(...)` combine the
+body's authoritative position and rotation with the host transform's
+hierarchy-derived `LossyScale`. Collider radius, size, compound bounds, and
+other authored shape dimensions are not transform scale. Inverse point
+conversion throws `InvalidOperationException` when any world-scale component is
+zero because the corresponding transform is singular.
+
 ## Common Configuration
 
 ### Surface Materials

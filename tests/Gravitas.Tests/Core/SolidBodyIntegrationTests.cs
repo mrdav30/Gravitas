@@ -221,24 +221,68 @@ public sealed class SolidBodyIntegrationTests
     }
 
     [Fact]
-    public void TransformPoint_WithColliderScale_ShouldRoundTripLocalAndWorldPositions()
+    public void TransformPoint_WithPrimitiveDimensions_ShouldUseOnlyHostTransformScale()
     {
         using PhysicsScenarioBuilder scenario = CreateIntegrationScenario(frameRate: 4);
         var collider = new LSCuboidCollider
         {
             Size = new Vector3d((Fixed64)2, (Fixed64)4, (Fixed64)6)
         };
+        Vector3d position = new((Fixed64)10, (Fixed64)2, (Fixed64)(-3));
+        FixedQuaternion rotation = PhysicsScenarioBuilder.Yaw(90);
+        Vector3d hostScale = new((Fixed64)3, (Fixed64)2, (Fixed64)4);
         ScenarioBody<LSCuboidCollider> body = scenario.CreateBody(
             collider,
-            new Vector3d((Fixed64)10, (Fixed64)2, (Fixed64)(-3)),
-            FixedQuaternion.Identity);
+            position,
+            rotation);
+        body.Body.Agent.Transform.LocalScale = hostScale;
+        body.Collider.Simulate();
         Vector3d localPoint = new(Fixed64.Half, Fixed64.One, -Fixed64.Half);
+        Vector3d expectedWorldPoint = position + rotation * Vector3d.Multiply(hostScale, localPoint);
 
         Vector3d worldPoint = body.Body.TransformPoint(localPoint);
         Vector3d roundTripped = body.Body.InverseTransformPoint(worldPoint);
 
-        worldPoint.Should().Be(new Vector3d((Fixed64)11, (Fixed64)6, (Fixed64)(-6)));
+        worldPoint.Should().Be(expectedWorldPoint);
         AssertNear(roundTripped, localPoint);
+    }
+
+    [Fact]
+    public void TransformPoint_WithCompoundBounds_ShouldUseOnlyHostTransformScale()
+    {
+        using PhysicsScenarioBuilder scenario = CreateIntegrationScenario(frameRate: 4);
+        var collider = new LSCompoundCollider(
+            CompoundColliderPart.Cuboid(
+                new Vector3d((Fixed64)8, (Fixed64)2, (Fixed64)4),
+                new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero)),
+            CompoundColliderPart.Sphere(
+                Fixed64.Half,
+                new Vector3d((Fixed64)(-3), Fixed64.One, Fixed64.Zero)));
+        Vector3d position = new((Fixed64)(-4), (Fixed64)3, (Fixed64)7);
+        FixedQuaternion rotation = PhysicsScenarioBuilder.Yaw(-90);
+        Vector3d hostScale = new(Fixed64.Half, (Fixed64)3, (Fixed64)2);
+        ScenarioBody<LSCompoundCollider> body = scenario.CreateBody(collider, position, rotation);
+        body.Body.Agent.Transform.LocalScale = hostScale;
+        body.Collider.Simulate();
+        Vector3d localPoint = new((Fixed64)2, -Fixed64.Half, Fixed64.One);
+        Vector3d expectedWorldPoint = position + rotation * Vector3d.Multiply(hostScale, localPoint);
+
+        Vector3d worldPoint = body.Body.TransformPoint(localPoint);
+
+        worldPoint.Should().Be(expectedWorldPoint);
+        AssertNear(body.Body.InverseTransformPoint(worldPoint), localPoint);
+    }
+
+    [Fact]
+    public void InverseTransformPoint_WithZeroHostScale_ShouldRejectSingularTransform()
+    {
+        using PhysicsScenarioBuilder scenario = CreateIntegrationScenario(frameRate: 4);
+        ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
+        body.Body.Agent.Transform.LocalScale = new Vector3d(Fixed64.One, Fixed64.Zero, Fixed64.One);
+
+        Action inverseTransform = () => body.Body.InverseTransformPoint(Vector3d.One);
+
+        inverseTransform.Should().Throw<InvalidOperationException>();
     }
 
     [Fact]
