@@ -1,7 +1,9 @@
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
+using Gravitas.CollisionHandling;
 using Gravitas.Tests.Support;
+using System;
 using Xunit;
 
 namespace Gravitas.Tests.MixedDimensions;
@@ -174,5 +176,51 @@ public sealed partial class MixedResponseTests
         entered2D.Should().Be(0);
         exited2D.Should().Be(0);
         context.MixedCollisions.ActivePairCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void MarkColliding_WhenDeferredExitCallbacksThrow_ShouldRetainGuardAndAggregateInDimensionOrder()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(context, Vector3d.Zero);
+        SolidBody2D body2D = CreateCircle2D(context, Vector2d.Zero);
+        var pair = new CollisionPairMixed(body3D.Collider, body2D.Collider);
+        int exits3D = 0;
+        int exits2D = 0;
+        bool guarded3D = false;
+        bool guarded2D = false;
+        body2D.Collider.OnMixedContactEnter += _ => pair.MarkSeparated();
+        body3D.Collider.OnMixedContactExit += _ =>
+        {
+            exits3D++;
+            guarded3D = pair.IsNotificationInProgress;
+            throw new InvalidOperationException("3D exit failure");
+        };
+        body2D.Collider.OnMixedContactExit += _ =>
+        {
+            exits2D++;
+            guarded2D = pair.IsNotificationInProgress;
+            throw new ArgumentException("2D exit failure");
+        };
+
+        Action notify = () => pair.MarkColliding(frame: 1, contact: default);
+
+        AggregateException exception = notify.Should().Throw<AggregateException>().Which.Flatten();
+        exception.InnerExceptions.Should().HaveCount(2);
+        exception.InnerExceptions[0].Should().BeOfType<InvalidOperationException>()
+            .Which.Message.Should().Be("3D exit failure");
+        exception.InnerExceptions[1].Should().BeOfType<ArgumentException>()
+            .Which.Message.Should().Be("2D exit failure");
+        exits3D.Should().Be(1);
+        exits2D.Should().Be(1);
+        guarded3D.Should().BeTrue();
+        guarded2D.Should().BeTrue();
+        pair.IsNotificationInProgress.Should().BeFalse();
+
+        Action retry = pair.MarkSeparated;
+
+        retry.Should().NotThrow();
+        exits3D.Should().Be(1);
+        exits2D.Should().Be(1);
     }
 }

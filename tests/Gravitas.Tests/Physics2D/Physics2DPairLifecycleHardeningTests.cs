@@ -686,6 +686,121 @@ public sealed class Physics2DPairLifecycleHardeningTests
         first.Collider.CollisionPairHolderCount.Should().Be(0);
     }
 
+    [Fact]
+    public void MarkCollidingDeferred_WhenExitCallbacksThrow_ShouldRetainGuardAndAggregateInPairOrder()
+    {
+        using GravitasWorldContext context = CreateContext(extent: 16);
+        SolidBody2D first = CreateCircle(context, Vector2d.Zero, immovable: false);
+        SolidBody2D second = CreateCircle(
+            context,
+            new Vector2d(Fixed64.FromFraction(3, 4), Fixed64.Zero),
+            immovable: true);
+        var pair = new CollisionPair2D(first.Collider, second.Collider);
+        pair.Manifold.SetContact(Vector2d.Zero, Vector2d.Zero, Fixed64.Half, Vector2d.Right);
+        int exitsA = 0;
+        int exitsB = 0;
+        bool guardedA = false;
+        bool guardedB = false;
+        pair.ColliderB.OnContactEnter += _ => pair.MarkSeparated();
+        pair.ColliderA.OnContactExit += _ =>
+        {
+            exitsA++;
+            guardedA = pair.IsNotificationInProgress;
+            throw new InvalidOperationException("collider A exit failure");
+        };
+        pair.ColliderB.OnContactExit += _ =>
+        {
+            exitsB++;
+            guardedB = pair.IsNotificationInProgress;
+            throw new ArgumentException("collider B exit failure");
+        };
+
+        Action notify = () => pair.MarkCollidingDeferred(frame: 1);
+
+        AggregateException exception = notify.Should().Throw<AggregateException>().Which.Flatten();
+        exception.InnerExceptions.Should().HaveCount(2);
+        exception.InnerExceptions[0].Should().BeOfType<InvalidOperationException>()
+            .Which.Message.Should().Be("collider A exit failure");
+        exception.InnerExceptions[1].Should().BeOfType<ArgumentException>()
+            .Which.Message.Should().Be("collider B exit failure");
+        exitsA.Should().Be(1);
+        exitsB.Should().Be(1);
+        guardedA.Should().BeTrue();
+        guardedB.Should().BeTrue();
+        pair.IsNotificationInProgress.Should().BeFalse();
+        pair.IsColliding.Should().BeFalse();
+
+        Action retry = pair.MarkSeparated;
+
+        retry.Should().NotThrow();
+        exitsA.Should().Be(1);
+        exitsB.Should().Be(1);
+    }
+
+    [Fact]
+    public void MarkCollidingDeferred_WhenLaterStaySeparatesPair_ShouldExitBothAdmittedSides()
+    {
+        using GravitasWorldContext context = CreateContext(extent: 16);
+        SolidBody2D first = CreateCircle(context, Vector2d.Zero, immovable: false);
+        SolidBody2D second = CreateCircle(
+            context,
+            new Vector2d(Fixed64.FromFraction(3, 4), Fixed64.Zero),
+            immovable: true);
+        var pair = new CollisionPair2D(first.Collider, second.Collider);
+        pair.Manifold.SetContact(Vector2d.Zero, Vector2d.Zero, Fixed64.Half, Vector2d.Right);
+        int entersB = 0;
+        int exitsA = 0;
+        int exitsB = 0;
+        pair.ColliderB.OnContactEnter += _ => entersB++;
+        pair.ColliderA.OnContactExit += _ => exitsA++;
+        pair.ColliderB.OnContactExit += _ => exitsB++;
+        pair.MarkCollidingDeferred(frame: 1);
+        pair.ColliderA.OnContact += _ => pair.MarkSeparated();
+
+        pair.MarkCollidingDeferred(frame: 2);
+
+        entersB.Should().Be(1);
+        exitsA.Should().Be(1);
+        exitsB.Should().Be(1);
+        pair.IsColliding.Should().BeFalse();
+        pair.IsNotificationInProgress.Should().BeFalse();
+    }
+
+    [Fact]
+    public void MarkSeparated_AfterFirstEnterThrows_ShouldNotExitUnadmittedSecondSide()
+    {
+        using GravitasWorldContext context = CreateContext(extent: 16);
+        SolidBody2D first = CreateCircle(context, Vector2d.Zero, immovable: false);
+        SolidBody2D second = CreateCircle(
+            context,
+            new Vector2d(Fixed64.FromFraction(3, 4), Fixed64.Zero),
+            immovable: true);
+        var pair = new CollisionPair2D(first.Collider, second.Collider);
+        pair.Manifold.SetContact(Vector2d.Zero, Vector2d.Zero, Fixed64.Half, Vector2d.Right);
+        int entersB = 0;
+        int exitsA = 0;
+        int exitsB = 0;
+        pair.ColliderA.OnContactEnter += _ => throw new InvalidOperationException("collider A enter failure");
+        pair.ColliderA.OnContactExit += _ => exitsA++;
+        pair.ColliderB.OnContactEnter += _ => entersB++;
+        pair.ColliderB.OnContactExit += _ => exitsB++;
+
+        Action enter = () => pair.MarkCollidingDeferred(frame: 1);
+
+        InvalidOperationException exception = enter.Should().Throw<InvalidOperationException>()
+            .WithMessage("collider A enter failure")
+            .Which;
+        exception.StackTrace.Should().Contain(nameof(MarkSeparated_AfterFirstEnterThrows_ShouldNotExitUnadmittedSecondSide));
+
+        pair.MarkSeparated();
+
+        entersB.Should().Be(0);
+        exitsA.Should().Be(1);
+        exitsB.Should().Be(0);
+        pair.IsColliding.Should().BeFalse();
+        pair.IsNotificationInProgress.Should().BeFalse();
+    }
+
     private static EnterDeactivationResult RunEnterDeactivationScenario(bool poolingEnabled)
     {
         using GravitasWorldContext context = CreateContext(extent: 32);

@@ -6,6 +6,8 @@
 //=======================================================================
 
 using Gravitas.Colliders;
+using SwiftCollections;
+using System;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas.CollisionHandling;
@@ -85,6 +87,7 @@ internal sealed partial class CollisionPairMixed
         var registration2D = new ColliderLifetimeToken2D(Collider2D);
         bool shouldRaiseTrigger = ColliderTriggerEventPolicy.ShouldRaise(Collider3D, Collider2D);
         _notificationInProgress = true;
+        SwiftList<Exception>? notificationExceptions = null;
         try
         {
             bool notifyEnter3D = changed || !_collider3DNotified;
@@ -113,13 +116,24 @@ internal sealed partial class CollisionPairMixed
                     shouldRaiseTrigger);
             }
         }
-        finally
+        catch (Exception exception)
+        {
+            CollisionNotificationExceptions.Capture(ref notificationExceptions, exception);
+        }
+
+        try
         {
             EndNotification(
                 registration3D,
                 registration2D,
                 shouldRaiseTrigger);
         }
+        catch (Exception exception)
+        {
+            CollisionNotificationExceptions.Capture(ref notificationExceptions, exception);
+        }
+
+        CollisionNotificationExceptions.ThrowIfAny(notificationExceptions);
     }
 
     public void MarkResting(int frame)
@@ -149,10 +163,19 @@ internal sealed partial class CollisionPairMixed
 
         var registration3D = new ColliderLifetimeToken(Collider3D);
         var registration2D = new ColliderLifetimeToken2D(Collider2D);
-        NotifySeparation(
-            registration3D,
-            registration2D,
-            ColliderTriggerEventPolicy.ShouldRaise(Collider3D, Collider2D));
+        _notificationInProgress = true;
+        try
+        {
+            NotifySeparation(
+                registration3D,
+                registration2D,
+                ColliderTriggerEventPolicy.ShouldRaise(Collider3D, Collider2D));
+        }
+        finally
+        {
+            _separationPending = false;
+            _notificationInProgress = false;
+        }
     }
 
     private void EndNotification(
@@ -160,12 +183,19 @@ internal sealed partial class CollisionPairMixed
         in ColliderLifetimeToken2D registration2D,
         bool shouldRaiseTrigger)
     {
-        _notificationInProgress = false;
-        if (!_separationPending)
-            return;
+        try
+        {
+            if (!_separationPending)
+                return;
 
-        _separationPending = false;
-        NotifySeparation(registration3D, registration2D, shouldRaiseTrigger);
+            _separationPending = false;
+            NotifySeparation(registration3D, registration2D, shouldRaiseTrigger);
+        }
+        finally
+        {
+            _separationPending = false;
+            _notificationInProgress = false;
+        }
     }
 
     private void NotifySeparation(
@@ -176,27 +206,45 @@ internal sealed partial class CollisionPairMixed
         bool notify2D = _collider2DNotified;
         _collider3DNotified = false;
         _collider2DNotified = false;
-        Collider3D.NotifyMixedContact(
-            Collider2D,
-            false,
-            true,
-            _isTriggerPair,
-            allowInactive: true,
-            registration3D,
-            registration2D,
-            shouldRaiseTrigger);
-        if (notify2D)
+        SwiftList<Exception>? notificationExceptions = null;
+        try
         {
-            Collider2D.NotifyMixedContact(
-                Collider3D,
+            Collider3D.NotifyMixedContact(
+                Collider2D,
                 false,
                 true,
                 _isTriggerPair,
                 allowInactive: true,
-                registration2D,
                 registration3D,
+                registration2D,
                 shouldRaiseTrigger);
         }
+        catch (Exception exception)
+        {
+            CollisionNotificationExceptions.Capture(ref notificationExceptions, exception);
+        }
+
+        if (notify2D && registration2D.IsCurrentLifetime)
+        {
+            try
+            {
+                Collider2D.NotifyMixedContact(
+                    Collider3D,
+                    false,
+                    true,
+                    _isTriggerPair,
+                    allowInactive: true,
+                    registration2D,
+                    registration3D,
+                    shouldRaiseTrigger);
+            }
+            catch (Exception exception)
+            {
+                CollisionNotificationExceptions.Capture(ref notificationExceptions, exception);
+            }
+        }
+
+        CollisionNotificationExceptions.ThrowIfAny(notificationExceptions);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

@@ -145,14 +145,15 @@ only when exactly one collider in the pair is a trigger and the other collider
 is body-owned. Both colliders in a valid trigger pair receive enter, stay, and
 exit callbacks.
 
-3D pair callbacks are admitted in stable collider A/B order. Exit admission is
-consumed before user delegates run, so callback failure or reentrant teardown
-does not retry an already admitted exit against the same pair lifetime. Both
-admitted sides are attempted even if the first throws: one exception is
-re-thrown with its original stack, while multiple failures are reported as an
-`AggregateException` in A/B callback order. Deferred exits retain the pair's
-notification guard until cleanup finishes, preventing direct deactivation from
-reentering the same separation.
+2D, 3D, and mixed pair callbacks use stable pair order: A/B for same-dimension
+pairs and 3D/2D for mixed pairs. Exit admission is consumed before user
+delegates run, so callback failure or reentrant teardown does not retry an
+already admitted exit against the same pair lifetime. Both admitted sides are
+attempted even if the first throws: one exception is re-thrown with its
+original stack, while multiple failures are reported as an `AggregateException`
+in pair order. Deferred exits retain the pair's notification guard until
+cleanup finishes, preventing direct deactivation from reentering the same
+separation.
 
 3D and 2D response both:
 

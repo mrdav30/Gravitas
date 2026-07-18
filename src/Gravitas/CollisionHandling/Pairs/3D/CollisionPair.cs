@@ -9,10 +9,9 @@ using FixedMathSharp;
 using Gravitas.Colliders;
 using GridForge.Grids;
 using GridForge.Grids.Topology;
+using SwiftCollections;
 using System;
-using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using System.Runtime.ExceptionServices;
 
 namespace Gravitas.CollisionHandling;
 
@@ -268,7 +267,7 @@ public partial class CollisionPair
         bool shouldRaiseTriggerA = isTriggerPair && ColliderTriggerEventPolicy.ShouldRaise(colliderA, colliderB);
         bool shouldRaiseTriggerB = isTriggerPair && ColliderTriggerEventPolicy.ShouldRaise(colliderB, colliderA);
         _notificationInProgress = true;
-        List<Exception>? notificationExceptions = null;
+        SwiftList<Exception>? notificationExceptions = null;
         try
         {
             if (isColliding)
@@ -316,7 +315,7 @@ public partial class CollisionPair
         }
         catch (Exception exception)
         {
-            notificationExceptions = new List<Exception>(2) { exception };
+            CollisionNotificationExceptions.Capture(ref notificationExceptions, exception);
         }
 
         try
@@ -330,14 +329,13 @@ public partial class CollisionPair
         }
         catch (Exception exception)
         {
-            (notificationExceptions ??= new List<Exception>(2)).Add(exception);
+            CollisionNotificationExceptions.Capture(ref notificationExceptions, exception);
         }
 
         if (!_isColliding || (_colliderANotified && _colliderBNotified))
             _isCollidingChanged = false;
 
-        if (notificationExceptions != null)
-            ThrowNotificationExceptions(notificationExceptions);
+        CollisionNotificationExceptions.ThrowIfAny(notificationExceptions);
     }
 
     private void EndNotification(
@@ -387,7 +385,7 @@ public partial class CollisionPair
         _colliderANotified = false;
         _colliderBNotified = false;
 
-        List<Exception>? notificationExceptions = null;
+        SwiftList<Exception>? notificationExceptions = null;
         if (notifyA)
         {
             try
@@ -405,7 +403,7 @@ public partial class CollisionPair
             }
             catch (Exception exception)
             {
-                notificationExceptions = new List<Exception>(2) { exception };
+                CollisionNotificationExceptions.Capture(ref notificationExceptions, exception);
             }
         }
 
@@ -426,21 +424,11 @@ public partial class CollisionPair
             }
             catch (Exception exception)
             {
-                (notificationExceptions ??= new List<Exception>(2)).Add(exception);
+                CollisionNotificationExceptions.Capture(ref notificationExceptions, exception);
             }
         }
 
-        if (notificationExceptions != null)
-            ThrowNotificationExceptions(notificationExceptions);
-    }
-
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void ThrowNotificationExceptions(List<Exception> exceptions)
-    {
-        if (exceptions.Count == 1)
-            ExceptionDispatchInfo.Capture(exceptions[0]).Throw();
-
-        throw new AggregateException(exceptions);
+        CollisionNotificationExceptions.ThrowIfAny(notificationExceptions);
     }
 
     private void ClearPendingNotificationState()

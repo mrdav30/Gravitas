@@ -196,7 +196,8 @@ active/dynamic-ID admission predicates removed in Task 67.
 **Resolved:** 2026-07-18  
 **Source:** 95%-to-100% coverage hardening, 3D collision-pair lifecycle review  
 **Affected area:** `CollisionPair.NotifyCollidersOfContact()`,
-`CollisionPair.EndNotification()`, and callback exception/reentrancy teardown
+`CollisionPair2D.NotifyColliders()`, `CollisionPairMixed.MarkColliding()`, and
+callback exception/reentrancy teardown
 
 RCA: 3D separation flags remained admitted until after both user delegates
 returned. If collider A's exit callback reentrantly deactivated the pair and
@@ -206,23 +207,31 @@ before invoking deferred exits, allowing a captured pair to recurse directly
 into the same separation. A repeated A failure could mask the original while B
 was skipped and notification state remained live.
 
-Fix: ordinary and deferred separation now share one A/B dispatcher that
-snapshots and consumes both admissions before invoking user code. Both
-still-current sides are attempted in stable A/B order even when A throws. One
-failure is rethrown with its original stack; multiple failures use
-`AggregateException` in callback order. Deferred exits retain the notification
-guard through dispatch, and final cleanup always clears pending state before
-the pair becomes reentrant again. Exception storage is allocated only after a
-delegate throws; the successful notification path remains allocation-free.
+Parity review found the same first-failure short-circuit and deferred cleanup
+masking in 2D. Mixed pairs already consumed their exit flags before delegates,
+but still skipped the 2D side after a 3D failure and released the notification
+guard before deferred exit dispatch.
+
+Fix: each 2D, 3D, and mixed pair dispatcher now consumes exit admission before
+invoking user code. Both still-current sides are attempted in stable pair order
+even when the first throws. One failure is rethrown with its original stack;
+multiple failures use `AggregateException` in callback order. Deferred exits
+retain the notification guard through dispatch, and final cleanup always clears
+pending state before the pair becomes reentrant again. Exception storage uses
+`SwiftList` and is allocated only after a delegate throws; successful
+notification paths remain allocation-free.
 
 Verification: RED regressions reproduced the duplicate A exit after B was
 rebound, direct captured-pair reentry from a deferred exit, skipped B dispatch,
 and first-callback short-circuiting. GREEN assertions prove at-most-once
 delivery, untouched rebound lifetime state, complete owner/holder cleanup,
-stable exception order, and no notifying-shell pool reuse. The focused 3D lifecycle
-suite passes `28/28`; full locally linked suites pass `2719/2719` in `Release`
-and `2680/2680` in `ReleaseLean`. Both configurations build `net8.0` and
-`netstandard2.1` package targets with zero warnings.
+stable exception order, and no notifying-shell pool reuse. Matching 2D and
+mixed RED regressions reproduced first-callback short-circuiting and early
+deferred-guard release; GREEN assertions prove stable A/B and 3D/2D exception
+order with both guards retained through exit dispatch. The combined lifecycle
+surface passes `125/125`; full locally linked suites pass `2723/2723` in
+`Release` and `2684/2684` in `ReleaseLean`. Both configurations build
+`net8.0` and `netstandard2.1` package targets with zero warnings.
 
 ### Continuous-Collision Modes Accepted Undefined Enum Values
 
