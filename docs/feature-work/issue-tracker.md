@@ -44,20 +44,20 @@ records follow with their original discovery context.
 ### Ordered Queue
 
 1. **Gravitas:**
-   [CCD Handoff Dedupe Can Strand A Same-Frame Requeued Body](#ccd-handoff-dedupe-can-strand-a-same-frame-requeued-body).
-2. **Gravitas:**
    [SolidBody Point Transforms Use Collider Dimensions As Transform Scale](#solidbody-point-transforms-use-collider-dimensions-as-transform-scale).
-3. **Gravitas:**
+2. **Gravitas:**
    [3D Angular Impulse Scales Immediate Velocity By Frame Delta](#3d-angular-impulse-scales-immediate-velocity-by-frame-delta).
-4. **Gravitas:**
+3. **Gravitas:**
    [Rotational CCD Can Miss Contacts Between Bounded Pose Samples](#rotational-ccd-can-miss-contacts-between-bounded-pose-samples).
-5. **Gravitas:**
+4. **Gravitas:**
    [Convex Mesh Mode Accepts Disconnected Topology And Can Collide In Empty Bounds Space](#convex-mesh-mode-accepts-disconnected-topology-and-can-collide-in-empty-bounds-space).
-6. **Gravitas:**
+5. **Gravitas:**
    [Relative CCD Quadratic Saturation Can Miss Extreme-Range Crossings](#relative-ccd-quadratic-saturation-can-miss-extreme-range-crossings).
    Reuse the magnitude and normalization policy established by the resolved
    extreme-convex-sweep work when adding the separate scale-safe quadratic
    implementation.
+6. **Gravitas:**
+   [3D CCD Handoff Callback Failure Can Abandon Queue Cleanup](#3d-ccd-handoff-callback-failure-can-abandon-queue-cleanup).
 
 ### Relative CCD Quadratic Saturation Can Miss Extreme-Range Crossings
 
@@ -161,35 +161,78 @@ fallback so invalid topology cannot create an empty-space contact. Add a
 regression that preserves valid open convex surfaces while rejecting or safely
 handling disconnected input without the AABB false-positive.
 
-### CCD Handoff Dedupe Can Strand A Same-Frame Requeued Body
+### 3D CCD Handoff Callback Failure Can Abandon Queue Cleanup
 
-**Discovered:** 2026-07-13  
+**Discovered:** 2026-07-18  
+**Source:** same-frame CCD handoff dedupe final lifecycle review  
+**Affected area:** queued 3D handoff consumption, `SolidBody.OnMoved`, mixed
+handoffs into 3D bodies, budget counters, and replay continuity
+
+`SolidBody.TryConsumeContinuousCollisionHandoff(...)` invokes the public
+`OnMoved` delegate after consuming body-local handoff state. If that delegate
+throws while the service drains its queue, control leaves
+`ProcessQueuedContinuousCollisionHandoffs(...)` before the service updates its
+counters or clears/discards unread entries. Starting another frame clears queue
+ownership without discarding those other bodies' pending handoffs, leaving
+old-token state visible to authoritative replay hashing. Pure 2D consumption
+does not invoke an equivalent delegate, but mixed routing can enqueue the
+affected 3D path.
+
+Resolve this against the callback-failure paradigm established for contact
+notifications: preserve the original host exception while deterministically
+closing service ownership and discarding work that cannot finish in the aborted
+step. Add a real multi-entry queue regression where the first consumed body's
+`OnMoved` throws and prove unread and requeued states are neither directly
+consumable nor replay-visible afterward. Keep the successful drain
+allocation-free and define counter behavior for the partially completed batch.
+
+## Resolved Issues
+
+### CCD Handoff Dedupe Could Strand A Same-Frame Requeued Body
+
+**Resolved:** 2026-07-18  
 **Source:** 95%-to-100% coverage hardening, dimensional CCD service admission
 review  
 **Affected area:** 2D/3D continuous-collision handoff queues, same-frame relay
 cycles, mixed CCD routing, iteration-budget ownership, and replay continuity
 
-The handoff drain leaves each dequeued body in
-`_queuedContinuousCollisionHandoffBodies` until the entire queue is cleared. If
-body A is consumed and a later same-frame relay applies another handoff to A,
-`ApplyContinuousCollisionHandoff` marks A pending but queue admission rejects
-the re-enqueue because A is still present in the dedupe set. End-of-drain queue
-cleanup then erases service ownership without discarding A's new pending state;
-the next late-simulate token makes that state permanently stale. The same queue
-shape exists in 2D and 3D and can participate in pure or mixed relay cycles.
+RCA: each service's dedupe set represented every body seen anywhere in the
+current drain instead of only bodies that still owned an unread queue entry. If
+body A was consumed and a later same-frame relay returned work to A,
+`ApplyContinuousCollisionHandoff(...)` published new body-local pending state
+but queue admission rejected A. End-of-drain cleanup then removed service
+ownership without consuming or discarding that authoritative, replay-hashed
+state.
 
-Resolve this as a focused queue-ownership change. Remove a body from the dedupe
-set immediately before consuming its queue entry so a later same-frame relay can
-re-enqueue it under the existing deterministic iteration budget, while retaining
-dedupe for repeated updates before dequeue. Add symmetric 2D/3D state-machine
-regressions (and a mixed relay witness if practical) where A is queued,
-consumed, receives a second handoff before drain completion, and is either
-consumed again within budget or explicitly discarded at the cap. Assert no
-directly consumable or replay-visible pending handoff remains after drain. This
-does not block coverage convergence and is independent of the redundant
-active/dynamic-ID admission predicates removed in Task 67.
+Fix: both dimensional services now remove a body from the dedupe set immediately
+after dequeue and before consumption. Reentrant or later same-frame relays can
+therefore append A at the queue tail in stable FIFO order, while repeated
+updates before dequeue retain the existing latest-state-wins dedupe. Requeued
+work remains governed by the same shared iteration budget; exhaustion reaches
+the existing explicit discard path. The added `SwiftHashSet.Remove(...)` is
+expected O(1), allocation-free, and does not expose hash iteration order.
+Mixed responses already route target handoffs through these dimensional queues,
+so no parallel mixed implementation was required. Final review also exposed
+the complementary latest-state edge: a terminal update could clear ignored
+collider references while leaving an older pending continuation intact. The 2D
+and 3D body paths now discard that superseded continuation atomically when the
+new update has no remaining time or resulting motion.
 
-## Resolved Issues
+Verification: symmetric 2D and 3D RED regressions use a perfectly elastic
+`A -> B <- C` relay cycle that returns a handoff to A after its first dequeue.
+With four iterations A is consumed again; with a three-iteration cap the new
+entry exposes the limit and is explicitly discarded. Both variants prove no
+directly consumable state remains and that a subsequent explicit discard cannot
+change the authoritative replay hash. Existing pre-dequeue dedupe behavior is
+also exercised because B receives multiple updates before its single entry is
+consumed. Separate terminal-update regressions prove a queued continuation is
+cancelled when a newer handoff has no time or velocity, without consuming a
+false iteration or changing replay state during later cleanup. The focused
+regressions pass `6/6`; the complete 2D, 3D, and mixed CCD surface passes
+`417/417`. Full locally linked suites pass `2729/2729` in `Release` and
+`2690/2690` in `ReleaseLean`; both configurations build the `net8.0` and
+`netstandard2.1` package targets with zero warnings. Both modified queue methods
+report 100% line and branch coverage.
 
 ### 3D Exit Callback Failure Duplicated Reentrant Separation Notifications
 

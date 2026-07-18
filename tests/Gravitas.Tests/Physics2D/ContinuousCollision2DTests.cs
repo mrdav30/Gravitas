@@ -14,7 +14,7 @@ using Xunit;
 
 namespace Gravitas.Tests.Physics2D;
 
-public sealed class ContinuousCollision2DTests
+public sealed partial class ContinuousCollision2DTests
 {
     [Theory]
     [InlineData((byte)4)]

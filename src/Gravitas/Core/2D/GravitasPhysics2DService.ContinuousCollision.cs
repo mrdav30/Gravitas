@@ -127,6 +127,8 @@ public sealed partial class GravitasPhysics2DService
         while (readIndex < _continuousCollisionHandoffQueue.Count && iterations < iterationBudget)
         {
             SolidBody2D body = _continuousCollisionHandoffQueue[readIndex++];
+            // Consumption can synchronously return work to this body; dequeue ends dedupe ownership first.
+            _queuedContinuousCollisionHandoffBodies.Remove(body);
 
             if (body.TryConsumeContinuousCollisionHandoff(updateSleepState: false, updateColliderState: false))
             {

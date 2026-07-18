@@ -29,8 +29,7 @@ public sealed partial class SolidBody2D
         ApplyCollisionLinearVelocityDelta(velocityDelta);
         if (remainingTime <= Fixed64.Epsilon || _linearVelocity.MagnitudeSquared <= Fixed64.Epsilon)
         {
-            _continuousCollisionHandoffIgnoredCollider3D = null;
-            _continuousCollisionHandoffIgnoredCollider2D = null;
+            DiscardContinuousCollisionHandoff();
             return;
         }
 

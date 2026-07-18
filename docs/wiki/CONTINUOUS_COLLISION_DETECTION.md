@@ -88,7 +88,14 @@ Dynamic-vs-dynamic CCD uses candidate indices and stable ordering:
 
 The ordering is deterministic across repeated runs. Service-level queues own
 same-frame handoff processing so dense contact chains do not depend on traversal
-side effects.
+side effects. Queue admission deduplicates a body only while that body owns an
+unread entry. Dequeue releases that ownership before consumption, allowing a
+later same-frame relay to append the body again under the same deterministic
+iteration budget. Requeued work that exceeds the budget is explicitly
+discarded rather than left as stale continuation state. A later terminal
+handoff update (no remaining time or no resulting motion) likewise cancels any
+older pending continuation for that body; latest-state-wins includes the
+absence of further work.
 
 ## Mixed CCD
 
