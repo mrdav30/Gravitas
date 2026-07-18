@@ -16,6 +16,25 @@ public sealed class SolidBody2DSerializationTests
     public static TheoryData<GravitasSerializationTransport> Transports => GravitasSerializationTransportCases.All();
 
     [Theory]
+    [InlineData((byte)4)]
+    [InlineData(byte.MaxValue)]
+    public void RecordData_WithUndefinedContinuousCollisionMode_ShouldRejectWithoutPublishingValue(byte rawValue)
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        SolidBody2D body = CreateDynamicCircle(context);
+        body.ContinuousCollisionMode = ContinuousCollisionMode.Auto;
+        var chronicler = new InvalidRecordPayloadChronicler(new Dictionary<string, object>
+        {
+            ["ContinuousCollisionMode"] = (ContinuousCollisionMode)rawValue
+        });
+
+        Action action = () => body.RecordData(chronicler);
+
+        action.Should().Throw<ArgumentOutOfRangeException>();
+        body.ContinuousCollisionMode.Should().Be(ContinuousCollisionMode.Auto);
+    }
+
+    [Theory]
     [MemberData(nameof(Transports))]
     public void Populate_WithLegacyMultiTurnRotation_ShouldCanonicalizeAuthoritativeState(
         GravitasSerializationTransport transport)

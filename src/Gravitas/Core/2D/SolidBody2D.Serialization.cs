@@ -32,6 +32,7 @@ public sealed partial class SolidBody2D
         Fixed64 groundedDistanceRay = GroundedDistanceRay;
         Fixed64 groundDownDistanceOnAir = GroundDownDistanceOnAir;
         Fixed64 groundMinNormalDot = GroundMinNormalDot;
+        ContinuousCollisionMode continuousCollisionMode = ContinuousCollisionMode;
 
         RecordValues.Look(chronicler, ref active, "Active", false);
         RecordValues.Look(chronicler, ref freezeAxes, "FreezeAxes", BodyFreezeAxes2D.None);
@@ -70,10 +71,11 @@ public sealed partial class SolidBody2D
         RecordValues.Look(chronicler, ref _groundNormal, "GroundNormal");
         RecordValues.Look(chronicler, ref _groundPoint, "GroundPoint");
         RecordValues.Look(chronicler, ref _lastGroundedPosition, "LastGroundedPosition");
-        RecordValues.Look(chronicler, ref _continuousCollisionMode, "ContinuousCollisionMode", ContinuousCollisionMode.Inherit);
+        RecordValues.Look(chronicler, ref continuousCollisionMode, "ContinuousCollisionMode", ContinuousCollisionMode.Inherit);
 
         if (chronicler.Mode == SerializationMode.Loading)
         {
+            ContinuousCollisionMode = continuousCollisionMode;
             _rotation = CanonicalizeRotation(_rotation);
             Active = active && Collider.Id >= 0;
             _freezeAxes = freezeAxes;

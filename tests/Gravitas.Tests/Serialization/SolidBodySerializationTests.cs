@@ -23,6 +23,25 @@ public sealed class SolidBodySerializationTests
     };
 
     [Theory]
+    [InlineData((byte)4)]
+    [InlineData(byte.MaxValue)]
+    public void RecordData_WithUndefinedContinuousCollisionMode_ShouldRejectWithoutPublishingValue(byte rawValue)
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
+        body.Body.ContinuousCollisionMode = ContinuousCollisionMode.Auto;
+        var chronicler = new InvalidRecordPayloadChronicler(new Dictionary<string, object>
+        {
+            ["ContinuousCollisionMode"] = (ContinuousCollisionMode)rawValue
+        });
+
+        Action action = () => body.Body.RecordData(chronicler);
+
+        action.Should().Throw<ArgumentOutOfRangeException>();
+        body.Body.ContinuousCollisionMode.Should().Be(ContinuousCollisionMode.Auto);
+    }
+
+    [Theory]
     [MemberData(nameof(RotationAdmissionCases))]
     public void RecordData_LoadingRotation_ShouldNormalizeBeforePublishingRuntimeState(
         string _,

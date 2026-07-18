@@ -146,6 +146,20 @@ public sealed class PhysicsSettingsTests
         action.Should().Throw<ArgumentException>().WithParameterName("value");
     }
 
+    [Theory]
+    [InlineData((byte)4)]
+    [InlineData(byte.MaxValue)]
+    public void DefaultContinuousCollisionMode_ShouldRejectUndefinedValues(byte rawValue)
+    {
+        var settings = PhysicsSettings.DefaultSettings();
+        settings.DefaultContinuousCollisionMode = ContinuousCollisionMode.Auto;
+
+        Action action = () => settings.DefaultContinuousCollisionMode = (ContinuousCollisionMode)rawValue;
+
+        action.Should().Throw<ArgumentOutOfRangeException>().WithParameterName("value");
+        settings.DefaultContinuousCollisionMode.Should().Be(ContinuousCollisionMode.Auto);
+    }
+
     [Fact]
     public void RestitutionVelocityThreshold_ShouldStoreNonNegativeValues()
     {

@@ -21,6 +21,7 @@ public partial class SolidBody
         BodyFreezeAxes3D freezeAxes = FreezeAxes;
         bool isKinematic = IsKinematic;
         Fixed64 gravityScale = GravityScale;
+        ContinuousCollisionMode continuousCollisionMode = ContinuousCollisionMode;
 
         RecordValues.Look(chronicler, ref Debug, "Debug");
         RecordValues.Look(chronicler, ref active, "Active");
@@ -59,7 +60,7 @@ public partial class SolidBody
         RecordValues.Look(chronicler, ref _sleepFrameThreshold, "SleepFrameThreshold", 16);
         RecordValues.Look(chronicler, ref _sleepLinearSpeedThreshold, "SleepLinearSpeedThreshold", (Fixed64)0.001f);
         RecordValues.Look(chronicler, ref _sleepAngularSpeedThreshold, "SleepAngularSpeedThreshold", (Fixed64)0.001f);
-        RecordValues.Look(chronicler, ref _continuousCollisionMode, "ContinuousCollisionMode", ContinuousCollisionMode.Inherit);
+        RecordValues.Look(chronicler, ref continuousCollisionMode, "ContinuousCollisionMode", ContinuousCollisionMode.Inherit);
         RecordValues.Look(chronicler, ref _linearSpeed, "LinearSpeed");
         RecordValues.Look(chronicler, ref _linearAccelerationStore, "LinearAccelerationStore");
         RecordValues.Look(chronicler, ref _deltaAcceleration, "DeltaAcceleration");
@@ -75,6 +76,7 @@ public partial class SolidBody
 
         if (chronicler.Mode == SerializationMode.Loading)
         {
+            ContinuousCollisionMode = continuousCollisionMode;
             _rotation = _rotation.Normalized;
             Active = active && Collider.Id >= 0;
             _freezeAxes = freezeAxes;

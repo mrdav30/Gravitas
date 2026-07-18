@@ -17,6 +17,21 @@ public sealed partial class ContinuousCollisionDetectionTests
     private static readonly Fixed64 WallThickness = Fixed64.FromFraction(1, 10);
     private static readonly Fixed64 ExpectedSphereImpactX = -(Fixed64.Half + WallThickness * Fixed64.Half);
 
+    [Theory]
+    [InlineData((byte)4)]
+    [InlineData(byte.MaxValue)]
+    public void ContinuousCollisionMode_WithUndefinedValue_ShouldRejectWithoutChangingMode(byte rawValue)
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        (SolidBody body, _) = CreateMover(scenario, TestColliderShape.Sphere);
+        body.ContinuousCollisionMode = ContinuousCollisionMode.Auto;
+
+        Action action = () => body.ContinuousCollisionMode = (ContinuousCollisionMode)rawValue;
+
+        action.Should().Throw<ArgumentOutOfRangeException>().WithParameterName("value");
+        body.ContinuousCollisionMode.Should().Be(ContinuousCollisionMode.Auto);
+    }
+
     [Fact]
     public void InheritMode_WithDefaultDiscreteSettings_ShouldUseDiscreteIntegration()
     {

@@ -52,6 +52,12 @@ before any runtime shape or host state observes it; a zero quaternion resolves
 to identity. 3D visual interpolation buffers reset from that authoritative
 state instead of being treated as replay truth.
 
+Continuous-collision modes are validated at the settings and body publication
+boundaries. `Inherit`, `Discrete`, `Continuous`, and `Auto` load normally;
+undefined byte-cast values throw `ArgumentOutOfRangeException`. A rejected body
+value does not replace its previously valid mode, and a rejected
+`PhysicsSettingsSaver` does not replace the context's existing settings.
+
 ## Recordable Types
 
 | Type                                    | What it records                                                                                                                                                                            | What it does not own                                             |

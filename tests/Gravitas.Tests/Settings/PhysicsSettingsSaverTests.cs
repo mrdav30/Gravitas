@@ -155,4 +155,23 @@ public sealed class PhysicsSettingsSaverTests
                 settings.CollisionMatrix[x, y].Should().Be(expected[x, y]);
         }
     }
+
+    [Theory]
+    [InlineData((byte)4)]
+    [InlineData(byte.MaxValue)]
+    public void ApplyTo_WithUndefinedContinuousCollisionMode_ShouldRejectBeforeReplacingSettings(byte rawValue)
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        PhysicsSettings originalSettings = context.Settings;
+        var saver = new PhysicsSettingsSaver
+        {
+            DefaultContinuousCollisionMode = (ContinuousCollisionMode)rawValue
+        };
+
+        Action action = () => saver.ApplyTo(context);
+
+        action.Should().Throw<ArgumentOutOfRangeException>().WithParameterName("value");
+        context.Settings.Should().BeSameAs(originalSettings);
+        context.Settings.DefaultContinuousCollisionMode.Should().Be(ContinuousCollisionMode.Discrete);
+    }
 }

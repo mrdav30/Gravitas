@@ -31,6 +31,14 @@ handoff queues.
 Both body types expose body-owned TOI counters, and both physics services expose
 service-level island counters for the last late step.
 
+`Inherit`, `Discrete`, `Continuous`, and `Auto` are the only valid
+`ContinuousCollisionMode` values. The context default deliberately accepts
+`Inherit`; if no body or hierarchy override supplies a concrete mode, that
+context value resolves to `Discrete`. Public settings/body assignment and
+settings or replay population reject undefined byte-cast values with
+`ArgumentOutOfRangeException` before publishing them. Invalid authored or
+serialized state therefore cannot silently change tunneling policy.
+
 ## CCD Paths
 
 ### `SolidBody`

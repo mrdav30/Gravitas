@@ -17,6 +17,25 @@ namespace Gravitas.Tests.Physics2D;
 public sealed class ContinuousCollision2DTests
 {
     [Theory]
+    [InlineData((byte)4)]
+    [InlineData(byte.MaxValue)]
+    public void ContinuousCollisionMode_WithUndefinedValue_ShouldRejectWithoutChangingMode(byte rawValue)
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        SolidBody2D body = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            Vector2d.Zero,
+            immovable: false);
+        body.ContinuousCollisionMode = ContinuousCollisionMode.Auto;
+
+        Action action = () => body.ContinuousCollisionMode = (ContinuousCollisionMode)rawValue;
+
+        action.Should().Throw<ArgumentOutOfRangeException>().WithParameterName("value");
+        body.ContinuousCollisionMode.Should().Be(ContinuousCollisionMode.Auto);
+    }
+
+    [Theory]
     [InlineData(ColliderType2D.Circle)]
     [InlineData(ColliderType2D.AABox)]
     [InlineData(ColliderType2D.ConvexPolygon)]

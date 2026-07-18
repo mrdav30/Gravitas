@@ -9,6 +9,7 @@ using FixedMathSharp;
 using Gravitas.Support;
 using SwiftCollections;
 using System;
+using System.Runtime.CompilerServices;
 
 namespace Gravitas;
 
@@ -53,6 +54,7 @@ public sealed partial class PhysicsSettings
 
     private int _retainedPartitionTimeToKillFrames = DefaultRetainedPartitionTimeToKillFrames;
     private int _retainedPartitionRetirementSweepBudget = DefaultRetainedPartitionRetirementSweepBudget;
+    private ContinuousCollisionMode _defaultContinuousCollisionMode = ContinuousCollisionMode.Discrete;
     private int _continuousCollisionMaxToiIterations = DefaultContinuousCollisionMaxToiIterations;
     private int _discreteSolverIterations = DefaultDiscreteSolverIterations;
     private Fixed64 _restitutionVelocityThreshold = DefaultRestitutionVelocityThreshold;
@@ -89,8 +91,20 @@ public sealed partial class PhysicsSettings
 
     /// <summary>
     /// Gets or sets the default tunneling policy used by bodies configured to inherit from the context.
+    /// A context default of <see cref="ContinuousCollisionMode.Inherit"/> resolves to
+    /// <see cref="ContinuousCollisionMode.Discrete"/>.
     /// </summary>
-    public ContinuousCollisionMode DefaultContinuousCollisionMode { get; set; } = ContinuousCollisionMode.Discrete;
+    /// <exception cref="ArgumentOutOfRangeException">The value is not a declared continuous-collision mode.</exception>
+    public ContinuousCollisionMode DefaultContinuousCollisionMode
+    {
+        get => _defaultContinuousCollisionMode;
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        set
+        {
+            value.ThrowIfInvalid(nameof(value));
+            _defaultContinuousCollisionMode = value;
+        }
+    }
 
     /// <summary>
     /// Gets or sets the maximum same-frame continuous-collision TOI iterations one body or handoff queue may consume.

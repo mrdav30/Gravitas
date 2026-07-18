@@ -127,12 +127,17 @@ public sealed partial class SolidBody2D : IRecordable
     /// <summary>
     /// Selects the deterministic tunneling guard used when this pure 2D body commits frame movement.
     /// </summary>
+    /// <exception cref="System.ArgumentOutOfRangeException">The value is not a declared continuous-collision mode.</exception>
     public ContinuousCollisionMode ContinuousCollisionMode
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get => _continuousCollisionMode;
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        set => _continuousCollisionMode = value;
+        set
+        {
+            value.ThrowIfInvalid(nameof(value));
+            _continuousCollisionMode = value;
+        }
     }
 
     /// <summary>

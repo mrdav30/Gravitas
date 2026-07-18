@@ -5,6 +5,9 @@
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
+using SwiftCollections;
+using System.Runtime.CompilerServices;
+
 namespace Gravitas;
 
 /// <summary>
@@ -31,4 +34,21 @@ public enum ContinuousCollisionMode : byte
     /// Sweeps only when the intended frame displacement is larger than the body proxy radius.
     /// </summary>
     Auto = 3
+}
+
+internal static class ContinuousCollisionModeSupport
+{
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static bool IsValid(this ContinuousCollisionMode mode) =>
+        (byte)mode <= (byte)ContinuousCollisionMode.Auto;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static void ThrowIfInvalid(this ContinuousCollisionMode mode, string parameterName)
+    {
+        SwiftThrowHelper.ThrowIfArgumentOutOfRange(
+            !mode.IsValid(),
+            (int)mode,
+            parameterName,
+            "Continuous collision mode must be Inherit, Discrete, Continuous, or Auto.");
+    }
 }

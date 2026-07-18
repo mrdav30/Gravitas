@@ -44,46 +44,22 @@ records follow with their original discovery context.
 ### Ordered Queue
 
 1. **Gravitas:**
-   [Continuous-Collision Modes Accept Undefined Enum Values](#continuous-collision-modes-accept-undefined-enum-values).
-2. **Gravitas:**
    [3D Exit Callback Failure Can Duplicate Reentrant Separation Notifications](#3d-exit-callback-failure-can-duplicate-reentrant-separation-notifications).
-3. **Gravitas:**
+2. **Gravitas:**
    [CCD Handoff Dedupe Can Strand A Same-Frame Requeued Body](#ccd-handoff-dedupe-can-strand-a-same-frame-requeued-body).
-4. **Gravitas:**
+3. **Gravitas:**
    [SolidBody Point Transforms Use Collider Dimensions As Transform Scale](#solidbody-point-transforms-use-collider-dimensions-as-transform-scale).
-5. **Gravitas:**
+4. **Gravitas:**
    [3D Angular Impulse Scales Immediate Velocity By Frame Delta](#3d-angular-impulse-scales-immediate-velocity-by-frame-delta).
-6. **Gravitas:**
+5. **Gravitas:**
    [Rotational CCD Can Miss Contacts Between Bounded Pose Samples](#rotational-ccd-can-miss-contacts-between-bounded-pose-samples).
+6. **Gravitas:**
+   [Convex Mesh Mode Accepts Disconnected Topology And Can Collide In Empty Bounds Space](#convex-mesh-mode-accepts-disconnected-topology-and-can-collide-in-empty-bounds-space).
 7. **Gravitas:**
-    [Convex Mesh Mode Accepts Disconnected Topology And Can Collide In Empty Bounds Space](#convex-mesh-mode-accepts-disconnected-topology-and-can-collide-in-empty-bounds-space).
-8. **Gravitas:**
-    [Relative CCD Quadratic Saturation Can Miss Extreme-Range Crossings](#relative-ccd-quadratic-saturation-can-miss-extreme-range-crossings).
-    Reuse the magnitude and normalization policy established by the resolved
-    extreme-convex-sweep work when adding the separate scale-safe quadratic
-    implementation.
-
-### Continuous-Collision Modes Accept Undefined Enum Values
-
-**Discovered:** 2026-07-13  
-**Source:** 95%-to-100% coverage hardening, 3D CCD helper review  
-**Affected area:** `PhysicsSettings.DefaultContinuousCollisionMode`,
-`SolidBody.ContinuousCollisionMode`, `SolidBody2D.ContinuousCollisionMode`, and
-replay/settings population
-
-The context setting and both body properties accept any byte-cast
-`ContinuousCollisionMode` value. Values outside `Inherit`, `Discrete`,
-`Continuous`, and `Auto` survive assignment and serialization, but the runtime
-mode check treats them as neither continuous nor automatic and silently falls
-back to discrete movement. That turns corrupt or invalid authored state into a
-quiet tunneling-policy change instead of an explicit deterministic failure.
-
-Resolve this consistently at all public assignment and load boundaries. Decide
-whether `Inherit` remains valid for the context default (it currently resolves
-to `Discrete` intentionally), add invalid byte-value regressions for 2D, 3D,
-settings save/apply, and replay population, and document the chosen exception
-and load behavior. This does not block the coverage campaign because no invalid
-value is needed to close the retained CCD branches.
+   [Relative CCD Quadratic Saturation Can Miss Extreme-Range Crossings](#relative-ccd-quadratic-saturation-can-miss-extreme-range-crossings).
+   Reuse the magnitude and normalization policy established by the resolved
+   extreme-convex-sweep work when adding the separate scale-safe quadratic
+   implementation.
 
 ### Relative CCD Quadratic Saturation Can Miss Extreme-Range Crossings
 
@@ -243,6 +219,38 @@ does not block coverage convergence and is independent of the redundant
 active/dynamic-ID admission predicates removed in Task 67.
 
 ## Resolved Issues
+
+### Continuous-Collision Modes Accepted Undefined Enum Values
+
+**Resolved:** 2026-07-17  
+**Source:** 95%-to-100% coverage hardening, 3D CCD helper review  
+**Affected area:** `PhysicsSettings.DefaultContinuousCollisionMode`,
+`SolidBody.ContinuousCollisionMode`, `SolidBody2D.ContinuousCollisionMode`, and
+replay/settings population
+
+RCA: the context setting and both body properties assigned the byte-backed enum
+without validating that the value was declared. Chronicler also populated the
+body backing fields directly. Undefined values could therefore survive public
+assignment or serialization, then resolve as neither continuous nor automatic
+and silently use discrete movement.
+
+Fix: one enum-adjacent validation policy now admits only `Inherit`, `Discrete`,
+`Continuous`, and `Auto`. Context settings and both body properties reject
+undefined values with `ArgumentOutOfRangeException` before changing their
+stored mode. Body replay loads through a validated local value, so a rejected
+payload does not publish the corrupt mode, while `PhysicsSettingsSaver`
+materialization rejects invalid authored or deserialized values before
+replacing context settings. Context-level `Inherit` remains valid and
+deliberately resolves to `Discrete` when no concrete body or hierarchy override
+exists.
+
+Verification: first-invalid (`4`) and byte-maximum (`255`) regressions cover
+3D and 2D body assignment, context settings, settings application, and both
+body replay paths, including preservation of the previously valid value after
+rejection. Existing 2D and 3D context-`Inherit` behavior remains covered. The
+focused suite passes `14/14`; the full locally linked suites pass `2716/2716`
+in `Release` and `2677/2677` in `ReleaseLean`. Both configurations build the
+`net8.0` and `netstandard2.1` package targets with zero warnings.
 
 ### Non-Unit Quaternion Admission Can Collapse Runtime Shape Axes
 

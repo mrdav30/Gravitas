@@ -93,12 +93,17 @@ public partial class SolidBody : IRecordable
     /// Selects the deterministic tunneling guard used when this body commits frame movement.
     /// Inherited values resolve through the cached top-parent body before falling back to context settings.
     /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">The value is not a declared continuous-collision mode.</exception>
     public ContinuousCollisionMode ContinuousCollisionMode
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get => _continuousCollisionMode;
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        set => _continuousCollisionMode = value;
+        set
+        {
+            value.ThrowIfInvalid(nameof(value));
+            _continuousCollisionMode = value;
+        }
     }
 
     /// <summary>
