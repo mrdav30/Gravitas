@@ -2050,6 +2050,109 @@ public sealed class MixedQueryCcdTests
     }
 
     [Fact]
+    public void CircleSlabReducer_WithExtremeOffAxisCrossing_ShouldPreserveEntryDistance()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        var target = (LSCircleCollider2D)CreateBodylessCircle2D(context, Vector2d.Zero);
+        // Change the authored shape only after its small registration footprint is established;
+        // this test calls the reducer directly and intentionally bypasses broad-phase traversal.
+        target.Radius = (Fixed64)99_999;
+        Vector3d start = new(-200_000, 0, 60_000);
+        Vector3d end = new(200_000, 0, 60_000);
+
+        bool found = GravitasQueryMixedService.TrySweepSphereAgainstCircleSlab(
+            start,
+            end,
+            Vector3d.Right,
+            (Fixed64)400_000,
+            Fixed64.One,
+            target,
+            out PhysicsMixedHit hit);
+
+        found.Should().BeTrue();
+        hit.Collider2D.Should().BeSameAs(target);
+        hit.Distance.Should().Be((Fixed64)120_000);
+        hit.ReducerKind.Should().Be(PhysicsQueryReducerKind.Exact);
+    }
+
+    [Fact]
+    public void CircleSlabReducer_WithRoundedSideContactAtEnd_ShouldUseAuthoredEndpoint()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        Fixed64 startX = Fixed64.FromFraction(-1, 32_768);
+        Fixed64 endX = Fixed64.FromFraction(-1, 65_536);
+        var target = (LSCircleCollider2D)CreateBodylessCircle2D(
+            context,
+            new Vector2d(endX, Fixed64.Zero));
+        Vector3d start = new(startX, Fixed64.Zero, (Fixed64)(-2));
+        Vector3d end = new(endX, Fixed64.Zero, -Fixed64.One);
+        Vector3d segment = end - start;
+        Fixed64 length = segment.Magnitude;
+
+        bool found = GravitasQueryMixedService.TrySweepSphereAgainstCircleSlab(
+            start,
+            end,
+            segment.Normalized,
+            length,
+            Fixed64.Half,
+            target,
+            out PhysicsMixedHit hit);
+
+        found.Should().BeTrue();
+        hit.Distance.Should().Be(length);
+        hit.Collider2D.Should().BeSameAs(target);
+    }
+
+    [Fact]
+    public void CircleSlabReducer_WithCapContactAtEnd_ShouldUseAuthoredEndpoint()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        var target = (LSCircleCollider2D)CreateBodylessCircle2D(context, Vector2d.Zero);
+        Vector3d start = new((Fixed64)2, (Fixed64)2, Fixed64.Zero);
+        Vector3d end = new(Fixed64.Zero, Fixed64.One, Fixed64.Zero);
+        Vector3d segment = end - start;
+        Fixed64 length = segment.Magnitude;
+
+        bool found = GravitasQueryMixedService.TrySweepSphereAgainstCircleSlab(
+            start,
+            end,
+            segment.Normalized,
+            length,
+            Fixed64.Half,
+            target,
+            out PhysicsMixedHit hit);
+
+        found.Should().BeTrue();
+        hit.Distance.Should().Be(length);
+        hit.Collider2D.Should().BeSameAs(target);
+    }
+
+    [Fact]
+    public void CircleAgainstSphereReducer_WithOppositeDomainVerticalSeparation_ShouldReject()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        LSSphereCollider target = CreateBodyless3D(context, new LSSphereCollider(), Vector3d.Zero);
+        target.Radius = Fixed64.MaxValue;
+        target.LocalOffset = new Vector3d(Fixed64.Zero, Fixed64.MaxValue, Fixed64.Zero);
+
+        bool found = GravitasQueryMixedService.TrySweepCircleAgainstSphere(
+            -Vector2d.One,
+            Vector2d.One,
+            Vector2d.One.Normalized,
+            Vector2d.One.Magnitude * 2,
+            Fixed64.Half,
+            Fixed64.MinValue,
+            Fixed64.One,
+            new Vector3d(Vector2d.One.Normalized.X, Fixed64.Zero, Vector2d.One.Normalized.Y),
+            target,
+            null,
+            out PhysicsMixedHit hit);
+
+        found.Should().BeFalse();
+        hit.Should().Be(default(PhysicsMixedHit));
+    }
+
+    [Fact]
     public void SweepSphereAgainst2D_WithCircleSlabTopFace_ShouldReportExactHit()
     {
         using GravitasWorldContext context = CreateMixedContext();
@@ -2716,7 +2819,7 @@ public sealed class MixedQueryCcdTests
     }
 
     [Fact]
-    public void SweepSphereAgainst2DAll_AabbPolygonAndCompoundSlabs_ShouldNotAllocateAfterWarmup()
+    public void SweepSphereAgainst2DAll_AabbCirclePolygonAndCompoundSlabs_ShouldNotAllocateAfterWarmup()
     {
         using GravitasWorldContext context = CreateMixedContext();
         _ = CreateBodylessBox2D(context, new Vector2d((Fixed64)(-2), Fixed64.Zero), new Vector2d((Fixed64)2, (Fixed64)2));
@@ -2726,6 +2829,7 @@ public sealed class MixedQueryCcdTests
             new Vector2d((Fixed64)2, Fixed64.Zero),
             CompoundColliderPart2D.AABBox(Vector2d.One, Vector2d.Zero),
             CompoundColliderPart2D.ConvexPolygon(CreateDiamondVertices(), new Vector2d(Fixed64.One, Fixed64.Zero)));
+        _ = CreateBodylessCircle2D(context, new Vector2d((Fixed64)4, Fixed64.Zero));
         var hits = new SwiftList<PhysicsMixedHit>(4);
 
         long allocatedBytes = AllocationTestHelper.MeasureSteadyState(

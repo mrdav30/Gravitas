@@ -19,7 +19,7 @@ namespace Gravitas.Queries;
 /// </summary>
 public sealed partial class GravitasQueryMixedService
 {
-    private static bool TrySweepCircleAgainstSphere(
+    internal static bool TrySweepCircleAgainstSphere(
         Vector2d start,
         Vector2d end,
         Vector2d direction,
@@ -33,17 +33,17 @@ public sealed partial class GravitasQueryMixedService
         out PhysicsMixedHit hit)
     {
         Fixed64 sphereRadius = sphere.ScaledRadius;
-        Fixed64 verticalExcess = (sphere.Center.Y - slabCenterY).Abs() - halfThickness;
-        if (verticalExcess < Fixed64.Zero)
-            verticalExcess = Fixed64.Zero;
-        if (verticalExcess > sphereRadius)
+        if (!FixedMath.TryGetSphereSlabCrossSectionRadius(
+                sphere.Center.Y,
+                sphereRadius,
+                slabCenterY,
+                halfThickness,
+                out Fixed64 planarSphereRadius))
         {
             hit = default;
             return false;
         }
 
-        Fixed64 planarSphereRadiusSqr = sphereRadius * sphereRadius - verticalExcess * verticalExcess;
-        Fixed64 planarSphereRadius = FixedMath.Sqrt(planarSphereRadiusSqr);
         Vector2d sphereCenter = new(sphere.Center.X, sphere.Center.Z);
         if (!TrySweepPointInPlane(
             start,

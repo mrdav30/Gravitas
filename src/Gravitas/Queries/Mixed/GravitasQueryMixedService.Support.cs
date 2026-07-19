@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using FixedMathSharp.Bounds;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using System.Runtime.CompilerServices;
@@ -128,90 +129,149 @@ public sealed partial class GravitasQueryMixedService
     }
 
     private static bool TrySweepCircleSlabSide(
-        Vector3d localStart,
-        Vector3d direction,
+        Fixed64 localStartY,
+        Fixed64 localEndY,
+        Vector2d planarStart,
+        Vector2d planarEnd,
+        Vector2d planarSpatialDirection,
         Fixed64 length,
-        Fixed64 radius,
+        FixedBoundCircle radialBound,
+        Fixed64 radiusExpansion,
         Fixed64 halfHeight,
         out Fixed64 distance)
     {
         distance = Fixed64.Zero;
-        Fixed64 a = direction.X * direction.X + direction.Z * direction.Z;
-        if (a <= Fixed64.Epsilon)
+        if (!Vector2d.TrySubtract(planarEnd, planarStart, out Vector2d planarSegment))
             return false;
 
-        Fixed64 b = 2 * (localStart.X * direction.X + localStart.Z * direction.Z);
-        Fixed64 c = localStart.X * localStart.X + localStart.Z * localStart.Z - radius * radius;
-        Fixed64 discriminant = b * b - 4 * a * c;
-        if (discriminant < Fixed64.Zero)
+        var ray = new FixedRay2d(planarStart, planarSegment);
+        if (!ray.TryGetIntersectionInterval(
+                radialBound,
+                radiusExpansion,
+                Fixed64.One,
+                out Fixed64 first,
+                out Fixed64 second))
+        {
             return false;
+        }
 
-        Fixed64 root = FixedMath.Sqrt(discriminant);
-        Fixed64 denominator = 2 * a;
-        Fixed64 first = (-b - root) / denominator;
-        Fixed64 second = (-b + root) / denominator;
-        bool found = false;
-        Fixed64 best = Fixed64.MaxValue;
-        TryKeepEarlierSweep(
-            IsCircleSlabSideHit(localStart, direction, length, halfHeight, first),
-            first,
-            ref found,
-            ref best);
-        TryKeepEarlierSweep(
-            IsCircleSlabSideHit(localStart, direction, length, halfHeight, second),
-            second,
-            ref found,
-            ref best);
+        bool useExit = !IsCircleSlabSideHit(localStartY, localEndY, halfHeight, first);
+        Fixed64 parameter = useExit ? second : first;
+        if ((useExit && second == first)
+            || !IsCircleSlabSideHit(localStartY, localEndY, halfHeight, parameter))
+        {
+            return false;
+        }
 
-        distance = best;
-        return found;
+        if (parameter == Fixed64.Zero)
+            return true;
+        if (parameter == Fixed64.One)
+        {
+            distance = length;
+            return true;
+        }
+
+        // Keep the established spatial-distance rounding when the normalized
+        // line can represent the same root. The authored segment interval
+        // above remains authoritative for admission and finite-Y clipping.
+        var spatialRay = new FixedRay2d(planarStart, planarSpatialDirection);
+        if (spatialRay.TryGetIntersectionInterval(
+                radialBound,
+                radiusExpansion,
+                length,
+                out Fixed64 spatialEntry,
+                out Fixed64 spatialExit))
+        {
+            distance = useExit ? spatialExit : spatialEntry;
+            return true;
+        }
+
+        distance = FixedMath.Lerp(Fixed64.Zero, length, parameter);
+        return true;
     }
 
     private static bool TrySweepCircleSlabCap(
-        Vector3d localStart,
-        Vector3d direction,
+        Fixed64 localStartY,
+        Fixed64 localEndY,
+        Fixed64 directionY,
+        Vector2d planarStart,
+        Vector2d planarEnd,
         Fixed64 length,
-        Fixed64 radius,
+        FixedBoundCircle radialBound,
+        Fixed64 radiusExpansion,
         Fixed64 capY,
         out Fixed64 distance)
     {
         distance = Fixed64.Zero;
-        if (direction.Y.Abs() <= Fixed64.Epsilon)
+        if (!Fixed64.TrySubtract(localEndY, localStartY, out Fixed64 verticalSegment)
+            || verticalSegment == Fixed64.Zero
+            || !Fixed64.TrySubtract(capY, localStartY, out Fixed64 capOffset))
+        {
+            return false;
+        }
+
+        Fixed64 candidate = capOffset / verticalSegment;
+        if (candidate < Fixed64.Zero || candidate > Fixed64.One)
             return false;
 
-        Fixed64 candidate = (capY - localStart.Y) / direction.Y;
-        if (candidate < Fixed64.Zero || candidate > length)
+        Vector2d planarPoint = Vector2d.Lerp(planarStart, planarEnd, candidate);
+        if (!IsInsideExpandedCircle(planarPoint, radialBound, radiusExpansion))
             return false;
 
-        Vector3d localPoint = localStart + direction * candidate;
-        Fixed64 radialSqr = localPoint.X * localPoint.X + localPoint.Z * localPoint.Z;
-        if (radialSqr > radius * radius + Fixed64.Epsilon)
-            return false;
+        if (candidate == Fixed64.One)
+        {
+            distance = length;
+            return true;
+        }
 
-        distance = candidate;
+        if (directionY != Fixed64.Zero)
+        {
+            Fixed64 spatialDistance = capOffset / directionY;
+            if (spatialDistance >= Fixed64.Zero && spatialDistance <= length)
+            {
+                distance = spatialDistance;
+                return true;
+            }
+        }
+
+        distance = FixedMath.Lerp(Fixed64.Zero, length, candidate);
         return true;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool IsCircleSlabSideHit(
-        Vector3d localStart,
-        Vector3d direction,
-        Fixed64 length,
+        Fixed64 localStartY,
+        Fixed64 localEndY,
         Fixed64 halfHeight,
-        Fixed64 distance)
+        Fixed64 parameter)
     {
-        if (distance < Fixed64.Zero || distance > length)
+        if (parameter < Fixed64.Zero || parameter > Fixed64.One)
             return false;
 
-        Fixed64 y = localStart.Y + direction.Y * distance;
+        Fixed64 y = FixedMath.Lerp(localStartY, localEndY, parameter);
         return y >= -halfHeight && y <= halfHeight;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool IsInsideCircleSlab(Vector3d localPoint, Fixed64 radius, Fixed64 halfHeight) =>
-        localPoint.Y >= -halfHeight
-        && localPoint.Y <= halfHeight
-        && localPoint.X * localPoint.X + localPoint.Z * localPoint.Z <= radius * radius;
+    private static bool IsInsideCircleSlab(
+        Fixed64 localY,
+        Vector2d planarPoint,
+        FixedBoundCircle radialBound,
+        Fixed64 radiusExpansion,
+        Fixed64 halfHeight) =>
+        localY >= -halfHeight
+        && localY <= halfHeight
+        && IsInsideExpandedCircle(planarPoint, radialBound, radiusExpansion);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool IsInsideExpandedCircle(
+        Vector2d point,
+        FixedBoundCircle radialBound,
+        Fixed64 radiusExpansion) =>
+        new FixedRay2d(point, Vector2d.Zero).Intersects(
+            radialBound,
+            radiusExpansion,
+            Fixed64.Zero).HasValue;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void TryKeepEarlierSweep(

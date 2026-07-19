@@ -30,9 +30,10 @@ records follow with their original discovery context.
   release with them in place.
 - FixedMathSharp foundation hardening is complete. The current locally linked
   radial extension also reports 100% line, branch, and method coverage, with
-  1,432 standard and 1,411 Lean tests passing. Close the remaining radial
-  interval item before releasing FixedMathSharp, then restore its package
-  references and validate/release SwiftCollections.
+  1,460 standard and 1,439 Lean tests plus 8 Chronicler tests in each
+  configuration passing. Its radial interval implementation is complete;
+  retain the local link while the remaining Gravitas queue and the explicitly
+  deferred finite-axis/sphere-construction items are triaged.
 - SwiftCollections has no library-specific active issue at this checkpoint; its
   place in the sequence is a full downstream compatibility and release gate.
 - GridForge's runtime-identity defect is resolved. Keep the lower stack locally
@@ -44,37 +45,16 @@ records follow with their original discovery context.
 
 ### Ordered Queue
 
-1. **FixedMathSharp then Gravitas:**
-   [Full-Domain Radial Bounds And Query Intervals Remain Incomplete](#full-domain-radial-bounds-and-query-intervals-remain-incomplete).
-2. **Gravitas:**
+1. **Gravitas:**
    [3D CCD Handoff Callback Failure Can Abandon Queue Cleanup](#3d-ccd-handoff-callback-failure-can-abandon-queue-cleanup).
-3. **Gravitas:**
+2. **Gravitas:**
    [Rotational CCD Omits Dynamic And Mixed Targets](#rotational-ccd-omits-dynamic-and-mixed-targets).
-
-### Full-Domain Radial Bounds And Query Intervals Remain Incomplete
-
-**Discovered:** 2026-07-18  
-**Source:** relative CCD exact-root migration and mixed-query parity review  
-**Affected area:** FixedMathSharp radial bounds and two-root intervals; Gravitas
-3D raycast segments and mixed finite-slab/capsule reducers
-
-FixedMathSharp's new exact bounded first-root solver closes the sphere/circle
-sweep defect, but it deliberately does not expose both roots of the radial
-quadratic. Gravitas still has interval consumers that require entry and exit:
-the 3D raycast segment worker, mixed circle-against-3D finite-slab side tests,
-and mixed sphere-against-2D capsule/cylinder projections. Migrating those sites
-to a first-root API would discard their finite-height or finite-segment clipping
-contract. The mixed planar sphere cross-section also evaluates
-`radiusSquared - verticalSquared` in saturating Q32.32.
-
-Some `FixedBoundCircle` and `FixedBoundSphere` containment/intersection paths
-also still compare saturated squared magnitudes. Resolve the lower-stack
-ownership first with reusable exact radial-distance predicates and a bounded
-two-root/interval primitive that preserves root ordering and nearest-even public
-conversion across the complete finite endpoint domain. Then migrate every
-remaining Gravitas interval consumer, with 2D/3D and mixed parity regressions,
-ordinary-range compatibility tests, zero-allocation hot-path evidence, and
-focused benchmarks.
+3. **FixedMathSharp then Gravitas:**
+   [Finite-Axis Capsule, Cylinder, And Mesh-Edge Projections Can Saturate Before Solving](#finite-axis-capsule-cylinder-and-mesh-edge-projections-can-saturate-before-solving).
+4. **FixedMathSharp:**
+   [Sphere Construction And Merge Paths Are Not Full-Domain](#sphere-construction-and-merge-paths-are-not-full-domain).
+5. **Gravitas:**
+   [Conic Query Quadratics Can Saturate Before Solving](#conic-query-quadratics-can-saturate-before-solving).
 
 ### 3D CCD Handoff Callback Failure Can Abandon Queue Cleanup
 
@@ -124,7 +104,104 @@ and dynamic hits must enter the existing bounded handoff/response lifecycle.
 Add pure 2D, pure 3D, both mixed source directions, dynamic handoff, replay, and
 allocation regressions.
 
+### Finite-Axis Capsule, Cylinder, And Mesh-Edge Projections Can Saturate Before Solving
+
+**Discovered:** 2026-07-18  
+**Source:** full-domain radial interval consumer audit  
+**Affected area:** FixedMathSharp finite-axis geometry ownership; Gravitas 3D
+raycast capsules/cylinders, 3D swept-sphere capsule/cylinder and mesh-edge
+reducers, mixed swept-sphere segment-capsule reducers, and mixed circle-slab
+height/cap clipping
+
+The exact circle/sphere interval API cannot repair a finite-axis projection
+after endpoint subtraction, axis normalization, perpendicular reduction, or
+quadratic coefficients have already saturated in `Fixed64`. These consumers
+also need both roots because axial clipping can reject the entry root while
+accepting the exit root. Feeding narrowed coefficients into another exact root
+solver would only hide the earlier information loss.
+
+Design one allocation-free FixedMathSharp primitive that owns the endpoint
+differences, perpendicular projection, exact radial solve, and finite axial
+clipping before public narrowing. Then migrate all 2D/3D/mixed consumers as one
+contract, preserving authored endpoints, deterministic feature order, and
+degenerate-segment reduction. Include the existing 3D raycast-capsule defect in
+this work: endpoint hemispheres are currently evaluated only when the cylinder
+misses, and short-circuit endpoint checks can select an internal seam or the far
+hemisphere instead of the nearest outer feature. This is mirrored as
+`FMS-Issue-014` in the FixedMathSharp tracker.
+
+The mixed circle-slab radial side and sphere cross-section are exact, but its
+vertical contract remains in this work: combined half-height, local Y offsets,
+and cap reconstruction can still narrow before finite-axis clipping.
+
+### Sphere Construction And Merge Paths Are Not Full-Domain
+
+**Discovered:** 2026-07-18  
+**Source:** exact radial predicate migration  
+**Affected area:** FixedMathSharp `FixedBoundSphere.CreateFromPoints`,
+`CreateFromFrustum`, `CreateMerged`, and radius expansion/update paths
+
+Exact containment exposed that several sphere construction and merge paths
+still narrow endpoint differences, squared-distance ordering, or radius updates
+before the result is known. The radial predicate work corrected ordinary
+tilted-frustum admission but deliberately did not claim full-domain sphere
+construction. Resolve this in FixedMathSharp before its next release with
+focused construction/merge regressions, 2D parity where applicable, and
+allocation benchmarks. This is the downstream release-tracking mirror of
+`FMS-Issue-015`.
+
+### Conic Query Quadratics Can Saturate Before Solving
+
+**Discovered:** 2026-07-18  
+**Source:** radial consumer audit  
+**Affected area:** `RaycastSegmentWorker` cone intersections and
+`GravitasQuery3DService` cone sweep/query reducers
+
+Cone intersections are conic rather than radial. Their local reductions and
+quadratic coefficients can saturate before discriminant/root evaluation, so
+the new circle/sphere interval primitive is not an honest replacement. Design
+a dedicated exact conic reducer with explicit finite-height clipping and
+feature ordering; cover extreme crossings, tangency/near-miss, first-root
+rejection with second-root admission, starts inside, and authored endpoint
+contact. Keep it allocation-free and benchmark the query hot path.
+
 ## Resolved Issues
+
+### Full-Domain Radial Bounds And Query Intervals Were Incomplete
+
+**Resolved:** 2026-07-18  
+**Source:** relative CCD exact-root migration and mixed-query parity review  
+**Affected area:** FixedMathSharp radial predicates, bounded ray intervals, and
+cross-sections; Gravitas 3D sphere-segment raycasts and mixed circle-slab/sphere
+cross-section reducers
+
+RCA: several circle/sphere predicates compared saturated squared values, and
+interval consumers recomputed two-root quadratics after narrowing. Gravitas's
+raw sphere-segment overload also accepted a pre-squared radius, preventing the
+lower layer from preserving the authored radius across the full domain. Mixed
+sphere/circle reduction separately narrowed a difference of squares.
+
+FixedMathSharp now owns exact 2D/3D radial predicates, strict containment,
+bounded entry/exit intervals with separate radius expansion, and exact sphere
+cross-section radii. Misleading public squared-radius properties were removed.
+Gravitas now retains actual radii through explicit `FixedBoundSphere` ownership,
+parameterizes sphere-segment raycasts by the authored segment over `[0, 1]`,
+preserves authored endpoints, uses exact mixed circle-slab entry/exit intervals,
+and consumes an exact full-domain sphere-vs-slab cross-section helper. The old
+raw `RaycastSegmentWorker.CheckSphereOverlaps(Vector3d, Fixed64, ...)` overload
+was replaced by a compiler-visible `FixedBoundSphere` overload so squared-radius
+callers cannot silently compile with changed semantics.
+
+Verification includes 100% FixedMathSharp line/branch/method coverage
+(9,408/9,408 lines, 3,064/3,064 branches, and 1,528/1,528 methods), full
+standard and Lean suites, full Gravitas Release validation, focused ordinary,
+extreme-scale, sub-raw-segment, authored-endpoint, and mixed-slab regressions,
+and zero-allocation benchmarks. Gravitas ShortRun medians were 1.425/1.669 us
+for sphere segments and 3.326/4.217 us for mixed circle slabs at scales 1 and
+100,000 respectively, with 0 B allocated. Finite-axis
+capsule/cylinder/mesh-edge projection, sphere construction/merge, and conic
+quadratics remain explicitly separate active issues rather than being masked by
+the radial result.
 
 ### Relative CCD Quadratic Saturation Could Miss Extreme-Range Crossings
 
@@ -1009,20 +1086,17 @@ after enter-callback removal.
 **Source:** 95%-to-100% coverage hardening, 3D raycast segment review  
 **Affected area:** `RaycastSegmentWorker.CheckSphereOverlaps(...)`
 
-RCA: the closest-point test could prove a segment touched a sphere while the
-subsequent quadratic discriminant evaluated to one negative raw fixed-point unit
-because the normalized segment direction was fractionally longer than one. The
-quadratic guard then rejected the exact tangent.
+Historical RCA: the former closest-point and normalized-direction quadratic
+disagreed by one raw unit for a near-tangent fixture, so the discriminant was
+clamped to zero. Full-domain radial hardening later proved that the stored
+Q32.32 values in that fixture are an exact one-raw-unit miss, not a tangent;
+the clamp therefore invented a contact.
 
-Fix: after the closest-point overlap and outside-origin checks establish a
-non-negative discriminant geometrically, the worker clamps fixed-point residue
-to zero before calculating the tangent root. The same proof makes negative
-sphere-root distances unreachable, so their redundant lower-bound guard was
-removed.
-
-Verification: a deterministic regression casts `(0,0,0)->(3,4,0)` against a
-sphere centered at `(1/5,3/10,0)` with radius `1/50`; it failed before the fix
-and now returns exactly one hit at `(27/125,36/125,0)`.
+Superseding fix: sphere segments now use the authored segment over `[0, 1]`
+and FixedMathSharp's exact bounded interval solver. Exact stored-value tangency
+still returns one hit, while the historical `(0,0,0)->(3,4,0)` fixture against
+center `(1/5,3/10,0)` and radius `1/50` is retained as an explicit near-miss
+regression. No epsilon or discriminant clamp remains.
 
 ### Context Disposal Ordering Could Admit Inactive Worlds And Invalidate Disabled CCD Handoffs
 

@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using FixedMathSharp.Bounds;
 using Gravitas.Colliders;
 using SwiftCollections;
 using SwiftCollections.Query;
@@ -19,6 +20,7 @@ public sealed class RaycastSegmentWorker
 {
     private Vector3d _cachedOrigin;
     private Vector3d _cachedEnd;
+    private Vector3d _cachedSegment;
     private Vector3d _segmentDirection;
     private Fixed64 _segmentLength;
     private Fixed64 _segmentLengthSqr;
@@ -41,6 +43,7 @@ public sealed class RaycastSegmentWorker
         {
             _segmentLengthSqr = Fixed64.Zero;
             _segmentLength = Fixed64.Zero;
+            _cachedSegment = Vector3d.Zero;
             _segmentDirection = Vector3d.Zero;
             _segmentIsValid = false;
             _calculateIntersections = calculateIntersectionPoints;
@@ -48,57 +51,63 @@ public sealed class RaycastSegmentWorker
         }
 
         _segmentLengthSqr = segment.MagnitudeSquared;
+        _cachedSegment = segment;
         _segmentDirection = _segmentLength == Fixed64.Zero ? Vector3d.Zero : segment.Normalized;
         _segmentIsValid = true;
         _calculateIntersections = calculateIntersectionPoints;
     }
 
     public bool CheckSphereOverlaps(LSSphereCollider sphereCollider, ref SwiftList<Vector3d> outputIntersectionPoints) =>
-        CheckSphereOverlaps(sphereCollider.Center, sphereCollider.ScaledRadiusSqr, ref outputIntersectionPoints);
+        CheckSphereOverlaps(
+            new FixedBoundSphere(sphereCollider.Center, sphereCollider.ScaledRadius),
+            ref outputIntersectionPoints);
 
     /// <summary>
     /// Checks whether a sphere overlaps this worker's prepared ray segment.
     /// </summary>
+    /// <param name="sphere">The sphere bound.</param>
+    /// <param name="outputIntersectionPoints">
+    /// Receives segment points reconstructed from the nearest representable bounded intersection parameters.
+    /// </param>
+    /// <returns><see langword="true"/> when the prepared segment overlaps the sphere.</returns>
     public bool CheckSphereOverlaps(
-        Vector3d position,
-        Fixed64 sqrRadius,
+        FixedBoundSphere sphere,
         ref SwiftList<Vector3d> outputIntersectionPoints)
     {
         if (!_segmentIsValid)
             return false;
 
-        if (_segmentLengthSqr == Fixed64.Zero)
-            return CheckPointInsideSphere(position, sqrRadius, ref outputIntersectionPoints);
+        if (_cachedSegment.IsZero)
+            return CheckPointInsideSphere(sphere, ref outputIntersectionPoints);
 
-        Vector3d originToCenter = position - _cachedOrigin;
-        Fixed64 closestParameter = Vector3d.Dot(originToCenter, _segmentDirection);
-        closestParameter = FixedMath.Clamp(closestParameter, Fixed64.Zero, _segmentLength);
-        Vector3d closestPoint = _cachedOrigin + _segmentDirection * closestParameter;
-        if ((closestPoint - position).MagnitudeSquared > sqrRadius)
+        bool startsInside = sphere.Contains(_cachedOrigin);
+        var ray = new FixedRay(_cachedOrigin, _cachedSegment);
+        if (!ray.TryGetIntersectionInterval(
+                sphere,
+                Fixed64.One,
+                out Fixed64 entry,
+                out Fixed64 exit))
+        {
             return false;
+        }
 
         if (!_calculateIntersections)
             return true;
 
-        Vector3d originFromCenter = _cachedOrigin - position;
-        Fixed64 c = originFromCenter.MagnitudeSquared - sqrRadius;
-        if (c <= Fixed64.Zero)
+        if (startsInside)
         {
             outputIntersectionPoints.Add(_cachedOrigin);
             return true;
         }
 
-        Fixed64 b = Vector3d.Dot(originFromCenter, _segmentDirection);
-        // In exact arithmetic the closest-point overlap proves a non-negative
-        // discriminant; clamp fixed-point normalization residue for tangencies.
-        Fixed64 discriminant = FixedMath.Max(b * b - c, Fixed64.Zero);
+        AddSphereIntersectionPoint(entry, ref outputIntersectionPoints);
+        if (exit != entry
+            && (exit < Fixed64.One || !sphere.ContainsStrict(_cachedEnd)))
+        {
+            AddSphereIntersectionPoint(exit, ref outputIntersectionPoints);
+        }
 
-        Fixed64 root = FixedMath.Sqrt(discriminant);
-        AddIntersectionPointIfOnSegment(-b - root, ref outputIntersectionPoints);
-        if (root != Fixed64.Zero)
-            AddIntersectionPointIfOnSegment(-b + root, ref outputIntersectionPoints);
-
-        return outputIntersectionPoints.Count > 0;
+        return true;
     }
 
     public bool CheckCapsuleOverlaps(LSCapsuleCollider capsuleCollider, ref SwiftList<Vector3d> outputIntersectionPoints)
@@ -107,8 +116,12 @@ public sealed class RaycastSegmentWorker
 
         if (!intersects)
         {
-            intersects = CheckSphereOverlaps(capsuleCollider.LineSegmentEnd, capsuleCollider.ScaledRadiusSqr, ref outputIntersectionPoints)
-                         || CheckSphereOverlaps(capsuleCollider.LineSegmentStart, capsuleCollider.ScaledRadiusSqr, ref outputIntersectionPoints);
+            intersects = CheckSphereOverlaps(
+                             new FixedBoundSphere(capsuleCollider.LineSegmentEnd, capsuleCollider.ScaledRadius),
+                             ref outputIntersectionPoints)
+                         || CheckSphereOverlaps(
+                             new FixedBoundSphere(capsuleCollider.LineSegmentStart, capsuleCollider.ScaledRadius),
+                             ref outputIntersectionPoints);
         }
 
         return intersects;
@@ -689,11 +702,10 @@ public sealed class RaycastSegmentWorker
     }
 
     private bool CheckPointInsideSphere(
-        Vector3d position,
-        Fixed64 sqrRadius,
+        FixedBoundSphere sphere,
         ref SwiftList<Vector3d> outputIntersectionPoints)
     {
-        if ((_cachedOrigin - position).MagnitudeSquared > sqrRadius)
+        if (!sphere.Contains(_cachedOrigin))
             return false;
 
         if (_calculateIntersections)
@@ -701,6 +713,14 @@ public sealed class RaycastSegmentWorker
 
         return true;
     }
+
+    private void AddSphereIntersectionPoint(
+        Fixed64 parameter,
+        ref SwiftList<Vector3d> outputIntersectionPoints) =>
+        outputIntersectionPoints.Add(
+            parameter == Fixed64.One
+                ? _cachedEnd
+                : Vector3d.Lerp(_cachedOrigin, _cachedEnd, parameter));
 
     private bool CheckPointInsideBox(
         Vector3d min,

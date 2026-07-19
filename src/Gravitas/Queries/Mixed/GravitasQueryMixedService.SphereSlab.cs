@@ -16,7 +16,11 @@ namespace Gravitas.Queries;
 /// </summary>
 public sealed partial class GravitasQueryMixedService
 {
-    private static bool TrySweepSphereAgainstCircleSlab(
+    /// <summary>
+    /// Reduces a prepared spatial-distance sphere sweep against one embedded circle slab.
+    /// The direction must match the authored start/end segment and the length must use the same parameterization.
+    /// </summary>
+    internal static bool TrySweepSphereAgainstCircleSlab(
         Vector3d start,
         Vector3d end,
         Vector3d direction,
@@ -26,11 +30,19 @@ public sealed partial class GravitasQueryMixedService
         out PhysicsMixedHit hit)
     {
         Vector3d center = new(circle.Center.X, circle.MixedSlabCenterY, circle.Center.Y);
-        Fixed64 combinedRadius = circle.ScaledRadius + radius;
+        var radialBound = new FixedBoundCircle(circle.Center, circle.ScaledRadius);
+        Vector2d planarStart = new(start.X, start.Z);
+        Vector2d planarEnd = new(end.X, end.Z);
         Fixed64 expandedHalfHeight = circle.MixedHalfThickness + radius;
-        Vector3d localStart = start - center;
+        Fixed64 localStartY = start.Y - center.Y;
+        Fixed64 localEndY = end.Y - center.Y;
 
-        if (IsInsideCircleSlab(localStart, combinedRadius, expandedHalfHeight))
+        if (IsInsideCircleSlab(
+                localStartY,
+                planarStart,
+                radialBound,
+                radius,
+                expandedHalfHeight))
         {
             hit = BuildSphereAgainst2DHit(
                 circle,
@@ -45,17 +57,47 @@ public sealed partial class GravitasQueryMixedService
         bool found = false;
         Fixed64 bestDistance = Fixed64.MaxValue;
         TryKeepEarlierSweep(
-            TrySweepCircleSlabSide(localStart, direction, length, combinedRadius, expandedHalfHeight, out Fixed64 sideDistance),
+            TrySweepCircleSlabSide(
+                localStartY,
+                localEndY,
+                planarStart,
+                planarEnd,
+                new Vector2d(direction.X, direction.Z),
+                length,
+                radialBound,
+                radius,
+                expandedHalfHeight,
+                out Fixed64 sideDistance),
             sideDistance,
             ref found,
             ref bestDistance);
         TryKeepEarlierSweep(
-            TrySweepCircleSlabCap(localStart, direction, length, combinedRadius, expandedHalfHeight, out Fixed64 topDistance),
+            TrySweepCircleSlabCap(
+                localStartY,
+                localEndY,
+                direction.Y,
+                planarStart,
+                planarEnd,
+                length,
+                radialBound,
+                radius,
+                expandedHalfHeight,
+                out Fixed64 topDistance),
             topDistance,
             ref found,
             ref bestDistance);
         TryKeepEarlierSweep(
-            TrySweepCircleSlabCap(localStart, direction, length, combinedRadius, -expandedHalfHeight, out Fixed64 bottomDistance),
+            TrySweepCircleSlabCap(
+                localStartY,
+                localEndY,
+                direction.Y,
+                planarStart,
+                planarEnd,
+                length,
+                radialBound,
+                radius,
+                -expandedHalfHeight,
+                out Fixed64 bottomDistance),
             bottomDistance,
             ref found,
             ref bestDistance);
