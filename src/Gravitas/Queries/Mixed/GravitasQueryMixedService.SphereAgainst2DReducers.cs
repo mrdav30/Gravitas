@@ -491,7 +491,7 @@ public sealed partial class GravitasQueryMixedService
             ref bestDistance);
     }
 
-    private static void TryKeepCapsuleSlabBoundaryEdgeSweep(
+    internal static void TryKeepCapsuleSlabBoundaryEdgeSweep(
         Vector3d start,
         Vector3d end,
         Vector3d direction,

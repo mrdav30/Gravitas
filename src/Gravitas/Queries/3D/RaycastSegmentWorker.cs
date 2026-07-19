@@ -540,8 +540,9 @@ public sealed class RaycastSegmentWorker
         // represented rotation matrix more accurately at large coordinates,
         // keeping tangent classification scale independent without widening
         // the geometric box.
-        if (!Vector3d.TrySubtract(worldOffset, rotation * localOffset, out Vector3d residual))
-            return false;
+        // The collider rotation is normalized, so rotating the inverse result
+        // back cannot cross to the opposite Fixed64 domain extreme.
+        Vector3d residual = worldOffset - rotation * localOffset;
         if (residual == Vector3d.Zero)
             return true;
 
@@ -738,14 +739,6 @@ public sealed class RaycastSegmentWorker
             outputIntersectionPoints.Add(_cachedOrigin);
 
         return true;
-    }
-
-    private void AddIntersectionPointIfOnSegment(Fixed64 distance, ref SwiftList<Vector3d> outputIntersectionPoints)
-    {
-        if (distance > _segmentLength)
-            return;
-
-        outputIntersectionPoints.Add(_cachedOrigin + _segmentDirection * distance);
     }
 
 }

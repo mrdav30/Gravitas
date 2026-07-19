@@ -43,9 +43,18 @@ public sealed partial class SolidBody2D
     {
         if (Collider is LSCircleCollider2D circle)
         {
-            if (!Vector2d.TrySubtract(circle.Center, _position, out Vector2d centerOffset)
-                || !Vector2d.TryGetMagnitude(centerOffset, out Fixed64 offsetDistance)
-                || !Fixed64.TryAdd(offsetDistance, circle.ScaledRadius, out Fixed64 circleRadius))
+            bool offsetResolved = Vector2d.TrySubtract(
+                circle.Center,
+                _position,
+                out Vector2d centerOffset);
+            bool distanceResolved = Vector2d.TryGetMagnitude(
+                centerOffset,
+                out Fixed64 offsetDistance);
+            bool radiusResolved = Fixed64.TryAdd(
+                offsetDistance,
+                circle.ScaledRadius,
+                out Fixed64 circleRadius);
+            if (!(offsetResolved & distanceResolved & radiusResolved))
             {
                 return Fixed64.MaxValue;
             }
@@ -57,10 +66,6 @@ public sealed partial class SolidBody2D
             ? ResolveConvexContinuousCollisionProxyRadius()
             : ResolveBoundsContinuousCollisionProxyRadius();
     }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal Vector2d ResolveContinuousCollisionFrameVelocity() =>
-        ProjectLinearMotion(ContinuousCollisionFrameDisplacement / Context.DeltaTime);
 
     private Fixed64 ResolveConvexContinuousCollisionProxyRadius()
     {
@@ -82,9 +87,9 @@ public sealed partial class SolidBody2D
         Vector2d max = Collider.Bounds.Max;
         Fixed64 bestDistance = Fixed64.Zero;
         return TryKeepPivotDistance(min, ref bestDistance)
-            && TryKeepPivotDistance(new Vector2d(min.X, max.Y), ref bestDistance)
-            && TryKeepPivotDistance(new Vector2d(max.X, min.Y), ref bestDistance)
-            && TryKeepPivotDistance(max, ref bestDistance)
+            & TryKeepPivotDistance(new Vector2d(min.X, max.Y), ref bestDistance)
+            & TryKeepPivotDistance(new Vector2d(max.X, min.Y), ref bestDistance)
+            & TryKeepPivotDistance(max, ref bestDistance)
                 ? bestDistance
                 : Fixed64.MaxValue;
     }
@@ -92,14 +97,10 @@ public sealed partial class SolidBody2D
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private bool TryKeepPivotDistance(Vector2d point, ref Fixed64 bestDistance)
     {
-        if (!Vector2d.TrySubtract(point, _position, out Vector2d offset)
-            || !Vector2d.TryGetMagnitude(offset, out Fixed64 distance))
-        {
-            return false;
-        }
-
+        bool offsetResolved = Vector2d.TrySubtract(point, _position, out Vector2d offset);
+        bool distanceResolved = Vector2d.TryGetMagnitude(offset, out Fixed64 distance);
         bestDistance = FixedMath.Max(bestDistance, distance);
-        return true;
+        return offsetResolved & distanceResolved;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -113,6 +114,13 @@ public sealed partial class SolidBody2D
     private bool IsValidContinuousCollisionTarget(LSCollider2D hitCollider)
     {
         SolidBody2D? hitBody = hitCollider.Body;
+        if (hitBody?.IsKinematic == true)
+        {
+            hitBody.EnsureContinuousCollisionFramePrepared(Context.LateSimulateToken);
+            if (hitBody.HasContinuousCollisionMotion)
+                return false;
+        }
+
         return ContinuousCollisionTargetPolicy.AllowsStaticOrKinematic2DTarget(
             hasCollider: true,
             ReferenceEquals(hitCollider, Collider),
@@ -126,6 +134,13 @@ public sealed partial class SolidBody2D
     private bool IsValidMixedContinuousCollisionHit(LSCollider hitCollider)
     {
         SolidBody? hitBody = hitCollider.Body;
+        if (hitBody?.IsKinematic == true)
+        {
+            hitBody.EnsureContinuousCollisionFramePrepared(Context.LateSimulateToken);
+            if (hitBody.HasContinuousCollisionMotion)
+                return false;
+        }
+
         return ContinuousCollisionTargetPolicy.AllowsMixedStaticOrKinematicTarget(
             hasCollider: true,
             ContinuousCollisionCandidateOrdering.IsIgnoredTarget(hitCollider, _continuousCollisionHandoffIgnoredCollider3D),

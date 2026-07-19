@@ -127,6 +127,74 @@ public sealed class GravitasRuntimeModeTests
         body2D.Position.Should().Be(position2D + Vector2d.Right * scenario.Context.DeltaTime);
     }
 
+    [Theory]
+    [InlineData(PhysicsRuntimeMode.ThreeD)]
+    [InlineData(PhysicsRuntimeMode.Both)]
+    [InlineData(PhysicsRuntimeMode.Mixed)]
+    public void LateSimulate_WithThreeDServiceDisabled_ShouldDeferBodyMotionPreparation(
+        PhysicsRuntimeMode runtimeMode)
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        scenario.Context.SetFrameRate(4);
+        scenario.Context.Settings.RuntimeMode = runtimeMode;
+        ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(
+            Vector3d.Zero,
+            mass: (Fixed64)2);
+        body.Body.AddForce(new Vector3d((Fixed64)8, Fixed64.Zero, Fixed64.Zero));
+        body.Body.AddTorque(new Vector3d(Fixed64.Zero, (Fixed64)8, Fixed64.Zero));
+        scenario.Context.Physics.SimulatePhysics = false;
+
+        scenario.Context.Simulate();
+        scenario.Context.LateSimulate();
+
+        body.Body.Position3d.Should().Be(Vector3d.Zero);
+        body.Body.Rotation.Should().Be(FixedQuaternion.Identity);
+        body.Body.LinearVelocity.Should().Be(Vector3d.Zero);
+        body.Body.AngularVelocity.Should().Be(Vector3d.Zero);
+
+        scenario.Context.Physics.SimulatePhysics = true;
+        scenario.Context.Simulate();
+        scenario.Context.LateSimulate();
+
+        body.Body.Position3d.X.Should().BeGreaterThan(Fixed64.Zero);
+        body.Body.Rotation.Should().NotBe(FixedQuaternion.Identity);
+        body.Body.LinearVelocity.X.Should().BeGreaterThan(Fixed64.Zero);
+        body.Body.AngularVelocity.Y.Should().NotBe(Fixed64.Zero);
+    }
+
+    [Theory]
+    [InlineData(PhysicsRuntimeMode.TwoD)]
+    [InlineData(PhysicsRuntimeMode.Both)]
+    [InlineData(PhysicsRuntimeMode.Mixed)]
+    public void LateSimulate_WithTwoDServiceDisabled_ShouldDeferBodyMotionPreparation(
+        PhysicsRuntimeMode runtimeMode)
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        scenario.Context.SetFrameRate(4);
+        scenario.Context.Settings.RuntimeMode = runtimeMode;
+        SolidBody2D body = Create2DBody(scenario.Context, Vector3d.Zero);
+        body.AddForce(new Vector2d((Fixed64)8, Fixed64.Zero));
+        body.AddTorque((Fixed64)8);
+        scenario.Context.Physics2D.SimulatePhysics = false;
+
+        scenario.Context.Simulate();
+        scenario.Context.LateSimulate();
+
+        body.Position.Should().Be(Vector2d.Zero);
+        body.Rotation.Should().Be(Fixed64.Zero);
+        body.LinearVelocity.Should().Be(Vector2d.Zero);
+        body.AngularVelocity.Should().Be(Fixed64.Zero);
+
+        scenario.Context.Physics2D.SimulatePhysics = true;
+        scenario.Context.Simulate();
+        scenario.Context.LateSimulate();
+
+        body.Position.X.Should().BeGreaterThan(Fixed64.Zero);
+        body.Rotation.Should().NotBe(Fixed64.Zero);
+        body.LinearVelocity.X.Should().BeGreaterThan(Fixed64.Zero);
+        body.AngularVelocity.Should().BeGreaterThan(Fixed64.Zero);
+    }
+
     [Fact]
     public void RuntimePhases_WithMixedMode_ShouldRunTwoDThreeDAndMixedLifecycle()
     {

@@ -324,6 +324,24 @@ public sealed class LSMeshColliderQueryTests
     }
 
     [Fact]
+    public void ClosestPointOnSurface_WhenSearchDeltaContainsMinValue_ShouldUseFullAuthoredScan()
+    {
+        var mesh = new LSMeshCollider(
+            new[] { Vector3d.Zero, Vector3d.Right, Vector3d.Up },
+            new[] { 0, 1, 2 },
+            MeshColliderMode.Concave,
+            MeshInertiaPolicy.SurfaceApproximation);
+
+        Vector3d closest = mesh.ClosestPointOnSurface(
+            new Vector3d(Fixed64.MinValue, Fixed64.Zero, Fixed64.Zero));
+        Vector3d closestFromMinY = mesh.ClosestPointOnSurface(
+            new Vector3d(Fixed64.Zero, Fixed64.MinValue, Fixed64.Zero));
+
+        closest.Should().Be(Vector3d.Zero);
+        closestFromMinY.Should().Be(Vector3d.Zero);
+    }
+
+    [Fact]
     public void SurfaceQueries_WhenFirstTriangleIsWithinEpsilon_ShouldContinueToLaterExactHit()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();

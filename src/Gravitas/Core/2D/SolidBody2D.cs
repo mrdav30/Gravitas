@@ -50,6 +50,7 @@ public sealed partial class SolidBody2D : IRecordable
     private int _continuousCollisionHandoffToken = int.MinValue;
     private Fixed64 _continuousCollisionHandoffRemainingTime;
     private readonly SwiftList<Physics2DHit> _continuousCollisionHits = new();
+    private readonly SwiftList<int> _rotationalContinuousCollisionCandidateIds = new();
     private readonly SwiftList<PhysicsMixedHit> _continuousMixedCollisionHits = new();
 
     public SolidBody2D(IMatterAgent agent, LSCollider2D collider)
@@ -519,9 +520,23 @@ public sealed partial class SolidBody2D : IRecordable
 
             Vector2d startPosition = _position;
             Vector2d proposedPosition = startPosition + _linearVelocity * Context.DeltaTime;
-            TryResolveContinuousCollision(startPosition, ref proposedPosition);
-            proposedPosition = ProjectLinearEndpoint(startPosition, proposedPosition);
-            TryResolveRotationalContinuousCollision(startPosition, ref proposedPosition, startRotation, ref proposedRotation);
+            if (ShouldUseRotationalContinuousCollisionArbiter(
+                    startPosition,
+                    proposedPosition,
+                    startRotation,
+                    proposedRotation,
+                    forceContinuous: false))
+            {
+                TryResolveRotationalContinuousCollision(
+                    startPosition,
+                    ref proposedPosition,
+                    startRotation,
+                    ref proposedRotation);
+            }
+            else
+            {
+                TryResolveContinuousCollision(startPosition, ref proposedPosition);
+            }
             proposedPosition = ProjectLinearEndpoint(startPosition, proposedPosition);
             _position = proposedPosition;
             _rotation = CanonicalizeRotation(proposedRotation);
@@ -563,17 +578,30 @@ public sealed partial class SolidBody2D : IRecordable
         Fixed64 kinematicRotation = ContinuousCollisionFrameTargetRotation;
         if (startPosition == kinematicPosition && startRotation == kinematicRotation)
         {
-            if (requestedHostPosition != kinematicPosition
-                || requestedHostRotation != kinematicRotation)
-                SetHostWorldPose(transform, kinematicPosition, kinematicRotation);
+            SetHostWorldPose(transform, kinematicPosition, kinematicRotation);
             return;
         }
 
         Wake();
         Vector2d resolvedPosition = kinematicPosition;
         Fixed64 resolvedRotation = kinematicRotation;
-        TryResolveKinematicContinuousCollision(startPosition, ref resolvedPosition);
-        TryResolveKinematicRotationalContinuousCollision(startPosition, ref resolvedPosition, startRotation, ref resolvedRotation);
+        if (ShouldUseRotationalContinuousCollisionArbiter(
+                startPosition,
+                resolvedPosition,
+                startRotation,
+                resolvedRotation,
+                forceContinuous: false))
+        {
+            TryResolveKinematicRotationalContinuousCollision(
+                startPosition,
+                ref resolvedPosition,
+                startRotation,
+                ref resolvedRotation);
+        }
+        else
+        {
+            TryResolveKinematicContinuousCollision(startPosition, ref resolvedPosition);
+        }
 
         resolvedRotation = CanonicalizeRotation(resolvedRotation);
         if (resolvedPosition != requestedHostPosition

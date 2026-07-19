@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using SwiftCollections;
 using SwiftCollections.Query;
@@ -25,7 +26,11 @@ public sealed partial class GravitasPhysics2DService
         }
 
         _planarContinuousCollisionCandidates.Clear();
+        _dirtyPlanarContinuousCollisionCandidates.Clear();
+        _dirtyPlanarContinuousCollisionBodies.FastClear();
+        _dirtyPlanarContinuousCollisionBodySet.Clear();
         _mixedContinuousCollisionCandidates.Clear();
+        _dirtyMixedContinuousCollisionCandidates.Clear();
         foreach (SolidBody2D body in _dynamicBodies)
         {
             body.EnsureContinuousCollisionFramePrepared(token);
@@ -52,6 +57,8 @@ public sealed partial class GravitasPhysics2DService
         if (planarRadius <= Fixed64.Epsilon)
             return;
 
+        _continuousCollisionCandidateLifetimes[body.DynamicId] =
+            new ColliderLifetimeToken2D(body.Collider);
         _planarContinuousCollisionCandidates.Add(
             body.DynamicId,
             DynamicCcdCandidateIndex2D.CreateBoundsBetween(
@@ -62,19 +69,9 @@ public sealed partial class GravitasPhysics2DService
         if (!buildMixedIndex)
             return;
 
-        Vector2d mixedStart2D = body.ContinuousCollisionFrameStart;
         _mixedContinuousCollisionCandidates.Add(
             body.DynamicId,
-            DynamicCcdCandidateIndex.CreateBoundsBetween(
-                new Vector3d(mixedStart2D.X, body.Collider.MixedSlabCenterY, mixedStart2D.Y),
-                new Vector3d(
-                    body.ContinuousCollisionFrameEnd.X,
-                    body.Collider.MixedSlabCenterY,
-                    body.ContinuousCollisionFrameEnd.Y),
-                new Vector3d(
-                    planarRadius,
-                    body.Collider.MixedHalfThickness,
-                    planarRadius)));
+            body.ResolveMixedContinuousCollisionTrajectoryBounds(planarRadius));
     }
 
 
@@ -82,7 +79,57 @@ public sealed partial class GravitasPhysics2DService
     {
         PrepareContinuousCollisionFrame();
         _planarContinuousCollisionCandidates.Query(sourceBounds, _continuousCollisionCandidateIds);
-        return _continuousCollisionCandidateIds;
+        _dirtyPlanarContinuousCollisionCandidates.Query(sourceBounds, _dirtyContinuousCollisionCandidateIds);
+        return MergeContinuousCollisionCandidateIds();
+    }
+
+    internal void RefreshContinuousCollisionCandidate(SolidBody2D body)
+    {
+        Fixed64 radius = body.ResolveContinuousCollisionProxyRadius();
+        TryReserveContinuousCollisionCandidateRefresh(body);
+
+        _dirtyPlanarContinuousCollisionCandidates.AddOrUpdate(
+            body.DynamicId,
+            body.ResolveContinuousCollisionTrajectoryBounds(radius));
+        if (_continuousCollisionPreparedMixedIndex)
+        {
+            _dirtyMixedContinuousCollisionCandidates.AddOrUpdate(
+                body.DynamicId,
+                body.ResolveMixedContinuousCollisionTrajectoryBounds(radius));
+        }
+    }
+
+    internal bool CanAdmitContinuousCollisionCandidateRefresh(SolidBody2D body) => true;
+
+    internal bool TryReserveContinuousCollisionCandidateRefresh(SolidBody2D body)
+    {
+        if (_dirtyPlanarContinuousCollisionBodySet.Add(body))
+            _dirtyPlanarContinuousCollisionBodies.Add(body);
+
+        return true;
+    }
+
+    private void ReleaseContinuousCollisionCandidateRefresh(SolidBody2D body)
+    {
+        if (!_dirtyPlanarContinuousCollisionBodySet.Remove(body))
+            return;
+
+        _dirtyPlanarContinuousCollisionBodies.Remove(body);
+        _dirtyPlanarContinuousCollisionCandidates.Remove(body.DynamicId);
+        _dirtyMixedContinuousCollisionCandidates.Remove(body.DynamicId);
+    }
+
+    internal bool CanAdmitContinuousCollisionCandidateRefresh(
+        SolidBody2D first,
+        SolidBody2D second) => true;
+
+    internal bool TryReserveContinuousCollisionCandidateRefresh(
+        SolidBody2D first,
+        SolidBody2D second)
+    {
+        TryReserveContinuousCollisionCandidateRefresh(first);
+        TryReserveContinuousCollisionCandidateRefresh(second);
+        return true;
     }
 
     internal SwiftList<int> QueryMixedContinuousCollisionCandidates(FixedBoundVolume sourceBounds)
@@ -95,8 +142,54 @@ public sealed partial class GravitasPhysics2DService
 
         PrepareContinuousCollisionFrame();
         _mixedContinuousCollisionCandidates.Query(sourceBounds, _continuousCollisionCandidateIds);
+        _dirtyMixedContinuousCollisionCandidates.Query(
+            sourceBounds,
+            _dirtyContinuousCollisionCandidateIds);
+        return MergeContinuousCollisionCandidateIds();
+    }
+
+    private SwiftList<int> MergeContinuousCollisionCandidateIds()
+    {
+        int retainedCount = 0;
+        for (int i = 0; i < _continuousCollisionCandidateIds.Count; i++)
+        {
+            int dynamicId = _continuousCollisionCandidateIds[i];
+            if (TryGetContinuousCollisionCandidate(dynamicId, out SolidBody2D body)
+                && !_dirtyPlanarContinuousCollisionBodySet.Contains(body))
+            {
+                _continuousCollisionCandidateIds[retainedCount++] = dynamicId;
+            }
+        }
+
+        while (_continuousCollisionCandidateIds.Count > retainedCount)
+            _continuousCollisionCandidateIds.RemoveAt(
+                _continuousCollisionCandidateIds.Count - 1);
+
+        for (int i = 0; i < _dirtyContinuousCollisionCandidateIds.Count; i++)
+        {
+            int dynamicId = _dirtyContinuousCollisionCandidateIds[i];
+            if (TryGetContinuousCollisionCandidate(dynamicId, out _))
+                _continuousCollisionCandidateIds.Add(dynamicId);
+        }
+
         return _continuousCollisionCandidateIds;
     }
+
+    internal bool TryGetContinuousCollisionCandidate(int dynamicId, out SolidBody2D body)
+    {
+        ColliderLifetimeToken2D registration = _continuousCollisionCandidateLifetimes[dynamicId];
+        if (registration.Collider != null && registration.IsActive)
+        {
+            body = registration.Collider.Body!;
+            return true;
+        }
+
+        body = null!;
+        return false;
+    }
+
+    internal SolidBody2D GetContinuousCollisionCandidate(int dynamicId) =>
+        _dynamicBodies[dynamicId];
 
     internal void QueueContinuousCollisionHandoff(SolidBody2D body)
     {
@@ -111,6 +204,9 @@ public sealed partial class GravitasPhysics2DService
 
     internal bool ProcessQueuedContinuousCollisionHandoffs() =>
         ProcessQueuedContinuousCollisionHandoffs(_context.Settings.ContinuousCollisionMaxToiIterations) > 0;
+
+    internal void ReportContinuousCollisionIterationLimit() =>
+        LastContinuousCollisionIslandLimitReached = true;
 
     internal int ProcessQueuedContinuousCollisionHandoffs(int iterationBudget)
     {

@@ -223,4 +223,31 @@ public sealed partial class MixedResponseTests
         exits3D.Should().Be(1);
         exits2D.Should().Be(1);
     }
+
+    [Fact]
+    public void MarkColliding_When3DEnterThrows_ShouldResetGuardAndRetainOnlyDeliveredAdmission()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(context, Vector3d.Zero);
+        SolidBody2D body2D = CreateCircle2D(context, Vector2d.Zero);
+        var pair = new CollisionPairMixed(body3D.Collider, body2D.Collider);
+        int entered2D = 0;
+        int exited3D = 0;
+        int exited2D = 0;
+        body3D.Collider.OnMixedContactEnter += _ => throw new InvalidOperationException("3D enter failure");
+        body2D.Collider.OnMixedContactEnter += _ => entered2D++;
+        body3D.Collider.OnMixedContactExit += _ => exited3D++;
+        body2D.Collider.OnMixedContactExit += _ => exited2D++;
+
+        Action notify = () => pair.MarkColliding(frame: 1, contact: default);
+
+        notify.Should().Throw<InvalidOperationException>().WithMessage("3D enter failure");
+        entered2D.Should().Be(0);
+        pair.IsNotificationInProgress.Should().BeFalse();
+
+        pair.MarkSeparated();
+
+        exited3D.Should().Be(1);
+        exited2D.Should().Be(0);
+    }
 }

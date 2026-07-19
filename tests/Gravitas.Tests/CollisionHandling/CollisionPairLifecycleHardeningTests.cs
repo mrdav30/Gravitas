@@ -773,6 +773,67 @@ public sealed class CollisionPairLifecycleHardeningTests
     }
 
     [Fact]
+    public void NotifyEnter_WhenReentrantDeactivationExitThrows_ShouldFinishNotificationCleanup()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> first = scenario.CreateSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> second = scenario.CreateSphere(
+            new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero),
+            immovable: true);
+        CollisionPair pair = scenario.CreatePair(first.Collider, second.Collider);
+        int secondEnters = 0;
+        int firstExits = 0;
+        first.Collider.OnContactEnter += _ => scenario.Context.Physics.FullDeactivateCollisionPair(pair);
+        first.Collider.OnContactExit += _ =>
+        {
+            firstExits++;
+            throw new InvalidOperationException("deferred exit failure");
+        };
+        second.Collider.OnContactEnter += _ => secondEnters++;
+        pair.UpdateCollisionDeferred();
+
+        Action notify = pair.NotifyCollidersOfContact;
+
+        notify.Should().Throw<InvalidOperationException>().WithMessage("deferred exit failure");
+        firstExits.Should().Be(1);
+        secondEnters.Should().Be(0);
+        pair.IsNotificationInProgress.Should().BeFalse();
+        pair.Active.Should().BeFalse();
+        first.Collider.CollisionPairCount.Should().Be(0);
+        second.Collider.CollisionPairHolderCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void NotifyEnter_WhenFirstCallbackThrows_ShouldRetainOnlyDeliveredAdmission()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> first = scenario.CreateSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> second = scenario.CreateSphere(
+            new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero),
+            immovable: true);
+        CollisionPair pair = scenario.CreatePair(first.Collider, second.Collider);
+        int secondEnters = 0;
+        int firstExits = 0;
+        int secondExits = 0;
+        first.Collider.OnContactEnter += _ => throw new InvalidOperationException("first enter failure");
+        second.Collider.OnContactEnter += _ => secondEnters++;
+        first.Collider.OnContactExit += _ => firstExits++;
+        second.Collider.OnContactExit += _ => secondExits++;
+        pair.UpdateCollisionDeferred();
+
+        Action notify = pair.NotifyCollidersOfContact;
+
+        notify.Should().Throw<InvalidOperationException>().WithMessage("first enter failure");
+        secondEnters.Should().Be(0);
+        pair.IsNotificationInProgress.Should().BeFalse();
+
+        pair.Deactivate();
+
+        firstExits.Should().Be(1);
+        secondExits.Should().Be(0);
+    }
+
+    [Fact]
     public void NotifyExit_WhenBothCallbacksThrow_ShouldAggregateInPairOrderAndConsumeBothAdmissions()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();

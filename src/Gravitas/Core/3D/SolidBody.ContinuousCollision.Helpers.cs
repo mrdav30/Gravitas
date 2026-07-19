@@ -16,19 +16,31 @@ namespace Gravitas;
 public partial class SolidBody
 {
     private bool IsEligibleDynamicContinuousCollisionTarget(SolidBody target) =>
-        ContinuousCollisionTargetPolicy.AllowsDynamic3DTarget(
+        (IsKinematic || !target.ShouldOwnContinuousCollisionMovingPair(
+            HasContinuousCollisionRotationalMotion))
+        && !ContinuousCollisionCandidateOrdering.IsIgnoredTarget(
+            target.Collider,
+            _continuousCollisionHandoffIgnoredCollider3D)
+        && ContinuousCollisionTargetPolicy.AllowsIndexed3DTarget(
             ReferenceEquals(target, this),
             target.Active,
             target.IsPositionFullyFrozen,
             target.IsKinematic,
+            target.IsKinematic && target.HasContinuousCollisionMotion,
             target.Collider.IsTrigger,
             Context.Physics.RequireCollisionPair(Collider, target.Collider));
 
     private bool IsEligibleDynamicMixed2DTarget(SolidBody2D target) =>
-        ContinuousCollisionTargetPolicy.AllowsMixedDynamicTarget(
+        (IsKinematic || !target.ShouldOwnContinuousCollisionMovingPair(
+            HasContinuousCollisionRotationalMotion))
+        && !ContinuousCollisionCandidateOrdering.IsIgnoredTarget(
+            target.Collider,
+            _continuousCollisionHandoffIgnoredCollider2D)
+        && ContinuousCollisionTargetPolicy.AllowsMixedIndexedTarget(
             target.Active,
             target.IsPositionFullyFrozen,
             target.IsKinematic,
+            target.IsKinematic && target.HasContinuousCollisionMotion,
             target.Collider.IsTrigger,
             Context.MixedCollisions.RequireCollisionPair(Collider, target.Collider));
 
@@ -57,17 +69,22 @@ public partial class SolidBody
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal Vector3d ResolveContinuousCollisionFrameVelocity() =>
-        ProjectLinearMotion(ContinuousCollisionFrameDisplacement / Context.DeltaTime);
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal Fixed64 ResolveContinuousCollisionProxyRadius()
     {
         if (Collider is LSSphereCollider sphere)
         {
-            if (!Vector3d.TrySubtract(sphere.Center, Position3d, out Vector3d centerOffset)
-                || !Vector3d.TryGetMagnitude(centerOffset, out Fixed64 offsetDistance)
-                || !Fixed64.TryAdd(offsetDistance, sphere.ScaledRadius, out Fixed64 sphereRadius))
+            bool offsetResolved = Vector3d.TrySubtract(
+                sphere.Center,
+                Position3d,
+                out Vector3d centerOffset);
+            bool distanceResolved = Vector3d.TryGetMagnitude(
+                centerOffset,
+                out Fixed64 offsetDistance);
+            bool radiusResolved = Fixed64.TryAdd(
+                offsetDistance,
+                sphere.ScaledRadius,
+                out Fixed64 sphereRadius);
+            if (!(offsetResolved & distanceResolved & radiusResolved))
             {
                 return Fixed64.MaxValue;
             }
@@ -80,8 +97,12 @@ public partial class SolidBody
         Fixed64 bestDistance = Fixed64.Zero;
         for (int i = 0; i < corners.Length; i++)
         {
-            if (!Vector3d.TrySubtract(corners[i], Position3d, out Vector3d offset)
-                || !Vector3d.TryGetMagnitude(offset, out Fixed64 distance))
+            bool offsetResolved = Vector3d.TrySubtract(
+                corners[i],
+                Position3d,
+                out Vector3d offset);
+            bool distanceResolved = Vector3d.TryGetMagnitude(offset, out Fixed64 distance);
+            if (!(offsetResolved & distanceResolved))
             {
                 return Fixed64.MaxValue;
             }
@@ -99,6 +120,13 @@ public partial class SolidBody
     private bool IsValidContinuousCollisionTarget(LSCollider hitCollider)
     {
         SolidBody? hitBody = hitCollider.Body;
+        if (hitBody?.IsKinematic == true)
+        {
+            hitBody.EnsureContinuousCollisionFramePrepared(Context.LateSimulateToken);
+            if (hitBody.HasContinuousCollisionMotion)
+                return false;
+        }
+
         return ContinuousCollisionTargetPolicy.AllowsStaticOrKinematic3DTarget(
             hasCollider: true,
             ReferenceEquals(hitCollider, Collider),
@@ -112,6 +140,13 @@ public partial class SolidBody
     private bool IsValidMixedContinuousCollisionHit(LSCollider2D hitCollider)
     {
         SolidBody2D? hitBody = hitCollider.Body;
+        if (hitBody?.IsKinematic == true)
+        {
+            hitBody.EnsureContinuousCollisionFramePrepared(Context.LateSimulateToken);
+            if (hitBody.HasContinuousCollisionMotion)
+                return false;
+        }
+
         return ContinuousCollisionTargetPolicy.AllowsMixedStaticOrKinematicTarget(
             hasCollider: true,
             ContinuousCollisionCandidateOrdering.IsIgnoredTarget(hitCollider, _continuousCollisionHandoffIgnoredCollider2D),

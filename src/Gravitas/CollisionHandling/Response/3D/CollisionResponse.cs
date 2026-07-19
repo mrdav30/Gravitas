@@ -70,12 +70,12 @@ public static class CollisionResponse
             SolverContact contact = contacts.GetContact(i);
             ContactNormalImpulseResult3D normalResult = ContactNormalImpulse3D.CalculateAccumulatedDelta(
                 contact.A.Body,
-                contact.A.Body.LinearVelocity,
-                contact.A.Body.AngularVelocity,
+                ResolveLinearVelocity(contact.A.Body),
+                ResolveAngularVelocity(contact.A.Body),
                 contact.RelativeA,
                 contact.B.Body,
-                contact.B.Body.LinearVelocity,
-                contact.B.Body.AngularVelocity,
+                ResolveLinearVelocity(contact.B.Body),
+                ResolveAngularVelocity(contact.B.Body),
                 contact.RelativeB,
                 contact.Normal,
                 contact.Restitution,
@@ -357,12 +357,26 @@ public static class CollisionResponse
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Vector3d ComputeRelativeVelocity(SolverContact contact)
     {
-        Vector3d velocityA = contact.A.Body.LinearVelocity
-            + Vector3d.Cross(contact.A.Body.AngularVelocity, contact.RelativeA);
-        Vector3d velocityB = contact.B.Body.LinearVelocity
-            + Vector3d.Cross(contact.B.Body.AngularVelocity, contact.RelativeB);
+        Vector3d velocityA = ResolveLinearVelocity(contact.A.Body)
+            + Vector3d.Cross(ResolveAngularVelocity(contact.A.Body), contact.RelativeA);
+        Vector3d velocityB = ResolveLinearVelocity(contact.B.Body)
+            + Vector3d.Cross(ResolveAngularVelocity(contact.B.Body), contact.RelativeB);
         return velocityB - velocityA;
     }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Vector3d ResolveLinearVelocity(SolidBody body) =>
+        body.ProjectLinearMotion(
+            body.IsKinematic
+                ? body.SampleContinuousCollisionLinearVelocity(Fixed64.One)
+                : body.LinearVelocity);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Vector3d ResolveAngularVelocity(SolidBody body) =>
+        body.ProjectAngularMotion(
+            body.IsKinematic
+                ? body.SampleContinuousCollisionAngularVelocity(Fixed64.One)
+                : body.AngularVelocity);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Fixed64 ComputeImpulseDenominator(SolverContact contact, Vector3d axis)

@@ -42,6 +42,10 @@ internal sealed class UnsupportedTestCollider2D : LSCollider2D
 
 internal sealed class UnsupportedTestCollider3D : LSCollider
 {
+    internal Fixed3x3 InertiaTensor { get; set; } = Fixed3x3.Zero;
+
+    internal Fixed64 MassPropertyWeight { get; set; } = Fixed64.Zero;
+
     internal bool ReportRayOverlapWithoutIntersection { get; set; }
 
     internal bool DeactivateOnInitialize { get; set; }
@@ -65,9 +69,9 @@ internal sealed class UnsupportedTestCollider3D : LSCollider
     }
 
     public override Fixed3x3 CalculateInertiaTensor(Fixed64 mass, Vector3d localCenterOfMassOffset) =>
-        Fixed3x3.Zero;
+        InertiaTensor;
 
-    protected internal override Fixed64 CalculateMassPropertyWeight() => Fixed64.Zero;
+    protected internal override Fixed64 CalculateMassPropertyWeight() => MassPropertyWeight;
 
     public override Vector3d ClosestPointOnSurface(Vector3d other) => Center;
 

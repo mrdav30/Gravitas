@@ -56,12 +56,12 @@ public static class CollisionResponse2D
             SolidBody2D? contactBodyB = contact.B.Body;
             ContactNormalImpulseResult2D normalResult = ContactNormalImpulse2D.CalculateAccumulatedDelta(
                 contactBodyA,
-                contactBodyA?.LinearVelocity ?? Vector2d.Zero,
-                contactBodyA?.AngularVelocity ?? Fixed64.Zero,
+                ResolveLinearVelocity(contactBodyA),
+                ResolveAngularVelocity(contactBodyA),
                 contact.RelativeA,
                 contactBodyB,
-                contactBodyB?.LinearVelocity ?? Vector2d.Zero,
-                contactBodyB?.AngularVelocity ?? Fixed64.Zero,
+                ResolveLinearVelocity(contactBodyB),
+                ResolveAngularVelocity(contactBodyB),
                 contact.RelativeB,
                 contact.Normal,
                 contact.Restitution,
@@ -296,14 +296,29 @@ public static class CollisionResponse2D
 
     private static Vector2d ComputeRelativeVelocity(SolverContact2D contact)
     {
-        Vector2d velocityA = contact.A.Body == null
-            ? Vector2d.Zero
-            : contact.A.Body.LinearVelocity + AngularVelocityAtPoint(contact.RelativeA, contact.A.Body.AngularVelocity);
-        Vector2d velocityB = contact.B.Body == null
-            ? Vector2d.Zero
-            : contact.B.Body.LinearVelocity + AngularVelocityAtPoint(contact.RelativeB, contact.B.Body.AngularVelocity);
+        Vector2d velocityA = ResolveLinearVelocity(contact.A.Body)
+            + AngularVelocityAtPoint(contact.RelativeA, ResolveAngularVelocity(contact.A.Body));
+        Vector2d velocityB = ResolveLinearVelocity(contact.B.Body)
+            + AngularVelocityAtPoint(contact.RelativeB, ResolveAngularVelocity(contact.B.Body));
         return velocityB - velocityA;
     }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Vector2d ResolveLinearVelocity(SolidBody2D? body) =>
+        body == null
+            ? Vector2d.Zero
+            : body.ProjectLinearMotion(
+                body.IsKinematic
+                    ? body.SampleContinuousCollisionLinearVelocity(Fixed64.One)
+                    : body.LinearVelocity);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Fixed64 ResolveAngularVelocity(SolidBody2D? body) =>
+        body == null
+            ? Fixed64.Zero
+            : body.IsKinematic
+                ? body.SampleContinuousCollisionAngularVelocity(Fixed64.One)
+                : body.AngularVelocity;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Vector2d AngularVelocityAtPoint(Vector2d relativePoint, Fixed64 angularVelocity) =>

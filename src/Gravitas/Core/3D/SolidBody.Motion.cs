@@ -183,6 +183,51 @@ public partial class SolidBody
         Context.Diagnostics.EmitAngularVelocityDelta(this, lastVelocity, _angularVelocity);
     }
 
+    internal bool CanApplyCollisionVelocityDeltas(
+        Vector3d linearVelocityDelta,
+        Vector3d angularVelocityDelta)
+    {
+        linearVelocityDelta = ProjectLinearMotion(linearVelocityDelta);
+        angularVelocityDelta = ProjectAngularMotion(angularVelocityDelta);
+        bool linearVelocityFits = Vector3d.TryAdd(
+            _linearVelocity,
+            linearVelocityDelta,
+            out _);
+        bool angularVelocityFits = Vector3d.TryAdd(
+            _angularVelocity,
+            angularVelocityDelta,
+            out _);
+        return (!CanTranslate | linearVelocityFits)
+            & (!CanRotate | angularVelocityFits);
+    }
+
+    internal void ApplyCollisionVelocityState(
+        Vector3d linearVelocity,
+        Vector3d angularVelocity)
+    {
+        linearVelocity = ProjectLinearMotion(linearVelocity);
+        angularVelocity = ProjectAngularMotion(angularVelocity);
+        if (_linearVelocity == linearVelocity && _angularVelocity == angularVelocity)
+            return;
+
+        WakeFromCollision();
+        if (_linearVelocity != linearVelocity)
+        {
+            Vector3d lastLinearVelocity = _linearVelocity;
+            _linearVelocity = linearVelocity;
+            RefreshLinearMotionState(lastLinearVelocity);
+            Context.Diagnostics.EmitLinearVelocityDelta(this, lastLinearVelocity, _linearVelocity);
+        }
+
+        if (_angularVelocity != angularVelocity)
+        {
+            Vector3d lastAngularVelocity = _angularVelocity;
+            _angularVelocity = angularVelocity;
+            RefreshAngularMotionState(lastAngularVelocity);
+            Context.Diagnostics.EmitAngularVelocityDelta(this, lastAngularVelocity, _angularVelocity);
+        }
+    }
+
     internal void ApplyCollisionPositionCorrection(Vector3d positionCorrection)
     {
         positionCorrection = ProjectLinearMotion(positionCorrection);
@@ -425,10 +470,29 @@ public partial class SolidBody
             return;
 
         Vector3d rotationalCcdStartPosition = Position3d;
-        PositionBasedOnForce();
-        Vector3d rotationalCcdProposedPosition = Position3d;
-        if (CanRotate && _angularSpeed > Fixed64.Zero)
-            RotationBasedOnTorque(rotationalCcdStartPosition, rotationalCcdProposedPosition);
+        Vector3d rotationalCcdProposedPosition = rotationalCcdStartPosition
+            + _linearVelocity * Context.DeltaTime;
+        FixedQuaternion rotationalCcdStartRotation = Rotation;
+        FixedQuaternion rotationalCcdProposedRotation = IntegrateAngularRotation(
+            rotationalCcdStartRotation,
+            Context.DeltaTime);
+        if (TryResolveRotationalContinuousCollision(
+                rotationalCcdStartPosition,
+                ref rotationalCcdProposedPosition,
+                rotationalCcdStartRotation,
+                ref rotationalCcdProposedRotation))
+        {
+            ApplyResolvedPosition(rotationalCcdStartPosition, rotationalCcdProposedPosition);
+            Rotation = rotationalCcdProposedRotation;
+            Collider.RebuildRuntimeShapeOnly();
+        }
+        else
+        {
+            PositionBasedOnForce();
+            rotationalCcdProposedPosition = Position3d;
+            if (CanRotate && _angularSpeed > Fixed64.Zero)
+                RotationBasedOnTorque(rotationalCcdStartPosition, rotationalCcdProposedPosition);
+        }
 
         CheckGroundForSimulation();
 
@@ -450,6 +514,11 @@ public partial class SolidBody
         Vector3d startPosition = Position3d;
         Vector3d velocityVector = startPosition + (_linearVelocity * Context.DeltaTime);
         TryResolveContinuousCollision(startPosition, ref velocityVector);
+        ApplyResolvedPosition(startPosition, velocityVector);
+    }
+
+    private void ApplyResolvedPosition(Vector3d startPosition, Vector3d velocityVector)
+    {
         velocityVector = startPosition + ProjectLinearMotion(velocityVector - startPosition);
 
         Vector2d velocityAxis = velocityVector.ToVector2d();

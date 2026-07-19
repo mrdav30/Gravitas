@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using SwiftCollections;
 using SwiftCollections.Query;
@@ -21,6 +22,9 @@ public sealed partial class GravitasPhysicsService
             return;
 
         _continuousCollisionCandidates.Clear();
+        _dirtyContinuousCollisionCandidates.Clear();
+        _dirtyContinuousCollisionBodyIds.Clear();
+        _dirtyContinuousCollisionBodies.FastClear();
         int peak = _dynamicBodies.PeakCount;
         for (int i = 0; i < peak; i++)
         {
@@ -47,6 +51,8 @@ public sealed partial class GravitasPhysicsService
         if (radius <= Fixed64.Epsilon)
             return;
 
+        _continuousCollisionCandidateLifetimes[body.DynamicId] =
+            new ColliderLifetimeToken(body.Collider);
         _continuousCollisionCandidates.Add(
             body.DynamicId,
             DynamicCcdCandidateIndex.CreateBoundsBetween(
@@ -63,7 +69,86 @@ public sealed partial class GravitasPhysicsService
     {
         PrepareContinuousCollisionFrame();
         _continuousCollisionCandidates.Query(sourceBounds, _continuousCollisionCandidateIds);
+        _dirtyContinuousCollisionCandidates.Query(sourceBounds, _dirtyContinuousCollisionCandidateIds);
+        int retainedCount = 0;
+        for (int i = 0; i < _continuousCollisionCandidateIds.Count; i++)
+        {
+            int dynamicId = _continuousCollisionCandidateIds[i];
+            if (!_dirtyContinuousCollisionBodyIds.Contains(dynamicId)
+                && TryGetContinuousCollisionCandidate(dynamicId, out _))
+            {
+                _continuousCollisionCandidateIds[retainedCount++] = dynamicId;
+            }
+        }
+
+        while (_continuousCollisionCandidateIds.Count > retainedCount)
+            _continuousCollisionCandidateIds.RemoveAt(
+                _continuousCollisionCandidateIds.Count - 1);
+
+        for (int i = 0; i < _dirtyContinuousCollisionCandidateIds.Count; i++)
+        {
+            int dynamicId = _dirtyContinuousCollisionCandidateIds[i];
+            if (TryGetContinuousCollisionCandidate(dynamicId, out _))
+                _continuousCollisionCandidateIds.Add(dynamicId);
+        }
+
         return _continuousCollisionCandidateIds;
+    }
+
+    internal bool TryGetContinuousCollisionCandidate(int dynamicId, out SolidBody body)
+    {
+        ColliderLifetimeToken registration = _continuousCollisionCandidateLifetimes[dynamicId];
+        if (registration.Collider != null && registration.IsActive)
+        {
+            body = registration.Collider.Body!;
+            return true;
+        }
+
+        body = null!;
+        return false;
+    }
+
+    internal SolidBody GetContinuousCollisionCandidate(int dynamicId) =>
+        _dynamicBodies[dynamicId];
+
+    internal bool CanAdmitContinuousCollisionCandidateRefresh(SolidBody body) => true;
+
+    internal bool CanAdmitContinuousCollisionCandidateRefresh(
+        SolidBody first,
+        SolidBody second) => true;
+
+    internal bool TryReserveContinuousCollisionCandidateRefresh(SolidBody body)
+    {
+        if (_dirtyContinuousCollisionBodyIds.Add(body.DynamicId))
+            _dirtyContinuousCollisionBodies.Add(body);
+
+        return true;
+    }
+
+    private void ReleaseContinuousCollisionCandidateRefresh(SolidBody body)
+    {
+        if (!_dirtyContinuousCollisionBodyIds.Remove(body.DynamicId))
+            return;
+
+        _dirtyContinuousCollisionBodies.Remove(body);
+        _dirtyContinuousCollisionCandidates.Remove(body.DynamicId);
+    }
+
+    internal bool TryReserveContinuousCollisionCandidateRefresh(
+        SolidBody first,
+        SolidBody second)
+    {
+        TryReserveContinuousCollisionCandidateRefresh(first);
+        TryReserveContinuousCollisionCandidateRefresh(second);
+        return true;
+    }
+
+    internal void RefreshContinuousCollisionCandidate(SolidBody body)
+    {
+        Fixed64 radius = body.ResolveContinuousCollisionProxyRadius();
+        _dirtyContinuousCollisionCandidates.AddOrUpdate(
+            body.DynamicId,
+            body.ResolveContinuousCollisionTrajectoryBounds(radius));
     }
 
     internal void QueueContinuousCollisionHandoff(SolidBody body)
@@ -79,6 +164,9 @@ public sealed partial class GravitasPhysicsService
 
     internal bool ProcessQueuedContinuousCollisionHandoffs() =>
         ProcessQueuedContinuousCollisionHandoffs(_context.Settings.ContinuousCollisionMaxToiIterations) > 0;
+
+    internal void ReportContinuousCollisionIterationLimit() =>
+        LastContinuousCollisionIslandLimitReached = true;
 
     internal int ProcessQueuedContinuousCollisionHandoffs(int iterationBudget)
     {

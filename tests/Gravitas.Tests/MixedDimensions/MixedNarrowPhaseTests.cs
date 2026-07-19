@@ -12,7 +12,7 @@ using Xunit;
 
 namespace Gravitas.Tests.MixedDimensions;
 
-public sealed class MixedNarrowPhaseTests
+public sealed partial class MixedNarrowPhaseTests
 {
     public static TheoryData<string, Func<GravitasWorldContext, LSCollider>, Func<GravitasWorldContext, LSCollider2D>> RemainingPrimitivePairs =>
         new()
@@ -818,6 +818,101 @@ public sealed class MixedNarrowPhaseTests
         contact.Depth.Should().BeGreaterThan(Fixed64.Zero);
         contact.Point2D.X.Should().Be(Fixed64.One);
         contact.Point2D.Z.Should().Be(Fixed64.One);
+    }
+
+    [Fact]
+    public void RotationalSeparationGap_ForSphereAndPolygonSlab_ShouldUseClosestFeatureDistance()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSSphereCollider> sphere = CreateSphere3D(
+            context,
+            new Vector3d((Fixed64)3, Fixed64.Zero, Fixed64.Zero));
+        SolidBody2D polygon = CreateBody2D(
+            context,
+            CreateSquarePolygon(),
+            Vector2d.Zero);
+
+        bool calculated = CollisionDetectionMixed.TryGetRotationalSeparationGap(
+            sphere.Collider,
+            polygon.Collider,
+            out Fixed64 gap,
+            out bool supported);
+
+        supported.Should().BeTrue();
+        calculated.Should().BeTrue();
+        gap.Should().Be(Fixed64.FromFraction(3, 2));
+    }
+
+    [Fact]
+    public void RotationalSeparationGap_ForYawCuboidAndCircleSlab_ShouldUsePlanarObbDistance()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSCuboidCollider> cuboid = CreateCuboid3D(
+            context,
+            Vector3d.Zero);
+        SolidBody2D circle = CreateBody2D(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            Vector2d.Right * (Fixed64)2);
+
+        bool calculated = CollisionDetectionMixed.TryGetRotationalSeparationGap(
+            cuboid.Collider,
+            circle.Collider,
+            out Fixed64 gap,
+            out bool supported);
+
+        supported.Should().BeTrue();
+        calculated.Should().BeTrue();
+        gap.Should().Be(Fixed64.One);
+    }
+
+    [Fact]
+    public void RotationalSeparationGap_WithUnrepresentableSpherePolygonDistance_ShouldNotCertify()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSSphereCollider> sphere = CreateSphere3D(context, Vector3d.Zero);
+        SolidBody2D polygon = CreateBody2D(context, CreateSquarePolygon(), Vector2d.Zero);
+        sphere.Collider.LocalOffset = new Vector3d(
+            Fixed64.MaxValue,
+            Fixed64.Zero,
+            Fixed64.MaxValue);
+        sphere.Collider.RebuildRuntimeShapeOnly();
+
+        CollisionDetectionMixed.TryGetRotationalSeparationGap(
+                sphere.Collider,
+                polygon.Collider,
+                out _,
+                out bool supported)
+            .Should()
+            .BeFalse();
+        supported.Should().BeTrue();
+    }
+
+    [Fact]
+    public void RotationalSeparationGap_WithUnrepresentableCuboidCircleDelta_ShouldNotCertify()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSCuboidCollider> cuboid = CreateCuboid3D(context, Vector3d.Zero);
+        SolidBody2D circle = CreateBody2D(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            Vector2d.Zero);
+        cuboid.Collider.LocalOffset = new Vector3d(
+            Fixed64.MinValue,
+            Fixed64.Zero,
+            Fixed64.Zero);
+        circle.Collider.LocalOffset = new Vector2d(Fixed64.MaxValue, Fixed64.Zero);
+        cuboid.Collider.RebuildRuntimeShapeOnly();
+        circle.Collider.RebuildRuntimeShapeOnly();
+
+        CollisionDetectionMixed.TryGetRotationalSeparationGap(
+                cuboid.Collider,
+                circle.Collider,
+                out _,
+                out bool supported)
+            .Should()
+            .BeFalse();
+        supported.Should().BeTrue();
     }
 
     [Theory]

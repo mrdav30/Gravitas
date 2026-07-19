@@ -10,6 +10,52 @@ namespace Gravitas.Tests.Core;
 public sealed class SolidBodyMotionHardeningTests
 {
     [Fact]
+    public void CollisionVelocityAdmission_ShouldRejectAnyUnrepresentableComponent()
+    {
+        using PhysicsScenarioBuilder scenario = CreateMotionScenario();
+        scenario.Context.Environment.MaxSpeed = Fixed64.MaxValue;
+        ScenarioBody<LSCuboidCollider> body = scenario.CreateCuboid(Vector3d.Zero);
+        body.Body.ApplyCollisionLinearVelocityDelta(Vector3d.Right * Fixed64.MaxValue);
+        body.Body.ApplyCollisionAngularVelocityDelta(Vector3d.Up * Fixed64.MaxValue);
+
+        body.Body.CanApplyCollisionVelocityDeltas(Vector3d.Right, Vector3d.Zero)
+            .Should()
+            .BeFalse();
+        body.Body.CanApplyCollisionVelocityDeltas(Vector3d.Zero, Vector3d.Up)
+            .Should()
+            .BeFalse();
+    }
+
+    [Fact]
+    public void LateSimulate_WithAngularSpeedAboveLimit_ShouldClampToEnvironmentMaximum()
+    {
+        using PhysicsScenarioBuilder scenario = CreateMotionScenario();
+        scenario.Context.Environment.MaxSpeed = Fixed64.One;
+        ScenarioBody<LSCuboidCollider> body = scenario.CreateCuboid(Vector3d.Zero);
+        body.Body.AddTorque(Vector3d.Up * (Fixed64)16);
+
+        scenario.Context.LateSimulate();
+
+        body.Body.AngularSpeed.Should().Be(Fixed64.One);
+    }
+
+    [Fact]
+    public void LateSimulate_WithAngularSpeedBelowLimit_ShouldPreserveVelocity()
+    {
+        using PhysicsScenarioBuilder scenario = CreateMotionScenario();
+        scenario.Context.Environment.DampingFactor = Fixed64.Zero;
+        scenario.Context.Environment.MaxSpeed = (Fixed64)100;
+        Vector3d requestedVelocity = Vector3d.Up * (Fixed64)4;
+        ScenarioBody<LSCuboidCollider> body = scenario.CreateCuboid(Vector3d.Zero);
+        body.Body.ApplyCollisionAngularVelocityDelta(requestedVelocity);
+
+        scenario.Context.LateSimulate();
+
+        body.Body.AngularVelocity.Should().Be(requestedVelocity);
+        body.Body.AngularSpeed.Should().Be(requestedVelocity.Magnitude);
+    }
+
+    [Fact]
     public void Initialize_AfterDeactivate_ShouldDiscardPriorAndQueuedMotion()
     {
         using PhysicsScenarioBuilder scenario = CreateMotionScenario();
@@ -135,7 +181,7 @@ public sealed class SolidBodyMotionHardeningTests
     }
 
     [Fact]
-    public void QueuedLinearCcdHandoff_AfterNormalAngularStep_ShouldPreserveAngularState()
+    public void QueuedLinearCcdHandoff_AfterNormalAngularStep_ShouldContinueAngularState()
     {
         using PhysicsScenarioBuilder scenario = CreateMotionScenario();
         scenario.Context.SetFrameRate(64);
@@ -157,18 +203,26 @@ public sealed class SolidBodyMotionHardeningTests
         Fixed64 angularSpeed = body.Body.AngularSpeed;
         Vector3d angularAcceleration = body.Body.AngularAcceleration;
         FixedQuaternion rotation = body.Body.Rotation;
+        Fixed64 remainingTime = scenario.Context.DeltaTime * Fixed64.Half;
+        FixedQuaternion angularVelocityQuaternion = new(
+            angularVelocity.X,
+            angularVelocity.Y,
+            angularVelocity.Z,
+            Fixed64.Zero);
+        FixedQuaternion expectedRotation = (rotation
+            + angularVelocityQuaternion * rotation * Fixed64.Half * remainingTime).Normalized;
 
         body.Body.ApplyContinuousCollisionHandoff(
             body.Body.Position3d,
             Vector3d.Right,
-            scenario.Context.DeltaTime * Fixed64.Half);
+            remainingTime);
 
         scenario.Context.Physics.ProcessQueuedContinuousCollisionHandoffs(
             iterationBudget: 1).Should().Be(1);
         body.Body.AngularVelocity.Should().Be(angularVelocity);
         body.Body.AngularSpeed.Should().Be(angularSpeed);
         body.Body.AngularAcceleration.Should().Be(angularAcceleration);
-        body.Body.Rotation.Should().Be(rotation);
+        body.Body.Rotation.Should().Be(expectedRotation);
     }
 
     [Fact]

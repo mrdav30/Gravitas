@@ -284,6 +284,18 @@ public sealed class CompoundCollider2DTests
     }
 
     [Fact]
+    public void ScaledRadius_WithNearerTrailingCircle_ShouldRetainFarthestPart()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        var compound = new LSCompoundCollider2D(
+            CompoundColliderPart2D.Circle(Fixed64.One, Vector2d.Right * (Fixed64)4),
+            CompoundColliderPart2D.Circle(Fixed64.Half, Vector2d.Zero));
+        _ = CreateBody(context, compound, Vector2d.Zero);
+
+        compound.ScaledRadius.Should().Be((Fixed64)5);
+    }
+
+    [Fact]
     public void CapsulePart_WithWideLocalScale_ShouldClampScaledHeightToScaledDiameter()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();

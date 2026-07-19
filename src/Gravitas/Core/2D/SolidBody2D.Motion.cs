@@ -130,6 +130,23 @@ public sealed partial class SolidBody2D
         RefreshAngularSpeed();
     }
 
+    internal bool CanApplyCollisionVelocityDeltas(
+        Vector2d linearVelocityDelta,
+        Fixed64 angularVelocityDelta)
+    {
+        linearVelocityDelta = ProjectLinearMotion(linearVelocityDelta);
+        bool linearVelocityFits = Vector2d.TryAdd(
+            _linearVelocity,
+            linearVelocityDelta,
+            out _);
+        bool angularVelocityFits = Fixed64.TryAdd(
+            _angularVelocity,
+            angularVelocityDelta,
+            out _);
+        return (!CanTranslate | linearVelocityFits)
+            & (!CanRotate | angularVelocityFits);
+    }
+
     internal void ApplyCollisionPositionCorrection(Vector2d positionCorrection)
     {
         positionCorrection = ProjectLinearMotion(positionCorrection);

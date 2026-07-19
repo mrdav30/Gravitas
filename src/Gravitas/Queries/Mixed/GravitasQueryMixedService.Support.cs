@@ -128,7 +128,7 @@ public sealed partial class GravitasQueryMixedService
         return direction;
     }
 
-    private static bool TrySweepCircleSlabSide(
+    internal static bool TrySweepCircleSlabSide(
         Fixed64 localStartY,
         Fixed64 localEndY,
         Vector2d planarStart,
@@ -141,8 +141,9 @@ public sealed partial class GravitasQueryMixedService
         out Fixed64 distance)
     {
         distance = Fixed64.Zero;
-        if (!Vector2d.TrySubtract(planarEnd, planarStart, out Vector2d planarSegment))
-            return false;
+        // The parent reducer admits only a representable 3D segment. Its X/Z
+        // projection is therefore representable as well.
+        Vector2d planarSegment = planarEnd - planarStart;
 
         var ray = new FixedRay2d(planarStart, planarSegment);
         if (!ray.TryGetIntersectionInterval(
@@ -157,14 +158,13 @@ public sealed partial class GravitasQueryMixedService
 
         bool useExit = !IsCircleSlabSideHit(localStartY, localEndY, halfHeight, first);
         Fixed64 parameter = useExit ? second : first;
-        if ((useExit && second == first)
-            || !IsCircleSlabSideHit(localStartY, localEndY, halfHeight, parameter))
-        {
+        // When entry and exit are the same, the side predicate is identical at
+        // both roots, so the second check already rejects an unusable tangent.
+        if (!IsCircleSlabSideHit(localStartY, localEndY, halfHeight, parameter))
             return false;
-        }
 
-        if (parameter == Fixed64.Zero)
-            return true;
+        // A zero-distance side root would already have been admitted by the
+        // parent reducer's inclusive starting-overlap check.
         if (parameter == Fixed64.One)
         {
             distance = length;
@@ -190,7 +190,7 @@ public sealed partial class GravitasQueryMixedService
         return true;
     }
 
-    private static bool TrySweepCircleSlabCap(
+    internal static bool TrySweepCircleSlabCap(
         Fixed64 localStartY,
         Fixed64 localEndY,
         Fixed64 directionY,
@@ -245,9 +245,8 @@ public sealed partial class GravitasQueryMixedService
         Fixed64 halfHeight,
         Fixed64 parameter)
     {
-        if (parameter < Fixed64.Zero || parameter > Fixed64.One)
-            return false;
-
+        // FixedRay2d.TryGetIntersectionInterval is called with maxDistance=1,
+        // so both roots are already guaranteed to be in [0, 1].
         Fixed64 y = FixedMath.Lerp(localStartY, localEndY, parameter);
         return y >= -halfHeight && y <= halfHeight;
     }

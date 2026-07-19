@@ -339,16 +339,21 @@ public partial class SolidBody
         for (int candidateIndex = 0; candidateIndex < candidateIds.Count; candidateIndex++)
         {
             int dynamicId = candidateIds[candidateIndex];
-            if (!Context.Physics.TryGetDynamicBody(dynamicId, out SolidBody target)
-                || !IsEligibleDynamicContinuousCollisionTarget(target))
+            SolidBody target = Context.Physics.GetContinuousCollisionCandidate(dynamicId);
+            if (!IsEligibleDynamicContinuousCollisionTarget(target))
             {
                 continue;
             }
 
             target.EnsureContinuousCollisionFramePrepared(token);
-            Vector3d targetStart = target.ContinuousCollisionFrameStart
-                + target.ContinuousCollisionFrameDisplacement * elapsedFrameFraction;
-            Vector3d targetDisplacement = target.ContinuousCollisionFrameDisplacement * remainingFrameFraction;
+            Fixed64 targetEndFrameFraction = FixedMath.Clamp01(
+                elapsedFrameFraction + remainingFrameFraction);
+            target.TrySampleContinuousCollisionDisplacement(
+                elapsedFrameFraction,
+                targetEndFrameFraction,
+                out Vector3d targetStart,
+                out Vector3d targetDisplacement);
+
             Fixed64 targetRadius = target.ResolveContinuousCollisionProxyRadius();
             if (!ContinuousCollisionMath.TrySweepRelativeSpheres(
                     startPosition,
@@ -548,8 +553,8 @@ public partial class SolidBody
         for (int candidateIndex = 0; candidateIndex < candidateIds.Count; candidateIndex++)
         {
             int dynamicId = candidateIds[candidateIndex];
-            if (!Context.Physics2D.TryGetDynamicBody(dynamicId, out SolidBody2D target)
-                || !IsEligibleDynamicMixed2DTarget(target))
+            SolidBody2D target = Context.Physics2D.GetContinuousCollisionCandidate(dynamicId);
+            if (!IsEligibleDynamicMixed2DTarget(target))
             {
                 continue;
             }
@@ -558,9 +563,14 @@ public partial class SolidBody
             Fixed64 targetRadius = FixedMath.Max(
                 target.ResolveContinuousCollisionProxyRadius(),
                 target.Collider.MixedHalfThickness);
-            Vector2d targetStart2D = target.ContinuousCollisionFrameStart
-                + target.ContinuousCollisionFrameDisplacement * elapsedFrameFraction;
-            Vector2d targetDisplacement2D = target.ContinuousCollisionFrameDisplacement * remainingFrameFraction;
+            Fixed64 targetEndFrameFraction = FixedMath.Clamp01(
+                elapsedFrameFraction + remainingFrameFraction);
+            target.TrySampleContinuousCollisionDisplacement(
+                elapsedFrameFraction,
+                targetEndFrameFraction,
+                out Vector2d targetStart2D,
+                out Vector2d targetDisplacement2D);
+
             Vector3d targetStart = new(targetStart2D.X, target.Collider.MixedSlabCenterY, targetStart2D.Y);
             Vector3d targetDisplacement = new(targetDisplacement2D.X, Fixed64.Zero, targetDisplacement2D.Y);
             if (!ContinuousCollisionMath.TrySweepRelativeSpheres(

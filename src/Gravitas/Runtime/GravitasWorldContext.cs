@@ -335,9 +335,9 @@ public sealed class GravitasWorldContext : IDisposable
         bool willRun2D = runtimeMode.Runs2D() && Physics2D.SimulatePhysics;
         if (willRun3D || willRun2D)
             AdvanceLateSimulateToken();
-        if (runtimeMode.Runs3D())
+        if (willRun3D)
             Physics.PrepareContinuousCollisionFrame();
-        if (runtimeMode.Runs2D())
+        if (willRun2D)
             Physics2D.PrepareContinuousCollisionFrame();
         bool ran3D = willRun3D
             && Physics.BeginLateSimulateBodies(continuousCollisionFramePrepared: true);

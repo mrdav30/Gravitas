@@ -37,8 +37,16 @@ public sealed partial class GravitasPhysics2DService
     private readonly SwiftList<DiscreteIslandNode2D> _discreteIslandNodes = new();
     private readonly SwiftList<DiscreteIslandConstraint2D> _discreteIslandConstraints = new();
     private readonly DynamicCcdCandidateIndex2D _planarContinuousCollisionCandidates = new();
+    private readonly DynamicCcdCandidateIndex2D _dirtyPlanarContinuousCollisionCandidates =
+        new(supportsUpdates: true);
+    private readonly SwiftList<SolidBody2D> _dirtyPlanarContinuousCollisionBodies = new();
+    private readonly SwiftHashSet<SolidBody2D> _dirtyPlanarContinuousCollisionBodySet = new();
     private readonly DynamicCcdCandidateIndex _mixedContinuousCollisionCandidates = new();
+    private readonly DynamicCcdCandidateIndex _dirtyMixedContinuousCollisionCandidates =
+        new(supportsUpdates: true);
+    private readonly SwiftList<ColliderLifetimeToken2D> _continuousCollisionCandidateLifetimes = new();
     private readonly SwiftList<int> _continuousCollisionCandidateIds = new();
+    private readonly SwiftList<int> _dirtyContinuousCollisionCandidateIds = new();
     private readonly SwiftHashSet<SolidBody2D> _processedContinuousCollisionBodies = new();
     private readonly SwiftHashSet<SolidBody2D> _queuedContinuousCollisionHandoffBodies = new();
     private readonly SwiftList<SolidBody2D> _continuousCollisionHandoffQueue = new();
@@ -85,6 +93,8 @@ public sealed partial class GravitasPhysics2DService
         if (isDynamic)
         {
             body.DynamicId = _dynamicBodies.Add(body);
+            while (_continuousCollisionCandidateLifetimes.Count <= body.DynamicId)
+                _continuousCollisionCandidateLifetimes.Add(default);
             BodyCount++;
         }
 
@@ -108,7 +118,11 @@ public sealed partial class GravitasPhysics2DService
     {
         SwiftThrowHelper.ThrowIfNull(body, nameof(body));
         if (body.DynamicId >= 0 && _dynamicBodies.TryRemoveAt(body.DynamicId))
+        {
+            _continuousCollisionCandidateLifetimes[body.DynamicId] = default;
+            ReleaseContinuousCollisionCandidateRefresh(body);
             BodyCount--;
+        }
 
         LSCollider2D collider = body.Collider;
         DessimilateCollider(collider);
@@ -228,8 +242,14 @@ public sealed partial class GravitasPhysics2DService
         _discreteIslandNodes.FastClear();
         _discreteIslandConstraints.FastClear();
         _planarContinuousCollisionCandidates.Clear();
+        _dirtyPlanarContinuousCollisionCandidates.Clear();
+        _dirtyPlanarContinuousCollisionBodies.FastClear();
+        _dirtyPlanarContinuousCollisionBodySet.Clear();
         _mixedContinuousCollisionCandidates.Clear();
+        _dirtyMixedContinuousCollisionCandidates.Clear();
+        _continuousCollisionCandidateLifetimes.Clear();
         _continuousCollisionCandidateIds.FastClear();
+        _dirtyContinuousCollisionCandidateIds.FastClear();
         _processedContinuousCollisionBodies.Clear();
         _continuousCollisionPreparedToken = int.MinValue;
         _continuousCollisionPreparedMixedIndex = false;

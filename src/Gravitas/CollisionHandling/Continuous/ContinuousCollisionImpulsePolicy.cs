@@ -25,19 +25,14 @@ internal static class ContinuousCollisionImpulsePolicy
             return true;
         }
 
-        if (!Fixed64.TryMultiplyDivide(
-                normalVelocity,
-                responseFactor,
-                bodyInverseMass,
-                constrainedInverseMass,
-                out Fixed64 speedDelta))
-        {
-            velocityDelta = default;
-            return false;
-        }
-
+        bool resolved = Fixed64.TryMultiplyDivide(
+            normalVelocity,
+            responseFactor,
+            bodyInverseMass,
+            constrainedInverseMass,
+            out Fixed64 speedDelta);
         velocityDelta = signedNormal * speedDelta;
-        return true;
+        return resolved;
     }
 
     internal static bool TryResolveVelocityDelta(
@@ -54,19 +49,14 @@ internal static class ContinuousCollisionImpulsePolicy
             return true;
         }
 
-        if (!Fixed64.TryMultiplyDivide(
-                normalVelocity,
-                responseFactor,
-                bodyInverseMass,
-                constrainedInverseMass,
-                out Fixed64 speedDelta))
-        {
-            velocityDelta = default;
-            return false;
-        }
-
+        bool resolved = Fixed64.TryMultiplyDivide(
+            normalVelocity,
+            responseFactor,
+            bodyInverseMass,
+            constrainedInverseMass,
+            out Fixed64 speedDelta);
         velocityDelta = signedNormal * speedDelta;
-        return true;
+        return resolved;
     }
 
     internal static bool TryResolveVelocityDelta(

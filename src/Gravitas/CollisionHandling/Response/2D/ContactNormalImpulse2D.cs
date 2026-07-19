@@ -122,36 +122,40 @@ internal static class ContactNormalImpulse2D
             ? restitution
             : Fixed64.Zero;
         Fixed64 responseFactor = -(Fixed64.One + appliedRestitution);
-        if (!ContinuousCollisionImpulsePolicy.TryResolveVelocityDelta(
+        bool linearAResolved = ContinuousCollisionImpulsePolicy.TryResolveVelocityDelta(
                 bodyA?.ProjectLinearMotion(-normal) ?? Vector2d.Zero,
                 normalVelocity,
                 responseFactor,
                 bodyA?.EffectiveInverseMass ?? Fixed64.Zero,
                 denominator,
-                out Vector2d linearVelocityDeltaA)
-            || !TryResolveAngularVelocityDelta(
+                out Vector2d linearVelocityDeltaA);
+        bool angularAResolved = TryResolveAngularVelocityDelta(
                 bodyA,
                 relativeContactPointA,
                 -normal,
                 normalVelocity,
                 responseFactor,
                 denominator,
-                out Fixed64 angularVelocityDeltaA)
-            || !ContinuousCollisionImpulsePolicy.TryResolveVelocityDelta(
+                out Fixed64 angularVelocityDeltaA);
+        bool linearBResolved = ContinuousCollisionImpulsePolicy.TryResolveVelocityDelta(
                 bodyB?.ProjectLinearMotion(normal) ?? Vector2d.Zero,
                 normalVelocity,
                 responseFactor,
                 bodyB?.EffectiveInverseMass ?? Fixed64.Zero,
                 denominator,
-                out Vector2d linearVelocityDeltaB)
-            || !TryResolveAngularVelocityDelta(
+                out Vector2d linearVelocityDeltaB);
+        bool angularBResolved = TryResolveAngularVelocityDelta(
                 bodyB,
                 relativeContactPointB,
                 normal,
                 normalVelocity,
                 responseFactor,
                 denominator,
-                out Fixed64 angularVelocityDeltaB))
+                out Fixed64 angularVelocityDeltaB);
+        if (!(linearAResolved
+                & angularAResolved
+                & linearBResolved
+                & angularBResolved))
         {
             return false;
         }
@@ -317,24 +321,20 @@ internal static class ContactNormalImpulse2D
         if (torqueScale == Fixed64.Zero)
             return true;
 
-        if (!Fixed64.TryMultiplyDivide(
+        bool angularScaleResolved = Fixed64.TryMultiplyDivide(
             normalVelocity,
             responseFactor,
             body.EffectiveInverseMomentOfInertia,
             denominator,
-            out Fixed64 angularScale))
-        {
-            return false;
-        }
-
-        if (angularScale == Fixed64.Zero && torqueScale.Abs() > Fixed64.One)
-            return false;
-
-        return Fixed64.TryMultiplyDivide(
+            out Fixed64 angularScale);
+        bool velocityDeltaResolved = Fixed64.TryMultiplyDivide(
             torqueScale,
             angularScale,
             Fixed64.One,
             out velocityDelta);
+        return angularScaleResolved
+            & (angularScale != Fixed64.Zero | torqueScale.Abs() <= Fixed64.One)
+            & velocityDeltaResolved;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

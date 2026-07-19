@@ -233,31 +233,23 @@ public static class CollisionResponseMixed
         Fixed64 inverseMoment2D,
         Fixed64 impulseScalar)
     {
-        if (inverseMass3D > Fixed64.Zero)
+        if (body3D != null)
         {
             Vector3d impulse3D = -axis * impulseScalar;
-            body3D!.ApplyCollisionLinearVelocityDelta(impulse3D * inverseMass3D);
-
-            if (CanRotate(body3D))
-            {
-                Vector3d angularVelocityDelta =
-                    body3D!.ApplyConstrainedInverseInertia(Vector3d.Cross(relative3D, impulse3D));
-                body3D.ApplyCollisionAngularVelocityDelta(angularVelocityDelta);
-            }
+            body3D.ApplyCollisionLinearVelocityDelta(impulse3D * inverseMass3D);
+            Vector3d angularVelocityDelta =
+                body3D.ApplyConstrainedInverseInertia(Vector3d.Cross(relative3D, impulse3D));
+            body3D.ApplyCollisionAngularVelocityDelta(angularVelocityDelta);
         }
 
-        if (inverseMass2D <= Fixed64.Zero)
+        if (body2D == null)
             return;
 
         Vector2d planarAxis = axis.ToVector2d();
-        if (planarAxis == Vector2d.Zero)
-            return;
-
         Vector2d planarImpulse = planarAxis * impulseScalar;
-        body2D!.ApplyCollisionLinearVelocityDelta(planarImpulse * inverseMass2D);
-
-        if (inverseMoment2D > Fixed64.Zero)
-            body2D.ApplyCollisionAngularVelocityDelta(Vector2d.CrossProduct(relative2D, planarImpulse) * inverseMoment2D);
+        body2D.ApplyCollisionLinearVelocityDelta(planarImpulse * inverseMass2D);
+        body2D.ApplyCollisionAngularVelocityDelta(
+            Vector2d.CrossProduct(relative2D, planarImpulse) * inverseMoment2D);
     }
 
     private static Vector3d ComputeRelativeVelocity(
@@ -268,31 +260,53 @@ public static class CollisionResponseMixed
     {
         Vector3d velocity3D = body3D == null
             ? Vector3d.Zero
-            : ResolveLinearVelocity(body3D) + Vector3d.Cross(body3D.AngularVelocity, relative3D);
+            : ResolveLinearVelocity(body3D)
+                + Vector3d.Cross(ResolveAngularVelocity(body3D), relative3D);
         Vector3d velocity2D = body2D == null
             ? Vector3d.Zero
-            : (ResolveLinearVelocity(body2D) + AngularVelocityAtPoint(relative2D, body2D.AngularVelocity)).ToVector3d(Fixed64.Zero);
+            : (ResolveLinearVelocity(body2D)
+                + AngularVelocityAtPoint(relative2D, ResolveAngularVelocity(body2D)))
+                .ToVector3d(Fixed64.Zero);
         return velocity2D - velocity3D;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Vector3d ResolveLinearVelocity(SolidBody body) =>
-        body.ProjectLinearMotion(body.IsKinematic ? body.ResolveContinuousCollisionFrameVelocity() : body.LinearVelocity);
+        body.ProjectLinearMotion(
+            body.IsKinematic
+                ? body.SampleContinuousCollisionLinearVelocity(Fixed64.One)
+                : body.LinearVelocity);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Vector2d ResolveLinearVelocity(SolidBody2D body) =>
-        body.ProjectLinearMotion(body.IsKinematic ? body.ResolveContinuousCollisionFrameVelocity() : body.LinearVelocity);
+        body.ProjectLinearMotion(
+            body.IsKinematic
+                ? body.SampleContinuousCollisionLinearVelocity(Fixed64.One)
+                : body.LinearVelocity);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Vector3d ResolveAngularVelocity(SolidBody body) =>
+        body.ProjectAngularMotion(
+            body.IsKinematic
+                ? body.SampleContinuousCollisionAngularVelocity(Fixed64.One)
+                : body.AngularVelocity);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Fixed64 ResolveAngularVelocity(SolidBody2D body) =>
+        body.IsKinematic
+            ? body.SampleContinuousCollisionAngularVelocity(Fixed64.One)
+            : body.AngularVelocity;
 
     private static Fixed64 ComputeAngularDenominator(SolidBody? body3D, Vector3d relativeContactPoint, Vector3d axis)
     {
-        if (!CanRotate(body3D))
+        if (body3D == null)
             return Fixed64.Zero;
 
         Vector3d angularVelocityDelta = body3D!.ApplyConstrainedInverseInertia(
             Vector3d.Cross(relativeContactPoint, axis));
         Vector3d angular = Vector3d.Cross(angularVelocityDelta, relativeContactPoint);
         Fixed64 denominator = Vector3d.Dot(angular, axis);
-        return denominator > Fixed64.Zero ? denominator : Fixed64.Zero;
+        return FixedMath.Max(denominator, Fixed64.Zero);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -359,9 +373,5 @@ public static class CollisionResponseMixed
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Vector2d AngularVelocityAtPoint(Vector2d relativePoint, Fixed64 angularVelocity) =>
         new(-angularVelocity * relativePoint.Y, angularVelocity * relativePoint.X);
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool CanRotate(SolidBody? body) =>
-        body?.CanRotate == true;
 
 }

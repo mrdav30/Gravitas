@@ -581,7 +581,10 @@ public sealed partial class MixedResponseTests
         using GravitasWorldContext context = CreateMixedContext();
         LSSphereCollider collider3D = CreateBodylessSphere3D(context, new Vector3d(-Fixed64.Half, Fixed64.Zero, Fixed64.Zero));
         SolidBody2D body2D = CreateCircle2D(context, Vector2d.Zero);
-        body2D.ApplyCollisionLinearVelocityDelta(-Vector2d.Right * (Fixed64)4);
+        PhysicsMaterial sliding = new(Fixed64.Half, Fixed64.Half, Fixed64.Zero);
+        collider3D.Material = sliding;
+        body2D.Collider.Material = sliding;
+        body2D.ApplyCollisionLinearVelocityDelta(new Vector2d((Fixed64)(-4), Fixed64.One));
         var pair = new CollisionPairMixed(collider3D, body2D.Collider);
         var contact = new MixedContact(
             collider3D.Center,
@@ -595,6 +598,7 @@ public sealed partial class MixedResponseTests
         collider3D.Center.Should().Be(new Vector3d(-Fixed64.Half, Fixed64.Zero, Fixed64.Zero));
         body2D.Position.X.Should().BeGreaterThan(Fixed64.Zero);
         body2D.LinearVelocity.X.Should().BeGreaterThan(-(Fixed64)4);
+        body2D.LinearVelocity.Y.Should().BeLessThan(Fixed64.One);
     }
 
     [Fact]
@@ -605,7 +609,11 @@ public sealed partial class MixedResponseTests
             context,
             new Vector3d(-Fixed64.Half, Fixed64.Zero, Fixed64.Zero));
         LSCollider2D collider2D = CreateBodylessCircle2D(context, Vector2d.Zero);
-        body3D.Body.ApplyCollisionLinearVelocityDelta(Vector3d.Right * (Fixed64)4);
+        PhysicsMaterial sliding = new(Fixed64.Half, Fixed64.Half, Fixed64.Zero);
+        body3D.Collider.Material = sliding;
+        collider2D.Material = sliding;
+        body3D.Body.ApplyCollisionLinearVelocityDelta(
+            new Vector3d((Fixed64)4, Fixed64.Zero, Fixed64.One));
         var pair = new CollisionPairMixed(body3D.Collider, collider2D);
         var contact = new MixedContact(
             body3D.Collider.Center,
@@ -618,6 +626,7 @@ public sealed partial class MixedResponseTests
         appliedImpulse.Should().BeTrue();
         body3D.Body.Position3d.X.Should().BeLessThan(-Fixed64.Half);
         body3D.Body.LinearVelocity.X.Should().BeLessThan((Fixed64)4);
+        body3D.Body.LinearVelocity.Z.Should().BeLessThan(Fixed64.One);
         collider2D.Center.Should().Be(Vector2d.Zero);
     }
 

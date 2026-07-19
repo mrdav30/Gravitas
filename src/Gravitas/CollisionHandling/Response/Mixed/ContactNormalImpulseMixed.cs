@@ -124,36 +124,40 @@ internal static class ContactNormalImpulseMixed
             : Fixed64.Zero;
         Fixed64 responseFactor = -(Fixed64.One + appliedRestitution);
         Vector2d planarNormal = normal.ToVector2d();
-        if (!ContinuousCollisionImpulsePolicy.TryResolveVelocityDelta(
+        bool linear3DResolved = ContinuousCollisionImpulsePolicy.TryResolveVelocityDelta(
                 body3D?.ProjectLinearMotion(-normal) ?? Vector3d.Zero,
                 normalVelocity,
                 responseFactor,
                 body3D?.EffectiveInverseMass ?? Fixed64.Zero,
                 denominator,
-                out Vector3d linearVelocityDelta3D)
-            || !TryResolveAngularVelocityDelta3D(
+                out Vector3d linearVelocityDelta3D);
+        bool angular3DResolved = TryResolveAngularVelocityDelta3D(
                 body3D,
                 relativeContactPoint3D,
                 -normal,
                 normalVelocity,
                 responseFactor,
                 denominator,
-                out Vector3d angularVelocityDelta3D)
-            || !ContinuousCollisionImpulsePolicy.TryResolveVelocityDelta(
+                out Vector3d angularVelocityDelta3D);
+        bool linear2DResolved = ContinuousCollisionImpulsePolicy.TryResolveVelocityDelta(
                 body2D?.ProjectLinearMotion(planarNormal) ?? Vector2d.Zero,
                 normalVelocity,
                 responseFactor,
                 body2D?.EffectiveInverseMass ?? Fixed64.Zero,
                 denominator,
-                out Vector2d linearVelocityDelta2D)
-            || !TryResolveAngularVelocityDelta2D(
+                out Vector2d linearVelocityDelta2D);
+        bool angular2DResolved = TryResolveAngularVelocityDelta2D(
                 body2D,
                 relativeContactPoint2D,
                 planarNormal,
                 normalVelocity,
                 responseFactor,
                 denominator,
-                out Fixed64 angularVelocityDelta2D))
+                out Fixed64 angularVelocityDelta2D);
+        if (!(linear3DResolved
+                & angular3DResolved
+                & linear2DResolved
+                & angular2DResolved))
         {
             return false;
         }
@@ -359,15 +363,26 @@ internal static class ContactNormalImpulseMixed
 
         Vector3d response = body.ApplyConstrainedInverseInertia(
             Vector3d.Cross(relativeContactPoint, signedNormal));
-        if (!Fixed64.TryMultiplyDivide(response.X, normalVelocity, responseFactor, denominator, out Fixed64 x)
-            || !Fixed64.TryMultiplyDivide(response.Y, normalVelocity, responseFactor, denominator, out Fixed64 y)
-            || !Fixed64.TryMultiplyDivide(response.Z, normalVelocity, responseFactor, denominator, out Fixed64 z))
-        {
-            return false;
-        }
-
+        bool xResolved = Fixed64.TryMultiplyDivide(
+            response.X,
+            normalVelocity,
+            responseFactor,
+            denominator,
+            out Fixed64 x);
+        bool yResolved = Fixed64.TryMultiplyDivide(
+            response.Y,
+            normalVelocity,
+            responseFactor,
+            denominator,
+            out Fixed64 y);
+        bool zResolved = Fixed64.TryMultiplyDivide(
+            response.Z,
+            normalVelocity,
+            responseFactor,
+            denominator,
+            out Fixed64 z);
         velocityDelta = new Vector3d(x, y, z);
-        return true;
+        return xResolved & yResolved & zResolved;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -388,24 +403,20 @@ internal static class ContactNormalImpulseMixed
         if (torqueScale == Fixed64.Zero)
             return true;
 
-        if (!Fixed64.TryMultiplyDivide(
+        bool angularScaleResolved = Fixed64.TryMultiplyDivide(
             normalVelocity,
             responseFactor,
             body.EffectiveInverseMomentOfInertia,
             denominator,
-            out Fixed64 angularScale))
-        {
-            return false;
-        }
-
-        if (angularScale == Fixed64.Zero && torqueScale.Abs() > Fixed64.One)
-            return false;
-
-        return Fixed64.TryMultiplyDivide(
+            out Fixed64 angularScale);
+        bool velocityDeltaResolved = Fixed64.TryMultiplyDivide(
             torqueScale,
             angularScale,
             Fixed64.One,
             out velocityDelta);
+        return angularScaleResolved
+            & (angularScale != Fixed64.Zero | torqueScale.Abs() <= Fixed64.One)
+            & velocityDeltaResolved;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

@@ -733,6 +733,9 @@ public sealed partial class ContinuousCollisionDetectionTests
         blade.Body.LinearVelocity.Y.Should().Be(tangentialSpeed);
         new Vector3d(blade.Body.LinearVelocity.X, Fixed64.Zero, blade.Body.LinearVelocity.Z)
             .MagnitudeSquared.Should().BeLessThan(closingVelocity.MagnitudeSquared);
+        blade.Body.SampleContinuousCollisionLinearVelocity(Fixed64.One)
+            .Should()
+            .Be(Vector3d.Zero);
     }
 
     [Fact]

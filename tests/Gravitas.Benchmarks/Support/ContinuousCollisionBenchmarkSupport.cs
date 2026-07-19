@@ -442,8 +442,8 @@ internal static class ContinuousCollisionBenchmarkSupport
             for (int j = 0; j < candidates.Count; j++)
             {
                 int dynamicId = candidates[j];
-                if (!context.Physics.TryGetDynamicBody(dynamicId, out SolidBody target)
-                    || ReferenceEquals(source, target))
+                SolidBody target = context.Physics.GetContinuousCollisionCandidate(dynamicId);
+                if (ReferenceEquals(source, target))
                 {
                     continue;
                 }
@@ -485,8 +485,8 @@ internal static class ContinuousCollisionBenchmarkSupport
             for (int j = 0; j < candidates.Count; j++)
             {
                 int dynamicId = candidates[j];
-                if (!context.Physics2D.TryGetDynamicBody(dynamicId, out SolidBody2D target)
-                    || ReferenceEquals(source, target))
+                SolidBody2D target = context.Physics2D.GetContinuousCollisionCandidate(dynamicId);
+                if (ReferenceEquals(source, target))
                 {
                     continue;
                 }

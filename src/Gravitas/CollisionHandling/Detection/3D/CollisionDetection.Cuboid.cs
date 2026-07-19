@@ -116,15 +116,7 @@ public static partial class CollisionDetection
         Vector3d target,
         out Vector3d supportPoint)
     {
-        if (!Vector3d.TrySubtract(
-                capsule.LineSegmentEnd,
-                capsule.LineSegmentStart,
-                out Vector3d segment))
-        {
-            supportPoint = default;
-            return false;
-        }
-
+        Vector3d segment = capsule.LineSegmentEnd - capsule.LineSegmentStart;
         Fixed64 segmentProjection = Vector3d.Dot(segment, direction);
         Vector3d segmentPoint;
         if (segmentProjection > Fixed64.Epsilon)

@@ -121,6 +121,22 @@ public sealed partial class ContinuousCollision2DTests
             Fixed64.MaxValue).Should().Be(1);
     }
 
+    [Fact]
+    public void CapsuleProxyRadius_WithUnrepresentableBoundsDistance_ShouldRemainConservative()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        var collider = new LSCapsuleCollider2D(Fixed64.Half, (Fixed64)3);
+        SolidBody2D source = CreateBody(
+            context,
+            collider,
+            Vector2d.Zero,
+            immovable: false);
+        collider.LocalOffset = new Vector2d(Fixed64.MaxValue, Fixed64.MaxValue);
+        collider.RebuildRuntimeShapeOnly();
+
+        source.ResolveContinuousCollisionProxyRadius().Should().Be(Fixed64.MaxValue);
+    }
+
     private static SolidBody2D CreateRotationalBlade(GravitasWorldContext context)
     {
         var collider = new LSPolygonCollider2D(

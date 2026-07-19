@@ -148,6 +148,60 @@ public sealed class DynamicCcdCandidateIndexTests
     }
 
     [Fact]
+    public void AddOrUpdate_ShouldReplaceSortedBoundsWithoutDuplicatingIdentity()
+    {
+        var index3D = new DynamicCcdCandidateIndex(2, supportsUpdates: true);
+        index3D.Add(7, CreateBounds(Fixed64.Zero, Fixed64.Zero));
+        index3D.Add(9, CreateBounds((Fixed64)4, Fixed64.Zero));
+        index3D.Sort();
+        index3D.AddOrUpdate(7, CreateBounds((Fixed64)8, Fixed64.Zero));
+        var results3D = new SwiftList<int>(2);
+        index3D.Query(CreateBounds((Fixed64)8, Fixed64.Zero), results3D);
+
+        var index2D = new DynamicCcdCandidateIndex2D(2, supportsUpdates: true);
+        index2D.Add(11, CreatePlanarBounds(Fixed64.Zero, Fixed64.Zero));
+        index2D.Add(13, CreatePlanarBounds((Fixed64)4, Fixed64.Zero));
+        index2D.Sort();
+        index2D.AddOrUpdate(11, CreatePlanarBounds((Fixed64)8, Fixed64.Zero));
+        var results2D = new SwiftList<int>(2);
+        index2D.Query(CreatePlanarBounds((Fixed64)8, Fixed64.Zero), results2D);
+
+        index3D.Count.Should().Be(2);
+        results3D.Should().Equal(7);
+        index2D.Count.Should().Be(2);
+        results2D.Should().Equal(11);
+    }
+
+    [Fact]
+    public void Remove_ShouldRepairMovedEntryIndicesAndRejectUnavailableIdentity()
+    {
+        var index3D = new DynamicCcdCandidateIndex(3, supportsUpdates: true);
+        index3D.Add(1, CreateBounds(Fixed64.Zero, Fixed64.Zero));
+        index3D.Add(2, CreateBounds(Fixed64.One, Fixed64.Zero));
+        index3D.Add(3, CreateBounds(Fixed64.Two, Fixed64.Zero));
+        index3D.Remove(1).Should().BeTrue();
+        index3D.Remove(3).Should().BeTrue();
+        index3D.Remove(9).Should().BeFalse();
+        new DynamicCcdCandidateIndex(1).Remove(1).Should().BeFalse();
+
+        var index2D = new DynamicCcdCandidateIndex2D(3, supportsUpdates: true);
+        index2D.Add(1, CreatePlanarBounds(Fixed64.Zero, Fixed64.Zero));
+        index2D.Add(2, CreatePlanarBounds(Fixed64.One, Fixed64.Zero));
+        index2D.Add(3, CreatePlanarBounds(Fixed64.Two, Fixed64.Zero));
+        index2D.Remove(1).Should().BeTrue();
+        index2D.Remove(3).Should().BeTrue();
+        index2D.Remove(9).Should().BeFalse();
+        new DynamicCcdCandidateIndex2D(1).Remove(1).Should().BeFalse();
+
+        var results3D = new SwiftList<int>(1);
+        index3D.Query(CreateBounds(Fixed64.One, Fixed64.Zero), results3D);
+        var results2D = new SwiftList<int>(1);
+        index2D.Query(CreatePlanarBounds(Fixed64.One, Fixed64.Zero), results2D);
+        results3D.Should().Equal(2);
+        results2D.Should().Equal(2);
+    }
+
+    [Fact]
     public void Query_ShouldAdmitCandidatesCoveredOnlyByExtremeProxyRadii()
     {
         Fixed64 radius3D = new Vector3d((Fixed64)20000, (Fixed64)40000, (Fixed64)40000).Magnitude;

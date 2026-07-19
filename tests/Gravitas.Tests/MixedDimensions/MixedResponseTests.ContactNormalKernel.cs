@@ -2,6 +2,7 @@ using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
+using Gravitas.Materials;
 using Gravitas.Tests.Support;
 using Xunit;
 
@@ -188,6 +189,80 @@ public sealed partial class MixedResponseTests
         body2D.LinearVelocity.Should().Be(Vector2d.Zero);
         body3D.Body.AngularVelocity.Should().NotBe(angularVelocity3DBefore);
         body2D.AngularVelocity.Should().NotBe(angularVelocity2DBefore);
+    }
+
+    [Fact]
+    public void Resolve_WithKinematic3DRotation_ShouldUseAuthoredAngularVelocityForFriction()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(
+            context,
+            -Vector3d.Right * Fixed64.Half,
+            isKinematic: true);
+        SolidBody2D body2D = CreateCircle2D(context, Vector2d.Zero);
+        PhysicsMaterial friction = new(Fixed64.One, Fixed64.One, Fixed64.Zero);
+        body3D.Collider.Material = friction;
+        body2D.Collider.Material = friction;
+        body2D.ApplyCollisionLinearVelocityDelta(-Vector2d.Right * (Fixed64)4);
+        body3D.Body.Agent.Transform.LocalRotation = FixedQuaternion.FromAxisAngle(
+            Vector3d.Up,
+            Fixed64.HalfPi);
+        body3D.Body.EnsureContinuousCollisionFramePrepared(context.LateSimulateToken);
+        var pair = new CollisionPairMixed(body3D.Collider, body2D.Collider);
+        var contact = new MixedContact(
+            body3D.Body.WorldCenterOfMass + Vector3d.Right,
+            body2D.WorldCenterOfMass.ToVector3d(Fixed64.Zero),
+            Vector3d.Right,
+            Fixed64.FromFraction(1, 10));
+
+        bool applied = CollisionResponseMixed.Resolve(
+            pair,
+            contact,
+            iteration: 0,
+            iterationLimit: 1,
+            applyPositionCorrection: false);
+
+        applied.Should().BeTrue();
+        body3D.Body.SampleContinuousCollisionAngularVelocity(Fixed64.One)
+            .Should()
+            .NotBe(Vector3d.Zero);
+        body2D.LinearVelocity.Y.Should().NotBe(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void Resolve_WithKinematic2DRotation_ShouldUseAuthoredAngularVelocityForFriction()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(
+            context,
+            -Vector3d.Right * Fixed64.Half);
+        SolidBody2D body2D = CreateCircle2D(context, Vector2d.Zero);
+        body2D.IsKinematic = true;
+        PhysicsMaterial friction = new(Fixed64.One, Fixed64.One, Fixed64.Zero);
+        body3D.Collider.Material = friction;
+        body2D.Collider.Material = friction;
+        body3D.Body.ApplyCollisionLinearVelocityDelta(Vector3d.Right * (Fixed64)4);
+        body2D.Agent.Transform.LocalRotationXZRadians = Fixed64.HalfPi;
+        body2D.EnsureContinuousCollisionFramePrepared(context.LateSimulateToken);
+        var pair = new CollisionPairMixed(body3D.Collider, body2D.Collider);
+        var contact = new MixedContact(
+            body3D.Body.WorldCenterOfMass,
+            (body2D.WorldCenterOfMass + Vector2d.Right).ToVector3d(Fixed64.Zero),
+            Vector3d.Right,
+            Fixed64.FromFraction(1, 10));
+
+        bool applied = CollisionResponseMixed.Resolve(
+            pair,
+            contact,
+            iteration: 0,
+            iterationLimit: 1,
+            applyPositionCorrection: false);
+
+        applied.Should().BeTrue();
+        body2D.SampleContinuousCollisionAngularVelocity(Fixed64.One)
+            .Should()
+            .NotBe(Fixed64.Zero);
+        body3D.Body.LinearVelocity.Z.Should().NotBe(Fixed64.Zero);
     }
 
     [Fact]

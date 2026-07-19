@@ -281,6 +281,10 @@ public sealed class ColliderTriggerTests
         body3D.Collider.NotifyMixedContact(body2D.Collider, isColliding: true, isChanged: true, isTriggerPair: false);
         body3D.Collider.IsActive = true;
 
+        body3D.Collider.IsActive = false;
+        body2D.Collider.NotifyMixedContact(body3D.Collider, isColliding: true, isChanged: true, isTriggerPair: false);
+        body3D.Collider.IsActive = true;
+
         body2D.Collider.Deactivate();
         body2D.Collider.NotifyContact(other2D.Collider, isColliding: true, isChanged: true);
         body2D.Collider.NotifyMixedContact(body3D.Collider, isColliding: true, isChanged: true, isTriggerPair: false);
@@ -565,6 +569,89 @@ public sealed class ColliderTriggerTests
         allowedExit.Should().Be(4);
         bodylessEnter.Should().Be(0);
         bodylessExit.Should().Be(0);
+    }
+
+    [Fact]
+    public void MixedExit_WithReusedOtherColliderLifetime_ShouldNotNotifyCurrent2DCollider()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        SolidBody2D body2D = CreateCircle2D(context, Vector2d.Zero);
+        SolidBody body3D = CreateSphere3D(context, Vector3d.Zero);
+        var registration2D = new ColliderLifetimeToken2D(body2D.Collider);
+        var retiredRegistration3D = new ColliderLifetimeToken(body3D.Collider);
+        int exits = 0;
+        body2D.Collider.OnMixedContactExit += _ => exits++;
+
+        body3D.Deactivate();
+        body3D.Initialize(Vector3d.Right, FixedQuaternion.Identity);
+        body2D.Collider.NotifyMixedContact(
+            body3D.Collider,
+            isColliding: false,
+            isChanged: true,
+            isTriggerPair: false,
+            allowInactive: true,
+            registration2D,
+            retiredRegistration3D,
+            shouldRaiseTrigger: false);
+
+        exits.Should().Be(0);
+        body3D.Collider.LifetimeVersion.Should().BeGreaterThan(
+            retiredRegistration3D.LifetimeVersion);
+    }
+
+    [Fact]
+    public void MixedExit_WithReusedLocalColliderLifetime_ShouldNotNotifyCurrent2DCollider()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        SolidBody2D body2D = CreateCircle2D(context, Vector2d.Zero);
+        SolidBody body3D = CreateSphere3D(context, Vector3d.Zero);
+        var retiredRegistration2D = new ColliderLifetimeToken2D(body2D.Collider);
+        var registration3D = new ColliderLifetimeToken(body3D.Collider);
+        int exits = 0;
+        body2D.Collider.OnMixedContactExit += _ => exits++;
+
+        body2D.Deactivate();
+        body2D.Initialize(Vector2d.Right);
+        body2D.Collider.NotifyMixedContact(
+            body3D.Collider,
+            isColliding: false,
+            isChanged: true,
+            isTriggerPair: false,
+            allowInactive: true,
+            retiredRegistration2D,
+            registration3D,
+            shouldRaiseTrigger: false);
+
+        exits.Should().Be(0);
+        body2D.Collider.LifetimeVersion.Should().BeGreaterThan(
+            retiredRegistration2D.LifetimeVersion);
+    }
+
+    [Fact]
+    public void MixedEnter_WithInactive3DCollider_ShouldNotNotify2DCollider()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        SolidBody2D body2D = CreateCircle2D(context, Vector2d.Zero);
+        SolidBody body3D = CreateSphere3D(context, Vector3d.Zero);
+        var registration2D = new ColliderLifetimeToken2D(body2D.Collider);
+        var registration3D = new ColliderLifetimeToken(body3D.Collider);
+        int enters = 0;
+        body2D.Collider.OnMixedContactEnter += _ => enters++;
+        body3D.Deactivate();
+
+        body2D.Collider.NotifyMixedContact(
+            body3D.Collider,
+            isColliding: true,
+            isChanged: true,
+            isTriggerPair: false,
+            allowInactive: false,
+            registration2D,
+            registration3D,
+            shouldRaiseTrigger: false);
+
+        enters.Should().Be(0);
+        body2D.Collider.IsActive.Should().BeTrue();
+        body3D.Collider.IsActive.Should().BeFalse();
     }
 
     private static void Step(GravitasWorldContext context)

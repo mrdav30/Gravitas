@@ -84,12 +84,6 @@ internal readonly struct ContinuousCollisionMotionSegment3D
         out Fixed64 motionBound)
     {
         Fixed64 segmentSpan = EndFraction - StartFraction;
-        if (segmentSpan <= Fixed64.Zero)
-        {
-            motionBound = Fixed64.Zero;
-            return true;
-        }
-
         Fixed64 localSpan = (upperFraction - lowerFraction) / segmentSpan;
         if (!Vector3d.TrySubtract(EndPosition, StartPosition, out Vector3d exactDisplacement))
         {
@@ -108,8 +102,6 @@ internal readonly struct ContinuousCollisionMotionSegment3D
     private Fixed64 ResolveLocalFraction(Fixed64 frameFraction)
     {
         Fixed64 span = EndFraction - StartFraction;
-        return span <= Fixed64.Zero
-            ? Fixed64.Zero
-            : FixedMath.Clamp01((frameFraction - StartFraction) / span);
+        return FixedMath.Clamp01((frameFraction - StartFraction) / span);
     }
 }

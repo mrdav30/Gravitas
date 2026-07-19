@@ -332,8 +332,8 @@ public partial class CollisionPair
             CollisionNotificationExceptions.Capture(ref notificationExceptions, exception);
         }
 
-        if (!_isColliding || (_colliderANotified && _colliderBNotified))
-            _isCollidingChanged = false;
+        _isCollidingChanged &= _isColliding
+            & !(_colliderANotified & _colliderBNotified);
 
         CollisionNotificationExceptions.ThrowIfAny(notificationExceptions);
     }

@@ -41,6 +41,45 @@ internal static class ContinuousCollisionMath
         public int Depth { get; }
     }
 
+    public static bool TryResolveRotationalSearchLimit(
+        RotationalInterval interval,
+        int processedNodeCount,
+        bool hasWitness,
+        Fixed64 witnessTime,
+        out Fixed64 safeTime,
+        out Fixed64 contactTime,
+        out bool retainsWitness)
+    {
+        bool nodeBudgetExhausted = processedNodeCount >= RotationalIntervalNodeBudget;
+        if (!nodeBudgetExhausted && interval.Depth < RotationalIntervalMaxDepth)
+        {
+            safeTime = default;
+            contactTime = default;
+            retainsWitness = false;
+            return false;
+        }
+
+        retainsWitness = hasWitness;
+        contactTime = hasWitness ? witnessTime : interval.LowerTime;
+        // Max depth defines the accepted temporal resolution, so its same-target
+        // witness may resolve this leaf only when it brackets the leaf itself. A
+        // global witness from a later interval cannot certify the unresolved gap.
+        // Hard node-budget exhaustion has no convergence guarantee either.
+        bool witnessIsBracketed = hasWitness
+            && witnessTime >= interval.LowerTime
+            && witnessTime <= interval.UpperTime;
+        safeTime = witnessIsBracketed && !nodeBudgetExhausted
+            ? witnessTime
+            : interval.LowerTime;
+        return true;
+    }
+
+    public static bool ShouldContinueRotationalArbiter(
+        Vector2d displacement,
+        Fixed64 angularDistance) =>
+        angularDistance > Fixed64.Epsilon
+        || displacement.MagnitudeSquared > Fixed64.Epsilon;
+
     public static bool TryResolveRotationalIntervalMotionBound(
         Vector2d displacement,
         Fixed64 angularDistance,
@@ -49,21 +88,24 @@ internal static class ContinuousCollisionMath
         out Fixed64 motionBound)
     {
         Vector2d halfIntervalDisplacement = displacement * (intervalSpan * Fixed64.Half);
-        if (!Vector2d.TryGetMagnitude(halfIntervalDisplacement, out Fixed64 linearMotion)
-            || !Fixed64.TryMultiplyDivide(
-                angularDistance,
-                pivotRadius,
-                intervalSpan,
-                Fixed64.Two,
-                out Fixed64 angularMotion)
-            || !Fixed64.TryMultiplyDivide(
-                pivotRadius,
-                RotationalRelativeUncertainty,
-                Fixed64.One,
-                out Fixed64 poseUncertainty)
-            || !Fixed64.TryAdd(linearMotion, angularMotion, out motionBound)
-            || !Fixed64.TryAdd(motionBound, poseUncertainty, out motionBound)
-            || !Fixed64.TryAdd(motionBound, RotationalMotionUncertainty, out motionBound))
+        bool linearResolved = Vector2d.TryGetMagnitude(
+            halfIntervalDisplacement,
+            out Fixed64 linearMotion);
+        bool angularResolved = Fixed64.TryMultiplyDivide(
+            angularDistance,
+            pivotRadius,
+            intervalSpan,
+            Fixed64.Two,
+            out Fixed64 angularMotion);
+        bool poseResolved = Fixed64.TryMultiplyDivide(
+            pivotRadius,
+            RotationalRelativeUncertainty,
+            Fixed64.One,
+            out Fixed64 poseUncertainty);
+        bool combined = Fixed64.TryAdd(linearMotion, angularMotion, out motionBound)
+            & Fixed64.TryAdd(motionBound, poseUncertainty, out motionBound)
+            & Fixed64.TryAdd(motionBound, RotationalMotionUncertainty, out motionBound);
+        if (!(linearResolved & angularResolved & poseResolved & combined))
         {
             motionBound = default;
             return false;
@@ -80,21 +122,24 @@ internal static class ContinuousCollisionMath
         out Fixed64 motionBound)
     {
         Vector3d halfIntervalDisplacement = displacement * (intervalSpan * Fixed64.Half);
-        if (!Vector3d.TryGetMagnitude(halfIntervalDisplacement, out Fixed64 linearMotion)
-            || !Fixed64.TryMultiplyDivide(
-                angularDistance,
-                pivotRadius,
-                intervalSpan,
-                Fixed64.Two,
-                out Fixed64 angularMotion)
-            || !Fixed64.TryMultiplyDivide(
-                pivotRadius,
-                RotationalRelativeUncertainty,
-                Fixed64.One,
-                out Fixed64 poseUncertainty)
-            || !Fixed64.TryAdd(linearMotion, angularMotion, out motionBound)
-            || !Fixed64.TryAdd(motionBound, poseUncertainty, out motionBound)
-            || !Fixed64.TryAdd(motionBound, RotationalMotionUncertainty, out motionBound))
+        bool linearResolved = Vector3d.TryGetMagnitude(
+            halfIntervalDisplacement,
+            out Fixed64 linearMotion);
+        bool angularResolved = Fixed64.TryMultiplyDivide(
+            angularDistance,
+            pivotRadius,
+            intervalSpan,
+            Fixed64.Two,
+            out Fixed64 angularMotion);
+        bool poseResolved = Fixed64.TryMultiplyDivide(
+            pivotRadius,
+            RotationalRelativeUncertainty,
+            Fixed64.One,
+            out Fixed64 poseUncertainty);
+        bool combined = Fixed64.TryAdd(linearMotion, angularMotion, out motionBound)
+            & Fixed64.TryAdd(motionBound, poseUncertainty, out motionBound)
+            & Fixed64.TryAdd(motionBound, RotationalMotionUncertainty, out motionBound);
+        if (!(linearResolved & angularResolved & poseResolved & combined))
         {
             motionBound = default;
             return false;
@@ -108,33 +153,37 @@ internal static class ContinuousCollisionMath
         FixedBoundArea target,
         Fixed64 motionBound) =>
         IsAxisGapGreaterThan(source.Min.X, source.Max.X, target.Min.X, target.Max.X, motionBound)
-        || IsAxisGapGreaterThan(source.Min.Y, source.Max.Y, target.Min.Y, target.Max.Y, motionBound);
+        | IsAxisGapGreaterThan(source.Min.Y, source.Max.Y, target.Min.Y, target.Max.Y, motionBound);
 
     public static bool AreBoundsSeparatedByMoreThan(
         FixedBoundBox source,
         FixedBoundBox target,
         Fixed64 motionBound) =>
         IsAxisGapGreaterThan(source.Min.X, source.Max.X, target.Min.X, target.Max.X, motionBound)
-        || IsAxisGapGreaterThan(source.Min.Y, source.Max.Y, target.Min.Y, target.Max.Y, motionBound)
-        || IsAxisGapGreaterThan(source.Min.Z, source.Max.Z, target.Min.Z, target.Max.Z, motionBound);
+        | IsAxisGapGreaterThan(source.Min.Y, source.Max.Y, target.Min.Y, target.Max.Y, motionBound)
+        | IsAxisGapGreaterThan(source.Min.Z, source.Max.Z, target.Min.Z, target.Max.Z, motionBound);
 
     public static bool TrySubtractClosestFeatureUncertainty(
         Fixed64 separationGap,
         Fixed64 characteristicScale,
         out Fixed64 conservativeGap)
     {
-        if (separationGap <= Fixed64.Zero
-            || characteristicScale < Fixed64.Zero
-            || !Fixed64.TryMultiplyDivide(
-                characteristicScale,
-                ClosestFeatureRelativeUncertainty,
-                Fixed64.One,
-                out Fixed64 scaledUncertainty)
-            || !Fixed64.TryAdd(
-                scaledUncertainty,
-                RotationalMotionUncertainty,
-                out Fixed64 uncertainty)
-            || !Fixed64.TrySubtract(separationGap, uncertainty, out conservativeGap))
+        bool inputValid = separationGap > Fixed64.Zero
+            & characteristicScale >= Fixed64.Zero;
+        bool scaled = Fixed64.TryMultiplyDivide(
+            characteristicScale,
+            ClosestFeatureRelativeUncertainty,
+            Fixed64.One,
+            out Fixed64 scaledUncertainty);
+        bool combined = Fixed64.TryAdd(
+            scaledUncertainty,
+            RotationalMotionUncertainty,
+            out Fixed64 uncertainty);
+        bool subtracted = Fixed64.TrySubtract(
+            separationGap,
+            uncertainty,
+            out conservativeGap);
+        if (!(inputValid & scaled & combined & subtracted))
         {
             conservativeGap = default;
             return false;
@@ -152,11 +201,12 @@ internal static class ContinuousCollisionMath
         Fixed64 motionBound)
     {
         if (sourceMax < targetMin)
-            return Fixed64.TrySubtract(targetMin, sourceMax, out Fixed64 gap) && gap > motionBound;
+            return !Fixed64.TrySubtract(targetMin, sourceMax, out Fixed64 gap)
+                | gap > motionBound;
 
         return targetMax < sourceMin
-            && Fixed64.TrySubtract(sourceMin, targetMax, out Fixed64 reverseGap)
-            && reverseGap > motionBound;
+            & (!Fixed64.TrySubtract(sourceMin, targetMax, out Fixed64 reverseGap)
+                | reverseGap > motionBound);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

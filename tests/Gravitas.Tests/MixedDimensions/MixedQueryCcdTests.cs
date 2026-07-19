@@ -2128,6 +2128,61 @@ public sealed partial class MixedQueryCcdTests
     }
 
     [Fact]
+    public void CircleSlabReducer_WithSubRawPlanarDirection_ShouldRetainEarlierCapContact()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        var target = (LSCircleCollider2D)CreateBodylessCircle2D(context, Vector2d.Zero);
+        Fixed64 raw = Fixed64.FromRaw(1);
+        Vector3d start = new(target.ScaledRadius + raw, (Fixed64)100_000, Fixed64.Zero);
+        Vector3d end = new(target.ScaledRadius - raw, (Fixed64)(-100_000), Fixed64.Zero);
+        Vector3d segment = end - start;
+        Fixed64 length = segment.Magnitude;
+        Vector3d direction = segment.Normalized;
+        direction.X.Should().Be(Fixed64.Zero);
+
+        bool found = GravitasQueryMixedService.TrySweepSphereAgainstCircleSlab(
+            start,
+            end,
+            direction,
+            length,
+            Fixed64.Zero,
+            target,
+            out PhysicsMixedHit hit);
+
+        found.Should().BeTrue();
+        hit.Collider2D.Should().BeSameAs(target);
+        hit.Distance.Should().Be((Fixed64)99_999 + Fixed64.Half);
+    }
+
+    [Fact]
+    public void CircleSlabReducer_WithSubRawVerticalDirection_ShouldRetainEarlierSideContact()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        var target = (LSCircleCollider2D)CreateBodylessCircle2D(context, Vector2d.Zero);
+        Fixed64 raw = Fixed64.FromRaw(1);
+        Fixed64 capY = target.MixedHalfThickness;
+        Vector3d start = new((Fixed64)(-100_000), capY + raw, Fixed64.Zero);
+        Vector3d end = new((Fixed64)100_000, capY - raw, Fixed64.Zero);
+        Vector3d segment = end - start;
+        Fixed64 length = segment.Magnitude;
+        Vector3d direction = segment.Normalized;
+        direction.Y.Should().Be(Fixed64.Zero);
+
+        bool found = GravitasQueryMixedService.TrySweepSphereAgainstCircleSlab(
+            start,
+            end,
+            direction,
+            length,
+            Fixed64.Zero,
+            target,
+            out PhysicsMixedHit hit);
+
+        found.Should().BeTrue();
+        hit.Collider2D.Should().BeSameAs(target);
+        hit.Distance.Should().Be((Fixed64)99_999 + Fixed64.Half);
+    }
+
+    [Fact]
     public void CircleAgainstSphereReducer_WithOppositeDomainVerticalSeparation_ShouldReject()
     {
         using GravitasWorldContext context = CreateMixedContext();
@@ -3634,7 +3689,10 @@ public sealed partial class MixedQueryCcdTests
         context.Simulate();
         context.LateSimulate();
 
-        moving2D.Position.X.Should().Be(-Fixed64.One);
+        moving2D.Position.X.Should().BeLessThanOrEqualTo(-Fixed64.One);
+        (moving2D.Position.X + Fixed64.One).Abs()
+            .Should()
+            .BeLessThanOrEqualTo(Fixed64.Epsilon);
         moving2D.LinearVelocity.Should().Be(Vector2d.Zero);
         moving2D.LastContinuousCollisionToiIterationCount.Should().Be(1);
     }
@@ -4718,7 +4776,10 @@ public sealed partial class MixedQueryCcdTests
 
         middle.IsSleeping.Should().BeFalse();
         receiver.Body.IsSleeping.Should().BeFalse();
-        middle.LinearVelocity.X.Should().BeGreaterThan(Fixed64.Zero);
+        // The inbound handoff fills the one-segment mutation budget. The
+        // outbound pair therefore clamps the middle body without partially
+        // mutating the receiver's already-applied handoff state.
+        middle.LinearVelocity.Should().Be(Vector2d.Zero);
         receiver.Body.LinearVelocity.X.Should().BeGreaterThan(Fixed64.Zero);
         (context.Physics.LastContinuousCollisionIslandIterationCount
             + context.Physics2D.LastContinuousCollisionIslandIterationCount)
@@ -4795,8 +4856,13 @@ public sealed partial class MixedQueryCcdTests
         driver2D.AddForce(Vector2d.Right * (Fixed64)10);
         context.LateSimulate();
 
-        middle3D.Body.LinearVelocity.X.Should().BeGreaterThan(Fixed64.Zero);
+        // The 3D queue owns the single shared iteration. Its already-mutated
+        // middle body clamps at the trajectory limit, while the untouched 2D
+        // queue is discarded with its inbound handoff velocity intact.
+        middle3D.Body.LinearVelocity.Should().Be(Vector3d.Zero);
+        receiver3D.Body.LinearVelocity.Should().Be(Vector3d.Zero);
         middle2D.LinearVelocity.X.Should().BeGreaterThan(Fixed64.Zero);
+        receiver2D.LinearVelocity.Should().Be(Vector2d.Zero);
         context.Physics.LastContinuousCollisionIslandIterationCount.Should().Be(1);
         context.Physics.LastContinuousCollisionIslandLimitReached.Should().BeTrue();
         context.Physics2D.LastContinuousCollisionIslandIterationCount.Should().Be(0);

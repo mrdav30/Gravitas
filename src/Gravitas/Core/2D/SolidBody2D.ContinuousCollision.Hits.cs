@@ -203,16 +203,21 @@ public sealed partial class SolidBody2D
         for (int candidateIndex = 0; candidateIndex < candidateIds.Count; candidateIndex++)
         {
             int dynamicId = candidateIds[candidateIndex];
-            if (!Context.Physics2D.TryGetDynamicBody(dynamicId, out SolidBody2D target)
-                || !IsEligibleDynamicContinuousCollisionTarget(target))
+            SolidBody2D target = Context.Physics2D.GetContinuousCollisionCandidate(dynamicId);
+            if (!IsEligibleDynamicContinuousCollisionTarget(target))
             {
                 continue;
             }
 
             target.EnsureContinuousCollisionFramePrepared(token);
-            Vector2d targetStart = target.ContinuousCollisionFrameStart
-                + target.ContinuousCollisionFrameDisplacement * elapsedFrameFraction;
-            Vector2d targetDisplacement = target.ContinuousCollisionFrameDisplacement * remainingFrameFraction;
+            Fixed64 targetEndFrameFraction = FixedMath.Clamp01(
+                elapsedFrameFraction + remainingFrameFraction);
+            target.TrySampleContinuousCollisionDisplacement(
+                elapsedFrameFraction,
+                targetEndFrameFraction,
+                out Vector2d targetStart,
+                out Vector2d targetDisplacement);
+
             Fixed64 targetRadius = target.ResolveContinuousCollisionProxyRadius();
             if (!ContinuousCollisionMath.TrySweepRelativeCircles(
                     startPosition,
@@ -235,6 +240,7 @@ public sealed partial class SolidBody2D
                     targetStart,
                     targetDisplacement,
                     sourceLength,
+                    elapsedFrameFraction,
                     out Physics2DHit candidate,
                     out Fixed64 candidateClosingSpeed))
             {
@@ -261,6 +267,7 @@ public sealed partial class SolidBody2D
         Vector2d targetStart,
         Vector2d targetDisplacement,
         Fixed64 sourceLength,
+        Fixed64 elapsedFrameFraction,
         out Physics2DHit hit,
         out Fixed64 closingSpeed)
     {
@@ -280,7 +287,8 @@ public sealed partial class SolidBody2D
         {
             _position = sourceStart;
             target._position = targetStart;
-            target._rotation = target.ContinuousCollisionFrameRotation;
+            target._rotation = target.SampleContinuousCollisionRotation(
+                elapsedFrameFraction);
             Collider.RebuildRuntimeShapeOnly();
             target.Collider.RebuildRuntimeShapeOnly();
 
@@ -340,16 +348,21 @@ public sealed partial class SolidBody2D
         for (int candidateIndex = 0; candidateIndex < candidateIds.Count; candidateIndex++)
         {
             int dynamicId = candidateIds[candidateIndex];
-            if (!Context.Physics.TryGetDynamicBody(dynamicId, out SolidBody target)
-                || !IsEligibleDynamicMixed3DTarget(target))
+            SolidBody target = Context.Physics.GetContinuousCollisionCandidate(dynamicId);
+            if (!IsEligibleDynamicMixed3DTarget(target))
             {
                 continue;
             }
 
             target.EnsureContinuousCollisionFramePrepared(token);
-            Vector3d targetStart = target.ContinuousCollisionFrameStart
-                + target.ContinuousCollisionFrameDisplacement * elapsedFrameFraction;
-            Vector3d targetDisplacement = target.ContinuousCollisionFrameDisplacement * remainingFrameFraction;
+            Fixed64 targetEndFrameFraction = FixedMath.Clamp01(
+                elapsedFrameFraction + remainingFrameFraction);
+            target.TrySampleContinuousCollisionDisplacement(
+                elapsedFrameFraction,
+                targetEndFrameFraction,
+                out Vector3d targetStart,
+                out Vector3d targetDisplacement);
+
             Fixed64 targetRadius = target.ResolveContinuousCollisionProxyRadius();
             if (!ContinuousCollisionMath.TrySweepRelativeSpheres(
                     sourceStart,
@@ -394,23 +407,35 @@ public sealed partial class SolidBody2D
 
     private bool IsEligibleDynamicContinuousCollisionTarget(SolidBody2D target)
     {
-        return ContinuousCollisionTargetPolicy.AllowsDynamic2DTarget(
-            ReferenceEquals(target, this),
-            target.Active,
-            target.IsPositionFullyFrozen,
-            target.IsKinematic,
-            target.Collider.IsTrigger,
-            Context.Physics2D.RequireCollisionPair(Collider, target.Collider));
+        return (IsKinematic || !target.ShouldOwnContinuousCollisionMovingPair(
+                HasContinuousCollisionRotationalMotion))
+            && !ContinuousCollisionCandidateOrdering.IsIgnoredTarget(
+                target.Collider,
+                _continuousCollisionHandoffIgnoredCollider2D)
+            && ContinuousCollisionTargetPolicy.AllowsIndexed2DTarget(
+                ReferenceEquals(target, this),
+                target.Active,
+                target.IsPositionFullyFrozen,
+                target.IsKinematic,
+                target.IsKinematic && target.HasContinuousCollisionMotion,
+                target.Collider.IsTrigger,
+                Context.Physics2D.RequireCollisionPair(Collider, target.Collider));
     }
 
     private bool IsEligibleDynamicMixed3DTarget(SolidBody target)
     {
-        return ContinuousCollisionTargetPolicy.AllowsMixedDynamicTarget(
-            target.Active,
-            target.IsPositionFullyFrozen,
-            target.IsKinematic,
-            target.Collider.IsTrigger,
-            Context.MixedCollisions.RequireCollisionPair(target.Collider, Collider));
+        return (IsKinematic || !target.ShouldOwnContinuousCollisionMovingPair(
+                HasContinuousCollisionRotationalMotion))
+            && !ContinuousCollisionCandidateOrdering.IsIgnoredTarget(
+                target.Collider,
+                _continuousCollisionHandoffIgnoredCollider3D)
+            && ContinuousCollisionTargetPolicy.AllowsMixedIndexedTarget(
+                target.Active,
+                target.IsPositionFullyFrozen,
+                target.IsKinematic,
+                target.IsKinematic && target.HasContinuousCollisionMotion,
+                target.Collider.IsTrigger,
+                Context.MixedCollisions.RequireCollisionPair(target.Collider, Collider));
     }
 
 }

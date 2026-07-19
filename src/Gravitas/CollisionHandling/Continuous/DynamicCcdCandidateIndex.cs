@@ -15,12 +15,18 @@ namespace Gravitas.CollisionHandling;
 internal sealed class DynamicCcdCandidateIndex
 {
     private readonly SwiftList<Entry> _entries;
+    private readonly SwiftDictionary<int, int>? _entryIndices;
     private Fixed64 _maxExtentX;
     private bool _isSorted = true;
 
-    public DynamicCcdCandidateIndex(int capacity = 0)
+    public DynamicCcdCandidateIndex(int capacity = 0, bool supportsUpdates = false)
     {
         _entries = capacity > 0 ? new SwiftList<Entry>(capacity) : new SwiftList<Entry>();
+        _entryIndices = !supportsUpdates
+            ? null
+            : capacity > 0
+                ? new SwiftDictionary<int, int>(capacity)
+                : new SwiftDictionary<int, int>();
     }
 
     public int Count => _entries.Count;
@@ -28,18 +34,60 @@ internal sealed class DynamicCcdCandidateIndex
     public void Clear()
     {
         _entries.FastClear();
+        _entryIndices?.Clear();
         _maxExtentX = Fixed64.Zero;
         _isSorted = true;
     }
 
     public void Add(int dynamicId, FixedBoundVolume bounds)
     {
+        _entryIndices?.Add(dynamicId, _entries.Count);
         _entries.Add(new Entry(dynamicId, bounds));
         Fixed64 extentX = bounds.Max.X - bounds.Min.X;
         if (extentX > _maxExtentX)
             _maxExtentX = extentX;
 
         _isSorted = false;
+    }
+
+    public void AddOrUpdate(int dynamicId, FixedBoundVolume bounds)
+    {
+        SwiftDictionary<int, int>? entryIndices = _entryIndices;
+        SwiftThrowHelper.ThrowIfTrue(
+            entryIndices == null,
+            nameof(DynamicCcdCandidateIndex),
+            "Candidate index was not configured for updates.");
+        if (entryIndices.TryGetValue(dynamicId, out int index))
+        {
+            _entries[index] = new Entry(dynamicId, bounds);
+            Fixed64 updatedExtentX = bounds.Max.X - bounds.Min.X;
+            if (updatedExtentX > _maxExtentX)
+                _maxExtentX = updatedExtentX;
+            _isSorted = false;
+            return;
+        }
+
+        Add(dynamicId, bounds);
+    }
+
+    public bool Remove(int dynamicId)
+    {
+        SwiftDictionary<int, int>? entryIndices = _entryIndices;
+        if (entryIndices == null || !entryIndices.TryGetValue(dynamicId, out int index))
+            return false;
+
+        int lastIndex = _entries.Count - 1;
+        if (index != lastIndex)
+        {
+            Entry moved = _entries[lastIndex];
+            _entries[index] = moved;
+            entryIndices[moved.DynamicId] = index;
+        }
+
+        _entries.RemoveAt(lastIndex);
+        entryIndices.Remove(dynamicId);
+        _isSorted = false;
+        return true;
     }
 
     public void Sort()
@@ -140,8 +188,18 @@ internal sealed class DynamicCcdCandidateIndex
         }
     }
 
-    private void Swap(int first, int second) =>
-        (_entries[second], _entries[first]) = (_entries[first], _entries[second]);
+    private void Swap(int first, int second)
+    {
+        Entry firstEntry = _entries[first];
+        Entry secondEntry = _entries[second];
+        _entries[first] = secondEntry;
+        _entries[second] = firstEntry;
+        if (_entryIndices != null)
+        {
+            _entryIndices[secondEntry.DynamicId] = first;
+            _entryIndices[firstEntry.DynamicId] = second;
+        }
+    }
 
     private static int Compare(Entry x, Entry y)
     {
@@ -222,12 +280,18 @@ internal readonly struct DynamicCcdPlanarBounds
 internal sealed class DynamicCcdCandidateIndex2D
 {
     private readonly SwiftList<Entry> _entries;
+    private readonly SwiftDictionary<int, int>? _entryIndices;
     private Fixed64 _maxExtentX;
     private bool _isSorted = true;
 
-    public DynamicCcdCandidateIndex2D(int capacity = 0)
+    public DynamicCcdCandidateIndex2D(int capacity = 0, bool supportsUpdates = false)
     {
         _entries = capacity > 0 ? new SwiftList<Entry>(capacity) : new SwiftList<Entry>();
+        _entryIndices = !supportsUpdates
+            ? null
+            : capacity > 0
+                ? new SwiftDictionary<int, int>(capacity)
+                : new SwiftDictionary<int, int>();
     }
 
     public int Count => _entries.Count;
@@ -235,18 +299,60 @@ internal sealed class DynamicCcdCandidateIndex2D
     public void Clear()
     {
         _entries.FastClear();
+        _entryIndices?.Clear();
         _maxExtentX = Fixed64.Zero;
         _isSorted = true;
     }
 
     public void Add(int dynamicId, DynamicCcdPlanarBounds bounds)
     {
+        _entryIndices?.Add(dynamicId, _entries.Count);
         _entries.Add(new Entry(dynamicId, bounds));
         Fixed64 extentX = bounds.MaxX - bounds.MinX;
         if (extentX > _maxExtentX)
             _maxExtentX = extentX;
 
         _isSorted = false;
+    }
+
+    public void AddOrUpdate(int dynamicId, DynamicCcdPlanarBounds bounds)
+    {
+        SwiftDictionary<int, int>? entryIndices = _entryIndices;
+        SwiftThrowHelper.ThrowIfTrue(
+            entryIndices == null,
+            nameof(DynamicCcdCandidateIndex2D),
+            "Candidate index was not configured for updates.");
+        if (entryIndices.TryGetValue(dynamicId, out int index))
+        {
+            _entries[index] = new Entry(dynamicId, bounds);
+            Fixed64 updatedExtentX = bounds.MaxX - bounds.MinX;
+            if (updatedExtentX > _maxExtentX)
+                _maxExtentX = updatedExtentX;
+            _isSorted = false;
+            return;
+        }
+
+        Add(dynamicId, bounds);
+    }
+
+    public bool Remove(int dynamicId)
+    {
+        SwiftDictionary<int, int>? entryIndices = _entryIndices;
+        if (entryIndices == null || !entryIndices.TryGetValue(dynamicId, out int index))
+            return false;
+
+        int lastIndex = _entries.Count - 1;
+        if (index != lastIndex)
+        {
+            Entry moved = _entries[lastIndex];
+            _entries[index] = moved;
+            entryIndices[moved.DynamicId] = index;
+        }
+
+        _entries.RemoveAt(lastIndex);
+        entryIndices.Remove(dynamicId);
+        _isSorted = false;
+        return true;
     }
 
     public void Sort()
@@ -345,8 +451,18 @@ internal sealed class DynamicCcdCandidateIndex2D
         }
     }
 
-    private void Swap(int first, int second) =>
-        (_entries[second], _entries[first]) = (_entries[first], _entries[second]);
+    private void Swap(int first, int second)
+    {
+        Entry firstEntry = _entries[first];
+        Entry secondEntry = _entries[second];
+        _entries[first] = secondEntry;
+        _entries[second] = firstEntry;
+        if (_entryIndices != null)
+        {
+            _entryIndices[secondEntry.DynamicId] = first;
+            _entryIndices[firstEntry.DynamicId] = second;
+        }
+    }
 
     private static int Compare(Entry x, Entry y)
     {

@@ -37,7 +37,14 @@ public sealed partial class GravitasPhysicsService
     private readonly SwiftList<DiscreteIslandNode> _discreteIslandNodes = new();
     private readonly SwiftList<DiscreteIslandConstraint> _discreteIslandConstraints = new();
     private readonly DynamicCcdCandidateIndex _continuousCollisionCandidates = new(DefaultBodySize);
+    private readonly DynamicCcdCandidateIndex _dirtyContinuousCollisionCandidates =
+        new(DefaultBodySize, supportsUpdates: true);
+    private readonly SwiftList<ColliderLifetimeToken> _continuousCollisionCandidateLifetimes =
+        new(DefaultBodySize);
     private readonly SwiftList<int> _continuousCollisionCandidateIds = new(DefaultBodySize);
+    private readonly SwiftList<int> _dirtyContinuousCollisionCandidateIds = new(DefaultBodySize);
+    private readonly SwiftHashSet<int> _dirtyContinuousCollisionBodyIds = new(DefaultBodySize);
+    private readonly SwiftList<SolidBody> _dirtyContinuousCollisionBodies = new(DefaultBodySize);
     private readonly SwiftHashSet<SolidBody> _processedContinuousCollisionBodies = new(DefaultBodySize);
     private readonly SwiftHashSet<SolidBody> _queuedContinuousCollisionHandoffBodies = new(DefaultBodySize);
     private readonly SwiftList<SolidBody> _continuousCollisionHandoffQueue = new(DefaultBodySize);
@@ -195,7 +202,12 @@ public sealed partial class GravitasPhysicsService
         _discreteIslandNodes.FastClear();
         _discreteIslandConstraints.FastClear();
         _continuousCollisionCandidates.Clear();
+        _dirtyContinuousCollisionCandidates.Clear();
+        _continuousCollisionCandidateLifetimes.Clear();
         _continuousCollisionCandidateIds.FastClear();
+        _dirtyContinuousCollisionCandidateIds.FastClear();
+        _dirtyContinuousCollisionBodyIds.Clear();
+        _dirtyContinuousCollisionBodies.FastClear();
         _processedContinuousCollisionBodies.Clear();
         _continuousCollisionPreparedToken = int.MinValue;
         LastContinuousCollisionIslandCount = 0;
@@ -217,6 +229,8 @@ public sealed partial class GravitasPhysicsService
         if (isDynamic)
         {
             dynamicId = _dynamicBodies.Add(body);
+            while (_continuousCollisionCandidateLifetimes.Count <= dynamicId)
+                _continuousCollisionCandidateLifetimes.Add(default);
             BodyCount++;
         }
 
@@ -240,6 +254,8 @@ public sealed partial class GravitasPhysicsService
         if (!_dynamicBodies.TryRemoveAt(dynamicId))
             return;
 
+        _continuousCollisionCandidateLifetimes[dynamicId] = default;
+        ReleaseContinuousCollisionCandidateRefresh(body);
         BodyCount--;
     }
 
@@ -302,9 +318,6 @@ public sealed partial class GravitasPhysicsService
     internal LSCollider GetColliderByServiceIndex(int serviceIndex) => _colliders[serviceIndex];
 
     internal SwiftList<LSCollider> PrepareReplayColliders() => _colliders.PrepareReplayColliders();
-
-    internal bool TryGetDynamicBody(int dynamicId, out SolidBody body) =>
-        _dynamicBodies.TryGetValue(dynamicId, out body);
 
     private void AddServiceRefreshCollider(LSCollider collider)
     {

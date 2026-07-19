@@ -304,6 +304,40 @@ public sealed class CollisionDetectionShapePairTests
     }
 
     [Fact]
+    public void CuboidCapsule_WithUnrepresentableCoreDistance_ShouldRejectWithoutFabricatingContact()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSCuboidCollider> cuboid = scenario.CreateCuboid(Vector3d.Zero);
+        ScenarioBody<LSCapsuleCollider> capsule = scenario.CreateCapsule(Vector3d.Zero);
+        capsule.Collider.Radius = Fixed64.MaxValue;
+        capsule.Body.ResetPosition(new Vector3d(
+            (Fixed64)1_600_000_000,
+            (Fixed64)1_600_000_000,
+            Fixed64.Zero));
+        capsule.Collider.RebuildRuntimeShapeOnly();
+        Vector3d coreSeparation = capsule.Collider.Center - cuboid.Collider.BoundsMax;
+
+        coreSeparation.MagnitudeSquared.Should().Be(Fixed64.MaxValue);
+        Vector3d.TryGetMagnitude(coreSeparation, out _).Should().BeFalse();
+        capsule.Collider.ScaledRadiusSqr.Should().Be(Fixed64.MaxValue);
+        AssertNoCollision(scenario, cuboid.Collider, capsule.Collider, CollisionType.AABox_Capsule);
+    }
+
+    [Fact]
+    public void CuboidCapsule_WithUnrepresentableContainedSupportPoint_ShouldRejectContact()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        Vector3d center = new(
+            Fixed64.MinValue + Fixed64.FromFraction(1, 4),
+            Fixed64.Zero,
+            Fixed64.Zero);
+        ScenarioBody<LSCuboidCollider> cuboid = scenario.CreateCuboid(center);
+        ScenarioBody<LSCapsuleCollider> capsule = scenario.CreateCapsule(center);
+
+        AssertNoCollision(scenario, cuboid.Collider, capsule.Collider, CollisionType.AABox_Capsule);
+    }
+
+    [Fact]
     public void CuboidCapsule_AxisAlignedRoundedEdgeBoundsOverlap_ShouldRejectExactMissInBothPairOrders()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
@@ -549,9 +583,16 @@ public sealed class CollisionDetectionShapePairTests
             -normal,
             translation,
             out Vector3d translatedSupport).Should().BeTrue();
+        CollisionDetection.TryFindCapsuleSupportFeaturePoint(
+            capsule.Collider,
+            normal,
+            translation,
+            out Vector3d oppositeSupport).Should().BeTrue();
 
         Vector3d.Distance(translatedSupport - translation, originSupport)
             .Should().BeLessThanOrEqualTo(Fixed64.Epsilon);
+        Vector3d.Dot(oppositeSupport - translatedSupport, normal)
+            .Should().BeGreaterThan(Fixed64.Zero);
     }
 
     [Fact]

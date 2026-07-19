@@ -923,6 +923,146 @@ public sealed class RaycastSegmentWorkerTests
     }
 
     [Fact]
+    public void CheckOBBoxOverlaps_WithRotatedMinimumFacePoint_ShouldSnapToInclusiveBoundary()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSCuboidCollider box = scenario.CreateCuboid(
+            Vector3d.Zero,
+            PhysicsScenarioBuilder.Yaw(45)).Collider;
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+        Vector3d boundary = LocalToWorld(
+            box,
+            new Vector3d(-Fixed64.Half, Fixed64.Zero, Fixed64.Zero));
+
+        worker.PrepareSegmentCheck(boundary, boundary);
+
+        bool found = worker.CheckOBBoxOverlaps(box, ref hits);
+
+        found.Should().BeTrue();
+        hits.Should().ContainSingle();
+        Vector3d.Distance(hits[0], boundary).Should().BeLessThanOrEqualTo(Fixed64.Epsilon);
+    }
+
+    [Fact]
+    public void CheckOBBoxOverlaps_WithUnrepresentableOriginOffset_ShouldReject()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSCuboidCollider box = scenario.CreateCuboid(
+            new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero)).Collider;
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+        Vector3d start = new(Fixed64.MinValue, Fixed64.Zero, Fixed64.Zero);
+        worker.PrepareSegmentCheck(start, start + Vector3d.Right);
+
+        bool found = worker.CheckOBBoxOverlaps(box, ref hits);
+
+        found.Should().BeFalse();
+        hits.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void CheckOBBoxOverlaps_WithUnrepresentableEndOffset_ShouldReject()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSCuboidCollider box = scenario.CreateCuboid(-Vector3d.Right).Collider;
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+        worker.PrepareSegmentCheck(
+            Vector3d.Zero,
+            new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero));
+
+        bool found = worker.CheckOBBoxOverlaps(box, ref hits);
+
+        found.Should().BeFalse();
+        hits.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void CheckOBBoxOverlaps_WithUnrepresentableOriginTransformCorrection_ShouldReject()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        FixedQuaternion rotation = FixedQuaternion.FromEulerAnglesInDegrees(
+            (Fixed64)23,
+            (Fixed64)37,
+            (Fixed64)11);
+        LSCuboidCollider box = scenario.CreateCuboid(Vector3d.Zero, rotation).Collider;
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+        worker.PrepareSegmentCheck(
+            new Vector3d(Fixed64.MinValue, Fixed64.MinValue, Fixed64.MinValue),
+            new Vector3d(Fixed64.MinValue, (Fixed64)(-1_147_483_648), (Fixed64)(-1_147_483_648)));
+
+        bool found = worker.CheckOBBoxOverlaps(box, ref hits);
+
+        found.Should().BeFalse();
+        hits.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void CheckOBBoxOverlaps_WithUnrepresentableEndTransformCorrection_ShouldReject()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        FixedQuaternion rotation = FixedQuaternion.FromEulerAnglesInDegrees(
+            (Fixed64)23,
+            (Fixed64)37,
+            (Fixed64)11);
+        LSCuboidCollider box = scenario.CreateCuboid(Vector3d.Zero, rotation).Collider;
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+        worker.PrepareSegmentCheck(
+            new Vector3d(Fixed64.MinValue, (Fixed64)(-1_147_483_648), (Fixed64)(-1_147_483_648)),
+            new Vector3d(Fixed64.MinValue, Fixed64.MinValue, Fixed64.MinValue));
+
+        bool found = worker.CheckOBBoxOverlaps(box, ref hits);
+
+        found.Should().BeFalse();
+        hits.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void CheckOBBoxOverlaps_WhenRotatedLocalSegmentOverflows_ShouldReject()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        FixedQuaternion rotation = FixedQuaternion.FromEulerAnglesInDegrees(
+            (Fixed64)179,
+            (Fixed64)71,
+            (Fixed64)(-133));
+        LSCuboidCollider box = scenario.CreateCuboid(Vector3d.Zero, rotation).Collider;
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+        worker.PrepareSegmentCheck(
+            new Vector3d(Fixed64.MinValue, Fixed64.Zero, (Fixed64)1_900_000_000),
+            new Vector3d(Fixed64.MinValue, (Fixed64)1_000_000_000, Fixed64.Zero));
+
+        bool found = worker.CheckOBBoxOverlaps(box, ref hits);
+
+        found.Should().BeFalse();
+        hits.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void CheckOBBoxOverlaps_WhenRotatedLocalLengthIsUnrepresentable_ShouldReject()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        FixedQuaternion rotation = FixedQuaternion.FromEulerAnglesInDegrees(
+            (Fixed64)23,
+            (Fixed64)37,
+            (Fixed64)11);
+        LSCuboidCollider box = scenario.CreateCuboid(Vector3d.Zero, rotation).Collider;
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+        worker.PrepareSegmentCheck(
+            new Vector3d(Fixed64.MinValue, Fixed64.Zero, Fixed64.Zero),
+            new Vector3d(Fixed64.MinValue, Fixed64.MaxValue, Fixed64.Zero));
+
+        bool found = worker.CheckOBBoxOverlaps(box, ref hits);
+
+        found.Should().BeFalse();
+        hits.Should().BeEmpty();
+    }
+
+    [Fact]
     public void CheckOBBoxOverlaps_WithPointOutsideRotatedBox_ShouldReturnFalse()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();

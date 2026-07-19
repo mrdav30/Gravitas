@@ -73,6 +73,27 @@ public sealed class CollisionPairCullingTests
     }
 
     [Fact]
+    public void UpdateCollision_WithUnchangedCulledPair_ShouldCountDownWithoutNarrowPhase()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> first = scenario.CreateSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> second = scenario.CreateSphere(Vector3d.Right * (Fixed64)8);
+        CollisionPair pair = scenario.CreatePair(first.Collider, second.Collider);
+        ClearPartitionFlags(first.Collider, second.Collider);
+        pair.UpdateCollision();
+        short initialCounter = pair.CullCounter;
+        initialCounter.Should().BeGreaterThan(0);
+        ClearPartitionFlags(first.Collider, second.Collider);
+        first.Body.CheckChangedValues();
+        second.Body.CheckChangedValues();
+
+        pair.UpdateCollision();
+
+        pair.CullCounter.Should().Be((short)(initialCounter - 1));
+        pair.Manifold.HasContact.Should().BeFalse();
+    }
+
+    [Fact]
     public void UpdateCollision_ShouldCullFastMovingPairsLessAggressivelyThanStationaryPairs()
     {
         using PhysicsScenarioBuilder stationaryScenario = PhysicsScenarioBuilder.Create();

@@ -49,6 +49,46 @@ internal static class ContinuousCollisionTargetPolicy
         && !trigger
         && mixedPairRequired;
 
+    internal static bool AllowsIndexed3DTarget(
+        bool isSelf,
+        bool active,
+        bool positionFullyFrozen,
+        bool kinematic,
+        bool movingKinematic,
+        bool trigger,
+        bool physicalPairRequired) =>
+        !isSelf
+        && active
+        && (kinematic ? movingKinematic : !positionFullyFrozen)
+        && !trigger
+        && physicalPairRequired;
+
+    internal static bool AllowsIndexed2DTarget(
+        bool isSelf,
+        bool active,
+        bool positionFullyFrozen,
+        bool kinematic,
+        bool movingKinematic,
+        bool trigger,
+        bool physicalPairRequired) =>
+        !isSelf
+        && active
+        && (kinematic ? movingKinematic : !positionFullyFrozen)
+        && !trigger
+        && physicalPairRequired;
+
+    internal static bool AllowsMixedIndexedTarget(
+        bool active,
+        bool positionFullyFrozen,
+        bool kinematic,
+        bool movingKinematic,
+        bool trigger,
+        bool mixedPairRequired) =>
+        active
+        && (kinematic ? movingKinematic : !positionFullyFrozen)
+        && !trigger
+        && mixedPairRequired;
+
     internal static bool AllowsStaticOrKinematic3DTarget(
         bool hasCollider,
         bool isSelf,

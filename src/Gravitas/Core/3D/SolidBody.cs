@@ -169,6 +169,7 @@ public partial class SolidBody : IRecordable
     private const int DefaultBodyHitBufferCapacity = 16;
     private readonly SwiftList<Physics3DHit> _continuousCollisionHits = new(DefaultBodyHitBufferCapacity);
     private readonly SwiftList<PhysicsMixedHit> _continuousMixedCollisionHits = new(DefaultBodyHitBufferCapacity);
+    private readonly SwiftList<int> _rotationalContinuousCollisionCandidateIds = new(DefaultBodyHitBufferCapacity);
     private readonly ContactManifold _rotationalContinuousCollisionManifold = new();
     private readonly SweptSphereQueryWorker _shapeExactContinuousSweepWorker = new();
     private readonly ConvexSweepQueryWorker _shapeExactContinuousConvexSweepWorker = new();
@@ -703,10 +704,8 @@ public partial class SolidBody : IRecordable
         FixedQuaternion kinematicRotation = ContinuousCollisionFrameTargetRotation;
         if (startPosition == kinematicPosition && startRotation == kinematicRotation)
         {
-            if (requestedPosition != kinematicPosition)
-                SetPositionTransformWorldPosition(kinematicPosition);
-            if (requestedRotation != kinematicRotation)
-                SetRotationTransformWorldRotation(kinematicRotation);
+            SetPositionTransformWorldPosition(kinematicPosition);
+            SetRotationTransformWorldRotation(kinematicRotation);
             return;
         }
 
@@ -716,8 +715,14 @@ public partial class SolidBody : IRecordable
         if (ShouldUseContinuousCollision(out _))
             _ = ContinuousCollisionSweepRange.ValidateEndpoint(startPosition, resolvedPosition, out _);
         FixedQuaternion resolvedRotation = kinematicRotation;
-        TryResolveKinematicContinuousCollision(startPosition, ref resolvedPosition);
-        TryResolveKinematicRotationalContinuousCollision(startPosition, ref resolvedPosition, startRotation, ref resolvedRotation);
+        if (!TryResolveKinematicRotationalContinuousCollision(
+                startPosition,
+                ref resolvedPosition,
+                startRotation,
+                ref resolvedRotation))
+        {
+            TryResolveKinematicContinuousCollision(startPosition, ref resolvedPosition);
+        }
 
         if (resolvedPosition != requestedPosition)
             SetPositionTransformWorldPosition(resolvedPosition);

@@ -122,36 +122,40 @@ internal static class ContactNormalImpulse3D
             ? restitution
             : Fixed64.Zero;
         Fixed64 responseFactor = -(Fixed64.One + appliedRestitution);
-        if (!ContinuousCollisionImpulsePolicy.TryResolveVelocityDelta(
+        bool linearAResolved = ContinuousCollisionImpulsePolicy.TryResolveVelocityDelta(
                 bodyA?.ProjectLinearMotion(-normal) ?? Vector3d.Zero,
                 normalVelocity,
                 responseFactor,
                 bodyA?.EffectiveInverseMass ?? Fixed64.Zero,
                 denominator,
-                out Vector3d linearVelocityDeltaA)
-            || !TryResolveAngularVelocityDelta(
+                out Vector3d linearVelocityDeltaA);
+        bool angularAResolved = TryResolveAngularVelocityDelta(
                 bodyA,
                 relativeContactPointA,
                 -normal,
                 normalVelocity,
                 responseFactor,
                 denominator,
-                out Vector3d angularVelocityDeltaA)
-            || !ContinuousCollisionImpulsePolicy.TryResolveVelocityDelta(
+                out Vector3d angularVelocityDeltaA);
+        bool linearBResolved = ContinuousCollisionImpulsePolicy.TryResolveVelocityDelta(
                 bodyB?.ProjectLinearMotion(normal) ?? Vector3d.Zero,
                 normalVelocity,
                 responseFactor,
                 bodyB?.EffectiveInverseMass ?? Fixed64.Zero,
                 denominator,
-                out Vector3d linearVelocityDeltaB)
-            || !TryResolveAngularVelocityDelta(
+                out Vector3d linearVelocityDeltaB);
+        bool angularBResolved = TryResolveAngularVelocityDelta(
                 bodyB,
                 relativeContactPointB,
                 normal,
                 normalVelocity,
                 responseFactor,
                 denominator,
-                out Vector3d angularVelocityDeltaB))
+                out Vector3d angularVelocityDeltaB);
+        if (!(linearAResolved
+                & angularAResolved
+                & linearBResolved
+                & angularBResolved))
         {
             return false;
         }
@@ -311,15 +315,26 @@ internal static class ContactNormalImpulse3D
 
         Vector3d response = body.ApplyConstrainedInverseInertia(
             Vector3d.Cross(relativeContactPoint, signedNormal));
-        if (!Fixed64.TryMultiplyDivide(response.X, normalVelocity, responseFactor, denominator, out Fixed64 x)
-            || !Fixed64.TryMultiplyDivide(response.Y, normalVelocity, responseFactor, denominator, out Fixed64 y)
-            || !Fixed64.TryMultiplyDivide(response.Z, normalVelocity, responseFactor, denominator, out Fixed64 z))
-        {
-            return false;
-        }
-
+        bool xResolved = Fixed64.TryMultiplyDivide(
+            response.X,
+            normalVelocity,
+            responseFactor,
+            denominator,
+            out Fixed64 x);
+        bool yResolved = Fixed64.TryMultiplyDivide(
+            response.Y,
+            normalVelocity,
+            responseFactor,
+            denominator,
+            out Fixed64 y);
+        bool zResolved = Fixed64.TryMultiplyDivide(
+            response.Z,
+            normalVelocity,
+            responseFactor,
+            denominator,
+            out Fixed64 z);
         velocityDelta = new Vector3d(x, y, z);
-        return true;
+        return xResolved & yResolved & zResolved;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

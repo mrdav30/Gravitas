@@ -59,7 +59,7 @@ public sealed partial class GravitasPhysics2DService
         if (mode != GravitasReplayHashMode.AuthoritativeWithSolverCaches)
             return;
 
-        writer.WriteSection("physics.2d.caches", 2);
+        writer.WriteSection("physics.2d.caches", 3);
         writer.WriteInt32(_colliders.PeakCount);
         writer.WriteInt32(_processedPairKeys.Count);
         writer.WriteInt32(_pairs.Count);
@@ -69,7 +69,12 @@ public sealed partial class GravitasPhysics2DService
         writer.WriteInt32(_continuousCollisionPreparedToken);
         writer.WriteBool(_continuousCollisionPreparedMixedIndex);
         writer.WriteInt32(_planarContinuousCollisionCandidates.Count);
+        writer.WriteInt32(_dirtyPlanarContinuousCollisionCandidates.Count);
+        writer.WriteInt32(_dirtyPlanarContinuousCollisionBodies.Count);
+        for (int i = 0; i < _dirtyPlanarContinuousCollisionBodies.Count; i++)
+            writer.WriteInt32(_dirtyPlanarContinuousCollisionBodies[i].Collider.ReplayOrdinal);
         writer.WriteInt32(_mixedContinuousCollisionCandidates.Count);
+        writer.WriteInt32(_dirtyMixedContinuousCollisionCandidates.Count);
         writer.WriteInt32(_processedContinuousCollisionBodies.Count);
         writer.WriteInt32(_queuedContinuousCollisionHandoffBodies.Count);
         writer.WriteInt32(_continuousCollisionHandoffQueue.Count);

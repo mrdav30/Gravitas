@@ -123,22 +123,60 @@ public sealed partial class SolidBody2D
         Fixed64 maxDistance,
         Fixed64 sourceLength)
     {
-        bool pushed = TryApplyKinematicDynamic2DContinuousCollisionPushes(
+        _continuousCollisionHits.FastClear();
+        _continuousMixedCollisionHits.FastClear();
+        GatherKinematicDynamic2DContinuousCollisionHits(
             startPosition,
             proposedPosition,
             proxyRadius,
             maxDistance,
             sourceLength);
-        pushed |= TryApplyKinematicDynamicMixed3DContinuousCollisionPushes(
+        GatherKinematicDynamicMixed3DContinuousCollisionHits(
             startPosition,
             proposedPosition,
             proxyRadius,
             maxDistance,
             sourceLength);
+
+        Physics2DHitSorter.SortByDistance(_continuousCollisionHits);
+        PhysicsMixedHitSorter.SortByDistance(_continuousMixedCollisionHits);
+        Vector2d sourceDisplacement = proposedPosition - startPosition;
+        int hit2DIndex = 0;
+        int hit3DIndex = 0;
+        bool pushed = false;
+        while (hit2DIndex < _continuousCollisionHits.Count
+            || hit3DIndex < _continuousMixedCollisionHits.Count)
+        {
+            bool take2D = hit3DIndex >= _continuousMixedCollisionHits.Count
+                || (hit2DIndex < _continuousCollisionHits.Count
+                    && _continuousCollisionHits[hit2DIndex].Distance
+                        <= _continuousMixedCollisionHits[hit3DIndex].Distance);
+            if (take2D)
+            {
+                Physics2DHit hit = _continuousCollisionHits[hit2DIndex++];
+                pushed |= ApplyKinematicContinuousCollisionHandoff(
+                    hit.Body!,
+                    sourceDisplacement,
+                    hit.Normal,
+                    hit.Distance,
+                    sourceLength);
+
+                continue;
+            }
+
+            PhysicsMixedHit hit3D = _continuousMixedCollisionHits[hit3DIndex++];
+            pushed |= ApplyKinematicContinuousCollisionHandoff(
+                hit3D.Body3D!,
+                sourceDisplacement,
+                hit3D.NormalFor2DSource,
+                hit3D.Distance,
+                sourceLength);
+        }
+
         return pushed;
     }
 
-    private bool TryApplyKinematicDynamic2DContinuousCollisionPushes(
+    private void GatherKinematicDynamic2DContinuousCollisionHits(
         Vector2d startPosition,
         Vector2d proposedPosition,
         Fixed64 proxyRadius,
@@ -146,15 +184,14 @@ public sealed partial class SolidBody2D
         Fixed64 sourceLength)
     {
         Vector2d sourceDisplacement = proposedPosition - startPosition;
-        bool pushed = false;
         int token = Context.LateSimulateToken;
         SwiftList<int> candidateIds = Context.Physics2D.QueryPlanarContinuousCollisionCandidates(
             DynamicCcdCandidateIndex2D.CreateSweptCircleBounds(startPosition, sourceDisplacement, proxyRadius));
         for (int candidateIndex = 0; candidateIndex < candidateIds.Count; candidateIndex++)
         {
             int dynamicId = candidateIds[candidateIndex];
-            if (!Context.Physics2D.TryGetDynamicBody(dynamicId, out SolidBody2D target)
-                || !IsEligibleDynamicContinuousCollisionTarget(target))
+            SolidBody2D target = Context.Physics2D.GetContinuousCollisionCandidate(dynamicId);
+            if (!IsEligibleDynamicContinuousCollisionTarget(target))
             {
                 continue;
             }
@@ -168,55 +205,40 @@ public sealed partial class SolidBody2D
                     target.ContinuousCollisionFrameStart,
                     target.ContinuousCollisionFrameDisplacement,
                     targetRadius,
-                    out Fixed64 normalizedTime,
-                    out Vector2d normal,
+                    out _,
+                    out _,
                     out _))
             {
                 continue;
             }
 
-            Vector2d targetStart = target.ContinuousCollisionFrameStart;
-            Vector2d targetDisplacement = target.ContinuousCollisionFrameDisplacement;
-            if (TryGetExactDynamicRelativeContinuousCollisionHit(
+            target.TrySampleContinuousCollisionDisplacement(
+                Fixed64.Zero,
+                Fixed64.One,
+                out Vector2d targetStart,
+                out Vector2d targetDisplacement);
+            if (!TryGetExactDynamicRelativeContinuousCollisionHit(
                     target,
                     startPosition,
                     sourceDisplacement,
                     targetStart,
                     targetDisplacement,
                     sourceLength,
+                    Fixed64.Zero,
                     out Physics2DHit exactHit,
                     out _))
             {
-                normal = exactHit.Normal;
-                normalizedTime = FixedMath.Clamp01(exactHit.Distance / sourceLength);
-            }
-            else
-            {
                 continue;
             }
 
-            Fixed64 distance = sourceLength * normalizedTime;
-            if (distance > maxDistance)
+            if (exactHit.Distance > maxDistance)
                 continue;
 
-            Fixed64 frameFraction = FixedMath.Clamp01(distance / sourceLength);
-            Vector2d targetPositionAtImpact = targetStart + targetDisplacement * frameFraction;
-            if (ApplyKinematicContinuousCollisionHandoff(
-                    target,
-                    sourceDisplacement,
-                    normal,
-                    targetPositionAtImpact,
-                    distance,
-                    sourceLength))
-            {
-                pushed = true;
-            }
+            _continuousCollisionHits.Add(exactHit);
         }
-
-        return pushed;
     }
 
-    private bool TryApplyKinematicDynamicMixed3DContinuousCollisionPushes(
+    private void GatherKinematicDynamicMixed3DContinuousCollisionHits(
         Vector2d startPosition,
         Vector2d proposedPosition,
         Fixed64 proxyRadius,
@@ -224,33 +246,37 @@ public sealed partial class SolidBody2D
         Fixed64 sourceLength)
     {
         if (!Context.Settings.RuntimeMode.RunsMixedContacts())
-            return false;
+            return;
 
         Vector2d sourceDisplacement2D = proposedPosition - startPosition;
         Vector3d sourceStart = new(startPosition.X, Collider.MixedSlabCenterY, startPosition.Y);
         Vector3d sourceDisplacement = new(sourceDisplacement2D.X, Fixed64.Zero, sourceDisplacement2D.Y);
         Fixed64 sourceRadius = FixedMath.Max(proxyRadius, Collider.MixedHalfThickness);
-        bool pushed = false;
         int token = Context.LateSimulateToken;
         SwiftList<int> candidateIds = Context.Physics.QueryContinuousCollisionCandidates(
             DynamicCcdCandidateIndex.CreateSweptSphereBounds(sourceStart, sourceDisplacement, sourceRadius));
         for (int candidateIndex = 0; candidateIndex < candidateIds.Count; candidateIndex++)
         {
             int dynamicId = candidateIds[candidateIndex];
-            if (!Context.Physics.TryGetDynamicBody(dynamicId, out SolidBody target)
-                || !IsEligibleDynamicMixed3DTarget(target))
+            SolidBody target = Context.Physics.GetContinuousCollisionCandidate(dynamicId);
+            if (!IsEligibleDynamicMixed3DTarget(target))
             {
                 continue;
             }
 
             target.EnsureContinuousCollisionFramePrepared(token);
             Fixed64 targetRadius = target.ResolveContinuousCollisionProxyRadius();
+            target.TrySampleContinuousCollisionDisplacement(
+                Fixed64.Zero,
+                Fixed64.One,
+                out Vector3d targetStart,
+                out Vector3d targetDisplacement);
             if (!ContinuousCollisionMath.TrySweepRelativeSpheres(
                     sourceStart,
                     sourceDisplacement,
                     sourceRadius,
-                    target.ContinuousCollisionFrameStart,
-                    target.ContinuousCollisionFrameDisplacement,
+                    targetStart,
+                    targetDisplacement,
                     targetRadius,
                     out Fixed64 normalizedTime,
                     out Vector3d normalForSource,
@@ -263,29 +289,22 @@ public sealed partial class SolidBody2D
             if (distance > maxDistance)
                 continue;
 
-            Fixed64 frameFraction = FixedMath.Clamp01(distance / sourceLength);
-            Vector3d targetPositionAtImpact = target.ContinuousCollisionFrameStart
-                + target.ContinuousCollisionFrameDisplacement * frameFraction;
-            if (ApplyKinematicContinuousCollisionHandoff(
-                    target,
-                    sourceDisplacement2D,
-                    normalForSource.ToVector2d(),
-                    targetPositionAtImpact,
-                    distance,
-                    sourceLength))
-            {
-                pushed = true;
-            }
+            _continuousMixedCollisionHits.Add(new PhysicsMixedHit(
+                target.Collider,
+                Collider,
+                Vector3d.Zero,
+                Vector3d.Zero,
+                normalForSource,
+                PhysicsQueryReducerKind.ConservativeFallback,
+                distance,
+                sourceDisplacement));
         }
-
-        return pushed;
     }
 
-    private bool ApplyKinematicContinuousCollisionHandoff(
+    internal bool ApplyKinematicContinuousCollisionHandoff(
         SolidBody2D target,
         Vector2d sourceDisplacement,
         Vector2d normalForSource,
-        Vector2d targetPositionAtImpact,
         Fixed64 hitDistance,
         Fixed64 sourceLength)
     {
@@ -296,36 +315,63 @@ public sealed partial class SolidBody2D
         if (constrainedInverseMass <= Fixed64.Zero)
             return false;
 
-        Vector2d sourceVelocity = sourceDisplacement / deltaTime;
-        Vector2d relativeVelocity = sourceVelocity - target.ResolveContinuousCollisionFrameVelocity();
+        Fixed64 hitTime = FixedMath.Clamp01(hitDistance / sourceLength);
+        Vector2d sourceVelocity = SampleContinuousCollisionLinearVelocity(hitTime);
+        Vector2d targetVelocity = target.SampleContinuousCollisionLinearVelocity(hitTime);
+        bool relativeVelocityResolved = Vector2d.TrySubtract(
+            sourceVelocity,
+            targetVelocity,
+            out Vector2d relativeVelocity);
         Fixed64 normalVelocity = Vector2d.Dot(relativeVelocity, normal);
         Fixed64 restitution = ResolveContinuousCollisionRestitution(target, -normalVelocity);
-        Fixed64 responseSpeed = -(Fixed64.One + restitution) * normalVelocity;
-        Fixed64 hitTime = FixedMath.Clamp01(hitDistance / sourceLength);
+        bool responseFactorResolved = Fixed64.TryAdd(
+            Fixed64.One,
+            restitution,
+            out Fixed64 responseFactor);
+        bool closingSpeedResolved = Fixed64.TrySubtract(
+            Fixed64.Zero,
+            normalVelocity,
+            out Fixed64 closingSpeed);
+        bool responseSpeedResolved = Fixed64.TryMultiplyDivide(
+            closingSpeed,
+            responseFactor,
+            Fixed64.One,
+            out Fixed64 responseSpeed);
         Vector2d targetResponseNormal = target.ProjectLinearMotion(-normal);
-        if (!ContinuousCollisionImpulsePolicy.TryResolveVelocityDelta(
+        bool targetDeltaResolved = ContinuousCollisionImpulsePolicy.TryResolveVelocityDelta(
             targetResponseNormal,
             responseSpeed,
             target.EffectiveInverseMass,
             constrainedInverseMass,
-            out Vector2d targetVelocityDelta))
+            out Vector2d targetVelocityDelta);
+        bool targetVelocityResolved = Vector2d.TryAdd(
+            targetVelocity,
+            target.ProjectLinearMotion(targetVelocityDelta),
+            out Vector2d targetPostVelocity);
+        if (!(relativeVelocityResolved
+            & normalVelocity < -Fixed64.Epsilon
+            & responseFactorResolved
+            & closingSpeedResolved
+            & responseSpeedResolved
+            & targetDeltaResolved
+            & targetVelocityResolved))
         {
             return false;
         }
 
-        target.ApplyContinuousCollisionHandoff(
-            targetPositionAtImpact,
-            targetVelocityDelta,
+        return target.ApplyContinuousCollisionHandoffState(
+            target.SampleContinuousCollisionPosition(hitTime),
+            target.SampleContinuousCollisionRotation(hitTime),
+            targetPostVelocity,
+            target.SampleContinuousCollisionAngularVelocity(hitTime),
             deltaTime * (Fixed64.One - hitTime),
             ignoredCollider2D: Collider);
-        return true;
     }
 
-    private bool ApplyKinematicContinuousCollisionHandoff(
+    internal bool ApplyKinematicContinuousCollisionHandoff(
         SolidBody target,
         Vector2d sourceDisplacement,
         Vector2d normalForSource,
-        Vector3d targetPositionAtImpact,
         Fixed64 hitDistance,
         Fixed64 sourceLength)
     {
@@ -337,32 +383,58 @@ public sealed partial class SolidBody2D
             return false;
 
         Vector3d normal3D = normal.ToVector3d(Fixed64.Zero);
-        Vector3d sourceVelocity = (sourceDisplacement / deltaTime).ToVector3d(Fixed64.Zero);
-        Vector3d relativeVelocity = sourceVelocity - target.ResolveContinuousCollisionFrameVelocity();
-        Fixed64 normalVelocity = Vector3d.Dot(relativeVelocity, normal3D);
-        if (normalVelocity >= -Fixed64.Epsilon)
-            return false;
-
-        Fixed64 restitution = ResolveContinuousCollisionRestitution(target, -normalVelocity);
-        Fixed64 responseSpeed = -(Fixed64.One + restitution) * normalVelocity;
         Fixed64 hitTime = FixedMath.Clamp01(hitDistance / sourceLength);
+        Vector3d sourceVelocity = SampleContinuousCollisionLinearVelocity(hitTime)
+            .ToVector3d(Fixed64.Zero);
+        Vector3d targetVelocity = target.SampleContinuousCollisionLinearVelocity(hitTime);
+        bool relativeVelocityResolved = Vector3d.TrySubtract(
+            sourceVelocity,
+            targetVelocity,
+            out Vector3d relativeVelocity);
+        Fixed64 normalVelocity = Vector3d.Dot(relativeVelocity, normal3D);
+        Fixed64 restitution = ResolveContinuousCollisionRestitution(target, -normalVelocity);
+        bool responseFactorResolved = Fixed64.TryAdd(
+            Fixed64.One,
+            restitution,
+            out Fixed64 responseFactor);
+        bool closingSpeedResolved = Fixed64.TrySubtract(
+            Fixed64.Zero,
+            normalVelocity,
+            out Fixed64 closingSpeed);
+        bool responseSpeedResolved = Fixed64.TryMultiplyDivide(
+            closingSpeed,
+            responseFactor,
+            Fixed64.One,
+            out Fixed64 responseSpeed);
         Vector3d targetResponseNormal = target.ProjectLinearMotion(-normal3D);
-        if (!ContinuousCollisionImpulsePolicy.TryResolveVelocityDelta(
+        bool targetDeltaResolved = ContinuousCollisionImpulsePolicy.TryResolveVelocityDelta(
             targetResponseNormal,
             responseSpeed,
             target.EffectiveInverseMass,
             constrainedInverseMass,
-            out Vector3d targetVelocityDelta))
+            out Vector3d targetVelocityDelta);
+        bool targetVelocityResolved = Vector3d.TryAdd(
+            targetVelocity,
+            target.ProjectLinearMotion(targetVelocityDelta),
+            out Vector3d targetPostVelocity);
+        if (!(relativeVelocityResolved
+            & normalVelocity < -Fixed64.Epsilon
+            & responseFactorResolved
+            & closingSpeedResolved
+            & responseSpeedResolved
+            & targetDeltaResolved
+            & targetVelocityResolved))
         {
             return false;
         }
 
-        target.ApplyContinuousCollisionHandoff(
-            targetPositionAtImpact,
-            targetVelocityDelta,
+        return target.ApplyContinuousCollisionHandoff(
+            target.SampleContinuousCollisionPosition(hitTime),
+            target.SampleContinuousCollisionRotation(hitTime),
+            targetPostVelocity,
+            target.SampleContinuousCollisionAngularVelocity(hitTime),
             deltaTime * (Fixed64.One - hitTime),
             ignoredCollider2D: Collider);
-        return true;
     }
 
 }

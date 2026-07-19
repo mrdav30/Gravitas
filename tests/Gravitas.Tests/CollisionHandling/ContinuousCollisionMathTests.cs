@@ -1,4 +1,5 @@
 using FixedMathSharp;
+using FixedMathSharp.Bounds;
 using FluentAssertions;
 using Gravitas.CollisionHandling;
 using System;
@@ -8,6 +9,180 @@ namespace Gravitas.Tests.CollisionHandlingTests;
 
 public sealed class ContinuousCollisionMathTests
 {
+    [Fact]
+    public void BoundsSeparation_ShouldRecognizeFullDomainAxisGaps()
+    {
+        FixedBoundBox negativeExtreme = FixedBoundBox.FromMinMax(
+            new Vector3d(Fixed64.MinValue, -Fixed64.One, -Fixed64.One),
+            new Vector3d(Fixed64.MinValue, Fixed64.One, Fixed64.One));
+        FixedBoundBox positiveExtreme = FixedBoundBox.FromMinMax(
+            new Vector3d(Fixed64.MaxValue, -Fixed64.One, -Fixed64.One),
+            new Vector3d(Fixed64.MaxValue, Fixed64.One, Fixed64.One));
+
+        ContinuousCollisionMath.AreBoundsSeparatedByMoreThan(
+                negativeExtreme,
+                positiveExtreme,
+                Fixed64.MaxValue)
+            .Should()
+            .BeTrue();
+        ContinuousCollisionMath.AreBoundsSeparatedByMoreThan(
+                positiveExtreme,
+                negativeExtreme,
+                Fixed64.MaxValue)
+            .Should()
+            .BeTrue();
+    }
+
+    [Fact]
+    public void RotationalArbiter_ShouldContinueTranslationAfterAngularMotionStops()
+    {
+        ContinuousCollisionMath.ShouldContinueRotationalArbiter(
+                Vector2d.Right,
+                Fixed64.Zero)
+            .Should()
+            .BeTrue();
+        ContinuousCollisionMath.ShouldContinueRotationalArbiter(
+                Vector2d.Zero,
+                Fixed64.Zero)
+            .Should()
+            .BeFalse();
+        ContinuousCollisionMath.ShouldContinueRotationalArbiter(
+                Vector2d.Zero,
+                Fixed64.Epsilon + Fixed64.MinIncrement)
+            .Should()
+            .BeTrue();
+    }
+
+    [Fact]
+    public void RotationalIntervalMotionBound_WhenAngularArcExceedsDomain_ShouldRemainUnresolved()
+    {
+        ContinuousCollisionMath.TryResolveRotationalIntervalMotionBound(
+                Vector2d.Zero,
+                Fixed64.MaxValue,
+                Fixed64.MaxValue,
+                Fixed64.One,
+                out Fixed64 planarBound)
+            .Should()
+            .BeFalse();
+        ContinuousCollisionMath.TryResolveRotationalIntervalMotionBound(
+                Vector3d.Zero,
+                Fixed64.MaxValue,
+                Fixed64.MaxValue,
+                Fixed64.One,
+                out Fixed64 spatialBound)
+            .Should()
+            .BeFalse();
+
+        planarBound.Should().Be(Fixed64.Zero);
+        spatialBound.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void RotationalSearchLimit_AtMaxDepth_ShouldResolveSameTargetWitness()
+    {
+        Fixed64 lowerTime = Fixed64.FromFraction(1, 4);
+        Fixed64 witnessTime = lowerTime + Fixed64.FromFraction(1, 4096);
+        var interval = new ContinuousCollisionMath.RotationalInterval(
+            lowerTime,
+            witnessTime,
+            ContinuousCollisionMath.RotationalIntervalMaxDepth);
+
+        ContinuousCollisionMath.TryResolveRotationalSearchLimit(
+                interval,
+                processedNodeCount: 1,
+                hasWitness: true,
+                witnessTime,
+                out Fixed64 safeTime,
+                out Fixed64 contactTime,
+                out bool retainsWitness)
+            .Should()
+            .BeTrue();
+
+        safeTime.Should().Be(witnessTime);
+        contactTime.Should().Be(witnessTime);
+        retainsWitness.Should().BeTrue();
+    }
+
+    [Fact]
+    public void RotationalSearchLimit_AtMaxDepthWithLaterGlobalWitness_ShouldRetainUnresolvedLower()
+    {
+        Fixed64 lowerTime = Fixed64.Zero;
+        Fixed64 upperTime = Fixed64.FromFraction(1, 4096);
+        Fixed64 laterWitnessTime = Fixed64.Half;
+        var interval = new ContinuousCollisionMath.RotationalInterval(
+            lowerTime,
+            upperTime,
+            ContinuousCollisionMath.RotationalIntervalMaxDepth);
+
+        ContinuousCollisionMath.TryResolveRotationalSearchLimit(
+                interval,
+                processedNodeCount: 1,
+                hasWitness: true,
+                laterWitnessTime,
+                out Fixed64 safeTime,
+                out Fixed64 contactTime,
+                out bool retainsWitness)
+            .Should()
+            .BeTrue();
+
+        safeTime.Should().Be(lowerTime);
+        contactTime.Should().Be(laterWitnessTime);
+        retainsWitness.Should().BeTrue();
+        safeTime.Should().BeLessThan(contactTime);
+    }
+
+    [Fact]
+    public void RotationalSearchLimit_WhenNodeBudgetExhausts_ShouldRetainConservativeLower()
+    {
+        Fixed64 lowerTime = Fixed64.FromFraction(1, 4);
+        Fixed64 witnessTime = Fixed64.Half;
+        var interval = new ContinuousCollisionMath.RotationalInterval(
+            lowerTime,
+            witnessTime,
+            depth: 1);
+
+        ContinuousCollisionMath.TryResolveRotationalSearchLimit(
+                interval,
+                ContinuousCollisionMath.RotationalIntervalNodeBudget,
+                hasWitness: true,
+                witnessTime,
+                out Fixed64 safeTime,
+                out Fixed64 contactTime,
+                out bool retainsWitness)
+            .Should()
+            .BeTrue();
+
+        safeTime.Should().Be(lowerTime);
+        contactTime.Should().Be(witnessTime);
+        retainsWitness.Should().BeTrue();
+        safeTime.Should().BeLessThan(contactTime);
+    }
+
+    [Fact]
+    public void RotationalSearchLimit_AtMaxDepthWithoutWitness_ShouldRemainConservative()
+    {
+        Fixed64 lowerTime = Fixed64.FromFraction(1, 4);
+        var interval = new ContinuousCollisionMath.RotationalInterval(
+            lowerTime,
+            Fixed64.Half,
+            ContinuousCollisionMath.RotationalIntervalMaxDepth);
+
+        ContinuousCollisionMath.TryResolveRotationalSearchLimit(
+                interval,
+                processedNodeCount: 1,
+                hasWitness: false,
+                witnessTime: Fixed64.Zero,
+                out Fixed64 safeTime,
+                out Fixed64 contactTime,
+                out bool retainsWitness)
+            .Should()
+            .BeTrue();
+
+        safeTime.Should().Be(lowerTime);
+        contactTime.Should().Be(lowerTime);
+        retainsWitness.Should().BeFalse();
+    }
+
     [Fact]
     public void RotationalIntervalMotionBound_WithLargePivot_ShouldCoverScaleDependentPoseRounding()
     {

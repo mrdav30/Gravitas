@@ -86,7 +86,9 @@ public sealed partial class ContinuousCollision2DTests
     }
 
     [Theory]
-    [InlineData(4, false)]
+    // Canonical target histories preserve the second outward relay instead of collapsing it into the first.
+    [InlineData(5, false)]
+    [InlineData(4, true)]
     [InlineData(3, true)]
     public void ContinuousHandoff_WhenRelayReturnsToConsumedBody_ShouldRequeueOrDiscardAtBudget(
         int iterationBudget,
