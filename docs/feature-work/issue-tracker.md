@@ -45,37 +45,16 @@ records follow with their original discovery context.
 
 ### Ordered Queue
 
-1. **Gravitas:**
-   [Rotational CCD Omits Dynamic And Mixed Targets](#rotational-ccd-omits-dynamic-and-mixed-targets).
-2. **FixedMathSharp then Gravitas:**
+1. **FixedMathSharp then Gravitas:**
    [Finite-Axis Capsule, Cylinder, And Mesh-Edge Projections Can Saturate Before Solving](#finite-axis-capsule-cylinder-and-mesh-edge-projections-can-saturate-before-solving).
-3. **FixedMathSharp:**
+2. **FixedMathSharp:**
    [Sphere Construction And Merge Paths Are Not Full-Domain](#sphere-construction-and-merge-paths-are-not-full-domain).
+3. **Gravitas:**
+   [Translational CCD Flattens Piecewise Target Trajectories](#translational-ccd-flattens-piecewise-target-trajectories).
 4. **Gravitas:**
+   [Fully Position-Frozen Bodies Cannot Retain Angular Mobility](#fully-position-frozen-bodies-cannot-retain-angular-mobility).
+5. **Gravitas:**
    [Conic Query Quadratics Can Saturate Before Solving](#conic-query-quadratics-can-saturate-before-solving).
-
-### Rotational CCD Omits Dynamic And Mixed Targets
-
-**Discovered:** 2026-07-18  
-**Source:** between-sample rotational CCD final parity review  
-**Affected area:** 2D/3D rotational candidate gathering, mixed collision mode,
-dynamic target response, and same-frame CCD handoffs
-
-The same-dimensional rotational path gathers only through the static-target
-query surface. Pure rotation also leaves the translational active-source path
-before dynamic candidate indexing or mixed routing can run. A rotating body can
-therefore be protected against static geometry while still rotating through a
-dynamic same-dimensional target or an embedded mixed-dimensional slab. A
-kinematic rotation also cannot wake or push a dynamic target through the
-existing handoff mechanism.
-
-Resolve this as a first-class moving-pair contract rather than treating dynamic
-targets as static proxies. The interval proof must bound both bodies' pose
-motion, mixed mode must use dimension-tagged deterministic candidate identity,
-and dynamic hits must enter the existing bounded handoff/response lifecycle.
-`PhysicsRuntimeMode.Both` must continue to exclude cross-dimensional contacts.
-Add pure 2D, pure 3D, both mixed source directions, dynamic handoff, replay, and
-allocation regressions.
 
 ### Finite-Axis Capsule, Cylinder, And Mesh-Edge Projections Can Saturate Before Solving
 
@@ -123,6 +102,63 @@ focused construction/merge regressions, 2D parity where applicable, and
 allocation benchmarks. This is the downstream release-tracking mirror of
 `FMS-Issue-015`.
 
+### Translational CCD Flattens Piecewise Target Trajectories
+
+**Discovered:** 2026-07-19  
+**Source:** rotational moving-pair CCD final trajectory-consumer review  
+**Affected area:** 2D/3D/mixed translational moving-pair CCD, kinematic pushes,
+same-frame requeues, and dirty candidate overlays
+
+The frame candidate indices correctly retain every piecewise target excursion,
+and a dirty target shadows its stale prepared bounds after a handoff. The
+translation-only narrow phase still samples only the target position at the
+start and end of the remaining interval, however, and treats the chord between
+those endpoints as the entire target path. An outward-and-return trajectory can
+therefore overlap the source between samples while presenting identical start
+and end positions. A focused 2D behavioral probe reproduced the tunnel: the
+candidate was admitted by its dirty bounds, then rejected by the straight
+relative-circle sweep and the source advanced through the intermediate target
+pose. The equivalent endpoint-chord pattern exists in 3D and both mixed
+kinematic-push paths.
+
+Resolve this as one piecewise translational moving-pair contract across 2D, 3D,
+and mixed modes. Traverse the target's canonical segments over the source's
+remaining normalized-time interval, convert segment-local hits back to global
+TOI, preserve stable dimension/ID ordering, and keep the existing atomic
+handoff budget. Add outward-return, stop/reverse, registration-order, replay,
+and warmed-allocation regressions. Do not collapse the trajectory back to a
+larger proxy chord or duplicate the rotational interval solver merely to cover
+this example.
+
+### Fully Position-Frozen Bodies Cannot Retain Angular Mobility
+
+**Discovered:** 2026-07-19  
+**Source:** rotational moving-pair CCD final mobility review  
+**Affected area:** 2D/3D freeze-axis semantics, collider mobility buckets,
+partition refresh, awake routing, discrete response islands, constraints,
+sleep/wake state, visualization, replay, and host documentation
+
+`BodyFreezeAxes2D.Position` and `BodyFreezeAxes3D.Position` currently make a
+body static-equivalent for solver and partition mobility. `CanRotate`, angular
+inertia, awake admission, collider `IsStatic`, partition buckets, island and
+joint participation, sleep, and host documentation all depend on that
+contract. A rotational CCD admission review briefly exposed the more intuitive
+alternative—lock every translation axis while retaining independent angular
+mobility—but enabling only `CanRotate` would leave the body in static
+partitions and outside the solver paths that must advance and respond to its
+rotation.
+
+Treat this as one explicit mobility redesign rather than a local `CanRotate`
+change. Decide whether full translation freeze should remain the documented
+static-equivalent convenience or whether static equivalence needs a separate
+body mode. If angular mobility is retained, update 2D/3D/mixed partition
+classification and refresh, awake and island gates, contact and joint
+response, sleep/wake behavior, visualization, replay, serialization defaults,
+and docs together. Add rotation-only integration, collision, constraint,
+partition migration, replay, and allocation regressions in both dimensions.
+The partial CCD-era change was deliberately reverted so the current release
+does not expose a half-enabled state.
+
 ### Conic Query Quadratics Can Saturate Before Solving
 
 **Discovered:** 2026-07-18  
@@ -139,6 +175,38 @@ rejection with second-root admission, starts inside, and authored endpoint
 contact. Keep it allocation-free and benchmark the query hot path.
 
 ## Resolved Issues
+
+### Rotational CCD Omits Dynamic And Mixed Targets
+
+**Resolved:** 2026-07-19  
+**Source:** between-sample rotational CCD final parity review  
+**Affected area:** 2D/3D rotational candidate gathering, mixed collision mode,
+dynamic target response, and same-frame CCD handoffs
+
+RCA: same-dimensional rotational CCD gathered only through static-target query
+surfaces, and pure rotation exited before dynamic candidate indexing or mixed
+routing. Moving-target snapshots lacked independently sampled angular
+trajectories, while the existing linear-mass response and handoff contracts
+could not represent contact-point angular response or remaining-frame rotation.
+
+Fix: 2D, 3D, and mixed CCD now share order-independent piecewise frame
+trajectories, immutable candidate indices with bounded dirty overlays, stable
+dimension-tagged normalized-time arbitration, contact-point inverse-mass and
+inertia response, and atomic bounded translation/rotation handoffs. Kinematic
+authored motion, dynamic wake/response, `Both` exclusion, callback-driven stale
+candidate lifetimes, and disabled-service preparation are explicit contracts.
+The 3D response also rejects separating and tangent contacts before mutation.
+
+Verification: the authoritative `Release` coverage run passes 3,056 tests and
+reports 100% line (33,555/33,555), branch (12,237/12,237), and method
+(4,167/4,167) coverage. Library/package and benchmark builds complete with zero
+warnings or errors. Twelve 1/8/32-pair benchmark rows remain approximately
+linear and allocation-free except for the separately tracked small 32-pair
+mixed discrete broad-phase capacity-growth signal. Independent final review
+found the three lifecycle/response defects above; all were corrected with
+behavior regressions before closure. The completed design and detailed evidence
+are retained in
+[`2026-07-18-rotational-moving-pair-ccd-plan.md`](done/2026-07-18-rotational-moving-pair-ccd-plan.md).
 
 ### 3D CCD Handoff Callback Failure Could Abandon Queue Cleanup
 

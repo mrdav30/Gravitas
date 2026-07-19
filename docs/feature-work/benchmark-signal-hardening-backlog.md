@@ -58,7 +58,28 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 
 | Signal | Status | Priority | Tracking |
 | ------ | ------ | -------- | -------- |
-| _None_ | -      | -        | -        |
+| Mixed discrete broad-phase refresh allocates at 32 moving CCD pairs | Isolated | Low | Reproduce capacity-growth threshold independently of rotational CCD |
+
+### Signal: Mixed Discrete Broad-Phase Refresh Allocation At 32 Pairs
+
+**Discovered:** 2026-07-19  
+**Source:** `RotationalMovingPairCcdBenchmarks` mixed 3D-to-2D ShortRun  
+**Status:** Isolated; no CCD runtime defect confirmed
+
+The mixed 3D-to-2D end-to-end rows measured `0 B/op` at 1 and 8 pairs. Repeated
+short runs reported a small, run-dependent 32-pair signal: initially `48 B/op`
+and finally `10 B/op`. Focused warmed guards for
+CCD preparation, interval search, response, handoff, reset, and completion all
+remain allocation-free. Temporary test-side phase instrumentation localized the
+recurring sample to the pre-existing mixed discrete
+`GravitasMixedCollisionService.LateSimulate` partition refresh and broad-phase
+capacity-growth path after CCD completes.
+
+Keep the honest 1/8/32 benchmark row. The smallest next step is to reproduce the
+same threshold without rotational motion, identify which retained partition or
+candidate buffer grows, and decide whether an explicit warm-capacity policy is
+justified by representative world churn. Do not add speculative production
+preallocation merely to hide this benchmark sample.
 
 ## Closed Signals
 
@@ -741,9 +762,9 @@ Promote a signal from this backlog into a dedicated dated plan when it has:
 
 ## Current Recommendation
 
-With the runtime CCD allocation, grounding, shape-exact false-positive, pure 2D
-dynamic candidate-asymmetry, mixed mesh triangle-scaling, SwiftCollections sort,
-and 2D response repartition signals closed, this backlog has no active
-benchmark-facing items. Keep it as the intake bucket for future measured
-signals; promote broader work into a dated feature plan when the scope outgrows
-a focused patch.
+The mixed discrete broad-phase refresh threshold is the only active measured
+signal. It is low priority because the CCD-owned preparation, search, response,
+handoff, reset, and completion paths remain allocation-free, but it should be
+reproduced without rotational motion before release. Keep this document as the
+intake bucket for future measured signals; promote broader work into a dated
+feature plan when the scope outgrows a focused patch.

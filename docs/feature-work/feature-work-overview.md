@@ -38,6 +38,15 @@ instead of burying it in notes.
 
 ## Recently Completed
 
+- [`Rotational Moving-Pair CCD Hardening`](done/2026-07-18-rotational-moving-pair-ccd-plan.md)
+  - Completed 2026-07-19. Pure 2D, pure 3D, and mixed rotational CCD now owns
+    moving dynamic and kinematic targets through order-independent piecewise
+    trajectories, stable normalized-time arbitration, contact-point angular
+    response, and bounded atomic handoffs. The authoritative 3,056-test
+    artifact reports 100% line, branch, and method coverage; the focused
+    1/8/32-pair benchmark remains approximately linear with only the separately
+    tracked mixed broad-phase capacity-growth allocation signal.
+
 - [`FixedMathSharp Foundation Hardening`](../../../FixedMathSharp/docs/feature-work/done/2026-07-14-fixedmathsharp-foundation-hardening-plan.md)
   - Completed 2026-07-17. FixedMathSharp now owns the shared full-domain
     arithmetic, vector/quaternion, segment/triangle, and transform contracts;

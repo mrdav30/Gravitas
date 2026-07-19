@@ -4,7 +4,7 @@
 > verification before completion, and an independent final code review for
 > every commit. Keep this document current as implementation evidence changes.
 
-**Status:** In progress
+**Status:** Complete (2026-07-19)
 
 **Goal:** Make 2D, 3D, and mixed rotational continuous collision a first-class
 moving-pair contract. Pure rotation and combined translation/rotation must not
@@ -56,8 +56,11 @@ scene-graph ownership, engine dependencies, or per-frame allocations.
    mutation budget before making the final storage bound structural.
 9. The frame-start candidate index is immutable after preparation. Impact-
    changed trajectories enter a service-owned, TOI-budget-bounded dirty
-   overlay so later sources cannot miss a body accelerated outside its original
-   swept bounds.
+   overlay so the rotational arbiter cannot miss a body accelerated outside its
+   original swept bounds. A final consumer audit confirmed that the legacy
+   translation-only narrow phase still flattens multi-segment target motion to
+   an endpoint chord; that separate parity defect is retained in the active
+   issue tracker rather than hidden in this plan.
 
 ## Refined Architecture Decision
 
@@ -80,8 +83,8 @@ response. Admission changes begin only after both contracts are green.
 - [x] Add failing pure-rotation regressions for dynamic 2D and 3D targets.
 - [x] Add failing kinematic-source regressions proving target wake/response and
       authored source completion.
-- [ ] Add failing mixed 3D-to-2D and 2D-to-3D regressions plus `Both` exclusion.
-- [ ] Add combined moving-target translation/rotation and equal-time ordering
+- [x] Add failing mixed 3D-to-2D and 2D-to-3D regressions plus `Both` exclusion.
+- [x] Add combined moving-target translation/rotation and equal-time ordering
       regressions.
 
 ## Phase 1: Order-Independent Frame Pose Trajectories
@@ -97,10 +100,10 @@ response. Admission changes begin only after both contracts are green.
       pieces; distinct increasing impacts remain lossless until Phase 3 owns
       the mutation bound.
 - [x] Include moving kinematic bodies in the bounded candidate indices.
-- [ ] Exclude moving kinematics from duplicate static-query admission when the
+- [x] Exclude moving kinematics from duplicate static-query admission when the
       unified arbiter begins consuming the new index.
 - [x] Add replay-cache hashing for every new trajectory field.
-- [ ] Prove body registration/service order does not change sampled poses once
+- [x] Prove body registration/service order does not change sampled poses once
       moving-pair admission consumes the trajectories.
 
 ## Phase 2: Contact-Point CCD Impact Kernels
@@ -120,35 +123,62 @@ response. Admission changes begin only after both contracts are green.
 
 ## Phase 3: Rotational Handoff Continuation
 
-- [ ] Extend 2D/3D handoffs with pose-at-impact and angular-velocity delta.
-- [ ] Continue translation and rotation together for the remaining frame under
+- [x] Extend 2D/3D handoffs with pose-at-impact and angular-velocity delta.
+- [x] Continue translation and rotation together for the remaining frame under
       the shared TOI budget, including requeue and already-processed targets.
-- [ ] Preserve ignored-pair identity across same-dimensional and mixed chains.
-- [ ] Extend authoritative and solver-cache replay hashing and abort/discard
+- [x] Preserve only the immediate prior pair identity across same-dimensional
+      and mixed chains, so `A -> B -> A` recontact remains admissible.
+- [x] Extend authoritative and solver-cache replay hashing and abort/discard
       cleanup for the new state.
 
 ## Phase 4: Moving-Pair Interval Search And Arbitration
 
-- [ ] Gather bodyless/frozen, dynamic, moving kinematic, and mixed candidates
+- [x] Gather bodyless/frozen, dynamic, moving kinematic, and mixed candidates
       through bounded indices into one dimension-tagged stable ordering.
-- [ ] Sample both participant poses at every interval midpoint and rebuild only
+- [x] Sample both participant poses at every interval midpoint and rebuild only
       the two runtime shapes under test.
-- [ ] Sum both motion bounds for separation proofs while preserving the current
+- [x] Sum both motion bounds for separation proofs while preserving the current
       fixed stack, depth limit, and node budget.
-- [ ] Apply witnessed dynamic response/handoffs; retain static clamps and
+- [x] Apply witnessed dynamic response/handoffs; retain static clamps and
       conservative no-impulse fallback for unresolved intervals.
-- [ ] Continue source translation/rotation after an impact until time, motion,
+- [x] Continue source translation/rotation after an impact until time, motion,
       or the shared TOI budget is exhausted.
 
 ## Phase 5: Validation, Performance, And Closure
 
-- [ ] Run focused 2D/3D/mixed/static/kinematic/dynamic handoff suites.
-- [ ] Prove deterministic replay and registration-order invariance.
-- [ ] Extend rotational CCD benchmarks with 1/8/32 same-dimensional dynamic
-      targets and both mixed directions; require zero steady-state allocation.
-- [ ] Run full `Release`, `ReleaseLean`, exact coverage, and CRAP analysis.
-- [ ] Update the issue tracker and relevant collision/runtime wiki contracts.
-- [ ] Obtain an independent final correctness/performance review.
+- [x] Run focused 2D/3D/mixed/static/kinematic/dynamic handoff suites. The
+      mixed-dimension suite passes 482/482, the exact cross-service lifecycle
+      slice passes 5/5, and the final mixed tie/recontact/combined-trajectory/
+      target-angular-admission/allocation slice passes 10/10.
+- [x] Prove deterministic replay and registration-order invariance, including
+      equal-time 2D-before-3D arbitration, combined target translation and
+      rotation, and translation-only sources against rotating `Discrete`
+      kinematic targets in both mixed directions.
+- [x] Extend rotational CCD benchmarks with 1/8/32 same-dimensional dynamic
+      targets and both mixed directions. Focused warmed moving-pair guards are
+      allocation-free. The final end-to-end short run remains approximately
+      linear from 1 to 8 to 32 pairs in all four modes. It reports 0 B/op in
+      every row except mixed 3D-to-2D at 32 pairs, where the latest run measured
+      10 B/op. Instrumentation localized that small, run-dependent residual to
+      pre-existing mixed discrete broad-phase partition refresh/capacity growth
+      rather than CCD preparation, search, response, handoff, reset, or
+      completion. The benchmark hardening backlog retains the signal.
+- [x] Run the full `Release` suite and package/benchmark builds. The suite passes
+      3,056/3,056; the library/package and benchmark projects build with zero
+      warnings and errors. `ReleaseLean` reaches a known local-link validation
+      boundary: GridForge's MemoryPack-bearing local project reference is not
+      propagated into the Lean compile, producing 12 `CS0012` dependency
+      errors. Repeat the Lean gate after restoring released package references.
+- [x] Restore the repository's 100% coverage gate. The authoritative
+      Coverlet/ReportGenerator artifact reports 100% line (33,555/33,555),
+      branch (12,237/12,237), and method (4,167/4,167) coverage. Coverage work
+      removed impossible branches and added behavior regressions for real
+      boundary, lifecycle, ordering, and fallback contracts; it did not retain
+      assertion-only API-shape tests. The CRAP report has 20 methods above 30,
+      all due to structural complexity rather than uncovered paths.
+- [x] Update the issue tracker, feature-work overview, benchmark backlog, and
+      continuous-collision wiki contracts.
+- [x] Obtain an independent final correctness/performance review.
 
 ## Commit Boundaries
 
