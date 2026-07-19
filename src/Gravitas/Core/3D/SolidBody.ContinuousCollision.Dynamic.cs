@@ -41,8 +41,30 @@ public partial class SolidBody
         Context.Physics.QueueContinuousCollisionHandoff(this);
     }
 
-    internal bool TryConsumeContinuousCollisionHandoff(bool updateSleepState, bool updateColliderState)
+    internal bool TryConsumeContinuousCollisionHandoff(bool updateSleepState, bool updateColliderState) =>
+        TryConsumeContinuousCollisionHandoff(
+            updateSleepState,
+            updateColliderState,
+            invokeMovementCallback: true,
+            out _);
+
+    internal bool TryConsumeQueuedContinuousCollisionHandoff(
+        bool updateSleepState,
+        bool updateColliderState,
+        out bool shouldNotifyMovement) =>
+        TryConsumeContinuousCollisionHandoff(
+            updateSleepState,
+            updateColliderState,
+            invokeMovementCallback: false,
+            out shouldNotifyMovement);
+
+    private bool TryConsumeContinuousCollisionHandoff(
+        bool updateSleepState,
+        bool updateColliderState,
+        bool invokeMovementCallback,
+        out bool shouldNotifyMovement)
     {
+        shouldNotifyMovement = false;
         if (!_continuousCollisionHandoffPending || _continuousCollisionHandoffToken != Context.LateSimulateToken)
             return false;
 
@@ -90,11 +112,14 @@ public partial class SolidBody
         if (updateSleepState)
             UpdateSleepState();
 
-        if (PositionChangePending || RotationChangePending)
-            OnMoved?.Invoke();
+        shouldNotifyMovement = PositionChangePending || RotationChangePending;
+        if (invokeMovementCallback && shouldNotifyMovement)
+            NotifyAuthoritativeMovement();
 
         return true;
     }
+
+    internal void NotifyAuthoritativeMovement() => OnMoved?.Invoke();
 
     internal void DiscardContinuousCollisionHandoff()
     {

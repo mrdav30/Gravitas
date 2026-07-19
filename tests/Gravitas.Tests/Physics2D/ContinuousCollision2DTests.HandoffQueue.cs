@@ -2,12 +2,51 @@ using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Tests.Support;
+using System;
 using Xunit;
 
 namespace Gravitas.Tests.Physics2D;
 
 public sealed partial class ContinuousCollision2DTests
 {
+    [Fact]
+    public void ContinuousHandoff_WhenConsumptionThrows_ShouldCloseBatch()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        SolidBody2D throwing = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            Vector2d.Zero,
+            immovable: false);
+        SolidBody2D unread = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            new Vector2d(Fixed64.Zero, (Fixed64)8),
+            immovable: false);
+        context.Physics2D.BeginLateSimulateBodies(continuousCollisionFramePrepared: false).Should().BeTrue();
+
+        throwing.ApplyContinuousCollisionHandoff(
+            throwing.Position,
+            new Vector2d(Fixed64.MaxValue, Fixed64.MaxValue),
+            Fixed64.One);
+        unread.ApplyContinuousCollisionHandoff(unread.Position, Vector2d.Right, Fixed64.Half);
+
+        Action process = () => context.Physics2D.ProcessQueuedContinuousCollisionHandoffs(iterationBudget: 4);
+
+        process.Should().Throw<ArgumentOutOfRangeException>();
+        context.Physics2D.LastContinuousCollisionIslandCount.Should().Be(0);
+        context.Physics2D.LastContinuousCollisionIslandIterationCount.Should().Be(0);
+        context.Physics2D.LastContinuousCollisionIslandLimitReached.Should().BeFalse();
+        context.Physics2D.ProcessQueuedContinuousCollisionHandoffs(iterationBudget: 4).Should().Be(0);
+        throwing.TryConsumeContinuousCollisionHandoff(false, false).Should().BeFalse();
+        unread.TryConsumeContinuousCollisionHandoff(false, false).Should().BeFalse();
+
+        var replayHash = context.ComputeReplayHash();
+        throwing.DiscardContinuousCollisionHandoff();
+        unread.DiscardContinuousCollisionHandoff();
+        context.ComputeReplayHash().Should().Be(replayHash);
+    }
+
     [Fact]
     public void ContinuousHandoff_WhenQueuedStateIsSupersededByTerminalUpdates_ShouldNotConsumeStaleContinuation()
     {

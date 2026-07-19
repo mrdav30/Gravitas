@@ -124,39 +124,54 @@ public sealed partial class GravitasPhysics2DService
         int readIndex = 0;
         int iterations = 0;
         bool processed = false;
-        while (readIndex < _continuousCollisionHandoffQueue.Count && iterations < iterationBudget)
+        bool completed = false;
+        bool limitReached = false;
+        try
         {
-            SolidBody2D body = _continuousCollisionHandoffQueue[readIndex++];
-            // Consumption can synchronously return work to this body; dequeue ends dedupe ownership first.
-            _queuedContinuousCollisionHandoffBodies.Remove(body);
-
-            if (body.TryConsumeContinuousCollisionHandoff(updateSleepState: false, updateColliderState: false))
+            while (readIndex < _continuousCollisionHandoffQueue.Count && iterations < iterationBudget)
             {
-                processed = true;
-                iterations++;
+                SolidBody2D body = _continuousCollisionHandoffQueue[readIndex++];
+                // Consumption can synchronously return work to this body; dequeue ends dedupe ownership first.
+                _queuedContinuousCollisionHandoffBodies.Remove(body);
+
+                if (body.TryConsumeContinuousCollisionHandoff(updateSleepState: false, updateColliderState: false))
+                {
+                    processed = true;
+                    iterations++;
+                }
             }
+
+            limitReached = readIndex < _continuousCollisionHandoffQueue.Count;
+            completed = true;
+            return iterations;
         }
+        finally
+        {
+            if (processed)
+                LastContinuousCollisionIslandCount++;
 
-        if (processed)
-            LastContinuousCollisionIslandCount++;
-
-        LastContinuousCollisionIslandIterationCount += iterations;
-        bool limitReached = readIndex < _continuousCollisionHandoffQueue.Count;
-        LastContinuousCollisionIslandLimitReached |= limitReached;
-        if (limitReached)
-            DiscardContinuousCollisionHandoffQueue();
-        else
-            ClearContinuousCollisionHandoffQueue();
-        return iterations;
+            LastContinuousCollisionIslandIterationCount += iterations;
+            LastContinuousCollisionIslandLimitReached |= completed && limitReached;
+            if (!completed || limitReached)
+                DiscardContinuousCollisionHandoffQueue();
+            else
+                ClearContinuousCollisionHandoffQueue();
+        }
     }
 
     private void BeginContinuousCollisionHandoffFrame()
     {
         _processedContinuousCollisionBodies.Clear();
-        ClearContinuousCollisionHandoffQueue();
+        DiscardContinuousCollisionHandoffQueue();
         LastContinuousCollisionIslandCount = 0;
         LastContinuousCollisionIslandIterationCount = 0;
         LastContinuousCollisionIslandLimitReached = false;
+    }
+
+    internal void AbortContinuousCollisionHandoffFrame()
+    {
+        _processedContinuousCollisionBodies.Clear();
+        DiscardContinuousCollisionHandoffQueue();
     }
 
     private void ClearContinuousCollisionHandoffQueue()

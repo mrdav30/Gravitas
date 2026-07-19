@@ -359,33 +359,44 @@ public sealed class GravitasWorldContext : IDisposable
         if (!runs3D && !runs2D)
             return;
 
-        int iterationLimit = Settings.ContinuousCollisionMaxToiIterations;
-        int remainingIterations = iterationLimit;
-        for (int iteration = 0; iteration < iterationLimit && remainingIterations > 0; iteration++)
+        try
         {
-            int processedIterations = 0;
+            int iterationLimit = Settings.ContinuousCollisionMaxToiIterations;
+            int remainingIterations = iterationLimit;
+            for (int iteration = 0; iteration < iterationLimit && remainingIterations > 0; iteration++)
+            {
+                int processedIterations = 0;
+                if (runs3D)
+                {
+                    int usedIterations = Physics.ProcessQueuedContinuousCollisionHandoffs(remainingIterations);
+                    processedIterations += usedIterations;
+                    remainingIterations -= usedIterations;
+                }
+
+                if (remainingIterations > 0 && runs2D)
+                {
+                    int usedIterations = Physics2D.ProcessQueuedContinuousCollisionHandoffs(remainingIterations);
+                    processedIterations += usedIterations;
+                    remainingIterations -= usedIterations;
+                }
+
+                if (processedIterations == 0)
+                    return;
+            }
+
             if (runs3D)
-            {
-                int usedIterations = Physics.ProcessQueuedContinuousCollisionHandoffs(remainingIterations);
-                processedIterations += usedIterations;
-                remainingIterations -= usedIterations;
-            }
-
-            if (remainingIterations > 0 && runs2D)
-            {
-                int usedIterations = Physics2D.ProcessQueuedContinuousCollisionHandoffs(remainingIterations);
-                processedIterations += usedIterations;
-                remainingIterations -= usedIterations;
-            }
-
-            if (processedIterations == 0)
-                return;
+                Physics.ProcessQueuedContinuousCollisionHandoffs(iterationBudget: 0);
+            if (runs2D)
+                Physics2D.ProcessQueuedContinuousCollisionHandoffs(iterationBudget: 0);
         }
-
-        if (runs3D)
-            Physics.ProcessQueuedContinuousCollisionHandoffs(iterationBudget: 0);
-        if (runs2D)
-            Physics2D.ProcessQueuedContinuousCollisionHandoffs(iterationBudget: 0);
+        catch
+        {
+            if (runs3D)
+                Physics.AbortContinuousCollisionHandoffFrame();
+            if (runs2D)
+                Physics2D.AbortContinuousCollisionHandoffFrame();
+            throw;
+        }
     }
 
     internal void AdvanceLateSimulateToken() => _lateSimulateToken++;

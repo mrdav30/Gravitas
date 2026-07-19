@@ -2,12 +2,53 @@ using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Tests.Support;
+using System;
 using Xunit;
 
 namespace Gravitas.Tests.CollisionHandlingTests;
 
 public sealed partial class ContinuousCollisionDetectionTests
 {
+    [Fact]
+    public void ContinuousHandoff_WhenMovementCallbackRequeuesAndThrows_ShouldCloseBatch()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        ScenarioBody<LSSphereCollider> throwing = scenario.CreateSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> unread = scenario.CreateSphere(Vector3d.Up * (Fixed64)8);
+        DisableGroundQueries(throwing.Body);
+        DisableGroundQueries(unread.Body);
+        scenario.Context.Physics.BeginLateSimulateBodies(continuousCollisionFramePrepared: false).Should().BeTrue();
+
+        throwing.Body.ApplyContinuousCollisionHandoff(Vector3d.Zero, Vector3d.Right, Fixed64.Half);
+        unread.Body.ApplyContinuousCollisionHandoff(unread.Body.Position3d, Vector3d.Right, Fixed64.Half);
+        var expected = new InvalidOperationException("movement callback failure");
+        throwing.Body.OnMoved += () =>
+        {
+            throwing.Body.ApplyContinuousCollisionHandoff(
+                throwing.Body.Position3d,
+                Vector3d.Right,
+                Fixed64.Half);
+            throw expected;
+        };
+
+        Action process = () => scenario.Context.Physics.ProcessQueuedContinuousCollisionHandoffs(iterationBudget: 4);
+
+        process.Should().Throw<InvalidOperationException>().Which.Should().BeSameAs(expected);
+        scenario.Context.Physics.LastContinuousCollisionIslandCount.Should().Be(1);
+        scenario.Context.Physics.LastContinuousCollisionIslandIterationCount.Should().Be(1);
+        scenario.Context.Physics.LastContinuousCollisionIslandLimitReached.Should().BeFalse();
+
+        throwing.Body.OnMoved = null;
+        scenario.Context.Physics.ProcessQueuedContinuousCollisionHandoffs(iterationBudget: 4).Should().Be(0);
+        throwing.Body.TryConsumeContinuousCollisionHandoff(false, false).Should().BeFalse();
+        unread.Body.TryConsumeContinuousCollisionHandoff(false, false).Should().BeFalse();
+
+        var replayHash = scenario.Context.ComputeReplayHash();
+        throwing.Body.DiscardContinuousCollisionHandoff();
+        unread.Body.DiscardContinuousCollisionHandoff();
+        scenario.Context.ComputeReplayHash().Should().Be(replayHash);
+    }
+
     [Fact]
     public void ContinuousHandoff_WhenQueuedStateIsSupersededByTerminalUpdates_ShouldNotConsumeStaleContinuation()
     {

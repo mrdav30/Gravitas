@@ -559,7 +559,8 @@ public partial class SolidBody : IRecordable
     public LSCollider Collider { get; private set; } = null!;
 
     /// <summary>
-    /// Called after visual position/rotation updated
+    /// Called after authoritative position or rotation changes have been
+    /// committed during simulation.
     /// </summary>
     public Action? OnMoved;
 

@@ -46,40 +46,13 @@ records follow with their original discovery context.
 ### Ordered Queue
 
 1. **Gravitas:**
-   [3D CCD Handoff Callback Failure Can Abandon Queue Cleanup](#3d-ccd-handoff-callback-failure-can-abandon-queue-cleanup).
-2. **Gravitas:**
    [Rotational CCD Omits Dynamic And Mixed Targets](#rotational-ccd-omits-dynamic-and-mixed-targets).
-3. **FixedMathSharp then Gravitas:**
+2. **FixedMathSharp then Gravitas:**
    [Finite-Axis Capsule, Cylinder, And Mesh-Edge Projections Can Saturate Before Solving](#finite-axis-capsule-cylinder-and-mesh-edge-projections-can-saturate-before-solving).
-4. **FixedMathSharp:**
+3. **FixedMathSharp:**
    [Sphere Construction And Merge Paths Are Not Full-Domain](#sphere-construction-and-merge-paths-are-not-full-domain).
-5. **Gravitas:**
+4. **Gravitas:**
    [Conic Query Quadratics Can Saturate Before Solving](#conic-query-quadratics-can-saturate-before-solving).
-
-### 3D CCD Handoff Callback Failure Can Abandon Queue Cleanup
-
-**Discovered:** 2026-07-18  
-**Source:** same-frame CCD handoff dedupe final lifecycle review  
-**Affected area:** queued 3D handoff consumption, `SolidBody.OnMoved`, mixed
-handoffs into 3D bodies, budget counters, and replay continuity
-
-`SolidBody.TryConsumeContinuousCollisionHandoff(...)` invokes the public
-`OnMoved` delegate after consuming body-local handoff state. If that delegate
-throws while the service drains its queue, control leaves
-`ProcessQueuedContinuousCollisionHandoffs(...)` before the service updates its
-counters or clears/discards unread entries. Starting another frame clears queue
-ownership without discarding those other bodies' pending handoffs, leaving
-old-token state visible to authoritative replay hashing. Pure 2D consumption
-does not invoke an equivalent delegate, but mixed routing can enqueue the
-affected 3D path.
-
-Resolve this against the callback-failure paradigm established for contact
-notifications: preserve the original host exception while deterministically
-closing service ownership and discarding work that cannot finish in the aborted
-step. Add a real multi-entry queue regression where the first consumed body's
-`OnMoved` throws and prove unread and requeued states are neither directly
-consumable nor replay-visible afterward. Keep the successful drain
-allocation-free and define counter behavior for the partially completed batch.
 
 ### Rotational CCD Omits Dynamic And Mixed Targets
 
@@ -166,6 +139,36 @@ rejection with second-root admission, starts inside, and authored endpoint
 contact. Keep it allocation-free and benchmark the query hot path.
 
 ## Resolved Issues
+
+### 3D CCD Handoff Callback Failure Could Abandon Queue Cleanup
+
+**Resolved:** 2026-07-18  
+**Source:** same-frame CCD handoff dedupe final lifecycle review  
+**Affected area:** queued 3D/2D handoff consumption, `SolidBody.OnMoved`, mixed
+handoff coordination, budget counters, and replay continuity
+
+RCA: queued 3D consumption invoked the public movement callback before the
+service recorded the completed iteration or closed its queue. A callback could
+requeue the same body and throw, leaving that continuation plus unread bodies
+pending and replay-visible. A 3D exception also skipped cleanup of an already
+prepared 2D queue. Both services merely cleared stale queue ownership at the
+next frame boundary without discarding body-local tokens.
+
+Fix: queued 3D consumption now commits body state and service iteration
+bookkeeping before invoking host code. Both dimensional drains finalize in
+`finally`: successful batches clear ownership, while callback/internal failures
+and exhausted budgets discard every unread or requeued body continuation. The
+world-context coordinator aborts both prepared dimensional batches while
+rethrowing the original exception, and the next-frame boundary defensively
+discards rather than merely forgetting stale work. `OnMoved` now documents its
+authoritative simulation timing.
+
+Regression coverage proves the exact exception instance escapes, partially
+completed counters remain deterministic, same-callback requeues and unread
+bodies are neither consumable nor replay-visible, 2D internal failures receive
+the same cleanup contract, and a 3D failure aborts a prepared 2D batch. All 51
+handoff-focused tests and three relevant warmed allocation guards pass. Full
+validation passes 2,793 Release and 2,754 ReleaseLean tests.
 
 ### Full-Domain Radial Bounds And Query Intervals Were Incomplete
 

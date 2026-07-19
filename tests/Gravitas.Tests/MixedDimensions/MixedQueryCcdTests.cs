@@ -4786,6 +4786,7 @@ public sealed class MixedQueryCcdTests
         middle2D.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
         receiver2D.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
         driver2D.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+
         middle3D.Body.Sleep();
         receiver3D.Body.Sleep();
         middle2D.Sleep();
@@ -4801,6 +4802,63 @@ public sealed class MixedQueryCcdTests
         context.Physics.LastContinuousCollisionIslandLimitReached.Should().BeTrue();
         context.Physics2D.LastContinuousCollisionIslandIterationCount.Should().Be(0);
         context.Physics2D.LastContinuousCollisionIslandLimitReached.Should().BeTrue();
+    }
+
+    [Fact]
+    public void LateSimulate_When3DHandoffCallbackThrows_ShouldAbortPrepared2DQueue()
+    {
+        using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
+        context.Environment.Gravity = Fixed64.Zero;
+        context.Settings.ContinuousCollisionMaxToiIterations = 4;
+        Fixed64 lane3D = (Fixed64)(-4);
+        Fixed64 lane2D = (Fixed64)4;
+
+        ScenarioBody<LSSphereCollider> middle3D = CreateSphere3D(
+            context,
+            new Vector3d(Fixed64.Zero, Fixed64.Zero, lane3D));
+        ScenarioBody<LSSphereCollider> receiver3D = CreateSphere3D(
+            context,
+            new Vector3d((Fixed64)2, Fixed64.Zero, lane3D));
+        ScenarioBody<LSSphereCollider> driver3D = CreateSphere3D(
+            context,
+            new Vector3d((Fixed64)(-5), Fixed64.Zero, lane3D));
+        SolidBody2D middle2D = CreateCircle2D(context, new Vector2d(Fixed64.Zero, lane2D));
+        SolidBody2D receiver2D = CreateCircle2D(context, new Vector2d((Fixed64)2, lane2D));
+        SolidBody2D driver2D = CreateCircle2D(context, new Vector2d((Fixed64)(-5), lane2D));
+
+        middle3D.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        receiver3D.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        driver3D.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        middle2D.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        receiver2D.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        driver2D.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        middle3D.Body.Sleep();
+        receiver3D.Body.Sleep();
+        middle2D.Sleep();
+        receiver2D.Sleep();
+
+        var expected = new InvalidOperationException("3D movement callback failure");
+        middle3D.Body.OnMoved += () =>
+        {
+            if (middle3D.Body.LinearVelocity.X > Fixed64.Zero)
+                throw expected;
+        };
+        driver3D.Body.AddForce(Vector3d.Right * (Fixed64)10);
+        driver2D.AddForce(Vector2d.Right * (Fixed64)10);
+
+        Exception? thrown = Record.Exception(context.LateSimulate);
+
+        thrown.Should().BeSameAs(expected);
+        context.Physics.LastContinuousCollisionIslandCount.Should().Be(1);
+        context.Physics.LastContinuousCollisionIslandIterationCount.Should().Be(1);
+        context.Physics.LastContinuousCollisionIslandLimitReached.Should().BeFalse();
+        context.Physics2D.LastContinuousCollisionIslandCount.Should().Be(0);
+        context.Physics2D.LastContinuousCollisionIslandIterationCount.Should().Be(0);
+        context.Physics2D.LastContinuousCollisionIslandLimitReached.Should().BeFalse();
+        context.Physics.ProcessQueuedContinuousCollisionHandoffs(iterationBudget: 4).Should().Be(0);
+        context.Physics2D.ProcessQueuedContinuousCollisionHandoffs(iterationBudget: 4).Should().Be(0);
+        middle3D.Body.TryConsumeContinuousCollisionHandoff(false, false).Should().BeFalse();
+        middle2D.TryConsumeContinuousCollisionHandoff(false, false).Should().BeFalse();
     }
 
     [Fact]
