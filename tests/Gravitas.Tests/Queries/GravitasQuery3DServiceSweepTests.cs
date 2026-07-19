@@ -2177,6 +2177,28 @@ public sealed class GravitasQuery3DServiceSweepTests
     }
 
     [Fact]
+    public void SweptSphereWorker_WithExtremeRangeSphereCrossing_ShouldPreserveEntryDistance()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSSphereCollider target = CreateDynamicCollider(context, new LSSphereCollider(), Vector3d.Zero);
+        var worker = new SweptSphereQueryWorker();
+        Vector3d start = new((Fixed64)(-100_000), Fixed64.Half, Fixed64.Zero);
+        Vector3d end = new((Fixed64)100_000, Fixed64.Half, Fixed64.Zero);
+        Fixed64 sourceRadius = Fixed64.Half;
+        Fixed64 combinedRadius = target.ScaledRadius + sourceRadius;
+        Fixed64 expectedOffset = FixedMath.Sqrt(
+            combinedRadius * combinedRadius - Fixed64.Half * Fixed64.Half);
+        Fixed64 expectedDistance = (Fixed64)100_000 - expectedOffset;
+        worker.Prepare(start, end, sourceRadius);
+
+        bool hit = worker.TrySweep(target, out Vector3d centerAtImpact, out Fixed64 distance);
+
+        hit.Should().BeTrue();
+        distance.Should().Be(expectedDistance);
+        centerAtImpact.Should().Be(new Vector3d(-expectedOffset, Fixed64.Half, Fixed64.Zero));
+    }
+
+    [Fact]
     public void SweptSphereWorker_WithBroadOverlapExactMisses_ShouldDefaultCapsuleMeshAndCompoundOutputs()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();

@@ -54,6 +54,7 @@ public sealed partial class GravitasQueryMixedService
 
     private static bool TrySweepSphereAgainst2DCandidate(
         Vector3d start,
+        Vector3d end,
         Vector3d direction,
         Fixed64 length,
         Fixed64 radius,
@@ -78,7 +79,7 @@ public sealed partial class GravitasQueryMixedService
             reducerCounters.RecordAttempt(reducerKind);
         }
 
-        if (!TrySweepSphereAgainst2D(start, direction, length, radius, collider, out candidate))
+        if (!TrySweepSphereAgainst2D(start, end, direction, length, radius, collider, out candidate))
         {
             if (captureReducerDiagnostics)
                 reducerCounters.RecordRejected(reducerKind);
@@ -93,6 +94,7 @@ public sealed partial class GravitasQueryMixedService
     private bool TrySweepCircleAgainst3DCandidate(
         LSCollider collider,
         Vector2d start,
+        Vector2d end,
         Vector2d direction2D,
         Fixed64 length,
         Fixed64 radius,
@@ -122,6 +124,7 @@ public sealed partial class GravitasQueryMixedService
         if (!TrySweepCircleAgainst3DCollider(
             collider,
             start,
+            end,
             direction2D,
             length,
             radius,

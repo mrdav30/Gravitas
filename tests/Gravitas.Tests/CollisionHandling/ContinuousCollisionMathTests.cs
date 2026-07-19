@@ -395,6 +395,187 @@ public sealed class ContinuousCollisionMathTests
     }
 
     [Fact]
+    public void TrySweepRelativeRadialBounds_ShouldAdmitExactFrameEndpointContactInBothDimensions()
+    {
+        bool sphereHit = ContinuousCollisionMath.TrySweepRelativeSpheres(
+            Vector3d.Zero,
+            new Vector3d(Fixed64.One, Fixed64.Half, Fixed64.Zero),
+            Fixed64.Half,
+            new Vector3d((Fixed64)2, Fixed64.Half, Fixed64.Zero),
+            Vector3d.Zero,
+            Fixed64.Half,
+            out Fixed64 sphereTime,
+            out Vector3d sphereNormal,
+            out Fixed64 sphereClosingSpeed);
+        bool circleHit = ContinuousCollisionMath.TrySweepRelativeCircles(
+            Vector2d.Zero,
+            new Vector2d(Fixed64.One, Fixed64.Half),
+            Fixed64.Half,
+            new Vector2d((Fixed64)2, Fixed64.Half),
+            Vector2d.Zero,
+            Fixed64.Half,
+            out Fixed64 circleTime,
+            out Vector2d circleNormal,
+            out Fixed64 circleClosingSpeed);
+
+        sphereHit.Should().BeTrue();
+        sphereTime.Should().Be(Fixed64.One);
+        sphereNormal.Should().Be(Vector3d.Left);
+        sphereClosingSpeed.Should().Be(Fixed64.One);
+        circleHit.Should().BeTrue();
+        circleTime.Should().Be(Fixed64.One);
+        circleNormal.Should().Be(Vector2d.Left);
+        circleClosingSpeed.Should().Be(Fixed64.One);
+    }
+
+    [Fact]
+    public void TrySweepRelativeSpheres_ShouldOrderExtremeRangeCrossingWithoutQuadraticSaturation()
+    {
+        bool hit = ContinuousCollisionMath.TrySweepRelativeSpheres(
+            new Vector3d((Fixed64)(-100_000), Fixed64.Zero, Fixed64.Zero),
+            new Vector3d((Fixed64)100_000, Fixed64.Zero, Fixed64.Zero),
+            Fixed64.Half,
+            Vector3d.Zero,
+            new Vector3d((Fixed64)(-100_000), Fixed64.Zero, Fixed64.Zero),
+            Fixed64.Half,
+            out Fixed64 normalizedTime,
+            out Vector3d normal,
+            out Fixed64 closingSpeed);
+
+        hit.Should().BeTrue();
+        normalizedTime.Should().Be(Fixed64.FromFraction(99_999, 200_000));
+        normal.Should().Be(Vector3d.Left);
+        closingSpeed.Should().Be((Fixed64)200_000);
+    }
+
+    [Fact]
+    public void TrySweepRelativeCircles_ShouldOrderExtremeRangeCrossingWithoutQuadraticSaturation()
+    {
+        bool hit = ContinuousCollisionMath.TrySweepRelativeCircles(
+            new Vector2d((Fixed64)(-100_000), Fixed64.Zero),
+            new Vector2d((Fixed64)100_000, Fixed64.Zero),
+            Fixed64.Half,
+            Vector2d.Zero,
+            new Vector2d((Fixed64)(-100_000), Fixed64.Zero),
+            Fixed64.Half,
+            out Fixed64 normalizedTime,
+            out Vector2d normal,
+            out Fixed64 closingSpeed);
+
+        hit.Should().BeTrue();
+        normalizedTime.Should().Be(Fixed64.FromFraction(99_999, 200_000));
+        normal.Should().Be(Vector2d.Left);
+        closingSpeed.Should().Be((Fixed64)200_000);
+    }
+
+    [Fact]
+    public void TrySweepRelativeSpheres_ShouldPreserveUnrepresentableCenterDifferenceAndRadiusSum()
+    {
+        bool crossing = ContinuousCollisionMath.TrySweepRelativeSpheres(
+            new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero),
+            new Vector3d(-Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero),
+            Fixed64.Half,
+            new Vector3d(-Fixed64.One, Fixed64.Zero, Fixed64.Zero),
+            Vector3d.Zero,
+            Fixed64.Half,
+            out Fixed64 crossingTime,
+            out Vector3d crossingNormal,
+            out Fixed64 crossingSpeed);
+        bool overlapping = ContinuousCollisionMath.TrySweepRelativeSpheres(
+            new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero),
+            Vector3d.Left,
+            Fixed64.One,
+            new Vector3d(-Fixed64.One, Fixed64.Zero, Fixed64.Zero),
+            Vector3d.Zero,
+            Fixed64.MaxValue,
+            out Fixed64 overlapTime,
+            out Vector3d overlapNormal,
+            out Fixed64 overlapSpeed);
+
+        crossing.Should().BeTrue();
+        crossingTime.Should().Be(Fixed64.One);
+        crossingNormal.Should().Be(Vector3d.Right);
+        crossingSpeed.Should().Be(Fixed64.MaxValue);
+        overlapping.Should().BeTrue();
+        overlapTime.Should().Be(Fixed64.Zero);
+        overlapNormal.Should().Be(Vector3d.Right);
+        overlapSpeed.Should().Be(Fixed64.One);
+    }
+
+    [Fact]
+    public void TrySweepRelativeCircles_ShouldPreserveUnrepresentableCenterDifferenceAndRadiusSum()
+    {
+        bool crossing = ContinuousCollisionMath.TrySweepRelativeCircles(
+            new Vector2d(Fixed64.MaxValue, Fixed64.Zero),
+            new Vector2d(-Fixed64.MaxValue, Fixed64.Zero),
+            Fixed64.Half,
+            new Vector2d(-Fixed64.One, Fixed64.Zero),
+            Vector2d.Zero,
+            Fixed64.Half,
+            out Fixed64 crossingTime,
+            out Vector2d crossingNormal,
+            out Fixed64 crossingSpeed);
+        bool overlapping = ContinuousCollisionMath.TrySweepRelativeCircles(
+            new Vector2d(Fixed64.MaxValue, Fixed64.Zero),
+            Vector2d.Left,
+            Fixed64.One,
+            new Vector2d(-Fixed64.One, Fixed64.Zero),
+            Vector2d.Zero,
+            Fixed64.MaxValue,
+            out Fixed64 overlapTime,
+            out Vector2d overlapNormal,
+            out Fixed64 overlapSpeed);
+
+        crossing.Should().BeTrue();
+        crossingTime.Should().Be(Fixed64.One);
+        crossingNormal.Should().Be(Vector2d.Right);
+        crossingSpeed.Should().Be(Fixed64.MaxValue);
+        overlapping.Should().BeTrue();
+        overlapTime.Should().Be(Fixed64.Zero);
+        overlapNormal.Should().Be(Vector2d.Right);
+        overlapSpeed.Should().Be(Fixed64.One);
+    }
+
+    [Fact]
+    public void TrySweepRelativeRadialBounds_ShouldRejectUnrepresentableEndpointSeparationInBothDimensions()
+    {
+        Vector2d far2D = new(Fixed64.MaxValue, Fixed64.MaxValue);
+        Vector2d target2D = new(Fixed64.MinValue, Fixed64.MinValue);
+        Vector3d far3D = new(Fixed64.MaxValue, Fixed64.MaxValue, Fixed64.MaxValue);
+        Vector3d target3D = new(Fixed64.MinValue, Fixed64.MinValue, Fixed64.MinValue);
+
+        bool sphereHit = ContinuousCollisionMath.TrySweepRelativeSpheres(
+            far3D,
+            Vector3d.Left,
+            Fixed64.Half,
+            target3D,
+            Vector3d.Zero,
+            Fixed64.Half,
+            out Fixed64 sphereTime,
+            out Vector3d sphereNormal,
+            out Fixed64 sphereClosingSpeed);
+        bool circleHit = ContinuousCollisionMath.TrySweepRelativeCircles(
+            far2D,
+            Vector2d.Left,
+            Fixed64.Half,
+            target2D,
+            Vector2d.Zero,
+            Fixed64.Half,
+            out Fixed64 circleTime,
+            out Vector2d circleNormal,
+            out Fixed64 circleClosingSpeed);
+
+        sphereHit.Should().BeFalse();
+        sphereTime.Should().Be(Fixed64.Zero);
+        sphereNormal.Should().Be(Vector3d.Zero);
+        sphereClosingSpeed.Should().Be(Fixed64.Zero);
+        circleHit.Should().BeFalse();
+        circleTime.Should().Be(Fixed64.Zero);
+        circleNormal.Should().Be(Vector2d.Zero);
+        circleClosingSpeed.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
     public void ResolveContactPointOnTarget_ShouldPreferNormalThenCenterDeltaThenTargetCenter()
     {
         Vector3d targetCenter = new((Fixed64)4, (Fixed64)5, (Fixed64)6);
@@ -621,5 +802,57 @@ public sealed class ContinuousCollisionMathTests
 
         sweepSpheres.Should().Throw<ArgumentOutOfRangeException>();
         sweepCircles.Should().Throw<ArgumentOutOfRangeException>();
+    }
+
+    [Fact]
+    public void RelativeSweepEntryPoints_ShouldRejectUnrepresentableWorldEndpoints()
+    {
+        Fixed64 sourceStart = Fixed64.MaxValue - Fixed64.Half;
+        Fixed64 quarter = Fixed64.One / (Fixed64)4;
+        Action sweepSpheres = () => ContinuousCollisionMath.TrySweepRelativeSpheres(
+            new Vector3d(sourceStart, Fixed64.Zero, Fixed64.Zero),
+            Vector3d.Right,
+            quarter,
+            new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero),
+            Vector3d.Zero,
+            quarter,
+            out _,
+            out _,
+            out _);
+        Action sweepCircles = () => ContinuousCollisionMath.TrySweepRelativeCircles(
+            new Vector2d(sourceStart, Fixed64.Zero),
+            Vector2d.Right,
+            quarter,
+            new Vector2d(Fixed64.MaxValue, Fixed64.Zero),
+            Vector2d.Zero,
+            quarter,
+            out _,
+            out _,
+            out _);
+        Action missSpheres = () => ContinuousCollisionMath.TrySweepRelativeSpheres(
+            new Vector3d(sourceStart, Fixed64.Zero, Fixed64.Zero),
+            Vector3d.Right,
+            quarter,
+            new Vector3d(sourceStart, (Fixed64)10, Fixed64.Zero),
+            Vector3d.Zero,
+            quarter,
+            out _,
+            out _,
+            out _);
+        Action missCircles = () => ContinuousCollisionMath.TrySweepRelativeCircles(
+            new Vector2d(sourceStart, Fixed64.Zero),
+            Vector2d.Right,
+            quarter,
+            new Vector2d(sourceStart, (Fixed64)10),
+            Vector2d.Zero,
+            quarter,
+            out _,
+            out _,
+            out _);
+
+        sweepSpheres.Should().Throw<ArgumentOutOfRangeException>();
+        sweepCircles.Should().Throw<ArgumentOutOfRangeException>();
+        missSpheres.Should().Throw<ArgumentOutOfRangeException>();
+        missCircles.Should().Throw<ArgumentOutOfRangeException>();
     }
 }

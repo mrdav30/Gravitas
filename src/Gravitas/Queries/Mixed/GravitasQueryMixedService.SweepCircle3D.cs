@@ -149,6 +149,7 @@ public sealed partial class GravitasQueryMixedService
             if (!TrySweepCircleAgainst3DCandidate(
                 _candidates3D[i],
                 start,
+                end,
                 direction2D,
                 length,
                 radius,
@@ -237,6 +238,7 @@ public sealed partial class GravitasQueryMixedService
             if (!TrySweepCircleAgainst3DCandidate(
                 _candidates3D[i],
                 start,
+                end,
                 direction2D,
                 length,
                 radius,

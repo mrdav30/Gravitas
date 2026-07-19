@@ -598,6 +598,32 @@ public sealed class Physics2DQueryTests
     }
 
     [Fact]
+    public void SweepCircle_WithExtremeRangeCircleCrossing_ShouldPreserveEntryDistance()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        SolidBody2D target = CreateCircle(context, Vector2d.Zero);
+        var targetCircle = (LSCircleCollider2D)target.Collider;
+        Vector2d start = new((Fixed64)(-100_000), Fixed64.Half);
+        Vector2d end = new((Fixed64)100_000, Fixed64.Half);
+        Fixed64 sourceRadius = Fixed64.Half;
+        Fixed64 combinedRadius = targetCircle.ScaledRadius + sourceRadius;
+        Fixed64 expectedOffset = FixedMath.Sqrt(
+            combinedRadius * combinedRadius - Fixed64.Half * Fixed64.Half);
+        Fixed64 expectedDistance = (Fixed64)100_000 - expectedOffset;
+
+        bool hit = QueryDetection2D.TrySweepCircle(
+            start,
+            end,
+            sourceRadius,
+            target.Collider,
+            out Physics2DHit sweepHit);
+
+        hit.Should().BeTrue();
+        sweepHit.Distance.Should().Be(expectedDistance);
+        sweepHit.Normal.Should().Be(new Vector2d(-expectedOffset, Fixed64.Half).Normalized);
+    }
+
+    [Fact]
     public void SweepCircle_WithUnrepresentableSegmentLength_ShouldReject()
     {
         using GravitasWorldContext context = Create2DContext();
@@ -1632,6 +1658,26 @@ public sealed class Physics2DQueryTests
         sweepHit.Distance.Should().Be((Fixed64)2);
         sweepHit.Point.Should().Be(-Vector2d.Right * Fixed64.Half);
         sweepHit.Normal.Should().Be(-Vector2d.Right);
+    }
+
+    [Fact]
+    public void Raycast_WithRoundedEndpointOnDegenerateCapsule_ShouldPreserveAuthoredContact()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        SolidBody2D capsule = CreateCapsule(context, Vector2d.Zero, Fixed64.Half, Fixed64.One);
+        Vector2d direction = new Vector2d(
+            Fixed64.One,
+            Fixed64.FromFraction(1, 65536)).Normalized;
+        Vector2d start = -direction * Fixed64.FromFraction(3, 2);
+        Vector2d end = -direction * Fixed64.Half;
+
+        bool hit = QueryDetection2D.TryRaycast(start, end, capsule.Collider, out Physics2DHit rayHit);
+
+        hit.Should().BeTrue();
+        rayHit.Collider.Should().BeSameAs(capsule.Collider);
+        rayHit.Distance.Should().Be(Fixed64.One);
+        Vector2d.TryGetDistance(rayHit.Point, Vector2d.Zero, out Fixed64 contactDistance).Should().BeTrue();
+        contactDistance.Should().Be(Fixed64.Half);
     }
 
     [Fact]

@@ -105,6 +105,74 @@ public sealed class MixedQueryCcdTests
     }
 
     [Fact]
+    public void SweepCircleAgainst3D_WithExtremeRangeSphereCrossing_ShouldPreserveEntryDistance()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        LSCollider target3D = CreateBodyless3D(context, new LSSphereCollider(), Vector3d.Zero);
+        Fixed64 extent = (Fixed64)50_000;
+        Fixed64 expectedDistance = extent - Fixed64.One;
+
+        bool circleHit = context.QueryMixed.SweepCircleAgainst3D(
+            new Vector2d(-extent, Fixed64.Zero),
+            Vector2d.Zero,
+            Fixed64.Half,
+            Fixed64.Zero,
+            Fixed64.Half,
+            IncludeLayerZero,
+            out PhysicsMixedHit circleResult);
+
+        circleHit.Should().BeTrue();
+        circleResult.Collider3D.Should().BeSameAs(target3D);
+        circleResult.Distance.Should().Be(expectedDistance);
+        circleResult.ReducerKind.Should().Be(PhysicsQueryReducerKind.Exact);
+    }
+
+    [Fact]
+    public void RadialMixedSweeps_WithRoundedEndpointContact_ShouldPreserveBothDirections()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        LSCollider target3D = CreateBodyless3D(context, new LSSphereCollider(), Vector3d.Zero);
+        LSCollider2D target2D = CreateBodylessCapsule2D(context, Vector2d.Zero);
+        Vector2d direction2D = new Vector2d(
+            Fixed64.One,
+            Fixed64.FromFraction(1, 65536)).Normalized;
+        Vector2d capDirection2D = new Vector2d(
+            Fixed64.FromFraction(1, 65536),
+            Fixed64.One).Normalized;
+        Vector3d capDirection3D = new(capDirection2D.X, Fixed64.Zero, capDirection2D.Y);
+        Vector2d capCenter2D = ((LSCapsuleCollider2D)target2D).SegmentStart;
+        Vector3d capCenter3D = new(capCenter2D.X, Fixed64.Zero, capCenter2D.Y);
+        Vector3d sphereEnd = capCenter3D - capDirection3D;
+
+        bool circleHit = context.QueryMixed.SweepCircleAgainst3D(
+            -direction2D * (Fixed64)2,
+            -direction2D,
+            Fixed64.Half,
+            Fixed64.Zero,
+            Fixed64.Half,
+            IncludeLayerZero,
+            out PhysicsMixedHit circleResult);
+        bool sphereHit = context.QueryMixed.SweepSphereAgainst2D(
+            capCenter3D - capDirection3D * (Fixed64)2,
+            sphereEnd,
+            Fixed64.Half,
+            IncludeLayerZero,
+            out PhysicsMixedHit sphereResult);
+
+        circleHit.Should().BeTrue();
+        circleResult.Collider3D.Should().BeSameAs(target3D);
+        circleResult.Distance.Should().Be(Fixed64.One);
+        circleResult.ReducerKind.Should().Be(PhysicsQueryReducerKind.Exact);
+        sphereHit.Should().BeTrue();
+        sphereResult.Collider2D.Should().BeSameAs(target2D);
+        sphereResult.Distance.Should().Be(Fixed64.One);
+        sphereResult.ReducerKind.Should().Be(PhysicsQueryReducerKind.Exact);
+        Vector3d expectedContact = sphereEnd + capDirection3D * Fixed64.Half;
+        sphereResult.Point3D.Should().Be(expectedContact);
+        sphereResult.Point2D.Should().Be(expectedContact);
+    }
+
+    [Fact]
     public void MixedSweeps_WithComponentOverflow_ShouldRejectBeforeCandidateCollection()
     {
         using GravitasWorldContext context = CreateMixedContext();
@@ -3750,15 +3818,15 @@ public sealed class MixedQueryCcdTests
         source.Body.LastContinuousCollisionToiIterationCount.Should().Be(1);
         source.Body.LastContinuousCollisionToiIterationLimitReached.Should().BeFalse();
         source.Body.Position3d.Should().Be(new Vector3d(
-            Fixed64.FromRaw(-4_294_966_397),
+            Fixed64.FromRaw(-4_294_965_629),
             Fixed64.Zero,
             -smallOffset * (Fixed64)3));
         source.Body.LinearVelocity.Should().Be(new Vector3d(
-            Fixed64.FromRaw(1_792),
+            Fixed64.FromRaw(3_584),
             Fixed64.Zero,
-            -smallOffset * (Fixed64)7));
+            Fixed64.FromRaw(-7_340_031)));
         target.Position.Should().Be(new Vector2d(Fixed64.Zero, smallOffset * (Fixed64)4));
-        target.LinearVelocity.Should().Be(Vector2d.Forward * (smallOffset * (Fixed64)7));
+        target.LinearVelocity.Should().Be(new Vector2d(Fixed64.Zero, Fixed64.FromRaw(7_340_031)));
     }
 
     [Fact]

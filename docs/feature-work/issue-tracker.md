@@ -28,9 +28,10 @@ records follow with their original discovery context.
   projects when transitive resolution is insufficient.
 - Treat local links as unstaged validation scaffolding. Do not publish or
   release with them in place.
-- FixedMathSharp foundation hardening is complete and committed. Its final
-  artifact reports 100% line, branch, and method coverage, with 1,406 standard
-  and 1,385 Lean tests passing. Release FixedMathSharp, then restore its package
+- FixedMathSharp foundation hardening is complete. The current locally linked
+  radial extension also reports 100% line, branch, and method coverage, with
+  1,432 standard and 1,411 Lean tests passing. Close the remaining radial
+  interval item before releasing FixedMathSharp, then restore its package
   references and validate/release SwiftCollections.
 - SwiftCollections has no library-specific active issue at this checkpoint; its
   place in the sequence is a full downstream compatibility and release gate.
@@ -43,34 +44,37 @@ records follow with their original discovery context.
 
 ### Ordered Queue
 
-1. **Gravitas:**
-   [Relative CCD Quadratic Saturation Can Miss Extreme-Range Crossings](#relative-ccd-quadratic-saturation-can-miss-extreme-range-crossings).
-   Reuse the magnitude and normalization policy established by the resolved
-   extreme-convex-sweep work when adding the separate scale-safe quadratic
-   implementation.
+1. **FixedMathSharp then Gravitas:**
+   [Full-Domain Radial Bounds And Query Intervals Remain Incomplete](#full-domain-radial-bounds-and-query-intervals-remain-incomplete).
 2. **Gravitas:**
    [3D CCD Handoff Callback Failure Can Abandon Queue Cleanup](#3d-ccd-handoff-callback-failure-can-abandon-queue-cleanup).
 3. **Gravitas:**
    [Rotational CCD Omits Dynamic And Mixed Targets](#rotational-ccd-omits-dynamic-and-mixed-targets).
 
-### Relative CCD Quadratic Saturation Can Miss Extreme-Range Crossings
+### Full-Domain Radial Bounds And Query Intervals Remain Incomplete
 
-**Discovered:** 2026-07-13  
-**Source:** 95%-to-100% coverage hardening, shared relative-sweep review  
-**Affected area:** 2D, 3D, and mixed relative continuous-collision sweeps
+**Discovered:** 2026-07-18  
+**Source:** relative CCD exact-root migration and mixed-query parity review  
+**Affected area:** FixedMathSharp radial bounds and two-root intervals; Gravitas
+3D raycast segments and mixed finite-slab/capsule reducers
 
-The relative sphere/circle sweep evaluates its quadratic directly in Q32.32. At
-separations or per-frame displacements above roughly `46,340.95`, squared terms
-can saturate before the discriminant and root are formed. A crossing can then
-collapse to an endpoint candidate with the wrong impact normal and be rejected
-even though the swept broad phase admitted it.
+FixedMathSharp's new exact bounded first-root solver closes the sphere/circle
+sweep defect, but it deliberately does not expose both roots of the radial
+quadratic. Gravitas still has interval consumers that require entry and exit:
+the 3D raycast segment worker, mixed circle-against-3D finite-slab side tests,
+and mixed sphere-against-2D capsule/cylinder projections. Migrating those sites
+to a first-root API would discard their finite-height or finite-segment clipping
+contract. The mixed planar sphere cross-section also evaluates
+`radiusSquared - verticalSquared` in saturating Q32.32.
 
-Resolve this with a scale-safe quadratic formulation or an explicit validated
-world/displacement range contract. Add symmetric 2D/3D regressions for large
-crossings, endpoint-adjacent hits, misses, and mixed CCD routing at the chosen
-boundary. This is distinct from conservative proxy-radius saturation and does
-not block coverage convergence because ordinary supported ranges and the current
-uncovered closing-speed boundary remain independently testable.
+Some `FixedBoundCircle` and `FixedBoundSphere` containment/intersection paths
+also still compare saturated squared magnitudes. Resolve the lower-stack
+ownership first with reusable exact radial-distance predicates and a bounded
+two-root/interval primitive that preserves root ordering and nearest-even public
+conversion across the complete finite endpoint domain. Then migrate every
+remaining Gravitas interval consumer, with 2D/3D and mixed parity regressions,
+ordinary-range compatibility tests, zero-allocation hot-path evidence, and
+focused benchmarks.
 
 ### 3D CCD Handoff Callback Failure Can Abandon Queue Cleanup
 
@@ -121,6 +125,53 @@ Add pure 2D, pure 3D, both mixed source directions, dynamic handoff, replay, and
 allocation regressions.
 
 ## Resolved Issues
+
+### Relative CCD Quadratic Saturation Could Miss Extreme-Range Crossings
+
+**Resolved:** 2026-07-18  
+**Source:** 95%-to-100% coverage hardening, shared relative-sweep review  
+**Affected area:** FixedMathSharp radial rays; Gravitas 2D, 3D, and mixed radial
+sweeps and relative continuous collision
+
+RCA: relative sphere/circle sweeps formed their quadratic directly in Q32.32.
+At large separations or displacements, squared terms saturated before the
+discriminant and root were evaluated. Query reducers duplicated variants of the
+same arithmetic. A crossing could collapse to a wrong endpoint candidate,
+produce the wrong normal, and be rejected despite broad-phase admission.
+
+Fix: FixedMathSharp now owns an allocation-free exact first-root solver. It
+retains 65-bit endpoint differences, `Signed192` coefficients, a `Signed320`
+discriminant, exact bounded-root ordering, and nearest-even conversion only at
+the public `Fixed64` boundary. `FixedRay` and `FixedRay2d` expose bounded radial
+intersection overloads with exact nonnegative radius expansion. Full-domain
+vector direction and endpoint-distance helpers support downstream
+reconstruction without saturated subtraction or squared magnitude.
+
+Gravitas now centralizes radial admission in `RadialSweepAdmission`. Relative
+CCD uses exact normalized-frame roots, validates both world endpoints, resolves
+impact normals from full-domain interpolation, and admits the closed frame end
+only when the separately authored endpoints round to contact. Public query
+workers retain normalized directions and spatial-distance parameters, avoiding
+amplification of one-raw-unit direction rounding. Safe first-root circle/sphere
+reducers in pure and mixed 2D/3D paths share the same contract. Consumers that
+require both roots remain explicitly queued under the separate full-domain
+radial-interval issue.
+
+Verification:
+
+- FixedMathSharp `Release` passed 1,432 tests and `ReleaseLean` passed 1,411,
+  plus eight Chronicler tests in each configuration.
+- Fresh merged coverage is 9,017/9,017 lines, 2,986/2,986 branches, and
+  1,504/1,504 ReportGenerator methods. All 1,498 CRAP identities are fully
+  covered; the five scores above 30 remain registered complexity floors.
+- Gravitas `Release` passes all 2,783 tests, including symmetric extreme
+  crossings, exact frame-end contacts, unrepresentable endpoint separation,
+  query-distance compatibility, and mixed routing regressions.
+- Short-run continuous-pipeline means were `6.520 us` discrete, `19.900 us`
+  against a thin wall, `37.264 us` for opposing dynamic spheres, and `37.159 us`
+  against a position-frozen mesh, with zero managed allocation on every row.
+  FixedMathSharp radial-ray means were `196.7 ns` in 2D and `119.2 ns` in 3D,
+  also with zero managed allocation.
 
 ### Convex Mesh Mode Accepted Invalid Topology And Could Collide In Empty Bounds Space
 

@@ -6,7 +6,9 @@
 //=======================================================================
 
 using FixedMathSharp;
+using FixedMathSharp.Bounds;
 using Gravitas.Colliders;
+using Gravitas.CollisionHandling;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas.Queries;
@@ -18,6 +20,7 @@ public sealed partial class GravitasQueryMixedService
 {
     private static bool TrySweepSphereAgainst2D(
         Vector3d start,
+        Vector3d end,
         Vector3d direction,
         Fixed64 length,
         Fixed64 radius,
@@ -25,22 +28,23 @@ public sealed partial class GravitasQueryMixedService
         out PhysicsMixedHit hit)
     {
         if (collider is LSCompoundCollider2D compound)
-            return TrySweepSphereAgainstCompound2D(start, direction, length, radius, compound, out hit);
+            return TrySweepSphereAgainstCompound2D(start, end, direction, length, radius, compound, out hit);
 
         if (collider is LSCircleCollider2D circle)
-            return TrySweepSphereAgainstCircleSlab(start, direction, length, radius, circle, out hit);
+            return TrySweepSphereAgainstCircleSlab(start, end, direction, length, radius, circle, out hit);
 
         if (collider is LSCapsuleCollider2D capsule)
-            return TrySweepSphereAgainstCapsuleSlab(start, direction, length, radius, capsule, out hit);
+            return TrySweepSphereAgainstCapsuleSlab(start, end, direction, length, radius, capsule, out hit);
 
         if (collider is LSAABBoxCollider2D || collider is LSPolygonCollider2D)
-            return TrySweepSphereAgainstConvexSlab(start, direction, length, radius, collider, out hit);
+            return TrySweepSphereAgainstConvexSlab(start, end, direction, length, radius, collider, out hit);
 
-        return TrySweepSphereAgainstPrismBounds(start, direction, length, radius, collider, out hit);
+        return TrySweepSphereAgainstPrismBounds(start, end, direction, length, radius, collider, out hit);
     }
 
     private static bool TrySweepSphereAgainstCompound2D(
         Vector3d start,
+        Vector3d end,
         Vector3d direction,
         Fixed64 length,
         Fixed64 radius,
@@ -54,7 +58,7 @@ public sealed partial class GravitasQueryMixedService
         for (int i = 0; i < compound.PartCount; i++)
         {
             LSCollider2D part = compound.GetPartCollider(i);
-            if (!TrySweepSphereAgainst2D(start, direction, length, radius, part, out PhysicsMixedHit candidate))
+            if (!TrySweepSphereAgainst2D(start, end, direction, length, radius, part, out PhysicsMixedHit candidate))
                 continue;
 
             if (!PhysicsHitSelectionPolicy.ShouldReplaceDistance(candidate.Distance, found, bestDistance))
@@ -85,6 +89,7 @@ public sealed partial class GravitasQueryMixedService
 
     private static bool TrySweepSphereAgainstCapsuleSlab(
         Vector3d start,
+        Vector3d end,
         Vector3d direction,
         Fixed64 length,
         Fixed64 radius,
@@ -129,6 +134,7 @@ public sealed partial class GravitasQueryMixedService
             ref bestDistance);
         TrySweepCapsuleSlabSide(
             start,
+            end,
             direction,
             length,
             capsule,
@@ -139,6 +145,7 @@ public sealed partial class GravitasQueryMixedService
             ref bestDistance);
         TrySweepCapsuleSlabBoundaryEdges(
             start,
+            end,
             direction,
             length,
             capsule,
@@ -154,7 +161,7 @@ public sealed partial class GravitasQueryMixedService
             return false;
         }
 
-        Vector3d sweepCenter = start + direction * bestDistance;
+        Vector3d sweepCenter = bestDistance == length ? end : start + direction * bestDistance;
         hit = BuildSphereAgainst2DHit(
             capsule,
             sweepCenter,
@@ -167,6 +174,7 @@ public sealed partial class GravitasQueryMixedService
 
     private static bool TrySweepSphereAgainstConvexSlab(
         Vector3d start,
+        Vector3d end,
         Vector3d direction,
         Fixed64 length,
         Fixed64 radius,
@@ -221,6 +229,7 @@ public sealed partial class GravitasQueryMixedService
             ref bestDistance);
         TrySweepConvexSlabEdges(
             start,
+            end,
             direction,
             length,
             radius,
@@ -236,7 +245,7 @@ public sealed partial class GravitasQueryMixedService
             return false;
         }
 
-        Vector3d sweepCenter = start + direction * bestDistance;
+        Vector3d sweepCenter = bestDistance == length ? end : start + direction * bestDistance;
         hit = BuildSphereAgainst2DHit(
             collider,
             sweepCenter,
@@ -325,6 +334,7 @@ public sealed partial class GravitasQueryMixedService
 
     private static void TrySweepConvexSlabEdges(
         Vector3d start,
+        Vector3d end,
         Vector3d direction,
         Fixed64 length,
         Fixed64 radius,
@@ -345,17 +355,17 @@ public sealed partial class GravitasQueryMixedService
             Vector3d topSecond = new(second.X, slabMaxY, second.Y);
 
             TryKeepEarlierSweep(
-                TrySweepPointAgainstSegmentCapsule3D(start, direction, length, bottomFirst, topFirst, radius, out Fixed64 verticalDistance),
+                TrySweepPointAgainstSegmentCapsule3D(start, end, direction, length, bottomFirst, topFirst, radius, out Fixed64 verticalDistance),
                 verticalDistance,
                 ref found,
                 ref bestDistance);
             TryKeepEarlierSweep(
-                TrySweepPointAgainstSegmentCapsule3D(start, direction, length, bottomFirst, bottomSecond, radius, out Fixed64 bottomDistance),
+                TrySweepPointAgainstSegmentCapsule3D(start, end, direction, length, bottomFirst, bottomSecond, radius, out Fixed64 bottomDistance),
                 bottomDistance,
                 ref found,
                 ref bestDistance);
             TryKeepEarlierSweep(
-                TrySweepPointAgainstSegmentCapsule3D(start, direction, length, topFirst, topSecond, radius, out Fixed64 topDistance),
+                TrySweepPointAgainstSegmentCapsule3D(start, end, direction, length, topFirst, topSecond, radius, out Fixed64 topDistance),
                 topDistance,
                 ref found,
                 ref bestDistance);
@@ -391,6 +401,7 @@ public sealed partial class GravitasQueryMixedService
 
     private static void TrySweepCapsuleSlabSide(
         Vector3d start,
+        Vector3d end,
         Vector3d direction,
         Fixed64 length,
         LSCapsuleCollider2D capsule,
@@ -410,6 +421,7 @@ public sealed partial class GravitasQueryMixedService
         Fixed64 planarLength = length * planarSpeed;
         if (!TrySweepPointAgainstSegmentCapsule(
                 new Vector2d(start.X, start.Z),
+                new Vector2d(end.X, end.Z),
                 planarUnit,
                 planarLength,
                 capsule.SegmentStart,
@@ -430,6 +442,7 @@ public sealed partial class GravitasQueryMixedService
 
     private static void TrySweepCapsuleSlabBoundaryEdges(
         Vector3d start,
+        Vector3d end,
         Vector3d direction,
         Fixed64 length,
         LSCapsuleCollider2D capsule,
@@ -446,6 +459,7 @@ public sealed partial class GravitasQueryMixedService
 
         TryKeepCapsuleSlabBoundaryEdgeSweep(
             start,
+            end,
             direction,
             length,
             capsule,
@@ -456,6 +470,7 @@ public sealed partial class GravitasQueryMixedService
             ref bestDistance);
         TryKeepCapsuleSlabBoundaryEdgeSweep(
             start,
+            end,
             direction,
             length,
             capsule,
@@ -465,12 +480,12 @@ public sealed partial class GravitasQueryMixedService
             ref found,
             ref bestDistance);
         TryKeepEarlierSweep(
-            TrySweepPointAgainstSegmentCapsule3D(start, direction, length, bottomStart, topStart, combinedRadius, out Fixed64 firstVerticalDistance),
+            TrySweepPointAgainstSegmentCapsule3D(start, end, direction, length, bottomStart, topStart, combinedRadius, out Fixed64 firstVerticalDistance),
             firstVerticalDistance,
             ref found,
             ref bestDistance);
         TryKeepEarlierSweep(
-            TrySweepPointAgainstSegmentCapsule3D(start, direction, length, bottomEnd, topEnd, combinedRadius, out Fixed64 secondVerticalDistance),
+            TrySweepPointAgainstSegmentCapsule3D(start, end, direction, length, bottomEnd, topEnd, combinedRadius, out Fixed64 secondVerticalDistance),
             secondVerticalDistance,
             ref found,
             ref bestDistance);
@@ -478,6 +493,7 @@ public sealed partial class GravitasQueryMixedService
 
     private static void TryKeepCapsuleSlabBoundaryEdgeSweep(
         Vector3d start,
+        Vector3d end,
         Vector3d direction,
         Fixed64 length,
         LSCapsuleCollider2D capsule,
@@ -487,10 +503,10 @@ public sealed partial class GravitasQueryMixedService
         ref bool found,
         ref Fixed64 bestDistance)
     {
-        if (!TrySweepPointAgainstSegmentCapsule3D(start, direction, length, edgeStart, edgeEnd, radius, out Fixed64 distance))
+        if (!TrySweepPointAgainstSegmentCapsule3D(start, end, direction, length, edgeStart, edgeEnd, radius, out Fixed64 distance))
             return;
 
-        Vector3d sweepCenter = start + direction * distance;
+        Vector3d sweepCenter = distance == length ? end : start + direction * distance;
         if (capsule.ContainsPoint(new Vector2d(sweepCenter.X, sweepCenter.Z)))
             return;
 
@@ -526,6 +542,7 @@ public sealed partial class GravitasQueryMixedService
 
     private static bool TrySweepPointAgainstSegmentCapsule3D(
         Vector3d start,
+        Vector3d end,
         Vector3d direction,
         Fixed64 length,
         Vector3d segmentStart,
@@ -540,12 +557,12 @@ public sealed partial class GravitasQueryMixedService
         bool found = false;
         Fixed64 best = Fixed64.MaxValue;
         TryKeepEarlierSweep(
-            TrySweepPointInSpace(start, direction, length, segmentStart, radius, out Fixed64 startDistance),
+            TrySweepPointInSpace(start, end, direction, length, segmentStart, radius, out Fixed64 startDistance),
             startDistance,
             ref found,
             ref best);
         TryKeepEarlierSweep(
-            TrySweepPointInSpace(start, direction, length, segmentEnd, radius, out Fixed64 endDistance),
+            TrySweepPointInSpace(start, end, direction, length, segmentEnd, radius, out Fixed64 endDistance),
             endDistance,
             ref found,
             ref best);
@@ -583,37 +600,23 @@ public sealed partial class GravitasQueryMixedService
 
     private static bool TrySweepPointInSpace(
         Vector3d start,
+        Vector3d end,
         Vector3d direction,
         Fixed64 length,
         Vector3d point,
         Fixed64 radius,
         out Fixed64 distance)
     {
-        Fixed64 radiusSqr = radius * radius;
-        Vector3d startToPoint = start - point;
-        Fixed64 a = direction.MagnitudeSquared;
-        Fixed64 b = 2 * Vector3d.Dot(startToPoint, direction);
-        Fixed64 c = startToPoint.MagnitudeSquared - radiusSqr;
-        if (c > Fixed64.Zero && b > Fixed64.Zero)
-        {
-            distance = default;
-            return false;
-        }
-
-        if (!TrySolveQuadraticSweep(a, b, c, out Fixed64 first, out _))
-        {
-            distance = default;
-            return false;
-        }
-
-        if (first <= length)
-        {
-            distance = first;
-            return true;
-        }
-
-        distance = default;
-        return false;
+        return RadialSweepAdmission.TryIntersect(
+            start,
+            direction,
+            length,
+            point,
+            radius,
+            Fixed64.Zero,
+            end,
+            point,
+            out distance);
     }
 
     private static bool TrySolveQuadraticSweep(

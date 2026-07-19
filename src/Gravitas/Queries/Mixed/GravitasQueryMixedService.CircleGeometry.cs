@@ -8,6 +8,7 @@
 using FixedMathSharp;
 using FixedMathSharp.Bounds;
 using Gravitas.Colliders;
+using Gravitas.CollisionHandling;
 using System;
 using System.Runtime.CompilerServices;
 
@@ -20,6 +21,7 @@ public sealed partial class GravitasQueryMixedService
 {
     private static bool TrySweepCircleAgainstSphere(
         Vector2d start,
+        Vector2d end,
         Vector2d direction,
         Fixed64 length,
         Fixed64 radius,
@@ -41,15 +43,23 @@ public sealed partial class GravitasQueryMixedService
         }
 
         Fixed64 planarSphereRadiusSqr = sphereRadius * sphereRadius - verticalExcess * verticalExcess;
-        Fixed64 combinedPlanarRadius = radius + FixedMath.Sqrt(planarSphereRadiusSqr);
+        Fixed64 planarSphereRadius = FixedMath.Sqrt(planarSphereRadiusSqr);
         Vector2d sphereCenter = new(sphere.Center.X, sphere.Center.Z);
-        if (!TrySweepPointInPlane(start, direction, length, sphereCenter, combinedPlanarRadius, out Fixed64 distance))
+        if (!TrySweepPointInPlane(
+            start,
+            end,
+            direction,
+            length,
+            sphereCenter,
+            planarSphereRadius,
+            radius,
+            out Fixed64 distance))
         {
             hit = default;
             return false;
         }
 
-        Vector2d center2D = start + direction * distance;
+        Vector2d center2D = distance == length ? end : start + direction * distance;
         Vector3d sweepCenter = new(center2D.X, slabCenterY, center2D.Y);
         hit = BuildCircleAgainst3DHit(
             sphere,
@@ -66,41 +76,49 @@ public sealed partial class GravitasQueryMixedService
 
     private static bool TrySweepPointInPlane(
         Vector2d start,
+        Vector2d end,
         Vector2d direction,
         Fixed64 length,
         Vector2d point,
         Fixed64 radius,
         out Fixed64 distance)
     {
-        Fixed64 radiusSqr = radius * radius;
-        Vector2d startToPoint = start - point;
-        if (startToPoint.MagnitudeSquared <= radiusSqr)
-        {
-            distance = Fixed64.Zero;
-            return true;
-        }
+        return TrySweepPointInPlane(
+            start,
+            end,
+            direction,
+            length,
+            point,
+            radius,
+            Fixed64.Zero,
+            out distance);
+    }
 
-        Fixed64 b = Vector2d.Dot(startToPoint, direction);
-        Fixed64 c = startToPoint.MagnitudeSquared - radiusSqr;
-        if (c > Fixed64.Zero && b > Fixed64.Zero)
-        {
-            distance = default;
-            return false;
-        }
-
-        Fixed64 discriminant = b * b - c;
-        if (discriminant < Fixed64.Zero)
-        {
-            distance = default;
-            return false;
-        }
-
-        distance = -b - FixedMath.Sqrt(discriminant);
-        return distance <= length;
+    private static bool TrySweepPointInPlane(
+        Vector2d start,
+        Vector2d end,
+        Vector2d direction,
+        Fixed64 length,
+        Vector2d point,
+        Fixed64 radius,
+        Fixed64 radiusExpansion,
+        out Fixed64 distance)
+    {
+        return RadialSweepAdmission.TryIntersect(
+            start,
+            direction,
+            length,
+            point,
+            radius,
+            radiusExpansion,
+            end,
+            point,
+            out distance);
     }
 
     private static bool TrySweepCircleAgainstTriangleProjection(
         Vector2d start,
+        Vector2d end,
         Vector2d direction,
         Fixed64 length,
         Fixed64 radius,
@@ -128,6 +146,7 @@ public sealed partial class GravitasQueryMixedService
         BuildConvexHullInPlace(projection, ref projectionCount);
         if (!TrySweepCircleAgainstConvexProjection(
             start,
+            end,
             direction,
             length,
             radius,
@@ -396,6 +415,7 @@ public sealed partial class GravitasQueryMixedService
 
     private static bool TrySweepCircleAgainstConvexProjection(
         Vector2d start,
+        Vector2d end,
         Vector2d direction,
         Fixed64 length,
         Fixed64 radius,
@@ -404,10 +424,10 @@ public sealed partial class GravitasQueryMixedService
     {
         distance = Fixed64.Zero;
         if (projection.Length == 1)
-            return TrySweepPointInPlane(start, direction, length, projection[0], radius, out distance);
+            return TrySweepPointInPlane(start, end, direction, length, projection[0], radius, out distance);
 
         if (projection.Length == 2)
-            return TrySweepPointAgainstSegmentCapsule(start, direction, length, projection[0], projection[1], radius, out distance);
+            return TrySweepPointAgainstSegmentCapsule(start, end, direction, length, projection[0], projection[1], radius, out distance);
 
         Fixed64 radiusSqr = radius * radius;
         if (IsPointInsideConvexProjection(start, projection)
@@ -423,7 +443,7 @@ public sealed partial class GravitasQueryMixedService
             Vector2d first = projection[i];
             Vector2d second = projection[(i + 1) % projection.Length];
             TryKeepEarlierSweep(
-                TrySweepPointAgainstSegmentCapsule(start, direction, length, first, second, radius, out Fixed64 candidate),
+                TrySweepPointAgainstSegmentCapsule(start, end, direction, length, first, second, radius, out Fixed64 candidate),
                 candidate,
                 ref found,
                 ref best);
@@ -435,6 +455,7 @@ public sealed partial class GravitasQueryMixedService
 
     private static bool TrySweepPointAgainstSegmentCapsule(
         Vector2d start,
+        Vector2d end,
         Vector2d direction,
         Fixed64 length,
         Vector2d segmentStart,
@@ -450,12 +471,12 @@ public sealed partial class GravitasQueryMixedService
         bool found = false;
         Fixed64 best = Fixed64.MaxValue;
         TryKeepEarlierSweep(
-            TrySweepPointInPlane(start, direction, length, segmentStart, radius, out Fixed64 startDistance),
+            TrySweepPointInPlane(start, end, direction, length, segmentStart, radius, out Fixed64 startDistance),
             startDistance,
             ref found,
             ref best);
         TryKeepEarlierSweep(
-            TrySweepPointInPlane(start, direction, length, segmentEnd, radius, out Fixed64 endDistance),
+            TrySweepPointInPlane(start, end, direction, length, segmentEnd, radius, out Fixed64 endDistance),
             endDistance,
             ref found,
             ref best);

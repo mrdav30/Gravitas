@@ -233,19 +233,43 @@ internal static class ContinuousCollisionMath
         out Vector3d normalForSource,
         out Fixed64 closingSpeed)
     {
-        Vector3d delta = sourceStart - targetStart;
+        normalizedTime = Fixed64.Zero;
+        normalForSource = Vector3d.Zero;
+        closingSpeed = Fixed64.Zero;
+
         Vector3d relativeDisplacement = ContinuousCollisionSweepRange.ValidateRelativeDisplacement(
             sourceDisplacement,
             targetDisplacement,
             out _);
-        Fixed64 combinedRadius = sourceRadius + targetRadius;
-        return TrySweepRelative(
-            delta,
-            relativeDisplacement,
-            combinedRadius,
-            out normalizedTime,
-            out normalForSource,
-            out closingSpeed);
+        Vector3d sourceEnd = GetSweepEnd(sourceStart, sourceDisplacement);
+        Vector3d targetEnd = GetSweepEnd(targetStart, targetDisplacement);
+        if (relativeDisplacement.MagnitudeSquared <= Fixed64.Epsilon
+            || !HasUsableCombinedRadius(sourceRadius, targetRadius))
+        {
+            return false;
+        }
+
+        if (!RadialSweepAdmission.TryIntersect(
+                sourceStart,
+                relativeDisplacement,
+                Fixed64.One,
+                targetStart,
+                targetRadius,
+                sourceRadius,
+                sourceEnd,
+                targetEnd,
+                out Fixed64 time))
+            return false;
+
+        Vector3d sourceImpact = Vector3d.Lerp(sourceStart, sourceEnd, time);
+        Vector3d targetImpact = Vector3d.Lerp(targetStart, targetEnd, time);
+        normalForSource = ResolveNormal(targetImpact, sourceImpact, relativeDisplacement);
+        closingSpeed = -Vector3d.Dot(relativeDisplacement, normalForSource);
+        if (closingSpeed <= Fixed64.Epsilon)
+            return false;
+
+        normalizedTime = time;
+        return true;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -260,109 +284,37 @@ internal static class ContinuousCollisionMath
         out Vector2d normalForSource,
         out Fixed64 closingSpeed)
     {
-        Vector2d delta = sourceStart - targetStart;
-        Vector2d relativeDisplacement = ContinuousCollisionSweepRange.ValidateRelativeDisplacement(
-            sourceDisplacement,
-            targetDisplacement,
-            out _);
-        Fixed64 combinedRadius = sourceRadius + targetRadius;
-        return TrySweepRelative(
-            delta,
-            relativeDisplacement,
-            combinedRadius,
-            out normalizedTime,
-            out normalForSource,
-            out closingSpeed);
-    }
-
-    private static bool TrySweepRelative(
-        Vector3d delta,
-        Vector3d relativeDisplacement,
-        Fixed64 combinedRadius,
-        out Fixed64 normalizedTime,
-        out Vector3d normalForSource,
-        out Fixed64 closingSpeed)
-    {
-        normalizedTime = Fixed64.Zero;
-        normalForSource = Vector3d.Zero;
-        closingSpeed = Fixed64.Zero;
-
-        Fixed64 relativeMagnitudeSquared = relativeDisplacement.MagnitudeSquared;
-        if (relativeMagnitudeSquared <= Fixed64.Epsilon || combinedRadius <= Fixed64.Epsilon)
-            return false;
-
-        Fixed64 combinedRadiusSquared = combinedRadius * combinedRadius;
-        Fixed64 c = delta.MagnitudeSquared - combinedRadiusSquared;
-        if (c <= Fixed64.Zero)
-        {
-            normalForSource = ResolveNormal(delta, relativeDisplacement);
-            closingSpeed = -Vector3d.Dot(relativeDisplacement, normalForSource);
-            return closingSpeed > Fixed64.Epsilon;
-        }
-
-        Fixed64 b = (Fixed64)2 * Vector3d.Dot(delta, relativeDisplacement);
-        if (b >= Fixed64.Zero)
-            return false;
-
-        Fixed64 a = relativeMagnitudeSquared;
-        Fixed64 discriminant = b * b - (Fixed64)4 * a * c;
-        if (discriminant < Fixed64.Zero)
-            return false;
-
-        Fixed64 time = (-b - FixedMath.Sqrt(discriminant)) / ((Fixed64)2 * a);
-        if (time > Fixed64.One)
-            return false;
-
-        Vector3d impactDelta = delta + relativeDisplacement * time;
-        normalForSource = ResolveNormal(impactDelta, relativeDisplacement);
-        closingSpeed = -Vector3d.Dot(relativeDisplacement, normalForSource);
-        if (closingSpeed <= Fixed64.Epsilon)
-            return false;
-
-        normalizedTime = time;
-        return true;
-    }
-
-    private static bool TrySweepRelative(
-        Vector2d delta,
-        Vector2d relativeDisplacement,
-        Fixed64 combinedRadius,
-        out Fixed64 normalizedTime,
-        out Vector2d normalForSource,
-        out Fixed64 closingSpeed)
-    {
         normalizedTime = Fixed64.Zero;
         normalForSource = Vector2d.Zero;
         closingSpeed = Fixed64.Zero;
 
-        Fixed64 relativeMagnitudeSquared = relativeDisplacement.MagnitudeSquared;
-        if (relativeMagnitudeSquared <= Fixed64.Epsilon || combinedRadius <= Fixed64.Epsilon)
-            return false;
-
-        Fixed64 combinedRadiusSquared = combinedRadius * combinedRadius;
-        Fixed64 c = delta.MagnitudeSquared - combinedRadiusSquared;
-        if (c <= Fixed64.Zero)
+        Vector2d relativeDisplacement = ContinuousCollisionSweepRange.ValidateRelativeDisplacement(
+            sourceDisplacement,
+            targetDisplacement,
+            out _);
+        Vector2d sourceEnd = GetSweepEnd(sourceStart, sourceDisplacement);
+        Vector2d targetEnd = GetSweepEnd(targetStart, targetDisplacement);
+        if (relativeDisplacement.MagnitudeSquared <= Fixed64.Epsilon
+            || !HasUsableCombinedRadius(sourceRadius, targetRadius))
         {
-            normalForSource = ResolveNormal(delta, relativeDisplacement);
-            closingSpeed = -Vector2d.Dot(relativeDisplacement, normalForSource);
-            return closingSpeed > Fixed64.Epsilon;
+            return false;
         }
 
-        Fixed64 b = (Fixed64)2 * Vector2d.Dot(delta, relativeDisplacement);
-        if (b >= Fixed64.Zero)
+        if (!RadialSweepAdmission.TryIntersect(
+                sourceStart,
+                relativeDisplacement,
+                Fixed64.One,
+                targetStart,
+                targetRadius,
+                sourceRadius,
+                sourceEnd,
+                targetEnd,
+                out Fixed64 time))
             return false;
 
-        Fixed64 a = relativeMagnitudeSquared;
-        Fixed64 discriminant = b * b - (Fixed64)4 * a * c;
-        if (discriminant < Fixed64.Zero)
-            return false;
-
-        Fixed64 time = (-b - FixedMath.Sqrt(discriminant)) / ((Fixed64)2 * a);
-        if (time > Fixed64.One)
-            return false;
-
-        Vector2d impactDelta = delta + relativeDisplacement * time;
-        normalForSource = ResolveNormal(impactDelta, relativeDisplacement);
+        Vector2d sourceImpact = Vector2d.Lerp(sourceStart, sourceEnd, time);
+        Vector2d targetImpact = Vector2d.Lerp(targetStart, targetEnd, time);
+        normalForSource = ResolveNormal(targetImpact, sourceImpact, relativeDisplacement);
         closingSpeed = -Vector2d.Dot(relativeDisplacement, normalForSource);
         if (closingSpeed <= Fixed64.Epsilon)
             return false;
@@ -372,28 +324,51 @@ internal static class ContinuousCollisionMath
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Vector3d ResolveNormal(Vector3d delta, Vector3d relativeDisplacement)
+    private static bool HasUsableCombinedRadius(Fixed64 sourceRadius, Fixed64 targetRadius)
     {
-        if (delta != Vector3d.Zero)
-        {
-            Fixed64 scale = FixedMath.Max(
-                delta.X.Abs(),
-                FixedMath.Max(delta.Y.Abs(), delta.Z.Abs()));
-            return new Vector3d(delta.X / scale, delta.Y / scale, delta.Z / scale).Normalized;
-        }
+        if (sourceRadius > Fixed64.Epsilon || targetRadius > Fixed64.Epsilon)
+            return true;
 
-        return -relativeDisplacement.Normalized;
+        return sourceRadius + targetRadius > Fixed64.Epsilon;
+    }
+
+    private static Vector3d GetSweepEnd(
+        Vector3d start,
+        Vector3d displacement)
+    {
+        if (!Vector3d.TryAdd(start, displacement, out Vector3d end))
+            throw new System.ArgumentOutOfRangeException(nameof(displacement), "Continuous collision endpoint is outside the fixed-point coordinate domain.");
+
+        return end;
+    }
+
+    private static Vector2d GetSweepEnd(
+        Vector2d start,
+        Vector2d displacement)
+    {
+        if (!Vector2d.TryAdd(start, displacement, out Vector2d end))
+            throw new System.ArgumentOutOfRangeException(nameof(displacement), "Continuous collision endpoint is outside the fixed-point coordinate domain.");
+
+        return end;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Vector2d ResolveNormal(Vector2d delta, Vector2d relativeDisplacement)
+    private static Vector3d ResolveNormal(
+        Vector3d targetPosition,
+        Vector3d sourcePosition,
+        Vector3d relativeDisplacement)
     {
-        if (delta != Vector2d.Zero)
-        {
-            Fixed64 scale = FixedMath.Max(delta.X.Abs(), delta.Y.Abs());
-            return new Vector2d(delta.X / scale, delta.Y / scale).Normalized;
-        }
+        Vector3d normal = Vector3d.GetDirection(targetPosition, sourcePosition);
+        return normal != Vector3d.Zero ? normal : -relativeDisplacement.Normalized;
+    }
 
-        return -relativeDisplacement.Normalized;
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Vector2d ResolveNormal(
+        Vector2d targetPosition,
+        Vector2d sourcePosition,
+        Vector2d relativeDisplacement)
+    {
+        Vector2d normal = Vector2d.GetDirection(targetPosition, sourcePosition);
+        return normal != Vector2d.Zero ? normal : -relativeDisplacement.Normalized;
     }
 }

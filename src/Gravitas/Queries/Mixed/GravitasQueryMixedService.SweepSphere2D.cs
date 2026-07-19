@@ -129,6 +129,7 @@ public sealed partial class GravitasQueryMixedService
         {
             if (!TrySweepSphereAgainst2DCandidate(
                 start,
+                end,
                 direction,
                 length,
                 radius,
@@ -207,6 +208,7 @@ public sealed partial class GravitasQueryMixedService
         {
             if (TrySweepSphereAgainst2DCandidate(
                 start,
+                end,
                 direction,
                 length,
                 radius,

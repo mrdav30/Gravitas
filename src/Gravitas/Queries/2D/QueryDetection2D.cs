@@ -133,9 +133,9 @@ internal static class QueryDetection2D
         }
 
         if (collider is LSCircleCollider2D circle)
-            return TryRaycastCircle(start, direction, segmentLength, circle, out hit);
+            return TryRaycastCircle(start, end, direction, segmentLength, circle, out hit);
         if (collider is LSCapsuleCollider2D capsule)
-            return TryRaycastCapsule(start, direction, segmentLength, capsule, out hit);
+            return TryRaycastCapsule(start, end, direction, segmentLength, capsule, out hit);
 
         return TryRaycastConvex(start, segment, direction, segmentLength, collider, out hit);
     }
@@ -177,11 +177,11 @@ internal static class QueryDetection2D
 
         Vector2d direction = segment.Normalized;
         if (collider is LSCircleCollider2D circle)
-            return TrySweepCircleCircle(start, direction, segmentLength, radius, circle, out hit);
+            return TrySweepCircleCircle(start, end, direction, segmentLength, radius, circle, out hit);
         if (collider is LSCapsuleCollider2D capsule)
-            return TrySweepCircleCapsule(start, direction, segmentLength, radius, capsule, out hit);
+            return TrySweepCircleCapsule(start, end, direction, segmentLength, radius, capsule, out hit);
 
-        return TrySweepCircleConvex(start, direction, segmentLength, radius, collider, out hit);
+        return TrySweepCircleConvex(start, end, direction, segmentLength, radius, collider, out hit);
     }
 
     internal static bool TrySweepMoverShape(
@@ -221,36 +221,31 @@ internal static class QueryDetection2D
 
     private static bool TryRaycastCircle(
         Vector2d start,
+        Vector2d end,
         Vector2d direction,
         Fixed64 segmentLength,
         LSCircleCollider2D circle,
         out Physics2DHit hit)
     {
-        Vector2d originFromCenter = start - circle.Center;
-        Fixed64 scaledRadius = circle.ScaledRadius;
-        Fixed64 c = originFromCenter.MagnitudeSquared - scaledRadius * scaledRadius;
-        Fixed64 b = Vector2d.Dot(originFromCenter, direction);
-        if (c > Fixed64.Zero && b > Fixed64.Zero)
+        if (!RadialSweepAdmission.TryIntersect(
+                start,
+                direction,
+                segmentLength,
+                circle.Center,
+                circle.ScaledRadius,
+                Fixed64.Zero,
+                end,
+                circle.Center,
+                out Fixed64 parameter))
         {
             hit = default;
             return false;
         }
 
-        Fixed64 discriminant = b * b - c;
-        if (discriminant < Fixed64.Zero)
-        {
-            hit = default;
-            return false;
-        }
-
-        Fixed64 distance = -b - FixedMath.Sqrt(discriminant);
-        if (distance > segmentLength)
-        {
-            hit = default;
-            return false;
-        }
-
-        Vector2d point = start + direction * distance;
+        Fixed64 distance = parameter;
+        Vector2d point = distance == segmentLength
+            ? end
+            : start + direction * distance;
         Vector2d normal = (point - circle.Center).Normalized;
         hit = new Physics2DHit(circle, point, normal, distance);
         return true;
@@ -258,20 +253,32 @@ internal static class QueryDetection2D
 
     private static bool TrySweepCircleCircle(
         Vector2d start,
+        Vector2d end,
         Vector2d direction,
         Fixed64 segmentLength,
         Fixed64 radius,
         LSCircleCollider2D circle,
         out Physics2DHit hit)
     {
-        Fixed64 combinedRadius = radius + circle.ScaledRadius;
-        if (!TryRaycastCircleDistance(start, direction, segmentLength, circle.Center, combinedRadius, out Fixed64 distance))
+        if (!RadialSweepAdmission.TryIntersect(
+                start,
+                direction,
+                segmentLength,
+                circle.Center,
+                circle.ScaledRadius,
+                radius,
+                end,
+                circle.Center,
+                out Fixed64 parameter))
         {
             hit = default;
             return false;
         }
 
-        Vector2d sweptCenter = start + direction * distance;
+        Fixed64 distance = parameter;
+        Vector2d sweptCenter = distance == segmentLength
+            ? end
+            : start + direction * distance;
         Vector2d normal = (sweptCenter - circle.Center).Normalized;
         Vector2d point = circle.Center + normal * circle.ScaledRadius;
         hit = new Physics2DHit(circle, point, normal, distance);
@@ -280,6 +287,7 @@ internal static class QueryDetection2D
 
     private static bool TryRaycastCapsule(
         Vector2d start,
+        Vector2d end,
         Vector2d direction,
         Fixed64 segmentLength,
         LSCapsuleCollider2D capsule,
@@ -287,6 +295,7 @@ internal static class QueryDetection2D
     {
         if (!TrySweepPointAgainstSegmentCapsule(
                 start,
+                end,
                 direction,
                 segmentLength,
                 capsule.SegmentStart,
@@ -298,7 +307,9 @@ internal static class QueryDetection2D
             return false;
         }
 
-        Vector2d pointOnRay = start + direction * distance;
+        Vector2d pointOnRay = distance == segmentLength
+            ? end
+            : start + direction * distance;
         Vector2d segmentPoint = new FixedSegment2d(
             capsule.SegmentStart,
             capsule.SegmentEnd).ClosestPoint(pointOnRay);
@@ -313,6 +324,7 @@ internal static class QueryDetection2D
 
     private static bool TrySweepCircleCapsule(
         Vector2d start,
+        Vector2d end,
         Vector2d direction,
         Fixed64 segmentLength,
         Fixed64 radius,
@@ -322,6 +334,7 @@ internal static class QueryDetection2D
         Fixed64 combinedRadius = radius + capsule.ScaledRadius;
         if (!TrySweepPointAgainstSegmentCapsule(
                 start,
+                end,
                 direction,
                 segmentLength,
                 capsule.SegmentStart,
@@ -333,7 +346,9 @@ internal static class QueryDetection2D
             return false;
         }
 
-        Vector2d sweptCenter = start + direction * distance;
+        Vector2d sweptCenter = distance == segmentLength
+            ? end
+            : start + direction * distance;
         Vector2d segmentPoint = new FixedSegment2d(
             capsule.SegmentStart,
             capsule.SegmentEnd).ClosestPoint(sweptCenter);
@@ -726,6 +741,7 @@ internal static class QueryDetection2D
 
     private static bool TrySweepCircleConvex(
         Vector2d start,
+        Vector2d end,
         Vector2d direction,
         Fixed64 segmentLength,
         Fixed64 radius,
@@ -763,6 +779,7 @@ internal static class QueryDetection2D
 
             if (TrySweepCircleVertex(
                     start,
+                    end,
                     direction,
                     segmentLength,
                     radius,
@@ -843,18 +860,56 @@ internal static class QueryDetection2D
 
         if (target is LSCircleCollider2D circle)
         {
-            TryKeepReversePointCapsuleHit(circle.Center, circle.ScaledRadius, mover, direction, length, target, ref found, ref best);
+            TryKeepReversePointCapsuleHit(
+                circle.Center,
+                circle.ScaledRadius,
+                mover,
+                displacement,
+                direction,
+                length,
+                target,
+                ref found,
+                ref best);
         }
         else if (target is LSCapsuleCollider2D targetCapsule)
         {
-            TryKeepReversePointCapsuleHit(targetCapsule.SegmentStart, targetCapsule.ScaledRadius, mover, direction, length, target, ref found, ref best);
-            TryKeepReversePointCapsuleHit(targetCapsule.SegmentEnd, targetCapsule.ScaledRadius, mover, direction, length, target, ref found, ref best);
+            TryKeepReversePointCapsuleHit(
+                targetCapsule.SegmentStart,
+                targetCapsule.ScaledRadius,
+                mover,
+                displacement,
+                direction,
+                length,
+                target,
+                ref found,
+                ref best);
+            TryKeepReversePointCapsuleHit(
+                targetCapsule.SegmentEnd,
+                targetCapsule.ScaledRadius,
+                mover,
+                displacement,
+                direction,
+                length,
+                target,
+                ref found,
+                ref best);
         }
         else
         {
             TrySweepCapsuleSegmentAgainstConvexEdges(mover, direction, length, target, ref found, ref best);
             for (int i = 0; i < target.VertexCount; i++)
-                TryKeepReversePointCapsuleHit(target.GetVertexUnchecked(i), Fixed64.Zero, mover, direction, length, target, ref found, ref best);
+            {
+                TryKeepReversePointCapsuleHit(
+                    target.GetVertexUnchecked(i),
+                    Fixed64.Zero,
+                    mover,
+                    displacement,
+                    direction,
+                    length,
+                    target,
+                    ref found,
+                    ref best);
+            }
         }
 
         if (!found)
@@ -938,6 +993,7 @@ internal static class QueryDetection2D
         Vector2d targetPoint,
         Fixed64 targetRadius,
         LSCapsuleCollider2D mover,
+        Vector2d displacement,
         Vector2d direction,
         Fixed64 length,
         LSCollider2D target,
@@ -945,8 +1001,10 @@ internal static class QueryDetection2D
         ref Physics2DHit best)
     {
         Fixed64 combinedRadius = mover.ScaledRadius + targetRadius;
-        if (!TrySweepPointAgainstSegmentCapsule(
+        if (!Vector2d.TrySubtract(targetPoint, displacement, out Vector2d end)
+            || !TrySweepPointAgainstSegmentCapsule(
                 targetPoint,
+                end,
                 -direction,
                 length,
                 mover.SegmentStart,
@@ -1066,6 +1124,7 @@ internal static class QueryDetection2D
 
     private static bool TrySweepCircleVertex(
         Vector2d start,
+        Vector2d end,
         Vector2d direction,
         Fixed64 segmentLength,
         Fixed64 radius,
@@ -1073,13 +1132,15 @@ internal static class QueryDetection2D
         out Fixed64 distance,
         out Vector2d normal)
     {
-        if (!TryRaycastCircleDistance(start, direction, segmentLength, vertex, radius, out distance))
+        if (!TryRaycastCircleDistance(start, end, direction, segmentLength, vertex, radius, out distance))
         {
             normal = default;
             return false;
         }
 
-        Vector2d sweptCenter = start + direction * distance;
+        Vector2d sweptCenter = distance == segmentLength
+            ? end
+            : start + direction * distance;
         normal = sweptCenter == vertex
             ? ResolveQueryFallbackNormal(sweptCenter, vertex)
             : (sweptCenter - vertex).Normalized;
@@ -1088,34 +1149,49 @@ internal static class QueryDetection2D
 
     private static bool TryRaycastCircleDistance(
         Vector2d start,
+        Vector2d end,
         Vector2d direction,
         Fixed64 segmentLength,
         Vector2d circleCenter,
         Fixed64 radius,
         out Fixed64 distance)
     {
-        Vector2d originFromCenter = start - circleCenter;
-        Fixed64 c = originFromCenter.MagnitudeSquared - radius * radius;
-        Fixed64 b = Vector2d.Dot(originFromCenter, direction);
-        if (c > Fixed64.Zero && b > Fixed64.Zero)
-        {
-            distance = default;
-            return false;
-        }
+        return TryRaycastCircleDistance(
+            start,
+            end,
+            direction,
+            segmentLength,
+            circleCenter,
+            radius,
+            Fixed64.Zero,
+            out distance);
+    }
 
-        Fixed64 discriminant = b * b - c;
-        if (discriminant < Fixed64.Zero)
-        {
-            distance = default;
-            return false;
-        }
-
-        distance = -b - FixedMath.Sqrt(discriminant);
-        return distance <= segmentLength;
+    private static bool TryRaycastCircleDistance(
+        Vector2d start,
+        Vector2d end,
+        Vector2d direction,
+        Fixed64 segmentLength,
+        Vector2d circleCenter,
+        Fixed64 radius,
+        Fixed64 radiusExpansion,
+        out Fixed64 distance)
+    {
+        return RadialSweepAdmission.TryIntersect(
+            start,
+            direction,
+            segmentLength,
+            circleCenter,
+            radius,
+            radiusExpansion,
+            end,
+            circleCenter,
+            out distance);
     }
 
     private static bool TrySweepPointAgainstSegmentCapsule(
         Vector2d start,
+        Vector2d end,
         Vector2d direction,
         Fixed64 segmentLength,
         Vector2d segmentStart,
@@ -1133,7 +1209,7 @@ internal static class QueryDetection2D
         Vector2d segment = segmentEnd - segmentStart;
         Fixed64 segmentLengthSquared = segment.MagnitudeSquared;
         if (segmentLengthSquared <= Fixed64.Epsilon)
-            return TryRaycastCircleDistance(start, direction, segmentLength, segmentStart, radius, out distance);
+            return TryRaycastCircleDistance(start, end, direction, segmentLength, segmentStart, radius, out distance);
 
         bool found = false;
         Fixed64 bestDistance = Fixed64.MaxValue;
@@ -1143,9 +1219,9 @@ internal static class QueryDetection2D
         TryKeepSegmentCapsuleSideDistance(start, direction, segmentLength, segmentStart, axis, normal, coreLength, radius, ref found, ref bestDistance);
         TryKeepSegmentCapsuleSideDistance(start, direction, segmentLength, segmentStart, axis, -normal, coreLength, radius, ref found, ref bestDistance);
 
-        if (TryRaycastCircleDistance(start, direction, segmentLength, segmentStart, radius, out Fixed64 startCapDistance))
+        if (TryRaycastCircleDistance(start, end, direction, segmentLength, segmentStart, radius, out Fixed64 startCapDistance))
             KeepEarlierDistance(startCapDistance, ref found, ref bestDistance);
-        if (TryRaycastCircleDistance(start, direction, segmentLength, segmentEnd, radius, out Fixed64 endCapDistance))
+        if (TryRaycastCircleDistance(start, end, direction, segmentLength, segmentEnd, radius, out Fixed64 endCapDistance))
             KeepEarlierDistance(endCapDistance, ref found, ref bestDistance);
 
         distance = bestDistance;

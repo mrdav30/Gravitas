@@ -18,6 +18,7 @@ public sealed partial class GravitasQueryMixedService
 {
     private static bool TrySweepSphereAgainstCircleSlab(
         Vector3d start,
+        Vector3d end,
         Vector3d direction,
         Fixed64 length,
         Fixed64 radius,
@@ -65,7 +66,7 @@ public sealed partial class GravitasQueryMixedService
             return false;
         }
 
-        Vector3d sweepCenter = start + direction * bestDistance;
+        Vector3d sweepCenter = bestDistance == length ? end : start + direction * bestDistance;
         hit = BuildSphereAgainst2DHit(
             circle,
             sweepCenter,
@@ -78,6 +79,7 @@ public sealed partial class GravitasQueryMixedService
 
     private static bool TrySweepSphereAgainstPrismBounds(
         Vector3d start,
+        Vector3d end,
         Vector3d direction,
         Fixed64 length,
         Fixed64 radius,
@@ -96,7 +98,7 @@ public sealed partial class GravitasQueryMixedService
             return false;
         }
 
-        Vector3d sweepCenter = start + direction * distance;
+        Vector3d sweepCenter = distance == length ? end : start + direction * distance;
         hit = BuildSphereAgainst2DHit(
             collider,
             sweepCenter,
