@@ -19,6 +19,8 @@ internal struct SolverContactBuffer2D
     private SolverContact2D _contact1;
     private Fixed64 _normalImpulse0;
     private Fixed64 _normalImpulse1;
+    private ContactNormalImpulseResult2D _normalResult0;
+    private ContactNormalImpulseResult2D _normalResult1;
     private Fixed64 _tangentImpulse0;
     private Fixed64 _tangentImpulse1;
 
@@ -41,18 +43,27 @@ internal struct SolverContactBuffer2D
     public Fixed64 GetNormalImpulse(int index) => index == 0 ? _normalImpulse0 : _normalImpulse1;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public ContactNormalImpulseResult2D GetNormalResult(int index) =>
+        index == 0 ? _normalResult0 : _normalResult1;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Fixed64 GetTangentImpulse(int index) => index == 0 ? _tangentImpulse0 : _tangentImpulse1;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void SetNormalImpulse(int index, Fixed64 impulse)
+    public void SetNormalImpulse(
+        int index,
+        Fixed64 impulse,
+        ContactNormalImpulseResult2D normalResult)
     {
         if (index == 0)
         {
             _normalImpulse0 = impulse;
+            _normalResult0 = normalResult;
             return;
         }
 
         _normalImpulse1 = impulse;
+        _normalResult1 = normalResult;
     }
 
     public void SetTangentImpulse(int index, Fixed64 impulse)

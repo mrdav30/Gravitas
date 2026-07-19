@@ -31,10 +31,10 @@ internal struct SolverContactBuffer
     private Fixed64 _secondaryTangentImpulse1;
     private Fixed64 _secondaryTangentImpulse2;
     private Fixed64 _secondaryTangentImpulse3;
-    private Fixed64 _normalVelocity0;
-    private Fixed64 _normalVelocity1;
-    private Fixed64 _normalVelocity2;
-    private Fixed64 _normalVelocity3;
+    private ContactNormalImpulseResult3D _normalResult0;
+    private ContactNormalImpulseResult3D _normalResult1;
+    private ContactNormalImpulseResult3D _normalResult2;
+    private ContactNormalImpulseResult3D _normalResult3;
 
     public int Count { get; private set; }
 
@@ -80,13 +80,13 @@ internal struct SolverContactBuffer
         };
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public Fixed64 GetNormalVelocity(int index) =>
+    public ContactNormalImpulseResult3D GetNormalResult(int index) =>
         index switch
         {
-            0 => _normalVelocity0,
-            1 => _normalVelocity1,
-            2 => _normalVelocity2,
-            _ => _normalVelocity3
+            0 => _normalResult0,
+            1 => _normalResult1,
+            2 => _normalResult2,
+            _ => _normalResult3
         };
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -109,25 +109,28 @@ internal struct SolverContactBuffer
             _ => _secondaryTangentImpulse3
         };
 
-    public void SetNormalImpulse(int index, Fixed64 impulse, Fixed64 normalVelocity)
+    public void SetNormalImpulse(
+        int index,
+        Fixed64 impulse,
+        ContactNormalImpulseResult3D normalResult)
     {
         switch (index)
         {
             case 0:
                 _normalImpulse0 = impulse;
-                _normalVelocity0 = normalVelocity;
+                _normalResult0 = normalResult;
                 break;
             case 1:
                 _normalImpulse1 = impulse;
-                _normalVelocity1 = normalVelocity;
+                _normalResult1 = normalResult;
                 break;
             case 2:
                 _normalImpulse2 = impulse;
-                _normalVelocity2 = normalVelocity;
+                _normalResult2 = normalResult;
                 break;
             default:
                 _normalImpulse3 = impulse;
-                _normalVelocity3 = normalVelocity;
+                _normalResult3 = normalResult;
                 break;
         }
     }

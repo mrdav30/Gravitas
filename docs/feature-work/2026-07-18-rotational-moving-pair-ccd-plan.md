@@ -105,13 +105,18 @@ response. Admission changes begin only after both contracts are green.
 
 ## Phase 2: Contact-Point CCD Impact Kernels
 
-- [ ] Extract allocation-free 2D, 3D, and mixed normal-impact math from the
+- [x] Extract allocation-free 2D, 3D, and mixed normal-impact math from the
       discrete response model: contact velocity, constrained inverse
       mass/inertia, restitution, and paired linear/angular deltas.
-- [ ] Keep response calculation side-effect-free until every finite delta is
+- [x] Keep response calculation side-effect-free until every finite delta is
       proven, then apply both participants atomically.
-- [ ] Cover frozen axes, infinite/zero effective mass, separating/tangent
+- [x] Cover frozen axes, infinite/zero effective mass, separating/tangent
       contact, pure angular closing speed, and mixed planar constraints.
+      The focused 2D/3D/mixed response and warm-start slice passes 106 tests
+      with zero allocations in the scalar-free kernels. A wider 3D fused
+      inverse-inertia matrix product-sum/divide remains a lower-math-layer
+      hardening candidate; the current extraction does not regress the
+      discrete solver's established Q32.32 boundary.
 
 ## Phase 3: Rotational Handoff Continuation
 

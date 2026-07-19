@@ -52,21 +52,34 @@ public static class CollisionResponse2D
         for (int i = 0; i < contacts.Count; i++)
         {
             SolverContact2D contact = contacts.GetContact(i);
-            Fixed64 normalDelta = ComputeNormalImpulseDelta(
-                contact,
-                restitutionVelocityThreshold);
-            Fixed64 normalImpulse = FixedMath.Max(
-                Fixed64.Zero,
-                contact.CachedNormalImpulse + normalDelta * contactShare);
+            SolidBody2D? contactBodyA = contact.A.Body;
+            SolidBody2D? contactBodyB = contact.B.Body;
+            ContactNormalImpulseResult2D normalResult = ContactNormalImpulse2D.CalculateAccumulatedDelta(
+                contactBodyA,
+                contactBodyA?.LinearVelocity ?? Vector2d.Zero,
+                contactBodyA?.AngularVelocity ?? Fixed64.Zero,
+                contact.RelativeA,
+                contactBodyB,
+                contactBodyB?.LinearVelocity ?? Vector2d.Zero,
+                contactBodyB?.AngularVelocity ?? Fixed64.Zero,
+                contact.RelativeB,
+                contact.Normal,
+                contact.Restitution,
+                restitutionVelocityThreshold,
+                contact.CachedNormalImpulse,
+                contactShare,
+                contactShare);
+            Fixed64 normalImpulse = contact.CachedNormalImpulse + normalResult.ImpulseScalar;
             contacts.SetNormalImpulse(
                 i,
-                normalImpulse);
+                normalImpulse,
+                normalResult);
         }
 
         for (int i = 0; i < contacts.Count; i++)
             ApplyNormalImpulse(
                 contacts.GetContact(i),
-                contacts.GetNormalImpulse(i) - contacts.GetContact(i).CachedNormalImpulse);
+                contacts.GetNormalResult(i));
 
         for (int i = 0; i < contacts.Count; i++)
         {
@@ -194,27 +207,34 @@ public static class CollisionResponse2D
         ApplyImpulse(contact, impulse);
     }
 
-    private static Fixed64 ComputeNormalImpulseDelta(
+    private static void ApplyNormalImpulse(
         SolverContact2D contact,
-        Fixed64 restitutionVelocityThreshold)
+        ContactNormalImpulseResult2D result)
     {
-        Fixed64 normalVelocity = Vector2d.Dot(ComputeRelativeVelocity(contact), contact.Normal);
-        Fixed64 denominator = ComputeImpulseDenominator(contact, contact.Normal);
-        if (denominator <= Fixed64.Epsilon)
-            return Fixed64.Zero;
-
-        Fixed64 restitution = normalVelocity < Fixed64.Zero
-            ? ResolveRestitution(contact, -normalVelocity, restitutionVelocityThreshold)
-            : Fixed64.Zero;
-        return -(Fixed64.One + restitution) * normalVelocity / denominator;
-    }
-
-    private static void ApplyNormalImpulse(SolverContact2D contact, Fixed64 impulseScalar)
-    {
-        if (impulseScalar == Fixed64.Zero)
+        if (result.ImpulseScalar == Fixed64.Zero)
             return;
 
-        ApplyImpulse(contact, contact.Normal * impulseScalar);
+        ApplyVelocityDelta(
+            contact.A,
+            result.LinearVelocityDeltaA,
+            result.AngularVelocityDeltaA);
+        ApplyVelocityDelta(
+            contact.B,
+            result.LinearVelocityDeltaB,
+            result.AngularVelocityDeltaB);
+    }
+
+    private static void ApplyVelocityDelta(
+        ResponseBody2D body,
+        Vector2d linearVelocityDelta,
+        Fixed64 angularVelocityDelta)
+    {
+        if (!body.CanTranslate)
+            return;
+
+        body.Body!.ApplyCollisionLinearVelocityDelta(linearVelocityDelta);
+        if (body.CanRotate)
+            body.Body.ApplyCollisionAngularVelocityDelta(angularVelocityDelta);
     }
 
     private static Fixed64 SolveFrictionImpulse(SolverContact2D contact, Fixed64 normalImpulseScalar)
@@ -307,17 +327,6 @@ public static class CollisionResponse2D
 
         Fixed64 cross = Vector2d.CrossProduct(relativeContactPoint, axis);
         return cross * cross * body.InverseMoment;
-    }
-
-    private static Fixed64 ResolveRestitution(
-        SolverContact2D contact,
-        Fixed64 closingSpeed,
-        Fixed64 restitutionVelocityThreshold)
-    {
-        if (closingSpeed <= restitutionVelocityThreshold)
-            return Fixed64.Zero;
-
-        return contact.Restitution;
     }
 
     private static Vector2d ResolveContactNormal(Vector2d normal, Vector2d fallbackDirection)

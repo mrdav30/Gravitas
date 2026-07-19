@@ -42,8 +42,6 @@ public static class CollisionResponseMixed
         Fixed64 inverseMass2D = body2D?.EffectiveInverseMass ?? Fixed64.Zero;
         Fixed64 correctionInverseMass = GetConstrainedInverseMass(body3D, normal)
             + GetConstrainedPlanarInverseMass(body2D, normal);
-        if (correctionInverseMass <= Fixed64.Zero)
-            return false;
 
         Vector3d relative3D = contact.Point3D - (body3D?.WorldCenterOfMass ?? pair.Collider3D.Center);
         Vector2d relative2D = body2D == null
@@ -51,7 +49,7 @@ public static class CollisionResponseMixed
             : contact.Point2D.ToVector2d() - body2D.WorldCenterOfMass;
         Fixed64 inverseMoment2D = body2D?.EffectiveInverseMomentOfInertia ?? Fixed64.Zero;
 
-        if (applyPositionCorrection)
+        if (applyPositionCorrection && correctionInverseMass > Fixed64.Zero)
             ApplyPositionCorrection(body3D, body2D, normal, contact.Depth, correctionInverseMass);
 
         Fixed64 normalImpulse = ApplyNormalImpulse(
@@ -62,9 +60,6 @@ public static class CollisionResponseMixed
             normal,
             relative3D,
             relative2D,
-            inverseMass3D,
-            inverseMass2D,
-            inverseMoment2D,
             iteration,
             iterationLimit);
 
@@ -123,39 +118,60 @@ public static class CollisionResponseMixed
         Vector3d normal,
         Vector3d relative3D,
         Vector2d relative2D,
-        Fixed64 inverseMass3D,
-        Fixed64 inverseMass2D,
-        Fixed64 inverseMoment2D,
         int iteration,
         int iterationLimit)
     {
-        Vector3d relativeVelocity = ComputeRelativeVelocity(body3D, body2D, relative3D, relative2D);
-        Fixed64 normalVelocity = Vector3d.Dot(relativeVelocity, normal);
-        if (normalVelocity >= Fixed64.Zero)
+        PhysicsMaterial material3D = contact.HasMaterialOverride
+            ? contact.Material3D
+            : pair.Collider3D.Material;
+        PhysicsMaterial material2D = contact.HasMaterialOverride
+            ? contact.Material2D
+            : pair.Collider2D.Material;
+        ContactNormalImpulseResultMixed result = ContactNormalImpulseMixed.CalculateAccumulatedDelta(
+            body3D,
+            body3D == null ? Vector3d.Zero : ResolveLinearVelocity(body3D),
+            body3D?.AngularVelocity ?? Vector3d.Zero,
+            relative3D,
+            body2D,
+            body2D == null ? Vector2d.Zero : ResolveLinearVelocity(body2D),
+            body2D?.AngularVelocity ?? Fixed64.Zero,
+            relative2D,
+            normal,
+            PhysicsMaterial.CombineRestitution(material3D, material2D),
+            pair.Context.Settings.RestitutionVelocityThreshold,
+            Fixed64.Zero,
+            Fixed64.One,
+            Fixed64.One);
+        if (result.ImpulseScalar <= Fixed64.Zero)
             return Fixed64.Zero;
 
-        Fixed64 denominator = GetConstrainedInverseMass(body3D, normal)
-            + GetConstrainedPlanarInverseMass(body2D, normal)
-            + ComputeAngularDenominator(body3D, relative3D, normal)
-            + ComputePlanarAngularDenominator(relative2D, normal.ToVector2d(), inverseMoment2D);
-        if (denominator <= Fixed64.Epsilon)
-            return Fixed64.Zero;
-
-        Fixed64 restitution = ResolveRestitution(
-            contact.HasMaterialOverride ? contact.Material3D : pair.Collider3D.Material,
-            contact.HasMaterialOverride ? contact.Material2D : pair.Collider2D.Material,
-            -normalVelocity,
-            pair.Context.Settings.RestitutionVelocityThreshold);
-        Fixed64 impulseScalar = -(Fixed64.One + restitution) * normalVelocity / denominator;
         pair.Context.Diagnostics.EmitMixedResponseImpulse(
             pair,
             contact,
-            normal * impulseScalar,
-            normalVelocity,
+            normal * result.ImpulseScalar,
+            result.NormalVelocity,
             iteration,
             iterationLimit);
-        ApplyImpulse(body3D, body2D, normal, relative3D, relative2D, inverseMass3D, inverseMass2D, inverseMoment2D, impulseScalar);
-        return impulseScalar;
+        ApplyNormalVelocityDeltas(body3D, body2D, result);
+        return result.ImpulseScalar;
+    }
+
+    private static void ApplyNormalVelocityDeltas(
+        SolidBody? body3D,
+        SolidBody2D? body2D,
+        ContactNormalImpulseResultMixed result)
+    {
+        if (body3D != null)
+        {
+            body3D.ApplyCollisionLinearVelocityDelta(result.LinearVelocityDelta3D);
+            body3D.ApplyCollisionAngularVelocityDelta(result.AngularVelocityDelta3D);
+        }
+
+        if (body2D == null)
+            return;
+
+        body2D.ApplyCollisionLinearVelocityDelta(result.LinearVelocityDelta2D);
+        body2D.ApplyCollisionAngularVelocityDelta(result.AngularVelocityDelta2D);
     }
 
     private static bool ApplyFrictionImpulse(
@@ -348,15 +364,4 @@ public static class CollisionResponseMixed
     private static bool CanRotate(SolidBody? body) =>
         body?.CanRotate == true;
 
-    private static Fixed64 ResolveRestitution(
-        PhysicsMaterial material3D,
-        PhysicsMaterial material2D,
-        Fixed64 closingSpeed,
-        Fixed64 restitutionVelocityThreshold)
-    {
-        if (closingSpeed <= restitutionVelocityThreshold)
-            return Fixed64.Zero;
-
-        return PhysicsMaterial.CombineRestitution(material3D, material2D);
-    }
 }

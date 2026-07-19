@@ -12,6 +12,64 @@ namespace Gravitas.CollisionHandling;
 internal static class ContinuousCollisionImpulsePolicy
 {
     internal static bool TryResolveVelocityDelta(
+        Vector3d signedNormal,
+        Fixed64 normalVelocity,
+        Fixed64 responseFactor,
+        Fixed64 bodyInverseMass,
+        Fixed64 constrainedInverseMass,
+        out Vector3d velocityDelta)
+    {
+        if (bodyInverseMass == Fixed64.Zero)
+        {
+            velocityDelta = default;
+            return true;
+        }
+
+        if (!Fixed64.TryMultiplyDivide(
+                normalVelocity,
+                responseFactor,
+                bodyInverseMass,
+                constrainedInverseMass,
+                out Fixed64 speedDelta))
+        {
+            velocityDelta = default;
+            return false;
+        }
+
+        velocityDelta = signedNormal * speedDelta;
+        return true;
+    }
+
+    internal static bool TryResolveVelocityDelta(
+        Vector2d signedNormal,
+        Fixed64 normalVelocity,
+        Fixed64 responseFactor,
+        Fixed64 bodyInverseMass,
+        Fixed64 constrainedInverseMass,
+        out Vector2d velocityDelta)
+    {
+        if (bodyInverseMass == Fixed64.Zero)
+        {
+            velocityDelta = default;
+            return true;
+        }
+
+        if (!Fixed64.TryMultiplyDivide(
+                normalVelocity,
+                responseFactor,
+                bodyInverseMass,
+                constrainedInverseMass,
+                out Fixed64 speedDelta))
+        {
+            velocityDelta = default;
+            return false;
+        }
+
+        velocityDelta = signedNormal * speedDelta;
+        return true;
+    }
+
+    internal static bool TryResolveVelocityDelta(
         Vector3d normal,
         Fixed64 responseSpeed,
         Fixed64 bodyInverseMass,
