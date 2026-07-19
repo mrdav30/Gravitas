@@ -14,7 +14,7 @@ using Xunit;
 
 namespace Gravitas.Tests.MixedDimensions;
 
-public sealed class MixedQueryCcdTests
+public sealed partial class MixedQueryCcdTests
 {
     private static readonly PhysicsLayerMask IncludeLayerZero = PhysicsLayerMask.FromLayer(0);
 
@@ -3892,13 +3892,11 @@ public sealed class MixedQueryCcdTests
         source.LastContinuousCollisionToiIterationLimitReached.Should().BeFalse();
         source.Position.Should().Be(new Vector2d(
             sourceStart.X,
-            Fixed64.Half + Fixed64.FromRaw(768)));
-        source.LinearVelocity.Should().Be(Vector2d.Forward * (Fixed64.Half + Fixed64.FromRaw(512)));
-        target.Body.Position3d.Should().Be(new Vector3d(
-            Fixed64.FromRaw(6_198_364_188),
-            Fixed64.Zero,
-            Fixed64.FromRaw(-512)));
-        target.Body.LinearVelocity.Should().Be(target.Body.Position3d);
+            Fixed64.Half + Fixed64.FromRaw(399)));
+        source.LinearVelocity.Should().Be(
+            Vector2d.Forward * (Fixed64.Half + Fixed64.FromRaw(143)));
+        target.Body.Position3d.Should().Be(Vector3d.Zero);
+        target.Body.LinearVelocity.Should().Be(Vector3d.Zero);
     }
 
     [Fact]
@@ -3952,13 +3950,14 @@ public sealed class MixedQueryCcdTests
         source.Body.Position3d.Should().Be(new Vector3d(
             -Fixed64.One,
             Fixed64.Zero,
-            Fixed64.FromRaw(598_220_249)));
-        source.Body.LinearVelocity.Should().Be(Vector3d.Forward * Fixed64.FromRaw(598_154_713));
-        source.Body.LastContinuousCollisionToiIterationCount.Should().Be(2);
+            Fixed64.FromRaw(598_089_177)));
+        source.Body.LinearVelocity.Should().Be(
+            Vector3d.Forward * Fixed64.FromRaw(598_023_641));
+        source.Body.LastContinuousCollisionToiIterationCount.Should().Be(1);
         source.Body.LastContinuousCollisionToiIterationLimitReached.Should().BeFalse();
         target.Position.Should().Be(new Vector2d(
-            Fixed64.FromRaw(8_589_916_336),
-            Fixed64.FromRaw(-262_144)));
+            Fixed64.FromRaw(-9_127),
+            Fixed64.FromRaw(-131_072)));
         target.LinearVelocity.Should().Be(target.Position);
     }
 

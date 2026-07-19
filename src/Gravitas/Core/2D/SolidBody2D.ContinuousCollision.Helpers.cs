@@ -60,7 +60,7 @@ public sealed partial class SolidBody2D
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal Vector2d ResolveContinuousCollisionFrameVelocity() =>
-        ProjectLinearMotion(_continuousCollisionFrameDisplacement / Context.DeltaTime);
+        ProjectLinearMotion(ContinuousCollisionFrameDisplacement / Context.DeltaTime);
 
     private Fixed64 ResolveConvexContinuousCollisionProxyRadius()
     {

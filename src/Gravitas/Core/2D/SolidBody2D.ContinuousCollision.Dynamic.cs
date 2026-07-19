@@ -27,13 +27,18 @@ public sealed partial class SolidBody2D
 
         _position += ProjectLinearMotion(positionAtImpact - _position);
         ApplyCollisionLinearVelocityDelta(velocityDelta);
-        if (remainingTime <= Fixed64.Epsilon || _linearVelocity.MagnitudeSquared <= Fixed64.Epsilon)
+        bool hasRemainingMotion = remainingTime > Fixed64.Epsilon
+            && _linearVelocity.MagnitudeSquared > Fixed64.Epsilon;
+        AppendContinuousCollisionFrameSegment(
+            positionAtImpact,
+            hasRemainingMotion ? _linearVelocity : Vector2d.Zero,
+            Context.DeltaTime - remainingTime);
+        if (!hasRemainingMotion)
         {
             DiscardContinuousCollisionHandoff();
             return;
         }
 
-        UpdateContinuousCollisionFrameTrajectory(positionAtImpact, _linearVelocity, Context.DeltaTime - remainingTime);
         _continuousCollisionHandoffToken = Context.LateSimulateToken;
         _continuousCollisionHandoffRemainingTime = remainingTime;
         _continuousCollisionHandoffIgnoredCollider3D = ignoredCollider3D;
@@ -263,7 +268,9 @@ public sealed partial class SolidBody2D
         Fixed64 constrainedInverseMassB = target.GetConstrainedInverseMass(normal);
         Fixed64 inverseMass = constrainedInverseMassA + constrainedInverseMassB;
 
-        Fixed64 normalVelocity = Vector2d.Dot(_linearVelocity - target.ResolveContinuousCollisionFrameVelocity(), normal);
+        Fixed64 normalVelocity = Vector2d.Dot(
+            _linearVelocity - target.ResolveContinuousCollisionFrameVelocity(),
+            normal);
         Fixed64 restitution = ResolveContinuousCollisionRestitution(target, -normalVelocity);
         Fixed64 responseSpeed = -(Fixed64.One + restitution) * normalVelocity;
         Vector2d sourceResponseNormal = ProjectLinearMotion(normal);
@@ -348,13 +355,10 @@ public sealed partial class SolidBody2D
         Vector2d velocity,
         Fixed64 elapsedTime)
     {
-        Fixed64 deltaTime = Context.DeltaTime;
-        Fixed64 elapsedFraction = FixedMath.Clamp01(elapsedTime / deltaTime);
-        Vector2d frameDisplacement = ProjectLinearMotion(velocity) * deltaTime;
-        _continuousCollisionFrameToken = Context.LateSimulateToken;
-        _continuousCollisionFrameDisplacement = frameDisplacement;
-        _continuousCollisionFrameStart = positionAtElapsedTime - frameDisplacement * elapsedFraction;
-        _continuousCollisionFrameRotation = _rotation;
+        AppendContinuousCollisionFrameSegment(
+            positionAtElapsedTime,
+            velocity,
+            elapsedTime);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

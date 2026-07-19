@@ -16,7 +16,7 @@ public partial class SolidBody
         ref ChronicleHashWriter writer,
         GravitasReplayHashMode mode)
     {
-        writer.WriteSection("body.3d", 2);
+        writer.WriteSection("body.3d", 3);
         writer.WriteInt32(_dynamicId);
         writer.WriteBool(Debug);
         writer.WriteBool(Active);
@@ -68,7 +68,7 @@ public partial class SolidBody
         writer.WriteVector3d(_normalForce);
         writer.WriteFixed64(Mass);
 
-        writer.WriteSection("body.3d.ccd-authoritative", 2);
+        writer.WriteSection("body.3d.ccd-authoritative", 3);
         writer.WriteBool(_continuousCollisionHandoffPending);
         if (_continuousCollisionHandoffPending)
         {
@@ -76,16 +76,16 @@ public partial class SolidBody
             writer.WriteFixed64(_continuousCollisionHandoffRemainingTime);
             writer.WriteInt32(_continuousCollisionHandoffIgnoredCollider3D?.ReplayOrdinal ?? -1);
             writer.WriteInt32(_continuousCollisionHandoffIgnoredCollider2D?.ReplayOrdinal ?? -1);
+            WriteContinuousCollisionTrajectory(ref writer);
         }
 
         if (mode != GravitasReplayHashMode.AuthoritativeWithSolverCaches)
             return;
 
-        writer.WriteSection("body.3d.solver-caches", 2);
+        writer.WriteSection("body.3d.solver-caches", 3);
         writer.WriteInt32(_continuousCollisionFrameToken);
-        writer.WriteVector3d(_continuousCollisionFrameStart);
-        writer.WriteVector3d(_continuousCollisionFrameDisplacement);
-        writer.WriteQuaternion(_continuousCollisionFrameRotation);
+        writer.WriteVector3d(_continuousCollisionAngularVelocityStepStart);
+        WriteContinuousCollisionTrajectory(ref writer);
         writer.WriteInt32(_continuousCollisionHandoffToken);
         writer.WriteFixed64(_continuousCollisionHandoffRemainingTime);
         writer.WriteInt32(LastContinuousCollisionToiIterationCount);
@@ -97,5 +97,25 @@ public partial class SolidBody
         writer.WriteInt32(_continuousCollisionHits.Count);
         writer.WriteInt32(_continuousMixedCollisionHits.Count);
         writer.WriteInt32(_rotationalContinuousCollisionManifold.Count);
+    }
+
+    private void WriteContinuousCollisionTrajectory(ref ChronicleHashWriter writer)
+    {
+        writer.WriteInt32(_continuousCollisionTrajectory.Count);
+        for (int i = 0; i < _continuousCollisionTrajectory.Count; i++)
+        {
+            Gravitas.CollisionHandling.ContinuousCollisionMotionSegment3D segment =
+                _continuousCollisionTrajectory[i];
+            writer.WriteFixed64(segment.StartFraction);
+            writer.WriteFixed64(segment.EndFraction);
+            writer.WriteVector3d(segment.StartPosition);
+            writer.WriteVector3d(segment.EndPosition);
+            writer.WriteVector3d(segment.Displacement);
+            writer.WriteQuaternion(segment.StartRotation);
+            writer.WriteVector3d(segment.AngularVelocity);
+            writer.WriteQuaternion(segment.TargetRotation);
+            writer.WriteFixed64(segment.AngularDistance);
+            writer.WriteEnum(segment.RotationPath);
+        }
     }
 }

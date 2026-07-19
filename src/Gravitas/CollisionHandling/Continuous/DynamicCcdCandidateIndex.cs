@@ -71,9 +71,19 @@ internal sealed class DynamicCcdCandidateIndex
     }
 
     public static FixedBoundVolume CreateSweptSphereBounds(Vector3d start, Vector3d displacement, Fixed64 radius)
+        => CreateBoundsBetween(start, start + displacement, Vector3d.One * radius);
+
+    public static FixedBoundVolume CreateSweptBounds(
+        Vector3d start,
+        Vector3d displacement,
+        Vector3d extents) =>
+        CreateBoundsBetween(start, start + displacement, extents);
+
+    public static FixedBoundVolume CreateBoundsBetween(
+        Vector3d start,
+        Vector3d end,
+        Vector3d extents)
     {
-        Vector3d end = start + displacement;
-        Vector3d extents = Vector3d.One * radius;
         return new FixedBoundVolume(Vector3d.Min(start, end) - extents, Vector3d.Max(start, end) + extents);
     }
 
@@ -268,8 +278,13 @@ internal sealed class DynamicCcdCandidateIndex2D
     }
 
     public static DynamicCcdPlanarBounds CreateSweptCircleBounds(Vector2d start, Vector2d displacement, Fixed64 radius)
+        => CreateBoundsBetween(start, start + displacement, radius);
+
+    public static DynamicCcdPlanarBounds CreateBoundsBetween(
+        Vector2d start,
+        Vector2d end,
+        Fixed64 radius)
     {
-        Vector2d end = start + displacement;
         Fixed64 minX = FixedMath.Min(start.X, end.X) - radius;
         Fixed64 maxX = FixedMath.Max(start.X, end.X) + radius;
         Fixed64 minZ = FixedMath.Min(start.Y, end.Y) - radius;

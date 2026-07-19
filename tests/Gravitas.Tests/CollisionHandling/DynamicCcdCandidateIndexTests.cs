@@ -169,6 +169,70 @@ public sealed class DynamicCcdCandidateIndexTests
     }
 
     [Fact]
+    public void MotionSegments_WithUnrepresentableEndpointDelta_ShouldPreserveEndpointsAndRefuseSeparationBound()
+    {
+        Vector3d start3D = new(Fixed64.MinValue, Fixed64.Zero, Fixed64.Zero);
+        Vector3d end3D = new(Fixed64.MaxValue, Fixed64.One, Fixed64.Zero);
+        var segment3D = new ContinuousCollisionMotionSegment3D(
+            Fixed64.Zero,
+            Fixed64.One,
+            start3D,
+            end3D,
+            end3D - start3D,
+            FixedQuaternion.Identity,
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            Fixed64.Zero,
+            ContinuousCollisionRotationPath3D.IntegratedAngularVelocity);
+        Vector2d start2D = new(Fixed64.MinValue, Fixed64.Zero);
+        Vector2d end2D = new(Fixed64.MaxValue, Fixed64.One);
+        var segment2D = new ContinuousCollisionMotionSegment2D(
+            Fixed64.Zero,
+            Fixed64.One,
+            start2D,
+            end2D,
+            end2D - start2D,
+            Fixed64.Zero,
+            Fixed64.Zero,
+            Fixed64.Zero);
+
+        segment3D.SamplePosition(Fixed64.One).Should().Be(end3D);
+        segment2D.SamplePosition(Fixed64.One).Should().Be(end2D);
+        segment3D.TryResolveMotionBound(
+                Fixed64.Zero,
+                Fixed64.One,
+                Fixed64.One,
+                out _)
+            .Should()
+            .BeFalse();
+        segment2D.TryResolveMotionBound(
+                Fixed64.Zero,
+                Fixed64.One,
+                Fixed64.One,
+                out _)
+            .Should()
+            .BeFalse();
+    }
+
+    [Fact]
+    public void CreateSweptBounds_ShouldPreserveAnisotropicExtents()
+    {
+        FixedBoundVolume bounds = DynamicCcdCandidateIndex.CreateSweptBounds(
+            new Vector3d((Fixed64)(-2), Fixed64.One, (Fixed64)3),
+            new Vector3d((Fixed64)4, (Fixed64)(-2), Fixed64.Two),
+            new Vector3d(Fixed64.Half, Fixed64.One, Fixed64.Two));
+
+        bounds.Min.Should().Be(new Vector3d(
+            Fixed64.FromFraction(-5, 2),
+            (Fixed64)(-2),
+            Fixed64.One));
+        bounds.Max.Should().Be(new Vector3d(
+            Fixed64.FromFraction(5, 2),
+            Fixed64.Two,
+            (Fixed64)7));
+    }
+
+    [Fact]
     public void CreateSweptCircleBounds_ShouldCreatePlanarBounds()
     {
         DynamicCcdPlanarBounds bounds = DynamicCcdCandidateIndex2D.CreateSweptCircleBounds(

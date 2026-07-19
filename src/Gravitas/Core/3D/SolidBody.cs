@@ -82,9 +82,9 @@ public partial class SolidBody : IRecordable
 
     private ContinuousCollisionMode _continuousCollisionMode = ContinuousCollisionMode.Inherit;
     private int _continuousCollisionFrameToken = int.MinValue;
-    private Vector3d _continuousCollisionFrameStart;
-    private Vector3d _continuousCollisionFrameDisplacement;
-    private FixedQuaternion _continuousCollisionFrameRotation;
+    private readonly SwiftList<ContinuousCollisionMotionSegment3D> _continuousCollisionTrajectory =
+        new(PhysicsSettings.DefaultContinuousCollisionMaxToiIterations + 1);
+    private Vector3d _continuousCollisionAngularVelocityStepStart;
     private bool _continuousCollisionHandoffPending;
     private int _continuousCollisionHandoffToken = int.MinValue;
     private Fixed64 _continuousCollisionHandoffRemainingTime;
@@ -603,6 +603,7 @@ public partial class SolidBody : IRecordable
 
         Active = true;
 
+        InvalidateContinuousCollisionTrajectory();
         ClearMotionForSleep();
         _normalForce = Vector3d.Zero;
         _isSleeping = false;
@@ -693,12 +694,21 @@ public partial class SolidBody : IRecordable
 
     private void UpdateKinematicPositionAndRotation()
     {
+        EnsureContinuousCollisionFramePrepared(Context.LateSimulateToken);
         Vector3d startPosition = Position3d;
         FixedQuaternion startRotation = Rotation;
-        Vector3d kinematicPosition = _positionTransform.WorldPosition;
-        FixedQuaternion kinematicRotation = _rotationTransform.WorldRotation;
+        Vector3d requestedPosition = _positionTransform.WorldPosition;
+        FixedQuaternion requestedRotation = _rotationTransform.WorldRotation;
+        Vector3d kinematicPosition = ContinuousCollisionFrameEnd;
+        FixedQuaternion kinematicRotation = ContinuousCollisionFrameTargetRotation;
         if (startPosition == kinematicPosition && startRotation == kinematicRotation)
+        {
+            if (requestedPosition != kinematicPosition)
+                SetPositionTransformWorldPosition(kinematicPosition);
+            if (requestedRotation != kinematicRotation)
+                SetRotationTransformWorldRotation(kinematicRotation);
             return;
+        }
 
         Wake();
 
@@ -706,13 +716,12 @@ public partial class SolidBody : IRecordable
         if (ShouldUseContinuousCollision(out _))
             _ = ContinuousCollisionSweepRange.ValidateEndpoint(startPosition, resolvedPosition, out _);
         FixedQuaternion resolvedRotation = kinematicRotation;
-        CaptureKinematicContinuousCollisionFrame(startPosition, resolvedPosition, startRotation);
         TryResolveKinematicContinuousCollision(startPosition, ref resolvedPosition);
         TryResolveKinematicRotationalContinuousCollision(startPosition, ref resolvedPosition, startRotation, ref resolvedRotation);
 
-        if (resolvedPosition != kinematicPosition)
+        if (resolvedPosition != requestedPosition)
             SetPositionTransformWorldPosition(resolvedPosition);
-        if (resolvedRotation != kinematicRotation)
+        if (resolvedRotation != requestedRotation)
             SetRotationTransformWorldRotation(resolvedRotation);
 
         SetPosition2d(resolvedPosition.ToVector2d());
@@ -827,6 +836,7 @@ public partial class SolidBody : IRecordable
             return;
 
         DiscardContinuousCollisionHandoff();
+        InvalidateContinuousCollisionTrajectory();
         Collider.DeactivateRuntimeRegistration();
         Context.Physics.DessimilateBody(this);
         _dynamicId = -1;
@@ -912,6 +922,7 @@ public partial class SolidBody : IRecordable
 
     public void ResetPosition(Vector3d position = default, FixedQuaternion rotation = default)
     {
+        InvalidateContinuousCollisionTrajectory();
         ClearMotionForSleep();
         bool wasSleeping = _isSleeping;
         _isSleeping = false;

@@ -44,9 +44,8 @@ public sealed partial class SolidBody2D : IRecordable
     private Fixed64 _sleepAngularSpeedThreshold = (Fixed64)0.001f;
     private ContinuousCollisionMode _continuousCollisionMode = ContinuousCollisionMode.Inherit;
     private int _continuousCollisionFrameToken = int.MinValue;
-    private Vector2d _continuousCollisionFrameStart;
-    private Vector2d _continuousCollisionFrameDisplacement;
-    private Fixed64 _continuousCollisionFrameRotation;
+    private readonly SwiftList<ContinuousCollisionMotionSegment2D> _continuousCollisionTrajectory =
+        new(PhysicsSettings.DefaultContinuousCollisionMaxToiIterations + 1);
     private bool _continuousCollisionHandoffPending;
     private int _continuousCollisionHandoffToken = int.MinValue;
     private Fixed64 _continuousCollisionHandoffRemainingTime;
@@ -404,6 +403,7 @@ public sealed partial class SolidBody2D : IRecordable
         _isSleeping = false;
         _isDynamic = isDynamic;
         _sleepFrameCount = 0;
+        InvalidateContinuousCollisionFrame();
         ResetGroundingForInitialize(position);
         Active = true;
         Collider.Initialize(this);
@@ -432,6 +432,7 @@ public sealed partial class SolidBody2D : IRecordable
         _sleepFrameCount = 0;
         _position = position;
         _rotation = CanonicalizeRotation(rotation);
+        InvalidateContinuousCollisionFrame();
         ResetGroundingForInitialize(position);
 
         if (!Active)
@@ -496,6 +497,8 @@ public sealed partial class SolidBody2D : IRecordable
             if (TryConsumeContinuousCollisionHandoff(updateSleepState, updateColliderState))
                 return;
 
+            EnsureContinuousCollisionFramePrepared(Context.LateSimulateToken);
+
             if (IsKinematic)
                 UpdateKinematicPositionAndRotation(updateColliderState);
 
@@ -511,28 +514,8 @@ public sealed partial class SolidBody2D : IRecordable
             if (_isSleeping)
                 return;
 
-            _linearAccelerationStore = RemoveIntoGroundComponent(_deltaAcceleration + Gravity * _gravityScale);
-            _deltaAcceleration = Vector2d.Zero;
-            _linearVelocity += ProjectLinearMotion(_linearAccelerationStore * Context.DeltaTime);
-            _linearVelocity = RemoveIntoGroundComponent(_linearVelocity);
-            _linearAccelerationStore = Vector2d.Zero;
-            RefreshLinearSpeed();
-
             Fixed64 startRotation = _rotation;
-            Fixed64 proposedRotation = startRotation;
-            if (CanRotate)
-            {
-                _angularAccelerationStore = _deltaAngularAcceleration;
-                _deltaAngularAcceleration = Fixed64.Zero;
-                _angularVelocity += _angularAccelerationStore * Context.DeltaTime;
-                proposedRotation += _angularVelocity * Context.DeltaTime;
-                RefreshAngularSpeed();
-            }
-            else
-            {
-                _angularAccelerationStore = Fixed64.Zero;
-                _deltaAngularAcceleration = Fixed64.Zero;
-            }
+            Fixed64 proposedRotation = startRotation + _angularVelocity * Context.DeltaTime;
 
             Vector2d startPosition = _position;
             Vector2d proposedPosition = startPosition + _linearVelocity * Context.DeltaTime;
@@ -573,22 +556,28 @@ public sealed partial class SolidBody2D : IRecordable
         Vector2d startPosition = _position;
         Fixed64 startRotation = _rotation;
         FixedTransform transform = Agent.Transform;
-        Vector2d kinematicPosition = transform.WorldPositionXZ;
-        Fixed64 kinematicRotation = CanonicalizeRotation(transform.WorldRotationXZRadians);
+        Vector2d requestedHostPosition = transform.WorldPositionXZ;
+        Fixed64 requestedHostRotation = CanonicalizeRotation(
+            transform.WorldRotationXZRadians);
+        Vector2d kinematicPosition = ContinuousCollisionFrameEnd;
+        Fixed64 kinematicRotation = ContinuousCollisionFrameTargetRotation;
         if (startPosition == kinematicPosition && startRotation == kinematicRotation)
+        {
+            if (requestedHostPosition != kinematicPosition
+                || requestedHostRotation != kinematicRotation)
+                SetHostWorldPose(transform, kinematicPosition, kinematicRotation);
             return;
+        }
 
         Wake();
-        Vector2d resolvedPosition = ProjectLinearEndpoint(startPosition, kinematicPosition);
-        if (ShouldUseContinuousCollision(out _))
-            _ = ContinuousCollisionSweepRange.ValidateEndpoint(startPosition, resolvedPosition, out _);
+        Vector2d resolvedPosition = kinematicPosition;
         Fixed64 resolvedRotation = kinematicRotation;
-        CaptureKinematicContinuousCollisionFrame(startPosition, resolvedPosition, startRotation);
         TryResolveKinematicContinuousCollision(startPosition, ref resolvedPosition);
         TryResolveKinematicRotationalContinuousCollision(startPosition, ref resolvedPosition, startRotation, ref resolvedRotation);
 
         resolvedRotation = CanonicalizeRotation(resolvedRotation);
-        if (resolvedPosition != kinematicPosition || resolvedRotation != kinematicRotation)
+        if (resolvedPosition != requestedHostPosition
+            || resolvedRotation != requestedHostRotation)
             SetHostWorldPose(transform, resolvedPosition, resolvedRotation);
 
         _position = resolvedPosition;
@@ -634,6 +623,7 @@ public sealed partial class SolidBody2D : IRecordable
             return;
 
         DiscardContinuousCollisionHandoff();
+        InvalidateContinuousCollisionFrame();
         Context.Physics2D.DessimilateBody(this);
         Active = false;
         _isDynamic = false;

@@ -37,8 +37,7 @@ public sealed partial class GravitasPhysicsService
 
     private void AddContinuousCollisionCandidate(SolidBody body)
     {
-        if (body.IsPositionFullyFrozen
-            || body.IsKinematic
+        if ((!body.IsKinematic && body.IsPositionFullyFrozen)
             || body.Collider.IsTrigger)
         {
             return;
@@ -50,10 +49,10 @@ public sealed partial class GravitasPhysicsService
 
         _continuousCollisionCandidates.Add(
             body.DynamicId,
-            DynamicCcdCandidateIndex.CreateSweptSphereBounds(
+            DynamicCcdCandidateIndex.CreateBoundsBetween(
                 body.ContinuousCollisionFrameStart,
-                body.ContinuousCollisionFrameDisplacement,
-                radius));
+                body.ContinuousCollisionFrameEnd,
+                Vector3d.One * radius));
     }
 
     /// <summary>

@@ -372,6 +372,7 @@ public partial class SolidBody
                     targetStart,
                     targetDisplacement,
                     sourceLength,
+                    elapsedFrameFraction,
                     out Physics3DHit exactHit,
                     out Fixed64 exactClosingSpeed,
                     out bool exactSupported))
@@ -412,6 +413,7 @@ public partial class SolidBody
         Vector3d targetStart,
         Vector3d targetDisplacement,
         Fixed64 sourceLength,
+        Fixed64 elapsedFrameFraction,
         out Physics3DHit hit,
         out Fixed64 closingSpeed,
         out bool exactSupported)
@@ -440,7 +442,7 @@ public partial class SolidBody
         {
             Position3d = sourceStart;
             target.Position3d = targetStart;
-            target.Rotation = target.ContinuousCollisionFrameRotation;
+            target.Rotation = target.SampleContinuousCollisionRotation(elapsedFrameFraction);
             Collider.RebuildRuntimeShapeOnly(refreshMassProperties: false);
             target.Collider.RebuildRuntimeShapeOnly(refreshMassProperties: false);
 

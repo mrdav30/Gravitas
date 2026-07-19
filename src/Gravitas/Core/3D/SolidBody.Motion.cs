@@ -223,18 +223,11 @@ public partial class SolidBody
 
     private void ProcessMovable()
     {
-        ApplyLinearForces();
-        UpdateLinearVelocity();
-        Vector3d angularVelocityStepStart = _angularVelocity;
+        EnsureContinuousCollisionFramePrepared(Context.LateSimulateToken);
 
-        if (CanRotate)
-        {
-            ApplyAngularTorques();
-            UpdateAngularVelocity();
-        }
-
-        // Non-kinematic bodies position is calculated based on current velocity
-        NonKinematicUpdate(angularVelocityStepStart);
+        // Non-kinematic bodies position is calculated from the motion prepared
+        // for every body before ordered body processing begins.
+        NonKinematicUpdate(_continuousCollisionAngularVelocityStepStart);
 
     }
 
@@ -334,27 +327,23 @@ public partial class SolidBody
 
     private void ApplyAngularTorques()
     {
-        _angularAccelerationStore = ProjectAngularMotion(_deltaTorque);
+        _angularAccelerationStore = ResolveAngularAccelerationForStep();
         _deltaTorque = Vector3d.Zero;
+    }
+
+    private Vector3d ResolveAngularAccelerationForStep()
+    {
+        Vector3d acceleration = ProjectAngularMotion(_deltaTorque);
 
         if (_angularSpeed <= Fixed64.Zero)
-            return;
+            return acceleration;
 
-        ApplyDragTorque();
-        ApplyFrictionTorque();
-    }
-
-    private void ApplyDragTorque()
-    {
         // Angular drag should also be proportional to the square of the angular velocity, just like linear drag.
         Fixed64 angularDragMagnitude = AngularDragCoefficient * Context.Environment.AirDensity * Collider.GetFrontalArea(_angularDirection) * _angularSpeed;
-        _angularAccelerationStore += (-_angularDirection * angularDragMagnitude);
-    }
+        acceleration += -_angularDirection * angularDragMagnitude;
 
-    private void ApplyFrictionTorque()
-    {
         if (!IsGrounded)
-            return;
+            return acceleration;
 
         // Calculate the friction force and convert it into a torque
         PhysicsEnvironment environment = Context.Environment;
@@ -366,25 +355,36 @@ public partial class SolidBody
         }
 
         Fixed64 frictionMagnitude = effectiveFriction * _normalForce.Magnitude;
-        _angularAccelerationStore += (-_angularDirection * frictionMagnitude) * _inverseInertiaTensor;
+        acceleration += (-_angularDirection * frictionMagnitude) * _inverseInertiaTensor;
+        return acceleration;
     }
 
     private void UpdateAngularVelocity()
     {
-        Fixed64 deltaTime = Context.DeltaTime;
-        PhysicsEnvironment environment = Context.Environment;
         Vector3d lastVelocity = _angularVelocity;
-        // Apply the accumulated angular acceleration
-        _angularVelocity += ProjectAngularMotion(_angularAccelerationStore * deltaTime);
-        // Reset the acceleration store for the next frame
+        _angularVelocity = ResolveAngularVelocityForStep(_angularVelocity, _angularAccelerationStore);
         _angularAccelerationStore = Vector3d.Zero;
-
-        // Add damping torque, proportional to negative angular velocity
-        Vector3d dampingTorque = -environment.DampingFactor * _angularVelocity;
-        _angularVelocity += ProjectAngularMotion(_inverseInertiaTensor * dampingTorque * deltaTime);
-        _angularVelocity = ProjectAngularMotion(_angularVelocity);
-
         RefreshAngularMotionState(lastVelocity);
+    }
+
+    private Vector3d ResolveAngularVelocityForStep(
+        Vector3d startVelocity,
+        Vector3d angularAcceleration)
+    {
+        Fixed64 deltaTime = Context.DeltaTime;
+        Vector3d velocity = startVelocity
+            + ProjectAngularMotion(angularAcceleration * deltaTime);
+        Vector3d dampingTorque = -Context.Environment.DampingFactor * velocity;
+        velocity += ProjectAngularMotion(_inverseInertiaTensor * dampingTorque * deltaTime);
+        velocity = ProjectAngularMotion(velocity);
+
+        Fixed64 desiredSpeed = velocity.Magnitude;
+        if (desiredSpeed <= Context.Environment.MinSpeed)
+            return Vector3d.Zero;
+
+        return desiredSpeed > Context.Environment.MaxSpeed
+            ? velocity.Normalized * Context.Environment.MaxSpeed
+            : velocity;
     }
 
     private void RefreshAngularMotionState(Vector3d lastVelocity)

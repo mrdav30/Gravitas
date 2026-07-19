@@ -15,16 +15,6 @@ namespace Gravitas;
 
 public sealed partial class SolidBody2D
 {
-    private void CaptureKinematicContinuousCollisionFrame(Vector2d startPosition, Vector2d targetPosition, Fixed64 startRotation)
-    {
-        Vector2d frameDisplacement = ProjectLinearMotion(
-            ContinuousCollisionSweepRange.ValidateEndpoint(startPosition, targetPosition, out _));
-        _continuousCollisionFrameToken = Context.LateSimulateToken;
-        _continuousCollisionFrameStart = startPosition;
-        _continuousCollisionFrameDisplacement = frameDisplacement;
-        _continuousCollisionFrameRotation = startRotation;
-    }
-
     private bool TryResolveKinematicContinuousCollision(Vector2d startPosition, ref Vector2d proposedPosition)
     {
         if (!ShouldUseContinuousCollision(out ContinuousCollisionMode mode))

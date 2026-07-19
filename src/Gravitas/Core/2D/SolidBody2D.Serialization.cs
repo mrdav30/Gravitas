@@ -75,6 +75,8 @@ public sealed partial class SolidBody2D
 
         if (chronicler.Mode == SerializationMode.Loading)
         {
+            DiscardContinuousCollisionHandoff();
+            InvalidateContinuousCollisionFrame();
             ContinuousCollisionMode = continuousCollisionMode;
             _rotation = CanonicalizeRotation(_rotation);
             Active = active && Collider.Id >= 0;

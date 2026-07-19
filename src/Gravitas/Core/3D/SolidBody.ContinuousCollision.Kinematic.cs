@@ -15,19 +15,6 @@ namespace Gravitas;
 
 public partial class SolidBody
 {
-    private void CaptureKinematicContinuousCollisionFrame(
-        Vector3d startPosition,
-        Vector3d targetPosition,
-        FixedQuaternion startRotation)
-    {
-        Vector3d frameDisplacement = ProjectLinearMotion(
-            ContinuousCollisionSweepRange.ValidateEndpoint(startPosition, targetPosition, out _));
-        _continuousCollisionFrameToken = Context.LateSimulateToken;
-        _continuousCollisionFrameStart = startPosition;
-        _continuousCollisionFrameDisplacement = frameDisplacement;
-        _continuousCollisionFrameRotation = startRotation;
-    }
-
     private bool TryResolveKinematicContinuousCollision(Vector3d startPosition, ref Vector3d proposedPosition)
     {
         if (!ShouldUseContinuousCollision(out ContinuousCollisionMode mode))
@@ -199,6 +186,7 @@ public partial class SolidBody
                     targetStart,
                     targetDisplacement,
                     sourceLength,
+                    Fixed64.Zero,
                     out Physics3DHit exactHit,
                     out _,
                     out bool exactSupported))

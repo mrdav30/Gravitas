@@ -540,11 +540,17 @@ public partial class SolidBody
     }
 
     private FixedQuaternion IntegrateAngularRotation(FixedQuaternion startRotation, Fixed64 deltaTime)
+        => IntegrateAngularRotation(startRotation, _angularVelocity, deltaTime);
+
+    private static FixedQuaternion IntegrateAngularRotation(
+        FixedQuaternion startRotation,
+        Vector3d angularVelocity,
+        Fixed64 deltaTime)
     {
         FixedQuaternion angularVelocityQuaternion = new(
-            _angularVelocity.X,
-            _angularVelocity.Y,
-            _angularVelocity.Z,
+            angularVelocity.X,
+            angularVelocity.Y,
+            angularVelocity.Z,
             Fixed64.Zero);
         FixedQuaternion spin = angularVelocityQuaternion * startRotation * Fixed64.Half * deltaTime;
         return (startRotation + spin).Normalized;

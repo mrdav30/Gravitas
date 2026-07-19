@@ -16,7 +16,7 @@ public sealed partial class SolidBody2D
         ref ChronicleHashWriter writer,
         GravitasReplayHashMode mode)
     {
-        writer.WriteSection("body.2d", 2);
+        writer.WriteSection("body.2d", 3);
         writer.WriteInt32(DynamicId);
         writer.WriteBool(Active);
         writer.WriteEnum(_freezeAxes);
@@ -58,7 +58,7 @@ public sealed partial class SolidBody2D
         writer.WriteVector2d(_lastGroundedPosition);
         writer.WriteEnum(_continuousCollisionMode);
 
-        writer.WriteSection("body.2d.ccd-authoritative", 2);
+        writer.WriteSection("body.2d.ccd-authoritative", 3);
         writer.WriteBool(_continuousCollisionHandoffPending);
         if (_continuousCollisionHandoffPending)
         {
@@ -66,16 +66,15 @@ public sealed partial class SolidBody2D
             writer.WriteFixed64(_continuousCollisionHandoffRemainingTime);
             writer.WriteInt32(_continuousCollisionHandoffIgnoredCollider3D?.ReplayOrdinal ?? -1);
             writer.WriteInt32(_continuousCollisionHandoffIgnoredCollider2D?.ReplayOrdinal ?? -1);
+            WriteContinuousCollisionTrajectory(ref writer);
         }
 
         if (mode != GravitasReplayHashMode.AuthoritativeWithSolverCaches)
             return;
 
-        writer.WriteSection("body.2d.solver-caches", 2);
+        writer.WriteSection("body.2d.solver-caches", 3);
         writer.WriteInt32(_continuousCollisionFrameToken);
-        writer.WriteVector2d(_continuousCollisionFrameStart);
-        writer.WriteVector2d(_continuousCollisionFrameDisplacement);
-        writer.WriteFixed64(_continuousCollisionFrameRotation);
+        WriteContinuousCollisionTrajectory(ref writer);
         writer.WriteInt32(_continuousCollisionHandoffToken);
         writer.WriteFixed64(_continuousCollisionHandoffRemainingTime);
         writer.WriteInt32(LastContinuousCollisionToiIterationCount);
@@ -84,5 +83,23 @@ public sealed partial class SolidBody2D
         writer.WriteFixed64(_inverseMomentOfInertia);
         writer.WriteInt32(_continuousCollisionHits.Count);
         writer.WriteInt32(_continuousMixedCollisionHits.Count);
+    }
+
+    private void WriteContinuousCollisionTrajectory(ref ChronicleHashWriter writer)
+    {
+        writer.WriteInt32(_continuousCollisionTrajectory.Count);
+        for (int i = 0; i < _continuousCollisionTrajectory.Count; i++)
+        {
+            Gravitas.CollisionHandling.ContinuousCollisionMotionSegment2D segment =
+                _continuousCollisionTrajectory[i];
+            writer.WriteFixed64(segment.StartFraction);
+            writer.WriteFixed64(segment.EndFraction);
+            writer.WriteVector2d(segment.StartPosition);
+            writer.WriteVector2d(segment.EndPosition);
+            writer.WriteVector2d(segment.Displacement);
+            writer.WriteFixed64(segment.StartRotation);
+            writer.WriteFixed64(segment.AngularDelta);
+            writer.WriteFixed64(segment.AngularVelocity);
+        }
     }
 }

@@ -42,8 +42,7 @@ public sealed partial class GravitasPhysics2DService
 
     private void AddContinuousCollisionCandidate(SolidBody2D body, bool buildMixedIndex)
     {
-        if (body.IsPositionFullyFrozen
-            || body.IsKinematic
+        if ((!body.IsKinematic && body.IsPositionFullyFrozen)
             || body.Collider.IsTrigger)
         {
             return;
@@ -55,23 +54,27 @@ public sealed partial class GravitasPhysics2DService
 
         _planarContinuousCollisionCandidates.Add(
             body.DynamicId,
-            DynamicCcdCandidateIndex2D.CreateSweptCircleBounds(
+            DynamicCcdCandidateIndex2D.CreateBoundsBetween(
                 body.ContinuousCollisionFrameStart,
-                body.ContinuousCollisionFrameDisplacement,
+                body.ContinuousCollisionFrameEnd,
                 planarRadius));
 
         if (!buildMixedIndex)
             return;
 
         Vector2d mixedStart2D = body.ContinuousCollisionFrameStart;
-        Vector2d mixedDisplacement2D = body.ContinuousCollisionFrameDisplacement;
-        Fixed64 mixedRadius = FixedMath.Max(planarRadius, body.Collider.MixedHalfThickness);
         _mixedContinuousCollisionCandidates.Add(
             body.DynamicId,
-            DynamicCcdCandidateIndex.CreateSweptSphereBounds(
+            DynamicCcdCandidateIndex.CreateBoundsBetween(
                 new Vector3d(mixedStart2D.X, body.Collider.MixedSlabCenterY, mixedStart2D.Y),
-                new Vector3d(mixedDisplacement2D.X, Fixed64.Zero, mixedDisplacement2D.Y),
-                mixedRadius));
+                new Vector3d(
+                    body.ContinuousCollisionFrameEnd.X,
+                    body.Collider.MixedSlabCenterY,
+                    body.ContinuousCollisionFrameEnd.Y),
+                new Vector3d(
+                    planarRadius,
+                    body.Collider.MixedHalfThickness,
+                    planarRadius)));
     }
 
 

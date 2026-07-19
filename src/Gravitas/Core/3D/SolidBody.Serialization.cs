@@ -99,6 +99,8 @@ public partial class SolidBody
 
     private void ApplyLoadedState()
     {
+        DiscardContinuousCollisionHandoff();
+        InvalidateContinuousCollisionTrajectory();
         SetPositionTransformWorldPosition(Position3d);
         SetRotationTransformWorldRotation(Rotation);
 

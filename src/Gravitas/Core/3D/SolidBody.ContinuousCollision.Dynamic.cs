@@ -26,13 +26,18 @@ public partial class SolidBody
 
         Position3d += ProjectLinearMotion(positionAtImpact - Position3d);
         ApplyCollisionLinearVelocityDelta(velocityDelta);
-        if (remainingTime <= Fixed64.Epsilon || _linearVelocity.MagnitudeSquared <= Fixed64.Epsilon)
+        bool hasRemainingMotion = remainingTime > Fixed64.Epsilon
+            && _linearVelocity.MagnitudeSquared > Fixed64.Epsilon;
+        AppendContinuousCollisionSegment(
+            positionAtImpact,
+            hasRemainingMotion ? _linearVelocity : Vector3d.Zero,
+            Context.DeltaTime - remainingTime);
+        if (!hasRemainingMotion)
         {
             DiscardContinuousCollisionHandoff();
             return;
         }
 
-        UpdateContinuousCollisionFrameTrajectory(positionAtImpact, _linearVelocity, Context.DeltaTime - remainingTime);
         _continuousCollisionHandoffToken = Context.LateSimulateToken;
         _continuousCollisionHandoffRemainingTime = remainingTime;
         _continuousCollisionHandoffIgnoredCollider3D = ignoredCollider3D;
@@ -301,7 +306,9 @@ public partial class SolidBody
         Fixed64 constrainedInverseMassB = target.GetConstrainedInverseMass(normal);
         Fixed64 inverseMass = constrainedInverseMassA + constrainedInverseMassB;
 
-        Fixed64 normalVelocity = Vector3d.Dot(_linearVelocity - target.ResolveContinuousCollisionFrameVelocity(), normal);
+        Fixed64 normalVelocity = Vector3d.Dot(
+            _linearVelocity - target.ResolveContinuousCollisionFrameVelocity(),
+            normal);
         Fixed64 restitution = ResolveContinuousCollisionRestitution(target, -normalVelocity);
         Fixed64 responseSpeed = -(Fixed64.One + restitution) * normalVelocity;
         Vector3d sourceResponseNormal = ProjectLinearMotion(normal);
@@ -349,7 +356,8 @@ public partial class SolidBody
         Fixed64 constrainedInverseMassB = target.GetConstrainedInverseMass(planarNormal) * planarNormal.MagnitudeSquared;
         Fixed64 inverseMass = constrainedInverseMassA + constrainedInverseMassB;
 
-        Vector3d targetVelocity = target.ResolveContinuousCollisionFrameVelocity().ToVector3d(Fixed64.Zero);
+        Vector3d targetVelocity = target.ResolveContinuousCollisionFrameVelocity()
+            .ToVector3d(Fixed64.Zero);
         Fixed64 normalVelocity = Vector3d.Dot(_linearVelocity - targetVelocity, normal);
         Fixed64 restitution = ResolveContinuousCollisionRestitution(target, -normalVelocity);
         Fixed64 responseSpeed = -(Fixed64.One + restitution) * normalVelocity;
@@ -385,13 +393,10 @@ public partial class SolidBody
         Vector3d velocity,
         Fixed64 elapsedTime)
     {
-        Fixed64 deltaTime = Context.DeltaTime;
-        Fixed64 elapsedFraction = FixedMath.Clamp01(elapsedTime / deltaTime);
-        Vector3d frameDisplacement = ProjectLinearMotion(velocity) * deltaTime;
-        _continuousCollisionFrameToken = Context.LateSimulateToken;
-        _continuousCollisionFrameDisplacement = frameDisplacement;
-        _continuousCollisionFrameStart = positionAtElapsedTime - frameDisplacement * elapsedFraction;
-        _continuousCollisionFrameRotation = Rotation;
+        AppendContinuousCollisionSegment(
+            positionAtElapsedTime,
+            velocity,
+            elapsedTime);
     }
 
     private Fixed64 ResolveContinuousCollisionFrameFraction(Fixed64 hitElapsedTime)
