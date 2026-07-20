@@ -29,69 +29,43 @@ records follow with their original discovery context.
 - Treat local links as unstaged validation scaffolding. Do not publish or
   release with them in place.
 - FixedMathSharp foundation hardening is complete. The current locally linked
-  radial, finite-axis, and sphere-construction extensions also report 100% line,
-  branch, and method coverage. Retain the local link while the remaining
-  Gravitas queue and the newly exposed derived-bound center/extent item are
-  triaged.
+  radial, finite-axis, sphere-construction, and derived-bound extensions report
+  100% line, branch, and method coverage. Retain the local link while the
+  remaining Gravitas queue is hardened.
 - SwiftCollections has no library-specific active issue at this checkpoint; its
   place in the sequence is a full downstream compatibility and release gate.
 - GridForge's runtime-identity defect is resolved. Keep the lower stack locally
   linked while the remaining Gravitas queue is hardened so another downstream
   discovery does not force a partial release cycle.
-- Gravitas's current authoritative coverage-enabled Release run passes 3,103
-  tests and reports 33,271/33,271 lines, 12,093/12,093 branches, and
-  4,149/4,149 methods for hand-authored source.
+- Gravitas's current authoritative coverage-enabled Release run passes 3,105
+  tests and reports 33,266/33,266 lines, 12,091/12,091 branches, and
+  4,148/4,148 methods for hand-authored source.
 - After the Gravitas queue closes, release the lower stack in dependency order,
   replace local links with released packages at each layer, and rerun Gravitas
   `Release`, `ReleaseLean`, coverage, replay, and relevant benchmark gates.
 
 ### Ordered Queue
 
-1. **FixedMathSharp:**
-   [Derived Bound Centers And Extents Are Not Full-Domain](#derived-bound-centers-and-extents-are-not-full-domain).
-2. **Gravitas:**
+1. **Gravitas:**
    [Translational CCD Flattens Piecewise Target Trajectories](#translational-ccd-flattens-piecewise-target-trajectories).
-3. **Gravitas:**
+2. **Gravitas:**
    [Fully Position-Frozen Bodies Cannot Retain Angular Mobility](#fully-position-frozen-bodies-cannot-retain-angular-mobility).
-4. **Gravitas:**
+3. **Gravitas:**
    [Conic Query Quadratics Can Saturate Before Solving](#conic-query-quadratics-can-saturate-before-solving).
-5. **Gravitas:**
+4. **Gravitas:**
    [Swept-Sphere Cylinder Dilation Uses A Sharp Rim Proxy](#swept-sphere-cylinder-dilation-uses-a-sharp-rim-proxy).
-6. **Gravitas:**
+5. **Gravitas:**
    [Finite-Slab Projection Support Math Is Not Full-Domain](#finite-slab-projection-support-math-is-not-full-domain).
-7. **Gravitas:**
+6. **Gravitas:**
    [Swept-Sphere Capsule-Slab Rim Dilation Overexpands The Rounded Boundary](#swept-sphere-capsule-slab-rim-dilation-overexpands-the-rounded-boundary).
-8. **Gravitas:**
+7. **Gravitas:**
    [Finite-Axis Collider Endpoint Snapshots Can Deform Scalar-Boundary Geometry](#finite-axis-collider-endpoint-snapshots-can-deform-scalar-boundary-geometry).
+8. **Gravitas:**
+   [Oriented Cuboid Boundary Proxies Can Deform Scalar-Face Geometry](#oriented-cuboid-boundary-proxies-can-deform-scalar-face-geometry).
 9. **Gravitas:**
    [Authored Collider Dimensions Can Saturate During Host-Scale Composition](#authored-collider-dimensions-can-saturate-during-host-scale-composition).
 10. **FixedMathSharp / Gravitas:**
     [Radial Segment Parameters Can Collapse Spatially Distinct Query Hits](#radial-segment-parameters-can-collapse-spatially-distinct-query-hits).
-
-### Derived Bound Centers And Extents Are Not Full-Domain
-
-**Discovered:** 2026-07-20  
-**Source:** FixedMathSharp sphere-construction full-domain audit  
-**Affected area:** FixedMathSharp `FixedBoundArea` and `FixedBoundBox` derived
-center, size/scope, resize, and recenter paths; downstream bounds consumers
-
-The sphere fix deliberately stopped using `FixedBoundBox.Center` because that
-property still calculates `(Min + Max) * Half`; same-sign endpoints can saturate
-before halving and report the wrong representable midpoint. The corresponding
-2D area property and several size/scope, resize, and recenter paths also narrow
-`Min + Max` or `Max - Min` before the final result is known. Bounds wider than
-one scalar can therefore report a saturated derived extent even when a later
-half-size is representable.
-
-Resolve this as one 2D/3D derived-bound contract in FixedMathSharp. Use exact
-midpoint and difference-before-halving primitives, decide how public full sizes
-report an inherently unrepresentable result, and keep mutators atomic when a
-requested center/extent would place an endpoint outside the scalar domain.
-Audit Gravitas broad-phase, proxy-radius, mesh-bound, query, and diagnostic
-consumers after the lower-stack fix. Cover same-sign scalar faces, opposite
-faces, one-raw midpoint ties, unrepresentable full extents with representable
-scope, failed mutations, serialization continuity, and allocation behavior.
-This mirrors `FMS-Issue-016`.
 
 ### Translational CCD Flattens Piecewise Target Trajectories
 
@@ -266,6 +240,34 @@ candidate admission, support/closest-point results, replay equality, stable
 ordering, and warmed zero-allocation behavior. Do not solve this by widening a
 cached AABB or retaining the deformed endpoints behind another adapter.
 
+### Oriented Cuboid Boundary Proxies Can Deform Scalar-Face Geometry
+
+**Discovered:** 2026-07-20  
+**Source:** derived-bound strict/clipped consumer review  
+**Affected area:** 3D OBB canonical geometry, vertex generation, bounds,
+discrete/mixed collision, queries, diagnostics, replay, and host admission
+
+`LSCuboidCollider` currently builds an axis-aligned centered box with saturating
+or explicitly clipped endpoints and then rotates those representable corners
+about the physical center. Near a scalar face, clipping makes the pre-rotation
+box asymmetric and can shorten it. Rotation can therefore deform the authored
+cuboid and under-bound another axis even though the canonical center,
+orientation, and half-extents remain meaningful. The explicit clipped factory
+introduced by the derived-bound hardening made this pre-existing behavior
+visible; it did not create it.
+
+Make `(center, normalized orientation, half-extents)` the canonical OBB runtime
+geometry. Derive support points, SAT projections, contacts, query features,
+replay state, and diagnostics from that representation without materializing
+clipped local corners as simulation truth. Broad-phase bounds should be the
+conservative representable-domain intersection of the rotated conceptual box,
+with admission failing explicitly only if the chosen runtime contract cannot
+remain conservative. Cover mirrored scalar faces, nontrivial rotations,
+axis-aligned parity, mixed contacts, query admission, replay equality, stable
+ordering, and warmed zero-allocation behavior. Coordinate this with the
+finite-axis canonical-geometry issue, but do not hide either defect inside a
+single generic endpoint workaround.
+
 ### Authored Collider Dimensions Can Saturate During Host-Scale Composition
 
 **Discovered:** 2026-07-19  
@@ -322,6 +324,61 @@ zero-allocation behavior. Keep this separate from sphere construction/merge
 and conic-quadratic ownership.
 
 ## Resolved Issues
+
+### Derived Bound Centers And Extents Were Not Full-Domain
+
+**Discovered:** 2026-07-20  
+**Resolved:** 2026-07-20  
+**Source:** FixedMathSharp sphere-construction full-domain audit  
+**Affected area:** FixedMathSharp bounds/range/circle derivation;
+SwiftCollections fixed query volumes, octree subdivision, and BVH insertion;
+GridForge grid centers; Gravitas mesh validation, mixed slab queries, and 3D
+broad-phase proxies
+
+FixedMathSharp now owns one strict 2D/3D derived-bound contract: exact
+nearest-even centers, conservative scopes, exact representable sizes, and
+atomic centered mutations. Unrepresentable public extents fail explicitly
+instead of saturating to an under-bound. Separately named clipped factories
+provide the intentional world-domain intersection required by spatial proxies
+whose conceptual shape crosses a scalar face. `FixedRange` follows the same
+exact midpoint/difference rules.
+
+Downstream, SwiftCollections' `FixedBoundVolume` now delegates to one canonical
+`FixedBoundBox`, and its octree compares child spans directly in unsigned raw
+space so a full-domain root can subdivide without asking for an unrepresentable
+size. Fixed BVH insertion delegates to FixedMathSharp's exact 192-bit
+union-volume growth and clamps only the final public `long` metric. GridForge
+derives `GridCenter` through the shared exact midpoint. Gravitas mesh validation
+accepts valid same-sign extreme centers while still rejecting genuinely
+unrepresentable sizes, mixed mesh-slab queries use exact reference centers, and
+collider broad-phase bounds opt into explicit domain clipping instead of
+relying on incidental saturating operators. Exact rotated OBB geometry at a
+scalar face remains the separately tracked canonical-half-extent issue. The
+audit also removed the now-unused mesh vector representability wrapper and
+simplified collider-bound refresh ownership.
+
+Regression coverage includes same-sign and opposite scalar faces, raw midpoint
+ties, representable scope with unrepresentable size, full-domain octree roots
+and BVH unions, atomic failure, serialization continuity, circle/proxy
+clipping, mesh scale admission, mixed slab hit points, and downstream
+grid-center parity. FixedMathSharp passed 1,655 Debug tests at
+13,855/13,855 lines, 3,952/3,952 branches, and 1,808/1,808 methods. Gravitas
+passed 3,105 Release tests at 33,266/33,266
+lines, 12,091/12,091 branches, and 4,148/4,148 methods. Centered bounds
+construction became materially faster with zero managed allocation; direct
+min/max construction remained flat. SwiftCollections' canonical volume layout
+also traded a few nanoseconds of repeated metadata recomputation for a much
+smaller pass-by-value copy path, with both paths remaining allocation-free.
+The exact volume-expansion hot path measured about 10.46 nanoseconds versus
+17.15 nanoseconds for the reconstructed legacy formula; its full-domain case
+measured about 10.27 nanoseconds, with zero managed allocation. Configuration
+gates passed FixedMathSharp `Release` (1,655 core plus 8 Chronicler tests) and
+`ReleaseLean` (1,634 plus 8), SwiftCollections `Release` (1,096) and
+`ReleaseLean` (1,068), GridForge `Release` and `ReleaseLean` (460), and the
+explicitly linked Gravitas `Release` test-project gate (3,105). The
+Gravitas `ReleaseLean` local-link gate remains blocked by the already documented
+GridForge MemoryPack public-type leak; it is still deferred to the
+package-reference release gate rather than masked downstream.
 
 ### Sphere Construction And Merge Paths Were Not Full-Domain
 

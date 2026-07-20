@@ -93,7 +93,7 @@ public partial class PhysicsMesh
 
         Vector3d scaledMin = Vector3d.Multiply(_localBounds.Min, scale);
         Vector3d scaledMax = Vector3d.Multiply(_localBounds.Max, scale);
-        Vector3d reference = (scaledMin + scaledMax) * Fixed64.Half;
+        Vector3d reference = Vector3d.Midpoint(scaledMin, scaledMax);
         if (!MeshSurfaceMassProperties.TryCreate(
             _localVertices,
             _triangles,
@@ -141,10 +141,8 @@ public partial class PhysicsMesh
 
         Vector3d scaledMin = Vector3d.Multiply(_localBounds.Min, scale);
         Vector3d scaledMax = Vector3d.Multiply(_localBounds.Max, scale);
-        Vector3d boundsSpan = scaledMax - scaledMin;
-        Vector3d boundsCenterSum = scaledMax + scaledMin;
-        if (!IsRepresentable(boundsSpan) | !IsRepresentable(boundsCenterSum))
-            throw new ArgumentException("Mesh scale must keep bounds arithmetic representable.", nameof(scale));
+        if (!Vector3d.TrySubtract(scaledMax, scaledMin, out _))
+            throw new ArgumentException("Mesh scale must keep the exact bounds size representable.", nameof(scale));
 
         Fixed64 totalArea = Fixed64.Zero;
         for (int i = 0; i < _triangleCount; i++)

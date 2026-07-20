@@ -3081,6 +3081,42 @@ public sealed partial class MixedQueryCcdTests
     }
 
     [Fact]
+    public void SweepCircleAgainst3D_WithSameSignExtremeSlab_UsesExactReferenceCenter()
+    {
+        Fixed64 slabCenter = Fixed64.MaxValue - (Fixed64)4;
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        context.ApplySettings(new PhysicsSettings(4, null));
+        context.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
+        context.World.TryAddGrid(
+            new GridConfiguration(
+                new Vector3d((Fixed64)(-8), slabCenter - (Fixed64)2, (Fixed64)(-8)),
+                new Vector3d((Fixed64)8, slabCenter + (Fixed64)2, (Fixed64)8)),
+            out _).Should().BeTrue();
+        ScenarioBody<LSMeshCollider> mesh = CreateMesh3D(
+            context,
+            CreateOpenTriangleMesh(
+                new Vector3d(Fixed64.Zero, -Fixed64.One, Fixed64.Zero),
+                new Vector3d(Fixed64.Zero, Fixed64.FromFraction(1, 4), Fixed64.Zero),
+                new Vector3d(Fixed64.One, Fixed64.FromFraction(1, 4), Fixed64.One)),
+            new Vector3d(Fixed64.Zero, slabCenter, Fixed64.Zero),
+            immovable: true);
+
+        bool mixedHit = context.QueryMixed.SweepCircleAgainst3D(
+            new Vector2d((Fixed64)(-3), Fixed64.Zero),
+            new Vector2d((Fixed64)3, Fixed64.Zero),
+            Fixed64.Half,
+            slabCenter,
+            Fixed64.One,
+            IncludeLayerZero,
+            out PhysicsMixedHit hit);
+
+        mixedHit.Should().BeTrue();
+        hit.Collider3D.Should().BeSameAs(mesh.Collider);
+        hit.Point3D.Y.Should().Be(slabCenter + Fixed64.FromFraction(1, 4));
+        hit.ReducerKind.Should().Be(PhysicsQueryReducerKind.Exact);
+    }
+
+    [Fact]
     public void SweepCircleAgainst3D_WithMeshTarget_ShouldReportTriangleCandidateCount()
     {
         using GravitasWorldContext context = CreateMixedContext();

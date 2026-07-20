@@ -56,6 +56,30 @@ public sealed class PhysicsMeshTests
     }
 
     [Fact]
+    public void SameSignExtremeBounds_UseExactCenterDuringScaleAndSurfaceValidation()
+    {
+        Fixed64 coordinate = Fixed64.MaxValue - (Fixed64)4;
+        var mesh = new PhysicsMesh(
+            new[]
+            {
+                new Vector3d(coordinate, Fixed64.Zero, Fixed64.Zero),
+                new Vector3d(coordinate + Fixed64.One, Fixed64.Zero, Fixed64.Zero),
+                new Vector3d(coordinate, Fixed64.One, Fixed64.Zero)
+            },
+            ValidTriangles(),
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+
+        mesh.ValidateSurfaceMassProperties(Vector3d.One);
+
+        Fixed64 expectedCenter = FixedMath.Midpoint(coordinate, coordinate + Fixed64.One);
+        mesh.LocalBounds.Center.X.Should().Be(expectedCenter);
+        mesh.ScaledLocalBounds.Center.X.Should().Be(expectedCenter);
+        mesh.SurfaceMassProperties.CenterOfMass.X.Should().BeGreaterThanOrEqualTo(coordinate);
+        mesh.SurfaceMassProperties.CenterOfMass.X.Should().BeLessThanOrEqualTo(coordinate + Fixed64.One);
+    }
+
+    [Fact]
     public void Constructor_ConvexMode_ShouldRejectDisconnectedTriangleTopology()
     {
         Action create = () => _ = new PhysicsMesh(

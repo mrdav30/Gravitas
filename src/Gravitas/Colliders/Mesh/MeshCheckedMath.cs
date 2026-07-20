@@ -99,9 +99,6 @@ internal static class MeshCheckedMath
         return IsRepresentable(result);
     }
 
-    internal static bool IsRepresentable(Vector3d value) =>
-        IsRepresentable(value.X) & IsRepresentable(value.Y) & IsRepresentable(value.Z);
-
     internal static bool IsRepresentable(Fixed3x3 value) =>
         IsRepresentable(value.M11) & IsRepresentable(value.M12) & IsRepresentable(value.M13)
         & IsRepresentable(value.M21) & IsRepresentable(value.M22) & IsRepresentable(value.M23)

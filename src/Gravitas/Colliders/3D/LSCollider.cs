@@ -599,16 +599,8 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
 
     protected virtual void BuildBoundingBox()
     {
-        if (!_boundsInitialized)
-        {
-            _bounds = FixedBoundBox.FromCenterAndSize(Center, ScaledSize);
-            _boundsInitialized = true;
-        }
-        else
-        {
-            _bounds.Orient(Center, ScaledSize);
-        }
-
+        _bounds = FixedBoundBox.FromCenterAndSizeClippedToDomain(Center, ScaledSize);
+        _boundsInitialized = true;
         CalculateBoundLimits();
     }
 

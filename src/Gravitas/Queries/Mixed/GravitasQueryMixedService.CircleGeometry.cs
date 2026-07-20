@@ -140,7 +140,7 @@ public sealed partial class GravitasQueryMixedService
         point3D = FindClosestPointOnClippedProjection(
             clipped.Slice(0, clippedCount),
             center2D,
-            (slabMinY + slabMaxY) * Fixed64.Half);
+            FixedMath.Midpoint(slabMinY, slabMaxY));
         return true;
     }
 

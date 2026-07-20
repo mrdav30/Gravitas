@@ -634,7 +634,7 @@ public sealed class PhysicsMeshScaleTests
     }
 
     [Fact]
-    public void ScaleValidation_ShouldRejectIndependentFixedPointOverflowModesBeforeMutation()
+    public void ScaleValidation_ShouldRejectTrueOverflowModesWithoutRejectingSameSignBounds()
     {
         PhysicsMesh mesh = CreateOffsetTriangleMesh();
         Vector3d priorVertex = mesh.GetVertexWorld(0);
@@ -648,17 +648,34 @@ public sealed class PhysicsMeshScaleTests
         mesh.GetVertexWorld(0).Should().Be(priorVertex);
         mesh.Bounds.Should().Be(priorBounds);
 
-        Action boundsOverflow = () => _ = new PhysicsMesh(
+        var sameSignBounds = new PhysicsMesh(
             new[]
             {
                 new Vector3d((Fixed64)1200000000, Fixed64.Zero, Fixed64.Zero),
-                new Vector3d((Fixed64)1300000000, Fixed64.Zero, Fixed64.Zero),
+                new Vector3d((Fixed64)1200000001, Fixed64.Zero, Fixed64.Zero),
                 new Vector3d((Fixed64)1200000000, Fixed64.One, Fixed64.Zero)
             },
             new[] { 0, 1, 2 },
             Vector3d.Zero,
             FixedQuaternion.Identity);
-        boundsOverflow.Should().Throw<ArgumentException>().WithMessage("*bounds arithmetic*");
+        sameSignBounds.LocalBounds.Center.X.Should().Be((Fixed64)1200000000 + Fixed64.Half);
+
+        var wideBounds = new PhysicsMesh(
+            new[]
+            {
+                new Vector3d((Fixed64)(-1000000000), Fixed64.Zero, Fixed64.Zero),
+                new Vector3d((Fixed64)1000000000, Fixed64.Zero, Fixed64.Zero),
+                new Vector3d((Fixed64)(-1000000000), Fixed64.MinIncrement, Fixed64.Zero)
+            },
+            new[] { 0, 1, 2 },
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+        Action boundsOverflow = () => wideBounds.UpdateTransform(
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            new Vector3d(Fixed64.FromFraction(11, 10), Fixed64.One, Fixed64.One));
+        boundsOverflow.Should().Throw<ArgumentException>().WithMessage("*exact bounds size*");
+        wideBounds.Scale.Should().Be(Vector3d.One);
 
         Action crossProductOverflow = () => _ = new PhysicsMesh(
             new[]

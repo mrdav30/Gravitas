@@ -121,7 +121,7 @@ public class LSCuboidCollider : LSCollider
     {
         if (Shape == ColliderType.OBBox)
         {
-            FixedBoundBox orientedBounds = FixedBoundBox.FromCenterAndSize(Center, ScaledSize);
+            FixedBoundBox orientedBounds = FixedBoundBox.FromCenterAndSizeClippedToDomain(Center, ScaledSize);
 
             for (int i = 0; i < _vertices.Length; i++)
                 _vertices[i] = orientedBounds.GetCorner(i).Rotate(Center, Rotation);

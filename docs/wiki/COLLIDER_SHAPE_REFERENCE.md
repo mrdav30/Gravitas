@@ -261,6 +261,18 @@ meshes reject before collider registration. Compound owners prevalidate every
 mesh part before rebuilding any part, so a failed scale/rotation change cannot
 leave half-updated geometry.
 
+Scaled mesh bounds use FixedMathSharp's full-domain nearest-even midpoint.
+Same-sign extreme coordinates are therefore valid when the exact bounds size,
+triangle geometry, and selected mass properties remain representable; a
+saturated endpoint sum is not itself grounds for rejecting the mesh.
+
+Collider broad-phase boxes explicitly use FixedMathSharp's clipped-to-domain
+center/size factory. This preserves the finite-domain proxy contract when a
+requested endpoint crosses a scalar face, while general-purpose centered bounds
+remain strict and do not clip implicitly. Rotated OBB geometry at a scalar face
+still requires separate canonical-half-extent hardening; clipping a centered
+box before rotation is not an exact substitute for that geometry.
+
 Direct `PhysicsMesh` transform APIs retain this strict validation contract.
 Compound-part authoring reaches the same mesh path only after
 `CompoundColliderPart` has normalized its stored local orientation.
