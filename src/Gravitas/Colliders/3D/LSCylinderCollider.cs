@@ -47,7 +47,12 @@ public class LSCylinderCollider : LSCollider
 
     public Vector3d LineSegmentEnd { get; private set; }
 
-    public Vector3d LineDirection => (LineSegmentEnd - LineSegmentStart).Normalized;
+    /// <summary>
+    /// Canonical normalized world-space cylinder axis derived from rotation.
+    /// </summary>
+    public Vector3d WorldAxis { get; private set; }
+
+    public Vector3d LineDirection => WorldAxis;
 
     protected override void OnInitialize()
     {
@@ -64,6 +69,9 @@ public class LSCylinderCollider : LSCollider
 
     protected override Vector3d NormalizeSize(Vector3d value) =>
         new(_radius * 2, value.Y, _radius * 2);
+
+    internal override void ValidateRuntimeTransform(Vector3d scale, FixedQuaternion rotation) =>
+        ValidateHalfHeight((_size.Y * scale.Y) * Fixed64.Half);
 
     protected internal override Fixed64 CalculateMassPropertyWeight() =>
         Fixed64.Pi * ScaledRadiusSqr * Height;
@@ -144,12 +152,19 @@ public class LSCylinderCollider : LSCollider
 
     protected override void BuildShape()
     {
-        Height = ScaledSize.Y;
-        HalfHeight = Height * Fixed64.Half;
-        CapCenterBottom = new Vector3d(Fixed64.Zero, -HalfHeight, Fixed64.Zero);
-        CapCenterTop = new Vector3d(Fixed64.Zero, HalfHeight, Fixed64.Zero);
-        LineSegmentStart = Center + Rotation * CapCenterBottom;
-        LineSegmentEnd = Center + Rotation * CapCenterTop;
+        Fixed64 height = ScaledSize.Y;
+        Fixed64 halfHeight = height * Fixed64.Half;
+
+        Vector3d capCenterBottom = new(Fixed64.Zero, -halfHeight, Fixed64.Zero);
+        Vector3d capCenterTop = new(Fixed64.Zero, halfHeight, Fixed64.Zero);
+
+        Height = height;
+        HalfHeight = halfHeight;
+        CapCenterBottom = capCenterBottom;
+        CapCenterTop = capCenterTop;
+        WorldAxis = (Rotation * Vector3d.Up).Normalized;
+        LineSegmentStart = Center + Rotation * capCenterBottom;
+        LineSegmentEnd = Center + Rotation * capCenterTop;
 
         Area = 2 * Fixed64.Pi * ScaledRadius * (Height + ScaledRadius);
     }
@@ -172,4 +187,10 @@ public class LSCylinderCollider : LSCollider
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private bool IsInsideFiniteCylinder(Vector3d local, Fixed64 radialDistance) =>
         radialDistance <= ScaledRadius && local.Y >= -HalfHeight && local.Y <= HalfHeight;
+
+    private static void ValidateHalfHeight(Fixed64 halfHeight) =>
+        SwiftThrowHelper.ThrowIfArgument(
+            halfHeight <= Fixed64.Zero,
+            nameof(Size),
+            "Scaled cylinder height must preserve a positive half-height.");
 }

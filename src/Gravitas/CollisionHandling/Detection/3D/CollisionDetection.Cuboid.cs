@@ -267,10 +267,13 @@ public static partial class CollisionDetection
         else if (samplePosition > halfExtent)
             boundary = halfExtent;
         else
-            return;
+            boundary = samplePosition;
 
-        numerator += direction * (start - boundary);
-        denominator += direction * direction;
+        if (boundary != samplePosition)
+        {
+            numerator += direction * (start - boundary);
+            denominator += direction * direction;
+        }
     }
 
     private static void KeepClosestSegmentBoxCandidate(

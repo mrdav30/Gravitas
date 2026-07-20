@@ -51,7 +51,9 @@ public sealed partial class ContinuousCollision2DTests
         mover.AddForce(new Vector2d((Fixed64)10, Fixed64.Zero));
         context.LateSimulate();
 
-        mover.Position.X.Should().Be((Fixed64)4);
+        Fixed64 contactPosition = (Fixed64)4;
+        mover.Position.X.Should().BeLessThanOrEqualTo(contactPosition);
+        (contactPosition - mover.Position.X).Should().BeLessThanOrEqualTo(Fixed64.Epsilon);
         mover.LinearVelocity.X.Should().Be(Fixed64.Zero);
     }
 

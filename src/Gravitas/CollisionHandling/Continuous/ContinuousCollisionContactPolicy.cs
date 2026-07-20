@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using FixedMathSharp.Bounds;
 using Gravitas.Colliders;
 
 namespace Gravitas.CollisionHandling;
@@ -15,8 +16,27 @@ internal static class ContinuousCollisionContactPolicy
     internal static Vector3d ResolveSweptSpherePoint(
         LSCollider target,
         Vector3d sphereCenterAtImpact,
-        Vector3d direction)
+        Vector3d direction,
+        Fixed64 sphereRadius)
     {
+        if (target is LSCapsuleCollider capsule)
+        {
+            Vector3d normal = capsule.GetNormalAtPoint(sphereCenterAtImpact);
+            if (FixedSegment.TryGetSurfacePointOnCenteredCapsule(
+                    sphereCenterAtImpact,
+                    capsule.Center,
+                    capsule.WorldAxis,
+                    capsule.AxisHalfLength,
+                    capsule.ScaledRadius,
+                    normal,
+                    out Vector3d targetSurfacePoint))
+            {
+                return targetSurfacePoint;
+            }
+
+            return sphereCenterAtImpact - normal * sphereRadius;
+        }
+
         Vector3d centerDelta = sphereCenterAtImpact - target.Center;
         if (centerDelta.MagnitudeSquared <= Fixed64.Epsilon)
             return target.Center - direction * target.ScaledRadius;
@@ -30,6 +50,9 @@ internal static class ContinuousCollisionContactPolicy
         Vector3d sphereCenterAtImpact,
         Vector3d direction)
     {
+        if (target is LSCapsuleCollider capsule)
+            return capsule.GetNormalAtPoint(sphereCenterAtImpact);
+
         Vector3d fromPointToSphereCenter = sphereCenterAtImpact - point;
         if ((target is LSCuboidCollider || target is LSCylinderCollider || target is LSConeCollider)
             && fromPointToSphereCenter.MagnitudeSquared > Fixed64.Epsilon)

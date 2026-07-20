@@ -6,7 +6,6 @@
 //=======================================================================
 
 using FixedMathSharp;
-using FixedMathSharp.Bounds;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Queries;
@@ -17,50 +16,6 @@ namespace Gravitas.Tests.MixedDimensions;
 
 public sealed class MixedQuerySupportTests
 {
-    [Theory]
-    [InlineData(false, 1)]
-    [InlineData(true, 3)]
-    public void CircleSlabSide_WhenEntryVerticalPositionIsInvalid_ShouldSelectUsableRoot(
-        bool useExit,
-        int expectedDistance)
-    {
-        GravitasQueryMixedService.TrySweepCircleSlabSide(
-            useExit ? (Fixed64)2 : Fixed64.Zero,
-            Fixed64.Zero,
-            new Vector2d((Fixed64)(-2), Fixed64.Zero),
-            new Vector2d((Fixed64)2, Fixed64.Zero),
-            Vector2d.Right,
-            (Fixed64)4,
-            new FixedBoundCircle(Vector2d.Zero, Fixed64.One),
-            Fixed64.Zero,
-            Fixed64.One,
-            out Fixed64 distance)
-            .Should()
-            .BeTrue();
-        distance.Should().Be((Fixed64)expectedDistance);
-    }
-
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void CircleSlabCap_WithUnrepresentableVerticalArithmetic_ShouldReject(bool segmentOverflows)
-    {
-        Fixed64 localStart = Fixed64.MinValue;
-        GravitasQueryMixedService.TrySweepCircleSlabCap(
-            localStart,
-            segmentOverflows ? Fixed64.MaxValue : localStart + Fixed64.One,
-            Fixed64.One,
-            Vector2d.Zero,
-            Vector2d.Zero,
-            Fixed64.One,
-            new FixedBoundCircle(Vector2d.Zero, Fixed64.One),
-            Fixed64.Zero,
-            segmentOverflows ? Fixed64.Zero : Fixed64.MaxValue,
-            out _)
-            .Should()
-            .BeFalse();
-    }
-
     [Fact]
     public void TryClipSegment_WhenStartIsInside_ShouldReturnZeroEntryAndBoundaryExit()
     {

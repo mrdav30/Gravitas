@@ -631,6 +631,8 @@ public sealed class ColliderOwnershipStateTests
 
         node3D.TryGetHierarchyColliderByKey(ColliderHierarchyKey.Create2D(10_000), out _).Should().BeFalse();
         node2D.TryGetHierarchyColliderByKey(ColliderHierarchyKey.Create3D(10_000), out _).Should().BeFalse();
+        node3D.TryGetHierarchyColliderByKey(ColliderHierarchyKey.Create3D(10_000), out _).Should().BeFalse();
+        node2D.TryGetHierarchyColliderByKey(ColliderHierarchyKey.Create2D(10_000), out _).Should().BeFalse();
     }
 
     [Fact]

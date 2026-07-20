@@ -34,7 +34,13 @@ ordering, except cone volumes sort by axial distance before collider ID.
 
 Reducer notes:
 
-- raycasts and swept spheres are exact for supported target geometry.
+- Capsule and finite-cylinder raycasts solve against the authored segment and
+  return Q32.32 spatial distances with one final round-to-even narrowing. Hit
+  points use the same exact authored-chord interpolation, so long segments do
+  not amplify parameter rounding or lose small representable components.
+- Swept-sphere capsule and mesh-edge reducers use the same full-domain
+  finite-axis admission. Finite-cylinder sweeps currently use a conservative
+  sharp-rim dilation rather than the rounded rim of the true Minkowski sum.
 - mesh targets query triangle BVH candidates and report the owning collider.
 - registered convex source sweeps use exact support-mapped conservative
   advancement and skip the source collider.
@@ -64,6 +70,10 @@ Reducer notes:
 - edge-touching counts as overlap.
 - zero-length ray segments miss.
 - starting inside a raycast target returns distance zero.
+- Capsule raycasts and circle sweeps use the full-domain finite-segment capsule
+  distance interval, with target radius and sweep expansion kept separate until
+  the exact comparison. Hit points are reconstructed directly from the
+  authored segment and returned distance.
 - compounds report the owner once through stable part reduction.
 
 ### Mixed
@@ -78,7 +88,16 @@ Mixed query hits sort by distance, then 3D collider ID, then 2D collider ID.
 
 Reducer notes:
 
-- supported 2D slabs and stable compound reductions report `Exact`.
+- Capsule-slab boundary reducers use full-domain planar and spatial
+  finite-segment capsule intervals, but the current horizontal-rim
+  decomposition conservatively overexpands the true sphere-dilated boundary.
+  Circle-slab axial and radial clipping also remains wide until the final
+  authored-segment distance. The capsule reducer's current `Exact` label is
+  tracked for correction with the rim model.
+- Circle slabs are reduced through a conservative sharp-rim expanded cylinder;
+  their current `Exact` label is a known model-labeling defect pending a rounded
+  finite-cylinder reducer.
+- AABB, convex-polygon, and stable compound reductions report `Exact`.
 - supported 3D primitive slabs, finite cones at any rotation, mesh triangles,
   and compounds report `Exact`.
 - conservative fallback labels are reserved for safe proxy candidates that must
@@ -209,7 +228,10 @@ Polygon query vertices must be convex and non-collinear; edge-touching counts as
 overlap.
 
 `Raycast` returns the closest segment hit from `start` to `end`. Zero-length
-segments miss. Starting inside a collider returns a zero-distance hit.
+segments miss. Starting inside a collider returns a zero-distance hit. Capsule
+targets use one exact finite-segment interval rather than independent side and
+endpoint tests, so authored center/axis/half-length geometry and the nearest
+outer feature remain authoritative even at extreme scale.
 
 `SweepCircle` is the 2D swept movement/query path used by 2D CCD. It is not a
 mixed 2D/3D bridge.
@@ -224,8 +246,13 @@ tie-breakers.
 
 `SweepSphereAgainst2D` sweeps a 3D sphere center against embedded 2D slabs:
 
-- circles are finite vertical cylinders.
-- capsules are finite capsule slabs.
+- circles use full-domain axial/radial clipping against a conservatively
+  expanded finite vertical cylinder. The sharp expanded rim contains the true
+  rounded sphere/cylinder Minkowski boundary; correcting the reducer and its
+  current `Exact` label is tracked separately.
+- capsule boundary segments use full-domain finite-segment capsule intervals;
+  the current horizontal-rim decomposition is a conservative overexpansion
+  pending an exact extruded-capsule sweep.
 - AABB and convex polygon slabs use finite-prism reducers.
 - compounds reduce supported parts in authored order and report the owner.
 
@@ -234,7 +261,8 @@ and half-thickness against 3D targets:
 
 - spheres use finite-slab projection.
 - cuboids project the slab-intersecting portion into X/Z.
-- capsules and cylinders use deterministic finite-slab reducers.
+- capsule edges use full-domain finite-segment capsule intervals, and cylinders
+  use deterministic finite-slab reducers.
 - finite cones use slab-clipped or support-mapped convex reducers depending on
   orientation.
 - mesh targets clip candidate triangles to the slab Y interval, project into

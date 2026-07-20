@@ -391,8 +391,7 @@ internal static partial class FiniteSlabProjectionSweep
     {
         for (int i = 0; i < count; i++)
         {
-            Vector2d difference = simplex[i].Point - point;
-            if (Vector2d.TryGetMagnitude(difference, out Fixed64 distance)
+            if (Vector2d.TryGetDistance(simplex[i].Point, point, out Fixed64 distance)
                 && distance <= Fixed64.Epsilon)
                 return true;
         }

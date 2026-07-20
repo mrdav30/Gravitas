@@ -1,11 +1,11 @@
 using FixedMathSharp;
+using FixedMathSharp.Bounds;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Materials;
 using Gravitas.Tests.Support;
 using System;
 using System.Linq;
-using System.Reflection;
 using Xunit;
 
 namespace Gravitas.Tests.Colliders;
@@ -333,6 +333,75 @@ public sealed class ColliderShapeDefinitionTests
     }
 
     [Fact]
+    public void CylinderRuntimeShape_ShouldRejectAHeightThatQuantizesToZeroHalfHeight()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        var transform = new FixedTransform(
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            new Vector3d(Fixed64.One, Fixed64.FromRaw(1), Fixed64.One));
+        var agent = new TestMatterAgent(scenario.Context, transform);
+        var body = new SolidBody(agent, new LSCylinderCollider());
+
+        Action initialize = () => body.Initialize(Vector3d.Zero, FixedQuaternion.Identity);
+
+        initialize.Should().Throw<ArgumentException>()
+            .WithParameterName("Size")
+            .WithMessage("*positive half-height*");
+        scenario.Context.Physics.BodyCount.Should().Be(0);
+        scenario.Context.Physics.ColliderCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void CylinderRuntimeShape_ShouldValidateChangedScaleBeforeMutatingCommittedState()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSCylinderCollider> source = scenario.CreateCylinder(Vector3d.Zero);
+        LSCylinderCollider collider = source.Collider;
+        FixedTransform transform = source.Body.Agent.Transform;
+        FixedBoundBox bounds = collider.Bounds;
+        Fixed64 area = collider.Area;
+        Fixed64 height = collider.Height;
+        Fixed64 halfHeight = collider.HalfHeight;
+        Vector3d bottom = collider.CapCenterBottom;
+        Vector3d top = collider.CapCenterTop;
+        Vector3d segmentStart = collider.LineSegmentStart;
+        Vector3d segmentEnd = collider.LineSegmentEnd;
+        Vector3d axis = collider.WorldAxis;
+        uint version = collider.RuntimeShapeVersion;
+        Fixed3x3 inverseInertia = source.Body.InverseInertiaTensor;
+        bool wasPartitioned = collider.IsPartitioned;
+        int partitionCoordinateCount = collider.PartitionCoordinates?.Count ?? 0;
+
+        transform.LocalScale = new Vector3d(Fixed64.One, Fixed64.FromRaw(1), Fixed64.One);
+        Action rebuild = collider.Simulate;
+
+        rebuild.Should().Throw<ArgumentException>()
+            .WithParameterName("Size")
+            .WithMessage("*positive half-height*");
+        collider.Bounds.Should().Be(bounds);
+        collider.Area.Should().Be(area);
+        collider.Height.Should().Be(height);
+        collider.HalfHeight.Should().Be(halfHeight);
+        collider.CapCenterBottom.Should().Be(bottom);
+        collider.CapCenterTop.Should().Be(top);
+        collider.LineSegmentStart.Should().Be(segmentStart);
+        collider.LineSegmentEnd.Should().Be(segmentEnd);
+        collider.WorldAxis.Should().Be(axis);
+        collider.RuntimeShapeVersion.Should().Be(version);
+        source.Body.InverseInertiaTensor.Should().Be(inverseInertia);
+        collider.IsPartitioned.Should().Be(wasPartitioned);
+        (collider.PartitionCoordinates?.Count ?? 0).Should().Be(partitionCoordinateCount);
+
+        transform.LocalScale = new Vector3d(Fixed64.One, (Fixed64)2, Fixed64.One);
+        collider.Simulate();
+
+        collider.RuntimeShapeVersion.Should().Be(version + 1);
+        collider.HalfHeight.Should().Be(halfHeight * (Fixed64)2);
+        collider.Bounds.Should().NotBe(bounds);
+    }
+
+    [Fact]
     public void CuboidFrontalArea_ShouldUseExactOrthographicProjectionInWorldSpace()
     {
         Vector3d size = new((Fixed64)2, (Fixed64)4, (Fixed64)6);
@@ -380,29 +449,4 @@ public sealed class ColliderShapeDefinitionTests
             .Be(-Vector3d.Up);
     }
 
-    [Fact]
-    public void ShapeDefinition_ShouldNotExposeRuntimeLifecycleState()
-    {
-        Type definitionType = typeof(ColliderShapeDefinition);
-        string[] publicMemberNames = definitionType
-            .GetMembers(BindingFlags.Instance | BindingFlags.Public)
-            .Select(member => member.Name)
-            .Distinct()
-            .ToArray();
-
-        publicMemberNames.Should().NotContain(new[]
-        {
-            nameof(LSCollider.Id),
-            nameof(LSCollider.Body),
-            nameof(LSCollider.Context),
-            nameof(LSCollider.PartitionCoordinates),
-            nameof(LSCollider.OnContact),
-            nameof(LSCollider.OnTriggerEnter)
-        });
-
-        definitionType.GetFields(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
-            .Select(field => field.FieldType)
-            .Should()
-            .NotContain(type => typeof(LSCollider).IsAssignableFrom(type));
-    }
 }

@@ -103,6 +103,16 @@ public sealed class LSCapsuleCollider2D : LSCollider2D
     }
 
     /// <summary>
+    /// Gets the normalized world-space direction of the capsule's conceptual center axis.
+    /// </summary>
+    public Vector2d WorldAxis { get; private set; } = Vector2d.Forward;
+
+    /// <summary>
+    /// Gets the distance from the capsule center to either conceptual cap center.
+    /// </summary>
+    public Fixed64 AxisHalfLength { get; private set; }
+
+    /// <summary>
     /// Gets the world-space center of the lower local-Y cap.
     /// </summary>
     public Vector2d SegmentStart
@@ -127,12 +137,13 @@ public sealed class LSCapsuleCollider2D : LSCollider2D
     }
 
     public override bool ContainsPoint(Vector2d point)
-    {
-        CalculateSegment(out Vector2d start, out Vector2d end);
-        Fixed64 radius = ScaledRadius;
-        Vector2d closest = new FixedSegment2d(start, end).ClosestPoint(point);
-        return Vector2d.DistanceSquared(point, closest) <= radius * radius;
-    }
+        => FixedSegment2d.ContainsPointInCenteredCapsule(
+            point,
+            Center,
+            WorldAxis,
+            AxisHalfLength,
+            ScaledRadius,
+            Fixed64.Zero);
 
     public override Vector2d GetClosestPoint(Vector2d point)
     {
@@ -147,6 +158,31 @@ public sealed class LSCapsuleCollider2D : LSCollider2D
 
         return segmentPoint + direction * ScaledRadius;
     }
+
+    internal Vector2d GetNormalFromCenteredAxis(Vector2d point)
+    {
+        Vector2d direction = FixedSegment2d.GetDirectionFromCenteredAxis(
+            point,
+            Center,
+            WorldAxis,
+            AxisHalfLength);
+        return direction.MagnitudeSquared > Fixed64.Epsilon
+            ? direction
+            : Rotate(Vector2d.Right, Rotation).Normalized;
+    }
+
+    internal bool TryGetSurfacePointFromCenteredAxis(
+        Vector2d point,
+        Vector2d normal,
+        out Vector2d surfacePoint) =>
+        FixedSegment2d.TryGetSurfacePointOnCenteredCapsule(
+            point,
+            Center,
+            WorldAxis,
+            AxisHalfLength,
+            ScaledRadius,
+            normal,
+            out surfacePoint);
 
     public override Vector2d GetSupportPoint(Vector2d direction)
     {
@@ -180,6 +216,8 @@ public sealed class LSCapsuleCollider2D : LSCollider2D
 
     protected override void RebuildShape()
     {
+        AxisHalfLength = GetScaledCylinderLength(ScaledRadius) * Fixed64.Half;
+        WorldAxis = Rotate(Vector2d.Forward, Rotation).Normalized;
         CalculateSegment(out Vector2d start, out Vector2d end);
         Fixed64 radius = ScaledRadius;
         Vector2d min = new(
@@ -207,12 +245,9 @@ public sealed class LSCapsuleCollider2D : LSCollider2D
 
     private void CalculateSegment(out Vector2d start, out Vector2d end)
     {
-        Fixed64 halfSegmentLength = GetScaledCylinderLength(ScaledRadius) * Fixed64.Half;
-        Vector2d localAxis = new(Fixed64.Zero, halfSegmentLength);
-        Vector2d worldAxis = Rotate(localAxis, Rotation);
         Vector2d center = Center;
-        start = center - worldAxis;
-        end = center + worldAxis;
+        start = center - WorldAxis * AxisHalfLength;
+        end = center + WorldAxis * AxisHalfLength;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

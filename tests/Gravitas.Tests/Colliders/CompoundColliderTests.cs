@@ -97,6 +97,30 @@ public sealed class CompoundColliderTests
     }
 
     [Fact]
+    public void BodyInitialize_WithCylinderPartWhoseScaledHalfHeightCollapses_ShouldRejectBeforeRuntimeMutation()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        var compound = new LSCompoundCollider(CompoundColliderPart.Cylinder(
+            Fixed64.Half,
+            Fixed64.FromRaw(1),
+            Vector3d.Zero));
+        var transform = new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One);
+        var body = new SolidBody(new TestMatterAgent(context, transform), compound);
+
+        Action initialize = () => body.Initialize(Vector3d.Zero, FixedQuaternion.Identity);
+
+        initialize.Should().Throw<ArgumentException>()
+            .WithParameterName("Size")
+            .WithMessage("*positive half-height*");
+        body.Active.Should().BeFalse();
+        body.DynamicId.Should().Be(-1);
+        compound.Id.Should().Be(-1);
+        compound.HasHostBinding.Should().BeFalse();
+        context.Physics.BodyCount.Should().Be(0);
+        context.Physics.ColliderCount.Should().Be(0);
+    }
+
+    [Fact]
     public void Initialize_ShouldRegisterOnlyOwningColliderAndAggregatePartBounds()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();

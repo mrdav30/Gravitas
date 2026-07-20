@@ -89,20 +89,16 @@ public class LSMeshCollider : LSCollider
     protected override void BuildBoundingBox() =>
         SetBounds(Mesh.Bounds);
 
-    protected override void OnBeforeInitialize(IMatterAgent agent) =>
-        ValidateRuntimeTransform(agent.Transform.LossyScale, agent.Transform.WorldRotation);
-
     protected override void BuildShape()
     {
         Vector3d scale = LocalScale;
         FixedQuaternion rotation = Rotation;
-        ValidateRuntimeTransform(scale, rotation);
         Vector3d scaledSourceCenter = Vector3d.Multiply(Mesh.LocalBounds.Center, scale);
         Vector3d meshOrigin = Position + (rotation * (ScaledOffset - scaledSourceCenter));
         Mesh.UpdateTransform(meshOrigin, rotation, scale);
     }
 
-    internal void ValidateRuntimeTransform(Vector3d scale, FixedQuaternion rotation)
+    internal override void ValidateRuntimeTransform(Vector3d scale, FixedQuaternion rotation)
     {
         Mesh.ValidateScale(scale);
         if (InertiaPolicy == MeshInertiaPolicy.RequireClosedVolume)

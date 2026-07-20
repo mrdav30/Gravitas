@@ -114,6 +114,28 @@ public sealed class GravitasQuery3DServiceCircleTests
     }
 
     [Fact]
+    public void OverlapCircle_WithNoCandidate_ShouldEmitDeterministicMissDiagnostic()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        context.Diagnostics.Enable();
+
+        bool found = context.Query3D.OverlapCircle(
+            Vector3d.Zero,
+            Fixed64.One,
+            out Physics3DHit hit,
+            IncludeLayerZero);
+
+        found.Should().BeFalse();
+        hit.Collider.Should().BeNull();
+        context.Query3D.LastQueryCandidateCount.Should().Be(0);
+        context.Diagnostics.EventCount.Should().Be(1);
+        GravitasDiagnosticEvent diagnostic = context.Diagnostics.Events[0];
+        diagnostic.Kind.Should().Be(GravitasDiagnosticEventKind.CircleQuery);
+        diagnostic.Hit.Should().BeFalse();
+        diagnostic.DataB.Should().Be(0);
+    }
+
+    [Fact]
     public void OverlapCircleAll_ShouldResolveColliderIdsThroughOwningContext()
     {
         using GravitasWorldContext contextA = GravitasWorldContext.CreateOwned();

@@ -1283,7 +1283,11 @@ public sealed partial class GravitasQuery3DService
         if (!found)
             return false;
 
-        Vector3d point = ContinuousCollisionContactPolicy.ResolveSweptSpherePoint(collider, sweepCenter, direction);
+        Vector3d point = ContinuousCollisionContactPolicy.ResolveSweptSpherePoint(
+            collider,
+            sweepCenter,
+            direction,
+            _sweepWorker.Radius);
         Vector3d normal = ContinuousCollisionContactPolicy.ResolveSweptSphereNormal(collider, point, sweepCenter, direction);
         sweepHit = new Physics3DHit(collider, point, normal, distance, direction);
         return true;

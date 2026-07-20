@@ -312,6 +312,29 @@ public sealed class RaycastSegmentWorkerTests
     }
 
     [Fact]
+    public void CheckCapsuleOverlaps_WithTwoRawTransverseChord_ShouldRetainTheTangent()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        Fixed64 radius = Fixed64.FromRaw(1);
+        LSCapsuleCollider capsule = scenario.CreateCapsule(
+            new Vector3d(Fixed64.Zero, Fixed64.FromRaw(2), Fixed64.Zero)).Collider;
+        capsule.Radius = radius;
+        capsule.Size = Vector3d.One * (radius * Fixed64.Two);
+        capsule.RebuildRuntimeShapeOnly();
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+        worker.PrepareSegmentCheck(
+            new Vector3d((Fixed64)(-100_000), Fixed64.Zero, Fixed64.Zero),
+            new Vector3d((Fixed64)100_000, Fixed64.FromRaw(2), Fixed64.Zero));
+
+        bool hit = worker.CheckCapsuleOverlaps(capsule, ref hits);
+
+        hit.Should().BeTrue();
+        hits.Should().ContainSingle()
+            .Which.Should().Be(new Vector3d(Fixed64.Zero, radius, Fixed64.Zero));
+    }
+
+    [Fact]
     public void CheckCapsuleOverlaps_WithSegmentHittingStartHemisphereAfterMissingCylinder_ShouldReturnCapHit()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
@@ -370,6 +393,47 @@ public sealed class RaycastSegmentWorkerTests
     }
 
     [Fact]
+    public void CheckCapsuleOverlaps_WithAxialCrossing_ShouldReturnOuterCapsuleInterval()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSCapsuleCollider capsule = scenario.CreateBody(
+            new LSCapsuleCollider(ColliderShapeDefinition.Capsule(Fixed64.Half, (Fixed64)3)),
+            Vector3d.Zero,
+            FixedQuaternion.Identity).Collider;
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+
+        worker.PrepareSegmentCheck(
+            new Vector3d(Fixed64.Zero, (Fixed64)(-3), Fixed64.Zero),
+            new Vector3d(Fixed64.Zero, (Fixed64)3, Fixed64.Zero));
+
+        bool hit = worker.CheckCapsuleOverlaps(capsule, ref hits);
+
+        hit.Should().BeTrue();
+        hits.Count.Should().Be(2);
+        hits[0].Should().Be(capsule.LineSegmentStart - Vector3d.Up * capsule.ScaledRadius);
+        hits[1].Should().Be(capsule.LineSegmentEnd + Vector3d.Up * capsule.ScaledRadius);
+    }
+
+    [Fact]
+    public void CheckCapsuleOverlaps_WithIntersectionsDisabled_ShouldReportOnlyTheOverlap()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSCapsuleCollider capsule = scenario.CreateCapsule(Vector3d.Zero).Collider;
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+        worker.PrepareSegmentCheck(
+            new Vector3d(Fixed64.Zero, (Fixed64)(-2), Fixed64.Zero),
+            new Vector3d(Fixed64.Zero, (Fixed64)2, Fixed64.Zero),
+            calculateIntersectionPoints: false);
+
+        bool hit = worker.CheckCapsuleOverlaps(capsule, ref hits);
+
+        hit.Should().BeTrue();
+        hits.Should().BeEmpty();
+    }
+
+    [Fact]
     public void CheckCylinderOverlaps_WithSegmentStartingInsideAndIntersectionsDisabled_ShouldNotWritePoint()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
@@ -406,6 +470,79 @@ public sealed class RaycastSegmentWorkerTests
         hits.Count.Should().Be(2);
         hits.Should().Contain(new Vector3d(-cylinder.ScaledRadius, Fixed64.Zero, Fixed64.Zero));
         hits.Should().Contain(new Vector3d(cylinder.ScaledRadius, Fixed64.Zero, Fixed64.Zero));
+    }
+
+    [Fact]
+    public void CheckCylinderOverlaps_ShouldPreserveClosedSegmentEndpointSemantics()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSCylinderCollider cylinder = scenario.CreateCylinder(Vector3d.Zero).Collider;
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+
+        worker.PrepareSegmentCheck(Vector3d.Zero, Vector3d.Right * (Fixed64)2);
+        worker.CheckCylinderOverlaps(cylinder, ref hits).Should().BeTrue();
+        hits.Count.Should().Be(1);
+        hits[0].Should().Be(Vector3d.Zero);
+
+        hits.FastClear();
+        worker.PrepareSegmentCheck(-Vector3d.Right * (Fixed64)2, Vector3d.Zero);
+        worker.CheckCylinderOverlaps(cylinder, ref hits).Should().BeTrue();
+        hits.Count.Should().Be(1);
+        hits[0].Should().Be(-Vector3d.Right * cylinder.ScaledRadius);
+
+        hits.FastClear();
+        Vector3d boundaryEnd = Vector3d.Right * cylinder.ScaledRadius;
+        worker.PrepareSegmentCheck(-Vector3d.Right * (Fixed64)2, boundaryEnd);
+        worker.CheckCylinderOverlaps(cylinder, ref hits).Should().BeTrue();
+        hits.Count.Should().Be(2);
+        FixedMath.Abs(hits[0].X + cylinder.ScaledRadius)
+            .Should().BeLessThanOrEqualTo(Fixed64.FromRaw(1));
+        hits[0].Y.Should().Be(Fixed64.Zero);
+        hits[0].Z.Should().Be(Fixed64.Zero);
+        hits[1].Should().Be(boundaryEnd);
+    }
+
+    [Fact]
+    public void CheckCylinderOverlaps_WithLargeCrossing_ShouldNotSaturateTheSideQuadratic()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSCylinderCollider cylinder = scenario.CreateCylinder(Vector3d.Zero).Collider;
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+        Vector3d start = new((Fixed64)(-100_000), Fixed64.Zero, Fixed64.Zero);
+        Vector3d end = new((Fixed64)100_000, Fixed64.Zero, Fixed64.Zero);
+
+        worker.PrepareSegmentCheck(start, end);
+
+        bool hit = worker.CheckCylinderOverlaps(cylinder, ref hits);
+
+        hit.Should().BeTrue();
+        hits.Count.Should().Be(2);
+        hits[0].Should().Be(new Vector3d(-Fixed64.Half, Fixed64.Zero, Fixed64.Zero));
+        hits[1].Should().Be(new Vector3d(Fixed64.Half, Fixed64.Zero, Fixed64.Zero));
+    }
+
+    [Fact]
+    public void CheckCylinderOverlaps_WithOneRawEntry_ShouldReturnBothExactBoundaries()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSCylinderCollider cylinder = scenario.CreateCylinder(Vector3d.Zero).Collider;
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+        Vector3d start = new(
+            cylinder.ScaledRadius + Fixed64.FromRaw(1),
+            Fixed64.Zero,
+            Fixed64.Zero);
+        Vector3d end = new((Fixed64)(-3), Fixed64.Zero, Fixed64.Zero);
+        worker.PrepareSegmentCheck(start, end);
+
+        bool hit = worker.CheckCylinderOverlaps(cylinder, ref hits);
+
+        hit.Should().BeTrue();
+        hits.Count.Should().Be(2);
+        hits[0].Should().Be(new Vector3d(cylinder.ScaledRadius, Fixed64.Zero, Fixed64.Zero));
+        hits[1].Should().Be(new Vector3d(-cylinder.ScaledRadius, Fixed64.Zero, Fixed64.Zero));
     }
 
     [Fact]
@@ -1314,6 +1451,7 @@ public sealed class RaycastSegmentWorkerTests
         var hits = new SwiftList<Vector3d>();
         LSMeshCollider mesh = MeshTestFixtures.CreateConvexCube();
         LSConeCollider cone = scenario.CreateCone(Vector3d.Zero).Collider;
+        LSCapsuleCollider capsule = scenario.CreateCapsule(Vector3d.Zero).Collider;
         LSCylinderCollider cylinder = scenario.CreateCylinder(Vector3d.Zero).Collider;
         LSCuboidCollider cuboid = scenario.CreateCuboid(Vector3d.Zero).Collider;
 
@@ -1327,6 +1465,7 @@ public sealed class RaycastSegmentWorkerTests
         componentOverflowWorker.CheckSphereOverlaps(Sphere(Vector3d.Zero, Fixed64.One), ref hits).Should().BeFalse();
         componentOverflowWorker.CheckConeOverlaps(cone, ref hits).Should().BeFalse();
         componentOverflowWorker.CheckMeshOverlaps(mesh, ref hits).Should().BeFalse();
+        componentOverflowWorker.CheckCapsuleOverlaps(capsule, ref hits).Should().BeFalse();
         componentOverflowWorker.CheckCylinderOverlaps(cylinder, ref hits).Should().BeFalse();
         componentOverflowWorker.CheckAABBoxOverlaps(-Vector3d.One, Vector3d.One, ref hits).Should().BeFalse();
         componentOverflowWorker.CheckOBBoxOverlaps(cuboid, ref hits).Should().BeFalse();

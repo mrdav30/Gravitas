@@ -529,10 +529,10 @@ public sealed class PhysicsMeshScaleTests
         FixedBoundBox sphereBounds = spherePart.Bounds;
         FixedBoundBox compoundBounds = compound.Bounds;
 
-        transform.LocalScale = Vector3d.Zero;
+        transform.LocalScale = new Vector3d((Fixed64)65536, (Fixed64)65536, Fixed64.Half);
         Action simulate = compound.Simulate;
 
-        simulate.Should().Throw<ArgumentException>();
+        simulate.Should().Throw<ArgumentException>().WithMessage("*determinant*");
         spherePart.RuntimeShapeVersion.Should().Be(sphereVersion);
         spherePart.Bounds.Should().Be(sphereBounds);
         meshPart.Mesh.Scale.Should().Be(Vector3d.One);
@@ -547,6 +547,43 @@ public sealed class PhysicsMeshScaleTests
         meshPart.Mesh.Scale.Should().Be(transform.LossyScale);
         compound.Bounds.Should().NotBe(compoundBounds);
 
+    }
+
+    [Fact]
+    public void RuntimeMeshScaleFailure_ShouldPreserveCommittedShapeAndRecoverOnNextValidScale()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSMeshCollider collider = MeshTestFixtures.CreateConvexCube();
+        var transform = new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One);
+        collider.InitializeWithNoBody(new TestMatterAgent(context, transform));
+        FixedBoundBox colliderBounds = collider.Bounds;
+        FixedBoundBox meshBounds = collider.Mesh.Bounds;
+        Vector3d meshScale = collider.Mesh.Scale;
+        Vector3d firstVertex = collider.Mesh.GetVertexWorld(0);
+        Fixed64 area = collider.Area;
+        uint version = collider.RuntimeShapeVersion;
+        bool wasPartitioned = collider.IsPartitioned;
+        int partitionCoordinateCount = collider.PartitionCoordinates?.Count ?? 0;
+
+        transform.LocalScale = new Vector3d((Fixed64)65536, (Fixed64)65536, Fixed64.Half);
+        Action rebuild = collider.Simulate;
+
+        rebuild.Should().Throw<ArgumentException>().WithMessage("*determinant*");
+        collider.Bounds.Should().Be(colliderBounds);
+        collider.Mesh.Bounds.Should().Be(meshBounds);
+        collider.Mesh.Scale.Should().Be(meshScale);
+        collider.Mesh.GetVertexWorld(0).Should().Be(firstVertex);
+        collider.Area.Should().Be(area);
+        collider.RuntimeShapeVersion.Should().Be(version);
+        collider.IsPartitioned.Should().Be(wasPartitioned);
+        (collider.PartitionCoordinates?.Count ?? 0).Should().Be(partitionCoordinateCount);
+
+        transform.LocalScale = new Vector3d((Fixed64)2, Fixed64.One, Fixed64.One);
+        collider.Simulate();
+
+        collider.RuntimeShapeVersion.Should().Be(version + 1);
+        collider.Mesh.Scale.Should().Be(transform.LossyScale);
+        collider.Bounds.Should().NotBe(colliderBounds);
     }
 
     [Fact]

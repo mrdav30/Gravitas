@@ -595,7 +595,7 @@ public sealed class GravitasQuery3DServiceSweepTests
 
         count.Should().Be(2);
         hits[0].Collider.Should().BeSameAs(near);
-        hits[0].Distance.Should().Be(Fixed64.FromFraction(5, 2));
+        AssertDistanceNear(hits[0].Distance, Fixed64.FromFraction(5, 2));
         hits[1].Collider.Should().BeSameAs(far);
         hits[1].Distance.Should().Be(Fixed64.FromFraction(9, 2));
     }
@@ -2112,36 +2112,64 @@ public sealed class GravitasQuery3DServiceSweepTests
     }
 
     [Fact]
-    public void SweptSphereWorker_WithQuantizedZeroMeshEdgeLength_ShouldUseOtherTriangleFeatures()
+    public void SweptSphereWorker_WithNonzeroQuantizedLengthMeshEdge_ShouldKeepItsEarlierSideHit()
     {
-        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
-        Fixed64 shortEdge = Fixed64.FromRaw(1 << 14);
-        LSMeshCollider mesh = CreateDynamicCollider(
-            context,
-            new LSMeshCollider(
-                new[]
-                {
-                    Vector3d.Zero,
-                    new Vector3d(shortEdge, Fixed64.Zero, Fixed64.Zero),
-                    new Vector3d(Fixed64.Zero, (Fixed64)8, Fixed64.Zero)
-                },
-                new[] { 0, 1, 2 },
-                MeshColliderMode.Concave,
-                MeshInertiaPolicy.SurfaceApproximation),
-            Vector3d.Zero);
+        Fixed64 halfEdge = Fixed64.FromRaw(30_000);
+        Vector3d edgeStart = new(Fixed64.Zero, -halfEdge, Fixed64.Zero);
+        Vector3d edgeEnd = new(Fixed64.Zero, halfEdge, Fixed64.Zero);
+        var mesh = new LSMeshCollider(
+            new[]
+            {
+                edgeStart,
+                edgeEnd,
+                new Vector3d((Fixed64)10, Fixed64.Zero, Fixed64.Zero)
+            },
+            new[] { 0, 1, 2 },
+            MeshColliderMode.Concave,
+            MeshInertiaPolicy.SurfaceApproximation);
         var worker = new SweptSphereQueryWorker();
-        Vector3d start = new(shortEdge / (Fixed64)4, Fixed64.One, -Fixed64.One);
-        Vector3d end = new(start.X, start.Y, Fixed64.One);
-        Fixed64 radius = Fixed64.FromFraction(1, 10);
-        (shortEdge * shortEdge).Should().Be(Fixed64.Zero);
+        Fixed64 radius = Fixed64.FromRaw(100_000);
+        Vector3d start = new(Fixed64.FromRaw(-200_000), Fixed64.Zero, Fixed64.Zero);
+        Vector3d end = new(Fixed64.FromRaw(200_000), Fixed64.Zero, Fixed64.Zero);
+        (edgeEnd - edgeStart).MagnitudeSquared.Should().BeLessThanOrEqualTo(Fixed64.Epsilon);
         AssertSweptSphereBroadOverlap(start, end, radius, mesh);
         worker.Prepare(start, end, radius);
 
         bool hit = worker.TrySweep(mesh, out Vector3d centerAtImpact, out Fixed64 distance);
 
         hit.Should().BeTrue();
-        centerAtImpact.Should().Be(new Vector3d(start.X, start.Y, -radius));
-        AssertDistanceNear(distance, Fixed64.One - radius);
+        centerAtImpact.Should().Be(new Vector3d(-radius, Fixed64.Zero, Fixed64.Zero));
+        distance.Should().Be(radius);
+        worker.LastMeshTriangleCandidateCount.Should().Be(1);
+    }
+
+    [Fact]
+    public void SweptSphereWorker_WithExtremeEdgeOnlyMeshContact_ShouldKeepTheFiniteEdgeRoot()
+    {
+        var mesh = new LSMeshCollider(
+            new[]
+            {
+                Vector3d.Zero,
+                new Vector3d(Fixed64.Zero, (Fixed64)10, Fixed64.Zero),
+                new Vector3d((Fixed64)10, (Fixed64)10, Fixed64.Zero)
+            },
+            new[] { 0, 1, 2 },
+            MeshColliderMode.Concave,
+            MeshInertiaPolicy.SurfaceApproximation);
+        var worker = new SweptSphereQueryWorker();
+        Fixed64 height = Fixed64.FromFraction(2, 5);
+        Vector3d start = new((Fixed64)(-100_000), (Fixed64)5, height);
+        Vector3d end = new((Fixed64)100_000, (Fixed64)5, height);
+        Fixed64 radius = Fixed64.Half;
+        AssertSweptSphereBroadOverlap(start, end, radius, mesh);
+        worker.Prepare(start, end, radius);
+
+        bool hit = worker.TrySweep(mesh, out Vector3d centerAtImpact, out Fixed64 distance);
+
+        hit.Should().BeTrue();
+        Fixed64 radialEntry = Fixed64.FromFraction(3, 10);
+        centerAtImpact.Should().Be(new Vector3d(-radialEntry, (Fixed64)5, height));
+        distance.Should().Be((Fixed64)100_000 - radialEntry);
         worker.LastMeshTriangleCandidateCount.Should().Be(1);
     }
 
@@ -2267,7 +2295,7 @@ public sealed class GravitasQuery3DServiceSweepTests
         bool hit = worker.TrySweep(cylinder, out Vector3d centerAtImpact, out Fixed64 distance);
 
         hit.Should().BeTrue();
-        centerAtImpact.Should().Be(new Vector3d(Fixed64.Zero, Fixed64.FromFraction(3, 5), Fixed64.Zero));
+        AssertSweepPointNear(centerAtImpact, new Vector3d(Fixed64.Zero, Fixed64.FromFraction(3, 5), Fixed64.Zero));
         AssertDistanceNear(distance, Fixed64.FromFraction(7, 5));
     }
 

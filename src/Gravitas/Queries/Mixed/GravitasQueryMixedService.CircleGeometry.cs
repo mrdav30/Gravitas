@@ -81,26 +81,6 @@ public sealed partial class GravitasQueryMixedService
         Fixed64 length,
         Vector2d point,
         Fixed64 radius,
-        out Fixed64 distance)
-    {
-        return TrySweepPointInPlane(
-            start,
-            end,
-            direction,
-            length,
-            point,
-            radius,
-            Fixed64.Zero,
-            out distance);
-    }
-
-    private static bool TrySweepPointInPlane(
-        Vector2d start,
-        Vector2d end,
-        Vector2d direction,
-        Fixed64 length,
-        Vector2d point,
-        Fixed64 radius,
         Fixed64 radiusExpansion,
         out Fixed64 distance)
     {
@@ -119,7 +99,6 @@ public sealed partial class GravitasQueryMixedService
     private static bool TrySweepCircleAgainstTriangleProjection(
         Vector2d start,
         Vector2d end,
-        Vector2d direction,
         Fixed64 length,
         Fixed64 radius,
         Fixed64 slabMinY,
@@ -147,8 +126,8 @@ public sealed partial class GravitasQueryMixedService
         if (!TrySweepCircleAgainstConvexProjection(
             start,
             end,
-            direction,
             length,
+            Fixed64.Zero,
             radius,
             projection.Slice(0, projectionCount),
             out distance))
@@ -157,7 +136,7 @@ public sealed partial class GravitasQueryMixedService
             return false;
         }
 
-        Vector2d center2D = start + direction * distance;
+        Vector2d center2D = new FixedSegment2d(start, end).GetPointAtDistance(distance, length);
         point3D = FindClosestPointOnClippedProjection(
             clipped.Slice(0, clippedCount),
             center2D,
@@ -416,25 +395,41 @@ public sealed partial class GravitasQueryMixedService
     private static bool TrySweepCircleAgainstConvexProjection(
         Vector2d start,
         Vector2d end,
-        Vector2d direction,
         Fixed64 length,
         Fixed64 radius,
+        Fixed64 radiusExpansion,
         ReadOnlySpan<Vector2d> projection,
         out Fixed64 distance)
     {
         distance = Fixed64.Zero;
         if (projection.Length == 1)
-            return TrySweepPointInPlane(start, end, direction, length, projection[0], radius, out distance);
+        {
+            return TrySweepPointAgainstSegmentCapsule(
+                start,
+                end,
+                length,
+                projection[0],
+                projection[0],
+                radius,
+                radiusExpansion,
+                out distance);
+        }
 
         if (projection.Length == 2)
-            return TrySweepPointAgainstSegmentCapsule(start, end, direction, length, projection[0], projection[1], radius, out distance);
-
-        Fixed64 radiusSqr = radius * radius;
-        if (IsPointInsideConvexProjection(start, projection)
-            || DistanceSquaredToConvexProjection(start, projection) <= radiusSqr)
         {
-            return true;
+            return TrySweepPointAgainstSegmentCapsule(
+                start,
+                end,
+                length,
+                projection[0],
+                projection[1],
+                radius,
+                radiusExpansion,
+                out distance);
         }
+
+        if (IsPointInsideConvexProjection(start, projection))
+            return true;
 
         bool found = false;
         Fixed64 best = Fixed64.MaxValue;
@@ -442,108 +437,54 @@ public sealed partial class GravitasQueryMixedService
         {
             Vector2d first = projection[i];
             Vector2d second = projection[(i + 1) % projection.Length];
-            TryKeepEarlierSweep(
-                TrySweepPointAgainstSegmentCapsule(start, end, direction, length, first, second, radius, out Fixed64 candidate),
-                candidate,
-                ref found,
-                ref best);
+            if (!TrySweepPointAgainstSegmentCapsule(
+                    start,
+                    end,
+                    length,
+                    first,
+                    second,
+                    radius,
+                    radiusExpansion,
+                    out Fixed64 candidate)
+                || (found && candidate >= best))
+            {
+                continue;
+            }
+
+            found = true;
+            best = candidate;
+        }
+
+        if (!found)
+        {
+            distance = default;
+            return false;
         }
 
         distance = best;
-        return found;
+        return true;
     }
 
     private static bool TrySweepPointAgainstSegmentCapsule(
         Vector2d start,
         Vector2d end,
-        Vector2d direction,
         Fixed64 length,
         Vector2d segmentStart,
         Vector2d segmentEnd,
         Fixed64 radius,
+        Fixed64 radiusExpansion,
         out Fixed64 distance)
     {
-        distance = Fixed64.Zero;
-        Fixed64 radiusSqr = radius * radius;
-        if (new FixedSegment2d(segmentStart, segmentEnd).DistanceSquared(start) <= radiusSqr)
-            return true;
-
-        bool found = false;
-        Fixed64 best = Fixed64.MaxValue;
-        TryKeepEarlierSweep(
-            TrySweepPointInPlane(start, end, direction, length, segmentStart, radius, out Fixed64 startDistance),
-            startDistance,
-            ref found,
-            ref best);
-        TryKeepEarlierSweep(
-            TrySweepPointInPlane(start, end, direction, length, segmentEnd, radius, out Fixed64 endDistance),
-            endDistance,
-            ref found,
-            ref best);
-
-        Vector2d edge = segmentEnd - segmentStart;
-        Fixed64 edgeLength = edge.Magnitude;
-        Vector2d edgeDirection = edge / edgeLength;
-        Vector2d normal = new(-edgeDirection.Y, edgeDirection.X);
-        Fixed64 signedStart = Vector2d.Dot(start - segmentStart, normal);
-        Fixed64 signedDirection = Vector2d.Dot(direction, normal);
-        if (signedDirection.Abs() > Fixed64.Epsilon)
-        {
-            TryKeepEarlierSweep(
-                TrySweepPointAgainstSegmentOffsetLine(
-                    start,
-                    direction,
-                    length,
-                    segmentStart,
-                    edgeDirection,
-                    edgeLength,
-                    signedStart,
-                    signedDirection,
-                    radius,
-                    out Fixed64 positiveDistance),
-                positiveDistance,
-                ref found,
-                ref best);
-            TryKeepEarlierSweep(
-                TrySweepPointAgainstSegmentOffsetLine(
-                    start,
-                    direction,
-                    length,
-                    segmentStart,
-                    edgeDirection,
-                    edgeLength,
-                    signedStart,
-                    signedDirection,
-                    -radius,
-                    out Fixed64 negativeDistance),
-                negativeDistance,
-                ref found,
-                ref best);
-        }
-
-        distance = best;
-        return found;
-    }
-
-    private static bool TrySweepPointAgainstSegmentOffsetLine(
-        Vector2d start,
-        Vector2d direction,
-        Fixed64 length,
-        Vector2d segmentStart,
-        Vector2d edgeDirection,
-        Fixed64 edgeLength,
-        Fixed64 signedStart,
-        Fixed64 signedDirection,
-        Fixed64 signedRadius,
-        out Fixed64 distance)
-    {
-        distance = (signedRadius - signedStart) / signedDirection;
-        if (distance < Fixed64.Zero || distance > length)
-            return false;
-
-        Vector2d point = start + direction * distance;
-        Fixed64 projection = Vector2d.Dot(point - segmentStart, edgeDirection);
-        return projection >= Fixed64.Zero && projection <= edgeLength;
+        var capsuleAxis = new FixedSegment2d(segmentStart, segmentEnd);
+        return new FixedSegment2d(start, end).TryGetCapsuleIntersectionDistanceInterval(
+                capsuleAxis,
+                radius,
+                radiusExpansion,
+                length,
+                out distance,
+                out _,
+                out _,
+                out _);
     }
 
     private static bool IsPointInsideConvexProjection(Vector2d point, ReadOnlySpan<Vector2d> projection)
@@ -560,21 +501,6 @@ public sealed partial class GravitasQueryMixedService
         }
 
         return true;
-    }
-
-    private static Fixed64 DistanceSquaredToConvexProjection(Vector2d point, ReadOnlySpan<Vector2d> projection)
-    {
-        Fixed64 best = Fixed64.MaxValue;
-        for (int i = 0; i < projection.Length; i++)
-        {
-            Fixed64 distanceSqr = new FixedSegment2d(
-                projection[i],
-                projection[(i + 1) % projection.Length]).DistanceSquared(point);
-            if (distanceSqr < best)
-                best = distanceSqr;
-        }
-
-        return best;
     }
 
     private static bool TryGetVerticalSegmentInterval(Vector3d start, Vector3d end, out Fixed64 minY, out Fixed64 maxY)

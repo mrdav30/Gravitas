@@ -424,6 +424,29 @@ public sealed partial class SolidBody2DGroundingTests
     }
 
     [Fact]
+    public void ContactGroundCandidate_WithZeroGravity_ShouldUseExplicitFallbackUpDirection()
+    {
+        using GravitasWorldContext context = CreateContext();
+        SolidBody2D body = CreateCircle(context, Vector2d.Zero);
+        LSAABBoxCollider2D support = CreateStaticFloor(context);
+        DisableProbeFallback(body);
+        body.Gravity = Vector2d.Zero;
+        body.UseGravityDerivedGroundUpDirection = true;
+        body.GroundUpDirection = Vector2d.Right;
+
+        body.BeginAutomaticGroundingRefresh();
+        body.TryAcceptContactGroundCandidate(
+            body.Collider,
+            support,
+            CreateGroundContact(1, Vector2d.Zero, Fixed64.Half, Vector2d.Right),
+            ownColliderIsA: true);
+        body.CompleteAutomaticGroundingRefresh();
+
+        body.IsGrounded.Should().BeTrue();
+        body.GroundNormal.Should().Be(Vector2d.Right);
+    }
+
+    [Fact]
     public void SweptCircleProbe_ShouldGroundWhenCenterRayMissesSupportEdge()
     {
         using GravitasWorldContext context = CreateContext();

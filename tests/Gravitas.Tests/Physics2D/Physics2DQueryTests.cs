@@ -254,6 +254,41 @@ public sealed class Physics2DQueryTests
     }
 
     [Fact]
+    public void RaycastAll_WithFiniteAxisHitsOneSpatialRawApart_ShouldPreserveDistanceOrder()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        const long RawUnitsPerWhole = 4_294_967_296L;
+        const long NearCenterRaw = 11L * RawUnitsPerWhole;
+        Fixed64 nearCenterX = Fixed64.FromRaw(NearCenterRaw);
+        Fixed64 farCenterX = Fixed64.FromRaw(NearCenterRaw + 1L);
+
+        // Register the farther collider first so collider identity cannot mask a
+        // distance tie caused by rounding a normalized segment parameter.
+        SolidBody2D far = CreateCapsule(
+            context,
+            new Vector2d(farCenterX, Fixed64.Zero),
+            Fixed64.One,
+            Fixed64.Two);
+        SolidBody2D near = CreateCapsule(
+            context,
+            new Vector2d(nearCenterX, Fixed64.Zero),
+            Fixed64.One,
+            Fixed64.Two);
+        var hits = new SwiftList<Physics2DHit>(2);
+
+        int count = context.Query2D.RaycastAll(
+            Vector2d.Zero,
+            new Vector2d((Fixed64)100, Fixed64.Zero),
+            hits);
+
+        count.Should().Be(2);
+        hits[0].Collider.Should().BeSameAs(near.Collider);
+        hits[1].Collider.Should().BeSameAs(far.Collider);
+        hits[0].Distance.Should().Be(Fixed64.FromRaw(10L * RawUnitsPerWhole));
+        hits[1].Distance.Should().Be(Fixed64.FromRaw((10L * RawUnitsPerWhole) + 1L));
+    }
+
+    [Fact]
     public void RaycastAll_WithCompoundCollider_ShouldReturnOwnerAtEarliestPart()
     {
         using GravitasWorldContext context = Create2DContext();
@@ -1669,6 +1704,26 @@ public sealed class Physics2DQueryTests
     }
 
     [Fact]
+    public void Raycast_WithOneRawCapsuleRadius_ShouldKeepExactEntryAndRadialNormal()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        Fixed64 radius = Fixed64.FromRaw(1);
+        SolidBody2D capsule = CreateCapsule(context, Vector2d.Zero, radius, (Fixed64)2);
+
+        bool found = QueryDetection2D.TryRaycast(
+            new Vector2d((Fixed64)(-3), Fixed64.Zero),
+            new Vector2d((Fixed64)3, Fixed64.Zero),
+            capsule.Collider,
+            out Physics2DHit hit);
+
+        found.Should().BeTrue();
+        hit.Collider.Should().BeSameAs(capsule.Collider);
+        hit.Distance.Should().Be((Fixed64)3 - radius);
+        hit.Normal.Should().Be(-Vector2d.Right);
+        hit.Point.Should().Be(-Vector2d.Right * radius);
+    }
+
+    [Fact]
     public void TrySweepMoverShape_WithCrossedCapsuleSegments_ShouldUseSegmentIntersectionContact()
     {
         using GravitasWorldContext context = Create2DContext();
@@ -1713,13 +1768,16 @@ public sealed class Physics2DQueryTests
             out Physics2DHit sweepHit).Should().BeTrue();
 
         sweepHit.Collider.Should().BeSameAs(capsule.Collider);
+        // The zero-length centered axis is an exact circle. Contact reporting
+        // therefore uses its canonical radial normal at the exact spatial entry.
+        Vector2d expectedNormal = -Vector2d.Right;
         sweepHit.Distance.Should().Be((Fixed64)2);
-        sweepHit.Point.Should().Be(-Vector2d.Right * Fixed64.Half);
-        sweepHit.Normal.Should().Be(-Vector2d.Right);
+        sweepHit.Point.Should().Be(expectedNormal * ((LSCapsuleCollider2D)capsule.Collider).ScaledRadius);
+        sweepHit.Normal.Should().Be(expectedNormal);
     }
 
     [Fact]
-    public void Raycast_WithRoundedEndpointOnDegenerateCapsule_ShouldPreserveAuthoredContact()
+    public void Raycast_WithRoundedEndpointSlightlyOutsideDegenerateCapsule_ShouldRejectExactMiss()
     {
         using GravitasWorldContext context = Create2DContext();
         SolidBody2D capsule = CreateCapsule(context, Vector2d.Zero, Fixed64.Half, Fixed64.One);
@@ -1731,11 +1789,55 @@ public sealed class Physics2DQueryTests
 
         bool hit = QueryDetection2D.TryRaycast(start, end, capsule.Collider, out Physics2DHit rayHit);
 
-        hit.Should().BeTrue();
-        rayHit.Collider.Should().BeSameAs(capsule.Collider);
-        rayHit.Distance.Should().Be(Fixed64.One);
-        Vector2d.TryGetDistance(rayHit.Point, Vector2d.Zero, out Fixed64 contactDistance).Should().BeTrue();
-        contactDistance.Should().Be(Fixed64.Half);
+        hit.Should().BeFalse();
+        rayHit.Should().Be(default(Physics2DHit));
+    }
+
+    [Fact]
+    public void SweepCircle_WithLargeCapsuleProjectionCoefficients_ShouldKeepFiniteEntry()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        SolidBody2D capsule = CreateCapsule(context, Vector2d.Zero);
+        Vector2d start = new((Fixed64)(-200_000), Fixed64.Zero);
+        Vector2d end = new((Fixed64)200_000, Fixed64.Zero);
+
+        bool found = QueryDetection2D.TrySweepCircle(
+            start,
+            end,
+            Fixed64.One,
+            capsule.Collider,
+            out Physics2DHit hit);
+
+        found.Should().BeTrue();
+        hit.Collider.Should().BeSameAs(capsule.Collider);
+        hit.Distance.Should().Be((Fixed64)199_998 + Fixed64.Half);
+        hit.Normal.Should().Be(-Vector2d.Right);
+    }
+
+    [Fact]
+    public void Raycast_WithTwoRawTransverseChord_ShouldRetainTheCapsuleTangent()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        Fixed64 radius = Fixed64.FromRaw(1);
+        SolidBody2D capsule = CreateCapsule(
+            context,
+            new Vector2d(Fixed64.Zero, Fixed64.FromRaw(2)),
+            radius,
+            radius * Fixed64.Two);
+        Vector2d start = new((Fixed64)(-100_000), Fixed64.Zero);
+        Vector2d end = new((Fixed64)100_000, Fixed64.FromRaw(2));
+
+        bool found = QueryDetection2D.TryRaycast(
+            start,
+            end,
+            capsule.Collider,
+            out Physics2DHit hit);
+
+        found.Should().BeTrue();
+        hit.Collider.Should().BeSameAs(capsule.Collider);
+        hit.Distance.Should().Be((Fixed64)100_000);
+        hit.Point.Should().Be(new Vector2d(Fixed64.Zero, radius));
+        hit.Normal.Should().Be(-Vector2d.Forward);
     }
 
     [Fact]
@@ -2209,7 +2311,45 @@ public sealed class Physics2DQueryTests
     }
 
     [Fact]
-    public void TrySweepMoverShape_WithQuantizedSeparationFromBoxVertex_ShouldUseFallbackNormal()
+    public void TrySweepMoverShape_WithQuantizedZeroRadiusCapsuleCrossingPointCircle_ShouldKeepDeterministicContact()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        Fixed64 authoredRadius = Fixed64.Half;
+        Fixed64 authoredScale = Fixed64.FromRaw(1);
+        SolidBody2D mover = CreateQuantizedZeroRadiusCapsuleMover(
+            context,
+            new Vector2d((Fixed64)(-2), Fixed64.Zero),
+            authoredRadius,
+            authoredScale);
+        SolidBody2D target = CreateCompound(
+            context,
+            Vector2d.Zero,
+            new LSCompoundCollider2D(
+                CompoundColliderPart2D.Circle(
+                    authoredRadius,
+                    Vector2d.Zero,
+                    Fixed64.Zero,
+                    new Vector2d(authoredScale, authoredScale))));
+        var moverCapsule = (LSCapsuleCollider2D)((LSCompoundCollider2D)mover.Collider).GetPartCollider(0);
+        var targetCircle = (LSCircleCollider2D)((LSCompoundCollider2D)target.Collider).GetPartCollider(0);
+
+        bool hit = QueryDetection2D.TrySweepMoverShape(
+            moverCapsule,
+            new Vector2d((Fixed64)2, Fixed64.Zero),
+            targetCircle,
+            out Physics2DHit sweepHit);
+
+        moverCapsule.ScaledRadius.Should().Be(Fixed64.Zero);
+        targetCircle.ScaledRadius.Should().Be(Fixed64.Zero);
+        hit.Should().BeTrue();
+        sweepHit.Collider.Should().BeSameAs(targetCircle);
+        sweepHit.Point.Should().Be(Vector2d.Zero);
+        sweepHit.Distance.Should().BeGreaterThan(Fixed64.One);
+        sweepHit.Distance.Should().BeLessThan((Fixed64)2);
+    }
+
+    [Fact]
+    public void TrySweepMoverShape_WithQuantizedSeparationFromBoxVertex_ShouldRejectExactMiss()
     {
         using GravitasWorldContext context = Create2DContext();
         Fixed64 authoredRadius = Fixed64.Half;
@@ -2233,11 +2373,8 @@ public sealed class Physics2DQueryTests
         (authoredRadius * authoredScale).Should().Be(Fixed64.Zero);
         gap.Should().BeGreaterThan(Fixed64.Zero);
         (gap * gap).Should().Be(Fixed64.Zero);
-        hit.Should().BeTrue();
-        sweepHit.Collider.Should().BeSameAs(target.Collider);
-        sweepHit.Point.Should().Be(new Vector2d(-Fixed64.Half, -Fixed64.Half));
-        sweepHit.Normal.Should().Be(Vector2d.Right);
-        sweepHit.Distance.Should().Be(Fixed64.Zero);
+        hit.Should().BeFalse();
+        sweepHit.Should().Be(default(Physics2DHit));
     }
 
     [Fact]

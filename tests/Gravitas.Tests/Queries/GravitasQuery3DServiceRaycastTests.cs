@@ -32,6 +32,34 @@ public sealed class GravitasQuery3DServiceRaycastTests
     }
 
     [Fact]
+    public void RaycastAll_WithFiniteAxisHitsOneSpatialRawApart_ShouldPreserveDistanceOrder()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        const long RawUnitsPerWhole = 4_294_967_296L;
+        const long NearCenterRaw = 3L * RawUnitsPerWhole;
+
+        LSCapsuleCollider far = CreateDynamicCapsule(
+            context,
+            new Vector3d(Fixed64.FromRaw(NearCenterRaw + 1L), Fixed64.Zero, Fixed64.Zero));
+        LSCapsuleCollider near = CreateDynamicCapsule(
+            context,
+            new Vector3d(Fixed64.FromRaw(NearCenterRaw), Fixed64.Zero, Fixed64.Zero));
+        var hits = new SwiftList<Physics3DHit>(2);
+
+        int count = context.Query3D.RaycastAll(
+            Vector(-4, 0, 0),
+            Vector(6, 0, 0),
+            IncludeLayerZero,
+            hits);
+
+        count.Should().Be(2);
+        hits[0].Collider.Should().BeSameAs(near);
+        hits[1].Collider.Should().BeSameAs(far);
+        hits[0].Distance.Should().Be(Fixed64.FromRaw(6L * RawUnitsPerWhole));
+        hits[1].Distance.Should().Be(Fixed64.FromRaw((6L * RawUnitsPerWhole) + 1L));
+    }
+
+    [Fact]
     public void Raycast_ShouldHitHorizontalVerticalAndDiagonalSegments()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
@@ -410,6 +438,18 @@ public sealed class GravitasQuery3DServiceRaycastTests
     private static LSCylinderCollider CreateDynamicCylinder(GravitasWorldContext context, Vector3d position)
     {
         return CreateDynamicCollider(context, new LSCylinderCollider(), position);
+    }
+
+    private static LSCapsuleCollider CreateDynamicCapsule(GravitasWorldContext context, Vector3d position)
+    {
+        return CreateDynamicCollider(
+            context,
+            new LSCapsuleCollider
+            {
+                Radius = Fixed64.One,
+                Size = Vector3d.One * Fixed64.Two
+            },
+            position);
     }
 
     private static LSSphereCollider CreateLargeDynamicSphere(GravitasWorldContext context, Vector3d position)

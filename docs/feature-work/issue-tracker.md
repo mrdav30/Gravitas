@@ -29,62 +29,45 @@ records follow with their original discovery context.
 - Treat local links as unstaged validation scaffolding. Do not publish or
   release with them in place.
 - FixedMathSharp foundation hardening is complete. The current locally linked
-  radial extension also reports 100% line, branch, and method coverage, with
-  1,460 standard and 1,439 Lean tests plus 8 Chronicler tests in each
-  configuration passing. Its radial interval implementation is complete;
-  retain the local link while the remaining Gravitas queue and the explicitly
-  deferred finite-axis/sphere-construction items are triaged.
+  radial and finite-axis extensions also report 100% line, branch, and method
+  coverage, with 1,623 standard and 1,602 Lean tests plus 8 Chronicler tests in
+  each configuration passing. Retain the local link while the remaining
+  Gravitas queue and the explicitly deferred sphere-construction item are
+  triaged.
 - SwiftCollections has no library-specific active issue at this checkpoint; its
   place in the sequence is a full downstream compatibility and release gate.
 - GridForge's runtime-identity defect is resolved. Keep the lower stack locally
   linked while the remaining Gravitas queue is hardened so another downstream
   discovery does not force a partial release cycle.
+- Gravitas's current authoritative coverage-enabled Release run passes 3,103
+  tests and reports 33,271/33,271 lines, 12,093/12,093 branches, and
+  4,149/4,149 methods for hand-authored source.
 - After the Gravitas queue closes, release the lower stack in dependency order,
   replace local links with released packages at each layer, and rerun Gravitas
   `Release`, `ReleaseLean`, coverage, replay, and relevant benchmark gates.
 
 ### Ordered Queue
 
-1. **FixedMathSharp then Gravitas:**
-   [Finite-Axis Capsule, Cylinder, And Mesh-Edge Projections Can Saturate Before Solving](#finite-axis-capsule-cylinder-and-mesh-edge-projections-can-saturate-before-solving).
-2. **FixedMathSharp:**
+1. **FixedMathSharp:**
    [Sphere Construction And Merge Paths Are Not Full-Domain](#sphere-construction-and-merge-paths-are-not-full-domain).
-3. **Gravitas:**
+2. **Gravitas:**
    [Translational CCD Flattens Piecewise Target Trajectories](#translational-ccd-flattens-piecewise-target-trajectories).
-4. **Gravitas:**
+3. **Gravitas:**
    [Fully Position-Frozen Bodies Cannot Retain Angular Mobility](#fully-position-frozen-bodies-cannot-retain-angular-mobility).
-5. **Gravitas:**
+4. **Gravitas:**
    [Conic Query Quadratics Can Saturate Before Solving](#conic-query-quadratics-can-saturate-before-solving).
-
-### Finite-Axis Capsule, Cylinder, And Mesh-Edge Projections Can Saturate Before Solving
-
-**Discovered:** 2026-07-18  
-**Source:** full-domain radial interval consumer audit  
-**Affected area:** FixedMathSharp finite-axis geometry ownership; Gravitas 3D
-raycast capsules/cylinders, 3D swept-sphere capsule/cylinder and mesh-edge
-reducers, mixed swept-sphere segment-capsule reducers, and mixed circle-slab
-height/cap clipping
-
-The exact circle/sphere interval API cannot repair a finite-axis projection
-after endpoint subtraction, axis normalization, perpendicular reduction, or
-quadratic coefficients have already saturated in `Fixed64`. These consumers
-also need both roots because axial clipping can reject the entry root while
-accepting the exit root. Feeding narrowed coefficients into another exact root
-solver would only hide the earlier information loss.
-
-Design one allocation-free FixedMathSharp primitive that owns the endpoint
-differences, perpendicular projection, exact radial solve, and finite axial
-clipping before public narrowing. Then migrate all 2D/3D/mixed consumers as one
-contract, preserving authored endpoints, deterministic feature order, and
-degenerate-segment reduction. Include the existing 3D raycast-capsule defect in
-this work: endpoint hemispheres are currently evaluated only when the cylinder
-misses, and short-circuit endpoint checks can select an internal seam or the far
-hemisphere instead of the nearest outer feature. This is mirrored as
-`FMS-Issue-014` in the FixedMathSharp tracker.
-
-The mixed circle-slab radial side and sphere cross-section are exact, but its
-vertical contract remains in this work: combined half-height, local Y offsets,
-and cap reconstruction can still narrow before finite-axis clipping.
+5. **Gravitas:**
+   [Swept-Sphere Cylinder Dilation Uses A Sharp Rim Proxy](#swept-sphere-cylinder-dilation-uses-a-sharp-rim-proxy).
+6. **Gravitas:**
+   [Finite-Slab Projection Support Math Is Not Full-Domain](#finite-slab-projection-support-math-is-not-full-domain).
+7. **Gravitas:**
+   [Swept-Sphere Capsule-Slab Rim Dilation Overexpands The Rounded Boundary](#swept-sphere-capsule-slab-rim-dilation-overexpands-the-rounded-boundary).
+8. **Gravitas:**
+   [Finite-Axis Collider Endpoint Snapshots Can Deform Scalar-Boundary Geometry](#finite-axis-collider-endpoint-snapshots-can-deform-scalar-boundary-geometry).
+9. **Gravitas:**
+   [Authored Collider Dimensions Can Saturate During Host-Scale Composition](#authored-collider-dimensions-can-saturate-during-host-scale-composition).
+10. **FixedMathSharp / Gravitas:**
+    [Radial Segment Parameters Can Collapse Spatially Distinct Query Hits](#radial-segment-parameters-can-collapse-spatially-distinct-query-hits).
 
 ### Sphere Construction And Merge Paths Are Not Full-Domain
 
@@ -174,7 +157,214 @@ feature ordering; cover extreme crossings, tangency/near-miss, first-root
 rejection with second-root admission, starts inside, and authored endpoint
 contact. Keep it allocation-free and benchmark the query hot path.
 
+### Swept-Sphere Cylinder Dilation Uses A Sharp Rim Proxy
+
+**Discovered:** 2026-07-19  
+**Source:** finite-axis interval migration  
+**Affected area:** `SweptSphereQueryWorker.TrySweepCylinder`, mixed
+sphere-versus-circle-slab reduction, reducer labels, and query/CCD documentation
+
+The full-domain affine interval independently expands cylinder radius and
+half-height. That produces a sharp expanded cylinder, while the true Minkowski
+sum of a finite cylinder and sphere has rounded rims. The sharp proxy contains
+those rounded corners and can report an earlier or extra diagonal-rim hit. The
+mixed reducer also currently reports `Exact`, which overstates the geometric
+contract even though the arithmetic for the sharp proxy is exact.
+
+Resolve this with a rounded finite-cylinder sweep or exact point-to-cylinder
+distance reducer covering side, cap, and rim features. Add diagonal rim
+miss/contact, tangent, starting-overlap, extreme-domain, allocation, and
+deterministic-order regressions. Until then, document the reducer as
+conservative rather than shape exact.
+
+### Finite-Slab Projection Support Math Is Not Full-Domain
+
+**Discovered:** 2026-07-19  
+**Source:** finite-axis consumer closure audit  
+**Affected area:** `FiniteSlabProjectionSweep`, rotated capsule/cylinder/cone
+mixed circle-against-3D queries, and `DistanceSquaredToConvexSlab`
+starting-overlap admission for mixed sphere-against-2D convex slabs
+
+`FiniteSlabProjectionSweep` selects a scaled GJK working frame, but several
+axis differences, slopes, radius squares, capacity products, stationary-point
+expressions, and support candidates are already calculated in saturating
+`Fixed64` before scale selection. Extreme valid geometry can therefore lose
+information before the GJK reducer begins.
+
+The opposite mixed direction has the same class of pre-reducer risk:
+`DistanceSquaredToConvexSlab` squares narrowed planar and vertical distances in
+`Fixed64`. Extreme separated starts can therefore saturate both sides of its
+overlap comparison and bypass the actual AABB/convex/compound sweep at distance
+zero. The finite-axis work removed the equivalent capsule shortcut, but did not
+broaden into full-domain convex-prism distance ownership.
+
+Harden candidate/support construction and convex-slab start admission before
+public narrowing, or scale authored inputs before products. Cover extreme
+rotated capsule, cylinder, and cone projections; extreme separated 2D convex
+slab starts; slab-boundary tangency; miss/hit separation; repeat determinism;
+and allocation behavior.
+
+### Swept-Sphere Capsule-Slab Rim Dilation Overexpands The Rounded Boundary
+
+**Discovered:** 2026-07-19  
+**Source:** finite-axis mixed-reducer coverage closure  
+**Affected area:** `TrySweepCapsuleSlabBoundaryEdges`, mixed sphere-versus-2D
+capsule queries and CCD, reducer classification, and query documentation
+
+The embedded 2D capsule is a planar capsule extruded over a finite Y interval.
+Its current horizontal-edge reducer treats each cap-plane core segment as a 3D
+capsule with radius `targetRadius + sweepRadius`. Away from the cap plane this
+is larger than the true sphere dilation. At vertical offset `dy`, the correct
+planar reach is `targetRadius + sqrt(sweepRadius^2 - dy^2)`; the current reducer
+instead admits `sqrt((targetRadius + sweepRadius)^2 - dy^2)` from the core
+segment. Diagonal rim approaches can therefore report an early or false hit
+while the reducer is labeled `Exact`.
+
+Replace the proxy with an exact point-to-extruded-capsule distance/sweep reducer
+or an equivalent feature decomposition that preserves side, cap, and rounded
+rim ownership. Cover diagonal rim misses and contacts, tangency, start overlap,
+endpoint contact, extreme-domain inputs, deterministic ordering, and zero
+allocation. Revisit the reducer label until the exact model lands.
+
+### Finite-Axis Collider Endpoint Snapshots Can Deform Scalar-Boundary Geometry
+
+**Discovered:** 2026-07-19  
+**Source:** centered finite-axis query migration and final consumer audit  
+**Affected area:** 2D/3D capsule and 3D cylinder endpoint properties; discrete
+2D/3D/mixed narrow phase, capsule-mover sweep decomposition, support and
+closest-point helpers, mesh contact candidates, replay hashing, and diagnostics
+
+Capsules and cylinders currently expose representable endpoint snapshots built
+from `center +/- worldAxis * halfLength`. Near a `Fixed64` scalar face, a
+rotated conceptual endpoint can lie outside the scalar domain. Component-wise
+saturation then shortens or bends the stored segment even though the canonical
+center, normalized axis, half-length, and radius remain valid. The centered
+finite-axis query reducers avoid those snapshots, but several discrete,
+mixed-dimension, support, capsule-mover, replay, and diagnostic consumers still
+treat them as authoritative geometry.
+
+Make `(center, normalized world axis, half-length, radius)` the only runtime
+geometry source of truth. Decide whether the endpoint properties should become
+explicit best-effort `Try*` projections or be removed as misleading public API.
+Move reusable centered-axis projection, closest-feature, support, and distance
+work into FixedMathSharp so downstream consumers never reconstruct conceptual
+endpoints merely to narrow them again. Bounds may clamp outward conservatively,
+while replay hashes should record canonical geometry and diagnostics should
+treat display clipping as presentation rather than simulation state.
+
+Cover mirrored minimum/maximum scalar faces, rotated axes, capsule/capsule and
+cylinder/capsule pairs, 2D and mixed contacts, capsule-mover sweeps, mesh
+candidate admission, support/closest-point results, replay equality, stable
+ordering, and warmed zero-allocation behavior. Do not solve this by widening a
+cached AABB or retaining the deformed endpoints behind another adapter.
+
+### Authored Collider Dimensions Can Saturate During Host-Scale Composition
+
+**Discovered:** 2026-07-19  
+**Source:** centered finite-axis admission and scaled-shape audit  
+**Affected area:** 2D/3D primitive shape rebuilds, compound part scale
+composition, bounds, mass properties, registration admission, and replay
+
+Several runtime shape rebuilds still compose an authored dimension with host
+lossy scale in ordinary saturating `Fixed64` operations before deriving a
+radius, half-length, half-extent, or compound-part world scale. Examples include
+capsule and cylinder height/radius derivation and owner-scale times local-part
+scale. A mathematically valid authored product can therefore saturate at an
+intermediate step, after which later division or subtraction produces a
+plausible but incorrect representable shape. This is distinct from endpoint
+snapshot deformation: the canonical dimensions themselves have already lost
+information before any conceptual endpoint is requested.
+
+Define one exact-or-rejecting scaled-shape admission contract across 2D and 3D
+circles/spheres, boxes, capsules, cylinders, cones, meshes where applicable,
+and every compound part. Derive dependent half-extents and radii from the exact
+composed dimensions, reject only when the final canonical runtime shape is not
+representable or physically valid, and keep registration mutation atomic.
+Cover scale-order counterexamples, mirrored scalar limits, anisotropic scale,
+owner/part scale composition, compound rollback, replay equality, mass and
+bounds parity, and warmed zero-allocation behavior. Prefer reusable fused or
+wide arithmetic in FixedMathSharp when the contract benefits the rest of the
+stack.
+
+### Radial Segment Parameters Can Collapse Spatially Distinct Query Hits
+
+**Discovered:** 2026-07-20  
+**Source:** authored-segment finite-axis distance closure  
+**Affected area:** FixedMathSharp radial segment output; Gravitas 2D circle
+raycasts/sweeps, 3D sphere raycasts/sweeps, relative radial CCD, and mixed
+radial reducers
+
+The prior radial hardening correctly keeps authored segment coefficients wide
+through its circle/sphere solve, but its public segment result still narrows to
+a Q32.32 parameter. Reconstructing spatial distance or a contact point from that
+parameter can collapse hits one spatial raw unit apart on a long chord. Several
+Gravitas distance-form consumers instead normalize an authored displacement
+before the solve; a representable transverse component can then round to zero,
+changing admission rather than only the reported result. An endpoint fallback
+does not repair an interior crossing or preserve the ordering of two valid
+roots.
+
+Add exact authored-segment distance intervals for radial circle/sphere queries
+in FixedMathSharp, using the same one-final-rounding contract as the finite-axis
+distance APIs. Migrate every 2D, 3D, mixed, and relative-CCD distance consumer
+without changing the deliberate normalized-ray API. Cover million-unit hits
+one raw apart, two-raw transverse interior tangency, starts inside, strict end
+containment, opposite scalar faces, deterministic ordering, and warmed
+zero-allocation behavior. Keep this separate from sphere construction/merge
+and conic-quadratic ownership.
+
 ## Resolved Issues
+
+### Finite-Axis Capsule, Cylinder, And Mesh-Edge Projections Can Saturate Before Solving
+
+**Discovered:** 2026-07-18  
+**Resolved:** 2026-07-19  
+**Source:** full-domain radial interval consumer audit
+
+FixedMathSharp now owns allocation-free finite-axis capsule intervals in 2D
+and 3D plus finite-cylinder and separately expanded affine-cylinder intervals
+in 3D. Endpoint differences, radial projection, quadratic roots, axial
+clipping, and root-to-chord reconstruction remain in exact wide integer
+arithmetic until one final half-to-even Q32.32 spatial-distance conversion.
+The contract returns both distances, reconstructs points directly from the
+authored segment, preserves exact inclusive-start and strict-end containment,
+reduces collapsed capsules to the sphere or circle limit, and explicitly
+rejects collapsed cylinders whose flat cap normal would be undefined.
+
+Gravitas migrated its 2D capsule raycasts and sweeps, 3D capsule/cylinder
+raycasts, swept-sphere capsule/cylinder and mesh-edge projections, and mixed
+finite-axis reducers to the lower-stack contract. Capsule feature selection now
+considers the cylindrical side and both endpoint hemispheres together instead
+of short-circuiting seams or far features. Runtime admission also rejects a
+scaled cylinder whose axis has collapsed before registration mutates collider
+or service state, including compound parts.
+
+The closure preserved exact 100% hand-authored coverage in both repositories.
+FixedMathSharp reports 13,691/13,691 lines, 3,908/3,908 branches, and
+1,777/1,777 methods. FixedMathSharp Release passed 1,623 core plus 8 Chronicler
+tests and ReleaseLean passed 1,602 core plus 8 Chronicler tests. Gravitas's
+authoritative coverage-enabled Release run passed 3,103 tests and reports
+33,271/33,271 lines, 12,093/12,093 branches, and 4,149/4,149 methods.
+The locally linked ReleaseLean gate passes 3,064 tests after configuration-
+scoped dependency restores and builds both library targets with zero warnings.
+CRAP analysis reports 19 fully covered methods above 30, all structural
+complexity floors rather than uncovered risk.
+
+The dedicated Gravitas short-run benchmark measured exact capsule and cylinder
+segment intervals, swept-sphere reducers, and the mixed circle-slab reducer at
+ordinary and 100,000-unit scales between 8.427 and 13.747 microseconds, with
+zero managed allocation in every row. The unchanged radial sphere baseline
+measured 1.462-1.821 microseconds. Lower-stack common finite-axis rows measured
+approximately 2.3-2.9 microseconds, its arbitrary-raw cylinder stress row
+approximately 8.9 microseconds, and warmed centered-capsule distance rows
+approximately 4.0-4.8 microseconds across normal and 100,000-unit inputs. All
+lower-stack rows allocated zero managed bytes. Existing end-to-end 2D, 3D
+mesh, and both mixed capsule sweep benchmarks remained allocation-free at 64
+and 1,024 candidate scales. These short runs are regression signals, not
+canonical performance claims. Follow-up audits separated the remaining
+sharp-rim, rounded capsule-slab rim, and finite convex-slab support-model risks
+into their own active issues instead of hiding them inside this arithmetic
+closure.
 
 ### Rotational CCD Omits Dynamic And Mixed Targets
 

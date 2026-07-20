@@ -163,6 +163,11 @@ public sealed class GjkSimplexScaleTests
             new Vector2d(Fixed64.MinValue, Fixed64.Zero),
             new Vector2d(-Fixed64.MinIncrement, Fixed64.Zero),
             shift: 1));
+        Assert.Throws<InvalidOperationException>(() => GjkSimplexScale.CreateWorkingDifference(
+            new Vector2d(Fixed64.MaxValue, Fixed64.Zero),
+            new Vector2d(Fixed64.MinValue, Fixed64.Zero),
+            Vector2d.Zero,
+            shift: 0));
     }
 
     [Fact]

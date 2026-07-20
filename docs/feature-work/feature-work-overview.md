@@ -38,6 +38,15 @@ instead of burying it in notes.
 
 ## Recently Completed
 
+- [`Finite-Axis Full-Domain Projection Closure`](issue-tracker.md#finite-axis-capsule-cylinder-and-mesh-edge-projections-can-saturate-before-solving)
+  - Completed 2026-07-19. FixedMathSharp now owns exact bounded-ray and
+    authored-segment physical-distance capsule/cylinder intervals, and Gravitas
+    consumes them across 2D, 3D, mixed, raycast, sweep, and mesh-edge reducers.
+    The authoritative Gravitas Release artifact passes 3,103 tests at 100%
+    line, branch, and method coverage; FixedMathSharp also retains exact 100%
+    coverage. Final finite-axis benchmark rows remain allocation-free, while
+    radial distance precision and the remaining conservative rim/support
+    models stay explicitly queued as separate work.
 - [`Rotational Moving-Pair CCD Hardening`](done/2026-07-18-rotational-moving-pair-ccd-plan.md)
   - Completed 2026-07-19. Pure 2D, pure 3D, and mixed rotational CCD now owns
     moving dynamic and kinematic targets through order-independent piecewise

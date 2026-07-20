@@ -411,6 +411,29 @@ public sealed class CollisionDetection2DTests
     }
 
     [Fact]
+    public void TryCollideManifold_WithCircleCapsuleEndCapOverlap_ShouldReverseStableContact()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        var capsule = new LSCapsuleCollider2D(Fixed64.Half, (Fixed64)3);
+        var circle = new LSCircleCollider2D(Fixed64.Half);
+        _ = CreateBody(context, capsule, Vector2d.Zero);
+        _ = CreateBody(context, circle, new Vector2d(Fixed64.Zero, Fixed64.FromFraction(3, 2)));
+
+        (bool forwardCollided, ContactManifold2D forward) = BuildManifold(capsule, circle);
+        (bool reversedCollided, ContactManifold2D reversed) = BuildManifold(circle, capsule);
+
+        forwardCollided.Should().BeTrue();
+        reversedCollided.Should().BeTrue();
+        reversed.Count.Should().Be(1);
+        reversed[0].PointA.Should().Be(forward[0].PointB);
+        reversed[0].PointB.Should().Be(forward[0].PointA);
+        reversed[0].Depth.Should().Be(forward[0].Depth);
+        reversed[0].Normal.Should().Be(-forward[0].Normal);
+        reversed[0].MaterialA.Should().Be(circle.Material);
+        reversed[0].MaterialB.Should().Be(capsule.Material);
+    }
+
+    [Fact]
     public void TryCollide_WithCircleCenteredOnCapsuleSegment_ShouldUseDeterministicFallbackNormal()
     {
         using GravitasWorldContext context = Create2DContext();

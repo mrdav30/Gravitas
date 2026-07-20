@@ -545,9 +545,6 @@ public partial class SolidBody
         while (intervalCount > 0)
         {
             ContinuousCollisionMath.RotationalInterval interval = intervals[--intervalCount];
-            if (hasKnownContact && interval.LowerTime >= knownContactTime)
-                continue;
-
             Fixed64 midpoint = (interval.LowerTime + interval.UpperTime) * Fixed64.Half;
             Fixed64 intervalSpan = interval.UpperTime - interval.LowerTime;
             if (isKinematic)

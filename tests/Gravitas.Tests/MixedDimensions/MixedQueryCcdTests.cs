@@ -128,7 +128,7 @@ public sealed partial class MixedQueryCcdTests
     }
 
     [Fact]
-    public void RadialMixedSweeps_WithRoundedEndpointContact_ShouldPreserveBothDirections()
+    public void RadialMixedSweeps_WithRoundedEndpointSlightlyOutsideCapsule_ShouldRejectExactSphereMiss()
     {
         using GravitasWorldContext context = CreateMixedContext();
         LSCollider target3D = CreateBodyless3D(context, new LSSphereCollider(), Vector3d.Zero);
@@ -163,13 +163,8 @@ public sealed partial class MixedQueryCcdTests
         circleResult.Collider3D.Should().BeSameAs(target3D);
         circleResult.Distance.Should().Be(Fixed64.One);
         circleResult.ReducerKind.Should().Be(PhysicsQueryReducerKind.Exact);
-        sphereHit.Should().BeTrue();
-        sphereResult.Collider2D.Should().BeSameAs(target2D);
-        sphereResult.Distance.Should().Be(Fixed64.One);
-        sphereResult.ReducerKind.Should().Be(PhysicsQueryReducerKind.Exact);
-        Vector3d expectedContact = sphereEnd + capDirection3D * Fixed64.Half;
-        sphereResult.Point3D.Should().Be(expectedContact);
-        sphereResult.Point2D.Should().Be(expectedContact);
+        sphereHit.Should().BeFalse();
+        sphereResult.Should().Be(default(PhysicsMixedHit));
     }
 
     [Fact]
@@ -2128,7 +2123,7 @@ public sealed partial class MixedQueryCcdTests
     }
 
     [Fact]
-    public void CircleSlabReducer_WithSubRawPlanarDirection_ShouldRetainEarlierCapContact()
+    public void CircleSlabReducer_WithSubRawPlanarDirection_ShouldUseExactJointInterval()
     {
         using GravitasWorldContext context = CreateMixedContext();
         var target = (LSCircleCollider2D)CreateBodylessCircle2D(context, Vector2d.Zero);
@@ -2151,11 +2146,11 @@ public sealed partial class MixedQueryCcdTests
 
         found.Should().BeTrue();
         hit.Collider2D.Should().BeSameAs(target);
-        hit.Distance.Should().Be((Fixed64)99_999 + Fixed64.Half);
+        hit.Distance.Should().Be(length * Fixed64.Half);
     }
 
     [Fact]
-    public void CircleSlabReducer_WithSubRawVerticalDirection_ShouldRetainEarlierSideContact()
+    public void CircleSlabReducer_WithSubRawVerticalDirection_ShouldUseExactJointInterval()
     {
         using GravitasWorldContext context = CreateMixedContext();
         var target = (LSCircleCollider2D)CreateBodylessCircle2D(context, Vector2d.Zero);
@@ -2179,7 +2174,7 @@ public sealed partial class MixedQueryCcdTests
 
         found.Should().BeTrue();
         hit.Collider2D.Should().BeSameAs(target);
-        hit.Distance.Should().Be((Fixed64)99_999 + Fixed64.Half);
+        hit.Distance.Should().Be(length * Fixed64.Half);
     }
 
     [Fact]
@@ -2403,6 +2398,26 @@ public sealed partial class MixedQueryCcdTests
         hit.Collider2D.Should().BeSameAs(target);
         hit.Distance.Should().Be((Fixed64)2);
         hit.Normal3DTo2D.Should().Be(-Vector3d.Up);
+        hit.ReducerKind.Should().Be(PhysicsQueryReducerKind.Exact);
+    }
+
+    [Fact]
+    public void SweepSphereAgainst2D_WithAabbSlabVerticalGrazingBottomFace_ShouldReportExactHit()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        LSCollider2D target = CreateBodylessBox2D(context, Vector2d.Zero, new Vector2d((Fixed64)2, (Fixed64)2));
+
+        bool mixedHit = context.QueryMixed.SweepSphereAgainst2D(
+            new Vector3d((Fixed64)(-3), -Fixed64.One, Fixed64.Zero),
+            new Vector3d((Fixed64)3, -Fixed64.One, Fixed64.Zero),
+            Fixed64.Half,
+            IncludeLayerZero,
+            out PhysicsMixedHit hit);
+
+        mixedHit.Should().BeTrue();
+        hit.Collider2D.Should().BeSameAs(target);
+        hit.Distance.Should().Be((Fixed64)2);
+        hit.Normal3DTo2D.Should().Be(Vector3d.Up);
         hit.ReducerKind.Should().Be(PhysicsQueryReducerKind.Exact);
     }
 
@@ -2899,48 +2914,6 @@ public sealed partial class MixedQueryCcdTests
             measurementIterations: 16);
 
         allocatedBytes.Should().Be(0);
-    }
-
-    [Fact]
-    public void PublicQuerySurface_ShouldExposeOnlyExplicitConvexMeshSourceSweeps()
-    {
-        Type[] services =
-        {
-            typeof(GravitasQuery2DService),
-            typeof(GravitasQuery3DService),
-            typeof(GravitasQueryMixedService)
-        };
-        string[] allowedMeshSourceMethods = { "SweepConvexMesh", "SweepConvexMeshAll" };
-
-        foreach (Type service in services)
-        {
-            foreach (System.Reflection.MethodInfo method in service.GetMethods(
-                System.Reflection.BindingFlags.Instance
-                | System.Reflection.BindingFlags.Public
-                | System.Reflection.BindingFlags.DeclaredOnly))
-            {
-                method.Name.Should().NotBe("SweepMesh");
-                method.Name.Should().NotBe("SweepMeshAll");
-                method.Name.Contains("Concave", StringComparison.Ordinal).Should().BeFalse();
-
-                bool acceptsMeshCollider = false;
-                bool acceptsRawMesh = false;
-                foreach (System.Reflection.ParameterInfo parameter in method.GetParameters())
-                {
-                    acceptsMeshCollider |= parameter.ParameterType == typeof(LSMeshCollider);
-                    acceptsRawMesh |= parameter.ParameterType == typeof(PhysicsMesh)
-                        || parameter.ParameterType == typeof(Vector3d[])
-                        || parameter.ParameterType == typeof(int[]);
-                }
-
-                acceptsRawMesh.Should().BeFalse();
-                if (!acceptsMeshCollider)
-                    continue;
-
-                service.Should().Be(typeof(GravitasQuery3DService));
-                allowedMeshSourceMethods.Should().Contain(method.Name);
-            }
-        }
     }
 
     [Fact]

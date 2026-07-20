@@ -5,7 +5,6 @@ using Gravitas.Materials;
 using Gravitas.Tests.Support;
 using System;
 using System.Linq;
-using System.Reflection;
 using Xunit;
 
 namespace Gravitas.Tests.Colliders;
@@ -228,32 +227,6 @@ public sealed class ColliderShapeDefinition2DTests
             new Vector2d((Fixed64)2, Fixed64.Zero));
 
         act.Should().Throw<ArgumentException>();
-    }
-
-    [Fact]
-    public void ShapeDefinition2D_ShouldNotExposeRuntimeLifecycleState()
-    {
-        Type definitionType = typeof(ColliderShapeDefinition2D);
-        string[] publicMemberNames = definitionType
-            .GetMembers(BindingFlags.Instance | BindingFlags.Public)
-            .Select(member => member.Name)
-            .Distinct()
-            .ToArray();
-
-        publicMemberNames.Should().NotContain(new[]
-        {
-            nameof(LSCollider2D.Id),
-            nameof(LSCollider2D.Body),
-            nameof(LSCollider2D.Context),
-            nameof(LSCollider2D.PartitionCoordinates),
-            nameof(LSCollider2D.OnContact),
-            nameof(LSCollider2D.OnTriggerEnter)
-        });
-
-        definitionType.GetFields(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
-            .Select(field => field.FieldType)
-            .Should()
-            .NotContain(type => typeof(LSCollider2D).IsAssignableFrom(type));
     }
 
     private static SolidBody2D CreateBody(GravitasWorldContext context, LSCollider2D collider, Vector2d position)

@@ -29,92 +29,33 @@ public sealed partial class GravitasQueryMixedService
         LSCircleCollider2D circle,
         out PhysicsMixedHit hit)
     {
-        Vector3d center = new(circle.Center.X, circle.MixedSlabCenterY, circle.Center.Y);
-        var radialBound = new FixedBoundCircle(circle.Center, circle.ScaledRadius);
-        Vector2d planarStart = new(start.X, start.Z);
-        Vector2d planarEnd = new(end.X, end.Z);
-        Fixed64 expandedHalfHeight = circle.MixedHalfThickness + radius;
-        Fixed64 localStartY = start.Y - center.Y;
-        Fixed64 localEndY = end.Y - center.Y;
-
-        if (IsInsideCircleSlab(
-                localStartY,
-                planarStart,
-                radialBound,
+        Vector2d planarCenter = circle.Center;
+        var center = new Vector3d(planarCenter.X, circle.MixedSlabCenterY, planarCenter.Y);
+        var segment = new FixedSegment(start, end);
+        if (!segment.TryGetFiniteCylinderIntersectionDistanceInterval(
+                center,
+                Vector3d.Up,
+                circle.MixedHalfThickness,
+                circle.ScaledRadius,
                 radius,
-                expandedHalfHeight))
-        {
-            hit = BuildSphereAgainst2DHit(
-                circle,
-                start,
                 radius,
-                PhysicsQueryReducerKind.Exact,
-                Fixed64.Zero,
-                direction);
-            return true;
-        }
-
-        bool found = false;
-        Fixed64 bestDistance = Fixed64.MaxValue;
-        TryKeepEarlierSweep(
-            TrySweepCircleSlabSide(
-                localStartY,
-                localEndY,
-                planarStart,
-                planarEnd,
-                new Vector2d(direction.X, direction.Z),
                 length,
-                radialBound,
-                radius,
-                expandedHalfHeight,
-                out Fixed64 sideDistance),
-            sideDistance,
-            ref found,
-            ref bestDistance);
-        TryKeepEarlierSweep(
-            TrySweepCircleSlabCap(
-                localStartY,
-                localEndY,
-                direction.Y,
-                planarStart,
-                planarEnd,
-                length,
-                radialBound,
-                radius,
-                expandedHalfHeight,
-                out Fixed64 topDistance),
-            topDistance,
-            ref found,
-            ref bestDistance);
-        TryKeepEarlierSweep(
-            TrySweepCircleSlabCap(
-                localStartY,
-                localEndY,
-                direction.Y,
-                planarStart,
-                planarEnd,
-                length,
-                radialBound,
-                radius,
-                -expandedHalfHeight,
-                out Fixed64 bottomDistance),
-            bottomDistance,
-            ref found,
-            ref bestDistance);
-
-        if (!found)
+                out Fixed64 distance,
+                out _,
+                out _,
+                out _))
         {
             hit = default;
             return false;
         }
 
-        Vector3d sweepCenter = bestDistance == length ? end : start + direction * bestDistance;
+        Vector3d sweepCenter = segment.GetPointAtDistance(distance, length);
         hit = BuildSphereAgainst2DHit(
             circle,
             sweepCenter,
             radius,
             PhysicsQueryReducerKind.Exact,
-            bestDistance,
+            distance,
             direction);
         return true;
     }

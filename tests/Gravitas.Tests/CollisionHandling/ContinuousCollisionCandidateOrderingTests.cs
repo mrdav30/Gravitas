@@ -327,6 +327,7 @@ public sealed class ContinuousCollisionCandidateOrderingTests
         ContinuousCollisionCandidateOrdering.IsIgnoredTarget(child.Collider, ignored: null).Should().BeFalse();
         ContinuousCollisionCandidateOrdering.IsIgnoredTarget(child.Collider, child.Collider).Should().BeTrue();
         ContinuousCollisionCandidateOrdering.IsIgnoredTarget(sameBody, top.Collider).Should().BeTrue();
+        ContinuousCollisionCandidateOrdering.IsIgnoredTarget(unrelated.Collider, top.Collider).Should().BeFalse();
         ContinuousCollisionCandidateOrdering.IsIgnoredTarget(child.Collider, top.Collider).Should().BeTrue();
         ContinuousCollisionCandidateOrdering.IsIgnoredTarget(top.Collider, child.Collider).Should().BeTrue();
         ContinuousCollisionCandidateOrdering.IsIgnoredTarget(child.Collider, sibling.Collider).Should().BeTrue();
@@ -351,6 +352,7 @@ public sealed class ContinuousCollisionCandidateOrderingTests
         ContinuousCollisionCandidateOrdering.IsIgnoredTarget(child.Collider, ignored: null).Should().BeFalse();
         ContinuousCollisionCandidateOrdering.IsIgnoredTarget(child.Collider, child.Collider).Should().BeTrue();
         ContinuousCollisionCandidateOrdering.IsIgnoredTarget(sameBody, top.Collider).Should().BeTrue();
+        ContinuousCollisionCandidateOrdering.IsIgnoredTarget(unrelated.Collider, top.Collider).Should().BeFalse();
         ContinuousCollisionCandidateOrdering.IsIgnoredTarget(child.Collider, top.Collider).Should().BeTrue();
         ContinuousCollisionCandidateOrdering.IsIgnoredTarget(top.Collider, child.Collider).Should().BeTrue();
         ContinuousCollisionCandidateOrdering.IsIgnoredTarget(child.Collider, sibling.Collider).Should().BeTrue();

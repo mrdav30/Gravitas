@@ -448,6 +448,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
     {
         SwiftThrowHelper.ThrowIfNull(agent, nameof(agent));
         ColliderScalePolicy.Validate(agent.Transform);
+        ValidateRuntimeTransform(agent.Transform.LossyScale, agent.Transform.WorldRotation);
         OnBeforeInitialize(agent);
     }
 
@@ -472,6 +473,8 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
     }
 
     protected virtual void OnBeforeInitialize(IMatterAgent agent) { }
+
+    internal virtual void ValidateRuntimeTransform(Vector3d scale, FixedQuaternion rotation) { }
 
     protected virtual void OnInitialize()
     {
@@ -563,6 +566,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
         if (!_runtimeShapeState.ShouldRebuild(snapshot))
             return false;
 
+        ValidateRuntimeTransform(snapshot.LocalScale, snapshot.Rotation);
         RebuildRuntimeShape();
         _runtimeShapeState.Commit(snapshot);
         if (refreshMassProperties)

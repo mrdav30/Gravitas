@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using FixedMathSharp.Bounds;
 using Gravitas.Colliders;
 using SwiftCollections.Query;
 using System;
@@ -121,8 +122,8 @@ public sealed partial class GravitasQueryMixedService
             || !TrySweepCircleAgainstConvexProjection(
                 start,
                 end,
-                direction,
                 length,
+                Fixed64.Zero,
                 radius,
                 projection.Slice(0, projectionCount),
                 out Fixed64 distance))
@@ -131,7 +132,7 @@ public sealed partial class GravitasQueryMixedService
             return false;
         }
 
-        Vector2d center2D = distance == length ? end : start + direction * distance;
+        Vector2d center2D = new FixedSegment2d(start, end).GetPointAtDistance(distance, length);
         Vector3d sweepCenter = new(center2D.X, slabCenterY, center2D.Y);
         hit = BuildCircleAgainst3DHit(
             cuboid,
@@ -407,7 +408,6 @@ public sealed partial class GravitasQueryMixedService
             if (!TrySweepCircleAgainstTriangleProjection(
                 start,
                 end,
-                direction,
                 length,
                 radius,
                 slabMinY,

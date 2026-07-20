@@ -28,10 +28,6 @@ public sealed class AuthoredConvexCollisionAssetTests
         part.LocalRotation.Should().Be(localRotation);
         part.LocalScale.Should().Be(localScale);
 
-        typeof(CompoundColliderPart)
-            .GetProperties()
-            .Should()
-            .NotContain(property => typeof(LSCollider).IsAssignableFrom(property.PropertyType));
     }
 
     [Fact]

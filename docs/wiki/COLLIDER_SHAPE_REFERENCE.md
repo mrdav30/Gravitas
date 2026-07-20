@@ -39,6 +39,13 @@ the next `Simulate()` call. If the snapshot has not changed, the collider skips
 the rebuild and keeps existing partition state. Shape mutation wakes a sleeping
 bound body before broad-phase refresh.
 
+Every changed 3D snapshot is validated before a shape builder mutates bounds,
+axis caches, mesh transforms, compound parts, runtime version, mass properties,
+or partition ownership. A failed live scale or rotation therefore leaves the
+last committed runtime shape intact; correcting the host transform allows the
+next simulation pass to rebuild normally. Compound validation walks every part
+in authored order before rebuilding the first part.
+
 2D colliders use the same helper pattern where the payload is dimension-free.
 Runtime-shape dirtying uses a 2D snapshot payload; query stamps, pair state, and
 hierarchy state are shared concepts. Partition coordinates stay 2D-specific
@@ -111,6 +118,13 @@ capsule with no cylindrical span uses the solid-sphere limit `2*m*r^2/5`. If
 fixed-point scaling leaves a positive span but quantizes the radius and both
 volumes to zero, the tensor uses the thin-rod limit
 `diag(m*h^2/12, 0, m*h^2/12)` before applying any requested parallel-axis shift.
+
+A finite cylinder must retain a positive scaled half-height when its runtime
+shape is rebuilt. A positive authored height can still round to zero after
+scaling in Q32.32; Gravitas rejects that runtime shape because coincident cap
+centers do not retain the cylinder's axis or flat-cap contract. Capsules remain
+different by design: a collapsed capsule center segment is the well-defined
+sphere limit.
 
 3D compound colliders distribute uniform-density mass by each solid part's
 volume rather than by the public `Area` value, whose drag/diagnostic meaning is

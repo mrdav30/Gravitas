@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using FixedMathSharp.Bounds;
 using Gravitas.Queries;
 using SwiftCollections;
 
@@ -35,11 +36,21 @@ public class LSCapsuleCollider : LSCollider
 
     public Fixed64 CylinderHeight { get; private set; }
 
+    /// <summary>
+    /// Gets the normalized world-space direction of the capsule's conceptual center axis.
+    /// </summary>
+    public Vector3d WorldAxis { get; private set; } = Vector3d.Up;
+
+    /// <summary>
+    /// Gets the distance from the capsule center to either conceptual cap center.
+    /// </summary>
+    public Fixed64 AxisHalfLength { get; private set; }
+
     public Vector3d LineSegmentStart { get; private set; }
 
     public Vector3d LineSegmentEnd { get; private set; }
 
-    public Vector3d LineDirection => (LineSegmentEnd - LineSegmentStart).Normalized;
+    public Vector3d LineDirection => WorldAxis;
 
     protected override void OnInitialize()
     {
@@ -62,6 +73,8 @@ public class LSCapsuleCollider : LSCollider
         Fixed64 halfCylinderHeight = FixedMath.Max(Fixed64.Zero, (ScaledSize.Y * Fixed64.Half) - ScaledRadius);
         HemisphereCenterBottom = new Vector3d(Fixed64.Zero, -halfCylinderHeight, Fixed64.Zero);
         HemisphereCenterTop = new Vector3d(Fixed64.Zero, halfCylinderHeight, Fixed64.Zero);
+        AxisHalfLength = halfCylinderHeight;
+        WorldAxis = (Rotation * Vector3d.Up).Normalized;
         CylinderHeight = halfCylinderHeight * 2;
 
         // Area calculation: A = 2πrh + 2πr^2
@@ -75,9 +88,11 @@ public class LSCapsuleCollider : LSCollider
 
     private void UpdateLineSegment()
     {
-        // Convert local start and end positions to world positions and add capsule position
-        LineSegmentStart = Center + (Rotation * HemisphereCenterBottom);
-        LineSegmentEnd = Center + (Rotation * HemisphereCenterTop);
+        // Retain representable endpoint snapshots for legacy consumers. Query and
+        // contact policy use Center/WorldAxis/AxisHalfLength so saturation here
+        // cannot bend the authoritative conceptual axis.
+        LineSegmentStart = Center - WorldAxis * AxisHalfLength;
+        LineSegmentEnd = Center + WorldAxis * AxisHalfLength;
     }
 
     // The capsule is split into a cylinder and a pair of solid hemispheres with masses
@@ -222,28 +237,14 @@ public class LSCapsuleCollider : LSCollider
 
     public override Vector3d GetNormalAtPoint(Vector3d point)
     {
-        Vector3d rotatedPoint = Rotation.Inverse() * (point - Center);
-
-        // If the point is on the top hemisphere
-        if (rotatedPoint.Y > HemisphereCenterTop.Y)
-        {
-            Vector3d topDirection = rotatedPoint - HemisphereCenterTop;
-            return Rotation * topDirection.Normalized;
-        }
-
-        // If the point is on the bottom hemisphere
-        if (rotatedPoint.Y < HemisphereCenterBottom.Y)
-        {
-            Vector3d bottomDirection = rotatedPoint - HemisphereCenterBottom;
-            return Rotation * bottomDirection.Normalized;
-        }
-
-        // If the point is along the length of the cylinder
-        Vector3d direction = new(rotatedPoint.X, Fixed64.Zero, rotatedPoint.Z);
-        Fixed64 distance = direction.Magnitude;
-        return distance > Fixed64.Zero
-            ? Rotation * direction.Normalized
-            : Rotation * Vector3d.Right;
+        Vector3d direction = FixedSegment.GetDirectionFromCenteredAxis(
+            point,
+            Center,
+            WorldAxis,
+            AxisHalfLength);
+        return direction.MagnitudeSquared > Fixed64.Epsilon
+            ? direction
+            : (Rotation * Vector3d.Right).Normalized;
     }
 
     public override bool ColliderOverlapsRay(RaycastSegmentWorker worker, ref SwiftList<Vector3d> outputIntersectionPoints) =>

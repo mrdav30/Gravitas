@@ -83,13 +83,15 @@ public sealed class ContinuousCollisionPolicyTests
         ContinuousCollisionContactPolicy.ResolveSweptSpherePoint(
                 sphere,
                 sphere.Center,
-                Vector3d.Right)
+                Vector3d.Right,
+                Fixed64.Zero)
             .Should().Be(sphere.Center - Vector3d.Right * sphere.ScaledRadius);
 
         ContinuousCollisionContactPolicy.ResolveSweptSpherePoint(
                 sphere,
                 Vector3d.Right * (Fixed64)2,
-                -Vector3d.Right)
+                -Vector3d.Right,
+                Fixed64.Zero)
             .Should().Be(Vector3d.Right * sphere.ScaledRadius);
 
         ContinuousCollisionContactPolicy.ResolveSweptSphereNormal(

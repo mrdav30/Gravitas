@@ -520,7 +520,11 @@ public partial class SolidBody
         if (!_shapeExactContinuousSweepWorker.TrySweep(target, out Vector3d sphereCenterAtImpact, out Fixed64 distance))
             return false;
 
-        Vector3d point = ContinuousCollisionContactPolicy.ResolveSweptSpherePoint(target, sphereCenterAtImpact, relativeDirection);
+        Vector3d point = ContinuousCollisionContactPolicy.ResolveSweptSpherePoint(
+            target,
+            sphereCenterAtImpact,
+            relativeDirection,
+            sourceSphere.ScaledRadius);
         Vector3d normal = ContinuousCollisionContactPolicy.ResolveSweptSphereNormal(target, point, sphereCenterAtImpact, relativeDirection);
         hit = new Physics3DHit(target, point, normal, distance, relativeDirection);
         return true;
