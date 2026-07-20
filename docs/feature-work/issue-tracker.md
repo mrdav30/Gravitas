@@ -29,10 +29,9 @@ records follow with their original discovery context.
 - Treat local links as unstaged validation scaffolding. Do not publish or
   release with them in place.
 - FixedMathSharp foundation hardening is complete. The current locally linked
-  radial and finite-axis extensions also report 100% line, branch, and method
-  coverage, with 1,623 standard and 1,602 Lean tests plus 8 Chronicler tests in
-  each configuration passing. Retain the local link while the remaining
-  Gravitas queue and the explicitly deferred sphere-construction item are
+  radial, finite-axis, and sphere-construction extensions also report 100% line,
+  branch, and method coverage. Retain the local link while the remaining
+  Gravitas queue and the newly exposed derived-bound center/extent item are
   triaged.
 - SwiftCollections has no library-specific active issue at this checkpoint; its
   place in the sequence is a full downstream compatibility and release gate.
@@ -49,7 +48,7 @@ records follow with their original discovery context.
 ### Ordered Queue
 
 1. **FixedMathSharp:**
-   [Sphere Construction And Merge Paths Are Not Full-Domain](#sphere-construction-and-merge-paths-are-not-full-domain).
+   [Derived Bound Centers And Extents Are Not Full-Domain](#derived-bound-centers-and-extents-are-not-full-domain).
 2. **Gravitas:**
    [Translational CCD Flattens Piecewise Target Trajectories](#translational-ccd-flattens-piecewise-target-trajectories).
 3. **Gravitas:**
@@ -69,21 +68,30 @@ records follow with their original discovery context.
 10. **FixedMathSharp / Gravitas:**
     [Radial Segment Parameters Can Collapse Spatially Distinct Query Hits](#radial-segment-parameters-can-collapse-spatially-distinct-query-hits).
 
-### Sphere Construction And Merge Paths Are Not Full-Domain
+### Derived Bound Centers And Extents Are Not Full-Domain
 
-**Discovered:** 2026-07-18  
-**Source:** exact radial predicate migration  
-**Affected area:** FixedMathSharp `FixedBoundSphere.CreateFromPoints`,
-`CreateFromFrustum`, `CreateMerged`, and radius expansion/update paths
+**Discovered:** 2026-07-20  
+**Source:** FixedMathSharp sphere-construction full-domain audit  
+**Affected area:** FixedMathSharp `FixedBoundArea` and `FixedBoundBox` derived
+center, size/scope, resize, and recenter paths; downstream bounds consumers
 
-Exact containment exposed that several sphere construction and merge paths
-still narrow endpoint differences, squared-distance ordering, or radius updates
-before the result is known. The radial predicate work corrected ordinary
-tilted-frustum admission but deliberately did not claim full-domain sphere
-construction. Resolve this in FixedMathSharp before its next release with
-focused construction/merge regressions, 2D parity where applicable, and
-allocation benchmarks. This is the downstream release-tracking mirror of
-`FMS-Issue-015`.
+The sphere fix deliberately stopped using `FixedBoundBox.Center` because that
+property still calculates `(Min + Max) * Half`; same-sign endpoints can saturate
+before halving and report the wrong representable midpoint. The corresponding
+2D area property and several size/scope, resize, and recenter paths also narrow
+`Min + Max` or `Max - Min` before the final result is known. Bounds wider than
+one scalar can therefore report a saturated derived extent even when a later
+half-size is representable.
+
+Resolve this as one 2D/3D derived-bound contract in FixedMathSharp. Use exact
+midpoint and difference-before-halving primitives, decide how public full sizes
+report an inherently unrepresentable result, and keep mutators atomic when a
+requested center/extent would place an endpoint outside the scalar domain.
+Audit Gravitas broad-phase, proxy-radius, mesh-bound, query, and diagnostic
+consumers after the lower-stack fix. Cover same-sign scalar faces, opposite
+faces, one-raw midpoint ties, unrepresentable full extents with representable
+scope, failed mutations, serialization continuity, and allocation behavior.
+This mirrors `FMS-Issue-016`.
 
 ### Translational CCD Flattens Piecewise Target Trajectories
 
@@ -314,6 +322,45 @@ zero-allocation behavior. Keep this separate from sphere construction/merge
 and conic-quadratic ownership.
 
 ## Resolved Issues
+
+### Sphere Construction And Merge Paths Were Not Full-Domain
+
+**Discovered:** 2026-07-18  
+**Resolved:** 2026-07-20  
+**Source:** exact radial predicate migration and release audit  
+**Affected area:** FixedMathSharp `FixedBoundSphere` factories and exact
+coordinate interpolation shared with finite segments
+
+`FixedBoundSphere.CreateFromBoundingBox`, `CreateFromFrustum`,
+`CreateFromPoints`, and `CreateMerged` now retain midpoint, squared-distance
+ordering, roots, radius sums, and center interpolation in exact wide arithmetic
+until the final Q32.32 result. Required radii round outward; successful results
+are containment-safe; and deterministic constructions whose required radius is
+not representable throw `OverflowException` instead of returning a saturated
+under-bound sphere. The docs explicitly retain deterministic Ritter-style
+point/frustum construction and Q32.32 lattice-center merge semantics rather
+than claiming a mathematically minimum sphere.
+
+Extreme-pair seeding compares exact squared distances from the midpoint to its
+two actual endpoints. Reversed secondary axes cannot select the nearer
+endpoint, and coordinate-wise synthesis cannot invent a farther corner that
+falsely requires an unrepresentable radius.
+
+The shared final-parity coordinate ratio removed duplicate segment interpolation
+code and its invariant-specific single-word path reduced existing segment
+reconstruction rows from roughly 514/759 nanoseconds to about 121/118 nanoseconds
+at unit/100,000 scale with zero allocation. Ordinary 1,024-point array/span
+sphere construction measured about 8.77/8.80 microseconds with zero allocation
+versus the former saturated approximation's roughly 4.84/4.60 microseconds;
+asymmetric full-domain merge measured about 321 nanoseconds with zero allocation.
+FixedMathSharp verification passed 1,640 core plus 8 Chronicler tests in
+`Release`, 1,619 core plus 8 Chronicler tests in `ReleaseLean`, and reported
+100% coverage across 13,826 lines, 3,930 branches, and 1,801 methods. The locally
+linked Gravitas `Release` test-project gate passed all 3,103 tests. Its
+`ReleaseLean` solution gate remains subject to the already documented GridForge
+local-link MemoryPack type leak and is deferred to the package-reference release
+gate. No Gravitas workaround was added. The audit exposed the separate derived
+area/box center and extent issue now first in the active queue.
 
 ### Finite-Axis Capsule, Cylinder, And Mesh-Edge Projections Can Saturate Before Solving
 
