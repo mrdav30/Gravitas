@@ -1315,17 +1315,23 @@ public sealed partial class MixedResponseTests
             collider.Layer = layer.Value;
 
         var agent = new TestMatterAgent(context, new FixedTransform(position, FixedQuaternion.Identity, Vector3d.One));
-        BodyFreezeAxes3D freezeAxes =
-            (immovable ? BodyFreezeAxes3D.Position : BodyFreezeAxes3D.None)
-            | (preventAngularForces ? BodyFreezeAxes3D.Rotation : BodyFreezeAxes3D.None);
+        BodyFreezeAxes3D freezeAxes = preventAngularForces
+            ? BodyFreezeAxes3D.Rotation
+            : BodyFreezeAxes3D.None;
         var body = new SolidBody(agent, collider)
         {
             Mass = Fixed64.One,
-            FreezeAxes = freezeAxes,
-            IsKinematic = isKinematic
+            FreezeAxes = freezeAxes
         };
         collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.Zero);
-        body.Initialize(position, FixedQuaternion.Identity);
+        body.Initialize(
+            position,
+            FixedQuaternion.Identity,
+            immovable
+                ? BodyMotionType.Static
+                : isKinematic
+                    ? BodyMotionType.Kinematic
+                    : BodyMotionType.Dynamic);
         return new ScenarioBody<LSSphereCollider>(body, collider);
     }
 
@@ -1355,11 +1361,12 @@ public sealed partial class MixedResponseTests
             new FixedTransform(new Vector3d(position.X, Fixed64.Zero, position.Y), FixedQuaternion.Identity, Vector3d.One));
         var body = new SolidBody2D(agent, collider)
         {
-            Mass = Fixed64.One,
-            FreezeAxes = immovable ? BodyFreezeAxes2D.Position : BodyFreezeAxes2D.None
+            Mass = Fixed64.One
         };
         collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.Zero);
-        body.Initialize(position);
+        body.Initialize(
+            position,
+            motionType: immovable ? BodyMotionType.Static : BodyMotionType.Dynamic);
         return body;
     }
 

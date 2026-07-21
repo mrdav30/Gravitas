@@ -421,11 +421,10 @@ public sealed class ColliderLocalCollisionFilteringTests
             Vector3d.One);
         var body = new SolidBody2D(new TestMatterAgent(context, transform), new LSCircleCollider2D(Fixed64.Half))
         {
-            Mass = Fixed64.One,
-            FreezeAxes = immovable ? BodyFreezeAxes2D.Position : BodyFreezeAxes2D.None
+            Mass = Fixed64.One
         };
         body.Collider.Layer = layer;
-        body.Initialize(position);
+        body.Initialize(position, motionType: immovable ? BodyMotionType.Static : BodyMotionType.Dynamic);
         return body;
     }
 
@@ -440,10 +439,12 @@ public sealed class ColliderLocalCollisionFilteringTests
         collider.Layer = layer;
         var body = new SolidBody(new TestMatterAgent(context, transform), collider)
         {
-            Mass = Fixed64.One,
-            FreezeAxes = immovable ? BodyFreezeAxes3D.Position : BodyFreezeAxes3D.None
+            Mass = Fixed64.One
         };
-        body.Initialize(position, FixedQuaternion.Identity);
+        body.Initialize(
+            position,
+            FixedQuaternion.Identity,
+            immovable ? BodyMotionType.Static : BodyMotionType.Dynamic);
         return new ScenarioBody<LSSphereCollider>(body, collider);
     }
 

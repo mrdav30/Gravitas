@@ -64,7 +64,7 @@ public sealed partial class MixedResponseTests
         body3D.Collider.OnMixedContactEnter += other =>
         {
             if (ReferenceEquals(other, first2D.Collider))
-                body3D.Body.FreezeAxes = BodyFreezeAxes3D.Position;
+                body3D.Body.FreezeAxes = BodyFreezeAxes3D.All;
         };
         immovable2D.Collider.OnMixedContactEnter += _ => immovableEnters++;
 
@@ -278,7 +278,7 @@ public sealed partial class MixedResponseTests
         Step(context);
         context.MixedCollisions.ActivePairCount.Should().Be(2);
         body3D.Body.SetPosition(Vector3d.Zero);
-        body3D.Collider.OnMixedContact += _ => body3D.Body.FreezeAxes = BodyFreezeAxes3D.Position;
+        body3D.Collider.OnMixedContact += _ => body3D.Body.FreezeAxes = BodyFreezeAxes3D.All;
         context.Diagnostics.Clear();
 
         Step(context);
@@ -300,7 +300,7 @@ public sealed partial class MixedResponseTests
         Step(context);
         rootless3D.Body.SetPosition(new Vector3d((Fixed64)(-3), Fixed64.Zero, Fixed64.Zero));
         movable3D.Body.SetPosition(new Vector3d((Fixed64)3, Fixed64.Zero, Fixed64.Zero));
-        rootless3D.Collider.OnMixedContact += _ => rootless3D.Body.FreezeAxes = BodyFreezeAxes3D.Position;
+        rootless3D.Collider.OnMixedContact += _ => rootless3D.Body.FreezeAxes = BodyFreezeAxes3D.All;
 
         Step(context);
 

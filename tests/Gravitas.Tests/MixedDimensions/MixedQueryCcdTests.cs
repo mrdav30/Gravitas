@@ -5020,6 +5020,37 @@ public sealed partial class MixedQueryCcdTests
     }
 
     [Fact]
+    public void Mixed2DHandoff_ShouldIgnoreTheJustResolved3DTargetDuringRemainingMotion()
+    {
+        using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
+        SolidBody2D source = CreateCircle2D(
+            context,
+            new Vector2d((Fixed64)(-2), Fixed64.Zero));
+        ScenarioBody<LSSphereCollider> resolvedTarget = CreateSphere3D(
+            context,
+            Vector3d.Zero,
+            immovable: true);
+        source.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+
+        source.ApplyContinuousCollisionHandoff(
+                new Vector2d(-Fixed64.One, Fixed64.Zero),
+                Vector2d.Right * (Fixed64)4,
+                Fixed64.Half,
+                ignoredCollider3D: resolvedTarget.Collider)
+            .Should()
+            .BeTrue();
+
+        source.TryConsumeContinuousCollisionHandoff(
+                updateSleepState: false,
+                updateColliderState: false)
+            .Should()
+            .BeTrue();
+
+        source.Position.X.Should().Be(Fixed64.One);
+        source.LastContinuousCollisionToiIterationCount.Should().Be(0);
+    }
+
+    [Fact]
     public void SweepSphereAgainst2DAll_WithInactiveWrongLayerAndMultiVoxelTargets_ShouldFilterCandidatesOnce()
     {
         using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
@@ -5417,12 +5448,15 @@ public sealed partial class MixedQueryCcdTests
         var agent = new TestMatterAgent(context, new FixedTransform(position, startRotation, Vector3d.One));
         var body = new SolidBody(agent, collider)
         {
-            Mass = Fixed64.One,
-            FreezeAxes = immovable ? BodyFreezeAxes3D.Position : BodyFreezeAxes3D.None,
-            IsKinematic = isKinematic
+            Mass = Fixed64.One
         };
         collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.Zero);
-        body.Initialize(position, startRotation, isDynamic);
+        BodyMotionType motionType = !isDynamic || immovable
+            ? BodyMotionType.Static
+            : isKinematic
+                ? BodyMotionType.Kinematic
+                : BodyMotionType.Dynamic;
+        body.Initialize(position, startRotation, motionType);
         return new ScenarioBody<TCollider>(body, collider);
     }
 
@@ -5439,12 +5473,15 @@ public sealed partial class MixedQueryCcdTests
             new FixedTransform(new Vector3d(position.X, Fixed64.Zero, position.Y), FixedQuaternion.Identity, Vector3d.One));
         var body = new SolidBody2D(agent, collider)
         {
-            Mass = Fixed64.One,
-            FreezeAxes = immovable ? BodyFreezeAxes2D.Position : BodyFreezeAxes2D.None,
-            IsKinematic = isKinematic
+            Mass = Fixed64.One
         };
         collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.Zero);
-        body.Initialize(position, isDynamic: isDynamic);
+        BodyMotionType motionType = !isDynamic || immovable
+            ? BodyMotionType.Static
+            : isKinematic
+                ? BodyMotionType.Kinematic
+                : BodyMotionType.Dynamic;
+        body.Initialize(position, motionType: motionType);
         return body;
     }
 

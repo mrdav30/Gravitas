@@ -40,7 +40,7 @@ public class ContinuousCollisionBenchmarks
         _dynamicRightBody = CreateMovingSphere(_dynamicContext, ContinuousCollisionMode.Continuous, new Vector3d((Fixed64)5, Fixed64.Zero, Fixed64.Zero));
 
         _meshContext = CreateContext();
-        CreatePositionFrozenMeshWall(_meshContext);
+        CreateStaticMeshWall(_meshContext);
         _meshBody = CreateMovingSphere(_meshContext, ContinuousCollisionMode.Continuous);
     }
 
@@ -124,7 +124,7 @@ public class ContinuousCollisionBenchmarks
         collider.InitializeWithNoBody(agent);
     }
 
-    private static void CreatePositionFrozenMeshWall(GravitasWorldContext context)
+    private static void CreateStaticMeshWall(GravitasWorldContext context)
     {
         var vertices = new[]
         {
@@ -139,11 +139,10 @@ public class ContinuousCollisionBenchmarks
         var body = new SolidBody(agent, collider)
         {
             Mass = Fixed64.One,
-            FreezeAxes = BodyFreezeAxes3D.Position,
             GroundProbeMode = GroundProbeMode.Ray
         };
 
-        body.Initialize(WallPosition, FixedQuaternion.Identity);
+        body.Initialize(WallPosition, FixedQuaternion.Identity, BodyMotionType.Static);
     }
 
     private static SolidBody CreateMovingSphere(

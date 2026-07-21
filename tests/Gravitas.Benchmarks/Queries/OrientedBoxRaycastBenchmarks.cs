@@ -34,7 +34,7 @@ public class OrientedBoxRaycastBenchmarks
         {
             Mass = Fixed64.One
         };
-        body.Initialize(Vector3d.Zero, rotation, isDynamic: false);
+        body.Initialize(Vector3d.Zero, rotation, BodyMotionType.Static);
         _box = (LSCuboidCollider)body.Collider;
 
         Fixed64 halfExtent = (Fixed64)HalfExtent;

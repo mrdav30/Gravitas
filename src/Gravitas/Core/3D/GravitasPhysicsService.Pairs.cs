@@ -157,6 +157,29 @@ public sealed partial class GravitasPhysicsService
         }
     }
 
+    internal void ClearWarmStartCachesForCollider(LSCollider collider)
+    {
+        SwiftDictionary<int, CollisionPair>? collisionPairs = collider.CollisionPairs;
+        if (collisionPairs != null)
+        {
+            foreach (var pairEntry in collisionPairs)
+                pairEntry.Value.ClearWarmStart();
+        }
+
+        SwiftHashSet<int>? collisionPairHolders = collider.CollisionPairHolders;
+        if (collisionPairHolders == null)
+            return;
+
+        foreach (int holderId in collisionPairHolders)
+        {
+            if (TryGetColliderById(holderId, out LSCollider? holder)
+                && holder!.TryGetCollisionPair(collider.Id, out CollisionPair? pair))
+            {
+                pair!.ClearWarmStart();
+            }
+        }
+    }
+
     private CollisionPair CreatePair(LSCollider collider1, LSCollider collider2)
     {
         if (!_context.Settings.PoolingEnabled || _cachedCollisionPairs.Count <= 0)

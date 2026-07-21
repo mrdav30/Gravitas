@@ -173,7 +173,7 @@ public sealed partial class SolidBody2DGroundingTests
 
         body.IsGrounded.Should().BeTrue();
 
-        body.IsKinematic = true;
+        body.SetMotionType(BodyMotionType.Kinematic);
         Step(context);
 
         body.IsGrounded.Should().BeFalse();
@@ -184,11 +184,10 @@ public sealed partial class SolidBody2DGroundingTests
     public void ContactSupport_ShouldGroundAgainstStaticFloorButRejectWallsAndCeilings()
     {
         using GravitasWorldContext floorContext = CreateContext();
-        SolidBody2D floorBody = CreateBox(
+        SolidBody2D floorBody = CreateStaticBox(
             floorContext,
             new Vector2d(Fixed64.Zero, -Fixed64.Half),
-            new Vector2d((Fixed64)4, Fixed64.One),
-            positionFrozen: true);
+            new Vector2d((Fixed64)4, Fixed64.One));
         SolidBody2D floorTouching = CreateCircle(floorContext, Vector2d.Zero);
         DisableProbeFallback(floorTouching);
 
@@ -200,11 +199,10 @@ public sealed partial class SolidBody2DGroundingTests
         floorBody.IsGrounded.Should().BeFalse();
 
         using GravitasWorldContext wallContext = CreateContext();
-        SolidBody2D wallBody = CreateBox(
+        SolidBody2D wallBody = CreateStaticBox(
             wallContext,
             new Vector2d(Fixed64.Half, Fixed64.Zero),
-            new Vector2d(Fixed64.One, (Fixed64)4),
-            positionFrozen: true);
+            new Vector2d(Fixed64.One, (Fixed64)4));
         SolidBody2D wallTouching = CreateCircle(wallContext, Vector2d.Zero);
         DisableProbeFallback(wallTouching);
 
@@ -214,11 +212,10 @@ public sealed partial class SolidBody2DGroundingTests
         wallBody.IsGrounded.Should().BeFalse();
 
         using GravitasWorldContext ceilingContext = CreateContext();
-        SolidBody2D ceilingBody = CreateBox(
+        SolidBody2D ceilingBody = CreateStaticBox(
             ceilingContext,
             new Vector2d(Fixed64.Zero, Fixed64.Half),
-            new Vector2d((Fixed64)4, Fixed64.One),
-            positionFrozen: true);
+            new Vector2d((Fixed64)4, Fixed64.One));
         SolidBody2D ceilingTouching = CreateCircle(ceilingContext, Vector2d.Zero);
         DisableProbeFallback(ceilingTouching);
 
@@ -667,8 +664,7 @@ public sealed partial class SolidBody2DGroundingTests
 
     private static SolidBody2D CreateCircle(
         GravitasWorldContext context,
-        Vector2d position,
-        bool positionFrozen = false)
+        Vector2d position)
     {
         var agent = new TestMatterAgent(context, new FixedTransform(
             new Vector3d(position.X, Fixed64.Zero, position.Y),
@@ -676,18 +672,16 @@ public sealed partial class SolidBody2DGroundingTests
             Vector3d.One));
         var body = new SolidBody2D(agent, new LSCircleCollider2D(Fixed64.Half))
         {
-            Mass = Fixed64.One,
-            FreezeAxes = positionFrozen ? BodyFreezeAxes2D.Position : BodyFreezeAxes2D.None
+            Mass = Fixed64.One
         };
         body.Initialize(position);
         return body;
     }
 
-    private static SolidBody2D CreateBox(
+    private static SolidBody2D CreateStaticBox(
         GravitasWorldContext context,
         Vector2d position,
-        Vector2d size,
-        bool positionFrozen)
+        Vector2d size)
     {
         var agent = new TestMatterAgent(context, new FixedTransform(
             new Vector3d(position.X, Fixed64.Zero, position.Y),
@@ -695,10 +689,9 @@ public sealed partial class SolidBody2DGroundingTests
             Vector3d.One));
         var body = new SolidBody2D(agent, new LSAABBoxCollider2D(size))
         {
-            Mass = Fixed64.One,
-            FreezeAxes = positionFrozen ? BodyFreezeAxes2D.Position : BodyFreezeAxes2D.None
+            Mass = Fixed64.One
         };
-        body.Initialize(position);
+        body.Initialize(position, motionType: BodyMotionType.Static);
         return body;
     }
 

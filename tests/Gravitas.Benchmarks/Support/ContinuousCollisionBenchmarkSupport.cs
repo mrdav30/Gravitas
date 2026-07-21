@@ -112,11 +112,10 @@ internal static class ContinuousCollisionBenchmarkSupport
         var agent = new BenchmarkMatterAgent(context, position);
         var body = new SolidBody(agent, new LSSphereCollider { Radius = Fixed64.FromFraction(1, 4) })
         {
-            FreezeAxes = BodyFreezeAxes3D.Position,
             Mass = Fixed64.One
         };
 
-        body.Initialize(position, FixedQuaternion.Identity);
+        body.Initialize(position, FixedQuaternion.Identity, BodyMotionType.Static);
     }
 
     public static void CreateStaticCuboid3D(GravitasWorldContext context, Vector3d position, Vector3d size)
@@ -124,11 +123,10 @@ internal static class ContinuousCollisionBenchmarkSupport
         var agent = new BenchmarkMatterAgent(context, position);
         var body = new SolidBody(agent, new LSCuboidCollider { Size = size })
         {
-            FreezeAxes = BodyFreezeAxes3D.Position,
             Mass = Fixed64.One
         };
 
-        body.Initialize(position, FixedQuaternion.Identity);
+        body.Initialize(position, FixedQuaternion.Identity, BodyMotionType.Static);
     }
 
     public static void CreateStaticCircle2D(GravitasWorldContext context, Vector2d position)
@@ -136,11 +134,10 @@ internal static class ContinuousCollisionBenchmarkSupport
         var agent = new BenchmarkMatterAgent(context, position.ToVector3d(Fixed64.Zero));
         var body = new SolidBody2D(agent, new LSCircleCollider2D(Fixed64.FromFraction(1, 4)))
         {
-            FreezeAxes = BodyFreezeAxes2D.Position,
             Mass = Fixed64.One
         };
 
-        body.Initialize(position);
+        body.Initialize(position, motionType: BodyMotionType.Static);
     }
 
     public static void CreateStaticAabb2D(GravitasWorldContext context, Vector2d position, Vector2d size)
@@ -148,11 +145,10 @@ internal static class ContinuousCollisionBenchmarkSupport
         var agent = new BenchmarkMatterAgent(context, position.ToVector3d(Fixed64.Zero));
         var body = new SolidBody2D(agent, new LSAABBoxCollider2D(size))
         {
-            FreezeAxes = BodyFreezeAxes2D.Position,
             Mass = Fixed64.One
         };
 
-        body.Initialize(position);
+        body.Initialize(position, motionType: BodyMotionType.Static);
     }
 
     public static void Reset3DBodies(SwiftList<SolidBody> bodies, Vector3d[] positions, bool pairedDirections)

@@ -329,7 +329,9 @@ public class Constraint2DBenchmarks
             SleepEnabled = sleepEnabled
         };
 
-        body.Initialize(position, isDynamic: dynamic);
+        body.Initialize(
+            position,
+            motionType: dynamic ? BodyMotionType.Dynamic : BodyMotionType.Static);
         return body;
     }
 
@@ -341,10 +343,11 @@ public class Constraint2DBenchmarks
             new Vector3d(offset.X, Fixed64.Zero, offset.Y - Fixed64.One));
         var body = new SolidBody2D(agent, collider)
         {
-            Mass = Fixed64.One,
-            FreezeAxes = BodyFreezeAxes2D.Position
+            Mass = Fixed64.One
         };
-        body.Initialize(offset + new Vector2d(Fixed64.Zero, -Fixed64.One));
+        body.Initialize(
+            offset + new Vector2d(Fixed64.Zero, -Fixed64.One),
+            motionType: BodyMotionType.Static);
     }
 
     private static RagdollLinkDefinition2D Link(int id, SolidBody2D body) =>

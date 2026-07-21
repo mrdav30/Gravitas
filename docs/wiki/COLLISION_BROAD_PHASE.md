@@ -95,13 +95,17 @@ Membership is explicit:
 | Collider/body state                   | Partition bucket           |
 | ------------------------------------- | -------------------------- |
 | Bodyless collider                     | static                     |
-| Body with all translation axes frozen | static                     |
-| `IsKinematic == true`                 | kinematic                  |
-| Movable non-kinematic body            | dynamic                    |
-| Awake movable non-kinematic body      | dynamic plus awake-dynamic |
+| `MotionType == BodyMotionType.Static` | static                     |
+| `MotionType == BodyMotionType.Kinematic` | kinematic               |
+| `MotionType == BodyMotionType.Dynamic` | dynamic                   |
+| Awake dynamic body with solver mobility | dynamic plus awake-dynamic |
 
-Partial 3D or planar position freezes remain dynamic. The solver constrains the
-frozen axes later through effective mass/inertia.
+Freeze axes never change the partition role. Partial freezes and fully locked
+dynamic bodies remain in dynamic membership; the solver constrains their
+degrees of freedom through effective mass and inertia. A fully locked dynamic
+body does not seed awake pair distribution because it has no solver mobility,
+but it remains available to contacts, queries, wake propagation, and an awake
+counterpart's candidate traversal.
 
 Only awake dynamic membership activates pair distribution for solver work.
 Sleeping bodies remain in normal dynamic membership so queries, wake

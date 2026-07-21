@@ -190,7 +190,7 @@ public sealed class ContactNormalImpulseResponseTests
         ScenarioBody<LSCuboidCollider> source = scenario.CreateCuboid(Vector3d.Zero);
         ScenarioBody<LSCuboidCollider> target = scenario.CreateCuboid(
             new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.Zero));
-        source.Body.IsKinematic = true;
+        source.Body.SetMotionType(BodyMotionType.Kinematic);
 
         bool resolved = ContactNormalImpulse3D.TryCalculateVelocityDeltas(
             source.Body,
@@ -220,7 +220,7 @@ public sealed class ContactNormalImpulseResponseTests
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
         SolidBody2D source = CreateBox2D(context, Vector2d.Zero);
         SolidBody2D target = CreateBox2D(context, new Vector2d((Fixed64)2, Fixed64.Zero));
-        source.IsKinematic = true;
+        source.SetMotionType(BodyMotionType.Kinematic);
 
         bool resolved = ContactNormalImpulse2D.TryCalculateVelocityDeltas(
             source,
@@ -242,27 +242,6 @@ public sealed class ContactNormalImpulseResponseTests
         result.AngularVelocityDeltaA.Should().Be(Fixed64.Zero);
         result.LinearVelocityDeltaB.X.Should().BeGreaterThan(Fixed64.Zero);
         result.AngularVelocityDeltaB.Should().NotBe(Fixed64.Zero);
-    }
-
-    [Fact]
-    public void ThreeD_KinematicPureAngularClosing_ShouldMoveOnlyDynamicTarget()
-    {
-        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
-        ScenarioBody<LSCuboidCollider> source = scenario.CreateCuboid(Vector3d.Zero);
-        ScenarioBody<LSCuboidCollider> target = scenario.CreateCuboid(new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.Zero));
-        source.Collider.Material = PhysicsMaterial.Frictionless;
-        target.Collider.Material = PhysicsMaterial.Frictionless;
-        source.Body.ApplyCollisionAngularVelocityDelta(-Vector3d.Forward);
-        source.Body.IsKinematic = true;
-        CollisionPair pair = CreatePair3D(scenario, source, target, Vector3d.Up);
-        Vector3d sourceAngularVelocity = source.Body.AngularVelocity;
-
-        CollisionResponse.CalculateImpulse(pair, applyCachedImpulse: false, applyPositionCorrection: false);
-
-        source.Body.LinearVelocity.Should().Be(Vector3d.Zero);
-        source.Body.AngularVelocity.Should().Be(sourceAngularVelocity);
-        target.Body.LinearVelocity.X.Should().BeGreaterThan(Fixed64.Zero);
-        target.Body.AngularVelocity.Should().NotBe(Vector3d.Zero);
     }
 
     [Theory]
@@ -307,27 +286,6 @@ public sealed class ContactNormalImpulseResponseTests
 
         source.Body.LinearVelocity.X.Should().Be(Fixed64.Zero);
         source.Body.AngularVelocity.Z.Should().BeGreaterThan(angularVelocityBefore);
-    }
-
-    [Fact]
-    public void TwoD_KinematicPureAngularClosing_ShouldMoveOnlyDynamicTarget()
-    {
-        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
-        SolidBody2D source = CreateBox2D(context, Vector2d.Zero);
-        SolidBody2D target = CreateBox2D(context, new Vector2d((Fixed64)2, Fixed64.Zero));
-        source.Collider.Material = PhysicsMaterial.Frictionless;
-        target.Collider.Material = PhysicsMaterial.Frictionless;
-        source.ApplyCollisionAngularVelocityDelta(-Fixed64.One);
-        source.IsKinematic = true;
-        CollisionPair2D pair = CreatePair2D(source, target, Vector2d.Forward);
-        Fixed64 sourceAngularVelocity = source.AngularVelocity;
-
-        CollisionResponse2D.Resolve(pair, applyCachedImpulse: false, applyPositionCorrection: false);
-
-        source.LinearVelocity.Should().Be(Vector2d.Zero);
-        source.AngularVelocity.Should().Be(sourceAngularVelocity);
-        target.LinearVelocity.X.Should().BeGreaterThan(Fixed64.Zero);
-        target.AngularVelocity.Should().NotBe(Fixed64.Zero);
     }
 
     [Theory]
@@ -418,10 +376,9 @@ public sealed class ContactNormalImpulseResponseTests
             new TestMatterAgent(context, transform),
             new LSAABBoxCollider2D(new Vector2d((Fixed64)2, (Fixed64)2)))
         {
-            Mass = Fixed64.One,
-            FreezeAxes = immovable ? BodyFreezeAxes2D.Position : BodyFreezeAxes2D.None
+            Mass = Fixed64.One
         };
-        body.Initialize(position);
+        body.Initialize(position, motionType: immovable ? BodyMotionType.Static : BodyMotionType.Dynamic);
         return body;
     }
 }

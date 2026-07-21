@@ -14,6 +14,32 @@ public sealed class SolidBodySerializationTests
 {
     public static TheoryData<GravitasSerializationTransport> Transports => GravitasSerializationTransportCases.All();
 
+    public static TheoryData<GravitasSerializationTransport, BodyMotionType, BodyMotionType> CrossRoleTransports
+    {
+        get
+        {
+            var cases = new TheoryData<GravitasSerializationTransport, BodyMotionType, BodyMotionType>();
+            AddCrossRoleCases(cases, GravitasSerializationTransport.Json);
+#if !GRAVITAS_DISABLE_MEMORYPACK
+            AddCrossRoleCases(cases, GravitasSerializationTransport.MemoryPack);
+#endif
+            return cases;
+        }
+    }
+
+    public static TheoryData<GravitasSerializationTransport, BodyMotionType, BodyMotionType> StaticDynamicCrossRoleTransports
+    {
+        get
+        {
+            var cases = new TheoryData<GravitasSerializationTransport, BodyMotionType, BodyMotionType>();
+            AddStaticDynamicCrossRoleCases(cases, GravitasSerializationTransport.Json);
+#if !GRAVITAS_DISABLE_MEMORYPACK
+            AddStaticDynamicCrossRoleCases(cases, GravitasSerializationTransport.MemoryPack);
+#endif
+            return cases;
+        }
+    }
+
     public static TheoryData<string, FixedQuaternion> RotationAdmissionCases => new()
     {
         { "zero", FixedQuaternion.Zero },
@@ -39,6 +65,149 @@ public sealed class SolidBodySerializationTests
 
         action.Should().Throw<ArgumentOutOfRangeException>();
         body.Body.ContinuousCollisionMode.Should().Be(ContinuousCollisionMode.Auto);
+    }
+
+    [Fact]
+    public void RecordData_WithUndefinedMotionType_ShouldRejectBeforeMutatingAuthoritativeState()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
+        Vector3d initialLinearVelocity = new(Fixed64.One, (Fixed64)2, (Fixed64)3);
+        body.Body.RecordData(new InvalidRecordPayloadChronicler(new Dictionary<string, object>
+        {
+            ["LinearVelocity"] = initialLinearVelocity
+        }));
+        int dynamicId = body.Body.DynamicId;
+        int colliderId = body.Collider.Id;
+        var chronicler = new InvalidRecordPayloadChronicler(new Dictionary<string, object>
+        {
+            ["MotionType"] = (BodyMotionType)byte.MaxValue,
+            ["Debug"] = true,
+            ["Position2d"] = new Vector2d((Fixed64)7, (Fixed64)8),
+            ["HeightPos"] = (Fixed64)9,
+            ["LinearVelocity"] = new Vector3d(Fixed64.Zero, Fixed64.Zero, (Fixed64)(-1))
+        });
+
+        Action action = () => body.Body.RecordData(chronicler);
+
+        action.Should().Throw<ArgumentOutOfRangeException>();
+        body.Body.MotionType.Should().Be(BodyMotionType.Dynamic);
+        body.Body.Debug.Should().BeFalse();
+        body.Body.Position3d.Should().Be(Vector3d.Zero);
+        body.Body.LinearVelocity.Should().Be(initialLinearVelocity);
+        body.Body.DynamicId.Should().Be(dynamicId);
+        body.Collider.Id.Should().Be(colliderId);
+        scenario.Context.Physics.BodyCount.Should().Be(1);
+    }
+
+    [Fact]
+    public void RecordData_WithUndefinedFreezeAxes_ShouldRejectBeforeMutatingAuthoritativeState()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
+        var chronicler = new InvalidRecordPayloadChronicler(new Dictionary<string, object>
+        {
+            ["FreezeAxes"] = (BodyFreezeAxes3D)byte.MaxValue,
+            ["Position2d"] = new Vector2d((Fixed64)7, (Fixed64)8),
+            ["HeightPos"] = (Fixed64)9
+        });
+
+        Action action = () => body.Body.RecordData(chronicler);
+
+        action.Should().Throw<ArgumentException>();
+        body.Body.FreezeAxes.Should().Be(BodyFreezeAxes3D.None);
+        body.Body.Position3d.Should().Be(Vector3d.Zero);
+        body.Body.DynamicId.Should().Be(0);
+        scenario.Context.Physics.BodyCount.Should().Be(1);
+    }
+
+    [Theory]
+    [MemberData(nameof(CrossRoleTransports))]
+    public void PopulateAcrossMotionTypes_ShouldReconcileRegistrationAndPreserveLoadedMotion(
+        GravitasSerializationTransport transport,
+        BodyMotionType sourceMotionType,
+        BodyMotionType targetMotionType)
+    {
+        Vector3d loadedLinearVelocity = new((Fixed64)3, (Fixed64)(-2), Fixed64.Half);
+        Vector3d loadedAngularVelocity = new(Fixed64.Half, Fixed64.One, (Fixed64)(-1));
+        using PhysicsScenarioBuilder sourceScenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> source = CreateSphere(sourceScenario, sourceMotionType);
+        source.Body.RecordData(new InvalidRecordPayloadChronicler(new Dictionary<string, object>
+        {
+            ["LinearVelocity"] = loadedLinearVelocity,
+            ["AngularVelocity"] = loadedAngularVelocity
+        }));
+        object payload = GravitasSerializationHarness.Serialize(source.Body, transport);
+
+        using PhysicsScenarioBuilder targetScenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> target = CreateSphere(targetScenario, targetMotionType);
+        LSSphereCollider targetCollider = target.Collider;
+        FixedTransform targetTransform = target.Body.Agent.Transform;
+        int colliderId = targetCollider.Id;
+
+        GravitasSerializationHarness.Populate(target.Body, payload, transport);
+
+        target.Body.MotionType.Should().Be(sourceMotionType);
+        target.Body.LinearVelocity.Should().Be(loadedLinearVelocity);
+        target.Body.AngularVelocity.Should().Be(loadedAngularVelocity);
+        target.Body.Agent.Transform.Should().BeSameAs(targetTransform);
+        target.Body.Collider.Should().BeSameAs(targetCollider);
+        targetCollider.Body.Should().BeSameAs(target.Body);
+        targetCollider.Id.Should().Be(colliderId);
+        targetCollider.IsStatic.Should().Be(sourceMotionType == BodyMotionType.Static);
+        target.Body.DynamicId.Should().Be(sourceMotionType == BodyMotionType.Static ? -1 : 0);
+        targetScenario.Context.Physics.BodyCount.Should().Be(sourceMotionType == BodyMotionType.Static ? 0 : 1);
+    }
+
+    [Theory]
+    [MemberData(nameof(StaticDynamicCrossRoleTransports))]
+    public void PopulateAcrossMotionTypesIntoDeactivatedShell_ShouldLoadRoleWithoutRegisteringBody(
+        GravitasSerializationTransport transport,
+        BodyMotionType sourceMotionType,
+        BodyMotionType targetMotionType)
+    {
+        using PhysicsScenarioBuilder sourceScenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> source = CreateSphere(sourceScenario, sourceMotionType);
+        source.Body.Deactivate();
+        object payload = GravitasSerializationHarness.Serialize(source.Body, transport);
+
+        using PhysicsScenarioBuilder targetScenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> target = CreateSphere(targetScenario, targetMotionType);
+        target.Body.Deactivate();
+
+        GravitasSerializationHarness.Populate(target.Body, payload, transport);
+
+        target.Body.Active.Should().BeFalse();
+        target.Body.MotionType.Should().Be(sourceMotionType);
+        target.Body.DynamicId.Should().Be(-1);
+        target.Collider.Id.Should().Be(-1);
+        targetScenario.Context.Physics.BodyCount.Should().Be(0);
+        targetScenario.Context.Physics.ColliderCount.Should().Be(0);
+    }
+
+    [Theory]
+    [InlineData(BodyMotionType.Dynamic)]
+    [InlineData(BodyMotionType.Static)]
+    public void RecordData_SameOrDifferentRoleLoadAfterContextReset_ShouldRejectBeforeMutatingState(
+        BodyMotionType loadedMotionType)
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> body = CreateSphere(scenario, BodyMotionType.Dynamic);
+        Vector3d originalPosition = body.Body.Position3d;
+        scenario.Context.Reset();
+        var chronicler = new InvalidRecordPayloadChronicler(new Dictionary<string, object>
+        {
+            ["MotionType"] = loadedMotionType,
+            ["Position2d"] = Vector2d.Right
+        });
+
+        Action load = () => body.Body.RecordData(chronicler);
+
+        load.Should().Throw<InvalidOperationException>();
+        body.Body.MotionType.Should().Be(BodyMotionType.Dynamic);
+        body.Body.Position3d.Should().Be(originalPosition);
+        body.Body.DynamicId.Should().Be(0);
+        scenario.Context.Physics.BodyCount.Should().Be(0);
     }
 
     [Theory]
@@ -167,7 +336,6 @@ public sealed class SolidBodySerializationTests
             new Vector3d((Fixed64)3, Fixed64.Half, (Fixed64)(-2)),
             FixedQuaternion.FromEulerAnglesInDegrees(Fixed64.Zero, (Fixed64)35, Fixed64.Zero),
             mass: (Fixed64)4,
-            immovable: true,
             isKinematic: true);
         source.Body.GroundProbeMode = GroundProbeMode.SweptSphere;
         source.Body.GroundProbeRadius = Fixed64.FromFraction(1, 3);
@@ -566,6 +734,38 @@ public sealed class SolidBodySerializationTests
         json.Should().NotContain("PositionChangedBuffer");
         json.Should().NotContain("RotationChangedBuffer");
         json.Should().NotContain("PositionCorrection");
+    }
+
+    private static void AddCrossRoleCases(
+        TheoryData<GravitasSerializationTransport, BodyMotionType, BodyMotionType> cases,
+        GravitasSerializationTransport transport)
+    {
+        cases.Add(transport, BodyMotionType.Dynamic, BodyMotionType.Kinematic);
+        cases.Add(transport, BodyMotionType.Dynamic, BodyMotionType.Static);
+        cases.Add(transport, BodyMotionType.Kinematic, BodyMotionType.Dynamic);
+        cases.Add(transport, BodyMotionType.Kinematic, BodyMotionType.Static);
+        cases.Add(transport, BodyMotionType.Static, BodyMotionType.Dynamic);
+        cases.Add(transport, BodyMotionType.Static, BodyMotionType.Kinematic);
+    }
+
+    private static void AddStaticDynamicCrossRoleCases(
+        TheoryData<GravitasSerializationTransport, BodyMotionType, BodyMotionType> cases,
+        GravitasSerializationTransport transport)
+    {
+        cases.Add(transport, BodyMotionType.Dynamic, BodyMotionType.Static);
+        cases.Add(transport, BodyMotionType.Static, BodyMotionType.Dynamic);
+    }
+
+    private static ScenarioBody<LSSphereCollider> CreateSphere(
+        PhysicsScenarioBuilder scenario,
+        BodyMotionType motionType)
+    {
+        return scenario.CreateBody(
+            new LSSphereCollider(),
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            isDynamic: motionType != BodyMotionType.Static,
+            isKinematic: motionType == BodyMotionType.Kinematic);
     }
 
     private static PhysicsScenarioBuilder CreateReplayScenario()

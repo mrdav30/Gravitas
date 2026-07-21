@@ -27,17 +27,21 @@ public sealed class Constraint3DServiceTests
     }
 
     [Fact]
-    public void Joint3D_IsSolverBody_ShouldRequireActiveRegisteredTranslatableBody()
+    public void Joint3D_IsSolverBody_ShouldRequireActiveRegisteredSolverMobility()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSSphereCollider> active = scenario.CreateSphere(Vector3d.Zero);
-        ScenarioBody<LSSphereCollider> frozen = scenario.CreateSphere(Vector3d.Right * (Fixed64)2, immovable: true);
+        ScenarioBody<LSSphereCollider> frozen = scenario.CreateSphere(Vector3d.Right * (Fixed64)2);
+        ScenarioBody<LSSphereCollider> locked = scenario.CreateSphere(Vector3d.Right * (Fixed64)3);
         ScenarioBody<LSSphereCollider> inactive = scenario.CreateSphere(Vector3d.Right * (Fixed64)4);
+        frozen.Body.FreezeAxes = BodyFreezeAxes3D.Position;
+        locked.Body.FreezeAxes = BodyFreezeAxes3D.All;
 
         inactive.Body.Deactivate();
 
         Joint3D.IsSolverBody(active.Body).Should().BeTrue();
-        Joint3D.IsSolverBody(frozen.Body).Should().BeFalse();
+        Joint3D.IsSolverBody(frozen.Body).Should().BeTrue();
+        Joint3D.IsSolverBody(locked.Body).Should().BeFalse();
         Joint3D.IsSolverBody(inactive.Body).Should().BeFalse();
     }
 
@@ -60,6 +64,29 @@ public sealed class Constraint3DServiceTests
         scenario.Context.Constraints3D.PeakJointCount.Should().Be(2);
         scenario.Context.Constraints3D.TryGetJoint(1, out Joint3D? resolved).Should().BeTrue();
         resolved.Should().BeSameAs(firstJoint);
+    }
+
+    [Fact]
+    public void MotionTypeChange_ShouldClearEveryAttachedJointSolverCacheWithoutRemovingJoints()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> first = scenario.CreateSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> second = scenario.CreateSphere(Vector3d.Right * (Fixed64)2);
+        ScenarioBody<LSSphereCollider> third = scenario.CreateSphere(Vector3d.Up * (Fixed64)2);
+        Joint3D firstJoint = scenario.Context.Constraints3D.RegisterJoint(CreateBallSocket(first.Body, second.Body));
+        Joint3D secondJoint = scenario.Context.Constraints3D.RegisterJoint(CreateBallSocket(first.Body, third.Body));
+        firstJoint.AccumulatedImpulseMagnitude = Fixed64.One;
+        secondJoint.AccumulatedImpulseMagnitude = Fixed64.One;
+
+        first.Body.SetMotionType(BodyMotionType.Kinematic);
+
+        firstJoint.AccumulatedImpulseMagnitude.Should().Be(Fixed64.Zero);
+        secondJoint.AccumulatedImpulseMagnitude.Should().Be(Fixed64.Zero);
+        scenario.Context.Constraints3D.RegisteredJointCount.Should().Be(2);
+        scenario.Context.Constraints3D.TryGetJoint(firstJoint.Id, out Joint3D? retainedFirst).Should().BeTrue();
+        scenario.Context.Constraints3D.TryGetJoint(secondJoint.Id, out Joint3D? retainedSecond).Should().BeTrue();
+        retainedFirst.Should().BeSameAs(firstJoint);
+        retainedSecond.Should().BeSameAs(secondJoint);
     }
 
     [Fact]
@@ -171,8 +198,8 @@ public sealed class Constraint3DServiceTests
         scenario.Context.Constraints3D.TryGetJointForSolver(joint.Id, out Joint3D? enabled).Should().BeTrue();
         enabled.Should().BeSameAs(joint);
 
-        first.Body.FreezeAxes = BodyFreezeAxes3D.Position;
-        second.Body.FreezeAxes = BodyFreezeAxes3D.Position;
+        first.Body.FreezeAxes = BodyFreezeAxes3D.All;
+        second.Body.FreezeAxes = BodyFreezeAxes3D.All;
         scenario.Context.Constraints3D.TryGetJointForSolver(joint.Id, out Joint3D? frozen).Should().BeFalse();
         frozen.Should().BeNull();
     }
@@ -1336,8 +1363,10 @@ public sealed class Constraint3DServiceTests
     public void ConstraintSolver_WithOnlyFrozenBodies_ShouldKeepJointRegisteredWithoutRows()
     {
         using PhysicsScenarioBuilder scenario = CreateConstraintScenario();
-        ScenarioBody<LSSphereCollider> first = scenario.CreateSphere(Vector3d.Zero, immovable: true);
-        ScenarioBody<LSSphereCollider> second = scenario.CreateSphere(Vector3d.Right * (Fixed64)2, immovable: true);
+        ScenarioBody<LSSphereCollider> first = scenario.CreateSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> second = scenario.CreateSphere(Vector3d.Right * (Fixed64)2);
+        first.Body.FreezeAxes = BodyFreezeAxes3D.All;
+        second.Body.FreezeAxes = BodyFreezeAxes3D.All;
         Joint3D joint = scenario.Context.Constraints3D.RegisterJoint(CreateBallSocket(first.Body, second.Body));
 
         Step(scenario.Context, 1);
@@ -1436,6 +1465,28 @@ public sealed class Constraint3DServiceTests
         root.Body.IsKinematic.Should().BeTrue();
         child.Body.IsKinematic.Should().BeTrue();
         runtime.GetJoint(0).IsEnabled.Should().BeFalse();
+    }
+
+    [Fact]
+    public void RagdollRuntime_WhenALaterLinkHasInvalidRuntimeScale_ShouldNotPartiallyDeactivate()
+    {
+        using PhysicsScenarioBuilder scenario = CreateConstraintScenario();
+        ScenarioBody<LSSphereCollider> root = scenario.CreateSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> child = scenario.CreateSphere(Vector3d.Right * (Fixed64)2);
+        RagdollRuntime3D runtime = scenario.Context.Constraints3D.RegisterRagdoll(CreateTwoLinkRagdoll(root, child));
+        var singularParent = new FixedTransform(
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            new Vector3d(Fixed64.Zero, Fixed64.One, Fixed64.One));
+        child.Body.PositionTransform.SetParentKeepingLocal(singularParent);
+
+        Action deactivate = runtime.DeactivateToKinematic;
+
+        deactivate.Should().Throw<ArgumentException>();
+        runtime.IsActive.Should().BeTrue();
+        root.Body.MotionType.Should().Be(BodyMotionType.Dynamic);
+        child.Body.MotionType.Should().Be(BodyMotionType.Dynamic);
+        runtime.GetJoint(0).IsEnabled.Should().BeTrue();
     }
 
     [Fact]

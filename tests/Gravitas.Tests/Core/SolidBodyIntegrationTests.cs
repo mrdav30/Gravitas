@@ -286,7 +286,7 @@ public sealed class SolidBodyIntegrationTests
     }
 
     [Fact]
-    public void SetHeightAndFreezeAxes_ShouldExposeLifecycleStateWithoutWakingOnNoOp()
+    public void SetHeightAndFreezeAxes_ShouldExposeIndependentLifecycleStateWithoutWakingOnNoOp()
     {
         using PhysicsScenarioBuilder scenario = CreateIntegrationScenario(frameRate: 4);
         ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
@@ -295,7 +295,7 @@ public sealed class SolidBodyIntegrationTests
         body.Body.SetHeight(body.Body.HeightPos);
 
         body.Body.IsSleeping.Should().BeTrue();
-        body.Body.AngularForcesHalted.Should().BeFalse();
+        body.Body.IsRotationFullyFrozen.Should().BeFalse();
 
         body.Body.SetHeight(Fixed64.One);
 
@@ -303,13 +303,13 @@ public sealed class SolidBodyIntegrationTests
         body.Body.IsSleeping.Should().BeFalse();
 
         body.Body.FreezeAxes = BodyFreezeAxes3D.Rotation;
-        body.Body.AngularForcesHalted.Should().BeTrue();
+        body.Body.IsRotationFullyFrozen.Should().BeTrue();
 
         body.Body.FreezeAxes = BodyFreezeAxes3D.None;
-        body.Body.AngularForcesHalted.Should().BeFalse();
+        body.Body.IsRotationFullyFrozen.Should().BeFalse();
 
         body.Body.FreezeAxes = BodyFreezeAxes3D.Position;
-        body.Body.AngularForcesHalted.Should().BeTrue();
+        body.Body.IsRotationFullyFrozen.Should().BeFalse();
     }
 
     [Fact]

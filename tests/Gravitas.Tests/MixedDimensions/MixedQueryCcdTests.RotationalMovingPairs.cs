@@ -124,7 +124,7 @@ public sealed partial class MixedQueryCcdTests
         using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
         context.Environment.DampingFactor = Fixed64.Zero;
         SolidBody2D blade = CreateRotationalMixedBlade2D(context);
-        blade.IsKinematic = false;
+        blade.SetMotionType(BodyMotionType.Dynamic);
         Vector3d targetPosition = Vector2d.Rotate(
                 new Vector2d(Fixed64.FromFraction(16, 5), Fixed64.Zero),
                 FixedMath.DegToRad((Fixed64)45))
@@ -261,7 +261,7 @@ public sealed partial class MixedQueryCcdTests
         using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
         context.Settings.ContinuousCollisionMaxToiIterations = 1;
         SolidBody2D blade = CreateRotationalMixedBlade2D(context);
-        blade.IsKinematic = false;
+        blade.SetMotionType(BodyMotionType.Dynamic);
         Vector3d targetPosition = Vector2d.Rotate(
                 new Vector2d(Fixed64.FromFraction(16, 5), Fixed64.Zero),
                 FixedMath.DegToRad((Fixed64)45))
@@ -507,4 +507,3 @@ public sealed partial class MixedQueryCcdTests
         allocatedBytes.Should().Be(0);
     }
 }
-

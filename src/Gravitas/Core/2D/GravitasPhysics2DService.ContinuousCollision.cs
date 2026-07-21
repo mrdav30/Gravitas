@@ -47,12 +47,6 @@ public sealed partial class GravitasPhysics2DService
 
     private void AddContinuousCollisionCandidate(SolidBody2D body, bool buildMixedIndex)
     {
-        if ((!body.IsKinematic && body.IsPositionFullyFrozen)
-            || body.Collider.IsTrigger)
-        {
-            return;
-        }
-
         Fixed64 planarRadius = body.ResolveContinuousCollisionProxyRadius();
         if (planarRadius <= Fixed64.Epsilon)
             return;
@@ -109,14 +103,33 @@ public sealed partial class GravitasPhysics2DService
         return true;
     }
 
-    private void ReleaseContinuousCollisionCandidateRefresh(SolidBody2D body)
+    private void ReleaseContinuousCollisionCandidateRefresh(SolidBody2D body) =>
+        ReleaseContinuousCollisionCandidateRefresh(body, body.DynamicId);
+
+    private void ReleaseContinuousCollisionCandidateRefresh(SolidBody2D body, int dynamicId)
     {
         if (!_dirtyPlanarContinuousCollisionBodySet.Remove(body))
             return;
 
         _dirtyPlanarContinuousCollisionBodies.Remove(body);
-        _dirtyPlanarContinuousCollisionCandidates.Remove(body.DynamicId);
-        _dirtyMixedContinuousCollisionCandidates.Remove(body.DynamicId);
+        _dirtyPlanarContinuousCollisionCandidates.Remove(dynamicId);
+        _dirtyMixedContinuousCollisionCandidates.Remove(dynamicId);
+    }
+
+    internal void InvalidateContinuousCollisionStateForMotionTypeChange(
+        SolidBody2D body,
+        int dynamicId)
+    {
+        if (dynamicId >= 0)
+            _continuousCollisionCandidateLifetimes[dynamicId] = default;
+
+        ReleaseContinuousCollisionCandidateRefresh(body, dynamicId);
+        _processedContinuousCollisionBodies.Remove(body);
+        _queuedContinuousCollisionHandoffBodies.Remove(body);
+        _continuousCollisionHandoffQueue.Remove(body);
+        body.DiscardContinuousCollisionHandoff();
+        _continuousCollisionPreparedToken = int.MinValue;
+        _continuousCollisionPreparedMixedIndex = false;
     }
 
     internal bool CanAdmitContinuousCollisionCandidateRefresh(

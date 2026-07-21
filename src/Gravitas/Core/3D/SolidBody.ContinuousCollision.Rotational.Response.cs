@@ -137,8 +137,8 @@ public partial class SolidBody
         Vector3d targetAngularDelta = sourceIsA
             ? result.AngularVelocityDeltaB
             : result.AngularVelocityDeltaA;
-        bool sourceNeedsRefresh = !sourceIsKinematic;
-        bool targetNeedsRefresh = !target.IsKinematic;
+        bool sourceNeedsRefresh = HasSolverMobility;
+        bool targetNeedsRefresh = target.HasSolverMobility;
         Vector3d postSourceLinearVelocity = sourceLinearVelocity;
         Vector3d postSourceAngularVelocity = sourceAngularVelocity;
         bool sourceStateResolved = !sourceNeedsRefresh

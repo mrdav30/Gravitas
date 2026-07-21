@@ -122,14 +122,27 @@ public sealed class RagdollRuntime2D : IRecordable
             nameof(RagdollRuntime2D),
             "Removed ragdolls cannot mutate simulation state.");
 
+        BodyMotionType targetMotionType = isActive
+            ? BodyMotionType.Dynamic
+            : BodyMotionType.Kinematic;
+
+        // Validate every link and publish every required host pose before any
+        // runtime role or joint state changes. This keeps the ragdoll atomic if
+        // a host transform cannot represent one of the authoritative poses.
+        for (int i = 0; i < _links.Length; i++)
+            _links[i].PrepareMotionTypeTransition(targetMotionType);
+
+        for (int i = 0; i < _links.Length; i++)
+        {
+            if (_links[i].MotionType != targetMotionType)
+                _links[i].CommitMotionTypeTransition(targetMotionType);
+
+            if (isActive)
+                _links[i].Wake();
+        }
+
         if (isActive)
         {
-            for (int i = 0; i < _links.Length; i++)
-            {
-                _links[i].IsKinematic = false;
-                _links[i].Wake();
-            }
-
             for (int i = 0; i < _joints.Length; i++)
                 _joints[i].IsEnabled = true;
         }
@@ -137,9 +150,6 @@ public sealed class RagdollRuntime2D : IRecordable
         {
             for (int i = 0; i < _joints.Length; i++)
                 _joints[i].IsEnabled = false;
-
-            for (int i = 0; i < _links.Length; i++)
-                _links[i].IsKinematic = true;
         }
 
         _isActive = isActive;

@@ -298,6 +298,7 @@ public sealed partial class ContinuousCollisionDetectionTests
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();
         ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
         body.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        body.Body.FreezeAxes = BodyFreezeAxes3D.Position;
         scenario.Context.Physics.PrepareContinuousCollisionFrame();
 
         body.Body.ApplyContinuousCollisionHandoff(
@@ -317,6 +318,7 @@ public sealed partial class ContinuousCollisionDetectionTests
         FixedQuaternion.Angle(FixedQuaternion.Identity, body.Body.Rotation)
             .Should()
             .BeGreaterThan(Fixed64.Zero);
+        body.Body.Position3d.Should().Be(Vector3d.Zero);
     }
 
     [Fact]

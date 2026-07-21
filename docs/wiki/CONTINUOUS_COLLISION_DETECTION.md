@@ -8,7 +8,8 @@ handoff queues.
 ## Quick Read
 
 - CCD resolves from body, hierarchy, then context defaults.
-- Bodyless and position-frozen targets use static-style sweeps.
+- Bodyless colliders, explicit static bodies, and stationary kinematic bodies
+  use static-style sweeps.
 - Moving dynamic and kinematic targets use frame-prepared candidate indexing.
 - Kinematic bodies can act as active swept sources from frame-start pose to host
   target pose.
@@ -47,30 +48,36 @@ serialized state therefore cannot silently change tunneling policy.
 
 | Path                    | Target set                                                           | Reducer policy                                                                                                                            |
 | ----------------------- | -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| Stationary 3D           | bodyless, position-frozen, and stationary kinematic 3D colliders     | Source collider proxy sphere, then shape-exact validation where supported.                                                                |
-| Moving 3D               | movable dynamic and moving kinematic 3D bodies                       | Prepared pair trajectories, exact validation for supported source families, conservative proxy behavior where no exact source reducer exists. |
-| Mixed stationary 2D     | bodyless, position-frozen, and stationary kinematic 2D slabs         | Same reducer policy as public `QueryMixed.SweepSphereAgainst2D`.                                                                          |
-| Mixed moving 2D         | movable dynamic and moving kinematic 2D bodies                       | Prepared pair trajectories, conservative mixed proxy candidate, then bounded handoff.                                                     |
+| Stationary 3D           | bodyless, static-role, and stationary kinematic 3D colliders         | Source collider proxy sphere, then shape-exact validation where supported.                                                                |
+| Moving 3D               | dynamic and moving kinematic 3D bodies                               | Prepared pair trajectories, exact validation for supported source families, conservative proxy behavior where no exact source reducer exists. |
+| Mixed stationary 2D     | bodyless, static-role, and stationary kinematic 2D slabs             | Same reducer policy as public `QueryMixed.SweepSphereAgainst2D`.                                                                          |
+| Mixed moving 2D         | dynamic and moving kinematic 2D bodies                               | Prepared pair trajectories, conservative mixed proxy candidate, then bounded handoff.                                                     |
 | Kinematic active source | static-style blockers and dynamic 3D/2D targets before first blocker | Frame-start pose to host target pose, using the underlying dimension-local or mixed reducer.                                              |
 
 ### `SolidBody2D`
 
 | Path                    | Target set                                                           | Reducer policy                                                                                                              |
 | ----------------------- | -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| Stationary 2D           | bodyless, position-frozen, and stationary kinematic 2D colliders     | Source circle sweep, refined by mover shape where needed.                                                                   |
-| Moving 2D               | movable dynamic and moving kinematic 2D bodies                       | Prepared pair trajectories, then exact mover-shape validation for circle, capsule, AABB, convex polygon, and compound families. |
-| Mixed stationary 3D     | bodyless, position-frozen, and stationary kinematic 3D colliders     | Same reducer policy as public `QueryMixed.SweepCircleAgainst3D`.                                                            |
-| Mixed moving 3D         | movable dynamic and moving kinematic 3D bodies                       | Prepared pair trajectories, conservative mixed proxy candidate, then bounded handoff.                                      |
+| Stationary 2D           | bodyless, static-role, and stationary kinematic 2D colliders         | Source circle sweep, refined by mover shape where needed.                                                                   |
+| Moving 2D               | dynamic and moving kinematic 2D bodies                               | Prepared pair trajectories, then exact mover-shape validation for circle, capsule, AABB, convex polygon, and compound families. |
+| Mixed stationary 3D     | bodyless, static-role, and stationary kinematic 3D colliders         | Same reducer policy as public `QueryMixed.SweepCircleAgainst3D`.                                                            |
+| Mixed moving 3D         | dynamic and moving kinematic 3D bodies                               | Prepared pair trajectories, conservative mixed proxy candidate, then bounded handoff.                                      |
 | Kinematic active source | static-style blockers and dynamic 2D/3D targets before first blocker | Frame-start pose to host target pose, using the underlying dimension-local or mixed reducer.                                |
 
 ## Stationary And Kinematic Targets
 
-Static-style CCD targets include bodyless colliders and position-frozen bodies.
+Static-style CCD targets include bodyless colliders, explicit static bodies,
+and stationary kinematic bodies. Freeze axes do not change a body's CCD role.
+Translational source admission follows `CanTranslate`; rotational source and
+target admission follows independent `CanRotate`, so a position-frozen dynamic
+body can still sweep changing rotational bounds. Fully locked dynamic bodies
+remain indexed for deterministic counterpart access but do not start CCD work.
+
 Moving kinematic targets are captured in the same frame-prepared candidate
 index and piecewise trajectory model as moving dynamic targets, so their sampled
 pose does not depend on body registration or service order. Public sweep queries
-can report dynamic, kinematic, position-frozen, and bodyless targets according
-to normal query filters. Final CCD target admission uses the owning collision
+can report dynamic, kinematic, static, and bodyless targets according to normal
+query filters. Final CCD target admission uses the owning collision
 service's physical-pair gate, including collider lifecycle, authored filters,
 hierarchy rules, and linked-joint collision suppression.
 

@@ -40,10 +40,9 @@ public sealed class SolidBody2DHostContractTests
         var agent = new TestMatterAgent(context, transform);
         var body = new SolidBody2D(agent, new LSCircleCollider2D(Fixed64.Half))
         {
-            IsKinematic = true,
             Mass = Fixed64.One
         };
-        body.Initialize(transform.WorldPositionXZ);
+        body.Initialize(transform.WorldPositionXZ, motionType: BodyMotionType.Kinematic);
 
         transform.LocalPosition = new Vector3d((Fixed64)5, (Fixed64)11, (Fixed64)7);
         context.LateSimulate();
@@ -141,7 +140,7 @@ public sealed class SolidBody2DHostContractTests
         FixedTransform transform = body.Agent.Transform;
         Vector3d hostPosition = new((Fixed64)5, (Fixed64)9, (Fixed64)7);
         Fixed64 hostRotation = Fixed64.Pi * Fixed64.Half;
-        body.IsKinematic = true;
+        body.SetMotionType(BodyMotionType.Kinematic);
         transform.LocalPosition = hostPosition;
         transform.LocalRotationXZRadians = hostRotation;
 
@@ -256,7 +255,7 @@ public sealed class SolidBody2DHostContractTests
         embeddedRight.FuzzyEqualAbsolute(expectedRight, Fixed64.Epsilon).Should().BeTrue();
         transform.WorldRotationXZRadians.Should().Be(angle);
 
-        body.IsKinematic = true;
+        body.SetMotionType(BodyMotionType.Kinematic);
         transform.LocalRotationXZRadians = -angle;
         context.LateSimulate();
 
@@ -332,7 +331,7 @@ public sealed class SolidBody2DHostContractTests
         child.WorldPosition.Should().Be(new Vector3d((Fixed64)20, (Fixed64)9, (Fixed64)30));
         child.WorldRotationXZRadians.Should().Be(halfPi);
 
-        body.IsKinematic = true;
+        body.SetMotionType(BodyMotionType.Kinematic);
         child.LocalPosition = new Vector3d((Fixed64)(-3), (Fixed64)6, (Fixed64)8);
         child.LocalRotationXZRadians = -halfPi;
         context.LateSimulate();

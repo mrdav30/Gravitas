@@ -121,7 +121,7 @@ public sealed class GravitasPhysicsServiceTests
     }
 
     [Fact]
-    public void ColliderIsStatic_ShouldBeTrueForBodylessAndPositionFrozenColliders()
+    public void ColliderIsStatic_ShouldDependOnBodylessOrExplicitStaticRole()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         var bodyless = new LSSphereCollider();
@@ -134,11 +134,12 @@ public sealed class GravitasPhysicsServiceTests
         nonDynamicBody.Collider.IsStatic.Should().BeTrue();
 
         body.FreezeAxes = BodyFreezeAxes3D.Position;
-        body.Collider.IsStatic.Should().BeTrue();
-
-        body.FreezeAxes = BodyFreezeAxes3D.None;
         body.Collider.IsStatic.Should().BeFalse();
-        body.IsKinematic = true;
+        body.CanRotate.Should().BeTrue();
+
+        body.SetMotionType(BodyMotionType.Static);
+        body.Collider.IsStatic.Should().BeTrue();
+        body.SetMotionType(BodyMotionType.Kinematic);
         body.Collider.IsStatic.Should().BeFalse();
     }
 
@@ -386,7 +387,10 @@ public sealed class GravitasPhysicsServiceTests
         {
             Mass = Fixed64.One
         };
-        body.Initialize(Vector3d.Zero, FixedQuaternion.Identity, isDynamic);
+        body.Initialize(
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            isDynamic ? BodyMotionType.Dynamic : BodyMotionType.Static);
         return body;
     }
 }

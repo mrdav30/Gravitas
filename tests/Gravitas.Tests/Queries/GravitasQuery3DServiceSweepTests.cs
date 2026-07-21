@@ -2730,12 +2730,15 @@ public sealed class GravitasQuery3DServiceSweepTests
         var agent = new TestMatterAgent(context);
         var body = new SolidBody(agent, collider)
         {
-            Mass = Fixed64.One,
-            FreezeAxes = immovable ? BodyFreezeAxes3D.Position : BodyFreezeAxes3D.None,
-            IsKinematic = isKinematic
+            Mass = Fixed64.One
         };
 
-        body.Initialize(position, rotation ?? FixedQuaternion.Identity, isDynamic);
+        BodyMotionType motionType = !isDynamic || immovable
+            ? BodyMotionType.Static
+            : isKinematic
+                ? BodyMotionType.Kinematic
+                : BodyMotionType.Dynamic;
+        body.Initialize(position, rotation ?? FixedQuaternion.Identity, motionType);
         return collider;
     }
 

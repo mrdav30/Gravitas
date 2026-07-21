@@ -171,8 +171,6 @@ public partial class SolidBody
         {
             LSCollider target = _continuousCollisionHits[hitIndex].Collider!;
             if (target == ignoredTarget
-                || target.Body is SolidBody movingBody
-                    && IsMovingRotationalContinuousCollisionTarget(movingBody)
                 || !IsValidContinuousCollisionTarget(target)
                 || ColliderSettings.GetCollisionType(Collider.Shape, target.Shape) == CollisionType.None
                 || !TryFindEarliestRotationalContinuousCollisionAgainstTarget(

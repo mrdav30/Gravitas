@@ -238,7 +238,7 @@ public sealed partial class SolidBody2DGroundingTests
             outerCandidate.IsGrounded.Should().BeFalse();
             outerSupport.IsTrigger = false;
         };
-        first.IsKinematic = true;
+        first.SetMotionType(BodyMotionType.Kinematic);
 
         Step(context);
 
@@ -421,7 +421,7 @@ public sealed partial class SolidBody2DGroundingTests
     }
 
     [Fact]
-    public void ContactCandidate_WhenGroundedCallbackMakesBodyKinematic_ShouldClearAutomaticGrounding()
+    public void ContactCandidate_WhenGroundedCallbackFreezesPosition_ShouldClearAutomaticGrounding()
     {
         using GravitasWorldContext context = CreateContext();
         SolidBody2D body = CreateCircle(context, Vector2d.Zero);
@@ -435,14 +435,15 @@ public sealed partial class SolidBody2DGroundingTests
         {
             events += grounded ? "true;" : "false;";
             if (grounded)
-                body.IsKinematic = true;
+                body.FreezeAxes = BodyFreezeAxes2D.Position;
         };
 
         Step(context);
 
         events.Should().Be("true;false;");
         body.Active.Should().BeTrue();
-        body.IsKinematic.Should().BeTrue();
+        body.IsDynamic.Should().BeTrue();
+        body.CanTranslate.Should().BeFalse();
         body.GroundingMode.Should().Be(GroundingMode.Automatic);
         body.IsGrounded.Should().BeFalse();
         body.GroundPoint.Should().Be(Vector2d.Zero);

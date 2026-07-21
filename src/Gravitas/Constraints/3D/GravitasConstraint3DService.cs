@@ -63,6 +63,21 @@ public sealed class GravitasConstraint3DService
 
     internal bool HasActiveJoints => _enabledJointCount > 0;
 
+    internal void ClearSolverCachesForBody(SolidBody body)
+    {
+        if (!_jointIdsByBody.TryGetLast(body, out int jointId))
+            return;
+
+        while (true)
+        {
+            _joints[jointId]!.ClearSolverCache();
+            if (!_jointIdsByBody.TryGetPrevious(body, jointId, out int previousJointId))
+                return;
+
+            jointId = previousJointId;
+        }
+    }
+
     /// <summary>
     /// Registers a context-owned deterministic 3D joint.
     /// </summary>

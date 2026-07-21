@@ -368,7 +368,7 @@ public sealed partial class MixedQueryCcdTests
         context.Environment.DampingFactor = Fixed64.Zero;
         context.Settings.ContinuousCollisionMaxToiIterations = 4;
         SolidBody2D blade = CreateRotationalMixedBlade2D(context);
-        blade.IsKinematic = false;
+        blade.SetMotionType(BodyMotionType.Dynamic);
         blade.Collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.One);
         Vector2d samePosition = Vector2d.Rotate(
             new Vector2d((Fixed64)3, Fixed64.Zero),
@@ -554,10 +554,9 @@ public sealed partial class MixedQueryCcdTests
             new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One));
         var blade = new SolidBody2D(agent, collider)
         {
-            Mass = Fixed64.One,
-            IsKinematic = true
+            Mass = Fixed64.One
         };
-        blade.Initialize(Vector2d.Zero);
+        blade.Initialize(Vector2d.Zero, motionType: BodyMotionType.Kinematic);
         blade.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
         return blade;
     }

@@ -114,7 +114,7 @@ public static class CollisionResponse2D
 
         bodyA = ResponseBody2D.Create(pair.ColliderA);
         bodyB = ResponseBody2D.Create(pair.ColliderB);
-        return bodyA.InverseMass + bodyB.InverseMass > Fixed64.Zero;
+        return bodyA.HasSolverMobility || bodyB.HasSolverMobility;
     }
 
     private static SolverContactBuffer2D BuildContactBuffer(
@@ -229,12 +229,13 @@ public static class CollisionResponse2D
         Vector2d linearVelocityDelta,
         Fixed64 angularVelocityDelta)
     {
-        if (!body.CanTranslate)
+        if (!body.HasSolverMobility)
             return;
 
-        body.Body!.ApplyCollisionLinearVelocityDelta(linearVelocityDelta);
+        if (body.CanTranslate)
+            body.Body!.ApplyCollisionLinearVelocityDelta(linearVelocityDelta);
         if (body.CanRotate)
-            body.Body.ApplyCollisionAngularVelocityDelta(angularVelocityDelta);
+            body.Body!.ApplyCollisionAngularVelocityDelta(angularVelocityDelta);
     }
 
     private static Fixed64 SolveFrictionImpulse(SolverContact2D contact, Fixed64 normalImpulseScalar)
@@ -280,10 +281,11 @@ public static class CollisionResponse2D
 
     private static void ApplyImpulse(ResponseBody2D body, Vector2d impulse, Vector2d relativeContactPoint)
     {
-        if (!body.CanTranslate || impulse == Vector2d.Zero)
+        if (!body.HasSolverMobility || impulse == Vector2d.Zero)
             return;
 
-        body.Body!.ApplyCollisionLinearVelocityDelta(impulse * body.InverseMass);
+        if (body.CanTranslate)
+            body.Body!.ApplyCollisionLinearVelocityDelta(impulse * body.InverseMass);
 
         if (!body.CanRotate)
             return;
@@ -291,7 +293,7 @@ public static class CollisionResponse2D
         Fixed64 angularVelocityDelta =
             Vector2d.CrossProduct(relativeContactPoint, impulse)
             * body.InverseMoment;
-        body.Body.ApplyCollisionAngularVelocityDelta(angularVelocityDelta);
+        body.Body!.ApplyCollisionAngularVelocityDelta(angularVelocityDelta);
     }
 
     private static Vector2d ComputeRelativeVelocity(SolverContact2D contact)

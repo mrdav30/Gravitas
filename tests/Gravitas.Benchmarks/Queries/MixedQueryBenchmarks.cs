@@ -400,10 +400,9 @@ public class MixedQueryBenchmarks
         agent.Transform.LocalRotation = startRotation;
         var body = new SolidBody(agent, collider)
         {
-            Mass = Fixed64.One,
-            FreezeAxes = BodyFreezeAxes3D.Position
+            Mass = Fixed64.One
         };
-        body.Initialize(position, startRotation);
+        body.Initialize(position, startRotation, BodyMotionType.Static);
         return body;
     }
 

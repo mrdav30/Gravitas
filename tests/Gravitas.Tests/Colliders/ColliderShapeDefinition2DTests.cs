@@ -235,10 +235,9 @@ public sealed class ColliderShapeDefinition2DTests
         var agent = new TestMatterAgent(context, transform);
         var body = new SolidBody2D(agent, collider)
         {
-            Mass = Fixed64.One,
-            FreezeAxes = BodyFreezeAxes2D.Position
+            Mass = Fixed64.One
         };
-        body.Initialize(position);
+        body.Initialize(position, motionType: BodyMotionType.Static);
         return body;
     }
 }

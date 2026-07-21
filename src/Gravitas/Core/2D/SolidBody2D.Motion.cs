@@ -79,21 +79,43 @@ public sealed partial class SolidBody2D
 
     public void SetPosition(Vector2d position)
     {
+        PreflightStaticPoseChange();
         if (_position != position)
             Wake();
 
         _position = position;
         Collider.Rebuild();
+        RefreshStaticColliderAfterExplicitPoseChange();
     }
 
     public void SetRotation(Fixed64 rotation)
     {
+        PreflightStaticPoseChange();
         Fixed64 canonicalRotation = CanonicalizeRotation(rotation);
         if (_rotation != canonicalRotation)
             Wake();
 
         _rotation = canonicalRotation;
         Collider.Rebuild();
+        RefreshStaticColliderAfterExplicitPoseChange();
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void RefreshStaticColliderAfterExplicitPoseChange()
+    {
+        if (Active && IsStatic && Context.Settings.RuntimeMode.RunsMixedContacts())
+            Context.MixedCollisions.Refresh2DColliderPartition(Collider);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void PreflightStaticPoseChange()
+    {
+        if (Active && IsStatic)
+        {
+            ThrowIfRuntimeRegistrationMissing();
+            Context.ThrowIfFixedStepMutationNotAllowed();
+            Collider.ValidateCurrentRuntimeTransform();
+        }
     }
 
     private void RefreshPartitionMobility()
@@ -157,7 +179,7 @@ public sealed partial class SolidBody2D
         Collider.Rebuild();
     }
 
-    private bool CanSleep => SleepEnabled && CanTranslate;
+    private bool CanSleep => SleepEnabled && HasSolverMobility;
 
     private void ApplyFreezeConstraintsToMotion()
     {

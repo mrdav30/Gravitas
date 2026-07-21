@@ -95,6 +95,7 @@ transform during `LateSimulate()`.
 
 | Concern                     | API                                          |
 | --------------------------- | -------------------------------------------- |
+| Runtime role                | `MotionType`, `SetMotionType(...)`           |
 | Freeze translation/rotation | `SolidBody.FreezeAxes`, `BodyFreezeAxes3D`   |
 | Solver linear mobility      | `CanTranslate`, `EffectiveInverseMass`       |
 | Solver angular mobility     | `CanRotate`, `EffectiveInverseInertiaTensor` |
@@ -159,6 +160,7 @@ during `LateSimulate()` and project its X/Z position into authoritative
 
 | Concern                       | API                                            |
 | ----------------------------- | ---------------------------------------------- |
+| Runtime role                  | `MotionType`, `SetMotionType(...)`             |
 | Freeze planar translation/yaw | `SolidBody2D.FreezeAxes`                       |
 | Solver linear mobility        | `CanTranslate`, `EffectiveInverseMass`         |
 | Solver yaw mobility           | `CanRotate`, `EffectiveInverseMomentOfInertia` |
@@ -175,10 +177,13 @@ advancing pose; planar force and yaw torque are integrated during the next
 fixed step.
 
 `BodyFreezeAxes2D.PositionX` maps to world X. `BodyFreezeAxes2D.PositionY` maps
-to world Z, not world height. Fully position-frozen, kinematic, inactive,
-non-positive-mass, and yaw-frozen states contribute zero effective solver mass
-or inertia where appropriate. Partial planar freezes remain dynamic and
-constrain only the frozen axis.
+to world Z, not world height. `BodyMotionType` selects solver-controlled
+`Dynamic`, host-controlled `Kinematic`, or immobile `Static` ownership in both
+dimensions. Freeze masks then constrain dynamic degrees of freedom without
+changing that role. A fully position-frozen dynamic body has zero effective
+linear mass but may retain angular response; a yaw-frozen body may retain
+linear response. Static, kinematic, inactive, and non-positive-mass states
+contribute zero applicable solver mobility.
 
 2D contact response uses planar COM-relative contact arms, scalar inverse
 moment, collider surface materials, normal impulses, tangent Coulomb friction,

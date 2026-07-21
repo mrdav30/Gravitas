@@ -1,12 +1,89 @@
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
+using Gravitas.CollisionHandling;
 using Xunit;
 
 namespace Gravitas.Tests.Physics2D;
 
 public sealed partial class ContinuousCollision2DTests
 {
+    [Fact]
+    public void RotationalDynamicResponse_WithFullyLockedDynamicTarget_ShouldApplyOnlySourceState2D()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        SolidBody2D source = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            -Vector2d.Right * (Fixed64)2,
+            immovable: false);
+        SolidBody2D target = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            Vector2d.Zero,
+            immovable: false);
+        target.FreezeAxes = BodyFreezeAxes2D.All;
+        context.AdvanceLateSimulateToken();
+        context.Physics2D.PrepareContinuousCollisionFrame();
+        source.ApplyCollisionLinearVelocityDelta(Vector2d.Right * (Fixed64)4);
+        var contact = new Contact2D(
+            -Vector2d.Right * Fixed64.Half,
+            -Vector2d.Right * Fixed64.Half,
+            Vector2d.Right,
+            Fixed64.Zero);
+
+        bool applied = source.TryApplyRotationalContinuousCollisionResponse(
+            target,
+            contact,
+            Fixed64.Half,
+            source.Position,
+            Fixed64.Zero,
+            Vector2d.Right * Fixed64.Two,
+            Fixed64.Zero,
+            Fixed64.Zero,
+            context.DeltaTime);
+
+        applied.Should().BeTrue();
+        source.LinearVelocity.X.Should().BeLessThanOrEqualTo(Fixed64.Zero);
+        target.Position.Should().Be(Vector2d.Zero);
+        target.LinearVelocity.Should().Be(Vector2d.Zero);
+        target.AngularVelocity.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void TranslationalDynamicResponse_WithFullyLockedDynamicTarget_ShouldApplyOnlySourceState2D()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        SolidBody2D source = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            -Vector2d.Right * (Fixed64)2,
+            immovable: false);
+        SolidBody2D target = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            Vector2d.Zero,
+            immovable: false);
+        target.FreezeAxes = BodyFreezeAxes2D.All;
+        context.AdvanceLateSimulateToken();
+        context.Physics2D.PrepareContinuousCollisionFrame();
+        source.ApplyCollisionLinearVelocityDelta(Vector2d.Right * (Fixed64)4);
+
+        bool applied = InvokeTranslationalDynamicResponse2D(
+            source,
+            target,
+            -Vector2d.Right,
+            -Vector2d.Right,
+            context.DeltaTime * Fixed64.Half,
+            context.DeltaTime * Fixed64.Half);
+
+        applied.Should().BeTrue();
+        source.LinearVelocity.X.Should().BeLessThanOrEqualTo(Fixed64.Zero);
+        target.Position.Should().Be(Vector2d.Zero);
+        target.LinearVelocity.Should().Be(Vector2d.Zero);
+        target.AngularVelocity.Should().Be(Fixed64.Zero);
+    }
+
     [Fact]
     public void TranslationalDynamicResponse_WhenTargetTrajectoryIsFull_ShouldRejectAtomically2D()
     {

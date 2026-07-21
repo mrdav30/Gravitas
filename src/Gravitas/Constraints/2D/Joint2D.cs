@@ -189,7 +189,8 @@ public sealed class Joint2D : IRecordable
 
     internal bool HasSolverParticipant() => IsSolverBody(BodyA) || IsSolverBody(BodyB);
 
-    internal static bool IsSolverBody(SolidBody2D body) => body.Active && body.DynamicId >= 0 && body.CanTranslate;
+    internal static bool IsSolverBody(SolidBody2D body) =>
+        body.Active && body.DynamicId >= 0 && body.HasSolverMobility;
 
     internal void ContributeReplayHash(
         ref ChronicleHashWriter writer,

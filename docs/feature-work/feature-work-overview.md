@@ -38,6 +38,15 @@ instead of burying it in notes.
 
 ## Recently Completed
 
+- [`Body Motion Type And Solver Mobility Hardening`](done/2026-07-20-body-motion-type-and-solver-mobility-plan.md)
+  - Completed 2026-07-20. Adds explicit Dynamic, Kinematic, and Static body
+    roles while keeping translation and rotation freeze constraints
+    independent across 2D, 3D, mixed response, constraints, partitions, CCD,
+    serialization, replay, and host presentation. Atomic transition and pose
+    contracts preserve runtime identity and reject invalid hierarchy-composed
+    transforms before observable mutation. The authoritative Release artifact
+    passes 3,237 tests at 100% line, branch, and method coverage; warmed 3D/2D
+    role transitions remain allocation-free.
 - [`Finite-Axis Full-Domain Projection Closure`](issue-tracker.md#finite-axis-capsule-cylinder-and-mesh-edge-projections-can-saturate-before-solving)
   - Completed 2026-07-19. FixedMathSharp now owns exact bounded-ray and
     authored-segment physical-distance capsule/cylinder intervals, and Gravitas

@@ -42,6 +42,22 @@ public sealed class GravitasWorldContext : IDisposable
 
     private int _lateSimulateToken;
 
+    private int _simulationPhaseDepth;
+
+    private bool _fixedStepOpen;
+
+    internal void EnterSimulationPhase() => _simulationPhaseDepth++;
+
+    internal void ExitSimulationPhase() => _simulationPhaseDepth--;
+
+    internal void ThrowIfFixedStepMutationNotAllowed()
+    {
+        SwiftThrowHelper.ThrowIfTrue(
+            _fixedStepOpen || _simulationPhaseDepth > 0,
+            nameof(GravitasWorldContext),
+            "Authoritative body roles, static poses, and loaded state can change only outside the Simulate-to-LateSimulate fixed-step transaction.");
+    }
+
     private GravitasWorldContext(GridWorld world, bool ownsWorld)
     {
         World = world;
@@ -310,17 +326,31 @@ public sealed class GravitasWorldContext : IDisposable
     public void Simulate()
     {
         ThrowIfDisposed();
-        _clock.Simulate();
-        PhysicsRuntimeMode runtimeMode = Settings.RuntimeMode;
-        if (runtimeMode.Runs3D())
-            Physics.Simulate();
-        if (runtimeMode.Runs2D())
-            Physics2D.Simulate();
-        if (runtimeMode.RunsMixedContacts())
-            MixedCollisions.Simulate();
+        _fixedStepOpen = true;
+        EnterSimulationPhase();
+        try
+        {
+            _clock.Simulate();
+            PhysicsRuntimeMode runtimeMode = Settings.RuntimeMode;
+            if (runtimeMode.Runs3D())
+                Physics.Simulate();
+            if (runtimeMode.Runs2D())
+                Physics2D.Simulate();
+            if (runtimeMode.RunsMixedContacts())
+                MixedCollisions.Simulate();
 
-        Coroutines.Simulate();
-        _hooks.InvokeSimulate();
+            Coroutines.Simulate();
+            _hooks.InvokeSimulate();
+        }
+        catch
+        {
+            _fixedStepOpen = false;
+            throw;
+        }
+        finally
+        {
+            ExitSimulationPhase();
+        }
     }
 
     /// <summary>
@@ -329,29 +359,39 @@ public sealed class GravitasWorldContext : IDisposable
     public void LateSimulate()
     {
         ThrowIfDisposed();
-        _clock.LateSimulate();
-        PhysicsRuntimeMode runtimeMode = Settings.RuntimeMode;
-        bool willRun3D = runtimeMode.Runs3D() && Physics.SimulatePhysics;
-        bool willRun2D = runtimeMode.Runs2D() && Physics2D.SimulatePhysics;
-        if (willRun3D || willRun2D)
-            AdvanceLateSimulateToken();
-        if (willRun3D)
-            Physics.PrepareContinuousCollisionFrame();
-        if (willRun2D)
-            Physics2D.PrepareContinuousCollisionFrame();
-        bool ran3D = willRun3D
-            && Physics.BeginLateSimulateBodies(continuousCollisionFramePrepared: true);
-        bool ran2D = willRun2D
-            && Physics2D.BeginLateSimulateBodies(continuousCollisionFramePrepared: true);
-        ProcessQueuedContinuousCollisionHandoffs(ran3D, ran2D);
-        if (ran3D)
-            Physics.CompleteLateSimulatePhysicsStep();
-        if (ran2D)
-            Physics2D.CompleteLateSimulatePhysicsStep();
-        if (runtimeMode.RunsMixedContacts())
-            MixedCollisions.LateSimulate();
+        _fixedStepOpen = true;
+        EnterSimulationPhase();
+        try
+        {
+            _clock.LateSimulate();
+            PhysicsRuntimeMode runtimeMode = Settings.RuntimeMode;
+            bool willRun3D = runtimeMode.Runs3D() && Physics.SimulatePhysics;
+            bool willRun2D = runtimeMode.Runs2D() && Physics2D.SimulatePhysics;
+            if (willRun3D || willRun2D)
+                AdvanceLateSimulateToken();
+            if (willRun3D)
+                Physics.PrepareContinuousCollisionFrame();
+            if (willRun2D)
+                Physics2D.PrepareContinuousCollisionFrame();
+            bool ran3D = willRun3D
+                && Physics.BeginLateSimulateBodies(continuousCollisionFramePrepared: true);
+            bool ran2D = willRun2D
+                && Physics2D.BeginLateSimulateBodies(continuousCollisionFramePrepared: true);
+            ProcessQueuedContinuousCollisionHandoffs(ran3D, ran2D);
+            if (ran3D)
+                Physics.CompleteLateSimulatePhysicsStep();
+            if (ran2D)
+                Physics2D.CompleteLateSimulatePhysicsStep();
+            if (runtimeMode.RunsMixedContacts())
+                MixedCollisions.LateSimulate();
 
-        _hooks.InvokeLateSimulate();
+            _hooks.InvokeLateSimulate();
+        }
+        finally
+        {
+            ExitSimulationPhase();
+            _fixedStepOpen = false;
+        }
     }
 
     private void ProcessQueuedContinuousCollisionHandoffs(bool runs3D, bool runs2D)

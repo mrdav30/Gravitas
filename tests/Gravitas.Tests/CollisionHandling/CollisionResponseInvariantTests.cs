@@ -465,6 +465,29 @@ public sealed class CollisionResponseInvariantTests
     }
 
     [Fact]
+    public void CalculateImpulse_WithPositionFrozenDynamicBody_ShouldApplyOffCenterFrictionAsRotationOnly()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSCuboidCollider> angularOnly = scenario.CreateCuboid(Vector3d.Zero);
+        ScenarioBody<LSCuboidCollider> moving = scenario.CreateCuboid(Vector3d.Right * (Fixed64)2);
+        angularOnly.Body.FreezeAxes = BodyFreezeAxes3D.Position;
+        var material = new PhysicsMaterial(Fixed64.One, Fixed64.One, Fixed64.Zero);
+        angularOnly.Collider.Material = material;
+        moving.Collider.Material = material;
+        moving.Body.ApplyCollisionLinearVelocityDelta(
+            new Vector3d((Fixed64)(-4), Fixed64.Zero, (Fixed64)2));
+        Fixed64 tangentialSpeedBefore = moving.Body.LinearVelocity.Z.Abs();
+        CollisionPair pair = scenario.CreatePair(angularOnly.Collider, moving.Collider);
+        pair.Manifold.SetContact(Vector3d.Right, Vector3d.Right, Fixed64.Zero, Vector3d.Right);
+
+        CollisionResponse.CalculateImpulse(pair);
+
+        angularOnly.Body.LinearVelocity.Should().Be(Vector3d.Zero);
+        angularOnly.Body.AngularVelocity.Should().NotBe(Vector3d.Zero);
+        moving.Body.LinearVelocity.Z.Abs().Should().BeLessThan(tangentialSpeedBefore);
+    }
+
+    [Fact]
     public void CalculateImpulse_WithHighStaticAndZeroDynamicFriction_ShouldHoldTangentialMotion()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
@@ -532,21 +555,28 @@ public sealed class CollisionResponseInvariantTests
     public void CalculateImpulse_WithKinematicTangentialMotionAndQuantizedTargetMass_ShouldSkipUndefinedFrictionImpulse()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
-        ScenarioBody<LSSphereCollider> driver = scenario.CreateSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> driver = scenario.CreateSphere(
+            Vector3d.Zero,
+            isKinematic: true);
         ScenarioBody<LSSphereCollider> target = scenario.CreateSphere(
             new Vector3d(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero),
             mass: Fixed64.MaxValue,
             preventAngularForces: true);
-        Push(driver.Body, new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.One));
-        driver.Body.IsKinematic = true;
+        driver.Body.Agent.Transform.LocalPosition = new Vector3d(
+            Fixed64.FromFraction(1, 10),
+            Fixed64.Zero,
+            Fixed64.FromFraction(1, 20));
+        scenario.Context.AdvanceLateSimulateToken();
+        driver.Body.EnsureContinuousCollisionFramePrepared(scenario.Context.LateSimulateToken);
+        driver.Body.SampleContinuousCollisionLinearVelocity(Fixed64.One)
+            .MagnitudeSquared.Should().BeGreaterThan(Fixed64.Zero);
         CollisionPair pair = CreateDetectedPair(scenario, driver.Collider, target.Collider);
         ManifoldContact contact = pair.Manifold.PrimaryContact;
         pair.StoreWarmStartImpulse(contact.ContactId, contact.Normal, Fixed64.One, Fixed64.Zero);
-        Vector3d driverVelocity = driver.Body.LinearVelocity;
 
         CollisionResponse.CalculateImpulse(pair);
 
-        driver.Body.LinearVelocity.Should().Be(driverVelocity);
+        driver.Body.LinearVelocity.Should().Be(Vector3d.Zero);
         target.Body.LinearVelocity.Should().Be(Vector3d.Zero);
     }
 

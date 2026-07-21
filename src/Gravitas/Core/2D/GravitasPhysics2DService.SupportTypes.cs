@@ -25,11 +25,11 @@ public sealed partial class GravitasPhysics2DService
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool IsAwakeMovable(SolidBody2D? body) =>
-        body != null && body.CanTranslate && !body.IsSleeping;
+        body != null && body.HasSolverMobility && !body.IsSleeping;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool IsMovableIslandBody(SolidBody2D? body) =>
-        body != null && body.DynamicId >= 0 && body.CanTranslate;
+        body != null && body.DynamicId >= 0 && body.HasSolverMobility;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool IsAwakeIslandBody(SolidBody2D? body) =>

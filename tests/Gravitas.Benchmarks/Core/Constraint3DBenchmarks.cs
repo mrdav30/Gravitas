@@ -321,7 +321,10 @@ public class Constraint3DBenchmarks
             SleepEnabled = sleepEnabled
         };
 
-        body.Initialize(position, FixedQuaternion.Identity, dynamic);
+        body.Initialize(
+            position,
+            FixedQuaternion.Identity,
+            dynamic ? BodyMotionType.Dynamic : BodyMotionType.Static);
         return body;
     }
 

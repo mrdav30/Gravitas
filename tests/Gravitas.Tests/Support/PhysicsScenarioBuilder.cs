@@ -49,17 +49,21 @@ internal sealed class PhysicsScenarioBuilder : IDisposable
     {
         var transform = new FixedTransform(position, rotation, Vector3d.One);
         var agent = new TestMatterAgent(Context, transform);
-        BodyFreezeAxes3D freezeAxes =
-            (immovable ? BodyFreezeAxes3D.Position : BodyFreezeAxes3D.None)
-            | (preventAngularForces ? BodyFreezeAxes3D.Rotation : BodyFreezeAxes3D.None);
+        BodyFreezeAxes3D freezeAxes = preventAngularForces
+            ? BodyFreezeAxes3D.Rotation
+            : BodyFreezeAxes3D.None;
         var body = new SolidBody(agent, collider)
         {
             Mass = mass ?? Fixed64.One,
-            FreezeAxes = freezeAxes,
-            IsKinematic = isKinematic
+            FreezeAxes = freezeAxes
         };
 
-        body.Initialize(position, rotation, isDynamic);
+        BodyMotionType motionType = !isDynamic || immovable
+            ? BodyMotionType.Static
+            : isKinematic
+                ? BodyMotionType.Kinematic
+                : BodyMotionType.Dynamic;
+        body.Initialize(position, rotation, motionType);
         return new ScenarioBody<TCollider>(body, collider);
     }
 

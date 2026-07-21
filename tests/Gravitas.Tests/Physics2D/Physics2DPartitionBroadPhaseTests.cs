@@ -190,7 +190,7 @@ public sealed class Physics2DPartitionBroadPhaseTests
 
         inactive.Collider.IsActive = false;
         wrongLayer.Collider.Layer = new PhysicsLayer(1);
-        staticStyle.IsKinematic = true;
+        staticStyle.SetMotionType(BodyMotionType.Kinematic);
         for (int i = 0; i < included.Collider.PartitionCoordinates!.Count; i++)
         {
             context.World.TryGetVoxel(included.Collider.PartitionCoordinates[i], out Voxel? voxel).Should().BeTrue();
@@ -559,20 +559,19 @@ public sealed class Physics2DPartitionBroadPhaseTests
         PhysicsPartition2D partition = GetFirstPartition(context, body.Collider);
         AssertPartitionMembership(partition, colliderId, dynamic: true, kinematic: false, @static: false);
 
-        body.IsKinematic = true;
+        body.SetMotionType(BodyMotionType.Kinematic);
         body.Collider.Simulate();
 
         partition = GetFirstPartition(context, body.Collider);
         AssertPartitionMembership(partition, colliderId, dynamic: false, kinematic: true, @static: false);
 
-        body.FreezeAxes = BodyFreezeAxes2D.Position;
+        body.SetMotionType(BodyMotionType.Static);
         body.Collider.Simulate();
 
         partition = GetFirstPartition(context, body.Collider);
         AssertPartitionMembership(partition, colliderId, dynamic: false, kinematic: false, @static: true);
 
-        body.IsKinematic = false;
-        body.FreezeAxes = BodyFreezeAxes2D.None;
+        body.SetMotionType(BodyMotionType.Dynamic);
         body.Collider.Simulate();
 
         partition = GetFirstPartition(context, body.Collider);
@@ -585,7 +584,7 @@ public sealed class Physics2DPartitionBroadPhaseTests
         using GravitasWorldContext context = CreateContext(extent: 16);
         SolidBody2D staticBody = CreateCircle(context, Vector2d.Zero, immovable: true);
         SolidBody2D kinematicBody = CreateCircle(context, new Vector2d((Fixed64)3, Fixed64.Zero), immovable: false);
-        kinematicBody.IsKinematic = true;
+        kinematicBody.SetMotionType(BodyMotionType.Kinematic);
         kinematicBody.Collider.Simulate();
 
         PhysicsPartition2D staticPartition = GetFirstPartition(context, staticBody.Collider);
@@ -1138,10 +1137,11 @@ public sealed class Physics2DPartitionBroadPhaseTests
         var agent = new TestMatterAgent(context, transform);
         var body = new SolidBody2D(agent, collider)
         {
-            Mass = Fixed64.One,
-            FreezeAxes = immovable ? BodyFreezeAxes2D.Position : BodyFreezeAxes2D.None
+            Mass = Fixed64.One
         };
-        body.Initialize(position);
+        body.Initialize(
+            position,
+            motionType: immovable ? BodyMotionType.Static : BodyMotionType.Dynamic);
         return body;
     }
 

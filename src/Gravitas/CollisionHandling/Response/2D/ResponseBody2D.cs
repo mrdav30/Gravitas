@@ -32,6 +32,8 @@ internal readonly struct ResponseBody2D
 
     public bool CanRotate => Body?.CanRotate == true;
 
+    public bool HasSolverMobility => Body?.HasSolverMobility == true;
+
     public Fixed64 GetConstrainedInverseMass(Vector2d axis) =>
         Body?.GetConstrainedInverseMass(axis) ?? Fixed64.Zero;
 

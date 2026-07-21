@@ -788,16 +788,22 @@ public sealed partial class SolidBody2D
 
     private bool IsMovingRotationalContinuousCollisionTarget(SolidBody2D target)
     {
-        return !ReferenceEquals(target, this)
-            && (IsKinematic || !target.ShouldOwnContinuousCollisionMovingPair(
+        if (ReferenceEquals(target, this) || !target.Active)
+            return false;
+
+        if (target.IsKinematic)
+            target.EnsureContinuousCollisionFramePrepared(Context.LateSimulateToken);
+
+        return (IsKinematic || !target.ShouldOwnContinuousCollisionMovingPair(
                 HasContinuousCollisionRotationalMotion))
-            && target.Active
             && !ContinuousCollisionCandidateOrdering.IsIgnoredTarget(
                 target.Collider,
                 _continuousCollisionHandoffIgnoredCollider2D)
             && !target.Collider.IsTrigger
             && Context.Physics2D.RequireCollisionPair(Collider, target.Collider)
-            && (target.IsKinematic || !target.IsPositionFullyFrozen);
+            && (target.IsKinematic
+                ? target.HasContinuousCollisionMotion
+                : target.IsDynamic);
     }
 
 }

@@ -15,6 +15,32 @@ public sealed class SolidBody2DSerializationTests
 {
     public static TheoryData<GravitasSerializationTransport> Transports => GravitasSerializationTransportCases.All();
 
+    public static TheoryData<GravitasSerializationTransport, BodyMotionType, BodyMotionType> CrossRoleTransports
+    {
+        get
+        {
+            var cases = new TheoryData<GravitasSerializationTransport, BodyMotionType, BodyMotionType>();
+            AddCrossRoleCases(cases, GravitasSerializationTransport.Json);
+#if !GRAVITAS_DISABLE_MEMORYPACK
+            AddCrossRoleCases(cases, GravitasSerializationTransport.MemoryPack);
+#endif
+            return cases;
+        }
+    }
+
+    public static TheoryData<GravitasSerializationTransport, BodyMotionType, BodyMotionType> StaticDynamicCrossRoleTransports
+    {
+        get
+        {
+            var cases = new TheoryData<GravitasSerializationTransport, BodyMotionType, BodyMotionType>();
+            AddStaticDynamicCrossRoleCases(cases, GravitasSerializationTransport.Json);
+#if !GRAVITAS_DISABLE_MEMORYPACK
+            AddStaticDynamicCrossRoleCases(cases, GravitasSerializationTransport.MemoryPack);
+#endif
+            return cases;
+        }
+    }
+
     [Theory]
     [InlineData((byte)4)]
     [InlineData(byte.MaxValue)]
@@ -32,6 +58,145 @@ public sealed class SolidBody2DSerializationTests
 
         action.Should().Throw<ArgumentOutOfRangeException>();
         body.ContinuousCollisionMode.Should().Be(ContinuousCollisionMode.Auto);
+    }
+
+    [Fact]
+    public void RecordData_WithUndefinedMotionType_ShouldRejectBeforeMutatingAuthoritativeState()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext(frameRate: 8);
+        SolidBody2D body = CreateCircle(context, BodyMotionType.Dynamic);
+        Vector2d initialLinearVelocity = new(Fixed64.One, (Fixed64)2);
+        body.RecordData(new InvalidRecordPayloadChronicler(new Dictionary<string, object>
+        {
+            ["LinearVelocity"] = initialLinearVelocity
+        }));
+        int dynamicId = body.DynamicId;
+        int colliderId = body.Collider.Id;
+        var chronicler = new InvalidRecordPayloadChronicler(new Dictionary<string, object>
+        {
+            ["MotionType"] = (BodyMotionType)byte.MaxValue,
+            ["Position"] = new Vector2d((Fixed64)7, (Fixed64)8),
+            ["LinearVelocity"] = new Vector2d(Fixed64.Zero, (Fixed64)(-1))
+        });
+
+        Action action = () => body.RecordData(chronicler);
+
+        action.Should().Throw<ArgumentOutOfRangeException>();
+        body.MotionType.Should().Be(BodyMotionType.Dynamic);
+        body.Position.Should().Be(Vector2d.Zero);
+        body.LinearVelocity.Should().Be(initialLinearVelocity);
+        body.DynamicId.Should().Be(dynamicId);
+        body.Collider.Id.Should().Be(colliderId);
+        context.Physics2D.BodyCount.Should().Be(1);
+    }
+
+    [Fact]
+    public void RecordData_WithUndefinedFreezeAxes_ShouldRejectBeforeMutatingAuthoritativeState()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext(frameRate: 8);
+        SolidBody2D body = CreateCircle(context, BodyMotionType.Dynamic);
+        var chronicler = new InvalidRecordPayloadChronicler(new Dictionary<string, object>
+        {
+            ["FreezeAxes"] = (BodyFreezeAxes2D)byte.MaxValue,
+            ["Position"] = new Vector2d((Fixed64)7, (Fixed64)8)
+        });
+
+        Action action = () => body.RecordData(chronicler);
+
+        action.Should().Throw<ArgumentException>();
+        body.FreezeAxes.Should().Be(BodyFreezeAxes2D.None);
+        body.Position.Should().Be(Vector2d.Zero);
+        body.DynamicId.Should().Be(0);
+        context.Physics2D.BodyCount.Should().Be(1);
+    }
+
+    [Theory]
+    [MemberData(nameof(CrossRoleTransports))]
+    public void PopulateAcrossMotionTypes_ShouldReconcileRegistrationAndPreserveLoadedMotion(
+        GravitasSerializationTransport transport,
+        BodyMotionType sourceMotionType,
+        BodyMotionType targetMotionType)
+    {
+        Vector2d loadedLinearVelocity = new((Fixed64)3, (Fixed64)(-2));
+        Fixed64 loadedAngularVelocity = Fixed64.Half;
+        using GravitasWorldContext sourceContext = Physics2DTestWorld.CreateContext(frameRate: 8);
+        SolidBody2D source = CreateCircle(sourceContext, sourceMotionType);
+        source.RecordData(new InvalidRecordPayloadChronicler(new Dictionary<string, object>
+        {
+            ["LinearVelocity"] = loadedLinearVelocity,
+            ["AngularVelocity"] = loadedAngularVelocity
+        }));
+        object payload = GravitasSerializationHarness.Serialize(source, transport);
+
+        using GravitasWorldContext targetContext = Physics2DTestWorld.CreateContext(frameRate: 8);
+        SolidBody2D target = CreateCircle(targetContext, targetMotionType);
+        var targetCollider = (LSCircleCollider2D)target.Collider;
+        FixedTransform targetTransform = target.Agent.Transform;
+        int colliderId = targetCollider.Id;
+
+        GravitasSerializationHarness.Populate(target, payload, transport);
+
+        target.MotionType.Should().Be(sourceMotionType);
+        target.LinearVelocity.Should().Be(loadedLinearVelocity);
+        target.AngularVelocity.Should().Be(loadedAngularVelocity);
+        target.Agent.Transform.Should().BeSameAs(targetTransform);
+        target.Collider.Should().BeSameAs(targetCollider);
+        targetCollider.Body.Should().BeSameAs(target);
+        targetCollider.Id.Should().Be(colliderId);
+        targetCollider.IsStatic.Should().Be(sourceMotionType == BodyMotionType.Static);
+        target.DynamicId.Should().Be(sourceMotionType == BodyMotionType.Static ? -1 : 0);
+        targetContext.Physics2D.BodyCount.Should().Be(sourceMotionType == BodyMotionType.Static ? 0 : 1);
+    }
+
+    [Theory]
+    [MemberData(nameof(StaticDynamicCrossRoleTransports))]
+    public void PopulateAcrossMotionTypesIntoDeactivatedShell_ShouldLoadRoleWithoutRegisteringBody(
+        GravitasSerializationTransport transport,
+        BodyMotionType sourceMotionType,
+        BodyMotionType targetMotionType)
+    {
+        using GravitasWorldContext sourceContext = Physics2DTestWorld.CreateContext();
+        SolidBody2D source = CreateCircle(sourceContext, sourceMotionType);
+        source.Deactivate();
+        object payload = GravitasSerializationHarness.Serialize(source, transport);
+
+        using GravitasWorldContext targetContext = Physics2DTestWorld.CreateContext();
+        SolidBody2D target = CreateCircle(targetContext, targetMotionType);
+        target.Deactivate();
+
+        GravitasSerializationHarness.Populate(target, payload, transport);
+
+        target.Active.Should().BeFalse();
+        target.MotionType.Should().Be(sourceMotionType);
+        target.DynamicId.Should().Be(-1);
+        target.Collider.Id.Should().Be(-1);
+        targetContext.Physics2D.BodyCount.Should().Be(0);
+        targetContext.Physics2D.ColliderCount.Should().Be(0);
+    }
+
+    [Theory]
+    [InlineData(BodyMotionType.Dynamic)]
+    [InlineData(BodyMotionType.Static)]
+    public void RecordData_SameOrDifferentRoleLoadAfterContextReset_ShouldRejectBeforeMutatingState(
+        BodyMotionType loadedMotionType)
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        SolidBody2D body = CreateCircle(context, BodyMotionType.Dynamic);
+        Vector2d originalPosition = body.Position;
+        context.Reset();
+        var chronicler = new InvalidRecordPayloadChronicler(new Dictionary<string, object>
+        {
+            ["MotionType"] = loadedMotionType,
+            ["Position"] = Vector2d.Right
+        });
+
+        Action load = () => body.RecordData(chronicler);
+
+        load.Should().Throw<InvalidOperationException>();
+        body.MotionType.Should().Be(BodyMotionType.Dynamic);
+        body.Position.Should().Be(originalPosition);
+        body.DynamicId.Should().Be(0);
+        context.Physics2D.BodyCount.Should().Be(0);
     }
 
     [Theory]
@@ -72,7 +237,6 @@ public sealed class SolidBody2DSerializationTests
         {
             Mass = (Fixed64)3,
             FreezeAxes = BodyFreezeAxes2D.All,
-            IsKinematic = true,
             Gravity = new Vector2d(Fixed64.Zero, (Fixed64)(-2)),
             GravityScale = Fixed64.FromFraction(3, 8),
             SleepEnabled = false,
@@ -85,6 +249,7 @@ public sealed class SolidBody2DSerializationTests
             Fixed64.FromFraction(5, 4),
             Fixed64.FromFraction(3, 4));
         source.Initialize(new Vector2d((Fixed64)5, (Fixed64)(-2)), Fixed64.FromFraction(1, 8));
+        source.SetMotionType(BodyMotionType.Kinematic);
         source.LocalCenterOfMassOffset = new Vector2d(Fixed64.FromFraction(1, 3), -Fixed64.FromFraction(1, 4));
         source.UseGravityDerivedGroundUpDirection = false;
         source.GroundUpDirection = Vector2d.Forward;
@@ -137,7 +302,7 @@ public sealed class SolidBody2DSerializationTests
         target.GroundPoint.Should().Be(source.GroundPoint);
         target.GroundNormal.Should().Be(Vector2d.Forward);
         target.LastGroundedPosition.Should().Be(source.LastGroundedPosition);
-        target.AngularMotionFrozen.Should().BeTrue();
+        target.IsRotationFullyFrozen.Should().BeTrue();
         target.LocalCenterOfMassOffset.Should().Be(source.LocalCenterOfMassOffset);
         target.WorldCenterOfMass.Should().Be(source.WorldCenterOfMass);
         targetCollider.Radius.Should().Be(sourceCollider.Radius);
@@ -674,7 +839,30 @@ public sealed class SolidBody2DSerializationTests
         target.IsMixedPartitioned.Should().BeFalse();
     }
 
-    private static SolidBody2D CreateDynamicCircle(GravitasWorldContext context, Vector2d position = default)
+    private static void AddCrossRoleCases(
+        TheoryData<GravitasSerializationTransport, BodyMotionType, BodyMotionType> cases,
+        GravitasSerializationTransport transport)
+    {
+        cases.Add(transport, BodyMotionType.Dynamic, BodyMotionType.Kinematic);
+        cases.Add(transport, BodyMotionType.Dynamic, BodyMotionType.Static);
+        cases.Add(transport, BodyMotionType.Kinematic, BodyMotionType.Dynamic);
+        cases.Add(transport, BodyMotionType.Kinematic, BodyMotionType.Static);
+        cases.Add(transport, BodyMotionType.Static, BodyMotionType.Dynamic);
+        cases.Add(transport, BodyMotionType.Static, BodyMotionType.Kinematic);
+    }
+
+    private static void AddStaticDynamicCrossRoleCases(
+        TheoryData<GravitasSerializationTransport, BodyMotionType, BodyMotionType> cases,
+        GravitasSerializationTransport transport)
+    {
+        cases.Add(transport, BodyMotionType.Dynamic, BodyMotionType.Static);
+        cases.Add(transport, BodyMotionType.Static, BodyMotionType.Dynamic);
+    }
+
+    private static SolidBody2D CreateCircle(
+        GravitasWorldContext context,
+        BodyMotionType motionType,
+        Vector2d position = default)
     {
         var agent = new TestMatterAgent(context, new FixedTransform(
             new Vector3d(position.X, Fixed64.Zero, position.Y),
@@ -684,9 +872,12 @@ public sealed class SolidBody2DSerializationTests
         {
             Mass = (Fixed64)2
         };
-        body.Initialize(position);
+        body.Initialize(position, motionType: motionType);
         return body;
     }
+
+    private static SolidBody2D CreateDynamicCircle(GravitasWorldContext context, Vector2d position = default) =>
+        CreateCircle(context, BodyMotionType.Dynamic, position);
 
     private static LSCircleCollider2D CreateStaticCircle(GravitasWorldContext context, Vector2d position)
     {

@@ -31,7 +31,7 @@ public sealed class SolidBody2DMassPropertiesTests
     [Theory]
     [InlineData(false, true)]
     [InlineData(true, false)]
-    public void EffectiveMassHelpers_ForKinematicOrPositionFrozenBody_ShouldExposeInfiniteSolverMass(
+    public void EffectiveMassHelpers_ForKinematicOrPositionFrozenBody_ShouldApplyRoleAndAxisIndependently(
         bool positionFrozen,
         bool isKinematic)
     {
@@ -40,15 +40,15 @@ public sealed class SolidBody2DMassPropertiesTests
             context,
             new LSCircleCollider2D(Fixed64.One),
             mass: (Fixed64)2,
-            immovable: positionFrozen,
-            isKinematic: isKinematic);
+            positionFrozen: positionFrozen,
+            motionType: isKinematic ? BodyMotionType.Kinematic : BodyMotionType.Dynamic);
 
         body.InverseMass.Should().Be(Fixed64.Half);
         body.InverseMomentOfInertia.Should().Be(Fixed64.One);
         body.CanTranslate.Should().BeFalse();
-        body.CanRotate.Should().BeFalse();
+        body.CanRotate.Should().Be(!isKinematic);
         body.EffectiveInverseMass.Should().Be(Fixed64.Zero);
-        body.EffectiveInverseMomentOfInertia.Should().Be(Fixed64.Zero);
+        body.EffectiveInverseMomentOfInertia.Should().Be(isKinematic ? Fixed64.Zero : Fixed64.One);
     }
 
     [Fact]
@@ -145,18 +145,16 @@ public sealed class SolidBody2DMassPropertiesTests
         GravitasWorldContext context,
         LSCollider2D collider,
         Fixed64 mass,
-        bool immovable = false,
-        bool isKinematic = false,
-        bool isDynamic = true)
+        bool positionFrozen = false,
+        BodyMotionType motionType = BodyMotionType.Dynamic)
     {
         var body = new SolidBody2D(new TestMatterAgent(context), collider)
         {
             Mass = mass,
-            FreezeAxes = immovable ? BodyFreezeAxes2D.Position : BodyFreezeAxes2D.None,
-            IsKinematic = isKinematic
+            FreezeAxes = positionFrozen ? BodyFreezeAxes2D.Position : BodyFreezeAxes2D.None
         };
 
-        body.Initialize(Vector2d.Zero, Fixed64.Zero, isDynamic);
+        body.Initialize(Vector2d.Zero, Fixed64.Zero, motionType);
         return body;
     }
 }

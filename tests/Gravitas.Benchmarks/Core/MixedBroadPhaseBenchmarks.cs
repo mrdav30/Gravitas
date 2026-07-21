@@ -116,10 +116,12 @@ public class MixedBroadPhaseBenchmarks
         var collider = new LSSphereCollider();
         var body = new SolidBody(agent, collider)
         {
-            Mass = Fixed64.One,
-            FreezeAxes = immovable ? BodyFreezeAxes3D.Position : BodyFreezeAxes3D.None
+            Mass = Fixed64.One
         };
-        body.Initialize(position, FixedQuaternion.Identity);
+        body.Initialize(
+            position,
+            FixedQuaternion.Identity,
+            immovable ? BodyMotionType.Static : BodyMotionType.Dynamic);
         return body;
     }
 
@@ -128,10 +130,9 @@ public class MixedBroadPhaseBenchmarks
         var agent = new BenchmarkMatterAgent(context, new Vector3d(position.X, Fixed64.Zero, position.Y));
         var body = new SolidBody2D(agent, new LSCircleCollider2D(Fixed64.Half))
         {
-            Mass = Fixed64.One,
-            FreezeAxes = immovable ? BodyFreezeAxes2D.Position : BodyFreezeAxes2D.None
+            Mass = Fixed64.One
         };
-        body.Initialize(position);
+        body.Initialize(position, motionType: immovable ? BodyMotionType.Static : BodyMotionType.Dynamic);
         return body;
     }
 

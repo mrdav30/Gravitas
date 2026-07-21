@@ -118,9 +118,10 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
     public SolidBody? Body => _body;
 
     /// <summary>
-    /// Gets whether this collider is static-style for partition mobility.
+    /// Gets whether this collider is bodyless or belongs to an explicit static
+    /// body role.
     /// </summary>
-    public bool IsStatic => _body == null || _body.DynamicId < 0 || _body.IsPositionFullyFrozen;
+    public bool IsStatic => _body == null || _body.IsStatic;
 
     internal bool RequiresServiceSideRefresh => _body == null || _body.DynamicId < 0;
 
@@ -475,6 +476,18 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
     protected virtual void OnBeforeInitialize(IMatterAgent agent) { }
 
     internal virtual void ValidateRuntimeTransform(Vector3d scale, FixedQuaternion rotation) { }
+
+    internal void ValidateCurrentRuntimeTransform()
+    {
+        ColliderShapeSnapshot snapshot = CaptureShapeSnapshot();
+        ValidateRuntimeTransform(snapshot.LocalScale, snapshot.Rotation);
+    }
+
+    internal void ValidateCurrentRuntimeTransform(FixedQuaternion rotation)
+    {
+        ColliderShapeSnapshot snapshot = CaptureShapeSnapshot();
+        ValidateRuntimeTransform(snapshot.LocalScale, rotation);
+    }
 
     protected virtual void OnInitialize()
     {

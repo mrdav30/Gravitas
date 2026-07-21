@@ -15,20 +15,17 @@ namespace Gravitas.CollisionHandling;
 /// </summary>
 internal readonly struct ResponseBody
 {
-    private ResponseBody(SolidBody body, Fixed64 inverseMass, Fixed3x3 inverseInertiaTensor)
+    private ResponseBody(SolidBody body, Fixed64 inverseMass)
     {
         Body = body;
         InverseMass = inverseMass;
-        InverseInertiaTensor = inverseInertiaTensor;
     }
 
     public SolidBody Body { get; }
 
     public Fixed64 InverseMass { get; }
 
-    public Fixed3x3 InverseInertiaTensor { get; }
-
-    public bool CanMove => InverseMass > Fixed64.Zero;
+    public bool HasSolverMobility => Body.HasSolverMobility;
 
     public bool CanRotate => Body.CanRotate;
 
@@ -47,8 +44,6 @@ internal readonly struct ResponseBody
     public static ResponseBody Create(SolidBody body)
     {
         Fixed64 inverseMass = body.EffectiveInverseMass;
-        Fixed3x3 inverseInertiaTensor = body.EffectiveInverseInertiaTensor;
-
-        return new ResponseBody(body, inverseMass, inverseInertiaTensor);
+        return new ResponseBody(body, inverseMass);
     }
 }

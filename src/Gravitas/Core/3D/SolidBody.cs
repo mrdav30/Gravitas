@@ -24,13 +24,18 @@ public partial class SolidBody : IRecordable
     public bool Active { get; private set; }
 
     private int _dynamicId = -1;
-    public int DynamicId => _dynamicId;  // Physics Id, if not set it's assumed the object isn't simulated
+
+    /// <summary>
+    /// Gets the ephemeral simulated-body slot, or <c>-1</c> for a static or
+    /// unregistered body.
+    /// </summary>
+    public int DynamicId => _dynamicId;
 
     private BodyFreezeAxes3D _freezeAxes;
 
     /// <summary>
     /// Gets or sets the 3D translational and rotational degrees of freedom
-    /// frozen for solver response, integration, CCD, and partition mobility.
+    /// frozen for solver response, integration, and CCD.
     /// </summary>
     public BodyFreezeAxes3D FreezeAxes
     {
@@ -48,14 +53,14 @@ public partial class SolidBody : IRecordable
 
             _freezeAxes = value;
             ApplyFreezeConstraintsToMotion();
-            RefreshInertiaTensor();
+            if (Active)
+                RefreshInertiaTensor();
             RefreshPartitionMobility();
         }
     }
 
     /// <summary>
-    /// Gets whether all translation axes are frozen. Such bodies behave as
-    /// static-equivalent participants for solver and partition mobility.
+    /// Gets whether all translation axes are frozen.
     /// </summary>
     public bool IsPositionFullyFrozen
     {
@@ -63,22 +68,134 @@ public partial class SolidBody : IRecordable
         get => (_freezeAxes & BodyFreezeAxes3D.Position) == BodyFreezeAxes3D.Position;
     }
 
-    // Controls whether physics affects the rigidbody.
-    // If enabled, transform is controlled by animation or script.
-    private bool _isKinematic;
-    public bool IsKinematic
-    {
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        get => _isKinematic;
-        set
-        {
-            if (_isKinematic == value)
-                return;
+    private BodyMotionType _motionType;
 
-            _isKinematic = value;
-            RefreshPartitionMobility();
-        }
+    /// <summary>
+    /// Gets this body's explicit solver-controlled, host-controlled, or static
+    /// runtime role.
+    /// </summary>
+    public BodyMotionType MotionType => _motionType;
+
+    /// <summary>
+    /// Gets whether the solver controls this body.
+    /// </summary>
+    public bool IsDynamic => _motionType == BodyMotionType.Dynamic;
+
+    /// <summary>
+    /// Gets whether this body is excluded from per-frame motion.
+    /// </summary>
+    public bool IsStatic => _motionType == BodyMotionType.Static;
+
+    /// <summary>
+    /// Gets whether the host controls this body's pose.
+    /// </summary>
+    public bool IsKinematic => _motionType == BodyMotionType.Kinematic;
+
+    /// <summary>
+    /// Changes this registered body's runtime role between fixed-step
+    /// transactions.
+    /// </summary>
+    /// <remarks>
+    /// The transition preserves body, collider, pair, joint, and host identity,
+    /// but clears incompatible motion, sleep, CCD, and solver-cache state before
+    /// repartitioning. Freeze axes remain independent of the selected role.
+    /// </remarks>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// <paramref name="motionType"/> is undefined.
+    /// </exception>
+    /// <exception cref="InvalidOperationException">
+    /// The body is not currently registered, its context registration has been
+    /// reset, or a simulation transaction or callback is active.
+    /// </exception>
+    public void SetMotionType(BodyMotionType motionType)
+    {
+        if (!PrepareMotionTypeTransition(motionType))
+            return;
+
+        CommitMotionTypeTransition(motionType);
     }
+
+    internal bool PrepareMotionTypeTransition(BodyMotionType motionType)
+    {
+        motionType.ThrowIfInvalid(nameof(motionType));
+        ThrowIfRuntimeRegistrationMissing();
+        if (_motionType == motionType)
+            return false;
+
+        Context.ThrowIfFixedStepMutationNotAllowed();
+        Collider.ValidateCurrentRuntimeTransform();
+        if (motionType != BodyMotionType.Dynamic)
+            PublishAuthoritativePose();
+
+        return true;
+    }
+
+    internal void CommitMotionTypeTransition(BodyMotionType motionType)
+    {
+        ReconcileMotionTypeRegistration(motionType);
+
+        ClearMotionForSleep();
+        _isSleeping = false;
+        _sleepFrameCount = 0;
+        InvalidateContinuousCollisionTrajectory();
+        ApplyFreezeConstraintsToMotion();
+        RefreshInertiaTensor();
+        RefreshPartitionMobility();
+    }
+
+    internal void ApplyLoadedMotionType(BodyMotionType motionType)
+    {
+        motionType.ThrowIfInvalid(nameof(motionType));
+        if (_motionType == motionType)
+            return;
+
+        if (!Active)
+        {
+            _motionType = motionType;
+            return;
+        }
+
+        ReconcileMotionTypeRegistration(motionType);
+        InvalidateContinuousCollisionTrajectory();
+    }
+
+    internal void PreflightLoadedMotionType(BodyMotionType motionType)
+    {
+        motionType.ThrowIfInvalid(nameof(motionType));
+        if (!Active)
+            return;
+
+        ThrowIfRuntimeRegistrationMissing();
+        Context.ThrowIfFixedStepMutationNotAllowed();
+        Collider.ValidateCurrentRuntimeTransform();
+    }
+
+    private void ThrowIfRuntimeRegistrationMissing()
+    {
+        SwiftThrowHelper.ThrowIfTrue(
+            !Active,
+            nameof(SolidBody),
+            "Body runtime state cannot change before initialization or after deactivation.");
+        SwiftThrowHelper.ThrowIfTrue(
+            !Context.Physics.TryGetColliderById(Collider.Id, out LSCollider? registeredCollider)
+                || !ReferenceEquals(registeredCollider, Collider),
+            nameof(SolidBody),
+            "Body runtime state cannot change after its registration has been reset or replaced.");
+    }
+
+    private void ReconcileMotionTypeRegistration(BodyMotionType motionType)
+    {
+        BodyMotionType previousMotionType = _motionType;
+        Context.Physics.ClearWarmStartCachesForCollider(Collider);
+        Context.Constraints3D.ClearSolverCachesForBody(this);
+        Context.Physics.InvalidateContinuousCollisionStateForMotionTypeChange(this, DynamicId);
+
+        _motionType = motionType;
+        Context.Physics.RefreshBodyMotionTypeRegistration(this, previousMotionType);
+        Context.Physics.RefreshColliderServiceRefreshRegistration(Collider);
+    }
+
+    internal void SetDynamicId(int dynamicId) => _dynamicId = dynamicId;
 
     private ContinuousCollisionMode _continuousCollisionMode = ContinuousCollisionMode.Inherit;
     private int _continuousCollisionFrameToken = int.MinValue;
@@ -222,15 +339,13 @@ public partial class SolidBody : IRecordable
     public FixedQuaternion LastVisualRotation => _lastVisualRotation;
 
     /// <summary>
-    /// Gets whether all angular axes are frozen.
+    /// Gets whether all rotation axes are frozen.
     /// </summary>
-    public bool AngularMotionFrozen
+    public bool IsRotationFullyFrozen
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        get => IsRotationFullyFrozen;
+        get => (_freezeAxes & BodyFreezeAxes3D.Rotation) == BodyFreezeAxes3D.Rotation;
     }
-
-    public bool AngularForcesHalted => IsPositionFullyFrozen || AngularMotionFrozen;
 
     public Fixed64 DefaultRotationSpeed = (Fixed64)30; // 1 for NPC...
 
@@ -313,16 +428,23 @@ public partial class SolidBody : IRecordable
     /// <summary>
     /// Gets whether solver-side response may translate this body.
     /// </summary>
-    public bool CanTranslate => Active && _dynamicId >= 0 && !IsPositionFullyFrozen && !IsKinematic && InverseMass > Fixed64.Zero;
+    public bool CanTranslate => Active && _dynamicId >= 0 && IsDynamic && !IsPositionFullyFrozen && InverseMass > Fixed64.Zero;
 
     /// <summary>
     /// Gets whether solver-side response may rotate this body.
     /// </summary>
-    public bool CanRotate => CanTranslate && !IsRotationFullyFrozen && _inverseInertiaTensor != Fixed3x3.Zero;
+    public bool CanRotate => Active
+        && _dynamicId >= 0
+        && IsDynamic
+        && !IsRotationFullyFrozen
+        && _inverseInertiaTensor != Fixed3x3.Zero;
+
+    internal bool HasSolverMobility => CanTranslate || CanRotate;
 
     /// <summary>
     /// Gets the inverse mass that should be used by collision response.
-    /// Fully position-frozen and kinematic bodies expose their raw mass but respond as infinite mass.
+    /// Translation-frozen, static, and kinematic bodies expose their raw mass
+    /// but contribute zero constrained inverse mass.
     /// </summary>
     public Fixed64 EffectiveInverseMass => CanTranslate ? InverseMass : Fixed64.Zero;
 
@@ -331,12 +453,6 @@ public partial class SolidBody : IRecordable
     /// Bodies that cannot rotate expose a zero tensor even when raw inertia is available.
     /// </summary>
     public Fixed3x3 EffectiveInverseInertiaTensor => CanRotate ? _inverseInertiaTensor : Fixed3x3.Zero;
-
-    internal bool IsRotationFullyFrozen
-    {
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        get => (_freezeAxes & BodyFreezeAxes3D.Rotation) == BodyFreezeAxes3D.Rotation;
-    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal Vector3d ProjectLinearMotion(Vector3d value)
@@ -362,7 +478,7 @@ public partial class SolidBody : IRecordable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal Vector3d ProjectAngularMotion(Vector3d value)
     {
-        if (value == Vector3d.Zero || IsPositionFullyFrozen || IsRotationFullyFrozen)
+        if (value == Vector3d.Zero || IsRotationFullyFrozen)
             return Vector3d.Zero;
 
         Fixed64 x = (_freezeAxes & BodyFreezeAxes3D.RotationX) == BodyFreezeAxes3D.RotationX ? Fixed64.Zero : value.X;
@@ -492,7 +608,7 @@ public partial class SolidBody : IRecordable
         }
     }
 
-    internal bool IsAwakeForCollision => Active && !IsPositionFullyFrozen && !IsSleeping;
+    internal bool IsAwakeForCollision => HasSolverMobility && !IsSleeping;
 
     // LinearVelocity magnitude
     private Fixed64 _linearSpeed;
@@ -593,8 +709,9 @@ public partial class SolidBody : IRecordable
     public void Initialize(
         Vector3d startPosition,
         FixedQuaternion startRotation,
-        bool isDynamic = true)
+        BodyMotionType motionType = BodyMotionType.Dynamic)
     {
+        motionType.ThrowIfInvalid(nameof(motionType));
         SwiftThrowHelper.ThrowIfArgument(
             Collider.Id >= 0
                 || (Collider.HasHostBinding && !ReferenceEquals(Collider.Body, this)),
@@ -602,6 +719,7 @@ public partial class SolidBody : IRecordable
             "Body collider must be unregistered and free of another host binding before initialization.");
         Collider.PreflightBodyInitialization(this);
 
+        _motionType = motionType;
         Active = true;
 
         InvalidateContinuousCollisionTrajectory();
@@ -635,14 +753,25 @@ public partial class SolidBody : IRecordable
 
         OnVisualize();
 
-        _dynamicId = Context.Physics.AssimilateBody(this, isDynamic);
+        _dynamicId = Context.Physics.AssimilateBody(this, motionType);
         Collider!.Initialize(this);
         RefreshMassPropertiesFromColliderShape();
         CheckGround(force: true);
     }
 
 
-    public void LateSimulate() => LateSimulate(updateSleepState: true, updateColliderState: true);
+    public void LateSimulate()
+    {
+        Context.EnterSimulationPhase();
+        try
+        {
+            LateSimulate(updateSleepState: true, updateColliderState: true);
+        }
+        finally
+        {
+            Context.ExitSimulationPhase();
+        }
+    }
 
     internal void LateSimulate(bool updateSleepState, bool updateColliderState)
     {
@@ -661,8 +790,7 @@ public partial class SolidBody : IRecordable
             if (IsKinematic)
                 UpdateKinematicPositionAndRotation();
 
-            // if we can't move...then we don't and ignore any forces
-            if (!IsPositionFullyFrozen)
+            if (HasSolverMobility)
             {
                 if (!IsSleeping)
                 {
@@ -779,12 +907,12 @@ public partial class SolidBody : IRecordable
         RefreshPartitionAwakeState();
     }
 
-    private bool CanSleep => Active && SleepEnabled && !IsPositionFullyFrozen && !IsKinematic;
+    private bool CanSleep => SleepEnabled && HasSolverMobility;
 
 
     internal void OnVisualize()
     {
-        if (IsPositionFullyFrozen || IsKinematic || !SettingVisuals)
+        if (!HasSolverMobility || !SettingVisuals)
             return;
 
         if (Context.ResetAccumulationThisVisualize)
@@ -833,6 +961,38 @@ public partial class SolidBody : IRecordable
             !_rotationTransform.TrySetWorldPose(_rotationTransform.WorldPosition, rotation),
             nameof(FixedTransform),
             "Rotation transform cannot represent the requested world rotation.");
+    }
+
+    private void SetTransformWorldPose(Vector3d position, FixedQuaternion rotation)
+    {
+        Vector3d originalLocalPosition = _positionTransform.LocalPosition;
+        FixedQuaternion originalLocalRotation = _positionTransform.LocalRotation;
+        SwiftThrowHelper.ThrowIfTrue(
+            !_positionTransform.TrySetWorldPose(position, rotation),
+            nameof(FixedTransform),
+            "Host transform cannot represent the requested world pose.");
+
+        if (!Active)
+            return;
+
+        try
+        {
+            // A world rotation below a non-uniformly scaled parent can change
+            // lossy scale even though local scale is unchanged.
+            Collider.ValidateCurrentRuntimeTransform(rotation);
+        }
+        catch
+        {
+            _positionTransform.LocalPosition = originalLocalPosition;
+            _positionTransform.LocalRotation = originalLocalRotation;
+            throw;
+        }
+    }
+
+    private void PublishAuthoritativePose()
+    {
+        SetPositionTransformWorldPosition(Position3d);
+        SetRotationTransformWorldRotation(Rotation);
     }
 
     public void Deactivate()
@@ -891,11 +1051,14 @@ public partial class SolidBody : IRecordable
 
     public void UpdateRotation(FixedQuaternion targetRotation, Fixed64 bufferInterpolation)
     {
+        FixedQuaternion normalizedRotation = targetRotation.Normalized;
+        PreflightStaticPoseChange(normalizedRotation);
         _rotationInterpoleSpeed = bufferInterpolation;
         _rotationSpeed = Agent.IsInteracting
             ? InteractionRotationSpeed
             : DefaultRotationSpeed;
-        Rotation = targetRotation.Normalized;
+        Rotation = normalizedRotation;
+        RefreshStaticColliderAfterExplicitPoseChange();
     }
 
     /// <summary>
@@ -927,6 +1090,9 @@ public partial class SolidBody : IRecordable
 
     public void ResetPosition(Vector3d position = default, FixedQuaternion rotation = default)
     {
+        FixedQuaternion normalizedRotation = rotation.Normalized;
+        PreflightResetPoseChange(normalizedRotation);
+        SetTransformWorldPose(position, normalizedRotation);
         InvalidateContinuousCollisionTrajectory();
         ClearMotionForSleep();
         bool wasSleeping = _isSleeping;
@@ -938,13 +1104,11 @@ public partial class SolidBody : IRecordable
         HeightPos = position.Y;
         _lastPosition = position;
         _lastVisualPosition = _visualPosition = position;
-        SetPositionTransformWorldPosition(position);
-        FixedQuaternion normalizedRotation = rotation.Normalized;
         Rotation = normalizedRotation;
 
         _visualRotation = normalizedRotation;
-        SetRotationTransformWorldRotation(normalizedRotation);
 
+        RefreshStaticColliderAfterExplicitPoseChange();
         if (wasSleeping)
             RefreshPartitionAwakeState();
     }

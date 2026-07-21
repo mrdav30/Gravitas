@@ -37,9 +37,9 @@ records follow with their original discovery context.
 - GridForge's runtime-identity defect is resolved. Keep the lower stack locally
   linked while the remaining Gravitas queue is hardened so another downstream
   discovery does not force a partial release cycle.
-- Gravitas's current authoritative coverage-enabled Release run passes 3,123
-  tests and reports 33,539/33,539 lines, 12,137/12,137 branches, and
-  4,158/4,158 methods for hand-authored source.
+- Gravitas's current authoritative coverage-enabled Release run passes 3,237
+  tests and reports 33,894/33,894 lines, 12,211/12,211 branches, and
+  4,206/4,206 methods for hand-authored source.
 - After the Gravitas queue closes, release the lower stack in dependency order,
   replace local links with released packages at each layer, and rerun Gravitas
   `Release`, `ReleaseLean`, coverage, replay, and relevant benchmark gates.
@@ -47,52 +47,21 @@ records follow with their original discovery context.
 ### Ordered Queue
 
 1. **Gravitas:**
-   [Fully Position-Frozen Bodies Cannot Retain Angular Mobility](#fully-position-frozen-bodies-cannot-retain-angular-mobility).
-2. **Gravitas:**
    [Conic Query Quadratics Can Saturate Before Solving](#conic-query-quadratics-can-saturate-before-solving).
-3. **Gravitas — exact swept-sphere dilation for finite extrusions:**
+2. **Gravitas — exact swept-sphere dilation for finite extrusions:**
    [Swept-Sphere Cylinder Dilation Uses A Sharp Rim Proxy](#swept-sphere-cylinder-dilation-uses-a-sharp-rim-proxy),
    then
    [Swept-Sphere Capsule-Slab Rim Dilation Overexpands The Rounded Boundary](#swept-sphere-capsule-slab-rim-dilation-overexpands-the-rounded-boundary).
-4. **Gravitas:**
+3. **Gravitas:**
    [Finite-Slab Projection Support Math Is Not Full-Domain](#finite-slab-projection-support-math-is-not-full-domain).
-5. **Gravitas — canonical collider geometry and exact scale admission:**
+4. **Gravitas — canonical collider geometry and exact scale admission:**
    [Authored Collider Dimensions Can Saturate During Host-Scale Composition](#authored-collider-dimensions-can-saturate-during-host-scale-composition),
    then
    [Finite-Axis Collider Endpoint Snapshots Can Deform Scalar-Boundary Geometry](#finite-axis-collider-endpoint-snapshots-can-deform-scalar-boundary-geometry),
    then
    [Oriented Cuboid Boundary Proxies Can Deform Scalar-Face Geometry](#oriented-cuboid-boundary-proxies-can-deform-scalar-face-geometry).
-6. **FixedMathSharp / Gravitas:**
+5. **FixedMathSharp / Gravitas:**
    [Radial Segment Parameters Can Collapse Spatially Distinct Query Hits](#radial-segment-parameters-can-collapse-spatially-distinct-query-hits).
-
-### Fully Position-Frozen Bodies Cannot Retain Angular Mobility
-
-**Discovered:** 2026-07-19  
-**Source:** rotational moving-pair CCD final mobility review  
-**Affected area:** 2D/3D freeze-axis semantics, collider mobility buckets,
-partition refresh, awake routing, discrete response islands, constraints,
-sleep/wake state, visualization, replay, and host documentation
-
-`BodyFreezeAxes2D.Position` and `BodyFreezeAxes3D.Position` currently make a
-body static-equivalent for solver and partition mobility. `CanRotate`, angular
-inertia, awake admission, collider `IsStatic`, partition buckets, island and
-joint participation, sleep, and host documentation all depend on that
-contract. A rotational CCD admission review briefly exposed the more intuitive
-alternative—lock every translation axis while retaining independent angular
-mobility—but enabling only `CanRotate` would leave the body in static
-partitions and outside the solver paths that must advance and respond to its
-rotation.
-
-Treat this as one explicit mobility redesign rather than a local `CanRotate`
-change. Decide whether full translation freeze should remain the documented
-static-equivalent convenience or whether static equivalence needs a separate
-body mode. If angular mobility is retained, update 2D/3D/mixed partition
-classification and refresh, awake and island gates, contact and joint
-response, sleep/wake behavior, visualization, replay, serialization defaults,
-and docs together. Add rotation-only integration, collision, constraint,
-partition migration, replay, and allocation regressions in both dimensions.
-The partial CCD-era change was deliberately reverted so the current release
-does not expose a half-enabled state.
 
 ### Conic Query Quadratics Can Saturate Before Solving
 
@@ -243,7 +212,8 @@ single generic endpoint workaround.
 **Discovered:** 2026-07-19  
 **Source:** centered finite-axis admission and scaled-shape audit  
 **Affected area:** 2D/3D primitive shape rebuilds, compound part scale
-composition, bounds, mass properties, registration admission, and replay
+composition, bodyless collider pose setters, bounds, mass properties,
+registration admission, and replay
 
 Several runtime shape rebuilds still compose an authored dimension with host
 lossy scale in ordinary saturating `Fixed64` operations before deriving a
@@ -265,6 +235,13 @@ owner/part scale composition, compound rollback, replay equality, mass and
 bounds parity, and warmed zero-allocation behavior. Prefer reusable fused or
 wide arithmetic in FixedMathSharp when the contract benefits the rest of the
 stack.
+
+The body-motion-role review also confirmed that direct bodyless
+`LSCollider.Position`/`Rotation` changes can alter hierarchy-composed lossy
+scale before the next `Simulate()` validation. Bring those setters under the
+same tentative-pose, exact candidate validation, rollback, and immediate
+partition-refresh contract so an invalid mesh or compound pose cannot leave a
+host transform ahead of committed collider geometry.
 
 ### Radial Segment Parameters Can Collapse Spatially Distinct Query Hits
 
@@ -294,6 +271,47 @@ zero-allocation behavior. Keep this separate from sphere construction/merge
 and conic-quadratic ownership.
 
 ## Resolved Issues
+
+### Explicit Body Roles Preserve Independent Angular Mobility
+
+**Discovered:** 2026-07-19  
+**Resolved:** 2026-07-20  
+**Source:** rotational moving-pair CCD final mobility review  
+**Affected area:** 2D/3D body roles, freeze-axis semantics, pure/mixed
+partitioning, response islands, joints, sleep, visualization, CCD,
+serialization, replay, and host integration
+
+The root cause was an overloaded constraint mask: full position freeze also
+acted as the runtime's implicit static-body identity, and `CanRotate` depended
+on `CanTranslate`. That leaked one authored choice into collider buckets,
+awake admission, effective mass, constraints, CCD, serialization, and
+presentation, making a translation-locked spinner impossible to model
+coherently.
+
+Gravitas now owns explicit `Dynamic`, `Kinematic`, and `Static` body roles
+through `BodyMotionType`, while translation and rotation mobility remain
+independent solver constraints. Role-aware 2D, 3D, and mixed paths preserve
+body, collider, pair, joint, and host identity; reconcile simulated-body and
+partition membership; and clear incompatible motion, sleep, CCD, warm-start,
+and joint caches atomically. Public transitions, ragdoll batches, registered
+serialization population, and explicit static pose changes validate before
+commit. Static pose refresh is immediately visible to pure and mixed queries,
+including a collider leaving and re-entering the grid. `ResetPosition` also
+uses a tentative host-pose transaction that validates the exact candidate
+hierarchy scale and rotation for every active role and restores exact local
+components before any body, collider, or partition mutation on rejection.
+
+Substantive regressions cover all six role transitions, translation-locked
+angular response, fully locked bodies, 2D/3D/mixed partition and CCD parity,
+fixed-step and callback rejection, invalid and detached registration,
+hierarchy-pose rollback, JSON/MemoryPack population, replay, and warmed
+zero-allocation transitions. The dedicated warmed transition benchmark reports
+about 15.146 microseconds for 3D and 6.751 microseconds for 2D with zero managed
+allocation. Final verification passed all 3,237 Release tests at 100% line,
+branch, and method coverage: 33,894/33,894 lines, 12,211/12,211 branches, and
+4,206/4,206 methods. The final independent review reported no critical or
+important findings. See the completed
+[`Body Motion Type And Solver Mobility Hardening Plan`](done/2026-07-20-body-motion-type-and-solver-mobility-plan.md).
 
 ### Translational CCD Preserves Piecewise Target Trajectories
 

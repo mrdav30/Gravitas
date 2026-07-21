@@ -276,6 +276,28 @@ public sealed class CollisionResponse2DManifoldTests
     }
 
     [Fact]
+    public void Resolve_WithPositionFrozenDynamicBody_ShouldApplyOffCenterFrictionAsYawOnly()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        SolidBody2D angularOnly = CreateBox(context, Vector2d.Zero);
+        SolidBody2D moving = CreateBox(context, Vector2d.Right * (Fixed64)2);
+        angularOnly.FreezeAxes = BodyFreezeAxes2D.Position;
+        var material = new PhysicsMaterial(Fixed64.One, Fixed64.One, Fixed64.Zero);
+        angularOnly.Collider.Material = material;
+        moving.Collider.Material = material;
+        moving.ApplyCollisionLinearVelocityDelta(new Vector2d((Fixed64)(-4), (Fixed64)2));
+        Fixed64 tangentialSpeedBefore = moving.LinearVelocity.Y.Abs();
+        var pair = new CollisionPair2D(angularOnly.Collider, moving.Collider);
+        pair.Manifold.SetContact(Vector2d.Right, Vector2d.Right, Fixed64.Zero, Vector2d.Right);
+
+        pair.MarkColliding(context.FrameCount);
+
+        angularOnly.LinearVelocity.Should().Be(Vector2d.Zero);
+        angularOnly.AngularVelocity.Should().NotBe(Fixed64.Zero);
+        moving.LinearVelocity.Y.Abs().Should().BeLessThan(tangentialSpeedBefore);
+    }
+
+    [Fact]
     public void Resolve_WithCapsuleSideContacts_ShouldOpposeTangentialMotionAndCacheContacts()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
@@ -558,11 +580,15 @@ public sealed class CollisionResponse2DManifoldTests
                 Vector3d.One)),
             collider)
         {
-            Mass = Fixed64.One,
-            FreezeAxes = immovable ? BodyFreezeAxes2D.Position : BodyFreezeAxes2D.None,
-            IsKinematic = isKinematic
+            Mass = Fixed64.One
         };
-        body.Initialize(position);
+        body.Initialize(
+            position,
+            motionType: immovable
+                ? BodyMotionType.Static
+                : isKinematic
+                    ? BodyMotionType.Kinematic
+                    : BodyMotionType.Dynamic);
         return body;
     }
 

@@ -227,10 +227,11 @@ public class MixedQueryCompound2DBenchmarks
         var agent = new BenchmarkMatterAgent(context, position);
         var body = new SolidBody2D(agent, collider)
         {
-            Mass = Fixed64.One,
-            FreezeAxes = BodyFreezeAxes2D.Position
+            Mass = Fixed64.One
         };
-        body.Initialize(new Vector2d(position.X, position.Z));
+        body.Initialize(
+            new Vector2d(position.X, position.Z),
+            motionType: BodyMotionType.Static);
         return body;
     }
 

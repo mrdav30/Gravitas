@@ -588,7 +588,7 @@ public sealed partial class SolidBody2D
             && ContinuousCollisionTargetPolicy.AllowsIndexed2DTarget(
                 ReferenceEquals(target, this),
                 target.Active,
-                target.IsPositionFullyFrozen,
+                target.IsDynamic,
                 target.IsKinematic,
                 target.IsKinematic && target.HasContinuousCollisionMotion,
                 target.Collider.IsTrigger,
@@ -604,7 +604,7 @@ public sealed partial class SolidBody2D
                 _continuousCollisionHandoffIgnoredCollider3D)
             && ContinuousCollisionTargetPolicy.AllowsMixedIndexedTarget(
                 target.Active,
-                target.IsPositionFullyFrozen,
+                target.IsDynamic,
                 target.IsKinematic,
                 target.IsKinematic && target.HasContinuousCollisionMotion,
                 target.Collider.IsTrigger,

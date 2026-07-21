@@ -162,8 +162,11 @@ contexts cannot reactivate their coroutine service.
 
 ## Registration Model
 
-Dynamic 3D bodies are stored in a `SwiftBucket<SolidBody>`. Their `DynamicId` is
-the bucket index returned by `GravitasPhysicsService.AssimilateBody(...)`.
+Simulated 3D bodies are stored in a `SwiftBucket<SolidBody>`. Dynamic and
+kinematic roles receive a `DynamicId`, which is the ephemeral bucket index
+returned by `GravitasPhysicsService.AssimilateBody(...)`; static bodies remain
+registered through their collider but are excluded from this per-frame body
+collection. The 2D service follows the same ownership contract.
 
 3D and 2D colliders use a shared context-local registry shape: reusable
 `SwiftBucket` slots provide stable live IDs, while compact live lists provide
@@ -177,9 +180,10 @@ registration order and writes dense replay ordinals for collider, hierarchy, and
 pair identity.
 
 Both 3D and 2D physics services keep compact service-refresh lists for bodyless
-and non-dynamic colliders. Dynamic body buckets refresh dynamic-body colliders,
-so fixed-step partition preparation only visits colliders whose bounds can
-change through that ownership path.
+and explicit static colliders. Simulated-body buckets refresh dynamic and
+kinematic colliders, so fixed-step partition preparation only visits colliders
+whose bounds can change through that ownership path. Freeze axes constrain
+solver degrees of freedom and never determine service or partition ownership.
 
 3D joints use context-local IDs allocated by `GravitasConstraint3DService`.
 Removing a joint releases solver cache and linked-collider suppression state,
@@ -229,15 +233,25 @@ contexts. These checks are core invariants.
 - deterministic sleep state.
 - Chronicler record data.
 
+`BodyMotionType` separates solver-controlled dynamic, host-controlled
+kinematic, and immobile static ownership. `FreezeAxes` independently constrains
+the linear and angular degrees of freedom of a dynamic body. Consequently, a
+position-frozen dynamic body can still integrate rotation, remain awake, solve
+off-center contacts and joints, run rotational CCD, and publish visualization.
+A fully locked dynamic body remains in dynamic partition membership but does
+not seed awake solver work.
+
 Body movement happens in `SolidBody.LateSimulate()`, called by
-`GravitasPhysicsService.LateSimulate()`. Non-kinematic movable bodies process
-forces, update velocities, commit position/rotation changes, run their selected
-ground probe, and then the service refreshes dynamic collider partitions before
-3D pair distribution.
+`GravitasPhysicsService.LateSimulate()`. Dynamic bodies with solver mobility
+process forces, update velocities, commit available position/rotation changes,
+run their selected ground probe, and then the service refreshes collider
+partitions before 3D pair distribution.
 
 Kinematic bodies read their host transforms during `LateSimulate()`. When CCD is
 enabled, the body records its frame-start pose, treats the host transform as the
 requested target pose, and sweeps between those poses as an active source.
+Static bodies do not poll host transforms or enter per-frame motion; explicit
+pose setters refresh their pure and mixed partition membership immediately.
 
 ### `SolidBody2D`
 
@@ -258,6 +272,10 @@ It intentionally has no `HeightPos`, y-up step offset, visual interpolation
 state, or 3D inertia tensor. `GravitasPhysics2DService.Visualize()` publishes
 dynamic 2D position and yaw rotation back to the host transform while preserving
 the host's vertical height.
+
+The 2D role/freeze contract matches 3D: motion type owns runtime lifecycle,
+while planar translation and yaw freezes independently constrain solver
+mobility. A position-frozen dynamic body can therefore retain yaw response.
 
 ## Collider State
 

@@ -16,12 +16,12 @@ public partial class SolidBody
         ref ChronicleHashWriter writer,
         GravitasReplayHashMode mode)
     {
-        writer.WriteSection("body.3d", 3);
+        writer.WriteSection("body.3d", 4);
         writer.WriteInt32(_dynamicId);
         writer.WriteBool(Debug);
         writer.WriteBool(Active);
         writer.WriteEnum(_freezeAxes);
-        writer.WriteBool(_isKinematic);
+        writer.WriteEnum(_motionType);
         writer.WriteVector2d(_position2dUnmarked);
         writer.WriteFixed64(_heightPosUnmarked);
         writer.WriteVector3d(_lastPosition);

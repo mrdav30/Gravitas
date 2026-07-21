@@ -160,9 +160,10 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
     public SolidBody2D? Body => _body;
 
     /// <summary>
-    /// Gets whether this collider is static-style for partition mobility.
+    /// Gets whether this collider is bodyless or belongs to an explicit static
+    /// body role.
     /// </summary>
-    public bool IsStatic => _body == null || _body.DynamicId < 0 || _body.IsPositionFullyFrozen;
+    public bool IsStatic => _body == null || _body.IsStatic;
 
     internal bool RequiresServiceSideRefresh => _body == null || _body.DynamicId < 0;
 
@@ -561,6 +562,8 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal bool RebuildRuntimeShapeOnly() => RebuildRuntimeShapeState();
+
+    internal void ValidateCurrentRuntimeTransform() => _ = CaptureShapeSnapshot();
 
     public void SetParent(LSCollider2D parent)
     {

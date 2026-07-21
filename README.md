@@ -122,7 +122,10 @@ Gravitas is centered around explicit world-context ownership:
    `GravitasQueryMixedService`, and `GravitasCoroutineService` own query and
    coroutine state per context.
 10. `SolidBody` and `SolidBody2D` own simulated body state and Chronicler state
-    recording for their runtime path.
+    recording for their runtime path. Their explicit `BodyMotionType` selects
+    solver-controlled `Dynamic`, host-controlled `Kinematic`, or immobile
+    `Static` ownership; `FreezeAxes` independently constrains the degrees of
+    freedom available to a dynamic body.
 11. `LSCollider` and `LSCollider2D` collider types own runtime shape data,
     bounds, layers, collider-local physical ignore masks, trigger/contact
     events, and GridForge partition coordinates; shape-definition APIs provide

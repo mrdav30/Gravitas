@@ -177,7 +177,7 @@ public class ReplayHashBenchmarks
     private static int CreateCircleGrid2D(GravitasWorldContext context, int count)
     {
         for (int i = 0; i < count; i++)
-            _ = CreateCircle2D(context, Position2DForGridIndex(i), immovable: false);
+            _ = CreateCircle2D(context, Position2DForGridIndex(i));
 
         return count;
     }
@@ -191,7 +191,7 @@ public class ReplayHashBenchmarks
                 context,
                 new LSSphereCollider { Radius = Fixed64.Half },
                 new Vector3d(position.X, Fixed64.Zero, position.Y));
-            _ = CreateCircle2D(context, position, immovable: false);
+            _ = CreateCircle2D(context, position);
         }
 
         return pairCount * 2;
@@ -271,16 +271,14 @@ public class ReplayHashBenchmarks
 
     private static SolidBody2D CreateCircle2D(
         GravitasWorldContext context,
-        Vector2d position,
-        bool immovable)
+        Vector2d position)
     {
         var agent = new BenchmarkMatterAgent(
             context,
             new Vector3d(position.X, Fixed64.Zero, position.Y));
         var body = new SolidBody2D(agent, new LSCircleCollider2D(Fixed64.Half))
         {
-            Mass = Fixed64.One,
-            FreezeAxes = immovable ? BodyFreezeAxes2D.Position : BodyFreezeAxes2D.None
+            Mass = Fixed64.One
         };
         body.Initialize(position);
         return body;

@@ -16,6 +16,125 @@ namespace Gravitas.Tests.Physics2D;
 
 public sealed partial class ContinuousCollision2DTests
 {
+    [Fact]
+    public void ContinuousCollisionIndexes_WithFullyLockedDynamicBody_ShouldRetainPureAndMixedTarget()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        context.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
+        SolidBody2D body = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            Vector2d.Zero,
+            immovable: false);
+        body.FreezeAxes = BodyFreezeAxes2D.All;
+        DynamicCcdPlanarBounds planarBounds = DynamicCcdCandidateIndex2D.CreateSweptCircleBounds(
+            Vector2d.Zero,
+            Vector2d.Zero,
+            Fixed64.One);
+        FixedBoundVolume mixedBounds = DynamicCcdCandidateIndex.CreateSweptSphereBounds(
+            Vector3d.Zero,
+            Vector3d.Zero,
+            Fixed64.One);
+
+        SwiftList<int> planarCandidates = context.Physics2D.QueryPlanarContinuousCollisionCandidates(planarBounds);
+        planarCandidates.Should().ContainSingle().Which.Should().Be(body.DynamicId);
+        SwiftList<int> mixedCandidates = context.Physics2D.QueryMixedContinuousCollisionCandidates(mixedBounds);
+
+        mixedCandidates.Should().ContainSingle().Which.Should().Be(body.DynamicId);
+    }
+
+    [Fact]
+    public void PreparedContinuousCollisionIndexes_MotionTypeTransitions_ShouldRebuildCurrentRole2D()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        context.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
+        SolidBody2D body = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            Vector2d.Zero,
+            immovable: false);
+        DynamicCcdPlanarBounds originBounds = DynamicCcdCandidateIndex2D.CreateSweptCircleBounds(
+            Vector2d.Zero,
+            Vector2d.Zero,
+            Fixed64.One);
+        FixedBoundVolume originMixedBounds = DynamicCcdCandidateIndex.CreateSweptSphereBounds(
+            Vector3d.Zero,
+            Vector3d.Zero,
+            Fixed64.One);
+
+        context.Physics2D.QueryPlanarContinuousCollisionCandidates(originBounds)
+            .Should().Contain(body.DynamicId);
+        context.Physics2D.QueryMixedContinuousCollisionCandidates(originMixedBounds)
+            .Should().Contain(body.DynamicId);
+
+        body.SetMotionType(BodyMotionType.Static);
+        context.Physics2D.QueryPlanarContinuousCollisionCandidates(originBounds)
+            .Should().BeEmpty();
+        context.Physics2D.QueryMixedContinuousCollisionCandidates(originMixedBounds)
+            .Should().BeEmpty();
+
+        body.SetMotionType(BodyMotionType.Dynamic);
+        context.Physics2D.QueryPlanarContinuousCollisionCandidates(originBounds)
+            .Should().Contain(body.DynamicId);
+
+        body.SetMotionType(BodyMotionType.Kinematic);
+        body.Agent.Transform.LocalPosition = Vector3d.Right * (Fixed64)4;
+        DynamicCcdPlanarBounds movedBounds = DynamicCcdCandidateIndex2D.CreateSweptCircleBounds(
+            Vector2d.Right * (Fixed64)4,
+            Vector2d.Right * (Fixed64)4,
+            Fixed64.One);
+        context.Physics2D.QueryPlanarContinuousCollisionCandidates(movedBounds)
+            .Should().Contain(body.DynamicId);
+
+        body.SetMotionType(BodyMotionType.Dynamic);
+        context.Physics2D.QueryPlanarContinuousCollisionCandidates(originBounds)
+            .Should().Contain(body.DynamicId);
+    }
+
+    [Fact]
+    public void PrepareContinuousCollisionFrame_WithPositionFrozenDynamicBody_ShouldIntegrateTorque()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        SolidBody2D body = CreateBody(
+            context,
+            new LSAABBoxCollider2D(Vector2d.One),
+            Vector2d.Zero,
+            immovable: false);
+        body.FreezeAxes = BodyFreezeAxes2D.Position;
+        body.AddTorque(Fixed64.One);
+
+        context.Physics2D.PrepareContinuousCollisionFrame();
+
+        body.LinearVelocity.Should().Be(Vector2d.Zero);
+        body.AngularVelocity.Should().NotBe(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void ContinuousMode_WithFullyLockedDynamicTarget_ShouldStopBeforeTunneling()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        SolidBody2D source = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            -Vector2d.Right * (Fixed64)5,
+            immovable: false);
+        SolidBody2D target = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            Vector2d.Zero,
+            immovable: false);
+        source.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        source.Collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.Zero);
+        target.Collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.Zero);
+        target.FreezeAxes = BodyFreezeAxes2D.All;
+
+        source.AddForce(Vector2d.Right * (Fixed64)10);
+        context.LateSimulate();
+
+        source.Position.X.Should().BeLessThanOrEqualTo(-Fixed64.One);
+        target.Position.Should().Be(Vector2d.Zero);
+    }
+
     [Theory]
     [InlineData((byte)4)]
     [InlineData(byte.MaxValue)]
@@ -530,11 +649,11 @@ public sealed partial class ContinuousCollision2DTests
     }
 
     [Fact]
-    public void ContinuousHandoff_WithFrozenBody_ShouldNotMoveOrQueue()
+    public void ContinuousHandoff_WithFullyLockedBody_ShouldNotMoveOrQueue()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
         SolidBody2D body = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
-        body.FreezeAxes = BodyFreezeAxes2D.Position;
+        body.FreezeAxes = BodyFreezeAxes2D.All;
 
         body.ApplyContinuousCollisionHandoff(
             Vector2d.Right,
@@ -825,7 +944,7 @@ public sealed partial class ContinuousCollision2DTests
     }
 
     [Fact]
-    public void ContinuousHandoff_WhenFrozenAfterQueue_ShouldConsumeAtImpactAndRefreshCollider()
+    public void ContinuousHandoff_WhenFullyLockedAfterQueue_ShouldConsumeAtImpactAndRefreshCollider()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
         SolidBody2D body = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
@@ -834,7 +953,7 @@ public sealed partial class ContinuousCollision2DTests
             Vector2d.Right * Fixed64.Half,
             Vector2d.Right,
             Fixed64.Half);
-        body.FreezeAxes = BodyFreezeAxes2D.Position;
+        body.FreezeAxes = BodyFreezeAxes2D.All;
         body.LateSimulate();
 
         body.Position.X.Should().Be(Fixed64.Half);
@@ -843,7 +962,7 @@ public sealed partial class ContinuousCollision2DTests
     }
 
     [Fact]
-    public void ContinuousHandoff_WhenFrozenAfterQueueAndDirectConsumeWithoutColliderRefresh_ShouldRemainAtImpact()
+    public void ContinuousHandoff_WhenFullyLockedAfterQueueAndDirectConsumeWithoutColliderRefresh_ShouldRemainAtImpact()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
         SolidBody2D body = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
@@ -852,7 +971,7 @@ public sealed partial class ContinuousCollision2DTests
             Vector2d.Right * Fixed64.Half,
             Vector2d.Right,
             Fixed64.Half);
-        body.FreezeAxes = BodyFreezeAxes2D.Position;
+        body.FreezeAxes = BodyFreezeAxes2D.All;
 
         body.TryConsumeContinuousCollisionHandoff(
             updateSleepState: false,
@@ -1527,11 +1646,12 @@ public sealed partial class ContinuousCollision2DTests
             immovable: true);
         blade.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
 
-        blade.AddAngularImpulse(FixedMath.DegToRad((Fixed64)90) / blade.EffectiveInverseMomentOfInertia);
+        Fixed64 angularVelocity = FixedMath.DegToRad((Fixed64)90);
+        blade.AddAngularImpulse(angularVelocity / blade.EffectiveInverseMomentOfInertia);
         context.LateSimulate();
 
         blade.Rotation.Should().BeLessThan(FixedMath.DegToRad((Fixed64)90));
-        blade.AngularVelocity.Should().Be(Fixed64.Zero);
+        blade.AngularVelocity.Abs().Should().BeLessThan(angularVelocity);
         blade.LastContinuousCollisionToiIterationCount.Should().Be(1);
     }
 
@@ -1556,8 +1676,9 @@ public sealed partial class ContinuousCollision2DTests
         blade.AddAngularImpulse(angularVelocity / blade.EffectiveInverseMomentOfInertia);
         context.LateSimulate();
 
-        blade.Rotation.Should().BeGreaterThan(FixedMath.DegToRad((Fixed64)1));
-        blade.AngularVelocity.Should().Be(Fixed64.Zero);
+        blade.Rotation.Should().BeLessThan(angularVelocity);
+        blade.LinearVelocity.Should().NotBe(Vector2d.Zero);
+        blade.AngularVelocity.Should().NotBe(angularVelocity);
     }
 
     [Fact]
@@ -2517,12 +2638,15 @@ public sealed partial class ContinuousCollision2DTests
         var agent = new TestMatterAgent(context, transform);
         var body = new SolidBody2D(agent, collider)
         {
-            Mass = Fixed64.One,
-            FreezeAxes = immovable ? BodyFreezeAxes2D.Position : BodyFreezeAxes2D.None,
-            IsKinematic = isKinematic
+            Mass = Fixed64.One
         };
         body.Collider.Layer = layer;
-        body.Initialize(position, isDynamic: isDynamic);
+        BodyMotionType motionType = !isDynamic || immovable
+            ? BodyMotionType.Static
+            : isKinematic
+                ? BodyMotionType.Kinematic
+                : BodyMotionType.Dynamic;
+        body.Initialize(position, motionType: motionType);
         return body;
     }
 

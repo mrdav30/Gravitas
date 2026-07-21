@@ -12,7 +12,7 @@ namespace Gravitas;
 
 public partial class SolidBody
 {
-    private bool CanUseAngularInertia => !IsPositionFullyFrozen && !IsKinematic && !IsRotationFullyFrozen;
+    private bool CanUseAngularInertia => IsDynamic && !IsRotationFullyFrozen;
 
     private void UpdateSleepState()
     {
@@ -79,8 +79,7 @@ public partial class SolidBody
         if (!Active || !Collider.TryGetBoundContext(out GravitasWorldContext? context))
             return;
 
-        if (Collider.IsPartitioned)
-            Collider.Simulate();
+        Collider.Simulate();
 
         if (context!.Settings.RuntimeMode.RunsMixedContacts())
             context.MixedCollisions.Refresh3DColliderPartition(Collider);
@@ -241,29 +240,70 @@ public partial class SolidBody
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void SetPosition(Vector3d position)
     {
+        PreflightStaticPoseChange();
         if (Position3d != position)
             Wake();
 
         Position3d = position;
+        RefreshStaticColliderAfterExplicitPoseChange();
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void SetHeight(Fixed64 height)
     {
+        PreflightStaticPoseChange();
         if (HeightPos != height)
             Wake();
 
         HeightPos = height;
+        RefreshStaticColliderAfterExplicitPoseChange();
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void SetRotation(FixedQuaternion quaternion)
     {
         FixedQuaternion normalizedRotation = quaternion.Normalized;
+        PreflightStaticPoseChange(normalizedRotation);
         if (Rotation != normalizedRotation)
             Wake();
 
         Rotation = normalizedRotation;
+        RefreshStaticColliderAfterExplicitPoseChange();
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void RefreshStaticColliderAfterExplicitPoseChange()
+    {
+        if (IsStatic)
+            RefreshPartitionMobility();
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void PreflightStaticPoseChange(FixedQuaternion? rotation = null)
+    {
+        if (Active && IsStatic)
+        {
+            ThrowIfRuntimeRegistrationMissing();
+            Context.ThrowIfFixedStepMutationNotAllowed();
+            if (rotation.HasValue)
+                Collider.ValidateCurrentRuntimeTransform(rotation.Value);
+            else
+                Collider.ValidateCurrentRuntimeTransform();
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void PreflightResetPoseChange(FixedQuaternion rotation)
+    {
+        if (!Active)
+            return;
+
+        ThrowIfRuntimeRegistrationMissing();
+        if (!IsStatic)
+            return;
+
+        Context.ThrowIfFixedStepMutationNotAllowed();
+        Collider.ValidateCurrentRuntimeTransform(rotation);
     }
 
     private void ProcessMovable()
@@ -466,9 +506,6 @@ public partial class SolidBody
 
     private void NonKinematicUpdate(Vector3d angularVelocityStateStart)
     {
-        if (IsKinematic)
-            return;
-
         Vector3d rotationalCcdStartPosition = Position3d;
         Vector3d rotationalCcdProposedPosition = rotationalCcdStartPosition
             + _linearVelocity * Context.DeltaTime;

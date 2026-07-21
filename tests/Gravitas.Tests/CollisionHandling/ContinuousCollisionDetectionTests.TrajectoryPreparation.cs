@@ -11,6 +11,26 @@ namespace Gravitas.Tests.CollisionHandlingTests;
 public sealed partial class ContinuousCollisionDetectionTests
 {
     [Fact]
+    public void TrajectorySampling3D_ShouldUseAuthoritativePoseUntilMotionIsPrepared()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Right);
+        FixedQuaternion authoredRotation = FixedQuaternion.FromAxisAngle(Vector3d.Up, Fixed64.Half);
+        body.Body.SetRotation(authoredRotation);
+
+        body.Body.SampleContinuousCollisionPosition(Fixed64.Half).Should().Be(Vector3d.Right);
+        body.Body.SampleContinuousCollisionRotation(Fixed64.Half).Should().Be(authoredRotation);
+
+        body.Body.ApplyCollisionLinearVelocityDelta(Vector3d.Right);
+        body.Body.ApplyCollisionAngularVelocityDelta(Vector3d.Up);
+        scenario.Context.AdvanceLateSimulateToken();
+        body.Body.EnsureContinuousCollisionFramePrepared(scenario.Context.LateSimulateToken);
+
+        body.Body.SampleContinuousCollisionPosition(Fixed64.One).Should().NotBe(Vector3d.Right);
+        body.Body.SampleContinuousCollisionRotation(Fixed64.One).Should().NotBe(authoredRotation);
+    }
+
+    [Fact]
     public void DirtyCandidateRefreshAndQuery3D_ShouldNotAllocateAfterWarmup()
     {
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();

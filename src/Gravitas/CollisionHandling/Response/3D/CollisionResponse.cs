@@ -135,7 +135,7 @@ public static class CollisionResponse
 
         bodyA = ResponseBody.Create(pair.ColliderA);
         bodyB = ResponseBody.Create(pair.ColliderB);
-        return bodyA.InverseMass + bodyB.InverseMass > Fixed64.Zero;
+        return bodyA.HasSolverMobility || bodyB.HasSolverMobility;
     }
 
     private static SolverContactBuffer BuildContactBuffer(CollisionPair pair, ResponseBody bodyA, ResponseBody bodyB)
@@ -260,10 +260,11 @@ public static class CollisionResponse
         Vector3d linearVelocityDelta,
         Vector3d angularVelocityDelta)
     {
-        if (!body.CanMove)
+        if (!body.HasSolverMobility)
             return;
 
-        body.Body.ApplyCollisionLinearVelocityDelta(linearVelocityDelta);
+        if (body.Body.CanTranslate)
+            body.Body.ApplyCollisionLinearVelocityDelta(linearVelocityDelta);
         if (body.CanRotate)
             body.Body.ApplyCollisionAngularVelocityDelta(angularVelocityDelta);
     }
@@ -400,10 +401,11 @@ public static class CollisionResponse
 
     private static void ApplyImpulse(ResponseBody body, Vector3d impulse, Vector3d relativeContactPoint)
     {
-        if (!body.CanMove)
+        if (!body.HasSolverMobility)
             return;
 
-        body.Body.ApplyCollisionLinearVelocityDelta(impulse * body.InverseMass);
+        if (body.Body.CanTranslate)
+            body.Body.ApplyCollisionLinearVelocityDelta(impulse * body.InverseMass);
 
         if (!body.CanRotate)
             return;

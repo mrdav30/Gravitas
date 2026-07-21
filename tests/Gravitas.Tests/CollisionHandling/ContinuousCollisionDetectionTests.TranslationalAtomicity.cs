@@ -1,6 +1,7 @@
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
+using Gravitas.CollisionHandling;
 using Gravitas.Tests.Support;
 using Xunit;
 
@@ -8,6 +9,67 @@ namespace Gravitas.Tests.CollisionHandlingTests;
 
 public sealed partial class ContinuousCollisionDetectionTests
 {
+    [Fact]
+    public void RotationalDynamicResponse_WithFullyLockedDynamicTarget_ShouldApplyOnlySourceState3D()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        ScenarioBody<LSSphereCollider> source = scenario.CreateSphere(-Vector3d.Right * (Fixed64)2);
+        ScenarioBody<LSSphereCollider> target = scenario.CreateSphere(Vector3d.Zero);
+        target.Body.FreezeAxes = BodyFreezeAxes3D.All;
+        scenario.Context.AdvanceLateSimulateToken();
+        scenario.Context.Physics.PrepareContinuousCollisionFrame();
+        source.Body.ApplyCollisionLinearVelocityDelta(Vector3d.Right * (Fixed64)4);
+        var contact = new ManifoldContact(
+            contactId: 1,
+            pointA: -Vector3d.Right * Fixed64.Half,
+            pointB: -Vector3d.Right * Fixed64.Half,
+            depth: Fixed64.Zero,
+            normal: Vector3d.Right);
+
+        bool applied = source.Body.TryApplyRotationalContinuousCollisionResponse(
+            target.Body,
+            contact,
+            Fixed64.Half,
+            source.Body.Position3d,
+            Vector3d.Right * Fixed64.Two,
+            source.Body.Rotation,
+            Fixed64.Zero,
+            scenario.Context.DeltaTime,
+            sourceIsKinematic: false);
+
+        applied.Should().BeTrue();
+        source.Body.LinearVelocity.X.Should().BeLessThanOrEqualTo(Fixed64.Zero);
+        target.Body.Position3d.Should().Be(Vector3d.Zero);
+        target.Body.LinearVelocity.Should().Be(Vector3d.Zero);
+        target.Body.AngularVelocity.Should().Be(Vector3d.Zero);
+    }
+
+    [Fact]
+    public void TranslationalDynamicResponse_WithFullyLockedDynamicTarget_ShouldApplyOnlySourceState3D()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        ScenarioBody<LSSphereCollider> source = scenario.CreateSphere(-Vector3d.Right * (Fixed64)2);
+        ScenarioBody<LSSphereCollider> target = scenario.CreateSphere(Vector3d.Zero);
+        target.Body.FreezeAxes = BodyFreezeAxes3D.All;
+        scenario.Context.AdvanceLateSimulateToken();
+        scenario.Context.Physics.PrepareContinuousCollisionFrame();
+        source.Body.ApplyCollisionLinearVelocityDelta(Vector3d.Right * (Fixed64)4);
+
+        bool applied = InvokeTranslationalDynamicResponse3D(
+            source.Body,
+            target.Body,
+            -Vector3d.Right,
+            -Vector3d.Right,
+            scenario.Context.DeltaTime * Fixed64.Half,
+            scenario.Context.DeltaTime * Fixed64.Half);
+
+        applied.Should().BeTrue();
+        source.Body.LinearVelocity.X.Should().BeLessThanOrEqualTo(Fixed64.Zero);
+        target.Body.Position3d.Should().Be(Vector3d.Zero);
+        target.Body.LinearVelocity.Should().Be(Vector3d.Zero);
+        target.Body.AngularVelocity.Should().Be(Vector3d.Zero);
+    }
+
     [Fact]
     public void TranslationalDynamicResponse_WhenTargetTrajectoryIsFull_ShouldRejectAtomically3D()
     {

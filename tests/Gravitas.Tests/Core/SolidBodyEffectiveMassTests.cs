@@ -26,21 +26,25 @@ public sealed class SolidBodyEffectiveMassTests
     [Theory]
     [InlineData(false, true)]
     [InlineData(true, false)]
-    public void EffectiveMass_ForKinematicOrPositionFrozenBody_ShouldBehaveAsInfiniteMass(
+    public void EffectiveMass_ForKinematicOrPositionFrozenBody_ShouldApplyRoleAndAxisIndependently(
         bool positionFrozen,
         bool isKinematic)
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(
             Vector3d.Zero,
-            immovable: positionFrozen,
             isKinematic: isKinematic);
+        if (positionFrozen)
+            body.Body.FreezeAxes = BodyFreezeAxes3D.Position;
 
         body.Body.InverseMass.Should().Be(Fixed64.One);
         body.Body.CanTranslate.Should().BeFalse();
-        body.Body.CanRotate.Should().BeFalse();
+        body.Body.CanRotate.Should().Be(!isKinematic);
         body.Body.EffectiveInverseMass.Should().Be(Fixed64.Zero);
-        body.Body.EffectiveInverseInertiaTensor.Should().Be(Fixed3x3.Zero);
+        if (isKinematic)
+            body.Body.EffectiveInverseInertiaTensor.Should().Be(Fixed3x3.Zero);
+        else
+            body.Body.EffectiveInverseInertiaTensor.Should().NotBe(Fixed3x3.Zero);
     }
 
     [Fact]

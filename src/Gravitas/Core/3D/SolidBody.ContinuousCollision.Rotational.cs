@@ -815,14 +815,22 @@ public partial class SolidBody
         return sourceIsA ? contact.Normal : -contact.Normal;
     }
 
-    private bool IsMovingRotationalContinuousCollisionTarget(SolidBody target) =>
-        target != this
-        && (IsKinematic || !target.ShouldOwnContinuousCollisionMovingPair(
-            HasContinuousCollisionRotationalMotion))
-        && target.Active
-        && !target.Collider.IsTrigger
-        && (target.IsKinematic || !target.IsPositionFullyFrozen)
-        && target.Collider != _continuousCollisionHandoffIgnoredCollider3D;
+    private bool IsMovingRotationalContinuousCollisionTarget(SolidBody target)
+    {
+        if (target == this || !target.Active)
+            return false;
+
+        if (target.IsKinematic)
+            target.EnsureContinuousCollisionFramePrepared(Context.LateSimulateToken);
+
+        return (IsKinematic || !target.ShouldOwnContinuousCollisionMovingPair(
+                HasContinuousCollisionRotationalMotion))
+            && !target.Collider.IsTrigger
+            && (target.IsKinematic
+                ? target.HasContinuousCollisionMotion
+                : target.IsDynamic)
+            && target.Collider != _continuousCollisionHandoffIgnoredCollider3D;
+    }
 
     private Fixed64 ResolveRotationalFrameFraction(
         Fixed64 elapsedTime,

@@ -26,7 +26,7 @@ public sealed class Collider2DStateParityTests
     }
 
     [Fact]
-    public void ColliderIsStatic_ShouldBeTrueForBodylessAndPositionFrozenColliders()
+    public void ColliderIsStatic_ShouldDependOnBodylessOrExplicitStaticRole()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
         var bodyless = new LSCircleCollider2D(Fixed64.Half);
@@ -44,11 +44,12 @@ public sealed class Collider2DStateParityTests
         nonDynamicBody.Collider.IsStatic.Should().BeTrue();
 
         body.FreezeAxes = BodyFreezeAxes2D.Position;
-        body.Collider.IsStatic.Should().BeTrue();
-
-        body.FreezeAxes = BodyFreezeAxes2D.None;
         body.Collider.IsStatic.Should().BeFalse();
-        body.IsKinematic = true;
+        body.CanRotate.Should().BeTrue();
+
+        body.SetMotionType(BodyMotionType.Static);
+        body.Collider.IsStatic.Should().BeTrue();
+        body.SetMotionType(BodyMotionType.Kinematic);
         body.Collider.IsStatic.Should().BeFalse();
     }
 
@@ -527,10 +528,11 @@ public sealed class Collider2DStateParityTests
         var agent = new TestMatterAgent(context, transform, isParent);
         var body = new SolidBody2D(agent, collider)
         {
-            Mass = Fixed64.One,
-            FreezeAxes = immovable ? BodyFreezeAxes2D.Position : BodyFreezeAxes2D.None
+            Mass = Fixed64.One
         };
-        body.Initialize(position, isDynamic: isDynamic);
+        body.Initialize(
+            position,
+            motionType: isDynamic && !immovable ? BodyMotionType.Dynamic : BodyMotionType.Static);
         return body;
     }
 

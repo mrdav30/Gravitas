@@ -69,7 +69,9 @@ Non-trigger 3D response:
 
 1. builds solver contacts from the pair manifold, collider bodies, contact
    points, relative COM arms, penetration depth, and pair-oriented normal.
-2. treats fully position-frozen and kinematic bodies as infinite mass.
+2. derives linear and angular solver mobility independently: translation
+   freezes zero constrained inverse mass, rotation freezes zero constrained
+   inverse inertia, and static or kinematic roles contribute neither.
 3. applies positional correction only for depth above
    `CollisionResponse.PenetrationSlop`.
 4. shares correction across active manifold contacts.
@@ -98,11 +100,13 @@ and normal fallback; they are not implicit body COM.
 - `SolidBody2D.EffectiveInverseMomentOfInertia`
 - `SolidBody2D.WorldCenterOfMass`
 
-Position-frozen, kinematic, inactive, non-positive-mass, and yaw-frozen states
-remain infinite mass/inertia to the solver while raw mass and scalar moment stay
-inspectable. 2D contact response applies planar linear velocity deltas and
-scalar angular velocity deltas from COM-relative normal and tangent friction
-impulses.
+Translation-frozen dynamic bodies contribute zero constrained inverse mass but
+retain scalar angular inertia when yaw remains free. Yaw-frozen bodies retain
+their available linear response. Static, kinematic, inactive, and
+non-positive-mass states contribute neither applicable solver value while raw
+mass and scalar moment stay inspectable. 2D contact response applies planar
+linear velocity deltas and scalar angular velocity deltas from COM-relative
+normal and tangent friction impulses.
 
 ## Mixed Response
 

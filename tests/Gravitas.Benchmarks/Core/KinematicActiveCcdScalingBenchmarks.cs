@@ -323,11 +323,10 @@ public class KinematicActiveCcdScalingBenchmarks
         var body = new SolidBody(agent, new LSSphereCollider())
         {
             ContinuousCollisionMode = ContinuousCollisionMode.Continuous,
-            IsKinematic = true,
             Mass = Fixed64.One
         };
 
-        body.Initialize(position, FixedQuaternion.Identity);
+        body.Initialize(position, FixedQuaternion.Identity, BodyMotionType.Kinematic);
         return body;
     }
 
@@ -342,11 +341,10 @@ public class KinematicActiveCcdScalingBenchmarks
             })
         {
             ContinuousCollisionMode = ContinuousCollisionMode.Continuous,
-            IsKinematic = true,
             Mass = Fixed64.One
         };
 
-        body.Initialize(position, FixedQuaternion.Identity);
+        body.Initialize(position, FixedQuaternion.Identity, BodyMotionType.Kinematic);
         return body;
     }
 
@@ -356,11 +354,10 @@ public class KinematicActiveCcdScalingBenchmarks
         var body = new SolidBody2D(agent, new LSCircleCollider2D(Fixed64.Half))
         {
             ContinuousCollisionMode = ContinuousCollisionMode.Continuous,
-            IsKinematic = true,
             Mass = Fixed64.One
         };
 
-        body.Initialize(position);
+        body.Initialize(position, motionType: BodyMotionType.Kinematic);
         return body;
     }
 
@@ -375,11 +372,10 @@ public class KinematicActiveCcdScalingBenchmarks
         var body = new SolidBody2D(agent, collider)
         {
             ContinuousCollisionMode = ContinuousCollisionMode.Continuous,
-            IsKinematic = true,
             Mass = Fixed64.One
         };
 
-        body.Initialize(position);
+        body.Initialize(position, motionType: BodyMotionType.Kinematic);
         return body;
     }
 

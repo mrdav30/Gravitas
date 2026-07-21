@@ -172,12 +172,13 @@ public class CollisionResponseBenchmarks
         var body = new SolidBody(agent, collider)
         {
             Mass = Fixed64.One,
-            FreezeAxes =
-                (immovable ? BodyFreezeAxes3D.Position : BodyFreezeAxes3D.None)
-                | (preventAngularForces ? BodyFreezeAxes3D.Rotation : BodyFreezeAxes3D.None)
+            FreezeAxes = preventAngularForces ? BodyFreezeAxes3D.Rotation : BodyFreezeAxes3D.None
         };
 
-        body.Initialize(position, FixedQuaternion.Identity);
+        body.Initialize(
+            position,
+            FixedQuaternion.Identity,
+            immovable ? BodyMotionType.Static : BodyMotionType.Dynamic);
         return new ScenarioBody<TCollider>(body, collider);
     }
 

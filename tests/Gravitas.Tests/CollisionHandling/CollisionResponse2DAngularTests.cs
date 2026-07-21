@@ -135,11 +135,15 @@ public sealed class CollisionResponse2DAngularTests
             new TestMatterAgent(context, transform),
             new LSAABBoxCollider2D(new Vector2d((Fixed64)2, (Fixed64)2)))
         {
-            Mass = Fixed64.One,
-            FreezeAxes = immovable ? BodyFreezeAxes2D.Position : BodyFreezeAxes2D.None,
-            IsKinematic = isKinematic
+            Mass = Fixed64.One
         };
-        body.Initialize(position);
+        body.Initialize(
+            position,
+            motionType: immovable
+                ? BodyMotionType.Static
+                : isKinematic
+                    ? BodyMotionType.Kinematic
+                    : BodyMotionType.Dynamic);
         return body;
     }
 

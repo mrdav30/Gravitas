@@ -3,6 +3,7 @@ using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Constraints;
 using Gravitas.Diagnostics;
+using Gravitas.Support;
 using Gravitas.Tests.Support;
 using System;
 using Xunit;
@@ -58,15 +59,18 @@ public sealed class Physics3DResponseHardeningTests
     }
 
     [Fact]
-    public void Simulate_WithZeroMassContactAndUnrelatedMovableJoint_ShouldSkipRootlessContact()
+    public void Simulate_WithZeroMassContactInAwakePartitionAndUnrelatedMovableJoint_ShouldSkipRootlessContact()
     {
         using PhysicsScenarioBuilder scenario = CreateScenario();
         ScenarioBody<LSSphereCollider> inertA = scenario.CreateSphere(Vector3d.Zero, mass: Fixed64.Zero);
         ScenarioBody<LSSphereCollider> inertB = scenario.CreateSphere(
             Vector3d.Right * Fixed64.FromFraction(3, 4),
             mass: Fixed64.Zero);
-        ScenarioBody<LSSphereCollider> movable = scenario.CreateSphere(new Vector3d((Fixed64)4, Fixed64.Zero, Fixed64.Zero));
-        ScenarioBody<LSSphereCollider> anchor = scenario.CreateSphere(new Vector3d((Fixed64)7, Fixed64.Zero, Fixed64.Zero), immovable: true);
+        ScenarioBody<LSSphereCollider> movable = scenario.CreateSphere(Vector3d.Forward * Fixed64.FromFraction(3, 4));
+        movable.Collider.IgnoredCollisionLayers = PhysicsLayerMask.All;
+        ScenarioBody<LSSphereCollider> anchor = scenario.CreateSphere(
+            Vector3d.Forward * Fixed64.FromFraction(3, 4) + Vector3d.Right * (Fixed64)3,
+            immovable: true);
         Joint3D joint = scenario.Context.Constraints3D.RegisterJoint(CreateBallSocket(movable.Body, anchor.Body));
         Vector3d inertAStart = inertA.Body.Position3d;
         Vector3d inertBStart = inertB.Body.Position3d;

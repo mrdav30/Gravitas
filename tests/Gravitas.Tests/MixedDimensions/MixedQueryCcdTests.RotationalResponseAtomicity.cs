@@ -11,6 +11,67 @@ namespace Gravitas.Tests.MixedDimensions;
 public sealed partial class MixedQueryCcdTests
 {
     [Fact]
+    public void RotationalMixedResponse_From3D_WithFullyLocked2DTarget_ShouldApplyOnlySourceState()
+    {
+        using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
+        context.Environment.Gravity = Fixed64.Zero;
+        context.Environment.DampingFactor = Fixed64.Zero;
+        ScenarioBody<LSSphereCollider> source = CreateSphere3D(context, -Vector3d.Right);
+        SolidBody2D target = CreateCircle2D(context, Vector2d.Zero);
+        target.FreezeAxes = BodyFreezeAxes2D.All;
+        source.Body.ApplyCollisionLinearVelocityDelta(Vector3d.Right * Fixed64.Two);
+        PrepareMixedContinuousCollisionFrame(context);
+
+        bool applied = source.Body.TryApplyMixedRotationalContinuousCollisionResponse(
+            target.Collider,
+            CreateMixedContact(Vector3d.Right),
+            Fixed64.Half,
+            source.Body.Position3d,
+            Vector3d.Zero,
+            source.Body.Rotation,
+            source.Body.Rotation,
+            Fixed64.Zero,
+            context.DeltaTime,
+            sourceIsKinematic: false);
+
+        applied.Should().BeTrue();
+        source.Body.LinearVelocity.X.Should().BeLessThan(Fixed64.Two);
+        target.Position.Should().Be(Vector2d.Zero);
+        target.LinearVelocity.Should().Be(Vector2d.Zero);
+        target.AngularVelocity.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void RotationalMixedResponse_From2D_WithFullyLocked3DTarget_ShouldApplyOnlySourceState()
+    {
+        using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
+        context.Environment.Gravity = Fixed64.Zero;
+        context.Environment.DampingFactor = Fixed64.Zero;
+        SolidBody2D source = CreateMixedTranslationSource2D(context, -Vector2d.Right);
+        ScenarioBody<LSSphereCollider> target = CreateSphere3D(context, Vector3d.Zero);
+        target.Body.FreezeAxes = BodyFreezeAxes3D.All;
+        source.ApplyCollisionLinearVelocityDelta(Vector2d.Right * Fixed64.Two);
+        PrepareMixedContinuousCollisionFrame(context);
+
+        bool applied = source.TryApplyMixedRotationalContinuousCollisionResponse(
+            target.Collider,
+            CreateMixedContact(Vector3d.Left),
+            Fixed64.Half,
+            source.Position,
+            Vector2d.Zero,
+            source.Rotation,
+            Fixed64.Zero,
+            Fixed64.Zero,
+            context.DeltaTime);
+
+        applied.Should().BeTrue();
+        source.LinearVelocity.X.Should().BeLessThan(Fixed64.Two);
+        target.Body.Position3d.Should().Be(Vector3d.Zero);
+        target.Body.LinearVelocity.Should().Be(Vector3d.Zero);
+        target.Body.AngularVelocity.Should().Be(Vector3d.Zero);
+    }
+
+    [Fact]
     public void RotationalMixedResponse_From2D_When3DTargetTrajectoryIsFull_ShouldRemainAtomic()
     {
         using GravitasWorldContext context = CreateMixedContext(frameRate: 1);

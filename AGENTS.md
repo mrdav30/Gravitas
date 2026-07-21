@@ -127,7 +127,7 @@ The current runtime uses explicit world-context ownership:
 - `GravitasWorldContext` is the host-facing runtime shell. It owns the
   `GridWorld`, context settings, physical environment, deterministic clock,
   lifecycle hooks, and context-local runtime services.
-- `GravitasPhysicsService` owns context-local dynamic body registration,
+- `GravitasPhysicsService` owns context-local simulated body registration,
   collider IDs, collider lookup, collision-pair pooling, active pair processing,
   and physics lifecycle phases.
 - `GravitasPhysics2DService` owns pure 2D body and collider registration,
@@ -145,9 +145,9 @@ The current runtime uses explicit world-context ownership:
 - `GravitasCollisionService` maps colliders into GridForge voxels through
   `GridWorld` spatial hash and active-grid access, `WorldVoxelIndex`, and
   `PhysicsPartition`, using `SwiftCollections` pools and duplicate-check sets.
-  Partition membership is mobility aware: bodyless and immovable colliders are
-  static, kinematic colliders are kinematic, and movable non-kinematic colliders
-  are dynamic.
+  Partition membership is role aware: bodyless and explicit static colliders
+  are static, kinematic colliders are kinematic, and dynamic colliders remain
+  dynamic regardless of their frozen solver axes.
 - `GravitasCollision2DService` maps pure 2D X/Z bounds into GridForge voxels
   through `PhysicsPartition2D`, using the internal Y=0 storage plane as
   deterministic broad-phase identity rather than physical thickness. It follows
@@ -616,7 +616,8 @@ Prioritize tests for:
 - collision detection for every supported shape pair, including edge-touching,
   full overlap, separated, degenerate, and rotated cases.
 - collision response invariants such as conservation expectations, restitution,
-  immovable bodies, kinematic bodies, and angular effects.
+  explicit static bodies, kinematic bodies, translation-frozen angular-only
+  dynamic bodies, fully locked dynamic bodies, and angular effects.
 - GridForge partition interactions, voxel snapping, static/kinematic/dynamic
   membership, partition reuse, and stale partition cleanup.
 - raycast/circlecast ordering and filtering.

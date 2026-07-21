@@ -27,7 +27,7 @@ testing, and replay tools.
 | Host-created shell                                 | Serialized state                                                                                                                                              |
 | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `GravitasWorldContext` and `GridWorld`             | Settings that affect deterministic execution.                                                                                                                 |
-| `IMatterAgent`, `FixedTransform`, engine wrappers  | Body position, rotation, velocities, force/torque stores, gravity scale, sleep, CCD, freeze axes.                                                             |
+| `IMatterAgent`, `FixedTransform`, engine wrappers  | Body position, rotation, motion type, velocities, force/torque stores, gravity scale, sleep, CCD, freeze axes.                                                |
 | `SolidBody`, `SolidBody2D`                         | 3D grounding state and 2D planar support state.                                                                                                               |
 | Concrete `LSCollider` and `LSCollider2D` types     | Active/trigger state for bodyless trigger volumes, layer, local ignored physical layers, material, local offset, shape inputs, mixed half-thickness override. |
 | Compound runtime shells and private part colliders | Authored shape/part values needed to rebuild deterministic geometry.                                                                                          |
@@ -58,12 +58,20 @@ undefined byte-cast values throw `ArgumentOutOfRangeException`. A rejected body
 value does not replace its previously valid mode, and a rejected
 `PhysicsSettingsSaver` does not replace the context's existing settings.
 
+`BodyMotionType` is authoritative serialized state and defaults to `Dynamic`
+when the field is absent. Motion type and freeze masks are validated before any
+loaded body state is published. Loading a different role into an already
+registered shell reconciles simulated-body membership, partitions, CCD state,
+and solver caches through the same atomic lifecycle invariants as a public role
+transition. Undefined roles or freeze bits fail without partially publishing
+the new state.
+
 ## Recordable Types
 
 | Type                                    | What it records                                                                                                                                                                            | What it does not own                                             |
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------- |
-| `SolidBody`                             | 3D position/height, rotation, freeze axes, motion stores, mass, COM, gravity scale, sleep, CCD, grounding/probe state, owned collider state.                                               | `FixedTransform` identity, service IDs, partitions, pairs.       |
-| `SolidBody2D`                           | X/Z position, scalar rotation, freeze axes, planar motion stores, scalar angular state, mass, COM, scalar moment policy, gravity, grounding/probe state, sleep, CCD, owned collider state. | Host transform identity, runtime service IDs, query buffers.     |
+| `SolidBody`                             | 3D position/height, rotation, motion type, freeze axes, motion stores, mass, COM, gravity scale, sleep, CCD, grounding/probe state, owned collider state.                                               | `FixedTransform` identity, service IDs, partitions, pairs.       |
+| `SolidBody2D`                           | X/Z position, scalar rotation, motion type, freeze axes, planar motion stores, scalar angular state, mass, COM, scalar moment policy, gravity, grounding/probe state, sleep, CCD, owned collider state. | Host transform identity, runtime service IDs, query buffers.     |
 | `LSCollider`                            | 3D active state, bodyless trigger state, layer/filter state, local ignored physical mask, material, shape state.                                                                           | Context-owned collider ID, partition identity, pairs/events.     |
 | `LSCollider2D`                          | 2D active state, bodyless trigger state, layer/filter state, material, shape-local values, mixed half-thickness override.                                                                  | Context-owned collider ID, private runtime pair/partition state. |
 | `ColliderShapeDefinition`               | Data-only 3D authoring/import values for primitive, mesh, and compound part inputs.                                                                                                        | Runtime body, context, collider ID, pairs, hierarchy, events.    |
@@ -136,6 +144,9 @@ The authoritative hash follows the same boundary as
 
 Replay hashes use Chronicler's `ChronicleHash` value and hash-writer mechanics.
 Gravitas owns the physics-specific inclusion policy and deterministic ordering.
+The `body.2d` and `body.3d` replay sections are version 4 because motion type is
+now explicit hash input. Sparse transports that omit a default-valued
+`MotionType` deterministically resolve it to `Dynamic`.
 
 ```mermaid
 flowchart LR

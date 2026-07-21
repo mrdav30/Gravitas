@@ -109,10 +109,9 @@ public sealed class MixedBatchQueryTests
         var agent = new TestMatterAgent(context, new FixedTransform(position, FixedQuaternion.Identity, Vector3d.One));
         var body = new SolidBody(agent, collider)
         {
-            Mass = Fixed64.One,
-            FreezeAxes = BodyFreezeAxes3D.Position
+            Mass = Fixed64.One
         };
-        body.Initialize(position, FixedQuaternion.Identity);
+        body.Initialize(position, FixedQuaternion.Identity, BodyMotionType.Static);
         return new ScenarioBody<LSSphereCollider>(body, collider);
     }
 

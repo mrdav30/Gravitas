@@ -144,26 +144,52 @@ public sealed partial class ContinuousCollision2DTests
         first.Hash.Should().Be(second.Hash);
     }
 
-    [Fact]
-    public void ContinuousMode_PureRotation_ShouldResolveMultipleMovingTargetsInTimeOrder()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ContinuousMode_PureRotation_ShouldResolveMultipleMovingTargetsInTimeOrderRegardlessOfRegistration(
+        bool reverseTargetRegistration)
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
         context.Settings.ContinuousCollisionMaxToiIterations = 4;
         SolidBody2D blade = CreateRotationalMovingPairBlade2D(context, isKinematic: true);
-        SolidBody2D first = CreateRotationalMovingPairTarget2D(
+        Fixed64 earlyAngle = FixedMath.DegToRad((Fixed64)30);
+        Fixed64 lateAngle = FixedMath.DegToRad((Fixed64)60);
+        SolidBody2D firstRegistered = CreateRotationalMovingPairTarget2D(
             context,
-            FixedMath.DegToRad((Fixed64)30));
-        SolidBody2D second = CreateRotationalMovingPairTarget2D(
+            reverseTargetRegistration ? lateAngle : earlyAngle);
+        SolidBody2D secondRegistered = CreateRotationalMovingPairTarget2D(
             context,
-            FixedMath.DegToRad((Fixed64)60));
-        first.Sleep();
-        second.Sleep();
+            reverseTargetRegistration ? earlyAngle : lateAngle);
+        firstRegistered.Sleep();
+        secondRegistered.Sleep();
 
         blade.Agent.Transform.LocalRotationXZRadians = RotationalMovingPairQuarterTurn2D;
         context.LateSimulate();
 
-        first.IsSleeping.Should().BeFalse();
-        second.IsSleeping.Should().BeFalse();
+        firstRegistered.IsSleeping.Should().BeFalse();
+        secondRegistered.IsSleeping.Should().BeFalse();
+        blade.LastContinuousCollisionToiIterationCount.Should().BeGreaterThanOrEqualTo(2);
+    }
+
+    [Fact]
+    public void ContinuousMode_CoincidentMovingTargets_ShouldResolveEqualTimeCandidatesByColliderId()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        context.Settings.ContinuousCollisionMaxToiIterations = 4;
+        SolidBody2D blade = CreateRotationalMovingPairBlade2D(context, isKinematic: true);
+        Fixed64 targetAngle = FixedMath.DegToRad((Fixed64)45);
+        SolidBody2D lowerId = CreateRotationalMovingPairTarget2D(context, targetAngle);
+        SolidBody2D higherId = CreateRotationalMovingPairTarget2D(context, targetAngle);
+        lowerId.Collider.Id.Should().BeLessThan(higherId.Collider.Id);
+        lowerId.Sleep();
+        higherId.Sleep();
+
+        blade.Agent.Transform.LocalRotationXZRadians = RotationalMovingPairQuarterTurn2D;
+        context.LateSimulate();
+
+        lowerId.IsSleeping.Should().BeFalse();
+        higherId.IsSleeping.Should().BeFalse();
         blade.LastContinuousCollisionToiIterationCount.Should().BeGreaterThanOrEqualTo(2);
     }
 
@@ -190,7 +216,7 @@ public sealed partial class ContinuousCollision2DTests
         blade.Rotation.Should().BeLessThan(RotationalMovingPairQuarterTurn2D);
         blade.SampleContinuousCollisionPosition(Fixed64.One).Should().Be(blade.Position);
         blade.SampleContinuousCollisionRotation(Fixed64.One).Should().Be(blade.Rotation);
-        blade.SampleContinuousCollisionAngularVelocity(Fixed64.One).Should().Be(Fixed64.Zero);
+        blade.SampleContinuousCollisionAngularVelocity(Fixed64.One).Should().Be(blade.AngularVelocity);
     }
 
     [Fact]
@@ -245,6 +271,7 @@ public sealed partial class ContinuousCollision2DTests
             Vector2d.Zero,
             immovable: false);
         body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        body.FreezeAxes = BodyFreezeAxes2D.Position;
 
         body.ApplyContinuousCollisionHandoff(
             Vector2d.Zero,
@@ -259,6 +286,7 @@ public sealed partial class ContinuousCollision2DTests
             .Should()
             .BeTrue();
         body.Rotation.Should().Be(RotationalMovingPairQuarterTurn2D * Fixed64.Half);
+        body.Position.Should().Be(Vector2d.Zero);
     }
 
     [Fact]

@@ -24,7 +24,7 @@ public partial class SolidBody
         && ContinuousCollisionTargetPolicy.AllowsIndexed3DTarget(
             ReferenceEquals(target, this),
             target.Active,
-            target.IsPositionFullyFrozen,
+            target.IsDynamic,
             target.IsKinematic,
             target.IsKinematic && target.HasContinuousCollisionMotion,
             target.Collider.IsTrigger,
@@ -38,7 +38,7 @@ public partial class SolidBody
             _continuousCollisionHandoffIgnoredCollider2D)
         && ContinuousCollisionTargetPolicy.AllowsMixedIndexedTarget(
             target.Active,
-            target.IsPositionFullyFrozen,
+            target.IsDynamic,
             target.IsKinematic,
             target.IsKinematic && target.HasContinuousCollisionMotion,
             target.Collider.IsTrigger,
@@ -128,7 +128,6 @@ public partial class SolidBody
         }
 
         return ContinuousCollisionTargetPolicy.AllowsStaticOrKinematic3DTarget(
-            hasCollider: true,
             ReferenceEquals(hitCollider, Collider),
             ContinuousCollisionCandidateOrdering.IsIgnoredTarget(hitCollider, _continuousCollisionHandoffIgnoredCollider3D),
             hitCollider.IsTrigger,
@@ -148,7 +147,6 @@ public partial class SolidBody
         }
 
         return ContinuousCollisionTargetPolicy.AllowsMixedStaticOrKinematicTarget(
-            hasCollider: true,
             ContinuousCollisionCandidateOrdering.IsIgnoredTarget(hitCollider, _continuousCollisionHandoffIgnoredCollider2D),
             hitCollider.IsTrigger,
             Context.MixedCollisions.RequireCollisionPair(Collider, hitCollider),

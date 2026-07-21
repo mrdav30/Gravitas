@@ -60,6 +60,12 @@ internal sealed class ConstraintEndpointJointIndex<TBody>
         return false;
     }
 
+    internal bool TryGetPrevious(TBody body, int jointId, out int previousJointId)
+    {
+        previousJointId = GetEndpoint(jointId, body).PreviousJointId;
+        return previousJointId != 0;
+    }
+
     internal void Clear()
     {
         _chainsByBody.Clear();

@@ -7,6 +7,7 @@ using Gravitas.Constraints;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
 using GridForge.Configuration;
+using SwiftCollections.Query;
 using System;
 using Xunit;
 
@@ -16,6 +17,91 @@ public sealed partial class ContinuousCollisionDetectionTests
 {
     private static readonly Fixed64 WallThickness = Fixed64.FromFraction(1, 10);
     private static readonly Fixed64 ExpectedSphereImpactX = -(Fixed64.Half + WallThickness * Fixed64.Half);
+
+    [Fact]
+    public void ContinuousCollisionIndex_WithFullyLockedDynamicBody_ShouldRetainTarget()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
+        body.Body.FreezeAxes = BodyFreezeAxes3D.All;
+        var bounds = DynamicCcdCandidateIndex.CreateSweptSphereBounds(
+            Vector3d.Zero,
+            Vector3d.Zero,
+            Fixed64.One);
+
+        var candidates = scenario.Context.Physics.QueryContinuousCollisionCandidates(bounds);
+
+        candidates.Should().ContainSingle().Which.Should().Be(body.Body.DynamicId);
+    }
+
+    [Fact]
+    public void PreparedContinuousCollisionIndex_MotionTypeTransitions_ShouldRebuildCurrentRole3D()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
+        FixedBoundVolume originBounds = DynamicCcdCandidateIndex.CreateSweptSphereBounds(
+            Vector3d.Zero,
+            Vector3d.Zero,
+            Fixed64.One);
+
+        scenario.Context.Physics.QueryContinuousCollisionCandidates(originBounds)
+            .Should().Contain(body.Body.DynamicId);
+
+        body.Body.SetMotionType(BodyMotionType.Static);
+        scenario.Context.Physics.QueryContinuousCollisionCandidates(originBounds)
+            .Should().BeEmpty();
+
+        body.Body.SetMotionType(BodyMotionType.Dynamic);
+        scenario.Context.Physics.QueryContinuousCollisionCandidates(originBounds)
+            .Should().Contain(body.Body.DynamicId);
+
+        body.Body.SetMotionType(BodyMotionType.Kinematic);
+        body.Body.Agent.Transform.LocalPosition = Vector3d.Right * (Fixed64)4;
+        scenario.Context.Physics.QueryContinuousCollisionCandidates(
+                DynamicCcdCandidateIndex.CreateSweptSphereBounds(
+                    Vector3d.Right * (Fixed64)4,
+                    Vector3d.Right * (Fixed64)4,
+                    Fixed64.One))
+            .Should().Contain(body.Body.DynamicId);
+
+        body.Body.SetMotionType(BodyMotionType.Dynamic);
+        scenario.Context.Physics.QueryContinuousCollisionCandidates(originBounds)
+            .Should().Contain(body.Body.DynamicId);
+    }
+
+    [Fact]
+    public void PrepareContinuousCollisionFrame_WithPositionFrozenDynamicBody_ShouldIntegrateTorque()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
+        body.Body.FreezeAxes = BodyFreezeAxes3D.Position;
+        body.Body.AddTorque(Vector3d.Up);
+
+        scenario.Context.Physics.PrepareContinuousCollisionFrame();
+
+        body.Body.LinearVelocity.Should().Be(Vector3d.Zero);
+        body.Body.AngularVelocity.Should().NotBe(Vector3d.Zero);
+    }
+
+    [Fact]
+    public void ContinuousMode_WithFullyLockedDynamicTarget_ShouldStopBeforeTunneling()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        ScenarioBody<LSSphereCollider> source = scenario.CreateSphere(-Vector3d.Right * (Fixed64)5);
+        ScenarioBody<LSSphereCollider> target = scenario.CreateSphere(Vector3d.Zero);
+        source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        source.Collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.Zero);
+        target.Collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.Zero);
+        target.Body.FreezeAxes = BodyFreezeAxes3D.All;
+        DisableGroundQueries(source.Body);
+        DisableGroundQueries(target.Body);
+
+        source.Body.AddForce(Vector3d.Right * (Fixed64)10);
+        scenario.Context.LateSimulate();
+
+        source.Body.Position3d.X.Should().BeLessThanOrEqualTo(-Fixed64.One);
+        target.Body.Position3d.Should().Be(Vector3d.Zero);
+    }
 
     [Theory]
     [InlineData((byte)4)]
@@ -1426,11 +1512,11 @@ public sealed partial class ContinuousCollisionDetectionTests
     }
 
     [Fact]
-    public void ContinuousHandoff_WithFrozenBody_ShouldNotMoveOrQueue()
+    public void ContinuousHandoff_WithFullyLockedBody_ShouldNotMoveOrQueue()
     {
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();
         ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
-        body.Body.FreezeAxes = BodyFreezeAxes3D.Position;
+        body.Body.FreezeAxes = BodyFreezeAxes3D.All;
 
         body.Body.ApplyContinuousCollisionHandoff(
             Vector3d.Right,
@@ -1645,7 +1731,7 @@ public sealed partial class ContinuousCollisionDetectionTests
     }
 
     [Fact]
-    public void ContinuousHandoff_WhenFrozenAfterQueue_ShouldConsumeAtImpactAndRefreshCollider()
+    public void ContinuousHandoff_WhenFullyLockedAfterQueue_ShouldConsumeAtImpactAndRefreshCollider()
     {
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();
         ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
@@ -1655,7 +1741,7 @@ public sealed partial class ContinuousCollisionDetectionTests
             Vector3d.Right * Fixed64.Half,
             Vector3d.Right,
             Fixed64.Half);
-        body.Body.FreezeAxes = BodyFreezeAxes3D.Position;
+        body.Body.FreezeAxes = BodyFreezeAxes3D.All;
         body.Body.LateSimulate();
 
         body.Body.Position3d.X.Should().Be(Fixed64.Half);
@@ -1664,7 +1750,7 @@ public sealed partial class ContinuousCollisionDetectionTests
     }
 
     [Fact]
-    public void ContinuousHandoff_WhenFrozenAfterQueueAndDirectConsumeWithoutColliderRefresh_ShouldRemainAtImpact()
+    public void ContinuousHandoff_WhenFullyLockedAfterQueueAndDirectConsumeWithoutColliderRefresh_ShouldRemainAtImpact()
     {
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();
         ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
@@ -1674,7 +1760,7 @@ public sealed partial class ContinuousCollisionDetectionTests
             Vector3d.Right * Fixed64.Half,
             Vector3d.Right,
             Fixed64.Half);
-        body.Body.FreezeAxes = BodyFreezeAxes3D.Position;
+        body.Body.FreezeAxes = BodyFreezeAxes3D.All;
 
         body.Body.TryConsumeContinuousCollisionHandoff(
             updateSleepState: false,
@@ -2757,11 +2843,10 @@ public sealed partial class ContinuousCollisionDetectionTests
         var body = new SolidBody(new TestMatterAgent(context, transform), new LSSphereCollider())
         {
             ContinuousCollisionMode = ContinuousCollisionMode.Continuous,
-            IsKinematic = true,
             Mass = Fixed64.One
         };
 
-        body.Initialize(position, FixedQuaternion.Identity);
+        body.Initialize(position, FixedQuaternion.Identity, BodyMotionType.Kinematic);
         return body;
     }
 
@@ -2772,11 +2857,10 @@ public sealed partial class ContinuousCollisionDetectionTests
             new TestMatterAgent(context, transform),
             new LSSphereCollider { Radius = Fixed64.FromFraction(1, 4) })
         {
-            FreezeAxes = BodyFreezeAxes3D.Position,
             Mass = Fixed64.One
         };
 
-        body.Initialize(position, FixedQuaternion.Identity);
+        body.Initialize(position, FixedQuaternion.Identity, BodyMotionType.Static);
         return body;
     }
 

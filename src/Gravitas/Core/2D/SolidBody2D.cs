@@ -36,7 +36,7 @@ public sealed partial class SolidBody2D : IRecordable
     private Fixed64 _deltaAngularAcceleration;
     private Fixed64 _angularSpeed;
     private bool _isSleeping;
-    private bool _isDynamic;
+    private BodyMotionType _motionType;
     private int _sleepFrameCount;
     private bool _sleepEnabled = true;
     private int _sleepFrameThreshold = 16;
@@ -68,6 +68,10 @@ public sealed partial class SolidBody2D : IRecordable
 
     public LSCollider2D Collider { get; }
 
+    /// <summary>
+    /// Gets the ephemeral simulated-body slot, or <c>-1</c> for a static or
+    /// unregistered body.
+    /// </summary>
     public int DynamicId { get; internal set; } = -1;
 
     public bool Active { get; private set; }
@@ -77,7 +81,7 @@ public sealed partial class SolidBody2D : IRecordable
     /// <summary>
     /// Gets or sets the planar translational and yaw rotational degrees of
     /// freedom frozen for pure 2D solver response, integration, CCD, and
-    /// partition mobility.
+    /// rotational CCD.
     /// </summary>
     public BodyFreezeAxes2D FreezeAxes
     {
@@ -100,8 +104,7 @@ public sealed partial class SolidBody2D : IRecordable
     }
 
     /// <summary>
-    /// Gets whether both planar translation axes are frozen. Such bodies behave
-    /// as static-equivalent participants for solver and partition mobility.
+    /// Gets whether both planar translation axes are frozen.
     /// </summary>
     public bool IsPositionFullyFrozen
     {
@@ -109,19 +112,141 @@ public sealed partial class SolidBody2D : IRecordable
         get => (_freezeAxes & BodyFreezeAxes2D.Position) == BodyFreezeAxes2D.Position;
     }
 
-    private bool _isKinematic;
-    public bool IsKinematic
-    {
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        get => _isKinematic;
-        set
-        {
-            if (_isKinematic == value)
-                return;
+    /// <summary>
+    /// Gets this body's explicit solver-controlled, host-controlled, or static
+    /// runtime role.
+    /// </summary>
+    public BodyMotionType MotionType => _motionType;
 
-            _isKinematic = value;
-            RefreshPartitionMobility();
+    /// <summary>
+    /// Gets whether the solver controls this body.
+    /// </summary>
+    public bool IsDynamic => _motionType == BodyMotionType.Dynamic;
+
+    /// <summary>
+    /// Gets whether this body is excluded from per-frame motion.
+    /// </summary>
+    public bool IsStatic => _motionType == BodyMotionType.Static;
+
+    /// <summary>
+    /// Gets whether the host controls this body's pose.
+    /// </summary>
+    public bool IsKinematic => _motionType == BodyMotionType.Kinematic;
+
+    /// <summary>
+    /// Changes this registered body's runtime role between fixed-step
+    /// transactions.
+    /// </summary>
+    /// <remarks>
+    /// The transition preserves body, collider, pair, joint, and host identity,
+    /// but clears incompatible motion, sleep, CCD, and solver-cache state before
+    /// repartitioning. Freeze axes remain independent of the selected role.
+    /// </remarks>
+    /// <exception cref="System.ArgumentOutOfRangeException">
+    /// <paramref name="motionType"/> is undefined.
+    /// </exception>
+    /// <exception cref="System.InvalidOperationException">
+    /// The body is not currently registered, its context registration has been
+    /// reset, or a simulation transaction or callback is active.
+    /// </exception>
+    public void SetMotionType(BodyMotionType motionType)
+    {
+        if (!PrepareMotionTypeTransition(motionType))
+            return;
+
+        CommitMotionTypeTransition(motionType);
+    }
+
+    internal bool PrepareMotionTypeTransition(BodyMotionType motionType)
+    {
+        motionType.ThrowIfInvalid(nameof(motionType));
+        ThrowIfRuntimeRegistrationMissing();
+        if (_motionType == motionType)
+            return false;
+
+        Context.ThrowIfFixedStepMutationNotAllowed();
+        Collider.ValidateCurrentRuntimeTransform();
+        if (motionType != BodyMotionType.Dynamic)
+            PublishAuthoritativePose();
+
+        return true;
+    }
+
+    internal void CommitMotionTypeTransition(BodyMotionType motionType)
+    {
+        ReconcileMotionTypeRegistration(motionType);
+
+        ClearMotionForMotionTypeTransition();
+        _isSleeping = false;
+        _sleepFrameCount = 0;
+        InvalidateContinuousCollisionFrame();
+        ApplyFreezeConstraintsToMotion();
+        RefreshMassPropertiesFromColliderShape();
+        RefreshPartitionMobility();
+    }
+
+    internal void ApplyLoadedMotionType(BodyMotionType motionType)
+    {
+        motionType.ThrowIfInvalid(nameof(motionType));
+        if (_motionType == motionType)
+            return;
+
+        if (!Active)
+        {
+            _motionType = motionType;
+            return;
         }
+
+        ReconcileMotionTypeRegistration(motionType);
+        InvalidateContinuousCollisionFrame();
+    }
+
+    internal void PreflightLoadedMotionType(BodyMotionType motionType)
+    {
+        motionType.ThrowIfInvalid(nameof(motionType));
+        if (!Active)
+            return;
+
+        ThrowIfRuntimeRegistrationMissing();
+        Context.ThrowIfFixedStepMutationNotAllowed();
+        Collider.ValidateCurrentRuntimeTransform();
+    }
+
+    private void ThrowIfRuntimeRegistrationMissing()
+    {
+        SwiftThrowHelper.ThrowIfTrue(
+            !Active,
+            nameof(SolidBody2D),
+            "2D body runtime state cannot change before initialization or after deactivation.");
+        SwiftThrowHelper.ThrowIfTrue(
+            !Context.Physics2D.TryGetColliderById(Collider.Id, out LSCollider2D? registeredCollider)
+                || !ReferenceEquals(registeredCollider, Collider),
+            nameof(SolidBody2D),
+            "2D body runtime state cannot change after its registration has been reset or replaced.");
+    }
+
+    private void ReconcileMotionTypeRegistration(BodyMotionType motionType)
+    {
+        BodyMotionType previousMotionType = _motionType;
+        Context.Physics2D.ClearWarmStartCachesForCollider(Collider);
+        Context.Constraints2D.ClearSolverCachesForBody(this);
+        Context.Physics2D.InvalidateContinuousCollisionStateForMotionTypeChange(this, DynamicId);
+
+        _motionType = motionType;
+        Context.Physics2D.RefreshBodyMotionTypeRegistration(this, previousMotionType);
+        Context.Physics2D.RefreshColliderServiceRefreshRegistration(Collider);
+    }
+
+    private void ClearMotionForMotionTypeTransition()
+    {
+        _linearVelocity = Vector2d.Zero;
+        _linearAccelerationStore = Vector2d.Zero;
+        _deltaAcceleration = Vector2d.Zero;
+        _linearSpeed = Fixed64.Zero;
+        _angularVelocity = Fixed64.Zero;
+        _angularAccelerationStore = Fixed64.Zero;
+        _deltaAngularAcceleration = Fixed64.Zero;
+        _angularSpeed = Fixed64.Zero;
     }
 
     /// <summary>
@@ -153,7 +278,7 @@ public sealed partial class SolidBody2D : IRecordable
     /// <summary>
     /// Gets whether pure 2D yaw rotation is frozen.
     /// </summary>
-    public bool AngularMotionFrozen
+    public bool IsRotationFullyFrozen
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get => (_freezeAxes & BodyFreezeAxes2D.Rotation) == BodyFreezeAxes2D.Rotation;
@@ -178,12 +303,18 @@ public sealed partial class SolidBody2D : IRecordable
     /// <summary>
     /// Gets whether solver-side response may translate this pure 2D body.
     /// </summary>
-    public bool CanTranslate => Active && _isDynamic && !IsPositionFullyFrozen && !IsKinematic && InverseMass > Fixed64.Zero;
+    public bool CanTranslate => Active && DynamicId >= 0 && IsDynamic && !IsPositionFullyFrozen && InverseMass > Fixed64.Zero;
 
     /// <summary>
     /// Gets whether solver-side response may rotate this pure 2D body around its yaw axis.
     /// </summary>
-    public bool CanRotate => CanTranslate && !AngularMotionFrozen && _inverseMomentOfInertia > Fixed64.Zero;
+    public bool CanRotate => Active
+        && DynamicId >= 0
+        && IsDynamic
+        && !IsRotationFullyFrozen
+        && _inverseMomentOfInertia > Fixed64.Zero;
+
+    internal bool HasSolverMobility => CanTranslate || CanRotate;
 
     /// <summary>
     /// Gets the inverse mass that should be used by pure 2D and mixed response.
@@ -379,10 +510,14 @@ public sealed partial class SolidBody2D : IRecordable
 
     public bool IsSleeping => _isSleeping;
 
-    internal bool IsAwakeForCollision => Active && !IsPositionFullyFrozen && !IsSleeping;
+    internal bool IsAwakeForCollision => HasSolverMobility && !IsSleeping;
 
-    public void Initialize(Vector2d position, Fixed64 rotation = default, bool isDynamic = true)
+    public void Initialize(
+        Vector2d position,
+        Fixed64 rotation = default,
+        BodyMotionType motionType = BodyMotionType.Dynamic)
     {
+        motionType.ThrowIfInvalid(nameof(motionType));
         SwiftThrowHelper.ThrowIfTrue(Active, nameof(SolidBody2D), "2D body is already initialized.");
         SwiftThrowHelper.ThrowIfArgument(
             Collider.Id >= 0
@@ -402,14 +537,14 @@ public sealed partial class SolidBody2D : IRecordable
         _deltaAngularAcceleration = Fixed64.Zero;
         _angularSpeed = Fixed64.Zero;
         _isSleeping = false;
-        _isDynamic = isDynamic;
+        _motionType = motionType;
         _sleepFrameCount = 0;
         InvalidateContinuousCollisionFrame();
         ResetGroundingForInitialize(position);
         Active = true;
         Collider.Initialize(this);
         RefreshMassPropertiesFromColliderShape();
-        Context.Physics2D.AssimilateBody(this, isDynamic);
+        Context.Physics2D.AssimilateBody(this, motionType);
         CheckGroundForSimulation();
     }
 
@@ -420,6 +555,7 @@ public sealed partial class SolidBody2D : IRecordable
     /// <param name="rotation">The new yaw rotation in radians.</param>
     public void ResetPosition(Vector2d position = default, Fixed64 rotation = default)
     {
+        PreflightStaticPoseChange();
         _linearVelocity = Vector2d.Zero;
         _linearAccelerationStore = Vector2d.Zero;
         _deltaAcceleration = Vector2d.Zero;
@@ -440,6 +576,7 @@ public sealed partial class SolidBody2D : IRecordable
             return;
 
         Collider.Rebuild();
+        RefreshStaticColliderAfterExplicitPoseChange();
         if (wasSleeping)
             Context.Collisions2D.RefreshPartitionAwakeState(Collider);
     }
@@ -503,7 +640,7 @@ public sealed partial class SolidBody2D : IRecordable
             if (IsKinematic)
                 UpdateKinematicPositionAndRotation(updateColliderState);
 
-            if (!CanTranslate)
+            if (!HasSolverMobility)
             {
                 _linearAccelerationStore = Vector2d.Zero;
                 _deltaAcceleration = Vector2d.Zero;
@@ -642,6 +779,9 @@ public sealed partial class SolidBody2D : IRecordable
             "Host transform cannot represent the requested world-space 2D pose.");
     }
 
+    private void PublishAuthoritativePose() =>
+        SetHostWorldPose(Agent.Transform, _position, _rotation);
+
     /// <summary>
     /// Removes this body and its collider from the pure 2D runtime service.
     /// </summary>
@@ -654,7 +794,6 @@ public sealed partial class SolidBody2D : IRecordable
         InvalidateContinuousCollisionFrame();
         Context.Physics2D.DessimilateBody(this);
         Active = false;
-        _isDynamic = false;
         DynamicId = -1;
         Collider.IsActive = false;
         Collider.ClearPhysicsState();

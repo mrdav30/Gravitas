@@ -115,13 +115,16 @@ public sealed partial class ContinuousCollision2DTests
             .Be(1);
     }
 
-    [Fact]
-    public void RotationalSweep_BetweenNonCircularShapes_ShouldUseBoundsSeparationFallback()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RotationalSweep_BetweenNonCircularShapes_ShouldUseBoundsSeparationFallback(
+        bool isKinematic)
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
         SolidBody2D blade = CreateRotationalMovingPairBlade2D(
             context,
-            isKinematic: true);
+            isKinematic);
         _ = CreateBody(
             context,
             new LSAABBoxCollider2D(new Vector2d(
@@ -132,11 +135,16 @@ public sealed partial class ContinuousCollision2DTests
         Fixed64 startRotation = FixedMath.DegToRad((Fixed64)(-5));
         Fixed64 endRotation = -startRotation;
         blade.SetRotation(startRotation);
-        blade.Agent.Transform.LocalRotationXZRadians = endRotation;
+        if (isKinematic)
+            blade.Agent.Transform.LocalRotationXZRadians = endRotation;
+        else
+            blade.ApplyCollisionAngularVelocityDelta(endRotation - startRotation);
 
         context.LateSimulate();
 
         blade.Rotation.Should().BeLessThan(endRotation);
         blade.LastContinuousCollisionToiIterationCount.Should().Be(1);
+        if (!isKinematic)
+            blade.AngularVelocity.Should().Be(Fixed64.Zero);
     }
 }

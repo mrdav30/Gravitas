@@ -285,10 +285,9 @@ public sealed class CollisionPair2DManifoldTests
             new TestMatterAgent(context, CreateTransform(position)),
             new LSCircleCollider2D(Fixed64.Half))
         {
-            Mass = Fixed64.One,
-            FreezeAxes = immovable ? BodyFreezeAxes2D.Position : BodyFreezeAxes2D.None
+            Mass = Fixed64.One
         };
-        body.Initialize(position);
+        body.Initialize(position, motionType: immovable ? BodyMotionType.Static : BodyMotionType.Dynamic);
         return body;
     }
 
@@ -308,10 +307,9 @@ public sealed class CollisionPair2DManifoldTests
             new TestMatterAgent(context, CreateTransform(position)),
             new LSAABBoxCollider2D(size))
         {
-            Mass = Fixed64.One,
-            FreezeAxes = immovable ? BodyFreezeAxes2D.Position : BodyFreezeAxes2D.None
+            Mass = Fixed64.One
         };
-        body.Initialize(position);
+        body.Initialize(position, motionType: immovable ? BodyMotionType.Static : BodyMotionType.Dynamic);
         return body;
     }
 
@@ -324,10 +322,9 @@ public sealed class CollisionPair2DManifoldTests
             new TestMatterAgent(context, CreateTransform(position)),
             new LSCapsuleCollider2D(Fixed64.Half, (Fixed64)4))
         {
-            Mass = Fixed64.One,
-            FreezeAxes = immovable ? BodyFreezeAxes2D.Position : BodyFreezeAxes2D.None
+            Mass = Fixed64.One
         };
-        body.Initialize(position);
+        body.Initialize(position, motionType: immovable ? BodyMotionType.Static : BodyMotionType.Dynamic);
         return body;
     }
 
@@ -340,10 +337,9 @@ public sealed class CollisionPair2DManifoldTests
             new TestMatterAgent(context, CreateTransform(position)),
             new LSCompoundCollider2D(parts))
         {
-            Mass = Fixed64.One,
-            FreezeAxes = BodyFreezeAxes2D.Position
+            Mass = Fixed64.One
         };
-        body.Initialize(position);
+        body.Initialize(position, motionType: BodyMotionType.Static);
         return body;
     }
 

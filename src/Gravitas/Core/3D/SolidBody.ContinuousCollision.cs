@@ -116,12 +116,16 @@ public partial class SolidBody
     }
 
     internal Vector3d SampleContinuousCollisionPosition(Fixed64 frameFraction) =>
-        ResolveContinuousCollisionSegment(frameFraction).SamplePosition(frameFraction);
+        _continuousCollisionTrajectory.Count == 0
+            ? Position3d
+            : ResolveContinuousCollisionSegment(frameFraction).SamplePosition(frameFraction);
 
     internal FixedQuaternion SampleContinuousCollisionRotation(Fixed64 frameFraction) =>
-        ResolveContinuousCollisionSegment(frameFraction).SampleRotation(
-            frameFraction,
-            Context.DeltaTime);
+        _continuousCollisionTrajectory.Count == 0
+            ? Rotation
+            : ResolveContinuousCollisionSegment(frameFraction).SampleRotation(
+                frameFraction,
+                Context.DeltaTime);
 
     internal Vector3d SampleContinuousCollisionLinearVelocity(Fixed64 frameFraction)
     {
@@ -200,10 +204,14 @@ public partial class SolidBody
         else
         {
             _continuousCollisionAngularVelocityStepStart = _angularVelocity;
-            if (!IsPositionFullyFrozen && !_isSleeping)
+            if (!_isSleeping)
             {
-                ApplyLinearForces();
-                UpdateLinearVelocity();
+                if (CanTranslate)
+                {
+                    ApplyLinearForces();
+                    UpdateLinearVelocity();
+                }
+
                 if (CanRotate)
                 {
                     ApplyAngularTorques();

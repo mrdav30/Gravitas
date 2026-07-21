@@ -26,17 +26,25 @@ public sealed class Constraint2DServiceTests
     }
 
     [Fact]
-    public void Joint2D_IsSolverBody_ShouldRequireActiveRegisteredTranslatableBody()
+    public void Joint2D_IsSolverBody_ShouldRequireActiveRegisteredSolverMobility()
     {
         using GravitasWorldContext context = CreateConstraintContext();
         SolidBody2D active = CreateBody(context, Vector2d.Zero);
-        SolidBody2D frozen = CreateBody(context, Vector2d.Right * (Fixed64)2, immovable: true);
+        SolidBody2D frozen = CreateBody(context, Vector2d.Right * (Fixed64)2);
+        SolidBody2D locked = CreateBody(context, Vector2d.Right * (Fixed64)3);
         SolidBody2D inactive = CreateBody(context, Vector2d.Right * (Fixed64)4);
+        frozen.FreezeAxes = BodyFreezeAxes2D.Position;
+        locked.FreezeAxes = BodyFreezeAxes2D.All;
 
         inactive.Deactivate();
 
+        active.Active.Should().BeTrue();
+        active.DynamicId.Should().BeGreaterThanOrEqualTo(0);
+        active.IsDynamic.Should().BeTrue();
+        active.CanTranslate.Should().BeTrue();
         Joint2D.IsSolverBody(active).Should().BeTrue();
-        Joint2D.IsSolverBody(frozen).Should().BeFalse();
+        Joint2D.IsSolverBody(frozen).Should().BeTrue();
+        Joint2D.IsSolverBody(locked).Should().BeFalse();
         Joint2D.IsSolverBody(inactive).Should().BeFalse();
     }
 
@@ -58,6 +66,23 @@ public sealed class Constraint2DServiceTests
         context.Constraints2D.PeakJointCount.Should().Be(2);
         context.Constraints2D.TryGetJoint(1, out Joint2D? resolved).Should().BeTrue();
         resolved.Should().BeSameAs(firstJoint);
+    }
+
+    [Fact]
+    public void MotionTypeChange_ShouldClearAttachedJointSolverCacheWithoutRemovingJoint()
+    {
+        using GravitasWorldContext context = CreateConstraintContext();
+        SolidBody2D first = CreateBody(context, Vector2d.Zero);
+        SolidBody2D second = CreateBody(context, Vector2d.Right * (Fixed64)2);
+        Joint2D joint = context.Constraints2D.RegisterJoint(CreatePin(first, second));
+        joint.AccumulatedImpulseMagnitude = Fixed64.One;
+
+        first.SetMotionType(BodyMotionType.Kinematic);
+
+        joint.AccumulatedImpulseMagnitude.Should().Be(Fixed64.Zero);
+        context.Constraints2D.RegisteredJointCount.Should().Be(1);
+        context.Constraints2D.TryGetJoint(joint.Id, out Joint2D? retained).Should().BeTrue();
+        retained.Should().BeSameAs(joint);
     }
 
     [Fact]
@@ -215,8 +240,8 @@ public sealed class Constraint2DServiceTests
         context.Constraints2D.TryGetJointForSolver(joint.Id, out Joint2D? enabled).Should().BeTrue();
         enabled.Should().BeSameAs(joint);
 
-        first.FreezeAxes = BodyFreezeAxes2D.Position;
-        second.FreezeAxes = BodyFreezeAxes2D.Position;
+        first.FreezeAxes = BodyFreezeAxes2D.All;
+        second.FreezeAxes = BodyFreezeAxes2D.All;
         context.Constraints2D.TryGetJointForSolver(joint.Id, out Joint2D? frozen).Should().BeFalse();
         frozen.Should().BeNull();
     }
@@ -680,8 +705,10 @@ public sealed class Constraint2DServiceTests
     public void ConstraintSolver_WithOnlyFrozen2DBodies_ShouldKeepJointRegisteredWithoutRows()
     {
         using GravitasWorldContext context = CreateConstraintContext();
-        SolidBody2D first = CreateBody(context, Vector2d.Zero, immovable: true);
-        SolidBody2D second = CreateBody(context, Vector2d.Right * (Fixed64)2, immovable: true);
+        SolidBody2D first = CreateBody(context, Vector2d.Zero);
+        SolidBody2D second = CreateBody(context, Vector2d.Right * (Fixed64)2);
+        first.FreezeAxes = BodyFreezeAxes2D.All;
+        second.FreezeAxes = BodyFreezeAxes2D.All;
         Joint2D joint = context.Constraints2D.RegisterJoint(CreatePin(first, second));
 
         Step(context);
@@ -1161,6 +1188,29 @@ public sealed class Constraint2DServiceTests
         child.IsKinematic.Should().BeTrue();
         runtime.GetJoint(0).IsEnabled.Should().BeFalse();
         context.Constraints2D.EnabledJointCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void RagdollRuntime_WhenALaterLinkHasInvalidRuntimeScale_ShouldNotPartiallyDeactivate()
+    {
+        using GravitasWorldContext context = CreateConstraintContext();
+        SolidBody2D root = CreateBody(context, Vector2d.Zero);
+        SolidBody2D child = CreateBody(context, Vector2d.Right * (Fixed64)2);
+        RagdollRuntime2D runtime = context.Constraints2D.RegisterRagdoll(CreateTwoLinkRagdoll(root, child));
+        var singularParent = new FixedTransform(
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            new Vector3d(Fixed64.Zero, Fixed64.One, Fixed64.One));
+        child.Agent.Transform.SetParentKeepingLocal(singularParent);
+
+        Action deactivate = runtime.DeactivateToKinematic;
+
+        deactivate.Should().Throw<ArgumentException>();
+        runtime.IsActive.Should().BeTrue();
+        root.MotionType.Should().Be(BodyMotionType.Dynamic);
+        child.MotionType.Should().Be(BodyMotionType.Dynamic);
+        runtime.GetJoint(0).IsEnabled.Should().BeTrue();
+        context.Constraints2D.EnabledJointCount.Should().Be(1);
     }
 
     [Fact]
@@ -1788,11 +1838,16 @@ public sealed class Constraint2DServiceTests
         var agent = new TestMatterAgent(context, transform);
         var body = new SolidBody2D(agent, new LSCircleCollider2D(Fixed64.Half))
         {
-            Mass = Fixed64.One,
-            FreezeAxes = immovable ? BodyFreezeAxes2D.Position : BodyFreezeAxes2D.None,
-            IsKinematic = isKinematic
+            Mass = Fixed64.One
         };
-        body.Initialize(position, rotation);
+        body.Initialize(
+            position,
+            rotation,
+            immovable
+                ? BodyMotionType.Static
+                : isKinematic
+                    ? BodyMotionType.Kinematic
+                    : BodyMotionType.Dynamic);
         return body;
     }
 

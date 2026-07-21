@@ -19,14 +19,23 @@ public partial class SolidBody
         Fixed64 groundProbeRadius = GroundProbeRadius;
         bool active = Active;
         BodyFreezeAxes3D freezeAxes = FreezeAxes;
-        bool isKinematic = IsKinematic;
+        BodyMotionType motionType = MotionType;
         Fixed64 gravityScale = GravityScale;
         ContinuousCollisionMode continuousCollisionMode = ContinuousCollisionMode;
 
-        RecordValues.Look(chronicler, ref Debug, "Debug");
         RecordValues.Look(chronicler, ref active, "Active");
         RecordValues.Look(chronicler, ref freezeAxes, "FreezeAxes", BodyFreezeAxes3D.None);
-        RecordValues.Look(chronicler, ref isKinematic, "IsKinematic", false);
+        RecordValues.Look(chronicler, ref motionType, "MotionType", BodyMotionType.Dynamic);
+        if (chronicler.Mode == SerializationMode.Loading)
+        {
+            PreflightLoadedMotionType(motionType);
+            SwiftThrowHelper.ThrowIfArgument(
+                (freezeAxes & ~BodyFreezeAxes3D.All) != BodyFreezeAxes3D.None,
+                nameof(freezeAxes),
+                "Unsupported 3D freeze axis bits.");
+        }
+
+        RecordValues.Look(chronicler, ref Debug, "Debug");
         RecordValues.Look(chronicler, ref _position2dUnmarked, "Position2d");
         RecordValues.Look(chronicler, ref _heightPosUnmarked, "HeightPos");
         RecordValues.Look(chronicler, ref _lastPosition, "LastPosition");
@@ -75,11 +84,10 @@ public partial class SolidBody
 
         if (chronicler.Mode == SerializationMode.Loading)
         {
+            ApplyLoadedMotionType(motionType);
             ContinuousCollisionMode = continuousCollisionMode;
             _rotation = _rotation.Normalized;
-            Active = active && Collider.Id >= 0;
             _freezeAxes = freezeAxes;
-            _isKinematic = isKinematic;
             GroundingMode = groundingMode;
             GroundProbeMode = groundProbeMode;
             GroundProbeRadius = groundProbeRadius;
@@ -92,7 +100,7 @@ public partial class SolidBody
         if (chronicler.Mode == SerializationMode.Loading)
         {
             ApplyLoadedState();
-            if (!Active)
+            if (!active || Collider.Id < 0)
                 Deactivate();
         }
     }

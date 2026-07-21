@@ -121,11 +121,15 @@ public sealed partial class SolidBody2D
     }
 
     internal Vector2d SampleContinuousCollisionPosition(Fixed64 frameFraction) =>
-        ResolveContinuousCollisionSegment(frameFraction).SamplePosition(frameFraction);
+        _continuousCollisionTrajectory.Count == 0
+            ? _position
+            : ResolveContinuousCollisionSegment(frameFraction).SamplePosition(frameFraction);
 
     internal Fixed64 SampleContinuousCollisionRotation(Fixed64 frameFraction) =>
-        CanonicalizeRotation(
-            ResolveContinuousCollisionSegment(frameFraction).SampleRotation(frameFraction));
+        _continuousCollisionTrajectory.Count == 0
+            ? _rotation
+            : CanonicalizeRotation(
+                ResolveContinuousCollisionSegment(frameFraction).SampleRotation(frameFraction));
 
     internal Vector2d SampleContinuousCollisionLinearVelocity(Fixed64 frameFraction)
     {
@@ -210,26 +214,25 @@ public sealed partial class SolidBody2D
 
     private void PrepareMovableContinuousCollisionMotion()
     {
-        if (!CanTranslate)
-        {
-            _linearAccelerationStore = Vector2d.Zero;
-            _deltaAcceleration = Vector2d.Zero;
-            _angularAccelerationStore = Fixed64.Zero;
-            _deltaAngularAcceleration = Fixed64.Zero;
-            return;
-        }
-
         if (_isSleeping)
             return;
 
         Fixed64 deltaTime = Context.DeltaTime;
-        _linearAccelerationStore = RemoveIntoGroundComponent(
-            _deltaAcceleration + Gravity * _gravityScale);
-        _deltaAcceleration = Vector2d.Zero;
-        _linearVelocity += ProjectLinearMotion(_linearAccelerationStore * deltaTime);
-        _linearVelocity = RemoveIntoGroundComponent(_linearVelocity);
-        _linearAccelerationStore = Vector2d.Zero;
-        RefreshLinearSpeed();
+        if (CanTranslate)
+        {
+            _linearAccelerationStore = RemoveIntoGroundComponent(
+                _deltaAcceleration + Gravity * _gravityScale);
+            _deltaAcceleration = Vector2d.Zero;
+            _linearVelocity += ProjectLinearMotion(_linearAccelerationStore * deltaTime);
+            _linearVelocity = RemoveIntoGroundComponent(_linearVelocity);
+            _linearAccelerationStore = Vector2d.Zero;
+            RefreshLinearSpeed();
+        }
+        else
+        {
+            _linearAccelerationStore = Vector2d.Zero;
+            _deltaAcceleration = Vector2d.Zero;
+        }
 
         if (CanRotate)
         {

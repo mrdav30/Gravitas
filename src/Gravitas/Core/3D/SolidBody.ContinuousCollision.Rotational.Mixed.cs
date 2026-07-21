@@ -92,12 +92,6 @@ public partial class SolidBody
         for (int i = 0; i < _rotationalMixedStatic2DCandidates.Count; i++)
         {
             LSCollider2D target = _rotationalMixedStatic2DCandidates[i];
-            if (target.Body is SolidBody2D movingBody
-                && IsMovingMixedRotationalContinuousCollisionTarget(movingBody))
-            {
-                continue;
-            }
-
             ConsiderMixedRotationalContinuousCollisionCandidate(
                 target,
                 startPosition,
@@ -484,11 +478,15 @@ public partial class SolidBody
 
     private bool IsMovingMixedRotationalContinuousCollisionTarget(SolidBody2D target)
     {
-        return target.Active
-            && (IsKinematic || !target.ShouldOwnContinuousCollisionMovingPair(
+        if (target.IsKinematic)
+            target.EnsureContinuousCollisionFramePrepared(Context.LateSimulateToken);
+
+        return (IsKinematic || !target.ShouldOwnContinuousCollisionMovingPair(
                 HasContinuousCollisionRotationalMotion))
             && IsValidMixedRotationalContinuousCollisionTarget(target.Collider)
-            && (target.IsKinematic || !target.IsPositionFullyFrozen);
+            && (target.IsKinematic
+                ? target.HasContinuousCollisionMotion
+                : target.IsDynamic);
     }
 
     internal bool TryApplyMixedRotationalContinuousCollisionResponse(
@@ -537,8 +535,8 @@ public partial class SolidBody
             ?? Vector2d.Zero;
         Fixed64 targetAngularVelocity = target?.SampleContinuousCollisionAngularVelocity(frameFraction)
             ?? Fixed64.Zero;
-        SolidBody? sourceResponseBody = sourceIsKinematic ? null : this;
-        SolidBody2D? targetResponseBody = target?.IsKinematic == false ? target : null;
+        SolidBody? sourceResponseBody = HasSolverMobility ? this : null;
+        SolidBody2D? targetResponseBody = target?.HasSolverMobility == true ? target : null;
         if (!Vector3d.TryAdd(
                 sourcePosition,
                 sourceRotation * LocalCenterOfMassOffset,
@@ -595,7 +593,7 @@ public partial class SolidBody
         Vector2d postTargetLinearVelocity = targetLinearVelocity;
         Fixed64 postTargetAngularVelocity = targetAngularVelocity;
         bool sourceStateAvailable = true;
-        if (!sourceIsKinematic)
+        if (sourceResponseBody != null)
         {
             bool sourceLinearVelocityResolved = Vector3d.TryAdd(
                 sourceLinearVelocity,
@@ -637,7 +635,7 @@ public partial class SolidBody
             return false;
         }
 
-        if (!sourceIsKinematic)
+        if (sourceResponseBody != null)
             _ = Context.Physics.TryReserveContinuousCollisionCandidateRefresh(this);
 
         if (targetResponseBody != null)
@@ -652,7 +650,7 @@ public partial class SolidBody
                 ignoredCollider3D: Collider);
         }
 
-        if (!sourceIsKinematic)
+        if (sourceResponseBody != null)
         {
             ApplyCollisionVelocityState(
                 postSourceLinearVelocity,

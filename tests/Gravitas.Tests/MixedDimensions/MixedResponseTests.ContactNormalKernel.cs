@@ -77,7 +77,7 @@ public sealed partial class MixedResponseTests
         using GravitasWorldContext context = CreateMixedContext();
         ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(context, Vector3d.Zero);
         SolidBody2D body2D = CreateCircle2D(context, new Vector2d((Fixed64)2, Fixed64.Zero));
-        body3D.Body.IsKinematic = true;
+        body3D.Body.SetMotionType(BodyMotionType.Kinematic);
 
         bool resolved = ContactNormalImpulseMixed.TryCalculateVelocityDeltas(
             body3D.Body,
@@ -108,7 +108,7 @@ public sealed partial class MixedResponseTests
         ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(context, Vector3d.Zero);
         SolidBody2D body2D = CreateCircle2D(context, new Vector2d((Fixed64)2, Fixed64.Zero));
         body3D.Body.FreezeAxes = BodyFreezeAxes3D.PositionX;
-        body2D.IsKinematic = true;
+        body2D.SetMotionType(BodyMotionType.Kinematic);
 
         bool resolved = ContactNormalImpulseMixed.TryCalculateVelocityDeltas(
             body3D.Body,
@@ -138,7 +138,7 @@ public sealed partial class MixedResponseTests
         using GravitasWorldContext context = CreateMixedContext();
         ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(context, Vector3d.Zero);
         SolidBody2D body2D = CreateCircle2D(context, new Vector2d((Fixed64)2, Fixed64.Zero));
-        body3D.Body.IsKinematic = true;
+        body3D.Body.SetMotionType(BodyMotionType.Kinematic);
         body2D.FreezeAxes = BodyFreezeAxes2D.PositionX;
 
         bool resolved = ContactNormalImpulseMixed.TryCalculateVelocityDeltas(
@@ -237,7 +237,7 @@ public sealed partial class MixedResponseTests
             context,
             -Vector3d.Right * Fixed64.Half);
         SolidBody2D body2D = CreateCircle2D(context, Vector2d.Zero);
-        body2D.IsKinematic = true;
+        body2D.SetMotionType(BodyMotionType.Kinematic);
         PhysicsMaterial friction = new(Fixed64.One, Fixed64.One, Fixed64.Zero);
         body3D.Collider.Material = friction;
         body2D.Collider.Material = friction;

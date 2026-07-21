@@ -243,10 +243,9 @@ public sealed class Physics2DBatchQueryTests
         var agent = new TestMatterAgent(context, transform);
         var body = new SolidBody2D(agent, new LSCircleCollider2D(Fixed64.Half))
         {
-            Mass = Fixed64.One,
-            FreezeAxes = BodyFreezeAxes2D.Position
+            Mass = Fixed64.One
         };
-        body.Initialize(position);
+        body.Initialize(position, motionType: BodyMotionType.Static);
         return body;
     }
 
@@ -270,10 +269,9 @@ public sealed class Physics2DBatchQueryTests
         var agent = new TestMatterAgent(context, transform);
         var body = new SolidBody2D(agent, new LSAABBoxCollider2D(Vector2d.One))
         {
-            Mass = Fixed64.One,
-            FreezeAxes = BodyFreezeAxes2D.Position
+            Mass = Fixed64.One
         };
-        body.Initialize(position);
+        body.Initialize(position, motionType: BodyMotionType.Static);
         return body;
     }
 
@@ -289,10 +287,9 @@ public sealed class Physics2DBatchQueryTests
                 new Vector2d(Fixed64.Half, Fixed64.Half),
                 new Vector2d(-Fixed64.Half, Fixed64.Half)))
         {
-            Mass = Fixed64.One,
-            FreezeAxes = BodyFreezeAxes2D.Position
+            Mass = Fixed64.One
         };
-        body.Initialize(position);
+        body.Initialize(position, motionType: BodyMotionType.Static);
         return body;
     }
 }

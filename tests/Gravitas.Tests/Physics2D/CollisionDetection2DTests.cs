@@ -920,10 +920,9 @@ public sealed class CollisionDetection2DTests
         var agent = new TestMatterAgent(context, transform);
         var body = new SolidBody2D(agent, collider)
         {
-            Mass = Fixed64.One,
-            FreezeAxes = BodyFreezeAxes2D.Position
+            Mass = Fixed64.One
         };
-        body.Initialize(position, rotation);
+        body.Initialize(position, rotation, BodyMotionType.Static);
         return body;
     }
 

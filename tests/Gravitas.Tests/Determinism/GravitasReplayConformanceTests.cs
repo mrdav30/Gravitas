@@ -245,10 +245,12 @@ public sealed class GravitasReplayConformanceTests
                 Vector3d.One));
         var body3D = new SolidBody(agent3D, new LSSphereCollider())
         {
-            Mass = (Fixed64)2,
-            FreezeAxes = BodyFreezeAxes3D.Position
+            Mass = (Fixed64)2
         };
-        body3D.Initialize(agent3D.Transform.LocalPosition, FixedQuaternion.Identity);
+        body3D.Initialize(
+            agent3D.Transform.LocalPosition,
+            FixedQuaternion.Identity,
+            BodyMotionType.Static);
 
         SolidBody2D body2D = CreateCircle2D(context, new Vector2d((Fixed64)(-1), Fixed64.Zero));
         body2D.AddForce(new Vector2d((Fixed64)6, Fixed64.Zero));
@@ -268,10 +270,9 @@ public sealed class GravitasReplayConformanceTests
             new TestMatterAgent(context, transform),
             new LSCircleCollider2D(Fixed64.Half))
         {
-            Mass = (Fixed64)2,
-            FreezeAxes = immovable ? BodyFreezeAxes2D.Position : BodyFreezeAxes2D.None
+            Mass = (Fixed64)2
         };
-        body.Initialize(position);
+        body.Initialize(position, motionType: immovable ? BodyMotionType.Static : BodyMotionType.Dynamic);
         return body;
     }
 
@@ -288,10 +289,9 @@ public sealed class GravitasReplayConformanceTests
             new TestMatterAgent(context, transform),
             new LSAABBoxCollider2D(Vector2d.One))
         {
-            Mass = Fixed64.One,
-            FreezeAxes = immovable ? BodyFreezeAxes2D.Position : BodyFreezeAxes2D.None
+            Mass = Fixed64.One
         };
-        body.Initialize(position);
+        body.Initialize(position, motionType: immovable ? BodyMotionType.Static : BodyMotionType.Dynamic);
         return body;
     }
 

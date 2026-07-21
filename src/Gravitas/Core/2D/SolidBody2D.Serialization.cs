@@ -16,7 +16,7 @@ public sealed partial class SolidBody2D
     {
         bool active = Active;
         BodyFreezeAxes2D freezeAxes = FreezeAxes;
-        bool isKinematic = IsKinematic;
+        BodyMotionType motionType = MotionType;
         Fixed64 mass = Mass;
         Vector2d gravity = Gravity;
         Fixed64 gravityScale = GravityScale;
@@ -36,7 +36,16 @@ public sealed partial class SolidBody2D
 
         RecordValues.Look(chronicler, ref active, "Active", false);
         RecordValues.Look(chronicler, ref freezeAxes, "FreezeAxes", BodyFreezeAxes2D.None);
-        RecordValues.Look(chronicler, ref isKinematic, "IsKinematic", false);
+        RecordValues.Look(chronicler, ref motionType, "MotionType", BodyMotionType.Dynamic);
+        if (chronicler.Mode == SerializationMode.Loading)
+        {
+            PreflightLoadedMotionType(motionType);
+            SwiftThrowHelper.ThrowIfArgument(
+                (freezeAxes & ~BodyFreezeAxes2D.All) != BodyFreezeAxes2D.None,
+                nameof(freezeAxes),
+                "Unsupported 2D freeze axis bits.");
+        }
+
         RecordValues.Look(chronicler, ref _position, "Position");
         RecordValues.Look(chronicler, ref _rotation, "Rotation");
         RecordValues.Look(chronicler, ref _localCenterOfMassOffset, "LocalCenterOfMassOffset");
@@ -75,13 +84,12 @@ public sealed partial class SolidBody2D
 
         if (chronicler.Mode == SerializationMode.Loading)
         {
+            ApplyLoadedMotionType(motionType);
             DiscardContinuousCollisionHandoff();
             InvalidateContinuousCollisionFrame();
             ContinuousCollisionMode = continuousCollisionMode;
             _rotation = CanonicalizeRotation(_rotation);
-            Active = active && Collider.Id >= 0;
             _freezeAxes = freezeAxes;
-            _isKinematic = isKinematic;
             Mass = mass;
             Gravity = gravity;
             GravityScale = gravityScale;
@@ -113,9 +121,9 @@ public sealed partial class SolidBody2D
         if (chronicler.Mode == SerializationMode.Loading)
         {
             RefreshMassPropertiesFromColliderShape();
-            ApplyFreezeConstraintsToMotion();
+            ApplyLoadedFreezeConstraintsToMotion();
             ApplyLoadedState();
-            if (!Active)
+            if (!active || Collider.Id < 0)
                 Deactivate();
             _groundingStateVersion++;
         }
@@ -125,5 +133,24 @@ public sealed partial class SolidBody2D
     {
         SetHostWorldPose(Agent.Transform, _position, _rotation);
         Collider.Rebuild();
+    }
+
+    private void ApplyLoadedFreezeConstraintsToMotion()
+    {
+        _linearVelocity = ProjectLinearMotion(_linearVelocity);
+        _linearAccelerationStore = ProjectLinearMotion(_linearAccelerationStore);
+        _deltaAcceleration = ProjectLinearMotion(_deltaAcceleration);
+        RefreshLinearSpeed();
+
+        if (IsRotationFullyFrozen)
+        {
+            _angularVelocity = Fixed64.Zero;
+            _angularAccelerationStore = Fixed64.Zero;
+            _deltaAngularAcceleration = Fixed64.Zero;
+            _angularSpeed = Fixed64.Zero;
+            return;
+        }
+
+        RefreshAngularSpeed();
     }
 }

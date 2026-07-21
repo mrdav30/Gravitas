@@ -190,19 +190,19 @@ internal sealed partial class GravitasMixedCollisionService
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool IsAwakeMovable(SolidBody? body) =>
-        body != null && body.Active && !body.IsPositionFullyFrozen && !body.IsKinematic && !body.IsSleeping && body.InverseMass > Fixed64.Zero;
+        body != null && body.HasSolverMobility && !body.IsSleeping;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool IsAwakeMovable(SolidBody2D? body) =>
-        body != null && body.CanTranslate && !body.IsSleeping;
+        body != null && body.HasSolverMobility && !body.IsSleeping;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool IsMovableMixedIslandBody(SolidBody? body) =>
-        body != null && body.DynamicId >= 0 && body.CanTranslate;
+        body != null && body.DynamicId >= 0 && body.HasSolverMobility;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool IsMovableMixedIslandBody(SolidBody2D? body) =>
-        body != null && body.DynamicId >= 0 && body.CanTranslate;
+        body != null && body.DynamicId >= 0 && body.HasSolverMobility;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static int Create3DBodyKey(SolidBody body) =>

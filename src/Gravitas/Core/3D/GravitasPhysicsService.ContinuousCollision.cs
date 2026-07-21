@@ -41,12 +41,6 @@ public sealed partial class GravitasPhysicsService
 
     private void AddContinuousCollisionCandidate(SolidBody body)
     {
-        if ((!body.IsKinematic && body.IsPositionFullyFrozen)
-            || body.Collider.IsTrigger)
-        {
-            return;
-        }
-
         Fixed64 radius = body.ResolveContinuousCollisionProxyRadius();
         if (radius <= Fixed64.Epsilon)
             return;
@@ -125,13 +119,31 @@ public sealed partial class GravitasPhysicsService
         return true;
     }
 
-    private void ReleaseContinuousCollisionCandidateRefresh(SolidBody body)
+    private void ReleaseContinuousCollisionCandidateRefresh(SolidBody body) =>
+        ReleaseContinuousCollisionCandidateRefresh(body, body.DynamicId);
+
+    private void ReleaseContinuousCollisionCandidateRefresh(SolidBody body, int dynamicId)
     {
-        if (!_dirtyContinuousCollisionBodyIds.Remove(body.DynamicId))
+        if (!_dirtyContinuousCollisionBodyIds.Remove(dynamicId))
             return;
 
         _dirtyContinuousCollisionBodies.Remove(body);
-        _dirtyContinuousCollisionCandidates.Remove(body.DynamicId);
+        _dirtyContinuousCollisionCandidates.Remove(dynamicId);
+    }
+
+    internal void InvalidateContinuousCollisionStateForMotionTypeChange(
+        SolidBody body,
+        int dynamicId)
+    {
+        if (dynamicId >= 0)
+            _continuousCollisionCandidateLifetimes[dynamicId] = default;
+
+        ReleaseContinuousCollisionCandidateRefresh(body, dynamicId);
+        _processedContinuousCollisionBodies.Remove(body);
+        _queuedContinuousCollisionHandoffBodies.Remove(body);
+        _continuousCollisionHandoffQueue.Remove(body);
+        body.DiscardContinuousCollisionHandoff();
+        _continuousCollisionPreparedToken = int.MinValue;
     }
 
     internal bool TryReserveContinuousCollisionCandidateRefresh(

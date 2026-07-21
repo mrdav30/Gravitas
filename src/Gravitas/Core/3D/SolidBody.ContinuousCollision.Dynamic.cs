@@ -491,7 +491,7 @@ public partial class SolidBody
         bool targetDeltaResolved = ContinuousCollisionImpulsePolicy.TryResolveVelocityDelta(
             targetResponseNormal,
             responseSpeed,
-            target.IsKinematic ? Fixed64.Zero : target.EffectiveInverseMass,
+            target.EffectiveInverseMass,
             inverseMass,
             out Vector3d targetVelocityDelta);
         if (!(sourceDeltaResolved & targetDeltaResolved))
@@ -514,7 +514,7 @@ public partial class SolidBody
         FixedQuaternion targetRotationAtImpact = target.SampleContinuousCollisionRotation(frameFraction);
         Vector3d targetAngularVelocity = target.SampleContinuousCollisionAngularVelocity(frameFraction);
         bool targetStateAvailable = true;
-        if (!target.IsKinematic)
+        if (target.CanTranslate)
         {
             bool targetVelocityResolved = Vector3d.TryAdd(
                 targetLinearVelocity,
@@ -532,14 +532,14 @@ public partial class SolidBody
             return false;
         }
 
-        _ = target.IsKinematic
-            ? Context.Physics.TryReserveContinuousCollisionCandidateRefresh(this)
-            : Context.Physics.TryReserveContinuousCollisionCandidateRefresh(this, target);
+        _ = target.CanTranslate
+            ? Context.Physics.TryReserveContinuousCollisionCandidateRefresh(this, target)
+            : Context.Physics.TryReserveContinuousCollisionCandidateRefresh(this);
 
         ApplyCollisionVelocityState(sourcePostLinearVelocity, _angularVelocity);
         UpdateContinuousCollisionFrameTrajectory(sourcePositionAtImpact, _linearVelocity, hitElapsedTime);
         Context.Physics.RefreshContinuousCollisionCandidate(this);
-        if (!target.IsKinematic)
+        if (target.CanTranslate)
         {
             target.ApplyContinuousCollisionHandoffReserved(
                 targetResolvedPosition,
@@ -605,7 +605,7 @@ public partial class SolidBody
         bool targetDeltaResolved = ContinuousCollisionImpulsePolicy.TryResolveVelocityDelta(
             targetResponseNormal,
             responseSpeed,
-            target.IsKinematic ? Fixed64.Zero : target.EffectiveInverseMass,
+            target.EffectiveInverseMass,
             inverseMass,
             out Vector2d targetVelocityDelta);
         bool sourceVelocityResolved = Vector3d.TryAdd(
@@ -618,7 +618,7 @@ public partial class SolidBody
         Fixed64 targetRotationAtImpact = target.SampleContinuousCollisionRotation(frameFraction);
         Fixed64 targetAngularVelocity = target.SampleContinuousCollisionAngularVelocity(frameFraction);
         bool targetStateAvailable = true;
-        if (!target.IsKinematic)
+        if (target.CanTranslate)
         {
             bool targetVelocityResolved = Vector2d.TryAdd(
                 targetLinearVelocity,
@@ -650,13 +650,13 @@ public partial class SolidBody
         }
 
         _ = Context.Physics.TryReserveContinuousCollisionCandidateRefresh(this);
-        if (!target.IsKinematic)
+        if (target.CanTranslate)
             _ = Context.Physics2D.TryReserveContinuousCollisionCandidateRefresh(target);
 
         ApplyCollisionVelocityState(sourcePostLinearVelocity, _angularVelocity);
         UpdateContinuousCollisionFrameTrajectory(sourcePositionAtImpact, _linearVelocity, hitElapsedTime);
         Context.Physics.RefreshContinuousCollisionCandidate(this);
-        if (!target.IsKinematic)
+        if (target.CanTranslate)
         {
             target.ApplyContinuousCollisionHandoffStateReserved(
                 targetResolvedPosition,

@@ -189,7 +189,10 @@ SolidBody body = new(agent, collider)
     Mass = Fixed64.One
 };
 
-body.Initialize(Vector3d.Zero, FixedQuaternion.Identity, isDynamic: true);
+body.Initialize(
+    Vector3d.Zero,
+    FixedQuaternion.Identity,
+    BodyMotionType.Dynamic);
 ```
 
 Initialization binds the body and collider to `agent.Context`, allocates
@@ -213,7 +216,9 @@ SolidBody2D body = new(agent, collider)
     Mass = Fixed64.One
 };
 
-body.Initialize(agent.Transform.WorldPositionXZ, isDynamic: true);
+body.Initialize(
+    agent.Transform.WorldPositionXZ,
+    motionType: BodyMotionType.Dynamic);
 ```
 
 The 2D projection uses the LSF X/Z convention: world X maps to 2D X and world Z
@@ -244,14 +249,33 @@ LSCuboidCollider floor = new();
 floor.InitializeWithNoBody(agent);
 ```
 
-A body with all translation axes frozen is different from a bodyless collider.
-Use `SolidBody.FreezeAxes = BodyFreezeAxes3D.Position` or
-`SolidBody2D.FreezeAxes = BodyFreezeAxes2D.Position` when an object should keep
-body state but behave as static-equivalent for solver and partition mobility.
-Partial freezes remain dynamic and constrain only the selected axes.
-`LSCollider.IsStatic` and `LSCollider2D.IsStatic` report this static-style
-partition role for bodyless colliders, non-dynamic bodies, and position-frozen
-bodies.
+A body with all translation axes frozen is different from a static body or a
+bodyless collider. Select the runtime role explicitly:
+
+| Role | Ownership |
+| ---- | --------- |
+| `BodyMotionType.Dynamic` | Solver controlled. `FreezeAxes` independently constrains translation and rotation. |
+| `BodyMotionType.Kinematic` | Host controlled. Gravitas samples deterministic host motion and CCD, but applies no solver impulse. |
+| `BodyMotionType.Static` | Immobile and excluded from simulated-body iteration. Use explicit pose setters to reposition it between fixed steps. |
+
+For example, a rotating platform that must not translate is a `Dynamic` body
+with `BodyFreezeAxes3D.Position`; the 2D equivalent uses
+`BodyFreezeAxes2D.Position`. Freezing every axis does not silently change the
+body role. `LSCollider.IsStatic` and `LSCollider2D.IsStatic` report only an
+explicit `Static` body or bodyless ownership.
+
+Call `SetMotionType(...)` to change a registered body's role between fixed-step
+transactions. The transition preserves body, collider, pair, and joint
+identity, but clears incompatible motion, sleep, CCD, contact warm-start, and
+joint-solver state before repartitioning. It rejects calls before
+initialization, after deactivation or context reset, during an open fixed-step
+transaction, and from simulation callbacks. Ragdoll role changes use their
+atomic runtime operation rather than transitioning links individually.
+
+Static bodies do not poll their host transforms. `SetPosition(...)`,
+`SetRotation(...)`, and 3D `UpdateRotation(...)` are the authoritative explicit
+repositioning surface; they refresh pure and mixed partition membership
+immediately so queries observe the new pose without a simulation step.
 
 Bodyless 3D and 2D colliders rebuild from their agent transform during the next
 fixed-step partition preparation. If the host mutates a bodyless collider's

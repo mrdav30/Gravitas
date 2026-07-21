@@ -82,7 +82,7 @@ public sealed partial class GravitasPhysics2DService
     /// </summary>
     public bool LastContinuousCollisionIslandLimitReached { get; private set; }
 
-    internal void AssimilateBody(SolidBody2D body, bool isDynamic)
+    internal void AssimilateBody(SolidBody2D body, BodyMotionType motionType)
     {
         SwiftThrowHelper.ThrowIfNull(body, nameof(body));
         SwiftThrowHelper.ThrowIfArgument(
@@ -90,7 +90,7 @@ public sealed partial class GravitasPhysics2DService
             nameof(body),
             "2D body must belong to this physics service context.");
 
-        if (isDynamic)
+        if (motionType != BodyMotionType.Static)
         {
             body.DynamicId = _dynamicBodies.Add(body);
             while (_continuousCollisionCandidateLifetimes.Count <= body.DynamicId)
@@ -99,6 +99,30 @@ public sealed partial class GravitasPhysics2DService
         }
 
         AssimilateCollider(body.Collider);
+    }
+
+    internal void RefreshBodyMotionTypeRegistration(
+        SolidBody2D body,
+        BodyMotionType previousMotionType)
+    {
+        if (previousMotionType == BodyMotionType.Static)
+        {
+            body.DynamicId = _dynamicBodies.Add(body);
+            while (_continuousCollisionCandidateLifetimes.Count <= body.DynamicId)
+                _continuousCollisionCandidateLifetimes.Add(default);
+            BodyCount++;
+            return;
+        }
+
+        if (body.MotionType == BodyMotionType.Static)
+        {
+            int previousDynamicId = body.DynamicId;
+            _dynamicBodies.RemoveAt(previousDynamicId);
+            _continuousCollisionCandidateLifetimes[previousDynamicId] = default;
+            ReleaseContinuousCollisionCandidateRefresh(body);
+            body.DynamicId = -1;
+            BodyCount--;
+        }
     }
 
     internal void AssimilateCollider(LSCollider2D collider)
@@ -146,19 +170,35 @@ public sealed partial class GravitasPhysics2DService
 
     public void Simulate()
     {
-        if (!SimulatePhysics)
-            return;
+        _context.EnterSimulationPhase();
+        try
+        {
+            if (!SimulatePhysics)
+                return;
 
-        LastBroadPhaseCandidateCount = 0;
+            LastBroadPhaseCandidateCount = 0;
+        }
+        finally
+        {
+            _context.ExitSimulationPhase();
+        }
     }
 
     public void LateSimulate()
     {
-        if (!BeginLateSimulateBodies(continuousCollisionFramePrepared: false))
-            return;
+        _context.EnterSimulationPhase();
+        try
+        {
+            if (!BeginLateSimulateBodies(continuousCollisionFramePrepared: false))
+                return;
 
-        ProcessQueuedContinuousCollisionHandoffs();
-        CompleteLateSimulatePhysicsStep();
+            ProcessQueuedContinuousCollisionHandoffs();
+            CompleteLateSimulatePhysicsStep();
+        }
+        finally
+        {
+            _context.ExitSimulationPhase();
+        }
     }
 
     internal bool BeginLateSimulateBodies(bool continuousCollisionFramePrepared)

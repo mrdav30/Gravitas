@@ -100,8 +100,16 @@ public sealed partial class GravitasPhysicsService
     /// </summary>
     public void Simulate()
     {
-        if (!SimulatePhysics)
-            return;
+        _context.EnterSimulationPhase();
+        try
+        {
+            if (!SimulatePhysics)
+                return;
+        }
+        finally
+        {
+            _context.ExitSimulationPhase();
+        }
     }
 
     private void PrepareCollisionPartitions()
@@ -118,11 +126,19 @@ public sealed partial class GravitasPhysicsService
     /// </summary>
     public void LateSimulate()
     {
-        if (!BeginLateSimulateBodies(continuousCollisionFramePrepared: false))
-            return;
+        _context.EnterSimulationPhase();
+        try
+        {
+            if (!BeginLateSimulateBodies(continuousCollisionFramePrepared: false))
+                return;
 
-        ProcessQueuedContinuousCollisionHandoffs();
-        CompleteLateSimulatePhysicsStep();
+            ProcessQueuedContinuousCollisionHandoffs();
+            CompleteLateSimulatePhysicsStep();
+        }
+        finally
+        {
+            _context.ExitSimulationPhase();
+        }
     }
 
     internal bool BeginLateSimulateBodies(bool continuousCollisionFramePrepared)
@@ -217,7 +233,7 @@ public sealed partial class GravitasPhysicsService
         BodyCount = 0;
     }
 
-    internal int AssimilateBody(SolidBody body, bool isDynamic)
+    internal int AssimilateBody(SolidBody body, BodyMotionType motionType)
     {
         SwiftThrowHelper.ThrowIfNull(body, nameof(body));
         SwiftThrowHelper.ThrowIfArgument(
@@ -226,7 +242,7 @@ public sealed partial class GravitasPhysicsService
             "Body must belong to this physics service context.");
 
         int dynamicId = -1;
-        if (isDynamic)
+        if (motionType != BodyMotionType.Static)
         {
             dynamicId = _dynamicBodies.Add(body);
             while (_continuousCollisionCandidateLifetimes.Count <= dynamicId)
@@ -235,6 +251,31 @@ public sealed partial class GravitasPhysicsService
         }
 
         return dynamicId;
+    }
+
+    internal void RefreshBodyMotionTypeRegistration(
+        SolidBody body,
+        BodyMotionType previousMotionType)
+    {
+        if (previousMotionType == BodyMotionType.Static)
+        {
+            int dynamicId = _dynamicBodies.Add(body);
+            while (_continuousCollisionCandidateLifetimes.Count <= dynamicId)
+                _continuousCollisionCandidateLifetimes.Add(default);
+            body.SetDynamicId(dynamicId);
+            BodyCount++;
+            return;
+        }
+
+        if (body.MotionType == BodyMotionType.Static)
+        {
+            int previousDynamicId = body.DynamicId;
+            _dynamicBodies.RemoveAt(previousDynamicId);
+            _continuousCollisionCandidateLifetimes[previousDynamicId] = default;
+            ReleaseContinuousCollisionCandidateRefresh(body);
+            body.SetDynamicId(-1);
+            BodyCount--;
+        }
     }
 
     internal int AssimilateCollider(LSCollider collider)

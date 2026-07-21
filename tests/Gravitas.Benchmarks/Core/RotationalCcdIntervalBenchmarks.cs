@@ -106,10 +106,9 @@ public class RotationalCcdIntervalBenchmarks
             })
         {
             ContinuousCollisionMode = ContinuousCollisionMode.Continuous,
-            IsKinematic = true,
             Mass = Fixed64.One
         };
-        body.Initialize(Vector3d.Zero, FixedQuaternion.Identity);
+        body.Initialize(Vector3d.Zero, FixedQuaternion.Identity, BodyMotionType.Kinematic);
         return body;
     }
 
@@ -124,10 +123,9 @@ public class RotationalCcdIntervalBenchmarks
         var body = new SolidBody2D(agent, collider)
         {
             ContinuousCollisionMode = ContinuousCollisionMode.Continuous,
-            IsKinematic = true,
             Mass = Fixed64.One
         };
-        body.Initialize(Vector2d.Zero);
+        body.Initialize(Vector2d.Zero, motionType: BodyMotionType.Kinematic);
         return body;
     }
 }

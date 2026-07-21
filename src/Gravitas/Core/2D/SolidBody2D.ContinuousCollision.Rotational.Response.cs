@@ -41,8 +41,8 @@ public partial class SolidBody2D
             : _angularVelocity;
         Vector2d targetLinearVelocity = target.SampleContinuousCollisionLinearVelocity(frameFraction);
         Fixed64 targetAngularVelocity = target.SampleContinuousCollisionAngularVelocity(frameFraction);
-        SolidBody2D? sourceResponseBody = IsKinematic ? null : this;
-        SolidBody2D? targetResponseBody = target.IsKinematic ? null : target;
+        SolidBody2D? sourceResponseBody = HasSolverMobility ? this : null;
+        SolidBody2D? targetResponseBody = target.HasSolverMobility ? target : null;
         Fixed64 restitution = PhysicsMaterial.CombineRestitution(
             Collider.Material,
             target.Collider.Material);
@@ -90,13 +90,13 @@ public partial class SolidBody2D
         Vector2d targetResolvedPosition = default;
         Fixed64 impactElapsedTime = elapsedTime + remainingTime * contactTime;
         Fixed64 remainingAfterImpact = remainingTime * (Fixed64.One - contactTime);
-        if (!IsKinematic)
+        if (sourceResponseBody != null)
         {
             bool sourceResponseAdmissible = CanApplyCollisionVelocityDeltas(
                     response.LinearVelocityDeltaA,
                     response.AngularVelocityDeltaA)
                 & CanAppendContinuousCollisionFrameSegment(impactElapsedTime)
-                & (target.IsKinematic
+                & (targetResponseBody == null
                     ? Context.Physics2D.CanAdmitContinuousCollisionCandidateRefresh(this)
                     : Context.Physics2D.CanAdmitContinuousCollisionCandidateRefresh(
                         this,
@@ -105,7 +105,7 @@ public partial class SolidBody2D
                 return false;
         }
 
-        if (!target.IsKinematic)
+        if (targetResponseBody != null)
         {
             bool targetLinearVelocityResolved = Vector2d.TryAdd(
                 targetLinearVelocity,
@@ -127,17 +127,17 @@ public partial class SolidBody2D
             }
         }
 
-        if (!IsKinematic)
+        if (sourceResponseBody != null)
         {
             // The admission check above is immediately followed by this
             // reservation in the single-threaded arbiter, so failure is not a
             // runtime state. Reserve the already-proven body set once.
-            _ = target.IsKinematic
+            _ = targetResponseBody == null
                 ? Context.Physics2D.TryReserveContinuousCollisionCandidateRefresh(this)
                 : Context.Physics2D.TryReserveContinuousCollisionCandidateRefresh(this, target);
         }
 
-        if (!target.IsKinematic)
+        if (targetResponseBody != null)
         {
             target.ApplyContinuousCollisionHandoffStateReserved(
                 targetResolvedPosition,
@@ -148,7 +148,7 @@ public partial class SolidBody2D
                 ignoredCollider2D: Collider);
         }
 
-        if (!IsKinematic)
+        if (sourceResponseBody != null)
         {
             ApplyCollisionLinearVelocityDelta(response.LinearVelocityDeltaA);
             ApplyCollisionAngularVelocityDelta(response.AngularVelocityDeltaA);

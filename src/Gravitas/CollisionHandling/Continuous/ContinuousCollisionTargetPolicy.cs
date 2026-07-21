@@ -9,125 +9,79 @@ namespace Gravitas.CollisionHandling;
 
 internal static class ContinuousCollisionTargetPolicy
 {
-    internal static bool AllowsDynamic3DTarget(
-        bool isSelf,
-        bool active,
-        bool positionFullyFrozen,
-        bool kinematic,
-        bool trigger,
-        bool physicalPairRequired) =>
-        !isSelf
-        && active
-        && !positionFullyFrozen
-        && !kinematic
-        && !trigger
-        && physicalPairRequired;
-
-    internal static bool AllowsDynamic2DTarget(
-        bool isSelf,
-        bool active,
-        bool positionFullyFrozen,
-        bool kinematic,
-        bool trigger,
-        bool physicalPairRequired) =>
-        !isSelf
-        && active
-        && !positionFullyFrozen
-        && !kinematic
-        && !trigger
-        && physicalPairRequired;
-
-    internal static bool AllowsMixedDynamicTarget(
-        bool active,
-        bool positionFullyFrozen,
-        bool kinematic,
-        bool trigger,
-        bool mixedPairRequired) =>
-        active
-        && !positionFullyFrozen
-        && !kinematic
-        && !trigger
-        && mixedPairRequired;
-
     internal static bool AllowsIndexed3DTarget(
         bool isSelf,
         bool active,
-        bool positionFullyFrozen,
+        bool dynamicBody,
         bool kinematic,
         bool movingKinematic,
         bool trigger,
         bool physicalPairRequired) =>
         !isSelf
         && active
-        && (kinematic ? movingKinematic : !positionFullyFrozen)
+        && (kinematic ? movingKinematic : dynamicBody)
         && !trigger
         && physicalPairRequired;
 
     internal static bool AllowsIndexed2DTarget(
         bool isSelf,
         bool active,
-        bool positionFullyFrozen,
+        bool dynamicBody,
         bool kinematic,
         bool movingKinematic,
         bool trigger,
         bool physicalPairRequired) =>
         !isSelf
         && active
-        && (kinematic ? movingKinematic : !positionFullyFrozen)
+        && (kinematic ? movingKinematic : dynamicBody)
         && !trigger
         && physicalPairRequired;
 
     internal static bool AllowsMixedIndexedTarget(
         bool active,
-        bool positionFullyFrozen,
+        bool dynamicBody,
         bool kinematic,
         bool movingKinematic,
         bool trigger,
         bool mixedPairRequired) =>
         active
-        && (kinematic ? movingKinematic : !positionFullyFrozen)
+        && (kinematic ? movingKinematic : dynamicBody)
         && !trigger
         && mixedPairRequired;
 
     internal static bool AllowsStaticOrKinematic3DTarget(
-        bool hasCollider,
         bool isSelf,
         bool ignored,
         bool trigger,
         bool physicalPairRequired,
         bool isStatic,
         bool bodyKinematic) =>
-        hasCollider
-        && !isSelf
+        !isSelf
         && !ignored
         && !trigger
         && physicalPairRequired
         && (isStatic || bodyKinematic);
 
     internal static bool AllowsStaticOrKinematic2DTarget(
-        bool hasCollider,
         bool isSelf,
         bool ignored,
         bool trigger,
         bool physicalPairRequired,
         bool isStatic,
         bool bodyKinematic) =>
-        hasCollider
-        && !isSelf
+        !isSelf
         && !ignored
         && !trigger
         && physicalPairRequired
         && (isStatic || bodyKinematic);
 
     internal static bool AllowsMixedStaticOrKinematicTarget(
-        bool hasCollider,
         bool ignored,
         bool trigger,
         bool mixedPairRequired,
         bool isStatic,
         bool bodyKinematic) =>
-        hasCollider
-        && !ignored
+        !ignored
         && !trigger
         && mixedPairRequired
         && (isStatic || bodyKinematic);

@@ -63,6 +63,21 @@ public sealed class GravitasConstraint2DService
 
     internal bool HasActiveJoints => _enabledJointCount > 0;
 
+    internal void ClearSolverCachesForBody(SolidBody2D body)
+    {
+        if (!_jointIdsByBody.TryGetLast(body, out int jointId))
+            return;
+
+        while (true)
+        {
+            _joints[jointId]!.ClearSolverCache();
+            if (!_jointIdsByBody.TryGetPrevious(body, jointId, out int previousJointId))
+                return;
+
+            jointId = previousJointId;
+        }
+    }
+
     /// <summary>
     /// Registers a context-owned deterministic pure 2D joint.
     /// </summary>

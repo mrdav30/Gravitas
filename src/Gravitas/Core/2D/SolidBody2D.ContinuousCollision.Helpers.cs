@@ -122,7 +122,6 @@ public sealed partial class SolidBody2D
         }
 
         return ContinuousCollisionTargetPolicy.AllowsStaticOrKinematic2DTarget(
-            hasCollider: true,
             ReferenceEquals(hitCollider, Collider),
             ContinuousCollisionCandidateOrdering.IsIgnoredTarget(hitCollider, _continuousCollisionHandoffIgnoredCollider2D),
             hitCollider.IsTrigger,
@@ -142,7 +141,6 @@ public sealed partial class SolidBody2D
         }
 
         return ContinuousCollisionTargetPolicy.AllowsMixedStaticOrKinematicTarget(
-            hasCollider: true,
             ContinuousCollisionCandidateOrdering.IsIgnoredTarget(hitCollider, _continuousCollisionHandoffIgnoredCollider3D),
             hitCollider.IsTrigger,
             Context.MixedCollisions.RequireCollisionPair(hitCollider, Collider),

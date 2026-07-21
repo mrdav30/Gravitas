@@ -508,7 +508,7 @@ public sealed class MixedBroadPhaseTests
         using GravitasWorldContext context = CreateMixedContext(extent: 64);
         ScenarioBody<LSSphereCollider> dynamic3D = CreateSphere3D(context, Vector3d.Zero, immovable: false);
         ScenarioBody<LSSphereCollider> kinematic3D = CreateSphere3D(context, Vector3d.Right * (Fixed64)2, immovable: false);
-        kinematic3D.Body.IsKinematic = true;
+        kinematic3D.Body.SetMotionType(BodyMotionType.Kinematic);
         ScenarioBody<LSSphereCollider> staticBody3D = CreateSphere3D(context, Vector3d.Right * (Fixed64)4, immovable: true);
         _ = CreateSphere3D(context, Vector3d.Right * (Fixed64)6, immovable: true, layer: new PhysicsLayer(1));
         LSSphereCollider inactive3D = CreateBodylessSphere3D(context, Vector3d.Right * (Fixed64)7);
@@ -643,22 +643,21 @@ public sealed class MixedBroadPhaseTests
         PhysicsMixedPartition partition = GetFirstMixedPartition(context, body3D.Collider.MixedPartitionCoordinates!);
         ContainsId(partition.ContainedDynamic3DObjects, body3D.Collider.Id).Should().BeTrue();
 
-        body3D.Body.IsKinematic = true;
+        body3D.Body.SetMotionType(BodyMotionType.Kinematic);
         Step(context);
         partition = GetFirstMixedPartition(context, body3D.Collider.MixedPartitionCoordinates!);
 
         ContainsId(partition.ContainedDynamic3DObjects, body3D.Collider.Id).Should().BeFalse();
         ContainsId(partition.ContainedKinematic3DObjects, body3D.Collider.Id).Should().BeTrue();
 
-        body3D.Body.IsKinematic = false;
-        body3D.Body.FreezeAxes = BodyFreezeAxes3D.Position;
+        body3D.Body.SetMotionType(BodyMotionType.Static);
         Step(context);
         partition = GetFirstMixedPartition(context, body3D.Collider.MixedPartitionCoordinates!);
 
         ContainsId(partition.ContainedKinematic3DObjects, body3D.Collider.Id).Should().BeFalse();
         ContainsId(partition.ContainedStatic3DObjects, body3D.Collider.Id).Should().BeTrue();
 
-        body3D.Body.FreezeAxes = BodyFreezeAxes3D.None;
+        body3D.Body.SetMotionType(BodyMotionType.Dynamic);
         Step(context);
         partition = GetFirstMixedPartition(context, body3D.Collider.MixedPartitionCoordinates!);
 
@@ -677,22 +676,21 @@ public sealed class MixedBroadPhaseTests
         PhysicsMixedPartition partition = GetFirstMixedPartition(context, body2D.Collider.MixedPartitionCoordinates!);
         ContainsId(partition.ContainedDynamic2DObjects, body2D.Collider.Id).Should().BeTrue();
 
-        body2D.IsKinematic = true;
+        body2D.SetMotionType(BodyMotionType.Kinematic);
         Step(context);
         partition = GetFirstMixedPartition(context, body2D.Collider.MixedPartitionCoordinates!);
 
         ContainsId(partition.ContainedDynamic2DObjects, body2D.Collider.Id).Should().BeFalse();
         ContainsId(partition.ContainedKinematic2DObjects, body2D.Collider.Id).Should().BeTrue();
 
-        body2D.IsKinematic = false;
-        body2D.FreezeAxes = BodyFreezeAxes2D.Position;
+        body2D.SetMotionType(BodyMotionType.Static);
         Step(context);
         partition = GetFirstMixedPartition(context, body2D.Collider.MixedPartitionCoordinates!);
 
         ContainsId(partition.ContainedKinematic2DObjects, body2D.Collider.Id).Should().BeFalse();
         ContainsId(partition.ContainedStatic2DObjects, body2D.Collider.Id).Should().BeTrue();
 
-        body2D.FreezeAxes = BodyFreezeAxes2D.None;
+        body2D.SetMotionType(BodyMotionType.Dynamic);
         Step(context);
         partition = GetFirstMixedPartition(context, body2D.Collider.MixedPartitionCoordinates!);
 
@@ -860,10 +858,12 @@ public sealed class MixedBroadPhaseTests
 
         var body = new SolidBody(agent, collider)
         {
-            Mass = Fixed64.One,
-            FreezeAxes = immovable ? BodyFreezeAxes3D.Position : BodyFreezeAxes3D.None
+            Mass = Fixed64.One
         };
-        body.Initialize(agent.Transform.LocalPosition, agent.Transform.LocalRotation);
+        body.Initialize(
+            agent.Transform.LocalPosition,
+            agent.Transform.LocalRotation,
+            immovable ? BodyMotionType.Static : BodyMotionType.Dynamic);
         return new ScenarioBody<LSSphereCollider>(body, collider);
     }
 
@@ -909,11 +909,15 @@ public sealed class MixedBroadPhaseTests
 
         var body = new SolidBody2D(agent, collider)
         {
-            Mass = Fixed64.One,
-            FreezeAxes = immovable ? BodyFreezeAxes2D.Position : BodyFreezeAxes2D.None,
-            IsKinematic = isKinematic
+            Mass = Fixed64.One
         };
-        body.Initialize(agent.Transform.LocalPosition.ToVector2d());
+        body.Initialize(
+            agent.Transform.LocalPosition.ToVector2d(),
+            motionType: immovable
+                ? BodyMotionType.Static
+                : isKinematic
+                    ? BodyMotionType.Kinematic
+                    : BodyMotionType.Dynamic);
         return body;
     }
 

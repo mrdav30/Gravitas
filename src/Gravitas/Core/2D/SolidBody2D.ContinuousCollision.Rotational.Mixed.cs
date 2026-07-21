@@ -492,11 +492,15 @@ public sealed partial class SolidBody2D
 
     private bool IsMovingMixedRotationalContinuousCollisionTarget(SolidBody target)
     {
-        return target.Active
-            && (IsKinematic || !target.ShouldOwnContinuousCollisionMovingPair(
+        if (target.IsKinematic)
+            target.EnsureContinuousCollisionFramePrepared(Context.LateSimulateToken);
+
+        return (IsKinematic || !target.ShouldOwnContinuousCollisionMovingPair(
                 HasContinuousCollisionRotationalMotion))
             && IsValidMixedRotationalContinuousCollisionTarget(target.Collider)
-            && (target.IsKinematic || !target.IsPositionFullyFrozen);
+            && (target.IsKinematic
+                ? target.HasContinuousCollisionMotion
+                : target.IsDynamic);
     }
 
     internal bool TryApplyMixedRotationalContinuousCollisionResponse(
@@ -537,8 +541,8 @@ public sealed partial class SolidBody2D
             ?? Vector3d.Zero;
         Vector3d targetAngularVelocity = target?.SampleContinuousCollisionAngularVelocity(frameFraction)
             ?? Vector3d.Zero;
-        SolidBody? targetResponseBody = target?.IsKinematic == false ? target : null;
-        SolidBody2D? sourceResponseBody = IsKinematic ? null : this;
+        SolidBody? targetResponseBody = target?.HasSolverMobility == true ? target : null;
+        SolidBody2D? sourceResponseBody = HasSolverMobility ? this : null;
         Vector3d targetCenterOfMass = targetPosition;
         if (target != null)
         {
@@ -592,7 +596,7 @@ public sealed partial class SolidBody2D
         Vector3d postTargetLinearVelocity = targetLinearVelocity;
         Vector3d postTargetAngularVelocity = targetAngularVelocity;
         Vector3d targetResolvedPosition = default;
-        if (!IsKinematic
+        if (sourceResponseBody != null
             && !(CanApplyCollisionVelocityDeltas(
                     response.LinearVelocityDelta2D,
                     response.AngularVelocityDelta2D)
@@ -624,7 +628,7 @@ public sealed partial class SolidBody2D
             }
         }
 
-        if (!IsKinematic)
+        if (sourceResponseBody != null)
             _ = Context.Physics2D.TryReserveContinuousCollisionCandidateRefresh(this);
 
         if (targetResponseBody != null)
@@ -642,7 +646,7 @@ public sealed partial class SolidBody2D
                 ignoredCollider2D: Collider);
         }
 
-        if (!IsKinematic)
+        if (sourceResponseBody != null)
         {
             ApplyCollisionLinearVelocityDelta(response.LinearVelocityDelta2D);
             ApplyCollisionAngularVelocityDelta(response.AngularVelocityDelta2D);

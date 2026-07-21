@@ -15,7 +15,7 @@ namespace Gravitas;
 public sealed partial class GravitasPhysicsService
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool IsMovableIslandBody(SolidBody body) => body.CanTranslate;
+    private static bool IsMovableIslandBody(SolidBody body) => body.HasSolverMobility;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool HasAwakeResponseParticipant(CollisionPair pair) =>

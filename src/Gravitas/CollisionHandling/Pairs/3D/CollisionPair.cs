@@ -573,6 +573,8 @@ public partial class CollisionPair
     internal bool TryGetWarmStartImpulse(ulong contactId, out ContactWarmStartImpulse impulse) =>
         _warmStart.TryGet(contactId, out impulse);
 
+    internal void ClearWarmStart() => _warmStart.Clear();
+
     /// <summary>
     /// Deactivates the CollisionPair.
     /// </summary>
