@@ -82,12 +82,14 @@ public sealed partial class ContinuousCollisionDetectionTests
     }
 
     [Theory]
-    // Canonical target histories preserve the second outward relay instead of collapsing it into the first.
-    [InlineData(5, false)]
-    [InlineData(4, true)]
-    [InlineData(3, true)]
+    // Piecewise target histories resolve the causal relay in four dequeues;
+    // only smaller shared budgets discard the terminal continuation.
+    [InlineData(5, 4, false)]
+    [InlineData(4, 4, false)]
+    [InlineData(3, 3, true)]
     public void ContinuousHandoff_WhenRelayReturnsToConsumedBody_ShouldRequeueOrDiscardAtBudget(
         int iterationBudget,
+        int expectedIterations,
         bool expectedLimitReached)
     {
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();
@@ -115,10 +117,10 @@ public sealed partial class ContinuousCollisionDetectionTests
             Fixed64.One);
 
         scenario.Context.Physics.ProcessQueuedContinuousCollisionHandoffs(iterationBudget)
-            .Should().Be(iterationBudget);
+            .Should().Be(expectedIterations);
 
         scenario.Context.Physics.LastContinuousCollisionIslandCount.Should().Be(1);
-        scenario.Context.Physics.LastContinuousCollisionIslandIterationCount.Should().Be(iterationBudget);
+        scenario.Context.Physics.LastContinuousCollisionIslandIterationCount.Should().Be(expectedIterations);
         scenario.Context.Physics.LastContinuousCollisionIslandLimitReached.Should().Be(expectedLimitReached);
         var replayHash = scenario.Context.ComputeReplayHash();
         returning.Body.TryConsumeContinuousCollisionHandoff(

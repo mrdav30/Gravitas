@@ -86,12 +86,14 @@ public sealed partial class ContinuousCollision2DTests
     }
 
     [Theory]
-    // Canonical target histories preserve the second outward relay instead of collapsing it into the first.
-    [InlineData(5, false)]
-    [InlineData(4, true)]
-    [InlineData(3, true)]
+    // Piecewise target histories resolve the causal relay in four dequeues;
+    // only smaller shared budgets discard the terminal continuation.
+    [InlineData(5, 4, false)]
+    [InlineData(4, 4, false)]
+    [InlineData(3, 3, true)]
     public void ContinuousHandoff_WhenRelayReturnsToConsumedBody_ShouldRequeueOrDiscardAtBudget(
         int iterationBudget,
+        int expectedIterations,
         bool expectedLimitReached)
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
@@ -128,10 +130,10 @@ public sealed partial class ContinuousCollision2DTests
             Fixed64.One);
 
         context.Physics2D.ProcessQueuedContinuousCollisionHandoffs(iterationBudget)
-            .Should().Be(iterationBudget);
+            .Should().Be(expectedIterations);
 
         context.Physics2D.LastContinuousCollisionIslandCount.Should().Be(1);
-        context.Physics2D.LastContinuousCollisionIslandIterationCount.Should().Be(iterationBudget);
+        context.Physics2D.LastContinuousCollisionIslandIterationCount.Should().Be(expectedIterations);
         context.Physics2D.LastContinuousCollisionIslandLimitReached.Should().Be(expectedLimitReached);
         var replayHash = context.ComputeReplayHash();
         returning.TryConsumeContinuousCollisionHandoff(

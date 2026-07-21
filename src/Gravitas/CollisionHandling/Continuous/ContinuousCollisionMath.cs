@@ -272,6 +272,52 @@ internal static class ContinuousCollisionMath
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void ClipTranslationalTrajectoryInterval(
+        Fixed64 queryStart,
+        Fixed64 segmentStart,
+        Fixed64 segmentEnd,
+        out Fixed64 overlapStart,
+        out Fixed64 overlapEnd,
+        out Fixed64 sourceStartTime,
+        out Fixed64 sourceEndTime)
+    {
+        overlapStart = FixedMath.Max(queryStart, segmentStart);
+        overlapEnd = segmentEnd;
+        Fixed64 querySpan = Fixed64.One - queryStart;
+        sourceStartTime = FixedMath.Clamp01((overlapStart - queryStart) / querySpan);
+        sourceEndTime = FixedMath.Clamp01((overlapEnd - queryStart) / querySpan);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool IsSupersededTranslationalBoundaryHit(
+        Fixed64 segmentTime,
+        Fixed64 overlapEnd,
+        int segmentIndex,
+        int segmentCount,
+        Fixed64 successorStart) =>
+        segmentTime >= Fixed64.One
+        && overlapEnd < Fixed64.One
+        && segmentIndex + 1 < segmentCount
+        && successorStart == overlapEnd;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool TryNormalizeTranslationalClosingSpeed(
+        Fixed64 localClosingSpeed,
+        Fixed64 sourceIntervalSpan,
+        out Fixed64 closingSpeed)
+    {
+        if (localClosingSpeed <= Fixed64.Epsilon
+            || sourceIntervalSpan <= Fixed64.Zero)
+        {
+            closingSpeed = Fixed64.Zero;
+            return false;
+        }
+
+        closingSpeed = localClosingSpeed / sourceIntervalSpan;
+        return true;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool TrySweepRelativeSpheres(
         Vector3d sourceStart,
         Vector3d sourceDisplacement,

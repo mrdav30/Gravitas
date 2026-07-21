@@ -4819,7 +4819,10 @@ public sealed partial class MixedQueryCcdTests
 
         middle.Body.IsSleeping.Should().BeFalse();
         receiver.IsSleeping.Should().BeFalse();
-        middle.Body.LinearVelocity.X.Should().BeGreaterThan(Fixed64.Zero);
+        // The middle body reaches the receiver before the kinematic source's
+        // later direct handoff. The one-iteration budget therefore resolves
+        // that causal relay and clamps the middle body's remaining motion.
+        middle.Body.LinearVelocity.Should().Be(Vector3d.Zero);
         receiver.LinearVelocity.X.Should().BeGreaterThan(Fixed64.Zero);
         (context.Physics.LastContinuousCollisionIslandIterationCount
             + context.Physics2D.LastContinuousCollisionIslandIterationCount)

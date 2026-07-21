@@ -11,6 +11,22 @@ namespace Gravitas.Tests.CollisionHandlingTests;
 
 public sealed class ContinuousCollisionCandidateOrderingTests
 {
+    [Theory]
+    [InlineData(1, 1, true)]
+    [InlineData(1, 2, true)]
+    [InlineData(2, 1, false)]
+    public void Is2DHitFirst_ShouldPrefer2DAtAnExactDistanceTie(
+        int distance2D,
+        int distance3D,
+        bool expected)
+    {
+        ContinuousCollisionCandidateOrdering.Is2DHitFirst(
+                (Fixed64)distance2D,
+                (Fixed64)distance3D)
+            .Should()
+            .Be(expected);
+    }
+
     [Fact]
     public void ShouldReplace3DHit_ShouldUseDistanceClosingSpeedAndStableColliderIds()
     {

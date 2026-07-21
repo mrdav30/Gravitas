@@ -294,13 +294,11 @@ public partial class SolidBody
                 Vector3d segmentEnd = requestedSegmentEnd;
 
                 Fixed64 elapsedFraction = elapsedTime / Context.DeltaTime;
-                Fixed64 remainingFraction = remainingTime / Context.DeltaTime;
                 if (!TryGetFirstContinuousCollisionHit(
                         currentPosition,
                         segmentEnd,
                         proxyRadius,
                         elapsedFraction,
-                        remainingFraction,
                         out Vector3d hitNormal,
                         out Fixed64 hitDistance,
                         out ContinuousCollisionTargetKind targetKind,

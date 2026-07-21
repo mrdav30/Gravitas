@@ -55,6 +55,10 @@ public sealed partial class SolidBody2D
     internal int ContinuousCollisionTrajectoryCount =>
         _continuousCollisionTrajectory.Count;
 
+    internal ContinuousCollisionMotionSegment2D GetContinuousCollisionTrajectorySegment(
+        int index) =>
+        _continuousCollisionTrajectory[index];
+
     internal bool HasContinuousCollisionMotion
     {
         get
@@ -138,17 +142,6 @@ public sealed partial class SolidBody2D
         _continuousCollisionTrajectory.Count == 0
             ? _angularVelocity
             : ResolveContinuousCollisionSegment(frameFraction).AngularVelocity;
-
-    internal bool TrySampleContinuousCollisionDisplacement(
-        Fixed64 startFraction,
-        Fixed64 endFraction,
-        out Vector2d startPosition,
-        out Vector2d displacement)
-    {
-        startPosition = SampleContinuousCollisionPosition(startFraction);
-        Vector2d endPosition = SampleContinuousCollisionPosition(endFraction);
-        return Vector2d.TrySubtract(endPosition, startPosition, out displacement);
-    }
 
     private Vector2d ResolveLegacyContinuousCollisionFrameStart()
     {
@@ -400,6 +393,11 @@ public sealed partial class SolidBody2D
     }
 
     private ContinuousCollisionMotionSegment2D ResolveContinuousCollisionSegment(
+        Fixed64 frameFraction) =>
+        _continuousCollisionTrajectory[
+            GetContinuousCollisionTrajectorySegmentIndex(frameFraction)];
+
+    internal int GetContinuousCollisionTrajectorySegmentIndex(
         Fixed64 frameFraction)
     {
         for (int i = _continuousCollisionTrajectory.Count - 1; i > 0; i--)
@@ -407,10 +405,21 @@ public sealed partial class SolidBody2D
             ContinuousCollisionMotionSegment2D segment =
                 _continuousCollisionTrajectory[i];
             if (frameFraction >= segment.StartFraction)
-                return segment;
+                return i;
         }
 
-        return _continuousCollisionTrajectory[0];
+        return 0;
+    }
+
+    internal void GetContinuousCollisionTrajectorySegmentRange(
+        Fixed64 startFraction,
+        out int startIndex,
+        out int endExclusive)
+    {
+        startIndex = startFraction <= Fixed64.Zero
+            ? 0
+            : GetContinuousCollisionTrajectorySegmentIndex(startFraction);
+        endExclusive = _continuousCollisionTrajectory.Count;
     }
 
     private void InvalidateContinuousCollisionFrame()

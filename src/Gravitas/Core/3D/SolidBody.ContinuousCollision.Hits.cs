@@ -21,7 +21,6 @@ public partial class SolidBody
         Vector3d proposedPosition,
         Fixed64 proxyRadius,
         Fixed64 elapsedFrameFraction,
-        Fixed64 remainingFrameFraction,
         out Vector3d normal,
         out Fixed64 distance,
         out ContinuousCollisionTargetKind targetKind,
@@ -66,7 +65,6 @@ public partial class SolidBody
                 proposedPosition,
                 proxyRadius,
                 elapsedFrameFraction,
-                remainingFrameFraction,
                 out Physics3DHit dynamicHit3D,
                 out Fixed64 dynamicClosingSpeed3D);
             if (ContinuousCollisionCandidateOrdering.ShouldReplaceHit(dynamicHit3D, dynamicClosingSpeed3D, foundDynamic3D, found3D, hit3D, Fixed64.Zero))
@@ -85,7 +83,6 @@ public partial class SolidBody
                 proposedPosition,
                 proxyRadius,
                 elapsedFrameFraction,
-                remainingFrameFraction,
                 out PhysicsMixedHit dynamicHitMixed,
                 out Fixed64 dynamicClosingSpeedMixed);
             if (ContinuousCollisionCandidateOrdering.ShouldReplaceMixedHit(dynamicHitMixed, dynamicClosingSpeedMixed, foundDynamicMixed, foundMixed, hitMixed, Fixed64.Zero))
@@ -95,7 +92,11 @@ public partial class SolidBody
                 hitMixedKind = ContinuousCollisionTargetKind.Dynamic2D;
             }
 
-            if (found3D && (!foundMixed || hit3D.Distance <= hitMixed.Distance))
+            if (found3D
+                && (!foundMixed
+                    || !ContinuousCollisionCandidateOrdering.Is2DHitFirst(
+                        hitMixed.Distance,
+                        hit3D.Distance)))
             {
                 normal = hit3D.Normal;
                 distance = hit3D.Distance;
@@ -320,7 +321,6 @@ public partial class SolidBody
         Vector3d proposedPosition,
         Fixed64 proxyRadius,
         Fixed64 elapsedFrameFraction,
-        Fixed64 remainingFrameFraction,
         out Physics3DHit hit,
         out Fixed64 closingSpeed)
     {
@@ -329,7 +329,6 @@ public partial class SolidBody
 
         Vector3d sourceDisplacement = proposedPosition - startPosition;
         Fixed64 sourceLength = sourceDisplacement.Magnitude;
-        Vector3d sourceDirection = sourceDisplacement.Normalized;
         bool found = false;
         Physics3DHit best = default;
         Fixed64 bestClosingSpeed = Fixed64.Zero;
@@ -346,57 +345,16 @@ public partial class SolidBody
             }
 
             target.EnsureContinuousCollisionFramePrepared(token);
-            Fixed64 targetEndFrameFraction = FixedMath.Clamp01(
-                elapsedFrameFraction + remainingFrameFraction);
-            target.TrySampleContinuousCollisionDisplacement(
-                elapsedFrameFraction,
-                targetEndFrameFraction,
-                out Vector3d targetStart,
-                out Vector3d targetDisplacement);
-
-            Fixed64 targetRadius = target.ResolveContinuousCollisionProxyRadius();
-            if (!ContinuousCollisionMath.TrySweepRelativeSpheres(
-                    startPosition,
-                    sourceDisplacement,
-                    proxyRadius,
-                    targetStart,
-                    targetDisplacement,
-                    targetRadius,
-                    out Fixed64 normalizedTime,
-                    out Vector3d normal,
-                    out Fixed64 candidateClosingSpeed))
-            {
-                continue;
-            }
-
-            Physics3DHit candidate;
-            if (TryGetExactDynamicRelativeContinuousCollisionHit(
+            if (!TryGetDynamicRelativeContinuousCollisionHit(
                     target,
                     startPosition,
                     sourceDisplacement,
-                    targetStart,
-                    targetDisplacement,
+                    proxyRadius,
                     sourceLength,
                     elapsedFrameFraction,
-                    out Physics3DHit exactHit,
-                    out Fixed64 exactClosingSpeed,
-                    out bool exactSupported))
-            {
-                candidate = exactHit;
-                candidateClosingSpeed = exactClosingSpeed;
-            }
-            else if (exactSupported)
-            {
+                    out Physics3DHit candidate,
+                    out Fixed64 candidateClosingSpeed))
                 continue;
-            }
-            else
-            {
-                Fixed64 distance = sourceLength * normalizedTime;
-                Vector3d sourceCenter = startPosition + sourceDisplacement * normalizedTime;
-                Vector3d targetCenter = targetStart + targetDisplacement * normalizedTime;
-                Vector3d point = ContinuousCollisionMath.ResolveContactPointOnTarget(sourceCenter, targetCenter, normal, targetRadius);
-                candidate = new Physics3DHit(target.Collider, point, normal, distance, sourceDirection);
-            }
 
             if (!ContinuousCollisionCandidateOrdering.ShouldReplaceHit(candidate, candidateClosingSpeed, true, found, best, bestClosingSpeed))
                 continue;
@@ -411,29 +369,28 @@ public partial class SolidBody
         return found;
     }
 
-    private bool TryGetExactDynamicRelativeContinuousCollisionHit(
+    internal bool TryGetDynamicRelativeContinuousCollisionHit(
         SolidBody target,
         Vector3d sourceStart,
         Vector3d sourceDisplacement,
-        Vector3d targetStart,
-        Vector3d targetDisplacement,
+        Fixed64 sourceRadius,
         Fixed64 sourceLength,
-        Fixed64 elapsedFrameFraction,
+        Fixed64 queryStartFraction,
         out Physics3DHit hit,
-        out Fixed64 closingSpeed,
-        out bool exactSupported)
+        out Fixed64 closingSpeed)
     {
         hit = default;
         closingSpeed = Fixed64.Zero;
-        exactSupported = false;
-
-        Vector3d relativeDisplacement = ContinuousCollisionSweepRange.ValidateRelativeDisplacement(
-            sourceDisplacement,
-            targetDisplacement,
-            out Fixed64 relativeLength);
-
-        Vector3d relativeDirection = relativeDisplacement.Normalized;
+        Vector3d sourceEnd = sourceStart + sourceDisplacement;
         Vector3d sourceDirection = sourceDisplacement.Normalized;
+        Fixed64 targetRadius = target.ResolveContinuousCollisionProxyRadius();
+        bool exactSupported = Collider is LSSphereCollider
+            || target.Collider is LSSphereCollider
+            || IsExactConvexSourceSupported(Collider);
+        bool found = false;
+        Physics3DHit best = default;
+        Fixed64 bestClosingSpeed = Fixed64.Zero;
+
         Vector3d originalSourcePosition = Position3d;
         FixedQuaternion originalSourceRotation = Rotation;
         bool originalSourcePositionMutated = _positionMutated;
@@ -445,50 +402,166 @@ public partial class SolidBody
 
         try
         {
-            Position3d = sourceStart;
-            target.Position3d = targetStart;
-            target.Rotation = target.SampleContinuousCollisionRotation(elapsedFrameFraction);
-            Collider.RebuildRuntimeShapeOnly(refreshMassProperties: false);
-            target.Collider.RebuildRuntimeShapeOnly(refreshMassProperties: false);
-
-            Physics3DHit relativeHit;
-            if (Collider is LSSphereCollider sourceSphere)
+            target.GetContinuousCollisionTrajectorySegmentRange(
+                queryStartFraction,
+                out int segmentStartIndex,
+                out int segmentEndExclusive);
+            for (int segmentIndex = segmentStartIndex;
+                segmentIndex < segmentEndExclusive;
+                segmentIndex++)
             {
-                exactSupported = true;
-                if (!TrySweepRelativeSourceSphere(sourceSphere, target.Collider, relativeDisplacement, relativeDirection, out relativeHit))
-                    return false;
-            }
-            else if (target.Collider is LSSphereCollider targetSphere)
-            {
-                if (!TryRefineContinuousCollisionAgainstTargetSphere(targetSphere, relativeDisplacement, relativeDirection, out relativeHit, out exactSupported))
-                    return false;
-            }
-            else if (IsExactConvexSourceSupported(Collider))
-            {
-                exactSupported = true;
-                PrepareExactConvexSourceSweep(relativeDisplacement);
-                if (!_shapeExactContinuousConvexSweepWorker.TrySweepPreparedSource(target.Collider, out Physics3DHit convexHit))
-                    return false;
+                ContinuousCollisionMotionSegment3D segment =
+                    target.GetContinuousCollisionTrajectorySegment(segmentIndex);
+                ContinuousCollisionMath.ClipTranslationalTrajectoryInterval(
+                    queryStartFraction,
+                    segment.StartFraction,
+                    segment.EndFraction,
+                    out Fixed64 overlapStart,
+                    out Fixed64 overlapEnd,
+                    out Fixed64 sourceStartTime,
+                    out Fixed64 sourceEndTime);
 
-                relativeHit = ApplyShapeExactContinuousContactSlop(convexHit);
-            }
-            else
-            {
-                return false;
-            }
+                Vector3d sourceSegmentStart = Vector3d.Lerp(
+                    sourceStart,
+                    sourceEnd,
+                    sourceStartTime);
+                Vector3d sourceSegmentEnd = Vector3d.Lerp(
+                    sourceStart,
+                    sourceEnd,
+                    sourceEndTime);
+                Vector3d sourceSegmentDisplacement =
+                    ContinuousCollisionSweepRange.ValidateEndpoint(
+                        sourceSegmentStart,
+                        sourceSegmentEnd,
+                        out _);
+                Vector3d targetStart = segment.SamplePosition(overlapStart);
+                Vector3d targetEnd = segment.SamplePosition(overlapEnd);
+                Vector3d targetDisplacement =
+                    ContinuousCollisionSweepRange.ValidateEndpoint(
+                        targetStart,
+                        targetEnd,
+                        out _);
+                if (!ContinuousCollisionMath.TrySweepRelativeSpheres(
+                        sourceSegmentStart,
+                        sourceSegmentDisplacement,
+                        sourceRadius,
+                        targetStart,
+                        targetDisplacement,
+                        targetRadius,
+                        out Fixed64 normalizedTime,
+                        out Vector3d normal,
+                        out _))
+                {
+                    continue;
+                }
 
-            closingSpeed = -Vector3d.Dot(relativeDisplacement, relativeHit.Normal);
-            if (closingSpeed <= Fixed64.Epsilon)
-                return false;
+                Vector3d relativeDisplacement =
+                    ContinuousCollisionSweepRange.ValidateRelativeDisplacement(
+                        sourceSegmentDisplacement,
+                        targetDisplacement,
+                        out Fixed64 relativeLength);
+                Vector3d relativeDirection = relativeDisplacement.Normalized;
+                Position3d = sourceSegmentStart;
+                target.Position3d = targetStart;
+                target.Rotation = target.SampleContinuousCollisionRotation(
+                    overlapStart);
+                Collider.RebuildRuntimeShapeOnly(refreshMassProperties: false);
+                target.Collider.RebuildRuntimeShapeOnly(refreshMassProperties: false);
 
-            Fixed64 normalizedTime = FixedMath.Clamp01(relativeHit.Distance / relativeLength);
-            hit = new Physics3DHit(
-                target.Collider,
-                relativeHit.Point + targetDisplacement * normalizedTime,
-                relativeHit.Normal,
-                sourceLength * normalizedTime,
-                sourceDirection);
-            return true;
+                Physics3DHit relativeHit = default;
+                bool foundExact = false;
+                if (Collider is LSSphereCollider sourceSphere)
+                {
+                    foundExact = TrySweepRelativeSourceSphere(
+                        sourceSphere,
+                        target.Collider,
+                        relativeDisplacement,
+                        relativeDirection,
+                        out relativeHit);
+                }
+                else if (target.Collider is LSSphereCollider targetSphere)
+                {
+                    foundExact = TryRefineContinuousCollisionAgainstTargetSphere(
+                        targetSphere,
+                        relativeDisplacement,
+                        relativeDirection,
+                        out relativeHit,
+                        out _);
+                }
+                else if (IsExactConvexSourceSupported(Collider))
+                {
+                    PrepareExactConvexSourceSweep(relativeDisplacement);
+                    foundExact = _shapeExactContinuousConvexSweepWorker
+                        .TrySweepPreparedSource(
+                            target.Collider,
+                            out Physics3DHit convexHit);
+                    if (foundExact)
+                        relativeHit = ApplyShapeExactContinuousContactSlop(convexHit);
+                }
+
+                if (exactSupported && !foundExact)
+                    continue;
+
+                if (foundExact)
+                {
+                    normalizedTime = FixedMath.Clamp01(
+                        relativeHit.Distance / relativeLength);
+                    normal = relativeHit.Normal;
+                }
+
+                Fixed64 successorStart = segmentIndex + 1
+                    < target.ContinuousCollisionTrajectoryCount
+                    ? target.GetContinuousCollisionTrajectorySegment(segmentIndex + 1)
+                        .StartFraction
+                    : Fixed64.Zero;
+                if (ContinuousCollisionMath.IsSupersededTranslationalBoundaryHit(
+                        normalizedTime,
+                        overlapEnd,
+                        segmentIndex,
+                        target.ContinuousCollisionTrajectoryCount,
+                        successorStart))
+                {
+                    continue;
+                }
+
+                Fixed64 localClosingSpeed =
+                    -Vector3d.Dot(relativeDisplacement, normal);
+                if (!ContinuousCollisionMath.TryNormalizeTranslationalClosingSpeed(
+                        localClosingSpeed,
+                        sourceEndTime - sourceStartTime,
+                        out Fixed64 candidateClosingSpeed))
+                    continue;
+
+                Fixed64 sourceTime = FixedMath.Lerp(
+                    sourceStartTime,
+                    sourceEndTime,
+                    normalizedTime);
+                Vector3d sourceCenter = Vector3d.Lerp(
+                    sourceSegmentStart,
+                    sourceSegmentEnd,
+                    normalizedTime);
+                Vector3d targetCenter = Vector3d.Lerp(
+                    targetStart,
+                    targetEnd,
+                    normalizedTime);
+                Vector3d point = foundExact
+                    ? relativeHit.Point + targetDisplacement * normalizedTime
+                    : ContinuousCollisionMath.ResolveContactPointOnTarget(
+                        sourceCenter,
+                        targetCenter,
+                        normal,
+                        targetRadius);
+                var candidate = new Physics3DHit(
+                    target.Collider,
+                    point,
+                    normal,
+                    sourceLength * sourceTime,
+                    sourceDirection);
+                best = candidate;
+                bestClosingSpeed = candidateClosingSpeed;
+                found = true;
+                break;
+            }
         }
         finally
         {
@@ -503,6 +576,10 @@ public partial class SolidBody
             _positionMutated = originalSourcePositionMutated;
             _rotationMutated = originalSourceRotationMutated;
         }
+
+        hit = best;
+        closingSpeed = bestClosingSpeed;
+        return found;
     }
 
     private bool TrySweepRelativeSourceSphere(
@@ -535,7 +612,6 @@ public partial class SolidBody
         Vector3d proposedPosition,
         Fixed64 proxyRadius,
         Fixed64 elapsedFrameFraction,
-        Fixed64 remainingFrameFraction,
         out PhysicsMixedHit hit,
         out Fixed64 closingSpeed)
     {
@@ -567,35 +643,153 @@ public partial class SolidBody
             Fixed64 targetRadius = FixedMath.Max(
                 target.ResolveContinuousCollisionProxyRadius(),
                 target.Collider.MixedHalfThickness);
-            Fixed64 targetEndFrameFraction = FixedMath.Clamp01(
-                elapsedFrameFraction + remainingFrameFraction);
-            target.TrySampleContinuousCollisionDisplacement(
-                elapsedFrameFraction,
-                targetEndFrameFraction,
-                out Vector2d targetStart2D,
-                out Vector2d targetDisplacement2D);
-
-            Vector3d targetStart = new(targetStart2D.X, target.Collider.MixedSlabCenterY, targetStart2D.Y);
-            Vector3d targetDisplacement = new(targetDisplacement2D.X, Fixed64.Zero, targetDisplacement2D.Y);
-            if (!ContinuousCollisionMath.TrySweepRelativeSpheres(
+            if (!TryGetDynamicMixed2DContinuousCollisionHit(
+                    target,
                     startPosition,
                     sourceDisplacement,
                     proxyRadius,
+                    targetRadius,
+                    sourceLength,
+                    elapsedFrameFraction,
+                    out PhysicsMixedHit candidate,
+                    out Fixed64 candidateClosingSpeed))
+                continue;
+
+            if (!ContinuousCollisionCandidateOrdering.ShouldReplaceMixedHit(candidate, candidateClosingSpeed, true, found, best, bestClosingSpeed))
+                continue;
+
+            best = candidate;
+            bestClosingSpeed = candidateClosingSpeed;
+            found = true;
+        }
+
+        hit = best;
+        closingSpeed = bestClosingSpeed;
+        return found;
+    }
+
+    private bool TryGetDynamicMixed2DContinuousCollisionHit(
+        SolidBody2D target,
+        Vector3d sourceStart,
+        Vector3d sourceDisplacement,
+        Fixed64 sourceRadius,
+        Fixed64 targetRadius,
+        Fixed64 sourceLength,
+        Fixed64 queryStartFraction,
+        out PhysicsMixedHit hit,
+        out Fixed64 closingSpeed)
+    {
+        hit = default;
+        closingSpeed = Fixed64.Zero;
+        Vector3d sourceEnd = sourceStart + sourceDisplacement;
+        Vector3d sourceDirection = sourceDisplacement.Normalized;
+        bool found = false;
+        PhysicsMixedHit best = default;
+        Fixed64 bestClosingSpeed = Fixed64.Zero;
+        target.GetContinuousCollisionTrajectorySegmentRange(
+            queryStartFraction,
+            out int segmentStartIndex,
+            out int segmentEndExclusive);
+        for (int segmentIndex = segmentStartIndex;
+            segmentIndex < segmentEndExclusive;
+            segmentIndex++)
+        {
+            ContinuousCollisionMotionSegment2D segment =
+                target.GetContinuousCollisionTrajectorySegment(segmentIndex);
+            ContinuousCollisionMath.ClipTranslationalTrajectoryInterval(
+                queryStartFraction,
+                segment.StartFraction,
+                segment.EndFraction,
+                out Fixed64 overlapStart,
+                out Fixed64 overlapEnd,
+                out Fixed64 sourceStartTime,
+                out Fixed64 sourceEndTime);
+
+            Vector3d sourceSegmentStart = Vector3d.Lerp(
+                sourceStart,
+                sourceEnd,
+                sourceStartTime);
+            Vector3d sourceSegmentEnd = Vector3d.Lerp(
+                sourceStart,
+                sourceEnd,
+                sourceEndTime);
+            Vector3d sourceSegmentDisplacement =
+                ContinuousCollisionSweepRange.ValidateEndpoint(
+                    sourceSegmentStart,
+                    sourceSegmentEnd,
+                    out _);
+            Vector2d targetStart2D = segment.SamplePosition(overlapStart);
+            Vector2d targetEnd2D = segment.SamplePosition(overlapEnd);
+            Vector2d targetDisplacement2D =
+                ContinuousCollisionSweepRange.ValidateEndpoint(
+                    targetStart2D,
+                    targetEnd2D,
+                    out _);
+            Vector3d targetStart = new(
+                targetStart2D.X,
+                target.Collider.MixedSlabCenterY,
+                targetStart2D.Y);
+            Vector3d targetEnd = new(
+                targetEnd2D.X,
+                target.Collider.MixedSlabCenterY,
+                targetEnd2D.Y);
+            Vector3d targetDisplacement = new(
+                targetDisplacement2D.X,
+                Fixed64.Zero,
+                targetDisplacement2D.Y);
+            if (!ContinuousCollisionMath.TrySweepRelativeSpheres(
+                    sourceSegmentStart,
+                    sourceSegmentDisplacement,
+                    sourceRadius,
                     targetStart,
                     targetDisplacement,
                     targetRadius,
                     out Fixed64 normalizedTime,
                     out Vector3d normalForSource,
-                    out Fixed64 candidateClosingSpeed))
+                    out Fixed64 localClosingSpeed))
             {
                 continue;
             }
 
-            Fixed64 distance = sourceLength * normalizedTime;
-            Vector3d sourceCenter = startPosition + sourceDisplacement * normalizedTime;
-            Vector3d targetCenter = targetStart + targetDisplacement * normalizedTime;
-            Vector3d point3D = sourceCenter - normalForSource * proxyRadius;
-            Vector3d point2D = ContinuousCollisionMath.ResolveContactPointOnTarget(sourceCenter, targetCenter, normalForSource, targetRadius);
+            Fixed64 successorStart = segmentIndex + 1
+                < target.ContinuousCollisionTrajectoryCount
+                ? target.GetContinuousCollisionTrajectorySegment(segmentIndex + 1)
+                    .StartFraction
+                : Fixed64.Zero;
+            if (ContinuousCollisionMath.IsSupersededTranslationalBoundaryHit(
+                    normalizedTime,
+                    overlapEnd,
+                    segmentIndex,
+                    target.ContinuousCollisionTrajectoryCount,
+                    successorStart))
+            {
+                continue;
+            }
+
+            if (!ContinuousCollisionMath.TryNormalizeTranslationalClosingSpeed(
+                    localClosingSpeed,
+                    sourceEndTime - sourceStartTime,
+                    out Fixed64 candidateClosingSpeed))
+                continue;
+
+            Fixed64 sourceTime = FixedMath.Lerp(
+                sourceStartTime,
+                sourceEndTime,
+                normalizedTime);
+            Vector3d sourceCenter = Vector3d.Lerp(
+                sourceSegmentStart,
+                sourceSegmentEnd,
+                normalizedTime);
+            Vector3d targetCenter = Vector3d.Lerp(
+                targetStart,
+                targetEnd,
+                normalizedTime);
+            Vector3d point3D = sourceCenter - normalForSource * sourceRadius;
+            Vector3d point2D = ContinuousCollisionMath.ResolveContactPointOnTarget(
+                sourceCenter,
+                targetCenter,
+                normalForSource,
+                targetRadius);
             var candidate = new PhysicsMixedHit(
                 null,
                 target.Collider,
@@ -603,14 +797,12 @@ public partial class SolidBody
                 point2D,
                 -normalForSource,
                 PhysicsQueryReducerKind.ConservativeFallback,
-                distance,
+                sourceLength * sourceTime,
                 sourceDirection);
-            if (!ContinuousCollisionCandidateOrdering.ShouldReplaceMixedHit(candidate, candidateClosingSpeed, true, found, best, bestClosingSpeed))
-                continue;
-
             best = candidate;
             bestClosingSpeed = candidateClosingSpeed;
             found = true;
+            break;
         }
 
         hit = best;

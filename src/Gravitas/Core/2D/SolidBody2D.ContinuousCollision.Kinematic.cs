@@ -94,7 +94,11 @@ public sealed partial class SolidBody2D
 
             bool found2D = TryGetFirstValidContinuousCollisionHit(startPosition, proposedPosition, hitCount, out Physics2DHit hit2D);
             bool foundMixed = TryGetFirstValidMixedContinuousCollisionHit(startPosition, proposedPosition, mixedHitCount, out PhysicsMixedHit hitMixed);
-            if (found2D && (!foundMixed || hit2D.Distance <= hitMixed.Distance))
+            if (found2D
+                && (!foundMixed
+                    || ContinuousCollisionCandidateOrdering.Is2DHitFirst(
+                        hit2D.Distance,
+                        hitMixed.Distance)))
             {
                 distance = hit2D.Distance;
                 return true;
@@ -197,32 +201,11 @@ public sealed partial class SolidBody2D
             }
 
             target.EnsureContinuousCollisionFramePrepared(token);
-            Fixed64 targetRadius = target.ResolveContinuousCollisionProxyRadius();
-            if (!ContinuousCollisionMath.TrySweepRelativeCircles(
-                    startPosition,
-                    sourceDisplacement,
-                    proxyRadius,
-                    target.ContinuousCollisionFrameStart,
-                    target.ContinuousCollisionFrameDisplacement,
-                    targetRadius,
-                    out _,
-                    out _,
-                    out _))
-            {
-                continue;
-            }
-
-            target.TrySampleContinuousCollisionDisplacement(
-                Fixed64.Zero,
-                Fixed64.One,
-                out Vector2d targetStart,
-                out Vector2d targetDisplacement);
-            if (!TryGetExactDynamicRelativeContinuousCollisionHit(
+            if (!TryGetDynamicRelativeContinuousCollisionHit(
                     target,
                     startPosition,
                     sourceDisplacement,
-                    targetStart,
-                    targetDisplacement,
+                    proxyRadius,
                     sourceLength,
                     Fixed64.Zero,
                     out Physics2DHit exactHit,
@@ -265,39 +248,19 @@ public sealed partial class SolidBody2D
             }
 
             target.EnsureContinuousCollisionFramePrepared(token);
-            Fixed64 targetRadius = target.ResolveContinuousCollisionProxyRadius();
-            target.TrySampleContinuousCollisionDisplacement(
-                Fixed64.Zero,
-                Fixed64.One,
-                out Vector3d targetStart,
-                out Vector3d targetDisplacement);
-            if (!ContinuousCollisionMath.TrySweepRelativeSpheres(
+            if (!TryGetDynamicMixed3DContinuousCollisionHit(
+                    target,
                     sourceStart,
                     sourceDisplacement,
                     sourceRadius,
-                    targetStart,
-                    targetDisplacement,
-                    targetRadius,
-                    out Fixed64 normalizedTime,
-                    out Vector3d normalForSource,
-                    out _))
-            {
-                continue;
-            }
-
-            Fixed64 distance = sourceLength * normalizedTime;
-            if (distance > maxDistance)
+                    sourceLength,
+                    Fixed64.Zero,
+                    out PhysicsMixedHit hit,
+                    out _)
+                || hit.Distance > maxDistance)
                 continue;
 
-            _continuousMixedCollisionHits.Add(new PhysicsMixedHit(
-                target.Collider,
-                Collider,
-                Vector3d.Zero,
-                Vector3d.Zero,
-                normalForSource,
-                PhysicsQueryReducerKind.ConservativeFallback,
-                distance,
-                sourceDisplacement));
+            _continuousMixedCollisionHits.Add(hit);
         }
     }
 

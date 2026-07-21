@@ -37,9 +37,9 @@ records follow with their original discovery context.
 - GridForge's runtime-identity defect is resolved. Keep the lower stack locally
   linked while the remaining Gravitas queue is hardened so another downstream
   discovery does not force a partial release cycle.
-- Gravitas's current authoritative coverage-enabled Release run passes 3,105
-  tests and reports 33,266/33,266 lines, 12,091/12,091 branches, and
-  4,148/4,148 methods for hand-authored source.
+- Gravitas's current authoritative coverage-enabled Release run passes 3,123
+  tests and reports 33,539/33,539 lines, 12,137/12,137 branches, and
+  4,158/4,158 methods for hand-authored source.
 - After the Gravitas queue closes, release the lower stack in dependency order,
   replace local links with released packages at each layer, and rerun Gravitas
   `Release`, `ReleaseLean`, coverage, replay, and relevant benchmark gates.
@@ -47,53 +47,23 @@ records follow with their original discovery context.
 ### Ordered Queue
 
 1. **Gravitas:**
-   [Translational CCD Flattens Piecewise Target Trajectories](#translational-ccd-flattens-piecewise-target-trajectories).
-2. **Gravitas:**
    [Fully Position-Frozen Bodies Cannot Retain Angular Mobility](#fully-position-frozen-bodies-cannot-retain-angular-mobility).
-3. **Gravitas:**
+2. **Gravitas:**
    [Conic Query Quadratics Can Saturate Before Solving](#conic-query-quadratics-can-saturate-before-solving).
-4. **Gravitas:**
-   [Swept-Sphere Cylinder Dilation Uses A Sharp Rim Proxy](#swept-sphere-cylinder-dilation-uses-a-sharp-rim-proxy).
-5. **Gravitas:**
-   [Finite-Slab Projection Support Math Is Not Full-Domain](#finite-slab-projection-support-math-is-not-full-domain).
-6. **Gravitas:**
+3. **Gravitas — exact swept-sphere dilation for finite extrusions:**
+   [Swept-Sphere Cylinder Dilation Uses A Sharp Rim Proxy](#swept-sphere-cylinder-dilation-uses-a-sharp-rim-proxy),
+   then
    [Swept-Sphere Capsule-Slab Rim Dilation Overexpands The Rounded Boundary](#swept-sphere-capsule-slab-rim-dilation-overexpands-the-rounded-boundary).
-7. **Gravitas:**
-   [Finite-Axis Collider Endpoint Snapshots Can Deform Scalar-Boundary Geometry](#finite-axis-collider-endpoint-snapshots-can-deform-scalar-boundary-geometry).
-8. **Gravitas:**
+4. **Gravitas:**
+   [Finite-Slab Projection Support Math Is Not Full-Domain](#finite-slab-projection-support-math-is-not-full-domain).
+5. **Gravitas — canonical collider geometry and exact scale admission:**
+   [Authored Collider Dimensions Can Saturate During Host-Scale Composition](#authored-collider-dimensions-can-saturate-during-host-scale-composition),
+   then
+   [Finite-Axis Collider Endpoint Snapshots Can Deform Scalar-Boundary Geometry](#finite-axis-collider-endpoint-snapshots-can-deform-scalar-boundary-geometry),
+   then
    [Oriented Cuboid Boundary Proxies Can Deform Scalar-Face Geometry](#oriented-cuboid-boundary-proxies-can-deform-scalar-face-geometry).
-9. **Gravitas:**
-   [Authored Collider Dimensions Can Saturate During Host-Scale Composition](#authored-collider-dimensions-can-saturate-during-host-scale-composition).
-10. **FixedMathSharp / Gravitas:**
-    [Radial Segment Parameters Can Collapse Spatially Distinct Query Hits](#radial-segment-parameters-can-collapse-spatially-distinct-query-hits).
-
-### Translational CCD Flattens Piecewise Target Trajectories
-
-**Discovered:** 2026-07-19  
-**Source:** rotational moving-pair CCD final trajectory-consumer review  
-**Affected area:** 2D/3D/mixed translational moving-pair CCD, kinematic pushes,
-same-frame requeues, and dirty candidate overlays
-
-The frame candidate indices correctly retain every piecewise target excursion,
-and a dirty target shadows its stale prepared bounds after a handoff. The
-translation-only narrow phase still samples only the target position at the
-start and end of the remaining interval, however, and treats the chord between
-those endpoints as the entire target path. An outward-and-return trajectory can
-therefore overlap the source between samples while presenting identical start
-and end positions. A focused 2D behavioral probe reproduced the tunnel: the
-candidate was admitted by its dirty bounds, then rejected by the straight
-relative-circle sweep and the source advanced through the intermediate target
-pose. The equivalent endpoint-chord pattern exists in 3D and both mixed
-kinematic-push paths.
-
-Resolve this as one piecewise translational moving-pair contract across 2D, 3D,
-and mixed modes. Traverse the target's canonical segments over the source's
-remaining normalized-time interval, convert segment-local hits back to global
-TOI, preserve stable dimension/ID ordering, and keep the existing atomic
-handoff budget. Add outward-return, stop/reverse, registration-order, replay,
-and warmed-allocation regressions. Do not collapse the trajectory back to a
-larger proxy chord or duplicate the rotational interval solver merely to cover
-this example.
+6. **FixedMathSharp / Gravitas:**
+   [Radial Segment Parameters Can Collapse Spatially Distinct Query Hits](#radial-segment-parameters-can-collapse-spatially-distinct-query-hits).
 
 ### Fully Position-Frozen Bodies Cannot Retain Angular Mobility
 
@@ -324,6 +294,41 @@ zero-allocation behavior. Keep this separate from sphere construction/merge
 and conic-quadratic ownership.
 
 ## Resolved Issues
+
+### Translational CCD Preserves Piecewise Target Trajectories
+
+**Discovered:** 2026-07-19  
+**Resolved:** 2026-07-20  
+**Source:** rotational moving-pair CCD final trajectory-consumer review  
+**Affected area:** 2D/3D/mixed translational moving-pair CCD, kinematic pushes,
+same-frame requeues, and dirty candidate overlays
+
+Translational moving-pair CCD now reduces the target's canonical trajectory
+segment by segment over the source's remaining frame interval. Each target
+slice is paired with the same source-time slice, the existing exact 2D and 3D
+shape reducers remain authoritative, and segment-local hits map back to source
+distance without flattening an outward-and-return path into its endpoint chord.
+The mixed directions retain their documented conservative proxy while consuming
+the same piecewise timing contract. Dynamic and kinematic paths share the same
+reducers rather than maintaining duplicate endpoint samplers.
+
+Canonical handoff boundaries are right-continuous, so a successor's separating
+motion suppresses a predecessor contact reported only at the shared endpoint.
+Chronological, non-overlapping segment ranges allow the first admitted
+non-boundary hit to terminate the target scan. Full-frame queries take a direct
+range fast path, while same-frame requeues select only the overlapping partial
+range. Exact-distance cross-dimension selection now shares one explicit policy:
+2D precedes 3D.
+
+Regression coverage includes outward-return dynamic and kinematic targets in
+pure 2D, pure 3D, and both mixed directions; stop/reverse boundary ownership;
+registration-order invariance; repeated replay hashes; causal relay budgets;
+and warmed zero-allocation reduction. The dedicated benchmark reports bounded
+segment scaling with no managed allocation: one/two/four target segments take
+about 0.55/0.93/1.76 microseconds in 2D and 1.08/1.51/2.37 microseconds in 3D
+on the current short-run host. Final authoritative verification passed all
+3,123 `Release` tests at 100% line, branch, and method coverage: 33,539/33,539
+lines, 12,137/12,137 branches, and 4,158/4,158 methods.
 
 ### Derived Bound Centers And Extents Were Not Full-Domain
 

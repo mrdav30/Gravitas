@@ -15,6 +15,10 @@ namespace Gravitas.CollisionHandling;
 internal static class ContinuousCollisionCandidateOrdering
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool Is2DHitFirst(Fixed64 distance2D, Fixed64 distance3D) =>
+        distance2D <= distance3D;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool ShouldReplaceHit(
         Physics3DHit candidate,
         Fixed64 candidateClosingSpeed,

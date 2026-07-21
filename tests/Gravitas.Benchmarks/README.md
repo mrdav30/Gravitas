@@ -94,6 +94,14 @@ dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll cont
 These rows are intentionally manual for now; do not wire them into CI until the
 repo-wide benchmark publication/gating strategy is settled.
 
+`piecewise-translational-ccd` isolates the allocation and bounded-scaling cost
+of reducing one-, two-, and four-segment moving-target trajectories in the 2D
+and 3D translational narrow phase:
+
+```bash
+dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll piecewise-translational-ccd --filter "*Piecewise*" --exporters json
+```
+
 Rows with `FullRuntime` in the method name include benchmark reset,
 host-transform publish, and simulation cost. Prefer the attribution rows when
 you need allocation-focused signal for CCD query, candidate-index, or relative

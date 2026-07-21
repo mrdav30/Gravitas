@@ -90,11 +90,15 @@ overlays for bodies whose same-frame handoff changes their remaining swept
 bounds. A dirty body shadows its immutable entry; stale prepared bounds are not
 unioned back into admission. Each body exposes a canonical piecewise position,
 rotation, and velocity trajectory. Later sources therefore sample the exact
-pre-impact and post-impact history in the rotational arbiter instead of
-whichever pose happened to be published most recently. The legacy
-translation-only moving-pair narrow phase still reduces the target interval to
-its endpoint chord; outward-and-return parity across 2D, 3D, and mixed modes is
-tracked as an active release issue.
+pre-impact and post-impact history instead of whichever pose happened to be
+published most recently. Translational moving-pair reducers traverse only the
+target segments that overlap the source's remaining interval, clip the source
+sweep to each segment, and map segment-local hits back to the source's global
+time of impact. Handoff boundaries are right-continuous: when a target reverses
+exactly at a shared boundary, the successor segment owns that instant. Because
+canonical segments are chronological and non-overlapping, the first admitted
+non-boundary hit is the global earliest hit. This contract is shared by dynamic
+and kinematic 2D, 3D, and mixed CCD.
 
 Candidate results use stable ordering:
 

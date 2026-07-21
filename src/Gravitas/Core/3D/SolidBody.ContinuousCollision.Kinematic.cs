@@ -95,7 +95,11 @@ public partial class SolidBody
                 staticHitsAreShapeExact,
                 out Physics3DHit hit3D);
             bool foundMixed = TryGetFirstValidMixedContinuousCollisionHit(startPosition, proposedPosition, mixedHitCount, out PhysicsMixedHit hitMixed);
-            if (found3D && (!foundMixed || hit3D.Distance <= hitMixed.Distance))
+            if (found3D
+                && (!foundMixed
+                    || !ContinuousCollisionCandidateOrdering.Is2DHitFirst(
+                        hitMixed.Distance,
+                        hit3D.Distance)))
             {
                 distance = hit3D.Distance;
                 return true;
@@ -199,53 +203,16 @@ public partial class SolidBody
             }
 
             target.EnsureContinuousCollisionFramePrepared(token);
-            target.TrySampleContinuousCollisionDisplacement(
-                Fixed64.Zero,
-                Fixed64.One,
-                out Vector3d targetStart,
-                out Vector3d targetDisplacement);
-            Fixed64 targetRadius = target.ResolveContinuousCollisionProxyRadius();
-            if (!ContinuousCollisionMath.TrySweepRelativeSpheres(
-                    startPosition,
-                    sourceDisplacement,
-                    proxyRadius,
-                    targetStart,
-                    targetDisplacement,
-                    targetRadius,
-                    out Fixed64 normalizedTime,
-                    out Vector3d normal,
-                    out _))
-            {
-                continue;
-            }
-
-            Physics3DHit hit;
-            if (TryGetExactDynamicRelativeContinuousCollisionHit(
+            if (!TryGetDynamicRelativeContinuousCollisionHit(
                     target,
                     startPosition,
                     sourceDisplacement,
-                    targetStart,
-                    targetDisplacement,
+                    proxyRadius,
                     sourceLength,
                     Fixed64.Zero,
-                    out Physics3DHit exactHit,
-                    out _,
-                    out bool exactSupported))
-            {
-                hit = exactHit;
-            }
-            else if (exactSupported)
+                    out Physics3DHit hit,
+                    out _))
                 continue;
-            else
-            {
-                Fixed64 distance = sourceLength * normalizedTime;
-                hit = new Physics3DHit(
-                    target.Collider,
-                    Vector3d.Zero,
-                    normal,
-                    distance,
-                    sourceDisplacement.Normalized);
-            }
 
             if (hit.Distance > maxDistance)
                 continue;
@@ -281,40 +248,20 @@ public partial class SolidBody
             Fixed64 targetRadius = FixedMath.Max(
                 target.ResolveContinuousCollisionProxyRadius(),
                 target.Collider.MixedHalfThickness);
-            target.TrySampleContinuousCollisionDisplacement(
-                Fixed64.Zero,
-                Fixed64.One,
-                out Vector2d targetStart2D,
-                out Vector2d targetDisplacement2D);
-            Vector3d targetStart = new(targetStart2D.X, target.Collider.MixedSlabCenterY, targetStart2D.Y);
-            Vector3d targetDisplacement = new(targetDisplacement2D.X, Fixed64.Zero, targetDisplacement2D.Y);
-            if (!ContinuousCollisionMath.TrySweepRelativeSpheres(
+            if (!TryGetDynamicMixed2DContinuousCollisionHit(
+                    target,
                     startPosition,
                     sourceDisplacement,
                     proxyRadius,
-                    targetStart,
-                    targetDisplacement,
                     targetRadius,
-                    out Fixed64 normalizedTime,
-                    out Vector3d normalForSource,
-                    out _))
-            {
-                continue;
-            }
-
-            Fixed64 distance = sourceLength * normalizedTime;
-            if (distance > maxDistance)
+                    sourceLength,
+                    Fixed64.Zero,
+                    out PhysicsMixedHit hit,
+                    out _)
+                || hit.Distance > maxDistance)
                 continue;
 
-            _continuousMixedCollisionHits.Add(new PhysicsMixedHit(
-                Collider,
-                target.Collider,
-                Vector3d.Zero,
-                Vector3d.Zero,
-                -normalForSource,
-                PhysicsQueryReducerKind.ConservativeFallback,
-                distance,
-                sourceDisplacement.Normalized));
+            _continuousMixedCollisionHits.Add(hit);
         }
     }
 
