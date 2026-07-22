@@ -253,22 +253,36 @@ public sealed class SweptSphereQueryWorker
         out Vector3d sphereCenterAtImpact,
         out Fixed64 impactDistance)
     {
-        FixedQuaternion inverseRotation = cuboid.Rotation.Inverse();
-        Vector3d localStart = (_start - cuboid.Center) * inverseRotation;
-        Vector3d localDirection = _direction * inverseRotation;
-        Vector3d halfExtents = cuboid.ScaledSize * Fixed64.Half;
+        sphereCenterAtImpact = Vector3d.Zero;
+        impactDistance = Fixed64.Zero;
 
-        Vector3d min = -halfExtents - Vector3d.One * _radius;
-        Vector3d max = halfExtents + Vector3d.One * _radius;
-        return TrySweepLocalBox(
-            cuboid.Center,
-            cuboid.Rotation,
-            localStart,
-            localDirection,
-            min,
-            max,
-            out sphereCenterAtImpact,
-            out impactDistance);
+        FixedQuaternion inverseRotation = cuboid.Rotation.Inverse();
+        if (!SweepBoundsUtility.TryTransformOrientedBoxSegmentToLocal(
+                _start,
+                _end,
+                cuboid.Center,
+                cuboid.Rotation,
+                inverseRotation,
+                out Vector3d localStart,
+                out Vector3d localEnd))
+        {
+            return false;
+        }
+
+        Vector3d halfExtents = cuboid.ScaledSize * Fixed64.Half;
+        var query = new FixedSegment(localStart, localEnd);
+        var box = FixedBoundBox.FromMinMax(-halfExtents, halfExtents);
+        if (!query.TryGetSweptSphereBoxIntersectionDistance(
+                box,
+                _radius,
+                _length,
+                out Fixed64 entry))
+        {
+            return false;
+        }
+
+        BuildFiniteAxisSweepHit(entry, out sphereCenterAtImpact, out impactDistance);
+        return true;
     }
 
     private bool TrySweepMesh(
@@ -449,42 +463,6 @@ public sealed class SweptSphereQueryWorker
         }
 
         BuildFiniteAxisSweepHit(entry, out sphereCenterAtImpact, out impactDistance);
-        return true;
-    }
-
-    private bool TrySweepLocalBox(
-        Vector3d center,
-        FixedQuaternion rotation,
-        Vector3d localStart,
-        Vector3d localDirection,
-        Vector3d min,
-        Vector3d max,
-        out Vector3d sphereCenterAtImpact,
-        out Fixed64 impactDistance)
-    {
-        sphereCenterAtImpact = Vector3d.Zero;
-        impactDistance = Fixed64.Zero;
-
-        if (SweepBoundsUtility.OverlapsInclusive(localStart, localStart, min, max))
-        {
-            sphereCenterAtImpact = _start;
-            return true;
-        }
-
-        if (!SweepBoundsUtility.TryClipSegment(
-            localStart,
-            localDirection,
-            _length,
-            min,
-            max,
-            out Fixed64 entry,
-            out _))
-        {
-            return false;
-        }
-
-        impactDistance = entry;
-        sphereCenterAtImpact = center + rotation * (localStart + localDirection * entry);
         return true;
     }
 

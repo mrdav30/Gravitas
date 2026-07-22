@@ -13,12 +13,14 @@ public class RadialRaycastBenchmarks
     private readonly RaycastSegmentWorker _worker = new();
     private readonly SweptSphereQueryWorker _sweptSphereWorker = new();
     private readonly SweptSphereQueryWorker _roundedRimWorker = new();
+    private readonly SweptSphereQueryWorker _roundedCuboidWorker = new();
     private SwiftList<Vector3d> _hits = new(2);
     private GravitasWorldContext _context = null!;
     private FixedBoundSphere _sphere;
     private LSCapsuleCollider _capsule = null!;
     private LSCylinderCollider _cylinder = null!;
     private LSCylinderCollider _roundedRimCylinder = null!;
+    private LSCuboidCollider _roundedCuboid = null!;
     private LSCircleCollider2D _circle = null!;
     private Vector3d _sweepCenter;
     private Fixed64 _sweepDistance;
@@ -66,6 +68,13 @@ public class RadialRaycastBenchmarks
             new Vector3d(scale * 2, scale * Fixed64.FromFraction(9, 10), Fixed64.Zero),
             new Vector3d(Fixed64.Zero, scale * Fixed64.FromFraction(9, 10), Fixed64.Zero),
             scale * Fixed64.Half);
+        _roundedCuboid = BenchmarkPhysicsScene.CreateDynamicCuboid(_context, Vector3d.Zero);
+        _roundedCuboid.Size = Vector3d.One * scale;
+        _roundedCuboid.RebuildRuntimeShapeOnly();
+        _roundedCuboidWorker.Prepare(
+            new Vector3d(scale * 2, scale * Fixed64.FromFraction(4, 5), Fixed64.Zero),
+            new Vector3d(Fixed64.Zero, scale * Fixed64.FromFraction(4, 5), Fixed64.Zero),
+            scale * Fixed64.Half);
         _sphere = new FixedBoundSphere(
             new Vector3d(Fixed64.Zero, scale * Fixed64.FromFraction(3, 5), Fixed64.Zero),
             scale);
@@ -91,6 +100,8 @@ public class RadialRaycastBenchmarks
             throw new System.InvalidOperationException("The finite-axis sweep benchmark scenarios must produce hits.");
         if (!SweptSphereAgainstRoundedCylinderRim())
             throw new System.InvalidOperationException("The rounded-cylinder rim benchmark scenario must produce a hit.");
+        if (!SweptSphereAgainstRoundedCuboidEdge())
+            throw new System.InvalidOperationException("The rounded-cuboid edge benchmark scenario must produce a hit.");
         if (!MixedCircleSlabInterval())
             throw new System.InvalidOperationException("The mixed radial benchmark scenario must produce a hit.");
         if (!MixedCircleSlabRoundedRimInterval())
@@ -132,6 +143,10 @@ public class RadialRaycastBenchmarks
     [Benchmark]
     public bool SweptSphereAgainstRoundedCylinderRim() =>
         _roundedRimWorker.TrySweep(_roundedRimCylinder, out _sweepCenter, out _sweepDistance);
+
+    [Benchmark]
+    public bool SweptSphereAgainstRoundedCuboidEdge() =>
+        _roundedCuboidWorker.TrySweep(_roundedCuboid, out _sweepCenter, out _sweepDistance);
 
     [Benchmark]
     public bool MixedCircleSlabInterval() =>

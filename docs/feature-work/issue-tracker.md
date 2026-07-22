@@ -30,15 +30,15 @@ records follow with their original discovery context.
   release with them in place.
 - FixedMathSharp foundation hardening is complete. The current locally linked
   radial, finite-axis, sphere-construction, derived-bound, and exact rounded
-  finite-cylinder extensions pass 1,742 core and eight Chronicler tests at
-  14,310/14,310 lines, 4,448/4,448 branches, and 1,996/1,996 ReportGenerator
+  finite-extrusion extensions pass 1,753 core and eight Chronicler tests at
+  14,421/14,421 lines, 4,493/4,493 branches, and 2,001/2,001 ReportGenerator
   methods. Retain the local link while the remaining Gravitas queue is hardened.
 - SwiftCollections has no library-specific active issue at this checkpoint; its
   place in the sequence is a full downstream compatibility and release gate.
 - GridForge's runtime-identity defect is resolved. Keep the lower stack locally
   linked while the remaining Gravitas queue is hardened so another downstream
   discovery does not force a partial release cycle.
-- Gravitas's current authoritative coverage-enabled Release run passes 3,244
+- Gravitas's current authoritative coverage-enabled Release run passes 3,252
   tests and reports 33,706/33,706 lines, 12,129/12,129 branches, and
   4,192/4,192 ReportGenerator methods for hand-authored source.
 - After the Gravitas queue closes, release the lower stack in dependency order,
@@ -48,40 +48,15 @@ records follow with their original discovery context.
 ### Ordered Queue
 
 1. **Gravitas:**
-   [Swept-Sphere Cuboid Dilation Uses Sharp Edge And Corner Proxies](#swept-sphere-cuboid-dilation-uses-sharp-edge-and-corner-proxies).
-2. **Gravitas:**
    [Finite-Slab Projection Support Math Is Not Full-Domain](#finite-slab-projection-support-math-is-not-full-domain).
-3. **Gravitas — canonical collider geometry and exact scale admission:**
+2. **Gravitas — canonical collider geometry and exact scale admission:**
    [Authored Collider Dimensions Can Saturate During Host-Scale Composition](#authored-collider-dimensions-can-saturate-during-host-scale-composition),
    then
    [Finite-Axis Collider Endpoint Snapshots Can Deform Scalar-Boundary Geometry](#finite-axis-collider-endpoint-snapshots-can-deform-scalar-boundary-geometry),
    then
    [Oriented Cuboid Boundary Proxies Can Deform Scalar-Face Geometry](#oriented-cuboid-boundary-proxies-can-deform-scalar-face-geometry).
-4. **FixedMathSharp / Gravitas:**
+3. **FixedMathSharp / Gravitas:**
    [Radial Segment Parameters Can Collapse Spatially Distinct Query Hits](#radial-segment-parameters-can-collapse-spatially-distinct-query-hits).
-
-### Swept-Sphere Cuboid Dilation Uses Sharp Edge And Corner Proxies
-
-**Discovered:** 2026-07-22  
-**Source:** exact finite-extrusion caller parity audit  
-**Affected area:** `SweptSphereQueryWorker.TrySweepCuboid`, compound cuboid
-parts, public sphere sweeps, grounding, and static-target sphere/cuboid CCD
-
-The cuboid reducer expands every local half-extent by the swept sphere radius
-and clips the center segment against that larger sharp box. The true Minkowski
-sum has planar faces, cylindrical edge rounds, and spherical corners. The sharp
-proxy therefore overcontains edge and corner regions and can report early or
-false hits in ordinary geometry. For example, a unit cuboid, radius-0.5 sphere,
-and sweep from `(2, 0.9, 0)` to `(0.9, 0.9, 0)` reaches the sharp proxy at
-`x = 1`, while its distance to the true edge remains
-`sqrt(0.4^2 + 0.4^2) > 0.5`.
-
-Replace the proxy with an exact local-space face/edge/vertex feature reducer.
-Cover axis-face hits, edge and corner misses/tangencies, rotated cuboids,
-compound parts, starting overlap, extreme-domain inputs, deterministic ordering,
-CCD parity, and warmed zero-allocation behavior. Keep this separate from the
-finite-cylinder/capsule-slab work because box dilation has distinct feature
-ownership despite the shared Minkowski-sum root cause.
 
 ### Finite-Slab Projection Support Math Is Not Full-Domain
 
@@ -238,6 +213,44 @@ zero-allocation behavior. Keep this separate from sphere construction/merge
 and conic-quadratic ownership.
 
 ## Resolved Issues
+
+### Swept-Sphere Cuboid Dilation Uses Exact Rounded Features
+
+**Discovered:** 2026-07-22  
+**Resolved:** 2026-07-22  
+**Source:** exact finite-extrusion caller parity audit  
+**Affected area:** FixedMathSharp `FixedSegment`; Gravitas cuboid and compound
+sphere sweeps, grounding, and static-target sphere/cuboid CCD
+
+The previous cuboid reducer expanded every local half-extent by the swept sphere
+radius and clipped against that larger sharp box. The proxy overcontained the
+true Minkowski sum at cylindrical edge rounds and spherical corners, producing
+ordinary false or early hits.
+
+FixedMathSharp now owns one public, engine-agnostic
+`FixedSegment.TryGetSweptSphereBoxIntersectionDistance(...)` contract. Its
+allocation-free solver orders at most six exact box-plane transitions, solves
+the active point-to-box squared-distance quadratic through existing fixed-width
+wide arithmetic, and performs one final round-half-to-even conversion into the
+caller's physical-distance range. No interval overload, OBB abstraction, or raw
+wide arithmetic was exposed.
+
+Gravitas transforms the original world chord into cuboid-local space through a
+shared ray/sweep helper, delegates to the exact FixedMathSharp query, and
+reconstructs the contact from the authored world segment. Ordinary, rotated,
+compound, edge/corner miss and tangency, exact entry, extreme atomic rejection,
+static CCD, and warmed zero-allocation regressions cover the shared worker.
+
+FixedMathSharp passes 1,753 core and eight Chronicler Release tests plus 1,732
+core and eight Chronicler ReleaseLean tests. Its hand-authored source reports
+14,421/14,421 lines, 4,493/4,493 branches, and 2,001/2,001 ReportGenerator
+methods. Locally linked Gravitas passes 3,252/3,252 Release tests and reports
+33,706/33,706 lines, 12,129/12,129 branches, and 4,192/4,192 methods. The direct
+FixedMathSharp reducer measures 6.635 microseconds at scale 1 and 8.558
+microseconds at scale 100,000; the Gravitas worker measures 7.595 and 9.511
+microseconds respectively, with zero managed allocation in every row. The exact
+path is intentionally slower than the incorrect sharp proxy but faster than the
+existing exact finite-capsule comparison at both scales.
 
 ### Swept-Sphere Finite Extrusions Use Exact Spherical Dilation
 

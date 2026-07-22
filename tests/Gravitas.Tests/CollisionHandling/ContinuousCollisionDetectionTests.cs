@@ -639,6 +639,26 @@ public sealed partial class ContinuousCollisionDetectionTests
     }
 
     [Fact]
+    public void ContinuousMode_SphereShouldNotClampForSharpOnlyStaticCuboidEdgeOverlap()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        var target = new LSCuboidCollider { Size = Vector3d.One };
+        scenario.InitializeStaticCollider(
+            target,
+            new Vector3d((Fixed64)4, Fixed64.FromFraction(9, 10), Fixed64.Zero));
+        ScenarioBody<LSSphereCollider> mover = scenario.CreateSphere(Vector3d.Zero);
+        mover.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        DisableGroundQueries(mover.Body);
+
+        Fixed64 displacement = Fixed64.FromFraction(31, 10);
+        mover.Body.AddForce(Vector3d.Right * displacement);
+        scenario.Context.LateSimulate();
+
+        mover.Body.Position3d.Should().Be(Vector3d.Right * displacement);
+        mover.Body.LinearVelocity.Should().Be(Vector3d.Right * displacement);
+    }
+
+    [Fact]
     public void ContinuousMode_ShouldClampThinCuboidWhenSweptShapeHitsStaticSphere()
     {
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();

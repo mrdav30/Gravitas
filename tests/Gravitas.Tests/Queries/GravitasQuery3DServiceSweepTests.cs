@@ -2584,6 +2584,166 @@ public sealed class GravitasQuery3DServiceSweepTests
     }
 
     [Fact]
+    public void SweptSphereWorker_WithCuboidRoundedEdgeSeparation_ShouldRejectSharpExpansionHit()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSCuboidCollider cuboid = CreateDynamicCollider(context, new LSCuboidCollider(), Vector3d.Zero);
+        var worker = new SweptSphereQueryWorker();
+        Vector3d start = new((Fixed64)2, Fixed64.FromFraction(9, 10), Fixed64.Zero);
+        Vector3d end = new(Fixed64.FromFraction(9, 10), Fixed64.FromFraction(9, 10), Fixed64.Zero);
+        worker.Prepare(start, end, Fixed64.Half);
+
+        bool hit = worker.TrySweep(cuboid, out Vector3d centerAtImpact, out Fixed64 distance);
+
+        hit.Should().BeFalse();
+        centerAtImpact.Should().Be(Vector3d.Zero);
+        distance.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void SweptSphereWorker_WithCuboidRoundedEdgeImpact_ShouldReturnExactEntry()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSCuboidCollider cuboid = CreateDynamicCollider(context, new LSCuboidCollider(), Vector3d.Zero);
+        var worker = new SweptSphereQueryWorker();
+        Fixed64 unit = Fixed64.FromRaw(429_496_729);
+        Fixed64 half = Fixed64.Half;
+        Vector3d start = new(half + unit * 10, half + unit * 3, Fixed64.Zero);
+        Vector3d end = new(half, half + unit * 3, Fixed64.Zero);
+        worker.Prepare(start, end, unit * 5);
+
+        bool hit = worker.TrySweep(cuboid, out Vector3d centerAtImpact, out Fixed64 distance);
+
+        hit.Should().BeTrue();
+        centerAtImpact.Should().Be(new Vector3d(half + unit * 4, half + unit * 3, Fixed64.Zero));
+        AssertDistanceNear(distance, unit * 6);
+    }
+
+    [Fact]
+    public void SweptSphereWorker_WithCuboidRoundedCornerSeparation_ShouldRejectSharpExpansionHit()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSCuboidCollider cuboid = CreateDynamicCollider(context, new LSCuboidCollider(), Vector3d.Zero);
+        var worker = new SweptSphereQueryWorker();
+        Vector3d start = new((Fixed64)2, Fixed64.FromFraction(9, 10), Fixed64.FromFraction(9, 10));
+        Vector3d end = new(Fixed64.FromFraction(9, 10), Fixed64.FromFraction(9, 10), Fixed64.FromFraction(9, 10));
+        worker.Prepare(start, end, Fixed64.Half);
+
+        bool hit = worker.TrySweep(cuboid, out Vector3d centerAtImpact, out Fixed64 distance);
+
+        hit.Should().BeFalse();
+        centerAtImpact.Should().Be(Vector3d.Zero);
+        distance.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void SweptSphereWorker_WithCompoundCuboidRoundedEdgeSeparation_ShouldReturnFalse()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSCompoundCollider compound = CreateDynamicCollider(
+            context,
+            new LSCompoundCollider(CompoundColliderPart.Cuboid(Vector3d.One, Vector3d.Zero)),
+            Vector3d.Zero);
+        var worker = new SweptSphereQueryWorker();
+        Vector3d start = new((Fixed64)2, Fixed64.FromFraction(9, 10), Fixed64.Zero);
+        Vector3d end = new(Fixed64.FromFraction(9, 10), Fixed64.FromFraction(9, 10), Fixed64.Zero);
+        worker.Prepare(start, end, Fixed64.Half);
+
+        bool hit = worker.TrySweep(compound, out Vector3d centerAtImpact, out Fixed64 distance);
+
+        hit.Should().BeFalse();
+        centerAtImpact.Should().Be(Vector3d.Zero);
+        distance.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void SweptSphereWorker_WithRotatedCuboidRoundedEdgeSeparation_ShouldReturnFalse()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        FixedQuaternion rotation = FixedQuaternion.FromEulerAnglesInDegrees(
+            (Fixed64)17,
+            (Fixed64)31,
+            (Fixed64)(-23));
+        LSCuboidCollider cuboid = CreateDynamicCollider(
+            context,
+            new LSCuboidCollider(),
+            Vector3d.Zero,
+            rotation);
+        var worker = new SweptSphereQueryWorker();
+        Vector3d localStart = new((Fixed64)2, Fixed64.FromFraction(9, 10), Fixed64.Zero);
+        Vector3d localEnd = new(Fixed64.FromFraction(9, 10), Fixed64.FromFraction(9, 10), Fixed64.Zero);
+        worker.Prepare(rotation * localStart, rotation * localEnd, Fixed64.Half);
+
+        bool hit = worker.TrySweep(cuboid, out Vector3d centerAtImpact, out Fixed64 distance);
+
+        hit.Should().BeFalse();
+        centerAtImpact.Should().Be(Vector3d.Zero);
+        distance.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void SweptSphereWorker_RoundedCuboidEdgePath_ShouldNotAllocateAfterWarmup()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSCuboidCollider cuboid = CreateDynamicCollider(context, new LSCuboidCollider(), Vector3d.Zero);
+        var worker = new SweptSphereQueryWorker();
+        worker.Prepare(
+            new Vector3d((Fixed64)2, Fixed64.FromFraction(4, 5), Fixed64.Zero),
+            new Vector3d(Fixed64.Zero, Fixed64.FromFraction(4, 5), Fixed64.Zero),
+            Fixed64.Half);
+
+        long allocatedBytes = AllocationTestHelper.MeasureSteadyState(() =>
+            worker.TrySweep(cuboid, out _, out _));
+
+        allocatedBytes.Should().Be(0);
+    }
+
+    [Fact]
+    public void SweptSphereWorker_WhenCuboidLocalSegmentIsUnrepresentable_ShouldRejectAndRemainReusable()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        FixedQuaternion rotation = FixedQuaternion.FromEulerAnglesInDegrees(
+            (Fixed64)23,
+            (Fixed64)37,
+            (Fixed64)11);
+        var cuboid = new BroadBoundsTestCuboid();
+        cuboid.InitializeWithNoBody(new TestMatterAgent(
+            context,
+            new FixedTransform(Vector3d.Zero, rotation, Vector3d.One)));
+        cuboid.SetTestBounds(
+            new Vector3d(Fixed64.MinValue, Fixed64.MinValue, Fixed64.MinValue),
+            new Vector3d(Fixed64.MaxValue, Fixed64.MaxValue, Fixed64.MaxValue));
+        var worker = new SweptSphereQueryWorker();
+        Vector3d invalidStart = new(Fixed64.MinValue, Fixed64.MinValue, Fixed64.MinValue);
+        Vector3d invalidEnd = new(
+            Fixed64.MinValue,
+            (Fixed64)(-1_147_483_648),
+            (Fixed64)(-1_147_483_648));
+        SweepBoundsUtility.TryTransformOrientedBoxSegmentToLocal(
+            invalidStart,
+            invalidEnd,
+            cuboid.Center,
+            cuboid.Rotation,
+            cuboid.Rotation.Inverse(),
+            out _,
+            out _).Should().BeFalse();
+        AssertSweptSphereBroadOverlap(invalidStart, invalidEnd, Fixed64.Half, cuboid);
+        worker.Prepare(invalidStart, invalidEnd, Fixed64.Half);
+
+        bool invalidHit = worker.TrySweep(cuboid, out Vector3d invalidCenter, out Fixed64 invalidDistance);
+
+        worker.Prepare(Vector3d.Zero, Vector3d.Right, Fixed64.Half);
+        bool ordinaryHit = worker.TrySweep(cuboid, out Vector3d ordinaryCenter, out Fixed64 ordinaryDistance);
+
+        invalidHit.Should().BeFalse();
+        invalidCenter.Should().Be(Vector3d.Zero);
+        invalidDistance.Should().Be(Fixed64.Zero);
+        ordinaryHit.Should().BeTrue();
+        ordinaryCenter.Should().Be(Vector3d.Zero);
+        ordinaryDistance.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
     public void SweptSphereWorker_WhenSmallestDirectionComponentReachesCuboidAtEndpoint_ShouldHit()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
@@ -2749,6 +2909,11 @@ public sealed class GravitasQuery3DServiceSweepTests
 
     private static FixedTransform LocalFrame(Vector3d position) =>
         new(position, FixedQuaternion.Identity, Vector3d.One);
+
+    private sealed class BroadBoundsTestCuboid : LSCuboidCollider
+    {
+        internal void SetTestBounds(Vector3d min, Vector3d max) => SetBoundsMinMax(min, max);
+    }
 
     private static TCollider CreateDynamicCollider<TCollider>(
         GravitasWorldContext context,

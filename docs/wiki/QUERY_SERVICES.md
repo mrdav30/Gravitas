@@ -48,6 +48,12 @@ cone section wholly contained by a large triangle is not dependent on an edge
 crossing or an axis/face intersection. Equal-distance mesh hits retain triangle
 index order, and the warmed query path remains allocation-free.
 
+Sphere sweeps against cuboids transform the authored center chord into cuboid
+local space and delegate to FixedMathSharp's exact spherical-box dilation.
+Planar faces, rounded edges, and spherical corners therefore share one
+full-domain first-distance contract; the older sharp expanded-box proxy is not
+used for queries, compound cuboid parts, grounding, or CCD.
+
 ### 2D Queries
 
 | Family                 | Closest hit                   | All hits                         |

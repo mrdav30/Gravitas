@@ -133,6 +133,11 @@ CCD is opt-in per body or through context defaults. The runtime supports:
 - service-level handoff queues for chained contacts.
 - mixed handoffs when `PhysicsRuntimeMode.Mixed` is active.
 
+Sphere/cuboid time of impact uses the exact spherical dilation of the oriented
+cuboid. The local-space reducer distinguishes planar faces from rounded edges
+and corners, then reconstructs contact from the original authored world chord
+without normalized-direction loss.
+
 The CCD reference explains exact reducer paths, conservative proxy boundaries,
 TOI ordering, and service counters:
 [Continuous Collision Detection](CONTINUOUS_COLLISION_DETECTION.md).

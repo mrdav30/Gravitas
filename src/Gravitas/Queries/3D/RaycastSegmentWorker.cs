@@ -298,10 +298,14 @@ public sealed class RaycastSegmentWorker
         Vector3d halfExtents = oobox.ScaledSize * Fixed64.Half;
         Vector3d min = -halfExtents;
         Vector3d max = halfExtents;
-        if (!Vector3d.TrySubtract(_cachedOrigin, oobox.Center, out Vector3d originOffset)
-            || !Vector3d.TrySubtract(_cachedEnd, oobox.Center, out Vector3d endOffset)
-            || !TryTransformObbOffsetToLocal(originOffset, oobox.Rotation, inverseRotation, out Vector3d transformedOrigin)
-            || !TryTransformObbOffsetToLocal(endOffset, oobox.Rotation, inverseRotation, out Vector3d transformedEnd))
+        if (!SweepBoundsUtility.TryTransformOrientedBoxSegmentToLocal(
+                _cachedOrigin,
+                _cachedEnd,
+                oobox.Center,
+                oobox.Rotation,
+                inverseRotation,
+                out Vector3d transformedOrigin,
+                out Vector3d transformedEnd))
         {
             return false;
         }
@@ -355,28 +359,6 @@ public sealed class RaycastSegmentWorker
         }
 
         return true;
-    }
-
-    private static bool TryTransformObbOffsetToLocal(
-        Vector3d worldOffset,
-        FixedQuaternion rotation,
-        FixedQuaternion inverseRotation,
-        out Vector3d localOffset)
-    {
-        localOffset = inverseRotation * worldOffset;
-
-        // Quaternion-vector multiplication is a rounded Q32.32 matrix
-        // transform. One deterministic iterative-refinement step solves the
-        // represented rotation matrix more accurately at large coordinates,
-        // keeping tangent classification scale independent without widening
-        // the geometric box.
-        // The collider rotation is normalized, so rotating the inverse result
-        // back cannot cross to the opposite Fixed64 domain extreme.
-        Vector3d residual = worldOffset - rotation * localOffset;
-        if (residual == Vector3d.Zero)
-            return true;
-
-        return Vector3d.TryAdd(localOffset, inverseRotation * residual, out localOffset);
     }
 
     private static Vector3d SnapLocalPointToBounds(Vector3d point, Vector3d min, Vector3d max) =>

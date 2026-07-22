@@ -13,6 +13,40 @@ namespace Gravitas.Queries;
 internal static class SweepBoundsUtility
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static bool TryTransformOrientedBoxSegmentToLocal(
+        Vector3d worldStart,
+        Vector3d worldEnd,
+        Vector3d boxCenter,
+        FixedQuaternion rotation,
+        FixedQuaternion inverseRotation,
+        out Vector3d localStart,
+        out Vector3d localEnd)
+    {
+        localStart = Vector3d.Zero;
+        localEnd = Vector3d.Zero;
+        return Vector3d.TrySubtract(worldStart, boxCenter, out Vector3d startOffset)
+            && Vector3d.TrySubtract(worldEnd, boxCenter, out Vector3d endOffset)
+            && TryTransformOrientedBoxOffsetToLocal(startOffset, rotation, inverseRotation, out localStart)
+            && TryTransformOrientedBoxOffsetToLocal(endOffset, rotation, inverseRotation, out localEnd);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool TryTransformOrientedBoxOffsetToLocal(
+        Vector3d worldOffset,
+        FixedQuaternion rotation,
+        FixedQuaternion inverseRotation,
+        out Vector3d localOffset)
+    {
+        localOffset = inverseRotation * worldOffset;
+
+        // One deterministic refinement step corrects Q32.32 matrix rounding
+        // without widening the represented box.
+        Vector3d residual = worldOffset - rotation * localOffset;
+        return residual == Vector3d.Zero
+            || Vector3d.TryAdd(localOffset, inverseRotation * residual, out localOffset);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static bool TryClipSegment(
         Vector3d start,
         Vector3d direction,
