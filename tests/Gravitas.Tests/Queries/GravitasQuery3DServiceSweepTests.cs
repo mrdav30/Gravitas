@@ -2300,6 +2300,40 @@ public sealed class GravitasQuery3DServiceSweepTests
     }
 
     [Fact]
+    public void SweptSphereWorker_WithCylinderDiagonalRimSeparation_ShouldRejectSharpExpansionHit()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSCylinderCollider cylinder = CreateDynamicCollider(context, new LSCylinderCollider(), Vector3d.Zero);
+        var worker = new SweptSphereQueryWorker();
+        Vector3d start = new((Fixed64)2, Fixed64.FromFraction(9, 10), Fixed64.Zero);
+        Vector3d end = new(Fixed64.FromFraction(9, 10), Fixed64.FromFraction(9, 10), Fixed64.Zero);
+        worker.Prepare(start, end, Fixed64.Half);
+
+        bool hit = worker.TrySweep(cylinder, out Vector3d centerAtImpact, out Fixed64 distance);
+
+        hit.Should().BeFalse();
+        centerAtImpact.Should().Be(Vector3d.Zero);
+        distance.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void SweptSphereWorker_WithCylinderDiagonalRimTangentAtEndpoint_ShouldReportEndpoint()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSCylinderCollider cylinder = CreateDynamicCollider(context, new LSCylinderCollider(), Vector3d.Zero);
+        var worker = new SweptSphereQueryWorker();
+        Vector3d start = new((Fixed64)2, Fixed64.FromFraction(9, 10), Fixed64.Zero);
+        Vector3d end = new(Fixed64.FromFraction(4, 5), Fixed64.FromFraction(9, 10), Fixed64.Zero);
+        worker.Prepare(start, end, Fixed64.Half);
+
+        bool hit = worker.TrySweep(cylinder, out Vector3d centerAtImpact, out Fixed64 distance);
+
+        hit.Should().BeTrue();
+        centerAtImpact.Should().Be(end);
+        distance.Should().Be(Fixed64.FromFraction(6, 5));
+    }
+
+    [Fact]
     public void SweptSphereWorker_WithCylinderSideRootBeyondTravel_ShouldReturnFalse()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();

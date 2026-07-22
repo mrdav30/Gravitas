@@ -32,18 +32,14 @@ public sealed partial class GravitasQueryMixedService
         Vector2d planarCenter = circle.Center;
         var center = new Vector3d(planarCenter.X, circle.MixedSlabCenterY, planarCenter.Y);
         var segment = new FixedSegment(start, end);
-        if (!segment.TryGetFiniteCylinderIntersectionDistanceInterval(
+        if (!segment.TryGetSweptSphereFiniteCylinderIntersectionDistance(
                 center,
                 Vector3d.Up,
                 circle.MixedHalfThickness,
                 circle.ScaledRadius,
                 radius,
-                radius,
                 length,
-                out Fixed64 distance,
-                out _,
-                out _,
-                out _))
+                out Fixed64 distance))
         {
             hit = default;
             return false;

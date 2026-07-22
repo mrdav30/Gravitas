@@ -45,9 +45,10 @@ Reducer notes:
   support points, axial ordering, and closest-axis witnesses retain the exact
   squared length of an accepted near-unit axis rather than treating it as a
   mathematically exact unit vector.
-- Swept-sphere capsule and mesh-edge reducers use the same full-domain
-  finite-axis admission. Finite-cylinder sweeps currently use a conservative
-  sharp-rim dilation rather than the rounded rim of the true Minkowski sum.
+- Swept-sphere capsule and mesh-edge reducers use full-domain finite-axis
+  admission. Finite-cylinder sweeps use the exact spherical dilation of the
+  authored cylinder, including its rounded cap rims; the entry-only lower-stack
+  contract avoids refining an unused toroidal-rim exit root.
 - mesh targets query triangle BVH candidates and report the owning collider.
 - registered convex source sweeps use exact support-mapped conservative
   advancement and skip the source collider.
@@ -95,15 +96,12 @@ Mixed query hits sort by distance, then 3D collider ID, then 2D collider ID.
 
 Reducer notes:
 
-- Capsule-slab boundary reducers use full-domain planar and spatial
-  finite-segment capsule intervals, but the current horizontal-rim
-  decomposition conservatively overexpands the true sphere-dilated boundary.
-  Circle-slab axial and radial clipping also remains wide until the final
-  authored-segment distance. The capsule reducer's current `Exact` label is
-  tracked for correction with the rim model.
-- Circle slabs are reduced through a conservative sharp-rim expanded cylinder;
-  their current `Exact` label is a known model-labeling defect pending a rounded
-  finite-cylinder reducer.
+- Capsule slabs use an exact feature union: the expanded planar side and cap
+  cores, four sphere-dilated straight rims, and two sphere-dilated vertical
+  endpoint cylinders. Circle slabs use the exact spherical dilation of their
+  finite vertical cylinder. Both reducers keep finite-axis and rounded-rim
+  arithmetic wide through the final authored-segment distance and correctly
+  report `Exact`.
 - AABB, convex-polygon, and stable compound reductions report `Exact`.
 - supported 3D primitive slabs, finite cones at any rotation, mesh triangles,
   and compounds report `Exact`.
@@ -258,13 +256,10 @@ tie-breakers.
 
 `SweepSphereAgainst2D` sweeps a 3D sphere center against embedded 2D slabs:
 
-- circles use full-domain axial/radial clipping against a conservatively
-  expanded finite vertical cylinder. The sharp expanded rim contains the true
-  rounded sphere/cylinder Minkowski boundary; correcting the reducer and its
-  current `Exact` label is tracked separately.
-- capsule boundary segments use full-domain finite-segment capsule intervals;
-  the current horizontal-rim decomposition is a conservative overexpansion
-  pending an exact extruded-capsule sweep.
+- circles use the exact spherical dilation of the finite vertical cylinder,
+  including rounded cap rims.
+- capsules use an exact union of planar side and cap-core features, four
+  straight cap rims, and the two rounded endpoint columns.
 - AABB and convex polygon slabs use finite-prism reducers.
 - compounds reduce supported parts in authored order and report the owner.
 

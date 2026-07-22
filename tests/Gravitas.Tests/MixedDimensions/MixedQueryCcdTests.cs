@@ -2045,6 +2045,45 @@ public sealed partial class MixedQueryCcdTests
     }
 
     [Fact]
+    public void SweepSphereAgainst2D_WithCircleSlabDiagonalRimSeparation_ShouldRejectSharpExpansionHit()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        _ = CreateBodylessCircle2D(context, Vector2d.Zero);
+        var hits = new SwiftList<PhysicsMixedHit>();
+
+        int count = context.QueryMixed.SweepSphereAgainst2DAll(
+            new Vector3d((Fixed64)2, Fixed64.FromFraction(9, 10), Fixed64.Zero),
+            new Vector3d(Fixed64.FromFraction(9, 10), Fixed64.FromFraction(9, 10), Fixed64.Zero),
+            Fixed64.Half,
+            IncludeLayerZero,
+            hits);
+
+        count.Should().Be(0);
+        context.QueryMixed.LastQueryCandidateCount.Should().Be(1);
+        hits.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void SweepSphereAgainst2D_WithCircleSlabDiagonalRimTangentAtEndpoint_ShouldReportExactHit()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        LSCollider2D target = CreateBodylessCircle2D(context, Vector2d.Zero);
+        Vector3d end = new(Fixed64.FromFraction(4, 5), Fixed64.FromFraction(9, 10), Fixed64.Zero);
+
+        bool found = context.QueryMixed.SweepSphereAgainst2D(
+            new Vector3d((Fixed64)2, Fixed64.FromFraction(9, 10), Fixed64.Zero),
+            end,
+            Fixed64.Half,
+            IncludeLayerZero,
+            out PhysicsMixedHit hit);
+
+        found.Should().BeTrue();
+        hit.Collider2D.Should().BeSameAs(target);
+        hit.Distance.Should().Be(Fixed64.FromFraction(6, 5));
+        hit.ReducerKind.Should().Be(PhysicsQueryReducerKind.Exact);
+    }
+
+    [Fact]
     public void CircleSlabReducer_WithExtremeOffAxisCrossing_ShouldPreserveEntryDistance()
     {
         using GravitasWorldContext context = CreateMixedContext();
@@ -2280,6 +2319,45 @@ public sealed partial class MixedQueryCcdTests
         hit.Collider2D.Should().BeSameAs(target);
         hit.Distance.Should().Be((Fixed64)2);
         hit.Normal3DTo2D.Should().Be(Vector3d.Right);
+        hit.ReducerKind.Should().Be(PhysicsQueryReducerKind.Exact);
+    }
+
+    [Fact]
+    public void SweepSphereAgainst2D_WithCapsuleSlabDiagonalStraightRimSeparation_ShouldRejectSpineExpansionHit()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        _ = CreateBodylessCapsule2D(context, Vector2d.Zero);
+        var hits = new SwiftList<PhysicsMixedHit>();
+
+        int count = context.QueryMixed.SweepSphereAgainst2DAll(
+            new Vector3d((Fixed64)2, Fixed64.FromFraction(9, 10), Fixed64.Zero),
+            new Vector3d(Fixed64.FromFraction(17, 20), Fixed64.FromFraction(9, 10), Fixed64.Zero),
+            Fixed64.Half,
+            IncludeLayerZero,
+            hits);
+
+        count.Should().Be(0);
+        context.QueryMixed.LastQueryCandidateCount.Should().Be(1);
+        hits.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void SweepSphereAgainst2D_WithCapsuleSlabDiagonalStraightRimTangentAtEndpoint_ShouldReportExactHit()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        LSCollider2D target = CreateBodylessCapsule2D(context, Vector2d.Zero);
+        Vector3d end = new(Fixed64.FromFraction(4, 5), Fixed64.FromFraction(9, 10), Fixed64.Zero);
+
+        bool found = context.QueryMixed.SweepSphereAgainst2D(
+            new Vector3d((Fixed64)2, Fixed64.FromFraction(9, 10), Fixed64.Zero),
+            end,
+            Fixed64.Half,
+            IncludeLayerZero,
+            out PhysicsMixedHit hit);
+
+        found.Should().BeTrue();
+        hit.Collider2D.Should().BeSameAs(target);
+        hit.Distance.Should().Be(Fixed64.FromFraction(6, 5));
         hit.ReducerKind.Should().Be(PhysicsQueryReducerKind.Exact);
     }
 

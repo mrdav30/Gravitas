@@ -29,27 +29,26 @@ records follow with their original discovery context.
 - Treat local links as unstaged validation scaffolding. Do not publish or
   release with them in place.
 - FixedMathSharp foundation hardening is complete. The current locally linked
-  radial, finite-axis, sphere-construction, and derived-bound extensions report
-  100% line, branch, and method coverage. Retain the local link while the
-  remaining Gravitas queue is hardened.
+  radial, finite-axis, sphere-construction, derived-bound, and exact rounded
+  finite-cylinder extensions pass 1,742 core and eight Chronicler tests at
+  14,310/14,310 lines, 4,448/4,448 branches, and 1,996/1,996 ReportGenerator
+  methods. Retain the local link while the remaining Gravitas queue is hardened.
 - SwiftCollections has no library-specific active issue at this checkpoint; its
   place in the sequence is a full downstream compatibility and release gate.
 - GridForge's runtime-identity defect is resolved. Keep the lower stack locally
   linked while the remaining Gravitas queue is hardened so another downstream
   discovery does not force a partial release cycle.
-- Gravitas's current authoritative coverage-enabled Release run passes 3,238
-  tests and reports 33,732/33,732 lines, 12,133/12,133 branches, and
-  4,191/4,191 ReportGenerator methods for hand-authored source.
+- Gravitas's current authoritative coverage-enabled Release run passes 3,244
+  tests and reports 33,706/33,706 lines, 12,129/12,129 branches, and
+  4,192/4,192 ReportGenerator methods for hand-authored source.
 - After the Gravitas queue closes, release the lower stack in dependency order,
   replace local links with released packages at each layer, and rerun Gravitas
   `Release`, `ReleaseLean`, coverage, replay, and relevant benchmark gates.
 
 ### Ordered Queue
 
-1. **Gravitas — exact swept-sphere dilation for finite extrusions:**
-   [Swept-Sphere Cylinder Dilation Uses A Sharp Rim Proxy](#swept-sphere-cylinder-dilation-uses-a-sharp-rim-proxy),
-   then
-   [Swept-Sphere Capsule-Slab Rim Dilation Overexpands The Rounded Boundary](#swept-sphere-capsule-slab-rim-dilation-overexpands-the-rounded-boundary).
+1. **Gravitas:**
+   [Swept-Sphere Cuboid Dilation Uses Sharp Edge And Corner Proxies](#swept-sphere-cuboid-dilation-uses-sharp-edge-and-corner-proxies).
 2. **Gravitas:**
    [Finite-Slab Projection Support Math Is Not Full-Domain](#finite-slab-projection-support-math-is-not-full-domain).
 3. **Gravitas — canonical collider geometry and exact scale admission:**
@@ -61,25 +60,28 @@ records follow with their original discovery context.
 4. **FixedMathSharp / Gravitas:**
    [Radial Segment Parameters Can Collapse Spatially Distinct Query Hits](#radial-segment-parameters-can-collapse-spatially-distinct-query-hits).
 
-### Swept-Sphere Cylinder Dilation Uses A Sharp Rim Proxy
+### Swept-Sphere Cuboid Dilation Uses Sharp Edge And Corner Proxies
 
-**Discovered:** 2026-07-19  
-**Source:** finite-axis interval migration  
-**Affected area:** `SweptSphereQueryWorker.TrySweepCylinder`, mixed
-sphere-versus-circle-slab reduction, reducer labels, and query/CCD documentation
+**Discovered:** 2026-07-22  
+**Source:** exact finite-extrusion caller parity audit  
+**Affected area:** `SweptSphereQueryWorker.TrySweepCuboid`, compound cuboid
+parts, public sphere sweeps, grounding, and static-target sphere/cuboid CCD
 
-The full-domain affine interval independently expands cylinder radius and
-half-height. That produces a sharp expanded cylinder, while the true Minkowski
-sum of a finite cylinder and sphere has rounded rims. The sharp proxy contains
-those rounded corners and can report an earlier or extra diagonal-rim hit. The
-mixed reducer also currently reports `Exact`, which overstates the geometric
-contract even though the arithmetic for the sharp proxy is exact.
+The cuboid reducer expands every local half-extent by the swept sphere radius
+and clips the center segment against that larger sharp box. The true Minkowski
+sum has planar faces, cylindrical edge rounds, and spherical corners. The sharp
+proxy therefore overcontains edge and corner regions and can report early or
+false hits in ordinary geometry. For example, a unit cuboid, radius-0.5 sphere,
+and sweep from `(2, 0.9, 0)` to `(0.9, 0.9, 0)` reaches the sharp proxy at
+`x = 1`, while its distance to the true edge remains
+`sqrt(0.4^2 + 0.4^2) > 0.5`.
 
-Resolve this with a rounded finite-cylinder sweep or exact point-to-cylinder
-distance reducer covering side, cap, and rim features. Add diagonal rim
-miss/contact, tangent, starting-overlap, extreme-domain, allocation, and
-deterministic-order regressions. Until then, document the reducer as
-conservative rather than shape exact.
+Replace the proxy with an exact local-space face/edge/vertex feature reducer.
+Cover axis-face hits, edge and corner misses/tangencies, rotated cuboids,
+compound parts, starting overlap, extreme-domain inputs, deterministic ordering,
+CCD parity, and warmed zero-allocation behavior. Keep this separate from the
+finite-cylinder/capsule-slab work because box dilation has distinct feature
+ownership despite the shared Minkowski-sum root cause.
 
 ### Finite-Slab Projection Support Math Is Not Full-Domain
 
@@ -107,28 +109,6 @@ public narrowing, or scale authored inputs before products. Cover extreme
 rotated capsule, cylinder, and cone projections; extreme separated 2D convex
 slab starts; slab-boundary tangency; miss/hit separation; repeat determinism;
 and allocation behavior.
-
-### Swept-Sphere Capsule-Slab Rim Dilation Overexpands The Rounded Boundary
-
-**Discovered:** 2026-07-19  
-**Source:** finite-axis mixed-reducer coverage closure  
-**Affected area:** `TrySweepCapsuleSlabBoundaryEdges`, mixed sphere-versus-2D
-capsule queries and CCD, reducer classification, and query documentation
-
-The embedded 2D capsule is a planar capsule extruded over a finite Y interval.
-Its current horizontal-edge reducer treats each cap-plane core segment as a 3D
-capsule with radius `targetRadius + sweepRadius`. Away from the cap plane this
-is larger than the true sphere dilation. At vertical offset `dy`, the correct
-planar reach is `targetRadius + sqrt(sweepRadius^2 - dy^2)`; the current reducer
-instead admits `sqrt((targetRadius + sweepRadius)^2 - dy^2)` from the core
-segment. Diagonal rim approaches can therefore report an early or false hit
-while the reducer is labeled `Exact`.
-
-Replace the proxy with an exact point-to-extruded-capsule distance/sweep reducer
-or an equivalent feature decomposition that preserves side, cap, and rounded
-rim ownership. Cover diagonal rim misses and contacts, tangency, start overlap,
-endpoint contact, extreme-domain inputs, deterministic ordering, and zero
-allocation. Revisit the reducer label until the exact model lands.
 
 ### Finite-Axis Collider Endpoint Snapshots Can Deform Scalar-Boundary Geometry
 
@@ -258,6 +238,55 @@ zero-allocation behavior. Keep this separate from sphere construction/merge
 and conic-quadratic ownership.
 
 ## Resolved Issues
+
+### Swept-Sphere Finite Extrusions Use Exact Spherical Dilation
+
+**Discovered:** 2026-07-19  
+**Resolved:** 2026-07-22  
+**Source:** finite-axis interval migration and mixed-reducer coverage closure  
+**Affected area:** FixedMathSharp finite-cylinder geometry; Gravitas 3D cylinder
+sweeps; mixed circle- and capsule-slab queries and CCD
+
+The old cylinder reducer independently expanded radius and half-height, forming
+a sharp cylinder that overcontained the true spherical Minkowski dilation at
+its cap rims. The mixed circle-slab path inherited the same proxy. The mixed
+capsule-slab path also expanded each cap-plane core segment as a 3D capsule,
+which overexpanded its horizontal rim away from the cap plane. All three paths
+could therefore report early or false diagonal-rim hits while their arithmetic
+or reducer labels implied exact geometry.
+
+FixedMathSharp now owns allocation-free first-hit and interval APIs for the
+exact spherical dilation of a centered finite cylinder. The reducer unions the
+original-height expanded side, the two cap-disk cores, and exact tubes around
+both cap rim circles. Rim boundaries use a factorized fixed-width quartic Sturm
+sequence with repeated-root tangency, degenerate subresultant, near-unit-axis,
+full-domain, and round-half-to-even distance handling. First-hit callers do not
+pay to refine the toroidal-rim exit root.
+
+Gravitas delegates 3D cylinder and mixed circle-slab sweeps to that shared
+contract. Mixed capsule slabs now decompose their remaining finite extrusion
+features explicitly: four straight top/bottom rim segments use exact segment
+capsules, while both endpoint columns use exact spherically dilated finite
+cylinders. The planar side and cap-face core paths remain responsible for their
+non-rounded regions. Obsolete sharp-rim proxy logic was removed rather than
+retained behind compatibility helpers.
+
+Regression coverage distinguishes diagonal misses from contacts and tangencies;
+exercises positive/negative rims, cap cores, straight capsule rims, start and
+end containment, stationary geometry, repeated and degenerate quartics,
+half-even roots, near-unit axes, opposite scalar faces, and direction symmetry;
+and keeps the exact query paths at zero managed allocation. FixedMathSharp
+passes 1,742 core and eight Chronicler Release tests at 14,310/14,310 lines,
+4,448/4,448 branches, and 1,996/1,996 ReportGenerator methods. Gravitas passes
+3,244 Release and 3,189 ReleaseLean tests at 33,706/33,706 lines,
+12,129/12,129 branches, and 4,192/4,192 methods.
+
+The final rounded-rim benchmark reports 61.75 microseconds for the 3D cylinder
+and 68.24 microseconds for the mixed circle slab at scale 1, and 89.91 and
+80.64 microseconds respectively at scale 100,000, with zero managed allocation
+in every row. The exact solver is intentionally more expensive than the former
+sharp proxy; its specialized fixed-width path remains roughly an order of
+magnitude faster than the initial generic exact prototype.
 
 ### Cone-Triangle Face Interiors Are Reduced Without Edge Crossings
 

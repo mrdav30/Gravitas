@@ -181,18 +181,14 @@ public sealed class SweptSphereQueryWorker
         impactDistance = Fixed64.Zero;
 
         var query = new FixedSegment(_start, _end);
-        if (!query.TryGetFiniteCylinderIntersectionDistanceInterval(
+        if (!query.TryGetSweptSphereFiniteCylinderIntersectionDistance(
                 cylinder.Center,
                 cylinder.WorldAxis,
                 cylinder.HalfHeight,
                 cylinder.ScaledRadius,
                 _radius,
-                _radius,
                 _length,
-                out Fixed64 entry,
-                out _,
-                out _,
-                out _))
+                out Fixed64 entry))
         {
             return false;
         }

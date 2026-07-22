@@ -132,12 +132,13 @@ Mixed CCD uses explicit mixed query reducers only in `PhysicsRuntimeMode.Mixed`.
 cross-dimensional CCD.
 
 3D swept-sphere mixed CCD routes through `QueryMixed.SweepSphereAgainst2D`.
-Capsule boundary intervals use full-domain finite-segment arithmetic, but the
-current horizontal-rim decomposition conservatively overexpands the true
-rounded boundary. Circle slabs likewise use full-domain arithmetic for a
-conservative sharp-rim expanded-cylinder proxy. Both current `Exact` labels are
-tracked for correction. AABB, convex polygon, and supported compound slab hits
-use their exact finite-slab reducers.
+Circle slabs use the exact spherical dilation of their finite vertical
+cylinder, including rounded cap rims. Capsule slabs use an exact union of their
+expanded planar side and cap cores, four sphere-dilated straight rims, and two
+sphere-dilated vertical endpoint cylinders. Both reducers retain full-domain
+finite-axis arithmetic through the final distance and report `Exact`. AABB,
+convex polygon, and supported compound slab hits use their exact finite-slab
+reducers.
 
 2D swept-circle mixed CCD routes through `QueryMixed.SweepCircleAgainst3D`.
 Supported primitive, mesh, and compound target families use exact reducers for
