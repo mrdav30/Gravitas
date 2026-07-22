@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using FixedMathSharp.Bounds;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas.Colliders;
@@ -27,25 +28,32 @@ internal static class ConeGeometry
         Vector3d normal = axis.MagnitudeSquared > Fixed64.Epsilon
             ? axis.Normalized
             : Vector3d.Up;
-        Vector3d baseExtents = CreateBaseDiskExtents(normal, baseRadius);
-        min = Vector3d.Min(apex, baseCenter - baseExtents);
-        max = Vector3d.Max(apex, baseCenter + baseExtents);
+        FixedBoundBox bounds = FixedBoundBox.FromFiniteConeClippedToDomain(
+            apex,
+            baseCenter,
+            normal,
+            baseRadius);
+        min = bounds.Min;
+        max = bounds.Max;
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Vector3d CreateBaseDiskExtents(Vector3d axis, Fixed64 radius) =>
-        new(
-            GetDiskAxisExtent(axis.X, radius),
-            GetDiskAxisExtent(axis.Y, radius),
-            GetDiskAxisExtent(axis.Z, radius));
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Fixed64 GetDiskAxisExtent(Fixed64 axisComponent, Fixed64 radius)
+    /// <summary>
+    /// Returns the finite-cone support point in a nonzero search direction.
+    /// </summary>
+    public static Vector3d GetFiniteConeSupportPoint(
+        Vector3d apex,
+        Vector3d baseCenter,
+        Vector3d axis,
+        Fixed64 baseRadius,
+        Vector3d direction)
     {
-        Fixed64 capacitySqr = Fixed64.One - axisComponent * axisComponent;
-        if (capacitySqr <= Fixed64.Zero)
-            return Fixed64.Zero;
+        Vector3d radialDirection = Vector3d.GetNormalizedProjectionOnPlane(direction, axis);
+        Vector3d baseSupport = radialDirection != Vector3d.Zero
+            ? baseCenter + radialDirection * baseRadius
+            : baseCenter;
 
-        return radius * FixedMath.Sqrt(capacitySqr);
+        return Vector3d.CompareProjection(baseSupport, apex, direction) >= 0
+            ? baseSupport
+            : apex;
     }
 }

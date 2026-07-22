@@ -37,17 +37,17 @@ records follow with their original discovery context.
 - GridForge's runtime-identity defect is resolved. Keep the lower stack locally
   linked while the remaining Gravitas queue is hardened so another downstream
   discovery does not force a partial release cycle.
-- Gravitas's current authoritative coverage-enabled Release run passes 3,237
-  tests and reports 33,894/33,894 lines, 12,211/12,211 branches, and
-  4,206/4,206 methods for hand-authored source.
+- Gravitas's current authoritative coverage-enabled Release run passes 3,248
+  tests and reports 33,825/33,825 lines, 12,163/12,163 branches, and
+  4,200/4,200 methods for hand-authored source.
 - After the Gravitas queue closes, release the lower stack in dependency order,
   replace local links with released packages at each layer, and rerun Gravitas
   `Release`, `ReleaseLean`, coverage, replay, and relevant benchmark gates.
 
 ### Ordered Queue
 
-1. **Gravitas:**
-   [Conic Query Quadratics Can Saturate Before Solving](#conic-query-quadratics-can-saturate-before-solving).
+1. **FixedMathSharp / Gravitas:**
+   [Cone-Triangle Face Interiors Can Be Missed Without Edge Crossings](#cone-triangle-face-interiors-can-be-missed-without-edge-crossings).
 2. **Gravitas — exact swept-sphere dilation for finite extrusions:**
    [Swept-Sphere Cylinder Dilation Uses A Sharp Rim Proxy](#swept-sphere-cylinder-dilation-uses-a-sharp-rim-proxy),
    then
@@ -63,20 +63,31 @@ records follow with their original discovery context.
 5. **FixedMathSharp / Gravitas:**
    [Radial Segment Parameters Can Collapse Spatially Distinct Query Hits](#radial-segment-parameters-can-collapse-spatially-distinct-query-hits).
 
-### Conic Query Quadratics Can Saturate Before Solving
+### Cone-Triangle Face Interiors Can Be Missed Without Edge Crossings
 
-**Discovered:** 2026-07-18  
-**Source:** radial consumer audit  
-**Affected area:** `RaycastSegmentWorker` cone intersections and
-`GravitasQuery3DService` cone sweep/query reducers
+**Discovered:** 2026-07-21  
+**Source:** conic-query full-domain migration  
+**Affected area:** concave-mesh cone-volume reduction,
+`GravitasQuery3DService.TryKeepConeAxisTriangleIntersection`,
+`MeshUtils.IsPointInTrianglePlane`, and FixedMathSharp `FixedTriangle`
 
-Cone intersections are conic rather than radial. Their local reductions and
-quadratic coefficients can saturate before discriminant/root evaluation, so
-the new circle/sphere interval primitive is not an honest replacement. Design
-a dedicated exact conic reducer with explicit finite-height clipping and
-feature ordering; cover extreme crossings, tangency/near-miss, first-root
-rejection with second-root admission, starts inside, and authored endpoint
-contact. Keep it allocation-free and benchmark the query hot path.
+A large mesh triangle can contain part of a cone without any triangle edge
+crossing the cone boundary. The retained axis/triangle fallback owns the subset
+where the axis pierces the triangle, but it cannot detect an interior cone-face
+intersection when the triangle plane is parallel to or offset from the axis.
+For example, a sufficiently large triangle in the plane `X = 1` can contain a
+cone cross-section while neither its edges nor the cone axis intersect the
+triangle. The fallback also intersects the triangle plane and classifies its
+projected point through ordinary saturating `Fixed64` products, so extreme
+representable triangles can lose an otherwise valid interior hit.
+
+Design an exact finite-cone/triangle face-interior reducer rather than extending
+the axis-only fallback. Move reusable plane and projected-triangle predicates
+into FixedMathSharp `FixedTriangle`, retaining wide differences, cross/dot
+products, and barycentric or oriented-edge classification until one final public
+narrowing. Cover axis-piercing and axis-parallel interior hits with no edge
+crossing, extreme same-sign and opposite-sign coordinates, strict miss/contact
+separation, stable triangle ordering, and warmed zero allocation.
 
 ### Swept-Sphere Cylinder Dilation Uses A Sharp Rim Proxy
 
@@ -151,22 +162,26 @@ allocation. Revisit the reducer label until the exact model lands.
 
 **Discovered:** 2026-07-19  
 **Source:** centered finite-axis query migration and final consumer audit  
-**Affected area:** 2D/3D capsule and 3D cylinder endpoint properties; discrete
-2D/3D/mixed narrow phase, capsule-mover sweep decomposition, support and
-closest-point helpers, mesh contact candidates, replay hashing, and diagnostics
+**Affected area:** 2D/3D capsule, 3D cylinder, and 3D cone endpoint properties;
+discrete 2D/3D/mixed narrow phase, capsule-mover sweep decomposition, support
+and closest-point helpers, mesh contact candidates, replay hashing, and
+diagnostics
 
-Capsules and cylinders currently expose representable endpoint snapshots built
-from `center +/- worldAxis * halfLength`. Near a `Fixed64` scalar face, a
-rotated conceptual endpoint can lie outside the scalar domain. Component-wise
-saturation then shortens or bends the stored segment even though the canonical
-center, normalized axis, half-length, and radius remain valid. The centered
-finite-axis query reducers avoid those snapshots, but several discrete,
-mixed-dimension, support, capsule-mover, replay, and diagnostic consumers still
-treat them as authoritative geometry.
+Capsules, cylinders, and cones currently expose representable endpoint
+snapshots built from `center +/- worldAxis * halfLength`. Near a `Fixed64`
+scalar face, a rotated conceptual endpoint can lie outside the scalar domain.
+Component-wise saturation then shortens or bends the stored segment even though
+the canonical center, normalized axis, full or half length, and radius remain
+valid. An odd raw-unit cone height also has a conceptual half-height that is not
+representable at all, so its cached apex and base center can collapse even near
+the origin. The centered query reducers avoid those snapshots, but several
+discrete, mixed-dimension, support, capsule-mover, replay, and diagnostic
+consumers still treat them as authoritative geometry.
 
-Make `(center, normalized world axis, half-length, radius)` the only runtime
-geometry source of truth. Decide whether the endpoint properties should become
-explicit best-effort `Try*` projections or be removed as misleading public API.
+Make `(center, normalized world axis, full/half length, radius)` the only
+runtime geometry source of truth. Decide whether the endpoint properties should
+become explicit best-effort `Try*` projections or be removed as misleading
+public API.
 Move reusable centered-axis projection, closest-feature, support, and distance
 work into FixedMathSharp so downstream consumers never reconstruct conceptual
 endpoints merely to narrow them again. Bounds may clamp outward conservatively,
@@ -271,6 +286,62 @@ zero-allocation behavior. Keep this separate from sphere construction/merge
 and conic-quadratic ownership.
 
 ## Resolved Issues
+
+### Conic Query Quadratics Remain Full-Domain Until Final Hit Narrowing
+
+**Discovered:** 2026-07-18  
+**Resolved:** 2026-07-21  
+**Source:** radial consumer audit  
+**Affected area:** FixedMathSharp finite-cone segment geometry,
+`RaycastSegmentWorker`, and `GravitasQuery3DService` cone-volume mesh reduction
+
+The root cause was duplicated downstream conic math. Both the cone-collider
+raycast and the concave-mesh edge path formed axial projections, quadratic
+coefficients, discriminants, and roots in saturating `Fixed64`; large valid
+coordinates could lose the crossing before any finite-height check. The raycast
+path also classified tiny nonzero segments through a squared-length value that
+could round to zero.
+
+FixedMathSharp now owns one allocation-free finite-cone segment reducer with
+apex-authored and centered contracts, exact supplied-axis length, exact axial
+clipping, positive, negative, linear, and constant polynomial handling,
+strict/inclusive endpoint classification, and deterministic half-even root
+selection. Parameter APIs serve bounded geometry, physical-distance APIs retain
+spatially distinct scalar hits, and point APIs retain high-resolution lattice
+witnesses on long authored chords. The same lower-stack work adds exact-or-false
+ray point reconstruction, q-aware axial projection and radial-plane
+normalization for accepted near-unit axes, and a conservative finite-cone AABB
+clipped to the representable domain. Gravitas consumes those contracts for
+collider raycasts, cone support mapping, broad-phase bounds, axial hit ordering,
+closest-axis witnesses, and concave-mesh edge reduction. A rounded lattice point
+from an accepted edge interval is retained without reclassifying the already
+exact continuous intersection. The tiny-segment sentinel now uses segment
+identity instead of a lossy squared magnitude, and a stale test that labeled an
+authored apex endpoint as outside was removed.
+
+Regression coverage includes extreme side crossings, tangency versus a
+one-raw-unit miss, opposite-lobe clipping, first-root rejection with later-root
+admission, starts inside, flat-base and apex endpoints, generator/linear paths,
+near-half-raw irrational roots, above- and below-unit non-cardinal axes,
+zero-radius generators, centered half-radius classification, long-edge spatial
+witnesses, tiny AABB segments, and warmed allocation guards. Dedicated query
+benchmarks exercise cone-collider raycasts, concave-mesh edge reduction, and
+oblique long/narrow cone bounds. The separate cone/triangle face-interior issue
+remains queued because its geometry is distinct from edge intersection.
+
+Verification passed 1,689 FixedMathSharp core and 8 Chronicler tests in
+`Release`, 1,668 core and 8 Chronicler tests in `ReleaseLean`, 3,248 Gravitas
+tests in `Release`, and 3,193 Gravitas tests in `ReleaseLean`. Authoritative
+coverage remains exact in both affected libraries: FixedMathSharp reports
+12,523/12,523 lines, 4,090/4,090 branches, and 1,887/1,887 methods; Gravitas
+reports 33,825/33,825 lines, 12,163/12,163 branches, and 4,200/4,200 methods.
+The final warmed 64-target rows measured about 867.8 microseconds for
+cone-collider raycasts, 3.798 milliseconds for cone-volume overlap against
+concave meshes, and 1.260 milliseconds for the oblique long/narrow bounds case,
+with zero managed allocation. Single-operation `Dry` samples measured 8.446,
+37.337, and 21.979 milliseconds respectively; those cold-start samples include
+wide-solver JIT cost and are retained as startup evidence rather than throughput
+estimates.
 
 ### Explicit Body Roles Preserve Independent Angular Mobility
 

@@ -38,6 +38,20 @@ instead of burying it in notes.
 
 ## Recently Completed
 
+- [`Full-Domain Conic Query Arithmetic`](issue-tracker.md#conic-query-quadratics-remain-full-domain-until-final-hit-narrowing)
+  - Completed 2026-07-21. FixedMathSharp now owns exact allocation-free
+    finite-cone segment intervals for apex-authored and centered cones, while
+    Gravitas consumes distance intervals for cone-collider raycasts and
+    high-resolution point intervals for concave-mesh edge reduction. Extreme
+    coordinates, clipped opposite lobes, roots near half-even boundaries,
+    non-cardinal authored endpoint contact, long-edge spatial witnesses, and
+    tiny nonzero segments retain full-domain behavior. The
+    authoritative Gravitas Release artifact passes 3,248 tests at 100% line,
+    branch, and method coverage; ReleaseLean passes 3,193 tests. FixedMathSharp
+    also retains exact 100% coverage. The final warmed 64-target cone raycast,
+    concave-mesh overlap, and oblique long/narrow bounds rows remain
+    allocation-free; the geometrically distinct cone/triangle face-interior
+    case stays explicitly queued for its own hardening.
 - [`Body Motion Type And Solver Mobility Hardening`](done/2026-07-20-body-motion-type-and-solver-mobility-plan.md)
   - Completed 2026-07-20. Adds explicit Dynamic, Kinematic, and Static body
     roles while keeping translation and rotation freeze constraints

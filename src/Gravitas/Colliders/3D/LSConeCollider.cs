@@ -92,7 +92,7 @@ public sealed class LSConeCollider : LSCollider
         Apex = new Vector3d(Fixed64.Zero, HalfHeight, Fixed64.Zero);
         WorldBaseCenter = Center + Rotation * BaseCenter;
         WorldApex = Center + Rotation * Apex;
-        Axis = (WorldApex - WorldBaseCenter).Normalized;
+        Axis = Rotation * Vector3d.Up;
         Volume = Fixed64.Pi * ScaledRadiusSqr * Height / (Fixed64)3;
         Area = Volume;
     }

@@ -64,6 +64,19 @@ internal static class BenchmarkPhysicsScene
         return context.Physics.BodyCount;
     }
 
+    public static int CreateDynamicConeLine(GravitasWorldContext context, int count)
+    {
+        for (int i = 0; i < count; i++)
+        {
+            CreateDynamicCone(
+                context,
+                new Vector3d((Fixed64)(i * DefaultSpacing), Fixed64.Zero, Fixed64.Zero),
+                FixedQuaternion.Identity);
+        }
+
+        return context.Physics.BodyCount;
+    }
+
     public static LSMeshCollider CreateDynamicConvexCube(GravitasWorldContext context, Vector3d position)
     {
         LSMeshCollider collider = CreateConvexCubeMesh();
@@ -165,6 +178,14 @@ internal static class BenchmarkPhysicsScene
     {
         for (int i = 0; i < count; i++)
             CreateStaticCollider(context, CreateVerticalQuadMesh(), new Vector3d(i * DefaultSpacing, 0, 0));
+
+        return context.Physics.ColliderCount;
+    }
+
+    public static int CreateStaticConcaveMeshWallLine(GravitasWorldContext context, int count)
+    {
+        for (int i = 0; i < count; i++)
+            CreateStaticCollider(context, CreateVerticalQuadMesh(MeshColliderMode.Concave), new Vector3d(i * DefaultSpacing, 0, 0));
 
         return context.Physics.ColliderCount;
     }
@@ -484,7 +505,8 @@ internal static class BenchmarkPhysicsScene
         triangles[offset++] = c;
     }
 
-    private static LSMeshCollider CreateVerticalQuadMesh()
+    private static LSMeshCollider CreateVerticalQuadMesh(
+        MeshColliderMode mode = MeshColliderMode.Convex)
     {
         var vertices = new[]
         {
@@ -497,7 +519,7 @@ internal static class BenchmarkPhysicsScene
         return new LSMeshCollider(
             vertices,
             triangles,
-            MeshColliderMode.Convex,
+            mode,
             MeshInertiaPolicy.SurfaceApproximation);
     }
 

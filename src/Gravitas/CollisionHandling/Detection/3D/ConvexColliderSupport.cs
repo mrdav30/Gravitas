@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using FixedMathSharp.Bounds;
 using Gravitas.Colliders;
 using System;
 using System.Runtime.CompilerServices;
@@ -87,28 +88,29 @@ internal static class ConvexColliderSupport
     public static bool IntersectsConeVolume(
         LSCollider collider,
         Vector3d apex,
+        Vector3d baseCenter,
         Vector3d axis,
-        Fixed64 length,
-        Fixed64 endRadius)
+        Fixed64 endRadius,
+        int maxIterations = 32)
     {
         if (!IsSupported(collider))
             return false;
 
         Span<Vector3d> simplex = stackalloc Vector3d[4];
         int count = 0;
-        Vector3d coneCenter = apex + axis * (length * Fixed64.Half);
+        Vector3d coneCenter = Vector3d.Midpoint(apex, baseCenter);
         Vector3d direction = collider.Center - coneCenter;
         if (direction.MagnitudeSquared <= Fixed64.Epsilon)
             direction = Vector3d.Right;
 
-        simplex[count++] = SupportMinkowskiConeCollider(collider, apex, axis, length, endRadius, direction);
+        simplex[count++] = SupportMinkowskiConeCollider(collider, apex, baseCenter, axis, endRadius, direction);
         direction = -simplex[0];
         if (direction.MagnitudeSquared <= Fixed64.Epsilon)
             return true;
 
-        for (int i = 0; i < 32; i++)
+        for (int i = 0; i < maxIterations; i++)
         {
-            Vector3d point = SupportMinkowskiConeCollider(collider, apex, axis, length, endRadius, direction);
+            Vector3d point = SupportMinkowskiConeCollider(collider, apex, baseCenter, axis, endRadius, direction);
             if (Vector3d.Dot(point, direction) < -Fixed64.Epsilon)
                 return false;
 
@@ -132,31 +134,17 @@ internal static class ConvexColliderSupport
     private static Vector3d SupportMinkowskiConeCollider(
         LSCollider collider,
         Vector3d apex,
+        Vector3d baseCenter,
         Vector3d axis,
-        Fixed64 length,
         Fixed64 endRadius,
         Vector3d direction) =>
-        SupportQueryCone(apex, axis, length, endRadius, direction) - Support(collider, -direction);
-
-    private static Vector3d SupportQueryCone(
-        Vector3d apex,
-        Vector3d axis,
-        Fixed64 length,
-        Fixed64 endRadius,
-        Vector3d direction)
-    {
-        direction = ResolveSupportDirection(direction);
-        Vector3d baseCenter = apex + axis * length;
-        Vector3d radial = direction - axis * Vector3d.Dot(direction, axis);
-        Fixed64 radialMagnitude = radial.Magnitude;
-        Vector3d baseSupport = radialMagnitude > Fixed64.Epsilon
-            ? baseCenter + radial / radialMagnitude * endRadius
-            : baseCenter;
-
-        return Vector3d.CompareProjection(baseSupport, apex, direction) >= 0
-            ? baseSupport
-            : apex;
-    }
+        ConeGeometry.GetFiniteConeSupportPoint(
+            apex,
+            baseCenter,
+            axis,
+            endRadius,
+            ResolveSupportDirection(direction))
+        - Support(collider, -direction);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Vector3d ResolveSupportDirection(Vector3d direction) =>

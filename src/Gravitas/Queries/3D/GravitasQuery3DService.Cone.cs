@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using FixedMathSharp.Bounds;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Support;
@@ -30,7 +31,7 @@ public sealed partial class GravitasQuery3DService
         out Physics3DHit hit,
         PhysicsLayerMask layerMask)
     {
-        Vector3d normalizedDirection = ValidateConeQuery(origin, direction, length, endRadius);
+        Vector3d normalizedDirection = ValidateConeQuery(origin, direction, length, endRadius, out Vector3d end);
         _currentLayerMask = layerMask;
         NextCircleVersion();
         ResetLastQueryCounters();
@@ -42,6 +43,7 @@ public sealed partial class GravitasQuery3DService
         Fixed64 closestDistance = Fixed64.MaxValue;
         TraceConeForClosestHit(
             origin,
+            end,
             normalizedDirection,
             length,
             endRadius,
@@ -52,7 +54,7 @@ public sealed partial class GravitasQuery3DService
         hit = closestHit;
         _context.Diagnostics.EmitRayQuery(
             origin,
-            origin + normalizedDirection * length,
+            end,
             endRadius,
             layerMask.Bits,
             found,
@@ -74,7 +76,7 @@ public sealed partial class GravitasQuery3DService
         SwiftList<Physics3DHit> results)
     {
         SwiftThrowHelper.ThrowIfNull(results, nameof(results));
-        Vector3d normalizedDirection = ValidateConeQuery(origin, direction, length, endRadius);
+        Vector3d normalizedDirection = ValidateConeQuery(origin, direction, length, endRadius, out Vector3d end);
         _currentLayerMask = layerMask;
         NextCircleVersion();
         ResetLastQueryCounters();
@@ -82,12 +84,12 @@ public sealed partial class GravitasQuery3DService
         _redundantColliderCheck.Clear();
         _redundantVoxelCheck.Clear();
 
-        TraceConeForAllHits(origin, normalizedDirection, length, endRadius, results);
+        TraceConeForAllHits(origin, end, normalizedDirection, length, endRadius, results);
         Physics3DHitSorter.SortByDistance(results);
 
         _context.Diagnostics.EmitRayQuery(
             origin,
-            origin + normalizedDirection * length,
+            end,
             endRadius,
             layerMask.Bits,
             results.Count > 0,
@@ -98,6 +100,7 @@ public sealed partial class GravitasQuery3DService
 
     private void TraceConeForClosestHit(
         Vector3d origin,
+        Vector3d baseCenter,
         Vector3d direction,
         Fixed64 length,
         Fixed64 endRadius,
@@ -105,7 +108,7 @@ public sealed partial class GravitasQuery3DService
         ref Physics3DHit closestHit,
         ref Fixed64 closestDistance)
     {
-        GetConeQueryBounds(origin, direction, length, endRadius, out Vector3d min, out Vector3d max);
+        GetConeQueryBounds(origin, baseCenter, direction, endRadius, out Vector3d min, out Vector3d max);
         GridTracer.GetCoveredVoxelsInto(_context.World, min, max, _coveredVoxels, _traceScratch);
         for (int i = 0; i < _coveredVoxels.Count; i++)
         {
@@ -116,6 +119,7 @@ public sealed partial class GravitasQuery3DService
             ProcessConePartitionForClosestHit(
                 partition!,
                 origin,
+                baseCenter,
                 direction,
                 length,
                 endRadius,
@@ -127,12 +131,13 @@ public sealed partial class GravitasQuery3DService
 
     private void TraceConeForAllHits(
         Vector3d origin,
+        Vector3d baseCenter,
         Vector3d direction,
         Fixed64 length,
         Fixed64 endRadius,
         SwiftList<Physics3DHit> results)
     {
-        GetConeQueryBounds(origin, direction, length, endRadius, out Vector3d min, out Vector3d max);
+        GetConeQueryBounds(origin, baseCenter, direction, endRadius, out Vector3d min, out Vector3d max);
         GridTracer.GetCoveredVoxelsInto(_context.World, min, max, _coveredVoxels, _traceScratch);
         for (int i = 0; i < _coveredVoxels.Count; i++)
         {
@@ -140,13 +145,14 @@ public sealed partial class GravitasQuery3DService
             if (!GridTraversal.TryGetUniquePartition(voxel, _redundantVoxelCheck, out PhysicsPartition? partition))
                 continue;
 
-            ProcessConePartitionForAllHits(partition!, origin, direction, length, endRadius, results);
+            ProcessConePartitionForAllHits(partition!, origin, baseCenter, direction, length, endRadius, results);
         }
     }
 
     private void ProcessConePartitionForClosestHit(
         PhysicsPartition partition,
         Vector3d origin,
+        Vector3d baseCenter,
         Vector3d direction,
         Fixed64 length,
         Fixed64 endRadius,
@@ -154,27 +160,29 @@ public sealed partial class GravitasQuery3DService
         ref Physics3DHit closestHit,
         ref Fixed64 closestDistance)
     {
-        ProcessConeColliderListForClosestHit(partition.ContainedDynamicObjects, origin, direction, length, endRadius, ref found, ref closestHit, ref closestDistance);
-        ProcessConeColliderListForClosestHit(partition.ContainedKinematicObjects, origin, direction, length, endRadius, ref found, ref closestHit, ref closestDistance);
-        ProcessConeColliderListForClosestHit(partition.ContainedStaticObjects, origin, direction, length, endRadius, ref found, ref closestHit, ref closestDistance);
+        ProcessConeColliderListForClosestHit(partition.ContainedDynamicObjects, origin, baseCenter, direction, length, endRadius, ref found, ref closestHit, ref closestDistance);
+        ProcessConeColliderListForClosestHit(partition.ContainedKinematicObjects, origin, baseCenter, direction, length, endRadius, ref found, ref closestHit, ref closestDistance);
+        ProcessConeColliderListForClosestHit(partition.ContainedStaticObjects, origin, baseCenter, direction, length, endRadius, ref found, ref closestHit, ref closestDistance);
     }
 
     private void ProcessConePartitionForAllHits(
         PhysicsPartition partition,
         Vector3d origin,
+        Vector3d baseCenter,
         Vector3d direction,
         Fixed64 length,
         Fixed64 endRadius,
         SwiftList<Physics3DHit> results)
     {
-        ProcessConeColliderListForAllHits(partition.ContainedDynamicObjects, origin, direction, length, endRadius, results);
-        ProcessConeColliderListForAllHits(partition.ContainedKinematicObjects, origin, direction, length, endRadius, results);
-        ProcessConeColliderListForAllHits(partition.ContainedStaticObjects, origin, direction, length, endRadius, results);
+        ProcessConeColliderListForAllHits(partition.ContainedDynamicObjects, origin, baseCenter, direction, length, endRadius, results);
+        ProcessConeColliderListForAllHits(partition.ContainedKinematicObjects, origin, baseCenter, direction, length, endRadius, results);
+        ProcessConeColliderListForAllHits(partition.ContainedStaticObjects, origin, baseCenter, direction, length, endRadius, results);
     }
 
     private void ProcessConeColliderListForClosestHit(
         SwiftSparseSet? colliderIds,
         Vector3d origin,
+        Vector3d baseCenter,
         Vector3d direction,
         Fixed64 length,
         Fixed64 endRadius,
@@ -187,7 +195,7 @@ public sealed partial class GravitasQuery3DService
 
         for (int i = colliderIds.Count - 1; i >= 0; i--)
         {
-            if (!TryBuildOverlapConeHit(colliderIds.DenseKeys[i], origin, direction, length, endRadius, out Physics3DHit hit)
+            if (!TryBuildOverlapConeHit(colliderIds.DenseKeys[i], origin, baseCenter, direction, length, endRadius, out Physics3DHit hit)
                 || !PhysicsHitSelectionPolicy.ShouldReplace(hit, found, closestHit))
             {
                 continue;
@@ -202,6 +210,7 @@ public sealed partial class GravitasQuery3DService
     private void ProcessConeColliderListForAllHits(
         SwiftSparseSet? colliderIds,
         Vector3d origin,
+        Vector3d baseCenter,
         Vector3d direction,
         Fixed64 length,
         Fixed64 endRadius,
@@ -212,7 +221,7 @@ public sealed partial class GravitasQuery3DService
 
         for (int i = colliderIds.Count - 1; i >= 0; i--)
         {
-            if (TryBuildOverlapConeHit(colliderIds.DenseKeys[i], origin, direction, length, endRadius, out Physics3DHit hit))
+            if (TryBuildOverlapConeHit(colliderIds.DenseKeys[i], origin, baseCenter, direction, length, endRadius, out Physics3DHit hit))
                 results.Add(hit);
         }
     }
@@ -220,6 +229,7 @@ public sealed partial class GravitasQuery3DService
     private bool TryBuildOverlapConeHit(
         int colliderId,
         Vector3d origin,
+        Vector3d baseCenter,
         Vector3d direction,
         Fixed64 length,
         Fixed64 endRadius,
@@ -239,26 +249,27 @@ public sealed partial class GravitasQuery3DService
 
         collider.CircleQueryVersion = CircleVersion;
         LastQueryCandidateCount++;
-        return TryBuildConeHitForCollider(collider, origin, direction, length, endRadius, out hit);
+        return TryBuildConeHitForCollider(collider, origin, baseCenter, direction, length, endRadius, out hit);
     }
 
     private bool TryBuildConeHitForCollider(
         LSCollider collider,
         Vector3d origin,
+        Vector3d baseCenter,
         Vector3d direction,
         Fixed64 length,
         Fixed64 endRadius,
         out Physics3DHit hit)
     {
         if (collider is LSCompoundCollider compound)
-            return TryBuildConeHitForCompound(compound, origin, direction, length, endRadius, out hit);
+            return TryBuildConeHitForCompound(compound, origin, baseCenter, direction, length, endRadius, out hit);
 
         if (collider is LSMeshCollider { Mode: MeshColliderMode.Concave } concaveMesh)
-            return TryBuildConeHitForConcaveMesh(concaveMesh, origin, direction, length, endRadius, out hit);
+            return TryBuildConeHitForConcaveMesh(concaveMesh, origin, baseCenter, direction, length, endRadius, out hit);
 
         bool supportedConvexTarget = ConvexColliderSupport.IsSupported(collider);
         if (supportedConvexTarget
-            && !ConvexColliderSupport.IntersectsConeVolume(collider, origin, direction, length, endRadius))
+            && !ConvexColliderSupport.IntersectsConeVolume(collider, origin, baseCenter, direction, endRadius))
         {
             hit = default;
             return false;
@@ -280,9 +291,8 @@ public sealed partial class GravitasQuery3DService
                 }
 
                 point = GetClosestSurfacePoint(collider, origin);
-                axialDistance = FixedMath.Clamp(
-                    Vector3d.Dot(point - origin, direction),
-                    Fixed64.Zero,
+                axialDistance = FixedMath.Min(
+                    Vector3d.ProjectNonNegativeDifferenceParameter(point, origin, direction),
                     length);
             }
             else
@@ -300,12 +310,13 @@ public sealed partial class GravitasQuery3DService
     private bool TryBuildConeHitForConcaveMesh(
         LSMeshCollider mesh,
         Vector3d origin,
+        Vector3d baseCenter,
         Vector3d direction,
         Fixed64 length,
         Fixed64 endRadius,
         out Physics3DHit hit)
     {
-        GetConeQueryBounds(origin, direction, length, endRadius, out Vector3d min, out Vector3d max);
+        GetConeQueryBounds(origin, baseCenter, direction, endRadius, out Vector3d min, out Vector3d max);
         mesh.GetTrianglesInBounds(new FixedBoundVolume(min, max), _meshTriangleCandidates);
         LastMeshTriangleCandidateCount += _meshTriangleCandidates.Count;
 
@@ -351,7 +362,7 @@ public sealed partial class GravitasQuery3DService
         return found;
     }
 
-    private static bool TryBuildConeTriangleHit(
+    internal static bool TryBuildConeTriangleHit(
         Vector3d origin,
         Vector3d direction,
         Fixed64 length,
@@ -367,13 +378,10 @@ public sealed partial class GravitasQuery3DService
         Vector3d bestPoint = default;
         Fixed64 bestAxialDistance = Fixed64.MaxValue;
 
-        TryKeepConeTrianglePoint(origin, direction, length, endRadius, first, ref found, ref bestPoint, ref bestAxialDistance);
-        TryKeepConeTrianglePoint(origin, direction, length, endRadius, second, ref found, ref bestPoint, ref bestAxialDistance);
-        TryKeepConeTrianglePoint(origin, direction, length, endRadius, third, ref found, ref bestPoint, ref bestAxialDistance);
         TryKeepConeTriangleSegment(origin, direction, length, endRadius, first, second, ref found, ref bestPoint, ref bestAxialDistance);
         TryKeepConeTriangleSegment(origin, direction, length, endRadius, second, third, ref found, ref bestPoint, ref bestAxialDistance);
         TryKeepConeTriangleSegment(origin, direction, length, endRadius, third, first, ref found, ref bestPoint, ref bestAxialDistance);
-        TryKeepConeAxisTriangleIntersection(origin, direction, length, endRadius, first, second, third, normal, ref found, ref bestPoint, ref bestAxialDistance);
+        TryKeepConeAxisTriangleIntersection(origin, direction, length, first, second, third, normal, ref found, ref bestPoint, ref bestAxialDistance);
 
         point = bestPoint;
         axialDistance = bestAxialDistance;
@@ -391,68 +399,53 @@ public sealed partial class GravitasQuery3DService
         ref Vector3d bestPoint,
         ref Fixed64 bestAxialDistance)
     {
-        TryKeepConeTrianglePoint(origin, direction, length, endRadius, start, ref found, ref bestPoint, ref bestAxialDistance);
-        TryKeepConeTrianglePoint(origin, direction, length, endRadius, end, ref found, ref bestPoint, ref bestAxialDistance);
-
-        Vector3d deltaStart = start - origin;
-        Vector3d segment = end - start;
-        Fixed64 axialStart = Vector3d.Dot(deltaStart, direction);
-        Fixed64 axialSlope = Vector3d.Dot(segment, direction);
-        Fixed64 radiusSlope = endRadius / length;
-        Fixed64 coneSlopeSqr = Fixed64.One + radiusSlope * radiusSlope;
-
-        Fixed64 a = segment.MagnitudeSquared - coneSlopeSqr * axialSlope * axialSlope;
-        Fixed64 b = (Fixed64)2 * (Vector3d.Dot(deltaStart, segment) - coneSlopeSqr * axialStart * axialSlope);
-        Fixed64 c = deltaStart.MagnitudeSquared - coneSlopeSqr * axialStart * axialStart;
-
-        if (a.Abs() <= Fixed64.Epsilon)
+        var segment = new FixedSegment(start, end);
+        if (!segment.TryGetFiniteConeIntersectionMinimumAxialPoint(
+                origin,
+                direction,
+                length,
+                endRadius,
+                out Vector3d point))
         {
-            if (b.Abs() > Fixed64.Epsilon)
-                TryKeepConeTriangleSegmentParameter(origin, direction, length, endRadius, start, segment, -c / b, ref found, ref bestPoint, ref bestAxialDistance);
-        }
-        else
-        {
-            Fixed64 discriminant = b * b - (Fixed64)4 * a * c;
-            if (discriminant >= Fixed64.Zero)
-            {
-                Fixed64 root = FixedMath.Sqrt(discriminant);
-                Fixed64 denominator = (Fixed64)2 * a;
-                TryKeepConeTriangleSegmentParameter(origin, direction, length, endRadius, start, segment, (-b - root) / denominator, ref found, ref bestPoint, ref bestAxialDistance);
-                TryKeepConeTriangleSegmentParameter(origin, direction, length, endRadius, start, segment, (-b + root) / denominator, ref found, ref bestPoint, ref bestAxialDistance);
-            }
+            return;
         }
 
-        if (axialSlope.Abs() > Fixed64.Epsilon)
-        {
-            TryKeepConeTriangleSegmentParameter(origin, direction, length, endRadius, start, segment, -axialStart / axialSlope, ref found, ref bestPoint, ref bestAxialDistance);
-            TryKeepConeTriangleSegmentParameter(origin, direction, length, endRadius, start, segment, (length - axialStart) / axialSlope, ref found, ref bestPoint, ref bestAxialDistance);
-        }
+        TryKeepConeTriangleSegmentPoint(
+            origin,
+            direction,
+            length,
+            point,
+            ref found,
+            ref bestPoint,
+            ref bestAxialDistance);
     }
 
-    private static void TryKeepConeTriangleSegmentParameter(
+    private static void TryKeepConeTriangleSegmentPoint(
         Vector3d origin,
         Vector3d direction,
         Fixed64 length,
-        Fixed64 endRadius,
-        Vector3d start,
-        Vector3d segment,
-        Fixed64 parameter,
+        Vector3d point,
         ref bool found,
         ref Vector3d bestPoint,
         ref Fixed64 bestAxialDistance)
     {
-        if (parameter < -Fixed64.Epsilon || parameter > Fixed64.One + Fixed64.Epsilon)
+        // The exact interval is authoritative: its high-resolution lattice
+        // witness may still round just outside a continuous sub-raw boundary.
+        Fixed64 axialDistance = FixedMath.Min(
+            Vector3d.ProjectNonNegativeDifferenceParameter(point, origin, direction),
+            length);
+        if (found && axialDistance >= bestAxialDistance)
             return;
 
-        parameter = FixedMath.Clamp01(parameter);
-        TryKeepConeTrianglePoint(origin, direction, length, endRadius, start + segment * parameter, ref found, ref bestPoint, ref bestAxialDistance);
+        bestPoint = point;
+        bestAxialDistance = axialDistance;
+        found = true;
     }
 
     private static void TryKeepConeAxisTriangleIntersection(
         Vector3d origin,
         Vector3d direction,
         Fixed64 length,
-        Fixed64 endRadius,
         Vector3d first,
         Vector3d second,
         Vector3d third,
@@ -470,24 +463,8 @@ public sealed partial class GravitasQuery3DService
             return;
 
         axialDistance = FixedMath.Clamp(axialDistance, Fixed64.Zero, length);
-        Vector3d point = origin + direction * axialDistance;
+        Vector3d point = new FixedRay(origin, direction).GetPoint(axialDistance);
         if (!MeshUtils.IsPointInTrianglePlane(first, second, third, normal, point))
-            return;
-
-        TryKeepConeTrianglePoint(origin, direction, length, endRadius, point, ref found, ref bestPoint, ref bestAxialDistance);
-    }
-
-    private static void TryKeepConeTrianglePoint(
-        Vector3d origin,
-        Vector3d direction,
-        Fixed64 length,
-        Fixed64 endRadius,
-        Vector3d point,
-        ref bool found,
-        ref Vector3d bestPoint,
-        ref Fixed64 bestAxialDistance)
-    {
-        if (!IsPointInsideConeVolume(origin, direction, length, endRadius, point, out Fixed64 axialDistance))
             return;
 
         if (found && axialDistance >= bestAxialDistance)
@@ -501,6 +478,7 @@ public sealed partial class GravitasQuery3DService
     private bool TryBuildConeHitForCompound(
         LSCompoundCollider compound,
         Vector3d origin,
+        Vector3d baseCenter,
         Vector3d direction,
         Fixed64 length,
         Fixed64 endRadius,
@@ -510,7 +488,7 @@ public sealed partial class GravitasQuery3DService
         Physics3DHit best = default;
         for (int i = 0; i < compound.PartCount; i++)
         {
-            if (!TryBuildConeHitForCollider(compound.GetPartCollider(i), origin, direction, length, endRadius, out Physics3DHit partHit)
+            if (!TryBuildConeHitForCollider(compound.GetPartCollider(i), origin, baseCenter, direction, length, endRadius, out Physics3DHit partHit)
                 || !PhysicsHitSelectionPolicy.ShouldReplace(partHit, found, best))
             {
                 continue;
@@ -532,14 +510,19 @@ public sealed partial class GravitasQuery3DService
         Vector3d point,
         out Fixed64 axialDistance)
     {
-        Vector3d delta = point - origin;
-        axialDistance = Vector3d.Dot(delta, direction);
-        if (axialDistance < Fixed64.Zero || axialDistance > length)
+        if (!FixedSegment.ContainsPointInFiniteCone(
+                point,
+                origin,
+                direction,
+                length,
+                endRadius))
+        {
+            axialDistance = default;
             return false;
+        }
 
-        Fixed64 radialSqr = delta.MagnitudeSquared - axialDistance * axialDistance;
-        Fixed64 coneRadius = endRadius * (axialDistance / length);
-        return radialSqr <= coneRadius * coneRadius + Fixed64.Epsilon;
+        axialDistance = Vector3d.ProjectNonNegativeDifferenceParameter(point, origin, direction);
+        return true;
     }
 
     private static Vector3d GetClosestPointOnConeAxis(
@@ -548,28 +531,29 @@ public sealed partial class GravitasQuery3DService
         Fixed64 length,
         Vector3d point)
     {
-        Fixed64 axial = Vector3d.Dot(point - origin, direction);
-        axial = FixedMath.Clamp(axial, Fixed64.Zero, length);
-        return origin + direction * axial;
+        Fixed64 axial = FixedMath.Min(
+            Vector3d.ProjectNonNegativeDifferenceParameter(point, origin, direction),
+            length);
+        return new FixedRay(origin, direction).GetPoint(axial);
     }
 
     private static void GetConeQueryBounds(
         Vector3d origin,
+        Vector3d baseCenter,
         Vector3d direction,
-        Fixed64 length,
         Fixed64 endRadius,
         out Vector3d min,
         out Vector3d max)
     {
-        Vector3d end = origin + direction * length;
-        ConeGeometry.CreateFiniteConeBounds(origin, end, direction, endRadius, out min, out max);
+        ConeGeometry.CreateFiniteConeBounds(origin, baseCenter, direction, endRadius, out min, out max);
     }
 
     private static Vector3d ValidateConeQuery(
         Vector3d origin,
         Vector3d direction,
         Fixed64 length,
-        Fixed64 endRadius)
+        Fixed64 endRadius,
+        out Vector3d end)
     {
         SwiftThrowHelper.ThrowIfArgument(
             direction == Vector3d.Zero,
@@ -585,9 +569,8 @@ public sealed partial class GravitasQuery3DService
             "Cone query end radius must be greater than zero.");
 
         Vector3d normalizedDirection = direction.Normalized;
-        Vector3d requestedDisplacement = normalizedDirection * length;
         SwiftThrowHelper.ThrowIfArgument(
-            !Vector3d.TryAdd(origin, requestedDisplacement, out _),
+            !new FixedRay(origin, normalizedDirection).TryGetPoint(length, out end),
             nameof(length),
             "Cone query endpoint must be representable without fixed-point saturation.");
         return normalizedDirection;

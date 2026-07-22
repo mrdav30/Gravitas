@@ -92,6 +92,54 @@ public sealed class GravitasQuery3DServiceConeTests
     }
 
     [Fact]
+    public void OverlapCone_WithAcceptedAboveUnitDirectionAndUnrepresentableEndpoint_ShouldReject()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        var direction = new Vector3d(
+            Fixed64.One + Fixed64.Epsilon * Fixed64.Half,
+            Fixed64.Zero,
+            Fixed64.Zero);
+
+        Action query = () => scenario.Context.Query3D.OverlapCone(
+            Vector3d.Zero,
+            direction,
+            Fixed64.MaxValue,
+            Fixed64.One,
+            out _,
+            IncludeLayerZero);
+
+        query.Should().Throw<ArgumentException>().WithParameterName("length");
+        scenario.Context.Query3D.LastQueryCandidateCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void TryBuildConeTriangleHit_NearUnitAxis_ShouldReportParametricAxialDistance()
+    {
+        var direction = new Vector3d(
+            Fixed64.One - Fixed64.Epsilon * Fixed64.Half,
+            Fixed64.Zero,
+            Fixed64.Zero);
+        var ray = new FixedMathSharp.Bounds.FixedRay(Vector3d.Zero, direction);
+        ray.TryGetPoint(Fixed64.Two, out Vector3d planeCenter).Should().BeTrue();
+        Fixed64 tenth = Fixed64.FromFraction(1, 10);
+
+        bool found = GravitasQuery3DService.TryBuildConeTriangleHit(
+            Vector3d.Zero,
+            direction,
+            (Fixed64)4,
+            Fixed64.Two,
+            planeCenter + new Vector3d(Fixed64.Zero, -tenth, -tenth),
+            planeCenter + new Vector3d(Fixed64.Zero, tenth, -tenth),
+            planeCenter + new Vector3d(Fixed64.Zero, Fixed64.Zero, tenth),
+            Vector3d.Right,
+            out _,
+            out Fixed64 axialDistance);
+
+        found.Should().BeTrue();
+        axialDistance.Should().Be(Fixed64.Two);
+    }
+
+    [Fact]
     public void OverlapConeQueries_WithStalePartitionColliderId_ShouldIgnoreStaleEntry()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
@@ -683,11 +731,52 @@ public sealed class GravitasQuery3DServiceConeTests
     }
 
     [Fact]
+    public void ConeTriangle_LongEdgeRetainsSpatiallyDistinctBoundaryWitness()
+    {
+        Fixed64 billion = (Fixed64)1_000_000_000;
+        Vector3d first = new(-billion, Fixed64.One, Fixed64.Zero);
+        Vector3d second = new(billion, Fixed64.One, Fixed64.Zero);
+        Vector3d third = new(billion, Fixed64.One, Fixed64.One);
+
+        bool found = GravitasQuery3DService.TryBuildConeTriangleHit(
+            Vector3d.Zero,
+            Vector3d.Up,
+            (Fixed64)10,
+            Fixed64.One,
+            first,
+            second,
+            third,
+            Vector3d.Down,
+            out Vector3d point,
+            out Fixed64 axialDistance);
+
+        found.Should().BeTrue();
+        point.Should().Be(new Vector3d(
+            -Fixed64.FromFraction(1, 10) + Fixed64.FromRaw(1),
+            Fixed64.One,
+            Fixed64.Zero));
+        axialDistance.Should().Be(Fixed64.One);
+    }
+
+    [Fact]
     public void OverlapConeAll_ShouldNotAllocateAfterWarmup()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         _ = scenario.CreateSphere(new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.Zero));
         _ = scenario.CreateCuboid(new Vector3d((Fixed64)4, Fixed64.Half, Fixed64.Zero));
+        _ = scenario.CreateBody(
+            new LSMeshCollider(
+                new[]
+                {
+                    new Vector3d((Fixed64)3, -Fixed64.Half, -Fixed64.Half),
+                    new Vector3d((Fixed64)3, Fixed64.Half, Fixed64.Zero),
+                    new Vector3d((Fixed64)3, -Fixed64.Half, Fixed64.Half)
+                },
+                new[] { 0, 1, 2 },
+                MeshColliderMode.Concave,
+                MeshInertiaPolicy.SurfaceApproximation),
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
         var hits = new SwiftList<Physics3DHit>(8);
 
         long allocatedBytes = AllocationTestHelper.MeasureSteadyState(() =>

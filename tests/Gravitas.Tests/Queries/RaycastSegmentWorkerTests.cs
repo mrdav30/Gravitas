@@ -747,6 +747,98 @@ public sealed class RaycastSegmentWorkerTests
     }
 
     [Fact]
+    public void CheckConeOverlaps_WithExtremeSideCrossing_ShouldPreserveBothIntersections()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSConeCollider cone = scenario.CreateCone(Vector3d.Zero).Collider;
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+
+        worker.PrepareSegmentCheck(
+            new Vector3d((Fixed64)(-100_000), Fixed64.Zero, Fixed64.Zero),
+            new Vector3d((Fixed64)100_000, Fixed64.Zero, Fixed64.Zero));
+
+        bool hit = worker.CheckConeOverlaps(cone, ref hits);
+
+        hit.Should().BeTrue();
+        hits.Count.Should().Be(2);
+        hits.Should().Contain(new Vector3d(-Fixed64.FromFraction(1, 4), Fixed64.Zero, Fixed64.Zero));
+        hits.Should().Contain(new Vector3d(Fixed64.FromFraction(1, 4), Fixed64.Zero, Fixed64.Zero));
+
+        long allocatedBytes = AllocationTestHelper.MeasureSteadyState(() =>
+        {
+            hits.FastClear();
+            worker.PrepareSegmentCheck(
+                new Vector3d((Fixed64)(-100_000), Fixed64.Zero, Fixed64.Zero),
+                new Vector3d((Fixed64)100_000, Fixed64.Zero, Fixed64.Zero));
+            _ = worker.CheckConeOverlaps(cone, ref hits);
+        });
+
+        allocatedBytes.Should().Be(0);
+    }
+
+    [Fact]
+    public void CheckConeOverlaps_WithTangentAndOneRawSeparatedSegments_ShouldDistinguishContact()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSConeCollider cone = scenario.CreateCone(Vector3d.Zero).Collider;
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+        Fixed64 sectionRadius = Fixed64.FromFraction(1, 4);
+
+        worker.PrepareSegmentCheck(
+            new Vector3d((Fixed64)(-2), Fixed64.Zero, sectionRadius),
+            new Vector3d((Fixed64)2, Fixed64.Zero, sectionRadius));
+
+        worker.CheckConeOverlaps(cone, ref hits).Should().BeTrue();
+        hits.Should().ContainSingle().Which.Should().Be(new Vector3d(Fixed64.Zero, Fixed64.Zero, sectionRadius));
+
+        hits.FastClear();
+        Fixed64 separated = sectionRadius + Fixed64.MinIncrement;
+        worker.PrepareSegmentCheck(
+            new Vector3d((Fixed64)(-2), Fixed64.Zero, separated),
+            new Vector3d((Fixed64)2, Fixed64.Zero, separated));
+
+        worker.CheckConeOverlaps(cone, ref hits).Should().BeFalse();
+        hits.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void CheckConeOverlaps_WithFirstInfiniteConeRootAboveApex_ShouldAdmitLaterFiniteRoot()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSConeCollider cone = scenario.CreateCone(Vector3d.Zero).Collider;
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+        Fixed64 x = Fixed64.FromFraction(1, 4);
+
+        worker.PrepareSegmentCheck(
+            new Vector3d(x, (Fixed64)2, Fixed64.Zero),
+            new Vector3d(x, (Fixed64)(-2), Fixed64.Zero));
+
+        worker.CheckConeOverlaps(cone, ref hits).Should().BeTrue();
+        hits.Count.Should().Be(2);
+        hits[0].Should().Be(new Vector3d(x, Fixed64.Zero, Fixed64.Zero));
+        hits[1].Should().Be(new Vector3d(x, -Fixed64.Half, Fixed64.Zero));
+    }
+
+    [Fact]
+    public void CheckConeOverlaps_WithSegmentEndingAtApex_ShouldPreserveAuthoredEndpoint()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSConeCollider cone = scenario.CreateCone(Vector3d.Zero).Collider;
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+
+        worker.PrepareSegmentCheck(
+            new Vector3d(Fixed64.One, cone.HalfHeight, Fixed64.Zero),
+            cone.WorldApex);
+
+        worker.CheckConeOverlaps(cone, ref hits).Should().BeTrue();
+        hits.Should().ContainSingle().Which.Should().Be(cone.WorldApex);
+    }
+
+    [Fact]
     public void CheckConeOverlaps_WithSegmentCrossingConeBase_ShouldReturnBaseIntersection()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
@@ -895,24 +987,6 @@ public sealed class RaycastSegmentWorkerTests
     }
 
     [Fact]
-    public void CheckConeOverlaps_WithGeneratorParallelSegmentOutsideCone_ShouldReturnFalse()
-    {
-        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
-        LSConeCollider cone = scenario.CreateCone(Vector3d.Zero).Collider;
-        var worker = new RaycastSegmentWorker();
-        var hits = new SwiftList<Vector3d>();
-
-        worker.PrepareSegmentCheck(
-            new Vector3d((Fixed64)(-3), -cone.HalfHeight, Fixed64.Zero),
-            new Vector3d(Fixed64.Zero, cone.HalfHeight, Fixed64.Zero));
-
-        bool hit = worker.CheckConeOverlaps(cone, ref hits);
-
-        hit.Should().BeFalse();
-        hits.Count.Should().Be(0);
-    }
-
-    [Fact]
     public void CheckConeOverlaps_WithExactGeneratorSlopeSegmentBelowCone_ShouldReturnFalse()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
@@ -999,6 +1073,27 @@ public sealed class RaycastSegmentWorkerTests
 
         hit.Should().BeTrue();
         hits.Should().ContainSingle().Which.Should().Be(end);
+    }
+
+    [Fact]
+    public void CheckAABBoxOverlaps_WithNonzeroSegmentWhoseSquaredLengthRoundsToZero_ShouldUseSegment()
+    {
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+        Fixed64 lower = Fixed64.FromRaw(250);
+        Vector3d end = new(Fixed64.FromRaw(300), Fixed64.FromRaw(300), Fixed64.Zero);
+        worker.PrepareSegmentCheck(Vector3d.Zero, end);
+
+        bool hit = worker.CheckAABBoxOverlaps(
+            new Vector3d(lower, lower, Fixed64.FromRaw(-1)),
+            new Vector3d(Fixed64.FromRaw(350), Fixed64.FromRaw(350), Fixed64.FromRaw(1)),
+            ref hits);
+
+        hit.Should().BeTrue();
+        hits.Should().HaveCount(2);
+        hits[0].X.Should().BeGreaterThanOrEqualTo(lower);
+        hits[0].Y.Should().BeGreaterThanOrEqualTo(lower);
+        hits[1].Should().Be(end);
     }
 
     [Fact]

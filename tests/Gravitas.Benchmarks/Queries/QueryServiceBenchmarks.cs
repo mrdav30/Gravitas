@@ -15,8 +15,10 @@ public class QueryServiceBenchmarks
     private static readonly PhysicsLayerMask IncludeLayerZero = PhysicsLayerMask.FromLayer(0);
 
     private GravitasWorldContext _context;
+    private GravitasWorldContext _coneTargetContext;
     private GravitasWorldContext _overlappingContext;
     private GravitasWorldContext _meshContext;
+    private GravitasWorldContext _concaveMeshContext;
     private GravitasWorldContext _capsuleSourceContext;
     private GravitasWorldContext _cuboidSourceContext;
     private GravitasWorldContext _cylinderSourceContext;
@@ -35,6 +37,7 @@ public class QueryServiceBenchmarks
     private Vector3d _rayEnd;
     private Vector3d _sourceSweepDisplacement;
     private SwiftList<Physics3DHit> _raycastHits;
+    private SwiftList<Physics3DHit> _coneTargetRaycastHits;
     private SwiftList<Physics3DHit> _overlappingRaycastHits;
     private SwiftList<Physics3DHit> _circlecastHits;
     private SwiftList<Physics3DHit> _coneVolumeHits;
@@ -59,11 +62,17 @@ public class QueryServiceBenchmarks
         _context = BenchmarkPhysicsScene.CreateContext(extent, clearAllPools: true);
         BenchmarkPhysicsScene.CreateDynamicSphereLine(_context, ColliderCount);
 
+        _coneTargetContext = BenchmarkPhysicsScene.CreateContext(extent);
+        BenchmarkPhysicsScene.CreateDynamicConeLine(_coneTargetContext, ColliderCount);
+
         _overlappingContext = BenchmarkPhysicsScene.CreateContext(extent);
         BenchmarkPhysicsScene.CreateDynamicSphereLine(_overlappingContext, ColliderCount);
 
         _meshContext = BenchmarkPhysicsScene.CreateContext(extent);
         BenchmarkPhysicsScene.CreateStaticMeshWallLine(_meshContext, ColliderCount);
+
+        _concaveMeshContext = BenchmarkPhysicsScene.CreateContext(extent);
+        BenchmarkPhysicsScene.CreateStaticConcaveMeshWallLine(_concaveMeshContext, ColliderCount);
 
         FixedQuaternion sideways = FixedQuaternion.FromEulerAnglesInDegrees(Fixed64.Zero, Fixed64.Zero, (Fixed64)90);
 
@@ -117,6 +126,7 @@ public class QueryServiceBenchmarks
         _rayEnd = new Vector3d((Fixed64)(ColliderCount * 2), Fixed64.Zero, Fixed64.Zero);
         _sourceSweepDisplacement = new Vector3d((Fixed64)(ColliderCount * 2 + 3), Fixed64.Zero, Fixed64.Zero);
         _raycastHits = new SwiftList<Physics3DHit>(ColliderCount);
+        _coneTargetRaycastHits = new SwiftList<Physics3DHit>(ColliderCount);
         _overlappingRaycastHits = new SwiftList<Physics3DHit>(ColliderCount);
         _circlecastHits = new SwiftList<Physics3DHit>(ColliderCount);
         _coneVolumeHits = new SwiftList<Physics3DHit>(ColliderCount);
@@ -135,8 +145,10 @@ public class QueryServiceBenchmarks
     public void Cleanup()
     {
         _context.Dispose();
+        _coneTargetContext.Dispose();
         _overlappingContext.Dispose();
         _meshContext.Dispose();
+        _concaveMeshContext.Dispose();
         _capsuleSourceContext.Dispose();
         _cuboidSourceContext.Dispose();
         _cylinderSourceContext.Dispose();
@@ -145,8 +157,10 @@ public class QueryServiceBenchmarks
         _highVertexConvexMeshSourceContext.Dispose();
         _compoundSourceContext.Dispose();
         _context = null;
+        _coneTargetContext = null;
         _overlappingContext = null;
         _meshContext = null;
+        _concaveMeshContext = null;
         _capsuleSourceContext = null;
         _cuboidSourceContext = null;
         _cylinderSourceContext = null;
@@ -162,6 +176,7 @@ public class QueryServiceBenchmarks
         _highVertexConvexMeshSource = null;
         _compoundSource = null;
         _raycastHits = null;
+        _coneTargetRaycastHits = null;
         _overlappingRaycastHits = null;
         _circlecastHits = null;
         _coneVolumeHits = null;
@@ -181,12 +196,26 @@ public class QueryServiceBenchmarks
         CountRaycastHits(_context, _raycastHits);
 
     [Benchmark]
+    public int RaycastAllAcrossConeTargets() =>
+        CountRaycastHits(_coneTargetContext, _coneTargetRaycastHits);
+
+    [Benchmark]
     public int OverlapCircleAllAcrossPopulatedContext() =>
         _context.Query3D.OverlapCircleAll(Vector3d.Zero, (Fixed64)4, IncludeLayerZero, _circlecastHits);
 
     [Benchmark]
     public int OverlapConeAllAcrossPopulatedContext() =>
         _context.Query3D.OverlapConeAll(
+            new Vector3d((Fixed64)(-2), Fixed64.Zero, Fixed64.Zero),
+            Vector3d.Right,
+            (Fixed64)(ColliderCount * 2 + 2),
+            (Fixed64)4,
+            IncludeLayerZero,
+            _coneVolumeHits);
+
+    [Benchmark]
+    public int OverlapConeAllAcrossConcaveMeshTargets() =>
+        _concaveMeshContext.Query3D.OverlapConeAll(
             new Vector3d((Fixed64)(-2), Fixed64.Zero, Fixed64.Zero),
             Vector3d.Right,
             (Fixed64)(ColliderCount * 2 + 2),

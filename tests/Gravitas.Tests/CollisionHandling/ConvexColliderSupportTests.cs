@@ -295,12 +295,12 @@ public sealed class ConvexColliderSupportTests
         ScenarioBody<LSSphereCollider> hit = scenario.CreateSphere(new Vector3d(Fixed64.Zero, Fixed64.One, Fixed64.Zero));
         ScenarioBody<LSSphereCollider> miss = scenario.CreateSphere(new Vector3d((Fixed64)4, Fixed64.One, Fixed64.Zero));
         Vector3d apex = Vector3d.Zero;
+        Vector3d baseCenter = new(Fixed64.Zero, (Fixed64)2, Fixed64.Zero);
         Vector3d axis = Vector3d.Up;
-        Fixed64 length = (Fixed64)2;
         Fixed64 radius = Fixed64.One;
 
-        ConvexColliderSupport.IntersectsConeVolume(hit.Collider, apex, axis, length, radius).Should().BeTrue();
-        ConvexColliderSupport.IntersectsConeVolume(miss.Collider, apex, axis, length, radius).Should().BeFalse();
+        ConvexColliderSupport.IntersectsConeVolume(hit.Collider, apex, baseCenter, axis, radius).Should().BeTrue();
+        ConvexColliderSupport.IntersectsConeVolume(miss.Collider, apex, baseCenter, axis, radius).Should().BeFalse();
     }
 
     [Fact]
@@ -313,8 +313,8 @@ public sealed class ConvexColliderSupportTests
         ConvexColliderSupport.IntersectsConeVolume(
             sphere.Collider,
             Vector3d.Zero,
+            new Vector3d(Fixed64.Zero, (Fixed64)2, Fixed64.Zero),
             Vector3d.Up,
-            (Fixed64)2,
             Fixed64.One).Should().BeTrue();
         sphere.Collider.BoundsMax.Y.Should().Be(Fixed64.Zero);
     }
@@ -330,8 +330,8 @@ public sealed class ConvexColliderSupportTests
         ConvexColliderSupport.IntersectsConeVolume(
             cuboid.Collider,
             Vector3d.Zero,
+            new Vector3d(Fixed64.Zero, (Fixed64)2, Fixed64.Zero),
             Vector3d.Up,
-            (Fixed64)2,
             Fixed64.One).Should().BeTrue();
         cuboid.Collider.BoundsMax.X.Should().Be(touchingPoint.X);
         cuboid.Collider.BoundsMin.Y.Should().BeLessThanOrEqualTo(touchingPoint.Y);
@@ -349,7 +349,23 @@ public sealed class ConvexColliderSupportTests
             unsupported,
             Vector3d.Zero,
             Vector3d.Up,
-            Fixed64.One,
+            Vector3d.Up,
             Fixed64.Half).Should().BeFalse();
+    }
+
+    [Fact]
+    public void IntersectsConeVolume_WithExhaustedIterationBudget_ShouldPreserveCandidate()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> sphere = scenario.CreateSphere(
+            new Vector3d(Fixed64.Zero, Fixed64.One, Fixed64.Zero));
+
+        ConvexColliderSupport.IntersectsConeVolume(
+            sphere.Collider,
+            Vector3d.Zero,
+            new Vector3d(Fixed64.Zero, (Fixed64)2, Fixed64.Zero),
+            Vector3d.Up,
+            Fixed64.One,
+            maxIterations: 0).Should().BeTrue();
     }
 }

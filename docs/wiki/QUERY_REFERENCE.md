@@ -38,6 +38,13 @@ Reducer notes:
   return Q32.32 spatial distances with one final round-to-even narrowing. Hit
   points use the same exact authored-chord interpolation, so long segments do
   not amplify parameter rounding or lose small representable components.
+- Finite-cone raycasts use the corresponding centered-cone physical-distance
+  interval. Axial clipping, conic coefficients, discriminant evaluation, and
+  root selection remain wide, while the closed interval owns side, apex, flat
+  base, and rim contact without downstream feature deduplication. Cone bounds,
+  support points, axial ordering, and closest-axis witnesses retain the exact
+  squared length of an accepted near-unit axis rather than treating it as a
+  mathematically exact unit vector.
 - Swept-sphere capsule and mesh-edge reducers use the same full-domain
   finite-axis admission. Finite-cylinder sweeps currently use a conservative
   sharp-rim dilation rather than the rounded rim of the true Minkowski sum.
@@ -202,7 +209,13 @@ can skip one additional collider.
 `OverlapCone` and `OverlapConeAll` query an apex-origin finite cone volume.
 Supported convex targets use deterministic support-mapped cone-volume
 intersection. Compound targets scan parts in stable authored order and report
-the owner once.
+the owner once. Concave-mesh triangle edges use the shared exact finite-cone
+point interval. Its high-resolution authored-chord interpolation keeps
+spatially distinct witnesses on very long edges; the admitted interval remains
+authoritative if the final lattice point rounds just outside a continuous
+sub-raw boundary. Triangle face-interior intersections with no edge crossing
+remain separately tracked; the current axis/triangle fallback only covers the
+subset where the cone axis itself pierces the triangle.
 
 The 3D `OverlapCircle` family is an X/Z proximity query for 3D colliders. It is
 not a `Query2D` call, not a swept circle, and not a swept sphere.

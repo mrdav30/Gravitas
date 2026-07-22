@@ -23,7 +23,6 @@ public sealed class RaycastSegmentWorker
     private Vector3d _cachedSegment;
     private Vector3d _segmentDirection;
     private Fixed64 _segmentLength;
-    private Fixed64 _segmentLengthSqr;
     private bool _segmentIsValid;
     private bool _calculateIntersections;
     private readonly SwiftList<int> _meshTriangleBuffer = new();
@@ -41,7 +40,6 @@ public sealed class RaycastSegmentWorker
         if (!Vector3d.TrySubtract(p2, p1, out Vector3d segment)
             || !Vector3d.TryGetMagnitude(segment, out _segmentLength))
         {
-            _segmentLengthSqr = Fixed64.Zero;
             _segmentLength = Fixed64.Zero;
             _cachedSegment = Vector3d.Zero;
             _segmentDirection = Vector3d.Zero;
@@ -50,7 +48,6 @@ public sealed class RaycastSegmentWorker
             return;
         }
 
-        _segmentLengthSqr = segment.MagnitudeSquared;
         _cachedSegment = segment;
         _segmentDirection = _segmentLength == Fixed64.Zero ? Vector3d.Zero : segment.Normalized;
         _segmentIsValid = true;
@@ -100,11 +97,11 @@ public sealed class RaycastSegmentWorker
             return true;
         }
 
-        AddSphereIntersectionPoint(entry, ref outputIntersectionPoints);
+        AddSegmentParameterIntersectionPoint(entry, ref outputIntersectionPoints);
         if (exit != entry
             && (exit < Fixed64.One || !sphere.ContainsStrict(_cachedEnd)))
         {
-            AddSphereIntersectionPoint(exit, ref outputIntersectionPoints);
+            AddSegmentParameterIntersectionPoint(exit, ref outputIntersectionPoints);
         }
 
         return true;
@@ -182,38 +179,32 @@ public sealed class RaycastSegmentWorker
         if (!_segmentIsValid)
             return false;
 
-        FixedQuaternion inverseRotation = coneCollider.Rotation.Inverse();
-        Vector3d localOrigin = (_cachedOrigin - coneCollider.Center) * inverseRotation;
-
-        if (_segmentLengthSqr == Fixed64.Zero)
+        var query = new FixedSegment(_cachedOrigin, _cachedEnd);
+        if (!query.TryGetCenteredFiniteConeIntersectionDistanceInterval(
+                coneCollider.Center,
+                coneCollider.Axis,
+                coneCollider.Height,
+                coneCollider.ScaledRadius,
+                _segmentLength,
+                out Fixed64 entry,
+                out Fixed64 exit,
+                out bool startContained,
+                out bool endContainedStrict))
         {
-            if (!coneCollider.ContainsWorldPoint(_cachedOrigin))
-                return false;
-
-            if (_calculateIntersections)
-                outputIntersectionPoints.Add(_cachedOrigin);
-            return true;
+            return false;
         }
 
-        if (coneCollider.ContainsWorldPoint(_cachedOrigin))
-        {
-            if (_calculateIntersections)
-                outputIntersectionPoints.Add(_cachedOrigin);
+        if (!_calculateIntersections)
             return true;
-        }
 
-        Vector3d localDirection = _segmentDirection * inverseRotation;
-        bool intersects = CheckConeSide(
-            coneCollider,
-            localOrigin,
-            localDirection,
+        AddFiniteAxisIntersectionInterval(
+            entry,
+            exit,
+            startContained,
+            endContainedStrict,
             ref outputIntersectionPoints);
-        intersects |= CheckConeBase(
-            coneCollider,
-            localOrigin,
-            localDirection,
-            ref outputIntersectionPoints);
-        return intersects;
+
+        return true;
     }
 
     public bool CheckMeshOverlaps(LSMeshCollider meshCollider, ref SwiftList<Vector3d> outputIntersectionPoints)
@@ -259,97 +250,6 @@ public sealed class RaycastSegmentWorker
         return intersects;
     }
 
-    private bool CheckConeSide(
-        LSConeCollider cone,
-        Vector3d localOrigin,
-        Vector3d localDirection,
-        ref SwiftList<Vector3d> outputIntersectionPoints)
-    {
-        Fixed64 slope = cone.ScaledRadius / cone.Height;
-        Fixed64 slopeSqr = slope * slope;
-        Fixed64 q = cone.HalfHeight - localOrigin.Y;
-        Fixed64 a = localDirection.X * localDirection.X
-            + localDirection.Z * localDirection.Z
-            - slopeSqr * localDirection.Y * localDirection.Y;
-        Fixed64 b = 2 * (localOrigin.X * localDirection.X
-            + localOrigin.Z * localDirection.Z
-            + slopeSqr * q * localDirection.Y);
-        Fixed64 c = localOrigin.X * localOrigin.X
-            + localOrigin.Z * localOrigin.Z
-            - slopeSqr * q * q;
-
-        if (a.Abs() <= Fixed64.Epsilon)
-        {
-            if (b.Abs() <= Fixed64.Epsilon)
-                return false;
-
-            return TryAddConeSidePoint(
-                cone,
-                localOrigin,
-                localDirection,
-                -c / b,
-                ref outputIntersectionPoints);
-        }
-
-        Fixed64 discriminant = b * b - 4 * a * c;
-        if (discriminant < Fixed64.Zero)
-            return false;
-
-        Fixed64 root = FixedMath.Sqrt(discriminant);
-        Fixed64 denominator = 2 * a;
-        Fixed64 first = (-b - root) / denominator;
-        Fixed64 second = (-b + root) / denominator;
-
-        bool intersects = TryAddConeSidePoint(cone, localOrigin, localDirection, first, ref outputIntersectionPoints);
-        if (second != first)
-            intersects |= TryAddConeSidePoint(cone, localOrigin, localDirection, second, ref outputIntersectionPoints);
-
-        return intersects;
-    }
-
-    private bool CheckConeBase(
-        LSConeCollider cone,
-        Vector3d localOrigin,
-        Vector3d localDirection,
-        ref SwiftList<Vector3d> outputIntersectionPoints)
-    {
-        if (localDirection.Y.Abs() <= Fixed64.Epsilon)
-            return false;
-
-        Fixed64 distance = (-cone.HalfHeight - localOrigin.Y) / localDirection.Y;
-        if (distance < Fixed64.Zero || distance > _segmentLength)
-            return false;
-
-        Vector3d localPoint = localOrigin + localDirection * distance;
-        Fixed64 radialSqr = localPoint.X * localPoint.X + localPoint.Z * localPoint.Z;
-        if (radialSqr > cone.ScaledRadiusSqr + Fixed64.Epsilon)
-            return false;
-
-        AddLocalIntersectionPoint(cone.Center, cone.Rotation, localPoint, ref outputIntersectionPoints);
-        return true;
-    }
-
-    private bool TryAddConeSidePoint(
-        LSConeCollider cone,
-        Vector3d localOrigin,
-        Vector3d localDirection,
-        Fixed64 distance,
-        ref SwiftList<Vector3d> outputIntersectionPoints)
-    {
-        if (distance < Fixed64.Zero || distance > _segmentLength)
-            return false;
-
-        Vector3d localPoint = localOrigin + localDirection * distance;
-        if (localPoint.Y < -cone.HalfHeight - Fixed64.Epsilon
-            || localPoint.Y > cone.HalfHeight + Fixed64.Epsilon)
-        {
-            return false;
-        }
-
-        AddLocalIntersectionPoint(cone.Center, cone.Rotation, localPoint, ref outputIntersectionPoints);
-        return true;
-    }
-
     public bool CheckAABBoxOverlaps(LSCuboidCollider aabox, ref SwiftList<Vector3d> outputIntersectionPoints) =>
          CheckAABBoxOverlaps(aabox.BoundsMin, aabox.BoundsMax, ref outputIntersectionPoints);
 
@@ -361,7 +261,7 @@ public sealed class RaycastSegmentWorker
         if (!_segmentIsValid)
             return false;
 
-        if (_segmentLengthSqr == Fixed64.Zero)
+        if (_cachedSegment.IsZero)
             return CheckPointInsideBox(min, max, ref outputIntersectionPoints);
 
         if (!SweepBoundsUtility.TryClipSegment(
@@ -514,7 +414,7 @@ public sealed class RaycastSegmentWorker
                 return false;
             }
 
-            AddTriangleIntersectionPoint(mesh.ConvertLocalToWorld(localOrigin), ref outputIntersectionPoints);
+            AddIntersectionPoint(mesh.ConvertLocalToWorld(localOrigin), ref outputIntersectionPoints);
             return true;
         }
 
@@ -527,13 +427,13 @@ public sealed class RaycastSegmentWorker
             bool found = false;
             if (MeshUtils.IsPointInTrianglePlane(first, second, third, normal, localOrigin))
             {
-                AddTriangleIntersectionPoint(mesh.ConvertLocalToWorld(localOrigin), ref outputIntersectionPoints);
+                AddIntersectionPoint(mesh.ConvertLocalToWorld(localOrigin), ref outputIntersectionPoints);
                 found = true;
             }
 
             if (MeshUtils.IsPointInTrianglePlane(first, second, third, normal, localEnd))
             {
-                AddTriangleIntersectionPoint(mesh.ConvertLocalToWorld(localEnd), ref outputIntersectionPoints);
+                AddIntersectionPoint(mesh.ConvertLocalToWorld(localEnd), ref outputIntersectionPoints);
                 found = true;
             }
 
@@ -548,11 +448,11 @@ public sealed class RaycastSegmentWorker
         if (!MeshUtils.IsPointInTrianglePlane(first, second, third, normal, localPoint))
             return false;
 
-        AddTriangleIntersectionPoint(mesh.ConvertLocalToWorld(localPoint), ref outputIntersectionPoints);
+        AddIntersectionPoint(mesh.ConvertLocalToWorld(localPoint), ref outputIntersectionPoints);
         return true;
     }
 
-    private void AddTriangleIntersectionPoint(Vector3d point, ref SwiftList<Vector3d> outputIntersectionPoints)
+    private void AddIntersectionPoint(Vector3d point, ref SwiftList<Vector3d> outputIntersectionPoints)
     {
         if (!_calculateIntersections)
             return;
@@ -579,17 +479,8 @@ public sealed class RaycastSegmentWorker
         Vector3d localPoint,
         ref SwiftList<Vector3d> outputIntersectionPoints)
     {
-        if (!_calculateIntersections)
-            return;
-
         Vector3d worldPoint = center + rotation * localPoint;
-        for (int i = 0; i < outputIntersectionPoints.Count; i++)
-        {
-            if (Vector3d.DistanceSquared(outputIntersectionPoints[i], worldPoint) <= Fixed64.Epsilon)
-                return;
-        }
-
-        outputIntersectionPoints.Add(worldPoint);
+        AddIntersectionPoint(worldPoint, ref outputIntersectionPoints);
     }
 
     private bool CheckPointInsideSphere(
@@ -628,7 +519,7 @@ public sealed class RaycastSegmentWorker
         outputIntersectionPoints.Add(new FixedSegment(_cachedOrigin, _cachedEnd)
             .GetPointAtDistance(distance, _segmentLength));
 
-    private void AddSphereIntersectionPoint(
+    private void AddSegmentParameterIntersectionPoint(
         Fixed64 parameter,
         ref SwiftList<Vector3d> outputIntersectionPoints) =>
         outputIntersectionPoints.Add(

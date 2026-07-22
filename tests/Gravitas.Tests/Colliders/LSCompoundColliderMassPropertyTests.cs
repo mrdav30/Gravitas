@@ -242,6 +242,7 @@ public sealed class LSCompoundColliderMassPropertyTests
         scenario.CreateBody(compound, Vector3d.Zero, FixedQuaternion.Identity);
         var cone = (LSConeCollider)compound.GetPartCollider(0);
 
+        cone.Axis.Should().Be(Vector3d.Up);
         cone.CalculateMassPropertyWeight().Should().Be(Fixed64.Zero);
         cone.ClosestPointOnSurface(Vector3d.Right)
             .Should().Be(new Vector3d(Fixed64.FromRaw(1), Fixed64.Zero, Fixed64.Zero));
