@@ -406,10 +406,11 @@ public sealed class RaycastSegmentWorker
         Fixed64 localSegmentLengthSqr,
         ref SwiftList<Vector3d> outputIntersectionPoints)
     {
+        var triangle = new FixedTriangle(first, second, third);
         if (localSegmentLengthSqr == Fixed64.Zero)
         {
             if (Vector3d.Dot(localOrigin - first, normal).Abs() > Fixed64.Epsilon
-                || !MeshUtils.IsPointInTrianglePlane(first, second, third, normal, localOrigin))
+                || !triangle.ContainsProjection(localOrigin))
             {
                 return false;
             }
@@ -425,13 +426,13 @@ public sealed class RaycastSegmentWorker
                 return false;
 
             bool found = false;
-            if (MeshUtils.IsPointInTrianglePlane(first, second, third, normal, localOrigin))
+            if (triangle.ContainsProjection(localOrigin))
             {
                 AddIntersectionPoint(mesh.ConvertLocalToWorld(localOrigin), ref outputIntersectionPoints);
                 found = true;
             }
 
-            if (MeshUtils.IsPointInTrianglePlane(first, second, third, normal, localEnd))
+            if (triangle.ContainsProjection(localEnd))
             {
                 AddIntersectionPoint(mesh.ConvertLocalToWorld(localEnd), ref outputIntersectionPoints);
                 found = true;
@@ -445,7 +446,7 @@ public sealed class RaycastSegmentWorker
             return false;
 
         Vector3d localPoint = localOrigin + localSegmentDirection * distance;
-        if (!MeshUtils.IsPointInTrianglePlane(first, second, third, normal, localPoint))
+        if (!triangle.ContainsProjection(localPoint))
             return false;
 
         AddIntersectionPoint(mesh.ConvertLocalToWorld(localPoint), ref outputIntersectionPoints);

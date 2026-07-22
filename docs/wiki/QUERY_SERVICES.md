@@ -41,6 +41,13 @@ flowchart LR
 | Cone volume                     | `Query3D.OverlapCone(...)`                                                                      | `Query3D.OverlapConeAll(...)` |
 | X/Z circle proximity            | `OverlapCircle`, `OverlapCircleInDirection`                                                     | `OverlapCircleAll`            |
 
+Concave-mesh cone overlap reduces every candidate through FixedMathSharp's
+full-domain `FixedTriangle` contract. Stable AB, BC, CA boundary candidates and
+the exact face-interior candidate are compared before final hit narrowing, so a
+cone section wholly contained by a large triangle is not dependent on an edge
+crossing or an axis/face intersection. Equal-distance mesh hits retain triangle
+index order, and the warmed query path remains allocation-free.
+
 ### 2D Queries
 
 | Family                 | Closest hit                   | All hits                         |

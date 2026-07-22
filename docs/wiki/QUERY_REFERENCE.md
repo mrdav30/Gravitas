@@ -209,13 +209,12 @@ can skip one additional collider.
 `OverlapCone` and `OverlapConeAll` query an apex-origin finite cone volume.
 Supported convex targets use deterministic support-mapped cone-volume
 intersection. Compound targets scan parts in stable authored order and report
-the owner once. Concave-mesh triangle edges use the shared exact finite-cone
-point interval. Its high-resolution authored-chord interpolation keeps
-spatially distinct witnesses on very long edges; the admitted interval remains
-authoritative if the final lattice point rounds just outside a continuous
-sub-raw boundary. Triangle face-interior intersections with no edge crossing
-remain separately tracked; the current axis/triangle fallback only covers the
-subset where the cone axis itself pierces the triangle.
+the owner once. Concave meshes delegate each candidate to FixedMathSharp's
+full-domain finite-cone/triangle reducer. It compares stable AB, BC, CA edge
+candidates with the exact face-interior candidate before returning one
+maximum-scale lattice witness, so a cone section wholly contained by a triangle
+does not require an edge crossing or an axis/face intersection. Exact ties keep
+edge order, and equal-distance mesh hits keep triangle index order.
 
 The 3D `OverlapCircle` family is an X/Z proximity query for 3D colliders. It is
 not a `Query2D` call, not a swept circle, and not a swept sphere.

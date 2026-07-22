@@ -38,20 +38,23 @@ instead of burying it in notes.
 
 ## Recently Completed
 
-- [`Full-Domain Conic Query Arithmetic`](issue-tracker.md#conic-query-quadratics-remain-full-domain-until-final-hit-narrowing)
-  - Completed 2026-07-21. FixedMathSharp now owns exact allocation-free
+- [`Full-Domain Conic Query And Triangle Arithmetic`](issue-tracker.md#cone-triangle-face-interiors-are-reduced-without-edge-crossings)
+  - Completed 2026-07-22. FixedMathSharp now owns exact allocation-free
     finite-cone segment intervals for apex-authored and centered cones, while
     Gravitas consumes distance intervals for cone-collider raycasts and
-    high-resolution point intervals for concave-mesh edge reduction. Extreme
+    high-resolution point intervals for concave-mesh edge reduction.
+    `FixedTriangle` separately owns exact projected containment plus
+    face-interior cone hits even when no edge or cone axis crosses the triangle.
+    Extreme
     coordinates, clipped opposite lobes, roots near half-even boundaries,
-    non-cardinal authored endpoint contact, long-edge spatial witnesses, and
-    tiny nonzero segments retain full-domain behavior. The
-    authoritative Gravitas Release artifact passes 3,248 tests at 100% line,
-    branch, and method coverage; ReleaseLean passes 3,193 tests. FixedMathSharp
-    also retains exact 100% coverage. The final warmed 64-target cone raycast,
-    concave-mesh overlap, and oblique long/narrow bounds rows remain
-    allocation-free; the geometrically distinct cone/triangle face-interior
-    case stays explicitly queued for its own hardening.
+    non-cardinal authored endpoint contact, long-edge spatial witnesses,
+    triangle feature ties, and tiny nonzero segments retain full-domain
+    behavior. The authoritative Gravitas Release artifact passes 3,238 tests at
+    100% line, branch, and method coverage; ReleaseLean passes 3,183 tests.
+    FixedMathSharp passes 1,714 Release and 1,693 ReleaseLean tests plus eight
+    Chronicler tests in each configuration at exact 100% coverage. The final
+    warmed cone raycast, concave-mesh overlap, mesh/cone collision, and oblique
+    long/narrow bounds rows remain allocation-free.
 - [`Body Motion Type And Solver Mobility Hardening`](done/2026-07-20-body-motion-type-and-solver-mobility-plan.md)
   - Completed 2026-07-20. Adds explicit Dynamic, Kinematic, and Static body
     roles while keeping translation and rotation freeze constraints

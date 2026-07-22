@@ -113,30 +113,35 @@ public sealed class GravitasQuery3DServiceConeTests
     }
 
     [Fact]
-    public void TryBuildConeTriangleHit_NearUnitAxis_ShouldReportParametricAxialDistance()
+    public void OverlapCone_WithConcaveFaceInteriorTangencyAndNoEdgeCrossing_ShouldHit()
     {
-        var direction = new Vector3d(
-            Fixed64.One - Fixed64.Epsilon * Fixed64.Half,
-            Fixed64.Zero,
-            Fixed64.Zero);
-        var ray = new FixedMathSharp.Bounds.FixedRay(Vector3d.Zero, direction);
-        ray.TryGetPoint(Fixed64.Two, out Vector3d planeCenter).Should().BeTrue();
-        Fixed64 tenth = Fixed64.FromFraction(1, 10);
-
-        bool found = GravitasQuery3DService.TryBuildConeTriangleHit(
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSMeshCollider mesh = scenario.CreateBody(
+            new LSMeshCollider(
+                new[]
+                {
+                    new Vector3d(Fixed64.One, (Fixed64)(-10), (Fixed64)(-10)),
+                    new Vector3d(Fixed64.One, (Fixed64)(-10), (Fixed64)10),
+                    new Vector3d(Fixed64.One, (Fixed64)20, Fixed64.Zero),
+                },
+                new[] { 0, 1, 2 },
+                MeshColliderMode.Concave,
+                MeshInertiaPolicy.SurfaceApproximation),
             Vector3d.Zero,
-            direction,
-            (Fixed64)4,
-            Fixed64.Two,
-            planeCenter + new Vector3d(Fixed64.Zero, -tenth, -tenth),
-            planeCenter + new Vector3d(Fixed64.Zero, tenth, -tenth),
-            planeCenter + new Vector3d(Fixed64.Zero, Fixed64.Zero, tenth),
-            Vector3d.Right,
-            out _,
-            out Fixed64 axialDistance);
+            FixedQuaternion.Identity).Collider;
+
+        bool found = scenario.Context.Query3D.OverlapCone(
+            Vector3d.Zero,
+            Vector3d.Up,
+            (Fixed64)10,
+            (Fixed64)5,
+            out Physics3DHit hit,
+            IncludeLayerZero);
 
         found.Should().BeTrue();
-        axialDistance.Should().Be(Fixed64.Two);
+        hit.Collider.Should().BeSameAs(mesh);
+        hit.Point.Should().Be(new Vector3d(Fixed64.One, Fixed64.Two, Fixed64.Zero));
+        hit.Distance.Should().Be(Fixed64.Two);
     }
 
     [Fact]
@@ -728,34 +733,6 @@ public sealed class GravitasQuery3DServiceConeTests
         coneHit.Distance.Should().BeGreaterThanOrEqualTo(Fixed64.Zero);
         coneHit.Distance.Should().BeLessThan(Fixed64.FromFraction(1, 1000));
         scenario.Context.Query3D.LastMeshTriangleCandidateCount.Should().Be(1);
-    }
-
-    [Fact]
-    public void ConeTriangle_LongEdgeRetainsSpatiallyDistinctBoundaryWitness()
-    {
-        Fixed64 billion = (Fixed64)1_000_000_000;
-        Vector3d first = new(-billion, Fixed64.One, Fixed64.Zero);
-        Vector3d second = new(billion, Fixed64.One, Fixed64.Zero);
-        Vector3d third = new(billion, Fixed64.One, Fixed64.One);
-
-        bool found = GravitasQuery3DService.TryBuildConeTriangleHit(
-            Vector3d.Zero,
-            Vector3d.Up,
-            (Fixed64)10,
-            Fixed64.One,
-            first,
-            second,
-            third,
-            Vector3d.Down,
-            out Vector3d point,
-            out Fixed64 axialDistance);
-
-        found.Should().BeTrue();
-        point.Should().Be(new Vector3d(
-            -Fixed64.FromFraction(1, 10) + Fixed64.FromRaw(1),
-            Fixed64.One,
-            Fixed64.Zero));
-        axialDistance.Should().Be(Fixed64.One);
     }
 
     [Fact]

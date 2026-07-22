@@ -337,7 +337,8 @@ public sealed class SweptSphereQueryWorker
         sphereCenterAtImpact = Vector3d.Zero;
         impactDistance = Fixed64.MaxValue;
 
-        Vector3d closestAtStart = MeshUtils.ClosestPointOnTriangle(first, second, third, normal, _start);
+        var triangle = new FixedTriangle(first, second, third);
+        Vector3d closestAtStart = triangle.ClosestPoint(_start);
         if (Vector3d.DistanceSquared(_start, closestAtStart) <= _radius * _radius)
         {
             sphereCenterAtImpact = _start;
@@ -347,13 +348,13 @@ public sealed class SweptSphereQueryWorker
 
         bool found = false;
         found |= TryKeepEarlierSweep(
-            TrySweepTriangleFace(first, second, third, normal, _radius, out Vector3d frontHit, out Fixed64 frontDistance),
+            TrySweepTriangleFace(triangle, normal, _radius, out Vector3d frontHit, out Fixed64 frontDistance),
             frontHit,
             frontDistance,
             ref sphereCenterAtImpact,
             ref impactDistance);
         found |= TryKeepEarlierSweep(
-            TrySweepTriangleFace(first, second, third, normal, -_radius, out Vector3d backHit, out Fixed64 backDistance),
+            TrySweepTriangleFace(triangle, normal, -_radius, out Vector3d backHit, out Fixed64 backDistance),
             backHit,
             backDistance,
             ref sphereCenterAtImpact,
@@ -399,9 +400,7 @@ public sealed class SweptSphereQueryWorker
     }
 
     private bool TrySweepTriangleFace(
-        Vector3d first,
-        Vector3d second,
-        Vector3d third,
+        FixedTriangle triangle,
         Vector3d normal,
         Fixed64 signedRadius,
         out Vector3d sphereCenterAtImpact,
@@ -414,14 +413,14 @@ public sealed class SweptSphereQueryWorker
         if (denominator.Abs() <= Fixed64.Epsilon)
             return false;
 
-        Fixed64 signedStartDistance = Vector3d.Dot(_start - first, normal);
+        Fixed64 signedStartDistance = Vector3d.Dot(_start - triangle.A, normal);
         Fixed64 distance = (signedRadius - signedStartDistance) / denominator;
         if (distance < Fixed64.Zero || distance > _length)
             return false;
 
         Vector3d center = _start + _direction * distance;
         Vector3d pointOnPlane = center - normal * signedRadius;
-        if (!MeshUtils.IsPointInTrianglePlane(first, second, third, normal, pointOnPlane))
+        if (!triangle.ContainsProjection(pointOnPlane))
             return false;
 
         sphereCenterAtImpact = center;

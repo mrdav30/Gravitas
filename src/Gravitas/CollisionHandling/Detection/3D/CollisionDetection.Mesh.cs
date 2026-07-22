@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using FixedMathSharp.Bounds;
 using Gravitas.Colliders;
 using System;
 
@@ -187,12 +188,7 @@ public static partial class CollisionDetection
             }
 
             KeepClosestFeaturePoint(
-                MeshUtils.ClosestPointOnTriangle(
-                    first,
-                    second,
-                    third,
-                    physicsMesh.GetFaceNormalWorld(i),
-                    target),
+                new FixedTriangle(first, second, third).ClosestPoint(target),
                 target,
                 ref closest,
                 ref closestDistanceSquared);

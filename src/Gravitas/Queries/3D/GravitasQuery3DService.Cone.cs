@@ -330,20 +330,19 @@ public sealed partial class GravitasQuery3DService
             int triangleIndex = _meshTriangleCandidates[i];
             mesh.Mesh.GetTriangleVertices(triangleIndex, out Vector3d first, out Vector3d second, out Vector3d third);
             Vector3d normal = mesh.Mesh.GetFaceNormalWorld(triangleIndex);
-            if (!TryBuildConeTriangleHit(
+            if (!new FixedTriangle(first, second, third).TryGetFiniteConeIntersectionMinimumAxialPoint(
                     origin,
                     direction,
                     length,
                     endRadius,
-                    first,
-                    second,
-                    third,
-                    normal,
-                    out Vector3d point,
-                    out Fixed64 axialDistance))
+                    out Vector3d point))
             {
                 continue;
             }
+
+            Fixed64 axialDistance = FixedMath.Min(
+                Vector3d.ProjectNonNegativeDifferenceParameter(point, origin, direction),
+                length);
 
             if (found
                 && (axialDistance > bestDistance
@@ -360,119 +359,6 @@ public sealed partial class GravitasQuery3DService
 
         hit = best;
         return found;
-    }
-
-    internal static bool TryBuildConeTriangleHit(
-        Vector3d origin,
-        Vector3d direction,
-        Fixed64 length,
-        Fixed64 endRadius,
-        Vector3d first,
-        Vector3d second,
-        Vector3d third,
-        Vector3d normal,
-        out Vector3d point,
-        out Fixed64 axialDistance)
-    {
-        bool found = false;
-        Vector3d bestPoint = default;
-        Fixed64 bestAxialDistance = Fixed64.MaxValue;
-
-        TryKeepConeTriangleSegment(origin, direction, length, endRadius, first, second, ref found, ref bestPoint, ref bestAxialDistance);
-        TryKeepConeTriangleSegment(origin, direction, length, endRadius, second, third, ref found, ref bestPoint, ref bestAxialDistance);
-        TryKeepConeTriangleSegment(origin, direction, length, endRadius, third, first, ref found, ref bestPoint, ref bestAxialDistance);
-        TryKeepConeAxisTriangleIntersection(origin, direction, length, first, second, third, normal, ref found, ref bestPoint, ref bestAxialDistance);
-
-        point = bestPoint;
-        axialDistance = bestAxialDistance;
-        return found;
-    }
-
-    private static void TryKeepConeTriangleSegment(
-        Vector3d origin,
-        Vector3d direction,
-        Fixed64 length,
-        Fixed64 endRadius,
-        Vector3d start,
-        Vector3d end,
-        ref bool found,
-        ref Vector3d bestPoint,
-        ref Fixed64 bestAxialDistance)
-    {
-        var segment = new FixedSegment(start, end);
-        if (!segment.TryGetFiniteConeIntersectionMinimumAxialPoint(
-                origin,
-                direction,
-                length,
-                endRadius,
-                out Vector3d point))
-        {
-            return;
-        }
-
-        TryKeepConeTriangleSegmentPoint(
-            origin,
-            direction,
-            length,
-            point,
-            ref found,
-            ref bestPoint,
-            ref bestAxialDistance);
-    }
-
-    private static void TryKeepConeTriangleSegmentPoint(
-        Vector3d origin,
-        Vector3d direction,
-        Fixed64 length,
-        Vector3d point,
-        ref bool found,
-        ref Vector3d bestPoint,
-        ref Fixed64 bestAxialDistance)
-    {
-        // The exact interval is authoritative: its high-resolution lattice
-        // witness may still round just outside a continuous sub-raw boundary.
-        Fixed64 axialDistance = FixedMath.Min(
-            Vector3d.ProjectNonNegativeDifferenceParameter(point, origin, direction),
-            length);
-        if (found && axialDistance >= bestAxialDistance)
-            return;
-
-        bestPoint = point;
-        bestAxialDistance = axialDistance;
-        found = true;
-    }
-
-    private static void TryKeepConeAxisTriangleIntersection(
-        Vector3d origin,
-        Vector3d direction,
-        Fixed64 length,
-        Vector3d first,
-        Vector3d second,
-        Vector3d third,
-        Vector3d normal,
-        ref bool found,
-        ref Vector3d bestPoint,
-        ref Fixed64 bestAxialDistance)
-    {
-        Fixed64 denominator = Vector3d.Dot(normal, direction);
-        if (denominator.Abs() <= Fixed64.Epsilon)
-            return;
-
-        Fixed64 axialDistance = Vector3d.Dot(normal, first - origin) / denominator;
-        if (axialDistance < -Fixed64.Epsilon || axialDistance > length + Fixed64.Epsilon)
-            return;
-
-        axialDistance = FixedMath.Clamp(axialDistance, Fixed64.Zero, length);
-        Vector3d point = new FixedRay(origin, direction).GetPoint(axialDistance);
-        if (!MeshUtils.IsPointInTrianglePlane(first, second, third, normal, point))
-            return;
-
-        if (found && axialDistance >= bestAxialDistance)
-            return;
-
-        bestPoint = point;
-        bestAxialDistance = axialDistance;
-        found = true;
     }
 
     private bool TryBuildConeHitForCompound(

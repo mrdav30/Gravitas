@@ -175,7 +175,7 @@ public static partial class CollisionDetectionMixed
         }
 
         Vector3d embeddedPoint = MixedEmbedded2DGeometry.GetClosestPointOnEmbeddedVolume(prism, triangle.Center);
-        Vector3d trianglePoint = MeshUtils.ClosestPointOnTriangle(triangle.A, triangle.B, triangle.C, triangle.Normal, embeddedPoint);
+        Vector3d trianglePoint = triangle.Triangle.ClosestPoint(embeddedPoint);
         if (!CheckTrianglePrismAxis(triangle, prism, embeddedPoint - trianglePoint, ref penetration))
             return false;
 
@@ -247,7 +247,7 @@ public static partial class CollisionDetectionMixed
         out MixedContact contact)
     {
         Vector3d embeddedCenter = GetEmbeddedCenter3D(embedded);
-        Vector3d point3D = MeshUtils.ClosestPointOnTriangle(triangle.A, triangle.B, triangle.C, triangle.Normal, embeddedCenter);
+        Vector3d point3D = triangle.Triangle.ClosestPoint(embeddedCenter);
         Vector3d point2D = MixedEmbedded2DGeometry.GetClosestPointOnEmbeddedVolume(embedded, point3D);
         contact = new MixedContact(point3D, point2D, penetration.Axis, penetration.Depth);
     }
@@ -260,7 +260,7 @@ public static partial class CollisionDetectionMixed
         out Vector3d pointOnTriangle)
     {
         pointOnSegment = segmentStart;
-        pointOnTriangle = MeshUtils.ClosestPointOnTriangle(triangle.A, triangle.B, triangle.C, triangle.Normal, segmentStart);
+        pointOnTriangle = triangle.Triangle.ClosestPoint(segmentStart);
         Fixed64 bestDistanceSqr = Vector3d.DistanceSquared(pointOnSegment, pointOnTriangle);
 
         Vector3d segment = segmentEnd - segmentStart;
@@ -271,7 +271,7 @@ public static partial class CollisionDetectionMixed
             if (t >= Fixed64.Zero && t <= Fixed64.One)
             {
                 Vector3d intersection = segmentStart + segment * t;
-                if (MeshUtils.IsPointInTrianglePlane(triangle.A, triangle.B, triangle.C, triangle.Normal, intersection))
+                if (triangle.Triangle.ContainsProjection(intersection))
                 {
                     pointOnSegment = intersection;
                     pointOnTriangle = intersection;
@@ -293,7 +293,7 @@ public static partial class CollisionDetectionMixed
         ref Vector3d pointOnTriangle,
         ref Fixed64 bestDistanceSqr)
     {
-        Vector3d candidate = MeshUtils.ClosestPointOnTriangle(triangle.A, triangle.B, triangle.C, triangle.Normal, point);
+        Vector3d candidate = triangle.Triangle.ClosestPoint(point);
         Fixed64 distanceSqr = Vector3d.DistanceSquared(point, candidate);
         if (distanceSqr >= bestDistanceSqr)
             return;

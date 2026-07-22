@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using FixedMathSharp.Bounds;
 using Gravitas.Colliders;
 using SwiftCollections.Query;
 using System.Runtime.CompilerServices;
@@ -117,13 +118,8 @@ public static partial class CollisionDetection
             int triangleIndex = triangleBuffer[i];
             mesh.Mesh.GetTriangleVertices(triangleIndex, out Vector3d first, out Vector3d second, out Vector3d third);
             Vector3d windingNormal = mesh.Mesh.GetFaceNormalWorld(triangleIndex);
-            // Triangle containment is winding-sensitive, while the contact normal may face either side.
-            Vector3d candidatePointOnMesh = MeshUtils.ClosestPointOnTriangle(
-                first,
-                second,
-                third,
-                windingNormal,
-                cone.Center);
+            var triangle = new FixedTriangle(first, second, third);
+            Vector3d candidatePointOnMesh = triangle.ClosestPoint(cone.Center);
             Vector3d candidateNormalMeshToCone = OrientNormal(
                 windingNormal,
                 cone.Center - candidatePointOnMesh).Normalized;
@@ -132,10 +128,7 @@ public static partial class CollisionDetection
             if (!closestMeshPointInsideCone
                 && !TryFindConeTriangleSupportContact(
                     cone,
-                    first,
-                    second,
-                    third,
-                    windingNormal,
+                    in triangle,
                     candidateNormalMeshToCone,
                     out candidatePointOnMesh,
                     out candidatePointOnCone))
@@ -146,12 +139,7 @@ public static partial class CollisionDetection
             if (closestMeshPointInsideCone)
                 candidatePointOnCone = cone.ClosestPointOnSurface(candidatePointOnMesh);
             else
-                candidatePointOnMesh = MeshUtils.ClosestPointOnTriangle(
-                    first,
-                    second,
-                    third,
-                    windingNormal,
-                    candidatePointOnCone);
+                candidatePointOnMesh = triangle.ClosestPoint(candidatePointOnCone);
 
             Fixed64 candidateDepth = Vector3d.Distance(candidatePointOnMesh, candidatePointOnCone);
             if (found && candidateDepth >= bestDepth)
@@ -170,22 +158,19 @@ public static partial class CollisionDetection
 
     private static bool TryFindConeTriangleSupportContact(
         LSConeCollider cone,
-        Vector3d first,
-        Vector3d second,
-        Vector3d third,
-        Vector3d windingNormal,
+        in FixedTriangle triangle,
         Vector3d normalMeshToCone,
         out Vector3d pointOnMesh,
         out Vector3d pointOnCone)
     {
         pointOnMesh = Vector3d.Zero;
         pointOnCone = ConvexColliderSupport.Support(cone, -normalMeshToCone);
-        Fixed64 signedDistance = Vector3d.Dot(pointOnCone - first, normalMeshToCone);
+        Fixed64 signedDistance = Vector3d.Dot(pointOnCone - triangle.A, normalMeshToCone);
         if (signedDistance > Fixed64.Epsilon)
             return false;
 
         pointOnMesh = pointOnCone - normalMeshToCone * signedDistance;
-        return MeshUtils.IsPointInTrianglePlane(first, second, third, windingNormal, pointOnMesh);
+        return triangle.ContainsProjection(pointOnMesh);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

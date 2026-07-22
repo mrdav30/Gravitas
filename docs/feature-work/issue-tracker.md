@@ -37,57 +37,29 @@ records follow with their original discovery context.
 - GridForge's runtime-identity defect is resolved. Keep the lower stack locally
   linked while the remaining Gravitas queue is hardened so another downstream
   discovery does not force a partial release cycle.
-- Gravitas's current authoritative coverage-enabled Release run passes 3,248
-  tests and reports 33,825/33,825 lines, 12,163/12,163 branches, and
-  4,200/4,200 methods for hand-authored source.
+- Gravitas's current authoritative coverage-enabled Release run passes 3,238
+  tests and reports 33,732/33,732 lines, 12,133/12,133 branches, and
+  4,191/4,191 ReportGenerator methods for hand-authored source.
 - After the Gravitas queue closes, release the lower stack in dependency order,
   replace local links with released packages at each layer, and rerun Gravitas
   `Release`, `ReleaseLean`, coverage, replay, and relevant benchmark gates.
 
 ### Ordered Queue
 
-1. **FixedMathSharp / Gravitas:**
-   [Cone-Triangle Face Interiors Can Be Missed Without Edge Crossings](#cone-triangle-face-interiors-can-be-missed-without-edge-crossings).
-2. **Gravitas — exact swept-sphere dilation for finite extrusions:**
+1. **Gravitas — exact swept-sphere dilation for finite extrusions:**
    [Swept-Sphere Cylinder Dilation Uses A Sharp Rim Proxy](#swept-sphere-cylinder-dilation-uses-a-sharp-rim-proxy),
    then
    [Swept-Sphere Capsule-Slab Rim Dilation Overexpands The Rounded Boundary](#swept-sphere-capsule-slab-rim-dilation-overexpands-the-rounded-boundary).
-3. **Gravitas:**
+2. **Gravitas:**
    [Finite-Slab Projection Support Math Is Not Full-Domain](#finite-slab-projection-support-math-is-not-full-domain).
-4. **Gravitas — canonical collider geometry and exact scale admission:**
+3. **Gravitas — canonical collider geometry and exact scale admission:**
    [Authored Collider Dimensions Can Saturate During Host-Scale Composition](#authored-collider-dimensions-can-saturate-during-host-scale-composition),
    then
    [Finite-Axis Collider Endpoint Snapshots Can Deform Scalar-Boundary Geometry](#finite-axis-collider-endpoint-snapshots-can-deform-scalar-boundary-geometry),
    then
    [Oriented Cuboid Boundary Proxies Can Deform Scalar-Face Geometry](#oriented-cuboid-boundary-proxies-can-deform-scalar-face-geometry).
-5. **FixedMathSharp / Gravitas:**
+4. **FixedMathSharp / Gravitas:**
    [Radial Segment Parameters Can Collapse Spatially Distinct Query Hits](#radial-segment-parameters-can-collapse-spatially-distinct-query-hits).
-
-### Cone-Triangle Face Interiors Can Be Missed Without Edge Crossings
-
-**Discovered:** 2026-07-21  
-**Source:** conic-query full-domain migration  
-**Affected area:** concave-mesh cone-volume reduction,
-`GravitasQuery3DService.TryKeepConeAxisTriangleIntersection`,
-`MeshUtils.IsPointInTrianglePlane`, and FixedMathSharp `FixedTriangle`
-
-A large mesh triangle can contain part of a cone without any triangle edge
-crossing the cone boundary. The retained axis/triangle fallback owns the subset
-where the axis pierces the triangle, but it cannot detect an interior cone-face
-intersection when the triangle plane is parallel to or offset from the axis.
-For example, a sufficiently large triangle in the plane `X = 1` can contain a
-cone cross-section while neither its edges nor the cone axis intersect the
-triangle. The fallback also intersects the triangle plane and classifies its
-projected point through ordinary saturating `Fixed64` products, so extreme
-representable triangles can lose an otherwise valid interior hit.
-
-Design an exact finite-cone/triangle face-interior reducer rather than extending
-the axis-only fallback. Move reusable plane and projected-triangle predicates
-into FixedMathSharp `FixedTriangle`, retaining wide differences, cross/dot
-products, and barycentric or oriented-edge classification until one final public
-narrowing. Cover axis-piercing and axis-parallel interior hits with no edge
-crossing, extreme same-sign and opposite-sign coordinates, strict miss/contact
-separation, stable triangle ordering, and warmed zero allocation.
 
 ### Swept-Sphere Cylinder Dilation Uses A Sharp Rim Proxy
 
@@ -286,6 +258,50 @@ zero-allocation behavior. Keep this separate from sphere construction/merge
 and conic-quadratic ownership.
 
 ## Resolved Issues
+
+### Cone-Triangle Face Interiors Are Reduced Without Edge Crossings
+
+**Discovered:** 2026-07-21  
+**Resolved:** 2026-07-22  
+**Source:** conic-query full-domain migration  
+**Affected area:** FixedMathSharp `FixedTriangle`; Gravitas concave-mesh cone
+queries and shared mesh-triangle geometry consumers
+
+FixedMathSharp now owns the complete apex-authored finite-cone/triangle
+contract. `FixedTriangle.TryGetFiniteConeIntersectionMinimumAxialPoint(...)`
+compares stable AB, BC, CA boundary candidates with the exact face-interior
+candidate, while `ContainsProjection(...)` classifies projected barycentric
+signs without narrowing. Plane construction, cone coefficients, half-space
+tests, and full-domain witnesses remain in fixed-width wide arithmetic. Normal
+faces retain the existing closed-form `Signed832` root path; coefficients whose
+discriminant products exceed that proven width use an exact, allocation-free
+63-step midpoint bisection over the maximum-scale parameter lattice. Edge/face
+boundary cells require both bracketing lattice points to remain inside the face,
+so stable edge ownership wins an ambiguous same-cell tie.
+
+Gravitas delegates concave mesh candidates directly to the shared triangle
+reducer and no longer owns the incomplete edge-plus-axis fallback. All mesh
+closest-point and projected-containment callers now use `FixedTriangle`, which
+also removes the public `MeshUtils` wrapper and its wrapper-only tests. This
+deletes the winding-normal misuse surface and reduces the Gravitas change by
+roughly 300 net lines while improving the reusable lower-layer contract. The
+problem is 3D-specific; there is no 2D cone/mesh parity path to duplicate.
+
+Regression coverage includes parallel and oblique face interiors without edge
+crossings, face hits preceding later edges, exact edge/face ties, maximum-scale
+root-cell ownership, perpendicular and out-of-range planes, zero-radius cones,
+near-unit axes, cap contact versus one-unit miss, degenerate and reversed
+triangles, and raw-domain coefficient/root cases. FixedMathSharp passes 1,714
+Release and 1,693 ReleaseLean tests plus eight Chronicler tests in each
+configuration at 13,060/13,060 lines, 4,184/4,184 branches, and 1,920/1,920
+ReportGenerator methods. Gravitas passes 3,238 Release and 3,183 ReleaseLean
+tests at 33,732/33,732 lines, 12,133/12,133 branches, and 4,191/4,191
+ReportGenerator methods.
+
+The final warmed 64-target concave-mesh cone query remains statistically flat
+at 4.189 ms versus the 4.118 ms baseline, with zero managed allocation. The
+representative 64-pair mesh/cone collision row reports 236.6 microseconds with
+zero managed allocation.
 
 ### Conic Query Quadratics Remain Full-Domain Until Final Hit Narrowing
 

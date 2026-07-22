@@ -97,8 +97,8 @@ internal static class MeshTriangleContactGenerator
                 if (!TryTestTriangles(first, second, meshB.Center - meshA.Center, out Vector3d normal, out Fixed64 depth))
                     continue;
 
-                Vector3d pointA = MeshUtils.ClosestPointOnTriangle(first.A, first.B, first.C, first.Normal, second.Center);
-                Vector3d pointB = MeshUtils.ClosestPointOnTriangle(second.A, second.B, second.C, second.Normal, pointA);
+                Vector3d pointA = first.Triangle.ClosestPoint(second.Center);
+                Vector3d pointB = second.Triangle.ClosestPoint(pointA);
                 if (Vector3d.DistanceSquared(pointA, pointB) <= Fixed64.Epsilon)
                     pointB = pointA - normal * depth;
 
@@ -116,7 +116,7 @@ internal static class MeshTriangleContactGenerator
         LSSphereCollider sphere)
     {
         GetTriangle(mesh, triangleIndex, out CollisionTriangle triangle);
-        Vector3d pointOnMesh = MeshUtils.ClosestPointOnTriangle(triangle.A, triangle.B, triangle.C, triangle.Normal, sphere.Center);
+        Vector3d pointOnMesh = triangle.Triangle.ClosestPoint(sphere.Center);
         Vector3d delta = sphere.Center - pointOnMesh;
         Fixed64 distanceSqr = delta.MagnitudeSquared;
         if (distanceSqr > sphere.ScaledRadiusSqr + Fixed64.Epsilon)
@@ -174,7 +174,7 @@ internal static class MeshTriangleContactGenerator
         if (TryAddCuboidFaceContacts(pair, mesh, triangle, cuboid, normal, depth))
             return;
 
-        Vector3d pointOnMesh = MeshUtils.ClosestPointOnTriangle(triangle.A, triangle.B, triangle.C, triangle.Normal, cuboid.Center);
+        Vector3d pointOnMesh = triangle.Triangle.ClosestPoint(cuboid.Center);
         Vector3d pointOnCuboid = pointOnMesh - normal * depth;
         AddContact(pair, pointOnMesh, pointOnCuboid, depth, normal);
     }
@@ -190,7 +190,7 @@ internal static class MeshTriangleContactGenerator
         if (TryAddCylinderCapTriangleContacts(pair, mesh, triangle, cylinder, normal))
             return;
 
-        Vector3d pointOnMesh = MeshUtils.ClosestPointOnTriangle(triangle.A, triangle.B, triangle.C, triangle.Normal, cylinder.Center);
+        Vector3d pointOnMesh = triangle.Triangle.ClosestPoint(cylinder.Center);
         if (!IsPointInsideCylinder(cylinder, pointOnMesh))
             return;
 
@@ -223,7 +223,7 @@ internal static class MeshTriangleContactGenerator
                 continue;
 
             Vector3d pointOnMesh = pointOnCuboid + normal * depth;
-            if (!MeshUtils.IsPointInTrianglePlane(triangle.A, triangle.B, triangle.C, triangle.Normal, pointOnMesh))
+            if (!triangle.Triangle.ContainsProjection(pointOnMesh))
                 continue;
 
             AddContact(pair, pointOnMesh, pointOnCuboid, depth, normal);
@@ -272,7 +272,7 @@ internal static class MeshTriangleContactGenerator
         Vector3d normal)
     {
         Vector3d pointOnMesh = pointOnCylinder + normal * depth;
-        if (!MeshUtils.IsPointInTrianglePlane(triangle.A, triangle.B, triangle.C, triangle.Normal, pointOnMesh))
+        if (!triangle.Triangle.ContainsProjection(pointOnMesh))
             return;
 
         AddContact(pair, pointOnMesh, pointOnCylinder, depth, normal);
@@ -442,7 +442,7 @@ internal static class MeshTriangleContactGenerator
         out Vector3d pointOnTriangle)
     {
         pointOnSegment = segmentStart;
-        pointOnTriangle = MeshUtils.ClosestPointOnTriangle(triangle.A, triangle.B, triangle.C, triangle.Normal, segmentStart);
+        pointOnTriangle = triangle.Triangle.ClosestPoint(segmentStart);
         Fixed64 bestDistanceSqr = Vector3d.DistanceSquared(pointOnSegment, pointOnTriangle);
 
         Vector3d segment = segmentEnd - segmentStart;
@@ -453,7 +453,7 @@ internal static class MeshTriangleContactGenerator
             if (t >= Fixed64.Zero && t <= Fixed64.One)
             {
                 Vector3d intersection = segmentStart + segment * t;
-                if (MeshUtils.IsPointInTrianglePlane(triangle.A, triangle.B, triangle.C, triangle.Normal, intersection))
+                if (triangle.Triangle.ContainsProjection(intersection))
                 {
                     pointOnSegment = intersection;
                     pointOnTriangle = intersection;
@@ -475,7 +475,7 @@ internal static class MeshTriangleContactGenerator
         ref Vector3d pointOnTriangle,
         ref Fixed64 bestDistanceSqr)
     {
-        Vector3d candidate = MeshUtils.ClosestPointOnTriangle(triangle.A, triangle.B, triangle.C, triangle.Normal, point);
+        Vector3d candidate = triangle.Triangle.ClosestPoint(point);
         Fixed64 distanceSqr = Vector3d.DistanceSquared(point, candidate);
         if (distanceSqr >= bestDistanceSqr)
             return;
