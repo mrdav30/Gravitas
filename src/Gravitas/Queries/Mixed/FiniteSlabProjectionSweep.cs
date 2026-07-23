@@ -103,15 +103,48 @@ internal static partial class FiniteSlabProjectionSweep
         if (!Vector2d.TryGetMagnitude(direction, out Fixed64 directionMagnitude)
             || (directionMagnitude != Fixed64.Zero
                 && FixedMath.Abs(directionMagnitude - Fixed64.One) > Fixed64.Epsilon)
-            || !target.HasProjection)
+            || maxConservativeAdvancementIterations <= 0
+            || !target.TrySupport(Vector2d.Right, out Vector2d rightSupport)
+            || !TryGetSweepEndpoint(start, direction, length, out Vector2d end))
             return false;
+
+        if (target.TryGetPlanarCircle(rightSupport, out Vector2d targetCenter, out Fixed64 targetRadius))
+        {
+            if (RadialSweepAdmission.TryIntersect(
+                start,
+                direction,
+                length,
+                targetCenter,
+                targetRadius,
+                radius,
+                end,
+                targetCenter,
+                out distance))
+            {
+                return true;
+            }
+
+            if (Fixed64.TryAdd(targetRadius, radius, out Fixed64 combinedRadius)
+                && Fixed64.TryAdd(combinedRadius, SweepContactTolerance, out Fixed64 tolerantRadius))
+            {
+                if (!end.CheckDistance(targetCenter, tolerantRadius))
+                    return false;
+
+                distance = length;
+                return true;
+            }
+        }
 
         Fixed64 travelDistance = Fixed64.Zero;
         for (int i = 0; i < maxConservativeAdvancementIterations; i++)
         {
-            Vector2d point = start + direction * travelDistance;
-            PlanarGjkResult result = ComputeDistance(point, radius, target);
-            if (result.Intersects || result.Distance <= SweepContactTolerance)
+            Vector2d point = GetSweepPoint(start, direction, travelDistance);
+            if (!TryComputeDistance(point, radius, target, out PlanarGjkResult result))
+            {
+                return false;
+            }
+
+            if (result.Distance <= SweepContactTolerance)
             {
                 distance = travelDistance;
                 return true;
@@ -122,12 +155,21 @@ internal static partial class FiniteSlabProjectionSweep
             if (closingSpeed <= Fixed64.Epsilon)
                 return false;
 
-            Fixed64 stepDistance = result.Distance / closingSpeed;
-            travelDistance += stepDistance;
-            if (travelDistance > length)
+            Fixed64 remainingDistance = length - travelDistance;
+            bool reachedEndpoint = !Fixed64.TryMultiplyDivide(
+                    result.Distance,
+                    Fixed64.One,
+                    closingSpeed,
+                    out Fixed64 stepDistance)
+                || stepDistance > remainingDistance;
+            if (reachedEndpoint)
             {
-                PlanarGjkResult endpoint = ComputeDistance(start + direction * length, radius, target);
-                if (endpoint.Intersects || endpoint.Distance <= SweepContactTolerance)
+                if (!TryComputeDistance(end, radius, target, out PlanarGjkResult endpoint))
+                {
+                    return false;
+                }
+
+                if (endpoint.Distance <= SweepContactTolerance)
                 {
                     distance = length;
                     return true;
@@ -135,12 +177,18 @@ internal static partial class FiniteSlabProjectionSweep
 
                 return false;
             }
+
+            travelDistance += stepDistance;
         }
 
         return false;
     }
 
-    private static PlanarGjkResult ComputeDistance(Vector2d point, Fixed64 expansionRadius, ProjectionTarget target)
+    private static bool TryComputeDistance(
+        Vector2d point,
+        Fixed64 expansionRadius,
+        ProjectionTarget target,
+        out PlanarGjkResult result)
     {
         Span<PlanarSupportPoint> simplex = stackalloc PlanarSupportPoint[3];
         int workingShift = GjkSimplexScale.SelectThreeTermShift(
@@ -167,13 +215,17 @@ internal static partial class FiniteSlabProjectionSweep
 
         for (int i = 0; i < MaxGjkIterations; i++)
         {
-            CreateSupportPoint(
-                point,
-                expansionRadius,
-                target,
-                direction,
-                workingShift,
-                out PlanarSupportPoint support);
+            if (!TryCreateSupportPoint(
+                    point,
+                    expansionRadius,
+                    target,
+                    direction,
+                    workingShift,
+                    out PlanarSupportPoint support))
+            {
+                result = default;
+                return false;
+            }
 
             if (ContainsSupportPoint(simplex, simplexCount, support.Point))
                 break;
@@ -188,7 +240,10 @@ internal static partial class FiniteSlabProjectionSweep
             distanceIsRepresentable = Vector2d.TryGetMagnitude(closest.Point, out workingDistance);
             if (closest.Intersects
                 || (distanceIsRepresentable && workingDistance <= workingDistanceTolerance))
-                return PlanarGjkResult.Intersection;
+            {
+                result = PlanarGjkResult.Intersection;
+                return true;
+            }
 
             if (hasPreviousDistance
                 && distanceIsRepresentable
@@ -204,10 +259,11 @@ internal static partial class FiniteSlabProjectionSweep
 
         Fixed64 distance = GjkSimplexScale.RestoreDistance(workingDistance, workingShift);
         Vector2d normal = closest.Point.Normalized;
-        return new PlanarGjkResult(false, distance, normal);
+        result = new PlanarGjkResult(distance, normal);
+        return true;
     }
 
-    private static void CreateSupportPoint(
+    private static bool TryCreateSupportPoint(
         Vector2d point,
         Fixed64 expansionRadius,
         ProjectionTarget target,
@@ -217,11 +273,37 @@ internal static partial class FiniteSlabProjectionSweep
     {
         Vector2d supportDirection = direction.Normalized;
         Vector2d targetDirection = -supportDirection;
-        target.TrySupport(targetDirection, out Vector2d targetSupport);
+        if (!target.TrySupport(targetDirection, out Vector2d targetSupport))
+        {
+            support = default;
+            return false;
+        }
 
         Vector2d expansion = targetDirection * expansionRadius;
         support = new PlanarSupportPoint(
             GjkSimplexScale.CreateWorkingDifference(point, targetSupport, expansion, workingShift));
+        return true;
+    }
+
+    // Endpoint admission proves every monotonic intermediate component is representable.
+    private static Vector2d GetSweepPoint(
+        Vector2d start,
+        Vector2d direction,
+        Fixed64 distance) =>
+        new(
+            Fixed64.MultiplyAdd(direction.X, distance, start.X),
+            Fixed64.MultiplyAdd(direction.Y, distance, start.Y));
+
+    private static bool TryGetSweepEndpoint(
+        Vector2d start,
+        Vector2d direction,
+        Fixed64 length,
+        out Vector2d endpoint)
+    {
+        bool hasX = Fixed64.TryMultiplyAdd(direction.X, length, start.X, out Fixed64 x);
+        bool hasY = Fixed64.TryMultiplyAdd(direction.Y, length, start.Y, out Fixed64 y);
+        endpoint = new Vector2d(x, y);
+        return hasX & hasY;
     }
 
     private static ClosestPlanarSimplexResult SolveClosestSimplex(
@@ -404,8 +486,7 @@ internal static partial class FiniteSlabProjectionSweep
         private readonly LSCapsuleCollider? _capsule;
         private readonly LSCylinderCollider? _cylinder;
         private readonly LSConeCollider? _cone;
-        private readonly Fixed64 _slabMinY;
-        private readonly Fixed64 _slabMaxY;
+        private readonly FixedRange _slabY;
         private readonly Vector2d _center;
 
         private ProjectionTarget(
@@ -419,8 +500,7 @@ internal static partial class FiniteSlabProjectionSweep
             _capsule = capsule;
             _cylinder = cylinder;
             _cone = cone;
-            _slabMinY = slabMinY;
-            _slabMaxY = slabMaxY;
+            _slabY = new FixedRange(slabMinY, slabMaxY);
             _center = center;
         }
 
@@ -433,20 +513,6 @@ internal static partial class FiniteSlabProjectionSweep
         private Vector3d TargetBoundsMin => _capsule?.BoundsMin ?? _cylinder?.BoundsMin ?? _cone!.BoundsMin;
 
         private Vector3d TargetBoundsMax => _capsule?.BoundsMax ?? _cylinder?.BoundsMax ?? _cone!.BoundsMax;
-
-        public bool HasProjection
-        {
-            get
-            {
-                if (_capsule != null)
-                    return CapsuleIntersectsSlab(_capsule, _slabMinY, _slabMaxY);
-
-                if (_cylinder != null)
-                    return CylinderIntersectsSlab(_cylinder, _slabMinY, _slabMaxY);
-
-                return ConeIntersectsSlab(_cone!, _slabMinY, _slabMaxY);
-            }
-        }
 
         public static ProjectionTarget CreateCapsule(LSCapsuleCollider capsule, Fixed64 slabMinY, Fixed64 slabMaxY) =>
             new(capsule, null, null, slabMinY, slabMaxY, new Vector2d(capsule.Center.X, capsule.Center.Z));
@@ -461,474 +527,58 @@ internal static partial class FiniteSlabProjectionSweep
         {
             Vector2d normal = direction.Normalized;
             if (_capsule != null)
-                return TrySupportCapsuleProjection(_capsule, _slabMinY, _slabMaxY, normal, out support);
+            {
+                return FixedSlabProjection.TryGetCapsuleSupport(
+                    _capsule.Center,
+                    _capsule.WorldAxis,
+                    _capsule.AxisHalfLength,
+                    _capsule.ScaledRadius,
+                    _slabY,
+                    normal,
+                    out support);
+            }
 
             if (_cylinder != null)
-                return TrySupportCylinderProjection(_cylinder, _slabMinY, _slabMaxY, normal, out support);
-
-            return TrySupportConeProjection(_cone!, _slabMinY, _slabMaxY, normal, out support);
-        }
-
-    }
-
-    private static bool TrySupportCapsuleProjection(
-        LSCapsuleCollider capsule,
-        Fixed64 slabMinY,
-        Fixed64 slabMaxY,
-        Vector2d direction,
-        out Vector2d support)
-    {
-        Vector3d segment = capsule.LineSegmentEnd - capsule.LineSegmentStart;
-        Fixed64 dy = segment.Y;
-        Fixed64 planarSlope = segment.X * direction.X + segment.Z * direction.Y;
-        bool found = false;
-        Vector2d best = default;
-
-        // The clipped capsule projection is piecewise over the capsule axis:
-        // axis endpoints, slab boundary crossings, and outside-slab stationary
-        // points are the only support extrema for a fixed planar direction.
-        TryKeepCapsuleSupport(capsule, slabMinY, slabMaxY, direction, Fixed64.Zero, ref found, ref best);
-        TryKeepCapsuleSupport(capsule, slabMinY, slabMaxY, direction, Fixed64.One, ref found, ref best);
-        if (dy.Abs() > Fixed64.Epsilon)
-        {
-            AddCapsuleYBoundaryCandidates(capsule, slabMinY, slabMaxY, direction, dy, ref found, ref best);
-            AddCapsuleStationaryCandidate(capsule, slabMinY, direction, planarSlope, dy, belowSlab: true, ref found, ref best);
-            AddCapsuleStationaryCandidate(capsule, slabMaxY, direction, planarSlope, dy, belowSlab: false, ref found, ref best);
-        }
-
-        support = best;
-        return found;
-    }
-
-    private static void AddCapsuleYBoundaryCandidates(
-        LSCapsuleCollider capsule,
-        Fixed64 slabMinY,
-        Fixed64 slabMaxY,
-        Vector2d direction,
-        Fixed64 dy,
-        ref bool found,
-        ref Vector2d best)
-    {
-        Fixed64 startY = capsule.LineSegmentStart.Y;
-        Fixed64 radius = capsule.ScaledRadius;
-        TryKeepCapsuleSupport(capsule, slabMinY, slabMaxY, direction, (slabMinY - radius - startY) / dy, ref found, ref best);
-        TryKeepCapsuleSupport(capsule, slabMinY, slabMaxY, direction, (slabMinY - startY) / dy, ref found, ref best);
-        TryKeepCapsuleSupport(capsule, slabMinY, slabMaxY, direction, (slabMaxY - startY) / dy, ref found, ref best);
-        TryKeepCapsuleSupport(capsule, slabMinY, slabMaxY, direction, (slabMaxY + radius - startY) / dy, ref found, ref best);
-    }
-
-    private static void AddCapsuleStationaryCandidate(
-        LSCapsuleCollider capsule,
-        Fixed64 slabPlaneY,
-        Vector2d direction,
-        Fixed64 planarSlope,
-        Fixed64 dy,
-        bool belowSlab,
-        ref bool found,
-        ref Vector2d best)
-    {
-        Fixed64 excessMagnitude = planarSlope.Abs() * capsule.ScaledRadius / FixedMath.Sqrt(dy * dy + planarSlope * planarSlope);
-        Fixed64 signProbe = belowSlab ? -planarSlope / dy : planarSlope / dy;
-        if (signProbe < Fixed64.Zero)
-            return;
-
-        Fixed64 excess = excessMagnitude;
-        Fixed64 startY = capsule.LineSegmentStart.Y;
-        Fixed64 u = belowSlab
-            ? (slabPlaneY - startY - excess) / dy
-            : (slabPlaneY + excess - startY) / dy;
-        TryKeepCapsuleSupport(capsule, slabPlaneY, slabPlaneY, direction, u, ref found, ref best);
-    }
-
-    private static void TryKeepCapsuleSupport(
-        LSCapsuleCollider capsule,
-        Fixed64 slabMinY,
-        Fixed64 slabMaxY,
-        Vector2d direction,
-        Fixed64 u,
-        ref bool found,
-        ref Vector2d best)
-    {
-        if (!TryClampUnitParameter(u, out Fixed64 clampedU))
-            return;
-
-        Vector3d point = capsule.LineSegmentStart + (capsule.LineSegmentEnd - capsule.LineSegmentStart) * clampedU;
-        Fixed64 verticalExcess = GetPointIntervalDistance(point.Y, slabMinY, slabMaxY);
-        Fixed64 radius = capsule.ScaledRadius;
-        if (verticalExcess > radius)
-            return;
-
-        Fixed64 planarRadiusSqr = radius * radius - verticalExcess * verticalExcess;
-        Fixed64 planarRadius = planarRadiusSqr <= Fixed64.Zero ? Fixed64.Zero : FixedMath.Sqrt(planarRadiusSqr);
-        Vector2d candidate = new(point.X + direction.X * planarRadius, point.Z + direction.Y * planarRadius);
-        KeepBestSupport(candidate, direction, ref found, ref best);
-    }
-
-    private static bool TrySupportCylinderProjection(
-        LSCylinderCollider cylinder,
-        Fixed64 slabMinY,
-        Fixed64 slabMaxY,
-        Vector2d direction,
-        out Vector2d support)
-    {
-        Vector3d axis = cylinder.LineSegmentEnd - cylinder.LineSegmentStart;
-        Fixed64 dy = axis.Y;
-        Fixed64 planarSlope = axis.X * direction.X + axis.Z * direction.Y;
-        bool found = false;
-        Vector2d best = default;
-
-        TryKeepCylinderSupport(cylinder, slabMinY, slabMaxY, direction, Fixed64.Zero, ref found, ref best);
-        TryKeepCylinderSupport(cylinder, slabMinY, slabMaxY, direction, Fixed64.One, ref found, ref best);
-
-        Fixed64 verticalRadialCapacity = GetCylinderVerticalRadialCapacity(cylinder);
-        if (dy.Abs() > Fixed64.Epsilon)
-        {
-            // A clipped cylinder disk support can change only at axis endpoints,
-            // slab plane intersections, or stationary points along a slab plane.
-            AddCylinderBoundaryCandidates(cylinder, slabMinY, slabMaxY, direction, dy, verticalRadialCapacity, ref found, ref best);
-            AddCylinderStationaryCandidates(cylinder, slabMinY, direction, planarSlope, dy, ref found, ref best);
-            AddCylinderStationaryCandidates(cylinder, slabMaxY, direction, planarSlope, dy, ref found, ref best);
-        }
-
-        support = best;
-        return found;
-    }
-
-    private static bool TrySupportConeProjection(
-        LSConeCollider cone,
-        Fixed64 slabMinY,
-        Fixed64 slabMaxY,
-        Vector2d direction,
-        out Vector2d support)
-    {
-        bool found = false;
-        Vector2d best = default;
-
-        TryKeepConePoint(cone.WorldApex, slabMinY, slabMaxY, direction, ref found, ref best);
-        if (TrySupportCylinderDiskInBand(cone.WorldBaseCenter, cone.Axis, cone.ScaledRadius, slabMinY, slabMaxY, direction, out Vector2d baseSupport))
-            KeepBestSupport(baseSupport, direction, ref found, ref best);
-
-        Vector3d wholeSupport = ConvexColliderSupport.Support(cone, new Vector3d(direction.X, Fixed64.Zero, direction.Y));
-        TryKeepConePoint(wholeSupport, slabMinY, slabMaxY, direction, ref found, ref best);
-
-        TryKeepVerticalConePlaneSupport(cone, slabMinY, direction, ref found, ref best);
-        TryKeepVerticalConePlaneSupport(cone, slabMaxY, direction, ref found, ref best);
-
-        support = best;
-        return found;
-    }
-
-    private static void AddCylinderBoundaryCandidates(
-        LSCylinderCollider cylinder,
-        Fixed64 slabMinY,
-        Fixed64 slabMaxY,
-        Vector2d direction,
-        Fixed64 dy,
-        Fixed64 verticalRadialCapacity,
-        ref bool found,
-        ref Vector2d best)
-    {
-        Fixed64 startY = cylinder.LineSegmentStart.Y;
-        TryGetCylinderUnconstrainedRadialY(cylinder, direction, out Fixed64 unconstrainedRadialY);
-
-        AddCylinderPlaneCandidates(cylinder, slabMinY, slabMinY, slabMaxY, direction, dy, startY, verticalRadialCapacity, unconstrainedRadialY, ref found, ref best);
-        AddCylinderPlaneCandidates(cylinder, slabMaxY, slabMinY, slabMaxY, direction, dy, startY, verticalRadialCapacity, unconstrainedRadialY, ref found, ref best);
-    }
-
-    private static void AddCylinderPlaneCandidates(
-        LSCylinderCollider cylinder,
-        Fixed64 planeY,
-        Fixed64 slabMinY,
-        Fixed64 slabMaxY,
-        Vector2d direction,
-        Fixed64 dy,
-        Fixed64 startY,
-        Fixed64 verticalRadialCapacity,
-        Fixed64 unconstrainedRadialY,
-        ref bool found,
-        ref Vector2d best)
-    {
-        TryKeepCylinderSupport(cylinder, slabMinY, slabMaxY, direction, (planeY - startY - verticalRadialCapacity) / dy, ref found, ref best);
-        TryKeepCylinderSupport(cylinder, slabMinY, slabMaxY, direction, (planeY - startY) / dy, ref found, ref best);
-        TryKeepCylinderSupport(cylinder, slabMinY, slabMaxY, direction, (planeY - startY + verticalRadialCapacity) / dy, ref found, ref best);
-        TryKeepCylinderSupport(cylinder, slabMinY, slabMaxY, direction, (planeY - startY - unconstrainedRadialY) / dy, ref found, ref best);
-    }
-
-    private static void AddCylinderStationaryCandidates(
-        LSCylinderCollider cylinder,
-        Fixed64 planeY,
-        Vector2d direction,
-        Fixed64 planarSlope,
-        Fixed64 dy,
-        ref bool found,
-        ref Vector2d best)
-    {
-        Vector3d axisDirection = cylinder.LineDirection;
-        Vector3d verticalInRadialPlane = Vector3d.Up - axisDirection * axisDirection.Y;
-        Fixed64 verticalCapacitySqr = verticalInRadialPlane.MagnitudeSquared;
-        if (verticalCapacitySqr <= Fixed64.Epsilon)
-            return;
-
-        Vector3d direction3D = new(direction.X, Fixed64.Zero, direction.Y);
-        Fixed64 linearBoundarySlope = Vector3d.Dot(direction3D, verticalInRadialPlane) / verticalCapacitySqr;
-        Vector3d tangent = Vector3d.Cross(axisDirection, verticalInRadialPlane);
-        Fixed64 tangentProjection = Vector3d.Dot(direction3D, tangent.Normalized).Abs();
-        if (tangentProjection <= Fixed64.Epsilon)
-            return;
-
-        Fixed64 k = planarSlope - linearBoundarySlope * dy;
-        Fixed64 m = -k * verticalCapacitySqr / (tangentProjection * dy);
-        Fixed64 mSqr = m * m;
-        Fixed64 qSqr = mSqr * cylinder.ScaledRadiusSqr * verticalCapacitySqr / (verticalCapacitySqr + mSqr);
-        Fixed64 q = FixedMath.Sqrt(qSqr);
-        if (m < Fixed64.Zero)
-            q = -q;
-
-        Fixed64 u = (planeY - cylinder.LineSegmentStart.Y - q) / dy;
-        TryKeepCylinderSupport(cylinder, planeY, planeY, direction, u, ref found, ref best);
-    }
-
-    private static void TryKeepCylinderSupport(
-        LSCylinderCollider cylinder,
-        Fixed64 slabMinY,
-        Fixed64 slabMaxY,
-        Vector2d direction,
-        Fixed64 u,
-        ref bool found,
-        ref Vector2d best)
-    {
-        if (!TryClampUnitParameter(u, out Fixed64 clampedU))
-            return;
-
-        Vector3d axisPoint = cylinder.LineSegmentStart + (cylinder.LineSegmentEnd - cylinder.LineSegmentStart) * clampedU;
-        if (!TrySupportCylinderDiskInBand(axisPoint, cylinder.LineDirection, cylinder.ScaledRadius, slabMinY, slabMaxY, direction, out Vector2d candidate))
-            return;
-
-        KeepBestSupport(candidate, direction, ref found, ref best);
-    }
-
-    private static bool TrySupportCylinderDiskInBand(
-        Vector3d axisPoint,
-        Vector3d axisDirection,
-        Fixed64 radius,
-        Fixed64 slabMinY,
-        Fixed64 slabMaxY,
-        Vector2d direction,
-        out Vector2d support)
-    {
-        bool found = false;
-        Vector2d best = default;
-        Vector3d direction3D = new(direction.X, Fixed64.Zero, direction.Y);
-        Vector3d radialDirection = direction3D - axisDirection * Vector3d.Dot(direction3D, axisDirection);
-        Fixed64 radialMagnitude = radialDirection.Magnitude;
-        if (radialMagnitude > Fixed64.Epsilon)
-        {
-            Vector3d radial = radialDirection / radialMagnitude * radius;
-            Fixed64 y = axisPoint.Y + radial.Y;
-            if (y >= slabMinY && y <= slabMaxY)
             {
-                KeepBestSupport(new Vector2d(axisPoint.X + radial.X, axisPoint.Z + radial.Z), direction, ref found, ref best);
+                return FixedSlabProjection.TryGetCylinderSupport(
+                    _cylinder.Center,
+                    _cylinder.LineDirection,
+                    _cylinder.HalfHeight,
+                    _cylinder.ScaledRadius,
+                    _slabY,
+                    normal,
+                    out support);
             }
+
+            return FixedSlabProjection.TryGetConeSupport(
+                _cone!.Center,
+                _cone.Axis,
+                _cone.Height,
+                _cone.ScaledRadius,
+                _slabY,
+                normal,
+                out support);
         }
 
-        TryKeepCylinderDiskBoundary(axisPoint, axisDirection, radius, slabMinY, direction, ref found, ref best);
-        TryKeepCylinderDiskBoundary(axisPoint, axisDirection, radius, slabMaxY, direction, ref found, ref best);
-
-        support = best;
-        return found;
-    }
-
-    private static void TryKeepCylinderDiskBoundary(
-        Vector3d axisPoint,
-        Vector3d axisDirection,
-        Fixed64 radius,
-        Fixed64 planeY,
-        Vector2d direction,
-        ref bool found,
-        ref Vector2d best)
-    {
-        if (!TryGetCylinderDiskBoundaryRadial(axisDirection, radius, planeY - axisPoint.Y, direction, out Vector3d radial))
-            return;
-
-        KeepBestSupport(new Vector2d(axisPoint.X + radial.X, axisPoint.Z + radial.Z), direction, ref found, ref best);
-    }
-
-    private static bool TryGetCylinderDiskBoundaryRadial(
-        Vector3d axisDirection,
-        Fixed64 radius,
-        Fixed64 yOffset,
-        Vector2d direction,
-        out Vector3d radial)
-    {
-        Vector3d verticalInRadialPlane = Vector3d.Up - axisDirection * axisDirection.Y;
-        Fixed64 verticalCapacitySqr = verticalInRadialPlane.MagnitudeSquared;
-        if (verticalCapacitySqr <= Fixed64.Epsilon)
+        public bool TryGetPlanarCircle(
+            Vector2d rightSupport,
+            out Vector2d center,
+            out Fixed64 radius)
         {
-            if (yOffset.Abs() > Fixed64.Epsilon)
+            Vector3d axis = _capsule?.WorldAxis ?? _cylinder?.LineDirection ?? _cone!.Axis;
+            if ((axis.X != Fixed64.Zero) | (axis.Z != Fixed64.Zero))
             {
-                radial = default;
+                center = default;
+                radius = default;
                 return false;
             }
 
-            Vector3d planarDirection = new(direction.X, Fixed64.Zero, direction.Y);
-            Vector3d radialDirection = planarDirection - axisDirection * Vector3d.Dot(planarDirection, axisDirection);
-            Fixed64 radialMagnitude = radialDirection.Magnitude;
-            radial = radialDirection / radialMagnitude * radius;
+            center = _center;
+            radius = rightSupport.X - _center.X;
             return true;
         }
 
-        Fixed64 maxYOffsetSqr = radius * radius * verticalCapacitySqr;
-        if (yOffset * yOffset > maxYOffsetSqr + Fixed64.Epsilon)
-        {
-            radial = default;
-            return false;
-        }
-
-        Vector3d baseRadial = verticalInRadialPlane * (yOffset / verticalCapacitySqr);
-        Fixed64 baseMagnitudeSqr = yOffset * yOffset / verticalCapacitySqr;
-        Fixed64 remainingSqr = radius * radius - baseMagnitudeSqr;
-        if (remainingSqr < Fixed64.Zero)
-            remainingSqr = Fixed64.Zero;
-
-        Vector3d tangent = Vector3d.Cross(axisDirection, verticalInRadialPlane);
-        Fixed64 tangentMagnitude = tangent.Magnitude;
-        if (remainingSqr <= Fixed64.Epsilon)
-        {
-            radial = baseRadial;
-            return true;
-        }
-
-        Vector3d tangentDirection = tangent / tangentMagnitude;
-        Vector3d direction3D = new(direction.X, Fixed64.Zero, direction.Y);
-        Fixed64 sign = Vector3d.Dot(direction3D, tangentDirection) >= Fixed64.Zero ? Fixed64.One : -Fixed64.One;
-        radial = baseRadial + tangentDirection * sign * FixedMath.Sqrt(remainingSqr);
-        return true;
     }
-
-    private static bool CapsuleIntersectsSlab(LSCapsuleCollider capsule, Fixed64 slabMinY, Fixed64 slabMaxY)
-    {
-        Fixed64 minY = FixedMath.Min(capsule.LineSegmentStart.Y, capsule.LineSegmentEnd.Y) - capsule.ScaledRadius;
-        Fixed64 maxY = FixedMath.Max(capsule.LineSegmentStart.Y, capsule.LineSegmentEnd.Y) + capsule.ScaledRadius;
-        return maxY >= slabMinY && minY <= slabMaxY;
-    }
-
-    private static bool CylinderIntersectsSlab(LSCylinderCollider cylinder, Fixed64 slabMinY, Fixed64 slabMaxY)
-    {
-        Fixed64 minAxisY = FixedMath.Min(cylinder.LineSegmentStart.Y, cylinder.LineSegmentEnd.Y);
-        Fixed64 maxAxisY = FixedMath.Max(cylinder.LineSegmentStart.Y, cylinder.LineSegmentEnd.Y);
-        Fixed64 radialY = GetCylinderVerticalRadialCapacity(cylinder);
-        return maxAxisY + radialY >= slabMinY && minAxisY - radialY <= slabMaxY;
-    }
-
-    private static bool ConeIntersectsSlab(LSConeCollider cone, Fixed64 slabMinY, Fixed64 slabMaxY) =>
-        cone.BoundsMax.Y >= slabMinY && cone.BoundsMin.Y <= slabMaxY;
-
-    private static void TryKeepConePoint(
-        Vector3d point,
-        Fixed64 slabMinY,
-        Fixed64 slabMaxY,
-        Vector2d direction,
-        ref bool found,
-        ref Vector2d best)
-    {
-        if (!IsPointYInsideSlab(point.Y, slabMinY, slabMaxY))
-            return;
-
-        KeepBestSupport(new Vector2d(point.X, point.Z), direction, ref found, ref best);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static bool IsConeAxisVertical(LSConeCollider cone) =>
-        cone.Axis.X.Abs() <= Fixed64.Epsilon && cone.Axis.Z.Abs() <= Fixed64.Epsilon;
-
-    private static void TryKeepVerticalConePlaneSupport(
-        LSConeCollider cone,
-        Fixed64 planeY,
-        Vector2d direction,
-        ref bool found,
-        ref Vector2d best)
-    {
-        Vector3d local = cone.Rotation.Inverse() * (new Vector3d(cone.Center.X, planeY, cone.Center.Z) - cone.Center);
-        Fixed64 radius = cone.RadiusAtLocalY(local.Y);
-        Vector3d localDirection = cone.Rotation.Inverse() * new Vector3d(direction.X, Fixed64.Zero, direction.Y);
-        Vector3d localRadial = new(localDirection.X, Fixed64.Zero, localDirection.Z);
-        Fixed64 radialMagnitude = localRadial.Magnitude;
-        localRadial = radialMagnitude > Fixed64.Epsilon
-            ? localRadial / radialMagnitude
-            : Vector3d.Right;
-
-        Vector3d localPoint = new(localRadial.X * radius, local.Y, localRadial.Z * radius);
-        Vector3d worldPoint = cone.Center + cone.Rotation * localPoint;
-        KeepBestSupport(new Vector2d(worldPoint.X, worldPoint.Z), direction, ref found, ref best);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool IsPointYInsideSlab(Fixed64 y, Fixed64 slabMinY, Fixed64 slabMaxY) =>
-        y >= slabMinY && y <= slabMaxY;
-
-    private static Fixed64 GetCylinderVerticalRadialCapacity(LSCylinderCollider cylinder)
-    {
-        Fixed64 capacitySqr = Fixed64.One - cylinder.LineDirection.Y * cylinder.LineDirection.Y;
-        return capacitySqr <= Fixed64.Zero ? Fixed64.Zero : cylinder.ScaledRadius * FixedMath.Sqrt(capacitySqr);
-    }
-
-    private static bool TryGetCylinderUnconstrainedRadialY(LSCylinderCollider cylinder, Vector2d direction, out Fixed64 radialY)
-    {
-        Vector3d direction3D = new(direction.X, Fixed64.Zero, direction.Y);
-        Vector3d radialDirection = direction3D - cylinder.LineDirection * Vector3d.Dot(direction3D, cylinder.LineDirection);
-        Fixed64 radialMagnitude = radialDirection.Magnitude;
-        if (radialMagnitude <= Fixed64.Epsilon)
-        {
-            radialY = Fixed64.Zero;
-            return false;
-        }
-
-        radialY = radialDirection.Y / radialMagnitude * cylinder.ScaledRadius;
-        return true;
-    }
-
-    private static Fixed64 GetPointIntervalDistance(Fixed64 point, Fixed64 min, Fixed64 max)
-    {
-        if (point < min)
-            return min - point;
-
-        if (point > max)
-            return point - max;
-
-        return Fixed64.Zero;
-    }
-
-    private static bool TryClampUnitParameter(Fixed64 value, out Fixed64 clamped)
-    {
-        if (value < -Fixed64.Epsilon || value > Fixed64.One + Fixed64.Epsilon)
-        {
-            clamped = default;
-            return false;
-        }
-
-        clamped = FixedMath.Clamp01(value);
-        return true;
-    }
-
-    private static void KeepBestSupport(Vector2d candidate, Vector2d direction, ref bool found, ref Vector2d best)
-    {
-        if (found)
-        {
-            int projectionComparison = Vector2d.CompareProjection(candidate, best, direction);
-            if (projectionComparison < 0)
-                return;
-
-            if (projectionComparison == 0 && ComesAfter(candidate, best))
-                return;
-        }
-
-        best = candidate;
-        found = true;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static bool ComesAfter(Vector2d first, Vector2d second) =>
-        first.X > second.X || (first.X == second.X && first.Y > second.Y);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Fixed64 Cross(Vector2d origin, Vector2d first, Vector2d second) =>

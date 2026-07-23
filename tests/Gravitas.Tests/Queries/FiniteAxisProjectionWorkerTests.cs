@@ -340,6 +340,99 @@ public sealed class FiniteAxisProjectionWorkerTests
         (distance - (Fixed64)2.5m).Abs().Should().BeLessThan(Fixed64.FromFraction(1, 100_000));
     }
 
+    [Fact]
+    public void FiniteSlabCapsuleProjection_WithExtremeCrossSection_ShouldPreserveEntryDistance()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        FixedQuaternion rotation = FixedQuaternion.FromEulerAnglesInDegrees(
+            Fixed64.Zero,
+            Fixed64.Zero,
+            (Fixed64)90);
+        var capsule = new LSCapsuleCollider();
+        capsule.InitializeWithNoBody(new TestMatterAgent(
+            context,
+            new FixedTransform(Vector3d.Zero, rotation, Vector3d.One)));
+        capsule.Radius = (Fixed64)100_000;
+        capsule.Size = new Vector3d((Fixed64)200_000, (Fixed64)200_002, (Fixed64)200_000);
+        capsule.RebuildRuntimeShapeOnly().Should().BeTrue();
+
+        bool found = FiniteSlabProjectionSweep.TrySweepCircleAgainstCapsule(
+            new Vector2d(Fixed64.Zero, (Fixed64)(-100_000)),
+            Vector2d.Forward,
+            (Fixed64)200_000,
+            Fixed64.Zero,
+            (Fixed64)60_000,
+            (Fixed64)60_000,
+            capsule,
+            out Fixed64 distance);
+
+        found.Should().BeTrue();
+        (distance - (Fixed64)20_000).Abs()
+            .Should().BeLessThan(Fixed64.FromFraction(1, 1_000_000));
+    }
+
+    [Fact]
+    public void FiniteSlabCylinderProjection_WithExtremeCrossSection_ShouldPreserveEntryDistance()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        FixedQuaternion rotation = FixedQuaternion.FromEulerAnglesInDegrees(
+            Fixed64.Zero,
+            Fixed64.Zero,
+            (Fixed64)90);
+        var cylinder = new LSCylinderCollider();
+        cylinder.InitializeWithNoBody(new TestMatterAgent(
+            context,
+            new FixedTransform(Vector3d.Zero, rotation, Vector3d.One)));
+        cylinder.Radius = (Fixed64)100_000;
+        cylinder.Size = new Vector3d((Fixed64)200_000, (Fixed64)2, (Fixed64)200_000);
+        cylinder.RebuildRuntimeShapeOnly().Should().BeTrue();
+
+        bool found = FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
+            new Vector2d(Fixed64.Zero, (Fixed64)(-100_000)),
+            Vector2d.Forward,
+            (Fixed64)200_000,
+            Fixed64.Zero,
+            (Fixed64)60_000,
+            (Fixed64)60_000,
+            cylinder,
+            out Fixed64 distance);
+
+        found.Should().BeTrue();
+        (distance - (Fixed64)20_000).Abs()
+            .Should().BeLessThan(Fixed64.FromFraction(1, 1_000_000));
+    }
+
+    [Fact]
+    public void FiniteSlabConeProjection_WithExtremeBaseCrossSection_ShouldPreserveEntryDistance()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        FixedQuaternion rotation = FixedQuaternion.FromEulerAnglesInDegrees(
+            Fixed64.Zero,
+            Fixed64.Zero,
+            (Fixed64)90);
+        var cone = new LSConeCollider();
+        cone.InitializeWithNoBody(new TestMatterAgent(
+            context,
+            new FixedTransform(Vector3d.Zero, rotation, Vector3d.One)));
+        cone.Radius = (Fixed64)100_000;
+        cone.Size = new Vector3d((Fixed64)200_000, (Fixed64)2, (Fixed64)200_000);
+        cone.RebuildRuntimeShapeOnly().Should().BeTrue();
+
+        bool found = FiniteSlabProjectionSweep.TrySweepCircleAgainstCone(
+            new Vector2d(cone.WorldBaseCenter.X, (Fixed64)(-100_000)),
+            Vector2d.Forward,
+            (Fixed64)200_000,
+            Fixed64.Zero,
+            (Fixed64)60_000,
+            (Fixed64)60_000,
+            cone,
+            out Fixed64 distance);
+
+        found.Should().BeTrue();
+        (distance - (Fixed64)20_000).Abs()
+            .Should().BeLessThan(Fixed64.FromFraction(1, 1_000_000));
+    }
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]

@@ -30,60 +30,31 @@ records follow with their original discovery context.
   release with them in place.
 - FixedMathSharp foundation hardening is complete. The current locally linked
   radial, finite-axis, sphere-construction, derived-bound, and exact rounded
-  finite-extrusion extensions pass 1,753 core and eight Chronicler tests at
-  14,421/14,421 lines, 4,493/4,493 branches, and 2,001/2,001 ReportGenerator
+  finite-extrusion and finite-slab extensions pass 1,784 Release tests at
+  15,072/15,072 lines, 4,684/4,684 branches, and 2,065/2,065 ReportGenerator
   methods. Retain the local link while the remaining Gravitas queue is hardened.
 - SwiftCollections has no library-specific active issue at this checkpoint; its
   place in the sequence is a full downstream compatibility and release gate.
 - GridForge's runtime-identity defect is resolved. Keep the lower stack locally
   linked while the remaining Gravitas queue is hardened so another downstream
   discovery does not force a partial release cycle.
-- Gravitas's current authoritative coverage-enabled Release run passes 3,252
-  tests and reports 33,706/33,706 lines, 12,129/12,129 branches, and
-  4,192/4,192 ReportGenerator methods for hand-authored source.
+- Gravitas's current authoritative coverage-enabled Release run passes 3,261
+  tests and reports 33,466/33,466 lines, 12,045/12,045 branches, and
+  4,164/4,164 ReportGenerator methods for hand-authored source.
 - After the Gravitas queue closes, release the lower stack in dependency order,
   replace local links with released packages at each layer, and rerun Gravitas
   `Release`, `ReleaseLean`, coverage, replay, and relevant benchmark gates.
 
 ### Ordered Queue
 
-1. **Gravitas:**
-   [Finite-Slab Projection Support Math Is Not Full-Domain](#finite-slab-projection-support-math-is-not-full-domain).
-2. **Gravitas — canonical collider geometry and exact scale admission:**
+1. **Gravitas — canonical collider geometry and exact scale admission:**
    [Authored Collider Dimensions Can Saturate During Host-Scale Composition](#authored-collider-dimensions-can-saturate-during-host-scale-composition),
    then
    [Finite-Axis Collider Endpoint Snapshots Can Deform Scalar-Boundary Geometry](#finite-axis-collider-endpoint-snapshots-can-deform-scalar-boundary-geometry),
    then
    [Oriented Cuboid Boundary Proxies Can Deform Scalar-Face Geometry](#oriented-cuboid-boundary-proxies-can-deform-scalar-face-geometry).
-3. **FixedMathSharp / Gravitas:**
+2. **FixedMathSharp / Gravitas:**
    [Radial Segment Parameters Can Collapse Spatially Distinct Query Hits](#radial-segment-parameters-can-collapse-spatially-distinct-query-hits).
-
-### Finite-Slab Projection Support Math Is Not Full-Domain
-
-**Discovered:** 2026-07-19  
-**Source:** finite-axis consumer closure audit  
-**Affected area:** `FiniteSlabProjectionSweep`, rotated capsule/cylinder/cone
-mixed circle-against-3D queries, and `DistanceSquaredToConvexSlab`
-starting-overlap admission for mixed sphere-against-2D convex slabs
-
-`FiniteSlabProjectionSweep` selects a scaled GJK working frame, but several
-axis differences, slopes, radius squares, capacity products, stationary-point
-expressions, and support candidates are already calculated in saturating
-`Fixed64` before scale selection. Extreme valid geometry can therefore lose
-information before the GJK reducer begins.
-
-The opposite mixed direction has the same class of pre-reducer risk:
-`DistanceSquaredToConvexSlab` squares narrowed planar and vertical distances in
-`Fixed64`. Extreme separated starts can therefore saturate both sides of its
-overlap comparison and bypass the actual AABB/convex/compound sweep at distance
-zero. The finite-axis work removed the equivalent capsule shortcut, but did not
-broaden into full-domain convex-prism distance ownership.
-
-Harden candidate/support construction and convex-slab start admission before
-public narrowing, or scale authored inputs before products. Cover extreme
-rotated capsule, cylinder, and cone projections; extreme separated 2D convex
-slab starts; slab-boundary tangency; miss/hit separation; repeat determinism;
-and allocation behavior.
 
 ### Finite-Axis Collider Endpoint Snapshots Can Deform Scalar-Boundary Geometry
 
@@ -213,6 +184,69 @@ zero-allocation behavior. Keep this separate from sphere construction/merge
 and conic-quadratic ownership.
 
 ## Resolved Issues
+
+### Finite-Slab Projection Support Math Is Full-Domain
+
+**Discovered:** 2026-07-19  
+**Resolved:** 2026-07-22  
+**Source:** finite-axis consumer closure audit  
+**Affected area:** FixedMathSharp capsule/cylinder/cone finite-slab support;
+Gravitas mixed circle-against-3D sweeps, sphere-against-2D convex-slab start
+admission, and exact 2D polygon predicates
+
+RCA: `FiniteSlabProjectionSweep` scaled its GJK simplex only after capsule,
+cylinder, and cone support candidates had already been reconstructed through
+saturating `Fixed64` products. Rotated extreme geometry could therefore lose
+the winning support before GJK began. The opposite mixed direction squared
+narrowed planar and vertical distances, allowing two saturated values to turn
+an extreme separated sphere/convex-slab start into a false distance-zero hit.
+The old rotated-cone fallback also reproduced a divide-by-zero in its generic
+GJK triangle reducer.
+
+FixedMathSharp now owns the public, allocation-free `FixedSlabProjection`
+capsule, cylinder, and cone operations. Shape-semantic wide internals retain
+candidate construction, stationary roots, comparison, and clipped-support
+selection at sufficient precision until the single winning planar point is
+narrowed. Adaptive signed multiplication, square-root, and ratio dispatch avoid
+paying maximum declared width when the exact operands fit smaller existing
+kernels. An exact unclipped-winner admission path reuses the same candidate
+construction and falls back to the complete clipped solver when necessary; no
+rounded duplicate geometry, public wide integer, threshold, or cached
+query-dependent state was introduced.
+
+Gravitas now delegates every capsule, cylinder, and cone orientation to that
+shared support surface while retaining sweep/GJK and hit ownership. It removes
+the old vertical-only reducers, saturated support reconstruction, rotated-cone
+fallback, duplicate interval helpers, and redundant GJK intersection state.
+Endpoint representability is admitted once, proving all monotonic intermediate
+sweep points representable. Reciprocal convex-slab admission reuses the exact
+sphere/slab cross-section plus planar distance predicate, and 2D convex polygon
+containment/nearest-edge selection use exact orientation and distance
+comparisons.
+
+Regression coverage includes extreme rotated supports, large clipped
+cross-sections, cone stationary-root and stable-tie cases, scalar-face support
+failure, near-orthogonal advancement overflow, endpoint tolerance, reciprocal
+extreme separation, polygon nearest-edge ordering, deterministic oracle cases,
+and warmed allocation guards. FixedMathSharp passes 1,784 Release tests,
+1,763 ReleaseLean tests, and explicit `netstandard2.1` compilation at
+15,072/15,072 lines and 4,684/4,684 branches. Gravitas passes 3,261 Release and
+3,206 ReleaseLean tests, both `netstandard2.1` configurations with zero
+warnings, 52 determinism/replay tests, and 66 allocation tests at
+33,466/33,466 lines, 12,045/12,045 branches, and 4,164/4,164 methods.
+
+The exact admitted-path benchmark reports capsule/cylinder/cone means of
+`9.498/7.958/11.773 ms` for 64 targets and
+`155.987/123.107/205.485 ms` for 1,024 targets. Forced partial clipping reports
+`22.689/29.758/81.119 ms` and `363.324/443.336/1,292.68 ms` respectively. Every
+case reports zero managed allocation. The clipped path is intentionally more
+expensive than the deleted narrow arithmetic because it now preserves the
+actual finite geometry rather than saturating before the solve.
+
+Independent final review approved the cross-stack ownership, full-domain math,
+determinism, allocation behavior, tests, documentation, and scope with no
+actionable findings. The guarded 190-bit cone-direction reduction remains a
+useful future randomized-oracle target, not a confirmed defect.
 
 ### Swept-Sphere Cuboid Dilation Uses Exact Rounded Features
 

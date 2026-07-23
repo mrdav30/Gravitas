@@ -19,7 +19,6 @@ public sealed partial class GravitasQueryMixedService
     private readonly SwiftList<LSCollider2D> _candidates2D = new();
     private readonly SwiftList<LSCollider> _candidates3D = new();
     private readonly SwiftList<int> _meshTriangleCandidates = new();
-    private readonly ConvexSweepQueryWorker _circleSlabSweepWorker = new();
 
     public GravitasQueryMixedService(GravitasWorldContext context)
     {

@@ -56,10 +56,10 @@ public sealed class LSPolygonCollider2D : LSCollider2D, IConvexVertexSource2D
         {
             Vector2d a = _worldVertices[i];
             Vector2d b = _worldVertices[(i + 1) % _worldVertices.Length];
-            Fixed64 cross = Vector2d.CrossProduct(b - a, point - a);
-            if (cross > Fixed64.Epsilon)
+            int orientation = Vector2d.OrientationSign(a, b, point);
+            if (orientation > 0)
                 hasPositive = true;
-            else if (cross < -Fixed64.Epsilon)
+            else if (orientation < 0)
                 hasNegative = true;
 
             if (hasPositive && hasNegative)
@@ -74,18 +74,15 @@ public sealed class LSPolygonCollider2D : LSCollider2D, IConvexVertexSource2D
         if (ContainsPoint(point))
             return point;
 
-        Fixed64 bestDistance = Fixed64.MaxValue;
         Vector2d bestPoint = _worldVertices[0];
         for (int i = 0; i < _worldVertices.Length; i++)
         {
             Vector2d a = _worldVertices[i];
             Vector2d b = _worldVertices[(i + 1) % _worldVertices.Length];
             Vector2d candidate = new FixedSegment2d(a, b).ClosestPoint(point);
-            Fixed64 distance = Vector2d.DistanceSquared(point, candidate);
-            if (distance >= bestDistance)
+            if (Vector2d.CompareDistanceSquared(point, candidate, point, bestPoint) >= 0)
                 continue;
 
-            bestDistance = distance;
             bestPoint = candidate;
         }
 

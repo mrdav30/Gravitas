@@ -23,20 +23,17 @@ internal static partial class FiniteSlabProjectionSweep
 
     private readonly struct PlanarGjkResult
     {
-        public PlanarGjkResult(bool intersects, Fixed64 distance, Vector2d normal)
+        public PlanarGjkResult(Fixed64 distance, Vector2d normal)
         {
-            Intersects = intersects;
             Distance = distance;
             Normal = normal;
         }
-
-        public bool Intersects { get; }
 
         public Fixed64 Distance { get; }
 
         public Vector2d Normal { get; }
 
-        public static PlanarGjkResult Intersection => new(true, Fixed64.Zero, Vector2d.Zero);
+        public static PlanarGjkResult Intersection => new(Fixed64.Zero, Vector2d.Zero);
     }
 
     private readonly struct ClosestPlanarSimplexResult

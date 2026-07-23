@@ -209,8 +209,7 @@ public sealed partial class GravitasQueryMixedService
         LSCollider2D collider,
         out PhysicsMixedHit hit)
     {
-        Fixed64 radiusSqr = radius * radius;
-        if (DistanceSquaredToConvexSlab(start, collider) <= radiusSqr)
+        if (DoesSphereOverlapConvexSlab(start, radius, collider))
         {
             hit = BuildSphereAgainst2DHit(
                 collider,
@@ -566,15 +565,24 @@ public sealed partial class GravitasQueryMixedService
             ref best);
     }
 
-    private static Fixed64 DistanceSquaredToConvexSlab(Vector3d point, LSCollider2D collider)
+    private static bool DoesSphereOverlapConvexSlab(
+        Vector3d center,
+        Fixed64 radius,
+        LSCollider2D collider)
     {
-        Vector2d planarPoint = new(point.X, point.Z);
+        if (!FixedMath.TryGetSphereSlabCrossSectionRadius(
+                center.Y,
+                radius,
+                collider.MixedSlabCenterY,
+                collider.MixedHalfThickness,
+                out Fixed64 planarRadius))
+        {
+            return false;
+        }
+
+        Vector2d planarPoint = new(center.X, center.Z);
         Vector2d closestPlanar = collider.GetClosestPoint(planarPoint);
-        Fixed64 planarDistanceSqr = (planarPoint - closestPlanar).MagnitudeSquared;
-        Fixed64 slabMinY = collider.MixedSlabCenterY - collider.MixedHalfThickness;
-        Fixed64 slabMaxY = collider.MixedSlabCenterY + collider.MixedHalfThickness;
-        Fixed64 verticalDistance = GetIntervalDistance(point.Y, point.Y, slabMinY, slabMaxY);
-        return planarDistanceSqr + verticalDistance * verticalDistance;
+        return planarPoint.CheckDistance(closestPlanar, planarRadius);
     }
 
     private static bool TrySweepPointAgainstSegmentCapsule3D(

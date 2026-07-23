@@ -1203,16 +1203,6 @@ public sealed partial class MixedQueryCcdTests
     }
 
     [Fact]
-    public void FiniteSlabProjectionOrdering_ShouldUseYOnlyWhenXCoordinatesTie()
-    {
-        Vector2d up = new(Fixed64.Zero, Fixed64.One);
-        FiniteSlabProjectionSweep.ComesAfter(Vector2d.Right, up).Should().BeTrue();
-        FiniteSlabProjectionSweep.ComesAfter(up, Vector2d.Zero).Should().BeTrue();
-        FiniteSlabProjectionSweep.ComesAfter(Vector2d.Zero, up).Should().BeFalse();
-        FiniteSlabProjectionSweep.ComesAfter(Vector2d.Left, Vector2d.Zero).Should().BeFalse();
-    }
-
-    [Fact]
     public void FiniteSlabProjectionSweep_WhenConservativeAdvancementBudgetIsExhausted_ShouldReturnMiss()
     {
         using GravitasWorldContext context = CreateMixedContext();
@@ -1246,6 +1236,174 @@ public sealed partial class MixedQueryCcdTests
         exhaustedDistance.Should().Be(Fixed64.Zero);
         defaultHit.Should().BeTrue();
         defaultDistance.Should().BeGreaterThan(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void FiniteSlabProjectionSweep_WithUnrepresentableEndpoint_ShouldReject()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSCylinderCollider> target = CreateBody3D(
+            context,
+            new LSCylinderCollider { Size = new Vector3d(Fixed64.One, (Fixed64)3, Fixed64.One) },
+            Vector3d.Zero,
+            immovable: true);
+
+        bool found = FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
+            new Vector2d(Fixed64.MaxValue, Fixed64.Zero),
+            Vector2d.Right,
+            Fixed64.One,
+            Fixed64.Half,
+            -Fixed64.Half,
+            Fixed64.Half,
+            target.Collider,
+            out Fixed64 distance);
+
+        found.Should().BeFalse();
+        distance.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void FiniteSlabProjectionSweep_WithUnrepresentableScalarFaceSupport_ShouldReject()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        var transform = new FixedTransform(
+            Vector3d.Zero,
+            FixedQuaternion.FromEulerAnglesInDegrees(Fixed64.Zero, Fixed64.Zero, (Fixed64)90),
+            Vector3d.One);
+        var cylinder = new LSCylinderCollider();
+        cylinder.InitializeWithNoBody(new TestMatterAgent(context, transform));
+        cylinder.Radius = (Fixed64)2;
+        cylinder.Size = new Vector3d((Fixed64)4, (Fixed64)2, (Fixed64)4);
+        transform.TrySetWorldPosition(new Vector3d(
+            Fixed64.Zero,
+            Fixed64.Zero,
+            Fixed64.MaxValue - Fixed64.One)).Should().BeTrue();
+        cylinder.RebuildRuntimeShapeOnly().Should().BeTrue();
+
+        bool startSupportFound = FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
+            new Vector2d((Fixed64)10, Fixed64.MaxValue),
+            Vector2d.Zero,
+            Fixed64.Zero,
+            Fixed64.Zero,
+            -Fixed64.Half,
+            Fixed64.Half,
+            cylinder,
+            out Fixed64 startSupportDistance);
+        bool endpointSupportFound = FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
+            new Vector2d((Fixed64)10, Fixed64.MaxValue - (Fixed64)5),
+            Vector2d.Forward,
+            (Fixed64)5,
+            Fixed64.Zero,
+            -Fixed64.Half,
+            Fixed64.Half,
+            cylinder,
+            out Fixed64 endpointSupportDistance);
+
+        startSupportFound.Should().BeFalse();
+        startSupportDistance.Should().Be(Fixed64.Zero);
+        endpointSupportFound.Should().BeFalse();
+        endpointSupportDistance.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void FiniteSlabProjectionSweep_WithNearOrthogonalMotion_ShouldRejectBeyondEndpoint()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSCylinderCollider> target = CreateBody3D(
+            context,
+            new LSCylinderCollider { Size = new Vector3d(Fixed64.One, (Fixed64)3, Fixed64.One) },
+            Vector3d.Zero,
+            immovable: true,
+            rotation: FixedQuaternion.FromEulerAnglesInDegrees(Fixed64.Zero, Fixed64.Zero, (Fixed64)45));
+        var direction = new Vector2d(Fixed64.FromRaw(4096), Fixed64.One);
+
+        bool found = FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
+            new Vector2d((Fixed64)(-1_000_000), Fixed64.Zero),
+            direction,
+            Fixed64.One,
+            Fixed64.Zero,
+            -Fixed64.Half,
+            Fixed64.Half,
+            target.Collider,
+            out Fixed64 distance);
+
+        direction.IsNormalized().Should().BeTrue();
+        found.Should().BeFalse();
+        distance.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void FiniteSlabProjectionSweep_WithOneAdvancementIteration_ShouldRespectBudget()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSCapsuleCollider> target = CreateBody3D(
+            context,
+            new LSCapsuleCollider { Size = new Vector3d(Fixed64.One, (Fixed64)3, Fixed64.One) },
+            Vector3d.Zero,
+            immovable: true,
+            rotation: FixedQuaternion.FromEulerAnglesInDegrees(Fixed64.Zero, Fixed64.Zero, (Fixed64)45));
+
+        bool boundedFound = FiniteSlabProjectionSweep.TrySweepCircleAgainstCapsule(
+            new Vector2d((Fixed64)(-4), Fixed64.Zero),
+            Vector2d.Right,
+            (Fixed64)8,
+            Fixed64.Half,
+            -Fixed64.Half,
+            Fixed64.Half,
+            target.Collider,
+            out Fixed64 boundedDistance,
+            maxConservativeAdvancementIterations: 1);
+        bool defaultFound = FiniteSlabProjectionSweep.TrySweepCircleAgainstCapsule(
+            new Vector2d((Fixed64)(-4), Fixed64.Zero),
+            Vector2d.Right,
+            (Fixed64)8,
+            Fixed64.Half,
+            -Fixed64.Half,
+            Fixed64.Half,
+            target.Collider,
+            out Fixed64 defaultDistance);
+
+        boundedFound.Should().BeFalse();
+        boundedDistance.Should().Be(Fixed64.Zero);
+        defaultFound.Should().BeTrue();
+        defaultDistance.Should().BeGreaterThan(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void FiniteSlabProjectionSweep_WithEndpointInsideContactTolerance_ShouldKeepHit()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSCapsuleCollider> target = CreateBody3D(
+            context,
+            new LSCapsuleCollider { Size = new Vector3d(Fixed64.One, (Fixed64)3, Fixed64.One) },
+            Vector3d.Zero,
+            immovable: true,
+            rotation: FixedQuaternion.FromEulerAnglesInDegrees(Fixed64.Zero, Fixed64.Zero, (Fixed64)45));
+        var start = new Vector2d((Fixed64)(-4), Fixed64.Zero);
+
+        FiniteSlabProjectionSweep.TrySweepCircleAgainstCapsule(
+            start,
+            Vector2d.Right,
+            (Fixed64)8,
+            Fixed64.Half,
+            -Fixed64.Half,
+            Fixed64.Half,
+            target.Collider,
+            out Fixed64 exactDistance).Should().BeTrue();
+        Fixed64 shortenedLength = exactDistance - Fixed64.FromFraction(1, 2_097_152);
+
+        bool found = FiniteSlabProjectionSweep.TrySweepCircleAgainstCapsule(
+            start,
+            Vector2d.Right,
+            shortenedLength,
+            Fixed64.Half,
+            -Fixed64.Half,
+            Fixed64.Half,
+            target.Collider,
+            out Fixed64 distance);
+
+        found.Should().BeTrue();
+        distance.Should().Be(shortenedLength);
     }
 
     [Fact]

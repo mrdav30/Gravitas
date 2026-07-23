@@ -503,36 +503,6 @@ public sealed partial class GravitasQueryMixedService
         return true;
     }
 
-    private static bool TryGetVerticalSegmentInterval(Vector3d start, Vector3d end, out Fixed64 minY, out Fixed64 maxY)
-    {
-        Vector3d segment = end - start;
-        if (segment.X * segment.X + segment.Z * segment.Z > Fixed64.Epsilon)
-        {
-            minY = Fixed64.Zero;
-            maxY = Fixed64.Zero;
-            return false;
-        }
-
-        minY = FixedMath.Min(start.Y, end.Y);
-        maxY = FixedMath.Max(start.Y, end.Y);
-        return true;
-    }
-
-    private static Fixed64 GetIntervalDistance(Fixed64 firstMin, Fixed64 firstMax, Fixed64 secondMin, Fixed64 secondMax)
-    {
-        if (firstMax < secondMin)
-            return secondMin - firstMax;
-
-        if (secondMax < firstMin)
-            return firstMin - secondMax;
-
-        return Fixed64.Zero;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool IntervalsOverlap(Fixed64 firstMin, Fixed64 firstMax, Fixed64 secondMin, Fixed64 secondMax) =>
-        firstMin <= secondMax && secondMin <= firstMax;
-
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool ComesAfter(Vector2d first, Vector2d second) =>
         first.X > second.X || (first.X == second.X && first.Y > second.Y);

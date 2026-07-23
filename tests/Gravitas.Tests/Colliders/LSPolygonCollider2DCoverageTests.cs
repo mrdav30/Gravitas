@@ -190,4 +190,21 @@ public sealed class LSPolygonCollider2DCoverageTests
         collider.CalculateLocalCenterOfMassOffset()
             .Should().Be(new Vector2d(Fixed64.FromFraction(2, 3), Fixed64.FromFraction(2, 3)));
     }
+
+    [Fact]
+    public void GetClosestPoint_WithSeveralSaturatedDistances_ShouldSelectTheExactNearestEdge()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        var collider = new LSPolygonCollider2D(
+            new Vector2d(-Fixed64.One, -Fixed64.One),
+            new Vector2d(Fixed64.One, -Fixed64.One),
+            new Vector2d(Fixed64.One, Fixed64.One),
+            new Vector2d(-Fixed64.One, Fixed64.One));
+        var body = new SolidBody2D(new TestMatterAgent(context), collider);
+        body.Initialize(Vector2d.Zero);
+
+        Vector2d closest = collider.GetClosestPoint(new Vector2d((Fixed64)200_000, (Fixed64)100_000));
+
+        closest.Should().Be(Vector2d.One);
+    }
 }

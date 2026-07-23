@@ -66,7 +66,6 @@ public sealed partial class GravitasQueryMixedService
         if (collider is LSCapsuleCollider capsule)
             return TrySweepCircleAgainstCapsule(
                 start,
-                end,
                 direction2D,
                 length,
                 radius,
@@ -80,7 +79,6 @@ public sealed partial class GravitasQueryMixedService
         if (collider is LSCylinderCollider cylinder)
             return TrySweepCircleAgainstCylinder(
                 start,
-                end,
                 direction2D,
                 length,
                 radius,
@@ -92,7 +90,7 @@ public sealed partial class GravitasQueryMixedService
                 out hit);
 
         if (collider is LSConeCollider cone)
-            return TrySweepCircleAgainstCone(start, end, direction2D, length, radius, slabCenterY, halfThickness, direction3D, cone, sourceCollider, out hit);
+            return TrySweepCircleAgainstCone(start, direction2D, length, radius, slabCenterY, halfThickness, direction3D, cone, sourceCollider, out hit);
 
         if (collider is LSMeshCollider mesh)
             return TrySweepCircleAgainstMesh(start, end, direction2D, length, radius, slabCenterY, halfThickness, direction3D, mesh, sourceCollider, out hit);
@@ -149,7 +147,6 @@ public sealed partial class GravitasQueryMixedService
 
     private static bool TrySweepCircleAgainstCapsule(
         Vector2d start,
-        Vector2d end,
         Vector2d direction,
         Fixed64 length,
         Fixed64 radius,
@@ -160,65 +157,37 @@ public sealed partial class GravitasQueryMixedService
         LSCollider2D? sourceCollider,
         out PhysicsMixedHit hit)
     {
-        if (!TryGetVerticalSegmentInterval(capsule.LineSegmentStart, capsule.LineSegmentEnd, out Fixed64 segmentMinY, out Fixed64 segmentMaxY))
-        {
-            Fixed64 slabMinY = slabCenterY - halfThickness;
-            Fixed64 slabMaxY = slabCenterY + halfThickness;
-            if (!FiniteSlabProjectionSweep.TrySweepCircleAgainstCapsule(
-                start,
-                direction,
-                length,
-                radius,
-                slabMinY,
-                slabMaxY,
-                capsule,
-                out Fixed64 distance))
-            {
-                hit = default;
-                return false;
-            }
-
-            hit = BuildCircleAgainstProjectedFiniteSlabHit(
-                start,
-                direction,
-                distance,
-                radius,
-                slabCenterY,
-                halfThickness,
-                direction3D,
-                capsule,
-                sourceCollider);
-            return true;
-        }
-
-        Fixed64 verticalExcess = GetIntervalDistance(segmentMinY, segmentMaxY, slabCenterY - halfThickness, slabCenterY + halfThickness);
-        Fixed64 capsuleRadius = capsule.ScaledRadius;
-        if (verticalExcess > capsuleRadius)
+        Fixed64 slabMinY = slabCenterY - halfThickness;
+        Fixed64 slabMaxY = slabCenterY + halfThickness;
+        if (!FiniteSlabProjectionSweep.TrySweepCircleAgainstCapsule(
+            start,
+            direction,
+            length,
+            radius,
+            slabMinY,
+            slabMaxY,
+            capsule,
+            out Fixed64 distance))
         {
             hit = default;
             return false;
         }
 
-        Fixed64 planarRadiusSqr = capsuleRadius * capsuleRadius - verticalExcess * verticalExcess;
-        return TryBuildCircleAgainstPlanarCircleTargetHit(
+        hit = BuildCircleAgainstProjectedFiniteSlabHit(
             start,
-            end,
             direction,
-            length,
+            distance,
             radius,
             slabCenterY,
             halfThickness,
             direction3D,
             capsule,
-            new Vector2d(capsule.Center.X, capsule.Center.Z),
-            FixedMath.Sqrt(planarRadiusSqr),
-            sourceCollider,
-            out hit);
+            sourceCollider);
+        return true;
     }
 
     private static bool TrySweepCircleAgainstCylinder(
         Vector2d start,
-        Vector2d end,
         Vector2d direction,
         Fixed64 length,
         Fixed64 radius,
@@ -229,57 +198,33 @@ public sealed partial class GravitasQueryMixedService
         LSCollider2D? sourceCollider,
         out PhysicsMixedHit hit)
     {
-        if (!TryGetVerticalSegmentInterval(cylinder.LineSegmentStart, cylinder.LineSegmentEnd, out Fixed64 segmentMinY, out Fixed64 segmentMaxY))
-        {
-            Fixed64 slabMinY = slabCenterY - halfThickness;
-            Fixed64 slabMaxY = slabCenterY + halfThickness;
-            if (!FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
-                start,
-                direction,
-                length,
-                radius,
-                slabMinY,
-                slabMaxY,
-                cylinder,
-                out Fixed64 distance))
-            {
-                hit = default;
-                return false;
-            }
-
-            hit = BuildCircleAgainstProjectedFiniteSlabHit(
-                start,
-                direction,
-                distance,
-                radius,
-                slabCenterY,
-                halfThickness,
-                direction3D,
-                cylinder,
-                sourceCollider);
-            return true;
-        }
-
-        if (!IntervalsOverlap(segmentMinY, segmentMaxY, slabCenterY - halfThickness, slabCenterY + halfThickness))
+        Fixed64 slabMinY = slabCenterY - halfThickness;
+        Fixed64 slabMaxY = slabCenterY + halfThickness;
+        if (!FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
+            start,
+            direction,
+            length,
+            radius,
+            slabMinY,
+            slabMaxY,
+            cylinder,
+            out Fixed64 distance))
         {
             hit = default;
             return false;
         }
 
-        return TryBuildCircleAgainstPlanarCircleTargetHit(
+        hit = BuildCircleAgainstProjectedFiniteSlabHit(
             start,
-            end,
             direction,
-            length,
+            distance,
             radius,
             slabCenterY,
             halfThickness,
             direction3D,
             cylinder,
-            new Vector2d(cylinder.Center.X, cylinder.Center.Z),
-            cylinder.ScaledRadius,
-            sourceCollider,
-            out hit);
+            sourceCollider);
+        return true;
     }
 
     private static PhysicsMixedHit BuildCircleAgainstProjectedFiniteSlabHit(
@@ -293,7 +238,9 @@ public sealed partial class GravitasQueryMixedService
         LSCollider collider,
         LSCollider2D? sourceCollider)
     {
-        Vector2d center2D = start + direction * distance;
+        var center2D = new Vector2d(
+            Fixed64.MultiplyAdd(direction.X, distance, start.X),
+            Fixed64.MultiplyAdd(direction.Y, distance, start.Y));
         Vector3d sweepCenter = new(center2D.X, slabCenterY, center2D.Y);
         return BuildCircleAgainst3DHit(
             collider,
@@ -307,9 +254,8 @@ public sealed partial class GravitasQueryMixedService
             sourceCollider);
     }
 
-    private bool TrySweepCircleAgainstCone(
+    private static bool TrySweepCircleAgainstCone(
         Vector2d start,
-        Vector2d end,
         Vector2d direction,
         Fixed64 length,
         Fixed64 radius,
@@ -322,50 +268,29 @@ public sealed partial class GravitasQueryMixedService
     {
         Fixed64 slabMinY = slabCenterY - halfThickness;
         Fixed64 slabMaxY = slabCenterY + halfThickness;
-        bool found;
-        Fixed64 distance;
-        Vector3d point3D;
-        if (FiniteSlabProjectionSweep.IsConeAxisVertical(cone))
-        {
-            found = FiniteSlabProjectionSweep.TrySweepCircleAgainstCone(
-                start,
-                direction,
-                length,
-                radius,
-                slabMinY,
-                slabMaxY,
-                cone,
-                out distance);
-            Vector2d verticalCenter2D = start + direction * distance;
-            Vector3d verticalSweepCenter = new(verticalCenter2D.X, slabCenterY, verticalCenter2D.Y);
-            point3D = GetSweepSurfacePoint(cone, verticalSweepCenter, direction3D);
-        }
-        else
-        {
-            found = _circleSlabSweepWorker.TrySweepPreparedSource(cone, out Physics3DHit sweepHit);
-            LastMeshTriangleCandidateCount += _circleSlabSweepWorker.LastMeshTriangleCandidateCount;
-            distance = sweepHit.Distance;
-            point3D = sweepHit.Point;
-        }
-
-        if (!found)
+        if (!FiniteSlabProjectionSweep.TrySweepCircleAgainstCone(
+            start,
+            direction,
+            length,
+            radius,
+            slabMinY,
+            slabMaxY,
+            cone,
+            out Fixed64 distance))
         {
             hit = default;
             return false;
         }
 
-        Vector2d center2D = start + direction * distance;
-        Vector3d sweepCenter = new(center2D.X, slabCenterY, center2D.Y);
-        hit = BuildCircleAgainst3DHit(
-            cone,
-            point3D,
-            sweepCenter,
-            direction3D,
+        hit = BuildCircleAgainstProjectedFiniteSlabHit(
+            start,
+            direction,
+            distance,
             radius,
             slabCenterY,
             halfThickness,
-            PhysicsQueryReducerKind.Exact,
-            distance,
+            direction3D,
+            cone,
             sourceCollider);
         return true;
     }
@@ -509,50 +434,6 @@ public sealed partial class GravitasQueryMixedService
             best.ReducerKind,
             best.Distance,
             best.Direction3D);
-        return true;
-    }
-
-    private static bool TryBuildCircleAgainstPlanarCircleTargetHit(
-        Vector2d start,
-        Vector2d end,
-        Vector2d direction,
-        Fixed64 length,
-        Fixed64 sourceRadius,
-        Fixed64 slabCenterY,
-        Fixed64 halfThickness,
-        Vector3d direction3D,
-        LSCollider collider,
-        Vector2d targetCenter,
-        Fixed64 targetPlanarRadius,
-        LSCollider2D? sourceCollider,
-        out PhysicsMixedHit hit)
-    {
-        if (!TrySweepPointInPlane(
-            start,
-            end,
-            direction,
-            length,
-            targetCenter,
-            targetPlanarRadius,
-            sourceRadius,
-            out Fixed64 distance))
-        {
-            hit = default;
-            return false;
-        }
-
-        Vector2d center2D = distance == length ? end : start + direction * distance;
-        Vector3d sweepCenter = new(center2D.X, slabCenterY, center2D.Y);
-        hit = BuildCircleAgainst3DHit(
-            collider,
-            sweepCenter,
-            direction3D,
-            sourceRadius,
-            slabCenterY,
-            halfThickness,
-            PhysicsQueryReducerKind.Exact,
-            distance,
-            sourceCollider);
         return true;
     }
 

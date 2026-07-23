@@ -388,6 +388,29 @@ public sealed partial class MixedQueryCcdTests
         hit.Normal3DTo2D.Should().Be(-Vector3d.Up);
     }
 
+    [Fact]
+    public void ConvexSlabReducer_WithSaturatedSquaredDistances_ShouldRejectSeparatedStart()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        LSCollider2D target = CreateBodylessBox2D(
+            context,
+            Vector2d.Zero,
+            new Vector2d(Fixed64.One, Fixed64.One));
+        var start = new Vector3d((Fixed64)200_000, (Fixed64)200_000, Fixed64.Zero);
+        Vector3d end = start + Vector3d.Right;
+
+        bool found = GravitasQueryMixedService.TrySweepSphereAgainstConvexSlab(
+            start,
+            end,
+            Vector3d.Right,
+            Fixed64.One,
+            (Fixed64)100_000,
+            target,
+            out _);
+
+        found.Should().BeFalse();
+    }
+
     [Theory]
     [InlineData(ColliderType2D.Capsule, true)]
     [InlineData(ColliderType2D.Capsule, false)]
