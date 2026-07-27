@@ -106,7 +106,7 @@ public readonly bool TryGetSweptSphereBoxIntersectionDistance(
 - Modify: `F:/gamedevrepos/FixedMathSharp/docs/wiki/bounds-and-geometry.md`
 - Modify: `F:/gamedevrepos/FixedMathSharp/docs/MIGRATION.md`
 - Modify: `docs/feature-work/issue-tracker.md`
-- Modify: `docs/feature-work/2026-07-22-exact-swept-sphere-cuboid-plan.md`
+- Modify: `docs/feature-work/done/2026-07-22-exact-swept-sphere-cuboid-plan.md`
 
 **Interfaces:**
 - Consumes: verified source, tests, coverage, and benchmark output.

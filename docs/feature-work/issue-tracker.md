@@ -38,10 +38,11 @@ records follow with their original discovery context.
 - GridForge's runtime-identity defect is resolved. Keep the lower stack locally
   linked while the remaining Gravitas queue is hardened so another downstream
   discovery does not force a partial release cycle.
-- Gravitas's current Release run passes 3,593 tests and ReleaseLean passes
-  3,538 tests. Exact coverage closure is paused at the canonical-geometry review
-  checkpoint; the earlier 100% artifact predates the current Task 7 changes and
-  is not a current release claim.
+- Gravitas's current Release run passes 3,611 tests and ReleaseLean passes
+  3,556 tests. Canonical-geometry Tasks 7 and 8 are implemented and independently
+  reviewed for user review. Exact coverage closure remains in Task 9; the
+  earlier 100% artifact predates these changes and is not a current release
+  claim.
 - After the Gravitas queue closes, release the lower stack in dependency order,
   replace local links with released packages at each layer, and rerun Gravitas
   `Release`, `ReleaseLean`, coverage, replay, and relevant benchmark gates.
@@ -49,10 +50,9 @@ records follow with their original discovery context.
 ### Ordered Queue
 
 1. **Gravitas — canonical collider geometry and exact scale admission:**
-   Tasks 5–7 are implemented for review. Resume the paused cuboid slice at
-   [Oriented Cuboid Boundary Proxies Can Deform Scalar-Face Geometry](#oriented-cuboid-boundary-proxies-can-deform-scalar-face-geometry),
-   then close the grouped issue and its completed scale, finite-axis, and 2D
-   convex-boundary records together.
+   Tasks 5–8 are implemented for review. After user review, run Task 9 coverage,
+   documentation, benchmark, and release gates, then close the grouped scale,
+   finite-axis, cuboid, and 2D convex-boundary records together.
 2. **Gravitas:**
    [True Unrepresentable Contact Lever Arms Can Drop Physical Response](#true-unrepresentable-contact-lever-arms-can-drop-physical-response).
 3. **Gravitas:**

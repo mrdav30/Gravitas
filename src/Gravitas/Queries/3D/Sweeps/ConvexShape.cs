@@ -329,7 +329,9 @@ internal readonly struct ConvexShape
                 cuboid.Center,
                 cuboid.Rotation,
                 localPoint,
-                _offset);
+                ConvexColliderSupport.GetLocalDisplacement(
+                    cuboid.Rotation,
+                    _offset));
         }
 
         return GetSupportAnchor(direction);
@@ -349,7 +351,25 @@ internal readonly struct ConvexShape
                 closest = Vector3d.Zero;
                 return false;
             }
+            if (_collider is LSCuboidCollider cuboid)
+            {
+                if (!Vector3d.TrySubtract(
+                        point,
+                        _offset,
+                        out Vector3d untranslatedPoint)
+                    || !cuboid.Rotation.Inverse().TryRotate(
+                        _offset,
+                        out Vector3d localTranslation))
+                {
+                    closest = Vector3d.Zero;
+                    return false;
+                }
 
+                return cuboid.OrientedBox
+                    .GetClosestPointAnchor(untranslatedPoint)
+                    .WithLocalTranslation(localTranslation)
+                    .TryGetPoint(out closest);
+            }
             closest = _collider!.ClosestPointOnSurface(point - _offset) + _offset;
             return true;
         }

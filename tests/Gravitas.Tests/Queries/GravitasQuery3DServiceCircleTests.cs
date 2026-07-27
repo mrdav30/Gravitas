@@ -114,6 +114,29 @@ public sealed class GravitasQuery3DServiceCircleTests
     }
 
     [Fact]
+    public void OverlapCircle_AtCuboidCenter_ShouldUseNearestFaceDistance()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSCuboidCollider cuboid =
+            CreateBodylessCuboid(context, Vector3d.Zero);
+
+        context.Query3D.OverlapCircle(
+                Vector3d.Zero,
+                Fixed64.FromFraction(3, 5),
+                out Physics3DHit hit,
+                IncludeLayerZero)
+            .Should().BeTrue();
+
+        hit.Collider.Should().BeSameAs(cuboid);
+        hit.Distance.Should().Be(Fixed64.Half);
+        hit.Anchor.TryGetOffsetFrom(
+                Vector3d.Zero,
+                out Vector3d surfaceOffset)
+            .Should().BeTrue();
+        surfaceOffset.Should().Be(Vector3d.Right * Fixed64.Half);
+    }
+
+    [Fact]
     public void OverlapCircle_WithNoCandidate_ShouldEmitDeterministicMissDiagnostic()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();

@@ -79,38 +79,12 @@ public sealed partial class GravitasQueryMixedService
         Fixed64 distance,
         LSCollider2D? sourceCollider)
     {
-        Vector3d point3D = GetSweepSurfacePoint(collider, sweepCenter, direction);
         return BuildCircleAgainst3DHit(
             collider,
-            point3D,
-            sweepCenter,
-            direction,
-            radius,
-            slabCenterY,
-            halfThickness,
-            reducerKind,
-            distance,
-            sourceCollider);
-    }
-
-    private static PhysicsMixedHit BuildCircleAgainst3DHit(
-        LSCollider collider,
-        Vector3d point3D,
-        Vector3d sweepCenter,
-        Vector3d direction,
-        Fixed64 radius,
-        Fixed64 slabCenterY,
-        Fixed64 halfThickness,
-        PhysicsQueryReducerKind reducerKind,
-        Fixed64 distance,
-        LSCollider2D? sourceCollider)
-    {
-        return BuildCircleAgainst3DHit(
-            collider,
-            new FixedPointAnchor(
-                point3D,
-                FixedQuaternion.Identity,
-                Vector3d.Zero),
+            GetSweepSurfaceAnchor(
+                collider,
+                sweepCenter,
+                direction),
             sweepCenter,
             direction,
             radius,
@@ -173,13 +147,27 @@ public sealed partial class GravitasQueryMixedService
             direction);
     }
 
-    private static Vector3d GetSweepSurfacePoint(LSCollider collider, Vector3d sweepCenter, Vector3d direction)
+    private static FixedPointAnchor GetSweepSurfaceAnchor(
+        LSCollider collider,
+        Vector3d sweepCenter,
+        Vector3d direction)
     {
+        if (collider is LSCuboidCollider cuboid)
+            return cuboid.OrientedBox.GetClosestPointAnchor(sweepCenter);
+
         Vector3d centerDelta = sweepCenter - collider.Center;
         if (centerDelta.MagnitudeSquared <= Fixed64.Epsilon)
-            return collider.Center - direction * collider.ScaledRadius;
+        {
+            return new FixedPointAnchor(
+                collider.Center,
+                FixedQuaternion.Identity,
+                -direction * collider.ScaledRadius);
+        }
 
-        return collider.ClosestPointOnSurface(sweepCenter);
+        return new FixedPointAnchor(
+            collider.ClosestPointOnSurface(sweepCenter),
+            FixedQuaternion.Identity,
+            Vector3d.Zero);
     }
 
     private static Vector3d Resolve3DTo2DFallback(LSCollider2D collider, Vector3d sweepCenter, Vector3d direction)

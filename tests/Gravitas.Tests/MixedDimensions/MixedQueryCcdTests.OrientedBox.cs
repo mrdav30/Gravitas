@@ -40,6 +40,35 @@ public sealed partial class MixedQueryCcdTests
         translated.ReducerKind.Should().Be(PhysicsQueryReducerKind.Exact);
     }
 
+    [Fact]
+    public void SweptCircleStartingInsideCuboid_ShouldUseNearestFaceAnchor()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSCuboidCollider> cuboid = CreateBody3D(
+            context,
+            new LSCuboidCollider(),
+            Vector3d.Zero,
+            immovable: true);
+
+        context.QueryMixed.SweepCircleAgainst3D(
+                Vector2d.Zero,
+                Vector2d.Right,
+                Fixed64.FromFraction(1, 4),
+                Fixed64.Zero,
+                Fixed64.Half,
+                IncludeLayerZero,
+                out PhysicsMixedHit hit)
+            .Should().BeTrue();
+
+        hit.Distance.Should().Be(Fixed64.Zero);
+        hit.Anchor3D.TryGetOffsetFrom(
+                cuboid.Collider.Center,
+                out Vector3d surfaceOffset)
+            .Should().BeTrue();
+        surfaceOffset.Should().Be(Vector3d.Right * Fixed64.Half);
+        hit.Normal3DTo2D.Should().Be(Vector3d.Left);
+    }
+
     private static PhysicsMixedHit SweepCircleAgainstRotatedCuboid(
         Fixed64 cuboidCenterX,
         bool positiveFace,

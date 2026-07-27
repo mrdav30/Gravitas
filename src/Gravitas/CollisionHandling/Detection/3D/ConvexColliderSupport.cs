@@ -256,7 +256,7 @@ internal static class ConvexColliderSupport
             ? direction.Normalized
             : Vector3d.Right;
 
-    private static Vector3d GetLocalDisplacement(
+    internal static Vector3d GetLocalDisplacement(
         FixedQuaternion rotation,
         Vector3d worldDisplacement)
     {

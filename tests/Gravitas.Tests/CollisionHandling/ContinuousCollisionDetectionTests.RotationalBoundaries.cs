@@ -3,6 +3,8 @@ using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Tests.Support;
+using GridForge.Configuration;
+using System;
 using Xunit;
 
 namespace Gravitas.Tests.CollisionHandlingTests;
@@ -286,6 +288,51 @@ public sealed partial class ContinuousCollisionDetectionTests
         SolidBody.TryGetSphereSeparationGap(source, capsule, out _)
             .Should()
             .BeFalse();
+    }
+
+    [Fact]
+    public void SphereCuboidSeparationGap_AtScalarFace_ShouldUseRelativeSurfaceAnchor()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        context.World.TryAddGrid(
+            new GridConfiguration(
+                new Vector3d(
+                    Fixed64.MaxValue - (Fixed64)4,
+                    (Fixed64)(-4),
+                    (Fixed64)(-4)),
+                new Vector3d(
+                    Fixed64.MaxValue,
+                    (Fixed64)4,
+                    (Fixed64)4)),
+            out _).Should().BeTrue();
+        Vector3d center = new(
+            Fixed64.MaxValue - Fixed64.FromFraction(1, 8),
+            Fixed64.Zero,
+            Fixed64.Zero);
+        var sphere = new LSSphereCollider();
+        sphere.InitializeWithNoBody(new TestMatterAgent(
+            context,
+            new FixedTransform(
+                center,
+                FixedQuaternion.Identity,
+                Vector3d.One)));
+        var cuboid = new LSCuboidCollider();
+        cuboid.InitializeWithNoBody(new TestMatterAgent(
+            context,
+            new FixedTransform(
+                center,
+                FixedQuaternion.Identity,
+                Vector3d.One)));
+
+        bool certified = true;
+        Action query = () => certified =
+            SolidBody.TryGetSphereSeparationGap(
+                sphere,
+                cuboid,
+                out _);
+
+        query.Should().NotThrow();
+        certified.Should().BeFalse();
     }
 
     [Fact]

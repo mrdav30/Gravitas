@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using System;
@@ -706,16 +707,33 @@ public partial class SolidBody
         LSCollider other,
         out Fixed64 separationGap)
     {
-        Vector3d closestPoint;
+        Vector3d separation;
         Fixed64 otherRadius;
         if (other is LSSphereCollider otherSphere)
         {
-            closestPoint = otherSphere.Center;
+            if (!Vector3d.TrySubtract(
+                    sphere.Center,
+                    otherSphere.Center,
+                    out separation))
+            {
+                separationGap = default;
+                return false;
+            }
             otherRadius = otherSphere.ScaledRadius;
         }
         else if (other is LSCuboidCollider cuboid)
         {
-            closestPoint = cuboid.ClosestPointOnSurface(sphere.Center);
+            var sphereCenter = new FixedPointAnchor(
+                sphere.Center,
+                FixedQuaternion.Identity,
+                Vector3d.Zero);
+            if (!sphereCenter.TryGetOffsetFrom(
+                    cuboid.OrientedBox.GetClosestPointAnchor(sphere.Center),
+                    out separation))
+            {
+                separationGap = default;
+                return false;
+            }
             otherRadius = Fixed64.Zero;
         }
         else
@@ -724,8 +742,7 @@ public partial class SolidBody
             return false;
         }
 
-        if (!Vector3d.TrySubtract(sphere.Center, closestPoint, out Vector3d separation)
-            || !Vector3d.TryGetMagnitude(separation, out Fixed64 distance)
+        if (!Vector3d.TryGetMagnitude(separation, out Fixed64 distance)
             || !Fixed64.TryAdd(sphere.ScaledRadius, otherRadius, out Fixed64 combinedRadius))
         {
             separationGap = default;

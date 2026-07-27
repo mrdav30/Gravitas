@@ -7,6 +7,7 @@
 
 using FixedMathSharp;
 using Gravitas.Colliders;
+using Gravitas.CollisionHandling;
 using Gravitas.Support;
 using GridForge.Grids;
 using GridForge.Utility;
@@ -227,15 +228,11 @@ public sealed partial class GravitasQuery3DService
         if ((collider.Center - position).MagnitudeSquared > broadDistance * broadDistance)
             return false;
 
-        Vector3d point = GetClosestSurfacePoint(collider, position);
-        Vector3d toPoint = point - position;
-        Fixed64 distance = toPoint.Magnitude;
-        if (distance > radius)
-            return false;
-
-        Vector3d normal = collider.GetNormalAtPoint(point);
-        hit = new Physics3DHit(collider, point, normal, distance, toPoint);
-        return true;
+        return TryBuildSurfaceOverlapHit(
+            collider,
+            position,
+            radius,
+            out hit);
     }
 
     private void TraceCircleForClosestHit(
@@ -400,8 +397,10 @@ public sealed partial class GravitasQuery3DService
             if (!TryBuildOverlapHit(colliderIds.DenseKeys[i], position, radius, out Physics3DHit hitInfo))
                 continue;
 
-            Vector3d toHit = hitInfo.Point - position;
-            if (toHit.MagnitudeSquared > maxDistanceSqr
+            if (!hitInfo.Anchor.TryGetOffsetFrom(
+                    position,
+                    out Vector3d toHit)
+                || toHit.MagnitudeSquared > maxDistanceSqr
                 || Vector3d.Dot(toHit.Normalized, direction) <= Fixed64.Zero
                 || !PhysicsHitSelectionPolicy.ShouldReplace(hitInfo, found, closestHit))
             {
@@ -461,14 +460,58 @@ public sealed partial class GravitasQuery3DService
         if ((collider.Center - position).MagnitudeSquared > broadDistance * broadDistance)
             return false;
 
-        Vector3d point = GetClosestSurfacePoint(collider, position);
-        Vector3d toPoint = point - position;
-        Fixed64 distance = toPoint.Magnitude;
-        if (distance > radius)
-            return false;
+        return TryBuildSurfaceOverlapHit(
+            collider,
+            position,
+            radius,
+            out raycastHit);
+    }
 
-        Vector3d normal = collider.GetNormalAtPoint(point);
-        raycastHit = new Physics3DHit(collider, point, normal, distance, toPoint);
+    private static bool TryBuildSurfaceOverlapHit(
+        LSCollider collider,
+        Vector3d position,
+        Fixed64 radius,
+        out Physics3DHit hit)
+    {
+        ContactAnchor anchor;
+        Vector3d toPoint;
+        Vector3d normal;
+        if (collider is LSCuboidCollider cuboid)
+        {
+            anchor = new ContactAnchor(
+                cuboid.OrientedBox.GetClosestPointAnchor(position));
+            if (!anchor.TryGetOffsetFrom(position, out toPoint))
+            {
+                hit = default;
+                return false;
+            }
+            normal = cuboid.OrientedBox.GetNearestFaceNormal(position);
+        }
+        else
+        {
+            Vector3d point = GetClosestSurfacePoint(collider, position);
+            if (!Vector3d.TrySubtract(point, position, out toPoint))
+            {
+                hit = default;
+                return false;
+            }
+            anchor = ContactAnchor.FromWorldPoint(point);
+            normal = collider.GetNormalAtPoint(point);
+        }
+
+        if (!Vector3d.TryGetMagnitude(toPoint, out Fixed64 distance)
+            || distance > radius)
+        {
+            hit = default;
+            return false;
+        }
+
+        hit = new Physics3DHit(
+            collider,
+            anchor,
+            normal,
+            distance,
+            toPoint);
         return true;
     }
 

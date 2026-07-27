@@ -126,6 +126,89 @@ public sealed class GravitasQuery3DServiceSweepTests
     }
 
     [Fact]
+    public void ConvexShape_CuboidAtScalarFace_ShouldFailSurfaceMaterializationWithoutThrowing()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        context.World.TryAddGrid(
+            new GridConfiguration(
+                new Vector3d(
+                    Fixed64.MaxValue - (Fixed64)4,
+                    (Fixed64)(-4),
+                    (Fixed64)(-4)),
+                new Vector3d(
+                    Fixed64.MaxValue,
+                    (Fixed64)4,
+                    (Fixed64)4)),
+            out _).Should().BeTrue();
+        Vector3d center = new(
+            Fixed64.MaxValue - Fixed64.FromFraction(1, 8),
+            Fixed64.Zero,
+            Fixed64.Zero);
+        var cuboid = new LSCuboidCollider();
+        cuboid.InitializeWithNoBody(new TestMatterAgent(
+            context,
+            new FixedTransform(
+                center,
+                FixedQuaternion.Identity,
+                Vector3d.One)));
+        var shape = new ConvexShape(cuboid, Vector3d.Zero);
+
+        bool succeeded = true;
+        Vector3d closest = Vector3d.One;
+        Action query = () =>
+            succeeded = shape.TryGetClosestPointOnSurface(
+                center,
+                out closest);
+
+        query.Should().NotThrow();
+        succeeded.Should().BeFalse();
+        closest.Should().Be(Vector3d.Zero);
+    }
+
+    [Fact]
+    public void ConvexShape_RotatedCuboidSweepOffset_ShouldRemainWorldSpace()
+    {
+        using PhysicsScenarioBuilder scenario =
+            PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSCuboidCollider> cuboid = scenario.CreateBody(
+            new LSCuboidCollider
+            {
+                Size = new Vector3d(
+                    Fixed64.Two,
+                    Fixed64.One,
+                    Fixed64.One)
+            },
+            Vector3d.Zero,
+            PhysicsScenarioBuilder.Yaw(90));
+        Vector3d offset = Vector3d.Right;
+        Vector3d queryPoint = Vector3d.Right * (Fixed64)3;
+        var shape = new ConvexShape(cuboid.Collider, offset);
+        var untranslatedShape =
+            new ConvexShape(cuboid.Collider, Vector3d.Zero);
+        FixedPointAnchor untranslatedAnchor =
+            cuboid.Collider.OrientedBox.GetClosestPointAnchor(
+                queryPoint - offset);
+        untranslatedAnchor.TryGetPoint(out Vector3d untranslatedPoint)
+            .Should().BeTrue();
+        FixedPointAnchor untranslatedFallback =
+            untranslatedShape.GetFallbackSurfaceAnchor(Vector3d.Right);
+        untranslatedFallback.TryGetPoint(out Vector3d fallbackPoint)
+            .Should().BeTrue();
+
+        shape.TryGetClosestPointOnSurface(
+                queryPoint,
+                out Vector3d closest)
+            .Should().BeTrue();
+
+        closest.Should().Be(untranslatedPoint + offset);
+        FixedPointAnchor translatedFallback =
+            shape.GetFallbackSurfaceAnchor(Vector3d.Right);
+        translatedFallback.TryGetPoint(out Vector3d translatedFallbackPoint)
+            .Should().BeTrue();
+        translatedFallbackPoint.Should().Be(fallbackPoint + offset);
+    }
+
+    [Fact]
     public void ConvexShape_TranslationAdmissionRequiresRepresentableCurrentAndFinalCenters()
     {
         var nearPositiveLimit = ConvexShape.CreateSphere(

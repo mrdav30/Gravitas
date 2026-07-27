@@ -31,56 +31,24 @@ public static partial class CollisionDetectionMixed
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void GetCircleSlabSegment(
-        LSCircleCollider2D circle,
-        out Vector3d start,
-        out Vector3d end)
-    {
-        Vector3d center = GetEmbeddedCenter3D(circle);
-        start = new Vector3d(
-            center.X,
-            circle.MixedBounds3D.Min.Y,
-            center.Z);
-        end = new Vector3d(
-            center.X,
-            circle.MixedBounds3D.Max.Y,
-            center.Z);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool TryGetClosestPointOnCenteredAxis(
-        Vector3d point,
-        Vector3d center,
-        Vector3d axis,
-        Fixed64 axisLength,
-        out Vector3d closestPoint) =>
-        FixedSegment.TryGetClosestPointsBetweenCenteredAxes(
-            center,
-            axis,
-            axisLength,
-            point,
-            Vector3d.Up,
-            Fixed64.Zero,
-            out closestPoint,
-            out _);
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Vector3d GetEmbeddedCenter3D(LSCollider2D embedded) =>
         MixedEmbedded2DGeometry.GetCenter3D(embedded);
 
     private static void GetEmbeddedCapsuleAxes(
         LSCapsuleCollider2D capsule,
+        out Vector2d planarAxis,
         out Vector3d axis,
         out Vector3d normal)
     {
         if (capsule.AxisLength <= Fixed64.Epsilon)
         {
+            planarAxis = Vector2d.Forward;
             axis = Vector3d.Zero;
             normal = Vector3d.Zero;
             return;
         }
 
-        Vector2d planarAxis = new(
+        planarAxis = new Vector2d(
             -FixedMath.Sin(capsule.Rotation),
             FixedMath.Cos(capsule.Rotation));
         axis = new Vector3d(
