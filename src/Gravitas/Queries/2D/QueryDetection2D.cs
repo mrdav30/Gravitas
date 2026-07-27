@@ -67,7 +67,7 @@ internal static partial class QueryDetection2D
                 out _,
                 out FixedPointAnchor2d contactAnchor,
                 out Vector2d circleToColliderNormal,
-                out _,
+                out Fixed64 depth,
                 out _))
         {
             hit = default;
@@ -82,25 +82,7 @@ internal static partial class QueryDetection2D
         Fixed64 distance = Fixed64.Zero;
         Vector2d normal = -circleToColliderNormal;
         if (!containsCenter)
-        {
-            contactAnchor = FixedConvex2dRelations.GetClosestPointAnchor(
-                center,
-                collider.Center,
-                collider.ConvexRotation,
-                vertexOffsets);
-
-            var anchor = new ContactAnchor2D(contactAnchor);
-            if (!anchor.TryGetOffsetFrom(center, out Vector2d centerToTarget)
-                || !Vector2d.TryGetMagnitude(centerToTarget, out distance))
-            {
-                hit = default;
-                return false;
-            }
-
-            normal = distance > Fixed64.Zero
-                ? -centerToTarget / distance
-                : ResolveQueryFallbackNormal(center, collider.Center);
-        }
+            distance = radius - depth;
 
         hit = new Physics2DHit(
             collider,
@@ -173,35 +155,14 @@ internal static partial class QueryDetection2D
     internal static void ValidateConvexQueryPolygon(ReadOnlySpan<Vector2d> vertices)
     {
         SwiftThrowHelper.ThrowIfArgument(vertices.Length < 3, nameof(vertices), "2D polygon query must contain at least three vertices.");
-
-        int sign = 0;
-        for (int i = 0; i < vertices.Length; i++)
-        {
-            Vector2d a = vertices[i];
-            Vector2d b = vertices[(i + 1) % vertices.Length];
-            Vector2d c = vertices[(i + 2) % vertices.Length];
-            Fixed64 cross = Vector2d.CrossProduct(b - a, c - b);
-            SwiftThrowHelper.ThrowIfArgument(cross.Abs() <= Fixed64.Epsilon, nameof(vertices), "2D polygon query vertices must not be collinear.");
-
-            int currentSign = cross > Fixed64.Zero ? 1 : -1;
-            if (sign == 0)
-            {
-                sign = currentSign;
-                continue;
-            }
-
-            SwiftThrowHelper.ThrowIfArgument(currentSign != sign, nameof(vertices), "2D polygon query must be convex.");
-        }
+        SwiftThrowHelper.ThrowIfArgument(
+            !FixedConvex2dRelations.IsStrictlyConvex(vertices),
+            nameof(vertices),
+            "2D polygon query vertices must form a strictly convex boundary.");
     }
 
-    internal static Vector2d CalculateAverageCenter(ReadOnlySpan<Vector2d> vertices)
-    {
-        Vector2d center = Vector2d.Zero;
-        for (int i = 0; i < vertices.Length; i++)
-            center += vertices[i];
-
-        return center / (Fixed64)vertices.Length;
-    }
+    internal static Vector2d CalculateAverageCenter(ReadOnlySpan<Vector2d> vertices) =>
+        Vector2d.GetAverage(vertices);
 
     internal static bool TryRaycast(Vector2d start, Vector2d end, LSCollider2D collider, out Physics2DHit hit)
     {
@@ -729,8 +690,6 @@ internal static partial class QueryDetection2D
             targetCenter,
             targetRotation,
             targetAxisLength);
-        if (normal == Vector2d.Zero)
-            normal = ResolveQueryFallbackNormal(queryCenter, targetCenter);
 
         hit = new Physics2DHit(
             target,
@@ -810,9 +769,7 @@ internal static partial class QueryDetection2D
             return false;
         }
 
-        Vector2d normal = distance > Fixed64.Zero
-            ? -centerToTarget / distance
-            : ResolveQueryFallbackNormal(queryCenter, target.Center);
+        Vector2d normal = -centerToTarget / distance;
         hit = new Physics2DHit(target, anchor, normal, distance);
         return true;
     }

@@ -491,7 +491,6 @@ public sealed partial class SolidBody2D
         Vector2d sourceStart,
         Vector2d sourceDisplacement,
         Fixed64 sourceStartRotation,
-        Fixed64 sourceAngularDelta,
         Fixed64 elapsedTime,
         Fixed64 remainingTime,
         out Fixed64 contactTime,
@@ -503,7 +502,6 @@ public sealed partial class SolidBody2D
         contact = default;
         if (Collider is not LSCircleCollider2D circle
             || target.Collider is not LSSphereCollider sphere
-            || sourceAngularDelta != Fixed64.Zero
             || targetSegment.AngularDistance != Fixed64.Zero)
         {
             return false;
@@ -562,24 +560,6 @@ public sealed partial class SolidBody2D
                 return false;
             }
 
-            if (totalDistance == Fixed64.Zero)
-            {
-                SampleMixedRotationalContinuousPairPose(
-                    sourceStart,
-                    sourceDisplacement,
-                    sourceStartRotation,
-                    Fixed64.Zero,
-                    Fixed64.Zero,
-                    elapsedTime,
-                    remainingTime,
-                    target,
-                    samplesTargetMotion: true);
-                return CollisionDetectionMixed.TryCollide(
-                    target.Collider,
-                    Collider,
-                    out contact);
-            }
-
             var relativeSpherePath = new FixedSegment(
                 sphereStart,
                 relativeSphereEnd);
@@ -596,17 +576,16 @@ public sealed partial class SolidBody2D
                 return false;
             }
 
-            if (!Vector2d.TryGetMagnitude(
-                    sourceDisplacement,
-                    out Fixed64 sourceTravelDistance)
-                || !Fixed64.TryMultiplyDivide(
-                    sourceTravelDistance,
-                    contactDistance,
-                    totalDistance,
-                    out sourceContactDistance))
-            {
-                return false;
-            }
+            // Caller admission proves the source segment and proportional
+            // contact distance are representable.
+            _ = Vector2d.TryGetMagnitude(
+                sourceDisplacement,
+                out Fixed64 sourceTravelDistance);
+            _ = Fixed64.TryMultiplyDivide(
+                sourceTravelDistance,
+                contactDistance,
+                totalDistance,
+                out sourceContactDistance);
 
             contactTime = FixedMath.Clamp01(
                 contactDistance / totalDistance);
@@ -630,10 +609,9 @@ public sealed partial class SolidBody2D
                 return true;
             }
 
-            if (contactTime == Fixed64.One)
-                return false;
-
-            contactTime += Fixed64.MinIncrement;
+            contactTime = FixedMath.Min(
+                Fixed64.One,
+                contactTime + Fixed64.MinIncrement);
             SampleMixedRotationalContinuousPairPose(
                 sourceStart,
                 sourceDisplacement,
@@ -644,17 +622,12 @@ public sealed partial class SolidBody2D
                 remainingTime,
                 target,
                 samplesTargetMotion: true);
-            if (!CollisionDetectionMixed.TryCollide(
-                    target.Collider,
-                    Collider,
-                    out contact))
-            {
-                return false;
-            }
-
             sourceContactDistance =
                 sourceTravelDistance * contactTime;
-            return true;
+            return CollisionDetectionMixed.TryCollide(
+                target.Collider,
+                Collider,
+                out contact);
         }
         finally
         {

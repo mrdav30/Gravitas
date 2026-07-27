@@ -236,6 +236,33 @@ public sealed partial class MixedQueryCcdTests
     }
 
     [Fact]
+    public void CapsuleSlabReducer_WhenFirstAxisEndpointIsOutsideDomain_ShouldReject()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        var target = (LSCapsuleCollider2D)
+            CreateBodylessCapsule2D(context, Vector2d.Zero);
+        target.AgentOrNull!.Transform.LocalPosition =
+            new Vector3d(
+                Fixed64.Zero,
+                Fixed64.Zero,
+                Fixed64.MinValue);
+        target.RebuildRuntimeShapeOnly().Should().BeTrue();
+
+        bool found =
+            GravitasQueryMixedService.TrySweepSphereAgainstCapsuleSlab(
+                Vector3d.Zero,
+                Vector3d.Right,
+                Vector3d.Right,
+                Fixed64.One,
+                Fixed64.Half,
+                target,
+                out PhysicsMixedHit hit);
+
+        found.Should().BeFalse();
+        hit.Should().Be(default(PhysicsMixedHit));
+    }
+
+    [Fact]
     public void SweepSphereAgainstCapsuleSlab_WithSubRawVerticalDirection_ShouldReconstructFromExactDistance()
     {
         using GravitasWorldContext context = CreateMixedContext();
@@ -409,6 +436,40 @@ public sealed partial class MixedQueryCcdTests
             out _);
 
         found.Should().BeFalse();
+    }
+
+    [Fact]
+    public void ConvexSlabReducer_WhenSweepCannotEnterTargetFrame_ShouldReject()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        LSCollider2D target = CreateBodylessBox2D(
+            context,
+            Vector2d.Zero,
+            Vector2d.One);
+        target.AgentOrNull!.Transform.LocalPosition =
+            new Vector3d(
+                Fixed64.MinValue,
+                Fixed64.Zero,
+                Fixed64.Zero);
+        target.RebuildRuntimeShapeOnly().Should().BeTrue();
+        Vector3d start = new(
+            Fixed64.MaxValue - Fixed64.One,
+            Fixed64.Zero,
+            Fixed64.Zero);
+        Vector3d end = start + Vector3d.Right;
+
+        bool found =
+            GravitasQueryMixedService.TrySweepSphereAgainstConvexSlab(
+                start,
+                end,
+                Vector3d.Right,
+                Fixed64.One,
+                Fixed64.Half,
+                target,
+                out PhysicsMixedHit hit);
+
+        found.Should().BeFalse();
+        hit.Should().Be(default(PhysicsMixedHit));
     }
 
     [Fact]

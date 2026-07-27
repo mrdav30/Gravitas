@@ -1461,6 +1461,71 @@ public sealed class CollisionDetectionShapePairTests
         AssertNoCollision(scenario, mesh.Collider, cone.Collider, CollisionType.Mesh_Cone);
     }
 
+    [Theory]
+    [InlineData(ColliderType.Cylinder)]
+    [InlineData(ColliderType.Cone)]
+    public void FiniteAxisMeshContact_WithOverlappingClippedBoundsAndUnrepresentableFrameOffset_ShouldReject(
+        ColliderType shape)
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        var mesh = new LSMeshCollider(
+            new[]
+            {
+                new Vector3d((Fixed64)(-3), -Fixed64.One, Fixed64.Zero),
+                new Vector3d((Fixed64)3, -Fixed64.One, Fixed64.Zero),
+                new Vector3d(Fixed64.Zero, Fixed64.One, Fixed64.Zero)
+            },
+            new[] { 0, 1, 2 },
+            MeshColliderMode.Concave,
+            MeshInertiaPolicy.SurfaceApproximation);
+        scenario.InitializeStaticCollider(
+            mesh,
+            new Vector3d((Fixed64)3, Fixed64.Zero, Fixed64.Zero));
+        LSCollider finiteAxis = shape == ColliderType.Cylinder
+            ? new LSCylinderCollider
+            {
+                Radius = Fixed64.MaxValue,
+                Size = Vector3d.One
+            }
+            : new LSConeCollider
+            {
+                Radius = Fixed64.MaxValue,
+                Size = Vector3d.One
+            };
+        scenario.InitializeStaticCollider(
+            finiteAxis,
+            new Vector3d(
+                Fixed64.MinValue + Fixed64.Two,
+                Fixed64.Zero,
+                Fixed64.Zero));
+
+        mesh.Bounds.Intersects(finiteAxis.Bounds).Should().BeTrue();
+        new FixedPointAnchor(
+                finiteAxis.Center,
+                FixedQuaternion.Identity,
+                Vector3d.Zero)
+            .TryGetLocalPointIn(
+                mesh.Mesh.Origin,
+                mesh.Mesh.Rotation,
+                out _)
+            .Should().BeFalse();
+        if (finiteAxis is LSCylinderCollider cylinder)
+        {
+            CylinderContactGeometry.IsAxisAligned(
+                    cylinder.Rotation,
+                    Vector3d.Up,
+                    mesh.Mesh.GetFaceNormalWorld(0))
+                .Should().BeFalse();
+        }
+        AssertNoCollision(
+            scenario,
+            mesh,
+            finiteAxis,
+            shape == ColliderType.Cylinder
+                ? CollisionType.Mesh_Cylinder
+                : CollisionType.Mesh_Cone);
+    }
+
     [Fact]
     public void MeshCone_WithMinimumRepresentableGap_ShouldClampToleranceContactDepthToZero()
     {

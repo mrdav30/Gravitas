@@ -137,6 +137,95 @@ public sealed class GravitasQuery3DServiceCircleTests
     }
 
     [Fact]
+    public void OverlapCircle_WhenSurfaceDistanceExceedsScalarDomain_ShouldReject()
+    {
+        using GravitasWorldContext context =
+            GravitasWorldContext.CreateOwned();
+        Fixed64 transverse = (Fixed64)1_600_000_000;
+        context.World.TryAddGrid(
+            new GridConfiguration(
+                new Vector3d(
+                    transverse - (Fixed64)4,
+                    (Fixed64)(-4),
+                    transverse - (Fixed64)4),
+                new Vector3d(
+                    transverse + (Fixed64)4,
+                    (Fixed64)4,
+                    transverse + (Fixed64)4)),
+            out _).Should().BeTrue();
+        var cuboid = new LSCuboidCollider();
+        cuboid.InitializeWithNoBody(new TestMatterAgent(
+            context,
+            new FixedTransform(
+                new Vector3d(
+                    transverse,
+                    Fixed64.Zero,
+                    transverse),
+                FixedQuaternion.Identity,
+                Vector3d.One)));
+
+        bool hit = context.Query3D.OverlapCircle(
+            Vector3d.Zero,
+            Fixed64.MaxValue,
+            out Physics3DHit result,
+            IncludeLayerZero);
+
+        hit.Should().BeFalse();
+        result.Should().Be(default(Physics3DHit));
+        context.Query3D.LastQueryCandidateCount.Should().Be(1);
+    }
+
+    [Fact]
+    public void SurfaceOverlapHit_WhenCuboidAnchorOffsetIsOutsideScalarDomain_ShouldReject()
+    {
+        using GravitasWorldContext context =
+            GravitasWorldContext.CreateOwned();
+        LSCuboidCollider cuboid = CreateBodylessCuboid(
+            context,
+            new Vector3d(
+                Fixed64.MaxValue,
+                Fixed64.Zero,
+                Fixed64.Zero));
+
+        bool hit = GravitasQuery3DService.TryBuildSurfaceOverlapHit(
+            cuboid,
+            new Vector3d(
+                Fixed64.MinValue,
+                Fixed64.Zero,
+                Fixed64.Zero),
+            Fixed64.MaxValue,
+            out Physics3DHit result);
+
+        hit.Should().BeFalse();
+        result.Should().Be(default(Physics3DHit));
+    }
+
+    [Fact]
+    public void SurfaceOverlapHit_WhenPrimitiveSurfaceOffsetIsOutsideScalarDomain_ShouldReject()
+    {
+        using GravitasWorldContext context =
+            GravitasWorldContext.CreateOwned();
+        LSSphereCollider sphere = CreateDynamicSphere(
+            context,
+            new Vector3d(
+                Fixed64.MaxValue,
+                Fixed64.Zero,
+                Fixed64.Zero));
+
+        bool hit = GravitasQuery3DService.TryBuildSurfaceOverlapHit(
+            sphere,
+            new Vector3d(
+                Fixed64.MinValue,
+                Fixed64.Zero,
+                Fixed64.Zero),
+            Fixed64.MaxValue,
+            out Physics3DHit result);
+
+        hit.Should().BeFalse();
+        result.Should().Be(default(Physics3DHit));
+    }
+
+    [Fact]
     public void OverlapCircle_WithNoCandidate_ShouldEmitDeterministicMissDiagnostic()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();

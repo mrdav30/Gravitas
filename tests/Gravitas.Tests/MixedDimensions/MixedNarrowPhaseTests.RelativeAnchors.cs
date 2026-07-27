@@ -44,6 +44,39 @@ public sealed partial class MixedNarrowPhaseTests
     }
 
     [Theory]
+    [InlineData(ColliderType.Capsule)]
+    [InlineData(ColliderType.Cylinder)]
+    [InlineData(ColliderType.Cone)]
+    public void FiniteAxisCapsuleSlab_WithOverlappingBoundsButPrincipalAxisSeparation_ShouldRejectContact(
+        ColliderType shape3D)
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        FixedQuaternion rotation = Euler(0, 0, 45);
+        Fixed64 separation = shape3D == ColliderType.Capsule
+            ? Fixed64.FromFraction(23, 10)
+            : Fixed64.FromFraction(13, 10);
+        Vector3d position = (rotation * Vector3d.Up) * separation;
+        LSCollider collider3D = CreatePrimitive3D(
+            context,
+            shape3D,
+            position,
+            rotation);
+        LSCollider2D capsule2D = CreatePrimitive2D(
+            context,
+            ColliderType2D.Capsule,
+            Fixed64.Zero);
+
+        collider3D.Bounds.Intersects(capsule2D.MixedBounds3D)
+            .Should().BeTrue();
+        CollisionDetectionMixed.TryCollide(
+                collider3D,
+                capsule2D,
+                out MixedContact contact)
+            .Should().BeFalse();
+        contact.HasContact.Should().BeFalse();
+    }
+
+    [Theory]
     [InlineData(ColliderType.Capsule, ColliderType2D.Circle)]
     [InlineData(ColliderType.Cylinder, ColliderType2D.Capsule)]
     [InlineData(ColliderType.Cone, ColliderType2D.Capsule)]
@@ -52,16 +85,27 @@ public sealed partial class MixedNarrowPhaseTests
         ColliderType2D shape2D)
     {
         using GravitasWorldContext context = CreateMixedContext();
+        Vector3d rotationAxis =
+            new Vector3d(Fixed64.One, Fixed64.Zero, -Fixed64.One)
+                .Normalized;
+        FixedQuaternion rotation = FixedQuaternion.FromAxisAngle(
+            rotationAxis,
+            Fixed64.HalfPi);
+        Vector3d shapeAxis = rotation * Vector3d.Up;
+        Vector3d separationAxis =
+            Vector3d.Cross(shapeAxis, Vector3d.Up).Normalized;
         LSCollider collider3D = CreatePrimitive3D(
             context,
             shape3D,
-            new Vector3d(Fixed64.Zero, Fixed64.Zero, (Fixed64)4),
-            Euler(0, 0, 90));
+            separationAxis * Fixed64.FromFraction(11, 10),
+            rotation);
         LSCollider2D collider2D = CreatePrimitive2D(
             context,
             shape2D,
-            Fixed64.Zero);
+            -Fixed64.PiOver4);
 
+        collider3D.Bounds.Intersects(collider2D.MixedBounds3D)
+            .Should().BeTrue();
         CollisionDetectionMixed.TryCollide(
                 collider3D,
                 collider2D,
@@ -413,6 +457,59 @@ public sealed partial class MixedNarrowPhaseTests
         embeddedOffset.Should().Be(Vector3d.Right * Fixed64.Half);
         contact.Normal3DTo2D.Should().Be(Vector3d.Right);
         contact.Depth.Should().Be(Fixed64.One);
+    }
+
+    [Fact]
+    public void SphereCircleSlab_WithUnrepresentableInteriorDepth_ShouldClampExplicitly()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSSphereCollider> sphere =
+            CreateSphere3D(context, Vector3d.Zero);
+        SolidBody2D circle = CreateBody2D(
+            context,
+            new LSCircleCollider2D(Fixed64.One),
+            Vector2d.Zero);
+        sphere.Collider.Radius = Fixed64.MaxValue;
+        sphere.Collider.RebuildRuntimeShapeOnly(
+            refreshMassProperties: false).Should().BeTrue();
+
+        CollisionDetectionMixed.TryCollide(
+                sphere.Collider,
+                circle.Collider,
+                out MixedContact contact)
+            .Should()
+            .BeTrue();
+
+        contact.Depth.Should().Be(Fixed64.MaxValue);
+        contact.DepthIsClamped.Should().BeTrue();
+    }
+
+    [Fact]
+    public void SphereCustomSlab_WithUnrepresentableDiagonalSeparation_ShouldRejectContact()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSSphereCollider> sphere =
+            CreateSphere3D(context, Vector3d.Zero);
+        SolidBody2D embedded = CreateBody2D(
+            context,
+            new UnsupportedTestCollider2D(),
+            Vector2d.Zero);
+        sphere.Collider.Radius = Fixed64.MaxValue;
+        embedded.Collider.LocalOffset =
+            Vector2d.One * (Fixed64)1_600_000_000;
+        sphere.Collider.RebuildRuntimeShapeOnly(
+            refreshMassProperties: false).Should().BeTrue();
+        embedded.Collider.RebuildRuntimeShapeOnly().Should().BeTrue();
+
+        sphere.Collider.Bounds.Intersects(embedded.Collider.MixedBounds3D)
+            .Should().BeTrue();
+        CollisionDetectionMixed.TryCollide(
+                sphere.Collider,
+                embedded.Collider,
+                out MixedContact contact)
+            .Should()
+            .BeFalse();
+        contact.HasContact.Should().BeFalse();
     }
 
     private static MixedContact GetRotatedFiniteAxisRoundSlabContact(

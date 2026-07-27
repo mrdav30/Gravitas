@@ -235,7 +235,7 @@ The right migration is a shared Gravitas wrapper backed by `FixedTriangle`.
   - cached `Normal` is the normal supplied by `PhysicsMesh`, not recomputed from
     `FixedTriangle.Normal`.
 - [x] Create the shared internal collision triangle wrapper using
-      `FixedMathSharp.Bounds.FixedTriangle`.
+      `FixedMathSharp.Geometry.FixedTriangle`.
 - [x] Replace the nested `TriangleData` in `MeshTriangleContactGenerator.cs`
       with the shared wrapper.
 - [x] Replace `MixedTriangle` in mixed mesh-vs-slab logic with the shared

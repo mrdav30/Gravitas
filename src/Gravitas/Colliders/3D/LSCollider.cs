@@ -178,11 +178,8 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
     {
         get => _hasCommittedShape
             ? _committedRotation
-            : _compoundOwner != null
-                ? _compoundOwner.Rotation * _compoundLocalRotation
-                : Body?.Rotation
-                ?? _agent?.Transform.WorldRotation
-                ?? throw new InvalidOperationException("Collider has no body or static transform.");
+            : throw new InvalidOperationException(
+                "Collider has no committed runtime shape.");
         set
         {
             SwiftThrowHelper.ThrowIfTrue(
@@ -383,12 +380,9 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
     /// </summary>
     public bool TryGetLocalScale(out Vector3d scale)
     {
-        Vector3d ownerScale = GetCurrentOwnerScale();
-        Vector3d partScale = _hasCommittedShape
-            ? _committedPartScale
-            : _compoundOwner != null
-                ? _compoundLocalScale
-                : Vector3d.One;
+        GetCurrentShapeScales(
+            out Vector3d ownerScale,
+            out Vector3d partScale);
 
         bool representable = Fixed64.TryMultiplyDivide(
                 ownerScale.X,

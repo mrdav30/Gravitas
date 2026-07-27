@@ -739,7 +739,7 @@ public sealed partial class SolidBody2D
         return false;
     }
 
-    private static bool TryGetCircleSeparationGap(
+    internal static bool TryGetCircleSeparationGap(
         LSCircleCollider2D circle,
         LSCollider2D other,
         out Fixed64 separationGap)

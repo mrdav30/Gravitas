@@ -125,16 +125,22 @@ public sealed class PhysicsMeshTests
     public void OpenSurface_ShouldReportItsClosureFailureForVolumeMassProperties()
     {
         var mesh = new PhysicsMesh(
-            ValidVertices(),
-            ValidTriangles(),
+            new[]
+            {
+                Vector3d.Right,
+                Vector3d.Up,
+                Vector3d.Forward
+            },
+            new[] { 0, 1, 2 },
             Vector3d.Zero,
-            FixedQuaternion.Identity);
+            FixedQuaternion.Identity,
+            MeshColliderMode.Concave);
 
         mesh.TryGetClosedVolumeMassProperties(
                 out _,
                 out MeshVolumeValidationResult result)
             .Should().BeFalse();
-        result.Should().NotBe(MeshVolumeValidationResult.Valid);
+        result.Should().Be(MeshVolumeValidationResult.BoundaryEdge);
     }
 
     [Fact]

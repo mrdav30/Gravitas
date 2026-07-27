@@ -361,21 +361,14 @@ public sealed partial class SolidBody2D
                     LastContinuousCollisionToiIterationCount++;
                     LastContinuousCollisionToiIterationLimitReached =
                         remainingAfterHit > Fixed64.Epsilon;
-                    if (CanAppendContinuousCollisionFrameSegment(hitElapsedTime)
-                        && Context.Physics2D
-                            .TryReserveContinuousCollisionCandidateRefresh(this))
-                    {
-                        UpdateContinuousCollisionFrameTrajectory(
-                            currentPosition,
-                            Vector2d.Zero,
-                            hitElapsedTime);
-                        Context.Physics2D
-                            .RefreshContinuousCollisionCandidate(this);
-                    }
-                    else
-                    {
-                        LastContinuousCollisionToiIterationLimitReached = true;
-                    }
+                    _ = Context.Physics2D
+                        .TryReserveContinuousCollisionCandidateRefresh(this);
+                    UpdateContinuousCollisionFrameTrajectory(
+                        currentPosition,
+                        Vector2d.Zero,
+                        hitElapsedTime);
+                    Context.Physics2D
+                        .RefreshContinuousCollisionCandidate(this);
 
                     if (LastContinuousCollisionToiIterationLimitReached)
                         Context.Physics2D.ReportContinuousCollisionIterationLimit();

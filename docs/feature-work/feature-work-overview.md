@@ -38,6 +38,20 @@ instead of burying it in notes.
 
 ## Recently Completed
 
+- [`Canonical Collider Geometry And Exact Scale Admission`](issue-tracker.md#finite-axis-collider-geometry-uses-canonical-rigid-frames)
+  - Completed 2026-07-27. FixedMathSharp owns strict transform composition,
+    fused scaled dimensions, centered finite-axis relations, local convex
+    boundaries, and `FixedOrientedBox`; Gravitas publishes collider geometry
+    transactionally and consumes canonical rigid-frame anchors across 2D, 3D,
+    mixed, mesh, query, CCD, replay, response, and diagnostics. FixedMathSharp
+    passes 2,575 Release and 2,554 ReleaseLean tests at exact 100% coverage.
+    Gravitas passes 3,669 Release and 3,614 ReleaseLean tests at 37,548/37,548
+    lines, 11,865/11,865 branches, and 4,246/4,246 methods; repeated replay and
+    allocation gates are green. The correctness work is closed, while the
+    exact-winner optimization reduced the measured ordinary-domain
+    `FixedOrientedBox` cost by 37-46%. The remaining throughput gap stays a
+    high-priority benchmark signal rather than being hidden behind downstream
+    approximation.
 - [`Full-Domain Conic Query And Triangle Arithmetic`](issue-tracker.md#cone-triangle-face-interiors-are-reduced-without-edge-crossings)
   - Completed 2026-07-22. FixedMathSharp now owns exact allocation-free
     finite-cone segment intervals for apex-authored and centered cones, while

@@ -229,6 +229,23 @@ Collider shape work has a focused selection:
 dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll collider-shape --filter "*" -j Short -i --exporters json
 ```
 
+### 2026-07-27 Canonical Geometry Closure
+
+The Task 9 comparison retained the Task 0 and final short in-process artifacts
+under `artifacts/benchmarks`. Exact candidate ranking now rounds only the
+winning `FixedOrientedBox` contact depth. The affected 64-pair rows improved
+from `5.113` to `2.499 ms` for cuboid/cuboid, `25.209` to `10.835 ms` for
+cuboid/capsule, and about `12.0` to `7.0 ms` for mesh/cuboid. Capsule runtime
+shape rebuild improved from `1.609` to `1.376 ms`, and compound movement from
+`62.82` to `58.76 us`.
+
+These are short-run diagnostic measurements, not a claim of parity with the
+older saturating geometry. The remaining exact ordinary-domain throughput gap
+is tracked in
+`docs/feature-work/benchmark-signal-hardening-backlog.md`. Allocation tests,
+not the occasional single-digit-byte in-process runner noise, remain the
+authoritative allocation gate.
+
 ## CI Guidance
 
 CI should at minimum compile the benchmark project in `Release`. The normal

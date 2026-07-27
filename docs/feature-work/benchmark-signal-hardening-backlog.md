@@ -58,8 +58,52 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 
 | Signal | Status | Priority | Tracking |
 | ------ | ------ | -------- | -------- |
+| Exact canonical OBB contacts regress ordinary narrow-phase throughput | Partially corrected | High | Add a proven exact ordinary-domain path in FixedMathSharp with the current wide kernels as fallback |
 | Mixed public sweep traversal stalls on extreme sparse-grid spans | Observed | Medium | Isolate GridTracer clipping and cell-visit scaling independently of narrow phase |
 | Mixed discrete broad-phase refresh allocates at 32 moving CCD pairs | Isolated | Low | Reproduce capacity-growth threshold independently of rotational CCD |
+
+### Signal: Exact Canonical OBB Contacts Regress Ordinary Narrow-Phase Throughput
+
+**Discovered:** 2026-07-27  
+**Source:** canonical-collider Task 9 comparison against the preserved Task 0
+short in-process baseline  
+**Status:** Exact-winner ranking corrected redundant depth rounding; the
+remaining cost is isolated to the exact wide `FixedOrientedBox` relation
+kernels. Correctness and allocation gates remain green.
+
+The same Release build, BenchmarkDotNet job, hardware, parameters, and contact
+fixtures reported the following ordinary-domain changes:
+
+| Row | Task 0 | Task 9 |
+| --- | -----: | -----: |
+| 64 rotated cuboid/cuboid pairs | 385.66 us | 5.113 ms |
+| 64 rotated cuboid/capsule pairs | 411.69 us | 25.209 ms |
+| 64 convex mesh/cuboid pairs | 1.363 ms | 12.035 ms |
+| 64 concave mesh/cuboid pairs | 1.368 ms | 12.106 ms |
+
+The first root-cause correction retains each candidate's exact overlap and
+squared-axis terms, selects the exact winner, and rounds only that final depth.
+Direct FixedMathSharp rows improved by 37-46% without allocations. The affected
+Gravitas rerun improved cuboid/cuboid from `5.113` to `2.499 ms`,
+cuboid/capsule from `25.209` to `10.835 ms`, and mesh/cuboid rows from about
+`12.0` to `7.0 ms`. The remaining gap is still release-relevant.
+
+The benchmark assembly loads the optimized Release FixedMathSharp binary, and
+all four fixtures still report 64 contacts, excluding the known local-link
+Debug mapping problem and an early-rejection workload change. Direct
+FixedMathSharp probes now place the ordinary OBB/triangle row at `87.787 us`
+after exact-winner ranking; the Gravitas rows route through the same full-domain
+relation family.
+
+This is the expected cost center of replacing saturating world-corner and
+endpoint authority with exact wide relations, but the remaining magnitude is
+not release-neutral. The smallest useful next step is an exact common-domain
+path inside FixedMathSharp that returns the same contact anchors and tie
+ordering, with the current wide kernels retained for overflow, cancellation,
+and scalar-face cases. Do not restore Gravitas-local SAT, cached world geometry,
+or an approximate early answer. The preserved artifacts are:
+`artifacts/benchmarks/task9-canonical-geometry-baseline-20260722` and
+`artifacts/benchmarks/task9-canonical-geometry-final-optimized-20260727`.
 
 ### Signal: Mixed Public Sweep Traversal Stalls On Extreme Sparse-Grid Spans
 

@@ -342,21 +342,14 @@ public partial class SolidBody
                     LastContinuousCollisionToiIterationCount++;
                     LastContinuousCollisionToiIterationLimitReached =
                         remainingAfterHit > Fixed64.Epsilon;
-                    if (CanAppendContinuousCollisionSegment(hitElapsedTime)
-                        && Context.Physics
-                            .TryReserveContinuousCollisionCandidateRefresh(this))
-                    {
-                        UpdateContinuousCollisionFrameTrajectory(
-                            currentPosition,
-                            Vector3d.Zero,
-                            hitElapsedTime);
-                        Context.Physics
-                            .RefreshContinuousCollisionCandidate(this);
-                    }
-                    else
-                    {
-                        LastContinuousCollisionToiIterationLimitReached = true;
-                    }
+                    _ = Context.Physics
+                        .TryReserveContinuousCollisionCandidateRefresh(this);
+                    UpdateContinuousCollisionFrameTrajectory(
+                        currentPosition,
+                        Vector3d.Zero,
+                        hitElapsedTime);
+                    Context.Physics
+                        .RefreshContinuousCollisionCandidate(this);
 
                     if (LastContinuousCollisionToiIterationLimitReached)
                         Context.Physics.ReportContinuousCollisionIterationLimit();

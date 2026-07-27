@@ -6,6 +6,7 @@ using Gravitas.CollisionHandling;
 using Gravitas.Queries;
 using Gravitas.Tests.Support;
 using SwiftCollections;
+using System;
 using Xunit;
 
 namespace Gravitas.Tests.Queries;
@@ -121,6 +122,115 @@ public sealed class FiniteAxisProjectionWorkerTests
 
         hit.Collider.Should().BeSameAs(compound);
         hit.Distance.Should().Be(expectedCircleHit.Distance);
+    }
+
+    [Fact]
+    public void PolygonOverlap_AtScalarFace_ShouldMeasureFromTheExactQueryCenter()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        var expectedCenter = new Vector2d(
+            Fixed64.MaxValue - Fixed64.Two,
+            Fixed64.Zero);
+        Vector2d[] vertices =
+        {
+            expectedCenter + new Vector2d(-Fixed64.One, -Fixed64.One),
+            expectedCenter + new Vector2d(Fixed64.One, -Fixed64.One),
+            expectedCenter + new Vector2d(Fixed64.One, Fixed64.One),
+            expectedCenter + new Vector2d(-Fixed64.One, Fixed64.One)
+        };
+        var target = new LSAABBoxCollider2D(Vector2d.One);
+        target.InitializeWithNoBody(new TestMatterAgent(
+            context,
+            new FixedTransform(
+                new Vector3d(
+                    expectedCenter.X,
+                    Fixed64.Zero,
+                    expectedCenter.Y),
+                FixedQuaternion.Identity,
+                Vector3d.One)));
+
+        bool found = QueryDetection2D.TryOverlapPolygon(
+            vertices,
+            QueryDetection2D.CalculateAverageCenter(vertices),
+            target,
+            out Physics2DHit hit);
+
+        found.Should().BeTrue();
+        hit.Distance.Should().Be(Fixed64.Zero);
+        hit.Anchor.TryGetWorldPoint(out Vector2d point).Should().BeTrue();
+        point.Should().Be(expectedCenter);
+    }
+
+    [Fact]
+    public void PolygonOverlap_WithUnrepresentableAnchorOffset_ShouldDeclineTheHit()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        Fixed64 left = Fixed64.MinValue + (Fixed64)10;
+        Fixed64 right = Fixed64.MaxValue - (Fixed64)10;
+        Vector2d[] vertices =
+        {
+            new(left, Fixed64.Zero),
+            new(right, -(Fixed64)100),
+            new(right, (Fixed64)100)
+        };
+        var target = new LSAABBoxCollider2D(
+            Vector2d.One * Fixed64.Two);
+        target.InitializeWithNoBody(new TestMatterAgent(
+            context,
+            new FixedTransform(
+                new Vector3d(
+                    left + Fixed64.One,
+                    Fixed64.Zero,
+                    Fixed64.Zero),
+                FixedQuaternion.Identity,
+                Vector3d.One)));
+
+        ConvexAreasOverlap(vertices, target).Should().BeTrue();
+        QueryDetection2D.TryOverlapPolygon(
+                vertices,
+                Vector2d.GetAverage(vertices),
+                target,
+                out Physics2DHit hit)
+            .Should()
+            .BeFalse();
+        hit.Should().Be(default(Physics2DHit));
+    }
+
+    [Fact]
+    public void PolygonOverlap_WithUnrepresentableCenterDistance_ShouldDeclineTheHit()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        Fixed64 minimum = Fixed64.MinValue + (Fixed64)10;
+        Fixed64 maximum = Fixed64.MaxValue - (Fixed64)10;
+        Vector2d[] vertices =
+        {
+            new(minimum, minimum),
+            new(maximum, minimum),
+            new(maximum, maximum),
+            new(minimum, maximum)
+        };
+        Fixed64 targetCoordinate = (Fixed64)1_600_000_000;
+        var target = new LSAABBoxCollider2D(
+            Vector2d.One * Fixed64.Two);
+        target.InitializeWithNoBody(new TestMatterAgent(
+            context,
+            new FixedTransform(
+                new Vector3d(
+                    targetCoordinate,
+                    Fixed64.Zero,
+                    targetCoordinate),
+                FixedQuaternion.Identity,
+                Vector3d.One)));
+
+        ConvexAreasOverlap(vertices, target).Should().BeTrue();
+        QueryDetection2D.TryOverlapPolygon(
+                vertices,
+                Vector2d.GetAverage(vertices),
+                target,
+                out Physics2DHit hit)
+            .Should()
+            .BeFalse();
+        hit.Should().Be(default(Physics2DHit));
     }
 
     [Fact]
@@ -551,6 +661,33 @@ public sealed class FiniteAxisProjectionWorkerTests
             new Vector3d(Fixed64.MaxValue - (Fixed64)5, Fixed64.Zero, Fixed64.Zero)).Should().BeTrue();
         collider.RebuildRuntimeShapeOnly(refreshMassProperties: false).Should().BeTrue();
         return collider;
+    }
+
+    private static bool ConvexAreasOverlap(
+        ReadOnlySpan<Vector2d> vertices,
+        LSCollider2D target)
+    {
+        Span<Vector2d> targetOffsets = stackalloc Vector2d[4];
+        for (int i = 0; i < target.VertexCount; i++)
+            targetOffsets[i] = target.GetScaledLocalVertexUnchecked(i);
+
+        Span<FixedPointAnchor2d> queryContacts =
+            stackalloc FixedPointAnchor2d[2];
+        Span<FixedPointAnchor2d> targetContacts =
+            stackalloc FixedPointAnchor2d[2];
+        return FixedConvex2dRelations.TryGetConvexContacts(
+            Vector2d.Zero,
+            Fixed64.Zero,
+            vertices,
+            target.Center,
+            target.ConvexRotation,
+            targetOffsets.Slice(0, target.VertexCount),
+            queryContacts,
+            targetContacts,
+            out _,
+            out _,
+            out _,
+            out _);
     }
 
     private static LSCapsuleCollider CreateOrdinaryCapsule(GravitasWorldContext context) =>

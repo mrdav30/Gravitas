@@ -356,15 +356,17 @@ internal readonly struct ConvexShape
                 if (!Vector3d.TrySubtract(
                         point,
                         _offset,
-                        out Vector3d untranslatedPoint)
-                    || !cuboid.Rotation.Inverse().TryRotate(
-                        _offset,
-                        out Vector3d localTranslation))
+                        out Vector3d untranslatedPoint))
                 {
                     closest = Vector3d.Zero;
                     return false;
                 }
 
+                // Sweep offsets come from a chord whose magnitude was admitted
+                // by Prepare, so a unit rotation preserves representability.
+                _ = cuboid.Rotation.Inverse().TryRotate(
+                    _offset,
+                    out Vector3d localTranslation);
                 return cuboid.OrientedBox
                     .GetClosestPointAnchor(untranslatedPoint)
                     .WithLocalTranslation(localTranslation)

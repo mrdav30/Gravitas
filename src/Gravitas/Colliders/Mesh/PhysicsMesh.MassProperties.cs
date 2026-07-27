@@ -211,9 +211,18 @@ public partial class PhysicsMesh
             return false;
         }
 
+        if (usePreparedVertices)
+        {
+            return TryCalculateClosedVolumeMassProperties(
+                _preparedScaledLocalVertices,
+                _preparedScaledLocalBounds,
+                out properties,
+                out result);
+        }
+
         return TryCalculateClosedVolumeMassProperties(
-            usePreparedVertices ? _preparedScaledLocalVertices : _scaledLocalVertices,
-            usePreparedVertices ? _preparedScaledLocalBounds : _scaledLocalBounds,
+            _scaledLocalVertices,
+            _scaledLocalBounds,
             out properties,
             out result);
     }
@@ -377,13 +386,6 @@ public partial class PhysicsMesh
         out MeshMassProperties properties,
         out MeshVolumeValidationResult result)
     {
-        if (!IsClosedSurface)
-        {
-            properties = default;
-            result = _surfaceClosureValidationResult;
-            return false;
-        }
-
         Vector3d reference = bounds.Center;
         Fixed64 signedVolume = Fixed64.Zero;
         Vector3d firstMoment = Vector3d.Zero;

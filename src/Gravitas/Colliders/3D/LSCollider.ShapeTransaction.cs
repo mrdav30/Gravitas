@@ -51,10 +51,7 @@ public abstract partial class LSCollider
             return _committedOwnerScale;
         if (_compoundOwner != null)
             return _compoundOwner.GetCurrentOwnerScale();
-        if (_agent == null)
-            return Vector3d.One;
-
-        return ColliderScalePolicy.Capture(Transform, out _, out _);
+        return Vector3d.One;
     }
 
     private Vector3d GetCurrentPartScale() =>
@@ -133,14 +130,12 @@ public abstract partial class LSCollider
         Vector3d requestedPosition,
         FixedQuaternion requestedRotation)
     {
-        Vector3d ownerScale = ColliderScalePolicy.Capture(
-            agent.Transform,
-            out Fixed4x4 worldMatrix,
-            out FixedQuaternion matrixRotation);
+        Vector3d ownerScale;
         Vector3d center;
         FixedQuaternion rotation;
         if (useRequestedPose)
         {
+            ownerScale = ColliderScalePolicy.CaptureScale(agent.Transform);
             rotation = requestedRotation;
             SwiftThrowHelper.ThrowIfArgument(
                 !rotation.TryTransformScaledPoint(
@@ -153,6 +148,10 @@ public abstract partial class LSCollider
         }
         else
         {
+            ownerScale = ColliderScalePolicy.Capture(
+                agent.Transform,
+                out Fixed4x4 worldMatrix,
+                out FixedQuaternion matrixRotation);
             rotation = matrixRotation;
             SwiftThrowHelper.ThrowIfArgument(
                 !Fixed4x4.TryTransformAffinePoint(worldMatrix, _offset, out center),
@@ -360,6 +359,13 @@ public abstract partial class LSCollider
     {
         if (_compoundOwner == null)
         {
+            if (_preparedSnapshot.LocalOffset == Vector3d.Zero
+                && scaledLocalPoint == Vector3d.Zero)
+            {
+                point = Vector3d.Zero;
+                return true;
+            }
+
             return Vector3d.TryComposeScaledLocalPoints(
                 _preparedSnapshot.LocalOffset,
                 _preparedSnapshot.OwnerScale,

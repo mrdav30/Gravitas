@@ -43,6 +43,7 @@ public sealed class CompoundColliderTests
 
         body.Collider.Parts[0].LocalRotation.Should().Be(expected);
         runtimePart.CompoundLocalRotation.Should().Be(expected);
+        runtimePart.Position.Should().Be(body.Collider.Center);
         runtimePart.Rotation.Should().Be(expected);
         runtimePart.WorldAxis.IsNormalized().Should().BeTrue();
     }

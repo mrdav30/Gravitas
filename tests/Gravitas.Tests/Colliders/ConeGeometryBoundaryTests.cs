@@ -98,6 +98,30 @@ public sealed class ConeGeometryBoundaryTests
     }
 
     [Fact]
+    public void ContainsWorldPoint_AcrossTheScalarDomain_ShouldDeclineAnUnmaterializableWitness()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSConeCollider cone = scenario.CreateBody(
+            new LSConeCollider(
+                ColliderShapeDefinition.Cone(
+                    Fixed64.One,
+                    Fixed64.Two)),
+            new Vector3d(
+                Fixed64.MaxValue,
+                Fixed64.Zero,
+                Fixed64.Zero),
+            FixedQuaternion.Identity).Collider;
+
+        cone.ContainsWorldPoint(
+                new Vector3d(
+                    Fixed64.MinValue,
+                    Fixed64.Zero,
+                    Fixed64.Zero))
+            .Should()
+            .BeFalse();
+    }
+
+    [Fact]
     public void CreateFiniteConeBounds_DegenerateAxis_ShouldUseStableUpFallback()
     {
         ConeGeometry.CreateFiniteConeBounds(

@@ -94,10 +94,12 @@ public static partial class CollisionDetectionMixed
             MixedEmbedded2DGeometry.GetClosestAnchorOnEmbeddedVolume(
                 embedded,
                 sphereCenter);
-        if (!embeddedAnchor.TryGetOffsetFrom(
-                sphereCenter,
-                out Vector3d delta)
-            || !Vector3d.TryGetMagnitude(delta, out Fixed64 distance)
+        // Broad-phase overlap plus a closest-volume anchor bounds every
+        // component of this relative offset to the Fixed64 domain.
+        _ = embeddedAnchor.TryGetOffsetFrom(
+            sphereCenter,
+            out Vector3d delta);
+        if (!Vector3d.TryGetMagnitude(delta, out Fixed64 distance)
             || (!inside && distance > sphere.ScaledRadius))
         {
             contact = default;
@@ -290,36 +292,35 @@ public static partial class CollisionDetectionMixed
             return false;
 
         Vector3d circleCenter = GetEmbeddedCenter3D(circle);
-        if (!FixedSegment.TryGetClosestCenteredFiniteConeSurfaceAnchor(
+        // The admitted broad-phase bounds and separating axes guarantee that
+        // this closest-feature offset is representable in either rigid frame.
+        _ = FixedSegment.TryGetClosestCenteredFiniteConeSurfaceAnchor(
+            circleCenter,
+            cone.Center,
+            cone.Rotation,
+            Vector3d.Up,
+            cone.Height,
+            cone.ScaledRadius,
+            Vector3d.Right,
+            out FixedPointAnchor conePoint,
+            out _,
+            out _);
+        _ = conePoint.TryGetOffsetFrom(
+            new FixedPointAnchor(
                 circleCenter,
-                cone.Center,
-                cone.Rotation,
-                Vector3d.Up,
-                cone.Height,
-                cone.ScaledRadius,
-                Vector3d.Right,
-                out FixedPointAnchor conePoint,
-                out _,
-                out _)
-            || !conePoint.TryGetOffsetFrom(
-                new FixedPointAnchor(
-                    circleCenter,
-                    FixedQuaternion.Identity,
-                    Vector3d.Zero),
-                out Vector3d conePointFromCircle))
-        {
-            return false;
-        }
+                FixedQuaternion.Identity,
+                Vector3d.Zero),
+            out Vector3d conePointFromCircle);
 
         Fixed64 closestCircleY = FixedMath.Clamp(
             conePointFromCircle.Y,
             -circle.MixedHalfThickness,
             circle.MixedHalfThickness);
-        if (!Vector3d.TrySubtract(
-                new Vector3d(Fixed64.Zero, closestCircleY, Fixed64.Zero),
-                conePointFromCircle,
-                out Vector3d closestFeatureAxis)
-            || !CheckConeCircleSlabAxis(
+        _ = Vector3d.TrySubtract(
+            new Vector3d(Fixed64.Zero, closestCircleY, Fixed64.Zero),
+            conePointFromCircle,
+            out Vector3d closestFeatureAxis);
+        if (!CheckConeCircleSlabAxis(
                 cone,
                 circle,
                 closestFeatureAxis,
@@ -547,31 +548,30 @@ public static partial class CollisionDetectionMixed
             MixedEmbedded2DGeometry.GetClosestAnchorOnEmbeddedVolume(
                 prism,
                 cone.Center);
-        if (!embeddedPoint.TryGetOffsetFrom(
+        // Earlier exact axes admit a shared finite feature neighborhood, so
+        // each relative offset remains representable through the cone frame.
+        _ = embeddedPoint.TryGetOffsetFrom(
+            cone.Center,
+            out Vector3d centerToEmbedded);
+        _ = cone.Rotation.Inverse().TryRotate(
+            centerToEmbedded,
+            out Vector3d localEmbeddedPoint);
+        _ = FixedSegment.TryGetClosestCenteredFiniteConeSurfaceOffset(
+            localEmbeddedPoint,
+            Vector3d.Zero,
+            Vector3d.Up,
+            cone.Height,
+            cone.ScaledRadius,
+            Vector3d.Right,
+            out Vector3d coneSurfaceOffset,
+            out _,
+            out _);
+        _ = embeddedPoint.TryGetOffsetFrom(
+            new ContactAnchor(
                 cone.Center,
-                out Vector3d centerToEmbedded)
-            || !cone.Rotation.Inverse().TryRotate(
-                centerToEmbedded,
-                out Vector3d localEmbeddedPoint)
-            || !FixedSegment.TryGetClosestCenteredFiniteConeSurfaceOffset(
-                localEmbeddedPoint,
-                Vector3d.Zero,
-                Vector3d.Up,
-                cone.Height,
-                cone.ScaledRadius,
-                Vector3d.Right,
-                out Vector3d coneSurfaceOffset,
-                out _,
-                out _)
-            || !embeddedPoint.TryGetOffsetFrom(
-                new ContactAnchor(
-                    cone.Center,
-                    cone.Rotation,
-                    coneSurfaceOffset),
-                out Vector3d closestFeatureAxis))
-        {
-            return false;
-        }
+                cone.Rotation,
+                coneSurfaceOffset),
+            out Vector3d closestFeatureAxis);
         if (!CheckConePrismAxis(
                 cone,
                 prism,

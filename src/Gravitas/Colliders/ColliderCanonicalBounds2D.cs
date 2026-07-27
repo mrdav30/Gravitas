@@ -111,9 +111,9 @@ internal static class ColliderCanonicalBounds2D
         if (collider.VertexCount == 0)
             return Fixed64.Zero;
 
-        return TryGetConvexRelativeBounds(
+        return TryGetConvexBoundsFromRelativeCenter(
             collider,
-            collider.Center,
+            Vector2d.Zero,
             out Vector2d convexMinimum,
             out Vector2d convexMaximum)
             ? GetMinimumAbsoluteExtent(convexMinimum, convexMaximum)
@@ -231,9 +231,9 @@ internal static class ColliderCanonicalBounds2D
                 out maximum);
         }
 
-        return TryGetConvexRelativeBounds(
+        return TryGetConvexBoundsFromRelativeCenter(
             collider,
-            referenceCenter,
+            relativeCenter,
             out minimum,
             out maximum);
     }
@@ -259,17 +259,13 @@ internal static class ColliderCanonicalBounds2D
         return representable;
     }
 
-    private static bool TryGetConvexRelativeBounds(
+    private static bool TryGetConvexBoundsFromRelativeCenter(
         LSCollider2D collider,
-        Vector2d referenceCenter,
+        Vector2d relativeCenter,
         out Vector2d minimum,
         out Vector2d maximum)
     {
-        if (!Vector2d.TrySubtract(
-                collider.Center,
-                referenceCenter,
-                out Vector2d relativeCenter)
-            || !Vector2d.TryTransformPoint(
+        if (!Vector2d.TryTransformPoint(
                 relativeCenter,
                 collider.GetScaledLocalVertexUnchecked(0),
                 collider.ConvexRotation,

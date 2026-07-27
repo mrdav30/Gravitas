@@ -397,10 +397,8 @@ public sealed partial class GravitasQuery3DService
             if (!TryBuildOverlapHit(colliderIds.DenseKeys[i], position, radius, out Physics3DHit hitInfo))
                 continue;
 
-            if (!hitInfo.Anchor.TryGetOffsetFrom(
-                    position,
-                    out Vector3d toHit)
-                || toHit.MagnitudeSquared > maxDistanceSqr
+            Vector3d toHit = hitInfo.Direction;
+            if (toHit.MagnitudeSquared > maxDistanceSqr
                 || Vector3d.Dot(toHit.Normalized, direction) <= Fixed64.Zero
                 || !PhysicsHitSelectionPolicy.ShouldReplace(hitInfo, found, closestHit))
             {
@@ -467,7 +465,7 @@ public sealed partial class GravitasQuery3DService
             out raycastHit);
     }
 
-    private static bool TryBuildSurfaceOverlapHit(
+    internal static bool TryBuildSurfaceOverlapHit(
         LSCollider collider,
         Vector3d position,
         Fixed64 radius,

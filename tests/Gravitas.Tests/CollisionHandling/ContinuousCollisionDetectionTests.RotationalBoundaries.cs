@@ -350,6 +350,22 @@ public sealed partial class ContinuousCollisionDetectionTests
     }
 
     [Fact]
+    public void SphereCuboidSeparationGap_UnrepresentableAnchorDelta_ShouldRemainUncertified()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        LSSphereCollider source = scenario.CreateStaticSphere(
+            new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero));
+        var target = new LSCuboidCollider();
+        scenario.InitializeStaticCollider(
+            target,
+            new Vector3d(Fixed64.MinValue, Fixed64.Zero, Fixed64.Zero));
+
+        SolidBody.TryGetSphereSeparationGap(source, target, out _)
+            .Should()
+            .BeFalse();
+    }
+
+    [Fact]
     public void SphereSeparationGap_UnrepresentableDistance_ShouldRemainUncertified()
     {
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();

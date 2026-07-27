@@ -14,20 +14,10 @@ internal sealed partial class ConvexSweepQueryWorker
 {
     private GjkResult ComputeDistance(ConvexShape sourceShape, ConvexShape targetShape)
     {
-        sourceShape.GetBounds(out Vector3d sourceMin, out Vector3d sourceMax);
-        targetShape.GetBounds(out Vector3d targetMin, out Vector3d targetMax);
-        int workingShift = GjkSimplexScale.SelectTwoTermShift(sourceMin, sourceMax, targetMin, targetMax);
-        return ComputeDistance(
-            sourceShape,
-            targetShape,
-            workingShift);
-    }
-
-    private GjkResult ComputeDistance(
-        ConvexShape sourceShape,
-        ConvexShape targetShape,
-        int workingShift)
-    {
+        const int workingShift = 2;
+        // Quartering both endpoints bounds every two-term Minkowski component
+        // below half the scalar domain. Any convex simplex combination then
+        // has a representable 3D magnitude without a lossy retry.
         Fixed64 workingScale = GjkSimplexScale.GetCoordinateScale(workingShift);
         Fixed64 workingDistanceTolerance = DistanceTolerance * workingScale;
         int simplexCount = 0;
@@ -54,7 +44,6 @@ internal sealed partial class ConvexSweepQueryWorker
         bool hasPreviousDistance = false;
         Fixed64 previousDistance = Fixed64.Zero;
         ClosestSimplexResult closest = default;
-        bool distanceIsRepresentable = false;
         Fixed64 workingDistance = Fixed64.MaxValue;
 
         for (int i = 0; i < MaxGjkIterations; i++)
@@ -70,14 +59,7 @@ internal sealed partial class ConvexSweepQueryWorker
             ClosestSimplexResult previousClosest = closest;
             _simplex[simplexCount++] = support;
             closest = SolveClosestSimplex(_simplex, ref simplexCount, workingScale);
-            distanceIsRepresentable = Vector3d.TryGetMagnitude(closest.Point, out workingDistance);
-            if (!distanceIsRepresentable && workingShift < 2)
-            {
-                return ComputeDistance(
-                    sourceShape,
-                    targetShape,
-                    2);
-            }
+            _ = Vector3d.TryGetMagnitude(closest.Point, out workingDistance);
             if (closest.Intersects)
             {
                 // Tetrahedron entry follows a valid one-to-three point simplex.
@@ -86,17 +68,16 @@ internal sealed partial class ConvexSweepQueryWorker
                 return GjkResult.CreateIntersection(previousClosest.PointA, previousClosest.PointB);
             }
 
-            if (distanceIsRepresentable && workingDistance <= workingDistanceTolerance)
+            if (workingDistance <= workingDistanceTolerance)
                 return GjkResult.CreateIntersection(closest.PointA, closest.PointB);
 
             if (hasPreviousDistance
-                && distanceIsRepresentable
                 && previousDistance - workingDistance <= Fixed64.Epsilon)
             {
                 break;
             }
 
-            hasPreviousDistance = distanceIsRepresentable;
+            hasPreviousDistance = true;
             previousDistance = workingDistance;
             direction = -closest.Point;
         }

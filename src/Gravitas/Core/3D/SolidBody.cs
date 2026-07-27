@@ -874,9 +874,6 @@ public partial class SolidBody : IRecordable
 
     private void SetTransformWorldPose(Vector3d position, FixedQuaternion rotation)
     {
-        if (_positionTransform == null)
-            return;
-
         Vector3d originalLocalPosition = _positionTransform.LocalPosition;
         FixedQuaternion originalLocalRotation = _positionTransform.LocalRotation;
         SwiftThrowHelper.ThrowIfTrue(

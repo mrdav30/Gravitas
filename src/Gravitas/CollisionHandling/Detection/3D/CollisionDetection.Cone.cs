@@ -196,12 +196,14 @@ public static partial class CollisionDetection
             FixedPointAnchor candidateConeAnchor;
             Fixed64 candidateDepth;
             bool candidateDepthIsClamped;
+            // The closest point belongs to a triangle already admitted into
+            // the cone's candidate bounds, so its cone-frame offset is finite.
+            _ = candidateMeshAnchor.TryGetLocalPointIn(
+                cone.Center,
+                cone.Rotation,
+                out Vector3d localPointInCone);
             bool closestMeshPointInsideCone =
-                candidateMeshAnchor.TryGetLocalPointIn(
-                    cone.Center,
-                    cone.Rotation,
-                    out Vector3d localPointInCone)
-                && FixedSegment.ContainsPointInCenteredFiniteCone(
+                FixedSegment.ContainsPointInCenteredFiniteCone(
                     localPointInCone,
                     Vector3d.Zero,
                     Vector3d.Up,
@@ -209,26 +211,21 @@ public static partial class CollisionDetection
                     cone.ScaledRadius);
             if (closestMeshPointInsideCone)
             {
-                if (!FixedSegment.TryGetClosestCenteredFiniteConeSurfaceOffset(
-                        localPointInCone,
-                        Vector3d.Zero,
-                        Vector3d.Up,
-                        cone.Height,
-                        cone.ScaledRadius,
-                        Vector3d.Right,
-                        out Vector3d localConePoint,
-                        out _,
-                        out Fixed64 signedDistance))
-                {
-                    continue;
-                }
+                // Exact containment proves the centered canonical surface
+                // offset remains inside the admitted radius and height.
+                _ = FixedSegment.TryGetClosestCenteredFiniteConeSurfaceOffset(
+                    localPointInCone,
+                    Vector3d.Zero,
+                    Vector3d.Up,
+                    cone.Height,
+                    cone.ScaledRadius,
+                    Vector3d.Right,
+                    out Vector3d localConePoint,
+                    out _,
+                    out Fixed64 signedDistance);
 
-                candidateDepthIsClamped = !Fixed64.TrySubtract(
-                    Fixed64.Zero,
-                    signedDistance,
-                    out candidateDepth);
-                if (candidateDepthIsClamped)
-                    candidateDepth = Fixed64.MaxValue;
+                candidateDepth = -signedDistance;
+                candidateDepthIsClamped = false;
                 candidateConeAnchor = new FixedPointAnchor(
                     cone.Center,
                     cone.Rotation,

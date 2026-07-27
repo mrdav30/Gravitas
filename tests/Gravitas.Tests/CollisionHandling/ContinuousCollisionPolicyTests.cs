@@ -109,6 +109,38 @@ public sealed class ContinuousCollisionPolicyTests
     }
 
     [Fact]
+    public void CuboidContactPolicy_ShouldFallBackToExactFaceNormalWhenAnchorOffsetIsUnrepresentable()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        var cuboid = new LSCuboidCollider { Size = Vector3d.One };
+        Vector3d center = new(
+            Fixed64.MaxValue - Fixed64.One,
+            Fixed64.Zero,
+            Fixed64.Zero);
+        cuboid.InitializeWithNoBody(new TestMatterAgent(
+            context,
+            new FixedTransform(
+                center,
+                FixedQuaternion.Identity,
+                Vector3d.One)));
+        Vector3d impact = new(
+            Fixed64.MinValue + Fixed64.One,
+            Fixed64.Zero,
+            Fixed64.Zero);
+
+        ContinuousCollisionContactPolicy.TryResolveSweptSphereContact(
+                cuboid,
+                impact,
+                Vector3d.Right,
+                out ContactAnchor anchor,
+                out Vector3d normal)
+            .Should().BeTrue();
+
+        anchor.TryGetWorldPoint(out _).Should().BeTrue();
+        normal.Should().Be(Vector3d.Left);
+    }
+
+    [Fact]
     public void ContinuousCollisionContactPolicy_ShouldStabilizeCustomColliderNormals()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();

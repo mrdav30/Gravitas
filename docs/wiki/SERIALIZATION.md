@@ -40,9 +40,10 @@ Runtime-owned state that should not be serialized:
 - GridForge partition coordinate lists and active partition payloads.
 - collision pairs, pair holder references, warm runtime pair caches, query
   buffers, diagnostic buffers, and pooled collections.
-- derived collider geometry and bounds caches, including materialized finite
-  endpoints, oriented-box projections, transformed mesh data, and planar world
-  vertices. These are rebuilt from canonical authored/body state.
+- derived collider bounds and transformed mesh caches. Absolute endpoints,
+  corners, and contact/query witnesses are materialized on demand from
+  canonical rigid-frame and local geometry rather than stored as runtime
+  authority.
 - context-local joint IDs, ragdoll IDs, articulation suppression tables, and
   service-owned joint/ragdoll arrays.
 - lifecycle hooks, delegates, renderer callbacks, and event subscribers.

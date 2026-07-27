@@ -4,6 +4,7 @@ using Gravitas.Colliders;
 using Gravitas.Queries;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
+using GridForge.Configuration;
 using GridForge.Grids;
 using SwiftCollections;
 using System;
@@ -733,6 +734,53 @@ public sealed class GravitasQuery3DServiceConeTests
         coneHit.Distance.Should().BeGreaterThanOrEqualTo(Fixed64.Zero);
         coneHit.Distance.Should().BeLessThan(Fixed64.FromFraction(1, 1000));
         scenario.Context.Query3D.LastMeshTriangleCandidateCount.Should().Be(1);
+    }
+
+    [Fact]
+    public void OverlapCone_WhenOriginCannotEnterConcaveMeshFrame_ShouldReject()
+    {
+        using GravitasWorldContext context =
+            GravitasWorldContext.CreateOwned();
+        Fixed64 transverse = (Fixed64)1_600_000_000;
+        context.World.TryAddGrid(
+            new GridConfiguration(
+                new Vector3d(
+                    (Fixed64)(-4),
+                    transverse - (Fixed64)4,
+                    transverse - (Fixed64)4),
+                new Vector3d(
+                    (Fixed64)4,
+                    transverse + (Fixed64)4,
+                    transverse + (Fixed64)4)),
+            out _).Should().BeTrue();
+        LSMeshCollider mesh = MeshTestFixtures.CreateConvexCube(
+            MeshColliderMode.Concave,
+            MeshInertiaPolicy.SurfaceApproximation);
+        mesh.InitializeWithNoBody(new TestMatterAgent(
+            context,
+            new FixedTransform(
+                new Vector3d(
+                    Fixed64.Zero,
+                    transverse,
+                    transverse),
+                FixedQuaternion.FromAxisAngle(
+                    Vector3d.Right,
+                    Fixed64.PiOver4),
+                Vector3d.One)));
+
+        bool hit = context.Query3D.OverlapCone(
+            Vector3d.Zero,
+            Vector3d.Right,
+            Fixed64.One,
+            Fixed64.MaxValue,
+            out Physics3DHit result,
+            IncludeLayerZero);
+
+        hit.Should().BeFalse();
+        result.Should().Be(default(Physics3DHit));
+        context.Query3D.LastQueryCandidateCount.Should().Be(1);
+        context.Query3D.LastMeshTriangleCandidateCount
+            .Should().BeGreaterThan(0);
     }
 
     [Fact]

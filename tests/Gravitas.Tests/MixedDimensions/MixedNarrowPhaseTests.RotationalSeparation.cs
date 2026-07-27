@@ -70,6 +70,38 @@ public sealed partial class MixedNarrowPhaseTests
         calculated.Should().BeFalse();
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void RotationalSeparationGap_ForOppositePlanarDomainCenters_ShouldDeclineUnrepresentableDistance(
+        bool sphereIsPositive)
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSSphereCollider> sphere = CreateSphere3D(
+            context,
+            new Vector3d(
+                sphereIsPositive ? Fixed64.MaxValue : Fixed64.MinValue,
+                Fixed64.Zero,
+                Fixed64.Zero));
+        SolidBody2D polygon = CreateBody2D(
+            context,
+            CreateSquarePolygon(),
+            new Vector2d(
+                sphereIsPositive
+                    ? Fixed64.MinValue + Fixed64.One
+                    : Fixed64.MaxValue - Fixed64.One,
+                Fixed64.Zero));
+
+        bool calculated = CollisionDetectionMixed.TryGetRotationalSeparationGap(
+            sphere.Collider,
+            polygon.Collider,
+            out _,
+            out bool supported);
+
+        supported.Should().BeTrue();
+        calculated.Should().BeFalse();
+    }
+
     [Fact]
     public void RotationalSeparationGap_ForYawCuboidShouldHonorRotationAndVerticalSlabDistance()
     {

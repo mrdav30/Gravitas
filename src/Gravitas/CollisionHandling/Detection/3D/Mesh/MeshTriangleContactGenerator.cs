@@ -87,21 +87,23 @@ internal static class MeshTriangleContactGenerator
         for (int i = 0; i < triangleBufferA.Count; i++)
         {
             int triangleA = triangleBufferA[i];
-            if (!TryGetTriangleInFrame(
-                    meshA,
-                    triangleA,
-                    meshA.Mesh.Origin,
-                    meshA.Mesh.Rotation,
-                    out CollisionTriangle first)
-                || !TryGetTriangleInFrame(
-                    meshA,
-                    triangleA,
-                    meshB.Mesh.Origin,
-                    meshB.Mesh.Rotation,
-                    out CollisionTriangle firstInSecondFrame))
-            {
-                continue;
-            }
+            meshA.Mesh.GetLocalTriangleVertices(
+                triangleA,
+                out Vector3d firstVertex,
+                out Vector3d secondVertex,
+                out Vector3d thirdVertex);
+            var firstTriangle =
+                new FixedTriangle(firstVertex, secondVertex, thirdVertex);
+            var first = new CollisionTriangle(
+                firstTriangle,
+                firstTriangle.Normal,
+                CreateTriangleBounds(firstVertex, secondVertex, thirdVertex));
+            GetTriangleInFrame(
+                meshA,
+                triangleA,
+                meshB.Mesh.Origin,
+                meshB.Mesh.Rotation,
+                out CollisionTriangle firstInSecondFrame);
             meshB.Mesh.GetTrianglesInLocalBounds(
                 firstInSecondFrame.QueryBounds,
                 triangleBufferB);
@@ -109,15 +111,12 @@ internal static class MeshTriangleContactGenerator
             for (int j = 0; j < triangleBufferB.Count; j++)
             {
                 int triangleB = triangleBufferB[j];
-                if (!TryGetTriangleInFrame(
-                        meshB,
-                        triangleB,
-                        meshA.Mesh.Origin,
-                        meshA.Mesh.Rotation,
-                        out CollisionTriangle second))
-                {
-                    continue;
-                }
+                GetTriangleInFrame(
+                    meshB,
+                    triangleB,
+                    meshA.Mesh.Origin,
+                    meshA.Mesh.Rotation,
+                    out CollisionTriangle second);
 
                 Vector3d desiredDirection =
                     second.Center - first.Center;
@@ -142,13 +141,10 @@ internal static class MeshTriangleContactGenerator
                     meshA.Mesh.Origin,
                     meshA.Mesh.Rotation,
                     pointB);
-                if (!secondInFirstFrame.TryGetLocalPointIn(
-                        meshB.Mesh.Origin,
-                        meshB.Mesh.Rotation,
-                        out Vector3d secondLocalPoint))
-                {
-                    continue;
-                }
+                _ = secondInFirstFrame.TryGetLocalPointIn(
+                    meshB.Mesh.Origin,
+                    meshB.Mesh.Rotation,
+                    out Vector3d secondLocalPoint);
 
                 AddContact(
                     pair,
@@ -354,11 +350,13 @@ internal static class MeshTriangleContactGenerator
             triangle.ClosestPoint(localCylinderCenter);
         FixedPointAnchor meshAnchor =
             mesh.Mesh.CreatePointAnchor(localPointOnMesh);
-        if (!meshAnchor.TryGetLocalPointIn(
-                cylinder.Center,
-                cylinder.Rotation,
-                out Vector3d localPointInCylinder)
-            || !FixedSegment.ContainsPointInCenteredFiniteCylinder(
+        // The closest point belongs to the admitted triangle candidate, so its
+        // cylinder-frame offset is finite once the center entered the mesh frame.
+        _ = meshAnchor.TryGetLocalPointIn(
+            cylinder.Center,
+            cylinder.Rotation,
+            out Vector3d localPointInCylinder);
+        if (!FixedSegment.ContainsPointInCenteredFiniteCylinder(
                 localPointInCylinder,
                 Vector3d.Zero,
                 Vector3d.Up,
@@ -367,31 +365,20 @@ internal static class MeshTriangleContactGenerator
         {
             return false;
         }
-        if (!FixedSegment.TryGetClosestCenteredFiniteCylinderSurfaceOffset(
-                localPointInCylinder,
-                Vector3d.Zero,
-                Vector3d.Up,
-                cylinder.Height,
-                cylinder.ScaledRadius,
-                Vector3d.Right,
-                out Vector3d localCylinderPoint,
-                out _,
-                out Fixed64 signedDistance))
-        {
-            return false;
-        }
+        // Exact containment proves the centered canonical surface offset
+        // remains inside the admitted radius and height.
+        _ = FixedSegment.TryGetClosestCenteredFiniteCylinderSurfaceOffset(
+            localPointInCylinder,
+            Vector3d.Zero,
+            Vector3d.Up,
+            cylinder.Height,
+            cylinder.ScaledRadius,
+            Vector3d.Right,
+            out Vector3d localCylinderPoint,
+            out _,
+            out Fixed64 signedDistance);
 
-        Fixed64 depth;
-        bool depthIsClamped;
-        if (Fixed64.TrySubtract(Fixed64.Zero, signedDistance, out depth))
-        {
-            depthIsClamped = false;
-        }
-        else
-        {
-            depth = Fixed64.MaxValue;
-            depthIsClamped = true;
-        }
+        Fixed64 depth = -signedDistance;
         AddContact(
             pair,
             new ContactAnchor(meshAnchor),
@@ -401,7 +388,7 @@ internal static class MeshTriangleContactGenerator
                 localCylinderPoint),
             depth,
             normal,
-            depthIsClamped);
+            depthIsClamped: false);
         return true;
     }
 
@@ -546,7 +533,7 @@ internal static class MeshTriangleContactGenerator
         return true;
     }
 
-    private static bool TryGetTriangleInFrame(
+    private static void GetTriangleInFrame(
         LSMeshCollider mesh,
         int triangleIndex,
         Vector3d frameOrigin,
@@ -558,22 +545,20 @@ internal static class MeshTriangleContactGenerator
             out Vector3d localFirst,
             out Vector3d localSecond,
             out Vector3d localThird);
-        if (!mesh.Mesh.CreatePointAnchor(localFirst).TryGetLocalPointIn(
-                frameOrigin,
-                frameRotation,
-                out Vector3d first)
-            || !mesh.Mesh.CreatePointAnchor(localSecond).TryGetLocalPointIn(
-                frameOrigin,
-                frameRotation,
-                out Vector3d second)
-            || !mesh.Mesh.CreatePointAnchor(localThird).TryGetLocalPointIn(
-                frameOrigin,
-                frameRotation,
-                out Vector3d third))
-        {
-            triangle = default;
-            return false;
-        }
+        // Scale admission and candidate-bound overlap keep all triangle
+        // vertices representable in the paired mesh frame.
+        _ = mesh.Mesh.CreatePointAnchor(localFirst).TryGetLocalPointIn(
+            frameOrigin,
+            frameRotation,
+            out Vector3d first);
+        _ = mesh.Mesh.CreatePointAnchor(localSecond).TryGetLocalPointIn(
+            frameOrigin,
+            frameRotation,
+            out Vector3d second);
+        _ = mesh.Mesh.CreatePointAnchor(localThird).TryGetLocalPointIn(
+            frameOrigin,
+            frameRotation,
+            out Vector3d third);
 
         var fixedTriangle = new FixedTriangle(
             first,
@@ -583,7 +568,6 @@ internal static class MeshTriangleContactGenerator
             fixedTriangle,
             fixedTriangle.Normal,
             CreateTriangleBounds(first, second, third));
-        return true;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

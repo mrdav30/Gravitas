@@ -77,6 +77,31 @@ public sealed class ColliderSurfaceDomainTests
     }
 
     [Fact]
+    public void CompoundOffsetPolygonAtScalarFace_ShouldRejectUnrepresentableClosestPoint()
+    {
+        using GravitasWorldContext context = CreatePositiveScalarFaceContext();
+        var collider = new LSCompoundCollider2D(
+            CompoundColliderPart2D.ConvexPolygon(
+                new[]
+                {
+                    new Vector2d(Fixed64.One, -Fixed64.One),
+                    new Vector2d(Fixed64.Two, -Fixed64.One),
+                    new Vector2d(Fixed64.Two, Fixed64.One),
+                    new Vector2d(Fixed64.One, Fixed64.One)
+                },
+                Vector2d.Zero,
+                Fixed64.Zero,
+                Vector2d.One));
+        Initialize(context, collider);
+
+        collider.TryGetClosestBoundaryAnchor(
+                new Vector2d(Fixed64.MinValue, Fixed64.Zero),
+                out _,
+                out _)
+            .Should().BeFalse();
+    }
+
+    [Fact]
     public void FiniteRound3DSurfacesAtScalarFace_ShouldRejectUnrepresentableResults()
     {
         using GravitasWorldContext context = CreatePositiveScalarFaceContext();

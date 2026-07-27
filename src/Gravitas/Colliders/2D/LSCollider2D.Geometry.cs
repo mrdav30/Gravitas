@@ -53,12 +53,9 @@ public abstract partial class LSCollider2D
     /// </summary>
     public bool TryGetLocalScale(out Vector2d scale)
     {
-        Vector2d ownerScale = GetCurrentOwnerScale();
-        Vector2d partScale = _hasCommittedShape
-            ? _committedPartScale
-            : _compoundOwner != null
-                ? _compoundLocalScale
-                : Vector2d.One;
+        GetCurrentScaleFactors(
+            out Vector2d ownerScale,
+            out Vector2d partScale);
 
         bool representable = Fixed64.TryMultiplyDivide(
                 ownerScale.X,

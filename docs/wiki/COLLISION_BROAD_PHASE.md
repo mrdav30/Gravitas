@@ -37,6 +37,11 @@ shape inputs, `LSCollider` rebuilds runtime shape data and asks
 internal snapshot so several local edits before a simulation call collapse into
 one bounds/shape rebuild.
 
+Prepared canonical geometry, analytical conservative bounds, and mass
+properties commit atomically. Bounds clipped to the representable coordinate
+domain exist only for partition coverage; narrow phase always consumes the
+canonical shape.
+
 `GravitasCollisionService.PartitionObject(...)`:
 
 1. validates that the collider belongs to the service context.

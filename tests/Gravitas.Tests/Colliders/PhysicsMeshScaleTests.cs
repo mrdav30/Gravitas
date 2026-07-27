@@ -691,6 +691,40 @@ public sealed class PhysicsMeshScaleTests
     }
 
     [Fact]
+    public void CompoundClosedVolume_ShouldUsePreparedVerticesWhenCombinedScaleIsUnrepresentable()
+    {
+        Fixed64 narrow = Fixed64.FromFraction(1, 65536);
+        var mesh = new PhysicsMesh(
+            new[]
+            {
+                Vector3d.Zero,
+                new Vector3d(narrow, Fixed64.Zero, Fixed64.Zero),
+                Vector3d.Up,
+                Vector3d.Forward
+            },
+            TetrahedronTriangles(),
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+        Vector3d ownerScale = new((Fixed64)50000, Fixed64.One, Fixed64.One);
+        Vector3d partScale = ownerScale;
+
+        mesh.PrepareTransformation(
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            ownerScale,
+            partScale,
+            MeshInertiaPolicy.RequireClosedVolume);
+        mesh.PublishPreparedTransformation();
+
+        mesh.TryGetClosedVolumeMassProperties(
+                out MeshMassProperties properties,
+                out MeshVolumeValidationResult result)
+            .Should().BeTrue();
+        result.Should().Be(MeshVolumeValidationResult.Valid);
+        properties.Volume.Should().BeGreaterThan(Fixed64.Epsilon);
+    }
+
+    [Fact]
     public void StandaloneRequireClosed_WithCollapsedScaledVolume_ShouldRejectBeforeRegistration()
     {
         Vector3d[] vertices = CreateTetrahedronVertices();

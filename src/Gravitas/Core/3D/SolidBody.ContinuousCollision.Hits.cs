@@ -16,33 +16,6 @@ namespace Gravitas;
 
 public partial class SolidBody
 {
-    private readonly struct DynamicMixedIntervalHit
-    {
-        public DynamicMixedIntervalHit(
-            ContinuousCollisionMath.IntervalSearchStatus status,
-            PhysicsMixedHit exactHit,
-            Fixed64 safeDistance,
-            Fixed64 closingSpeed,
-            int targetId)
-        {
-            Status = status;
-            ExactHit = exactHit;
-            SafeDistance = safeDistance;
-            ClosingSpeed = closingSpeed;
-            TargetId = targetId;
-        }
-
-        public ContinuousCollisionMath.IntervalSearchStatus Status { get; }
-
-        public PhysicsMixedHit ExactHit { get; }
-
-        public Fixed64 SafeDistance { get; }
-
-        public Fixed64 ClosingSpeed { get; }
-
-        public int TargetId { get; }
-    }
-
     private bool TryGetFirstContinuousCollisionHit(
         Vector3d startPosition,
         Vector3d proposedPosition,
@@ -114,20 +87,11 @@ public partial class SolidBody
                 proxyRadius,
                 elapsedFrameFraction,
                 out DynamicMixedIntervalHit dynamicMixed);
-            bool dynamicMixedIsEarlier = foundDynamicMixed
-                && (!foundMixed
-                    || dynamicMixed.SafeDistance < hitMixedDistance);
-            bool exactDynamicMixedReplaces = foundDynamicMixed
-                && dynamicMixed.Status
-                    == ContinuousCollisionMath.IntervalSearchStatus.ExactHit
-                && ContinuousCollisionCandidateOrdering.ShouldReplaceMixedHit(
-                    dynamicMixed.ExactHit,
-                    dynamicMixed.ClosingSpeed,
-                    true,
-                    foundMixed,
+            if (DynamicMixedIntervalHit.ShouldReplaceStatic(
+                    dynamicMixed,
+                    foundDynamicMixed,
                     hitMixed,
-                    Fixed64.Zero);
-            if (dynamicMixedIsEarlier || exactDynamicMixedReplaces)
+                    foundMixed))
             {
                 hitMixed = dynamicMixed.ExactHit;
                 hitMixedDistance = dynamicMixed.SafeDistance;
@@ -138,11 +102,11 @@ public partial class SolidBody
                     : ContinuousCollisionTargetKind.UnresolvedMixed;
             }
 
-            if (found3D
-                && (!foundMixed
-                    || !ContinuousCollisionCandidateOrdering.Is2DHitFirst(
-                        hitMixedDistance,
-                        hit3D.Distance)))
+            if (DynamicMixedIntervalHit.ShouldSelect3D(
+                    found3D,
+                    hit3D.Distance,
+                    foundMixed,
+                    hitMixedDistance))
             {
                 normal = hit3D.Normal;
                 distance = hit3D.Distance;
@@ -309,15 +273,12 @@ public partial class SolidBody
         if (!_shapeExactContinuousSweepWorker.TrySweep(Collider, out Vector3d reverseCenterAtImpact, out Fixed64 distance))
             return false;
 
-        if (!ContinuousCollisionContactPolicy.TryResolveSweptSphereContact(
-                Collider,
-                reverseCenterAtImpact,
-                -direction,
-                out _,
-                out Vector3d sourceSurfaceNormal))
-        {
-            return false;
-        }
+        _ = ContinuousCollisionContactPolicy.TryResolveSweptSphereContact(
+            Collider,
+            reverseCenterAtImpact,
+            -direction,
+            out _,
+            out Vector3d sourceSurfaceNormal);
 
         Vector3d normal = -sourceSurfaceNormal;
         refined = new Physics3DHit(
@@ -669,15 +630,12 @@ public partial class SolidBody
         if (!_shapeExactContinuousSweepWorker.TrySweep(target, out Vector3d sphereCenterAtImpact, out Fixed64 distance))
             return false;
 
-        if (!ContinuousCollisionContactPolicy.TryResolveSweptSphereContact(
-                target,
-                sphereCenterAtImpact,
-                relativeDirection,
-                out ContactAnchor anchor,
-                out Vector3d normal))
-        {
-            return false;
-        }
+        _ = ContinuousCollisionContactPolicy.TryResolveSweptSphereContact(
+            target,
+            sphereCenterAtImpact,
+            relativeDirection,
+            out ContactAnchor anchor,
+            out Vector3d normal);
 
         hit = new Physics3DHit(target, anchor, normal, distance, relativeDirection);
         return true;
@@ -732,33 +690,10 @@ public partial class SolidBody
                 continue;
             }
 
-            bool candidateIsEarlier = !found
-                || candidate.SafeDistance < best.SafeDistance;
-            bool exactTieReplaces = found
-                && candidate.SafeDistance == best.SafeDistance
-                && candidate.Status
-                    == ContinuousCollisionMath.IntervalSearchStatus.ExactHit
-                && (best.Status
-                        != ContinuousCollisionMath.IntervalSearchStatus.ExactHit
-                    || ContinuousCollisionCandidateOrdering.ShouldReplaceMixedHit(
-                        candidate.ExactHit,
-                        candidate.ClosingSpeed,
-                        true,
-                        true,
-                        best.ExactHit,
-                        best.ClosingSpeed));
-            bool unresolvedTieReplaces = found
-                && candidate.SafeDistance == best.SafeDistance
-                && candidate.Status
-                    == ContinuousCollisionMath.IntervalSearchStatus.Unresolved
-                && best.Status
-                    == ContinuousCollisionMath.IntervalSearchStatus.Unresolved
-                && candidate.TargetId < best.TargetId;
-            if (!(candidateIsEarlier | exactTieReplaces | unresolvedTieReplaces))
-                continue;
-
-            best = candidate;
-            found = true;
+            best = DynamicMixedIntervalHit.Select(
+                candidate,
+                best,
+                ref found);
         }
 
         hit = best;
@@ -885,7 +820,6 @@ public partial class SolidBody
                     sourceSegmentDisplacement,
                     sourceStartRotation,
                     sourceEndRotation,
-                    angularDistance,
                     intervalElapsedTime,
                     intervalDuration,
                     IsKinematic,
@@ -947,7 +881,7 @@ public partial class SolidBody
                 sourceStartTime,
                 sourceEndTime,
                 safeTime);
-            bool exactHit = hasContact && contactTime == safeTime;
+            bool exactHit = hasContact & contactTime == safeTime;
             PhysicsMixedHit exact = exactHit
                 ? new PhysicsMixedHit(
                     null,

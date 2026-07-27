@@ -364,20 +364,11 @@ public class LSMeshCollider : LSCollider
         out FixedBoundVolume bounds)
     {
         if (!Vector3d.TrySubtract(point, closest, out Vector3d delta)
-            || delta.X == Fixed64.MinValue
-            || delta.Y == Fixed64.MinValue
-            || delta.Z == Fixed64.MinValue)
-        {
-            bounds = default;
-            return false;
-        }
-
-        Vector3d absoluteDelta = Vector3d.Abs(delta);
-        Fixed64 halfExtent = absoluteDelta.X
-            + absoluteDelta.Y
-            + absoluteDelta.Z
-            + Fixed64.Epsilon;
-        if (halfExtent == Fixed64.MaxValue)
+            || !delta.TryGetMagnitudeCeiling(out Fixed64 halfExtent)
+            || !Fixed64.TryAdd(
+                halfExtent,
+                Fixed64.Epsilon,
+                out halfExtent))
         {
             bounds = default;
             return false;

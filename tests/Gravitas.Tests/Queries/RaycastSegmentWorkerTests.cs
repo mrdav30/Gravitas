@@ -4,6 +4,7 @@ using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Queries;
 using Gravitas.Tests.Support;
+using GridForge.Configuration;
 using SwiftCollections;
 using Xunit;
 
@@ -1574,6 +1575,87 @@ public sealed class RaycastSegmentWorkerTests
         componentOverflowWorker.CheckAABBoxOverlaps(-Vector3d.One, Vector3d.One, ref hits).Should().BeFalse();
         componentOverflowWorker.CheckOBBoxOverlaps(cuboid, ref hits).Should().BeFalse();
         magnitudeOverflowWorker.CheckSphereOverlaps(Sphere(Vector3d.Zero, Fixed64.One), ref hits).Should().BeFalse();
+        hits.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void CheckMeshOverlaps_WhenSegmentOriginCannotEnterMeshFrame_ShouldReject()
+    {
+        using GravitasWorldContext context =
+            GravitasWorldContext.CreateOwned();
+        context.World.TryAddGrid(
+            new GridConfiguration(
+                new Vector3d(
+                    Fixed64.MinValue,
+                    (Fixed64)(-4),
+                    (Fixed64)(-4)),
+                new Vector3d(
+                    Fixed64.MinValue + (Fixed64)8,
+                    (Fixed64)4,
+                    (Fixed64)4)),
+            out _).Should().BeTrue();
+        LSMeshCollider mesh = MeshTestFixtures.CreateConvexCube();
+        mesh.InitializeWithNoBody(new TestMatterAgent(
+            context,
+            new FixedTransform(
+                new Vector3d(
+                    Fixed64.MinValue,
+                    Fixed64.Zero,
+                    Fixed64.Zero),
+                FixedQuaternion.Identity,
+                Vector3d.One)));
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+        worker.PrepareSegmentCheck(
+            new Vector3d(
+                Fixed64.MaxValue - Fixed64.One,
+                Fixed64.Zero,
+                Fixed64.Zero),
+            new Vector3d(
+                Fixed64.MaxValue,
+                Fixed64.Zero,
+                Fixed64.Zero));
+
+        worker.CheckMeshOverlaps(mesh, ref hits).Should().BeFalse();
+        hits.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void CheckMeshOverlaps_WhenOnlySegmentEndCannotEnterMeshFrame_ShouldReject()
+    {
+        using GravitasWorldContext context =
+            GravitasWorldContext.CreateOwned();
+        context.World.TryAddGrid(
+            new GridConfiguration(
+                new Vector3d(
+                    Fixed64.MinValue,
+                    (Fixed64)(-4),
+                    (Fixed64)(-4)),
+                new Vector3d(
+                    Fixed64.MinValue + (Fixed64)8,
+                    (Fixed64)4,
+                    (Fixed64)4)),
+            out _).Should().BeTrue();
+        LSMeshCollider mesh = MeshTestFixtures.CreateConvexCube();
+        mesh.InitializeWithNoBody(new TestMatterAgent(
+            context,
+            new FixedTransform(
+                new Vector3d(
+                    Fixed64.MinValue,
+                    Fixed64.Zero,
+                    Fixed64.Zero),
+                FixedQuaternion.Identity,
+                Vector3d.One)));
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+        worker.PrepareSegmentCheck(
+            new Vector3d(
+                -Fixed64.Epsilon,
+                Fixed64.Zero,
+                Fixed64.Zero),
+            Vector3d.Zero);
+
+        worker.CheckMeshOverlaps(mesh, ref hits).Should().BeFalse();
         hits.Should().BeEmpty();
     }
 

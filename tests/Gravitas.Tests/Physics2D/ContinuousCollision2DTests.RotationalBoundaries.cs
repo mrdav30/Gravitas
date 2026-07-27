@@ -115,6 +115,93 @@ public sealed partial class ContinuousCollision2DTests
             .Be(1);
     }
 
+    [Fact]
+    public void CircleSeparationGap_UnrepresentableCenterDistance_ShouldRemainUncertified()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        SolidBody2D source = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.MinIncrement),
+            new Vector2d(Fixed64.MaxValue, Fixed64.Zero),
+            immovable: true);
+        SolidBody2D target = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.MinIncrement),
+            new Vector2d(Fixed64.MinValue, Fixed64.Zero),
+            immovable: true);
+
+        SolidBody2D.TryGetCircleSeparationGap(
+                (LSCircleCollider2D)source.Collider,
+                target.Collider,
+                out _)
+            .Should()
+            .BeFalse();
+    }
+
+    [Fact]
+    public void CircleSeparationGap_ContainedCenter_ShouldRemainUncertified()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        SolidBody2D source = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            Vector2d.Zero,
+            immovable: true);
+        SolidBody2D target = CreateBody(
+            context,
+            new LSAABBoxCollider2D(Vector2d.One * Fixed64.Two),
+            Vector2d.Zero,
+            immovable: true);
+
+        SolidBody2D.TryGetCircleSeparationGap(
+                (LSCircleCollider2D)source.Collider,
+                target.Collider,
+                out _)
+            .Should()
+            .BeFalse();
+    }
+
+    [Fact]
+    public void CircleSeparationGap_UnrepresentableBoundaryDistance_ShouldRemainUncertified()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        SolidBody2D source = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.MinIncrement),
+            new Vector2d(Fixed64.MaxValue, Fixed64.Zero),
+            immovable: true);
+        SolidBody2D target = CreateBody(
+            context,
+            new LSAABBoxCollider2D(Vector2d.One),
+            new Vector2d(
+                Fixed64.MinValue + Fixed64.One,
+                Fixed64.Zero),
+            immovable: true);
+
+        SolidBody2D.TryGetCircleSeparationGap(
+                (LSCircleCollider2D)source.Collider,
+                target.Collider,
+                out _)
+            .Should()
+            .BeFalse();
+    }
+
+    [Fact]
+    public void CircleSeparationGap_UnrepresentableCombinedRadius_ShouldRemainUncertified()
+    {
+        Fixed64 radius = Fixed64.MaxValue / Fixed64.Two
+            + Fixed64.MinIncrement;
+        var source = new LSCircleCollider2D(radius);
+        var target = new LSCircleCollider2D(radius);
+
+        SolidBody2D.TryGetCircleSeparationGap(
+                source,
+                target,
+                out _)
+            .Should()
+            .BeFalse();
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

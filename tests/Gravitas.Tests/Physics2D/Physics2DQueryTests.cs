@@ -208,6 +208,22 @@ public sealed class Physics2DQueryTests
     }
 
     [Fact]
+    public void ValidateConvexQueryPolygon_WithFullDomainEdges_ShouldUseExactOrientation()
+    {
+        Vector2d[] vertices =
+        {
+            new(-(Fixed64)1000, -(Fixed64)1000),
+            Vector2d.Zero,
+            new(Fixed64.MaxValue, Fixed64.MaxValue - Fixed64.One)
+        };
+
+        Action validate = () =>
+            QueryDetection2D.ValidateConvexQueryPolygon(vertices);
+
+        validate.Should().NotThrow();
+    }
+
+    [Fact]
     public void OverlapPolygon_ShouldRejectSeparatedTargetsAndReturnClosestHit()
     {
         using GravitasWorldContext context = Create2DContext();

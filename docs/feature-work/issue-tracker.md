@@ -29,172 +29,36 @@ records follow with their original discovery context.
 - Treat local links as unstaged validation scaffolding. Do not publish or
   release with them in place.
 - FixedMathSharp foundation hardening is complete. The current locally linked
-  geometry and arithmetic extensions pass 2,572 Release tests at
-  44,126/44,126 lines, 8,450/8,450 branches, and 3,341/3,341 ReportGenerator
-  methods. ReleaseLean passes 2,551 tests. Retain the local link while the
+  geometry and arithmetic extensions pass 2,575 Release tests at
+  44,047/44,047 lines, 8,422/8,422 branches, and 3,312/3,312 ReportGenerator
+  methods. ReleaseLean passes 2,554 tests. Retain the local link while the
   remaining Gravitas queue is hardened.
 - SwiftCollections has no library-specific active issue at this checkpoint; its
   place in the sequence is a full downstream compatibility and release gate.
 - GridForge's runtime-identity defect is resolved. Keep the lower stack locally
   linked while the remaining Gravitas queue is hardened so another downstream
   discovery does not force a partial release cycle.
-- Gravitas's current Release run passes 3,611 tests and ReleaseLean passes
-  3,556 tests. Canonical-geometry Tasks 7 and 8 are implemented and independently
-  reviewed for user review. Exact coverage closure remains in Task 9; the
-  earlier 100% artifact predates these changes and is not a current release
-  claim.
+- Gravitas's current Release run passes 3,669 tests at 37,548/37,548 lines,
+  11,865/11,865 branches, and 4,246/4,246 methods. ReleaseLean passes 3,614
+  tests. Canonical-geometry correctness, replay, allocation, coverage, and
+  documentation gates are closed; the measured exact-OBB throughput signal
+  remains in the benchmark backlog.
 - After the Gravitas queue closes, release the lower stack in dependency order,
   replace local links with released packages at each layer, and rerun Gravitas
   `Release`, `ReleaseLean`, coverage, replay, and relevant benchmark gates.
 
 ### Ordered Queue
 
-1. **Gravitas — canonical collider geometry and exact scale admission:**
-   Tasks 5–8 are implemented for review. After user review, run Task 9 coverage,
-   documentation, benchmark, and release gates, then close the grouped scale,
-   finite-axis, cuboid, and 2D convex-boundary records together.
-2. **Gravitas:**
+1. **Gravitas:**
    [True Unrepresentable Contact Lever Arms Can Drop Physical Response](#true-unrepresentable-contact-lever-arms-can-drop-physical-response).
-3. **Gravitas:**
+2. **Gravitas:**
    [SolidBody Point Transforms Can Saturate Before Their Final World Or Local Coordinate](#solidbody-point-transforms-can-saturate-before-their-final-world-or-local-coordinate).
-4. **Gravitas:**
+3. **Gravitas:**
    [3D Overlap-Circle Classification Depends On A Full-3D Surface Witness](#3d-overlap-circle-classification-depends-on-a-full-3d-surface-witness).
-5. **FixedMathSharp / Gravitas:**
+4. **FixedMathSharp / Gravitas:**
    [Radial Segment Parameters Can Collapse Spatially Distinct Query Hits](#radial-segment-parameters-can-collapse-spatially-distinct-query-hits).
-6. **FixedMathSharp / Gravitas:**
+5. **FixedMathSharp / Gravitas:**
    [Mesh Triangle-Triangle SAT Can Saturate Before Axis Classification](#mesh-triangle-triangle-sat-can-saturate-before-axis-classification).
-
-### Finite-Axis Collider Endpoint Snapshots Can Deform Scalar-Boundary Geometry
-
-**Discovered:** 2026-07-19  
-**Source:** centered finite-axis query migration and final consumer audit  
-**Affected area:** 2D/3D capsule, 3D cylinder, and 3D cone endpoint properties;
-discrete 2D/3D/mixed narrow phase, capsule-mover sweep decomposition, support
-and closest-point helpers, mesh contact candidates, replay hashing, and
-diagnostics
-
-Capsules, cylinders, and cones currently expose representable endpoint
-snapshots built from `center +/- worldAxis * halfLength`. Near a `Fixed64`
-scalar face, a rotated conceptual endpoint can lie outside the scalar domain.
-Component-wise saturation then shortens or bends the stored segment even though
-the canonical center, normalized rigid frame, normalized local axis, full or
-half length, and radius remain valid. An odd raw-unit cone height also has a
-conceptual half-height that is not
-representable at all, so its cached apex and base center can collapse even near
-the origin. The centered query reducers avoid those snapshots, but several
-discrete, mixed-dimension, support, capsule-mover, replay, and diagnostic
-consumers still treat them as authoritative geometry.
-
-Make `(center, normalized rigid-frame rotation, normalized local axis,
-full/half length, radius)` the only runtime geometry source of truth. A public
-`WorldAxis` may remain as a derived convenience projection but must never be
-fed back into exact support or contact construction. Decide whether the
-endpoint properties should
-become explicit best-effort `Try*` projections or be removed as misleading
-public API.
-Move reusable centered-axis projection, closest-feature, support, and distance
-work into FixedMathSharp so downstream consumers never reconstruct conceptual
-endpoints merely to narrow them again. Bounds may clamp outward conservatively,
-while replay hashes should record canonical geometry and diagnostics should
-treat display clipping as presentation rather than simulation state.
-
-Cover mirrored minimum/maximum scalar faces, rotated axes, capsule/capsule and
-cylinder/capsule pairs, 2D and mixed contacts, capsule-mover sweeps, mesh
-candidate admission, support/closest-point results, replay equality, stable
-ordering, and warmed zero-allocation behavior. Do not solve this by widening a
-cached AABB or retaining the deformed endpoints behind another adapter.
-
-### Oriented Cuboid Boundary Proxies Can Deform Scalar-Face Geometry
-
-**Discovered:** 2026-07-20  
-**Source:** derived-bound strict/clipped consumer review  
-**Affected area:** 3D OBB canonical geometry, vertex generation, bounds,
-discrete/mixed collision, queries, diagnostics, replay, and host admission
-
-`LSCuboidCollider` currently builds an axis-aligned centered box with saturating
-or explicitly clipped endpoints and then rotates those representable corners
-about the physical center. Near a scalar face, clipping makes the pre-rotation
-box asymmetric and can shorten it. Rotation can therefore deform the authored
-cuboid and under-bound another axis even though the canonical center,
-orientation, and half-extents remain meaningful. The explicit clipped factory
-introduced by the derived-bound hardening made this pre-existing behavior
-visible; it did not create it.
-
-Make `(center, normalized orientation, half-extents)` the canonical OBB runtime
-geometry. Derive support points, SAT projections, contacts, query features,
-replay state, and diagnostics from that representation without materializing
-clipped local corners as simulation truth. Broad-phase bounds should be the
-conservative representable-domain intersection of the rotated conceptual box,
-with admission failing explicitly only if the chosen runtime contract cannot
-remain conservative. Cover mirrored scalar faces, nontrivial rotations,
-axis-aligned parity, mixed contacts, query admission, replay equality, stable
-ordering, and warmed zero-allocation behavior. Coordinate this with the
-finite-axis canonical-geometry issue, but do not hide either defect inside a
-single generic endpoint workaround.
-
-### Authored Collider Dimensions Can Saturate During Host-Scale Composition
-
-**Discovered:** 2026-07-19  
-**Source:** centered finite-axis admission and scaled-shape audit  
-**Affected area:** 2D/3D primitive shape rebuilds, compound part scale
-composition, bodyless collider pose setters, bounds, mass properties,
-registration admission, and replay
-
-Several runtime shape rebuilds still compose an authored dimension with host
-lossy scale in ordinary saturating `Fixed64` operations before deriving a
-radius, half-length, half-extent, or compound-part world scale. Examples include
-capsule and cylinder height/radius derivation and owner-scale times local-part
-scale. A mathematically valid authored product can therefore saturate at an
-intermediate step, after which later division or subtraction produces a
-plausible but incorrect representable shape. This is distinct from endpoint
-snapshot deformation: the canonical dimensions themselves have already lost
-information before any conceptual endpoint is requested.
-
-Define one exact-or-rejecting scaled-shape admission contract across 2D and 3D
-circles/spheres, boxes, capsules, cylinders, cones, meshes where applicable,
-and every compound part. Derive dependent half-extents and radii from the exact
-composed dimensions, reject only when the final canonical runtime shape is not
-representable or physically valid, and keep registration mutation atomic.
-Cover scale-order counterexamples, mirrored scalar limits, anisotropic scale,
-owner/part scale composition, compound rollback, replay equality, mass and
-bounds parity, and warmed zero-allocation behavior. Prefer reusable fused or
-wide arithmetic in FixedMathSharp when the contract benefits the rest of the
-stack.
-
-The body-motion-role review also confirmed that direct bodyless
-`LSCollider.Position`/`Rotation` changes can alter hierarchy-composed lossy
-scale before the next `Simulate()` validation. Bring those setters under the
-same tentative-pose, exact candidate validation, rollback, and immediate
-partition-refresh contract so an invalid mesh or compound pose cannot leave a
-host transform ahead of committed collider geometry.
-
-### 2D Convex Boundary Proxies Can Deform Scalar-Face Geometry
-
-**Discovered:** 2026-07-22  
-**Source:** mixed oriented-box/prism canonical-geometry migration  
-**Affected area:** 2D AABB and convex-polygon canonical vertices; pure 2D
-collision and query SAT; mixed convex-prism collision, queries, and CCD
-
-The canonical OBB migration exposed the same representation defect on the 2D
-side of a mixed pair. `LSPolygonCollider2D` stores transformed absolute world
-vertices, while `LSAABBoxCollider2D.GetVertexUnchecked` reconstructs corners
-from domain-clipped broad-phase bounds. Near a `Fixed64` scalar face, a valid
-conceptual polygon vertex may be unrepresentable and an AABB corner is silently
-shortened to the clipped bounds. Pure 2D and mixed SAT/query consumers then
-treat those materialized proxies as authoritative geometry.
-
-Store 2D convex vertices as stable scaled-local offsets and retain the
-collider's canonical planar rotation separately. Keep absolute world vertices
-behind explicit `Try*` presentation APIs. Pass `(origin, rotation,
-scaledLocalOffsets)` into exact FixedMathSharp convex relations so projection,
-containment, contact anchors, mixed prism geometry, mass properties, and query
-ordering remain full-domain. Derive broad-phase bounds analytically and clip
-only their final endpoints. Cover mirrored scalar faces, rotated offsets whose
-world-relative component is not representable before origin cancellation,
-AABB/polygon and polygon/polygon pairs, capsule/convex contacts, pure 2D
-queries, mixed contacts and sweeps, compound promotion, replay equality, and
-warmed zero-allocation behavior. Do not materialize, clip, or saturate a
-rotated offset or world vertex before an exact decision.
 
 ### True Unrepresentable Contact Lever Arms Can Drop Physical Response
 
@@ -241,6 +105,13 @@ ratio that was already lost at that earlier scalar boundary. The complete
 solution therefore needs semantic wide weights from primitive measurement
 through nested aggregation and inertia distribution, rather than a
 distribution-only patch at the final compound.
+
+The canonical-geometry release audit found the corresponding mixed-query
+failure mode: a far full-domain 2D circle can reach
+`MixedEmbedded2DGeometry` with an unrepresentable boundary distance, where its
+public-point fallback throws before narrow phase can decline the contact or
+query. Resolve that path through the same semantic anchor/lever contract; do
+not hide it with a saturated point or a query-local exception handler.
 
 Define an explicit solver-domain contract for true final lever overflow. The
 solution may be a bounded exact lever/mass-point representation carried into
@@ -368,6 +239,59 @@ projection/ranking paths; do not assume a discrete 3D collision fix provides
 query parity.
 
 ## Resolved Issues
+
+### Finite-Axis Collider Geometry Uses Canonical Rigid Frames
+
+**Discovered:** 2026-07-19  
+**Resolved:** 2026-07-27
+
+Capsules, cylinders, and cones now retain center, normalized rigid frame,
+normalized local axis, full axis length, and radius as simulation authority.
+Collision, query, CCD, replay, response, and diagnostic consumers use semantic
+anchors and centered-axis FixedMathSharp relations instead of reconstructed
+world endpoints. Broad-phase and presentation values may clip only after the
+exact geometric decision.
+
+### Oriented Cuboids Use One Canonical `FixedOrientedBox`
+
+**Discovered:** 2026-07-20  
+**Resolved:** 2026-07-27
+
+`LSCuboidCollider` stores one center/orientation/half-extents representation.
+Discrete, mixed, mesh, query, CCD, replay, and diagnostic paths no longer treat
+clipped or cached world corners as geometry. Bounds are derived analytically
+and clipped only at the representable-domain boundary.
+
+### Collider Scale Composition Is Exact And Transactional
+
+**Discovered:** 2026-07-19  
+**Resolved:** 2026-07-27
+
+FixedMathSharp owns fused scaled-dimension arithmetic, and Gravitas validates
+owner/part scale composition before publishing a primitive, mesh, compound, or
+bodyless-pose change. Invalid final geometry rejects atomically without leaving
+the host transform, partitions, mass properties, or committed collider state
+partially updated.
+
+### 2D Convex Geometry Retains Local Boundary Authority
+
+**Discovered:** 2026-07-22  
+**Resolved:** 2026-07-27
+
+2D boxes and polygons retain stable scaled-local boundaries plus canonical
+planar rotation. Pure 2D and mixed relations consume origin/rotation/local
+offsets directly; absolute vertices and clipped broad-phase bounds are no
+longer fed back into exact collision or query decisions.
+
+The shared Task 9 release artifact passes 2,575 FixedMathSharp Release tests
+and 3,669 Gravitas Release tests at exact 100% line, branch, and method
+coverage. FixedMathSharp ReleaseLean passes 2,554 tests; Gravitas ReleaseLean
+passes 3,614. Three repeated replay runs pass 84 tests each, all 68 allocation
+guards pass, and the benchmark comparison plus exact-winner optimization are
+retained in
+[`benchmark-signal-hardening-backlog.md`](benchmark-signal-hardening-backlog.md)
+because exact ordinary OBB contacts still require a separate
+adaptive-performance hardening pass.
 
 ### Finite-Slab Projection Support Math Is Full-Domain
 

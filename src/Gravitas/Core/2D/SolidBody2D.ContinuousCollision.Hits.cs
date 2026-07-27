@@ -16,33 +16,6 @@ namespace Gravitas;
 
 public sealed partial class SolidBody2D
 {
-    private readonly struct DynamicMixedIntervalHit
-    {
-        public DynamicMixedIntervalHit(
-            ContinuousCollisionMath.IntervalSearchStatus status,
-            PhysicsMixedHit exactHit,
-            Fixed64 safeDistance,
-            Fixed64 closingSpeed,
-            int targetId)
-        {
-            Status = status;
-            ExactHit = exactHit;
-            SafeDistance = safeDistance;
-            ClosingSpeed = closingSpeed;
-            TargetId = targetId;
-        }
-
-        public ContinuousCollisionMath.IntervalSearchStatus Status { get; }
-
-        public PhysicsMixedHit ExactHit { get; }
-
-        public Fixed64 SafeDistance { get; }
-
-        public Fixed64 ClosingSpeed { get; }
-
-        public int TargetId { get; }
-    }
-
     private bool TryGetFirstContinuousCollisionHit(
         Vector2d startPosition,
         Vector2d proposedPosition,
@@ -113,20 +86,11 @@ public sealed partial class SolidBody2D
                 proxyRadius,
                 elapsedFrameFraction,
                 out DynamicMixedIntervalHit dynamicMixed);
-            bool dynamicMixedIsEarlier = foundDynamicMixed
-                && (!foundMixed
-                    || dynamicMixed.SafeDistance < hitMixedDistance);
-            bool exactDynamicMixedReplaces = foundDynamicMixed
-                && dynamicMixed.Status
-                    == ContinuousCollisionMath.IntervalSearchStatus.ExactHit
-                && ContinuousCollisionCandidateOrdering.ShouldReplaceMixedHit(
-                    dynamicMixed.ExactHit,
-                    dynamicMixed.ClosingSpeed,
-                    true,
-                    foundMixed,
+            if (DynamicMixedIntervalHit.ShouldReplaceStatic(
+                    dynamicMixed,
+                    foundDynamicMixed,
                     hitMixed,
-                    Fixed64.Zero);
-            if (dynamicMixedIsEarlier || exactDynamicMixedReplaces)
+                    foundMixed))
             {
                 hitMixed = dynamicMixed.ExactHit;
                 hitMixedDistance = dynamicMixed.SafeDistance;
@@ -137,11 +101,11 @@ public sealed partial class SolidBody2D
                     : ContinuousCollisionTargetKind.UnresolvedMixed;
             }
 
-            if (found2D
-                && (!foundMixed
-                    || ContinuousCollisionCandidateOrdering.Is2DHitFirst(
-                        hit2D.Distance,
-                        hitMixedDistance)))
+            if (DynamicMixedIntervalHit.ShouldSelect2D(
+                    found2D,
+                    hit2D.Distance,
+                    foundMixed,
+                    hitMixedDistance))
             {
                 normal = hit2D.Normal;
                 distance = hit2D.Distance;
@@ -413,14 +377,10 @@ public sealed partial class SolidBody2D
                     sourceStartTime,
                     sourceEndTime,
                     segmentTime);
-                if (!TryTranslateContactAnchor(
-                        relativeHit.Anchor,
-                        targetDisplacement,
-                        segmentTime,
-                        out ContactAnchor2D candidateAnchor))
-                {
-                    continue;
-                }
+                ContactAnchor2D candidateAnchor = TranslateContactAnchor(
+                    relativeHit.Anchor,
+                    targetDisplacement,
+                    segmentTime);
 
                 var candidate = new Physics2DHit(
                     target.Collider,
@@ -448,35 +408,28 @@ public sealed partial class SolidBody2D
         return found;
     }
 
-    private static bool TryTranslateContactAnchor(
+    private static ContactAnchor2D TranslateContactAnchor(
         ContactAnchor2D anchor,
         Vector2d displacement,
-        Fixed64 fraction,
-        out ContactAnchor2D translated)
+        Fixed64 fraction)
     {
-        bool representable =
-            Fixed64.TryMultiplyAdd(
-                displacement.X,
-                fraction,
-                anchor.Origin.X,
-                out Fixed64 x)
-            & Fixed64.TryMultiplyAdd(
-                displacement.Y,
-                fraction,
-                anchor.Origin.Y,
-                out Fixed64 y);
-        if (!representable)
-        {
-            translated = default;
-            return false;
-        }
-
-        translated = new ContactAnchor2D(
+        // The validated target trajectory keeps every interpolation between
+        // its admitted endpoints in the coordinate domain.
+        _ = Fixed64.TryMultiplyAdd(
+            displacement.X,
+            fraction,
+            anchor.Origin.X,
+            out Fixed64 x);
+        _ = Fixed64.TryMultiplyAdd(
+            displacement.Y,
+            fraction,
+            anchor.Origin.Y,
+            out Fixed64 y);
+        return new ContactAnchor2D(
             new Vector2d(x, y),
             anchor.Rotation,
             anchor.LocalPoint,
             anchor.LocalDisplacement);
-        return true;
     }
 
     private bool TryGetFirstDynamicMixedContinuousCollisionHit(
@@ -526,33 +479,10 @@ public sealed partial class SolidBody2D
                 continue;
             }
 
-            bool candidateIsEarlier = !found
-                || candidate.SafeDistance < best.SafeDistance;
-            bool exactTieReplaces = found
-                && candidate.SafeDistance == best.SafeDistance
-                && candidate.Status
-                    == ContinuousCollisionMath.IntervalSearchStatus.ExactHit
-                && (best.Status
-                        != ContinuousCollisionMath.IntervalSearchStatus.ExactHit
-                    || ContinuousCollisionCandidateOrdering.ShouldReplaceMixedHit(
-                        candidate.ExactHit,
-                        candidate.ClosingSpeed,
-                        true,
-                        true,
-                        best.ExactHit,
-                        best.ClosingSpeed));
-            bool unresolvedTieReplaces = found
-                && candidate.SafeDistance == best.SafeDistance
-                && candidate.Status
-                    == ContinuousCollisionMath.IntervalSearchStatus.Unresolved
-                && best.Status
-                    == ContinuousCollisionMath.IntervalSearchStatus.Unresolved
-                && candidate.TargetId < best.TargetId;
-            if (!(candidateIsEarlier | exactTieReplaces | unresolvedTieReplaces))
-                continue;
-
-            best = candidate;
-            found = true;
+            best = DynamicMixedIntervalHit.Select(
+                candidate,
+                best,
+                ref found);
         }
 
         hit = best;
@@ -665,7 +595,6 @@ public sealed partial class SolidBody2D
                     sourceSegmentStart.ToVector2d(),
                     sourceSegmentDisplacement.ToVector2d(),
                     sourceStartRotation,
-                    angularDelta,
                     intervalElapsedTime,
                     intervalDuration,
                     out _,
@@ -725,7 +654,7 @@ public sealed partial class SolidBody2D
                 sourceStartTime,
                 sourceEndTime,
                 safeTime);
-            bool exactHit = hasContact && contactTime == safeTime;
+            bool exactHit = hasContact & contactTime == safeTime;
             PhysicsMixedHit exact = exactHit
                 ? new PhysicsMixedHit(
                     target.Collider,

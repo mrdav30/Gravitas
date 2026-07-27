@@ -285,14 +285,11 @@ internal sealed partial class ConvexSweepQueryWorker
         Fixed64 closestNumerator = Fixed64.MaxValue;
         int closestTriangleIndex = int.MaxValue;
 
-        if (!TryCreateSweptSourceBoundsInMeshFrame(
-                sourceShape,
-                mesh,
-                out Vector3d min,
-                out Vector3d max))
-        {
-            return false;
-        }
+        CreateSweptSourceBoundsInMeshFrame(
+            sourceShape,
+            mesh,
+            out Vector3d min,
+            out Vector3d max);
 
         mesh.Mesh.GetTrianglesInLocalBounds(
             new FixedBoundVolume(min, max),
@@ -377,37 +374,61 @@ internal sealed partial class ConvexSweepQueryWorker
         Vector3d padding = Vector3d.One * ContactTolerance;
         sourceMin -= padding;
         sourceMax += padding;
+        return TryComputeSweepLowerBoundNumerator(
+            sourceMin,
+            sourceMax,
+            targetMin,
+            targetMax,
+            _displacement,
+            _length,
+            out lowerBoundNumerator);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static bool TryComputeSweepLowerBoundNumerator(
+        Vector3d sourceMin,
+        Vector3d sourceMax,
+        Vector3d targetMin,
+        Vector3d targetMax,
+        Vector3d displacement,
+        Fixed64 length,
+        out Fixed64 lowerBoundNumerator)
+    {
         lowerBoundNumerator = Fixed64.Zero;
         return IncludeAxisEntryNumerator(
                 sourceMin.X,
                 sourceMax.X,
                 targetMin.X,
                 targetMax.X,
-                _displacement.X,
+                displacement.X,
+                length,
                 ref lowerBoundNumerator)
             && IncludeAxisEntryNumerator(
                 sourceMin.Y,
                 sourceMax.Y,
                 targetMin.Y,
                 targetMax.Y,
-                _displacement.Y,
+                displacement.Y,
+                length,
                 ref lowerBoundNumerator)
             && IncludeAxisEntryNumerator(
                 sourceMin.Z,
                 sourceMax.Z,
                 targetMin.Z,
                 targetMax.Z,
-                _displacement.Z,
+                displacement.Z,
+                length,
                 ref lowerBoundNumerator);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private bool IncludeAxisEntryNumerator(
+    private static bool IncludeAxisEntryNumerator(
         Fixed64 sourceMin,
         Fixed64 sourceMax,
         Fixed64 targetMin,
         Fixed64 targetMax,
         Fixed64 displacement,
+        Fixed64 length,
         ref Fixed64 entryNumerator)
     {
         if (sourceMax >= targetMin
@@ -445,7 +466,7 @@ internal sealed partial class ConvexSweepQueryWorker
         // With 0 <= gap <= span, the fused result is bounded by the already
         // representable chord length.
         _ = Fixed64.TryMultiplyDivide(
-            _length,
+            length,
             gap,
             span,
             out Fixed64 axisNumerator);
@@ -543,14 +564,21 @@ internal sealed partial class ConvexSweepQueryWorker
                     out hit,
                     out hitNumerator);
             }
-            bool hasStep = Fixed64.TryMultiplyDivide(
-                result.Distance,
+            Fixed64 boundedDistance =
+                FixedMath.Min(
+                    result.Distance,
+                    closingPerFraction);
+            // Capping the advancement ratio at one preserves the endpoint
+            // decision while keeping the fused result inside the chord length.
+            _ = Fixed64.TryMultiplyDivide(
+                boundedDistance,
                 _length,
                 closingPerFraction,
                 out Fixed64 stepNumerator);
             Fixed64 nextTravelNumerator =
                 travelNumerator + stepNumerator;
-            if (!hasStep || nextTravelNumerator > _length)
+            if (result.Distance > closingPerFraction
+                || nextTravelNumerator > _length)
             {
                 ConvexShape endpointSource = sourceShape.WithSourceOffset(_displacement);
                 GjkResult endpointResult = ComputeDistance(endpointSource, targetShape);
@@ -779,22 +807,19 @@ internal sealed partial class ConvexSweepQueryWorker
             throw CreateConcaveSourceException(source);
     }
 
-    private bool TryCreateSweptSourceBoundsInMeshFrame(
+    private void CreateSweptSourceBoundsInMeshFrame(
         ConvexShape sourceShape,
         LSMeshCollider mesh,
         out Vector3d min,
         out Vector3d max)
     {
-        if (!sourceShape.TryGetBoundsRelativeTo(
-                mesh.Mesh.Origin,
-                mesh.Mesh.Rotation,
-                out Vector3d sourceMin,
-                out Vector3d sourceMax))
-        {
-            min = default;
-            max = default;
-            return false;
-        }
+        // Concave-target dispatch receives only the source's committed shape;
+        // iterative chord offsets are introduced after broad-phase collection.
+        _ = sourceShape.TryGetBoundsRelativeTo(
+            mesh.Mesh.Origin,
+            mesh.Mesh.Rotation,
+            out Vector3d sourceMin,
+            out Vector3d sourceMax);
 
         // Prepare admitted the chord magnitude, so a unit rotation preserves
         // representability.
@@ -808,7 +833,6 @@ internal sealed partial class ConvexSweepQueryWorker
             ContactTolerance,
             out min,
             out max);
-        return true;
     }
 
     private bool CanSweptSourceShapeReachTarget(ConvexShape sourceShape, LSCollider target)

@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using FixedMathSharp.Geometry;
 using System;
 
 namespace Gravitas.Queries;
@@ -201,71 +202,29 @@ internal sealed partial class ConvexSweepQueryWorker
         b = scaled[1];
         c = scaled[2];
 
-        Vector3d ab = b - a;
-        Vector3d ac = c - a;
-        if (Vector3d.Cross(ab, ac).IsZero)
+        var triangle = new FixedTriangle(a, b, c);
+        Vector3d closest = triangle.ClosestPoint(Vector3d.Zero);
+        if (!triangle.TryGetProjectedBarycentricWeights(
+                closest,
+                out _,
+                out Fixed64 weightB,
+                out Fixed64 weightC))
+        {
             return ClosestPointOnDegenerateTriangleToOrigin(a, b, c);
-
-        Vector3d ap = -a;
-        Fixed64 d1 = Vector3d.Dot(ab, ap);
-        Fixed64 d2 = Vector3d.Dot(ac, ap);
-        if (d1 <= Fixed64.Zero && d2 <= Fixed64.Zero)
-            return new TriangleWeights(Fixed64.One, Fixed64.Zero, Fixed64.Zero);
-
-        Vector3d bp = -b;
-        Fixed64 d3 = Vector3d.Dot(ab, bp);
-        Fixed64 d4 = Vector3d.Dot(ac, bp);
-        if (d3 >= Fixed64.Zero && d4 <= d3)
-            return new TriangleWeights(Fixed64.Zero, Fixed64.One, Fixed64.Zero);
-
-        Fixed64 vc = d1 * d4 - d3 * d2;
-        if (vc <= Fixed64.Zero && d1 >= Fixed64.Zero && d3 <= Fixed64.Zero)
-        {
-            Fixed64 edgeDenominator = d1 - d3;
-            if (edgeDenominator == Fixed64.Zero)
-                return ClosestPointOnDegenerateTriangleToOrigin(a, b, c);
-
-            Fixed64 v = d1 / edgeDenominator;
-            return new TriangleWeights(Fixed64.One - v, v, Fixed64.Zero);
         }
 
-        Vector3d cp = -c;
-        Fixed64 d5 = Vector3d.Dot(ab, cp);
-        Fixed64 d6 = Vector3d.Dot(ac, cp);
-        if (d6 >= Fixed64.Zero && d5 <= d6)
-            return new TriangleWeights(Fixed64.Zero, Fixed64.Zero, Fixed64.One);
-
-        Fixed64 vb = d5 * d2 - d1 * d6;
-        if (vb <= Fixed64.Zero && d2 >= Fixed64.Zero && d6 <= Fixed64.Zero)
-        {
-            Fixed64 edgeDenominator = d2 - d6;
-            if (edgeDenominator == Fixed64.Zero)
-                return ClosestPointOnDegenerateTriangleToOrigin(a, b, c);
-
-            Fixed64 w = d2 / edgeDenominator;
-            return new TriangleWeights(Fixed64.One - w, Fixed64.Zero, w);
-        }
-
-        Fixed64 va = d3 * d6 - d5 * d4;
-        if (va <= Fixed64.Zero && (d4 - d3) >= Fixed64.Zero && (d5 - d6) >= Fixed64.Zero)
-        {
-            Fixed64 edgeNumerator = d4 - d3;
-            Fixed64 edgeDenominator = edgeNumerator + (d5 - d6);
-            if (edgeDenominator == Fixed64.Zero)
-                return ClosestPointOnDegenerateTriangleToOrigin(a, b, c);
-
-            Fixed64 w = edgeNumerator / edgeDenominator;
-            return new TriangleWeights(Fixed64.Zero, Fixed64.One - w, w);
-        }
-
-        Fixed64 barycentricDenominator = va + vb + vc;
-        if (barycentricDenominator == Fixed64.Zero)
-            return ClosestPointOnDegenerateTriangleToOrigin(a, b, c);
-
-        Fixed64 denominator = Fixed64.One / barycentricDenominator;
-        Fixed64 vInside = vb * denominator;
-        Fixed64 wInside = vc * denominator;
-        return new TriangleWeights(Fixed64.One - vInside - wInside, vInside, wInside);
+        weightB = FixedMath.Clamp(
+            weightB,
+            Fixed64.Zero,
+            Fixed64.One);
+        weightC = FixedMath.Clamp(
+            weightC,
+            Fixed64.Zero,
+            Fixed64.One - weightB);
+        return new TriangleWeights(
+            Fixed64.One - weightB - weightC,
+            weightB,
+            weightC);
     }
 
     private static TriangleWeights ClosestPointOnDegenerateTriangleToOrigin(

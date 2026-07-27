@@ -50,12 +50,7 @@ internal static class ColliderScalePolicy
         out FixedQuaternion worldRotation)
     {
         SwiftThrowHelper.ThrowIfNull(transform, nameof(transform));
-        FixedTransform? current = transform;
-        while (current != null)
-        {
-            Validate(current.LocalScale);
-            current = current.Parent;
-        }
+        ValidateAncestry(transform);
 
         Vector3d worldScale = default;
         worldRotation = default;
@@ -73,13 +68,37 @@ internal static class ColliderScalePolicy
         return worldScale;
     }
 
-    private static bool TryExtractPlanarScale(
-        Fixed4x4 matrix,
-        out Vector2d scale) =>
-        TryExtractPlanarTransform(
-            matrix,
-            out scale,
-            out _);
+    internal static Vector3d CaptureScale(FixedTransform transform)
+    {
+        ValidateAncestry(transform);
+        if (transform.Parent == null)
+            return transform.LocalScale;
+
+        Vector3d worldScale = default;
+        bool capturedMatrix =
+            transform.TryGetLocalToWorldMatrix(out Fixed4x4 worldMatrix);
+        bool capturedScale = Fixed4x4.Decompose(
+            worldMatrix,
+            out _,
+            out _,
+            out worldScale);
+        SwiftThrowHelper.ThrowIfArgument(
+            !(capturedMatrix & capturedScale),
+            nameof(transform),
+            "Collider transform hierarchy must compose to a representable, nonsheared transform.");
+        Validate(worldScale);
+        return worldScale;
+    }
+
+    private static void ValidateAncestry(FixedTransform transform)
+    {
+        FixedTransform? current = transform;
+        while (current != null)
+        {
+            Validate(current.LocalScale);
+            current = current.Parent;
+        }
+    }
 
     private static bool TryExtractPlanarTransform(
         Fixed4x4 matrix,

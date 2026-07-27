@@ -16,6 +16,10 @@ public sealed class ColliderExactScaleAdmissionTests
         var collider3D = new UnsupportedTestCollider3D();
         var collider2D = new UnsupportedTestCollider2D();
 
+        collider3D.TryGetLocalScale(out Vector3d detached3DScale)
+            .Should().BeTrue();
+        detached3DScale.Should().Be(Vector3d.One);
+
         ColliderCanonicalBounds.GetCurrentCenteredProxyRadius(collider3D)
             .Should().Be(Fixed64.MaxValue);
         ColliderCanonicalBounds.GetCenteredProxyRadius(collider3D)
@@ -38,6 +42,32 @@ public sealed class ColliderExactScaleAdmissionTests
             .Should().Be(Fixed64.MaxValue);
         ColliderCanonicalBounds2D.GetGroundProbeRadius(collider2D)
             .Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void DetachedPlanarMixedThicknessOverride_ShouldPublishIntoCanonicalSlab()
+    {
+        var collider = new LSCircleCollider2D(Fixed64.One)
+        {
+            MixedHalfThicknessOverride = Fixed64.Two
+        };
+
+        collider.RebuildRuntimeShapeOnly().Should().BeTrue();
+
+        collider.MixedHalfThickness.Should().Be(Fixed64.Two);
+        collider.MixedBounds3D.Min.Y.Should().Be(-Fixed64.Two);
+        collider.MixedBounds3D.Max.Y.Should().Be(Fixed64.Two);
+    }
+
+    [Fact]
+    public void PlanarNearZeroClamp_ShouldTreatComponentsIndependently()
+    {
+        PublishObservingCollider2D.ClampForTest(
+                new Vector2d(Fixed64.Epsilon, Fixed64.Two))
+            .Should().Be(new Vector2d(Fixed64.Zero, Fixed64.Two));
+        PublishObservingCollider2D.ClampForTest(
+                new Vector2d(Fixed64.Two, -Fixed64.Epsilon))
+            .Should().Be(new Vector2d(Fixed64.Two, Fixed64.Zero));
     }
 
     [Fact]
@@ -80,6 +110,39 @@ public sealed class ColliderExactScaleAdmissionTests
         collider.ScaledOffset.Should().Be(collider.LocalOffset);
         Action readCenter = () => _ = collider.Center;
         readCenter.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void CommittedCompoundCuboidProxyRadius_ShouldClampAnUnrepresentableDiagonal()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        var compound = new LSCompoundCollider(
+            CompoundColliderPart.Cuboid(
+                Vector3d.One * Fixed64.MaxValue,
+                Vector3d.Zero,
+                FixedQuaternion.Identity,
+                Vector3d.One * Fixed64.Two));
+        compound.InitializeWithNoBody(new TestMatterAgent(context));
+        var cuboid = (LSCuboidCollider)compound.GetPartCollider(0);
+
+        ColliderCanonicalBounds.GetCenteredProxyRadius(cuboid)
+            .Should()
+            .Be(Fixed64.MaxValue);
+    }
+
+    [Fact]
+    public void CompoundCircleGroundProbe_ShouldClampUnrepresentableRelativeBounds()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        var compound = new LSCompoundCollider2D(
+            CompoundColliderPart2D.Circle(
+                Fixed64.MaxValue,
+                Vector2d.Right));
+        compound.InitializeWithNoBody(new TestMatterAgent(context));
+
+        ColliderCanonicalBounds2D.GetGroundProbeRadius(compound)
+            .Should()
+            .Be(Fixed64.MaxValue);
     }
 
     [Fact]
@@ -364,6 +427,47 @@ public sealed class ColliderExactScaleAdmissionTests
     }
 
     [Fact]
+    public void BodyPosePreparation_ShouldReturnFalseWhenOnlyWorldCenterCancelsIntoRange()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        var transform = new FixedTransform(
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            Vector3d.One);
+        var collider = new LSSphereCollider
+        {
+            Radius = Fixed64.FromRaw(1L),
+            LocalOffset = new Vector3d(
+                Fixed64.FromRaw((long.MaxValue / 2L) + 1L),
+                Fixed64.Zero,
+                Fixed64.Zero)
+        };
+        var body = new SolidBody(
+            new TestMatterAgent(context, transform),
+            collider)
+        {
+            Mass = Fixed64.One
+        };
+        body.Initialize(
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            BodyMotionType.Dynamic);
+        transform.LocalScale = new Vector3d(
+            Fixed64.Two,
+            Fixed64.One,
+            Fixed64.One);
+
+        collider.TryPrepareBodyPose(
+                new Vector3d(
+                    Fixed64.MinValue,
+                    Fixed64.Zero,
+                    Fixed64.Zero),
+                FixedQuaternion.Identity)
+            .Should()
+            .BeFalse();
+    }
+
+    [Fact]
     public void BodyPlanarCenter_ShouldRejectAtTrueBodyLocalLeverBoundary()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
@@ -527,6 +631,9 @@ public sealed class ColliderExactScaleAdmissionTests
             Fixed64 mass,
             Vector2d localReferencePoint) =>
             Fixed64.Zero;
+
+        internal static Vector2d ClampForTest(Vector2d value) =>
+            ClampNearZero(value);
 
         internal override Fixed64 CalculateAreaForMassProperties() =>
             Fixed64.Zero;
