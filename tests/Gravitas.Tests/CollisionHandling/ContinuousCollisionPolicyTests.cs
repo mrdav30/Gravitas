@@ -10,60 +10,156 @@ namespace Gravitas.Tests.CollisionHandlingTests;
 public sealed class ContinuousCollisionPolicyTests
 {
     [Fact]
-    public void ContinuousCollisionContactPolicy_ShouldResolveSweptSpherePointsAndNormals()
+    public void ContinuousCollisionContactPolicy_ShouldResolveSweptSphereAnchorsAndNormals()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         LSSphereCollider sphere = scenario.CreateStaticSphere(Vector3d.Zero);
         LSCuboidCollider cuboid = scenario.CreateCuboid(Vector3d.Zero).Collider;
 
-        ContinuousCollisionContactPolicy.ResolveSweptSpherePoint(
+        ContinuousCollisionContactPolicy.TryResolveSweptSphereContact(
                 sphere,
                 sphere.Center,
                 Vector3d.Right,
-                Fixed64.Zero)
-            .Should().Be(sphere.Center - Vector3d.Right * sphere.ScaledRadius);
+                out ContactAnchor coincidentAnchor,
+                out Vector3d coincidentNormal)
+            .Should().BeTrue();
+        coincidentAnchor.TryGetWorldPoint(out Vector3d coincidentPoint).Should().BeTrue();
+        coincidentPoint.Should().Be(sphere.Center - Vector3d.Right * sphere.ScaledRadius);
+        coincidentNormal.Should().Be(Vector3d.Left);
 
-        ContinuousCollisionContactPolicy.ResolveSweptSpherePoint(
+        ContinuousCollisionContactPolicy.TryResolveSweptSphereContact(
                 sphere,
                 Vector3d.Right * (Fixed64)2,
                 -Vector3d.Right,
-                Fixed64.Zero)
-            .Should().Be(Vector3d.Right * sphere.ScaledRadius);
+                out ContactAnchor separatedAnchor,
+                out Vector3d separatedNormal)
+            .Should().BeTrue();
+        separatedAnchor.TryGetWorldPoint(out Vector3d separatedPoint).Should().BeTrue();
+        separatedPoint.Should().Be(Vector3d.Right * sphere.ScaledRadius);
+        separatedNormal.Should().Be(Vector3d.Right);
 
-        ContinuousCollisionContactPolicy.ResolveSweptSphereNormal(
+        ContinuousCollisionContactPolicy.TryResolveSweptSphereContact(
                 cuboid,
-                Vector3d.Zero,
                 Vector3d.Right,
-                -Vector3d.Right)
-            .Should().Be(Vector3d.Right);
+                -Vector3d.Right,
+                out _,
+                out Vector3d cuboidNormal)
+            .Should().BeTrue();
+        cuboidNormal.Should().Be(Vector3d.Right);
 
-        ContinuousCollisionContactPolicy.ResolveSweptSphereNormal(
-                sphere,
-                Vector3d.Right * sphere.ScaledRadius,
-                Vector3d.Right * (Fixed64)2,
-                -Vector3d.Right)
-            .Should().Be(Vector3d.Right);
-
-        ContinuousCollisionContactPolicy.ResolveSweptSphereNormal(
+        ContinuousCollisionContactPolicy.TryResolveSweptSphereContact(
                 sphere,
                 sphere.Center,
-                Vector3d.Up,
-                -Vector3d.Up)
-            .Should().Be(Vector3d.Up);
+                -Vector3d.Up,
+                out _,
+                out Vector3d upwardFallback)
+            .Should().BeTrue();
+        upwardFallback.Should().Be(Vector3d.Up);
 
-        ContinuousCollisionContactPolicy.ResolveSweptSphereNormal(
+        ContinuousCollisionContactPolicy.TryResolveSweptSphereContact(
                 sphere,
                 sphere.Center,
-                sphere.Center,
-                Vector3d.Right)
-            .Should().Be(-Vector3d.Right);
+                Vector3d.Zero,
+                out _,
+                out Vector3d zeroMotionFallback)
+            .Should().BeTrue();
+        zeroMotionFallback.Should().Be(Vector3d.Right);
+    }
 
-        ContinuousCollisionContactPolicy.ResolveSweptSphereNormal(
-                sphere,
-                sphere.Center,
-                sphere.Center,
-                Vector3d.Zero)
-            .Should().Be(Vector3d.Zero);
+    [Fact]
+    public void ContinuousCollisionContactPolicy_ShouldRejectUnrepresentableFiniteAxisWitnesses()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSCylinderCollider cylinder =
+            scenario.CreateCylinder(Vector3d.Zero).Collider;
+        LSConeCollider cone = scenario.CreateBody(
+            new LSConeCollider(),
+            Vector3d.Zero,
+            FixedQuaternion.Identity).Collider;
+        Vector3d farCenter = new(
+            Fixed64.MinValue + Fixed64.One,
+            Fixed64.Zero,
+            Fixed64.Zero);
+        Vector3d impact = new(
+            Fixed64.MaxValue - Fixed64.One,
+            Fixed64.Zero,
+            Fixed64.Zero);
+        cylinder.LocalOffset = farCenter;
+        cone.LocalOffset = farCenter;
+        cylinder.RebuildRuntimeShapeOnly().Should().BeTrue();
+        cone.RebuildRuntimeShapeOnly().Should().BeTrue();
+
+        ContinuousCollisionContactPolicy.TryResolveSweptSphereContact(
+            cylinder,
+            impact,
+            Vector3d.Right,
+            out ContactAnchor cylinderAnchor,
+            out Vector3d cylinderNormal).Should().BeFalse();
+        ContinuousCollisionContactPolicy.TryResolveSweptSphereContact(
+            cone,
+            impact,
+            Vector3d.Right,
+            out ContactAnchor coneAnchor,
+            out Vector3d coneNormal).Should().BeFalse();
+
+        cylinderAnchor.Should().Be(default(ContactAnchor));
+        cylinderNormal.Should().Be(Vector3d.Zero);
+        coneAnchor.Should().Be(default(ContactAnchor));
+        coneNormal.Should().Be(Vector3d.Zero);
+    }
+
+    [Fact]
+    public void ContinuousCollisionContactPolicy_ShouldStabilizeCustomColliderNormals()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        var custom = new UnsupportedTestCollider3D
+        {
+            ClosestPointOverride = Vector3d.Left,
+            NormalOverride = Vector3d.Zero,
+        };
+        scenario.InitializeStaticCollider(custom, Vector3d.Zero);
+
+        ContinuousCollisionContactPolicy.TryResolveSweptSphereContact(
+            custom,
+            Vector3d.Right,
+            Vector3d.Up,
+            out _,
+            out Vector3d geometricNormal).Should().BeTrue();
+        geometricNormal.Should().Be(Vector3d.Right);
+
+        custom.ClosestPointOverride = Vector3d.Zero;
+        ContinuousCollisionContactPolicy.TryResolveSweptSphereContact(
+            custom,
+            Vector3d.Zero,
+            Vector3d.Up,
+            out _,
+            out Vector3d motionNormal).Should().BeTrue();
+        motionNormal.Should().Be(Vector3d.Down);
+        ContinuousCollisionContactPolicy.TryResolveSweptSphereContact(
+            custom,
+            Vector3d.Zero,
+            Vector3d.Zero,
+            out _,
+            out Vector3d zeroNormal).Should().BeTrue();
+        zeroNormal.Should().Be(Vector3d.Zero);
+
+        custom.LocalOffset = new Vector3d(
+            Fixed64.MinValue + Fixed64.One,
+            Fixed64.Zero,
+            Fixed64.Zero);
+        custom.ClosestPointOverride = new Vector3d(
+            Fixed64.MaxValue - Fixed64.One,
+            Fixed64.Zero,
+            Fixed64.Zero);
+        custom.RebuildRuntimeShapeOnly().Should().BeTrue();
+        ContinuousCollisionContactPolicy.TryResolveSweptSphereContact(
+            custom,
+            custom.ClosestPointOverride.Value,
+            Vector3d.Right,
+            out ContactAnchor unavailable,
+            out Vector3d unavailableNormal).Should().BeFalse();
+        unavailable.Should().Be(default(ContactAnchor));
+        unavailableNormal.Should().Be(Vector3d.Zero);
     }
 
     [Fact]

@@ -227,12 +227,20 @@ and scalar moment.
 `FixedTransform.LocalScale` is general authored transform data and may be signed
 or zero. Gravitas collider dimensions are a stricter boundary: runtime colliders
 require every consumed authored local axis throughout the transform ancestry and
-the resulting hierarchy-derived `LossyScale` axis to be greater than zero before
-body registration, shape, mass, bounds, or partition state is mutated. Pure 2D
-consumes X/Z; 3D consumes X/Y/Z. Even when multiple negative scales cancel in
-the composed matrix, Gravitas rejects the reflected ancestry because canonical
-lossy scale cannot represent the authored reflection axes. Invalid physics scale
-is rejected without rewriting the host's authored local scale.
+the strictly composed world TRS scale axis to be greater than zero before body
+registration, shape, mass, bounds, or partition state is mutated. Pure 2D
+consumes X/Z and rejects a composed basis that leaves its simulation plane; 3D
+consumes X/Y/Z. Multiple negative scales do not become valid merely because
+their signs cancel, and rotated nonuniform hierarchy scale that produces real
+shear is rejected instead of being approximated as diagonal scale. Invalid
+physics scale is rejected atomically without rewriting the host's authored
+local transform.
+
+Compound owner and part scales are retained as separate factors until the final
+canonical dimension or centered coordinate is formed. Exact fused admission
+therefore accepts a representable final value even when an ordinary chained
+multiply would have saturated, while still rejecting an unrepresentable or
+nonpositive physical result.
 
 ## Broad Phase
 

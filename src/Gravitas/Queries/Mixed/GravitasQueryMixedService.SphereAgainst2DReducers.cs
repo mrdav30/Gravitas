@@ -6,8 +6,9 @@
 //=======================================================================
 
 using FixedMathSharp;
-using FixedMathSharp.Bounds;
+using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
+using Gravitas.CollisionHandling;
 
 namespace Gravitas.Queries;
 
@@ -76,8 +77,8 @@ public sealed partial class GravitasQueryMixedService
         hit = new PhysicsMixedHit(
             null,
             compound,
-            best.Point3D,
-            best.Point2D,
+            best.Anchor3D,
+            best.Anchor2D,
             best.Normal3DTo2D,
             best.ReducerKind,
             best.Distance,
@@ -251,25 +252,37 @@ public sealed partial class GravitasQueryMixedService
                 ref best);
         }
 
-        TrySweepConvexSlabSideFaces(
-            start,
-            end,
-            direction,
-            length,
-            radius,
-            collider,
-            slabMinY,
-            slabMaxY,
-            ref best);
-        TrySweepConvexSlabEdges(
-            start,
-            end,
-            length,
-            radius,
-            collider,
-            slabMinY,
-            slabMaxY,
-            ref best);
+        if (TryGetConvexSlabLocalSweep(
+                start,
+                end,
+                direction,
+                collider,
+                out Vector3d localStart,
+                out Vector3d localEnd,
+                out Vector3d localDirection))
+        {
+            Fixed64 localSlabMinY = -collider.MixedHalfThickness;
+            Fixed64 localSlabMaxY = collider.MixedHalfThickness;
+            TrySweepConvexSlabSideFaces(
+                localStart,
+                localEnd,
+                localDirection,
+                length,
+                radius,
+                collider,
+                localSlabMinY,
+                localSlabMaxY,
+                ref best);
+            TrySweepConvexSlabEdges(
+                localStart,
+                localEnd,
+                length,
+                radius,
+                collider,
+                localSlabMinY,
+                localSlabMaxY,
+                ref best);
+        }
 
         if (!best.Found)
         {
@@ -326,13 +339,13 @@ public sealed partial class GravitasQueryMixedService
     {
         Vector2d planarStart = new(start.X, start.Z);
         Vector2d planarDirection = new(direction.X, direction.Z);
-        Vector2d polygonCenter = collider.Center;
+        Vector2d polygonCenter = Vector2d.Zero;
         int vertexCount = collider.VertexCount;
 
         for (int i = 0; i < vertexCount; i++)
         {
-            Vector2d first = collider.GetVertexUnchecked(i);
-            Vector2d second = collider.GetVertexUnchecked((i + 1) % vertexCount);
+            Vector2d first = collider.GetScaledLocalVertexUnchecked(i);
+            Vector2d second = collider.GetScaledLocalVertexUnchecked((i + 1) % vertexCount);
             Vector2d edge = second - first;
             Fixed64 edgeLength = edge.Magnitude;
             Vector2d edgeDirection = edge / edgeLength;
@@ -375,8 +388,8 @@ public sealed partial class GravitasQueryMixedService
         int vertexCount = collider.VertexCount;
         for (int i = 0; i < vertexCount; i++)
         {
-            Vector2d first = collider.GetVertexUnchecked(i);
-            Vector2d second = collider.GetVertexUnchecked((i + 1) % vertexCount);
+            Vector2d first = collider.GetScaledLocalVertexUnchecked(i);
+            Vector2d second = collider.GetScaledLocalVertexUnchecked((i + 1) % vertexCount);
             Vector3d bottomFirst = new(first.X, slabMinY, first.Y);
             Vector3d topFirst = new(first.X, slabMaxY, first.Y);
             Vector3d bottomSecond = new(second.X, slabMinY, second.Y);
@@ -464,8 +477,8 @@ public sealed partial class GravitasQueryMixedService
             new Vector2d(end.X, end.Z));
         if (!planarSegment.TryGetCapsuleIntersectionDistanceInterval(
                 capsule.Center,
-                capsule.WorldAxis,
-                capsule.AxisHalfLength,
+                capsule.Rotation,
+                capsule.AxisLength,
                 targetRadius,
                 radiusExpansion,
                 length,
@@ -495,9 +508,28 @@ public sealed partial class GravitasQueryMixedService
         Fixed64 slabMaxY,
         ref SweepCandidate best)
     {
-        Vector2d firstEndpoint = capsule.SegmentStart;
-        Vector2d secondEndpoint = capsule.SegmentEnd;
-        Vector2d outward = new Vector2d(capsule.WorldAxis.Y, -capsule.WorldAxis.X) * targetRadius;
+        Vector2d capsuleAxis = new(
+            -FixedMath.Sin(capsule.Rotation),
+            FixedMath.Cos(capsule.Rotation));
+        if (!FixedSegment2d.TryGetCenteredAxisEndpoint(
+                capsule.Center,
+                capsuleAxis,
+                capsule.AxisLength,
+                positive: false,
+                out Vector2d firstEndpoint)
+            || !FixedSegment2d.TryGetCenteredAxisEndpoint(
+                capsule.Center,
+                capsuleAxis,
+                capsule.AxisLength,
+                positive: true,
+                out Vector2d secondEndpoint))
+        {
+            return;
+        }
+
+        Vector2d outward =
+            new Vector2d(capsuleAxis.Y, -capsuleAxis.X)
+            * targetRadius;
         Vector2d firstSideStart = firstEndpoint + outward;
         Vector2d firstSideEnd = secondEndpoint + outward;
         Vector2d secondSideStart = firstEndpoint - outward;
@@ -581,8 +613,53 @@ public sealed partial class GravitasQueryMixedService
         }
 
         Vector2d planarPoint = new(center.X, center.Z);
-        Vector2d closestPlanar = collider.GetClosestPoint(planarPoint);
-        return planarPoint.CheckDistance(closestPlanar, planarRadius);
+        if (collider.ContainsPoint(planarPoint))
+            return true;
+
+        return collider.TryGetClosestBoundaryAnchor(
+                planarPoint,
+                out _,
+                out Fixed64 planarDistance)
+            && planarDistance <= planarRadius;
+    }
+
+    private static bool TryGetConvexSlabLocalSweep(
+        Vector3d start,
+        Vector3d end,
+        Vector3d direction,
+        LSCollider2D collider,
+        out Vector3d localStart,
+        out Vector3d localEnd,
+        out Vector3d localDirection)
+    {
+        var frameOrigin = new Vector3d(
+            collider.Center.X,
+            collider.MixedSlabCenterY,
+            collider.Center.Y);
+        FixedQuaternion frameRotation =
+            FixedQuaternion.FromAxisAngle(
+                Vector3d.Up,
+                -collider.ConvexRotation);
+        var startAnchor = new FixedPointAnchor(
+            start,
+            FixedQuaternion.Identity,
+            Vector3d.Zero);
+        var endAnchor = new FixedPointAnchor(
+            end,
+            FixedQuaternion.Identity,
+            Vector3d.Zero);
+        bool representable = startAnchor.TryGetLocalPointIn(
+                frameOrigin,
+                frameRotation,
+                out localStart)
+            & endAnchor.TryGetLocalPointIn(
+                frameOrigin,
+                frameRotation,
+                out localEnd);
+        localDirection = representable
+            ? frameRotation.Inverse().Rotate(direction)
+            : default;
+        return representable;
     }
 
     private static bool TrySweepPointAgainstSegmentCapsule3D(

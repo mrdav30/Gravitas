@@ -1,5 +1,5 @@
 using FixedMathSharp;
-using FixedMathSharp.Bounds;
+using FixedMathSharp.Geometry;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Queries;
@@ -409,6 +409,51 @@ public sealed partial class MixedQueryCcdTests
             out _);
 
         found.Should().BeFalse();
+    }
+
+    [Fact]
+    public void ConvexSlabReducer_WithScalarFacePolygon_ShouldRetainRepresentableSideHit()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        var target = (LSPolygonCollider2D)CreateBodylessPolygon2D(
+            context,
+            Vector2d.Zero,
+            new[]
+            {
+                new Vector2d(-Fixed64.Half, -Fixed64.Half),
+                new Vector2d(Fixed64.Half, -Fixed64.Half),
+                new Vector2d(Fixed64.Half, Fixed64.Half),
+                new Vector2d(-Fixed64.Half, Fixed64.Half)
+            });
+        Fixed64 centerX =
+            Fixed64.MaxValue - Fixed64.FromFraction(1, 4);
+        target.AgentOrNull!.Transform.LocalPosition =
+            new Vector3d(centerX, Fixed64.Zero, Fixed64.Zero);
+        target.RebuildRuntimeShapeOnly().Should().BeTrue();
+        target.TryGetWorldVertex(1, out _).Should().BeFalse();
+
+        Vector3d start = new(
+            centerX - Fixed64.Two,
+            Fixed64.Zero,
+            Fixed64.Zero);
+        Vector3d end = new(
+            centerX,
+            Fixed64.Zero,
+            Fixed64.Zero);
+        bool found =
+            GravitasQueryMixedService.TrySweepSphereAgainstConvexSlab(
+                start,
+                end,
+                Vector3d.Right,
+                Fixed64.Two,
+                Fixed64.FromFraction(1, 4),
+                target,
+                out PhysicsMixedHit hit);
+
+        found.Should().BeTrue();
+        hit.Collider2D.Should().BeSameAs(target);
+        hit.Distance.Should().Be(Fixed64.FromFraction(5, 4));
+        hit.ReducerKind.Should().Be(PhysicsQueryReducerKind.Exact);
     }
 
     [Theory]

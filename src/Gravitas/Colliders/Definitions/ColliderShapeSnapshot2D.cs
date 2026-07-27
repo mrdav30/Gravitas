@@ -16,7 +16,8 @@ internal readonly struct ColliderShapeSnapshot2D : IEquatable<ColliderShapeSnaps
     public ColliderShapeSnapshot2D(
         Vector2d center,
         Fixed64 rotation,
-        Vector2d localScale,
+        Vector2d ownerScale,
+        Vector2d partScale,
         Vector2d localOffset,
         uint shapeVersion,
         Fixed64 mixedSlabCenterY,
@@ -24,7 +25,8 @@ internal readonly struct ColliderShapeSnapshot2D : IEquatable<ColliderShapeSnaps
     {
         Center = center;
         Rotation = rotation;
-        LocalScale = localScale;
+        OwnerScale = ownerScale;
+        PartScale = partScale;
         LocalOffset = localOffset;
         ShapeVersion = shapeVersion;
         MixedSlabCenterY = mixedSlabCenterY;
@@ -35,7 +37,9 @@ internal readonly struct ColliderShapeSnapshot2D : IEquatable<ColliderShapeSnaps
 
     public Fixed64 Rotation { get; }
 
-    public Vector2d LocalScale { get; }
+    public Vector2d OwnerScale { get; }
+
+    public Vector2d PartScale { get; }
 
     public Vector2d LocalOffset { get; }
 
@@ -49,7 +53,8 @@ internal readonly struct ColliderShapeSnapshot2D : IEquatable<ColliderShapeSnaps
     public bool Equals(ColliderShapeSnapshot2D other) =>
         Center == other.Center
         && Rotation == other.Rotation
-        && LocalScale == other.LocalScale
+        && OwnerScale == other.OwnerScale
+        && PartScale == other.PartScale
         && LocalOffset == other.LocalOffset
         && ShapeVersion == other.ShapeVersion
         && MixedSlabCenterY == other.MixedSlabCenterY
@@ -58,6 +63,24 @@ internal readonly struct ColliderShapeSnapshot2D : IEquatable<ColliderShapeSnaps
     public override bool Equals(object? obj) =>
         obj is ColliderShapeSnapshot2D other && Equals(other);
 
-    public override int GetHashCode() =>
-        HashCode.Combine(Center, Rotation, LocalScale, LocalOffset, ShapeVersion, MixedSlabCenterY, MixedHalfThickness);
+    public override int GetHashCode()
+    {
+        unchecked
+        {
+            int hash = 17;
+            hash = hash * 31 + Center.X.GetHashCode();
+            hash = hash * 31 + Center.Y.GetHashCode();
+            hash = hash * 31 + Rotation.GetHashCode();
+            hash = hash * 31 + OwnerScale.X.GetHashCode();
+            hash = hash * 31 + OwnerScale.Y.GetHashCode();
+            hash = hash * 31 + PartScale.X.GetHashCode();
+            hash = hash * 31 + PartScale.Y.GetHashCode();
+            hash = hash * 31 + LocalOffset.X.GetHashCode();
+            hash = hash * 31 + LocalOffset.Y.GetHashCode();
+            hash = hash * 31 + ShapeVersion.GetHashCode();
+            hash = hash * 31 + MixedSlabCenterY.GetHashCode();
+            hash = hash * 31 + MixedHalfThickness.GetHashCode();
+            return hash;
+        }
+    }
 }

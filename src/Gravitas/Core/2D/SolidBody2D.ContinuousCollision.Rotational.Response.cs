@@ -46,21 +46,17 @@ public partial class SolidBody2D
         Fixed64 restitution = PhysicsMaterial.CombineRestitution(
             Collider.Material,
             target.Collider.Material);
-        bool sourceCenterResolved = Vector2d.TryAdd(
-            sourcePositionAtImpact,
-            ClampNearZero(Vector2d.Rotate(_localCenterOfMassOffset, sourceRotationAtImpact)),
-            out Vector2d sourceCenterOfMass);
-        bool targetCenterResolved = Vector2d.TryAdd(
-            targetPositionAtImpact,
-            ClampNearZero(Vector2d.Rotate(target._localCenterOfMassOffset, targetRotationAtImpact)),
-            out Vector2d targetCenterOfMass);
-        bool sourceContactArmResolved = Vector2d.TrySubtract(
-            contact.PointA,
-            sourceCenterOfMass,
+        bool sourceContactArmResolved = contact.AnchorA.TryGetOffsetFrom(
+            new ContactAnchor2D(
+                sourcePositionAtImpact,
+                sourceRotationAtImpact,
+                _localCenterOfMassOffset),
             out Vector2d relativeContactPointA);
-        bool targetContactArmResolved = Vector2d.TrySubtract(
-            contact.PointB,
-            targetCenterOfMass,
+        bool targetContactArmResolved = contact.AnchorB.TryGetOffsetFrom(
+            new ContactAnchor2D(
+                targetPositionAtImpact,
+                targetRotationAtImpact,
+                target._localCenterOfMassOffset),
             out Vector2d relativeContactPointB);
         bool responseResolved = ContactNormalImpulse2D.TryCalculateVelocityDeltas(
                 sourceResponseBody,
@@ -75,9 +71,7 @@ public partial class SolidBody2D
                 restitution,
                 Context.Settings.RestitutionVelocityThreshold,
                 out ContactNormalVelocityDeltaResult2D response);
-        if (!(sourceCenterResolved
-                & targetCenterResolved
-                & sourceContactArmResolved
+        if (!(sourceContactArmResolved
                 & targetContactArmResolved
                 & responseResolved)
             || response.NormalVelocity >= -Fixed64.Epsilon)
@@ -117,6 +111,7 @@ public partial class SolidBody2D
                 out targetPostAngularVelocity);
             bool targetHandoffAdmissible = target.CanApplyContinuousCollisionHandoffState(
                 targetPositionAtImpact,
+                targetRotationAtImpact,
                 remainingAfterImpact,
                 out targetResolvedPosition);
             if (!(targetLinearVelocityResolved

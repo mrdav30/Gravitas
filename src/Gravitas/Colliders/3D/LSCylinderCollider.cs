@@ -6,14 +6,21 @@
 //=======================================================================
 
 using FixedMathSharp;
+using FixedMathSharp.Geometry;
 using Gravitas.Queries;
 using SwiftCollections;
-using System.Runtime.CompilerServices;
+using System;
 
 namespace Gravitas.Colliders;
 
 public class LSCylinderCollider : LSCollider
 {
+    private Fixed64 _scaledRadius = Fixed64.Half;
+    private Fixed64 _preparedRadius;
+    private Fixed64 _preparedHeight;
+    private Vector3d _preparedAxis;
+    private Fixed64 _preparedArea;
+
     public LSCylinderCollider() { }
 
     public LSCylinderCollider(ColliderShapeDefinition definition)
@@ -27,39 +34,18 @@ public class LSCylinderCollider : LSCollider
     public override ColliderType Shape => ColliderType.Cylinder;
     public override int Priority => ColliderSettings.GetPriority(Shape);
 
-    public override Fixed64 ScaledRadius => _radius * FixedMath.Max(LocalScale.X, LocalScale.Z);
+    public override Fixed64 ScaledRadius => _scaledRadius;
 
     /// <summary>
-    /// Local bottom cap center before world rotation and translation.
+    /// Gets the cylinder's full physical length along <see cref="WorldAxis"/>.
     /// </summary>
-    public Vector3d CapCenterBottom { get; private set; }
-
-    /// <summary>
-    /// Local top cap center before world rotation and translation.
-    /// </summary>
-    public Vector3d CapCenterTop { get; private set; }
-
     public Fixed64 Height { get; private set; }
 
-    public Fixed64 HalfHeight { get; private set; }
-
-    public Vector3d LineSegmentStart { get; private set; }
-
-    public Vector3d LineSegmentEnd { get; private set; }
-
     /// <summary>
-    /// Canonical normalized world-space cylinder axis derived from rotation.
+    /// Gets the derived normalized world-space cylinder axis. Exact geometry
+    /// remains authoritative in the collider's rigid frame.
     /// </summary>
-    public Vector3d WorldAxis { get; private set; }
-
-    public Vector3d LineDirection => WorldAxis;
-
-    protected override void OnInitialize()
-    {
-        Fixed64 diameter = _radius * 2;
-        _size = new Vector3d(diameter, _size.Y, diameter);
-        base.OnInitialize();
-    }
+    public Vector3d WorldAxis { get; private set; } = Vector3d.Up;
 
     protected override void OnRadiusChanged()
     {
@@ -69,9 +55,6 @@ public class LSCylinderCollider : LSCollider
 
     protected override Vector3d NormalizeSize(Vector3d value) =>
         new(_radius * 2, value.Y, _radius * 2);
-
-    internal override void ValidateRuntimeTransform(Vector3d scale, FixedQuaternion rotation) =>
-        ValidateHalfHeight((_size.Y * scale.Y) * Fixed64.Half);
 
     protected internal override Fixed64 CalculateMassPropertyWeight() =>
         Fixed64.Pi * ScaledRadiusSqr * Height;
@@ -98,75 +81,79 @@ public class LSCylinderCollider : LSCollider
 
     public override Vector3d ClosestPointOnSurface(Vector3d other)
     {
-        Vector3d local = Rotation.Inverse() * (other - Center);
-        Vector3d radial = new(local.X, Fixed64.Zero, local.Z);
-        Fixed64 radialDistance = radial.Magnitude;
-        Fixed64 clampedY = FixedMath.Clamp(local.Y, -HalfHeight, HalfHeight);
-
-        if (IsInsideFiniteCylinder(local, radialDistance))
+        if (!FixedSegment.TryGetClosestCenteredFiniteCylinderSurfaceAnchor(
+                other,
+                Center,
+                Rotation,
+                Vector3d.Up,
+                Height,
+                ScaledRadius,
+                Vector3d.Right,
+                out FixedPointAnchor surfaceAnchor,
+                out _,
+                out _)
+            || !surfaceAnchor.TryGetPoint(out Vector3d surfacePoint))
         {
-            Fixed64 sideDistance = ScaledRadius - radialDistance;
-            Fixed64 capDistance = HalfHeight - local.Y.Abs();
-
-            if (sideDistance <= capDistance)
-            {
-                Vector3d direction = radialDistance > Fixed64.Epsilon
-                    ? radial / radialDistance
-                    : Vector3d.Right;
-                return Center + Rotation * new Vector3d(direction.X * ScaledRadius, local.Y, direction.Z * ScaledRadius);
-            }
-
-            return Center + Rotation * new Vector3d(local.X, local.Y.Sign() * HalfHeight, local.Z);
+            throw new InvalidOperationException(
+                "The closest cylinder surface point is outside the representable coordinate domain.");
         }
 
-        Vector3d radialDirection;
-        if (radialDistance > Fixed64.Epsilon)
-            radialDirection = radial / radialDistance;
-        else
-            radialDirection = Vector3d.Right;
-
-        Fixed64 surfaceRadius = radialDistance > ScaledRadius ? ScaledRadius : radialDistance;
-        Vector3d surfaceLocal = new(
-            radialDirection.X * surfaceRadius,
-            clampedY,
-            radialDirection.Z * surfaceRadius);
-
-        return Center + Rotation * surfaceLocal;
+        return surfacePoint;
     }
 
     public override Vector3d GetNormalAtPoint(Vector3d point)
     {
-        Vector3d local = Rotation.Inverse() * (point - Center);
-        Fixed64 radialDistance = FixedMath.Sqrt(local.X * local.X + local.Z * local.Z);
-        Fixed64 sideDistance = (radialDistance - ScaledRadius).Abs();
-        Fixed64 capDistance = (local.Y.Abs() - HalfHeight).Abs();
+        if (!FixedSegment.TryGetClosestCenteredFiniteCylinderSurfaceAnchor(
+                point,
+                Center,
+                Rotation,
+                Vector3d.Up,
+                Height,
+                ScaledRadius,
+                Vector3d.Right,
+                out _,
+                out Vector3d outwardNormal,
+                out _))
+        {
+            throw new InvalidOperationException(
+                "The closest cylinder surface normal is outside the representable coordinate domain.");
+        }
 
-        if (capDistance <= sideDistance && local.Y.Abs() >= HalfHeight - Fixed64.Epsilon)
-            return Rotation * new Vector3d(Fixed64.Zero, local.Y >= Fixed64.Zero ? Fixed64.One : -Fixed64.One, Fixed64.Zero);
-
-        if (radialDistance <= Fixed64.Epsilon)
-            return Rotation * Vector3d.Right;
-
-        return Rotation * new Vector3d(local.X / radialDistance, Fixed64.Zero, local.Z / radialDistance);
+        return outwardNormal;
     }
 
-    protected override void BuildShape()
+    private protected override void PrepareShape(in ColliderShapeSnapshot snapshot)
     {
-        Fixed64 height = ScaledSize.Y;
-        Fixed64 halfHeight = height * Fixed64.Half;
+        Fixed64 radiusX = ColliderScalePolicy.ScalePositive(
+            snapshot.Radius,
+            snapshot.OwnerScale.X,
+            snapshot.PartScale.X);
+        Fixed64 radiusZ = ColliderScalePolicy.ScalePositive(
+            snapshot.Radius,
+            snapshot.OwnerScale.Z,
+            snapshot.PartScale.Z);
+        _preparedRadius = FixedMath.Max(radiusX, radiusZ);
+        _preparedHeight = ColliderScalePolicy.ScalePositive(
+            snapshot.Size.Y,
+            snapshot.OwnerScale.Y,
+            snapshot.PartScale.Y);
+        _preparedAxis = (snapshot.Rotation * Vector3d.Up).Normalized;
+        _preparedArea = Fixed64.Two * Fixed64.Pi * _preparedRadius
+            * (_preparedHeight + _preparedRadius);
+        SetPreparedBounds(FixedBoundBox.FromCenteredFiniteCylinderClippedToDomain(
+            snapshot.Center,
+            snapshot.Rotation,
+            Vector3d.Up,
+            _preparedHeight,
+            _preparedRadius));
+    }
 
-        Vector3d capCenterBottom = new(Fixed64.Zero, -halfHeight, Fixed64.Zero);
-        Vector3d capCenterTop = new(Fixed64.Zero, halfHeight, Fixed64.Zero);
-
-        Height = height;
-        HalfHeight = halfHeight;
-        CapCenterBottom = capCenterBottom;
-        CapCenterTop = capCenterTop;
-        WorldAxis = (Rotation * Vector3d.Up).Normalized;
-        LineSegmentStart = Center + Rotation * capCenterBottom;
-        LineSegmentEnd = Center + Rotation * capCenterTop;
-
-        Area = 2 * Fixed64.Pi * ScaledRadius * (Height + ScaledRadius);
+    private protected override void PublishShape()
+    {
+        _scaledRadius = _preparedRadius;
+        Height = _preparedHeight;
+        WorldAxis = _preparedAxis;
+        Area = _preparedArea;
     }
 
     public override Fixed64 GetFrontalArea(Vector3d direction)
@@ -176,7 +163,8 @@ public class LSCylinderCollider : LSCollider
             return Area;
 
         Vector3d normalizedDirection = direction / directionMagnitude;
-        Fixed64 axial = Vector3d.Dot(normalizedDirection, LineDirection).Abs();
+        Fixed64 axial = Rotation.Inverse()
+            .Rotate(normalizedDirection).Y.Abs();
         Fixed64 radialFactorSqr = Fixed64.One - axial * axial;
         Fixed64 radialFactor = radialFactorSqr <= Fixed64.Zero ? Fixed64.Zero : FixedMath.Sqrt(radialFactorSqr);
 
@@ -184,13 +172,4 @@ public class LSCylinderCollider : LSCollider
             + radialFactor * 2 * ScaledRadius * Height;
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private bool IsInsideFiniteCylinder(Vector3d local, Fixed64 radialDistance) =>
-        radialDistance <= ScaledRadius && local.Y >= -HalfHeight && local.Y <= HalfHeight;
-
-    private static void ValidateHalfHeight(Fixed64 halfHeight) =>
-        SwiftThrowHelper.ThrowIfArgument(
-            halfHeight <= Fixed64.Zero,
-            nameof(Size),
-            "Scaled cylinder height must preserve a positive half-height.");
 }

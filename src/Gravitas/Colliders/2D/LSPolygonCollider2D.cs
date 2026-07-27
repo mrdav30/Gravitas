@@ -7,7 +7,8 @@
 
 using Chronicler;
 using FixedMathSharp;
-using FixedMathSharp.Bounds;
+using FixedMathSharp.Geometry;
+using Gravitas.CollisionHandling;
 using System;
 
 namespace Gravitas.Colliders;
@@ -18,12 +19,14 @@ namespace Gravitas.Colliders;
 public sealed class LSPolygonCollider2D : LSCollider2D, IConvexVertexSource2D
 {
     private Vector2d[] _localVertices;
-    private Vector2d[] _worldVertices;
+    private Vector2d[] _scaledLocalVertices;
+    private Vector2d[] _scaledLocalVerticesScratch;
 
     public LSPolygonCollider2D(params Vector2d[] vertices)
     {
         _localVertices = Array.Empty<Vector2d>();
-        _worldVertices = Array.Empty<Vector2d>();
+        _scaledLocalVertices = Array.Empty<Vector2d>();
+        _scaledLocalVerticesScratch = Array.Empty<Vector2d>();
         SetLocalVertices(vertices, markDirty: true);
     }
 
@@ -32,94 +35,123 @@ public sealed class LSPolygonCollider2D : LSCollider2D, IConvexVertexSource2D
         definition.EnsureKind(ColliderShapeDefinition2DKind.ConvexPolygon);
         Material = definition.Material;
         _localVertices = Array.Empty<Vector2d>();
-        _worldVertices = Array.Empty<Vector2d>();
+        _scaledLocalVertices = Array.Empty<Vector2d>();
+        _scaledLocalVerticesScratch = Array.Empty<Vector2d>();
         SetLocalVertices(definition.GetPolygonVerticesForRuntime(), markDirty: true);
     }
 
     public override ColliderType2D Shape => ColliderType2D.ConvexPolygon;
 
-    public int Count => _worldVertices.Length;
+    public int Count => _scaledLocalVertices.Length;
 
-    int IConvexVertexSource2D.VertexCount => _worldVertices.Length;
+    /// <summary>
+    /// Gets the committed vertices in the collider's scaled local frame.
+    /// </summary>
+    internal ReadOnlySpan<Vector2d> ScaledLocalVertices => _scaledLocalVertices;
 
+    int IConvexVertexSource2D.VertexCount => _scaledLocalVertices.Length;
+
+    Fixed64 IConvexVertexSource2D.Rotation => Rotation;
+
+    /// <summary>
+    /// Gets a world-space vertex when the conceptual point is representable.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when the conceptual vertex lies outside the fixed-point scalar
+    /// domain. Use <see cref="TryGetWorldVertex(int, out Vector2d)"/> when
+    /// querying geometry near a scalar boundary.
+    /// </exception>
     public Vector2d GetWorldVertex(int index)
     {
-        SwiftThrowHelper.ThrowIfArrayIndexInvalid(index, _worldVertices.Length, nameof(index));
-        return _worldVertices[index];
+        if (TryGetWorldVertex(index, out Vector2d vertex))
+            return vertex;
+
+        throw new InvalidOperationException(
+            "The polygon vertex is outside the representable coordinate range. Use TryGetWorldVertex.");
     }
 
-    public override bool ContainsPoint(Vector2d point)
+    /// <summary>
+    /// Attempts to materialize a committed polygon vertex in world space
+    /// without saturation.
+    /// </summary>
+    public bool TryGetWorldVertex(int index, out Vector2d vertex)
     {
-        bool hasPositive = false;
-        bool hasNegative = false;
-        for (int i = 0; i < _worldVertices.Length; i++)
-        {
-            Vector2d a = _worldVertices[i];
-            Vector2d b = _worldVertices[(i + 1) % _worldVertices.Length];
-            int orientation = Vector2d.OrientationSign(a, b, point);
-            if (orientation > 0)
-                hasPositive = true;
-            else if (orientation < 0)
-                hasNegative = true;
-
-            if (hasPositive && hasNegative)
-                return false;
-        }
-
-        return true;
+        SwiftThrowHelper.ThrowIfArrayIndexInvalid(
+            index,
+            _scaledLocalVertices.Length,
+            nameof(index));
+        return TryGetVertex(index, out vertex);
     }
+
+    public override bool ContainsPoint(Vector2d point) =>
+        FixedConvex2dRelations.ContainsPoint(
+            point,
+            Center,
+            Rotation,
+            _scaledLocalVertices);
 
     public override Vector2d GetClosestPoint(Vector2d point)
     {
         if (ContainsPoint(point))
             return point;
 
-        Vector2d bestPoint = _worldVertices[0];
-        for (int i = 0; i < _worldVertices.Length; i++)
+        FixedPointAnchor2d anchor =
+            FixedConvex2dRelations.GetClosestPointAnchor(
+                point,
+                Center,
+                Rotation,
+                _scaledLocalVertices);
+        if (anchor.TryGetPoint(out Vector2d closest))
         {
-            Vector2d a = _worldVertices[i];
-            Vector2d b = _worldVertices[(i + 1) % _worldVertices.Length];
-            Vector2d candidate = new FixedSegment2d(a, b).ClosestPoint(point);
-            if (Vector2d.CompareDistanceSquared(point, candidate, point, bestPoint) >= 0)
-                continue;
-
-            bestPoint = candidate;
+            return closest;
         }
 
-        return bestPoint;
+        throw new InvalidOperationException(
+            "The closest polygon point is outside the Fixed64 coordinate domain.");
     }
 
     public override Vector2d GetSupportPoint(Vector2d direction)
     {
-        int bestIndex = 0;
-        Fixed64 best = Vector2d.Dot(_worldVertices[0], direction);
-        for (int i = 1; i < _worldVertices.Length; i++)
+        FixedPointAnchor2d anchor = FixedConvex2dRelations.GetSupportAnchor(
+            Center,
+            Rotation,
+            _scaledLocalVertices,
+            direction);
+        if (anchor.TryGetPoint(out Vector2d support))
         {
-            Fixed64 projection = Vector2d.Dot(_worldVertices[i], direction);
-            if (projection <= best)
-                continue;
-
-            best = projection;
-            bestIndex = i;
+            return support;
         }
 
-        return _worldVertices[bestIndex];
+        throw new InvalidOperationException(
+            "The polygon support point is outside the Fixed64 coordinate domain.");
     }
 
-    Vector2d IConvexVertexSource2D.GetVertexUnchecked(int index) => _worldVertices[index];
+    Vector2d IConvexVertexSource2D.GetScaledLocalVertexUnchecked(int index) =>
+        _scaledLocalVertices[index];
+
+    FixedPointAnchor2d IConvexVertexSource2D.GetSupportAnchor(Vector2d direction) =>
+        FixedConvex2dRelations.GetSupportAnchor(
+            Center,
+            Rotation,
+            _scaledLocalVertices,
+            direction);
 
     public override Vector2d CalculateLocalCenterOfMassOffset()
     {
-        if (!TryCalculateSignedAreaAndCentroid(out _, out Vector2d centroid))
-            return base.CalculateLocalCenterOfMassOffset();
-
-        return centroid;
+        _ = TryCalculateIntrinsicSignedAreaAndCentroid(
+            out _,
+            out Vector2d intrinsicCentroid);
+        return TransformRelativeMassPropertyPoint(intrinsicCentroid);
     }
 
     internal override Fixed64 CalculateAreaForMassProperties()
     {
-        Fixed64 signedDoubleArea = CalculateSignedDoubleArea();
-        return signedDoubleArea.Abs() * Fixed64.Half;
+        ReadOnlySpan<Vector2d> vertices = GetMassPropertyVertices();
+        _ = FixedConvex2dRelations.TryGetAreaAndCentroid(
+            vertices,
+            out Fixed64 area,
+            out _);
+        return area;
     }
 
     public override Fixed64 CalculateMomentOfInertia(Fixed64 mass, Vector2d localReferencePoint)
@@ -127,20 +159,27 @@ public sealed class LSPolygonCollider2D : LSCollider2D, IConvexVertexSource2D
         if (mass <= Fixed64.Zero)
             return Fixed64.Zero;
 
-        if (!TryCalculateSignedAreaAndCentroid(out Fixed64 signedDoubleArea, out Vector2d centerOfMass))
+        ReadOnlySpan<Vector2d> vertices = GetMassPropertyVertices();
+        _ = FixedConvex2dRelations.TryGetAreaAndCentroid(
+            vertices,
+            out Fixed64 area,
+            out Vector2d intrinsicCenterOfMass);
+        if (area <= Fixed64.Zero)
+        {
             return ApplyParallelAxis(
                 Fixed64.Zero,
                 mass,
                 base.CalculateLocalCenterOfMassOffset(),
                 localReferencePoint);
+        }
 
-        Fixed64 area = signedDoubleArea.Abs() * Fixed64.Half;
         Fixed64 density = mass / area;
         Fixed64 centeredIntegral = Fixed64.Zero;
-        for (int i = 0; i < _localVertices.Length; i++)
+        for (int i = 0; i < vertices.Length; i++)
         {
-            Vector2d a = GetMassPropertyVertex(i) - centerOfMass;
-            Vector2d b = GetMassPropertyVertex((i + 1) % _localVertices.Length) - centerOfMass;
+            Vector2d a = vertices[i] - intrinsicCenterOfMass;
+            Vector2d b =
+                vertices[(i + 1) % vertices.Length] - intrinsicCenterOfMass;
             Fixed64 cross = Vector2d.CrossProduct(a, b);
             Fixed64 term =
                 a.MagnitudeSquared +
@@ -150,6 +189,8 @@ public sealed class LSPolygonCollider2D : LSCollider2D, IConvexVertexSource2D
         }
 
         Fixed64 momentAboutCenterOfMass = (density * centeredIntegral).Abs() / (Fixed64)12;
+        Vector2d centerOfMass =
+            TransformRelativeMassPropertyPoint(intrinsicCenterOfMass);
 
         return ApplyParallelAxis(
             momentAboutCenterOfMass,
@@ -158,29 +199,28 @@ public sealed class LSPolygonCollider2D : LSCollider2D, IConvexVertexSource2D
             localReferencePoint);
     }
 
-    protected override void RebuildShape()
+    private protected override void PrepareShape(in ColliderShapeSnapshot2D snapshot)
     {
-        Vector2d min = Vector2d.Zero;
-        Vector2d max = Vector2d.Zero;
-        Fixed64 rotation = Rotation;
-        Vector2d center = Center;
-        Vector2d localScale = LocalScale;
         for (int i = 0; i < _localVertices.Length; i++)
         {
-            Vector2d vertex = center + Rotate(Vector2d.Multiply(_localVertices[i], localScale), rotation);
-            _worldVertices[i] = vertex;
-            if (i == 0)
-            {
-                min = vertex;
-                max = vertex;
-                continue;
-            }
-
-            min = new Vector2d(FixedMath.Min(min.X, vertex.X), FixedMath.Min(min.Y, vertex.Y));
-            max = new Vector2d(FixedMath.Max(max.X, vertex.X), FixedMath.Max(max.Y, vertex.Y));
+            Vector2d scaledVertex = ColliderScalePolicy.Scale(
+                _localVertices[i],
+                snapshot.OwnerScale,
+                snapshot.PartScale);
+            _scaledLocalVerticesScratch[i] = scaledVertex;
         }
 
-        SetBoundsFromMinMax(min, max);
+        SetPreparedBounds(FixedBoundArea.FromRotatedOffsetsClippedToDomain(
+            snapshot.Center,
+            snapshot.Rotation,
+            _scaledLocalVerticesScratch));
+    }
+
+    private protected override void PublishShape()
+    {
+        Vector2d[] offsets = _scaledLocalVertices;
+        _scaledLocalVertices = _scaledLocalVerticesScratch;
+        _scaledLocalVerticesScratch = offsets;
     }
 
     protected override void RecordShapeData(IChronicler chronicler)
@@ -200,7 +240,8 @@ public sealed class LSPolygonCollider2D : LSCollider2D, IConvexVertexSource2D
         if (_localVertices.Length != vertices.Length)
         {
             _localVertices = new Vector2d[vertices.Length];
-            _worldVertices = new Vector2d[vertices.Length];
+            _scaledLocalVertices = new Vector2d[vertices.Length];
+            _scaledLocalVerticesScratch = new Vector2d[vertices.Length];
         }
 
         Array.Copy(vertices, _localVertices, vertices.Length);
@@ -211,66 +252,38 @@ public sealed class LSPolygonCollider2D : LSCollider2D, IConvexVertexSource2D
     internal static void ValidateConvexPolygon(Vector2d[] vertices)
     {
         SwiftThrowHelper.ThrowIfArgument(vertices.Length < 3, nameof(vertices), "2D polygon must contain at least three vertices.");
-
-        int sign = 0;
-        for (int i = 0; i < vertices.Length; i++)
-        {
-            Vector2d a = vertices[i];
-            Vector2d b = vertices[(i + 1) % vertices.Length];
-            Vector2d c = vertices[(i + 2) % vertices.Length];
-            Fixed64 cross = Vector2d.CrossProduct(b - a, c - b);
-            SwiftThrowHelper.ThrowIfArgument(cross.Abs() <= Fixed64.Epsilon, nameof(vertices), "2D polygon vertices must not be collinear.");
-
-            int currentSign = cross > Fixed64.Zero ? 1 : -1;
-            if (sign == 0)
-            {
-                sign = currentSign;
-                continue;
-            }
-
-            SwiftThrowHelper.ThrowIfArgument(currentSign != sign, nameof(vertices), "2D polygon must be convex.");
-        }
+        SwiftThrowHelper.ThrowIfArgument(
+            !FixedConvex2dRelations.IsStrictlyConvex(vertices),
+            nameof(vertices),
+            "2D polygon vertices must form a strictly convex boundary.");
     }
 
-    private Fixed64 CalculateSignedDoubleArea()
+    private bool TryCalculateIntrinsicSignedAreaAndCentroid(
+        out Fixed64 signedDoubleArea,
+        out Vector2d centroid)
     {
-        Fixed64 signedDoubleArea = Fixed64.Zero;
-        Vector2d anchor = GetMassPropertyVertex(0);
+        return FixedConvex2dRelations.TryGetAreaAndCentroid(
+            GetMassPropertyVertices(),
+            out signedDoubleArea,
+            out centroid);
+    }
+
+    private ReadOnlySpan<Vector2d> GetMassPropertyVertices()
+    {
+        if (HasCommittedShape)
+            return _scaledLocalVertices;
+
+        GetCurrentScaleFactors(
+            out Vector2d ownerScale,
+            out Vector2d partScale);
         for (int i = 0; i < _localVertices.Length; i++)
         {
-            Vector2d a = GetMassPropertyVertex(i) - anchor;
-            Vector2d b = GetMassPropertyVertex((i + 1) % _localVertices.Length) - anchor;
-            signedDoubleArea += Vector2d.CrossProduct(a, b);
+            _scaledLocalVerticesScratch[i] = ColliderScalePolicy.Scale(
+                _localVertices[i],
+                ownerScale,
+                partScale);
         }
 
-        return signedDoubleArea;
+        return _scaledLocalVerticesScratch;
     }
-
-    private bool TryCalculateSignedAreaAndCentroid(out Fixed64 signedDoubleArea, out Vector2d centroid)
-    {
-        signedDoubleArea = Fixed64.Zero;
-        Vector2d weightedCentroid = Vector2d.Zero;
-        Vector2d anchor = GetMassPropertyVertex(0);
-        for (int i = 0; i < _localVertices.Length; i++)
-        {
-            Vector2d a = GetMassPropertyVertex(i) - anchor;
-            Vector2d b = GetMassPropertyVertex((i + 1) % _localVertices.Length) - anchor;
-            Fixed64 cross = Vector2d.CrossProduct(a, b);
-            signedDoubleArea += cross;
-            weightedCentroid += (a + b) * cross;
-        }
-
-        if (signedDoubleArea.Abs() <= Fixed64.Epsilon)
-        {
-            centroid = Vector2d.Zero;
-            return false;
-        }
-
-        centroid = anchor + weightedCentroid / ((Fixed64)3 * signedDoubleArea);
-        return true;
-    }
-
-    private Vector2d GetMassPropertyVertex(int index) =>
-        TransformMassPropertyPoint(
-            ScaledLocalOffset + Vector2d.Multiply(_localVertices[index], LocalScale));
 }

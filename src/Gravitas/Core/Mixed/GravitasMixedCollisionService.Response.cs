@@ -22,10 +22,12 @@ internal sealed partial class GravitasMixedCollisionService
         if (_mixedResponsePairs.Count == 1)
         {
             CollisionPairMixed pair = _mixedResponsePairs[0];
-            if (!HasAwakeResponseParticipant(pair))
+            bool hasPlanarResponseCoupling = CollisionResponseMixed.HasPlanarResponseCoupling(pair, pair.Contact);
+            if (!ShouldSolveSingleMixedPair(pair, hasPlanarResponseCoupling))
                 return;
 
-            pair.WakeSleepingBodiesForCollision();
+            if (hasPlanarResponseCoupling)
+                pair.WakeSleepingBodiesForCollision();
             CollisionResponseMixed.Resolve(pair, pair.Contact);
             return;
         }
@@ -76,7 +78,9 @@ internal sealed partial class GravitasMixedCollisionService
             CollisionPairMixed pair = _mixedResponsePairs[i];
             int node3D = FindMixedIslandNode(pair.Collider3D.Body);
             int node2D = FindMixedIslandNode(pair.Collider2D.Body);
-            if (node3D >= 0 && node2D >= 0)
+            if (CollisionResponseMixed.HasPlanarResponseCoupling(pair, pair.Contact)
+                && node3D >= 0
+                && node2D >= 0)
                 UnionMixedIslandNodes(node3D, node2D);
         }
 
@@ -187,6 +191,17 @@ internal sealed partial class GravitasMixedCollisionService
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool HasAwakeResponseParticipant(CollisionPairMixed pair) =>
         IsAwakeMovable(pair.Collider3D.Body) || IsAwakeMovable(pair.Collider2D.Body);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool ShouldSolveSingleMixedPair(CollisionPairMixed pair, bool hasPlanarResponseCoupling)
+    {
+        if (hasPlanarResponseCoupling)
+            return HasAwakeResponseParticipant(pair);
+
+        return IsMovableMixedIslandBody(pair.Collider3D.Body)
+            ? IsAwakeMovable(pair.Collider3D.Body)
+            : IsAwakeMovable(pair.Collider2D.Body);
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool IsAwakeMovable(SolidBody? body) =>

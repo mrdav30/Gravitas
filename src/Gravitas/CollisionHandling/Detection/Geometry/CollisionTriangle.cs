@@ -6,14 +6,15 @@
 //=======================================================================
 
 using FixedMathSharp;
-using FixedMathSharp.Bounds;
+using FixedMathSharp.Geometry;
 using SwiftCollections.Query;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas.CollisionHandling;
 
 /// <summary>
-/// World-space triangle geometry plus Gravitas-owned cached collision data.
+/// Triangle geometry expressed in one explicitly selected collision chart,
+/// plus Gravitas-owned cached collision data.
 /// </summary>
 internal readonly struct CollisionTriangle
 {

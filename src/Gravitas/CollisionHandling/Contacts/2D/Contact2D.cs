@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using System;
 
 namespace Gravitas.CollisionHandling;
 
@@ -14,20 +15,44 @@ namespace Gravitas.CollisionHandling;
 /// </summary>
 internal readonly struct Contact2D
 {
-    public Contact2D(Vector2d pointA, Vector2d pointB, Vector2d normal, Fixed64 depth)
+    public Contact2D(
+        Vector2d pointA,
+        Vector2d pointB,
+        Vector2d normal,
+        Fixed64 depth,
+        bool depthIsClamped = false)
+        : this(
+            ContactAnchor2D.FromWorldPoint(pointA),
+            ContactAnchor2D.FromWorldPoint(pointB),
+            normal,
+            depth,
+            depthIsClamped)
+    { }
+
+    public Contact2D(
+        ContactAnchor2D anchorA,
+        ContactAnchor2D anchorB,
+        Vector2d normal,
+        Fixed64 depth,
+        bool depthIsClamped = false)
     {
-        PointA = pointA;
-        PointB = pointB;
+        AnchorA = anchorA;
+        AnchorB = anchorB;
         Normal = normal;
         Depth = depth;
+        DepthIsClamped = depthIsClamped;
         HasContact = true;
     }
 
     public bool HasContact { get; }
 
-    public Vector2d PointA { get; }
+    public ContactAnchor2D AnchorA { get; }
 
-    public Vector2d PointB { get; }
+    public ContactAnchor2D AnchorB { get; }
+
+    public Vector2d PointA => GetRequiredWorldPoint(AnchorA, nameof(PointA));
+
+    public Vector2d PointB => GetRequiredWorldPoint(AnchorB, nameof(PointB));
 
     /// <summary>
     /// Contact normal pointing from collider A toward collider B.
@@ -35,4 +60,16 @@ internal readonly struct Contact2D
     public Vector2d Normal { get; }
 
     public Fixed64 Depth { get; }
+
+    public bool DepthIsClamped { get; }
+
+    private static Vector2d GetRequiredWorldPoint(ContactAnchor2D anchor, string propertyName)
+    {
+        if (anchor.TryGetWorldPoint(out Vector2d point))
+            return point;
+
+        throw new InvalidOperationException(
+            $"{propertyName} is outside the representable coordinate range.");
+    }
+
 }

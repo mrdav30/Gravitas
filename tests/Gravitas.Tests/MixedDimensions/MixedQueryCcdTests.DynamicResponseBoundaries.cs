@@ -90,6 +90,24 @@ public sealed partial class MixedQueryCcdTests
                 Fixed64.One)
             .Should()
             .BeFalse();
+        InvokeMixedKinematicHandoff2D(
+                source2D,
+                target3D.Body,
+                Vector2d.Right,
+                Vector2d.Zero,
+                Fixed64.Half,
+                Fixed64.One)
+            .Should()
+            .BeFalse();
+        InvokeMixedKinematicHandoff3D(
+                source3D.Body,
+                target2D,
+                Vector3d.Right,
+                Vector3d.Zero,
+                Fixed64.Half,
+                Fixed64.One)
+            .Should()
+            .BeFalse();
 
         context.ComputeReplayHash(GravitasReplayHashMode.AuthoritativeWithSolverCaches)
             .Should()

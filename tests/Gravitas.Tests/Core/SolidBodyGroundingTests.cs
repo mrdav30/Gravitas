@@ -3,6 +3,8 @@ using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
+using GridForge.Configuration;
+using System;
 using Xunit;
 
 namespace Gravitas.Tests.Core;
@@ -20,6 +22,9 @@ public sealed class SolidBodyGroundingTests
 
         body.Body.IsGrounded.Should().BeTrue();
         body.Body.WasGrounded.Should().BeFalse();
+        body.Body.HasHitPoint.Should().BeTrue();
+        body.Body.TryGetHitPoint(out Vector3d hitPoint).Should().BeTrue();
+        hitPoint.Y.Should().Be(Fixed64.Zero);
         body.Body.HitPoint.Y.Should().Be(Fixed64.Zero);
         body.Body.GroundNormal.Should().Be(Vector3d.Up);
     }
@@ -33,6 +38,9 @@ public sealed class SolidBodyGroundingTests
 
         body.Body.IsGrounded.Should().BeFalse();
         body.Body.WasGrounded.Should().BeFalse();
+        body.Body.HasHitPoint.Should().BeFalse();
+        body.Body.TryGetHitPoint(out Vector3d hitPoint).Should().BeFalse();
+        hitPoint.Should().Be(Vector3d.Zero);
         body.Body.HitPoint.Should().Be(Vector3d.Zero);
         body.Body.GroundNormal.Should().Be(Vector3d.Zero);
     }
@@ -294,6 +302,70 @@ public sealed class SolidBodyGroundingTests
         body.Body.CheckGround();
 
         body.Body.IsGrounded.Should().BeTrue();
+    }
+
+    [Fact]
+    public void AutomaticGrounding_WithUnmaterializableSurfaceWitness_ShouldPreserveGroundingWithoutChangingHeight()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        Fixed64 x = Fixed64.MaxValue - Fixed64.FromFraction(1, 16);
+        context.World.TryAddGrid(
+            new GridConfiguration(
+                new Vector3d(
+                    Fixed64.MaxValue - (Fixed64)8,
+                    (Fixed64)(-8),
+                    (Fixed64)(-8)),
+                new Vector3d(
+                    Fixed64.MaxValue,
+                    (Fixed64)8,
+                    (Fixed64)8)),
+            out _).Should().BeTrue();
+        context.Settings.GroundCheckLayerMask =
+            PhysicsLayerMask.FromLayer(new PhysicsLayer(1));
+        context.Environment.Gravity = Fixed64.Zero;
+        var ground = new LSCuboidCollider
+        {
+            Layer = new PhysicsLayer(1),
+            Size = new Vector3d(Fixed64.One, Fixed64.One, (Fixed64)4)
+        };
+        ground.InitializeWithNoBody(new TestMatterAgent(
+            context,
+            new FixedTransform(
+                new Vector3d(x, -Fixed64.Half, Fixed64.Zero),
+                FixedQuaternion.FromEulerAnglesInDegrees(
+                    Fixed64.Zero,
+                    Fixed64.Zero,
+                    (Fixed64)15),
+                Vector3d.One)));
+        var body = new SolidBody(
+            new TestMatterAgent(context),
+            new LSSphereCollider())
+        {
+            Mass = Fixed64.One,
+            GroundProbeMode = GroundProbeMode.SweptSphere,
+            GroundProbeRadius = Fixed64.Half,
+            GroundOriginOffset = Fixed64.Half,
+            GroundedDistanceRay = Fixed64.One,
+            GroundDownDistanceOnAir = Fixed64.One
+        };
+
+        body.Initialize(
+            new Vector3d(x, Fixed64.Zero, Fixed64.Zero),
+            FixedQuaternion.Identity);
+
+        body.IsGrounded.Should().BeTrue();
+        body.HasHitPoint.Should().BeFalse();
+        body.TryGetHitPoint(out Vector3d hitPoint).Should().BeFalse();
+        hitPoint.Should().Be(Vector3d.Zero);
+        Action readPoint = () => _ = body.HitPoint;
+        readPoint.Should().Throw<InvalidOperationException>()
+            .WithMessage("*TryGetHitPoint*");
+
+        context.Simulate();
+        context.LateSimulate();
+
+        body.IsGrounded.Should().BeTrue();
+        body.HeightPos.Should().Be(Fixed64.Zero);
     }
 
     private static StaticCollider<LSCuboidCollider> CreateGround(

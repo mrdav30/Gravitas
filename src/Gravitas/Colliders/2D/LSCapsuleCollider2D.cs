@@ -7,7 +7,8 @@
 
 using Chronicler;
 using FixedMathSharp;
-using FixedMathSharp.Bounds;
+using FixedMathSharp.Geometry;
+using System;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas.Colliders;
@@ -19,6 +20,11 @@ public sealed class LSCapsuleCollider2D : LSCollider2D
 {
     private Fixed64 _radius;
     private Fixed64 _height;
+    private Fixed64 _scaledRadius;
+    private Fixed64 _axisLength;
+    private Fixed64 _preparedRadius;
+    private Fixed64 _preparedAxisLength;
+    private Vector2d _preparedAxis;
 
     public LSCapsuleCollider2D(Fixed64 radius, Fixed64 height)
     {
@@ -84,55 +90,37 @@ public sealed class LSCapsuleCollider2D : LSCollider2D
     public Fixed64 ScaledRadius
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        get => _radius * FixedMath.Max(LocalScale.X, LocalScale.Y);
-    }
-
-    /// <summary>
-    /// Gets the full end-to-end capsule height after local-axis scaling.
-    /// </summary>
-    public Fixed64 ScaledHeight
-    {
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get
         {
-            Fixed64 radius = ScaledRadius;
-            Fixed64 scaledHeight = _height * LocalScale.Y;
-            Fixed64 diameter = radius * (Fixed64)2;
-            return scaledHeight < diameter ? diameter : scaledHeight;
+            GetMassPropertyGeometry(
+                out Fixed64 radius,
+                out _);
+            return radius;
         }
     }
 
     /// <summary>
-    /// Gets the normalized world-space direction of the capsule's conceptual center axis.
+    /// Gets the derived normalized world-space direction of the capsule's
+    /// conceptual center axis. Exact geometry remains authoritative in the
+    /// collider's planar rigid frame.
     /// </summary>
     public Vector2d WorldAxis { get; private set; } = Vector2d.Forward;
 
     /// <summary>
-    /// Gets the distance from the capsule center to either conceptual cap center.
+    /// Gets the full length of the conceptual center axis.
     /// </summary>
-    public Fixed64 AxisHalfLength { get; private set; }
-
-    /// <summary>
-    /// Gets the world-space center of the lower local-Y cap.
-    /// </summary>
-    public Vector2d SegmentStart
+    public Fixed64 AxisLength
     {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get
         {
-            CalculateSegment(out Vector2d start, out _);
-            return start;
-        }
-    }
+            if (HasCommittedShape)
+                return _axisLength;
 
-    /// <summary>
-    /// Gets the world-space center of the upper local-Y cap.
-    /// </summary>
-    public Vector2d SegmentEnd
-    {
-        get
-        {
-            CalculateSegment(out _, out Vector2d end);
-            return end;
+            GetMassPropertyGeometry(
+                out _,
+                out Fixed64 axisLength);
+            return axisLength;
         }
     }
 
@@ -140,23 +128,32 @@ public sealed class LSCapsuleCollider2D : LSCollider2D
         => FixedSegment2d.ContainsPointInCenteredCapsule(
             point,
             Center,
-            WorldAxis,
-            AxisHalfLength,
+            Rotation,
+            AxisLength,
             ScaledRadius,
-            Fixed64.Zero);
+            Fixed64.Zero,
+            strict: false);
 
     public override Vector2d GetClosestPoint(Vector2d point)
     {
-        CalculateSegment(out Vector2d start, out Vector2d end);
-        Vector2d segmentPoint = new FixedSegment2d(start, end).ClosestPoint(point);
-        Vector2d direction = point - segmentPoint;
-        Fixed64 directionLengthSquared = direction.MagnitudeSquared;
-        if (directionLengthSquared <= Fixed64.Epsilon)
-            direction = Rotate(Vector2d.Right, Rotation);
-        else
-            direction /= FixedMath.Sqrt(directionLengthSquared);
+        Vector2d direction = FixedSegment2d.GetDirectionFromCenteredAxis(
+            point,
+            Center,
+            Rotation,
+            AxisLength);
+        if (direction == Vector2d.Zero)
+            direction = Rotate(Vector2d.Right, Rotation).Normalized;
+        if (FixedSegment2d.TryGetSurfacePointOnCenteredCapsule(
+                point,
+                Center,
+                Rotation,
+                AxisLength,
+                ScaledRadius,
+                direction,
+                out Vector2d surfacePoint))
+            return surfacePoint;
 
-        return segmentPoint + direction * ScaledRadius;
+        throw new InvalidOperationException("The closest capsule surface point is outside the Fixed64 coordinate domain.");
     }
 
     internal Vector2d GetNormalFromCenteredAxis(Vector2d point)
@@ -164,9 +161,9 @@ public sealed class LSCapsuleCollider2D : LSCollider2D
         Vector2d direction = FixedSegment2d.GetDirectionFromCenteredAxis(
             point,
             Center,
-            WorldAxis,
-            AxisHalfLength);
-        return direction.MagnitudeSquared > Fixed64.Epsilon
+            Rotation,
+            AxisLength);
+        return direction != Vector2d.Zero
             ? direction
             : Rotate(Vector2d.Right, Rotation).Normalized;
     }
@@ -175,30 +172,49 @@ public sealed class LSCapsuleCollider2D : LSCollider2D
         Vector2d point,
         Vector2d normal,
         out Vector2d surfacePoint) =>
-        FixedSegment2d.TryGetSurfacePointOnCenteredCapsule(
-            point,
-            Center,
-            WorldAxis,
-            AxisHalfLength,
-            ScaledRadius,
-            normal,
-            out surfacePoint);
+        TryGetSurfacePoint(point, normal, out surfacePoint);
 
     public override Vector2d GetSupportPoint(Vector2d direction)
     {
-        CalculateSegment(out Vector2d start, out Vector2d end);
-        Vector2d normal = direction.MagnitudeSquared > Fixed64.Epsilon
-            ? direction.Normalized
-            : Rotate(Vector2d.Right, Rotation);
-        Vector2d axis = end - start;
-        Vector2d segmentPoint = Vector2d.Dot(axis, normal) >= Fixed64.Zero ? end : start;
-        return segmentPoint + normal * ScaledRadius;
+        if (TryGetSupportPoint(direction, out Vector2d support))
+            return support;
+
+        throw new InvalidOperationException("The capsule support point is outside the Fixed64 coordinate domain.");
     }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal bool TryGetSupportPoint(Vector2d direction, out Vector2d support)
+    {
+        Vector2d supportDirection = direction == Vector2d.Zero
+            ? Rotate(Vector2d.Right, Rotation)
+            : direction;
+        return FixedSegment2d.TryGetCenteredCapsuleSupport(
+            Center,
+            Rotation,
+            AxisLength,
+            ScaledRadius,
+            supportDirection,
+            out support);
+    }
+
+    private bool TryGetSurfacePoint(
+        Vector2d point,
+        Vector2d worldNormal,
+        out Vector2d surfacePoint) =>
+        FixedSegment2d.TryGetSurfacePointOnCenteredCapsule(
+            point,
+            Center,
+            Rotation,
+            AxisLength,
+            ScaledRadius,
+            worldNormal,
+            out surfacePoint);
 
     internal override Fixed64 CalculateAreaForMassProperties()
     {
-        Fixed64 radius = ScaledRadius;
-        Fixed64 cylinderLength = GetScaledCylinderLength(radius);
+        GetMassPropertyGeometry(
+            out Fixed64 radius,
+            out Fixed64 cylinderLength);
         return cylinderLength * radius * (Fixed64)2 + Fixed64.Pi * radius * radius;
     }
 
@@ -207,26 +223,70 @@ public sealed class LSCapsuleCollider2D : LSCollider2D
         if (mass <= Fixed64.Zero)
             return Fixed64.Zero;
 
-        Fixed64 radius = ScaledRadius;
-        Fixed64 cylinderLength = GetScaledCylinderLength(radius);
+        GetMassPropertyGeometry(
+            out Fixed64 radius,
+            out Fixed64 cylinderLength);
         Vector2d centerOfMass = CalculateLocalCenterOfMassOffset();
         Fixed64 momentAboutCenterOfMass = CalculateCenteredMoment(mass, radius, cylinderLength);
         return ApplyParallelAxis(momentAboutCenterOfMass, mass, centerOfMass, localReferencePoint);
     }
 
-    protected override void RebuildShape()
+    private protected override void PrepareShape(in ColliderShapeSnapshot2D snapshot)
     {
-        AxisHalfLength = GetScaledCylinderLength(ScaledRadius) * Fixed64.Half;
-        WorldAxis = Rotate(Vector2d.Forward, Rotation).Normalized;
-        CalculateSegment(out Vector2d start, out Vector2d end);
-        Fixed64 radius = ScaledRadius;
-        Vector2d min = new(
-            FixedMath.Min(start.X, end.X) - radius,
-            FixedMath.Min(start.Y, end.Y) - radius);
-        Vector2d max = new(
-            FixedMath.Max(start.X, end.X) + radius,
-            FixedMath.Max(start.Y, end.Y) + radius);
-        SetBoundsFromMinMax(min, max);
+        Fixed64 radiusX = ColliderScalePolicy.ScalePositive(
+            _radius,
+            snapshot.OwnerScale.X,
+            snapshot.PartScale.X);
+        Fixed64 radiusY = ColliderScalePolicy.ScalePositive(
+            _radius,
+            snapshot.OwnerScale.Y,
+            snapshot.PartScale.Y);
+        _preparedRadius = FixedMath.Max(radiusX, radiusY);
+        SwiftThrowHelper.ThrowIfArgument(
+            !HasValidScaledDimensions(
+                _radius,
+                _height,
+                snapshot.OwnerScale,
+                snapshot.PartScale),
+            nameof(snapshot),
+            "Scaled 2D capsule height must be at least the capsule diameter.");
+        SwiftThrowHelper.ThrowIfArgument(
+            !Fixed64.TryMultiplySubtractClamped(
+                _height,
+                snapshot.OwnerScale.Y,
+                snapshot.PartScale.Y,
+                Fixed64.One,
+                _radius,
+                Fixed64.Two,
+                snapshot.OwnerScale.X,
+                snapshot.PartScale.X,
+                out Fixed64 axisLengthX)
+            | !Fixed64.TryMultiplySubtractClamped(
+                _height,
+                snapshot.OwnerScale.Y,
+                snapshot.PartScale.Y,
+                Fixed64.One,
+                _radius,
+                Fixed64.Two,
+                snapshot.OwnerScale.Y,
+                snapshot.PartScale.Y,
+                out Fixed64 axisLengthY),
+            nameof(snapshot),
+            "Scaled 2D capsule center-axis length must be representable.");
+        _preparedAxisLength = FixedMath.Min(axisLengthX, axisLengthY);
+        _preparedAxis = Rotate(Vector2d.Forward, snapshot.Rotation).Normalized;
+        SetPreparedBounds(FixedBoundArea.FromCenteredRotatedCapsuleClippedToDomain(
+            snapshot.Center,
+            snapshot.Rotation,
+            _preparedAxisLength,
+            _preparedRadius));
+    }
+
+    private protected override void PublishShape()
+    {
+        _scaledRadius = _preparedRadius;
+        _axisLength = _preparedAxisLength;
+        WorldAxis = _preparedAxis;
     }
 
     protected override void RecordShapeData(IChronicler chronicler)
@@ -243,18 +303,62 @@ public sealed class LSCapsuleCollider2D : LSCollider2D
         }
     }
 
-    private void CalculateSegment(out Vector2d start, out Vector2d end)
+    private void GetMassPropertyGeometry(
+        out Fixed64 radius,
+        out Fixed64 axisLength)
     {
-        Vector2d center = Center;
-        start = center - WorldAxis * AxisHalfLength;
-        end = center + WorldAxis * AxisHalfLength;
-    }
+        if (HasCommittedShape)
+        {
+            radius = _scaledRadius;
+            axisLength = _axisLength;
+            return;
+        }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private Fixed64 GetScaledCylinderLength(Fixed64 scaledRadius)
-    {
-        Fixed64 cylinderLength = ScaledHeight - scaledRadius * (Fixed64)2;
-        return cylinderLength > Fixed64.Zero ? cylinderLength : Fixed64.Zero;
+        GetCurrentScaleFactors(
+            out Vector2d ownerScale,
+            out Vector2d partScale);
+        Fixed64 radiusX = ColliderScalePolicy.Scale(
+            _radius,
+            ownerScale.X,
+            partScale.X);
+        Fixed64 radiusY = ColliderScalePolicy.Scale(
+            _radius,
+            ownerScale.Y,
+            partScale.Y);
+        radius = FixedMath.Max(radiusX, radiusY);
+        SwiftThrowHelper.ThrowIfTrue(
+            !HasValidScaledDimensions(
+                _radius,
+                _height,
+                ownerScale,
+                partScale),
+            nameof(CalculateAreaForMassProperties),
+            "Scaled 2D capsule height must be at least the capsule diameter.");
+        bool representable = Fixed64.TryMultiplySubtractClamped(
+                _height,
+                ownerScale.Y,
+                partScale.Y,
+                Fixed64.One,
+                _radius,
+                Fixed64.Two,
+                ownerScale.X,
+                partScale.X,
+                out Fixed64 axisLengthX)
+            & Fixed64.TryMultiplySubtractClamped(
+                _height,
+                ownerScale.Y,
+                partScale.Y,
+                Fixed64.One,
+                _radius,
+                Fixed64.Two,
+                ownerScale.Y,
+                partScale.Y,
+                out Fixed64 axisLengthY);
+        SwiftThrowHelper.ThrowIfTrue(
+            !representable,
+            nameof(CalculateAreaForMassProperties),
+            "Scaled 2D capsule center-axis length must be representable.");
+        axisLength = FixedMath.Min(axisLengthX, axisLengthY);
     }
 
     private static Fixed64 CalculateCenteredMoment(Fixed64 mass, Fixed64 radius, Fixed64 cylinderLength)
@@ -291,8 +395,37 @@ public sealed class LSCapsuleCollider2D : LSCollider2D
     {
         SwiftThrowHelper.ThrowIfArgument(radius <= Fixed64.Zero, nameof(radius), "2D capsule radius must be greater than zero.");
         SwiftThrowHelper.ThrowIfArgument(
-            height < radius * (Fixed64)2,
+            Fixed64.CompareProducts(
+                height,
+                Fixed64.One,
+                radius,
+                Fixed64.Two) < 0,
             nameof(height),
             "2D capsule height must be at least the capsule diameter.");
     }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool HasValidScaledDimensions(
+        Fixed64 radius,
+        Fixed64 height,
+        Vector2d ownerScale,
+        Vector2d partScale) =>
+        Fixed64.CompareProducts(
+            height,
+            ownerScale.Y,
+            partScale.Y,
+            Fixed64.One,
+            radius,
+            Fixed64.Two,
+            ownerScale.X,
+            partScale.X) >= 0
+        & Fixed64.CompareProducts(
+            height,
+            ownerScale.Y,
+            partScale.Y,
+            Fixed64.One,
+            radius,
+            Fixed64.Two,
+            ownerScale.Y,
+            partScale.Y) >= 0;
 }

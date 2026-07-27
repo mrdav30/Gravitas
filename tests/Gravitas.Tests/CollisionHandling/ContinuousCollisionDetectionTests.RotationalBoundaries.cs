@@ -200,7 +200,7 @@ public sealed partial class ContinuousCollisionDetectionTests
     }
 
     [Fact]
-    public void KinematicRotationalResponse_UnrepresentableSourceCenterOfMass_ShouldRemainAtomic()
+    public void KinematicRotationalResponse_UnrepresentableWorldCenterOfMass_ShouldUseRelativeLeverArm()
     {
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();
         ScenarioBody<LSCuboidCollider> blade = CreateKinematicRotationalCcdBlade(scenario);
@@ -215,9 +215,11 @@ public sealed partial class ContinuousCollisionDetectionTests
         blade.Body.Agent.Transform.LocalRotation = RotationalMovingPairQuarterTurn3D;
         scenario.Context.LateSimulate();
 
-        target.Body.IsSleeping.Should().BeTrue();
-        target.Body.LinearVelocity.Should().Be(Vector3d.Zero);
-        target.Body.AngularVelocity.Should().Be(Vector3d.Zero);
+        target.Body.IsSleeping.Should().BeFalse();
+        (target.Body.LinearVelocity.MagnitudeSquared
+            + target.Body.AngularVelocity.MagnitudeSquared)
+            .Should()
+            .BeGreaterThan(Fixed64.Zero);
     }
 
     [Fact]

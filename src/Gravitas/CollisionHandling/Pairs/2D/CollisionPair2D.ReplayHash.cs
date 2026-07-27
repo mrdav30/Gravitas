@@ -32,16 +32,27 @@ internal sealed partial class CollisionPair2D
         ref ChronicleHashWriter writer,
         ContactManifold2D manifold)
     {
-        writer.WriteSection("manifold.2d", 1);
+        writer.WriteSection("manifold.2d", 4);
         writer.WriteInt32(manifold.LastUpdatedFrame);
         writer.WriteInt32(manifold.Count);
         for (int i = 0; i < manifold.Count; i++)
         {
             ManifoldContact2D contact = manifold[i];
             writer.WriteUInt64(contact.ContactId);
-            writer.WriteVector2d(contact.PointA);
-            writer.WriteVector2d(contact.PointB);
+            writer.WriteInt32(contact.FeatureNamespaceA);
+            writer.WriteVector2d(contact.AnchorA.Origin);
+            writer.WriteVector2d(contact.AnchorA.LocalPoint);
+            writer.WriteVector2d(contact.AnchorA.LocalDisplacement);
+            writer.WriteUInt64(contact.AnchorA.GetLocalFeatureHash64());
+            writer.WriteFixed64(contact.AnchorA.Rotation);
+            writer.WriteInt32(contact.FeatureNamespaceB);
+            writer.WriteVector2d(contact.AnchorB.Origin);
+            writer.WriteVector2d(contact.AnchorB.LocalPoint);
+            writer.WriteVector2d(contact.AnchorB.LocalDisplacement);
+            writer.WriteUInt64(contact.AnchorB.GetLocalFeatureHash64());
+            writer.WriteFixed64(contact.AnchorB.Rotation);
             writer.WriteFixed64(contact.Depth);
+            writer.WriteBool(contact.DepthIsClamped);
             writer.WriteVector2d(contact.Normal);
             writer.WriteBool(contact.HasMaterialOverride);
             if (contact.HasMaterialOverride)

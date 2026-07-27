@@ -6,14 +6,21 @@
 //=======================================================================
 
 using FixedMathSharp;
-using FixedMathSharp.Bounds;
+using FixedMathSharp.Geometry;
 using Gravitas.Queries;
 using SwiftCollections;
+using System;
 
 namespace Gravitas.Colliders;
 
 public class LSCapsuleCollider : LSCollider
 {
+    private Fixed64 _scaledRadius = Fixed64.Half;
+    private Fixed64 _preparedRadius;
+    private Fixed64 _preparedAxisLength;
+    private Vector3d _preparedAxis;
+    private Fixed64 _preparedArea;
+
     public LSCapsuleCollider() { }
 
     public LSCapsuleCollider(ColliderShapeDefinition definition)
@@ -27,37 +34,19 @@ public class LSCapsuleCollider : LSCollider
     public override ColliderType Shape => ColliderType.Capsule;
     public override int Priority => ColliderSettings.GetPriority(Shape);
 
-    public override Fixed64 ScaledRadius => _radius * FixedMath.Max(LocalScale.X, LocalScale.Z);
-
-    // The local top and bottom center points that define the hemispheres of the capsule
-    public Vector3d HemisphereCenterTop { get; private set; }
-
-    public Vector3d HemisphereCenterBottom { get; private set; }
-
-    public Fixed64 CylinderHeight { get; private set; }
+    public override Fixed64 ScaledRadius => _scaledRadius;
 
     /// <summary>
-    /// Gets the normalized world-space direction of the capsule's conceptual center axis.
+    /// Gets the full physical distance between the capsule's hemisphere centers.
+    /// </summary>
+    public Fixed64 AxisLength { get; private set; }
+
+    /// <summary>
+    /// Gets the derived normalized world-space direction of the capsule's
+    /// conceptual center axis. Exact geometry remains authoritative in the
+    /// collider's rigid frame.
     /// </summary>
     public Vector3d WorldAxis { get; private set; } = Vector3d.Up;
-
-    /// <summary>
-    /// Gets the distance from the capsule center to either conceptual cap center.
-    /// </summary>
-    public Fixed64 AxisHalfLength { get; private set; }
-
-    public Vector3d LineSegmentStart { get; private set; }
-
-    public Vector3d LineSegmentEnd { get; private set; }
-
-    public Vector3d LineDirection => WorldAxis;
-
-    protected override void OnInitialize()
-    {
-        Fixed64 diameter = _radius * 2;
-        _size = new Vector3d(diameter, _size.Y, diameter);
-        base.OnInitialize();
-    }
 
     protected override void OnRadiusChanged()
     {
@@ -68,39 +57,95 @@ public class LSCapsuleCollider : LSCollider
     protected override Vector3d NormalizeSize(Vector3d value) =>
         new(_radius * 2, value.Y, _radius * 2);
 
-    protected override void BuildShape()
+    private protected override void PrepareShape(in ColliderShapeSnapshot snapshot)
     {
-        Fixed64 halfCylinderHeight = FixedMath.Max(Fixed64.Zero, (ScaledSize.Y * Fixed64.Half) - ScaledRadius);
-        HemisphereCenterBottom = new Vector3d(Fixed64.Zero, -halfCylinderHeight, Fixed64.Zero);
-        HemisphereCenterTop = new Vector3d(Fixed64.Zero, halfCylinderHeight, Fixed64.Zero);
-        AxisHalfLength = halfCylinderHeight;
-        WorldAxis = (Rotation * Vector3d.Up).Normalized;
-        CylinderHeight = halfCylinderHeight * 2;
+        Fixed64 radiusX = ColliderScalePolicy.ScalePositive(
+            snapshot.Radius,
+            snapshot.OwnerScale.X,
+            snapshot.PartScale.X);
+        Fixed64 radiusZ = ColliderScalePolicy.ScalePositive(
+            snapshot.Radius,
+            snapshot.OwnerScale.Z,
+            snapshot.PartScale.Z);
+        _preparedRadius = FixedMath.Max(radiusX, radiusZ);
+        SwiftThrowHelper.ThrowIfArgument(
+            !HasValidScaledDimensions(snapshot),
+            nameof(snapshot),
+            "Scaled capsule height must be at least the capsule diameter.");
+        SwiftThrowHelper.ThrowIfArgument(
+            !Fixed64.TryMultiplySubtractClamped(
+                snapshot.Size.Y,
+                snapshot.OwnerScale.Y,
+                snapshot.PartScale.Y,
+                Fixed64.One,
+                snapshot.Radius,
+                Fixed64.Two,
+                snapshot.OwnerScale.X,
+                snapshot.PartScale.X,
+                out Fixed64 axisLengthX)
+            | !Fixed64.TryMultiplySubtractClamped(
+                snapshot.Size.Y,
+                snapshot.OwnerScale.Y,
+                snapshot.PartScale.Y,
+                Fixed64.One,
+                snapshot.Radius,
+                Fixed64.Two,
+                snapshot.OwnerScale.Z,
+                snapshot.PartScale.Z,
+                out Fixed64 axisLengthZ),
+            nameof(snapshot),
+            "Scaled capsule center-axis length must be representable.");
+        _preparedAxisLength = FixedMath.Min(axisLengthX, axisLengthZ);
+        _preparedAxis = (snapshot.Rotation * Vector3d.Up).Normalized;
+        _preparedArea = Fixed64.Two * Fixed64.Pi * _preparedRadius * _preparedAxisLength
+            + Fixed64.Two * Fixed64.Pi * _preparedRadius * _preparedRadius;
+        SetPreparedBounds(FixedBoundBox.FromCenteredCapsuleClippedToDomain(
+            snapshot.Center,
+            snapshot.Rotation,
+            Vector3d.Up,
+            _preparedAxisLength,
+            _preparedRadius));
+    }
 
-        // Area calculation: A = 2πrh + 2πr^2
-        Area = 2 * Fixed64.Pi * ScaledRadius * CylinderHeight + 2 * Fixed64.Pi * ScaledRadiusSqr;
-        UpdateLineSegment();
+    private static bool HasValidScaledDimensions(
+        in ColliderShapeSnapshot snapshot) =>
+        Fixed64.CompareProducts(
+            snapshot.Size.Y,
+            snapshot.OwnerScale.Y,
+            snapshot.PartScale.Y,
+            Fixed64.One,
+            snapshot.Radius,
+            Fixed64.Two,
+            snapshot.OwnerScale.X,
+            snapshot.PartScale.X) >= 0
+        & Fixed64.CompareProducts(
+            snapshot.Size.Y,
+            snapshot.OwnerScale.Y,
+            snapshot.PartScale.Y,
+            Fixed64.One,
+            snapshot.Radius,
+            Fixed64.Two,
+            snapshot.OwnerScale.Z,
+            snapshot.PartScale.Z) >= 0;
+
+    private protected override void PublishShape()
+    {
+        _scaledRadius = _preparedRadius;
+        AxisLength = _preparedAxisLength;
+        WorldAxis = _preparedAxis;
+        Area = _preparedArea;
     }
 
     protected internal override Fixed64 CalculateMassPropertyWeight() =>
-        Fixed64.Pi * ScaledRadiusSqr * CylinderHeight
+        Fixed64.Pi * ScaledRadiusSqr * AxisLength
         + Fixed64.FromFraction(4, 3) * Fixed64.Pi * ScaledRadiusSqr * ScaledRadius;
-
-    private void UpdateLineSegment()
-    {
-        // Retain representable endpoint snapshots for legacy consumers. Query and
-        // contact policy use Center/WorldAxis/AxisHalfLength so saturation here
-        // cannot bend the authoritative conceptual axis.
-        LineSegmentStart = Center - WorldAxis * AxisHalfLength;
-        LineSegmentEnd = Center + WorldAxis * AxisHalfLength;
-    }
 
     // The capsule is split into a cylinder and a pair of solid hemispheres with masses
     // proportional to their volumes. Each hemisphere's centroid lies 3r/8 outward from
     // its sphere center, which contributes the 3dr/4 cross term to transverse cap inertia.
     public override Fixed3x3 CalculateInertiaTensor(Fixed64 mass, Vector3d localCenterOfMassOffset)
     {
-        if (CylinderHeight <= Fixed64.Epsilon)
+        if (AxisLength <= Fixed64.Epsilon)
         {
             Fixed64 sphereDiagonal = Fixed64.FromFraction(2, 5) * mass * ScaledRadiusSqr;
             Fixed3x3 sphereTensor = new(
@@ -112,14 +157,14 @@ public class LSCapsuleCollider : LSCollider
         }
 
         // Masses of the cylinder and spheres (proportional to their volumes)
-        Fixed64 cylinderVolume = Fixed64.Pi * ScaledRadiusSqr * CylinderHeight;
+        Fixed64 cylinderVolume = Fixed64.Pi * ScaledRadiusSqr * AxisLength;
         Fixed64 sphereVolume = Fixed64.FromFraction(4, 3) * Fixed64.Pi * ScaledRadiusSqr * ScaledRadius;
         Fixed64 totalVolume = cylinderVolume + sphereVolume;
         if (totalVolume <= Fixed64.Zero)
         {
             // Fixed-point scaling can quantize a positive radius and both volumes to zero.
             // The remaining shape is the zero-radius limit: a thin rod along local Y.
-            Fixed64 rodInertiaXZ = Fixed64.FromFraction(1, 12) * mass * CylinderHeight * CylinderHeight;
+            Fixed64 rodInertiaXZ = Fixed64.FromFraction(1, 12) * mass * AxisLength * AxisLength;
             Fixed3x3 rodTensor = new(
                 rodInertiaXZ, Fixed64.Zero, Fixed64.Zero,
                 Fixed64.Zero, Fixed64.Zero, Fixed64.Zero,
@@ -132,11 +177,11 @@ public class LSCapsuleCollider : LSCollider
         Fixed64 sphereMass = mass - cylinderMass;
 
         // Distance from the center of the hemisphere to the center of the capsule
-        Fixed64 d = CylinderHeight / 2;
+        Fixed64 d = AxisLength / 2;
 
         // Calculating the inertia tensors for the cylinder and the spheres
         Fixed64 cylinderInertiaY = Fixed64.FromFraction(1, 2) * cylinderMass * ScaledRadiusSqr;
-        Fixed64 cylinderInertiaXZ = Fixed64.FromFraction(1, 12) * cylinderMass * ((3 * ScaledRadiusSqr) + (CylinderHeight * CylinderHeight));
+        Fixed64 cylinderInertiaXZ = Fixed64.FromFraction(1, 12) * cylinderMass * ((3 * ScaledRadiusSqr) + (AxisLength * AxisLength));
         Fixed64 sphereInertiaXZ = sphereMass
             * (Fixed64.FromFraction(2, 5) * ScaledRadiusSqr
                 + d * d
@@ -168,83 +213,59 @@ public class LSCapsuleCollider : LSCollider
             return Area;
 
         Vector3d normalizedDirection = direction / directionMagnitude;
-        Vector3d axis = Rotation * Vector3d.Up;
-        Fixed64 axial = Vector3d.Dot(normalizedDirection, axis).Abs();
+        Fixed64 axial = Rotation.Inverse()
+            .Rotate(normalizedDirection).Y.Abs();
         Fixed64 radialFactorSqr = Fixed64.One - axial * axial;
         Fixed64 radialFactor = radialFactorSqr <= Fixed64.Zero
             ? Fixed64.Zero
             : FixedMath.Sqrt(radialFactorSqr);
 
         Fixed64 capArea = Fixed64.Pi * ScaledRadiusSqr;
-        Fixed64 sideProfile = 2 * ScaledRadius * CylinderHeight;
+        Fixed64 sideProfile = 2 * ScaledRadius * AxisLength;
         return capArea + radialFactor * sideProfile;
     }
 
     public override Vector3d ClosestPointOnSurface(Vector3d other)
     {
-        Vector3d directionToStart = other - LineSegmentStart;
-        Fixed64 distanceToStart = directionToStart.Magnitude;
-        Vector3d directionToEnd = other - LineSegmentEnd;
-        Fixed64 distanceToEnd = directionToEnd.Magnitude;
-
-        // If the point is within the bottom hemisphere
-        if (distanceToStart < ScaledRadius && distanceToStart > Fixed64.Zero)
+        if (!FixedSegment.TryGetClosestCenteredCapsuleSurfaceAnchor(
+                other,
+                Center,
+                Rotation,
+                Vector3d.Up,
+                AxisLength,
+                ScaledRadius,
+                Vector3d.Right,
+                out FixedPointAnchor surfaceAnchor,
+                out _,
+                out _)
+            || !surfaceAnchor.TryGetPoint(out Vector3d surfacePoint))
         {
-            directionToStart /= distanceToStart; // normalize
-            directionToStart *= ScaledRadius;
-            return LineSegmentStart + directionToStart;
+            throw new InvalidOperationException(
+                "The closest capsule surface point is outside the representable coordinate domain.");
         }
 
-        // If the point is within the top hemisphere
-        if (distanceToEnd < ScaledRadius && distanceToEnd > Fixed64.Zero)
-        {
-            directionToEnd /= distanceToEnd; // normalize
-            directionToEnd *= ScaledRadius;
-            return LineSegmentEnd + directionToEnd;
-        }
-
-        // If the point is along the length of the cylinder
-        Vector3d lineDirection = LineSegmentEnd - LineSegmentStart;
-        Fixed64 lineLength = lineDirection.Magnitude;
-
-        if (lineLength > Fixed64.Epsilon)
-            lineDirection /= lineLength;  // normalize
-
-        // Compute the t value for the line equation
-        Fixed64 t = Vector3d.Dot(other - LineSegmentStart, lineDirection);
-
-        // Clamp to the segment extents
-        t = FixedMath.Max(Fixed64.Zero, FixedMath.Min(lineLength, t));
-
-        // Calculate the projection of 'other' onto the line to find the closest point on the line segment
-        Vector3d projection = LineSegmentStart + t * lineDirection;
-
-        // Now find the direction from the closest point on the line segment to 'other'
-        Vector3d direction = other - projection;
-
-        Fixed64 distance = direction.Magnitude;
-
-        // If the point is inside the capsule, return the point itself
-        if (distance <= ScaledRadius)
-            return other;
-
-        // The preceding inside test proves distance > ScaledRadius >= 0 here.
-        direction /= distance;
-        direction *= ScaledRadius;
-
-        return projection + direction;
+        return surfacePoint;
     }
 
     public override Vector3d GetNormalAtPoint(Vector3d point)
     {
-        Vector3d direction = FixedSegment.GetDirectionFromCenteredAxis(
-            point,
-            Center,
-            WorldAxis,
-            AxisHalfLength);
-        return direction.MagnitudeSquared > Fixed64.Epsilon
-            ? direction
-            : (Rotation * Vector3d.Right).Normalized;
+        if (!FixedSegment.TryGetClosestCenteredCapsuleSurfaceAnchor(
+                point,
+                Center,
+                Rotation,
+                Vector3d.Up,
+                AxisLength,
+                ScaledRadius,
+                Vector3d.Right,
+                out _,
+                out Vector3d outwardNormal,
+                out _))
+        {
+            throw new InvalidOperationException(
+                "The closest capsule surface normal is outside the representable coordinate domain.");
+        }
+
+        return outwardNormal;
     }
 
     public override bool ColliderOverlapsRay(RaycastSegmentWorker worker, ref SwiftList<Vector3d> outputIntersectionPoints) =>

@@ -15,7 +15,8 @@ public sealed class ColliderShapeSnapshotTests
         ColliderShapeSnapshot differentRadius = new(
             snapshot.Center,
             snapshot.Rotation,
-            snapshot.LocalScale,
+            snapshot.OwnerScale,
+            snapshot.PartScale,
             snapshot.LocalOffset,
             snapshot.Size,
             Fixed64.Half);
@@ -39,7 +40,8 @@ public sealed class ColliderShapeSnapshotTests
         ColliderShapeSnapshot2D differentThickness = new(
             snapshot.Center,
             snapshot.Rotation,
-            snapshot.LocalScale,
+            snapshot.OwnerScale,
+            snapshot.PartScale,
             snapshot.LocalOffset,
             snapshot.ShapeVersion,
             snapshot.MixedSlabCenterY,
@@ -58,6 +60,7 @@ public sealed class ColliderShapeSnapshotTests
             new Vector3d(Fixed64.One, (Fixed64)2, (Fixed64)3),
             FixedQuaternion.FromEulerAnglesInDegrees(Fixed64.Zero, (Fixed64)45, Fixed64.Zero),
             new Vector3d(Fixed64.One, Fixed64.Half, (Fixed64)2),
+            new Vector3d(Fixed64.Half, Fixed64.One, (Fixed64)3),
             new Vector3d(Fixed64.Half, Fixed64.Zero, -Fixed64.Half),
             new Vector3d((Fixed64)2, (Fixed64)3, (Fixed64)4),
             Fixed64.One);
@@ -67,6 +70,7 @@ public sealed class ColliderShapeSnapshotTests
             new Vector2d(Fixed64.One, (Fixed64)2),
             FixedMath.DegToRad((Fixed64)30),
             new Vector2d(Fixed64.One, Fixed64.Half),
+            new Vector2d(Fixed64.Half, (Fixed64)2),
             new Vector2d(Fixed64.Half, -Fixed64.Half),
             7,
             Fixed64.FromFraction(3, 4),

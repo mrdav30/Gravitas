@@ -1,5 +1,5 @@
 using FixedMathSharp;
-using FixedMathSharp.Bounds;
+using FixedMathSharp.Geometry;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
@@ -51,12 +51,12 @@ public sealed class FiniteAxisProjectionWorkerTests
         Vector2d planarStart = capsule.Center
             + capsule.WorldAxis * Fixed64.FromFraction(27, 4);
         capsule.ContainsPoint(planarStart).Should().BeTrue();
-        var legacyAxis = new FixedMathSharp.Bounds.FixedSegment2d(
-            capsule.SegmentStart,
-            capsule.SegmentEnd);
-        Vector2d legacyClosest = legacyAxis.ClosestPoint(planarStart);
-        Vector2d.TryGetDistance(planarStart, legacyClosest, out Fixed64 legacyDistance).Should().BeTrue();
-        legacyDistance.Should().BeGreaterThan(capsule.ScaledRadius + Fixed64.Quarter);
+        FixedSegment2d.TryGetCenteredAxisEndpoint(
+            capsule.Center,
+            capsule.WorldAxis,
+            capsule.AxisLength,
+            positive: true,
+            out _).Should().BeFalse();
 
         var containedStart = new Vector3d(planarStart.X, Fixed64.Zero, planarStart.Y);
         var containedEnd = containedStart - Vector3d.Forward;
@@ -104,7 +104,7 @@ public sealed class FiniteAxisProjectionWorkerTests
             queryCenter,
             capsule.Center,
             capsule.WorldAxis,
-            capsule.AxisHalfLength,
+            capsule.AxisLength,
             capsule.ScaledRadius);
         QueryDetection2D.TryOverlapCircle(
             queryCenter,
@@ -129,11 +129,13 @@ public sealed class FiniteAxisProjectionWorkerTests
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         LSCapsuleCollider capsule = CreateOrdinaryCapsule(context);
 
-        Vector3d point = ContinuousCollisionContactPolicy.ResolveSweptSpherePoint(
+        ContinuousCollisionContactPolicy.TryResolveSweptSphereContact(
             capsule,
             capsule.Center,
             Vector3d.Right,
-            Fixed64.Quarter);
+            out ContactAnchor anchor,
+            out _).Should().BeTrue();
+        anchor.TryGetWorldPoint(out Vector3d point).Should().BeTrue();
 
         point.Should().Be(capsule.Center + Vector3d.Right * capsule.ScaledRadius);
     }
@@ -150,11 +152,13 @@ public sealed class FiniteAxisProjectionWorkerTests
         roundedFallback.IsNormalized().Should().BeFalse();
 
         Vector3d normal = capsule.GetNormalAtPoint(capsule.Center);
-        Vector3d point = ContinuousCollisionContactPolicy.ResolveSweptSpherePoint(
+        ContinuousCollisionContactPolicy.TryResolveSweptSphereContact(
             capsule,
             capsule.Center,
             Vector3d.Forward,
-            Fixed64.Quarter);
+            out ContactAnchor anchor,
+            out _).Should().BeTrue();
+        anchor.TryGetWorldPoint(out Vector3d point).Should().BeTrue();
 
         normal.IsNormalized().Should().BeTrue();
         point.Should().Be(capsule.Center + normal * capsule.ScaledRadius);
@@ -165,11 +169,17 @@ public sealed class FiniteAxisProjectionWorkerTests
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         LSCapsuleCollider capsule = CreateOrdinaryCapsule(context);
-        Vector3d pointInsideTopHemisphere = capsule.LineSegmentEnd + Vector3d.Right * Fixed64.Quarter;
+        FixedSegment.TryGetCenteredAxisEndpoint(
+            capsule.Center,
+            capsule.WorldAxis,
+            capsule.AxisLength,
+            positive: true,
+            out Vector3d topCenter).Should().BeTrue();
+        Vector3d pointInsideTopHemisphere = topCenter + Vector3d.Right * Fixed64.Quarter;
 
         Vector3d closest = capsule.ClosestPointOnSurface(pointInsideTopHemisphere);
 
-        closest.Should().Be(capsule.LineSegmentEnd + Vector3d.Right * capsule.ScaledRadius);
+        closest.Should().Be(topCenter + Vector3d.Right * capsule.ScaledRadius);
     }
 
     [Fact]
@@ -187,7 +197,7 @@ public sealed class FiniteAxisProjectionWorkerTests
     }
 
     [Fact]
-    public void SweptSphereCapsulePoint_WithUnrepresentableTargetSurface_ShouldUseSphereFallback()
+    public void SweptSphereCapsuleContact_WithUnrepresentableTargetSurface_ShouldRetainTargetAnchor()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         LSCapsuleCollider capsule = CreateCapsuleAtScalarFace(context);
@@ -198,18 +208,53 @@ public sealed class FiniteAxisProjectionWorkerTests
             sphereCenter,
             capsule.Center,
             capsule.WorldAxis,
-            capsule.AxisHalfLength,
+            capsule.AxisLength,
             capsule.ScaledRadius,
             normal,
             out _).Should().BeFalse();
 
-        Vector3d point = ContinuousCollisionContactPolicy.ResolveSweptSpherePoint(
+        ContinuousCollisionContactPolicy.TryResolveSweptSphereContact(
             capsule,
             sphereCenter,
             Vector3d.Forward,
-            Fixed64.Quarter);
+            out ContactAnchor anchor,
+            out Vector3d resolvedNormal).Should().BeTrue();
 
-        point.Should().Be(sphereCenter - normal * Fixed64.Quarter);
+        anchor.Origin.Should().Be(capsule.Center);
+        anchor.TryGetWorldPoint(out _).Should().BeFalse();
+        resolvedNormal.Should().Be(normal);
+    }
+
+    [Fact]
+    public void SweptSphereCylinderContact_WithUnrepresentableCap_ShouldRetainTargetAnchor()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSCylinderCollider cylinder = CreateCylinderAtScalarEdge(context, positive: true);
+        cylinder.Radius = (Fixed64)2;
+        cylinder.RebuildRuntimeShapeOnly(refreshMassProperties: false).Should().BeTrue();
+        var sphereCenter = new Vector3d(Fixed64.Zero, Fixed64.MaxValue, Fixed64.Zero);
+
+        FixedSegment.TryGetClosestPointOnCenteredFiniteCylinderSurface(
+            sphereCenter,
+            cylinder.Center,
+            cylinder.WorldAxis,
+            cylinder.Height,
+            cylinder.ScaledRadius,
+            Vector3d.Right,
+            out _,
+            out _,
+            out _).Should().BeFalse();
+
+        ContinuousCollisionContactPolicy.TryResolveSweptSphereContact(
+            cylinder,
+            sphereCenter,
+            Vector3d.Up,
+            out ContactAnchor anchor,
+            out Vector3d normal).Should().BeTrue();
+
+        anchor.Origin.Should().Be(cylinder.Center);
+        anchor.TryGetWorldPoint(out _).Should().BeFalse();
+        normal.Should().Be(Vector3d.Down);
     }
 
     [Fact]
@@ -243,7 +288,7 @@ public sealed class FiniteAxisProjectionWorkerTests
     }
 
     [Fact]
-    public void Capsule2DRaycast_AtScalarFace_ShouldPreserveRayWitness()
+    public void Capsule2DRaycast_AtScalarFace_ShouldPreserveTargetSurfaceWitness()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
         LSCapsuleCollider2D capsule = CreateCapsule2DAtScalarFace(context);
@@ -256,13 +301,13 @@ public sealed class FiniteAxisProjectionWorkerTests
             capsule,
             out Physics2DHit hit).Should().BeTrue();
 
-        hit.Point.Should().Be(new FixedSegment2d(start, end).GetPointAtDistance(
-            hit.Distance,
-            (start.Y - end.Y).Abs()));
+        hit.TryGetPoint(out Vector2d surfacePoint).Should().BeTrue();
+        surfacePoint.X.Should().Be(Fixed64.MaxValue);
+        hit.Distance.Should().BeGreaterThan(Fixed64.Zero);
     }
 
     [Fact]
-    public void Capsule2DSweep_EnteringScalarFaceProjection_ShouldUseRepresentableCircleContact()
+    public void Capsule2DSweep_EnteringScalarFaceProjection_ShouldRetainUnrepresentableCircleAnchor()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
         LSCapsuleCollider2D capsule = CreateCapsule2DAtScalarFace(context);
@@ -277,16 +322,10 @@ public sealed class FiniteAxisProjectionWorkerTests
             capsule,
             out Physics2DHit hit).Should().BeTrue();
 
-        capsule.TryGetSurfacePointFromCenteredAxis(
-            hit.Point + hit.Normal * queryRadius,
-            hit.Normal,
-            out _).Should().BeFalse();
+        hit.TryGetPoint(out _).Should().BeFalse();
         hit.Distance.Should().BeGreaterThan(Fixed64.Zero);
-        var sweep = new FixedSegment2d(start, end);
-        Vector2d sweptCenter = sweep.GetPointAtDistance(
-            hit.Distance,
-            (end.Y - start.Y).Abs());
-        hit.Point.Should().Be(sweptCenter - hit.Normal * queryRadius);
+        hit.Anchor.Origin.X.Should().Be(Fixed64.MaxValue);
+        hit.Normal.X.Should().BeLessThan(Fixed64.Zero);
     }
 
     [Theory]
@@ -418,8 +457,14 @@ public sealed class FiniteAxisProjectionWorkerTests
         cone.Size = new Vector3d((Fixed64)200_000, (Fixed64)2, (Fixed64)200_000);
         cone.RebuildRuntimeShapeOnly().Should().BeTrue();
 
+        FixedSegment.TryGetCenteredAxisEndpoint(
+            cone.Center,
+            cone.WorldAxis,
+            cone.Height,
+            positive: false,
+            out Vector3d baseCenter).Should().BeTrue();
         bool found = FiniteSlabProjectionSweep.TrySweepCircleAgainstCone(
-            new Vector2d(cone.WorldBaseCenter.X, (Fixed64)(-100_000)),
+            new Vector2d(baseCenter.X, (Fixed64)(-100_000)),
             Vector2d.Forward,
             (Fixed64)200_000,
             Fixed64.Zero,

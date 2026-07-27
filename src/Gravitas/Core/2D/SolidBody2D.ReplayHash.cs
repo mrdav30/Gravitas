@@ -53,6 +53,7 @@ public sealed partial class SolidBody2D
         writer.WriteBool(_isGrounded);
         writer.WriteBool(_wasGrounded);
         writer.WriteVector2d(_groundNormal);
+        writer.WriteBool(_hasGroundPoint);
         writer.WriteVector2d(_groundPoint);
         writer.WriteVector2d(_lastGroundedPosition);
         writer.WriteEnum(_continuousCollisionMode);

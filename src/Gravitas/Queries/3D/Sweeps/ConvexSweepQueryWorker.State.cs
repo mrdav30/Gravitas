@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using FixedMathSharp.Geometry;
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -16,31 +17,36 @@ internal sealed partial class ConvexSweepQueryWorker
 {
     private readonly struct SupportPoint
     {
-        public SupportPoint(Vector3d pointA, Vector3d pointB, int workingShift)
+        public SupportPoint(
+            FixedPointAnchor pointA,
+            FixedPointAnchor pointB,
+            Vector3d point)
         {
             PointA = pointA;
             PointB = pointB;
-            Point = GjkSimplexScale.CreateWorkingDifference(pointA, pointB, workingShift);
+            Point = point;
         }
 
-        public Vector3d PointA { get; }
+        public FixedPointAnchor PointA { get; }
 
-        public Vector3d PointB { get; }
+        public FixedPointAnchor PointB { get; }
 
         public Vector3d Point { get; }
     }
 
     private readonly struct SweepTriangleCandidate
     {
-        public SweepTriangleCandidate(int triangleIndex, Fixed64 lowerBound)
+        public SweepTriangleCandidate(
+            int triangleIndex,
+            Fixed64 lowerBoundNumerator)
         {
             TriangleIndex = triangleIndex;
-            LowerBound = lowerBound;
+            LowerBoundNumerator = lowerBoundNumerator;
         }
 
         public int TriangleIndex { get; }
 
-        public Fixed64 LowerBound { get; }
+        public Fixed64 LowerBoundNumerator { get; }
     }
 
     private sealed class SweepTriangleCandidateComparer : IComparer<SweepTriangleCandidate>
@@ -48,7 +54,9 @@ internal sealed partial class ConvexSweepQueryWorker
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public int Compare(SweepTriangleCandidate left, SweepTriangleCandidate right)
         {
-            int lowerBoundCompare = left.LowerBound.CompareTo(right.LowerBound);
+            int lowerBoundCompare =
+                left.LowerBoundNumerator.CompareTo(
+                    right.LowerBoundNumerator);
             return lowerBoundCompare != 0
                 ? lowerBoundCompare
                 : left.TriangleIndex.CompareTo(right.TriangleIndex);
@@ -60,8 +68,8 @@ internal sealed partial class ConvexSweepQueryWorker
         public GjkResult(
             bool intersects,
             Fixed64 distance,
-            Vector3d pointA,
-            Vector3d pointB,
+            FixedPointAnchor pointA,
+            FixedPointAnchor pointB,
             Vector3d normal)
         {
             Intersects = intersects;
@@ -75,13 +83,15 @@ internal sealed partial class ConvexSweepQueryWorker
 
         public Fixed64 Distance { get; }
 
-        public Vector3d PointA { get; }
+        public FixedPointAnchor PointA { get; }
 
-        public Vector3d PointB { get; }
+        public FixedPointAnchor PointB { get; }
 
         public Vector3d Normal { get; }
 
-        public static GjkResult CreateIntersection(Vector3d pointA, Vector3d pointB) =>
+        public static GjkResult CreateIntersection(
+            FixedPointAnchor pointA,
+            FixedPointAnchor pointB) =>
             new(true, Fixed64.Zero, pointA, pointB, Vector3d.Zero);
     }
 
@@ -90,8 +100,8 @@ internal sealed partial class ConvexSweepQueryWorker
         public ClosestSimplexResult(
             bool intersects,
             Vector3d point,
-            Vector3d pointA,
-            Vector3d pointB)
+            FixedPointAnchor pointA,
+            FixedPointAnchor pointB)
         {
             Intersects = intersects;
             Point = point;
@@ -104,14 +114,14 @@ internal sealed partial class ConvexSweepQueryWorker
 
         public Vector3d Point { get; }
 
-        public Vector3d PointA { get; }
+        public FixedPointAnchor PointA { get; }
 
-        public Vector3d PointB { get; }
+        public FixedPointAnchor PointB { get; }
 
         public Fixed64 DistanceSqr { get; }
 
         public static ClosestSimplexResult Intersection =>
-            new(true, Vector3d.Zero, Vector3d.Zero, Vector3d.Zero);
+            new(true, Vector3d.Zero, default, default);
 
         public static ClosestSimplexResult FromWeights(
             SupportPoint[] simplex,
@@ -134,18 +144,11 @@ internal sealed partial class ConvexSweepQueryWorker
             Span<int> indices,
             Span<Fixed64> weights)
         {
-            Vector3d point = Vector3d.Zero;
-            Vector3d pointA = Vector3d.Zero;
-            Vector3d pointB = Vector3d.Zero;
+            Span<SupportPoint> selected = stackalloc SupportPoint[3];
             for (int i = 0; i < 3; i++)
-            {
-                SupportPoint support = simplex[indices[i]];
-                point += support.Point * weights[i];
-                pointA += support.PointA * weights[i];
-                pointB += support.PointB * weights[i];
-            }
+                selected[i] = simplex[indices[i]];
 
-            return new ClosestSimplexResult(false, point, pointA, pointB);
+            return FromSpanWeights(selected, weights, 3);
         }
 
         public static ClosestSimplexResult FromSpanWeights(
@@ -153,17 +156,63 @@ internal sealed partial class ConvexSweepQueryWorker
             Span<Fixed64> weights,
             int count)
         {
-            Vector3d point = Vector3d.Zero;
-            Vector3d pointA = Vector3d.Zero;
-            Vector3d pointB = Vector3d.Zero;
+            Span<Vector3d> points = stackalloc Vector3d[4];
+            Span<Vector3d> firstLocalPoints = stackalloc Vector3d[4];
+            Span<Vector3d> firstLocalDisplacements = stackalloc Vector3d[4];
+            Span<Vector3d> secondLocalPoints = stackalloc Vector3d[4];
+            Span<Vector3d> secondLocalDisplacements = stackalloc Vector3d[4];
+            int frameIndex = 0;
             for (int i = 0; i < count; i++)
             {
-                point += simplex[i].Point * weights[i];
-                pointA += simplex[i].PointA * weights[i];
-                pointB += simplex[i].PointB * weights[i];
+                points[i] = simplex[i].Point;
+                firstLocalPoints[i] = simplex[i].PointA.LocalPoint;
+                firstLocalDisplacements[i] =
+                    simplex[i].PointA.LocalDisplacement;
+                secondLocalPoints[i] = simplex[i].PointB.LocalPoint;
+                secondLocalDisplacements[i] =
+                    simplex[i].PointB.LocalDisplacement;
+                if (weights[frameIndex] <= Fixed64.Zero
+                    && weights[i] > Fixed64.Zero)
+                {
+                    frameIndex = i;
+                }
             }
 
-            return new ClosestSimplexResult(false, point, pointA, pointB);
+            _ = Vector3d.TryGetWeightedAverage(
+                points[..count],
+                weights[..count],
+                out Vector3d point);
+            _ = Vector3d.TryGetWeightedAverage(
+                firstLocalPoints[..count],
+                weights[..count],
+                out Vector3d firstLocalPoint);
+            _ = Vector3d.TryGetWeightedAverage(
+                firstLocalDisplacements[..count],
+                weights[..count],
+                out Vector3d firstLocalDisplacement);
+            _ = Vector3d.TryGetWeightedAverage(
+                secondLocalPoints[..count],
+                weights[..count],
+                out Vector3d secondLocalPoint);
+            _ = Vector3d.TryGetWeightedAverage(
+                secondLocalDisplacements[..count],
+                weights[..count],
+                out Vector3d secondLocalDisplacement);
+            FixedPointAnchor firstFrame = simplex[frameIndex].PointA;
+            FixedPointAnchor secondFrame = simplex[frameIndex].PointB;
+            return new ClosestSimplexResult(
+                false,
+                point,
+                new FixedPointAnchor(
+                    firstFrame.Origin,
+                    firstFrame.Rotation,
+                    firstLocalPoint,
+                    firstLocalDisplacement),
+                new FixedPointAnchor(
+                    secondFrame.Origin,
+                    secondFrame.Rotation,
+                    secondLocalPoint,
+                    secondLocalDisplacement));
         }
 
         private static ClosestSimplexResult FromArrayWeights(
@@ -171,17 +220,7 @@ internal sealed partial class ConvexSweepQueryWorker
             Span<Fixed64> weights,
             int count)
         {
-            Vector3d point = Vector3d.Zero;
-            Vector3d pointA = Vector3d.Zero;
-            Vector3d pointB = Vector3d.Zero;
-            for (int i = 0; i < count; i++)
-            {
-                point += simplex[i].Point * weights[i];
-                pointA += simplex[i].PointA * weights[i];
-                pointB += simplex[i].PointB * weights[i];
-            }
-
-            return new ClosestSimplexResult(false, point, pointA, pointB);
+            return FromSpanWeights(simplex.AsSpan(), weights, count);
         }
     }
 

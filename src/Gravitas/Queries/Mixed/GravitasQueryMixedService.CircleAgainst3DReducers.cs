@@ -6,7 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
-using FixedMathSharp.Bounds;
+using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
 using SwiftCollections.Query;
 using System;
@@ -51,7 +51,6 @@ public sealed partial class GravitasQueryMixedService
         {
             return TrySweepCircleAgainstCuboid(
                 start,
-                end,
                 direction2D,
                 length,
                 radius,
@@ -104,7 +103,6 @@ public sealed partial class GravitasQueryMixedService
 
     private static bool TrySweepCircleAgainstCuboid(
         Vector2d start,
-        Vector2d end,
         Vector2d direction,
         Fixed64 length,
         Fixed64 radius,
@@ -115,32 +113,27 @@ public sealed partial class GravitasQueryMixedService
         LSCollider2D? sourceCollider,
         out PhysicsMixedHit hit)
     {
-        Span<Vector2d> projection = stackalloc Vector2d[32];
-        if (!TryBuildCuboidSlabProjection(cuboid, slabCenterY, halfThickness, projection, out int projectionCount)
-            || !TrySweepCircleAgainstConvexProjection(
-                start,
-                end,
+        if (!cuboid.OrientedBox.TryGetCircleSlabSweepDistance(
+                new Vector3d(start.X, slabCenterY, start.Y),
+                direction,
                 length,
-                Fixed64.Zero,
+                halfThickness,
                 radius,
-                projection.Slice(0, projectionCount),
                 out Fixed64 distance))
         {
             hit = default;
             return false;
         }
 
-        Vector2d center2D = new FixedSegment2d(start, end).GetPointAtDistance(distance, length);
-        Vector3d sweepCenter = new(center2D.X, slabCenterY, center2D.Y);
-        hit = BuildCircleAgainst3DHit(
-            cuboid,
-            sweepCenter,
-            direction3D,
+        hit = BuildCircleAgainstProjectedFiniteSlabHit(
+            start,
+            direction,
+            distance,
             radius,
             slabCenterY,
             halfThickness,
-            PhysicsQueryReducerKind.Exact,
-            distance,
+            direction3D,
+            cuboid,
             sourceCollider);
         return true;
     }
@@ -319,8 +312,6 @@ public sealed partial class GravitasQueryMixedService
         mesh.GetTrianglesInBounds(new FixedBoundVolume(min, max), _meshTriangleCandidates);
         LastMeshTriangleCandidateCount += _meshTriangleCandidates.Count;
 
-        Fixed64 slabMinY = slabCenterY - halfThickness;
-        Fixed64 slabMaxY = slabCenterY + halfThickness;
         bool found = false;
         Fixed64 bestDistance = Fixed64.MaxValue;
         int bestTriangleIndex = int.MaxValue;
@@ -329,19 +320,26 @@ public sealed partial class GravitasQueryMixedService
         for (int i = 0; i < _meshTriangleCandidates.Count; i++)
         {
             int triangleIndex = _meshTriangleCandidates[i];
-            mesh.Mesh.GetTriangleVertices(triangleIndex, out Vector3d first, out Vector3d second, out Vector3d third);
-            if (!TrySweepCircleAgainstTriangleProjection(
-                start,
-                end,
-                length,
-                radius,
-                slabMinY,
-                slabMaxY,
+            mesh.Mesh.GetLocalTriangleVertices(
+                triangleIndex,
+                out Vector3d first,
+                out Vector3d second,
+                out Vector3d third);
+            var triangle = new FixedTriangle(
                 first,
                 second,
-                third,
+                third);
+            if (!triangle.TryGetFiniteSlabProjectedCircleSweep(
+                mesh.Mesh.Origin,
+                mesh.Mesh.Rotation,
+                start,
+                direction,
+                maximumDistance: length,
+                radius,
+                slabCenterY,
+                halfThickness,
                 out Fixed64 distance,
-                out Vector3d point3D))
+                out FixedPointAnchor triangleContact))
             {
                 continue;
             }
@@ -357,7 +355,7 @@ public sealed partial class GravitasQueryMixedService
             Vector3d sweepCenter = new(center2D.X, slabCenterY, center2D.Y);
             best = BuildCircleAgainst3DHit(
                 mesh,
-                point3D,
+                triangleContact,
                 sweepCenter,
                 direction3D,
                 radius,
@@ -428,8 +426,8 @@ public sealed partial class GravitasQueryMixedService
         hit = new PhysicsMixedHit(
             compound,
             sourceCollider,
-            best.Point3D,
-            best.Point2D,
+            best.Anchor3D,
+            best.Anchor2D,
             best.Normal3DTo2D,
             best.ReducerKind,
             best.Distance,

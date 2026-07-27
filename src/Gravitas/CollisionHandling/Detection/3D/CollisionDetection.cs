@@ -5,7 +5,6 @@
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
-using FixedMathSharp;
 using Gravitas.Colliders;
 
 namespace Gravitas.CollisionHandling;
@@ -44,27 +43,6 @@ public static partial class CollisionDetection
             CollisionType.Compound => DoCompoundCheck(pair),
             _ => false,
         };
-    }
-
-    private static void KeepDirectionalPenetration(
-        Vector3d axis,
-        FixedRange firstProjection,
-        FixedRange secondProjection,
-        ref AxisPenetration penetration)
-    {
-        Fixed64 positiveDepth = firstProjection.Max - secondProjection.Min;
-        Fixed64 negativeDepth = secondProjection.Max - firstProjection.Min;
-        Vector3d candidateAxis = axis;
-        Fixed64 candidateDepth = positiveDepth;
-        if (negativeDepth < positiveDepth)
-        {
-            candidateAxis = -axis;
-            candidateDepth = negativeDepth;
-        }
-
-        if (!penetration.HasValue
-            || candidateDepth + Fixed64.Epsilon < penetration.Depth)
-            penetration = new AxisPenetration(candidateAxis, candidateDepth);
     }
 
 }

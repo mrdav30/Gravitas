@@ -490,12 +490,12 @@ public partial class CollisionPair
 
     private bool ShouldPerformCollisionCheck()
     {
-        // Calculate the square distance between the two bounding box centers
-        // If the square distance between the centers is greater than the square of the sum of their combine scope,
-        // then the bounding boxes do not overlap and no collision check should be performed
+        // Center distance remains a scheduling signal only. Canonical geometry
+        // may extend beyond a scalar face while its conservative broad-phase
+        // bounds are clipped to the representable domain, which can shorten
+        // Bounds.Scope without shortening the physical shape.
         _fastDistance = Vector3d.DistanceSquared(ColliderA.Center, ColliderB.Center);
-        if (_fastDistance > _fastCollideDistance)
-            return false;
+
         // Inclusive bounds overlap preserves zero-depth touching contacts for the manifold pass.
         return BoundsOverlapInclusive(ColliderA, ColliderB);
     }

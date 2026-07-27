@@ -81,6 +81,7 @@ public sealed partial class SolidBody2D
     {
         if (!CanApplyContinuousCollisionHandoffState(
                 positionAtImpact,
+                rotationAtImpact,
                 remainingTime,
                 out Vector2d resolvedPosition))
         {
@@ -111,6 +112,7 @@ public sealed partial class SolidBody2D
     {
         _position = resolvedPosition;
         _rotation = CanonicalizeRotation(rotationAtImpact);
+        Collider.PublishPreparedBodyPose();
         postLinearVelocity = ProjectLinearMotion(postLinearVelocity);
         postAngularVelocity = CanRotate ? postAngularVelocity : Fixed64.Zero;
         if (_linearVelocity != postLinearVelocity || _angularVelocity != postAngularVelocity)
@@ -145,6 +147,7 @@ public sealed partial class SolidBody2D
 
     internal bool CanApplyContinuousCollisionHandoffState(
         Vector2d positionAtImpact,
+        Fixed64 rotationAtImpact,
         Fixed64 remainingTime,
         out Vector2d resolvedPosition)
     {
@@ -159,10 +162,17 @@ public sealed partial class SolidBody2D
             _position,
             ProjectLinearMotion(positionDelta),
             out resolvedPosition);
-        return hasMobility
-            & hasTrajectoryCapacity
-            & positionDeltaResolved
-            & positionResolved;
+        if (!(hasMobility
+                & hasTrajectoryCapacity
+                & positionDeltaResolved
+                & positionResolved))
+        {
+            return false;
+        }
+
+        return Collider.TryPrepareBodyPose(
+            resolvedPosition,
+            CanonicalizeRotation(rotationAtImpact));
     }
 
     internal bool TryConsumeContinuousCollisionHandoff(bool updateSleepState, bool updateColliderState)
@@ -291,6 +301,7 @@ public sealed partial class SolidBody2D
         }
 
         bool resolved = false;
+        int conservativeMixedRefinementCount = 0;
         Vector2d currentPosition = startPosition;
         Fixed64 remainingTime = initialRemainingTime;
         Fixed64 elapsedTime = initialElapsedTime;
@@ -299,7 +310,7 @@ public sealed partial class SolidBody2D
         LSCollider? originalIgnoredCollider3D = _continuousCollisionHandoffIgnoredCollider3D;
         try
         {
-            for (int toiIteration = 0; toiIteration < maxToiIterations; toiIteration++)
+            while (LastContinuousCollisionToiIterationCount < maxToiIterations)
             {
                 Vector2d requestedSegmentDisplacement = _linearVelocity * remainingTime;
                 Vector2d requestedSegmentEnd = currentPosition + requestedSegmentDisplacement;
@@ -332,6 +343,46 @@ public sealed partial class SolidBody2D
                 Fixed64 consumedTime = remainingTime * hitTime;
                 Fixed64 remainingAfterHit = remainingTime - consumedTime;
                 Fixed64 hitElapsedTime = elapsedTime + consumedTime;
+                if (targetKind
+                    == ContinuousCollisionTargetKind.UnresolvedMixed)
+                {
+                    resolved = true;
+                    if (hitTime > Fixed64.Epsilon
+                        && conservativeMixedRefinementCount
+                            < ContinuousCollisionMath.RotationalIntervalMaxDepth)
+                    {
+                        conservativeMixedRefinementCount++;
+                        remainingTime = remainingAfterHit;
+                        elapsedTime = hitElapsedTime;
+                        if (remainingTime > Fixed64.Epsilon)
+                            continue;
+                    }
+
+                    LastContinuousCollisionToiIterationCount++;
+                    LastContinuousCollisionToiIterationLimitReached =
+                        remainingAfterHit > Fixed64.Epsilon;
+                    if (CanAppendContinuousCollisionFrameSegment(hitElapsedTime)
+                        && Context.Physics2D
+                            .TryReserveContinuousCollisionCandidateRefresh(this))
+                    {
+                        UpdateContinuousCollisionFrameTrajectory(
+                            currentPosition,
+                            Vector2d.Zero,
+                            hitElapsedTime);
+                        Context.Physics2D
+                            .RefreshContinuousCollisionCandidate(this);
+                    }
+                    else
+                    {
+                        LastContinuousCollisionToiIterationLimitReached = true;
+                    }
+
+                    if (LastContinuousCollisionToiIterationLimitReached)
+                        Context.Physics2D.ReportContinuousCollisionIterationLimit();
+
+                    break;
+                }
+
                 if (!CanAppendContinuousCollisionFrameSegment(hitElapsedTime))
                 {
                     ContinuousCollisionMotionSegment2D activeSegment =
@@ -539,6 +590,7 @@ public sealed partial class SolidBody2D
                 out targetPostLinearVelocity);
             bool targetTrajectoryAvailable = target.CanApplyContinuousCollisionHandoffState(
                 targetPositionAtImpact,
+                targetRotationAtImpact,
                 remainingTime,
                 out targetResolvedPosition);
             targetStateAvailable = targetVelocityResolved & targetTrajectoryAvailable;
@@ -643,6 +695,7 @@ public sealed partial class SolidBody2D
                 out targetPostLinearVelocity);
             bool targetTrajectoryAvailable = target.CanApplyContinuousCollisionHandoff(
                 targetPositionAtImpact,
+                targetRotationAtImpact,
                 remainingTime,
                 out targetResolvedPosition);
             targetStateAvailable = targetVelocityResolved & targetTrajectoryAvailable;

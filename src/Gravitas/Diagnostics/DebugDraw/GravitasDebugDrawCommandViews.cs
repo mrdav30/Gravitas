@@ -145,7 +145,7 @@ public readonly struct GravitasWireBoxDebugDrawView
 
     public Vector3d Center => Command.Center;
 
-    public Vector3d Size => Command.Size;
+    public Vector3d HalfExtents => Command.HalfExtents;
 
     public FixedQuaternion Rotation => Command.Rotation;
 
@@ -179,7 +179,10 @@ public readonly struct GravitasWireCapsuleDebugDrawView
 
     public Fixed64 Radius => Command.Radius;
 
-    public Fixed64 Height => Command.Height;
+    /// <summary>
+    /// Gets the full distance between the capsule's hemisphere centers.
+    /// </summary>
+    public Fixed64 AxisLength => Command.AxisLength;
 
     public GravitasDiagnosticColor Color => Command.Color;
 }

@@ -7,7 +7,7 @@
 
 using Chronicler;
 using FixedMathSharp;
-using FixedMathSharp.Bounds;
+using FixedMathSharp.Geometry;
 using Gravitas.CollisionHandling;
 using Gravitas.Materials;
 using Gravitas.Queries;
@@ -42,18 +42,23 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
             if (_active == value)
                 return;
 
-            _active = value;
             if (_context == null || _id < 0)
-                return;
-
-            if (_active)
             {
+                _active = value;
+                return;
+            }
+
+            if (value)
+            {
+                RebuildRuntimeShapeState();
+                _active = true;
                 InitialPartition();
                 if (_context.Settings.RuntimeMode.RunsMixedContacts())
                     _context.MixedCollisions.Refresh3DColliderPartition(this);
                 return;
             }
 
+            _active = false;
             if (IsPartitioned)
                 _context.Collisions.ClearPartitionedObject(this, force: true);
 
@@ -142,7 +147,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
 
     internal LSCompoundCollider? CompoundOwner => _compoundOwner;
 
-    public virtual Vector3d Position
+    public Vector3d Position
     {
         get => _compoundOwner?.Center
             ?? Body?.Position3d
@@ -158,23 +163,26 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
                 _agent == null,
                 nameof(Position),
                 "Collider is not bound to a static transform.");
+            SwiftThrowHelper.ThrowIfTrue(
+                _body != null,
+                nameof(Position),
+                "Body-owned collider positions must be changed through their SolidBody.");
 
             if (_agent.Transform.WorldPosition == value)
                 return;
-            SwiftThrowHelper.ThrowIfTrue(
-                !_agent.Transform.TrySetWorldPosition(value),
-                nameof(Position),
-                "Static collider transform cannot represent the requested world position.");
+            SetBodylessWorldPose(value, default, setRotation: false, nameof(Position));
         }
     }
 
-    public virtual FixedQuaternion Rotation
+    public FixedQuaternion Rotation
     {
-        get => _compoundOwner != null
-            ? _compoundOwner.Rotation * _compoundLocalRotation
-            : Body?.Rotation
-            ?? _agent?.Transform.WorldRotation
-            ?? throw new InvalidOperationException("Collider has no body or static transform.");
+        get => _hasCommittedShape
+            ? _committedRotation
+            : _compoundOwner != null
+                ? _compoundOwner.Rotation * _compoundLocalRotation
+                : Body?.Rotation
+                ?? _agent?.Transform.WorldRotation
+                ?? throw new InvalidOperationException("Collider has no body or static transform.");
         set
         {
             SwiftThrowHelper.ThrowIfTrue(
@@ -185,13 +193,14 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
                 _agent == null,
                 nameof(Rotation),
                 "Collider is not bound to a static transform.");
+            SwiftThrowHelper.ThrowIfTrue(
+                _body != null,
+                nameof(Rotation),
+                "Body-owned collider rotations must be changed through their SolidBody.");
 
             if (_agent.Transform.WorldRotation == value)
                 return;
-            SwiftThrowHelper.ThrowIfTrue(
-                !_agent.Transform.TrySetWorldPose(_agent.Transform.WorldPosition, value),
-                nameof(Rotation),
-                "Static collider transform cannot represent the requested world rotation.");
+            SetBodylessWorldPose(default, value, setRotation: true, nameof(Rotation));
         }
     }
 
@@ -325,7 +334,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
     /// For boxes, this is half of the diagonal length of the cube
     /// </summary>
     /// <value>The radius.</value>
-    public virtual Fixed64 ScaledRadius => _radius * FixedMath.Max(LocalScale.Z, FixedMath.Max(LocalScale.X, LocalScale.Y));
+    public virtual Fixed64 ScaledRadius => GetCurrentScaledRadius();
 
     public Fixed64 ScaledRadiusSqr => ScaledRadius * ScaledRadius;
 
@@ -354,21 +363,78 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
 
     #region Grid & Partition Bounds
 
-    public virtual Vector3d LocalScale => _compoundOwner != null
-        ? Vector3d.Multiply(_compoundOwner.LocalScale, _compoundLocalScale)
-        : Transform.LossyScale;
+    public virtual Vector3d LocalScale
+    {
+        get
+        {
+            bool representable = TryGetLocalScale(out Vector3d scale);
+            SwiftThrowHelper.ThrowIfTrue(
+                !representable,
+                nameof(LocalScale),
+                "The combined 3D collider scale is outside the Fixed64 coordinate domain.");
+            return scale;
+        }
+    }
 
-    public virtual Vector3d ScaledSize => Vector3d.Multiply(_size, LocalScale);
+    /// <summary>
+    /// Attempts to materialize the combined owner and compound-part scale.
+    /// Shape preparation retains those factors separately and does not require
+    /// their product to be representable.
+    /// </summary>
+    public bool TryGetLocalScale(out Vector3d scale)
+    {
+        Vector3d ownerScale = GetCurrentOwnerScale();
+        Vector3d partScale = _hasCommittedShape
+            ? _committedPartScale
+            : _compoundOwner != null
+                ? _compoundLocalScale
+                : Vector3d.One;
 
-    public Vector3d ScaledOffset => Vector3d.Multiply(_offset, LocalScale);
+        bool representable = Fixed64.TryMultiplyDivide(
+                ownerScale.X,
+                partScale.X,
+                Fixed64.One,
+                out Fixed64 x)
+            & Fixed64.TryMultiplyDivide(
+                ownerScale.Y,
+                partScale.Y,
+                Fixed64.One,
+                out Fixed64 y)
+            & Fixed64.TryMultiplyDivide(
+                ownerScale.Z,
+                partScale.Z,
+                Fixed64.One,
+                out Fixed64 z);
+        scale = representable ? new Vector3d(x, y, z) : default;
+        return representable;
+    }
+
+    /// <summary>
+    /// Gets the component-scaled local offset.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// The scaled offset itself is outside the Fixed64 coordinate domain. The
+    /// collider may still have a representable world center through exact
+    /// transform cancellation.
+    /// </exception>
+    public Vector3d ScaledOffset => GetCurrentScaledOffset();
+
+    /// <summary>
+    /// Attempts to materialize the component-scaled local offset independently
+    /// from the collider's complete world transform.
+    /// </summary>
+    public bool TryGetScaledOffset(out Vector3d scaledOffset) =>
+        TryGetCurrentScaledOffset(out scaledOffset);
 
     /// <summary>
     /// Bodies position in world space + collider offset (center) value
     /// </summary>
-    public Vector3d Center => Position + (Rotation * ScaledOffset);
+    public Vector3d Center => _hasCommittedShape
+        ? _committedCenter
+        : throw new InvalidOperationException(
+            "Collider has no committed runtime shape.");
 
     protected FixedBoundBox _bounds;
-    private bool _boundsInitialized;
     public FixedBoundBox Bounds => _bounds;
     public Vector3d BoundsMin => _bounds.Min;
     public Vector3d BoundsMax => _bounds.Max;
@@ -420,7 +486,6 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
 
     internal void Initialize(SolidBody body)
     {
-        PreflightBodyInitialization(body);
         _body = body;
         InitCore(body.Agent);
     }
@@ -437,20 +502,34 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
         InitCore(agent);
     }
 
-    internal void PreflightBodyInitialization(SolidBody body)
+    internal void PreflightBodyInitialization(
+        SolidBody body,
+        Vector3d requestedPosition,
+        FixedQuaternion requestedRotation)
     {
         ThrowIfCompoundPartLifecycle(nameof(Initialize));
         SwiftThrowHelper.ThrowIfNull(body, nameof(body));
         ThrowIfTriggerWouldAttachToBody(nameof(Initialize));
-        PreflightInitialization(body.Agent);
+        PreflightInitialization(
+            body.Agent,
+            useRequestedPose: true,
+            requestedPosition,
+            requestedRotation);
     }
 
-    private void PreflightInitialization(IMatterAgent agent)
+    private void PreflightInitialization(
+        IMatterAgent agent,
+        bool useRequestedPose = false,
+        Vector3d requestedPosition = default,
+        FixedQuaternion requestedRotation = default)
     {
         SwiftThrowHelper.ThrowIfNull(agent, nameof(agent));
-        ColliderScalePolicy.Validate(agent.Transform);
-        ValidateRuntimeTransform(agent.Transform.LossyScale, agent.Transform.WorldRotation);
         OnBeforeInitialize(agent);
+        PrepareStandaloneInitialization(
+            agent,
+            useRequestedPose,
+            requestedPosition,
+            requestedRotation);
     }
 
     private void InitCore(IMatterAgent agent)
@@ -463,9 +542,9 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
         _active = true;
         _deactivationInProgress = false;
         BindContext(agent.Context);
+        PublishPreparedShape();
         Context.Physics.AssimilateCollider(this);
         _hierarchyState.Initialize(_agent.IsParent);
-
         OnInitialize();
 
         _partitionState.SetPreviousGridBounds(Vector3d.Zero, Vector3d.Zero);
@@ -475,23 +554,14 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
 
     protected virtual void OnBeforeInitialize(IMatterAgent agent) { }
 
-    internal virtual void ValidateRuntimeTransform(Vector3d scale, FixedQuaternion rotation) { }
+    protected virtual void OnInitialize() { }
 
     internal void ValidateCurrentRuntimeTransform()
     {
         ColliderShapeSnapshot snapshot = CaptureShapeSnapshot();
-        ValidateRuntimeTransform(snapshot.LocalScale, snapshot.Rotation);
-    }
-
-    internal void ValidateCurrentRuntimeTransform(FixedQuaternion rotation)
-    {
-        ColliderShapeSnapshot snapshot = CaptureShapeSnapshot();
-        ValidateRuntimeTransform(snapshot.LocalScale, rotation);
-    }
-
-    protected virtual void OnInitialize()
-    {
-        RebuildRuntimeShapeState();
+        PrepareRuntimeShape(
+            snapshot,
+            requireRepresentableMassPoint: true);
     }
 
     private void InitialPartition()
@@ -515,7 +585,6 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
     public void Simulate()
     {
         ThrowIfCompoundPartLifecycle(nameof(Simulate));
-        PartitionChanged = false;
         if (!IsActive)
             return;
 
@@ -525,7 +594,10 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
             return;
         }
 
-        if (RebuildRuntimeShapeState() || Context.Collisions.IsPartitionRefreshRequired(this))
+        bool refreshPartition = RebuildRuntimeShapeState()
+            || Context.Collisions.IsPartitionRefreshRequired(this);
+        PartitionChanged = false;
+        if (refreshPartition)
             UpdatePartition();
     }
 
@@ -545,6 +617,50 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
         SetPreviousGridBounds();
 
         _partitionState.MarkPartitioned();
+    }
+
+    private void SetBodylessWorldPose(
+        Vector3d position,
+        FixedQuaternion rotation,
+        bool setRotation,
+        string operation)
+    {
+        GravitasWorldContext context = _context!;
+        context.ThrowIfFixedStepMutationNotAllowed();
+        FixedTransform transform = _agent!.Transform;
+        Vector3d localPosition = transform.LocalPosition;
+        FixedQuaternion localRotation = transform.LocalRotation;
+        bool transformed = setRotation
+            ? transform.TrySetWorldPose(transform.WorldPosition, rotation)
+            : transform.TrySetWorldPosition(position);
+        SwiftThrowHelper.ThrowIfTrue(
+            !transformed,
+            operation,
+            setRotation
+                ? "Static collider transform cannot represent the requested world rotation."
+                : "Static collider transform cannot represent the requested world position.");
+
+        try
+        {
+            RebuildRuntimeShapeState();
+        }
+        catch
+        {
+            transform.LocalPosition = localPosition;
+            transform.LocalRotation = localRotation;
+            throw;
+        }
+
+        if (!IsActive)
+            return;
+
+        if (IsPartitioned)
+            UpdatePartition();
+        else
+            InitialPartition();
+
+        if (context.Settings.RuntimeMode.RunsMixedContacts())
+            context.MixedCollisions.Refresh3DColliderPartition(this);
     }
 
     public void SetParent(LSCollider parent)
@@ -579,9 +695,11 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
         if (!_runtimeShapeState.ShouldRebuild(snapshot))
             return false;
 
-        ValidateRuntimeTransform(snapshot.LocalScale, snapshot.Rotation);
-        RebuildRuntimeShape();
-        _runtimeShapeState.Commit(snapshot);
+        PrepareRuntimeShape(
+            snapshot,
+            requireRepresentableMassPoint:
+                _body != null || _compoundOwner != null);
+        PublishPreparedShape();
         if (refreshMassProperties)
             _body?.RefreshMassPropertiesFromColliderShape();
         return true;
@@ -590,72 +708,6 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal bool RebuildRuntimeShapeOnly(bool refreshMassProperties = true) =>
         RebuildRuntimeShapeState(refreshMassProperties);
-
-    protected virtual void RebuildRuntimeShape()
-    {
-        BuildBoundingBox();
-        BuildShape();
-    }
-
-    private ColliderShapeSnapshot CaptureShapeSnapshot()
-    {
-        Vector3d scale;
-        if (_compoundOwner == null && _agent != null)
-            scale = ColliderScalePolicy.Validate(_agent.Transform);
-        else
-        {
-            scale = LocalScale;
-            ColliderScalePolicy.Validate(scale);
-        }
-        return new ColliderShapeSnapshot(Center, Rotation, scale, _offset, _size, _radius);
-    }
-
-    protected virtual void BuildBoundingBox()
-    {
-        _bounds = FixedBoundBox.FromCenterAndSizeClippedToDomain(Center, ScaledSize);
-        _boundsInitialized = true;
-        CalculateBoundLimits();
-    }
-
-    protected void SetBounds(FixedBoundBox bounds)
-    {
-        _bounds = bounds;
-        _boundsInitialized = true;
-    }
-
-    protected void SetBoundsMinMax(Vector3d min, Vector3d max)
-    {
-        if (!_boundsInitialized)
-        {
-            _bounds = FixedBoundBox.FromMinMax(min, max);
-            _boundsInitialized = true;
-            return;
-        }
-
-        _bounds.SetMinMax(min, max);
-    }
-
-    private void CalculateBoundLimits()
-    {
-        if (Rotation == FixedQuaternion.Identity || Shape == ColliderType.Mesh)
-            return;
-
-        // Calculate the axis-aligned bounding box (AABB) of the OBB
-        Vector3d min = _bounds.Center;
-        Vector3d max = _bounds.Center;
-        Span<Vector3d> vertices = stackalloc Vector3d[FixedBoundBox.CornerCount];
-        _bounds.CopyCorners(vertices);
-        for (int i = 0; i < vertices.Length; i++)
-        {
-            Vector3d orientedVertex = vertices[i].Rotate(_bounds.Center, Rotation);
-            min = Vector3d.Min(min, orientedVertex);
-            max = Vector3d.Max(max, orientedVertex);
-        }
-
-        _bounds.SetMinMax(min, max);
-    }
-
-    protected abstract void BuildShape();
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     protected void MarkShapeDirty()
@@ -686,90 +738,6 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
             nameof(value),
             "Collider size components must be greater than zero.");
     }
-
-    private void SetTrigger(bool value)
-    {
-        if (_isTrigger == value)
-            return;
-
-        if (value)
-            ThrowIfCannotEnableTrigger(nameof(IsTrigger));
-
-        _isTrigger = value;
-    }
-
-    private void ThrowIfCannotEnableTrigger(string operation)
-    {
-        SwiftThrowHelper.ThrowIfArgument(
-            _body != null,
-            operation,
-            "Trigger colliders must be initialized without a SolidBody. Use InitializeWithNoBody for trigger volumes.");
-        SwiftThrowHelper.ThrowIfArgument(
-            _compoundOwner != null,
-            operation,
-            "Compound collider parts are not trigger identities. Set IsTrigger on the owning compound collider.");
-    }
-
-    private void ThrowIfTriggerWouldAttachToBody(string operation)
-    {
-        SwiftThrowHelper.ThrowIfArgument(
-            _isTrigger,
-            operation,
-            "Trigger colliders must be initialized without a SolidBody. Use InitializeWithNoBody for trigger volumes.");
-    }
-
-    private void ThrowIfLoadedTriggerHasBody(string operation)
-    {
-        SwiftThrowHelper.ThrowIfArgument(
-            _isTrigger && _body != null,
-            operation,
-            "Loaded trigger state is invalid for a collider attached to a SolidBody.");
-    }
-
-    // default to total area for shapes where frontal area doesn't make sense
-    public virtual Fixed64 GetFrontalArea(Vector3d direction) => Area;
-
-    /// <summary>
-    /// Calculates the body-local center of mass offset implied by this collider's current shape state.
-    /// </summary>
-    public virtual Vector3d CalculateLocalCenterOfMassOffset() =>
-        TransformMassPropertyPoint(ScaledOffset);
-
-    /// <summary>
-    /// Calculates the deterministic relative measure used to distribute mass
-    /// when this shape is owned by a compound collider.
-    /// </summary>
-    /// <remarks>
-    /// Solid shapes return volume. Explicit surface-approximation shapes may
-    /// return a documented shell measure instead.
-    /// </remarks>
-    protected internal abstract Fixed64 CalculateMassPropertyWeight();
-
-    public abstract Fixed3x3 CalculateInertiaTensor(Fixed64 mass, Vector3d localCenterOfMassOffset);
-
-    protected Fixed3x3 ShiftInertiaTensorFromLocalCenterOfMass(
-        Fixed3x3 centerTensor,
-        Fixed64 mass,
-        Vector3d targetLocalOffset) =>
-        AddParallelAxisTensor(centerTensor, mass, targetLocalOffset - CalculateLocalCenterOfMassOffset());
-
-    protected static Fixed3x3 AddParallelAxisTensor(Fixed3x3 tensor, Fixed64 mass, Vector3d offset) =>
-        InertiaTensorMath.AddParallelAxisTensor(tensor, mass, offset);
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    protected Vector3d TransformMassPropertyPoint(Vector3d localPoint) =>
-        _compoundOwner == null
-            ? localPoint
-            : _compoundOwner.ScaledOffset + _compoundLocalRotation * localPoint;
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    protected Vector3d InverseTransformMassPropertyPoint(Vector3d ownerLocalPoint) =>
-        _compoundOwner == null
-            ? ownerLocalPoint
-            : _compoundLocalRotation.Inverse()
-                * (ownerLocalPoint - _compoundOwner.ScaledOffset);
-
-    internal FixedQuaternion CompoundLocalRotation => _compoundLocalRotation;
 
     /// <summary>
     /// The point on the surface of the capsule that's nearest to the given point
@@ -959,62 +927,6 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal void ClearMixedPartitionCoordinates() => _mixedPartitionState.ClearCoordinates();
 
-    #region Serialization
-
-    public void RecordData(IChronicler chronicler)
-    {
-        RecordValues.Look(chronicler, ref _debug, "Debug", false);
-        RecordValues.Look(chronicler, ref _drawShape, "DrawShape", false);
-        RecordValues.Look(chronicler, ref _drawPartitions, "DrawPartitions", false);
-        RecordValues.Look(chronicler, ref _drawBoundingBox, "DrawBoundingBox", false);
-        RecordValues.Look(chronicler, ref _active, "Active", true);
-        RecordValues.Look(chronicler, ref _layer, "Layer", new());
-        RecordValues.Look(chronicler, ref _ignoredCollisionLayers, "IgnoredCollisionLayers", PhysicsLayerMask.None);
-        RecordValues.Look(chronicler, ref _material, "Material", PhysicsMaterial.Default);
-        RecordValues.Look(chronicler, ref _isTrigger, "IsTrigger", false);
-        RecordValues.Look(chronicler, ref _offset, "Offset", Vector3d.Zero);
-        RecordValues.Look(chronicler, ref _radius, "Radius", Fixed64.Half);
-        RecordValues.Look(chronicler, ref _size, "Size", Vector3d.One);
-
-        if (chronicler.Mode == SerializationMode.Loading)
-        {
-            ThrowIfLoadedTriggerHasBody(nameof(IsTrigger));
-            ApplyLoadedState();
-        }
-        else
-        {
-            _runtimeShapeState.MarkDirty();
-        }
-    }
-
-    private void ApplyLoadedState()
-    {
-        _runtimeShapeState.MarkDirty();
-        if (_context == null)
-            return;
-
-        RebuildRuntimeShapeState();
-
-        if (!_active)
-        {
-            if (IsPartitioned)
-                _context.Collisions.ClearPartitionedObject(this, force: true);
-
-            if (IsMixedPartitioned)
-                _context.MixedCollisions.ClearPartitioned3DCollider(this, force: true);
-            return;
-        }
-
-        if (IsPartitioned)
-            UpdatePartition();
-        else
-            InitialPartition();
-        if (_context.Settings.RuntimeMode.RunsMixedContacts())
-            _context.MixedCollisions.Refresh3DColliderPartition(this);
-    }
-
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal bool IgnoresCollisionLayer(PhysicsLayer layer) => _ignoredCollisionLayers.Includes(layer);
-
-    #endregion
 }

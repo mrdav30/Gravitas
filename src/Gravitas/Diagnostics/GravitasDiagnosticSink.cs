@@ -188,6 +188,8 @@ public sealed partial class GravitasDiagnosticSink
         if (!Enabled)
             return;
 
+        Vector3d point = default;
+        bool hasPoint = hit && raycastHit.TryGetPoint(out point);
         AddEvent(
             GravitasDiagnosticEventKind.GroundProbe,
             bodyId: body.DynamicId,
@@ -197,7 +199,8 @@ public sealed partial class GravitasDiagnosticSink
             colliderBType: raycastHit.Collider?.Shape ?? ColliderType.None,
             start: origin,
             end: end,
-            pointA: raycastHit.Point,
+            pointA: point,
+            hasPointA: hasPoint,
             vector: raycastHit.Normal,
             scalarA: radius,
             scalarB: raycastHit.Distance,
@@ -229,6 +232,7 @@ public sealed partial class GravitasDiagnosticSink
             start: ToDiagnosticVector(start),
             end: ToDiagnosticVector(end),
             pointA: ToDiagnosticVector(raycastHit.Point),
+            hasPointA: hit,
             vector: ToDiagnosticVector(raycastHit.Normal),
             scalarA: radius,
             scalarB: raycastHit.Distance,
@@ -249,13 +253,16 @@ public sealed partial class GravitasDiagnosticSink
         if (!Enabled)
             return;
 
+        Vector3d point = default;
+        bool hasPoint = hit && raycastHit.TryGetPoint(out point);
         AddEvent(
             GravitasDiagnosticEventKind.RayQuery,
             colliderAId: raycastHit.Collider?.Id ?? -1,
             colliderAType: raycastHit.Collider?.Shape ?? ColliderType.None,
             start: start,
             end: end,
-            pointA: raycastHit.Point,
+            pointA: point,
+            hasPointA: hasPoint,
             vector: raycastHit.Normal,
             scalarA: radius,
             scalarB: raycastHit.Distance,
@@ -277,13 +284,16 @@ public sealed partial class GravitasDiagnosticSink
         if (!Enabled)
             return;
 
+        Vector3d point = default;
+        bool hasPoint = hit && raycastHit.TryGetPoint(out point);
         AddEvent(
             GravitasDiagnosticEventKind.CircleQuery,
             colliderAId: raycastHit.Collider?.Id ?? -1,
             colliderAType: raycastHit.Collider?.Shape ?? ColliderType.None,
             start: center,
             end: center + direction * maxDistance,
-            pointA: raycastHit.Point,
+            pointA: point,
+            hasPointA: hasPoint,
             vector: direction,
             scalarA: radius,
             scalarB: raycastHit.Distance,
@@ -320,9 +330,14 @@ public sealed partial class GravitasDiagnosticSink
         if (!Enabled)
             return;
 
-        ManifoldContact contact = pair.Manifold.HasContact
+        bool hasContact = pair.Manifold.HasContact;
+        ManifoldContact contact = hasContact
             ? pair.Manifold.PrimaryContact
             : default;
+        Vector3d pointA = default;
+        Vector3d pointB = default;
+        bool hasPointA = hasContact && contact.TryGetPointA(out pointA);
+        bool hasPointB = hasContact && contact.TryGetPointB(out pointB);
 
         AddEvent(
             GravitasDiagnosticEventKind.Contact,
@@ -330,12 +345,15 @@ public sealed partial class GravitasDiagnosticSink
             colliderBId: pair.ColliderB.Id,
             colliderAType: pair.ColliderA.Shape,
             colliderBType: pair.ColliderB.Shape,
-            pointA: contact.PointA,
-            pointB: contact.PointB,
+            pointA: pointA,
+            pointB: pointB,
+            hasPointA: hasPointA,
+            hasPointB: hasPointB,
             vector: contact.Normal,
             scalarA: contact.Depth,
             dataA: pair.Manifold.Count,
-            hit: hit && pair.Manifold.HasContact);
+            dataB: contact.DepthIsClamped ? 1 : 0,
+            hit: hit && hasContact);
     }
 
     internal void EmitResponseImpulse(CollisionPair pair, Vector3d impulse, Fixed64 normalVelocity)
@@ -343,14 +361,20 @@ public sealed partial class GravitasDiagnosticSink
         if (!Enabled)
             return;
 
+        ManifoldContact contact = pair.Manifold.PrimaryContact;
+        bool hasPointA = contact.TryGetPointA(out Vector3d pointA);
+        bool hasPointB = contact.TryGetPointB(out Vector3d pointB);
+
         AddEvent(
             GravitasDiagnosticEventKind.ResponseImpulse,
             colliderAId: pair.ColliderA.Id,
             colliderBId: pair.ColliderB.Id,
             colliderAType: pair.ColliderA.Shape,
             colliderBType: pair.ColliderB.Shape,
-            pointA: pair.Manifold.PrimaryContact.PointA,
-            pointB: pair.Manifold.PrimaryContact.PointB,
+            pointA: pointA,
+            pointB: pointB,
+            hasPointA: hasPointA,
+            hasPointB: hasPointB,
             vector: impulse,
             scalarA: impulse.Magnitude,
             scalarB: normalVelocity,
@@ -369,6 +393,10 @@ public sealed partial class GravitasDiagnosticSink
         if (!Enabled)
             return;
 
+        Vector3d point3D = default;
+        Vector3d point2D = default;
+        bool hasPoint3D = hit && mixedHit.TryGetPoint3D(out point3D);
+        bool hasPoint2D = hit && mixedHit.TryGetPoint2D(out point2D);
         AddEvent(
             GravitasDiagnosticEventKind.MixedQuery,
             colliderAId: mixedHit.Collider3D?.Id ?? -1,
@@ -379,8 +407,10 @@ public sealed partial class GravitasDiagnosticSink
             colliderB2DType: mixedHit.Collider2D?.Shape ?? ColliderType2D.None,
             start: start,
             end: end,
-            pointA: mixedHit.Point3D,
-            pointB: mixedHit.Point2D,
+            pointA: point3D,
+            pointB: point2D,
+            hasPointA: hasPoint3D,
+            hasPointB: hasPoint2D,
             vector: mixedHit.Normal3DTo2D,
             scalarA: radius,
             scalarB: mixedHit.Distance,
@@ -394,6 +424,8 @@ public sealed partial class GravitasDiagnosticSink
         if (!Enabled)
             return;
 
+        bool hasPoint3D = contact.TryGetPoint3D(out Vector3d point3D);
+        bool hasPoint2D = contact.TryGetPoint2D(out Vector3d point2D);
         AddEvent(
             GravitasDiagnosticEventKind.MixedContact,
             colliderAId: pair.Collider3DId,
@@ -402,10 +434,13 @@ public sealed partial class GravitasDiagnosticSink
             colliderBDimension: GravitasColliderDimension.TwoD,
             colliderAType: pair.Collider3D.Shape,
             colliderB2DType: pair.Collider2D.Shape,
-            pointA: contact.Point3D,
-            pointB: contact.Point2D,
+            pointA: point3D,
+            pointB: point2D,
+            hasPointA: hasPoint3D,
+            hasPointB: hasPoint2D,
             vector: contact.Normal3DTo2D,
             scalarA: contact.Depth,
+            dataA: contact.DepthIsClamped ? 1 : 0,
             hit: true);
     }
 
@@ -420,6 +455,8 @@ public sealed partial class GravitasDiagnosticSink
         if (!Enabled)
             return;
 
+        bool hasPoint3D = contact.TryGetPoint3D(out Vector3d point3D);
+        bool hasPoint2D = contact.TryGetPoint2D(out Vector3d point2D);
         AddEvent(
             GravitasDiagnosticEventKind.MixedResponseImpulse,
             colliderAId: pair.Collider3DId,
@@ -428,8 +465,10 @@ public sealed partial class GravitasDiagnosticSink
             colliderBDimension: GravitasColliderDimension.TwoD,
             colliderAType: pair.Collider3D.Shape,
             colliderB2DType: pair.Collider2D.Shape,
-            pointA: contact.Point3D,
-            pointB: contact.Point2D,
+            pointA: point3D,
+            pointB: point2D,
+            hasPointA: hasPoint3D,
+            hasPointB: hasPoint2D,
             vector: impulse,
             scalarA: impulse.Magnitude,
             scalarB: normalVelocity,
@@ -636,6 +675,8 @@ public sealed partial class GravitasDiagnosticSink
         Vector3d end = default,
         Vector3d pointA = default,
         Vector3d pointB = default,
+        bool hasPointA = false,
+        bool hasPointB = false,
         Vector3d vector = default,
         Fixed64 scalarA = default,
         Fixed64 scalarB = default,
@@ -661,6 +702,8 @@ public sealed partial class GravitasDiagnosticSink
             end,
             pointA,
             pointB,
+            hasPointA,
+            hasPointB,
             vector,
             scalarA,
             scalarB,
@@ -678,12 +721,13 @@ public sealed partial class GravitasDiagnosticSink
         Vector3d start = default,
         Vector3d end = default,
         Vector3d center = default,
-        Vector3d size = default,
+        Vector3d halfExtents = default,
         Vector3d pointA = default,
         Vector3d pointB = default,
         Vector3d pointC = default,
         FixedQuaternion rotation = default,
         Fixed64 radius = default,
+        Fixed64 axisLength = default,
         Fixed64 height = default,
         GravitasDiagnosticColor color = default)
     {
@@ -698,12 +742,13 @@ public sealed partial class GravitasDiagnosticSink
             start,
             end,
             center,
-            size,
+            halfExtents,
             pointA,
             pointB,
             pointC,
             rotation,
             radius,
+            axisLength,
             height,
             color));
     }

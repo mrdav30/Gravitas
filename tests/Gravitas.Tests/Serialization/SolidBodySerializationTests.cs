@@ -472,8 +472,10 @@ public sealed class SolidBodySerializationTests
         target.Collider.Radius.Should().Be(source.Collider.Radius);
         target.Collider.Size.Should().Be(source.Collider.Size);
         target.Collider.LocalOffset.Should().Be(source.Collider.LocalOffset);
-        target.Collider.BaseCenter.Should().Be(source.Collider.BaseCenter);
-        target.Collider.Apex.Should().Be(source.Collider.Apex);
+        target.Collider.Center.Should().Be(source.Collider.Center);
+        target.Collider.WorldAxis.Should().Be(source.Collider.WorldAxis);
+        target.Collider.Height.Should().Be(source.Collider.Height);
+        target.Collider.ScaledRadius.Should().Be(source.Collider.ScaledRadius);
         target.Body.LocalCenterOfMassOffset.Should().Be(source.Body.LocalCenterOfMassOffset);
         target.Body.InverseInertiaTensor.Should().Be(source.Body.InverseInertiaTensor);
     }

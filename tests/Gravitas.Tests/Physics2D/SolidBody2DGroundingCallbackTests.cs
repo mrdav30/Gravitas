@@ -40,7 +40,7 @@ public sealed partial class SolidBody2DGroundingTests
         support.IsActive.Should().BeTrue();
         body.GroundingMode.Should().Be(GroundingMode.Automatic);
         body.IsGrounded.Should().BeFalse();
-        body.GroundPoint.Should().Be(Vector2d.Zero);
+        body.HasGroundPoint.Should().BeFalse();
         body.GroundNormal.Should().Be(Vector2d.Zero);
     }
 
@@ -161,7 +161,7 @@ public sealed partial class SolidBody2DGroundingTests
         first.IsGrounded.Should().BeTrue();
         laterWasGroundedWhenSupportDeactivated.Should().BeFalse();
         laterSupport.IsActive.Should().BeFalse();
-        later.GroundPoint.Should().Be(Vector2d.Zero);
+        later.HasGroundPoint.Should().BeFalse();
         later.GroundNormal.Should().Be(Vector2d.Zero);
         later.IsGrounded.Should().BeFalse();
     }
@@ -276,7 +276,7 @@ public sealed partial class SolidBody2DGroundingTests
         support.IsActive.Should().BeTrue();
         body.GroundingMode.Should().Be(GroundingMode.Automatic);
         body.IsGrounded.Should().BeFalse();
-        body.GroundPoint.Should().Be(Vector2d.Zero);
+        body.HasGroundPoint.Should().BeFalse();
         body.GroundNormal.Should().Be(Vector2d.Zero);
     }
 
@@ -416,7 +416,7 @@ public sealed partial class SolidBody2DGroundingTests
         body.Active.Should().BeFalse();
         body.GroundingMode.Should().Be(GroundingMode.Automatic);
         body.IsGrounded.Should().BeFalse();
-        body.GroundPoint.Should().Be(Vector2d.Zero);
+        body.HasGroundPoint.Should().BeFalse();
         body.GroundNormal.Should().Be(Vector2d.Zero);
     }
 
@@ -446,7 +446,7 @@ public sealed partial class SolidBody2DGroundingTests
         body.CanTranslate.Should().BeFalse();
         body.GroundingMode.Should().Be(GroundingMode.Automatic);
         body.IsGrounded.Should().BeFalse();
-        body.GroundPoint.Should().Be(Vector2d.Zero);
+        body.HasGroundPoint.Should().BeFalse();
         body.GroundNormal.Should().Be(Vector2d.Zero);
     }
 

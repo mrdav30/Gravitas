@@ -119,6 +119,20 @@ candidate order follows the stable built tree rather than authored triangle
 indices. Compound paths scan parts in stable declaration order and return the
 owner collider as the public identity.
 
+Finite axes, oriented cuboids, and planar convex shapes retain center-relative
+canonical geometry through narrow phase. Contact witnesses use
+`ContactAnchor` or `ContactAnchor2D`: a representable origin, normalized frame
+rotation, and representable local point. Solvers and replay hashes consume that
+canonical frame directly, so a valid contact is not dropped or deformed merely
+because its rotated offset or absolute world point crosses a `Fixed64` scalar
+face. `Origin`, `Rotation`, `LocalPoint`, and `LocalDisplacement` expose the
+canonical components. The two local terms remain separate until exact
+evaluation so a representable world witness is not lost to an overflowing
+local intermediate.
+`Offset` and legacy `PointA`/`PointB` views materialize derived coordinates and
+throw when the requested view is not representable; domain-edge callers should
+use `TryGetOffset` and the matching `TryGetPoint*` method.
+
 For shape state, pair matrices, SAT invariants, mesh policy, and compound
 ownership details, read [Collider Shape Reference](COLLIDER_SHAPE_REFERENCE.md).
 

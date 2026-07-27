@@ -6,8 +6,9 @@
 //=======================================================================
 
 using FixedMathSharp;
-using FixedMathSharp.Bounds;
+using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
+using System;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas.CollisionHandling;
@@ -58,7 +59,12 @@ internal static class CollisionDetection2D
             case CollisionType2D.Convex_Circle:
                 bool result = TryCircleConvex((LSCircleCollider2D)colliderB, colliderA, out Contact2D reversed);
                 contact = result
-                    ? new Contact2D(reversed.PointB, reversed.PointA, -reversed.Normal, reversed.Depth)
+                    ? new Contact2D(
+                        reversed.AnchorB,
+                        reversed.AnchorA,
+                        -reversed.Normal,
+                        reversed.Depth,
+                        reversed.DepthIsClamped)
                     : default;
                 return result;
             case CollisionType2D.Convex_Convex:
@@ -68,7 +74,12 @@ internal static class CollisionDetection2D
             case CollisionType2D.Circle_Capsule:
                 bool circleCapsule = TryCapsuleCircle((LSCapsuleCollider2D)colliderB, (LSCircleCollider2D)colliderA, out Contact2D circleCapsuleReversed);
                 contact = circleCapsule
-                    ? new Contact2D(circleCapsuleReversed.PointB, circleCapsuleReversed.PointA, -circleCapsuleReversed.Normal, circleCapsuleReversed.Depth)
+                    ? new Contact2D(
+                        circleCapsuleReversed.AnchorB,
+                        circleCapsuleReversed.AnchorA,
+                        -circleCapsuleReversed.Normal,
+                        circleCapsuleReversed.Depth,
+                        circleCapsuleReversed.DepthIsClamped)
                     : default;
                 return circleCapsule;
             case CollisionType2D.Capsule_Convex:
@@ -76,7 +87,12 @@ internal static class CollisionDetection2D
             case CollisionType2D.Convex_Capsule:
                 bool convexCapsule = TryCapsuleConvex((LSCapsuleCollider2D)colliderB, colliderA, out Contact2D convexCapsuleReversed);
                 contact = convexCapsule
-                    ? new Contact2D(convexCapsuleReversed.PointB, convexCapsuleReversed.PointA, -convexCapsuleReversed.Normal, convexCapsuleReversed.Depth)
+                    ? new Contact2D(
+                        convexCapsuleReversed.AnchorB,
+                        convexCapsuleReversed.AnchorA,
+                        -convexCapsuleReversed.Normal,
+                        convexCapsuleReversed.Depth,
+                        convexCapsuleReversed.DepthIsClamped)
                     : default;
                 return convexCapsule;
             case CollisionType2D.Capsule_Capsule:
@@ -127,8 +143,12 @@ internal static class CollisionDetection2D
         Vector2d normal = distance > Fixed64.Zero ? delta / distance : Vector2d.Right;
         Fixed64 depth = radius - distance;
         contact = new Contact2D(
-            colliderA.Center + normal * colliderA.ScaledRadius,
-            colliderB.Center - normal * colliderB.ScaledRadius,
+            new ContactAnchor2D(
+                colliderA.Center,
+                normal * colliderA.ScaledRadius),
+            new ContactAnchor2D(
+                colliderB.Center,
+                -normal * colliderB.ScaledRadius),
             normal,
             depth);
         return true;
@@ -148,34 +168,32 @@ internal static class CollisionDetection2D
 
     private static bool TryCircleConvex(LSCircleCollider2D circle, LSCollider2D convex, out Contact2D contact)
     {
-        Fixed64 bestOverlap = Fixed64.MaxValue;
-        Vector2d bestAxis = Vector2d.Zero;
-
-        for (int i = 0; i < convex.VertexCount; i++)
-        {
-            Vector2d edge = convex.GetVertexUnchecked((i + 1) % convex.VertexCount) - convex.GetVertexUnchecked(i);
-            if (!TryTestAxis(edge.RightHandNormal, circle, convex, ref bestOverlap, ref bestAxis))
-            {
-                contact = default;
-                return false;
-            }
-        }
-
-        Vector2d closest = convex.GetClosestPoint(circle.Center);
-        Vector2d closestAxis = closest - circle.Center;
-        if (closestAxis.MagnitudeSquared > Fixed64.Epsilon
-            && !TryTestAxis(closestAxis, circle, convex, ref bestOverlap, ref bestAxis))
+        Span<Vector2d> convexOffsets = stackalloc Vector2d[4];
+        ReadOnlySpan<Vector2d> convexVertexOffsets =
+            GetConvexVertexOffsets(convex, convexOffsets);
+        if (!FixedConvex2dRelations.TryGetCircleContact(
+                circle.Center,
+                circle.Rotation,
+                circle.ScaledRadius,
+                convex.Center,
+                convex.ConvexRotation,
+                convexVertexOffsets,
+                out FixedPointAnchor2d circleAnchor,
+                out FixedPointAnchor2d convexAnchor,
+                out Vector2d normal,
+                out Fixed64 depth,
+                out bool depthIsClamped))
         {
             contact = default;
             return false;
         }
 
-        Vector2d normal = bestAxis;
         contact = new Contact2D(
-            circle.GetSupportPoint(normal),
-            convex.GetSupportPoint(-normal),
+            new ContactAnchor2D(circleAnchor),
+            new ContactAnchor2D(convexAnchor),
             normal,
-            bestOverlap);
+            depth,
+            depthIsClamped);
         return true;
     }
 
@@ -200,38 +218,41 @@ internal static class CollisionDetection2D
             return false;
 
         manifold.AddContact(
-            contact.PointB,
-            contact.PointA,
+            contact.AnchorB,
+            contact.AnchorA,
             contact.Depth,
             -contact.Normal,
             convex.Material,
-            circle.Material);
+            circle.Material,
+            contact.DepthIsClamped);
         return true;
     }
 
     private static bool TryCapsuleCircle(LSCapsuleCollider2D capsule, LSCircleCollider2D circle, out Contact2D contact)
     {
-        Vector2d segmentPoint = new FixedSegment2d(
-            capsule.SegmentStart,
-            capsule.SegmentEnd).ClosestPoint(circle.Center);
-        Vector2d delta = circle.Center - segmentPoint;
-        Fixed64 distanceSquared = delta.MagnitudeSquared;
-        Fixed64 radius = capsule.ScaledRadius + circle.ScaledRadius;
-        if (distanceSquared > radius * radius)
+        Vector2d fallbackNormal = capsule.GetNormalFromCenteredAxis(circle.Center);
+        if (!FixedSegment2d.TryGetCenteredCapsulesContact(
+                capsule.Center,
+                capsule.Rotation,
+                capsule.AxisLength,
+                capsule.ScaledRadius,
+                circle.Center,
+                circle.Rotation,
+                Fixed64.Zero,
+                circle.ScaledRadius,
+                fallbackNormal,
+                out FixedContactAnchors2d fixedContact))
         {
             contact = default;
             return false;
         }
 
-        Fixed64 distance = distanceSquared > Fixed64.Epsilon ? FixedMath.Sqrt(distanceSquared) : Fixed64.Zero;
-        Vector2d normal = distance > Fixed64.Zero
-            ? delta / distance
-            : OrientCoincidentCapsuleNormal(circle.Center - capsule.Center);
         contact = new Contact2D(
-            segmentPoint + normal * capsule.ScaledRadius,
-            circle.Center - normal * circle.ScaledRadius,
-            normal,
-            radius - distance);
+            new ContactAnchor2D(fixedContact.FirstAnchor),
+            new ContactAnchor2D(fixedContact.SecondAnchor),
+            fixedContact.Normal,
+            fixedContact.Depth,
+            fixedContact.DepthIsClamped);
         return true;
     }
 
@@ -256,41 +277,45 @@ internal static class CollisionDetection2D
             return false;
 
         manifold.AddContact(
-            contact.PointB,
-            contact.PointA,
+            contact.AnchorB,
+            contact.AnchorA,
             contact.Depth,
             -contact.Normal,
             circle.Material,
-            capsule.Material);
+            capsule.Material,
+            contact.DepthIsClamped);
         return true;
     }
 
     private static bool TryCapsuleCapsule(LSCapsuleCollider2D colliderA, LSCapsuleCollider2D colliderB, out Contact2D contact)
     {
-        (Vector2d pointAOnSegment, Vector2d pointBOnSegment) = new FixedSegment2d(
-            colliderA.SegmentStart,
-            colliderA.SegmentEnd).GetClosestPoints(
-                new FixedSegment2d(
-                    colliderB.SegmentStart,
-                    colliderB.SegmentEnd));
-        Vector2d delta = pointBOnSegment - pointAOnSegment;
-        Fixed64 distanceSquared = delta.MagnitudeSquared;
-        Fixed64 radius = colliderA.ScaledRadius + colliderB.ScaledRadius;
-        if (distanceSquared > radius * radius)
+        Vector2d fallbackNormal = colliderB.AxisLength <= Fixed64.Epsilon
+            ? colliderA.GetNormalFromCenteredAxis(colliderB.Center)
+            : colliderA.AxisLength <= Fixed64.Epsilon
+                ? -colliderB.GetNormalFromCenteredAxis(colliderA.Center)
+                : OrientCoincidentCapsuleNormal(colliderB.Center - colliderA.Center);
+        if (!FixedSegment2d.TryGetCenteredCapsulesContact(
+                colliderA.Center,
+                colliderA.Rotation,
+                colliderA.AxisLength,
+                colliderA.ScaledRadius,
+                colliderB.Center,
+                colliderB.Rotation,
+                colliderB.AxisLength,
+                colliderB.ScaledRadius,
+                fallbackNormal,
+                out FixedContactAnchors2d fixedContact))
         {
             contact = default;
             return false;
         }
 
-        Fixed64 distance = distanceSquared > Fixed64.Epsilon ? FixedMath.Sqrt(distanceSquared) : Fixed64.Zero;
-        Vector2d normal = distance > Fixed64.Zero
-            ? delta / distance
-            : OrientCoincidentCapsuleNormal(colliderB.Center - colliderA.Center);
         contact = new Contact2D(
-            pointAOnSegment + normal * colliderA.ScaledRadius,
-            pointBOnSegment - normal * colliderB.ScaledRadius,
-            normal,
-            radius - distance);
+            new ContactAnchor2D(fixedContact.FirstAnchor),
+            new ContactAnchor2D(fixedContact.SecondAnchor),
+            fixedContact.Normal,
+            fixedContact.Depth,
+            fixedContact.DepthIsClamped);
         return true;
     }
 
@@ -308,34 +333,74 @@ internal static class CollisionDetection2D
 
     private static bool TryCapsuleConvex(LSCapsuleCollider2D capsule, LSCollider2D convex, out Contact2D contact)
     {
-        Fixed64 bestOverlap = Fixed64.MaxValue;
-        Vector2d bestAxis = Vector2d.Zero;
-
-        for (int i = 0; i < convex.VertexCount; i++)
-        {
-            Vector2d edge = convex.GetVertexUnchecked((i + 1) % convex.VertexCount) - convex.GetVertexUnchecked(i);
-            if (!TryTestCapsuleConvexAxis(edge.RightHandNormal, capsule, convex, ref bestOverlap, ref bestAxis))
-            {
-                contact = default;
-                return false;
-            }
-        }
-
-        Vector2d closestAxis = FindCapsuleConvexClosestAxis(capsule, convex);
-        if (closestAxis.MagnitudeSquared > Fixed64.Epsilon
-            && !TryTestCapsuleConvexAxis(closestAxis, capsule, convex, ref bestOverlap, ref bestAxis))
+        Span<FixedPointAnchor2d> capsuleAnchors =
+            stackalloc FixedPointAnchor2d[2];
+        Span<FixedPointAnchor2d> convexAnchors =
+            stackalloc FixedPointAnchor2d[2];
+        if (!TryGetCapsuleConvexContacts(
+                capsule,
+                convex,
+                capsuleAnchors,
+                convexAnchors,
+                out _,
+                out Vector2d normal,
+                out Fixed64 depth,
+                out bool depthIsClamped))
         {
             contact = default;
             return false;
         }
 
-        Vector2d normal = bestAxis;
         contact = new Contact2D(
-            capsule.GetSupportPoint(normal),
-            convex.GetSupportPoint(-normal),
+            new ContactAnchor2D(capsuleAnchors[0]),
+            new ContactAnchor2D(convexAnchors[0]),
             normal,
-            bestOverlap);
+            depth,
+            depthIsClamped);
         return true;
+    }
+
+    private static bool TryGetCapsuleConvexContacts(
+        LSCapsuleCollider2D capsule,
+        LSCollider2D convex,
+        Span<FixedPointAnchor2d> capsuleAnchors,
+        Span<FixedPointAnchor2d> convexAnchors,
+        out int contactCount,
+        out Vector2d normal,
+        out Fixed64 depth,
+        out bool depthIsClamped)
+    {
+        Span<Vector2d> vertexOffsets = stackalloc Vector2d[4];
+        ReadOnlySpan<Vector2d> convexVertexOffsets =
+            GetConvexVertexOffsets(convex, vertexOffsets);
+        return FixedSegment2d.TryGetCenteredCapsuleConvexContacts(
+            capsule.Center,
+            capsule.Rotation,
+            Vector2d.Forward,
+            capsule.AxisLength,
+            capsule.ScaledRadius,
+            convex.Center,
+            convex.ConvexRotation,
+            convexVertexOffsets,
+            capsuleAnchors,
+            convexAnchors,
+            out contactCount,
+            out normal,
+            out depth,
+            out depthIsClamped);
+    }
+
+    private static ReadOnlySpan<Vector2d> GetConvexVertexOffsets(
+        LSCollider2D convex,
+        Span<Vector2d> scratch)
+    {
+        if (convex is LSPolygonCollider2D polygon)
+            return polygon.ScaledLocalVertices;
+
+        int vertexCount = convex.VertexCount;
+        for (int i = 0; i < vertexCount; i++)
+            scratch[i] = convex.GetScaledLocalVertexUnchecked(i);
+        return scratch.Slice(0, vertexCount);
     }
 
     private static bool TryCapsuleConvex(
@@ -343,13 +408,34 @@ internal static class CollisionDetection2D
         LSCollider2D convex,
         ContactManifold2D manifold)
     {
-        if (!TryCapsuleConvex(capsule, convex, out Contact2D contact))
+        Span<FixedPointAnchor2d> capsuleAnchors =
+            stackalloc FixedPointAnchor2d[2];
+        Span<FixedPointAnchor2d> convexAnchors =
+            stackalloc FixedPointAnchor2d[2];
+        if (!TryGetCapsuleConvexContacts(
+                capsule,
+                convex,
+                capsuleAnchors,
+                convexAnchors,
+                out int contactCount,
+                out Vector2d normal,
+                out Fixed64 depth,
+                out bool depthIsClamped))
+        {
             return false;
+        }
 
-        if (TryAddCapsuleSideContacts(capsule, convex, manifold, contact.Normal, contact.Depth))
-            return true;
-
-        AddContact(manifold, contact, capsule, convex);
+        for (int i = 0; i < contactCount; i++)
+        {
+            manifold.AddContact(
+                new ContactAnchor2D(capsuleAnchors[i]),
+                new ContactAnchor2D(convexAnchors[i]),
+                depth,
+                normal,
+                capsule.Material,
+                convex.Material,
+                depthIsClamped);
+        }
         return true;
     }
 
@@ -358,40 +444,73 @@ internal static class CollisionDetection2D
         LSCollider2D convex,
         ContactManifold2D manifold)
     {
-        if (!TryCapsuleConvex(capsule, convex, out Contact2D contact))
+        Span<FixedPointAnchor2d> capsuleAnchors =
+            stackalloc FixedPointAnchor2d[2];
+        Span<FixedPointAnchor2d> convexAnchors =
+            stackalloc FixedPointAnchor2d[2];
+        if (!TryGetCapsuleConvexContacts(
+                capsule,
+                convex,
+                capsuleAnchors,
+                convexAnchors,
+                out int contactCount,
+                out Vector2d normal,
+                out Fixed64 depth,
+                out bool depthIsClamped))
+        {
             return false;
+        }
 
-        if (TryAddCapsuleSideContactsReversed(capsule, convex, manifold, contact.Normal, contact.Depth))
-            return true;
-
-        manifold.AddContact(
-            contact.PointB,
-            contact.PointA,
-            contact.Depth,
-            -contact.Normal,
-            convex.Material,
-            capsule.Material);
+        for (int i = 0; i < contactCount; i++)
+        {
+            manifold.AddContact(
+                new ContactAnchor2D(convexAnchors[i]),
+                new ContactAnchor2D(capsuleAnchors[i]),
+                depth,
+                -normal,
+                convex.Material,
+                capsule.Material,
+                depthIsClamped);
+        }
         return true;
     }
 
     private static bool TryConvexConvex(LSCollider2D colliderA, LSCollider2D colliderB, out Contact2D contact)
     {
-        Fixed64 bestOverlap = Fixed64.MaxValue;
-        Vector2d bestAxis = Vector2d.Zero;
-
-        if (!TryTestConvexAxes(colliderA, colliderA, colliderB, ref bestOverlap, ref bestAxis)
-            || !TryTestConvexAxes(colliderB, colliderA, colliderB, ref bestOverlap, ref bestAxis))
+        Span<Vector2d> firstVertexScratch = stackalloc Vector2d[4];
+        Span<Vector2d> secondVertexScratch = stackalloc Vector2d[4];
+        ReadOnlySpan<Vector2d> firstVertexOffsets =
+            GetConvexVertexOffsets(colliderA, firstVertexScratch);
+        ReadOnlySpan<Vector2d> secondVertexOffsets =
+            GetConvexVertexOffsets(colliderB, secondVertexScratch);
+        Span<FixedPointAnchor2d> firstContactAnchors =
+            stackalloc FixedPointAnchor2d[2];
+        Span<FixedPointAnchor2d> secondContactAnchors =
+            stackalloc FixedPointAnchor2d[2];
+        if (!FixedConvex2dRelations.TryGetConvexContacts(
+                colliderA.Center,
+                colliderA.ConvexRotation,
+                firstVertexOffsets,
+                colliderB.Center,
+                colliderB.ConvexRotation,
+                secondVertexOffsets,
+                firstContactAnchors,
+                secondContactAnchors,
+                out _,
+                out Vector2d normal,
+                out Fixed64 depth,
+                out bool depthIsClamped))
         {
             contact = default;
             return false;
         }
 
-        Vector2d normal = bestAxis;
         contact = new Contact2D(
-            colliderA.GetSupportPoint(normal),
-            colliderB.GetSupportPoint(-normal),
+            new ContactAnchor2D(colliderA.GetConvexSupportAnchor(normal)),
+            new ContactAnchor2D(colliderB.GetConvexSupportAnchor(-normal)),
             normal,
-            bestOverlap);
+            depth,
+            depthIsClamped);
         return true;
     }
 
@@ -400,337 +519,45 @@ internal static class CollisionDetection2D
         LSCollider2D colliderB,
         ContactManifold2D manifold)
     {
-        if (!TryFindMinimumPenetrationAxis(colliderA, colliderB, out MinimumAxis2D axis))
-            return false;
-
-        bool referenceIsA = axis.SourceIsA;
-        LSCollider2D reference = referenceIsA ? colliderA : colliderB;
-        LSCollider2D incident = referenceIsA ? colliderB : colliderA;
-        Vector2d ownerNormal = axis.Normal;
-        Vector2d referenceNormal = referenceIsA ? ownerNormal : -ownerNormal;
-
-        Edge2D referenceEdge = FindReferenceEdge(reference, referenceNormal);
-        Edge2D incidentEdge = FindIncidentEdge(incident, referenceNormal);
-        var first = new ClipPoint2D(incidentEdge.Start);
-        var second = new ClipPoint2D(incidentEdge.End);
-
-        // The minimum signed exit axis guarantees overlapping tangential feature intervals.
-        ClipSegment(referenceEdge.Start, referenceEdge.Direction, ref first, ref second);
-        int count = ClipSegment(referenceEdge.End, -referenceEdge.Direction, ref first, ref second);
-
-        bool found = false;
-        for (int i = 0; i < count; i++)
+        Span<Vector2d> firstVertexScratch = stackalloc Vector2d[4];
+        Span<Vector2d> secondVertexScratch = stackalloc Vector2d[4];
+        ReadOnlySpan<Vector2d> firstVertexOffsets =
+            GetConvexVertexOffsets(colliderA, firstVertexScratch);
+        ReadOnlySpan<Vector2d> secondVertexOffsets =
+            GetConvexVertexOffsets(colliderB, secondVertexScratch);
+        Span<FixedPointAnchor2d> firstContactAnchors =
+            stackalloc FixedPointAnchor2d[2];
+        Span<FixedPointAnchor2d> secondContactAnchors =
+            stackalloc FixedPointAnchor2d[2];
+        if (!FixedConvex2dRelations.TryGetConvexContacts(
+                colliderA.Center,
+                colliderA.ConvexRotation,
+                firstVertexOffsets,
+                colliderB.Center,
+                colliderB.ConvexRotation,
+                secondVertexOffsets,
+                firstContactAnchors,
+                secondContactAnchors,
+                out int contactCount,
+                out Vector2d normal,
+                out Fixed64 depth,
+                out bool depthIsClamped))
         {
-            Vector2d incidentPoint = i == 0 ? first.Point : second.Point;
-            Fixed64 separation = Vector2d.Dot(incidentPoint - referenceEdge.Start, referenceNormal);
-            if (separation > Fixed64.Epsilon)
-                continue;
-
-            Fixed64 depth = separation < Fixed64.Zero ? -separation : Fixed64.Zero;
-            Vector2d referencePoint = incidentPoint - referenceNormal * separation;
-            if (referenceIsA)
-            {
-                manifold.AddContact(
-                    referencePoint,
-                    incidentPoint,
-                    depth,
-                    ownerNormal,
-                    colliderA.Material,
-                    colliderB.Material);
-            }
-            else
-            {
-                manifold.AddContact(
-                    incidentPoint,
-                    referencePoint,
-                    depth,
-                    ownerNormal,
-                    colliderA.Material,
-                    colliderB.Material);
-            }
-
-            found = true;
-        }
-
-        return found;
-    }
-
-    private static bool TryFindMinimumPenetrationAxis(
-        LSCollider2D colliderA,
-        LSCollider2D colliderB,
-        out MinimumAxis2D axis)
-    {
-        axis = new MinimumAxis2D(Fixed64.MaxValue, Vector2d.Zero, sourceIsA: true, hasAxis: false);
-        return TryTestConvexAxes(colliderA, colliderA, colliderB, sourceIsA: true, ref axis)
-            && TryTestConvexAxes(colliderB, colliderA, colliderB, sourceIsA: false, ref axis)
-            && axis.HasAxis;
-    }
-
-    private static bool TryTestConvexAxes(
-        LSCollider2D axisSource,
-        LSCollider2D colliderA,
-        LSCollider2D colliderB,
-        bool sourceIsA,
-        ref MinimumAxis2D bestAxis)
-    {
-        for (int i = 0; i < axisSource.VertexCount; i++)
-        {
-            Vector2d edge = axisSource.GetVertexUnchecked((i + 1) % axisSource.VertexCount) - axisSource.GetVertexUnchecked(i);
-            if (!TryTestManifoldAxis(edge.RightHandNormal, colliderA, colliderB, sourceIsA, ref bestAxis))
-                return false;
-        }
-
-        return true;
-    }
-
-    private static bool TryTestManifoldAxis(
-        Vector2d axis,
-        LSCollider2D colliderA,
-        LSCollider2D colliderB,
-        bool sourceIsA,
-        ref MinimumAxis2D bestAxis)
-    {
-        Vector2d candidateAxis = axis.Normalized;
-        Project(colliderA, candidateAxis, out Fixed64 minA, out Fixed64 maxA);
-        Project(colliderB, candidateAxis, out Fixed64 minB, out Fixed64 maxB);
-        if (!TryCalculateProjectionOverlap(
-                candidateAxis,
-                minA,
-                maxA,
-                minB,
-                maxB,
-                out Fixed64 overlap,
-                out Vector2d normal))
-            return false;
-
-        if (!bestAxis.HasAxis || overlap < bestAxis.Overlap)
-            bestAxis = new MinimumAxis2D(overlap, normal, sourceIsA, hasAxis: true);
-
-        return true;
-    }
-
-    private static bool TryTestConvexAxes(
-        LSCollider2D axisSource,
-        LSCollider2D colliderA,
-        LSCollider2D colliderB,
-        ref Fixed64 bestOverlap,
-        ref Vector2d bestAxis)
-    {
-        for (int i = 0; i < axisSource.VertexCount; i++)
-        {
-            Vector2d edge = axisSource.GetVertexUnchecked((i + 1) % axisSource.VertexCount) - axisSource.GetVertexUnchecked(i);
-            if (!TryTestAxis(edge.RightHandNormal, colliderA, colliderB, ref bestOverlap, ref bestAxis))
-                return false;
-        }
-
-        return true;
-    }
-
-    private static bool TryTestAxis(
-        Vector2d axis,
-        LSCollider2D colliderA,
-        LSCollider2D colliderB,
-        ref Fixed64 bestOverlap,
-        ref Vector2d bestAxis)
-    {
-        Vector2d candidateAxis = axis.Normalized;
-        Project(colliderA, candidateAxis, out Fixed64 minA, out Fixed64 maxA);
-        Project(colliderB, candidateAxis, out Fixed64 minB, out Fixed64 maxB);
-        if (!TryCalculateProjectionOverlap(
-                candidateAxis,
-                minA,
-                maxA,
-                minB,
-                maxB,
-                out Fixed64 overlap,
-                out Vector2d normal))
-            return false;
-
-        if (overlap < bestOverlap)
-        {
-            bestOverlap = overlap;
-            bestAxis = normal;
-        }
-
-        return true;
-    }
-
-    private static bool TryTestAxis(
-        Vector2d axis,
-        LSCircleCollider2D circle,
-        LSCollider2D convex,
-        ref Fixed64 bestOverlap,
-        ref Vector2d bestAxis)
-    {
-        Vector2d candidateAxis = axis.Normalized;
-        Fixed64 centerProjection = Vector2d.Dot(circle.Center, candidateAxis);
-        Fixed64 radius = circle.ScaledRadius;
-        Fixed64 minA = centerProjection - radius;
-        Fixed64 maxA = centerProjection + radius;
-        Project(convex, candidateAxis, out Fixed64 minB, out Fixed64 maxB);
-        if (!TryCalculateProjectionOverlap(
-                candidateAxis,
-                minA,
-                maxA,
-                minB,
-                maxB,
-                out Fixed64 overlap,
-                out Vector2d normal))
-            return false;
-
-        if (overlap < bestOverlap)
-        {
-            bestOverlap = overlap;
-            bestAxis = normal;
-        }
-
-        return true;
-    }
-
-    private static bool TryTestCapsuleConvexAxis(
-        Vector2d axis,
-        LSCapsuleCollider2D capsule,
-        LSCollider2D convex,
-        ref Fixed64 bestOverlap,
-        ref Vector2d bestAxis)
-    {
-        Vector2d candidateAxis = axis.Normalized;
-        ProjectCapsule(capsule, candidateAxis, out Fixed64 minA, out Fixed64 maxA);
-        Project(convex, candidateAxis, out Fixed64 minB, out Fixed64 maxB);
-        if (!TryCalculateProjectionOverlap(
-                candidateAxis,
-                minA,
-                maxA,
-                minB,
-                maxB,
-                out Fixed64 overlap,
-                out Vector2d normal))
-            return false;
-
-        if (overlap < bestOverlap)
-        {
-            bestOverlap = overlap;
-            bestAxis = normal;
-        }
-
-        return true;
-    }
-
-    private static bool TryCalculateProjectionOverlap(
-        Vector2d axis,
-        Fixed64 minA,
-        Fixed64 maxA,
-        Fixed64 minB,
-        Fixed64 maxB,
-        out Fixed64 overlap,
-        out Vector2d normal)
-    {
-        Fixed64 positive = maxA - minB;
-        Fixed64 negative = maxB - minA;
-        if (positive < Fixed64.Zero || negative < Fixed64.Zero)
-        {
-            overlap = Fixed64.Zero;
-            normal = axis;
             return false;
         }
 
-        overlap = FixedMath.Min(positive, negative);
-        normal = positive <= negative ? axis : -axis;
-        return true;
-    }
-
-    private static Vector2d FindCapsuleConvexClosestAxis(LSCapsuleCollider2D capsule, LSCollider2D convex)
-    {
-        Vector2d segmentStart = capsule.SegmentStart;
-        Vector2d segmentEnd = capsule.SegmentEnd;
-        Fixed64 bestDistance = Fixed64.MaxValue;
-        Vector2d bestAxis = Vector2d.Zero;
-
-        for (int i = 0; i < convex.VertexCount; i++)
+        for (int i = 0; i < contactCount; i++)
         {
-            Vector2d vertex = convex.GetVertexUnchecked(i);
-            Vector2d segmentPoint = new FixedSegment2d(segmentStart, segmentEnd).ClosestPoint(vertex);
-            KeepClosestAxis(vertex - segmentPoint, ref bestDistance, ref bestAxis);
+            manifold.AddContact(
+                new ContactAnchor2D(firstContactAnchors[i]),
+                new ContactAnchor2D(secondContactAnchors[i]),
+                depth,
+                normal,
+                colliderA.Material,
+                colliderB.Material,
+                depthIsClamped);
         }
 
-        Vector2d closestToStart = convex.GetClosestPoint(segmentStart);
-        KeepClosestAxis(closestToStart - segmentStart, ref bestDistance, ref bestAxis);
-        Vector2d closestToEnd = convex.GetClosestPoint(segmentEnd);
-        KeepClosestAxis(closestToEnd - segmentEnd, ref bestDistance, ref bestAxis);
-
-        if (bestAxis.MagnitudeSquared > Fixed64.Epsilon)
-            return bestAxis;
-
-        return convex.Center - capsule.Center;
-    }
-
-    private static void KeepClosestAxis(Vector2d axis, ref Fixed64 bestDistance, ref Vector2d bestAxis)
-    {
-        Fixed64 distance = axis.MagnitudeSquared;
-        if (distance >= bestDistance)
-            return;
-
-        bestDistance = distance;
-        bestAxis = axis;
-    }
-
-    private static bool TryAddCapsuleSideContacts(
-        LSCapsuleCollider2D capsule,
-        LSCollider2D convex,
-        ContactManifold2D manifold,
-        Vector2d normal,
-        Fixed64 depth)
-    {
-        Vector2d segmentStart = capsule.SegmentStart;
-        Vector2d segmentEnd = capsule.SegmentEnd;
-        Vector2d segment = segmentEnd - segmentStart;
-        Fixed64 segmentLengthSquared = segment.MagnitudeSquared;
-        if (segmentLengthSquared <= Fixed64.Epsilon)
-            return false;
-
-        Vector2d segmentDirection = segment / FixedMath.Sqrt(segmentLengthSquared);
-        if (Vector2d.Dot(segmentDirection, normal).Abs() > Fixed64.Epsilon * (Fixed64)16)
-            return false;
-
-        Vector2d firstA = segmentStart + normal * capsule.ScaledRadius;
-        Vector2d secondA = segmentEnd + normal * capsule.ScaledRadius;
-        Vector2d firstB = firstA - normal * depth;
-        Vector2d secondB = secondA - normal * depth;
-        if (!convex.ContainsPoint(firstB) || !convex.ContainsPoint(secondB))
-            return false;
-
-        manifold.AddContact(firstA, firstB, depth, normal, capsule.Material, convex.Material);
-        manifold.AddContact(secondA, secondB, depth, normal, capsule.Material, convex.Material);
-        return true;
-    }
-
-    private static bool TryAddCapsuleSideContactsReversed(
-        LSCapsuleCollider2D capsule,
-        LSCollider2D convex,
-        ContactManifold2D manifold,
-        Vector2d normal,
-        Fixed64 depth)
-    {
-        Vector2d segmentStart = capsule.SegmentStart;
-        Vector2d segmentEnd = capsule.SegmentEnd;
-        Vector2d segment = segmentEnd - segmentStart;
-        Fixed64 segmentLengthSquared = segment.MagnitudeSquared;
-        if (segmentLengthSquared <= Fixed64.Epsilon)
-            return false;
-
-        Vector2d segmentDirection = segment / FixedMath.Sqrt(segmentLengthSquared);
-        if (Vector2d.Dot(segmentDirection, normal).Abs() > Fixed64.Epsilon * (Fixed64)16)
-            return false;
-
-        Vector2d firstB = segmentStart + normal * capsule.ScaledRadius;
-        Vector2d secondB = segmentEnd + normal * capsule.ScaledRadius;
-        Vector2d firstA = firstB - normal * depth;
-        Vector2d secondA = secondB - normal * depth;
-        if (!convex.ContainsPoint(firstA) || !convex.ContainsPoint(secondA))
-            return false;
-
-        manifold.AddContact(firstA, firstB, depth, -normal, convex.Material, capsule.Material);
-        manifold.AddContact(secondA, secondB, depth, -normal, convex.Material, capsule.Material);
         return true;
     }
 
@@ -848,6 +675,7 @@ internal static class CollisionDetection2D
         ContactManifold2D manifold)
     {
         bool found = false;
+        ContactManifold2D scratch = compoundA.PartManifoldScratch;
         for (int i = 0; i < compoundA.PartCount; i++)
         {
             LSCollider2D partA = compoundA.GetPartCollider(i);
@@ -855,7 +683,16 @@ internal static class CollisionDetection2D
             {
                 LSCollider2D partB = compoundB.GetPartCollider(j);
                 CollisionType2D collisionType = ColliderSettings2D.GetCollisionType(partA.Shape, partB.Shape);
-                found |= TryCollide(new CollisionWorkItem2D(partA, partB, collisionType), manifold);
+                scratch.BeginUpdate(manifold.LastUpdatedFrame);
+                if (!TryCollide(new CollisionWorkItem2D(partA, partB, collisionType), scratch))
+                    continue;
+
+                found = true;
+                AddCompoundPartContacts(
+                    manifold,
+                    scratch,
+                    featureNamespaceA: i + 1,
+                    featureNamespaceB: -(j + 1));
             }
         }
 
@@ -869,151 +706,48 @@ internal static class CollisionDetection2D
         ContactManifold2D manifold)
     {
         bool found = false;
+        ContactManifold2D scratch = compound.PartManifoldScratch;
         for (int i = 0; i < compound.PartCount; i++)
         {
             LSCollider2D part = compound.GetPartCollider(i);
             LSCollider2D colliderA = compoundIsA ? part : other;
             LSCollider2D colliderB = compoundIsA ? other : part;
             CollisionType2D collisionType = ColliderSettings2D.GetCollisionType(colliderA.Shape, colliderB.Shape);
-            found |= TryCollide(new CollisionWorkItem2D(colliderA, colliderB, collisionType), manifold);
+            scratch.BeginUpdate(manifold.LastUpdatedFrame);
+            if (!TryCollide(new CollisionWorkItem2D(colliderA, colliderB, collisionType), scratch))
+                continue;
+
+            found = true;
+            AddCompoundPartContacts(
+                manifold,
+                scratch,
+                featureNamespaceA: compoundIsA ? i + 1 : 0,
+                featureNamespaceB: compoundIsA ? 0 : -(i + 1));
         }
 
         return found;
     }
 
-    private static void Project(LSCollider2D collider, Vector2d axis, out Fixed64 min, out Fixed64 max)
+    private static void AddCompoundPartContacts(
+        ContactManifold2D destination,
+        ContactManifold2D source,
+        int featureNamespaceA,
+        int featureNamespaceB)
     {
-        Vector2d first = collider.GetVertexUnchecked(0);
-        min = Vector2d.Dot(first, axis);
-        max = min;
-        for (int i = 1; i < collider.VertexCount; i++)
+        for (int i = 0; i < source.Count; i++)
         {
-            Fixed64 projection = Vector2d.Dot(collider.GetVertexUnchecked(i), axis);
-            if (projection < min)
-                min = projection;
-            if (projection > max)
-                max = projection;
+            ManifoldContact2D contact = source[i];
+            destination.AddContact(
+                contact.AnchorA,
+                contact.AnchorB,
+                contact.Depth,
+                contact.Normal,
+                contact.MaterialA,
+                contact.MaterialB,
+                contact.DepthIsClamped,
+                featureNamespaceA,
+                featureNamespaceB);
         }
-    }
-
-    private static void ProjectCapsule(LSCapsuleCollider2D capsule, Vector2d axis, out Fixed64 min, out Fixed64 max)
-    {
-        Fixed64 start = Vector2d.Dot(capsule.SegmentStart, axis);
-        Fixed64 end = Vector2d.Dot(capsule.SegmentEnd, axis);
-        Fixed64 radius = capsule.ScaledRadius;
-        min = FixedMath.Min(start, end) - radius;
-        max = FixedMath.Max(start, end) + radius;
-    }
-
-    private static Edge2D FindReferenceEdge(LSCollider2D collider, Vector2d outwardNormal)
-    {
-        int bestIndex = 0;
-        Fixed64 bestDot = -Fixed64.MaxValue;
-        bool clockwise = Vector2d.CrossProduct(
-            collider.GetVertexUnchecked(1) - collider.GetVertexUnchecked(0),
-            collider.GetVertexUnchecked(2) - collider.GetVertexUnchecked(1)) < Fixed64.Zero;
-        for (int i = 0; i < collider.VertexCount; i++)
-        {
-            Vector2d start = collider.GetVertexUnchecked(i);
-            Vector2d end = collider.GetVertexUnchecked((i + 1) % collider.VertexCount);
-            Vector2d edge = end - start;
-            Vector2d edgeNormal = clockwise ? edge.RightHandNormal : edge.LeftHandNormal;
-            Fixed64 dot = Vector2d.Dot(edgeNormal.Normalized, outwardNormal);
-            if (dot > bestDot)
-            {
-                bestDot = dot;
-                bestIndex = i;
-            }
-        }
-
-        return CreateEdge(collider, bestIndex);
-    }
-
-    private static Edge2D FindIncidentEdge(LSCollider2D collider, Vector2d referenceNormal)
-    {
-        int bestIndex = 0;
-        Fixed64 bestDot = Fixed64.MaxValue;
-        bool clockwise = Vector2d.CrossProduct(
-            collider.GetVertexUnchecked(1) - collider.GetVertexUnchecked(0),
-            collider.GetVertexUnchecked(2) - collider.GetVertexUnchecked(1)) < Fixed64.Zero;
-        for (int i = 0; i < collider.VertexCount; i++)
-        {
-            Vector2d start = collider.GetVertexUnchecked(i);
-            Vector2d end = collider.GetVertexUnchecked((i + 1) % collider.VertexCount);
-            Vector2d edge = end - start;
-            Vector2d edgeNormal = clockwise ? edge.RightHandNormal : edge.LeftHandNormal;
-            Fixed64 dot = Vector2d.Dot(edgeNormal.Normalized, referenceNormal);
-            if (dot < bestDot)
-            {
-                bestDot = dot;
-                bestIndex = i;
-            }
-        }
-
-        return CreateEdge(collider, bestIndex);
-    }
-
-    private static Edge2D CreateEdge(LSCollider2D collider, int index)
-    {
-        Vector2d start = collider.GetVertexUnchecked(index);
-        Vector2d end = collider.GetVertexUnchecked((index + 1) % collider.VertexCount);
-        Vector2d direction = end - start;
-        return new Edge2D(start, end, direction.Normalized);
-    }
-
-    private static int ClipSegment(
-        Vector2d planePoint,
-        Vector2d insideNormal,
-        ref ClipPoint2D first,
-        ref ClipPoint2D second)
-    {
-        ClipPoint2D input0 = first;
-        ClipPoint2D input1 = second;
-        Fixed64 distance0 = Vector2d.Dot(input0.Point - planePoint, insideNormal);
-        Fixed64 distance1 = Vector2d.Dot(input1.Point - planePoint, insideNormal);
-        bool inside0 = distance0 >= Fixed64.Zero;
-        bool inside1 = distance1 >= Fixed64.Zero;
-        int outputCount = 0;
-        ClipPoint2D output0 = default;
-        ClipPoint2D output1 = default;
-
-        if (inside0)
-            AddClippedPoint(input0, ref output0, ref output1, ref outputCount);
-
-        if (inside0 != inside1)
-        {
-            Fixed64 denominator = distance0 - distance1;
-            Fixed64 t = distance0 / denominator;
-            AddClippedPoint(
-                new ClipPoint2D(input0.Point + (input1.Point - input0.Point) * t),
-                ref output0,
-                ref output1,
-                ref outputCount);
-        }
-
-        if (inside1)
-            AddClippedPoint(input1, ref output0, ref output1, ref outputCount);
-
-        first = output0;
-        second = output1;
-        return outputCount;
-    }
-
-    private static void AddClippedPoint(
-        ClipPoint2D point,
-        ref ClipPoint2D first,
-        ref ClipPoint2D second,
-        ref int count)
-    {
-        if (count == 0)
-        {
-            first = point;
-            count = 1;
-            return;
-        }
-
-        second = point;
-        count = 2;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1023,12 +757,13 @@ internal static class CollisionDetection2D
         LSCollider2D colliderA,
         LSCollider2D colliderB) =>
         manifold.AddContact(
-            contact.PointA,
-            contact.PointB,
+            contact.AnchorA,
+            contact.AnchorB,
             contact.Depth,
             contact.Normal,
             colliderA.Material,
-            colliderB.Material);
+            colliderB.Material,
+            contact.DepthIsClamped);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static bool BoundsOverlap(LSCollider2D colliderA, LSCollider2D colliderB) =>
@@ -1042,50 +777,5 @@ internal static class CollisionDetection2D
         direction.MagnitudeSquared > Fixed64.Epsilon && direction.X < Fixed64.Zero
             ? -Vector2d.Right
             : Vector2d.Right;
-
-    private readonly struct MinimumAxis2D
-    {
-        public MinimumAxis2D(Fixed64 overlap, Vector2d normal, bool sourceIsA, bool hasAxis)
-        {
-            Overlap = overlap;
-            Normal = normal;
-            SourceIsA = sourceIsA;
-            HasAxis = hasAxis;
-        }
-
-        public Fixed64 Overlap { get; }
-
-        public Vector2d Normal { get; }
-
-        public bool SourceIsA { get; }
-
-        public bool HasAxis { get; }
-    }
-
-    private readonly struct Edge2D
-    {
-        public Edge2D(Vector2d start, Vector2d end, Vector2d direction)
-        {
-            Start = start;
-            End = end;
-            Direction = direction;
-        }
-
-        public Vector2d Start { get; }
-
-        public Vector2d End { get; }
-
-        public Vector2d Direction { get; }
-    }
-
-    private readonly struct ClipPoint2D
-    {
-        public ClipPoint2D(Vector2d point)
-        {
-            Point = point;
-        }
-
-        public Vector2d Point { get; }
-    }
 
 }

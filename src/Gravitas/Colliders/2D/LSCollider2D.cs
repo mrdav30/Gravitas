@@ -7,7 +7,7 @@
 
 using Chronicler;
 using FixedMathSharp;
-using FixedMathSharp.Bounds;
+using FixedMathSharp.Geometry;
 using Gravitas.Materials;
 using Gravitas.Support;
 using GridForge.Spatial;
@@ -61,7 +61,6 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
     private Fixed64? _mixedHalfThicknessOverride;
     private Fixed64 _mixedHalfThickness;
     private Fixed64 _mixedSlabCenterY;
-    private bool _mixedBoundsInitialized;
     private uint _shapeVersion;
     private readonly ColliderRuntimeShapeState<ColliderShapeSnapshot2D> _runtimeShapeState = new();
     private ColliderPartitionState2D _partitionState;
@@ -204,18 +203,23 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
             if (_isActive == value)
                 return;
 
-            _isActive = value;
             if (_context == null || _id < 0)
-                return;
-
-            if (_isActive)
             {
+                _isActive = value;
+                return;
+            }
+
+            if (value)
+            {
+                RebuildRuntimeShapeState();
+                _isActive = true;
                 _context.Collisions2D.RefreshColliderPartition(this);
                 if (_context.Settings.RuntimeMode.RunsMixedContacts())
                     _context.MixedCollisions.Refresh2DColliderPartition(this);
             }
             else
             {
+                _isActive = false;
                 _context.Collisions2D.ClearPartitionedCollider(this, force: true);
                 if (IsMixedPartitioned)
                     _context.MixedCollisions.ClearPartitioned2DCollider(this, force: true);
@@ -345,22 +349,6 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
         }
     }
 
-    public Vector2d Position => _compoundOwner != null
-        ? _compoundOwner.Center
-        : ResolveStandalonePosition();
-
-    public Fixed64 Rotation => _compoundOwner != null
-        ? _compoundOwner.Rotation + _compoundLocalRotation
-        : ResolveStandaloneRotation();
-
-    public virtual Vector2d LocalScale => _compoundOwner != null
-        ? Vector2d.Multiply(_compoundOwner.LocalScale, _compoundLocalScale)
-        : _agent?.Transform.LossyScale.ToVector2d() ?? Vector2d.One;
-
-    public Vector2d ScaledLocalOffset => Vector2d.Multiply(_localOffset, LocalScale);
-
-    public Vector2d Center => Position + Rotate(ScaledLocalOffset, Rotation);
-
     public FixedBoundArea Bounds => _bounds;
 
     internal FixedBoundBox MixedBounds3D => _mixedBounds3D;
@@ -404,7 +392,6 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
 
     internal void Initialize(SolidBody2D body)
     {
-        PreflightBodyInitialization(body);
         InitCore(body.Agent, body);
     }
 
@@ -421,19 +408,34 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
         Context.Physics2D.AssimilateCollider(this);
     }
 
-    internal void PreflightBodyInitialization(SolidBody2D body)
+    internal void PreflightBodyInitialization(
+        SolidBody2D body,
+        Vector2d requestedPosition,
+        Fixed64 requestedRotation)
     {
         ThrowIfCompoundPartLifecycle(nameof(Initialize));
         SwiftThrowHelper.ThrowIfNull(body, nameof(body));
         ThrowIfTriggerWouldAttachToBody(nameof(Initialize));
-        PreflightInitialization(body.Agent);
+        PreflightInitialization(
+            body.Agent,
+            useRequestedPose: true,
+            requestedPosition,
+            requestedRotation);
     }
 
-    private void PreflightInitialization(IMatterAgent agent)
+    private void PreflightInitialization(
+        IMatterAgent agent,
+        bool useRequestedPose = false,
+        Vector2d requestedPosition = default,
+        Fixed64 requestedRotation = default)
     {
         SwiftThrowHelper.ThrowIfNull(agent, nameof(agent));
-        ColliderScalePolicy.ValidatePlanar(agent.Transform);
         OnBeforeInitialize(agent);
+        PrepareStandaloneInitialization(
+            agent,
+            useRequestedPose,
+            requestedPosition,
+            requestedRotation);
     }
 
     private void InitCore(IMatterAgent agent, SolidBody2D? body)
@@ -445,8 +447,7 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
         _isActive = true;
         _queryState.Reset();
         _hierarchyState.Initialize(agent.IsParent);
-        _runtimeShapeState.MarkDirty();
-        RebuildRuntimeShapeState();
+        PublishPreparedShape();
     }
 
     protected virtual void OnBeforeInitialize(IMatterAgent agent) { }
@@ -520,6 +521,7 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
         _body = null;
         _agent = null;
         _context = null;
+        _preparedContext = null;
     }
 
     public void Deactivate()
@@ -563,7 +565,10 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal bool RebuildRuntimeShapeOnly() => RebuildRuntimeShapeState();
 
-    internal void ValidateCurrentRuntimeTransform() => _ = CaptureShapeSnapshot();
+    internal void ValidateCurrentRuntimeTransform() =>
+        PrepareRuntimeShape(
+            CaptureShapeSnapshot(),
+            requireRepresentableMassPoint: true);
 
     public void SetParent(LSCollider2D parent)
     {
@@ -685,356 +690,6 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
         ClearParent();
     }
 
-    internal void NotifyContact(LSCollider2D other, bool isColliding, bool isChanged) =>
-        NotifyContact(
-            other,
-            other.Body,
-            isColliding,
-            isChanged,
-            allowInactive: false,
-            new ColliderLifetimeToken2D(this),
-            new ColliderLifetimeToken2D(other),
-            IsTrigger || other.IsTrigger,
-            ColliderTriggerEventPolicy.ShouldRaise(this, other));
-
-    internal void NotifyContact(
-        LSCollider2D other,
-        SolidBody2D? otherBody,
-        bool isColliding,
-        bool isChanged,
-        bool allowInactive,
-        in ColliderLifetimeToken2D registration,
-        in ColliderLifetimeToken2D otherRegistration,
-        bool isTriggerPair,
-        bool shouldRaiseTrigger)
-    {
-        if (isColliding
-            ? !registration.IsActive || !otherRegistration.IsActive
-            : allowInactive ? !registration.IsCurrentLifetime : !registration.IsActive)
-        {
-            return;
-        }
-
-        if (isColliding)
-        {
-            if (isTriggerPair)
-            {
-                if (shouldRaiseTrigger)
-                {
-                    if (isChanged)
-                    {
-                        OnTriggerEnter?.Invoke(other);
-                        if (!registration.IsActive || !otherRegistration.IsActive)
-                            return;
-                    }
-
-                    OnTriggerStay?.Invoke(other);
-                }
-
-                return;
-            }
-
-            if (isChanged && otherBody != null)
-            {
-                OnContactEnter?.Invoke(otherBody);
-                if (!registration.IsActive || !otherRegistration.IsActive)
-                    return;
-            }
-
-            if (otherBody != null)
-                OnContact?.Invoke(otherBody);
-            return;
-        }
-
-        if (!isChanged)
-            return;
-
-        if (isTriggerPair)
-        {
-            if (shouldRaiseTrigger)
-                OnTriggerExit?.Invoke(other);
-
-            return;
-        }
-
-        if (otherBody != null)
-            OnContactExit?.Invoke(otherBody);
-    }
-
-    internal void NotifyMixedContact(LSCollider other, bool isColliding, bool isChanged, bool isTriggerPair) =>
-        NotifyMixedContact(
-            other,
-            isColliding,
-            isChanged,
-            isTriggerPair,
-            allowInactive: false,
-            new ColliderLifetimeToken2D(this),
-            new ColliderLifetimeToken(other),
-            ColliderTriggerEventPolicy.ShouldRaise(other, this));
-
-    internal void NotifyMixedContact(
-        LSCollider other,
-        bool isColliding,
-        bool isChanged,
-        bool isTriggerPair,
-        bool allowInactive,
-        in ColliderLifetimeToken2D registration,
-        in ColliderLifetimeToken otherRegistration,
-        bool shouldRaiseTrigger)
-    {
-        if (isColliding
-            ? !registration.IsActive || !otherRegistration.IsActive
-            : allowInactive
-                ? !registration.IsCurrentLifetime || !otherRegistration.IsCurrentLifetime
-                : !registration.IsActive)
-        {
-            return;
-        }
-
-        if (isColliding)
-        {
-            if (isTriggerPair)
-            {
-                if (shouldRaiseTrigger)
-                {
-                    if (isChanged)
-                    {
-                        OnMixedTriggerEnter?.Invoke(other);
-                        if (!registration.IsActive || !otherRegistration.IsActive)
-                            return;
-                    }
-
-                    OnMixedTriggerStay?.Invoke(other);
-                }
-
-                return;
-            }
-
-            if (isChanged)
-            {
-                OnMixedContactEnter?.Invoke(other);
-                if (!registration.IsActive || !otherRegistration.IsActive)
-                    return;
-            }
-
-            OnMixedContact?.Invoke(other);
-            return;
-        }
-
-        if (!isChanged)
-            return;
-
-        if (isTriggerPair)
-        {
-            if (shouldRaiseTrigger)
-                OnMixedTriggerExit?.Invoke(other);
-
-            return;
-        }
-
-        OnMixedContactExit?.Invoke(other);
-    }
-
-    public abstract bool ContainsPoint(Vector2d point);
-
-    public abstract Vector2d GetClosestPoint(Vector2d point);
-
-    public abstract Vector2d GetSupportPoint(Vector2d direction);
-
-    internal int VertexCount
-    {
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        get => this is IConvexVertexSource2D source ? source.VertexCount : 0;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal Vector2d GetVertexUnchecked(int index) =>
-        ((IConvexVertexSource2D)this).GetVertexUnchecked(index);
-
-    /// <summary>
-    /// Calculates the body-local center of mass implied by this 2D collider's current shape state.
-    /// </summary>
-    public virtual Vector2d CalculateLocalCenterOfMassOffset() =>
-        TransformMassPropertyPoint(ScaledLocalOffset);
-
-    /// <summary>
-    /// Calculates the scalar moment of inertia about a requested body-local reference point.
-    /// </summary>
-    public abstract Fixed64 CalculateMomentOfInertia(Fixed64 mass, Vector2d localReferencePoint);
-
-    internal abstract Fixed64 CalculateAreaForMassProperties();
-
-    protected abstract void RebuildShape();
-
-    protected virtual void OnMaterialChanged() { }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    protected void MarkShapeDirty()
-    {
-        _shapeVersion++;
-        _runtimeShapeState.MarkDirty();
-        if (_compoundOwner != null)
-        {
-            _compoundOwner.MarkShapeDirty();
-            return;
-        }
-
-        _body?.Wake();
-        _body?.RefreshMassPropertiesFromColliderShape();
-    }
-
-    protected static Fixed64 ApplyParallelAxis(
-        Fixed64 momentAboutCenterOfMass,
-        Fixed64 mass,
-        Vector2d centerOfMass,
-        Vector2d localReferencePoint)
-    {
-        Vector2d delta = localReferencePoint - centerOfMass;
-        return momentAboutCenterOfMass + mass * delta.MagnitudeSquared;
-    }
-
-    private bool RebuildRuntimeShapeState()
-    {
-        ColliderShapeSnapshot2D snapshot = CaptureShapeSnapshot();
-        if (!_runtimeShapeState.ShouldRebuild(snapshot))
-            return false;
-
-        RebuildShape();
-        RebuildMixedEmbedding(snapshot.MixedSlabCenterY, snapshot.MixedHalfThickness);
-        _runtimeShapeState.Commit(snapshot);
-        return true;
-    }
-
-    private ColliderShapeSnapshot2D CaptureShapeSnapshot()
-    {
-        if (_compoundOwner != null)
-        {
-            Fixed64 rotation = _compoundOwner.Rotation + _compoundLocalRotation;
-            Vector2d localScale = Vector2d.Multiply(_compoundOwner.LocalScale, _compoundLocalScale);
-            ColliderScalePolicy.Validate(localScale);
-            Vector2d center = _compoundOwner.Center + Rotate(Vector2d.Multiply(_localOffset, localScale), rotation);
-            return new(
-                center,
-                rotation,
-                localScale,
-                _localOffset,
-                _shapeVersion,
-                ResolveMixedSlabCenterY(),
-                ResolveMixedHalfThickness());
-        }
-
-        Fixed64 standaloneRotation = ResolveStandaloneRotation();
-        Vector2d standaloneScale;
-        if (_agent != null)
-            standaloneScale = ColliderScalePolicy.ValidatePlanar(_agent.Transform);
-        else
-        {
-            standaloneScale = LocalScale;
-            ColliderScalePolicy.Validate(standaloneScale);
-        }
-        Vector2d standaloneCenter = ResolveStandalonePosition()
-            + Rotate(Vector2d.Multiply(_localOffset, standaloneScale), standaloneRotation);
-        return new(
-            standaloneCenter,
-            standaloneRotation,
-            standaloneScale,
-            _localOffset,
-            _shapeVersion,
-            ResolveMixedSlabCenterY(),
-            ResolveMixedHalfThickness());
-    }
-
-    private Fixed64 ResolveMixedHalfThickness() =>
-        _mixedHalfThicknessOverride ?? _context?.Settings.Mixed2DHalfThickness ?? PhysicsSettings.DefaultMixed2DHalfThickness;
-
-    private Fixed64 ResolveMixedSlabCenterY() =>
-        _agent?.Transform.WorldPosition.Y ?? Fixed64.Zero;
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private Vector2d ResolveStandalonePosition() =>
-        _body?.Position
-        ?? _agent?.Transform.WorldPositionXZ
-        ?? Vector2d.Zero;
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private Fixed64 ResolveStandaloneRotation() =>
-        _body?.Rotation ?? ResolveAgentRotation();
-
-    private void RebuildMixedEmbedding(Fixed64 slabCenterY, Fixed64 halfThickness)
-    {
-        _mixedHalfThickness = halfThickness;
-        _mixedSlabCenterY = slabCenterY;
-
-        Vector3d min = new(MinX, slabCenterY - halfThickness, MinY);
-        Vector3d max = new(MaxX, slabCenterY + halfThickness, MaxY);
-        if (!_mixedBoundsInitialized)
-        {
-            _mixedBounds3D = FixedBoundBox.FromMinMax(min, max);
-            _mixedBoundsInitialized = true;
-            return;
-        }
-
-        _mixedBounds3D.SetMinMax(min, max);
-    }
-
-    private void ClearChildParentReferences()
-    {
-        SwiftHashSet<ulong>? children = _hierarchyState.Children;
-        if (children == null || _context == null)
-            return;
-
-        foreach (ulong childPackedKey in children)
-        {
-            ColliderHierarchyKey childKey = ColliderHierarchyKey.FromPacked(childPackedKey);
-            if (((IColliderHierarchyNode)this).TryGetHierarchyColliderByKey(childKey, out IColliderHierarchyNode? child))
-                child!.ClearParentReference();
-        }
-
-        _hierarchyState.ClearChildren();
-    }
-
-    void IColliderHierarchyNode.AddChild(ColliderHierarchyKey key)
-    {
-        ThrowIfCompoundPartLifecycle(nameof(IColliderHierarchyNode.AddChild));
-        _hierarchyState.AddChild(key);
-    }
-
-    void IColliderHierarchyNode.RemoveChild(ColliderHierarchyKey key)
-    {
-        ThrowIfCompoundPartLifecycle(nameof(IColliderHierarchyNode.RemoveChild));
-        _hierarchyState.RemoveChild(key);
-    }
-
-    void IColliderHierarchyNode.ClearParentReference() => _hierarchyState.ClearParentReference();
-
-    bool IColliderHierarchyNode.TryGetHierarchyColliderByKey(ColliderHierarchyKey key, out IColliderHierarchyNode? collider)
-    {
-        collider = null;
-        if (!key.IsValid || _context == null)
-            return false;
-
-        if (key.Is2D && _context.Physics2D.TryGetColliderById(key.Id, out LSCollider2D? collider2D))
-        {
-            collider = collider2D;
-            return true;
-        }
-
-        if (key.Is3D && _context.Physics.TryGetColliderById(key.Id, out LSCollider? collider3D))
-        {
-            collider = collider3D;
-            return true;
-        }
-
-        return false;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    protected void SetBounds(FixedBoundArea bounds) => _bounds = bounds;
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    protected void SetBoundsFromMinMax(Vector2d min, Vector2d max) =>
-        SetBounds(FixedBoundArea.FromMinMax(min, max));
-
     private Fixed64 ResolveAgentRotation()
     {
         return _agent == null
@@ -1051,24 +706,6 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
             nameof(context),
             "2D collider is already bound to a different GravitasWorldContext.");
         _context = context;
-    }
-
-    internal void BindCompoundPart(
-        LSCompoundCollider2D owner,
-        Fixed64 localRotation,
-        Vector2d localScale,
-        GravitasWorldContext context)
-    {
-        SwiftThrowHelper.ThrowIfNull(owner, nameof(owner));
-        SwiftThrowHelper.ThrowIfArgument(
-            HasHostBinding,
-            nameof(owner),
-            "2D compound collider parts cannot be initialized as standalone colliders.");
-        _compoundOwner = owner;
-        _compoundLocalRotation = localRotation;
-        _compoundLocalScale = localScale;
-        BindContext(context);
-        RebuildRuntimeShapeState();
     }
 
     internal void ReserveCompoundPart(
@@ -1101,10 +738,26 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    protected Vector2d TransformMassPropertyPoint(Vector2d localPoint) =>
-        _compoundOwner == null
-            ? localPoint
-            : _compoundOwner.ScaledLocalOffset + Rotate(localPoint, _compoundLocalRotation);
+    protected Vector2d TransformRelativeMassPropertyPoint(
+        Vector2d partRelativePoint)
+    {
+        bool representable = _compoundOwner == null
+            ? Vector2d.TryAdd(
+                ScaledLocalOffset,
+                partRelativePoint,
+                out Vector2d transformed)
+            : Vector2d.TryTransformPoint(
+                _compoundOwner.ScaledLocalOffset,
+                ScaledLocalOffset,
+                partRelativePoint,
+                _compoundLocalRotation,
+                out transformed);
+        if (representable)
+            return transformed;
+
+        throw new System.InvalidOperationException(
+            "2D collider mass-property point is outside the Fixed64 coordinate domain.");
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     protected static Vector2d Rotate(Vector2d value, Fixed64 radians)
@@ -1122,10 +775,6 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
         Fixed64 y = value.Y.Abs() <= Fixed64.Epsilon ? Fixed64.Zero : value.Y;
         return new Vector2d(x, y);
     }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    protected static Fixed64 ClampAxis(Fixed64 value, Fixed64 min, Fixed64 max) =>
-        value < min ? min : value > max ? max : value;
 
     private void SetTrigger(bool value)
     {

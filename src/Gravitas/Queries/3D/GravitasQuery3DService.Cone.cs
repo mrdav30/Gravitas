@@ -6,7 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
-using FixedMathSharp.Bounds;
+using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Support;
@@ -324,24 +324,46 @@ public sealed partial class GravitasQuery3DService
         Fixed64 bestDistance = Fixed64.MaxValue;
         int bestTriangleIndex = int.MaxValue;
         Physics3DHit best = default;
+        var queryOriginAnchor = new FixedPointAnchor(
+            origin,
+            FixedQuaternion.Identity,
+            Vector3d.Zero);
+        if (!queryOriginAnchor.TryGetLocalPointIn(
+                mesh.Mesh.Origin,
+                mesh.Mesh.Rotation,
+                out Vector3d localOrigin))
+        {
+            hit = default;
+            return false;
+        }
+        Vector3d localDirection =
+            mesh.Mesh.Rotation.Inverse().Rotate(direction);
 
         for (int i = 0; i < _meshTriangleCandidates.Count; i++)
         {
             int triangleIndex = _meshTriangleCandidates[i];
-            mesh.Mesh.GetTriangleVertices(triangleIndex, out Vector3d first, out Vector3d second, out Vector3d third);
+            mesh.Mesh.GetLocalTriangleVertices(
+                triangleIndex,
+                out Vector3d first,
+                out Vector3d second,
+                out Vector3d third);
             Vector3d normal = mesh.Mesh.GetFaceNormalWorld(triangleIndex);
             if (!new FixedTriangle(first, second, third).TryGetFiniteConeIntersectionMinimumAxialPoint(
-                    origin,
-                    direction,
+                    localOrigin,
+                    localDirection,
                     length,
                     endRadius,
-                    out Vector3d point))
+                    out Vector3d localPoint))
             {
                 continue;
             }
 
+            FixedPointAnchor pointAnchor =
+                mesh.Mesh.CreatePointAnchor(localPoint);
             Fixed64 axialDistance = FixedMath.Min(
-                Vector3d.ProjectNonNegativeDifferenceParameter(point, origin, direction),
+                pointAnchor.ProjectNonNegativeOffsetFrom(
+                    queryOriginAnchor,
+                    direction),
                 length);
 
             if (found
@@ -351,7 +373,15 @@ public sealed partial class GravitasQuery3DService
                 continue;
             }
 
-            best = new Physics3DHit(mesh, point, normal, axialDistance, point - origin);
+            _ = pointAnchor.TryGetOffsetFrom(
+                queryOriginAnchor,
+                out Vector3d toPoint);
+            best = new Physics3DHit(
+                mesh,
+                new ContactAnchor(pointAnchor),
+                normal,
+                axialDistance,
+                toPoint);
             bestDistance = axialDistance;
             bestTriangleIndex = triangleIndex;
             found = true;
@@ -380,7 +410,7 @@ public sealed partial class GravitasQuery3DService
                 continue;
             }
 
-            best = new Physics3DHit(compound, partHit.Point, partHit.Normal, partHit.Distance, partHit.Direction);
+            best = new Physics3DHit(compound, partHit.Anchor, partHit.Normal, partHit.Distance, partHit.Direction);
             found = true;
         }
 

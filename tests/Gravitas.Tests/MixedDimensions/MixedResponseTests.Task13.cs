@@ -159,10 +159,12 @@ public sealed partial class MixedResponseTests
     }
 
     [Fact]
-    public void Simulate_WithSleeping3DAndAwake2D_ShouldWake3DParticipant()
+    public void Simulate_WithPlanarContactBetweenSleeping3DAndAwake2D_ShouldWake3DParticipant()
     {
         using GravitasWorldContext context = CreateMixedContext();
-        ScenarioBody<LSSphereCollider> sleeping3D = CreateSphere3D(context, Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> sleeping3D = CreateSphere3D(
+            context,
+            new Vector3d(-Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
         _ = CreateCircle2D(context, Vector2d.Zero);
         sleeping3D.Body.Sleep();
 

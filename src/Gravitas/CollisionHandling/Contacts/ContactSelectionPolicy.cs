@@ -13,9 +13,17 @@ internal static class ContactSelectionPolicy
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static bool ShouldReplaceWithDeeper(Contact2D candidate, bool found, Contact2D current) =>
-        !found || candidate.Depth > current.Depth;
+        !found
+        || candidate.Depth > current.Depth
+        || (candidate.Depth == current.Depth
+            && candidate.DepthIsClamped
+            && !current.DepthIsClamped);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static bool ShouldReplaceWithShallower(MixedContact candidate, bool found, MixedContact current) =>
-        !found || candidate.Depth < current.Depth;
+        !found
+        || candidate.Depth < current.Depth
+        || (candidate.Depth == current.Depth
+            && current.DepthIsClamped
+            && !candidate.DepthIsClamped);
 }

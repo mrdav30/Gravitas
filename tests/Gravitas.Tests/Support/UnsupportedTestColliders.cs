@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
 using Gravitas.Queries;
 using SwiftCollections;
@@ -36,8 +37,12 @@ internal sealed class UnsupportedTestCollider2D : LSCollider2D
 
     internal override Fixed64 CalculateAreaForMassProperties() => Fixed64.Zero;
 
-    protected override void RebuildShape() =>
-        SetBoundsFromMinMax(Center - Vector2d.One, Center + Vector2d.One);
+    private protected override void PrepareShape(in ColliderShapeSnapshot2D snapshot) =>
+        SetPreparedBounds(FixedBoundArea.FromMinMax(
+            snapshot.Center - Vector2d.One,
+            snapshot.Center + Vector2d.One));
+
+    private protected override void PublishShape() { }
 }
 
 internal sealed class UnsupportedTestCollider3D : LSCollider
@@ -50,15 +55,23 @@ internal sealed class UnsupportedTestCollider3D : LSCollider
 
     internal bool DeactivateOnInitialize { get; set; }
 
+    internal Vector3d? ClosestPointOverride { get; set; }
+
+    internal Vector3d? NormalOverride { get; set; }
+
+    internal void OverrideDerivedBoundsForReplayTest(Vector3d min, Vector3d max) =>
+        _bounds = FixedBoundBox.FromMinMax(min, max);
+
     public override ColliderType Shape => (ColliderType)byte.MaxValue;
 
     public override int Priority => 0;
 
-    protected override void BuildShape()
-    {
-        Area = Fixed64.One;
-        SetBoundsMinMax(Center - Vector3d.One, Center + Vector3d.One);
-    }
+    private protected override void PrepareShape(in ColliderShapeSnapshot snapshot) =>
+        SetPreparedBounds(FixedBoundBox.FromMinMax(
+            snapshot.Center - Vector3d.One,
+            snapshot.Center + Vector3d.One));
+
+    private protected override void PublishShape() => Area = Fixed64.One;
 
     protected override void OnInitialize()
     {
@@ -73,9 +86,11 @@ internal sealed class UnsupportedTestCollider3D : LSCollider
 
     protected internal override Fixed64 CalculateMassPropertyWeight() => MassPropertyWeight;
 
-    public override Vector3d ClosestPointOnSurface(Vector3d other) => Center;
+    public override Vector3d ClosestPointOnSurface(Vector3d other) =>
+        ClosestPointOverride ?? Center;
 
-    public override Vector3d GetNormalAtPoint(Vector3d point) => Vector3d.Up;
+    public override Vector3d GetNormalAtPoint(Vector3d point) =>
+        NormalOverride ?? Vector3d.Up;
 
     public override bool ColliderOverlapsRay(RaycastSegmentWorker worker, ref SwiftList<Vector3d> outputIntersectionPoints) =>
         ReportRayOverlapWithoutIntersection;

@@ -6,15 +6,21 @@
 //=======================================================================
 
 using FixedMathSharp;
+using FixedMathSharp.Geometry;
 
 namespace Gravitas.Colliders;
 
 /// <summary>
-/// Exposes deterministic world vertices only for 2D shapes with one convex boundary.
+/// Exposes canonical scaled-local vertices and their center-relative rotation
+/// for a 2D shape with one convex boundary.
 /// </summary>
 internal interface IConvexVertexSource2D
 {
     int VertexCount { get; }
 
-    Vector2d GetVertexUnchecked(int index);
+    Fixed64 Rotation { get; }
+
+    Vector2d GetScaledLocalVertexUnchecked(int index);
+
+    FixedPointAnchor2d GetSupportAnchor(Vector2d direction);
 }

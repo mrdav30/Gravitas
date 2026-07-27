@@ -112,6 +112,7 @@ public sealed partial class ContinuousCollision2DTests
             immovable: true);
         source.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
         sourceCollider.LocalOffset = new Vector2d(Fixed64.MaxValue, Fixed64.Zero);
+        sourceCollider.RebuildRuntimeShapeOnly();
         source.ResolveContinuousCollisionProxyRadius().Should().Be(Fixed64.MaxValue);
 
         source.GatherRotationalContinuousCollisionCandidates(

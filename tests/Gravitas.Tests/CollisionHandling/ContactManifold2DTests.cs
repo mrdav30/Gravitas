@@ -1,6 +1,7 @@
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.CollisionHandling;
+using Gravitas.Materials;
 using System.Collections;
 using System.Linq;
 using Xunit;
@@ -9,6 +10,36 @@ namespace Gravitas.Tests.CollisionHandlingTests;
 
 public sealed class ContactManifold2DTests
 {
+    [Fact]
+    public void SetContact_WithCanonicalAnchors_ShouldReplaceExistingContacts()
+    {
+        var manifold = new ContactManifold2D();
+        manifold.AddContact(
+            Vector2d.Zero,
+            Vector2d.Right,
+            Fixed64.One,
+            Vector2d.Right);
+        var anchorA = new ContactAnchor2D(
+            Vector2d.One,
+            Fixed64.PiOver4,
+            Vector2d.Right);
+        var anchorB = ContactAnchor2D.FromWorldPoint(Vector2d.Zero);
+
+        manifold.SetContact(
+            anchorA,
+            anchorB,
+            Fixed64.Half,
+            Vector2d.Forward,
+            depthIsClamped: true);
+
+        manifold.Count.Should().Be(1);
+        ManifoldContact2D contact = manifold.PrimaryContact;
+        contact.AnchorA.Should().Be(anchorA);
+        contact.AnchorB.Should().Be(anchorB);
+        contact.Depth.Should().Be(Fixed64.Half);
+        contact.DepthIsClamped.Should().BeTrue();
+    }
+
     [Fact]
     public void NewManifold_ShouldBeEmpty()
     {
@@ -61,6 +92,157 @@ public sealed class ContactManifold2DTests
         manifold.Count.Should().Be(1);
         manifold.PrimaryContact.Depth.Should().Be(Fixed64.FromFraction(1, 2));
         manifold.PrimaryContact.Normal.Should().Be(Vector2d.Right);
+    }
+
+    [Fact]
+    public void AddContact_WithEqualScalarDepth_ShouldPreferConceptuallyClampedContact()
+    {
+        var manifold = new ContactManifold2D();
+        ContactAnchor2D anchorA = ContactAnchor2D.FromWorldPoint(Vector2d.Zero);
+        ContactAnchor2D anchorB = ContactAnchor2D.FromWorldPoint(Vector2d.Forward);
+
+        manifold.AddContact(anchorA, anchorB, Fixed64.MaxValue, Vector2d.Forward);
+        manifold.AddContact(
+            anchorA,
+            anchorB,
+            Fixed64.MaxValue,
+            Vector2d.Right,
+            depthIsClamped: true);
+
+        manifold.Count.Should().Be(1);
+        manifold.PrimaryContact.DepthIsClamped.Should().BeTrue();
+        manifold.PrimaryContact.Normal.Should().Be(Vector2d.Right);
+    }
+
+    [Fact]
+    public void RelativeAnchors_ShouldKeepIdentityUnderRigidTranslationWithoutRequiringWorldPoints()
+    {
+        var first = new ContactManifold2D();
+        var translated = new ContactManifold2D();
+        Vector2d firstOffset = Vector2d.Right;
+        Vector2d secondOffset = Vector2d.Left;
+        first.AddContact(
+            new ContactAnchor2D(new Vector2d(Fixed64.MaxValue, Fixed64.Zero), firstOffset),
+            new ContactAnchor2D(new Vector2d(Fixed64.MaxValue, Fixed64.One), secondOffset),
+            Fixed64.Half,
+            Vector2d.Forward);
+        translated.AddContact(
+            new ContactAnchor2D(new Vector2d(Fixed64.MinValue, Fixed64.Zero), firstOffset),
+            new ContactAnchor2D(new Vector2d(Fixed64.MinValue, Fixed64.One), secondOffset),
+            Fixed64.Half,
+            Vector2d.Forward);
+
+        ManifoldContact2D contact = first.PrimaryContact;
+        contact.ContactId.Should().Be(translated.PrimaryContact.ContactId);
+        contact.TryGetPointA(out _).Should().BeFalse();
+        contact.AnchorA.Offset.Should().Be(firstOffset);
+    }
+
+    [Fact]
+    public void CanonicalAnchors_ShouldKeepIdentityAcrossFrameRotation()
+    {
+        var first = new ContactManifold2D();
+        var rotated = new ContactManifold2D();
+        var differentFeature = new ContactManifold2D();
+        Vector2d localPointA = new(Fixed64.One, Fixed64.Two);
+        Vector2d localPointB = new(-Fixed64.One, Fixed64.Half);
+        Vector2d displacementA = new(Fixed64.Half, -Fixed64.Half);
+        Vector2d displacementB = new(-Fixed64.Half, Fixed64.One);
+
+        first.AddContact(
+            new ContactAnchor2D(
+                Vector2d.Zero,
+                Fixed64.Zero,
+                localPointA,
+                displacementA),
+            new ContactAnchor2D(
+                Vector2d.One,
+                Fixed64.Zero,
+                localPointB,
+                displacementB),
+            Fixed64.Half,
+            Vector2d.Right);
+        rotated.AddContact(
+            new ContactAnchor2D(
+                Vector2d.Forward,
+                Fixed64.PiOver4,
+                localPointA,
+                displacementA),
+            new ContactAnchor2D(
+                -Vector2d.One,
+                -Fixed64.PiOver4,
+                localPointB,
+                displacementB),
+            Fixed64.Half,
+            Vector2d.Forward);
+        differentFeature.AddContact(
+            new ContactAnchor2D(
+                Vector2d.Zero,
+                Fixed64.Zero,
+                localPointA,
+                displacementA + Vector2d.Right),
+            new ContactAnchor2D(
+                Vector2d.One,
+                Fixed64.Zero,
+                localPointB,
+                displacementB),
+            Fixed64.Half,
+            Vector2d.Right);
+
+        rotated.PrimaryContact.ContactId.Should().Be(first.PrimaryContact.ContactId);
+        differentFeature.PrimaryContact.ContactId.Should().NotBe(
+            first.PrimaryContact.ContactId);
+    }
+
+    [Fact]
+    public void CompoundPartNamespaces_ShouldDistinguishPartsAndPreserveOwnerOrder()
+    {
+        var manifold = new ContactManifold2D();
+        ContactAnchor2D anchorA = new(
+            Vector2d.Zero,
+            Vector2d.Right);
+        ContactAnchor2D anchorB = new(
+            Vector2d.Forward,
+            Vector2d.Left);
+
+        manifold.AddContact(
+            anchorA,
+            anchorB,
+            Fixed64.Half,
+            Vector2d.Forward,
+            PhysicsMaterial.Default,
+            PhysicsMaterial.Default,
+            featureNamespaceA: 1,
+            featureNamespaceB: -1);
+        manifold.AddContact(
+            anchorA,
+            anchorB,
+            Fixed64.One,
+            Vector2d.Forward,
+            PhysicsMaterial.Default,
+            PhysicsMaterial.Default,
+            featureNamespaceA: 1,
+            featureNamespaceB: -1);
+        manifold.AddContact(
+            anchorB,
+            anchorA,
+            Fixed64.Half,
+            Vector2d.Left,
+            PhysicsMaterial.Default,
+            PhysicsMaterial.Default,
+            featureNamespaceA: -2,
+            featureNamespaceB: 1);
+
+        manifold.Count.Should().Be(2);
+        manifold.Select(static contact => contact.ContactId)
+            .Should()
+            .OnlyHaveUniqueItems();
+        manifold.Single(contact =>
+                contact.FeatureNamespaceA == 1
+                && contact.FeatureNamespaceB == -1)
+            .Depth.Should().Be(Fixed64.One);
+        manifold.Single(contact => contact.FeatureNamespaceA == -2)
+            .FeatureNamespaceB.Should().Be(1);
     }
 
     [Fact]

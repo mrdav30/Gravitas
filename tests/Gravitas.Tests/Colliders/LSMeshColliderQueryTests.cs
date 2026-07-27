@@ -1,10 +1,12 @@
 using FixedMathSharp;
+using FixedMathSharp.Geometry;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Queries;
 using Gravitas.Tests.Support;
 using SwiftCollections;
 using SwiftCollections.Query;
+using System;
 using Xunit;
 
 namespace Gravitas.Tests.Colliders;
@@ -49,7 +51,7 @@ public sealed class LSMeshColliderQueryTests
         hit.Should().BeTrue();
         hits.Count.Should().Be(1);
         hits[0].Should().Be(expected);
-        mesh.Mesh.TriangleBvhBuildCount.Should().Be(1);
+        mesh.Mesh.TriangleBvhBuildCount.Should().Be(2);
     }
 
     [Fact]
@@ -336,9 +338,83 @@ public sealed class LSMeshColliderQueryTests
             new Vector3d(Fixed64.MinValue, Fixed64.Zero, Fixed64.Zero));
         Vector3d closestFromMinY = mesh.ClosestPointOnSurface(
             new Vector3d(Fixed64.Zero, Fixed64.MinValue, Fixed64.Zero));
+        Vector3d closestFromMinZ = mesh.ClosestPointOnSurface(
+            new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.MinValue));
 
         closest.Should().Be(Vector3d.Zero);
         closestFromMinY.Should().Be(Vector3d.Zero);
+        closestFromMinZ.Should().Be(Vector3d.Zero);
+    }
+
+    [Fact]
+    public void SurfaceQueries_WhenWorldToLocalConversionOverflows_ShouldScanEveryTriangle()
+    {
+        var mesh = new LSMeshCollider(
+            new[]
+            {
+                Vector3d.Zero,
+                Vector3d.Right,
+                Vector3d.Up,
+                Vector3d.Forward,
+                Vector3d.Right + Vector3d.Forward,
+                Vector3d.Up + Vector3d.Forward
+            },
+            new[] { 0, 1, 2, 3, 4, 5 },
+            MeshColliderMode.Concave,
+            MeshInertiaPolicy.SurfaceApproximation);
+        mesh.Mesh.UpdateTransform(
+            new Vector3d(Fixed64.MaxValue - Fixed64.Two, Fixed64.Zero, Fixed64.Zero),
+            FixedQuaternion.Identity,
+            Vector3d.One);
+
+        Vector3d above = new(Fixed64.MinValue, Fixed64.Zero, Fixed64.Two);
+        Vector3d below = new(Fixed64.MinValue, Fixed64.Zero, -Fixed64.One);
+
+        mesh.FindClosestPointAnchor(
+            above,
+            out FixedPointAnchor aboveAnchor,
+            out Vector3d aboveNormal);
+        mesh.FindClosestPointAnchor(
+            below,
+            out FixedPointAnchor belowAnchor,
+            out Vector3d belowNormal);
+        aboveAnchor.TryGetPoint(out Vector3d abovePoint).Should().BeTrue();
+        belowAnchor.TryGetPoint(out Vector3d belowPoint).Should().BeTrue();
+        abovePoint.Z.Should().Be(Fixed64.Half);
+        belowPoint.Z.Should().Be(-Fixed64.Half);
+        aboveNormal.Should().Be(Vector3d.Forward);
+        belowNormal.Should().Be(Vector3d.Backward);
+    }
+
+    [Fact]
+    public void ClosestPointOnSurface_WhenExactAnchorCannotMaterialize_ShouldReject()
+    {
+        var mesh = new LSMeshCollider(
+            new[]
+            {
+                new Vector3d(Fixed64.One, Fixed64.Zero, Fixed64.Zero),
+                new Vector3d(Fixed64.One, Fixed64.One, Fixed64.Zero),
+                new Vector3d(Fixed64.One, Fixed64.Zero, Fixed64.One),
+                new Vector3d(Fixed64.Zero, (Fixed64)10, Fixed64.Zero),
+                new Vector3d(Fixed64.Zero, (Fixed64)11, Fixed64.Zero),
+                new Vector3d(Fixed64.Zero, (Fixed64)10, Fixed64.One)
+            },
+            new[] { 0, 1, 2, 3, 4, 5 },
+            MeshColliderMode.Concave,
+            MeshInertiaPolicy.SurfaceApproximation);
+        mesh.Mesh.UpdateTransform(
+            new Vector3d(
+                Fixed64.MaxValue - Fixed64.FromFraction(1, 8),
+                Fixed64.Zero,
+                Fixed64.Zero),
+            FixedQuaternion.Identity,
+            Vector3d.One);
+
+        Action query = () => mesh.ClosestPointOnSurface(
+            mesh.Mesh.Origin + Vector3d.Down * Fixed64.FromFraction(11, 2));
+
+        query.Should().Throw<InvalidOperationException>()
+            .WithMessage("*outside*representable*");
     }
 
     [Fact]
@@ -436,6 +512,14 @@ public sealed class LSMeshColliderQueryTests
     {
         LSMeshCollider mesh = CreateZDominantMesh();
         var indices = new SwiftList<int>();
+        mesh.Bounds.Min.Should().Be(new Vector3d(
+            Fixed64.Zero,
+            Fixed64.Zero,
+            (Fixed64)(-4)));
+        mesh.Bounds.Max.Should().Be(new Vector3d(
+            Fixed64.One,
+            Fixed64.One,
+            (Fixed64)4));
 
         mesh.GetNearbyTriangles(new Vector3d(Fixed64.Half, Fixed64.Half, Fixed64.Zero), indices);
 

@@ -165,6 +165,25 @@ public sealed class MixedQuerySupportTests
     }
 
     [Fact]
+    public void TryClipSegment_WhenAxisIntervalsDifferByOneRawUnit_ShouldUseSharedBoundary()
+    {
+        Fixed64 oneRawBelowOne = Fixed64.One - Fixed64.Epsilon;
+
+        bool hit = SweepBoundsUtility.TryClipSegment(
+            Vector3d.Zero,
+            new Vector3d(1, 1, 0),
+            Fixed64.Two,
+            new Vector3d(Fixed64.One, oneRawBelowOne, -Fixed64.One),
+            new Vector3d(Fixed64.One, oneRawBelowOne, Fixed64.One),
+            out Fixed64 entry,
+            out Fixed64 exit);
+
+        hit.Should().BeTrue();
+        entry.Should().Be(exit);
+        entry.Should().Be(FixedMath.Midpoint(Fixed64.One, oneRawBelowOne));
+    }
+
+    [Fact]
     public void ClassifySweepSphereAgainst2D_ShouldMarkSupportedShapesExact()
     {
         LSCollider2D[] colliders =

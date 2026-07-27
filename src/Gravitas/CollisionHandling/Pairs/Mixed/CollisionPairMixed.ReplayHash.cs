@@ -17,7 +17,7 @@ internal sealed partial class CollisionPairMixed
         ref ChronicleHashWriter writer,
         GravitasReplayHashMode mode)
     {
-        writer.WriteSection("pair.mixed", 2);
+        writer.WriteSection("pair.mixed", 5);
         writer.WriteInt32(Collider3D.ReplayOrdinal);
         writer.WriteInt32(Collider2D.ReplayOrdinal);
         writer.WriteUInt64(MixedColliderKey.CreateKey(Collider3D.ReplayOrdinal, Collider2D.ReplayOrdinal));
@@ -28,10 +28,19 @@ internal sealed partial class CollisionPairMixed
         if (!Contact.HasContact)
             return;
 
-        writer.WriteVector3d(Contact.Point3D);
-        writer.WriteVector3d(Contact.Point2D);
+        writer.WriteVector3d(Contact.Anchor3D.Origin);
+        writer.WriteQuaternion(Contact.Anchor3D.Rotation);
+        writer.WriteVector3d(Contact.Anchor3D.LocalPoint);
+        writer.WriteVector3d(Contact.Anchor3D.LocalDisplacement);
+        writer.WriteUInt64(Contact.Anchor3D.GetLocalFeatureHash64());
+        writer.WriteVector3d(Contact.Anchor2D.Origin);
+        writer.WriteQuaternion(Contact.Anchor2D.Rotation);
+        writer.WriteVector3d(Contact.Anchor2D.LocalPoint);
+        writer.WriteVector3d(Contact.Anchor2D.LocalDisplacement);
+        writer.WriteUInt64(Contact.Anchor2D.GetLocalFeatureHash64());
         writer.WriteVector3d(Contact.Normal3DTo2D);
         writer.WriteFixed64(Contact.Depth);
+        writer.WriteBool(Contact.DepthIsClamped);
         writer.WriteBool(Contact.HasMaterialOverride);
         if (!Contact.HasMaterialOverride)
             return;

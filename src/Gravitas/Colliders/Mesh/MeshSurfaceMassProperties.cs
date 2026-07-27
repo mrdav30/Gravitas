@@ -58,7 +58,6 @@ public readonly struct MeshSurfaceMassProperties
         ReadOnlySpan<Vector3d> localVertices,
         ReadOnlySpan<int> triangles,
         ReadOnlySpan<Fixed64> scaledFaceAreas,
-        Vector3d scale,
         Vector3d reference,
         Fixed64 totalArea,
         out MeshSurfaceMassProperties properties)
@@ -69,13 +68,26 @@ public readonly struct MeshSurfaceMassProperties
         for (int i = 0; i < scaledFaceAreas.Length; i++)
         {
             int triangleIndex = i * 3;
-            Vector3d a = Vector3d.Multiply(localVertices[triangles[triangleIndex]], scale) - reference;
-            Vector3d b = Vector3d.Multiply(localVertices[triangles[triangleIndex + 1]], scale) - reference;
-            Vector3d c = Vector3d.Multiply(localVertices[triangles[triangleIndex + 2]], scale) - reference;
+            bool valid = TrySubtract(
+                localVertices[triangles[triangleIndex]],
+                reference,
+                out Vector3d a);
+            valid &= TrySubtract(
+                localVertices[triangles[triangleIndex + 1]],
+                reference,
+                out Vector3d b);
+            valid &= TrySubtract(
+                localVertices[triangles[triangleIndex + 2]],
+                reference,
+                out Vector3d c);
             Fixed64 area = scaledFaceAreas[i];
-            bool valid = TryAdd(a, b, out Vector3d vertexSum);
+            valid &= TryAdd(a, b, out Vector3d vertexSum);
             valid &= TryAdd(vertexSum, c, out vertexSum);
-            valid &= TryMultiply(vertexSum, area / (Fixed64)3, out Vector3d triangleMoment);
+            valid &= TryMultiplyDivide(
+                vertexSum,
+                area,
+                (Fixed64)3,
+                out Vector3d triangleMoment);
             valid &= TryAdd(firstMoment, triangleMoment, out firstMoment);
             if (!valid)
             {
@@ -83,17 +95,34 @@ public readonly struct MeshSurfaceMassProperties
             }
         }
 
-        Vector3d centerRelativeToReference = firstMoment / totalArea;
-        Vector3d centerOfMass = reference + centerRelativeToReference;
+        // Positive face-area weights keep the centroid inside the admitted
+        // vertex bounds, so both materializations are representable.
+        _ = TryDivide(
+            firstMoment,
+            totalArea,
+            out Vector3d centerRelativeToReference);
+        _ = TryAdd(
+            reference,
+            centerRelativeToReference,
+            out Vector3d centerOfMass);
 
         Fixed3x3 areaWeightedTensor = Fixed3x3.Zero;
         for (int i = 0; i < scaledFaceAreas.Length; i++)
         {
             int triangleIndex = i * 3;
-            Vector3d a = Vector3d.Multiply(localVertices[triangles[triangleIndex]], scale) - reference;
-            Vector3d b = Vector3d.Multiply(localVertices[triangles[triangleIndex + 1]], scale) - reference;
-            Vector3d c = Vector3d.Multiply(localVertices[triangles[triangleIndex + 2]], scale) - reference;
-            bool valid = TryAdd(a, b, out Vector3d triangleSum);
+            bool valid = TrySubtract(
+                localVertices[triangles[triangleIndex]],
+                reference,
+                out Vector3d a);
+            valid &= TrySubtract(
+                localVertices[triangles[triangleIndex + 1]],
+                reference,
+                out Vector3d b);
+            valid &= TrySubtract(
+                localVertices[triangles[triangleIndex + 2]],
+                reference,
+                out Vector3d c);
+            valid &= TryAdd(a, b, out Vector3d triangleSum);
             valid &= TryAdd(triangleSum, c, out triangleSum);
             valid &= TryDivide(triangleSum, (Fixed64)3, out Vector3d triangleCenter);
             valid &= TrySubtract(a, triangleCenter, out Vector3d relativeA);
@@ -126,7 +155,14 @@ public readonly struct MeshSurfaceMassProperties
             }
         }
 
-        Fixed3x3 unitCenterTensor = areaWeightedTensor * (Fixed64.One / totalArea);
+        // Every accumulated tensor component is an area-weighted average of
+        // representable per-triangle components. With positive admitted face
+        // areas, dividing the representable sum by their positive total cannot
+        // leave the Fixed64 component domain.
+        _ = TryDivide(
+            areaWeightedTensor,
+            totalArea,
+            out Fixed3x3 unitCenterTensor);
 
         properties = new MeshSurfaceMassProperties(totalArea, centerOfMass, centerOfMass, unitCenterTensor);
         return true;

@@ -6,7 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
-using FixedMathSharp.Bounds;
+using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
 using System;
 using System.Runtime.CompilerServices;
@@ -15,6 +15,75 @@ namespace Gravitas.CollisionHandling;
 
 internal static class ConvexColliderSupport
 {
+    public static FixedPointAnchor GetSupportAnchor(
+        LSCollider collider,
+        Vector3d direction,
+        Vector3d originOffset)
+    {
+        Vector3d normal = ResolveSupportDirection(direction);
+        Vector3d localTranslation =
+            GetLocalDisplacement(collider.Rotation, originOffset);
+        if (collider is LSSphereCollider sphere)
+        {
+            return FixedSegment.GetCenteredCapsuleSupportAnchor(
+                    sphere.Center,
+                    sphere.Rotation,
+                    Fixed64.Zero,
+                    sphere.ScaledRadius,
+                    normal)
+                .WithLocalTranslation(localTranslation);
+        }
+        if (collider is LSCapsuleCollider capsule)
+        {
+            return FixedSegment.GetCenteredCapsuleSupportAnchor(
+                    capsule.Center,
+                    capsule.Rotation,
+                    capsule.AxisLength,
+                    capsule.ScaledRadius,
+                    normal)
+                .WithLocalTranslation(localTranslation);
+        }
+        if (collider is LSCuboidCollider cuboid)
+        {
+            return new FixedPointAnchor(
+                cuboid.Center,
+                cuboid.Rotation,
+                cuboid.OrientedBox.GetLocalSupportPoint(normal))
+                .WithLocalTranslation(localTranslation);
+        }
+        if (collider is LSCylinderCollider cylinder)
+        {
+            return FixedSegment.GetCenteredFiniteCylinderSupportAnchor(
+                    cylinder.Center,
+                    cylinder.Rotation,
+                    cylinder.Height,
+                    cylinder.ScaledRadius,
+                    normal)
+                .WithLocalTranslation(localTranslation);
+        }
+        if (collider is LSConeCollider cone)
+        {
+            return FixedSegment.GetCenteredFiniteConeSupportAnchor(
+                    cone.Center,
+                    cone.Rotation,
+                    cone.Height,
+                    cone.ScaledRadius,
+                    normal)
+                .WithLocalTranslation(localTranslation);
+        }
+        if (collider is LSMeshCollider { Mode: MeshColliderMode.Convex } mesh)
+        {
+            return new FixedPointAnchor(
+                mesh.Mesh.Origin,
+                mesh.Mesh.Rotation,
+                mesh.Mesh.GetSupportVertexLocal(normal))
+                .WithLocalTranslation(localTranslation);
+        }
+
+        throw new NotSupportedException(
+            $"Convex support mapping does not support {collider.GetType().Name}.");
+    }
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool IsSupported(LSCollider collider) =>
         collider is LSSphereCollider
@@ -23,33 +92,6 @@ internal static class ConvexColliderSupport
             or LSCylinderCollider
             or LSConeCollider
             or LSMeshCollider { Mode: MeshColliderMode.Convex };
-
-    public static Vector3d Support(LSCollider collider, Vector3d direction)
-    {
-        Vector3d normal = ResolveSupportDirection(direction);
-
-        return collider switch
-        {
-            LSSphereCollider sphere => sphere.Center + normal * sphere.ScaledRadius,
-            LSCapsuleCollider capsule => SupportCapsule(capsule, normal),
-            LSCuboidCollider cuboid => SupportVertices(cuboid.Vertices, normal),
-            LSCylinderCollider cylinder => SupportCylinder(cylinder, normal),
-            LSConeCollider cone => SupportCone(cone, normal),
-            LSMeshCollider mesh when mesh.Mode == MeshColliderMode.Convex => mesh.Mesh.GetSupportVertexWorld(normal),
-            _ => throw new NotSupportedException(
-                $"Convex support mapping does not support {collider.GetType().Name}.")
-        };
-    }
-
-    public static FixedRange ProjectOntoAxis(LSCollider collider, Vector3d axis)
-    {
-        Vector3d normalized = axis != Vector3d.Zero
-            ? axis.Normalized
-            : Vector3d.Right;
-        Fixed64 min = Vector3d.Dot(Support(collider, -normalized), normalized);
-        Fixed64 max = Vector3d.Dot(Support(collider, normalized), normalized);
-        return new FixedRange(min, max);
-    }
 
     public static bool Intersects(LSCollider first, LSCollider second, int maxIterations = 32)
     {
@@ -62,14 +104,17 @@ internal static class ConvexColliderSupport
         if (direction.MagnitudeSquared <= Fixed64.Epsilon)
             direction = Vector3d.Right;
 
-        simplex[count++] = SupportMinkowski(first, second, direction);
+        if (!TrySupportMinkowski(first, second, direction, out simplex[count]))
+            return false;
+        count++;
         direction = -simplex[0];
         if (direction.MagnitudeSquared <= Fixed64.Epsilon)
             return true;
 
         for (int i = 0; i < maxIterations; i++)
         {
-            Vector3d point = SupportMinkowski(first, second, direction);
+            if (!TrySupportMinkowski(first, second, direction, out Vector3d point))
+                return false;
             if (Vector3d.Dot(point, direction) < -Fixed64.Epsilon)
                 return false;
 
@@ -103,14 +148,35 @@ internal static class ConvexColliderSupport
         if (direction.MagnitudeSquared <= Fixed64.Epsilon)
             direction = Vector3d.Right;
 
-        simplex[count++] = SupportMinkowskiConeCollider(collider, apex, baseCenter, axis, endRadius, direction);
+        if (!TrySupportMinkowskiConeCollider(
+                collider,
+                apex,
+                baseCenter,
+                axis,
+                endRadius,
+                direction,
+                out simplex[count]))
+        {
+            return false;
+        }
+        count++;
         direction = -simplex[0];
         if (direction.MagnitudeSquared <= Fixed64.Epsilon)
             return true;
 
         for (int i = 0; i < maxIterations; i++)
         {
-            Vector3d point = SupportMinkowskiConeCollider(collider, apex, baseCenter, axis, endRadius, direction);
+            if (!TrySupportMinkowskiConeCollider(
+                    collider,
+                    apex,
+                    baseCenter,
+                    axis,
+                    endRadius,
+                    direction,
+                    out Vector3d point))
+            {
+                return false;
+            }
             if (Vector3d.Dot(point, direction) < -Fixed64.Epsilon)
                 return false;
 
@@ -126,25 +192,63 @@ internal static class ConvexColliderSupport
         return true;
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Vector3d SupportMinkowski(LSCollider first, LSCollider second, Vector3d direction) =>
-        Support(first, direction) - Support(second, -direction);
+    private static bool TrySupportMinkowski(
+        LSCollider first,
+        LSCollider second,
+        Vector3d direction,
+        out Vector3d difference)
+    {
+        Vector3d normal = ResolveSupportDirection(direction);
+        if (first is LSCuboidCollider firstBox
+            && second is LSCuboidCollider secondBox)
+        {
+            return firstBox.OrientedBox.TryGetSupportDifference(
+                secondBox.OrientedBox,
+                normal,
+                out difference);
+        }
+
+        FixedPointAnchor supportA =
+            GetSupportAnchor(first, normal, Vector3d.Zero);
+        FixedPointAnchor supportB =
+            GetSupportAnchor(second, -normal, Vector3d.Zero);
+        return supportA.TryGetOffsetFrom(supportB, out difference);
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Vector3d SupportMinkowskiConeCollider(
+    private static bool TrySupportMinkowskiConeCollider(
         LSCollider collider,
         Vector3d apex,
         Vector3d baseCenter,
         Vector3d axis,
         Fixed64 endRadius,
-        Vector3d direction) =>
-        ConeGeometry.GetFiniteConeSupportPoint(
+        Vector3d direction,
+        out Vector3d difference)
+    {
+        Vector3d normal = ResolveSupportDirection(direction);
+        Vector3d radialDirection =
+            Vector3d.GetNormalizedProjectionOnPlane(normal, axis);
+        var apexAnchor = new FixedPointAnchor(
             apex,
+            FixedQuaternion.Identity,
+            Vector3d.Zero);
+        var baseAnchor = new FixedPointAnchor(
             baseCenter,
-            axis,
-            endRadius,
-            ResolveSupportDirection(direction))
-        - Support(collider, -direction);
+            FixedQuaternion.Identity,
+            radialDirection * endRadius);
+        FixedPointAnchor coneSupport =
+            baseAnchor.ProjectNonNegativeOffsetFrom(apexAnchor, normal)
+                > Fixed64.Zero
+            || apexAnchor.ProjectNonNegativeOffsetFrom(baseAnchor, normal)
+                == Fixed64.Zero
+                ? baseAnchor
+                : apexAnchor;
+        FixedPointAnchor colliderSupport =
+            GetSupportAnchor(collider, -normal, Vector3d.Zero);
+        return coneSupport.TryGetOffsetFrom(
+            colliderSupport,
+            out difference);
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Vector3d ResolveSupportDirection(Vector3d direction) =>
@@ -152,59 +256,19 @@ internal static class ConvexColliderSupport
             ? direction.Normalized
             : Vector3d.Right;
 
-    private static Vector3d SupportCapsule(LSCapsuleCollider capsule, Vector3d direction)
+    private static Vector3d GetLocalDisplacement(
+        FixedQuaternion rotation,
+        Vector3d worldDisplacement)
     {
-        Vector3d segmentPoint = Vector3d.CompareProjection(
-                capsule.LineSegmentEnd,
-                capsule.LineSegmentStart,
-                direction) > 0
-            ? capsule.LineSegmentEnd
-            : capsule.LineSegmentStart;
-        return segmentPoint + direction * capsule.ScaledRadius;
-    }
-
-    private static Vector3d SupportCylinder(LSCylinderCollider cylinder, Vector3d direction)
-    {
-        Vector3d localDirection = cylinder.Rotation.Inverse() * direction;
-        Vector3d radial = new(localDirection.X, Fixed64.Zero, localDirection.Z);
-        Fixed64 radialMagnitude = radial.Magnitude;
-        Vector3d radialSupport = radialMagnitude > Fixed64.Epsilon
-            ? radial / radialMagnitude * cylinder.ScaledRadius
-            : Vector3d.Right * cylinder.ScaledRadius;
-        Fixed64 y = localDirection.Y >= Fixed64.Zero ? cylinder.HalfHeight : -cylinder.HalfHeight;
-        return cylinder.Center + cylinder.Rotation * new Vector3d(radialSupport.X, y, radialSupport.Z);
-    }
-
-    private static Vector3d SupportCone(LSConeCollider cone, Vector3d direction)
-    {
-        Vector3d localDirection = cone.Rotation.Inverse() * direction;
-        Vector3d radial = new(localDirection.X, Fixed64.Zero, localDirection.Z);
-        Fixed64 radialMagnitude = radial.Magnitude;
-        Vector3d radialSupport = radialMagnitude > Fixed64.Epsilon
-            ? radial / radialMagnitude * cone.ScaledRadius
-            : Vector3d.Right * cone.ScaledRadius;
-
-        Vector3d localBase = new(radialSupport.X, -cone.HalfHeight, radialSupport.Z);
-        Vector3d localApex = new(Fixed64.Zero, cone.HalfHeight, Fixed64.Zero);
-        return cone.Center + cone.Rotation * (
-            Vector3d.CompareProjection(localApex, localBase, localDirection) >= 0
-                ? localApex
-                : localBase);
-    }
-
-    private static Vector3d SupportVertices(Vector3d[] vertices, Vector3d direction)
-    {
-        Vector3d best = vertices[0];
-        for (int i = 1; i < vertices.Length; i++)
+        if (rotation.Inverse().TryRotate(
+                worldDisplacement,
+                out Vector3d localDisplacement))
         {
-            Vector3d candidate = vertices[i];
-            if (Vector3d.CompareProjection(candidate, best, direction) <= 0)
-                continue;
-
-            best = candidate;
+            return localDisplacement;
         }
 
-        return best;
+        throw new InvalidOperationException(
+            "The sweep displacement cannot be represented in the collider's canonical frame.");
     }
 
 }

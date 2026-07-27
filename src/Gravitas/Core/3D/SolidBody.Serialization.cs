@@ -51,6 +51,7 @@ public partial class SolidBody
         RecordValues.Look(chronicler, ref _groundNormal, "GroundNormal");
         RecordValues.Look(chronicler, ref _hitPlatformPosition, "HitPlatformPosition");
         RecordValues.Look(chronicler, ref _hitPoint, "HitPoint");
+        RecordValues.Look(chronicler, ref _hasHitPoint, "HasHitPoint");
         RecordValues.Look(chronicler, ref _isGrounded, "IsGrounded");
         RecordValues.Look(chronicler, ref _wasGrounded, "WasGrounded");
         RecordValues.Look(chronicler, ref _lastGroundedPosition, "LastGroundedPosition");

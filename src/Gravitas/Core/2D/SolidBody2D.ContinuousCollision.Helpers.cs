@@ -41,66 +41,18 @@ public sealed partial class SolidBody2D
 
     internal Fixed64 ResolveContinuousCollisionProxyRadius()
     {
-        if (Collider is LSCircleCollider2D circle)
-        {
-            bool offsetResolved = Vector2d.TrySubtract(
-                circle.Center,
-                _position,
-                out Vector2d centerOffset);
-            bool distanceResolved = Vector2d.TryGetMagnitude(
-                centerOffset,
+        bool offsetResolved =
+            Collider.TryGetCurrentScaledOffset(out Vector2d centerOffset);
+        bool distanceResolved =
+            centerOffset.TryGetMagnitudeCeiling(
                 out Fixed64 offsetDistance);
-            bool radiusResolved = Fixed64.TryAdd(
-                offsetDistance,
-                circle.ScaledRadius,
-                out Fixed64 circleRadius);
-            if (!(offsetResolved & distanceResolved & radiusResolved))
-            {
-                return Fixed64.MaxValue;
-            }
-
-            return circleRadius;
-        }
-
-        return Collider.VertexCount > 0
-            ? ResolveConvexContinuousCollisionProxyRadius()
-            : ResolveBoundsContinuousCollisionProxyRadius();
-    }
-
-    private Fixed64 ResolveConvexContinuousCollisionProxyRadius()
-    {
-        int vertexCount = Collider.VertexCount;
-        Fixed64 bestDistance = Fixed64.Zero;
-        for (int i = 0; i < vertexCount; i++)
-        {
-            Vector2d vertex = Collider.GetVertexUnchecked(i);
-            if (!TryKeepPivotDistance(vertex, ref bestDistance))
-                return Fixed64.MaxValue;
-        }
-
-        return bestDistance;
-    }
-
-    private Fixed64 ResolveBoundsContinuousCollisionProxyRadius()
-    {
-        Vector2d min = Collider.Bounds.Min;
-        Vector2d max = Collider.Bounds.Max;
-        Fixed64 bestDistance = Fixed64.Zero;
-        return TryKeepPivotDistance(min, ref bestDistance)
-            & TryKeepPivotDistance(new Vector2d(min.X, max.Y), ref bestDistance)
-            & TryKeepPivotDistance(new Vector2d(max.X, min.Y), ref bestDistance)
-            & TryKeepPivotDistance(max, ref bestDistance)
-                ? bestDistance
-                : Fixed64.MaxValue;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private bool TryKeepPivotDistance(Vector2d point, ref Fixed64 bestDistance)
-    {
-        bool offsetResolved = Vector2d.TrySubtract(point, _position, out Vector2d offset);
-        bool distanceResolved = Vector2d.TryGetMagnitude(offset, out Fixed64 distance);
-        bestDistance = FixedMath.Max(bestDistance, distance);
-        return offsetResolved & distanceResolved;
+        bool radiusResolved = Fixed64.TryAdd(
+            offsetDistance,
+            Collider.CanonicalCenteredProxyRadius,
+            out Fixed64 proxyRadius);
+        return offsetResolved & distanceResolved & radiusResolved
+            ? proxyRadius
+            : Fixed64.MaxValue;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

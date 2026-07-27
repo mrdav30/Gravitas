@@ -241,59 +241,93 @@ public partial class SolidBody
     public void SetPosition(Vector3d position)
     {
         PreflightStaticPoseChange();
+        bool preparedPose = PrepareExplicitBodyPose(
+            position,
+            Rotation,
+            nameof(position),
+            "The requested body position produces collider geometry outside the representable coordinate domain.");
         if (Position3d != position)
             Wake();
 
         Position3d = position;
-        RefreshStaticColliderAfterExplicitPoseChange();
+        PublishExplicitBodyPose(preparedPose);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void SetHeight(Fixed64 height)
     {
         PreflightStaticPoseChange();
+        Vector3d position = Position3d;
+        position.Y = height;
+        bool preparedPose = PrepareExplicitBodyPose(
+            position,
+            Rotation,
+            nameof(height),
+            "The requested body height produces collider geometry outside the representable coordinate domain.");
         if (HeightPos != height)
             Wake();
 
         HeightPos = height;
-        RefreshStaticColliderAfterExplicitPoseChange();
+        PublishExplicitBodyPose(preparedPose);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void SetRotation(FixedQuaternion quaternion)
     {
         FixedQuaternion normalizedRotation = quaternion.Normalized;
-        PreflightStaticPoseChange(normalizedRotation);
+        PreflightStaticPoseChange();
+        bool preparedPose = PrepareExplicitBodyPose(
+            Position3d,
+            normalizedRotation,
+            nameof(quaternion),
+            "The requested body rotation produces collider geometry outside the representable coordinate domain.");
         if (Rotation != normalizedRotation)
             Wake();
 
         Rotation = normalizedRotation;
-        RefreshStaticColliderAfterExplicitPoseChange();
+        PublishExplicitBodyPose(preparedPose);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private void RefreshStaticColliderAfterExplicitPoseChange()
+    private bool PrepareExplicitBodyPose(
+        Vector3d position,
+        FixedQuaternion rotation,
+        string parameterName,
+        string message)
     {
-        if (IsStatic)
-            RefreshPartitionMobility();
+        if (!Active)
+            return false;
+
+        SwiftThrowHelper.ThrowIfTrue(
+            !Collider.TryPrepareBodyPose(position, rotation),
+            parameterName,
+            message);
+        return true;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private void PreflightStaticPoseChange(FixedQuaternion? rotation = null)
+    private void PublishExplicitBodyPose(bool preparedPose)
+    {
+        if (!preparedPose)
+            return;
+
+        Collider.PublishPreparedExplicitBodyPose();
+        RefreshPartitionMobility();
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void PreflightStaticPoseChange()
     {
         if (Active && IsStatic)
         {
             ThrowIfRuntimeRegistrationMissing();
             Context.ThrowIfFixedStepMutationNotAllowed();
-            if (rotation.HasValue)
-                Collider.ValidateCurrentRuntimeTransform(rotation.Value);
-            else
-                Collider.ValidateCurrentRuntimeTransform();
+            Collider.ValidateCurrentRuntimeTransform();
         }
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private void PreflightResetPoseChange(FixedQuaternion rotation)
+    private void PreflightResetPoseChange()
     {
         if (!Active)
             return;
@@ -303,7 +337,7 @@ public partial class SolidBody
             return;
 
         Context.ThrowIfFixedStepMutationNotAllowed();
-        Collider.ValidateCurrentRuntimeTransform(rotation);
+        Collider.ValidateCurrentRuntimeTransform();
     }
 
     private void ProcessMovable()
@@ -532,11 +566,7 @@ public partial class SolidBody
         }
 
         CheckGroundForSimulation();
-
-        if (_isGrounded)
-            HeightPos = HitPoint.Y;
-        else
-            ResetGroundCalculations();
+        ApplyGroundedHeightOrReset();
 
         CheckChangedValues();
         if (!CanRotate && !RotationChangePending)

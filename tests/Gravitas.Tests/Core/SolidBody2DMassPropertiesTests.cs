@@ -1,7 +1,9 @@
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
+using Gravitas.CollisionHandling;
 using Gravitas.Tests.Support;
+using System;
 using Xunit;
 
 namespace Gravitas.Tests.Core;
@@ -105,6 +107,108 @@ public sealed class SolidBody2DMassPropertiesTests
         body.LocalCenterOfMassOffset = new Vector2d((Fixed64)2, Fixed64.Zero);
 
         body.WorldCenterOfMass.Should().Be(new Vector2d((Fixed64)3, (Fixed64)6));
+    }
+
+    [Fact]
+    public void WorldCenterOfMass_WhenAbsolutePointIsUnrepresentable_ShouldExposeTryContract()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        SolidBody2D body = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.One),
+            mass: Fixed64.One);
+        body.SetPosition(new Vector2d(Fixed64.MaxValue, Fixed64.Zero));
+        body.LocalCenterOfMassOffset = Vector2d.Right;
+
+        body.TryGetWorldCenterOfMass(out Vector2d center).Should().BeFalse();
+        center.Should().Be(Vector2d.Zero);
+
+        Func<Vector2d> readWorldCenter = () => body.WorldCenterOfMass;
+        readWorldCenter.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void WorldCenterOfMass_WhenRotatedOffsetIsUnrepresentable_ShouldExposeTryContract()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        SolidBody2D body = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.One),
+            mass: Fixed64.One);
+        body.LocalCenterOfMassOffset = new Vector2d(
+            Fixed64.MaxValue,
+            Fixed64.MaxValue);
+        body.SetRotation(Fixed64.PiOver4);
+
+        body.TryGetWorldCenterOfMass(out Vector2d center).Should().BeFalse();
+        center.Should().Be(Vector2d.Zero);
+        body.TryGetOffsetFromCenterOfMass(
+            new ContactAnchor2D(Vector2d.Zero, Vector2d.Zero),
+            out Vector2d offset).Should().BeFalse();
+        offset.Should().Be(Vector2d.Zero);
+    }
+
+    [Fact]
+    public void CenterOfMassOperations_WhenRotationOverflowsButFinalValuesCancel_ShouldSucceed()
+    {
+        using GravitasWorldContext context =
+            Physics2DTestWorld.CreateContext();
+        Vector2d localOffset = new(
+            Fixed64.MaxValue,
+            Fixed64.MaxValue);
+        Vector2d.TryRotate(
+            localOffset,
+            Fixed64.PiOver4,
+            out _).Should().BeFalse();
+
+        SolidBody2D worldBody = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.One),
+            mass: Fixed64.One);
+        worldBody.SetPosition(new Vector2d(
+            Fixed64.Zero,
+            -Fixed64.MaxValue));
+        worldBody.LocalCenterOfMassOffset = localOffset;
+        worldBody.SetRotation(Fixed64.PiOver4);
+        worldBody.TryGetWorldCenterOfMass(
+            out Vector2d worldCenter).Should().BeTrue();
+        worldCenter.Y.Should().BeGreaterThan(Fixed64.Zero);
+        worldCenter.Y.Should().BeLessThan(Fixed64.MaxValue);
+
+        SolidBody2D relativeBody = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.One),
+            mass: Fixed64.One);
+        relativeBody.LocalCenterOfMassOffset = localOffset;
+        relativeBody.SetRotation(Fixed64.PiOver4);
+        relativeBody.TryGetOffsetFromCenterOfMass(
+            new ContactAnchor2D(
+                new Vector2d(
+                    Fixed64.Zero,
+                    Fixed64.MaxValue),
+                new Vector2d(
+                    Fixed64.Zero,
+                    Fixed64.MaxValue)),
+            out Vector2d relative).Should().BeTrue();
+        relative.Y.Should().BeGreaterThan(Fixed64.Zero);
+        relative.Y.Should().BeLessThan(Fixed64.MaxValue);
+    }
+
+    [Fact]
+    public void TryGetOffsetFromCenterOfMass_WhenAbsolutePointsAreUnrepresentable_ShouldRetainExactLeverArm()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        SolidBody2D body = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.One),
+            mass: Fixed64.One);
+        body.LocalCenterOfMassOffset = Vector2d.Right;
+        var anchor = new ContactAnchor2D(
+            new Vector2d(Fixed64.MaxValue, Fixed64.Zero),
+            Vector2d.Right);
+
+        body.TryGetOffsetFromCenterOfMass(anchor, out Vector2d offset).Should().BeTrue();
+        offset.Should().Be(new Vector2d(Fixed64.MaxValue, Fixed64.Zero));
     }
 
     [Fact]

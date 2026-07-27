@@ -6,8 +6,9 @@
 //=======================================================================
 
 using FixedMathSharp;
-using FixedMathSharp.Bounds;
+using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
+using System;
 
 namespace Gravitas.CollisionHandling;
 
@@ -33,14 +34,17 @@ public static partial class CollisionDetectionMixed
         }
 
         if (collider3D is LSCuboidCollider cuboid
-            && collider2D is LSCircleCollider2D circle
-            && IsWorldYAligned(cuboid))
+            && collider2D is LSCircleCollider2D circle)
         {
             supported = true;
-            return TryGetYawCuboidCircleSlabSeparationGap(
-                cuboid,
-                circle,
-                out separationGap);
+            separationGap = cuboid.OrientedBox.GetCircleSlabSeparationLowerBound(
+                new Vector3d(
+                    circle.Center.X,
+                    circle.MixedSlabCenterY,
+                    circle.Center.Y),
+                circle.MixedHalfThickness,
+                circle.ScaledRadius);
+            return true;
         }
 
         return false;
@@ -72,103 +76,37 @@ public static partial class CollisionDetectionMixed
         return true;
     }
 
-    private static bool TryGetYawCuboidCircleSlabSeparationGap(
-        LSCuboidCollider cuboid,
-        LSCircleCollider2D circle,
-        out Fixed64 separationGap)
-    {
-        Vector3d center3D = cuboid.Center;
-        Vector2d cuboidCenter = new(center3D.X, center3D.Z);
-        if (!Vector2d.TrySubtract(circle.Center, cuboidCenter, out Vector2d delta))
-        {
-            separationGap = default;
-            return false;
-        }
-
-        // IsWorldYAligned and quaternion admission guarantee non-degenerate
-        // planar X/Z axes. Dot saturation is intentional here: each result is
-        // immediately clamped to the corresponding representable half extent.
-        Vector3d worldAxisX = cuboid.Rotation.Rotate(Vector3d.Right);
-        Vector3d worldAxisZ = cuboid.Rotation.Rotate(Vector3d.Forward);
-        Vector2d axisX = new Vector2d(worldAxisX.X, worldAxisX.Z).Normalized;
-        Vector2d axisZ = new Vector2d(worldAxisZ.X, worldAxisZ.Z).Normalized;
-        Fixed64 halfX = cuboid.ScaledSize.X * Fixed64.Half;
-        Fixed64 halfY = cuboid.ScaledSize.Y * Fixed64.Half;
-        Fixed64 halfZ = cuboid.ScaledSize.Z * Fixed64.Half;
-        Fixed64 localX = Vector2d.Dot(delta, axisX);
-        Fixed64 localZ = Vector2d.Dot(delta, axisZ);
-        localX = FixedMath.Clamp(localX, -halfX, halfX);
-        localZ = FixedMath.Clamp(localZ, -halfZ, halfZ);
-        // Saturation can only pull an out-of-domain box feature back onto the
-        // representable boundary, which underestimates this pruning gap and is
-        // therefore conservative.
-        Vector2d closestOffset = axisX * localX + axisZ * localZ;
-        Vector2d closestPoint = cuboidCenter + closestOffset;
-        if (!Vector2d.TryGetDistance(circle.Center, closestPoint, out Fixed64 planarDistance)
-            || !Fixed64.TrySubtract(center3D.Y, halfY, out Fixed64 cuboidMinY)
-            || !Fixed64.TryAdd(center3D.Y, halfY, out Fixed64 cuboidMaxY)
-            || !TryGetIntervalGap(
-                cuboidMinY,
-                cuboidMaxY,
-                circle.MixedBounds3D.Min.Y,
-                circle.MixedBounds3D.Max.Y,
-                out Fixed64 verticalGap))
-        {
-            separationGap = default;
-            return false;
-        }
-
-        Fixed64 planarGap = planarDistance - circle.ScaledRadius;
-        separationGap = FixedMath.Max(
-            FixedMath.Max(planarGap, Fixed64.Zero),
-            verticalGap);
-        return true;
-    }
-
     private static bool TryGetPolygonExteriorGap(
         LSPolygonCollider2D polygon,
         Vector2d point,
         out Fixed64 exteriorGap)
     {
-        Vector2d fanOrigin = polygon.GetVertexUnchecked(0);
-        for (int i = 1; i < polygon.VertexCount - 1; i++)
+        ReadOnlySpan<Vector2d> offsets = polygon.ScaledLocalVertices;
+        if (FixedConvex2dRelations.ContainsPoint(
+                point,
+                polygon.Center,
+                polygon.Rotation,
+                offsets))
         {
-            if (new FixedTriangle2d(
-                    fanOrigin,
-                    polygon.GetVertexUnchecked(i),
-                    polygon.GetVertexUnchecked(i + 1)).Contains(point))
-            {
-                exteriorGap = Fixed64.Zero;
-                return true;
-            }
+            exteriorGap = Fixed64.Zero;
+            return true;
         }
 
-        Fixed64 bestDistance = Fixed64.MaxValue;
-        int vertexCount = polygon.VertexCount;
-        for (int i = 0; i < vertexCount; i++)
+        FixedPointAnchor2d closestPoint =
+            FixedConvex2dRelations.GetClosestPointAnchor(
+                point,
+                polygon.Center,
+                polygon.Rotation,
+                offsets);
+        if (!new ContactAnchor2D(closestPoint)
+                .TryGetOffsetFrom(point, out Vector2d difference)
+            || !Vector2d.TryGetMagnitude(difference, out exteriorGap))
         {
-            Vector2d start = polygon.GetVertexUnchecked(i);
-            Vector2d end = polygon.GetVertexUnchecked((i + 1) % vertexCount);
-            Vector2d candidate = new FixedSegment2d(start, end).ClosestPoint(point);
-            if (!Vector2d.TryGetDistance(point, candidate, out Fixed64 distance))
-            {
-                exteriorGap = default;
-                return false;
-            }
-
-            if (distance < bestDistance)
-                bestDistance = distance;
+            exteriorGap = default;
+            return false;
         }
 
-        exteriorGap = bestDistance;
         return true;
-    }
-
-    private static bool IsWorldYAligned(LSCuboidCollider cuboid)
-    {
-        Vector3d yAxis = cuboid.Rotation.Rotate(Vector3d.Up);
-        return yAxis.ToVector2d() == Vector2d.Zero
-            && yAxis.Y.Abs() > Fixed64.Epsilon;
     }
 
     private static bool TryGetPointIntervalGap(

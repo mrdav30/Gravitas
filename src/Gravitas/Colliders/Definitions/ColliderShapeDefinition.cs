@@ -122,6 +122,14 @@ public readonly struct ColliderShapeDefinition : IEquatable<ColliderShapeDefinit
     {
         ValidateRadius(radius);
         ValidateHeight(height);
+        SwiftThrowHelper.ThrowIfArgument(
+            Fixed64.CompareProducts(
+                height,
+                Fixed64.One,
+                radius,
+                Fixed64.Two) < 0,
+            nameof(height),
+            "Capsule height must be at least the capsule diameter.");
         Fixed64 diameter = radius * (Fixed64)2;
         return new(
             ColliderShapeDefinitionKind.Capsule,

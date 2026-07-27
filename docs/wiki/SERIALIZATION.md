@@ -40,6 +40,9 @@ Runtime-owned state that should not be serialized:
 - GridForge partition coordinate lists and active partition payloads.
 - collision pairs, pair holder references, warm runtime pair caches, query
   buffers, diagnostic buffers, and pooled collections.
+- derived collider geometry and bounds caches, including materialized finite
+  endpoints, oriented-box projections, transformed mesh data, and planar world
+  vertices. These are rebuilt from canonical authored/body state.
 - context-local joint IDs, ragdoll IDs, articulation suppression tables, and
   service-owned joint/ragdoll arrays.
 - lifecycle hooks, delegates, renderer callbacks, and event subscribers.
@@ -88,6 +91,14 @@ authoritative.
 Pair-local contact caches and joint solver caches are rebuildable runtime data
 unless a drift investigation explicitly hashes them through
 `GravitasReplayHashMode.AuthoritativeWithSolverCaches`.
+
+When solver caches are included, contact and query-adjacent witnesses are
+hashed as the canonical `Origin`, `Rotation`, `LocalPoint`, and
+`LocalDisplacement` components of
+their `ContactAnchor` or `ContactAnchor2D` frame. A clipped or unavailable
+rotated offset or absolute world point is not replay truth.
+Derived bounds and other rebuildable shape caches remain outside the
+authoritative shape hash and are covered only by their dedicated cache section.
 
 Joint and ragdoll handles are valid serialization targets only while registered
 with their owning constraint service. Endpoint teardown removes dependent

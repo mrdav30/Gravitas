@@ -34,6 +34,8 @@ public readonly struct GravitasDiagnosticEvent
         Vector3d end,
         Vector3d pointA,
         Vector3d pointB,
+        bool hasPointA,
+        bool hasPointB,
         Vector3d vector,
         Fixed64 scalarA,
         Fixed64 scalarB,
@@ -58,6 +60,8 @@ public readonly struct GravitasDiagnosticEvent
         End = end;
         PointA = pointA;
         PointB = pointB;
+        HasPointA = hasPointA;
+        HasPointB = hasPointB;
         Vector = vector;
         ScalarA = scalarA;
         ScalarB = scalarB;
@@ -99,6 +103,16 @@ public readonly struct GravitasDiagnosticEvent
     public Vector3d PointA { get; }
 
     public Vector3d PointB { get; }
+
+    /// <summary>
+    /// Gets whether <see cref="PointA"/> contains a materialized point.
+    /// </summary>
+    public bool HasPointA { get; }
+
+    /// <summary>
+    /// Gets whether <see cref="PointB"/> contains a materialized point.
+    /// </summary>
+    public bool HasPointB { get; }
 
     public Vector3d Vector { get; }
 

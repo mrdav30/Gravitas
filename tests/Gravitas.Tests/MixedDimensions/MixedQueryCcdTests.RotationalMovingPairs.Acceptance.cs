@@ -12,58 +12,32 @@ public sealed partial class MixedQueryCcdTests
     [Fact]
     public void MixedMode_Dynamic2DRotation_ShouldClampConservativelyWithoutExactContactWitness()
     {
-        using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
-        context.Environment.DampingFactor = Fixed64.Zero;
-        SolidBody2D blade = CreateRotationalMixedBlade2D(context);
-        blade.SetMotionType(BodyMotionType.Dynamic);
-        Vector3d targetPosition = Vector2d.Rotate(
-                new Vector2d(Fixed64.FromFraction(16, 5), Fixed64.Zero),
-                FixedMath.DegToRad((Fixed64)45))
-            .ToVector3d(Fixed64.Zero);
-        LSCollider target = CreateBodyless3D(
-            context,
-            new UnsupportedTestCollider3D(),
-            targetPosition);
+        var first = RunUnresolved2DRotationalSearch();
+        var second = RunUnresolved2DRotationalSearch();
 
-        blade.ApplyCollisionAngularVelocityDelta(RotationalMixedQuarterTurn);
-        context.LateSimulate();
-
-        blade.Rotation.Should().BeLessThan(RotationalMixedQuarterTurn);
-        blade.AngularVelocity.Should().Be(Fixed64.Zero);
-        blade.LastContinuousCollisionToiIterationCount.Should().BeGreaterThan(0);
-        target.Center.Should().Be(targetPosition);
+        second.Should().Be(first);
+        first.Rotation.Should().BeLessThan(RotationalMixedQuarterTurn);
+        first.AngularVelocity.Should().Be(Fixed64.Zero);
+        first.ToiIterations.Should().BeGreaterThan(0);
+        first.TargetPosition.Should().Be(first.ExpectedTargetPosition);
     }
 
     [Fact]
     public void MixedMode_Dynamic3DRotation_ShouldClampConservativelyWithoutExactContactWitness()
     {
-        using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
-        context.Environment.DampingFactor = Fixed64.Zero;
-        var sourceCollider = new UnsupportedTestCollider3D
-        {
-            InertiaTensor = Fixed3x3.Identity,
-            MassPropertyWeight = Fixed64.One
-        };
-        ScenarioBody<UnsupportedTestCollider3D> blade = CreateBody3D(
-            context,
-            sourceCollider,
-            Vector3d.Zero);
-        blade.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
-        Vector2d targetPosition = Vector2d.Right * Fixed64.Half;
-        LSCollider2D target = CreateBodylessCircle2D(context, targetPosition);
+        var first = RunUnresolved3DRotationalSearch();
+        var second = RunUnresolved3DRotationalSearch();
 
-        blade.Body.AddAngularImpulse(Vector3d.Up * RotationalMixedQuarterTurn);
-        context.LateSimulate();
-
+        second.Should().Be(first);
         Fixed64 retainedRotation = FixedQuaternion.Angle(
             FixedQuaternion.Identity,
-            blade.Body.Rotation);
+            first.Rotation);
         ((Fixed64)90 - retainedRotation)
             .Should()
             .BeGreaterThan(Fixed64.Zero);
-        blade.Body.AngularVelocity.Should().Be(Vector3d.Zero);
-        blade.Body.LastContinuousCollisionToiIterationCount.Should().BeGreaterThan(0);
-        target.Center.Should().Be(targetPosition);
+        first.AngularVelocity.Should().Be(Vector3d.Zero);
+        first.ToiIterations.Should().BeGreaterThan(0);
+        first.TargetPosition.Should().Be(first.ExpectedTargetPosition);
     }
 
     [Fact]
@@ -196,5 +170,73 @@ public sealed partial class MixedQueryCcdTests
         sourceFirst.Should().Be(targetFirst);
         sourceFirst.SourceLinearVelocity.Should().NotBe(
             Vector2d.Forward * Fixed64.FromFraction(1, 5));
+    }
+
+    private static (
+        Fixed64 Rotation,
+        Fixed64 AngularVelocity,
+        int ToiIterations,
+        bool LimitReached,
+        Vector3d TargetPosition,
+        Vector3d ExpectedTargetPosition) RunUnresolved2DRotationalSearch()
+    {
+        using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
+        context.Environment.DampingFactor = Fixed64.Zero;
+        SolidBody2D blade = CreateRotationalMixedBlade2D(context);
+        blade.SetMotionType(BodyMotionType.Dynamic);
+        Vector3d targetPosition = Vector2d.Rotate(
+                new Vector2d(Fixed64.FromFraction(16, 5), Fixed64.Zero),
+                FixedMath.DegToRad((Fixed64)45))
+            .ToVector3d(Fixed64.Zero);
+        LSCollider target = CreateBodyless3D(
+            context,
+            new UnsupportedTestCollider3D(),
+            targetPosition);
+
+        blade.ApplyCollisionAngularVelocityDelta(RotationalMixedQuarterTurn);
+        context.LateSimulate();
+
+        return (
+            blade.Rotation,
+            blade.AngularVelocity,
+            blade.LastContinuousCollisionToiIterationCount,
+            blade.LastContinuousCollisionToiIterationLimitReached,
+            target.Center,
+            targetPosition);
+    }
+
+    private static (
+        FixedQuaternion Rotation,
+        Vector3d AngularVelocity,
+        int ToiIterations,
+        bool LimitReached,
+        Vector2d TargetPosition,
+        Vector2d ExpectedTargetPosition) RunUnresolved3DRotationalSearch()
+    {
+        using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
+        context.Environment.DampingFactor = Fixed64.Zero;
+        var sourceCollider = new UnsupportedTestCollider3D
+        {
+            InertiaTensor = Fixed3x3.Identity,
+            MassPropertyWeight = Fixed64.One
+        };
+        ScenarioBody<UnsupportedTestCollider3D> blade = CreateBody3D(
+            context,
+            sourceCollider,
+            Vector3d.Zero);
+        blade.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        Vector2d targetPosition = Vector2d.Right * Fixed64.Half;
+        LSCollider2D target = CreateBodylessCircle2D(context, targetPosition);
+
+        blade.Body.AddAngularImpulse(Vector3d.Up * RotationalMixedQuarterTurn);
+        context.LateSimulate();
+
+        return (
+            blade.Body.Rotation,
+            blade.Body.AngularVelocity,
+            blade.Body.LastContinuousCollisionToiIterationCount,
+            blade.Body.LastContinuousCollisionToiIterationLimitReached,
+            target.Center,
+            targetPosition);
     }
 }

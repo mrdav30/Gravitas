@@ -6,10 +6,11 @@
 //=======================================================================
 
 using FixedMathSharp;
-using FixedMathSharp.Bounds;
+using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
 using SwiftCollections;
 using SwiftCollections.Query;
+using System;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas.CollisionHandling;
@@ -39,15 +40,13 @@ internal static class MeshTriangleContactGenerator
         LSCapsuleCollider capsule,
         SwiftList<int> triangleBuffer)
     {
-        Vector3d radius = Vector3d.One * capsule.ScaledRadius;
-        Vector3d min = Vector3d.Min(capsule.LineSegmentStart, capsule.LineSegmentEnd) - radius;
-        Vector3d max = Vector3d.Max(capsule.LineSegmentStart, capsule.LineSegmentEnd) + radius;
-        mesh.GetTrianglesInBounds(CreateBounds(min, max), triangleBuffer);
+        mesh.GetTrianglesInBounds(CreateBounds(capsule.BoundsMin, capsule.BoundsMax), triangleBuffer);
 
+        bool overlaps = false;
         for (int i = 0; i < triangleBuffer.Count; i++)
-            TryAddCapsuleTriangleContact(pair, mesh, triangleBuffer[i], capsule);
+            overlaps |= TryAddCapsuleTriangleContact(pair, mesh, triangleBuffer[i], capsule);
 
-        return pair.Manifold.HasContact;
+        return overlaps;
     }
 
     public static bool TryBuildMeshCuboidManifold(
@@ -70,10 +69,11 @@ internal static class MeshTriangleContactGenerator
         SwiftList<int> triangleBuffer)
     {
         mesh.GetTrianglesInBounds(CreateBounds(cylinder.BoundsMin, cylinder.BoundsMax), triangleBuffer);
+        bool overlaps = false;
         for (int i = 0; i < triangleBuffer.Count; i++)
-            TryAddCylinderTriangleContact(pair, mesh, triangleBuffer[i], cylinder);
+            overlaps |= TryAddCylinderTriangleContact(pair, mesh, triangleBuffer[i], cylinder);
 
-        return pair.Manifold.HasContact;
+        return overlaps;
     }
 
     public static bool TryBuildMeshMeshManifold(
@@ -87,22 +87,79 @@ internal static class MeshTriangleContactGenerator
         for (int i = 0; i < triangleBufferA.Count; i++)
         {
             int triangleA = triangleBufferA[i];
-            GetTriangle(meshA, triangleA, out CollisionTriangle first);
-            meshB.GetTrianglesInBounds(first.QueryBounds, triangleBufferB);
+            if (!TryGetTriangleInFrame(
+                    meshA,
+                    triangleA,
+                    meshA.Mesh.Origin,
+                    meshA.Mesh.Rotation,
+                    out CollisionTriangle first)
+                || !TryGetTriangleInFrame(
+                    meshA,
+                    triangleA,
+                    meshB.Mesh.Origin,
+                    meshB.Mesh.Rotation,
+                    out CollisionTriangle firstInSecondFrame))
+            {
+                continue;
+            }
+            meshB.Mesh.GetTrianglesInLocalBounds(
+                firstInSecondFrame.QueryBounds,
+                triangleBufferB);
 
             for (int j = 0; j < triangleBufferB.Count; j++)
             {
                 int triangleB = triangleBufferB[j];
-                GetTriangle(meshB, triangleB, out CollisionTriangle second);
-                if (!TryTestTriangles(first, second, meshB.Center - meshA.Center, out Vector3d normal, out Fixed64 depth))
+                if (!TryGetTriangleInFrame(
+                        meshB,
+                        triangleB,
+                        meshA.Mesh.Origin,
+                        meshA.Mesh.Rotation,
+                        out CollisionTriangle second))
+                {
                     continue;
+                }
+
+                Vector3d desiredDirection =
+                    second.Center - first.Center;
+                if (!TryTestTriangles(
+                        first,
+                        second,
+                        desiredDirection,
+                        out Vector3d localNormal,
+                        out Fixed64 depth))
+                {
+                    continue;
+                }
 
                 Vector3d pointA = first.Triangle.ClosestPoint(second.Center);
                 Vector3d pointB = second.Triangle.ClosestPoint(pointA);
                 if (Vector3d.DistanceSquared(pointA, pointB) <= Fixed64.Epsilon)
-                    pointB = pointA - normal * depth;
+                    pointB = pointA - localNormal * depth;
 
-                AddContact(pair, pointA, pointB, depth, normal);
+                FixedPointAnchor firstAnchor =
+                    meshA.Mesh.CreatePointAnchor(pointA);
+                var secondInFirstFrame = new FixedPointAnchor(
+                    meshA.Mesh.Origin,
+                    meshA.Mesh.Rotation,
+                    pointB);
+                if (!secondInFirstFrame.TryGetLocalPointIn(
+                        meshB.Mesh.Origin,
+                        meshB.Mesh.Rotation,
+                        out Vector3d secondLocalPoint))
+                {
+                    continue;
+                }
+
+                AddContact(
+                    pair,
+                    new ContactAnchor(firstAnchor),
+                    new ContactAnchor(
+                        meshB.Mesh.Origin,
+                        meshB.Mesh.Rotation,
+                        secondLocalPoint),
+                    depth,
+                    meshA.Mesh.Rotation.Rotate(localNormal).Normalized,
+                    depthIsClamped: false);
             }
         }
 
@@ -115,50 +172,71 @@ internal static class MeshTriangleContactGenerator
         int triangleIndex,
         LSSphereCollider sphere)
     {
-        GetTriangle(mesh, triangleIndex, out CollisionTriangle triangle);
-        Vector3d pointOnMesh = triangle.Triangle.ClosestPoint(sphere.Center);
-        Vector3d delta = sphere.Center - pointOnMesh;
-        Fixed64 distanceSqr = delta.MagnitudeSquared;
-        if (distanceSqr > sphere.ScaledRadiusSqr + Fixed64.Epsilon)
+        mesh.Mesh.GetLocalTriangleVertices(
+            triangleIndex,
+            out Vector3d first,
+            out Vector3d second,
+            out Vector3d third);
+        if (!new FixedTriangle(first, second, third).TryGetSphereContact(
+                mesh.Mesh.Origin,
+                mesh.Mesh.Rotation,
+                sphere.Center,
+                sphere.Rotation,
+                sphere.ScaledRadius,
+                out FixedContactAnchors contact))
+        {
             return;
+        }
 
-        Fixed64 distance = distanceSqr <= Fixed64.Epsilon
-            ? Fixed64.Zero
-            : FixedMath.Sqrt(distanceSqr);
-        Vector3d normal = distance > Fixed64.Epsilon
-            ? delta / distance
-            : OrientNormal(triangle.Normal, sphere.Center - triangle.Center);
-        Vector3d pointOnSphere = sphere.Center - normal * sphere.ScaledRadius;
-        AddContact(pair, pointOnMesh, pointOnSphere, sphere.ScaledRadius - distance, normal);
+        AddContact(
+            pair,
+            new ContactAnchor(contact.FirstAnchor),
+            new ContactAnchor(contact.SecondAnchor),
+            contact.Depth,
+            contact.Normal,
+            contact.DepthIsClamped);
     }
 
-    private static void TryAddCapsuleTriangleContact(
+    private static bool TryAddCapsuleTriangleContact(
         CollisionWorkItem pair,
         LSMeshCollider mesh,
         int triangleIndex,
         LSCapsuleCollider capsule)
     {
-        GetTriangle(mesh, triangleIndex, out CollisionTriangle triangle);
-        ClosestPointsSegmentTriangle(
-            capsule.LineSegmentStart,
-            capsule.LineSegmentEnd,
-            triangle,
-            out Vector3d pointOnCapsuleLine,
-            out Vector3d pointOnMesh);
+        mesh.Mesh.GetLocalTriangleVertices(
+            triangleIndex,
+            out Vector3d first,
+            out Vector3d second,
+            out Vector3d third);
+        var triangle = new FixedTriangle(first, second, third);
+        Vector3d fallbackNormal = OrientNormal(
+            mesh.Mesh.CreatePointAnchor(triangle.Centroid),
+            new FixedPointAnchor(
+                capsule.Center,
+                FixedQuaternion.Identity,
+                Vector3d.Zero),
+            mesh.Mesh.GetFaceNormalWorld(triangleIndex));
+        if (!triangle.TryGetCenteredCapsuleContact(
+                mesh.Mesh.Origin,
+                mesh.Mesh.Rotation,
+                capsule.Center,
+                capsule.Rotation,
+                capsule.AxisLength,
+                capsule.ScaledRadius,
+                fallbackNormal,
+                out FixedContactAnchors contact))
+        {
+            return false;
+        }
 
-        Vector3d delta = pointOnCapsuleLine - pointOnMesh;
-        Fixed64 distanceSqr = delta.MagnitudeSquared;
-        if (distanceSqr > capsule.ScaledRadiusSqr + Fixed64.Epsilon)
-            return;
-
-        Fixed64 distance = distanceSqr <= Fixed64.Epsilon
-            ? Fixed64.Zero
-            : FixedMath.Sqrt(distanceSqr);
-        Vector3d normal = distance > Fixed64.Epsilon
-            ? delta / distance
-            : OrientNormal(triangle.Normal, capsule.Center - triangle.Center);
-        Vector3d pointOnCapsule = pointOnCapsuleLine - normal * capsule.ScaledRadius;
-        AddContact(pair, pointOnMesh, pointOnCapsule, capsule.ScaledRadius - distance, normal);
+        AddContact(
+            pair,
+            new ContactAnchor(contact.FirstAnchor),
+            new ContactAnchor(contact.SecondAnchor),
+            contact.Depth,
+            contact.Normal,
+            contact.DepthIsClamped);
+        return true;
     }
 
     private static void TryAddCuboidTriangleContact(
@@ -167,148 +245,222 @@ internal static class MeshTriangleContactGenerator
         int triangleIndex,
         LSCuboidCollider cuboid)
     {
-        GetTriangle(mesh, triangleIndex, out CollisionTriangle triangle);
-        if (!TryTestTriangleCuboid(triangle, cuboid, out Vector3d normal, out Fixed64 depth))
+        mesh.Mesh.GetLocalTriangleVertices(
+            triangleIndex,
+            out Vector3d first,
+            out Vector3d second,
+            out Vector3d third);
+        var triangle = new FixedTriangle(first, second, third);
+        Span<FixedContactLocalPoints> faceContacts =
+            stackalloc FixedContactLocalPoints[4];
+        if (!cuboid.OrientedBox.TryGetTriangleContact(
+                mesh.Mesh.Origin,
+                mesh.Mesh.Rotation,
+                triangle,
+                faceContacts,
+                out FixedContactAnchors contact,
+                out int faceContactCount))
+        {
             return;
+        }
 
-        if (TryAddCuboidFaceContacts(pair, mesh, triangle, cuboid, normal, depth))
+        if (faceContactCount > 0)
+        {
+            for (int index = 0; index < faceContactCount; index++)
+            {
+                AddReversedBoxTriangleContact(
+                    pair,
+                    contact,
+                    faceContacts[index]);
+            }
             return;
+        }
 
-        Vector3d pointOnMesh = triangle.Triangle.ClosestPoint(cuboid.Center);
-        Vector3d pointOnCuboid = pointOnMesh - normal * depth;
-        AddContact(pair, pointOnMesh, pointOnCuboid, depth, normal);
+        AddReversedBoxTriangleContact(pair, contact);
     }
 
-    private static void TryAddCylinderTriangleContact(
+    private static void AddReversedBoxTriangleContact(
+        CollisionWorkItem pair,
+        FixedContactAnchors contact)
+    {
+        AddContact(
+            pair,
+            new ContactAnchor(contact.SecondAnchor),
+            new ContactAnchor(contact.FirstAnchor),
+            contact.Depth,
+            -contact.Normal,
+            contact.DepthIsClamped);
+    }
+
+    private static void AddReversedBoxTriangleContact(
+        CollisionWorkItem pair,
+        FixedContactAnchors primary,
+        FixedContactLocalPoints contact)
+    {
+        AddContact(
+            pair,
+            new ContactAnchor(
+                primary.SecondAnchor.Origin,
+                primary.SecondAnchor.Rotation,
+                contact.SecondLocalPoint),
+            new ContactAnchor(
+                primary.FirstAnchor.Origin,
+                primary.FirstAnchor.Rotation,
+                contact.FirstLocalPoint),
+            primary.Depth,
+            -primary.Normal,
+            primary.DepthIsClamped);
+    }
+
+    private static bool TryAddCylinderTriangleContact(
         CollisionWorkItem pair,
         LSMeshCollider mesh,
         int triangleIndex,
         LSCylinderCollider cylinder)
     {
-        GetTriangle(mesh, triangleIndex, out CollisionTriangle triangle);
-        Vector3d normal = OrientNormal(triangle.Normal, cylinder.Center - triangle.Center);
-        if (TryAddCylinderCapTriangleContacts(pair, mesh, triangle, cylinder, normal))
-            return;
-
-        Vector3d pointOnMesh = triangle.Triangle.ClosestPoint(cylinder.Center);
-        if (!IsPointInsideCylinder(cylinder, pointOnMesh))
-            return;
-
-        Vector3d pointOnCylinder = cylinder.ClosestPointOnSurface(pointOnMesh);
-        Fixed64 depth = Vector3d.Distance(pointOnMesh, pointOnCylinder);
-        AddContact(pair, pointOnMesh, pointOnCylinder, depth, normal);
-    }
-
-    private static bool TryAddCuboidFaceContacts(
-        CollisionWorkItem pair,
-        LSMeshCollider mesh,
-        CollisionTriangle triangle,
-        LSCuboidCollider cuboid,
-        Vector3d normal,
-        Fixed64 depth)
-    {
-        Fixed64 minProjection = Fixed64.MaxValue;
-        for (int i = 0; i < cuboid.Vertices.Length; i++)
+        mesh.Mesh.GetLocalTriangleVertices(
+            triangleIndex,
+            out Vector3d first,
+            out Vector3d second,
+            out Vector3d third);
+        var triangle = new FixedTriangle(first, second, third);
+        var cylinderCenter = new FixedPointAnchor(
+            cylinder.Center,
+            FixedQuaternion.Identity,
+            Vector3d.Zero);
+        Vector3d normal = OrientNormal(
+            mesh.Mesh.CreatePointAnchor(triangle.Centroid),
+            cylinderCenter,
+            mesh.Mesh.GetFaceNormalWorld(triangleIndex));
+        if (TryAddCylinderCapTriangleContacts(
+                pair,
+                mesh,
+                triangle,
+                cylinder,
+                normal))
         {
-            Fixed64 projection = Vector3d.Dot(cuboid.Vertices[i], normal);
-            if (projection < minProjection)
-                minProjection = projection;
+            return true;
         }
 
-        int initialCount = pair.Manifold.Count;
-        for (int i = 0; i < cuboid.Vertices.Length; i++)
+        if (!cylinderCenter.TryGetLocalPointIn(
+                mesh.Mesh.Origin,
+                mesh.Mesh.Rotation,
+                out Vector3d localCylinderCenter))
         {
-            Vector3d pointOnCuboid = cuboid.Vertices[i];
-            if (Vector3d.Dot(pointOnCuboid, normal) > minProjection + Fixed64.Epsilon)
-                continue;
-
-            Vector3d pointOnMesh = pointOnCuboid + normal * depth;
-            if (!triangle.Triangle.ContainsProjection(pointOnMesh))
-                continue;
-
-            AddContact(pair, pointOnMesh, pointOnCuboid, depth, normal);
+            return false;
         }
 
-        return pair.Manifold.Count > initialCount;
+        Vector3d localPointOnMesh =
+            triangle.ClosestPoint(localCylinderCenter);
+        FixedPointAnchor meshAnchor =
+            mesh.Mesh.CreatePointAnchor(localPointOnMesh);
+        if (!meshAnchor.TryGetLocalPointIn(
+                cylinder.Center,
+                cylinder.Rotation,
+                out Vector3d localPointInCylinder)
+            || !FixedSegment.ContainsPointInCenteredFiniteCylinder(
+                localPointInCylinder,
+                Vector3d.Zero,
+                Vector3d.Up,
+                cylinder.Height,
+                cylinder.ScaledRadius))
+        {
+            return false;
+        }
+        if (!FixedSegment.TryGetClosestCenteredFiniteCylinderSurfaceOffset(
+                localPointInCylinder,
+                Vector3d.Zero,
+                Vector3d.Up,
+                cylinder.Height,
+                cylinder.ScaledRadius,
+                Vector3d.Right,
+                out Vector3d localCylinderPoint,
+                out _,
+                out Fixed64 signedDistance))
+        {
+            return false;
+        }
+
+        Fixed64 depth;
+        bool depthIsClamped;
+        if (Fixed64.TrySubtract(Fixed64.Zero, signedDistance, out depth))
+        {
+            depthIsClamped = false;
+        }
+        else
+        {
+            depth = Fixed64.MaxValue;
+            depthIsClamped = true;
+        }
+        AddContact(
+            pair,
+            new ContactAnchor(meshAnchor),
+            new ContactAnchor(
+                cylinder.Center,
+                cylinder.Rotation,
+                localCylinderPoint),
+            depth,
+            normal,
+            depthIsClamped);
+        return true;
     }
 
     private static bool TryAddCylinderCapTriangleContacts(
         CollisionWorkItem pair,
         LSMeshCollider mesh,
-        CollisionTriangle triangle,
+        FixedTriangle triangle,
         LSCylinderCollider cylinder,
         Vector3d normal)
     {
-        if (!CylinderContactGeometry.IsAxisAligned(normal, cylinder.LineDirection))
+        if (!CylinderContactGeometry.IsAxisAligned(
+                cylinder.Rotation,
+                Vector3d.Up,
+                normal))
             return false;
 
-        Vector3d capCenter = CylinderContactGeometry.GetCapCenter(cylinder, -normal);
-        Fixed64 signedDistance = Vector3d.Dot(capCenter - triangle.A, normal);
-        if (signedDistance > Fixed64.Epsilon)
-            return false;
-
-        Fixed64 depth = signedDistance < Fixed64.Zero ? -signedDistance : Fixed64.Zero;
         int initialCount = pair.Manifold.Count;
         CylinderContactGeometry.GetCapBasis(cylinder, out Vector3d tangentA, out Vector3d tangentB);
-        AddCylinderCapTriangleContact(pair, mesh, triangle, cylinder, capCenter + tangentA * cylinder.ScaledRadius, depth, normal);
-        AddCylinderCapTriangleContact(pair, mesh, triangle, cylinder, capCenter - tangentA * cylinder.ScaledRadius, depth, normal);
-        AddCylinderCapTriangleContact(pair, mesh, triangle, cylinder, capCenter + tangentB * cylinder.ScaledRadius, depth, normal);
-        AddCylinderCapTriangleContact(pair, mesh, triangle, cylinder, capCenter - tangentB * cylinder.ScaledRadius, depth, normal);
+        TryAddCylinderCapTriangleContact(pair, mesh, triangle, cylinder, -normal + tangentA, normal);
+        TryAddCylinderCapTriangleContact(pair, mesh, triangle, cylinder, -normal - tangentA, normal);
+        TryAddCylinderCapTriangleContact(pair, mesh, triangle, cylinder, -normal + tangentB, normal);
+        TryAddCylinderCapTriangleContact(pair, mesh, triangle, cylinder, -normal - tangentB, normal);
 
         if (pair.Manifold.Count > initialCount)
             return true;
 
-        AddCylinderCapTriangleContact(pair, mesh, triangle, cylinder, capCenter, depth, normal);
+        TryAddCylinderCapTriangleContact(pair, mesh, triangle, cylinder, -normal, normal);
         return pair.Manifold.Count > initialCount;
     }
 
-    private static void AddCylinderCapTriangleContact(
+    private static void TryAddCylinderCapTriangleContact(
         CollisionWorkItem pair,
         LSMeshCollider mesh,
-        CollisionTriangle triangle,
+        FixedTriangle triangle,
         LSCylinderCollider cylinder,
-        Vector3d pointOnCylinder,
-        Fixed64 depth,
+        Vector3d supportDirection,
         Vector3d normal)
     {
-        Vector3d pointOnMesh = pointOnCylinder + normal * depth;
-        if (!triangle.Triangle.ContainsProjection(pointOnMesh))
+        if (!triangle.TryGetCenteredFiniteCylinderSupportContact(
+                mesh.Mesh.Origin,
+                mesh.Mesh.Rotation,
+                cylinder.Center,
+                cylinder.Rotation,
+                cylinder.Height,
+                cylinder.ScaledRadius,
+                supportDirection,
+                normal,
+                out FixedContactAnchors contact))
+        {
             return;
-
-        AddContact(pair, pointOnMesh, pointOnCylinder, depth, normal);
-    }
-
-    private static bool TryTestTriangleCuboid(
-        CollisionTriangle triangle,
-        LSCuboidCollider cuboid,
-        out Vector3d normal,
-        out Fixed64 depth)
-    {
-        normal = Vector3d.Zero;
-        depth = Fixed64.MaxValue;
-        Vector3d desiredDirection = cuboid.Center - triangle.Center;
-
-        for (int i = 0; i < cuboid.FaceNormals.Length; i++)
-        {
-            if (!CheckTriangleCuboidAxis(triangle, cuboid, cuboid.FaceNormals[i], desiredDirection, ref normal, ref depth))
-                return false;
         }
 
-        if (!CheckTriangleCuboidAxis(triangle, cuboid, triangle.Normal, desiredDirection, ref normal, ref depth))
-            return false;
-
-        for (int i = 0; i < 3; i++)
-        {
-            Vector3d triangleEdge = triangle.GetEdgeVector(i);
-            for (int j = 0; j < cuboid.EdgeDirections.Length; j++)
-            {
-                Vector3d axis = Vector3d.Cross(triangleEdge, cuboid.EdgeDirections[j]);
-                if (!CheckTriangleCuboidAxis(triangle, cuboid, axis, desiredDirection, ref normal, ref depth))
-                    return false;
-            }
-        }
-
-        return normal.MagnitudeSquared > Fixed64.Epsilon;
+        AddContact(
+            pair,
+            new ContactAnchor(contact.FirstAnchor),
+            new ContactAnchor(contact.SecondAnchor),
+            contact.Depth,
+            contact.Normal,
+            contact.DepthIsClamped);
     }
 
     private static bool TryTestTriangles(
@@ -348,23 +500,6 @@ internal static class MeshTriangleContactGenerator
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool CheckTriangleCuboidAxis(
-        CollisionTriangle triangle,
-        LSCuboidCollider cuboid,
-        Vector3d axis,
-        Vector3d desiredDirection,
-        ref Vector3d normal,
-        ref Fixed64 depth)
-    {
-        if (!TryNormalizeAxis(axis, out Vector3d NormalAxis))
-            return true;
-
-        ProjectTriangle(triangle, NormalAxis, out Fixed64 minA, out Fixed64 maxA);
-        ProjectVertices(cuboid.Vertices, NormalAxis, out Fixed64 minB, out Fixed64 maxB);
-        return CheckProjectedAxis(minA, maxA, minB, maxB, NormalAxis, desiredDirection, ref normal, ref depth);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool CheckTriangleTriangleAxis(
         CollisionTriangle first,
         CollisionTriangle second,
@@ -380,29 +515,6 @@ internal static class MeshTriangleContactGenerator
         ProjectTriangle(first, axis, out Fixed64 minA, out Fixed64 maxA);
         ProjectTriangle(second, axis, out Fixed64 minB, out Fixed64 maxB);
         return CheckProjectedTriangleAxis(minA, maxA, minB, maxB, axis, axisMagnitudeSqr, desiredDirection, ref normal, ref depth);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool CheckProjectedAxis(
-        Fixed64 minA,
-        Fixed64 maxA,
-        Fixed64 minB,
-        Fixed64 maxB,
-        Vector3d axis,
-        Vector3d desiredDirection,
-        ref Vector3d normal,
-        ref Fixed64 depth)
-    {
-        if (maxA < minB || maxB < minA)
-            return false;
-
-        Fixed64 overlap = FixedMath.Min(maxA - minB, maxB - minA);
-        if (overlap > Fixed64.Zero && overlap >= depth)
-            return true;
-
-        depth = overlap;
-        normal = OrientNormal(axis, desiredDirection);
-        return true;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -434,85 +546,44 @@ internal static class MeshTriangleContactGenerator
         return true;
     }
 
-    private static void ClosestPointsSegmentTriangle(
-        Vector3d segmentStart,
-        Vector3d segmentEnd,
-        CollisionTriangle triangle,
-        out Vector3d pointOnSegment,
-        out Vector3d pointOnTriangle)
+    private static bool TryGetTriangleInFrame(
+        LSMeshCollider mesh,
+        int triangleIndex,
+        Vector3d frameOrigin,
+        FixedQuaternion frameRotation,
+        out CollisionTriangle triangle)
     {
-        pointOnSegment = segmentStart;
-        pointOnTriangle = triangle.Triangle.ClosestPoint(segmentStart);
-        Fixed64 bestDistanceSqr = Vector3d.DistanceSquared(pointOnSegment, pointOnTriangle);
-
-        Vector3d segment = segmentEnd - segmentStart;
-        Fixed64 denominator = Vector3d.Dot(triangle.Normal, segment);
-        if (denominator.Abs() > Fixed64.Epsilon)
+        mesh.Mesh.GetLocalTriangleVertices(
+            triangleIndex,
+            out Vector3d localFirst,
+            out Vector3d localSecond,
+            out Vector3d localThird);
+        if (!mesh.Mesh.CreatePointAnchor(localFirst).TryGetLocalPointIn(
+                frameOrigin,
+                frameRotation,
+                out Vector3d first)
+            || !mesh.Mesh.CreatePointAnchor(localSecond).TryGetLocalPointIn(
+                frameOrigin,
+                frameRotation,
+                out Vector3d second)
+            || !mesh.Mesh.CreatePointAnchor(localThird).TryGetLocalPointIn(
+                frameOrigin,
+                frameRotation,
+                out Vector3d third))
         {
-            Fixed64 t = Vector3d.Dot(triangle.Normal, triangle.A - segmentStart) / denominator;
-            if (t >= Fixed64.Zero && t <= Fixed64.One)
-            {
-                Vector3d intersection = segmentStart + segment * t;
-                if (triangle.Triangle.ContainsProjection(intersection))
-                {
-                    pointOnSegment = intersection;
-                    pointOnTriangle = intersection;
-                    return;
-                }
-            }
+            triangle = default;
+            return false;
         }
 
-        TrySetCloserPointTriangle(segmentEnd, triangle, ref pointOnSegment, ref pointOnTriangle, ref bestDistanceSqr);
-        TrySetCloserSegmentEdge(segmentStart, segmentEnd, triangle.A, triangle.B, ref pointOnSegment, ref pointOnTriangle, ref bestDistanceSqr);
-        TrySetCloserSegmentEdge(segmentStart, segmentEnd, triangle.B, triangle.C, ref pointOnSegment, ref pointOnTriangle, ref bestDistanceSqr);
-        TrySetCloserSegmentEdge(segmentStart, segmentEnd, triangle.C, triangle.A, ref pointOnSegment, ref pointOnTriangle, ref bestDistanceSqr);
-    }
-
-    private static void TrySetCloserPointTriangle(
-        Vector3d point,
-        CollisionTriangle triangle,
-        ref Vector3d pointOnSegment,
-        ref Vector3d pointOnTriangle,
-        ref Fixed64 bestDistanceSqr)
-    {
-        Vector3d candidate = triangle.Triangle.ClosestPoint(point);
-        Fixed64 distanceSqr = Vector3d.DistanceSquared(point, candidate);
-        if (distanceSqr >= bestDistanceSqr)
-            return;
-
-        bestDistanceSqr = distanceSqr;
-        pointOnSegment = point;
-        pointOnTriangle = candidate;
-    }
-
-    private static void TrySetCloserSegmentEdge(
-        Vector3d segmentStart,
-        Vector3d segmentEnd,
-        Vector3d edgeStart,
-        Vector3d edgeEnd,
-        ref Vector3d pointOnSegment,
-        ref Vector3d pointOnTriangle,
-        ref Fixed64 bestDistanceSqr)
-    {
-        (Vector3d segmentPoint, Vector3d edgePoint) = new FixedSegment(
-            segmentStart,
-            segmentEnd).GetClosestPoints(new FixedSegment(edgeStart, edgeEnd));
-        Fixed64 distanceSqr = Vector3d.DistanceSquared(segmentPoint, edgePoint);
-        if (distanceSqr >= bestDistanceSqr)
-            return;
-
-        bestDistanceSqr = distanceSqr;
-        pointOnSegment = segmentPoint;
-        pointOnTriangle = edgePoint;
-    }
-
-    private static void GetTriangle(LSMeshCollider mesh, int triangleIndex, out CollisionTriangle triangle)
-    {
-        mesh.Mesh.GetTriangleVertices(triangleIndex, out Vector3d first, out Vector3d second, out Vector3d third);
+        var fixedTriangle = new FixedTriangle(
+            first,
+            second,
+            third);
         triangle = new CollisionTriangle(
-            new FixedTriangle(first, second, third),
-            mesh.Mesh.GetFaceNormalWorld(triangleIndex),
+            fixedTriangle,
+            fixedTriangle.Normal,
             CreateTriangleBounds(first, second, third));
+        return true;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -533,14 +604,6 @@ internal static class MeshTriangleContactGenerator
         IncludeProjection(axis, triangle.C, ref min, ref max);
     }
 
-    private static void ProjectVertices(Vector3d[] vertices, Vector3d axis, out Fixed64 min, out Fixed64 max)
-    {
-        min = Vector3d.Dot(axis, vertices[0]);
-        max = min;
-        for (int i = 1; i < vertices.Length; i++)
-            IncludeProjection(axis, vertices[i], ref min, ref max);
-    }
-
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void IncludeProjection(Vector3d axis, Vector3d point, ref Fixed64 min, ref Fixed64 max)
     {
@@ -552,30 +615,6 @@ internal static class MeshTriangleContactGenerator
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool TryNormalizeAxis(Vector3d axis, out Vector3d NormalAxis)
-    {
-        Fixed64 magnitudeSqr = axis.MagnitudeSquared;
-        if (magnitudeSqr <= Fixed64.Epsilon)
-        {
-            NormalAxis = Vector3d.Zero;
-            return false;
-        }
-
-        NormalAxis = axis / FixedMath.Sqrt(magnitudeSqr);
-        return true;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool IsPointInsideCylinder(LSCylinderCollider cylinder, Vector3d point)
-    {
-        Vector3d local = cylinder.Rotation.Inverse() * (point - cylinder.Center);
-        Fixed64 radialSqr = local.X * local.X + local.Z * local.Z;
-        return radialSqr <= cylinder.ScaledRadiusSqr + Fixed64.Epsilon
-            && local.Y >= -cylinder.HalfHeight - Fixed64.Epsilon
-            && local.Y <= cylinder.HalfHeight + Fixed64.Epsilon;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Vector3d OrientNormal(Vector3d normal, Vector3d desiredDirection)
     {
         Vector3d resolved = normal.Normalized;
@@ -583,14 +622,33 @@ internal static class MeshTriangleContactGenerator
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Vector3d OrientNormal(
+        in FixedPointAnchor source,
+        in FixedPointAnchor target,
+        Vector3d normal)
+    {
+        Vector3d resolved = normal.Normalized;
+        return source.ProjectNonNegativeOffsetFrom(target, resolved)
+                > Fixed64.Zero
+            ? -resolved
+            : resolved;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void AddContact(
         CollisionWorkItem pair,
-        Vector3d pointOnFirst,
-        Vector3d pointOnSecond,
+        ContactAnchor anchorOnFirst,
+        ContactAnchor anchorOnSecond,
         Fixed64 depth,
-        Vector3d normalFirstToSecond)
+        Vector3d normalFirstToSecond,
+        bool depthIsClamped)
     {
-        pair.Manifold.AddContact(pointOnFirst, pointOnSecond, depth, normalFirstToSecond);
+        pair.Manifold.AddContact(
+            anchorOnFirst,
+            anchorOnSecond,
+            depth,
+            normalFirstToSecond,
+            depthIsClamped);
     }
 
 }

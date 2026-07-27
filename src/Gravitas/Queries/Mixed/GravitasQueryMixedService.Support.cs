@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using System.Runtime.CompilerServices;
@@ -26,14 +27,20 @@ public sealed partial class GravitasQueryMixedService
         Vector3d direction,
         Vector3d featureNormal = default)
     {
-        Vector3d point2D = GetClosestEmbeddedPoint(collider, sweepCenter);
-        Vector3d to2D = point2D - sweepCenter;
+        ContactAnchor anchor2D =
+            MixedEmbedded2DGeometry.GetClosestAnchorOnEmbeddedVolume(
+                collider,
+                sweepCenter);
+        bool offsetResolved = anchor2D.TryGetOffsetFrom(
+            sweepCenter,
+            out Vector3d to2D);
         Vector3d normal3DTo2D;
         if (featureNormal != Vector3d.Zero)
         {
             normal3DTo2D = featureNormal;
         }
-        else if (to2D.Y != Fixed64.Zero
+        else if (offsetResolved
+                 && to2D.Y != Fixed64.Zero
                  && new Vector2d(to2D.X, to2D.Z).MagnitudeSquared <= Fixed64.Epsilon)
         {
             normal3DTo2D = to2D.Y > Fixed64.Zero
@@ -42,16 +49,19 @@ public sealed partial class GravitasQueryMixedService
         }
         else
         {
-            normal3DTo2D = to2D.MagnitudeSquared > Fixed64.Epsilon
+            normal3DTo2D = offsetResolved
+                && to2D.MagnitudeSquared > Fixed64.Epsilon
                 ? to2D.Normalized
                 : Resolve3DTo2DFallback(collider, sweepCenter, direction);
         }
-        Vector3d point3D = sweepCenter + normal3DTo2D * radius;
+        var anchor3D = new ContactAnchor(
+            sweepCenter,
+            normal3DTo2D * radius);
         return new PhysicsMixedHit(
             null,
             collider,
-            point3D,
-            point2D,
+            anchor3D,
+            anchor2D,
             normal3DTo2D,
             reducerKind,
             distance,
@@ -95,33 +105,72 @@ public sealed partial class GravitasQueryMixedService
         Fixed64 distance,
         LSCollider2D? sourceCollider)
     {
-        Vector3d to2D = sweepCenter - point3D;
-        Vector3d normal3DTo2D = to2D.MagnitudeSquared > Fixed64.Epsilon
+        return BuildCircleAgainst3DHit(
+            collider,
+            new FixedPointAnchor(
+                point3D,
+                FixedQuaternion.Identity,
+                Vector3d.Zero),
+            sweepCenter,
+            direction,
+            radius,
+            slabCenterY,
+            halfThickness,
+            reducerKind,
+            distance,
+            sourceCollider);
+    }
+
+    private static PhysicsMixedHit BuildCircleAgainst3DHit(
+        LSCollider collider,
+        FixedPointAnchor point3D,
+        Vector3d sweepCenter,
+        Vector3d direction,
+        Fixed64 radius,
+        Fixed64 slabCenterY,
+        Fixed64 halfThickness,
+        PhysicsQueryReducerKind reducerKind,
+        Fixed64 distance,
+        LSCollider2D? sourceCollider)
+    {
+        var anchor3D = new ContactAnchor(point3D);
+        bool offsetResolved = anchor3D.TryGetOffsetFrom(
+            sweepCenter,
+            out Vector3d fromSweepCenter);
+        Vector3d to2D = offsetResolved
+            ? -fromSweepCenter
+            : Vector3d.Zero;
+        Vector3d normal3DTo2D = offsetResolved
+            && to2D.MagnitudeSquared > Fixed64.Epsilon
             ? to2D.Normalized
             : -direction;
-        Vector2d planarNormal = new(normal3DTo2D.X, normal3DTo2D.Z);
-        Vector2d planarPoint = new(sweepCenter.X, sweepCenter.Z);
-        if (planarNormal.MagnitudeSquared > Fixed64.Epsilon)
-            planarPoint -= planarNormal.Normalized * radius;
-
-        Vector3d point2D = new(
-            planarPoint.X,
-            ClampAxis(point3D.Y, slabCenterY - halfThickness, slabCenterY + halfThickness),
-            planarPoint.Y);
+        Vector2d planarNormal = new(
+            normal3DTo2D.X,
+            normal3DTo2D.Z);
+        Vector2d planarOffset = planarNormal.MagnitudeSquared > Fixed64.Epsilon
+            ? -planarNormal.Normalized * radius
+            : Vector2d.Zero;
+        Fixed64 verticalOffset = offsetResolved
+            ? FixedMath.Clamp(
+                fromSweepCenter.Y,
+                -halfThickness,
+                halfThickness)
+            : Fixed64.Zero;
+        var anchor2D = new ContactAnchor(
+            sweepCenter,
+            new Vector3d(
+                planarOffset.X,
+                verticalOffset,
+                planarOffset.Y));
         return new PhysicsMixedHit(
             collider,
             sourceCollider,
-            point3D,
-            point2D,
+            anchor3D,
+            anchor2D,
             normal3DTo2D,
             reducerKind,
             distance,
             direction);
-    }
-
-    private static Vector3d GetClosestEmbeddedPoint(LSCollider2D collider, Vector3d sweepCenter)
-    {
-        return MixedEmbedded2DGeometry.GetClosestPointOnEmbeddedVolume(collider, sweepCenter);
     }
 
     private static Vector3d GetSweepSurfacePoint(LSCollider collider, Vector3d sweepCenter, Vector3d direction)
@@ -207,9 +256,5 @@ public sealed partial class GravitasQueryMixedService
             slabCenterY + halfThickness,
             FixedMath.Max(start.Y, end.Y) + radius);
     }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Fixed64 ClampAxis(Fixed64 value, Fixed64 min, Fixed64 max) =>
-        value < min ? min : value > max ? max : value;
 
 }

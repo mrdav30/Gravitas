@@ -80,11 +80,15 @@ public sealed partial class SolidBody2D
     public void SetPosition(Vector2d position)
     {
         PreflightStaticPoseChange();
+        SwiftThrowHelper.ThrowIfTrue(
+            !Collider.TryPrepareBodyPose(position, _rotation),
+            nameof(position),
+            "The requested 2D body position produces collider geometry outside the representable coordinate domain.");
         if (_position != position)
             Wake();
 
         _position = position;
-        Collider.Rebuild();
+        Collider.PublishPreparedExplicitBodyPose();
         RefreshStaticColliderAfterExplicitPoseChange();
     }
 
@@ -92,11 +96,15 @@ public sealed partial class SolidBody2D
     {
         PreflightStaticPoseChange();
         Fixed64 canonicalRotation = CanonicalizeRotation(rotation);
+        SwiftThrowHelper.ThrowIfTrue(
+            !Collider.TryPrepareBodyPose(_position, canonicalRotation),
+            nameof(rotation),
+            "The requested 2D body rotation produces collider geometry outside the representable coordinate domain.");
         if (_rotation != canonicalRotation)
             Wake();
 
         _rotation = canonicalRotation;
-        Collider.Rebuild();
+        Collider.PublishPreparedExplicitBodyPose();
         RefreshStaticColliderAfterExplicitPoseChange();
     }
 
@@ -256,11 +264,4 @@ public sealed partial class SolidBody2D
             : Fixed64.Zero;
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Vector2d ClampNearZero(Vector2d value)
-    {
-        Fixed64 x = value.X.Abs() <= Fixed64.Epsilon ? Fixed64.Zero : value.X;
-        Fixed64 y = value.Y.Abs() <= Fixed64.Epsilon ? Fixed64.Zero : value.Y;
-        return new Vector2d(x, y);
-    }
 }

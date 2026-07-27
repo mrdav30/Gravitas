@@ -7,6 +7,7 @@
 
 using Chronicler;
 using FixedMathSharp;
+using FixedMathSharp.Geometry;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas.Colliders;
@@ -17,6 +18,8 @@ namespace Gravitas.Colliders;
 public sealed class LSCircleCollider2D : LSCollider2D
 {
     private Fixed64 _radius;
+    private Fixed64 _scaledRadius;
+    private Fixed64 _preparedRadius;
 
     public LSCircleCollider2D(Fixed64 radius)
     {
@@ -50,47 +53,113 @@ public sealed class LSCircleCollider2D : LSCollider2D
     public Fixed64 ScaledRadius
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        get => _radius * FixedMath.Max(LocalScale.X, LocalScale.Y);
+        get => GetMassPropertyRadius();
     }
 
     public override bool ContainsPoint(Vector2d point) =>
-        Vector2d.DistanceSquared(point, Center) <= ScaledRadius * ScaledRadius;
+        FixedSegment2d.ContainsPointInCenteredCapsule(
+            point,
+            Center,
+            Vector2d.Forward,
+            Fixed64.Zero,
+            ScaledRadius,
+            Fixed64.Zero);
 
     public override Vector2d GetClosestPoint(Vector2d point)
     {
-        Vector2d direction = point - Center;
-        if (direction.MagnitudeSquared <= Fixed64.Epsilon)
-            return Center + Vector2d.Right * ScaledRadius;
+        if (TryGetClosestBoundaryAnchor(
+                point,
+                out FixedPointAnchor2d anchor,
+                out _)
+            && anchor.TryGetPoint(out Vector2d closest))
+        {
+            return closest;
+        }
 
-        return Center + direction.Normalized * ScaledRadius;
+        throw new System.InvalidOperationException(
+            "The closest circle surface point is outside the Fixed64 coordinate domain.");
     }
 
     public override Vector2d GetSupportPoint(Vector2d direction)
     {
-        if (direction.MagnitudeSquared <= Fixed64.Epsilon)
-            return Center + Vector2d.Right * ScaledRadius;
+        if (direction == Vector2d.Zero)
+            direction = Vector2d.Right;
 
-        return Center + direction.Normalized * ScaledRadius;
+        if (Vector2d.TryRotate(
+                direction.Normalized,
+                -Rotation,
+                out Vector2d localDirection))
+        {
+            FixedPointAnchor2d anchor =
+                FixedSegment2d.GetCenteredCapsuleSupportAnchor(
+                Center,
+                Rotation,
+                Vector2d.Forward,
+                Fixed64.Zero,
+                ScaledRadius,
+                localDirection);
+            if (anchor.TryGetPoint(out Vector2d support))
+                return support;
+        }
+
+        throw new System.InvalidOperationException(
+            "The circle support point is outside the Fixed64 coordinate domain.");
     }
 
-    internal override Fixed64 CalculateAreaForMassProperties() =>
-        Fixed64.Pi * ScaledRadius * ScaledRadius;
+    internal override Fixed64 CalculateAreaForMassProperties()
+    {
+        Fixed64 radius = GetMassPropertyRadius();
+        return Fixed64.Pi * radius * radius;
+    }
 
     public override Fixed64 CalculateMomentOfInertia(Fixed64 mass, Vector2d localReferencePoint)
     {
         if (mass <= Fixed64.Zero)
             return Fixed64.Zero;
 
+        Fixed64 radius = GetMassPropertyRadius();
         Vector2d centerOfMass = CalculateLocalCenterOfMassOffset();
-        Fixed64 momentAboutCenterOfMass = mass * ScaledRadius * ScaledRadius * Fixed64.Half;
+        Fixed64 momentAboutCenterOfMass = mass * radius * radius * Fixed64.Half;
         return ApplyParallelAxis(momentAboutCenterOfMass, mass, centerOfMass, localReferencePoint);
     }
 
-    protected override void RebuildShape()
+    private Fixed64 GetMassPropertyRadius()
     {
-        Vector2d extents = new(ScaledRadius, ScaledRadius);
-        SetBoundsFromMinMax(Center - extents, Center + extents);
+        if (HasCommittedShape)
+            return _scaledRadius;
+
+        GetCurrentScaleFactors(
+            out Vector2d ownerScale,
+            out Vector2d partScale);
+        Fixed64 radiusX = ColliderScalePolicy.Scale(
+            _radius,
+            ownerScale.X,
+            partScale.X);
+        Fixed64 radiusY = ColliderScalePolicy.Scale(
+            _radius,
+            ownerScale.Y,
+            partScale.Y);
+        return FixedMath.Max(radiusX, radiusY);
     }
+
+    private protected override void PrepareShape(in ColliderShapeSnapshot2D snapshot)
+    {
+        Fixed64 radiusX = ColliderScalePolicy.ScalePositive(
+            _radius,
+            snapshot.OwnerScale.X,
+            snapshot.PartScale.X);
+        Fixed64 radiusY = ColliderScalePolicy.ScalePositive(
+            _radius,
+            snapshot.OwnerScale.Y,
+            snapshot.PartScale.Y);
+        _preparedRadius = FixedMath.Max(radiusX, radiusY);
+        SetPreparedBounds(FixedBoundArea.FromCenterAndScopeClippedToDomain(
+            snapshot.Center,
+            new Vector2d(_preparedRadius, _preparedRadius)));
+    }
+
+    private protected override void PublishShape() =>
+        _scaledRadius = _preparedRadius;
 
     protected override void RecordShapeData(IChronicler chronicler)
     {

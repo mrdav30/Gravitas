@@ -1,13 +1,31 @@
 using FixedMathSharp;
+using FixedMathSharp.Geometry;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Tests.Support;
+using System;
 using Xunit;
 
 namespace Gravitas.Tests.Colliders;
 
 public sealed class LSCapsuleColliderTests
 {
+    [Fact]
+    public void ReassigningCurrentDimensions_ShouldNotRebuildRuntimeGeometry()
+    {
+        using PhysicsScenarioBuilder scenario =
+            PhysicsScenarioBuilder.Create();
+        LSCapsuleCollider capsule = scenario.CreateCapsule(Vector3d.Zero)
+            .Collider;
+        uint runtimeVersion = capsule.RuntimeShapeVersion;
+
+        capsule.Radius = capsule.Radius;
+        capsule.Size = capsule.Size;
+        capsule.Simulate();
+
+        capsule.RuntimeShapeVersion.Should().Be(runtimeVersion);
+    }
+
     [Fact]
     public void GetFrontalArea_ShouldUseCapsuleProjectionInWorldSpace()
     {
@@ -30,9 +48,9 @@ public sealed class LSCapsuleColliderTests
             FixedQuaternion.FromEulerAnglesInDegrees(Fixed64.Zero, Fixed64.Zero, (Fixed64)90)).Collider;
 
         Fixed64 capArea = Fixed64.Pi * capsule.ScaledRadiusSqr;
-        Fixed64 sideProfile = (Fixed64)2 * capsule.ScaledRadius * capsule.CylinderHeight;
+        Fixed64 sideProfile = (Fixed64)2 * capsule.ScaledRadius * capsule.AxisLength;
         Vector3d diagonal = new Vector3d(Fixed64.One, Fixed64.One, Fixed64.Zero).Normalized;
-        Fixed64 diagonalAxial = Vector3d.Dot(diagonal, capsule.LineDirection).Abs();
+        Fixed64 diagonalAxial = Vector3d.Dot(diagonal, capsule.WorldAxis).Abs();
         Fixed64 diagonalRadial = FixedMath.Sqrt(Fixed64.One - diagonalAxial * diagonalAxial);
         Vector3d fixedPointOverNormalizedAxis = new(
             Fixed64.FromRaw(1),
@@ -40,7 +58,7 @@ public sealed class LSCapsuleColliderTests
             Fixed64.Zero);
 
         capsule.GetFrontalArea(Vector3d.Zero).Should().Be(capsule.Area);
-        capsule.GetFrontalArea(capsule.LineDirection).Should().Be(capArea);
+        capsule.GetFrontalArea(capsule.WorldAxis).Should().Be(capArea);
         capsule.GetFrontalArea(fixedPointOverNormalizedAxis).Should().Be(capArea);
         capsule.GetFrontalArea(Vector3d.Right).Should().Be(capArea + sideProfile);
         capsule.GetFrontalArea(diagonal).Should().Be(capArea + sideProfile * diagonalRadial);
@@ -67,7 +85,7 @@ public sealed class LSCapsuleColliderTests
         Fixed64 mass = (Fixed64)5;
         Vector3d reference = new(Fixed64.One, (Fixed64)2, (Fixed64)3);
 
-        capsule.CylinderHeight.Should().Be(Fixed64.Zero);
+        capsule.AxisLength.Should().Be(Fixed64.Zero);
         capsule.CalculateInertiaTensor(mass, reference)
             .Should()
             .Be(sphere.CalculateInertiaTensor(mass, reference));
@@ -87,7 +105,7 @@ public sealed class LSCapsuleColliderTests
             FixedQuaternion.Identity).Collider;
         Fixed64 mass = (Fixed64)10;
         Fixed64 radiusSqr = capsule.ScaledRadiusSqr;
-        Fixed64 height = capsule.CylinderHeight;
+        Fixed64 height = capsule.AxisLength;
         Fixed64 cylinderVolume = Fixed64.Pi * radiusSqr * height;
         Fixed64 capVolume = Fixed64.FromFraction(4, 3) * Fixed64.Pi * radiusSqr * capsule.ScaledRadius;
         Fixed64 cylinderMass = mass * (cylinderVolume / (cylinderVolume + capVolume));
@@ -113,9 +131,42 @@ public sealed class LSCapsuleColliderTests
     }
 
     [Fact]
-    public void CalculateInertiaTensor_WithQuantizedZeroRadius_ShouldUseShiftedThinRodLimit()
+    public void CalculateInertiaTensor_WithQuantizedZeroVolume_ShouldUseThinRodLimit()
     {
-        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        var compound = new LSCompoundCollider(
+            CompoundColliderPart.Capsule(
+                Fixed64.One,
+                (Fixed64)4,
+                Vector3d.Zero,
+                FixedQuaternion.Identity,
+                new Vector3d(
+                    Fixed64.FromRaw(1),
+                    Fixed64.One,
+                    Fixed64.FromRaw(1))));
+        compound.InitializeWithNoBody(new TestMatterAgent(context));
+        var capsule = (LSCapsuleCollider)compound.GetPartCollider(0);
+        Fixed64 mass = (Fixed64)12;
+
+        Fixed3x3 tensor =
+            capsule.CalculateInertiaTensor(mass, Vector3d.Zero);
+        Fixed64 expectedTransverse =
+            Fixed64.FromFraction(1, 12)
+            * mass
+            * capsule.AxisLength
+            * capsule.AxisLength;
+
+        capsule.ScaledRadius.Should().Be(Fixed64.FromRaw(1));
+        capsule.AxisLength.Should().BeGreaterThan(Fixed64.Epsilon);
+        tensor.M11.Should().Be(expectedTransverse);
+        tensor.M22.Should().Be(Fixed64.Zero);
+        tensor.M33.Should().Be(expectedTransverse);
+    }
+
+    [Fact]
+    public void Initialize_WithQuantizedZeroFinalRadius_ShouldRejectWithoutPublishing()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         Vector3d tinyScale = new(Fixed64.FromRaw(1), Fixed64.FromRaw(1), Fixed64.FromRaw(1));
         var compound = new LSCompoundCollider(
             CompoundColliderPart.Capsule(
@@ -124,32 +175,58 @@ public sealed class LSCapsuleColliderTests
                 Vector3d.Zero,
                 FixedQuaternion.Identity,
                 tinyScale));
-        scenario.CreateBody(compound, Vector3d.Zero, FixedQuaternion.Identity);
         var capsule = (LSCapsuleCollider)compound.GetPartCollider(0);
-        Fixed64 mass = (Fixed64)3;
-        Vector3d reference = new(Fixed64.One, (Fixed64)2, (Fixed64)3);
-        Fixed64 rodTransverse = Fixed64.FromFraction(1, 12)
-            * mass
-            * capsule.CylinderHeight
-            * capsule.CylinderHeight;
-        Fixed3x3 expected = new(
-            rodTransverse + mass * (reference.Y * reference.Y + reference.Z * reference.Z),
-            -mass * reference.X * reference.Y,
-            -mass * reference.X * reference.Z,
-            -mass * reference.X * reference.Y,
-            mass * (reference.X * reference.X + reference.Z * reference.Z),
-            -mass * reference.Y * reference.Z,
-            -mass * reference.X * reference.Z,
-            -mass * reference.Y * reference.Z,
-            rodTransverse + mass * (reference.X * reference.X + reference.Y * reference.Y));
+        var body = new SolidBody(new TestMatterAgent(context), compound);
+        Fixed64 originalRadius = capsule.ScaledRadius;
+        Fixed64 originalAxisLength = capsule.AxisLength;
+        var originalBounds = capsule.Bounds;
+        uint originalShapeVersion = capsule.RuntimeShapeVersion;
 
-        capsule.ScaledRadius.Should().Be(Fixed64.Zero);
-        capsule.CylinderHeight.Should().BeGreaterThan(Fixed64.Zero);
-        Fixed3x3 centerTensor = capsule.CalculateInertiaTensor(mass, Vector3d.Zero);
-        centerTensor.M11.Should().BeGreaterThan(Fixed64.Zero);
-        centerTensor.M11.Should().Be(centerTensor.M33);
-        centerTensor.M22.Should().Be(Fixed64.Zero);
-        capsule.CalculateInertiaTensor(mass, reference).Should().Be(expected);
+        Action initialize = () => body.Initialize(Vector3d.Zero, FixedQuaternion.Identity);
+
+        initialize.Should().Throw<ArgumentException>().WithParameterName("dimension");
+        body.Active.Should().BeFalse();
+        body.DynamicId.Should().Be(-1);
+        compound.Id.Should().Be(-1);
+        capsule.ScaledRadius.Should().Be(originalRadius);
+        capsule.AxisLength.Should().Be(originalAxisLength);
+        capsule.Bounds.Should().Be(originalBounds);
+        capsule.RuntimeShapeVersion.Should().Be(originalShapeVersion);
+    }
+
+    [Fact]
+    public void Initialize_WhenScaledHeightIsShorterThanDiameter_ShouldRejectWithoutRegistration()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        var transform = new FixedTransform(
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            new Vector3d(
+                Fixed64.Two,
+                Fixed64.One,
+                Fixed64.One));
+        var capsule = new LSCapsuleCollider
+        {
+            Radius = Fixed64.One,
+            Size = new Vector3d(
+                Fixed64.Two,
+                Fixed64.Two,
+                Fixed64.Two)
+        };
+        var body = new SolidBody(
+            new TestMatterAgent(context, transform),
+            capsule);
+
+        Action initialize = () =>
+            body.Initialize(Vector3d.Zero, FixedQuaternion.Identity);
+
+        initialize.Should()
+            .Throw<ArgumentException>()
+            .WithParameterName("snapshot");
+        body.Active.Should().BeFalse();
+        capsule.Id.Should().Be(-1);
+        capsule.HasHostBinding.Should().BeFalse();
+        context.Physics.ColliderCount.Should().Be(0);
     }
 
     [Fact]
@@ -168,10 +245,20 @@ public sealed class LSCapsuleColliderTests
             },
             Vector3d.Zero,
             rotation).Collider;
-        Vector3d topPoint = capsule.Center
-            + rotation * (capsule.HemisphereCenterTop + Vector3d.Up * Fixed64.FromRaw(1));
-        Vector3d bottomPoint = capsule.Center
-            + rotation * (capsule.HemisphereCenterBottom - Vector3d.Up * Fixed64.FromRaw(1));
+        FixedSegment.TryGetCenteredAxisEndpoint(
+            capsule.Center,
+            capsule.WorldAxis,
+            capsule.AxisLength,
+            positive: true,
+            out Vector3d topCenter).Should().BeTrue();
+        FixedSegment.TryGetCenteredAxisEndpoint(
+            capsule.Center,
+            capsule.WorldAxis,
+            capsule.AxisLength,
+            positive: false,
+            out Vector3d bottomCenter).Should().BeTrue();
+        Vector3d topPoint = topCenter + capsule.WorldAxis * Fixed64.FromRaw(1);
+        Vector3d bottomPoint = bottomCenter - capsule.WorldAxis * Fixed64.FromRaw(1);
 
         capsule.GetNormalAtPoint(topPoint).Should().Be(rotation * Vector3d.Up);
         capsule.GetNormalAtPoint(bottomPoint).Should().Be(rotation * -Vector3d.Up);

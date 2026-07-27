@@ -360,33 +360,6 @@ public sealed partial class SolidBody2D : IRecordable
         return allowedScale > Fixed64.Zero ? InverseMass * allowedScale : Fixed64.Zero;
     }
 
-    /// <summary>
-    /// Gets or sets the authoritative body-local center-of-mass offset in the X/Z simulation plane.
-    /// </summary>
-    public Vector2d LocalCenterOfMassOffset
-    {
-        get => _localCenterOfMassOffset;
-        set
-        {
-            if (_localCenterOfMassOffset == value && _centerOfMassOffsetExplicit)
-                return;
-
-            _localCenterOfMassOffset = value;
-            _centerOfMassOffsetExplicit = true;
-            if (!Active)
-                return;
-
-            Wake();
-            RefreshMassPropertiesFromColliderShape();
-        }
-    }
-
-    /// <summary>
-    /// Gets the authoritative world-space center of mass in the X/Z simulation plane.
-    /// </summary>
-    public Vector2d WorldCenterOfMass =>
-        _position + ClampNearZero(Vector2d.Rotate(_localCenterOfMassOffset, _rotation));
-
     public Fixed64 MomentOfInertia => _momentOfInertia;
 
     public Fixed64 InverseMomentOfInertia => _inverseMomentOfInertia;
@@ -396,15 +369,6 @@ public sealed partial class SolidBody2D : IRecordable
     public Fixed64 AngularAcceleration => _angularAccelerationStore;
 
     public Fixed64 AngularSpeed => _angularSpeed;
-
-    /// <summary>
-    /// Clears an explicit center-of-mass override and derives the offset from the bound collider again.
-    /// </summary>
-    public void ResetCenterOfMassFromCollider()
-    {
-        _centerOfMassOffsetExplicit = false;
-        RefreshMassPropertiesFromColliderShape();
-    }
 
     public Vector2d Position
     {
@@ -524,10 +488,11 @@ public sealed partial class SolidBody2D : IRecordable
                 || (Collider.HasHostBinding && !ReferenceEquals(Collider.Body, this)),
             nameof(Collider),
             "Body collider must be unregistered and free of another host binding before initialization.");
-        Collider.PreflightBodyInitialization(this);
+        Fixed64 canonicalRotation = CanonicalizeRotation(rotation);
+        Collider.PreflightBodyInitialization(this, position, canonicalRotation);
 
         _position = position;
-        _rotation = CanonicalizeRotation(rotation);
+        _rotation = canonicalRotation;
         _linearVelocity = Vector2d.Zero;
         _linearAccelerationStore = Vector2d.Zero;
         _deltaAcceleration = Vector2d.Zero;
@@ -556,6 +521,11 @@ public sealed partial class SolidBody2D : IRecordable
     public void ResetPosition(Vector2d position = default, Fixed64 rotation = default)
     {
         PreflightStaticPoseChange();
+        Fixed64 canonicalRotation = CanonicalizeRotation(rotation);
+        SwiftThrowHelper.ThrowIfTrue(
+            !Collider.TryPrepareBodyPose(position, canonicalRotation),
+            nameof(position),
+            "The requested 2D body pose produces collider geometry outside the representable coordinate domain.");
         _linearVelocity = Vector2d.Zero;
         _linearAccelerationStore = Vector2d.Zero;
         _deltaAcceleration = Vector2d.Zero;
@@ -568,14 +538,14 @@ public sealed partial class SolidBody2D : IRecordable
         _isSleeping = false;
         _sleepFrameCount = 0;
         _position = position;
-        _rotation = CanonicalizeRotation(rotation);
+        _rotation = canonicalRotation;
         InvalidateContinuousCollisionFrame();
         ResetGroundingForInitialize(position);
 
         if (!Active)
             return;
 
-        Collider.Rebuild();
+        Collider.PublishPreparedExplicitBodyPose();
         RefreshStaticColliderAfterExplicitPoseChange();
         if (wasSleeping)
             Context.Collisions2D.RefreshPartitionAwakeState(Collider);
@@ -752,18 +722,8 @@ public sealed partial class SolidBody2D : IRecordable
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Fixed64 CanonicalizeRotation(Fixed64 rotation)
-    {
-        if (rotation >= -Fixed64.Pi && rotation < Fixed64.Pi)
-            return rotation;
-
-        rotation %= Fixed64.TwoPi;
-        if (rotation >= Fixed64.Pi)
-            return rotation - Fixed64.TwoPi;
-        if (rotation < -Fixed64.Pi)
-            return rotation + Fixed64.TwoPi;
-        return rotation;
-    }
+    private static Fixed64 CanonicalizeRotation(Fixed64 rotation) =>
+        PlanarRotation.Canonicalize(rotation);
 
     private static void SetHostWorldPose(
         FixedTransform transform,

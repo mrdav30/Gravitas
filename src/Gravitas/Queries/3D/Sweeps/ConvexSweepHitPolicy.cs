@@ -19,7 +19,8 @@ internal static class ConvexSweepHitPolicy
         Vector3d fallbackNormal,
         Vector3d sweepDirection,
         Vector3d planarNormal,
-        bool hasRefinedSurfaceNormal = false)
+        bool hasRefinedSurfaceNormal = false,
+        bool hasMaterializedPoint = true)
     {
         Vector3d surfaceNormal = hasRefinedSurfaceNormal
             ? targetCollider.GetNormalAtPoint(point)
@@ -32,12 +33,23 @@ internal static class ConvexSweepHitPolicy
                 ? resultNormal
                 : fallbackNormal.MagnitudeSquared > Fixed64.Epsilon
                     ? fallbackNormal
-                    : targetCollider.GetNormalAtPoint(point);
+                    : hasMaterializedPoint
+                        ? targetCollider.GetNormalAtPoint(point)
+                        : Vector3d.Zero;
 
         if (normal.MagnitudeSquared <= Fixed64.Epsilon)
-            return sweepDirection.MagnitudeSquared > Fixed64.Epsilon ? -sweepDirection : Vector3d.Zero;
+        {
+            return sweepDirection.MagnitudeSquared > Fixed64.Epsilon
+                ? -sweepDirection.Normalized
+                : Vector3d.Zero;
+        }
 
         normal = normal.Normalized;
-        return Vector3d.Dot(normal, sweepDirection) > Fixed64.Zero ? -normal : normal;
+        return Vector3d.CompareProjection(
+                normal,
+                Vector3d.Zero,
+                sweepDirection) > 0
+            ? -normal
+            : normal;
     }
 }

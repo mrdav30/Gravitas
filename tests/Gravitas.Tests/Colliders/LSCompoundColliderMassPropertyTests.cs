@@ -4,12 +4,34 @@ using Gravitas.Colliders;
 using Gravitas.Queries;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
+using System;
 using Xunit;
 
 namespace Gravitas.Tests.Colliders;
 
 public sealed class LSCompoundColliderMassPropertyTests
 {
+    [Fact]
+    public void DetachedCompoundPartCenterOfMass_ShouldRejectUnrepresentableLocalComposition()
+    {
+        var compound = new LSCompoundCollider(
+            CompoundColliderPart.Sphere(
+                Fixed64.Half,
+                Vector3d.Right))
+        {
+            LocalOffset = new Vector3d(
+                Fixed64.MaxValue,
+                Fixed64.Zero,
+                Fixed64.Zero)
+        };
+        LSCollider part = compound.GetPartCollider(0);
+
+        Action calculate = () => part.CalculateLocalCenterOfMassOffset();
+
+        calculate.Should().Throw<InvalidOperationException>()
+            .WithMessage("*outside*coordinate*domain*");
+    }
+
     [Fact]
     public void MassProperties_ShouldWeightSolidPartsByVolume()
     {
@@ -35,7 +57,7 @@ public sealed class LSCompoundColliderMassPropertyTests
     }
 
     [Fact]
-    public void MassProperties_ShouldRotatePartOffsetsAndAnisotropicTensorsIntoOwnerSpace()
+    public void MassProperties_ShouldKeepPartTranslationInOwnerFrameAndRotateAnisotropicTensor()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         FixedQuaternion partRotation = FixedQuaternion.FromEulerAnglesInDegrees(
@@ -48,18 +70,20 @@ public sealed class LSCompoundColliderMassPropertyTests
                 new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.Zero),
                 partRotation));
         compound.LocalOffset = new Vector3d((Fixed64)3, Fixed64.Zero, Fixed64.Zero);
+        Vector3d expectedCenter = new((Fixed64)5, Fixed64.Zero, Fixed64.Zero);
+        Vector3d detachedCenter =
+            compound.CalculateLocalCenterOfMassOffset();
         scenario.CreateBody(compound, new Vector3d((Fixed64)10, Fixed64.Zero, Fixed64.Zero), FixedQuaternion.Identity);
-        Vector3d expectedCenter = new((Fixed64)3, (Fixed64)2, Fixed64.Zero);
         Fixed3x3 expectedTensor = new(
             (Fixed64)40, Fixed64.Zero, Fixed64.Zero,
             Fixed64.Zero, (Fixed64)52, Fixed64.Zero,
             Fixed64.Zero, Fixed64.Zero, (Fixed64)20);
 
+        detachedCenter.Should().Be(expectedCenter);
         compound.Center.Should().Be(new Vector3d((Fixed64)13, Fixed64.Zero, Fixed64.Zero));
-        compound.GetPartCollider(0).Center.Should().Be(new Vector3d((Fixed64)13, (Fixed64)2, Fixed64.Zero));
+        compound.GetPartCollider(0).Center.Should().Be(new Vector3d((Fixed64)15, Fixed64.Zero, Fixed64.Zero));
         compound.CalculateLocalCenterOfMassOffset().Should().Be(expectedCenter);
         compound.CalculateInertiaTensor((Fixed64)12, expectedCenter).Should().Be(expectedTensor);
-        compound.ScaledSize.Should().Be(Vector3d.One);
     }
 
     [Fact]
@@ -114,11 +138,7 @@ public sealed class LSCompoundColliderMassPropertyTests
             CompoundColliderPart.Sphere(Fixed64.Half, new Vector3d((Fixed64)10, Fixed64.Zero, Fixed64.Zero)));
         scenario.CreateBody(compound, Vector3d.Zero, FixedQuaternion.Identity);
 
-        Vector3d farthestBoundsCorner = new(
-            Fixed64.FromFraction(21, 2),
-            Fixed64.Half,
-            Fixed64.Half);
-        compound.ScaledRadius.Should().Be(farthestBoundsCorner.Magnitude);
+        compound.ScaledRadius.Should().Be(Fixed64.FromFraction(21, 2));
         bool found = scenario.Context.Query3D.OverlapCircle(
             new Vector3d((Fixed64)10, Fixed64.Zero, Fixed64.Zero),
             Fixed64.Half,
@@ -182,7 +202,7 @@ public sealed class LSCompoundColliderMassPropertyTests
         sphere.CalculateMassPropertyWeight().Should().Be(
             Fixed64.FromFraction(4, 3) * Fixed64.Pi * sphere.ScaledRadiusSqr * sphere.ScaledRadius);
         capsule.CalculateMassPropertyWeight().Should().Be(
-            Fixed64.Pi * capsule.ScaledRadiusSqr * capsule.CylinderHeight
+            Fixed64.Pi * capsule.ScaledRadiusSqr * capsule.AxisLength
             + Fixed64.FromFraction(4, 3) * Fixed64.Pi * capsule.ScaledRadiusSqr * capsule.ScaledRadius);
         box.CalculateMassPropertyWeight().Should().Be((Fixed64)24);
         cylinder.CalculateMassPropertyWeight().Should().Be(
@@ -242,7 +262,9 @@ public sealed class LSCompoundColliderMassPropertyTests
         scenario.CreateBody(compound, Vector3d.Zero, FixedQuaternion.Identity);
         var cone = (LSConeCollider)compound.GetPartCollider(0);
 
-        cone.Axis.Should().Be(Vector3d.Up);
+        cone.WorldAxis.Should().Be(Vector3d.Up);
+        cone.Height.Should().Be(Fixed64.FromRaw(1));
+        cone.ScaledRadius.Should().Be(Fixed64.FromRaw(1));
         cone.CalculateMassPropertyWeight().Should().Be(Fixed64.Zero);
         cone.ClosestPointOnSurface(Vector3d.Right)
             .Should().Be(new Vector3d(Fixed64.FromRaw(1), Fixed64.Zero, Fixed64.Zero));
@@ -290,11 +312,13 @@ public sealed class LSCompoundColliderMassPropertyTests
         var mesh = (LSMeshCollider)compound.GetPartCollider(0);
         Vector3d rawCenter = new(Fixed64.Quarter, Fixed64.Quarter, Fixed64.Quarter);
         Vector3d effectiveScale = Vector3d.Multiply(ownerScale, partScale);
-        Vector3d partLocalCenter = Vector3d.Multiply(
-            partOffset + rawCenter - mesh.Mesh.LocalBounds.Center,
+        Vector3d scaledPartOffset = Vector3d.Multiply(partOffset, ownerScale);
+        Vector3d centeredMeshCenter = Vector3d.Multiply(
+            rawCenter - mesh.Mesh.LocalBounds.Center,
             effectiveScale);
         Vector3d expectedCenter = Vector3d.Multiply(compound.LocalOffset, ownerScale)
-            + partRotation * partLocalCenter;
+            + scaledPartOffset
+            + partRotation * centeredMeshCenter;
 
         AssertVectorNear(mesh.CalculateLocalCenterOfMassOffset(), expectedCenter);
         AssertVectorNear(compound.CalculateLocalCenterOfMassOffset(), expectedCenter);

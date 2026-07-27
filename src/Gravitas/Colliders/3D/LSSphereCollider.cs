@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using FixedMathSharp.Geometry;
 using Gravitas.Queries;
 using SwiftCollections;
 
@@ -13,6 +14,10 @@ namespace Gravitas.Colliders;
 
 public class LSSphereCollider : LSCollider
 {
+    private Fixed64 _scaledRadius = Fixed64.Half;
+    private Fixed64 _preparedRadius;
+    private Fixed64 _preparedArea;
+
     public LSSphereCollider() { }
 
     public LSSphereCollider(ColliderShapeDefinition definition)
@@ -26,21 +31,40 @@ public class LSSphereCollider : LSCollider
 
     public override int Priority => ColliderSettings.GetPriority(Shape);
 
-    protected override void OnInitialize()
-    {
-        Fixed64 diameter = _radius * 2;
-        _size = new Vector3d(diameter, diameter, diameter);
-        base.OnInitialize();
-    }
-
     protected override void OnRadiusChanged()
     {
         Fixed64 diameter = _radius * 2;
         _size = new Vector3d(diameter, diameter, diameter);
     }
 
-    protected override void BuildShape() =>
-        Area = Fixed64.Pi * ScaledRadiusSqr;  // The area of a circle is pi times the radius squared (A = π r²)
+    public override Fixed64 ScaledRadius => _scaledRadius;
+
+    private protected override void PrepareShape(in ColliderShapeSnapshot snapshot)
+    {
+        Fixed64 radiusX = ColliderScalePolicy.ScalePositive(
+            snapshot.Radius,
+            snapshot.OwnerScale.X,
+            snapshot.PartScale.X);
+        Fixed64 radiusY = ColliderScalePolicy.ScalePositive(
+            snapshot.Radius,
+            snapshot.OwnerScale.Y,
+            snapshot.PartScale.Y);
+        Fixed64 radiusZ = ColliderScalePolicy.ScalePositive(
+            snapshot.Radius,
+            snapshot.OwnerScale.Z,
+            snapshot.PartScale.Z);
+        _preparedRadius = FixedMath.Max(radiusX, FixedMath.Max(radiusY, radiusZ));
+        _preparedArea = Fixed64.Pi * _preparedRadius * _preparedRadius;
+        SetPreparedBounds(FixedBoundBox.FromCenterAndScopeClippedToDomain(
+            snapshot.Center,
+            Vector3d.One * _preparedRadius));
+    }
+
+    private protected override void PublishShape()
+    {
+        _scaledRadius = _preparedRadius;
+        Area = _preparedArea;
+    }
 
     protected internal override Fixed64 CalculateMassPropertyWeight() =>
         Fixed64.FromFraction(4, 3) * Fixed64.Pi * ScaledRadiusSqr * ScaledRadius;

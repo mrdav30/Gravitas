@@ -1,5 +1,5 @@
 using FixedMathSharp;
-using FixedMathSharp.Bounds;
+using FixedMathSharp.Geometry;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Queries;
@@ -341,17 +341,18 @@ public sealed class RaycastSegmentWorkerTests
         LSCapsuleCollider capsule = scenario.CreateCapsule(Vector3d.Zero).Collider;
         var worker = new RaycastSegmentWorker();
         var hits = new SwiftList<Vector3d>();
+        Fixed64 capY = GetAxisEndpoint(capsule, positive: false).Y;
 
         worker.PrepareSegmentCheck(
-            new Vector3d((Fixed64)(-2), capsule.LineSegmentStart.Y, Fixed64.Zero),
-            new Vector3d((Fixed64)2, capsule.LineSegmentStart.Y, Fixed64.Zero));
+            new Vector3d((Fixed64)(-2), capY, Fixed64.Zero),
+            new Vector3d((Fixed64)2, capY, Fixed64.Zero));
 
         bool hit = worker.CheckCapsuleOverlaps(capsule, ref hits);
 
         hit.Should().BeTrue();
         hits.Count.Should().Be(2);
-        hits.Should().Contain(new Vector3d(-capsule.ScaledRadius, capsule.LineSegmentStart.Y, Fixed64.Zero));
-        hits.Should().Contain(new Vector3d(capsule.ScaledRadius, capsule.LineSegmentStart.Y, Fixed64.Zero));
+        hits.Should().Contain(new Vector3d(-capsule.ScaledRadius, capY, Fixed64.Zero));
+        hits.Should().Contain(new Vector3d(capsule.ScaledRadius, capY, Fixed64.Zero));
     }
 
     [Fact]
@@ -361,17 +362,18 @@ public sealed class RaycastSegmentWorkerTests
         LSCapsuleCollider capsule = scenario.CreateCapsule(Vector3d.Zero).Collider;
         var worker = new RaycastSegmentWorker();
         var hits = new SwiftList<Vector3d>();
+        Fixed64 capY = GetAxisEndpoint(capsule, positive: true).Y;
 
         worker.PrepareSegmentCheck(
-            new Vector3d((Fixed64)(-2), capsule.LineSegmentEnd.Y, Fixed64.Zero),
-            new Vector3d((Fixed64)2, capsule.LineSegmentEnd.Y, Fixed64.Zero));
+            new Vector3d((Fixed64)(-2), capY, Fixed64.Zero),
+            new Vector3d((Fixed64)2, capY, Fixed64.Zero));
 
         bool hit = worker.CheckCapsuleOverlaps(capsule, ref hits);
 
         hit.Should().BeTrue();
         hits.Count.Should().Be(2);
-        hits.Should().Contain(new Vector3d(-capsule.ScaledRadius, capsule.LineSegmentEnd.Y, Fixed64.Zero));
-        hits.Should().Contain(new Vector3d(capsule.ScaledRadius, capsule.LineSegmentEnd.Y, Fixed64.Zero));
+        hits.Should().Contain(new Vector3d(-capsule.ScaledRadius, capY, Fixed64.Zero));
+        hits.Should().Contain(new Vector3d(capsule.ScaledRadius, capY, Fixed64.Zero));
     }
 
     [Fact]
@@ -411,8 +413,8 @@ public sealed class RaycastSegmentWorkerTests
 
         hit.Should().BeTrue();
         hits.Count.Should().Be(2);
-        hits[0].Should().Be(capsule.LineSegmentStart - Vector3d.Up * capsule.ScaledRadius);
-        hits[1].Should().Be(capsule.LineSegmentEnd + Vector3d.Up * capsule.ScaledRadius);
+        hits[0].Should().Be(GetAxisEndpoint(capsule, positive: false) - Vector3d.Up * capsule.ScaledRadius);
+        hits[1].Should().Be(GetAxisEndpoint(capsule, positive: true) + Vector3d.Up * capsule.ScaledRadius);
     }
 
     [Fact]
@@ -652,8 +654,14 @@ public sealed class RaycastSegmentWorkerTests
 
         hit.Should().BeTrue();
         hits.Count.Should().Be(2);
-        hits.Should().Contain(new Vector3d(Fixed64.Half, -cylinder.HalfHeight, Fixed64.Zero));
-        hits.Should().Contain(new Vector3d(Fixed64.Half, cylinder.HalfHeight, Fixed64.Zero));
+        hits.Should().Contain(new Vector3d(
+            Fixed64.Half,
+            GetAxisEndpoint(cylinder, positive: false).Y,
+            Fixed64.Zero));
+        hits.Should().Contain(new Vector3d(
+            Fixed64.Half,
+            GetAxisEndpoint(cylinder, positive: true).Y,
+            Fixed64.Zero));
     }
 
     [Fact]
@@ -829,13 +837,14 @@ public sealed class RaycastSegmentWorkerTests
         LSConeCollider cone = scenario.CreateCone(Vector3d.Zero).Collider;
         var worker = new RaycastSegmentWorker();
         var hits = new SwiftList<Vector3d>();
+        Vector3d apex = GetAxisEndpoint(cone, positive: true);
 
         worker.PrepareSegmentCheck(
-            new Vector3d(Fixed64.One, cone.HalfHeight, Fixed64.Zero),
-            cone.WorldApex);
+            new Vector3d(Fixed64.One, apex.Y, Fixed64.Zero),
+            apex);
 
         worker.CheckConeOverlaps(cone, ref hits).Should().BeTrue();
-        hits.Should().ContainSingle().Which.Should().Be(cone.WorldApex);
+        hits.Should().ContainSingle().Which.Should().Be(apex);
     }
 
     [Fact]
@@ -918,7 +927,8 @@ public sealed class RaycastSegmentWorkerTests
         LSConeCollider cone = scenario.CreateCone(Vector3d.Zero).Collider;
         var worker = new RaycastSegmentWorker();
         var hits = new SwiftList<Vector3d>();
-        Fixed64 y = -cone.HalfHeight - cone.Height;
+        Fixed64 halfHeight = cone.Height * Fixed64.Half;
+        Fixed64 y = -halfHeight - cone.Height;
 
         worker.PrepareSegmentCheck(
             new Vector3d(-cone.ScaledRadius * (Fixed64)3, y, Fixed64.Zero),
@@ -937,16 +947,17 @@ public sealed class RaycastSegmentWorkerTests
         LSConeCollider cone = scenario.CreateCone(Vector3d.Zero).Collider;
         var worker = new RaycastSegmentWorker();
         var hits = new SwiftList<Vector3d>();
+        Fixed64 halfHeight = cone.Height * Fixed64.Half;
 
         worker.PrepareSegmentCheck(
-            new Vector3d(cone.ScaledRadius, -cone.HalfHeight - cone.Height, Fixed64.Zero),
-            new Vector3d(cone.ScaledRadius, cone.HalfHeight + cone.Height, Fixed64.Zero));
+            new Vector3d(cone.ScaledRadius, -halfHeight - cone.Height, Fixed64.Zero),
+            new Vector3d(cone.ScaledRadius, halfHeight + cone.Height, Fixed64.Zero));
 
         bool hit = worker.CheckConeOverlaps(cone, ref hits);
 
         hit.Should().BeTrue();
         hits.Count.Should().Be(1);
-        hits[0].Should().Be(new Vector3d(cone.ScaledRadius, -cone.HalfHeight, Fixed64.Zero));
+        hits[0].Should().Be(new Vector3d(cone.ScaledRadius, -halfHeight, Fixed64.Zero));
     }
 
     [Fact]
@@ -956,10 +967,11 @@ public sealed class RaycastSegmentWorkerTests
         LSConeCollider cone = scenario.CreateCone(Vector3d.Zero).Collider;
         var worker = new RaycastSegmentWorker();
         var hits = new SwiftList<Vector3d>();
+        Fixed64 halfHeight = cone.Height * Fixed64.Half;
 
         worker.PrepareSegmentCheck(
-            new Vector3d(cone.ScaledRadius, -cone.HalfHeight - cone.Height, Fixed64.Zero),
-            new Vector3d(cone.ScaledRadius, cone.HalfHeight + cone.Height, Fixed64.Zero),
+            new Vector3d(cone.ScaledRadius, -halfHeight - cone.Height, Fixed64.Zero),
+            new Vector3d(cone.ScaledRadius, halfHeight + cone.Height, Fixed64.Zero),
             calculateIntersectionPoints: false);
 
         bool hit = worker.CheckConeOverlaps(cone, ref hits);
@@ -993,10 +1005,11 @@ public sealed class RaycastSegmentWorkerTests
         LSConeCollider cone = scenario.CreateCone(Vector3d.Zero).Collider;
         var worker = new RaycastSegmentWorker();
         var hits = new SwiftList<Vector3d>();
+        Fixed64 halfHeight = cone.Height * Fixed64.Half;
 
         worker.PrepareSegmentCheck(
-            new Vector3d(-cone.ScaledRadius * (Fixed64)2, -cone.HalfHeight - cone.Height, Fixed64.Zero),
-            new Vector3d(-cone.ScaledRadius * Fixed64.FromFraction(3, 2), -cone.HalfHeight - cone.Height * Fixed64.Half, Fixed64.Zero));
+            new Vector3d(-cone.ScaledRadius * (Fixed64)2, -halfHeight - cone.Height, Fixed64.Zero),
+            new Vector3d(-cone.ScaledRadius * Fixed64.FromFraction(3, 2), -halfHeight - cone.Height * Fixed64.Half, Fixed64.Zero));
 
         bool hit = worker.CheckConeOverlaps(cone, ref hits);
 
@@ -1012,10 +1025,11 @@ public sealed class RaycastSegmentWorkerTests
         var worker = new RaycastSegmentWorker();
         var hits = new SwiftList<Vector3d>();
         Fixed64 offset = cone.ScaledRadius * Fixed64.FromFraction(1, 4);
+        Fixed64 halfHeight = cone.Height * Fixed64.Half;
 
         worker.PrepareSegmentCheck(
-            new Vector3d(-cone.ScaledRadius * (Fixed64)2 - offset, -cone.HalfHeight - cone.Height, Fixed64.Zero),
-            new Vector3d(-cone.ScaledRadius * Fixed64.FromFraction(3, 2) - offset, -cone.HalfHeight - cone.Height * Fixed64.Half, Fixed64.Zero));
+            new Vector3d(-cone.ScaledRadius * (Fixed64)2 - offset, -halfHeight - cone.Height, Fixed64.Zero),
+            new Vector3d(-cone.ScaledRadius * Fixed64.FromFraction(3, 2) - offset, -halfHeight - cone.Height * Fixed64.Half, Fixed64.Zero));
 
         bool hit = worker.CheckConeOverlaps(cone, ref hits);
 
@@ -1389,7 +1403,7 @@ public sealed class RaycastSegmentWorkerTests
     }
 
     [Fact]
-    public void CheckOBBoxOverlaps_WithSegmentTangentToRotatedBoxCorner_ShouldReturnSingleIntersection()
+    public void CheckOBBoxOverlaps_WithQuantizedNearTangentOutsideRotatedBox_ShouldReturnFalse()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         LSCuboidCollider box = scenario.CreateCuboid(
@@ -1399,17 +1413,12 @@ public sealed class RaycastSegmentWorkerTests
         var hits = new SwiftList<Vector3d>();
         Vector3d localStart = new((Fixed64)(-2), -Fixed64.One, Fixed64.Half);
         Vector3d localEnd = new((Fixed64)2, (Fixed64)3, Fixed64.Half);
-
         worker.PrepareSegmentCheck(LocalToWorld(box, localStart), LocalToWorld(box, localEnd));
 
         bool hit = worker.CheckOBBoxOverlaps(box, ref hits);
 
-        hit.Should().BeTrue();
-        hits.Count.Should().Be(1);
-        Vector3d.Distance(
-            hits[0],
-            LocalToWorld(box, new Vector3d(-Fixed64.Half, Fixed64.Half, Fixed64.Half)))
-            .Should().BeLessThanOrEqualTo(Fixed64.Epsilon);
+        hit.Should().BeFalse();
+        hits.Should().BeEmpty();
     }
 
     [Fact]
@@ -1578,6 +1587,39 @@ public sealed class RaycastSegmentWorkerTests
 
     private static Vector3d LocalToWorld(LSCuboidCollider box, Vector3d localPoint) =>
         box.Center + box.Rotation * localPoint;
+
+    private static Vector3d GetAxisEndpoint(LSCapsuleCollider capsule, bool positive)
+    {
+        FixedSegment.TryGetCenteredAxisEndpoint(
+            capsule.Center,
+            capsule.WorldAxis,
+            capsule.AxisLength,
+            positive,
+            out Vector3d endpoint).Should().BeTrue();
+        return endpoint;
+    }
+
+    private static Vector3d GetAxisEndpoint(LSCylinderCollider cylinder, bool positive)
+    {
+        FixedSegment.TryGetCenteredAxisEndpoint(
+            cylinder.Center,
+            cylinder.WorldAxis,
+            cylinder.Height,
+            positive,
+            out Vector3d endpoint).Should().BeTrue();
+        return endpoint;
+    }
+
+    private static Vector3d GetAxisEndpoint(LSConeCollider cone, bool positive)
+    {
+        FixedSegment.TryGetCenteredAxisEndpoint(
+            cone.Center,
+            cone.WorldAxis,
+            cone.Height,
+            positive,
+            out Vector3d endpoint).Should().BeTrue();
+        return endpoint;
+    }
 
     private static FixedBoundSphere Sphere(Vector3d center, Fixed64 radius) => new(center, radius);
 }

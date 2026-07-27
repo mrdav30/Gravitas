@@ -1,5 +1,5 @@
 using FixedMathSharp;
-using FixedMathSharp.Bounds;
+using FixedMathSharp.Geometry;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Tests.Support;
@@ -13,6 +13,131 @@ namespace Gravitas.Tests.Colliders;
 
 public sealed class PhysicsMeshScaleTests
 {
+    [Fact]
+    public void AreaAdmittedMicroTriangle_ShouldRetainAUsableFaceNormal()
+    {
+        var mesh = new PhysicsMesh(
+            new[]
+            {
+                Vector3d.Zero,
+                Vector3d.Right * Fixed64.Half,
+                Vector3d.Up * Fixed64.FromFraction(1, 65536)
+            },
+            new[] { 0, 1, 2 },
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+
+        mesh.TotalArea.Should().Be(Fixed64.FromFraction(1, 262144));
+        mesh.GetFaceNormalWorld(0).Should().Be(Vector3d.Forward);
+    }
+
+    [Fact]
+    public void CompoundMesh_WithUnrepresentableCombinedScale_ShouldCommitExactCenteredVertices()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        Vector3d[] vertices =
+        {
+            Vector3d.Zero,
+            Vector3d.Right * Fixed64.Half,
+            Vector3d.Up * Fixed64.FromFraction(1, 65536)
+        };
+        var compound = new LSCompoundCollider(
+            CompoundColliderPart.ConvexMesh(
+                vertices,
+                new[] { 0, 1, 2 },
+                Vector3d.Zero,
+                FixedQuaternion.Identity,
+                new Vector3d((Fixed64)2, Fixed64.One, Fixed64.One),
+                MeshInertiaPolicy.RequireClosedVolume));
+        Fixed64 ownerX = (Fixed64)1500000000;
+        var transform = new FixedTransform(
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            new Vector3d(ownerX, Fixed64.One, Fixed64.One));
+
+        compound.InitializeWithNoBody(new TestMatterAgent(context, transform));
+
+        var meshPart = (LSMeshCollider)compound.GetPartCollider(0);
+        meshPart.Mesh.OwnerScale.X.Should().Be(ownerX);
+        meshPart.Mesh.PartScale.X.Should().Be((Fixed64)2);
+        meshPart.Mesh.GetVertexWorld(0).X.Should().Be((Fixed64)(-750000000));
+        meshPart.Mesh.GetVertexWorld(1).X.Should().Be((Fixed64)750000000);
+        meshPart.Area.Should().Be(Fixed64.FromFraction(1500000000, 131072));
+    }
+
+    [Fact]
+    public void ClosedMesh_WithUnrepresentableScaledSourceCenter_ShouldUseCenteredCandidateMass()
+    {
+        Vector3d translation = Vector3d.Right * (Fixed64)1200000000;
+        Vector3d[] vertices = CreateTetrahedronVertices();
+        for (int i = 0; i < vertices.Length; i++)
+            vertices[i] += translation;
+
+        var mesh = new PhysicsMesh(
+            vertices,
+            TetrahedronTriangles(),
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+        mesh.UpdateTransform(
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            new Vector3d((Fixed64)2, Fixed64.One, Fixed64.One));
+
+        mesh.TryGetClosedVolumeMassProperties(
+            out MeshMassProperties properties,
+            out MeshVolumeValidationResult result).Should().BeTrue();
+        result.Should().Be(MeshVolumeValidationResult.Valid);
+        AssertNear(properties.Volume, Fixed64.FromFraction(1, 3));
+        AssertVectorNear(
+            properties.CenterOfMass,
+            new Vector3d(
+                -Fixed64.Half,
+                -Fixed64.Quarter,
+                -Fixed64.Quarter));
+    }
+
+    [Fact]
+    public void PreparedMeshScaleFailure_ShouldPreserveCommittedBuffersAndCaches()
+    {
+        PhysicsMesh mesh = CreateOffsetTriangleMesh();
+        Vector3d[] vertices = GetWorldVertices(mesh);
+        FixedBoundBox bounds = mesh.Bounds;
+        Fixed64 area = mesh.TotalArea;
+        int bvhBuildCount = mesh.TriangleBvhBuildCount;
+
+        Action prepare = () => mesh.PrepareTransformation(
+            new Vector3d((Fixed64)9, (Fixed64)8, (Fixed64)7),
+            FixedQuaternion.Identity,
+            new Vector3d((Fixed64)65536, (Fixed64)65536, Fixed64.One),
+            Vector3d.One,
+            MeshInertiaPolicy.SurfaceApproximation);
+
+        prepare.Should().Throw<ArgumentException>();
+        GetWorldVertices(mesh).Should().Equal(vertices);
+        mesh.Bounds.Should().Be(bounds);
+        mesh.TotalArea.Should().Be(area);
+        mesh.OwnerScale.Should().Be(Vector3d.One);
+        mesh.PartScale.Should().Be(Vector3d.One);
+        mesh.TriangleBvhBuildCount.Should().Be(bvhBuildCount);
+    }
+
+    [Fact]
+    public void ChangedMeshPreparation_AfterWarmup_ShouldAllocateZeroBytes()
+    {
+        PhysicsMesh mesh = CreateOffsetTriangleMesh();
+        Vector3d firstScale = new((Fixed64)2, (Fixed64)3, Fixed64.One);
+        Vector3d secondScale = new((Fixed64)3, (Fixed64)2, Fixed64.One);
+        PrepareAndPublish(mesh, firstScale);
+        PrepareAndPublish(mesh, secondScale);
+
+        long before = GC.GetAllocatedBytesForCurrentThread();
+        PrepareAndPublish(mesh, firstScale);
+        PrepareAndPublish(mesh, secondScale);
+        long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+
+        allocated.Should().Be(0);
+    }
+
     [Fact]
     public void ClosedCube_WithNonUniformScale_ShouldUpdateGeometryAndMassProperties()
     {
@@ -160,7 +285,7 @@ public sealed class PhysicsMeshScaleTests
         Fixed3x3 tensor = mesh.CalculateInertiaTensor(
             (Fixed64)12,
             MeshInertiaPolicy.SurfaceApproximation,
-            Vector3d.Zero);
+            new Vector3d(-Fixed64.One, -Fixed64.One, Fixed64.Zero));
         MeshSurfaceMassProperties cached = mesh.SurfaceMassProperties;
         mesh.SurfaceMassProperties.Should().Be(cached);
 
@@ -203,7 +328,8 @@ public sealed class PhysicsMeshScaleTests
                 invalidScale);
 
             update.Should().Throw<ArgumentException>();
-            mesh.Scale.Should().Be(priorScale);
+            mesh.OwnerScale.Should().Be(priorScale);
+            mesh.PartScale.Should().Be(Vector3d.One);
             mesh.GetVertexWorld(0).Should().Be(priorVertex);
             mesh.Bounds.Should().Be(priorBounds);
             mesh.TotalArea.Should().Be(priorArea);
@@ -220,6 +346,7 @@ public sealed class PhysicsMeshScaleTests
             Vector3d.Zero,
             FixedQuaternion.Identity);
         FixedBoundBox priorBounds = mesh.Bounds;
+        Vector3d priorVertex = mesh.GetVertexWorld(0);
 
         Action update = () => mesh.UpdateTransform(
             Vector3d.One,
@@ -227,9 +354,9 @@ public sealed class PhysicsMeshScaleTests
             new Vector3d(Fixed64.FromFraction(1, 1000), Fixed64.FromFraction(1, 1000), Fixed64.One));
 
         update.Should().Throw<ArgumentException>().WithMessage("*nondegenerate*");
-        mesh.Scale.Should().Be(Vector3d.One);
+        mesh.OwnerScale.Should().Be(Vector3d.One);
         mesh.Bounds.Should().Be(priorBounds);
-        mesh.GetVertexWorld(0).Should().Be(Vector3d.Zero);
+        mesh.GetVertexWorld(0).Should().Be(priorVertex);
     }
 
     [Fact]
@@ -265,8 +392,8 @@ public sealed class PhysicsMeshScaleTests
             new Vector3d((Fixed64)2, (Fixed64)3, (Fixed64)4));
         Vector3d localPoint = new(Fixed64.Quarter, Fixed64.Half, Fixed64.FromFraction(3, 4));
 
-        Vector3d worldPoint = mesh.ConvertLocalToWorld(localPoint);
-        Vector3d roundTrip = mesh.ConvertWorldToLocal(worldPoint);
+        Vector3d worldPoint = mesh.ConvertScaledLocalToWorld(localPoint);
+        Vector3d roundTrip = mesh.ConvertWorldToScaledLocal(worldPoint);
         mesh.GetTriangleVertices(0, out Vector3d first, out Vector3d second, out Vector3d third);
         Vector3d normal = mesh.GetFaceNormalWorld(0);
 
@@ -277,22 +404,187 @@ public sealed class PhysicsMeshScaleTests
     }
 
     [Fact]
-    public void ScaleChange_ShouldReuseLocalTriangleBvhAndQueryScaledWorldBounds()
+    public void WorldDirectionConversion_ShouldExposeRigidRotationOverflow()
+    {
+        var mesh = new PhysicsMesh(
+            new[] { Vector3d.Zero, Vector3d.Right, Vector3d.Up },
+            new[] { 0, 1, 2 },
+            Vector3d.Zero,
+            FixedQuaternion.FromAxisAngle(
+                Vector3d.Up,
+                Fixed64.PiOver4));
+        var direction = new Vector3d(
+            Fixed64.MaxValue,
+            Fixed64.Zero,
+            Fixed64.MaxValue);
+
+        mesh.TryConvertWorldDirectionToLocal(
+                direction,
+                out Vector3d localDirection)
+            .Should()
+            .BeFalse();
+        localDirection.Should().Be(Vector3d.Zero);
+        Action materialize = () =>
+            mesh.ConvertWorldDirectionToLocal(direction);
+        materialize.Should().Throw<InvalidOperationException>()
+            .WithMessage("*cannot be represented*");
+    }
+
+    [Fact]
+    public void TriangleWorldView_ShouldExposeUnmaterializableVerticesExplicitly()
+    {
+        var mesh = new PhysicsMesh(
+            new[] { Vector3d.Zero, Vector3d.Right, Vector3d.Up },
+            new[] { 0, 1, 2 },
+            new Vector3d(
+                Fixed64.MaxValue,
+                Fixed64.Zero,
+                Fixed64.Zero),
+            FixedQuaternion.Identity,
+            MeshColliderMode.Concave);
+
+        mesh.TryGetTriangleVertices(0, out Vector3d first, out Vector3d second, out Vector3d third)
+            .Should().BeFalse();
+        first.Should().Be(Vector3d.Zero);
+        second.Should().Be(Vector3d.Zero);
+        third.Should().Be(Vector3d.Zero);
+        Action materialize = () => mesh.GetTriangleVertices(0, out _, out _, out _);
+        materialize.Should().Throw<InvalidOperationException>()
+            .WithMessage("*outside the Fixed64 world-coordinate domain*");
+    }
+
+    [Fact]
+    public void ExactWorldViews_ShouldExposeUnrepresentableSupportAndConversionsExplicitly()
+    {
+        var mesh = new PhysicsMesh(
+            new[] { Vector3d.Zero, Vector3d.Right, Vector3d.Up },
+            new[] { 0, 1, 2 },
+            new Vector3d(
+                Fixed64.MaxValue,
+                Fixed64.Zero,
+                Fixed64.Zero),
+            FixedQuaternion.Identity);
+
+        mesh.TryGetSupportVertexWorld(Vector3d.Right, out Vector3d support)
+            .Should().BeFalse();
+        support.Should().Be(Vector3d.Zero);
+        Action getSupport = () => mesh.GetSupportVertexWorld(Vector3d.Right);
+        getSupport.Should().Throw<InvalidOperationException>()
+            .WithMessage("*outside the Fixed64 world-coordinate domain*");
+        mesh.TryGetVertexWorld(1, out Vector3d vertex)
+            .Should().BeFalse();
+        vertex.Should().Be(Vector3d.Zero);
+        Action getVertex = () => mesh.GetVertexWorld(1);
+        getVertex.Should().Throw<InvalidOperationException>()
+            .WithMessage("*outside the Fixed64 world-coordinate domain*");
+
+        mesh.TryConvertScaledLocalToWorld(
+                Vector3d.Right,
+                out Vector3d worldPoint)
+            .Should().BeFalse();
+        worldPoint.Should().Be(Vector3d.Zero);
+        Action toWorld = () => mesh.ConvertScaledLocalToWorld(Vector3d.Right);
+        toWorld.Should().Throw<InvalidOperationException>()
+            .WithMessage("*outside the Fixed64 world-coordinate domain*");
+
+        mesh.TryConvertWorldToScaledLocal(
+                new Vector3d(
+                    Fixed64.MinValue,
+                    Fixed64.Zero,
+                    Fixed64.Zero),
+                out Vector3d localPoint)
+            .Should().BeFalse();
+        localPoint.Should().Be(Vector3d.Zero);
+        Action toLocal = () => mesh.ConvertWorldToScaledLocal(
+            new Vector3d(
+                Fixed64.MinValue,
+                Fixed64.Zero,
+                Fixed64.Zero));
+        toLocal.Should().Throw<InvalidOperationException>()
+            .WithMessage("*scaled-local frame*");
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ExtremeRotatedWorldBoundsAndQueries_ShouldUseExactRelativeFrames(
+        bool positive)
+    {
+        Fixed64 edge = positive
+            ? Fixed64.MaxValue - (Fixed64)4
+            : Fixed64.MinValue + (Fixed64)4;
+        var mesh = new PhysicsMesh(
+            new[]
+            {
+                new Vector3d(-Fixed64.One, -Fixed64.One, Fixed64.Zero),
+                new Vector3d(Fixed64.One, -Fixed64.One, Fixed64.Zero),
+                new Vector3d(Fixed64.Zero, Fixed64.One, Fixed64.Zero),
+            },
+            new[] { 0, 1, 2 },
+            new Vector3d(edge, edge, Fixed64.Zero),
+            FixedQuaternion.FromEulerAnglesInDegrees(
+                Fixed64.Zero,
+                Fixed64.Zero,
+                (Fixed64)45));
+
+        var candidates = new SwiftList<int>();
+        for (int i = 0; i < mesh.VertexCount; i++)
+        {
+            mesh.TryGetVertexWorld(i, out Vector3d vertex).Should().BeTrue();
+            mesh.Bounds.Contains(vertex).Should().BeTrue();
+            mesh.GetTrianglesInWorldBounds(
+                new FixedBoundVolume(vertex, vertex),
+                candidates);
+            candidates.Should().Contain(0);
+        }
+    }
+
+    [Fact]
+    public void FullSpanAuthoredMesh_ShouldDownscaleWithoutIntermediateSubtractionLoss()
+    {
+        var mesh = new PhysicsMesh(
+            new[]
+            {
+                new Vector3d(Fixed64.MinValue, Fixed64.Zero, Fixed64.Zero),
+                new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero),
+                new Vector3d(Fixed64.MaxValue, Fixed64.One, Fixed64.Zero),
+            },
+            new[] { 0, 1, 2 },
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+        FixedBoundBox priorBounds = mesh.Bounds;
+
+        mesh.UpdateTransform(
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            new Vector3d(Fixed64.Quarter, Fixed64.One, Fixed64.One));
+
+        mesh.ScaledLocalBounds.Min.X.Should().Be(Fixed64.MinValue / (Fixed64)4);
+        mesh.ScaledLocalBounds.Max.X.Should().Be(Fixed64.MaxValue / (Fixed64)4);
+        mesh.Bounds.Should().NotBe(priorBounds);
+    }
+
+    [Fact]
+    public void ScaleChange_ShouldRebuildCenteredTriangleBvhAndQueryScaledWorldBounds()
     {
         PhysicsMesh mesh = CreateOffsetTriangleMesh();
         var hits = new SwiftList<int>();
         mesh.GetTrianglesInWorldBounds(
-            new FixedBoundVolume(new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.Zero), new Vector3d((Fixed64)3, Fixed64.One, Fixed64.Zero)),
+            new FixedBoundVolume(
+                new Vector3d(Fixed64.Half, -Fixed64.Half, Fixed64.Zero),
+                new Vector3d(Fixed64.FromFraction(3, 2), Fixed64.Half, Fixed64.Zero)),
             hits);
         int buildCount = mesh.TriangleBvhBuildCount;
 
         mesh.UpdateTransform(Vector3d.Zero, FixedQuaternion.Identity, new Vector3d((Fixed64)2, (Fixed64)3, (Fixed64)4));
         mesh.GetTrianglesInWorldBounds(
-            new FixedBoundVolume(new Vector3d((Fixed64)4, Fixed64.Zero, Fixed64.Zero), new Vector3d((Fixed64)6, (Fixed64)3, Fixed64.Zero)),
+            new FixedBoundVolume(
+                new Vector3d(Fixed64.One, Fixed64.FromFraction(-3, 2), Fixed64.Zero),
+                new Vector3d((Fixed64)3, Fixed64.FromFraction(3, 2), Fixed64.Zero)),
             hits);
 
         hits.Should().Contain(1);
-        mesh.TriangleBvhBuildCount.Should().Be(buildCount);
+        mesh.TriangleBvhBuildCount.Should().Be(buildCount + 1);
     }
 
     [Fact]
@@ -338,7 +630,10 @@ public sealed class PhysicsMeshScaleTests
         var first = new PhysicsMesh(centeredVertices, new[] { 0, 1, 2, 0, 2, 3 }, Vector3d.Zero, FixedQuaternion.Identity);
         var second = new PhysicsMesh(translatedVertices, new[] { 0, 1, 3, 1, 2, 3 }, Vector3d.Zero, FixedQuaternion.Identity);
         Fixed3x3 firstTensor = first.CalculateInertiaTensor((Fixed64)12, MeshInertiaPolicy.SurfaceApproximation, Vector3d.Zero);
-        Fixed3x3 secondTensor = second.CalculateInertiaTensor((Fixed64)12, MeshInertiaPolicy.SurfaceApproximation, translation);
+        Fixed3x3 secondTensor = second.CalculateInertiaTensor(
+            (Fixed64)12,
+            MeshInertiaPolicy.SurfaceApproximation,
+            Vector3d.Zero);
 
         AssertMatrixNear(firstTensor, secondTensor);
         AssertNear(firstTensor.M11, (Fixed64)4);
@@ -367,6 +662,32 @@ public sealed class PhysicsMeshScaleTests
         AssertNear(tensor.M11, (Fixed64)36);
         AssertNear(tensor.M22, (Fixed64)16);
         AssertNear(tensor.M33, (Fixed64)52);
+    }
+
+    [Fact]
+    public void TranslatedClosedVolume_ShouldFallBackToCenteredScalingWhenAbsoluteCenterOverflows()
+    {
+        Vector3d translation = Vector3d.Up * (Fixed64.MaxValue - (Fixed64)4);
+        Vector3d[] vertices = CreateTetrahedronVertices();
+        for (int i = 0; i < vertices.Length; i++)
+            vertices[i] += translation;
+        var mesh = new PhysicsMesh(
+            vertices,
+            TetrahedronTriangles(),
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+
+        mesh.UpdateTransform(
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            new Vector3d(Fixed64.One, Fixed64.Two, Fixed64.One));
+
+        mesh.TryGetClosedVolumeMassProperties(
+                out MeshMassProperties properties,
+                out MeshVolumeValidationResult result)
+            .Should().BeTrue();
+        result.Should().Be(MeshVolumeValidationResult.Valid);
+        properties.CenterOfMass.Y.Abs().Should().BeLessThan((Fixed64)4);
     }
 
     [Fact]
@@ -532,10 +853,11 @@ public sealed class PhysicsMeshScaleTests
         transform.LocalScale = new Vector3d((Fixed64)65536, (Fixed64)65536, Fixed64.Half);
         Action simulate = compound.Simulate;
 
-        simulate.Should().Throw<ArgumentException>().WithMessage("*determinant*");
+        simulate.Should().Throw<ArgumentException>();
         spherePart.RuntimeShapeVersion.Should().Be(sphereVersion);
         spherePart.Bounds.Should().Be(sphereBounds);
-        meshPart.Mesh.Scale.Should().Be(Vector3d.One);
+        meshPart.Mesh.OwnerScale.Should().Be(Vector3d.One);
+        meshPart.Mesh.PartScale.Should().Be(Vector3d.One);
         compound.Bounds.Should().Be(compoundBounds);
         context.Physics.ColliderCount.Should().Be(1);
 
@@ -544,7 +866,8 @@ public sealed class PhysicsMeshScaleTests
 
         spherePart.RuntimeShapeVersion.Should().BeGreaterThan(sphereVersion);
         compound.RuntimeShapeVersion.Should().BeGreaterThan(compoundVersion);
-        meshPart.Mesh.Scale.Should().Be(transform.LossyScale);
+        meshPart.Mesh.OwnerScale.Should().Be(transform.LossyScale);
+        meshPart.Mesh.PartScale.Should().Be(Vector3d.One);
         compound.Bounds.Should().NotBe(compoundBounds);
 
     }
@@ -558,7 +881,7 @@ public sealed class PhysicsMeshScaleTests
         collider.InitializeWithNoBody(new TestMatterAgent(context, transform));
         FixedBoundBox colliderBounds = collider.Bounds;
         FixedBoundBox meshBounds = collider.Mesh.Bounds;
-        Vector3d meshScale = collider.Mesh.Scale;
+        Vector3d meshScale = collider.Mesh.OwnerScale;
         Vector3d firstVertex = collider.Mesh.GetVertexWorld(0);
         Fixed64 area = collider.Area;
         uint version = collider.RuntimeShapeVersion;
@@ -568,10 +891,10 @@ public sealed class PhysicsMeshScaleTests
         transform.LocalScale = new Vector3d((Fixed64)65536, (Fixed64)65536, Fixed64.Half);
         Action rebuild = collider.Simulate;
 
-        rebuild.Should().Throw<ArgumentException>().WithMessage("*determinant*");
+        rebuild.Should().Throw<ArgumentException>();
         collider.Bounds.Should().Be(colliderBounds);
         collider.Mesh.Bounds.Should().Be(meshBounds);
-        collider.Mesh.Scale.Should().Be(meshScale);
+        collider.Mesh.OwnerScale.Should().Be(meshScale);
         collider.Mesh.GetVertexWorld(0).Should().Be(firstVertex);
         collider.Area.Should().Be(area);
         collider.RuntimeShapeVersion.Should().Be(version);
@@ -582,7 +905,7 @@ public sealed class PhysicsMeshScaleTests
         collider.Simulate();
 
         collider.RuntimeShapeVersion.Should().Be(version + 1);
-        collider.Mesh.Scale.Should().Be(transform.LossyScale);
+        collider.Mesh.OwnerScale.Should().Be(transform.LossyScale);
         collider.Bounds.Should().NotBe(colliderBounds);
     }
 
@@ -634,19 +957,16 @@ public sealed class PhysicsMeshScaleTests
     }
 
     [Fact]
-    public void ScaleValidation_ShouldRejectTrueOverflowModesWithoutRejectingSameSignBounds()
+    public void ScaleAdmission_ShouldUseFinalCanonicalGeometryInsteadOfIntermediateAggregates()
     {
         PhysicsMesh mesh = CreateOffsetTriangleMesh();
-        Vector3d priorVertex = mesh.GetVertexWorld(0);
-        FixedBoundBox priorBounds = mesh.Bounds;
-
         Action determinantOverflow = () => mesh.UpdateTransform(
             Vector3d.One,
             FixedQuaternion.Identity,
             new Vector3d((Fixed64)65536, (Fixed64)65536, Fixed64.Half));
-        determinantOverflow.Should().Throw<ArgumentException>().WithMessage("*determinant*");
-        mesh.GetVertexWorld(0).Should().Be(priorVertex);
-        mesh.Bounds.Should().Be(priorBounds);
+        determinantOverflow.Should().NotThrow();
+        mesh.OwnerScale.Should().Be(
+            new Vector3d((Fixed64)65536, (Fixed64)65536, Fixed64.Half));
 
         var sameSignBounds = new PhysicsMesh(
             new[]
@@ -674,10 +994,11 @@ public sealed class PhysicsMeshScaleTests
             Vector3d.Zero,
             FixedQuaternion.Identity,
             new Vector3d(Fixed64.FromFraction(11, 10), Fixed64.One, Fixed64.One));
-        boundsOverflow.Should().Throw<ArgumentException>().WithMessage("*exact bounds size*");
-        wideBounds.Scale.Should().Be(Vector3d.One);
+        boundsOverflow.Should().NotThrow();
+        wideBounds.OwnerScale.X.Should().Be(Fixed64.FromFraction(11, 10));
 
-        Action crossProductOverflow = () => _ = new PhysicsMesh(
+        PhysicsMesh? crossProductMesh = null;
+        Action crossProductOverflow = () => crossProductMesh = new PhysicsMesh(
             new[]
             {
                 Vector3d.Zero,
@@ -687,9 +1008,11 @@ public sealed class PhysicsMeshScaleTests
             new[] { 0, 1, 2 },
             Vector3d.Zero,
             FixedQuaternion.Identity);
-        crossProductOverflow.Should().Throw<ArgumentException>().WithMessage("*cross products*");
+        crossProductOverflow.Should().NotThrow();
+        crossProductMesh!.TotalArea.Should().Be(Fixed64.MaxValue);
 
-        Action crossDifferenceOverflow = () => _ = new PhysicsMesh(
+        PhysicsMesh? crossDifferenceMesh = null;
+        Action crossDifferenceOverflow = () => crossDifferenceMesh = new PhysicsMesh(
             new[]
             {
                 Vector3d.Zero,
@@ -699,18 +1022,21 @@ public sealed class PhysicsMeshScaleTests
             new[] { 0, 1, 2 },
             Vector3d.Zero,
             FixedQuaternion.Identity);
-        crossDifferenceOverflow.Should().Throw<ArgumentException>().WithMessage("*cross products*");
+        crossDifferenceOverflow.Should().NotThrow();
+        crossDifferenceMesh!.TotalArea.Should().Be((Fixed64)1500000000);
 
-        Action magnitudeOverflow = () => _ = new PhysicsMesh(
+        PhysicsMesh? largeTriangleMesh = null;
+        Action magnitudeOverflow = () => largeTriangleMesh = new PhysicsMesh(
             new[] { Vector3d.Zero, Vector3d.Right * (Fixed64)50000, Vector3d.Up },
             new[] { 0, 1, 2 },
             Vector3d.Zero,
             FixedQuaternion.Identity);
-        magnitudeOverflow.Should().Throw<ArgumentException>().WithMessage("*scaled triangle representable*");
+        magnitudeOverflow.Should().NotThrow();
+        largeTriangleMesh!.TotalArea.Should().Be((Fixed64)25000);
     }
 
     [Fact]
-    public void ScaleValidation_ShouldRejectVertexUnderflowAndTotalAreaSaturation()
+    public void CenteredScale_ShouldIgnoreAuthoredTranslationUnderflowAndSaturateAggregateArea()
     {
         var mesh = new PhysicsMesh(
             new[]
@@ -723,12 +1049,12 @@ public sealed class PhysicsMeshScaleTests
             Vector3d.Zero,
             FixedQuaternion.Identity,
             MeshColliderMode.Concave);
-        Action underflow = () => mesh.UpdateTransform(
+        Action centeredScale = () => mesh.UpdateTransform(
             Vector3d.Zero,
             FixedQuaternion.Identity,
             Vector3d.One * Fixed64.Half);
-        underflow.Should().Throw<ArgumentException>().WithMessage("*authored vertex*");
-        mesh.Scale.Should().Be(Vector3d.One);
+        centeredScale.Should().NotThrow();
+        mesh.OwnerScale.Should().Be(Vector3d.One * Fixed64.Half);
 
         const int triangleCount = 100000;
         var triangles = new int[triangleCount * 3];
@@ -739,13 +1065,15 @@ public sealed class PhysicsMeshScaleTests
             triangles[i + 2] = 2;
         }
 
-        Action totalAreaOverflow = () => _ = new PhysicsMesh(
+        PhysicsMesh? repeatedTriangleMesh = null;
+        Action totalAreaOverflow = () => repeatedTriangleMesh = new PhysicsMesh(
             new[] { Vector3d.Zero, Vector3d.Right * (Fixed64)45000, Vector3d.Up },
             triangles,
             Vector3d.Zero,
             FixedQuaternion.Identity,
             MeshColliderMode.Concave);
-        totalAreaOverflow.Should().Throw<ArgumentException>().WithMessage("*total surface area*");
+        totalAreaOverflow.Should().NotThrow();
+        repeatedTriangleMesh!.TotalArea.Should().Be(Fixed64.MaxValue);
     }
 
     [Fact]
@@ -803,6 +1131,34 @@ public sealed class PhysicsMeshScaleTests
     }
 
     [Fact]
+    public void SurfaceApproximation_WithSaturatedAreaNearScalarFace_ShouldRejectUnrepresentableCenter()
+    {
+        Fixed64 edge = Fixed64.MaxValue;
+        var mesh = new PhysicsMesh(
+            new[]
+            {
+                new Vector3d(edge - Fixed64.One, Fixed64.Zero, Fixed64.Zero),
+                new Vector3d(edge, (Fixed64)(-25000), (Fixed64)(-25000)),
+                new Vector3d(edge, (Fixed64)25000, (Fixed64)(-25000)),
+                new Vector3d(edge, (Fixed64)(-25000), (Fixed64)25000)
+            },
+            new[]
+            {
+                0, 1, 2,
+                1, 2, 3,
+                1, 2, 3
+            },
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            MeshColliderMode.Concave);
+
+        Action read = () => _ = mesh.SurfaceMassProperties;
+
+        read.Should().Throw<InvalidOperationException>()
+            .WithMessage("*not representable*");
+    }
+
+    [Fact]
     public void SurfaceApproximation_WithDistantBalancedTriangles_ShouldRejectParallelAxisOverflow()
     {
         var mesh = new PhysicsMesh(
@@ -856,6 +1212,31 @@ public sealed class PhysicsMeshScaleTests
             Fixed3x3.Identity * (Fixed64)1000000000,
             out Fixed3x3 matrixSum).Should().BeFalse();
         matrixSum.Should().Be(default(Fixed3x3));
+    }
+
+    [Fact]
+    public void CheckedMeshMath_ShouldAdmitExactFixed64DomainEndpoints()
+    {
+        Vector3d endpoint = new(
+            Fixed64.MaxValue,
+            Fixed64.MinValue,
+            Fixed64.Zero);
+
+        MeshCheckedMath.TrySubtract(
+                endpoint,
+                Vector3d.Zero,
+                out Vector3d difference)
+            .Should()
+            .BeTrue();
+        difference.Should().Be(endpoint);
+
+        MeshCheckedMath.TryMultiply(
+                difference,
+                Fixed64.One,
+                out Vector3d product)
+            .Should()
+            .BeTrue();
+        product.Should().Be(endpoint);
     }
 
     private static PhysicsMesh CreateOffsetTriangleMesh() =>
@@ -1005,5 +1386,24 @@ public sealed class PhysicsMeshScaleTests
         AssertNear(actual.X, expected.X);
         AssertNear(actual.Y, expected.Y);
         AssertNear(actual.Z, expected.Z);
+    }
+
+    private static void PrepareAndPublish(PhysicsMesh mesh, Vector3d scale)
+    {
+        mesh.PrepareTransformation(
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            scale,
+            Vector3d.One,
+            null);
+        mesh.PublishPreparedTransformation();
+    }
+
+    private static Vector3d[] GetWorldVertices(PhysicsMesh mesh)
+    {
+        var vertices = new Vector3d[mesh.VertexCount];
+        for (int index = 0; index < vertices.Length; index++)
+            vertices[index] = mesh.GetVertexWorld(index);
+        return vertices;
     }
 }

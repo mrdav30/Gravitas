@@ -3,6 +3,7 @@ using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Tests.Support;
+using System;
 using Xunit;
 
 namespace Gravitas.Tests.Core;
@@ -41,6 +42,103 @@ public sealed class SolidBodyCenterOfMassTests
         body.Body.SetRotation(rotation);
 
         body.Body.WorldCenterOfMass.Should().Be(body.Body.Position3d + (rotation * Vector3d.Right));
+    }
+
+    [Fact]
+    public void WorldCenterOfMass_WhenAbsolutePointIsUnrepresentable_ShouldExposeTryContract()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(
+            new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero));
+        body.Body.LocalCenterOfMassOffset = Vector3d.Right;
+
+        body.Body.TryGetWorldCenterOfMass(out Vector3d center).Should().BeFalse();
+        center.Should().Be(Vector3d.Zero);
+
+        Func<Vector3d> readWorldCenter = () => body.Body.WorldCenterOfMass;
+        readWorldCenter.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void WorldCenterOfMass_WhenRotatedOffsetIsUnrepresentable_ShouldExposeTryContract()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
+        body.Body.LocalCenterOfMassOffset = new Vector3d(
+            Fixed64.MaxValue,
+            Fixed64.Zero,
+            Fixed64.MaxValue);
+        body.Body.SetRotation(FixedQuaternion.FromEulerAnglesInDegrees(
+            Fixed64.Zero,
+            (Fixed64)45,
+            Fixed64.Zero));
+
+        body.Body.TryGetWorldCenterOfMass(out Vector3d center).Should().BeFalse();
+        center.Should().Be(Vector3d.Zero);
+        body.Body.TryGetOffsetFromCenterOfMass(
+            new ContactAnchor(Vector3d.Zero, Vector3d.Zero),
+            out Vector3d offset).Should().BeFalse();
+        offset.Should().Be(Vector3d.Zero);
+    }
+
+    [Fact]
+    public void CenterOfMassOperations_WhenRotationOverflowsButFinalValuesCancel_ShouldSucceed()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        FixedQuaternion rotation =
+            FixedQuaternion.FromEulerAnglesInDegrees(
+                Fixed64.Zero,
+                (Fixed64)45,
+                Fixed64.Zero);
+        Vector3d localOffset = new(
+            Fixed64.MaxValue,
+            Fixed64.Zero,
+            Fixed64.MaxValue);
+        rotation.TryRotate(localOffset, out _).Should().BeFalse();
+
+        ScenarioBody<LSSphereCollider> worldBody = scenario.CreateSphere(
+            new Vector3d(
+                -Fixed64.MaxValue,
+                Fixed64.Zero,
+                Fixed64.Zero));
+        worldBody.Body.LocalCenterOfMassOffset = localOffset;
+        worldBody.Body.SetRotation(rotation);
+        worldBody.Body.TryGetWorldCenterOfMass(
+            out Vector3d worldCenter).Should().BeTrue();
+        worldCenter.X.Should().BeGreaterThan(Fixed64.Zero);
+        worldCenter.X.Should().BeLessThan(Fixed64.MaxValue);
+
+        ScenarioBody<LSSphereCollider> relativeBody =
+            scenario.CreateSphere(Vector3d.Zero);
+        relativeBody.Body.LocalCenterOfMassOffset = localOffset;
+        relativeBody.Body.SetRotation(rotation);
+        relativeBody.Body.TryGetOffsetFromCenterOfMass(
+            new ContactAnchor(
+                new Vector3d(
+                    Fixed64.MaxValue,
+                    Fixed64.Zero,
+                    Fixed64.Zero),
+                new Vector3d(
+                    Fixed64.MaxValue,
+                    Fixed64.Zero,
+                    Fixed64.Zero)),
+            out Vector3d relative).Should().BeTrue();
+        relative.X.Should().BeGreaterThan(Fixed64.Zero);
+        relative.X.Should().BeLessThan(Fixed64.MaxValue);
+    }
+
+    [Fact]
+    public void TryGetOffsetFromCenterOfMass_WhenAbsolutePointsAreUnrepresentable_ShouldRetainExactLeverArm()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
+        body.Body.LocalCenterOfMassOffset = Vector3d.Right;
+        var anchor = new ContactAnchor(
+            new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero),
+            Vector3d.Right);
+
+        body.Body.TryGetOffsetFromCenterOfMass(anchor, out Vector3d offset).Should().BeTrue();
+        offset.Should().Be(new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero));
     }
 
     [Fact]
@@ -94,8 +192,9 @@ public sealed class SolidBodyCenterOfMassTests
             Vector3d.Zero,
             FixedQuaternion.Identity);
 
-        body.Body.LocalCenterOfMassOffset.Should().Be(properties.CenterOfMass);
-        body.Body.WorldCenterOfMass.Should().Be(properties.CenterOfMass);
+        Vector3d expected = collider.ScaledOffset + properties.CenterOfMass;
+        body.Body.LocalCenterOfMassOffset.Should().Be(expected);
+        body.Body.WorldCenterOfMass.Should().Be(expected);
     }
 
     [Fact]

@@ -162,6 +162,17 @@ public static class CollisionResponse
         Vector3d normal = ResolveContactNormal(manifoldContact.Normal, pair.ColliderB.Center - pair.ColliderA.Center);
         if (normal == Vector3d.Zero)
             return false;
+        if (!bodyA.Body.TryGetOffsetFromCenterOfMass(
+                manifoldContact.AnchorA,
+                out Vector3d relativeA)
+            || !bodyB.Body.TryGetOffsetFromCenterOfMass(
+                manifoldContact.AnchorB,
+                out Vector3d relativeB))
+        {
+            GravitasLogger.Channel.Error(
+                $"Contact {manifoldContact.ContactId} cannot be rebased onto its response centers.");
+            return false;
+        }
         PhysicsMaterial materialA = manifoldContact.HasMaterialOverride
             ? manifoldContact.MaterialA
             : pair.ColliderA.Material;
@@ -186,10 +197,8 @@ public static class CollisionResponse
             manifoldContact.ContactId,
             bodyA,
             bodyB,
-            manifoldContact.PointA,
-            manifoldContact.PointB,
-            manifoldContact.PointA - bodyA.Body.WorldCenterOfMass,
-            manifoldContact.PointB - bodyB.Body.WorldCenterOfMass,
+            relativeA,
+            relativeB,
             manifoldContact.Depth,
             normal,
             materialA,

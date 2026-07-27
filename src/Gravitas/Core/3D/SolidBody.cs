@@ -381,44 +381,6 @@ public partial class SolidBody : IRecordable
     /// </summary>
     private Vector3d _deltaTorque;
 
-    private Vector3d _localCenterOfMassOffset;
-    private bool _centerOfMassOffsetExplicit;
-
-    /// <summary>
-    /// Gets or sets the authoritative body-local center-of-mass offset used by response and inertia.
-    /// </summary>
-    public Vector3d LocalCenterOfMassOffset
-    {
-        get => _localCenterOfMassOffset;
-        set
-        {
-            if (_localCenterOfMassOffset == value && _centerOfMassOffsetExplicit)
-                return;
-
-            _localCenterOfMassOffset = value;
-            _centerOfMassOffsetExplicit = true;
-            if (!Active)
-                return;
-
-            Wake();
-            RefreshInertiaTensor();
-        }
-    }
-
-    /// <summary>
-    /// Gets the authoritative world-space center of mass.
-    /// </summary>
-    public Vector3d WorldCenterOfMass => Position3d + (Rotation * _localCenterOfMassOffset);
-
-    /// <summary>
-    /// Clears an explicit center-of-mass override and derives the offset from the bound collider again.
-    /// </summary>
-    public void ResetCenterOfMassFromCollider()
-    {
-        _centerOfMassOffsetExplicit = false;
-        RefreshMassPropertiesFromColliderShape();
-    }
-
     private Fixed3x3 _inertiaTensor;
     private Fixed3x3 _worldInertiaTensor;
     private Fixed3x3 _inverseLocalInertiaTensor;
@@ -717,7 +679,8 @@ public partial class SolidBody : IRecordable
                 || (Collider.HasHostBinding && !ReferenceEquals(Collider.Body, this)),
             nameof(Collider),
             "Body collider must be unregistered and free of another host binding before initialization.");
-        Collider.PreflightBodyInitialization(this);
+        FixedQuaternion normalizedRotation = startRotation.Normalized;
+        Collider.PreflightBodyInitialization(this, startPosition, normalizedRotation);
 
         _motionType = motionType;
         Active = true;
@@ -740,7 +703,6 @@ public partial class SolidBody : IRecordable
         _lastGroundedPosition = _lastPosition = startPosition;
         _heightPosUnmarked = startPosition.Y;
 
-        FixedQuaternion normalizedRotation = startRotation.Normalized;
         _rotationChangedBuffer = true;
         _rotation = normalizedRotation;
 
@@ -910,61 +872,11 @@ public partial class SolidBody : IRecordable
     private bool CanSleep => SleepEnabled && HasSolverMobility;
 
 
-    internal void OnVisualize()
-    {
-        if (!HasSolverMobility || !SettingVisuals)
-            return;
-
-        if (Context.ResetAccumulationThisVisualize)
-        {
-            if (CanSetVisualPosition)
-                SetVisualPosition(Position3d);
-            if (CanSetVisualRotation)
-                StoreVisualRotation(_rotation);
-        }
-
-        if (CanSetVisualPosition)
-        {
-            Vector3d expectedPosition = Vector3d.SpeedLerp(_lastVisualPosition, _visualPosition, Fixed64.One, Context.ExpectedAccumulation);
-            SetPositionTransformWorldPosition(expectedPosition);
-        }
-
-        if (!CanSetVisualRotation)
-            return;
-
-        Fixed64 targetSpeed = ResolveVisualRotationStep();
-        FixedQuaternion expectedRotation = _rotationInterpoleSpeed > Fixed64.Zero
-            ? FixedQuaternion.Slerp(_rotationTransform.WorldRotation, _visualRotation, targetSpeed)
-            : FixedQuaternion.Slerp(_lastVisualRotation, _visualRotation, targetSpeed);
-        SetRotationTransformWorldRotation(expectedRotation);
-    }
-
-    private Fixed64 ResolveVisualRotationStep()
-    {
-        if (_rotationInterpoleSpeed <= Fixed64.Zero)
-            return Context.ExpectedAccumulation;
-
-        return FixedMath.Clamp01(Context.DeltaTime * _rotationInterpoleSpeed * _rotationSpeed);
-    }
-
-    private void SetPositionTransformWorldPosition(Vector3d position)
-    {
-        SwiftThrowHelper.ThrowIfTrue(
-            !_positionTransform.TrySetWorldPosition(position),
-            nameof(FixedTransform),
-            "Position transform cannot represent the requested world position.");
-    }
-
-    private void SetRotationTransformWorldRotation(FixedQuaternion rotation)
-    {
-        SwiftThrowHelper.ThrowIfTrue(
-            !_rotationTransform.TrySetWorldPose(_rotationTransform.WorldPosition, rotation),
-            nameof(FixedTransform),
-            "Rotation transform cannot represent the requested world rotation.");
-    }
-
     private void SetTransformWorldPose(Vector3d position, FixedQuaternion rotation)
     {
+        if (_positionTransform == null)
+            return;
+
         Vector3d originalLocalPosition = _positionTransform.LocalPosition;
         FixedQuaternion originalLocalRotation = _positionTransform.LocalRotation;
         SwiftThrowHelper.ThrowIfTrue(
@@ -972,14 +884,15 @@ public partial class SolidBody : IRecordable
             nameof(FixedTransform),
             "Host transform cannot represent the requested world pose.");
 
-        if (!Active)
-            return;
-
         try
         {
-            // A world rotation below a non-uniformly scaled parent can change
-            // lossy scale even though local scale is unchanged.
-            Collider.ValidateCurrentRuntimeTransform(rotation);
+            if (Active)
+            {
+                SwiftThrowHelper.ThrowIfTrue(
+                    !Collider.TryPrepareBodyPose(position, rotation),
+                    nameof(position),
+                    "The requested body pose produces collider geometry outside the representable coordinate domain.");
+            }
         }
         catch
         {
@@ -987,12 +900,6 @@ public partial class SolidBody : IRecordable
             _positionTransform.LocalRotation = originalLocalRotation;
             throw;
         }
-    }
-
-    private void PublishAuthoritativePose()
-    {
-        SetPositionTransformWorldPosition(Position3d);
-        SetRotationTransformWorldRotation(Rotation);
     }
 
     public void Deactivate()
@@ -1008,57 +915,21 @@ public partial class SolidBody : IRecordable
         Active = false;
     }
 
-    public void CheckChangedValues()
-    {
-        // we want to keep the buffers true until the next time we visualize, so we can be sure to update visuals at least once after a change
-
-        if (_positionMutated)
-        {
-            _positionChangedBuffer = _positionMutated;
-            _positionMutated = false;
-            _settingVisualsCounter = Context.FrameRate;
-        }
-        else
-            _positionChangedBuffer = false;
-
-        if (_rotationMutated)
-        {
-            _rotationChangedBuffer = _rotationMutated;
-            _rotationMutated = false;
-            _settingVisualsCounter = Context.FrameRate;
-        }
-        else
-            _rotationChangedBuffer = false;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void SetVisualPosition(Vector3d position)
-    {
-        _lastVisualPosition = _visualPosition;
-        _visualPosition = position;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void SetVisualRotation(FixedQuaternion rot) =>
-        StoreVisualRotation(rot.Normalized);
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private void StoreVisualRotation(FixedQuaternion rotation)
-    {
-        _lastVisualRotation = _visualRotation;
-        _visualRotation = rotation;
-    }
-
     public void UpdateRotation(FixedQuaternion targetRotation, Fixed64 bufferInterpolation)
     {
         FixedQuaternion normalizedRotation = targetRotation.Normalized;
-        PreflightStaticPoseChange(normalizedRotation);
+        PreflightStaticPoseChange();
+        bool preparedPose = PrepareExplicitBodyPose(
+            Position3d,
+            normalizedRotation,
+            nameof(targetRotation),
+            "The requested target rotation produces collider geometry outside the representable coordinate domain.");
         _rotationInterpoleSpeed = bufferInterpolation;
         _rotationSpeed = Agent.IsInteracting
             ? InteractionRotationSpeed
             : DefaultRotationSpeed;
         Rotation = normalizedRotation;
-        RefreshStaticColliderAfterExplicitPoseChange();
+        PublishExplicitBodyPose(preparedPose);
     }
 
     /// <summary>
@@ -1091,7 +962,7 @@ public partial class SolidBody : IRecordable
     public void ResetPosition(Vector3d position = default, FixedQuaternion rotation = default)
     {
         FixedQuaternion normalizedRotation = rotation.Normalized;
-        PreflightResetPoseChange(normalizedRotation);
+        PreflightResetPoseChange();
         SetTransformWorldPose(position, normalizedRotation);
         InvalidateContinuousCollisionTrajectory();
         ClearMotionForSleep();
@@ -1108,7 +979,7 @@ public partial class SolidBody : IRecordable
 
         _visualRotation = normalizedRotation;
 
-        RefreshStaticColliderAfterExplicitPoseChange();
+        PublishExplicitBodyPose(Active);
         if (wasSleeping)
             RefreshPartitionAwakeState();
     }

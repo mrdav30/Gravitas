@@ -29,18 +29,19 @@ records follow with their original discovery context.
 - Treat local links as unstaged validation scaffolding. Do not publish or
   release with them in place.
 - FixedMathSharp foundation hardening is complete. The current locally linked
-  radial, finite-axis, sphere-construction, derived-bound, and exact rounded
-  finite-extrusion and finite-slab extensions pass 1,784 Release tests at
-  15,072/15,072 lines, 4,684/4,684 branches, and 2,065/2,065 ReportGenerator
-  methods. Retain the local link while the remaining Gravitas queue is hardened.
+  geometry and arithmetic extensions pass 2,572 Release tests at
+  44,126/44,126 lines, 8,450/8,450 branches, and 3,341/3,341 ReportGenerator
+  methods. ReleaseLean passes 2,551 tests. Retain the local link while the
+  remaining Gravitas queue is hardened.
 - SwiftCollections has no library-specific active issue at this checkpoint; its
   place in the sequence is a full downstream compatibility and release gate.
 - GridForge's runtime-identity defect is resolved. Keep the lower stack locally
   linked while the remaining Gravitas queue is hardened so another downstream
   discovery does not force a partial release cycle.
-- Gravitas's current authoritative coverage-enabled Release run passes 3,261
-  tests and reports 33,466/33,466 lines, 12,045/12,045 branches, and
-  4,164/4,164 ReportGenerator methods for hand-authored source.
+- Gravitas's current Release run passes 3,593 tests and ReleaseLean passes
+  3,538 tests. Exact coverage closure is paused at the canonical-geometry review
+  checkpoint; the earlier 100% artifact predates the current Task 7 changes and
+  is not a current release claim.
 - After the Gravitas queue closes, release the lower stack in dependency order,
   replace local links with released packages at each layer, and rerun Gravitas
   `Release`, `ReleaseLean`, coverage, replay, and relevant benchmark gates.
@@ -48,13 +49,20 @@ records follow with their original discovery context.
 ### Ordered Queue
 
 1. **Gravitas — canonical collider geometry and exact scale admission:**
-   [Authored Collider Dimensions Can Saturate During Host-Scale Composition](#authored-collider-dimensions-can-saturate-during-host-scale-composition),
-   then
-   [Finite-Axis Collider Endpoint Snapshots Can Deform Scalar-Boundary Geometry](#finite-axis-collider-endpoint-snapshots-can-deform-scalar-boundary-geometry),
-   then
-   [Oriented Cuboid Boundary Proxies Can Deform Scalar-Face Geometry](#oriented-cuboid-boundary-proxies-can-deform-scalar-face-geometry).
-2. **FixedMathSharp / Gravitas:**
+   Tasks 5–7 are implemented for review. Resume the paused cuboid slice at
+   [Oriented Cuboid Boundary Proxies Can Deform Scalar-Face Geometry](#oriented-cuboid-boundary-proxies-can-deform-scalar-face-geometry),
+   then close the grouped issue and its completed scale, finite-axis, and 2D
+   convex-boundary records together.
+2. **Gravitas:**
+   [True Unrepresentable Contact Lever Arms Can Drop Physical Response](#true-unrepresentable-contact-lever-arms-can-drop-physical-response).
+3. **Gravitas:**
+   [SolidBody Point Transforms Can Saturate Before Their Final World Or Local Coordinate](#solidbody-point-transforms-can-saturate-before-their-final-world-or-local-coordinate).
+4. **Gravitas:**
+   [3D Overlap-Circle Classification Depends On A Full-3D Surface Witness](#3d-overlap-circle-classification-depends-on-a-full-3d-surface-witness).
+5. **FixedMathSharp / Gravitas:**
    [Radial Segment Parameters Can Collapse Spatially Distinct Query Hits](#radial-segment-parameters-can-collapse-spatially-distinct-query-hits).
+6. **FixedMathSharp / Gravitas:**
+   [Mesh Triangle-Triangle SAT Can Saturate Before Axis Classification](#mesh-triangle-triangle-sat-can-saturate-before-axis-classification).
 
 ### Finite-Axis Collider Endpoint Snapshots Can Deform Scalar-Boundary Geometry
 
@@ -69,15 +77,19 @@ Capsules, cylinders, and cones currently expose representable endpoint
 snapshots built from `center +/- worldAxis * halfLength`. Near a `Fixed64`
 scalar face, a rotated conceptual endpoint can lie outside the scalar domain.
 Component-wise saturation then shortens or bends the stored segment even though
-the canonical center, normalized axis, full or half length, and radius remain
-valid. An odd raw-unit cone height also has a conceptual half-height that is not
+the canonical center, normalized rigid frame, normalized local axis, full or
+half length, and radius remain valid. An odd raw-unit cone height also has a
+conceptual half-height that is not
 representable at all, so its cached apex and base center can collapse even near
 the origin. The centered query reducers avoid those snapshots, but several
 discrete, mixed-dimension, support, capsule-mover, replay, and diagnostic
 consumers still treat them as authoritative geometry.
 
-Make `(center, normalized world axis, full/half length, radius)` the only
-runtime geometry source of truth. Decide whether the endpoint properties should
+Make `(center, normalized rigid-frame rotation, normalized local axis,
+full/half length, radius)` the only runtime geometry source of truth. A public
+`WorldAxis` may remain as a derived convenience projection but must never be
+fed back into exact support or contact construction. Decide whether the
+endpoint properties should
 become explicit best-effort `Try*` projections or be removed as misleading
 public API.
 Move reusable centered-axis projection, closest-feature, support, and distance
@@ -156,6 +168,150 @@ same tentative-pose, exact candidate validation, rollback, and immediate
 partition-refresh contract so an invalid mesh or compound pose cannot leave a
 host transform ahead of committed collider geometry.
 
+### 2D Convex Boundary Proxies Can Deform Scalar-Face Geometry
+
+**Discovered:** 2026-07-22  
+**Source:** mixed oriented-box/prism canonical-geometry migration  
+**Affected area:** 2D AABB and convex-polygon canonical vertices; pure 2D
+collision and query SAT; mixed convex-prism collision, queries, and CCD
+
+The canonical OBB migration exposed the same representation defect on the 2D
+side of a mixed pair. `LSPolygonCollider2D` stores transformed absolute world
+vertices, while `LSAABBoxCollider2D.GetVertexUnchecked` reconstructs corners
+from domain-clipped broad-phase bounds. Near a `Fixed64` scalar face, a valid
+conceptual polygon vertex may be unrepresentable and an AABB corner is silently
+shortened to the clipped bounds. Pure 2D and mixed SAT/query consumers then
+treat those materialized proxies as authoritative geometry.
+
+Store 2D convex vertices as stable scaled-local offsets and retain the
+collider's canonical planar rotation separately. Keep absolute world vertices
+behind explicit `Try*` presentation APIs. Pass `(origin, rotation,
+scaledLocalOffsets)` into exact FixedMathSharp convex relations so projection,
+containment, contact anchors, mixed prism geometry, mass properties, and query
+ordering remain full-domain. Derive broad-phase bounds analytically and clip
+only their final endpoints. Cover mirrored scalar faces, rotated offsets whose
+world-relative component is not representable before origin cancellation,
+AABB/polygon and polygon/polygon pairs, capsule/convex contacts, pure 2D
+queries, mixed contacts and sweeps, compound promotion, replay equality, and
+warmed zero-allocation behavior. Do not materialize, clip, or saturate a
+rotated offset or world vertex before an exact decision.
+
+### True Unrepresentable Contact Lever Arms Can Drop Physical Response
+
+**Discovered:** 2026-07-22  
+**Source:** canonical contact-anchor and center-of-mass migration  
+**Affected area:** 2D, 3D, and mixed collision response; rotational CCD;
+grounding/support response; compound child mass-property aggregation; solver
+contact admission and diagnostics
+
+Canonical point anchors allow narrow phase to preserve a real contact when an
+intermediate rotated offset or absolute world point lies outside the
+`Fixed64` scalar range. Exact anchor-to-center-of-mass subtraction also
+recovers every final lever arm that cancels back into range. A physically real
+contact can nevertheless have a true final lever arm whose component exceeds
+`Fixed64.MaxValue`. The current solver stores lever arms as `Vector2d` or
+`Vector3d`, so that contact cannot enter angular response without narrowing.
+Silently saturating it would invent torque; treating anchor materialization
+failure as separation would lose collision state.
+
+The same storage boundary appears when an individual compound child's
+body-local center of mass is outside the scalar domain even though a later
+weighted aggregate could cancel back into range. The current exact
+weighted-average hardening covers representable child centers without
+saturating their products or sum; retaining unrepresentable child centers
+requires a semantic mass-point representation carried through parallel-axis
+calculations.
+
+The exact scale-admission pass makes that boundary explicit for collider
+offsets as well. A bodyless collider may retain a representable world center
+when `world origin + rotation * (owner scale * local offset)` cancels only in
+the complete expression, even though the independently requested scaled offset
+is unavailable. Compound parts likewise admit when their complete body-local
+owner/part composition is representable. A body-attached standalone collider
+whose final body-local center of mass or lever arm is genuinely outside the
+scalar domain still rejects at that solver boundary; admitting it requires the
+same semantic mass-point/lever representation described here, not saturation
+or a collider-registration workaround.
+
+Mass-property weights have the same representation boundary before averaging.
+Primitive volume or shell measures and nested compound weight sums can exceed
+`Fixed64.MaxValue`; saturating those values can change their relative ratios.
+An exact final weighted-average or mass-share distributor cannot recover a
+ratio that was already lost at that earlier scalar boundary. The complete
+solution therefore needs semantic wide weights from primitive measurement
+through nested aggregation and inertia distribution, rather than a
+distribution-only patch at the final compound.
+
+Define an explicit solver-domain contract for true final lever overflow. The
+solution may be a bounded exact lever/mass-point representation carried into
+cross/dot and parallel-axis products, including semantic wide mass weights, or
+a documented deterministic response mode that preserves contact and linear
+response while reporting unavailable angular response. It must not
+conservatively reject canonical colliders or center-of-mass overrides, because
+most apparent overflows cancel once the complete relative expression is
+evaluated. Cover mirrored scalar faces, primitive and nested-compound weight
+ratios, compound weighted-COM cancellation, 2D/3D/mixed parity, rotational CCD,
+stable replay/diagnostics, and warmed zero-allocation behavior.
+
+### SolidBody Point Transforms Can Saturate Before Their Final World Or Local Coordinate
+
+**Discovered:** 2026-07-22  
+**Source:** canonical scale-admission final public-API audit  
+**Affected area:** 3D `SolidBody.TransformPoint(...)`,
+`SolidBody.InverseTransformPoint(...)`, host hierarchy scale, and adapter-facing
+point conversion
+
+The earlier point-transform correction removed collider dimensions from the
+body transform contract, but the public methods still evaluate scale, rotation,
+translation, and inverse operations as ordinary chained Q32.32 expressions.
+`TransformPoint` can saturate the scale product or rotated coordinate before a
+later component cancels back into the representable world range.
+`InverseTransformPoint` can likewise saturate the world-position subtraction
+before inverse rotation and division recover a representable local point.
+Parenthesizing those expressions does not fuse them.
+
+Add explicit exact-or-false forward and inverse scaled-point primitives to
+FixedMathSharp if the complete operations are reusable there, then give
+`SolidBody` friendly `TryTransformPoint`/`TryInverseTransformPoint` APIs and
+defined throwing convenience behavior. Preserve the body's authoritative
+position/rotation plus the host hierarchy-scale contract; do not silently clamp
+or route through collider shape dimensions. Cover cancellation after an
+otherwise overflowing intermediate, mirrored scalar faces, anisotropic scale,
+singular inverse rejection, ordinary parity, round trips, and warmed
+zero-allocation behavior. Pure 2D currently has no equivalent public point API,
+so parity means deciding whether a first-class planar surface is useful rather
+than copying the defect.
+
+### 3D Overlap-Circle Classification Depends On A Full-3D Surface Witness
+
+**Discovered:** 2026-07-22  
+**Source:** finite-axis closest-surface authority audit  
+**Affected area:** 3D `OverlapCircle`, `OverlapCircleInDirection`,
+`OverlapCircleAll`, batch variants, `Physics3DHit`, and finite-axis/cuboid
+surface witnesses
+
+The public 3D overlap-circle family is documented as X/Z proximity, but
+`TryBuildOverlapHit` currently obtains a collider's full-3D closest surface
+point and compares the resulting 3D distance with the circle radius. A vertical
+offset can therefore reject a collider whose X/Z projection overlaps the query.
+The same path treats the surface witness as both classification evidence and
+the required hit payload. Near a `Fixed64` scalar face, canonical finite-axis
+or oriented-box geometry can overlap the circle even when its conceptual
+nearest surface point is outside the representable coordinate domain. The
+current `Physics3DHit` contract has no explicit way to preserve that
+classification without returning a false negative or inventing a non-surface
+point.
+
+Define an exact X/Z classification contract independently from hit-witness
+materialization. Decide whether an overlap whose selected planar surface
+witness is not representable needs a richer result state, a deterministic
+representable planar feature policy, or a documented query-domain admission
+rule. Apply the decision consistently to closest, directional, all-hit, and
+batch paths. Cover vertical-offset invariance, scalar-face finite axes and
+cuboids, ordinary witness parity, deterministic ordering, and warmed
+zero-allocation behavior. Do not mask the issue with full-3D distance,
+saturating projection, a fake hit point, or a silent miss.
+
 ### Radial Segment Parameters Can Collapse Spatially Distinct Query Hits
 
 **Discovered:** 2026-07-20  
@@ -182,6 +338,34 @@ one raw apart, two-raw transverse interior tangency, starts inside, strict end
 containment, opposite scalar faces, deterministic ordering, and warmed
 zero-allocation behavior. Keep this separate from sphere construction/merge
 and conic-quadratic ownership.
+
+### Mesh Triangle-Triangle SAT Can Saturate Before Axis Classification
+
+**Discovered:** 2026-07-24  
+**Source:** canonical-collider coverage closure and collision math review  
+**Affected area:** convex mesh/mesh triangle contact fallback, exact SAT axis
+projection and penetration ranking; related mesh query reducers
+
+`MeshTriangleContactGenerator.TryTestTriangles(...)` first expresses both
+triangles in one rigid frame, but then projects vertices with ordinary
+`Vector3d.Dot`, subtracts the narrowed scalar interval endpoints, and ranks
+axes through `overlap * overlap` and
+`depth * depth * axisMagnitudeSquared`. Large representable relative geometry
+or unnormalized edge-cross axes can therefore saturate before separation,
+minimum-depth selection, or normal orientation. Scalar-face origin cancellation
+alone does not protect this arithmetic, and broad-phase overlap does not bound
+the intermediate projection products.
+
+The optimal fix is a reusable FixedMathSharp triangle/triangle axis-penetration
+contract that retains vertex projections, interval overlap, axis magnitude,
+and normalized-depth ordering in wide arithmetic, then narrows only the final
+oriented unit axis and penetration depth. Gravitas should consume that contract
+instead of adding local clamps or rescaling heuristics. Cover mirrored scalar
+limits, long relative triangles, tiny and large edge-cross axes, separation,
+touching, minimum-axis ties, clamped final depth, and warmed zero-allocation
+behavior. Audit convex-mesh query and mixed reducers for equivalent scalar
+projection/ranking paths; do not assume a discrete 3D collision fix provides
+query parity.
 
 ## Resolved Issues
 

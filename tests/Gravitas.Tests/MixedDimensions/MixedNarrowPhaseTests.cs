@@ -332,7 +332,10 @@ public sealed partial class MixedNarrowPhaseTests
             {
                 "Capsule_AABox_Line",
                 ColliderType.Capsule,
-                new Vector3d(Fixed64.FromFraction(-3, 2), (Fixed64)2, Fixed64.FromFraction(-3, 2)),
+                new Vector3d(
+                    Fixed64.FromFraction(-3, 2),
+                    Fixed64.FromFraction(39, 20),
+                    Fixed64.FromFraction(-3, 2)),
                 Euler(0, 0, 15),
                 ColliderType2D.AABox,
                 Fixed64.Zero
@@ -348,7 +351,10 @@ public sealed partial class MixedNarrowPhaseTests
             {
                 "Capsule_AABox_PrismNormal",
                 ColliderType.Capsule,
-                new Vector3d((Fixed64)(-2), Fixed64.FromFraction(-3, 2), -Fixed64.One),
+                new Vector3d(
+                    Fixed64.FromFraction(-39, 20),
+                    Fixed64.FromFraction(-3, 2),
+                    -Fixed64.One),
                 Euler(0, 15, 30),
                 ColliderType2D.AABox,
                 Fixed64.Zero
@@ -889,7 +895,7 @@ public sealed partial class MixedNarrowPhaseTests
     }
 
     [Fact]
-    public void RotationalSeparationGap_WithUnrepresentableCuboidCircleDelta_ShouldNotCertify()
+    public void RotationalSeparationGap_WithUnrepresentableCuboidCircleDelta_ShouldReturnAConservativeLowerBound()
     {
         using GravitasWorldContext context = CreateMixedContext();
         ScenarioBody<LSCuboidCollider> cuboid = CreateCuboid3D(context, Vector3d.Zero);
@@ -908,11 +914,12 @@ public sealed partial class MixedNarrowPhaseTests
         CollisionDetectionMixed.TryGetRotationalSeparationGap(
                 cuboid.Collider,
                 circle.Collider,
-                out _,
+                out Fixed64 gap,
                 out bool supported)
             .Should()
-            .BeFalse();
+            .BeTrue();
         supported.Should().BeTrue();
+        gap.Should().BeGreaterThan(Fixed64.Zero);
     }
 
     [Theory]

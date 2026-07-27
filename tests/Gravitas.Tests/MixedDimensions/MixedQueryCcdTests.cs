@@ -1,4 +1,5 @@
 using FixedMathSharp;
+using FixedMathSharp.Geometry;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
@@ -140,7 +141,13 @@ public sealed partial class MixedQueryCcdTests
             Fixed64.FromFraction(1, 65536),
             Fixed64.One).Normalized;
         Vector3d capDirection3D = new(capDirection2D.X, Fixed64.Zero, capDirection2D.Y);
-        Vector2d capCenter2D = ((LSCapsuleCollider2D)target2D).SegmentStart;
+        var capsule = (LSCapsuleCollider2D)target2D;
+        FixedSegment2d.TryGetCenteredAxisEndpoint(
+            capsule.Center,
+            capsule.WorldAxis,
+            capsule.AxisLength,
+            positive: false,
+            out Vector2d capCenter2D).Should().BeTrue();
         Vector3d capCenter3D = new(capCenter2D.X, Fixed64.Zero, capCenter2D.Y);
         Vector3d sphereEnd = capCenter3D - capDirection3D;
 
@@ -1508,8 +1515,24 @@ public sealed partial class MixedQueryCcdTests
             Vector3d.Zero,
             immovable: true);
         Fixed64 bandHalfHeight = Fixed64.FromFraction(1, 10);
-        Fixed64 baseY = target.Collider.WorldBaseCenter.Y;
-        Fixed64 apexY = target.Collider.WorldApex.Y;
+        FixedSegment.TryGetCenteredAxisEndpoint(
+                target.Collider.Center,
+                target.Collider.WorldAxis,
+                target.Collider.Height,
+                positive: false,
+                out Vector3d baseCenter)
+            .Should()
+            .BeTrue();
+        FixedSegment.TryGetCenteredAxisEndpoint(
+                target.Collider.Center,
+                target.Collider.WorldAxis,
+                target.Collider.Height,
+                positive: true,
+                out Vector3d apex)
+            .Should()
+            .BeTrue();
+        Fixed64 baseY = baseCenter.Y;
+        Fixed64 apexY = apex.Y;
 
         bool baseFound = FiniteSlabProjectionSweep.TrySweepCircleAgainstCone(
             new Vector2d((Fixed64)(-4), Fixed64.Zero),
@@ -1625,7 +1648,7 @@ public sealed partial class MixedQueryCcdTests
             immovable: true,
             rotation: FixedQuaternion.FromEulerAnglesInDegrees(Fixed64.Zero, Fixed64.Zero, almostHorizontal));
         Vector3d radialDirection = Vector3d.Right
-            - target.Collider.LineDirection * Vector3d.Dot(Vector3d.Right, target.Collider.LineDirection);
+            - target.Collider.WorldAxis * Vector3d.Dot(Vector3d.Right, target.Collider.WorldAxis);
 
         bool found = FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
             Vector2d.Zero,
@@ -1637,7 +1660,7 @@ public sealed partial class MixedQueryCcdTests
             target.Collider,
             out Fixed64 distance);
 
-        (target.Collider.LineSegmentEnd.Y - target.Collider.LineSegmentStart.Y).Abs().Should().BeGreaterThan(Fixed64.Epsilon);
+        (target.Collider.WorldAxis.Y * target.Collider.Height).Abs().Should().BeGreaterThan(Fixed64.Epsilon);
         radialDirection.Magnitude.Should().BeLessThanOrEqualTo(Fixed64.Epsilon);
         found.Should().BeTrue();
         distance.Should().Be(Fixed64.Zero);
@@ -2246,9 +2269,10 @@ public sealed partial class MixedQueryCcdTests
     {
         using GravitasWorldContext context = CreateMixedContext();
         var target = (LSCircleCollider2D)CreateBodylessCircle2D(context, Vector2d.Zero);
-        // Change the authored shape only after its small registration footprint is established;
-        // this test calls the reducer directly and intentionally bypasses broad-phase traversal.
+        // Keep the small registered footprint, then commit the larger shape
+        // before calling the reducer directly without broad-phase traversal.
         target.Radius = (Fixed64)99_999;
+        target.RebuildRuntimeShapeOnly().Should().BeTrue();
         Vector3d start = new(-200_000, 0, 60_000);
         Vector3d end = new(200_000, 0, 60_000);
 
@@ -3994,11 +4018,19 @@ public sealed partial class MixedQueryCcdTests
         body2D.AddForce(-Vector2d.Right * (Fixed64)5);
         context.LateSimulate();
 
-        body3D.Body.Position3d.X.Should().BeLessThanOrEqualTo(-Fixed64.Half);
-        body2D.Position.X.Should().BeGreaterThanOrEqualTo(Fixed64.Half);
-        (body2D.Position.X - body3D.Body.Position3d.X).Should().BeGreaterThanOrEqualTo(Fixed64.One);
-        body3D.Body.LinearVelocity.X.Should().BeLessThanOrEqualTo(Fixed64.Zero);
-        body2D.LinearVelocity.X.Should().BeGreaterThanOrEqualTo(Fixed64.Zero);
+        Fixed64 retryAdvance3D =
+            body3D.Body.Position3d.X + Fixed64.Half;
+        Fixed64 retryAdvance2D =
+            Fixed64.Half - body2D.Position.X;
+        Fixed64 maximumSingleBodyRetryAdvance =
+            (Fixed64)5 * Fixed64.MinIncrement;
+        retryAdvance3D.Should().Be(retryAdvance2D);
+        retryAdvance3D.Should().BeGreaterThan(Fixed64.Zero);
+        retryAdvance3D.Should().BeLessThanOrEqualTo(
+            maximumSingleBodyRetryAdvance);
+        body3D.Body.Position3d.X.Should().Be(-body2D.Position.X);
+        body3D.Body.LinearVelocity.X.Should().Be(Fixed64.Zero);
+        body2D.LinearVelocity.X.Should().Be(Fixed64.Zero);
     }
 
     [Fact]
@@ -5494,12 +5526,12 @@ public sealed partial class MixedQueryCcdTests
         commands[2].Collider2DType.Should().Be(ColliderType2D.Capsule);
         commands[3].Kind.Should().Be(GravitasDebugDrawKind.WireBox);
         commands[3].Collider2DType.Should().Be(ColliderType2D.Capsule);
-        commands[3].Size.Should().Be(new Vector3d(Fixed64.One, context.Settings.Mixed2DHalfThickness * 2, (Fixed64)2));
+        commands[3].HalfExtents.Should().Be(new Vector3d(Fixed64.Half, context.Settings.Mixed2DHalfThickness, Fixed64.One));
         commands[4].Kind.Should().Be(GravitasDebugDrawKind.WireBox);
         commands[4].ColliderDimension.Should().Be(GravitasColliderDimension.TwoD);
         commands[4].Collider2DType.Should().Be(ColliderType2D.AABox);
         commands[4].Center.Should().Be(new Vector3d((Fixed64)(-2), Fixed64.Zero, (Fixed64)(-3)));
-        commands[4].Size.Should().Be(new Vector3d((Fixed64)4, context.Settings.Mixed2DHalfThickness * 2, (Fixed64)2));
+        commands[4].HalfExtents.Should().Be(new Vector3d((Fixed64)2, context.Settings.Mixed2DHalfThickness, Fixed64.One));
     }
 
     private static GravitasWorldContext CreateMixedContext(int frameRate = 4)

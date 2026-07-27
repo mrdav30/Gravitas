@@ -6,7 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
-using FixedMathSharp.Bounds;
+using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
 
 namespace Gravitas.Queries;
@@ -32,7 +32,8 @@ public sealed partial class GravitasQueryMixedService
         Vector2d planarCenter = circle.Center;
         var center = new Vector3d(planarCenter.X, circle.MixedSlabCenterY, planarCenter.Y);
         var segment = new FixedSegment(start, end);
-        if (!segment.TryGetSweptSphereFiniteCylinderIntersectionDistance(
+        if (!segment
+            .TryGetSweptSphereCenteredFiniteCylinderIntersectionDistanceFromHalfAxisLength(
                 center,
                 Vector3d.Up,
                 circle.MixedHalfThickness,

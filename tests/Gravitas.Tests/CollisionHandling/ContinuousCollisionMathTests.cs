@@ -1,5 +1,5 @@
 using FixedMathSharp;
-using FixedMathSharp.Bounds;
+using FixedMathSharp.Geometry;
 using FluentAssertions;
 using Gravitas.CollisionHandling;
 using System;
@@ -132,7 +132,7 @@ public sealed class ContinuousCollisionMathTests
     }
 
     [Fact]
-    public void RotationalSearchLimit_WhenNodeBudgetExhausts_ShouldRetainConservativeLower()
+    public void RotationalSearchLimit_WhenNodeBudgetExhausts_ShouldReturnDeterministicConservativeLower()
     {
         Fixed64 lowerTime = Fixed64.FromFraction(1, 4);
         Fixed64 witnessTime = Fixed64.Half;
@@ -141,21 +141,33 @@ public sealed class ContinuousCollisionMathTests
             witnessTime,
             depth: 1);
 
-        ContinuousCollisionMath.TryResolveRotationalSearchLimit(
-                interval,
-                ContinuousCollisionMath.RotationalIntervalNodeBudget,
-                hasWitness: true,
-                witnessTime,
-                out Fixed64 safeTime,
-                out Fixed64 contactTime,
-                out bool retainsWitness)
-            .Should()
-            .BeTrue();
+        var first = ResolveBudgetExhaustion();
+        var second = ResolveBudgetExhaustion();
 
-        safeTime.Should().Be(lowerTime);
-        contactTime.Should().Be(witnessTime);
-        retainsWitness.Should().BeTrue();
-        safeTime.Should().BeLessThan(contactTime);
+        second.Should().Be(first);
+        first.Resolved.Should().BeTrue();
+        first.SafeTime.Should().Be(lowerTime);
+        first.ContactTime.Should().Be(witnessTime);
+        first.RetainsWitness.Should().BeTrue();
+        first.SafeTime.Should().BeLessThan(first.ContactTime);
+
+        (
+            bool Resolved,
+            Fixed64 SafeTime,
+            Fixed64 ContactTime,
+            bool RetainsWitness) ResolveBudgetExhaustion()
+        {
+            bool resolved =
+                ContinuousCollisionMath.TryResolveRotationalSearchLimit(
+                    interval,
+                    ContinuousCollisionMath.RotationalIntervalNodeBudget,
+                    hasWitness: true,
+                    witnessTime,
+                    out Fixed64 safeTime,
+                    out Fixed64 contactTime,
+                    out bool retainsWitness);
+            return (resolved, safeTime, contactTime, retainsWitness);
+        }
     }
 
     [Fact]

@@ -11,16 +11,19 @@ namespace Gravitas.CollisionHandling;
 
 internal readonly struct AxisPenetration
 {
-    public AxisPenetration(Vector3d axis, Fixed64 depth)
+    public AxisPenetration(Vector3d axis, Fixed64 depth, bool depthIsClamped = false)
     {
         Axis = axis;
         Depth = depth;
+        DepthIsClamped = depthIsClamped;
         HasValue = true;
     }
 
     public Vector3d Axis { get; }
 
     public Fixed64 Depth { get; }
+
+    public bool DepthIsClamped { get; }
 
     public bool HasValue { get; }
 }

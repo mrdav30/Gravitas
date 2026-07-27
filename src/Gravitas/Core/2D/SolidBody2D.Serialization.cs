@@ -78,6 +78,7 @@ public sealed partial class SolidBody2D
         RecordValues.Look(chronicler, ref _isGrounded, "IsGrounded");
         RecordValues.Look(chronicler, ref _wasGrounded, "WasGrounded");
         RecordValues.Look(chronicler, ref _groundNormal, "GroundNormal");
+        RecordValues.Look(chronicler, ref _hasGroundPoint, "HasGroundPoint");
         RecordValues.Look(chronicler, ref _groundPoint, "GroundPoint");
         RecordValues.Look(chronicler, ref _lastGroundedPosition, "LastGroundedPosition");
         RecordValues.Look(chronicler, ref continuousCollisionMode, "ContinuousCollisionMode", ContinuousCollisionMode.Inherit);

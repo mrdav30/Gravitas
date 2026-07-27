@@ -107,7 +107,9 @@ public sealed class MyDiagnosticAdapter : GravitasDiagnosticEventVisitor
     public override void VisitMixedContact(in GravitasMixedContactDiagnosticView contact)
     {
         // contact.Collider3DId, contact.Collider2DId,
-        // contact.Point3D, contact.Point2D, contact.Normal3DTo2D, contact.Depth
+        // contact.HasPoint3D, contact.Point3D,
+        // contact.HasPoint2D, contact.Point2D,
+        // contact.Normal3DTo2D, contact.Depth
     }
 }
 
@@ -137,6 +139,12 @@ Available views cover the event stream:
 dimension/type properties to route shape payloads. 2D probe points are stored in
 the X/Z debug plane: event X is planar X, event Z is planar Y, and event Y is
 zero.
+
+Contact and mixed-query views expose `HasPoint*` flags because canonical
+surface anchors can describe a valid hit whose absolute world coordinate is
+outside the `Fixed64` scalar domain. Point fields are zero when their matching
+flag is false; adapters should omit that marker while still reporting the
+contact, normal, depth, or query distance.
 
 The views are read-only wrappers over the event value. Visitors and views do not
 change capture storage, event ordering, diagnostic buffering, or disabled path
@@ -175,8 +183,8 @@ API.
 | `Ray`          | `Start`, `End`, `Color`                           |
 | `Point`        | `Center`, `Radius`, `Color`                       |
 | `WireSphere`   | `Center`, `Radius`, `Color`                       |
-| `WireBox`      | `Center`, `Size`, `Rotation`, `Color`             |
-| `WireCapsule`  | `Center`, `Radius`, `Height`, `Rotation`, `Color` |
+| `WireBox`      | `Center`, `HalfExtents`, `Rotation`, `Color`      |
+| `WireCapsule`  | `Center`, `Radius`, `AxisLength`, `Rotation`, `Color` |
 | `WireCylinder` | `Center`, `Radius`, `Height`, `Rotation`, `Color` |
 | `WireCone`     | `Center`, `Radius`, `Height`, `Rotation`, `Color` |
 | `WireTriangle` | `PointA`, `PointB`, `PointC`, `Color`             |
@@ -197,8 +205,11 @@ context.Diagnostics.CapturePoint(point, Fixed64.Half, GravitasDiagnosticColor.Re
 ```
 
 `CaptureCollider(...)` emits one command for primitive colliders and one
-`WireTriangle` command per mesh triangle. Compound colliders emit one command
-per internal part using the owning compound collider ID and `ColliderType`
+`WireTriangle` command per materializable mesh triangle. Mesh geometry remains
+canonical in its rigid local frame; presentation triangles whose absolute
+vertices cross the `Fixed64` coordinate boundary are skipped deterministically
+instead of affecting simulation. Compound colliders emit one command per
+internal part using the owning compound collider ID and `ColliderType`
 `Compound`.
 
 `CaptureMixedCollider(LSCollider2D, ...)` emits the finite 2D slab/prism used by

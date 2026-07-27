@@ -280,6 +280,102 @@ public sealed partial class ContinuousCollisionDetectionTests
     }
 
     [Fact]
+    public void FrozenAxisHandoff3D_ShouldPublishProjectedColliderAndCandidateBounds()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        ScenarioBody<LSSphereCollider> mover = scenario.CreateSphere(Vector3d.Zero);
+        mover.Body.FreezeAxes = BodyFreezeAxes3D.PositionX;
+        scenario.Context.AdvanceLateSimulateToken();
+        scenario.Context.Physics.PrepareContinuousCollisionFrame();
+        Vector3d rawImpactPosition = new((Fixed64)2, (Fixed64)3, (Fixed64)4);
+        Vector3d projectedImpactPosition = new(Fixed64.Zero, (Fixed64)3, (Fixed64)4);
+
+        mover.Body.ApplyContinuousCollisionHandoff(
+                rawImpactPosition,
+                FixedQuaternion.Identity,
+                Vector3d.Zero,
+                Vector3d.Zero,
+                Fixed64.Half)
+            .Should()
+            .BeTrue();
+
+        mover.Body.Position3d.Should().Be(projectedImpactPosition);
+        mover.Collider.Center.Should().Be(projectedImpactPosition);
+        mover.Body.SampleContinuousCollisionPosition(Fixed64.Half)
+            .Should()
+            .Be(projectedImpactPosition);
+        var rawImpactBounds = new FixedBoundVolume(
+            rawImpactPosition - Vector3d.One * Fixed64.FromFraction(1, 10),
+            rawImpactPosition + Vector3d.One * Fixed64.FromFraction(1, 10));
+        scenario.Context.Physics.QueryContinuousCollisionCandidates(rawImpactBounds)
+            .Should()
+            .NotContain(mover.Body.DynamicId);
+    }
+
+    [Fact]
+    public void Handoff3D_WhenRequestedPoseCannotPublishCollider_ShouldRemainAtomic()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        var collider = new LSSphereCollider
+        {
+            LocalOffset = Vector3d.Right
+        };
+        ScenarioBody<LSSphereCollider> mover = scenario.CreateBody(
+            collider,
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+        Vector3d originalCenter = collider.Center;
+        var originalBounds = collider.Bounds;
+
+        mover.Body.ApplyContinuousCollisionHandoff(
+                new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero),
+                FixedQuaternion.Identity,
+                Vector3d.Zero,
+                Vector3d.Zero,
+                Fixed64.Half)
+            .Should()
+            .BeFalse();
+
+        mover.Body.Position3d.Should().Be(Vector3d.Zero);
+        collider.Center.Should().Be(originalCenter);
+        collider.Bounds.Should().Be(originalBounds);
+    }
+
+    [Fact]
+    public void ProxyRadius3D_WhenPublishedPoseLeadsBody_ShouldRemainCanonicalForOffsetCompound()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        var collider = new LSCompoundCollider(
+            CompoundColliderPart.Sphere(
+                Fixed64.Half,
+                Vector3d.Right))
+        {
+            LocalOffset = Vector3d.Right * (Fixed64)3
+        };
+        ScenarioBody<LSCompoundCollider> mover = scenario.CreateBody(
+            collider,
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+        Fixed64 expectedRadius = Fixed64.FromFraction(9, 2);
+        mover.Body.ResolveContinuousCollisionProxyRadius()
+            .Should()
+            .Be(expectedRadius);
+
+        collider.TryPrepareBodyPose(
+                Vector3d.Right * (Fixed64)10,
+                FixedQuaternion.Identity)
+            .Should()
+            .BeTrue();
+        collider.PublishPreparedBodyPose();
+
+        mover.Body.Position3d.Should().Be(Vector3d.Zero);
+        collider.Center.Should().Be(Vector3d.Right * (Fixed64)13);
+        mover.Body.ResolveContinuousCollisionProxyRadius()
+            .Should()
+            .Be(expectedRadius);
+    }
+
+    [Fact]
     public void DirtyCandidateIndex3D_WhenDynamicIdIsReused_ShouldDiscardRetiredBounds()
     {
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();

@@ -292,9 +292,12 @@ public sealed class GravitasDiagnosticEventViewTests
             colliderBType: ColliderType.OBBox,
             pointA: pointA,
             pointB: pointB,
+            hasPointA: true,
+            hasPointB: true,
             vector: normal,
             scalarA: Fixed64.Half,
             dataA: 2,
+            dataB: 1,
             hit: true);
 
         contactEvent.TryAsContact(out GravitasContactDiagnosticView contactView).Should().BeTrue();
@@ -306,9 +309,12 @@ public sealed class GravitasDiagnosticEventViewTests
         contactView.ColliderBType.Should().Be(ColliderType.OBBox);
         contactView.PointA.Should().Be(pointA);
         contactView.PointB.Should().Be(pointB);
+        contactView.HasPointA.Should().BeTrue();
+        contactView.HasPointB.Should().BeTrue();
         contactView.Normal.Should().Be(normal);
         contactView.Depth.Should().Be(Fixed64.Half);
         contactView.ContactCount.Should().Be(2);
+        contactView.DepthIsClamped.Should().BeTrue();
         contactView.HasContact.Should().BeTrue();
 
         Vector3d impulse = Vector3d.Left * (Fixed64)5;
@@ -320,6 +326,8 @@ public sealed class GravitasDiagnosticEventViewTests
             colliderBType: ColliderType.Mesh,
             pointA: pointA,
             pointB: pointB,
+            hasPointA: true,
+            hasPointB: true,
             vector: impulse,
             scalarA: impulse.Magnitude,
             scalarB: (Fixed64)(-2),
@@ -334,9 +342,22 @@ public sealed class GravitasDiagnosticEventViewTests
         impulseView.ColliderBType.Should().Be(ColliderType.Mesh);
         impulseView.PointA.Should().Be(pointA);
         impulseView.PointB.Should().Be(pointB);
+        impulseView.HasPointA.Should().BeTrue();
+        impulseView.HasPointB.Should().BeTrue();
         impulseView.Impulse.Should().Be(impulse);
         impulseView.ImpulseMagnitude.Should().Be(impulse.Magnitude);
         impulseView.NormalVelocity.Should().Be((Fixed64)(-2));
+
+        GravitasDiagnosticEvent relativeOnlyEvent = CreateEvent(
+            GravitasDiagnosticEventKind.Contact,
+            hit: true);
+        relativeOnlyEvent.TryAsContact(out GravitasContactDiagnosticView relativeOnlyView)
+            .Should()
+            .BeTrue();
+        relativeOnlyView.HasContact.Should().BeTrue();
+        relativeOnlyView.HasPointA.Should().BeFalse();
+        relativeOnlyView.HasPointB.Should().BeFalse();
+        relativeOnlyView.DepthIsClamped.Should().BeFalse();
     }
 
     [Fact]
@@ -395,8 +416,11 @@ public sealed class GravitasDiagnosticEventViewTests
             colliderB2DType: ColliderType2D.Circle,
             pointA: point3D,
             pointB: point2D,
+            hasPointA: true,
+            hasPointB: true,
             vector: normal,
             scalarA: (Fixed64)2,
+            dataA: 1,
             hit: true);
 
         mixedContactEvent.TryAsMixedContact(out GravitasMixedContactDiagnosticView contactView).Should().BeTrue();
@@ -410,8 +434,11 @@ public sealed class GravitasDiagnosticEventViewTests
         contactView.Collider2DDimension.Should().Be(GravitasColliderDimension.TwoD);
         contactView.Point3D.Should().Be(point3D);
         contactView.Point2D.Should().Be(point2D);
+        contactView.HasPoint3D.Should().BeTrue();
+        contactView.HasPoint2D.Should().BeTrue();
         contactView.Normal3DTo2D.Should().Be(normal);
         contactView.Depth.Should().Be((Fixed64)2);
+        contactView.DepthIsClamped.Should().BeTrue();
         contactView.HasContact.Should().BeTrue();
 
         Vector3d impulse = normal * (Fixed64)6;
@@ -425,6 +452,8 @@ public sealed class GravitasDiagnosticEventViewTests
             colliderB2DType: ColliderType2D.AABox,
             pointA: point3D,
             pointB: point2D,
+            hasPointA: true,
+            hasPointB: true,
             vector: impulse,
             scalarA: impulse.Magnitude,
             scalarB: (Fixed64)(-3),
@@ -443,6 +472,8 @@ public sealed class GravitasDiagnosticEventViewTests
         impulseView.Collider2DDimension.Should().Be(GravitasColliderDimension.TwoD);
         impulseView.Point3D.Should().Be(point3D);
         impulseView.Point2D.Should().Be(point2D);
+        impulseView.HasPoint3D.Should().BeTrue();
+        impulseView.HasPoint2D.Should().BeTrue();
         impulseView.Impulse.Should().Be(impulse);
         impulseView.ImpulseMagnitude.Should().Be(impulse.Magnitude);
         impulseView.NormalVelocity.Should().Be((Fixed64)(-3));
@@ -683,6 +714,8 @@ public sealed class GravitasDiagnosticEventViewTests
         Vector3d end = default,
         Vector3d pointA = default,
         Vector3d pointB = default,
+        bool hasPointA = false,
+        bool hasPointB = false,
         Vector3d vector = default,
         Fixed64 scalarA = default,
         Fixed64 scalarB = default,
@@ -708,6 +741,8 @@ public sealed class GravitasDiagnosticEventViewTests
             end: end,
             pointA: pointA,
             pointB: pointB,
+            hasPointA: hasPointA,
+            hasPointB: hasPointB,
             vector: vector,
             scalarA: scalarA,
             scalarB: scalarB,

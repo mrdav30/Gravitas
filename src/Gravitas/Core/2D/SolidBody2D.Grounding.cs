@@ -34,6 +34,7 @@ public sealed partial class SolidBody2D
     private bool _groundedTransitionCapturedForStep;
     private long _groundingStateVersion;
     private Vector2d _groundNormal;
+    private bool _hasGroundPoint;
     private Vector2d _groundPoint;
     private Vector2d _lastGroundedPosition;
     private LSCollider2D? _groundCollider;
@@ -45,6 +46,7 @@ public sealed partial class SolidBody2D
     private int _groundContactCandidateColliderId;
     private ulong _groundContactCandidateId;
     private Vector2d _groundContactCandidateNormal;
+    private bool _groundContactCandidateHasPoint;
     private Vector2d _groundContactCandidatePoint;
     private ColliderLifetimeToken2D _groundContactCandidateRegistration;
 
@@ -148,9 +150,32 @@ public sealed partial class SolidBody2D
     public Vector2d GroundNormal => _groundNormal;
 
     /// <summary>
+    /// Gets whether the current support point can be represented in the X/Z
+    /// simulation plane.
+    /// </summary>
+    public bool HasGroundPoint => _hasGroundPoint;
+
+    /// <summary>
     /// Gets the current support point in the X/Z simulation plane.
     /// </summary>
-    public Vector2d GroundPoint => _groundPoint;
+    /// <exception cref="InvalidOperationException">
+    /// No grounded point is available or the conceptual contact point is
+    /// outside the scalar range.
+    /// </exception>
+    public Vector2d GroundPoint =>
+        _hasGroundPoint
+            ? _groundPoint
+            : throw new InvalidOperationException(
+                "No representable ground point is available. Use TryGetGroundPoint.");
+
+    /// <summary>
+    /// Attempts to get the current support point.
+    /// </summary>
+    public bool TryGetGroundPoint(out Vector2d point)
+    {
+        point = _hasGroundPoint ? _groundPoint : default;
+        return _hasGroundPoint;
+    }
 
     /// <summary>
     /// Gets the body position captured when the current support state was accepted.
@@ -258,7 +283,10 @@ public sealed partial class SolidBody2D
         if (upDot < GroundMinNormalDot)
             return;
 
-        Vector2d point = ownColliderIsA ? contact.PointA : contact.PointB;
+        Vector2d point;
+        bool hasPoint = ownColliderIsA
+            ? contact.TryGetPointA(out point)
+            : contact.TryGetPointB(out point);
         int otherId = otherCollider.Id;
         if (_hasGroundContactCandidate)
         {
@@ -277,6 +305,7 @@ public sealed partial class SolidBody2D
         _groundContactCandidateColliderId = otherId;
         _groundContactCandidateId = contact.ContactId;
         _groundContactCandidateNormal = normal;
+        _groundContactCandidateHasPoint = hasPoint;
         _groundContactCandidatePoint = point;
         _groundContactCandidateRegistration = new ColliderLifetimeToken2D(otherCollider);
     }
@@ -298,7 +327,8 @@ public sealed partial class SolidBody2D
             long groundingStateVersion = SetGroundingState(
                 _groundContactCandidatePoint,
                 _groundContactCandidateNormal,
-                candidateRegistration.Collider);
+                candidateRegistration.Collider,
+                _groundContactCandidateHasPoint);
             if (!RevalidateAutomaticGroundingWrite(
                     groundingStateVersion,
                     bodyRegistration,
@@ -383,7 +413,12 @@ public sealed partial class SolidBody2D
 
         var bodyRegistration = new ColliderLifetimeToken2D(Collider);
         var supportRegistration = new ColliderLifetimeToken2D(hit.Collider);
-        long groundingStateVersion = SetGroundingState(hit.Point, hit.Normal.Normalized, hit.Collider);
+        bool hasGroundPoint = hit.TryGetPoint(out Vector2d groundPoint);
+        long groundingStateVersion = SetGroundingState(
+            groundPoint,
+            hit.Normal.Normalized,
+            hit.Collider,
+            hasGroundPoint);
         RevalidateAutomaticGroundingWrite(groundingStateVersion, bodyRegistration, supportRegistration);
     }
 
@@ -486,11 +521,12 @@ public sealed partial class SolidBody2D
 
         return Collider switch
         {
-            LSCircleCollider2D circle => circle.ScaledRadius,
-            LSCapsuleCollider2D capsule => capsule.ScaledRadius,
-            LSAABBoxCollider2D box => FixedMath.Min(box.ScaledSize.X, box.ScaledSize.Y) * Fixed64.Half,
-            LSPolygonCollider2D polygon => FixedMath.Min(polygon.Bounds.Size.X, polygon.Bounds.Size.Y) * Fixed64.Half,
-            LSCompoundCollider2D compound => FixedMath.Min(compound.Bounds.Size.X, compound.Bounds.Size.Y) * Fixed64.Half,
+            LSCircleCollider2D or
+            LSCapsuleCollider2D or
+            LSAABBoxCollider2D or
+            LSPolygonCollider2D or
+            LSCompoundCollider2D =>
+                Collider.CanonicalGroundProbeRadius,
             _ => Fixed64.Zero
         };
     }
@@ -521,6 +557,7 @@ public sealed partial class SolidBody2D
     {
         _groundingStateVersion++;
         _groundNormal = Vector2d.Zero;
+        _hasGroundPoint = false;
         _groundPoint = Vector2d.Zero;
         _groundCollider = null;
         _groundColliderBroadPhaseVersion = 0;
@@ -537,9 +574,14 @@ public sealed partial class SolidBody2D
         CompleteGroundedStepState();
     }
 
-    private long SetGroundingState(Vector2d groundPoint, Vector2d groundNormal, LSCollider2D? groundCollider)
+    private long SetGroundingState(
+        Vector2d groundPoint,
+        Vector2d groundNormal,
+        LSCollider2D? groundCollider,
+        bool hasGroundPoint = true)
     {
         long groundingStateVersion = ++_groundingStateVersion;
+        _hasGroundPoint = hasGroundPoint;
         _groundPoint = groundPoint;
         _groundNormal = groundNormal;
         _lastGroundedPosition = _position;
@@ -556,6 +598,7 @@ public sealed partial class SolidBody2D
         _wasGrounded = false;
         _groundedTransitionCapturedForStep = false;
         _groundNormal = Vector2d.Zero;
+        _hasGroundPoint = false;
         _groundPoint = Vector2d.Zero;
         _lastGroundedPosition = position;
         _groundCollider = null;
@@ -595,6 +638,7 @@ public sealed partial class SolidBody2D
         _groundContactCandidateColliderId = int.MaxValue;
         _groundContactCandidateId = ulong.MaxValue;
         _groundContactCandidateNormal = Vector2d.Zero;
+        _groundContactCandidateHasPoint = false;
         _groundContactCandidatePoint = Vector2d.Zero;
         _groundContactCandidateRegistration = default;
     }

@@ -49,6 +49,8 @@ public sealed partial class MixedQueryCcdTests
             ContinuousCollisionMode targetMode = ContinuousCollisionMode.Discrete)
     {
         using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
+        context.Environment.Gravity = Fixed64.Zero;
+        context.Settings.ContinuousCollisionMaxToiIterations = 1;
         Fixed64 startRotation = -FixedMath.DegToRad((Fixed64)45);
         Fixed64 targetRotation = FixedMath.DegToRad((Fixed64)45);
         Vector3d sourcePosition = new(

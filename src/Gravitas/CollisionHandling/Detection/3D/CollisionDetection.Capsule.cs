@@ -6,7 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
-using FixedMathSharp.Bounds;
+using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
 
 namespace Gravitas.CollisionHandling;
@@ -20,19 +20,29 @@ public static partial class CollisionDetection
         var capsule = (LSCapsuleCollider)pair.ColliderA;
         var sphere = (LSSphereCollider)pair.ColliderB;
 
-        Vector3d closestPointOnCapsule = capsule.ClosestPointOnSurface(sphere.Center);
-        Vector3d penetrationVector = sphere.Center - closestPointOnCapsule;
-        // Check if the distance from the sphere center to the closest point is less than the sum of the radii
-        if (penetrationVector.MagnitudeSquared > sphere.ScaledRadiusSqr)
-            return false; // No collision if the distance squared is greater than the sum of the radii squared
+        if (!FixedSegment.TryGetCenteredCapsulesContact(
+                capsule.Center,
+                capsule.Rotation,
+                Vector3d.Up,
+                capsule.AxisLength,
+                capsule.ScaledRadius,
+                sphere.Center,
+                sphere.Rotation,
+                Vector3d.Up,
+                Fixed64.Zero,
+                sphere.ScaledRadius,
+                ResolveCenteredCapsuleFallback(capsule.Center, sphere.Center),
+                out FixedContactAnchors contact))
+        {
+            return false;
+        }
 
-        Vector3d penetrationNormal = ResolveNormal(penetrationVector, sphere.Center - capsule.Center);
         pair.Manifold.SetContact(
-            closestPointOnCapsule,
-            sphere.Center - penetrationNormal * sphere.ScaledRadius,
-            penetrationVector.Magnitude - sphere.ScaledRadius,
-            penetrationNormal
-        );
+            new ContactAnchor(contact.FirstAnchor),
+            new ContactAnchor(contact.SecondAnchor),
+            contact.Depth,
+            contact.Normal,
+            contact.DepthIsClamped);
         return true;
     }
 
@@ -41,54 +51,43 @@ public static partial class CollisionDetection
         var capsule1 = (LSCapsuleCollider)pair.ColliderA;
         var capsule2 = (LSCapsuleCollider)pair.ColliderB;
 
-        (Vector3d, Vector3d) closestPointsOnCapsules = ClosestPointsOnSegments(
-            capsule1.LineSegmentStart,
-            capsule1.LineSegmentEnd,
-            capsule2.LineSegmentStart,
-            capsule2.LineSegmentEnd);
-        Vector3d centerDelta = closestPointsOnCapsules.Item2 - closestPointsOnCapsules.Item1;
-        Fixed64 radiusSum = capsule1.ScaledRadius + capsule2.ScaledRadius;
-        if (centerDelta.MagnitudeSquared > radiusSum * radiusSum)
-            return false; // No collision if the distance squared is greater than the sum of the radii squared
+        if (!FixedSegment.TryGetCenteredCapsulesContact(
+                capsule1.Center,
+                capsule1.Rotation,
+                Vector3d.Up,
+                capsule1.AxisLength,
+                capsule1.ScaledRadius,
+                capsule2.Center,
+                capsule2.Rotation,
+                Vector3d.Up,
+                capsule2.AxisLength,
+                capsule2.ScaledRadius,
+                ResolveCenteredCapsuleFallback(capsule1.Center, capsule2.Center),
+                out FixedContactAnchors contact))
+        {
+            return false;
+        }
 
-        Fixed64 distance = centerDelta.Magnitude;
-        Vector3d penetrationNormal = distance > Fixed64.Epsilon
-            ? centerDelta / distance
-            : Vector3d.Right;
-        Vector3d collisionPointCapsule1 = closestPointsOnCapsules.Item1 + penetrationNormal * capsule1.ScaledRadius;
-        Vector3d collisionPointCapsule2 = closestPointsOnCapsules.Item2 - penetrationNormal * capsule2.ScaledRadius;
         pair.Manifold.SetContact(
-            collisionPointCapsule1,
-            collisionPointCapsule2,
-            radiusSum - distance,
-            penetrationNormal
-        );
+            new ContactAnchor(contact.FirstAnchor),
+            new ContactAnchor(contact.SecondAnchor),
+            contact.Depth,
+            contact.Normal,
+            contact.DepthIsClamped);
         return true;
     }
 
-    private static (Vector3d First, Vector3d Second) ClosestPointsOnSegments(
-        Vector3d firstStart,
-        Vector3d firstEnd,
-        Vector3d secondStart,
-        Vector3d secondEnd)
+    private static Vector3d ResolveCenteredCapsuleFallback(
+        Vector3d firstCenter,
+        Vector3d secondCenter)
     {
-        FixedSegment first = new(firstStart, firstEnd);
-        FixedSegment second = new(secondStart, secondEnd);
-        bool firstDegenerate = (firstEnd - firstStart).MagnitudeSquared <= Fixed64.Epsilon;
-        bool secondDegenerate = (secondEnd - secondStart).MagnitudeSquared <= Fixed64.Epsilon;
-
-        // Collider center lines at or below Epsilon are intentionally sphere-like. This physics policy is
-        // broader than FixedSegment's Q32.32-resolution degeneracy contract and must remain symmetric.
-        if (firstDegenerate && secondDegenerate)
-            return (firstStart, secondStart);
-
-        if (firstDegenerate)
-            return (firstStart, second.ClosestPoint(firstStart));
-
-        if (secondDegenerate)
-            return (first.ClosestPoint(secondStart), secondStart);
-
-        return first.GetClosestPoints(second);
+        if (secondCenter.X != firstCenter.X)
+            return secondCenter.X > firstCenter.X ? Vector3d.Right : Vector3d.Left;
+        if (secondCenter.Y != firstCenter.Y)
+            return secondCenter.Y > firstCenter.Y ? Vector3d.Up : Vector3d.Down;
+        if (secondCenter.Z != firstCenter.Z)
+            return secondCenter.Z > firstCenter.Z ? Vector3d.Forward : Vector3d.Backward;
+        return Vector3d.Right;
     }
 
     #endregion

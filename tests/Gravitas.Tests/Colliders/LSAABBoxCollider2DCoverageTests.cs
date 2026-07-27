@@ -11,11 +11,62 @@ namespace Gravitas.Tests.Colliders;
 public sealed class LSAABBoxCollider2DCoverageTests
 {
     [Fact]
+    public void ReassigningCurrentPrimitiveDimensions_ShouldNotRebuildRuntimeGeometry()
+    {
+        using GravitasWorldContext context =
+            Physics2DTestWorld.CreateContext();
+        var box = new LSAABBoxCollider2D(Vector2d.One);
+        var circle = new LSCircleCollider2D(Fixed64.Half);
+        var capsule = new LSCapsuleCollider2D(
+            Fixed64.Half,
+            Fixed64.Two);
+        box.InitializeWithNoBody(new TestMatterAgent(context));
+        circle.InitializeWithNoBody(new TestMatterAgent(context));
+        capsule.InitializeWithNoBody(new TestMatterAgent(context));
+        uint boxVersion = box.RuntimeShapeVersion;
+        uint circleVersion = circle.RuntimeShapeVersion;
+        uint capsuleVersion = capsule.RuntimeShapeVersion;
+
+        box.Size = box.Size;
+        circle.Radius = circle.Radius;
+        capsule.Radius = capsule.Radius;
+        capsule.Height = capsule.Height;
+        box.Simulate();
+        circle.Simulate();
+        capsule.Simulate();
+
+        box.RuntimeShapeVersion.Should().Be(boxVersion);
+        circle.RuntimeShapeVersion.Should().Be(circleVersion);
+        capsule.RuntimeShapeVersion.Should().Be(capsuleVersion);
+    }
+
+    [Fact]
     public void HalfExtents_ShouldRemainHalfOfAuthoredSize()
     {
         var collider = new LSAABBoxCollider2D(new Vector2d((Fixed64)6, (Fixed64)4));
 
         collider.HalfExtents.Should().Be(new Vector2d((Fixed64)3, (Fixed64)2));
+    }
+
+    [Fact]
+    public void ClosestPoint_InsideBox_ShouldPreserveTheQuery()
+    {
+        var collider = new LSAABBoxCollider2D(
+            new Vector2d((Fixed64)6, (Fixed64)4));
+        Vector2d point = new(Fixed64.One, Fixed64.Half);
+
+        collider.GetClosestPoint(point).Should().Be(point);
+    }
+
+    [Fact]
+    public void Area_WhenTheExactProductExceedsFixed64_ShouldSaturate()
+    {
+        var collider = new LSAABBoxCollider2D(
+            new Vector2d(Fixed64.MaxValue, Fixed64.MaxValue));
+
+        collider.CalculateAreaForMassProperties()
+            .Should()
+            .Be(Fixed64.MaxValue);
     }
 
     [Fact]

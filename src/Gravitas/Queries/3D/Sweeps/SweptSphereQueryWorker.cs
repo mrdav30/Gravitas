@@ -6,7 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
-using FixedMathSharp.Bounds;
+using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using SwiftCollections;
@@ -22,6 +22,7 @@ public sealed class SweptSphereQueryWorker
     private static readonly Fixed64 BoundsTolerance = Fixed64.FromFraction(1, 4096);
 
     private readonly SwiftList<int> _meshTriangleBuffer = new();
+    private readonly ConvexSweepQueryWorker _finiteAxisConvexSweep = new();
 
     private Vector3d _start;
     private Vector3d _end;
@@ -34,8 +35,6 @@ public sealed class SweptSphereQueryWorker
     private int _sweepDepth;
 
     internal int LastMeshTriangleCandidateCount { get; private set; }
-
-    internal Fixed64 Radius => _radius;
 
     /// <summary>
     /// Prepares this worker for a swept sphere from <paramref name="start"/> to <paramref name="end"/>.
@@ -64,6 +63,10 @@ public sealed class SweptSphereQueryWorker
             BoundsTolerance,
             out _sweptBoundsMin,
             out _sweptBoundsMax);
+        _finiteAxisConvexSweep.PrepareSphereSource(
+            start,
+            radius,
+            segment);
     }
 
     /// <summary>
@@ -120,27 +123,48 @@ public sealed class SweptSphereQueryWorker
         Fixed64 radius,
         Fixed64 radiusExpansion,
         out Vector3d sphereCenterAtImpact,
+        out Fixed64 impactDistance) =>
+        TrySweepSphere(
+            _start,
+            _end,
+            _direction,
+            _length,
+            center,
+            radius,
+            radiusExpansion,
+            out sphereCenterAtImpact,
+            out impactDistance);
+
+    private static bool TrySweepSphere(
+        Vector3d start,
+        Vector3d end,
+        Vector3d direction,
+        Fixed64 length,
+        Vector3d center,
+        Fixed64 radius,
+        Fixed64 radiusExpansion,
+        out Vector3d sphereCenterAtImpact,
         out Fixed64 impactDistance)
     {
         sphereCenterAtImpact = Vector3d.Zero;
         impactDistance = Fixed64.Zero;
 
         if (!RadialSweepAdmission.TryIntersect(
-                _start,
-                _direction,
-                _length,
+                start,
+                direction,
+                length,
                 center,
                 radius,
                 radiusExpansion,
-                _end,
+                end,
                 center,
                 out Fixed64 parameter))
             return false;
 
         impactDistance = parameter;
-        sphereCenterAtImpact = parameter == _length
-            ? _end
-            : _start + _direction * parameter;
+        sphereCenterAtImpact = parameter == length
+            ? end
+            : start + direction * parameter;
         return true;
     }
 
@@ -155,8 +179,8 @@ public sealed class SweptSphereQueryWorker
         var query = new FixedSegment(_start, _end);
         if (!query.TryGetCapsuleIntersectionDistanceInterval(
                 capsule.Center,
-                capsule.WorldAxis,
-                capsule.AxisHalfLength,
+                capsule.Rotation,
+                capsule.AxisLength,
                 capsule.ScaledRadius,
                 _radius,
                 _length,
@@ -175,77 +199,43 @@ public sealed class SweptSphereQueryWorker
     private bool TrySweepCylinder(
         LSCylinderCollider cylinder,
         out Vector3d sphereCenterAtImpact,
-        out Fixed64 impactDistance)
-    {
-        sphereCenterAtImpact = Vector3d.Zero;
-        impactDistance = Fixed64.Zero;
-
-        var query = new FixedSegment(_start, _end);
-        if (!query.TryGetSweptSphereFiniteCylinderIntersectionDistance(
-                cylinder.Center,
-                cylinder.WorldAxis,
-                cylinder.HalfHeight,
-                cylinder.ScaledRadius,
-                _radius,
-                _length,
-                out Fixed64 entry))
-        {
-            return false;
-        }
-
-        BuildFiniteAxisSweepHit(entry, out sphereCenterAtImpact, out impactDistance);
-        return true;
-    }
+        out Fixed64 impactDistance) =>
+        TrySweepCanonicalFiniteAxis(
+            cylinder,
+            out sphereCenterAtImpact,
+            out impactDistance);
 
     private bool TrySweepCone(
         LSConeCollider cone,
+        out Vector3d sphereCenterAtImpact,
+        out Fixed64 impactDistance) =>
+        TrySweepCanonicalFiniteAxis(
+            cone,
+            out sphereCenterAtImpact,
+            out impactDistance);
+
+    private bool TrySweepCanonicalFiniteAxis(
+        LSCollider target,
         out Vector3d sphereCenterAtImpact,
         out Fixed64 impactDistance)
     {
         sphereCenterAtImpact = Vector3d.Zero;
         impactDistance = Fixed64.Zero;
-
-        if (GetSphereConeSeparation(cone, _start) <= Fixed64.Zero)
+        if (!_finiteAxisConvexSweep.TrySweepPreparedSource(
+                target,
+                out Physics3DHit hit))
         {
-            sphereCenterAtImpact = _start;
-            return true;
+            return false;
         }
 
-        Fixed64 travel = Fixed64.Zero;
-        Fixed64 previousTravel = Fixed64.Zero;
-
-        for (int i = 0; i < 32; i++)
-        {
-            Vector3d center = _start + _direction * travel;
-            Fixed64 separation = GetSphereConeSeparation(cone, center);
-            if (separation <= BoundsTolerance)
-            {
-                impactDistance = RefineSphereConeImpact(cone, previousTravel, travel);
-                sphereCenterAtImpact = _start + _direction * impactDistance;
-                return true;
-            }
-
-            Vector3d closest = cone.ClosestPointOnSurface(center);
-            Vector3d toCenter = center - closest;
-            Fixed64 distance = toCenter.Magnitude;
-            // Positive separation implies a non-zero closest-surface delta for
-            // a valid non-negative swept radius.
-            Vector3d normal = toCenter / distance;
-            Fixed64 closingSpeed = -Vector3d.Dot(_direction, normal);
-            Fixed64 step = closingSpeed > Fixed64.Epsilon
-                ? separation / closingSpeed
-                : _length * Fixed64.FromFraction(1, 32);
-
-            if (step <= BoundsTolerance)
-                step = BoundsTolerance;
-
-            previousTravel = travel;
-            travel += step;
-            if (travel > _length)
-                break;
-        }
-
-        return false;
+        Fixed64 distance = _length - hit.Distance <= BoundsTolerance
+            ? _length
+            : hit.Distance;
+        BuildFiniteAxisSweepHit(
+            distance,
+            out sphereCenterAtImpact,
+            out impactDistance);
+        return true;
     }
 
     private bool TrySweepCuboid(
@@ -256,24 +246,9 @@ public sealed class SweptSphereQueryWorker
         sphereCenterAtImpact = Vector3d.Zero;
         impactDistance = Fixed64.Zero;
 
-        FixedQuaternion inverseRotation = cuboid.Rotation.Inverse();
-        if (!SweepBoundsUtility.TryTransformOrientedBoxSegmentToLocal(
-                _start,
-                _end,
-                cuboid.Center,
-                cuboid.Rotation,
-                inverseRotation,
-                out Vector3d localStart,
-                out Vector3d localEnd))
-        {
-            return false;
-        }
-
-        Vector3d halfExtents = cuboid.ScaledSize * Fixed64.Half;
-        var query = new FixedSegment(localStart, localEnd);
-        var box = FixedBoundBox.FromMinMax(-halfExtents, halfExtents);
-        if (!query.TryGetSweptSphereBoxIntersectionDistance(
-                box,
+        var query = new FixedSegment(_start, _end);
+        if (!query.TryGetSweptSphereOrientedBoxIntersectionDistance(
+                cuboid.OrientedBox,
                 _radius,
                 _length,
                 out Fixed64 entry))
@@ -297,20 +272,63 @@ public sealed class SweptSphereQueryWorker
         mesh.GetTrianglesInBounds(new FixedBoundVolume(min, max), _meshTriangleBuffer);
         LastMeshTriangleCandidateCount += _meshTriangleBuffer.Count;
 
+        var startAnchor = new FixedPointAnchor(
+            _start,
+            FixedQuaternion.Identity,
+            Vector3d.Zero);
+        var endAnchor = new FixedPointAnchor(
+            _end,
+            FixedQuaternion.Identity,
+            Vector3d.Zero);
+        if (!startAnchor.TryGetLocalPointIn(
+                mesh.Mesh.Origin,
+                mesh.Mesh.Rotation,
+                out Vector3d localStart)
+            || !endAnchor.TryGetLocalPointIn(
+                mesh.Mesh.Origin,
+                mesh.Mesh.Rotation,
+                out Vector3d localEnd))
+        {
+            return false;
+        }
+
+        Vector3d localDirection =
+            mesh.Mesh.Rotation.Inverse().Rotate(_direction);
         bool found = false;
         for (int i = 0; i < _meshTriangleBuffer.Count; i++)
         {
             int triangleIndex = _meshTriangleBuffer[i];
-            mesh.Mesh.GetTriangleVertices(triangleIndex, out Vector3d first, out Vector3d second, out Vector3d third);
-            Vector3d normal = mesh.Mesh.GetFaceNormalWorld(triangleIndex);
+            mesh.Mesh.GetLocalTriangleVertices(
+                triangleIndex,
+                out Vector3d first,
+                out Vector3d second,
+                out Vector3d third);
+            Vector3d normal = mesh.Mesh.FaceNormals[triangleIndex];
             found |= TryKeepEarlierSweep(
-                TrySweepTriangle(first, second, third, normal.Normalized, out Vector3d triangleHit, out Fixed64 triangleDistance),
+                TrySweepTriangle(
+                    first,
+                    second,
+                    third,
+                    normal,
+                    localStart,
+                    localEnd,
+                    localDirection,
+                    out Vector3d triangleHit,
+                    out Fixed64 triangleDistance),
                 triangleHit,
                 triangleDistance,
                 ref sphereCenterAtImpact,
                 ref impactDistance);
         }
 
+        if (found)
+        {
+            sphereCenterAtImpact = new FixedSegment(
+                _start,
+                _end).GetPointAtDistance(
+                    impactDistance,
+                    _length);
+        }
         return found;
     }
 
@@ -341,6 +359,9 @@ public sealed class SweptSphereQueryWorker
         Vector3d second,
         Vector3d third,
         Vector3d normal,
+        Vector3d start,
+        Vector3d end,
+        Vector3d direction,
         out Vector3d sphereCenterAtImpact,
         out Fixed64 impactDistance)
     {
@@ -348,59 +369,59 @@ public sealed class SweptSphereQueryWorker
         impactDistance = Fixed64.MaxValue;
 
         var triangle = new FixedTriangle(first, second, third);
-        Vector3d closestAtStart = triangle.ClosestPoint(_start);
-        if (Vector3d.DistanceSquared(_start, closestAtStart) <= _radius * _radius)
+        Vector3d closestAtStart = triangle.ClosestPoint(start);
+        if (Vector3d.DistanceSquared(start, closestAtStart) <= _radius * _radius)
         {
-            sphereCenterAtImpact = _start;
+            sphereCenterAtImpact = start;
             impactDistance = Fixed64.Zero;
             return true;
         }
 
         bool found = false;
         found |= TryKeepEarlierSweep(
-            TrySweepTriangleFace(triangle, normal, _radius, out Vector3d frontHit, out Fixed64 frontDistance),
+            TrySweepTriangleFace(triangle, normal, _radius, start, direction, out Vector3d frontHit, out Fixed64 frontDistance),
             frontHit,
             frontDistance,
             ref sphereCenterAtImpact,
             ref impactDistance);
         found |= TryKeepEarlierSweep(
-            TrySweepTriangleFace(triangle, normal, -_radius, out Vector3d backHit, out Fixed64 backDistance),
+            TrySweepTriangleFace(triangle, normal, -_radius, start, direction, out Vector3d backHit, out Fixed64 backDistance),
             backHit,
             backDistance,
             ref sphereCenterAtImpact,
             ref impactDistance);
         found |= TryKeepEarlierSweep(
-            TrySweepTriangleEdge(first, second, out Vector3d firstEdgeHit, out Fixed64 firstEdgeDistance),
+            TrySweepTriangleEdge(first, second, start, end, out Vector3d firstEdgeHit, out Fixed64 firstEdgeDistance),
             firstEdgeHit,
             firstEdgeDistance,
             ref sphereCenterAtImpact,
             ref impactDistance);
         found |= TryKeepEarlierSweep(
-            TrySweepTriangleEdge(second, third, out Vector3d secondEdgeHit, out Fixed64 secondEdgeDistance),
+            TrySweepTriangleEdge(second, third, start, end, out Vector3d secondEdgeHit, out Fixed64 secondEdgeDistance),
             secondEdgeHit,
             secondEdgeDistance,
             ref sphereCenterAtImpact,
             ref impactDistance);
         found |= TryKeepEarlierSweep(
-            TrySweepTriangleEdge(third, first, out Vector3d thirdEdgeHit, out Fixed64 thirdEdgeDistance),
+            TrySweepTriangleEdge(third, first, start, end, out Vector3d thirdEdgeHit, out Fixed64 thirdEdgeDistance),
             thirdEdgeHit,
             thirdEdgeDistance,
             ref sphereCenterAtImpact,
             ref impactDistance);
         found |= TryKeepEarlierSweep(
-            TrySweepSphere(first, Fixed64.Zero, _radius, out Vector3d firstVertexHit, out Fixed64 firstVertexDistance),
+            TrySweepSphere(start, end, direction, _length, first, Fixed64.Zero, _radius, out Vector3d firstVertexHit, out Fixed64 firstVertexDistance),
             firstVertexHit,
             firstVertexDistance,
             ref sphereCenterAtImpact,
             ref impactDistance);
         found |= TryKeepEarlierSweep(
-            TrySweepSphere(second, Fixed64.Zero, _radius, out Vector3d secondVertexHit, out Fixed64 secondVertexDistance),
+            TrySweepSphere(start, end, direction, _length, second, Fixed64.Zero, _radius, out Vector3d secondVertexHit, out Fixed64 secondVertexDistance),
             secondVertexHit,
             secondVertexDistance,
             ref sphereCenterAtImpact,
             ref impactDistance);
         found |= TryKeepEarlierSweep(
-            TrySweepSphere(third, Fixed64.Zero, _radius, out Vector3d thirdVertexHit, out Fixed64 thirdVertexDistance),
+            TrySweepSphere(start, end, direction, _length, third, Fixed64.Zero, _radius, out Vector3d thirdVertexHit, out Fixed64 thirdVertexDistance),
             thirdVertexHit,
             thirdVertexDistance,
             ref sphereCenterAtImpact,
@@ -413,22 +434,24 @@ public sealed class SweptSphereQueryWorker
         FixedTriangle triangle,
         Vector3d normal,
         Fixed64 signedRadius,
+        Vector3d start,
+        Vector3d direction,
         out Vector3d sphereCenterAtImpact,
         out Fixed64 impactDistance)
     {
         sphereCenterAtImpact = Vector3d.Zero;
         impactDistance = Fixed64.Zero;
 
-        Fixed64 denominator = Vector3d.Dot(_direction, normal);
+        Fixed64 denominator = Vector3d.Dot(direction, normal);
         if (denominator.Abs() <= Fixed64.Epsilon)
             return false;
 
-        Fixed64 signedStartDistance = Vector3d.Dot(_start - triangle.A, normal);
+        Fixed64 signedStartDistance = Vector3d.Dot(start - triangle.A, normal);
         Fixed64 distance = (signedRadius - signedStartDistance) / denominator;
         if (distance < Fixed64.Zero || distance > _length)
             return false;
 
-        Vector3d center = _start + _direction * distance;
+        Vector3d center = start + direction * distance;
         Vector3d pointOnPlane = center - normal * signedRadius;
         if (!triangle.ContainsProjection(pointOnPlane))
             return false;
@@ -441,13 +464,15 @@ public sealed class SweptSphereQueryWorker
     private bool TrySweepTriangleEdge(
         Vector3d edgeStart,
         Vector3d edgeEnd,
+        Vector3d start,
+        Vector3d end,
         out Vector3d sphereCenterAtImpact,
         out Fixed64 impactDistance)
     {
         sphereCenterAtImpact = Vector3d.Zero;
         impactDistance = Fixed64.MaxValue;
 
-        var query = new FixedSegment(_start, _end);
+        var query = new FixedSegment(start, end);
         var edgeAxis = new FixedSegment(edgeStart, edgeEnd);
         if (!query.TryGetFiniteCylinderIntersectionDistanceInterval(
                 edgeAxis,
@@ -462,7 +487,8 @@ public sealed class SweptSphereQueryWorker
             return false;
         }
 
-        BuildFiniteAxisSweepHit(entry, out sphereCenterAtImpact, out impactDistance);
+        impactDistance = entry;
+        sphereCenterAtImpact = query.GetPointAtDistance(entry, _length);
         return true;
     }
 
@@ -489,31 +515,6 @@ public sealed class SweptSphereQueryWorker
         sphereCenterAtImpact = candidateCenter;
         impactDistance = candidateDistance;
         return true;
-    }
-
-    private Fixed64 GetSphereConeSeparation(LSConeCollider cone, Vector3d center)
-    {
-        Vector3d closest = cone.ClosestPointOnSurface(center);
-        Fixed64 distance = Vector3d.Distance(center, closest);
-        return distance - _radius;
-    }
-
-    private Fixed64 RefineSphereConeImpact(LSConeCollider cone, Fixed64 lower, Fixed64 upper)
-    {
-        Fixed64 low = FixedMath.Clamp(lower, Fixed64.Zero, _length);
-        Fixed64 high = FixedMath.Clamp(upper, Fixed64.Zero, _length);
-
-        for (int i = 0; i < 16; i++)
-        {
-            Fixed64 mid = (low + high) * Fixed64.Half;
-            Vector3d center = _start + _direction * mid;
-            if (GetSphereConeSeparation(cone, center) <= BoundsTolerance)
-                high = mid;
-            else
-                low = mid;
-        }
-
-        return high;
     }
 
     private static void CreateSweepBounds(Vector3d start, Vector3d end, Fixed64 radius, out Vector3d min, out Vector3d max)

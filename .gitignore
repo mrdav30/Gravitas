@@ -15,3 +15,4 @@ artifacts/
 !.vscode/extensions.json
 BenchmarkDotNet.Artifacts/
 docs/feature-work/prototype/
+docs/superpowers/

@@ -16,7 +16,7 @@ public partial class SolidBody
         ref ChronicleHashWriter writer,
         GravitasReplayHashMode mode)
     {
-        writer.WriteSection("body.3d", 4);
+        writer.WriteSection("body.3d", 5);
         writer.WriteInt32(_dynamicId);
         writer.WriteBool(Debug);
         writer.WriteBool(Active);
@@ -37,6 +37,7 @@ public partial class SolidBody
         writer.WriteVector3d(_groundNormal);
         writer.WriteVector3d(_hitPlatformPosition);
         writer.WriteVector3d(_hitPoint);
+        writer.WriteBool(_hasHitPoint);
         writer.WriteBool(_isGrounded);
         writer.WriteBool(_wasGrounded);
         writer.WriteVector3d(_lastGroundedPosition);

@@ -6,6 +6,8 @@
 //=======================================================================
 
 using FixedMathSharp;
+using FixedMathSharp.Geometry;
+using Gravitas.CollisionHandling;
 using Gravitas.Materials;
 using System;
 using System.Runtime.CompilerServices;
@@ -20,6 +22,9 @@ public sealed class LSCompoundCollider2D : LSCollider2D
 {
     private readonly CompoundColliderPart2D[] _parts;
     private readonly LSCollider2D[] _partColliders;
+    private readonly Vector2d[] _massCenterScratch;
+    private readonly Fixed64[] _massWeightScratch;
+    private readonly ContactManifold2D _partManifoldScratch = new();
 
     public LSCompoundCollider2D(params CompoundColliderPart2D[] parts)
     {
@@ -31,6 +36,8 @@ public sealed class LSCompoundCollider2D : LSCollider2D
 
         _parts = new CompoundColliderPart2D[parts.Length];
         _partColliders = new LSCollider2D[parts.Length];
+        _massCenterScratch = new Vector2d[parts.Length];
+        _massWeightScratch = new Fixed64[parts.Length];
         for (int i = 0; i < parts.Length; i++)
         {
             _parts[i] = parts[i];
@@ -43,65 +50,18 @@ public sealed class LSCompoundCollider2D : LSCollider2D
 
     public override int Priority => ColliderSettings2D.GetPriority(Shape);
 
-    protected override void OnBeforeInitialize(IMatterAgent agent) =>
-        ValidatePartWorldScales(agent.Transform.LossyScale.ToVector2d());
-
     /// <summary>
     /// Gets the radius of a circle that conservatively contains the current
     /// aggregate shape.
     /// </summary>
     public Fixed64 ScaledRadius
     {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get
         {
-            Vector2d center = Center;
-            Fixed64 bestDistance = Fixed64.Zero;
-            Fixed64 bestDistanceSquared = Fixed64.Zero;
-            for (int i = 0; i < _partColliders.Length; i++)
-            {
-                LSCollider2D part = _partColliders[i];
-                if (part is LSCircleCollider2D circle)
-                {
-                    Fixed64 distance = Vector2d.Distance(center, circle.Center) + circle.ScaledRadius;
-                    if (distance > bestDistance)
-                    {
-                        bestDistance = distance;
-                        bestDistanceSquared = distance * distance;
-                    }
-                    continue;
-                }
-
-                if (part is LSCapsuleCollider2D capsule)
-                {
-                    Fixed64 distance = Vector2d.Distance(center, capsule.Center) + capsule.ScaledHeight * Fixed64.Half;
-                    if (distance > bestDistance)
-                    {
-                        bestDistance = distance;
-                        bestDistanceSquared = distance * distance;
-                    }
-                    continue;
-                }
-
-                for (int j = 0; j < part.VertexCount; j++)
-                {
-                    Vector2d vertex = part.GetVertexUnchecked(j);
-                    Fixed64 distanceSquared = Vector2d.DistanceSquared(center, vertex);
-                    if (distanceSquared == Fixed64.MaxValue)
-                    {
-                        bestDistance = FixedMath.Max(bestDistance, Vector2d.Distance(center, vertex));
-                        bestDistanceSquared = Fixed64.MaxValue;
-                        continue;
-                    }
-
-                    if (distanceSquared <= bestDistanceSquared)
-                        continue;
-
-                    bestDistanceSquared = distanceSquared;
-                    bestDistance = FixedMath.Sqrt(distanceSquared);
-                }
-            }
-
-            return bestDistance;
+            return HasCommittedShape
+                ? CanonicalCenteredProxyRadius
+                : ColliderCanonicalBounds2D.GetCurrentCenteredProxyRadius(this);
         }
     }
 
@@ -126,6 +86,8 @@ public sealed class LSCompoundCollider2D : LSCollider2D
         SwiftThrowHelper.ThrowIfArrayIndexInvalid(index, _parts.Length, nameof(index));
         return _partColliders[index];
     }
+
+    internal ContactManifold2D PartManifoldScratch => _partManifoldScratch;
 
     public override bool ContainsPoint(Vector2d point)
     {
@@ -164,24 +126,34 @@ public sealed class LSCompoundCollider2D : LSCollider2D
 
     public override Vector2d CalculateLocalCenterOfMassOffset()
     {
-        Fixed64 totalArea = Fixed64.Zero;
-        Vector2d weightedCenter = Vector2d.Zero;
+        bool hasPositiveArea = false;
         for (int i = 0; i < _partColliders.Length; i++)
         {
             LSCollider2D partCollider = _partColliders[i];
             Fixed64 partArea = partCollider.CalculateAreaForMassProperties();
-            totalArea += partArea;
-            weightedCenter += partCollider.CalculateLocalCenterOfMassOffset() * partArea;
+            _massCenterScratch[i] =
+                partCollider.CalculateLocalCenterOfMassOffset();
+            _massWeightScratch[i] = partArea;
+            hasPositiveArea |= partArea > Fixed64.Zero;
         }
 
-        if (totalArea > Fixed64.Zero)
-            return weightedCenter / totalArea;
+        if (hasPositiveArea)
+        {
+            Vector2d.TryGetWeightedAverage(
+                _massCenterScratch,
+                _massWeightScratch,
+                out Vector2d weightedCenter);
+            return weightedCenter;
+        }
 
-        Vector2d equalWeightedCenter = Vector2d.Zero;
         for (int i = 0; i < _partColliders.Length; i++)
-            equalWeightedCenter += _partColliders[i].CalculateLocalCenterOfMassOffset();
+            _massWeightScratch[i] = Fixed64.One;
 
-        return equalWeightedCenter / (Fixed64)_partColliders.Length;
+        Vector2d.TryGetWeightedAverage(
+            _massCenterScratch,
+            _massWeightScratch,
+            out Vector2d equalWeightedCenter);
+        return equalWeightedCenter;
     }
 
     internal override Fixed64 CalculateAreaForMassProperties()
@@ -215,9 +187,8 @@ public sealed class LSCompoundCollider2D : LSCollider2D
         return moment;
     }
 
-    protected override void RebuildShape()
+    private protected override void PrepareShape(in ColliderShapeSnapshot2D snapshot)
     {
-        ValidatePartWorldScales(LocalScale);
         Vector2d min = Vector2d.Zero;
         Vector2d max = Vector2d.Zero;
 
@@ -225,12 +196,14 @@ public sealed class LSCompoundCollider2D : LSCollider2D
         {
             CompoundColliderPart2D part = _parts[i];
             LSCollider2D partCollider = _partColliders[i];
-            partCollider.LocalOffset = part.LocalOffset;
-            partCollider.Material = part.ResolveMaterial(Material);
-            partCollider.BindCompoundPart(this, part.LocalRotation, part.LocalScale, Context);
+            partCollider.PrepareCompoundPart(
+                snapshot,
+                part.LocalRotation,
+                part.LocalScale,
+                PreparedContext);
 
-            Vector2d partMin = new(partCollider.MinX, partCollider.MinY);
-            Vector2d partMax = new(partCollider.MaxX, partCollider.MaxY);
+            Vector2d partMin = partCollider.PreparedShapeBounds.Min;
+            Vector2d partMax = partCollider.PreparedShapeBounds.Max;
             if (i == 0)
             {
                 min = partMin;
@@ -242,13 +215,19 @@ public sealed class LSCompoundCollider2D : LSCollider2D
             max = new Vector2d(FixedMath.Max(max.X, partMax.X), FixedMath.Max(max.Y, partMax.Y));
         }
 
-        SetBoundsFromMinMax(min, max);
+        SetPreparedBounds(FixedBoundArea.FromMinMax(min, max));
     }
 
-    private void ValidatePartWorldScales(Vector2d ownerScale)
+    private protected override void PublishShape()
     {
         for (int i = 0; i < _parts.Length; i++)
-            ColliderScalePolicy.Validate(Vector2d.Multiply(ownerScale, _parts[i].LocalScale));
+        {
+            CompoundColliderPart2D part = _parts[i];
+            _partColliders[i].PublishCompoundPart(
+                part.LocalRotation,
+                part.LocalScale,
+                PreparedContext);
+        }
     }
 
     private int FindClosestPartIndex(Vector2d point)

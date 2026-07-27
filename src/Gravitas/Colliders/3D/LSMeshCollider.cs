@@ -6,10 +6,11 @@
 //=======================================================================
 
 using FixedMathSharp;
-using FixedMathSharp.Bounds;
+using FixedMathSharp.Geometry;
 using Gravitas.Queries;
 using SwiftCollections;
 using SwiftCollections.Query;
+using System;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas.Colliders;
@@ -17,6 +18,10 @@ namespace Gravitas.Colliders;
 public class LSMeshCollider : LSCollider
 {
     private readonly SwiftList<int> _triangleQueryBuffer = new();
+    private Vector3d _preparedMassPropertyOrigin;
+    private Vector3d _preparedCenterOfMassOffset;
+    private Vector3d _massPropertyOrigin;
+    private Vector3d _centerOfMassOffset;
 
     public override ColliderType Shape => ColliderType.Mesh;
 
@@ -59,9 +64,10 @@ public class LSMeshCollider : LSCollider
         InertiaPolicy = inertiaPolicy;
         Mesh = new PhysicsMesh(vertices, triangles, Vector3d.Zero, FixedQuaternion.Identity, mode);
         _offset = Mesh.LocalBounds.Center;
+        Mesh.UpdatePosition(_offset, FixedQuaternion.Identity);
         _size = Mesh.LocalBounds.Proportions;
         _radius = _size.Magnitude * Fixed64.Half;
-        SetBounds(Mesh.Bounds);
+        _bounds = Mesh.Bounds;
     }
 
     public LSMeshCollider(ColliderShapeDefinition definition)
@@ -77,35 +83,47 @@ public class LSMeshCollider : LSCollider
     public override Fixed64 ScaledRadius
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        get => Bounds.Scope.Magnitude;
+        get
+        {
+            return Mesh.ScaledLocalRadius;
+        }
     }
 
-    protected override void RebuildRuntimeShape()
+    private protected override void PrepareShape(in ColliderShapeSnapshot snapshot)
     {
-        BuildShape();
-        BuildBoundingBox();
-    }
+        Mesh.PrepareTransformation(
+            snapshot.Center,
+            snapshot.Rotation,
+            snapshot.OwnerScale,
+            snapshot.PartScale,
+            InertiaPolicy);
+        _preparedMassPropertyOrigin = GetPreparedMassPropertyPoint(Vector3d.Zero);
 
-    protected override void BuildBoundingBox() =>
-        SetBounds(Mesh.Bounds);
-
-    protected override void BuildShape()
-    {
-        Vector3d scale = LocalScale;
-        FixedQuaternion rotation = Rotation;
-        Vector3d scaledSourceCenter = Vector3d.Multiply(Mesh.LocalBounds.Center, scale);
-        Vector3d meshOrigin = Position + (rotation * (ScaledOffset - scaledSourceCenter));
-        Mesh.UpdateTransform(meshOrigin, rotation, scale);
-    }
-
-    internal override void ValidateRuntimeTransform(Vector3d scale, FixedQuaternion rotation)
-    {
-        Mesh.ValidateScale(scale);
-        if (InertiaPolicy == MeshInertiaPolicy.RequireClosedVolume)
-            Mesh.ValidateClosedVolumeScaleRepresentability(scale);
+        Vector3d meshCenterOfMass;
+        if (InertiaPolicy == MeshInertiaPolicy.SurfaceApproximation)
+        {
+            meshCenterOfMass = Mesh.PreparedSurfaceMassProperties.CenterOfMass;
+        }
+        else if (Mesh.TryGetPreparedClosedVolumeMassProperties(
+            out MeshMassProperties properties,
+            out _))
+        {
+            meshCenterOfMass = properties.CenterOfMass;
+        }
         else
-            Mesh.ValidateSurfaceMassProperties(scale);
-        Mesh.ValidateRotation(rotation);
+        {
+            meshCenterOfMass = Vector3d.Zero;
+        }
+
+        _preparedCenterOfMassOffset = GetPreparedMassPropertyPoint(meshCenterOfMass);
+        SetPreparedBounds(Mesh.PreparedBounds);
+    }
+
+    private protected override void PublishShape()
+    {
+        Mesh.PublishPreparedTransformation();
+        _massPropertyOrigin = _preparedMassPropertyOrigin;
+        _centerOfMassOffset = _preparedCenterOfMassOffset;
     }
 
     protected internal override Fixed64 CalculateMassPropertyWeight()
@@ -119,27 +137,22 @@ public class LSMeshCollider : LSCollider
         return Fixed64.Zero;
     }
 
-    public override Vector3d CalculateLocalCenterOfMassOffset()
-    {
-        Vector3d meshCenterOfMass;
-        if (InertiaPolicy == MeshInertiaPolicy.SurfaceApproximation)
-            meshCenterOfMass = Mesh.SurfaceMassProperties.CenterOfMass;
-        else if (Mesh.TryGetClosedVolumeMassProperties(out MeshMassProperties properties, out _))
-            meshCenterOfMass = properties.CenterOfMass;
-        else
-            return base.CalculateLocalCenterOfMassOffset();
-
-        Vector3d scaledLocalCenter = ScaledOffset
-            + meshCenterOfMass - Mesh.ScaledLocalBounds.Center;
-        return TransformMassPropertyPoint(scaledLocalCenter);
-    }
+    public override Vector3d CalculateLocalCenterOfMassOffset() =>
+        _centerOfMassOffset;
 
     public override Fixed3x3 CalculateInertiaTensor(Fixed64 mass, Vector3d localCenterOfMassOffset)
     {
-        Vector3d partLocalReference = InverseTransformMassPropertyPoint(localCenterOfMassOffset);
-        Vector3d scaledMeshReference = Mesh.ScaledLocalBounds.Center
-            + partLocalReference - ScaledOffset;
-        return Mesh.CalculateInertiaTensor(mass, InertiaPolicy, scaledMeshReference);
+        Vector3d scaledMeshReference = localCenterOfMassOffset - _massPropertyOrigin;
+        if (CompoundOwner != null)
+        {
+            scaledMeshReference = CompoundLocalRotation.Inverse()
+                * scaledMeshReference;
+        }
+
+        return Mesh.CalculateInertiaTensor(
+            mass,
+            InertiaPolicy,
+            scaledMeshReference);
     }
 
     public override Fixed64 GetFrontalArea(Vector3d direction) =>
@@ -158,54 +171,158 @@ public class LSMeshCollider : LSCollider
 
     public override Vector3d ClosestPointOnSurface(Vector3d queryPoint)
     {
-        FindClosestPointOnSurface(queryPoint, _triangleQueryBuffer, out Vector3d closest, out _);
-        return closest;
+        FindClosestPointAnchor(
+            queryPoint,
+            _triangleQueryBuffer,
+            out FixedPointAnchor closest,
+            out _);
+        if (closest.TryGetPoint(out Vector3d point))
+            return point;
+
+        throw new InvalidOperationException(
+            "The closest mesh point is outside the representable coordinate range.");
     }
 
-    internal void FindClosestPointOnSurface(
+    internal void FindClosestPointAnchor(
+        Vector3d queryPoint,
+        out FixedPointAnchor closest,
+        out Vector3d normal) =>
+        FindClosestPointAnchor(
+            queryPoint,
+            _triangleQueryBuffer,
+            out closest,
+            out normal);
+
+    internal void FindClosestPointAnchor(
         Vector3d queryPoint,
         SwiftList<int> triangleBuffer,
-        out Vector3d closest,
+        out FixedPointAnchor closest,
         out Vector3d normal)
     {
-        closest = queryPoint;
+        if (!Mesh.TryConvertWorldToScaledLocal(
+                queryPoint,
+                out Vector3d localQueryPoint))
+        {
+            FindClosestPointWithoutLocalQuery(
+                queryPoint,
+                out closest,
+                out normal);
+            return;
+        }
+
+        Vector3d localClosest = localQueryPoint;
         normal = Vector3d.Zero;
         int closestTriangleIndex = -1;
         _ = KeepClosestPointOnTriangle(
             0,
-            queryPoint,
+            localQueryPoint,
             ref closestTriangleIndex,
-            ref closest,
+            ref localClosest,
             ref normal);
-        if (closest == queryPoint)
+        if (localClosest == localQueryPoint)
+        {
+            closest = Mesh.CreatePointAnchor(localClosest);
+            normal = Mesh.Rotation.Rotate(normal).Normalized;
             return;
+        }
 
-        if (!TryCreateClosestPointSearchBounds(queryPoint, closest, out FixedBoundVolume queryBounds))
+        if (!TryCreateClosestPointSearchBounds(
+                localQueryPoint,
+                localClosest,
+                out FixedBoundVolume queryBounds))
         {
             FindClosestPointAcrossAllTriangles(
-                queryPoint,
+                localQueryPoint,
                 1,
                 ref closestTriangleIndex,
-                ref closest,
+                ref localClosest,
                 ref normal);
-            return;
+        }
+        else
+        {
+            Mesh.GetTrianglesInLocalBounds(queryBounds, triangleBuffer);
+            for (int i = 0; i < triangleBuffer.Count; i++)
+            {
+                _ = KeepClosestPointOnTriangle(
+                    triangleBuffer[i],
+                    localQueryPoint,
+                    ref closestTriangleIndex,
+                    ref localClosest,
+                    ref normal);
+            }
         }
 
-        Mesh.GetTrianglesInWorldBounds(queryBounds, triangleBuffer);
-        for (int i = 0; i < triangleBuffer.Count; i++)
+        closest = Mesh.CreatePointAnchor(localClosest);
+        normal = Mesh.Rotation.Rotate(normal).Normalized;
+    }
+
+    private void FindClosestPointWithoutLocalQuery(
+        Vector3d queryPoint,
+        out FixedPointAnchor closest,
+        out Vector3d normal)
+    {
+        var queryAnchor = new FixedPointAnchor(
+            queryPoint,
+            FixedQuaternion.Identity,
+            Vector3d.Zero);
+        closest = GetClosestPointAnchorOnTriangle(
+            0,
+            queryAnchor,
+            out normal);
+        for (int triangleIndex = 1;
+            triangleIndex < Mesh.TriangleCount;
+            triangleIndex++)
         {
-            _ = KeepClosestPointOnTriangle(
-                triangleBuffer[i],
-                queryPoint,
-                ref closestTriangleIndex,
-                ref closest,
-                ref normal);
+            FixedPointAnchor candidate = GetClosestPointAnchorOnTriangle(
+                triangleIndex,
+                queryAnchor,
+                out Vector3d candidateNormal);
+            int comparison =
+                queryAnchor.CompareSquaredDistance(candidate, closest);
+            if (comparison >= 0)
+            {
+                continue;
+            }
+
+            closest = candidate;
+            normal = candidateNormal;
         }
+
+    }
+
+    private FixedPointAnchor GetClosestPointAnchorOnTriangle(
+        int triangleIndex,
+        in FixedPointAnchor query,
+        out Vector3d normal)
+    {
+        Mesh.GetLocalTriangleVertices(
+            triangleIndex,
+            out Vector3d first,
+            out Vector3d second,
+            out Vector3d third);
+        var triangle = new FixedTriangle(first, second, third);
+        FixedPointAnchor closest = triangle.GetClosestPointAnchor(
+            Mesh.Origin,
+            Mesh.Rotation,
+            query);
+        normal = OrientNormalTowardPoint(
+            Mesh.GetFaceNormalWorld(triangleIndex),
+            query,
+            closest);
+        return closest;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private Fixed64 GetMeshQueryHalfExtent() =>
-        FixedMath.Max(FixedMath.Max(Bounds.Scope.X, Bounds.Scope.Y), Bounds.Scope.Z);
+    private Fixed64 GetMeshQueryHalfExtent()
+    {
+        Vector3d extents =
+            ColliderCanonicalBounds.GetMaximumAbsoluteExtents(
+                this,
+                Mesh.Origin);
+        return FixedMath.Max(
+            FixedMath.Max(extents.X, extents.Y),
+            extents.Z);
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static FixedBoundVolume CreateQueryBounds(Vector3d center, Fixed64 halfExtent)
@@ -298,9 +415,14 @@ public class LSMeshCollider : LSCollider
         ref Vector3d closest,
         ref Vector3d normal)
     {
-        Mesh.GetTriangleVertices(triangleIndex, out Vector3d first, out Vector3d second, out Vector3d third);
-        Vector3d faceNormal = Mesh.GetFaceNormalWorld(triangleIndex);
-        Vector3d pointOnTriangle = new FixedTriangle(first, second, third).ClosestPoint(point);
+        Mesh.GetLocalTriangleVertices(
+            triangleIndex,
+            out Vector3d first,
+            out Vector3d second,
+            out Vector3d third);
+        var triangle = new FixedTriangle(first, second, third);
+        Vector3d faceNormal = triangle.Normal;
+        Vector3d pointOnTriangle = triangle.ClosestPoint(point);
         if (closestTriangleIndex >= 0)
         {
             int distanceComparison = Vector3d.CompareDistanceSquared(
@@ -323,13 +445,21 @@ public class LSMeshCollider : LSCollider
 
     public override Vector3d GetNormalAtPoint(Vector3d point)
     {
-        FindClosestPointOnSurface(point, _triangleQueryBuffer, out _, out Vector3d normal);
+        FindClosestPointAnchor(
+            point,
+            _triangleQueryBuffer,
+            out _,
+            out Vector3d normal);
         return normal;
     }
 
     internal override bool TryGetPlanarSurfaceNormal(Vector3d point, out Vector3d normal)
     {
-        FindClosestPointOnSurface(point, _triangleQueryBuffer, out _, out normal);
+        FindClosestPointAnchor(
+            point,
+            _triangleQueryBuffer,
+            out _,
+            out normal);
         return true;
     }
 
@@ -345,5 +475,23 @@ public class LSMeshCollider : LSCollider
             return normal;
 
         return Vector3d.Dot(normal, targetDirection) < Fixed64.Zero ? -normal : normal;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Vector3d OrientNormalTowardPoint(
+        Vector3d normal,
+        in FixedPointAnchor target,
+        in FixedPointAnchor surfacePoint)
+    {
+        if (target.ProjectNonNegativeOffsetFrom(surfacePoint, normal)
+            > Fixed64.Zero)
+        {
+            return normal;
+        }
+
+        return surfacePoint.ProjectNonNegativeOffsetFrom(target, normal)
+            > Fixed64.Zero
+            ? -normal
+            : normal;
     }
 }

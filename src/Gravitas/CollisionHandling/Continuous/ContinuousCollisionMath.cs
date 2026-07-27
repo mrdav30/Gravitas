@@ -6,7 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
-using FixedMathSharp.Bounds;
+using FixedMathSharp.Geometry;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas.CollisionHandling;
@@ -15,6 +15,13 @@ internal static class ContinuousCollisionMath
 {
     public const int RotationalIntervalMaxDepth = 12;
     public const int RotationalIntervalNodeBudget = 64;
+
+    public enum IntervalSearchStatus : byte
+    {
+        CertifiedNoHit,
+        ExactHit,
+        Unresolved,
+    }
 
     // Pose reconstruction uses normalized fixed-point rotations. Cover both
     // absolute operation rounding and its radius-scaled positional effect;
@@ -329,7 +336,33 @@ internal static class ContinuousCollisionMath
         out Vector3d normalForSource,
         out Fixed64 closingSpeed)
     {
-        normalizedTime = Fixed64.Zero;
+        return TryGetRelativeSphereOverlapInterval(
+            sourceStart,
+            sourceDisplacement,
+            sourceRadius,
+            targetStart,
+            targetDisplacement,
+            targetRadius,
+            out normalizedTime,
+            out _,
+            out normalForSource,
+            out closingSpeed);
+    }
+
+    public static bool TryGetRelativeSphereOverlapInterval(
+        Vector3d sourceStart,
+        Vector3d sourceDisplacement,
+        Fixed64 sourceRadius,
+        Vector3d targetStart,
+        Vector3d targetDisplacement,
+        Fixed64 targetRadius,
+        out Fixed64 entryTime,
+        out Fixed64 exitTime,
+        out Vector3d normalForSource,
+        out Fixed64 closingSpeed)
+    {
+        entryTime = Fixed64.Zero;
+        exitTime = Fixed64.Zero;
         normalForSource = Vector3d.Zero;
         closingSpeed = Fixed64.Zero;
 
@@ -345,26 +378,26 @@ internal static class ContinuousCollisionMath
             return false;
         }
 
-        if (!RadialSweepAdmission.TryIntersect(
-                sourceStart,
-                relativeDisplacement,
-                Fixed64.One,
-                targetStart,
-                targetRadius,
-                sourceRadius,
-                sourceEnd,
-                targetEnd,
-                out Fixed64 time))
+        if (!new FixedRay(sourceStart, relativeDisplacement)
+                .TryGetIntersectionInterval(
+                    new FixedBoundSphere(targetStart, targetRadius),
+                    sourceRadius,
+                    Fixed64.One,
+                    out Fixed64 entry,
+                    out Fixed64 exit))
+        {
             return false;
+        }
 
-        Vector3d sourceImpact = Vector3d.Lerp(sourceStart, sourceEnd, time);
-        Vector3d targetImpact = Vector3d.Lerp(targetStart, targetEnd, time);
+        Vector3d sourceImpact = Vector3d.Lerp(sourceStart, sourceEnd, entry);
+        Vector3d targetImpact = Vector3d.Lerp(targetStart, targetEnd, entry);
         normalForSource = ResolveNormal(targetImpact, sourceImpact, relativeDisplacement);
         closingSpeed = -Vector3d.Dot(relativeDisplacement, normalForSource);
         if (closingSpeed <= Fixed64.Epsilon)
             return false;
 
-        normalizedTime = time;
+        entryTime = entry;
+        exitTime = exit;
         return true;
     }
 

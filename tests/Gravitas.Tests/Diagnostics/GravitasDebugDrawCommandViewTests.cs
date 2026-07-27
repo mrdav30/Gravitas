@@ -18,7 +18,7 @@ public sealed class GravitasDebugDrawCommandViewTests
         Vector3d start = new(Fixed64.One, Fixed64.Zero, Fixed64.Zero);
         Vector3d end = new((Fixed64)2, Fixed64.Zero, Fixed64.Zero);
         Vector3d center = new((Fixed64)3, Fixed64.Zero, Fixed64.Zero);
-        Vector3d size = new((Fixed64)4, (Fixed64)5, (Fixed64)6);
+        Vector3d halfExtents = new((Fixed64)4, (Fixed64)5, (Fixed64)6);
         Vector3d pointA = Vector3d.Right;
         Vector3d pointB = Vector3d.Up;
         Vector3d pointC = Vector3d.Forward;
@@ -28,8 +28,8 @@ public sealed class GravitasDebugDrawCommandViewTests
         CreateCommand(GravitasDebugDrawKind.Ray, start: start, end: end, color: color).DispatchTo(visitor);
         CreateCommand(GravitasDebugDrawKind.Point, center: center, radius: Fixed64.Half, color: color).DispatchTo(visitor);
         CreateCommand(GravitasDebugDrawKind.WireSphere, center: center, radius: Fixed64.One, color: color).DispatchTo(visitor);
-        CreateCommand(GravitasDebugDrawKind.WireBox, center: center, size: size, rotation: FixedQuaternion.Identity, color: color).DispatchTo(visitor);
-        CreateCommand(GravitasDebugDrawKind.WireCapsule, center: center, rotation: FixedQuaternion.Identity, radius: Fixed64.Half, height: (Fixed64)2, color: color).DispatchTo(visitor);
+        CreateCommand(GravitasDebugDrawKind.WireBox, center: center, halfExtents: halfExtents, rotation: FixedQuaternion.Identity, color: color).DispatchTo(visitor);
+        CreateCommand(GravitasDebugDrawKind.WireCapsule, center: center, rotation: FixedQuaternion.Identity, radius: Fixed64.Half, axisLength: (Fixed64)2, color: color).DispatchTo(visitor);
         CreateCommand(GravitasDebugDrawKind.WireCylinder, center: center, rotation: FixedQuaternion.Identity, radius: Fixed64.Half, height: (Fixed64)3, color: color).DispatchTo(visitor);
         CreateCommand(GravitasDebugDrawKind.WireTriangle, pointA: pointA, pointB: pointB, pointC: pointC, color: color).DispatchTo(visitor);
         CreateCommand(GravitasDebugDrawKind.WireCone, center: center, rotation: FixedQuaternion.Identity, radius: Fixed64.One, height: (Fixed64)4, color: color).DispatchTo(visitor);
@@ -122,13 +122,13 @@ public sealed class GravitasDebugDrawCommandViewTests
         visitor.LastWireSphere.Radius.Should().Be(Fixed64.One);
         visitor.LastWireSphere.Color.Should().Be(color);
         visitor.LastWireBox.Center.Should().Be(center);
-        visitor.LastWireBox.Size.Should().Be(size);
+        visitor.LastWireBox.HalfExtents.Should().Be(halfExtents);
         visitor.LastWireBox.Rotation.Should().Be(FixedQuaternion.Identity);
         visitor.LastWireBox.Color.Should().Be(color);
         visitor.LastWireCapsule.Center.Should().Be(center);
         visitor.LastWireCapsule.Rotation.Should().Be(FixedQuaternion.Identity);
         visitor.LastWireCapsule.Radius.Should().Be(Fixed64.Half);
-        visitor.LastWireCapsule.Height.Should().Be((Fixed64)2);
+        visitor.LastWireCapsule.AxisLength.Should().Be((Fixed64)2);
         visitor.LastWireCapsule.Color.Should().Be(color);
         visitor.LastWireCylinder.Center.Should().Be(center);
         visitor.LastWireCylinder.Rotation.Should().Be(FixedQuaternion.Identity);
@@ -234,12 +234,13 @@ public sealed class GravitasDebugDrawCommandViewTests
         Vector3d start = default,
         Vector3d end = default,
         Vector3d center = default,
-        Vector3d size = default,
+        Vector3d halfExtents = default,
         Vector3d pointA = default,
         Vector3d pointB = default,
         Vector3d pointC = default,
         FixedQuaternion rotation = default,
         Fixed64 radius = default,
+        Fixed64 axisLength = default,
         Fixed64 height = default,
         GravitasDiagnosticColor color = default)
     {
@@ -254,12 +255,13 @@ public sealed class GravitasDebugDrawCommandViewTests
             start: start,
             end: end,
             center: center,
-            size: size,
+            halfExtents: halfExtents,
             pointA: pointA,
             pointB: pointB,
             pointC: pointC,
             rotation: rotation,
             radius: radius,
+            axisLength: axisLength,
             height: height,
             color: color);
     }

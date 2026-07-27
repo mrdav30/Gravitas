@@ -4,6 +4,7 @@ using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Materials;
 using Gravitas.Tests.Support;
+using SwiftCollections.Diagnostics;
 using System;
 using Xunit;
 
@@ -11,6 +12,65 @@ namespace Gravitas.Tests.Response;
 
 public sealed class CollisionResponse2DManifoldTests
 {
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Resolve_WithUnrepresentableLeverArm_ShouldRejectContactAtomically(
+        bool loggingEnabled)
+    {
+        using GravitasWorldContext context =
+            Physics2DTestWorld.CreateContext();
+        SolidBody2D left = CreateBox(context, Vector2d.Zero);
+        SolidBody2D right = CreateBox(context, Vector2d.Right);
+        var pair = new CollisionPair2D(
+            left.Collider,
+            right.Collider);
+        pair.Manifold.SetContact(
+            new ContactAnchor2D(
+                new Vector2d(
+                    Fixed64.MaxValue,
+                    Fixed64.Zero),
+                Vector2d.Right),
+            ContactAnchor2D.FromWorldPoint(
+                right.Collider.Center),
+            Fixed64.Half,
+            Vector2d.Right);
+        Vector2d leftVelocity = left.LinearVelocity;
+        Vector2d rightVelocity = right.LinearVelocity;
+        string? loggedMessage = null;
+        var originalLevel = GravitasLogger.MinimumLevel;
+        Action<DiagnosticLevel, string, string> originalHandler =
+            GravitasLogger.LogHandler;
+
+        try
+        {
+            GravitasLogger.MinimumLevel = loggingEnabled
+                ? DiagnosticLevel.Error
+                : DiagnosticLevel.None;
+            GravitasLogger.LogHandler =
+                (_, message, _) => loggedMessage = message;
+
+            pair.MarkColliding(context.FrameCount);
+        }
+        finally
+        {
+            GravitasLogger.MinimumLevel = originalLevel;
+            GravitasLogger.LogHandler = originalHandler;
+        }
+
+        left.LinearVelocity.Should().Be(leftVelocity);
+        right.LinearVelocity.Should().Be(rightVelocity);
+        if (loggingEnabled)
+        {
+            loggedMessage.Should().Contain(
+                "cannot be rebased onto its response centers");
+        }
+        else
+        {
+            loggedMessage.Should().BeNull();
+        }
+    }
+
     [Fact]
     public void Resolve_WithSymmetricFaceContacts_ShouldNotIntroduceAngularVelocity()
     {

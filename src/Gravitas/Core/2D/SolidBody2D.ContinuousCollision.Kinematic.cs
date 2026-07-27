@@ -47,7 +47,13 @@ public sealed partial class SolidBody2D
             proposedPosition,
             proxyRadius,
             dynamicPushLimit,
-            sourceLength);
+            sourceLength,
+            out bool hasUnresolvedMixedLimit,
+            out Fixed64 unresolvedMixedDistance);
+        staticHitDistance = FixedMath.Min(
+            dynamicPushLimit,
+            unresolvedMixedDistance);
+        foundStatic |= hasUnresolvedMixedLimit;
         if (!foundStatic && !pushedDynamic)
             return false;
 
@@ -125,8 +131,12 @@ public sealed partial class SolidBody2D
         Vector2d proposedPosition,
         Fixed64 proxyRadius,
         Fixed64 maxDistance,
-        Fixed64 sourceLength)
+        Fixed64 sourceLength,
+        out bool hasUnresolvedMixedLimit,
+        out Fixed64 unresolvedMixedDistance)
     {
+        hasUnresolvedMixedLimit = false;
+        unresolvedMixedDistance = maxDistance;
         _continuousCollisionHits.FastClear();
         _continuousMixedCollisionHits.FastClear();
         GatherKinematicDynamic2DContinuousCollisionHits(
@@ -140,7 +150,9 @@ public sealed partial class SolidBody2D
             proposedPosition,
             proxyRadius,
             maxDistance,
-            sourceLength);
+            sourceLength,
+            ref hasUnresolvedMixedLimit,
+            ref unresolvedMixedDistance);
 
         Physics2DHitSorter.SortByDistance(_continuousCollisionHits);
         PhysicsMixedHitSorter.SortByDistance(_continuousMixedCollisionHits);
@@ -226,7 +238,9 @@ public sealed partial class SolidBody2D
         Vector2d proposedPosition,
         Fixed64 proxyRadius,
         Fixed64 maxDistance,
-        Fixed64 sourceLength)
+        Fixed64 sourceLength,
+        ref bool hasUnresolvedMixedLimit,
+        ref Fixed64 unresolvedMixedDistance)
     {
         if (!Context.Settings.RuntimeMode.RunsMixedContacts())
             return;
@@ -248,19 +262,33 @@ public sealed partial class SolidBody2D
             }
 
             target.EnsureContinuousCollisionFramePrepared(token);
-            if (!TryGetDynamicMixed3DContinuousCollisionHit(
+            ContinuousCollisionMath.IntervalSearchStatus status =
+                TryGetDynamicMixed3DContinuousCollisionHit(
                     target,
                     sourceStart,
                     sourceDisplacement,
                     sourceRadius,
                     sourceLength,
                     Fixed64.Zero,
-                    out PhysicsMixedHit hit,
-                    out _)
-                || hit.Distance > maxDistance)
+                    out DynamicMixedIntervalHit candidate);
+            if (status
+                    == ContinuousCollisionMath.IntervalSearchStatus.CertifiedNoHit
+                || candidate.SafeDistance > maxDistance)
+            {
                 continue;
+            }
 
-            _continuousMixedCollisionHits.Add(hit);
+            if (status
+                == ContinuousCollisionMath.IntervalSearchStatus.Unresolved)
+            {
+                hasUnresolvedMixedLimit = true;
+                unresolvedMixedDistance = FixedMath.Min(
+                    unresolvedMixedDistance,
+                    candidate.SafeDistance);
+                continue;
+            }
+
+            _continuousMixedCollisionHits.Add(candidate.ExactHit);
         }
     }
 
@@ -338,7 +366,12 @@ public sealed partial class SolidBody2D
         Fixed64 hitDistance,
         Fixed64 sourceLength)
     {
-        _ = ContinuousCollisionImpulsePolicy.TryResolveSourceNormal(normalForSource, sourceDisplacement, out Vector2d normal);
+        if (!ContinuousCollisionImpulsePolicy.TryResolveImpactNormal(
+                normalForSource,
+                out Vector2d normal))
+        {
+            return false;
+        }
 
         Fixed64 deltaTime = Context.DeltaTime;
         Fixed64 constrainedInverseMass = target.GetConstrainedInverseMass(normal.ToVector3d(Fixed64.Zero));

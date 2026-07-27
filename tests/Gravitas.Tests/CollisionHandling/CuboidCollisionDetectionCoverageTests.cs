@@ -3,18 +3,10 @@ using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Tests.Support;
-using SwiftCollections.Pool;
 using Xunit;
 
 namespace Gravitas.Tests.CollisionHandlingTests;
 
-[CollectionDefinition(Name, DisableParallelization = true)]
-public sealed class PooledAxisHistoryCollection
-{
-    public const string Name = nameof(PooledAxisHistoryCollection);
-}
-
-[Collection(PooledAxisHistoryCollection.Name)]
 public sealed class CuboidCollisionDetectionCoverageTests
 {
     [Fact]
@@ -69,48 +61,21 @@ public sealed class CuboidCollisionDetectionCoverageTests
     }
 
     [Fact]
-    public void ObbCapsule_EqualDepthAxes_ShouldKeepFirstFaceNormalAcrossPooledCapacityHistory()
+    public void ObbCapsule_EqualDepthAxes_ShouldKeepFirstFaceNormal()
     {
-        SwiftHashSetPool<Vector3d>.Shared.Clear();
-        SwiftListPool<Vector3d>.Shared.Clear();
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        FixedQuaternion rotation = PhysicsScenarioBuilder.Yaw(45);
+        ScenarioBody<LSCuboidCollider> cuboid = scenario.CreateCuboid(Vector3d.Zero, rotation);
+        ScenarioBody<LSCapsuleCollider> capsule = scenario.CreateCapsule(Vector3d.Zero);
+        CollisionPair pair = scenario.CreatePair(cuboid.Collider, capsule.Collider);
+        Vector3d expectedNormal = (rotation * Vector3d.Forward).Normalized;
 
-        try
-        {
-            using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
-            FixedQuaternion rotation = PhysicsScenarioBuilder.Yaw(45);
-            ScenarioBody<LSCuboidCollider> cuboid = scenario.CreateCuboid(Vector3d.Zero, rotation);
-            ScenarioBody<LSCapsuleCollider> capsule = scenario.CreateCapsule(Vector3d.Zero);
-            CollisionPair pair = scenario.CreatePair(cuboid.Collider, capsule.Collider);
-            Vector3d expectedNormal = (rotation * Vector3d.Forward).Normalized;
-
-            foreach (int retainedCapacity in new[] { 8, 64 })
-            {
-                PrimeAxisPools(retainedCapacity);
-
-                pair.CollisionType.Should().Be(CollisionType.OBBox_Capsule);
-                CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
-                pair.Manifold.Count.Should().Be(1);
-                (pair.Manifold.PrimaryContact.Depth - Fixed64.One)
-                    .Abs().Should().BeLessThanOrEqualTo(Fixed64.Epsilon);
-                Vector3d.Distance(pair.Manifold.PrimaryContact.Normal, expectedNormal)
-                    .Should().BeLessThanOrEqualTo(Fixed64.Epsilon);
-            }
-        }
-        finally
-        {
-            SwiftHashSetPool<Vector3d>.Shared.Clear();
-            SwiftListPool<Vector3d>.Shared.Clear();
-        }
-    }
-
-    private static void PrimeAxisPools(int retainedCapacity)
-    {
-        var hashAxes = SwiftHashSetPool<Vector3d>.Shared.Rent();
-        hashAxes.EnsureCapacity(retainedCapacity);
-        SwiftHashSetPool<Vector3d>.Shared.Release(hashAxes);
-
-        var orderedAxes = SwiftListPool<Vector3d>.Shared.Rent();
-        orderedAxes.EnsureCapacity(retainedCapacity);
-        SwiftListPool<Vector3d>.Shared.Release(orderedAxes);
+        pair.CollisionType.Should().Be(CollisionType.OBBox_Capsule);
+        CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
+        pair.Manifold.Count.Should().Be(1);
+        (pair.Manifold.PrimaryContact.Depth - Fixed64.One)
+            .Abs().Should().BeLessThanOrEqualTo(Fixed64.Epsilon);
+        Vector3d.Distance(pair.Manifold.PrimaryContact.Normal, expectedNormal)
+            .Should().BeLessThanOrEqualTo(Fixed64.Epsilon);
     }
 }

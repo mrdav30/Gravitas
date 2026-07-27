@@ -39,13 +39,12 @@ public sealed class LSPolygonCollider2DCoverageTests
     }
 
     [Fact]
-    public void LargeCompoundOffset_ShouldPreserveScaledPolygonCentroidAndInertia()
+    public void LargeCompoundOffset_ShouldKeepPartTranslationInOwnerFrame()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
         Vector2d[] vertices = { Vector2d.Zero, Vector2d.Right, Vector2d.Forward };
         Vector2d translation = new((Fixed64)30000, (Fixed64)30000);
         Vector2d scale = new((Fixed64)2, (Fixed64)3);
-        Vector2d scaledTranslation = Vector2d.Multiply(translation, scale);
         var originCompound = new LSCompoundCollider2D(
             CompoundColliderPart2D.ConvexPolygon(vertices, Vector2d.Zero, Fixed64.Zero, scale));
         var translatedCompound = new LSCompoundCollider2D(
@@ -61,10 +60,10 @@ public sealed class LSPolygonCollider2DCoverageTests
         Vector2d originReference = new((Fixed64)(-4), (Fixed64)5);
         Fixed64 mass = (Fixed64)100;
 
-        translatedCentroid.Should().Be(originCentroid + scaledTranslation);
+        translatedCentroid.Should().Be(originCentroid + translation);
         translated.CalculateMomentOfInertia(mass, translatedCentroid).m_rawValue
             .Should().Be(origin.CalculateMomentOfInertia(mass, originCentroid).m_rawValue);
-        translated.CalculateMomentOfInertia(mass, originReference + scaledTranslation).m_rawValue
+        translated.CalculateMomentOfInertia(mass, originReference + translation).m_rawValue
             .Should().Be(origin.CalculateMomentOfInertia(mass, originReference).m_rawValue);
     }
 
@@ -111,7 +110,7 @@ public sealed class LSPolygonCollider2DCoverageTests
         };
         body.Initialize(Vector2d.Zero);
         var polygon = (LSPolygonCollider2D)compound.GetPartCollider(0);
-        Vector2d expectedCentroid = localOffset * Fixed64.Epsilon;
+        Vector2d expectedCentroid = localOffset;
 
         polygon.CalculateLocalCenterOfMassOffset().Should().Be(expectedCentroid);
         polygon.CalculateMomentOfInertia((Fixed64)5, expectedCentroid).Should().Be(Fixed64.Zero);

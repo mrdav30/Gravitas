@@ -269,11 +269,17 @@ public readonly struct GravitasContactDiagnosticView
 
     public Vector3d PointB => Event.PointB;
 
+    public bool HasPointA => Event.HasPointA;
+
+    public bool HasPointB => Event.HasPointB;
+
     public Vector3d Normal => Event.Vector;
 
     public Fixed64 Depth => Event.ScalarA;
 
     public int ContactCount => Event.DataA;
+
+    public bool DepthIsClamped => Event.DataB != 0;
 
     public bool HasContact => Event.Hit;
 }
@@ -302,6 +308,10 @@ public readonly struct GravitasResponseImpulseDiagnosticView
     public Vector3d PointA => Event.PointA;
 
     public Vector3d PointB => Event.PointB;
+
+    public bool HasPointA => Event.HasPointA;
+
+    public bool HasPointB => Event.HasPointB;
 
     public Vector3d Impulse => Event.Vector;
 
@@ -385,9 +395,15 @@ public readonly struct GravitasMixedContactDiagnosticView
 
     public Vector3d Point2D => Event.PointB;
 
+    public bool HasPoint3D => Event.HasPointA;
+
+    public bool HasPoint2D => Event.HasPointB;
+
     public Vector3d Normal3DTo2D => Event.Vector;
 
     public Fixed64 Depth => Event.ScalarA;
+
+    public bool DepthIsClamped => Event.DataA != 0;
 
     public bool HasContact => Event.Hit;
 }
@@ -420,6 +436,10 @@ public readonly struct GravitasMixedResponseImpulseDiagnosticView
     public Vector3d Point3D => Event.PointA;
 
     public Vector3d Point2D => Event.PointB;
+
+    public bool HasPoint3D => Event.HasPointA;
+
+    public bool HasPoint2D => Event.HasPointB;
 
     public Vector3d Impulse => Event.Vector;
 

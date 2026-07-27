@@ -1,5 +1,5 @@
 using FixedMathSharp;
-using FixedMathSharp.Bounds;
+using FixedMathSharp.Geometry;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
@@ -1062,7 +1062,10 @@ public sealed partial class ContinuousCollisionDetectionTests
         scenario.Context.Environment.MaxFallSpeed = Fixed64.MaxValue;
         Fixed64 normalOffset = Fixed64.FromFraction(1, 65536);
         Vector3d direction = new Vector3d(Fixed64.One, normalOffset, Fixed64.Zero).Normalized;
-        ScenarioBody<LSSphereCollider> source = scenario.CreateSphere(direction * Fixed64.FromFraction(-3, 2));
+        Fixed64 sourceStartDistance =
+            Fixed64.FromFraction(3, 2) - normalOffset;
+        ScenarioBody<LSSphereCollider> source = scenario.CreateSphere(
+            direction * -sourceStartDistance);
         ScenarioBody<LSSphereCollider> target = scenario.CreateSphere(Vector3d.Zero);
         source.Body.Mass = Fixed64.MaxValue;
         target.Body.Mass = Fixed64.MinIncrement;
@@ -2191,6 +2194,23 @@ public sealed partial class ContinuousCollisionDetectionTests
         source.Collider.RebuildRuntimeShapeOnly(refreshMassProperties: false);
 
         source.Body.ResolveContinuousCollisionProxyRadius().Should().Be((Fixed64)60000);
+    }
+
+    [Fact]
+    public void CuboidProxyRadius_WithIrrationalLowRawMagnitude_ShouldRoundOutward()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        ScenarioBody<LSCuboidCollider> source =
+            scenario.CreateCuboid(Vector3d.Zero);
+        source.Collider.Size = new Vector3d(
+            Fixed64.FromRaw(2),
+            Fixed64.FromRaw(2),
+            Fixed64.FromRaw(2));
+        source.Collider.RebuildRuntimeShapeOnly(
+            refreshMassProperties: false);
+
+        source.Body.ResolveContinuousCollisionProxyRadius()
+            .Should().Be(Fixed64.FromRaw(2));
     }
 
     [Fact]

@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using FixedMathSharp.Geometry;
 
 namespace Gravitas.CollisionHandling;
 
@@ -15,18 +16,29 @@ public static partial class CollisionDetection
 
     private static bool DoSpheresCheck(CollisionWorkItem pair)
     {
-        Vector3d penetrationVector = pair.ColliderB.Center - pair.ColliderA.Center;
-        if (penetrationVector.MagnitudeSquared > (pair.ColliderA.ScaledRadius + pair.ColliderB.ScaledRadius) * (pair.ColliderA.ScaledRadius + pair.ColliderB.ScaledRadius))
-            return false; // No collision if the distance squared is greater than the sum of the radii squared
+        if (!FixedSegment.TryGetCenteredCapsulesContact(
+                pair.ColliderA.Center,
+                pair.ColliderA.Rotation,
+                Vector3d.Up,
+                Fixed64.Zero,
+                pair.ColliderA.ScaledRadius,
+                pair.ColliderB.Center,
+                pair.ColliderB.Rotation,
+                Vector3d.Up,
+                Fixed64.Zero,
+                pair.ColliderB.ScaledRadius,
+                ResolveCenteredCapsuleFallback(pair.ColliderA.Center, pair.ColliderB.Center),
+                out FixedContactAnchors contact))
+        {
+            return false;
+        }
 
-        // Calculate the penetration depths and normals
-        Vector3d penetrationNormal = ResolveNormal(penetrationVector, pair.ColliderB.Center - pair.ColliderA.Center);
         pair.Manifold.SetContact(
-            pair.ColliderA.Center + penetrationNormal * pair.ColliderA.ScaledRadius,
-            pair.ColliderB.Center - penetrationNormal * pair.ColliderB.ScaledRadius,
-            penetrationVector.Magnitude - (pair.ColliderA.ScaledRadius + pair.ColliderB.ScaledRadius),
-            penetrationNormal
-        );
+            new ContactAnchor(contact.FirstAnchor),
+            new ContactAnchor(contact.SecondAnchor),
+            contact.Depth,
+            contact.Normal,
+            contact.DepthIsClamped);
         return true;
     }
 

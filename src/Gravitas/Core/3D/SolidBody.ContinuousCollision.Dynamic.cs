@@ -45,6 +45,7 @@ public partial class SolidBody
     {
         if (!CanApplyContinuousCollisionHandoff(
                 positionAtImpact,
+                rotationAtImpact,
                 remainingTime,
                 out Vector3d resolvedPosition))
             return false;
@@ -71,8 +72,10 @@ public partial class SolidBody
         LSCollider? ignoredCollider3D = null,
         LSCollider2D? ignoredCollider2D = null)
     {
+        FixedQuaternion resolvedRotation = rotationAtImpact.Normalized;
         Position3d = resolvedPosition;
-        Rotation = rotationAtImpact.Normalized;
+        Rotation = resolvedRotation;
+        Collider.PublishPreparedBodyPose();
         UpdateInertiaTensorOrientation();
         ApplyCollisionVelocityState(postLinearVelocity, postAngularVelocity);
         bool hasRemainingMotion = remainingTime > Fixed64.Epsilon
@@ -101,6 +104,7 @@ public partial class SolidBody
 
     internal bool CanApplyContinuousCollisionHandoff(
         Vector3d positionAtImpact,
+        FixedQuaternion rotationAtImpact,
         Fixed64 remainingTime,
         out Vector3d resolvedPosition)
     {
@@ -115,10 +119,17 @@ public partial class SolidBody
             Position3d,
             ProjectLinearMotion(positionDelta),
             out resolvedPosition);
-        return hasMobility
-            & hasTrajectoryCapacity
-            & positionDeltaResolved
-            & positionResolved;
+        if (!(hasMobility
+                & hasTrajectoryCapacity
+                & positionDeltaResolved
+                & positionResolved))
+        {
+            return false;
+        }
+
+        return Collider.TryPrepareBodyPose(
+            resolvedPosition,
+            rotationAtImpact.Normalized);
     }
 
     internal bool TryConsumeContinuousCollisionHandoff(bool updateSleepState, bool updateColliderState) =>
@@ -200,10 +211,7 @@ public partial class SolidBody
         UpdateInertiaTensorOrientation();
 
         CheckGroundForSimulation();
-        if (_isGrounded)
-            HeightPos = HitPoint.Y;
-        else
-            ResetGroundCalculations();
+        ApplyGroundedHeightOrReset();
 
         CheckChangedValues();
 
@@ -274,6 +282,7 @@ public partial class SolidBody
         }
 
         bool resolved = false;
+        int conservativeMixedRefinementCount = 0;
         Vector3d currentPosition = startPosition;
         Fixed64 remainingTime = initialRemainingTime;
         Fixed64 elapsedTime = initialElapsedTime;
@@ -282,7 +291,7 @@ public partial class SolidBody
         LSCollider2D? originalIgnoredCollider2D = _continuousCollisionHandoffIgnoredCollider2D;
         try
         {
-            for (int toiIteration = 0; toiIteration < maxToiIterations; toiIteration++)
+            while (LastContinuousCollisionToiIterationCount < maxToiIterations)
             {
                 Vector3d requestedSegmentDisplacement = _linearVelocity * remainingTime;
                 Vector3d requestedSegmentEnd = currentPosition + requestedSegmentDisplacement;
@@ -315,6 +324,46 @@ public partial class SolidBody
                 Fixed64 consumedTime = remainingTime * hitTime;
                 Fixed64 remainingAfterHit = remainingTime - consumedTime;
                 Fixed64 hitElapsedTime = elapsedTime + consumedTime;
+                if (targetKind
+                    == ContinuousCollisionTargetKind.UnresolvedMixed)
+                {
+                    resolved = true;
+                    if (hitTime > Fixed64.Epsilon
+                        && conservativeMixedRefinementCount
+                            < ContinuousCollisionMath.RotationalIntervalMaxDepth)
+                    {
+                        conservativeMixedRefinementCount++;
+                        remainingTime = remainingAfterHit;
+                        elapsedTime = hitElapsedTime;
+                        if (remainingTime > Fixed64.Epsilon)
+                            continue;
+                    }
+
+                    LastContinuousCollisionToiIterationCount++;
+                    LastContinuousCollisionToiIterationLimitReached =
+                        remainingAfterHit > Fixed64.Epsilon;
+                    if (CanAppendContinuousCollisionSegment(hitElapsedTime)
+                        && Context.Physics
+                            .TryReserveContinuousCollisionCandidateRefresh(this))
+                    {
+                        UpdateContinuousCollisionFrameTrajectory(
+                            currentPosition,
+                            Vector3d.Zero,
+                            hitElapsedTime);
+                        Context.Physics
+                            .RefreshContinuousCollisionCandidate(this);
+                    }
+                    else
+                    {
+                        LastContinuousCollisionToiIterationLimitReached = true;
+                    }
+
+                    if (LastContinuousCollisionToiIterationLimitReached)
+                        Context.Physics.ReportContinuousCollisionIterationLimit();
+
+                    break;
+                }
+
                 if (!CanAppendContinuousCollisionSegment(hitElapsedTime))
                 {
                     ContinuousCollisionMotionSegment3D activeSegment =
@@ -522,6 +571,7 @@ public partial class SolidBody
                 out targetPostLinearVelocity);
             bool targetTrajectoryAvailable = target.CanApplyContinuousCollisionHandoff(
                 targetPositionAtImpact,
+                targetRotationAtImpact,
                 remainingTime,
                 out targetResolvedPosition);
             targetStateAvailable = targetVelocityResolved & targetTrajectoryAvailable;
@@ -565,8 +615,13 @@ public partial class SolidBody
             normalForSource,
             out Vector3d normal);
         Vector2d planarNormal = normal.ToVector2d();
+        bool targetParticipates =
+            planarNormal != Vector2d.Zero && target.CanTranslate;
         Fixed64 constrainedInverseMassA = GetConstrainedInverseMass(normal);
-        Fixed64 constrainedInverseMassB = target.GetConstrainedInverseMass(planarNormal) * planarNormal.MagnitudeSquared;
+        Fixed64 constrainedInverseMassB = targetParticipates
+            ? target.GetConstrainedInverseMass(planarNormal)
+                * planarNormal.MagnitudeSquared
+            : Fixed64.Zero;
         Fixed64 frameFraction = ResolveContinuousCollisionFrameFraction(hitElapsedTime);
         Vector2d targetLinearVelocity = target.SampleContinuousCollisionLinearVelocity(frameFraction);
         Vector3d targetVelocity = targetLinearVelocity
@@ -595,19 +650,23 @@ public partial class SolidBody
             Fixed64.One,
             out Fixed64 responseSpeed);
         Vector3d sourceResponseNormal = ProjectLinearMotion(normal);
-        Vector2d targetResponseNormal = target.ProjectLinearMotion(-planarNormal);
+        Vector2d targetResponseNormal = targetParticipates
+            ? target.ProjectLinearMotion(-planarNormal)
+            : Vector2d.Zero;
         bool sourceDeltaResolved = ContinuousCollisionImpulsePolicy.TryResolveVelocityDelta(
             sourceResponseNormal,
             responseSpeed,
             EffectiveInverseMass,
             inverseMass,
             out Vector3d sourceVelocityDelta);
-        bool targetDeltaResolved = ContinuousCollisionImpulsePolicy.TryResolveVelocityDelta(
-            targetResponseNormal,
-            responseSpeed,
-            target.EffectiveInverseMass,
-            inverseMass,
-            out Vector2d targetVelocityDelta);
+        Vector2d targetVelocityDelta = Vector2d.Zero;
+        bool targetDeltaResolved = !targetParticipates
+            || ContinuousCollisionImpulsePolicy.TryResolveVelocityDelta(
+                targetResponseNormal,
+                responseSpeed,
+                target.EffectiveInverseMass,
+                inverseMass,
+                out targetVelocityDelta);
         bool sourceVelocityResolved = Vector3d.TryAdd(
             _linearVelocity,
             sourceVelocityDelta,
@@ -618,7 +677,7 @@ public partial class SolidBody
         Fixed64 targetRotationAtImpact = target.SampleContinuousCollisionRotation(frameFraction);
         Fixed64 targetAngularVelocity = target.SampleContinuousCollisionAngularVelocity(frameFraction);
         bool targetStateAvailable = true;
-        if (target.CanTranslate)
+        if (targetParticipates)
         {
             bool targetVelocityResolved = Vector2d.TryAdd(
                 targetLinearVelocity,
@@ -626,13 +685,13 @@ public partial class SolidBody
                 out targetPostLinearVelocity);
             bool targetTrajectoryAvailable = target.CanApplyContinuousCollisionHandoffState(
                 targetPositionAtImpact,
+                targetRotationAtImpact,
                 remainingTime,
                 out targetResolvedPosition);
             targetStateAvailable = targetVelocityResolved & targetTrajectoryAvailable;
         }
 
         bool responseAdmissible = normalResolved
-            & planarNormal != Vector2d.Zero
             & inverseMassResolved
             & relativeVelocityResolved
             & normalVelocity < -Fixed64.Epsilon
@@ -650,13 +709,13 @@ public partial class SolidBody
         }
 
         _ = Context.Physics.TryReserveContinuousCollisionCandidateRefresh(this);
-        if (target.CanTranslate)
+        if (targetParticipates)
             _ = Context.Physics2D.TryReserveContinuousCollisionCandidateRefresh(target);
 
         ApplyCollisionVelocityState(sourcePostLinearVelocity, _angularVelocity);
         UpdateContinuousCollisionFrameTrajectory(sourcePositionAtImpact, _linearVelocity, hitElapsedTime);
         Context.Physics.RefreshContinuousCollisionCandidate(this);
-        if (target.CanTranslate)
+        if (targetParticipates)
         {
             target.ApplyContinuousCollisionHandoffStateReserved(
                 targetResolvedPosition,

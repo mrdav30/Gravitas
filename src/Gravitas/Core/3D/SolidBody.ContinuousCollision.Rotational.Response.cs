@@ -68,23 +68,19 @@ public partial class SolidBody
         Vector3d linearVelocityB = sourceIsA ? targetLinearVelocity : sourceLinearVelocity;
         Vector3d angularVelocityA = sourceIsA ? sourceAngularVelocity : targetAngularVelocity;
         Vector3d angularVelocityB = sourceIsA ? targetAngularVelocity : sourceAngularVelocity;
-        bool centerAResolved = Vector3d.TryAdd(
-            positionA,
-            rotationA * bodyA._localCenterOfMassOffset,
-            out Vector3d centerOfMassA);
-        bool centerBResolved = Vector3d.TryAdd(
-            positionB,
-            rotationB * bodyB._localCenterOfMassOffset,
-            out Vector3d centerOfMassB);
-        bool armAResolved = Vector3d.TrySubtract(
-            contact.PointA,
-            centerOfMassA,
+        bool armAResolved = contact.AnchorA.TryGetOffsetFrom(
+            new ContactAnchor(
+                positionA,
+                rotationA,
+                bodyA._localCenterOfMassOffset),
             out Vector3d contactArmA);
-        bool armBResolved = Vector3d.TrySubtract(
-            contact.PointB,
-            centerOfMassB,
+        bool armBResolved = contact.AnchorB.TryGetOffsetFrom(
+            new ContactAnchor(
+                positionB,
+                rotationB,
+                bodyB._localCenterOfMassOffset),
             out Vector3d contactArmB);
-        if (!(centerAResolved & centerBResolved & armAResolved & armBResolved))
+        if (!(armAResolved & armBResolved))
         {
             return false;
         }
@@ -170,6 +166,7 @@ public partial class SolidBody
                     out resolvedTargetAngularVelocity)
                 & target.CanApplyContinuousCollisionHandoff(
                     targetPosition,
+                    targetRotation,
                     remainingAfterImpact,
                     out resolvedTargetPosition));
         if (!targetStateResolved)

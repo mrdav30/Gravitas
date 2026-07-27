@@ -721,31 +721,16 @@ public sealed class MixedBroadPhaseTests
         partition.EmptySinceFrame.Should().Be(context.FrameCount);
         partition.IsAllocated.Should().BeFalse();
         partition.AwakeDynamicObjectCount.Should().Be(0);
-        partition.ContainedDynamic3DObjects!.Count.Should().Be(0);
-        partition.ContainedAwakeDynamic3DObjects!.Count.Should().Be(0);
-        partition.ContainedKinematic3DObjects!.Count.Should().Be(0);
-        partition.ContainedStatic3DObjects!.Count.Should().Be(0);
-        partition.ContainedDynamic2DObjects!.Count.Should().Be(0);
-        partition.ContainedAwakeDynamic2DObjects!.Count.Should().Be(0);
-        partition.ContainedKinematic2DObjects!.Count.Should().Be(0);
-        partition.ContainedStatic2DObjects!.Count.Should().Be(0);
+        partition.ContainedDynamic3DObjects.Should().BeNull();
+        partition.ContainedAwakeDynamic3DObjects.Should().BeNull();
+        partition.ContainedKinematic3DObjects.Should().BeNull();
+        partition.ContainedStatic3DObjects.Should().BeNull();
+        partition.ContainedDynamic2DObjects.Should().BeNull();
+        partition.ContainedAwakeDynamic2DObjects.Should().BeNull();
+        partition.ContainedKinematic2DObjects.Should().BeNull();
+        partition.ContainedStatic2DObjects.Should().BeNull();
+        context.MixedCollisions.InactivePartitionMembershipCount.Should().Be(8);
         context.MixedCollisions.ReleasePartition(partition);
-    }
-
-    [Fact]
-    public void ResetRetainedMembership_WithFreshMixedPartition_ShouldBeIdempotent()
-    {
-        var partition = new PhysicsMixedPartition();
-
-        partition.ResetRetainedMembership();
-        partition.ResetRetainedMembership();
-
-        partition.IsEmpty.Should().BeTrue();
-        partition.EmptySinceFrame.Should().Be(0);
-        partition.IsAllocated.Should().BeFalse();
-        partition.AwakeDynamicObjectCount.Should().Be(0);
-        ContainsId(partition.ContainedDynamic3DObjects, 7).Should().BeFalse();
-        ContainsId(partition.ContainedDynamic2DObjects, 11).Should().BeFalse();
     }
 
     [Fact]
@@ -795,6 +780,7 @@ public sealed class MixedBroadPhaseTests
         partition.RemoveStatic2DObject(999);
         partition.RemoveKinematic2DObject(999);
 
+        partition.SetDynamic3DObjectAwake(11, awake: false);
         partition.RemoveDynamic3DObject(11);
         partition.RemoveKinematic3DObject(7);
         partition.RemoveStatic3DObject(19);
@@ -806,6 +792,62 @@ public sealed class MixedBroadPhaseTests
         partition.AwakeDynamicObjectCount.Should().Be(0);
         partition.IsAllocated.Should().BeFalse();
         context.MixedCollisions.ReleasePartition(partition);
+    }
+
+    [Fact]
+    public void MixedPartitionMembership_ShouldRecycleClearedBucketAcrossRolesAndDimensions()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        PhysicsMixedPartition source = context.MixedCollisions.RentPartition();
+        PhysicsMixedPartition destination = context.MixedCollisions.RentPartition();
+
+        source.AddStatic3DObject(7);
+        source.AddStatic3DObject(9);
+        SwiftSparseSet releasedMembership = source.ContainedStatic3DObjects!;
+        source.RemoveStatic3DObject(7);
+
+        source.ContainedStatic3DObjects.Should().BeSameAs(releasedMembership);
+        source.ContainedStatic3DObjects!.Contains(9).Should().BeTrue();
+        context.MixedCollisions.InactivePartitionMembershipCount.Should().Be(0);
+
+        source.RemoveStatic3DObject(9);
+
+        source.ContainedStatic3DObjects.Should().BeNull();
+        context.MixedCollisions.InactivePartitionMembershipCount.Should().Be(1);
+
+        destination.AddKinematic2DObject(11);
+
+        destination.ContainedKinematic2DObjects.Should().BeSameAs(releasedMembership);
+        destination.ContainedKinematic2DObjects!.Contains(7).Should().BeFalse();
+        destination.ContainedKinematic2DObjects.Contains(11).Should().BeTrue();
+        context.MixedCollisions.InactivePartitionMembershipCount.Should().Be(0);
+
+        source.AddStatic3DObject(13);
+        source.ContainedStatic3DObjects.Should().NotBeSameAs(destination.ContainedKinematic2DObjects);
+
+        context.MixedCollisions.ReleasePartition(source);
+        context.MixedCollisions.ReleasePartition(destination);
+    }
+
+    [Fact]
+    public void MixedPartitionPool_ShouldStartReusedGenerationWithoutStaleMembership()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        PhysicsMixedPartition original = context.MixedCollisions.RentPartition();
+        original.AddStatic3DObject(7);
+        SwiftSparseSet originalMembership = original.ContainedStatic3DObjects!;
+
+        context.MixedCollisions.ReleasePartition(original);
+        PhysicsMixedPartition replacement = context.MixedCollisions.RentPartition();
+
+        replacement.Should().BeSameAs(original);
+        replacement.ContainedStatic3DObjects.Should().BeNull();
+        replacement.AddStatic2DObject(11);
+        replacement.ContainedStatic2DObjects.Should().BeSameAs(originalMembership);
+        replacement.ContainedStatic2DObjects!.Contains(7).Should().BeFalse();
+        replacement.ContainedStatic2DObjects.Contains(11).Should().BeTrue();
+
+        context.MixedCollisions.ReleasePartition(replacement);
     }
 
     private static GravitasWorldContext CreateMixedContext(int extent = 32)

@@ -18,7 +18,7 @@ public abstract partial class LSCollider2D
         ref ChronicleHashWriter writer,
         GravitasReplayHashMode mode)
     {
-        writer.WriteSection("collider.2d", 3);
+        writer.WriteSection("collider.2d", 4);
         writer.WriteInt32(_replayOrdinal);
         writer.WriteBool(_isActive);
         writer.WriteBool(_isTrigger);
@@ -33,14 +33,9 @@ public abstract partial class LSCollider2D
             writer.WriteFixed64(_mixedHalfThicknessOverride.Value);
         writer.WriteVector2d(Position);
         writer.WriteFixed64(Rotation);
-        writer.WriteVector2d(LocalScale);
+        writer.WriteVector2d(_committedOwnerScale);
+        writer.WriteVector2d(_committedPartScale);
         writer.WriteVector2d(Center);
-        writer.WriteFixed64(MinX);
-        writer.WriteFixed64(MinY);
-        writer.WriteFixed64(MaxX);
-        writer.WriteFixed64(MaxY);
-        writer.WriteVector3d(_mixedBounds3D.Min);
-        writer.WriteVector3d(_mixedBounds3D.Max);
         writer.WriteFixed64(_mixedHalfThickness);
         writer.WriteFixed64(_mixedSlabCenterY);
         writer.WriteInt32(HierarchyChildCount);
@@ -64,13 +59,19 @@ public abstract partial class LSCollider2D
         writer.WriteUInt32(BroadPhaseVersion);
         writer.WriteUInt32(RaycastVersion);
         writer.WriteUInt32(CircleQueryVersion);
+        writer.WriteFixed64(MinX);
+        writer.WriteFixed64(MinY);
+        writer.WriteFixed64(MaxX);
+        writer.WriteFixed64(MaxY);
+        writer.WriteVector3d(_mixedBounds3D.Min);
+        writer.WriteVector3d(_mixedBounds3D.Max);
         writer.WriteInt32(CollisionPairCount);
         writer.WriteInt32(CollisionPairHolderCount);
     }
 
     private void ContributeShapeReplayHash(ref ChronicleHashWriter writer)
     {
-        writer.WriteSection("collider.2d.shape", 1);
+        writer.WriteSection("collider.2d.shape", 3);
         switch (this)
         {
             case LSCircleCollider2D circle:
@@ -80,16 +81,15 @@ public abstract partial class LSCollider2D
 
             case LSAABBoxCollider2D box:
                 writer.WriteVector2d(box.Size);
-                writer.WriteVector2d(box.ScaledSize);
+                writer.WriteVector2d(box.ScaledHalfExtents);
                 break;
 
             case LSCapsuleCollider2D capsule:
                 writer.WriteFixed64(capsule.Radius);
                 writer.WriteFixed64(capsule.Height);
+                writer.WriteVector2d(capsule.Center);
+                writer.WriteFixed64(capsule.AxisLength);
                 writer.WriteFixed64(capsule.ScaledRadius);
-                writer.WriteFixed64(capsule.ScaledHeight);
-                writer.WriteVector2d(capsule.SegmentStart);
-                writer.WriteVector2d(capsule.SegmentEnd);
                 break;
 
             case LSCompoundCollider2D compound:
@@ -102,7 +102,7 @@ public abstract partial class LSCollider2D
 
         writer.WriteInt32(VertexCount);
         for (int i = 0; i < VertexCount; i++)
-            writer.WriteVector2d(GetVertexUnchecked(i));
+            writer.WriteVector2d(GetScaledLocalVertexUnchecked(i));
     }
 
     private void WriteReplayHierarchyKey(ref ChronicleHashWriter writer, ColliderHierarchyKey key)

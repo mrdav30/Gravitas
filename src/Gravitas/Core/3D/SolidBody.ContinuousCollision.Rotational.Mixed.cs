@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Materials;
@@ -231,6 +232,8 @@ public partial class SolidBody
                 elapsedTime,
                 remainingTime,
                 sourceIsKinematic,
+                Fixed64.Zero,
+                Fixed64.One,
                 out Fixed64 candidateTime,
                 out MixedContact candidateContact,
                 out bool candidateHasContact,
@@ -265,6 +268,8 @@ public partial class SolidBody
         Fixed64 elapsedTime,
         Fixed64 remainingTime,
         bool sourceIsKinematic,
+        Fixed64 searchStart,
+        Fixed64 searchEnd,
         out Fixed64 safeTime,
         out MixedContact contact,
         out bool hasContact,
@@ -293,8 +298,8 @@ public partial class SolidBody
             Fixed64 knownContactTime = Fixed64.One;
             MixedContact knownContact = default;
             intervals[0] = new ContinuousCollisionMath.RotationalInterval(
-                Fixed64.Zero,
-                Fixed64.One,
+                searchStart,
+                searchEnd,
                 depth: 0);
 
             while (intervalCount > 0)
@@ -466,6 +471,195 @@ public partial class SolidBody
             movingTarget.SampleContinuousCollisionRotation(frameFraction));
     }
 
+    private bool TryGetExactSphereCircleTranslationalContact(
+        SolidBody2D target,
+        ContinuousCollisionMotionSegment2D targetSegment,
+        Vector3d sourceStart,
+        Vector3d sourceDisplacement,
+        FixedQuaternion sourceStartRotation,
+        FixedQuaternion sourceEndRotation,
+        Fixed64 sourceAngularDistance,
+        Fixed64 elapsedTime,
+        Fixed64 remainingTime,
+        bool sourceIsKinematic,
+        out Fixed64 contactTime,
+        out Fixed64 sourceContactDistance,
+        out MixedContact contact)
+    {
+        contactTime = default;
+        sourceContactDistance = default;
+        contact = default;
+        if (Collider is not LSSphereCollider sphere
+            || target.Collider is not LSCircleCollider2D circle
+            || sourceAngularDistance != Fixed64.Zero
+            || targetSegment.AngularDistance != Fixed64.Zero)
+        {
+            return false;
+        }
+
+        Vector3d originalSourcePosition = Position3d;
+        FixedQuaternion originalSourceRotation = Rotation;
+        Vector2d originalTargetPosition = target.Position;
+        Fixed64 originalTargetRotation = target.Rotation;
+        try
+        {
+            SampleMixedRotationalContinuousPairPose(
+                sourceStart,
+                sourceDisplacement,
+                sourceStartRotation,
+                sourceEndRotation,
+                Fixed64.Zero,
+                elapsedTime,
+                remainingTime,
+                sourceIsKinematic,
+                target,
+                samplesTargetMotion: true);
+            Vector3d sphereStart = sphere.Center;
+            Vector3d cylinderStart = new(
+                circle.Center.X,
+                circle.MixedSlabCenterY,
+                circle.Center.Y);
+
+            SampleMixedRotationalContinuousPairPose(
+                sourceStart,
+                sourceDisplacement,
+                sourceStartRotation,
+                sourceEndRotation,
+                Fixed64.One,
+                elapsedTime,
+                remainingTime,
+                sourceIsKinematic,
+                target,
+                samplesTargetMotion: true);
+            Vector3d sphereEnd = sphere.Center;
+            Vector3d cylinderEnd = new(
+                circle.Center.X,
+                circle.MixedSlabCenterY,
+                circle.Center.Y);
+            if (!Vector3d.TrySubtract(
+                    cylinderEnd,
+                    cylinderStart,
+                    out Vector3d cylinderDisplacement)
+                || !Vector3d.TrySubtract(
+                    sphereEnd,
+                    cylinderDisplacement,
+                    out Vector3d relativeSphereEnd)
+                || !Vector3d.TryGetDistance(
+                    sphereStart,
+                    relativeSphereEnd,
+                    out Fixed64 totalDistance))
+            {
+                return false;
+            }
+
+            if (totalDistance == Fixed64.Zero)
+            {
+                SampleMixedRotationalContinuousPairPose(
+                    sourceStart,
+                    sourceDisplacement,
+                    sourceStartRotation,
+                    sourceEndRotation,
+                    Fixed64.Zero,
+                    elapsedTime,
+                    remainingTime,
+                    sourceIsKinematic,
+                    target,
+                    samplesTargetMotion: true);
+                return CollisionDetectionMixed.TryCollide(
+                    Collider,
+                    target.Collider,
+                    out contact);
+            }
+
+            var relativeSpherePath = new FixedSegment(
+                sphereStart,
+                relativeSphereEnd);
+            if (!relativeSpherePath
+                    .TryGetSweptSphereCenteredFiniteCylinderIntersectionDistanceFromHalfAxisLength(
+                        cylinderStart,
+                        Vector3d.Up,
+                        circle.MixedHalfThickness,
+                        circle.ScaledRadius,
+                        sphere.ScaledRadius,
+                        totalDistance,
+                        out Fixed64 contactDistance))
+            {
+                return false;
+            }
+
+            if (!Vector3d.TryGetMagnitude(
+                    sourceDisplacement,
+                    out Fixed64 sourceTravelDistance)
+                || !Fixed64.TryMultiplyDivide(
+                    sourceTravelDistance,
+                    contactDistance,
+                    totalDistance,
+                    out sourceContactDistance))
+            {
+                return false;
+            }
+
+            contactTime = FixedMath.Clamp01(
+                contactDistance / totalDistance);
+            SampleMixedRotationalContinuousPairPose(
+                sourceStart,
+                sourceDisplacement,
+                sourceStartRotation,
+                sourceEndRotation,
+                contactTime,
+                elapsedTime,
+                remainingTime,
+                sourceIsKinematic,
+                target,
+                samplesTargetMotion: true);
+            if (CollisionDetectionMixed.TryCollide(
+                Collider,
+                target.Collider,
+                out contact))
+            {
+                sourceContactDistance =
+                    sourceTravelDistance * contactTime;
+                return true;
+            }
+
+            if (contactTime == Fixed64.One)
+                return false;
+
+            contactTime += Fixed64.MinIncrement;
+            SampleMixedRotationalContinuousPairPose(
+                sourceStart,
+                sourceDisplacement,
+                sourceStartRotation,
+                sourceEndRotation,
+                contactTime,
+                elapsedTime,
+                remainingTime,
+                sourceIsKinematic,
+                target,
+                samplesTargetMotion: true);
+            if (!CollisionDetectionMixed.TryCollide(
+                    Collider,
+                    target.Collider,
+                    out contact))
+            {
+                return false;
+            }
+
+            sourceContactDistance =
+                sourceTravelDistance * contactTime;
+            return true;
+        }
+        finally
+        {
+            SetMixedContinuousCollisionSamplePose(
+                originalSourcePosition,
+                originalSourceRotation);
+            target.SetMixedContinuousCollisionSamplePose(
+                originalTargetPosition,
+                originalTargetRotation);
+        }
+    }
+
     private bool IsValidMixedRotationalContinuousCollisionTarget(LSCollider2D target)
     {
         return target.IsActive
@@ -537,35 +731,26 @@ public partial class SolidBody
             ?? Fixed64.Zero;
         SolidBody? sourceResponseBody = HasSolverMobility ? this : null;
         SolidBody2D? targetResponseBody = target?.HasSolverMobility == true ? target : null;
-        if (!Vector3d.TryAdd(
-                sourcePosition,
-                sourceRotation * LocalCenterOfMassOffset,
-                out Vector3d sourceCenterOfMass))
-        {
-            return false;
-        }
-
-        Vector2d targetCenterOfMass = targetPosition;
-        if (target != null
-            && !Vector2d.TryAdd(
-                targetPosition,
-                Vector2d.Rotate(target.LocalCenterOfMassOffset, targetRotation),
-                out targetCenterOfMass))
-        {
-            return false;
-        }
-
         Fixed64 restitution = PhysicsMaterial.CombineRestitution(
             Collider.Material,
             targetCollider.Material);
-        bool sourceContactArmResolved = Vector3d.TrySubtract(
-            contact.Point3D,
-            sourceCenterOfMass,
+        bool sourceContactArmResolved = contact.Anchor3D.TryGetOffsetFrom(
+            new ContactAnchor(
+                sourcePosition,
+                sourceRotation,
+                LocalCenterOfMassOffset),
             out Vector3d sourceContactArm);
-        bool targetContactArmResolved = Vector2d.TrySubtract(
-            contact.Point2D.ToVector2d(),
-            targetCenterOfMass,
-            out Vector2d targetContactArm);
+        bool targetContactArmResolved = target == null
+            ? contact.TryGetPlanarOffset2DFrom(
+                targetPosition,
+                Fixed64.Zero,
+                Vector2d.Zero,
+                out Vector2d targetContactArm)
+            : contact.TryGetPlanarOffset2DFrom(
+                targetPosition,
+                targetRotation,
+                target.LocalCenterOfMassOffset,
+                out targetContactArm);
         bool responseResolved = ContactNormalImpulseMixed.TryCalculateVelocityDeltas(
             sourceResponseBody,
             sourceLinearVelocity,
@@ -623,6 +808,7 @@ public partial class SolidBody
                 out postTargetAngularVelocity);
             bool targetTrajectoryAvailable = targetResponseBody.CanApplyContinuousCollisionHandoffState(
                 targetPosition,
+                targetRotation,
                 remainingAfterImpact,
                 out targetPosition);
             targetStateAvailable = targetLinearVelocityResolved

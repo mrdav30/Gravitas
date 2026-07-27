@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using SwiftCollections;
@@ -23,9 +24,15 @@ internal sealed partial class ConvexSweepQueryWorker
 {
     private const int MaxGjkIterations = 32;
     private const int MaxConservativeAdvancementIterations = 32;
-    private static readonly Fixed64 DistanceTolerance = Fixed64.FromFraction(1, 1_048_576);
+    private static readonly Fixed64 DistanceTolerance =
+        Fixed64.FromFraction(1, 1_048_576);
     internal static readonly Fixed64 ContactTolerance = Fixed64.FromFraction(1, 4096);
     private static readonly SweepTriangleCandidateComparer SweepTriangleComparer = new();
+    private static readonly FixedPointAnchor ZeroAnchor =
+        new(
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            Vector3d.Zero);
 
     private readonly SupportPoint[] _simplex = new SupportPoint[4];
     private readonly SwiftList<int> _triangleCandidates = new(16);
@@ -36,9 +43,11 @@ internal sealed partial class ConvexSweepQueryWorker
     private ConvexShape _sourceShape;
     private bool _hasSource;
     private Vector3d _displacement;
-    private Vector3d _direction;
+    private Vector3d _outputDirection;
     private Vector3d _sweptSourceBoundsMin;
     private Vector3d _sweptSourceBoundsMax;
+    private FixedPointAnchor _displacementAnchor;
+    private FixedSegment _chord;
     private Fixed64 _length;
 
     internal int LastMeshTriangleCandidateCount { get; private set; }
@@ -78,6 +87,19 @@ internal sealed partial class ConvexSweepQueryWorker
         Prepare(ConvexShape.CreateCircleSlab(center, radius, halfHeight), displacement);
     }
 
+    internal void PrepareSphereSource(
+        Vector3d center,
+        Fixed64 radius,
+        Vector3d displacement)
+    {
+        SwiftThrowHelper.ThrowIfArgument(
+            radius < Fixed64.Zero,
+            nameof(radius),
+            "Sphere sweep radius cannot be negative.");
+        _source = null;
+        Prepare(ConvexShape.CreateSphere(center, radius), displacement);
+    }
+
     public bool TrySweepPreparedSource(LSCollider target, out Physics3DHit hit)
     {
         LastMeshTriangleCandidateCount = 0;
@@ -92,7 +114,11 @@ internal sealed partial class ConvexSweepQueryWorker
         if (_source is LSCompoundCollider compound)
             return TrySweepCompoundSource(compound, target, out hit);
 
-        return TrySweepSourceShape(_sourceShape, target, out hit);
+        return TrySweepSourceShape(
+            _sourceShape,
+            target,
+            out hit,
+            out _);
     }
 
     private void Prepare(LSCollider source, Vector3d displacement)
@@ -105,23 +131,27 @@ internal sealed partial class ConvexSweepQueryWorker
     {
         _sourceShape = sourceShape;
         _displacement = displacement;
-        _hasSource = Vector3d.TryGetMagnitude(displacement, out _length);
+        _displacementAnchor = new FixedPointAnchor(
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            displacement);
+        _chord = new FixedSegment(Vector3d.Zero, displacement);
+        _hasSource =
+            Vector3d.TryGetMagnitude(displacement, out _length)
+            && sourceShape.CanTranslateCenter(displacement);
         if (!_hasSource)
         {
-            _direction = Vector3d.Zero;
+            _outputDirection = Vector3d.Zero;
             return;
         }
 
-        _direction = _length <= Fixed64.Epsilon ? Vector3d.Zero : displacement.Normalized;
+        _outputDirection =
+            _length <= Fixed64.Epsilon
+                ? Vector3d.Zero
+                : displacement.Normalized;
         sourceShape.GetSourceBounds(out Vector3d sourceMin, out Vector3d sourceMax);
-        if (!Vector3d.TryAdd(sourceMin, displacement, out _)
-            || !Vector3d.TryAdd(sourceMax, displacement, out _))
-        {
-            _hasSource = false;
-            _direction = Vector3d.Zero;
-            return;
-        }
-
+        // Bounds are broad-phase clips, not canonical pose coordinates. A
+        // valid center may have support beyond a scalar face.
         SweepBoundsUtility.CreateSweptBounds(
             sourceMin,
             sourceMax,
@@ -135,20 +165,29 @@ internal sealed partial class ConvexSweepQueryWorker
     {
         hit = default;
         bool found = false;
-        Fixed64 closestDistance = Fixed64.MaxValue;
+        Fixed64 closestNumerator = Fixed64.MaxValue;
         int closestPartIndex = int.MaxValue;
 
         for (int i = 0; i < source.PartCount; i++)
         {
             LSCollider part = source.GetPartCollider(i);
-            if (!TrySweepSourceShape(CreateColliderShape(part, Vector3d.Zero), target, out Physics3DHit candidate)
-                || !ComesBeforeReducerCandidate(candidate, i, found, closestDistance, closestPartIndex))
+            if (!TrySweepSourceShape(
+                    CreateColliderShape(part, Vector3d.Zero),
+                    target,
+                    out Physics3DHit candidate,
+                    out Fixed64 candidateNumerator)
+                || !ComesBeforeReducerCandidate(
+                    candidateNumerator,
+                    i,
+                    found,
+                    closestNumerator,
+                    closestPartIndex))
             {
                 continue;
             }
 
             hit = candidate;
-            closestDistance = candidate.Distance;
+            closestNumerator = candidateNumerator;
             closestPartIndex = i;
             found = true;
         }
@@ -156,40 +195,77 @@ internal sealed partial class ConvexSweepQueryWorker
         return found;
     }
 
-    private bool TrySweepSourceShape(ConvexShape sourceShape, LSCollider target, out Physics3DHit hit)
+    private bool TrySweepSourceShape(
+        ConvexShape sourceShape,
+        LSCollider target,
+        out Physics3DHit hit,
+        out Fixed64 hitNumerator)
     {
         hit = default;
+        hitNumerator = default;
 
         if (!CanSweptSourceShapeReachTarget(sourceShape, target))
             return false;
 
         if (target is LSCompoundCollider compound)
-            return TrySweepTargetCompound(sourceShape, compound, out hit);
+        {
+            return TrySweepTargetCompound(
+                sourceShape,
+                compound,
+                out hit,
+                out hitNumerator);
+        }
 
         if (target is LSMeshCollider mesh && mesh.Mode == MeshColliderMode.Concave)
-            return TrySweepConcaveMeshTarget(sourceShape, mesh, out hit);
+        {
+            return TrySweepConcaveMeshTarget(
+                sourceShape,
+                mesh,
+                out hit,
+                out hitNumerator);
+        }
 
-        return TrySweepConvexTarget(sourceShape, CreateColliderShape(target, Vector3d.Zero), target, out hit);
+        return TrySweepConvexTarget(
+            sourceShape,
+            CreateColliderShape(target, Vector3d.Zero),
+            target,
+            out hit,
+            out hitNumerator);
     }
 
-    private bool TrySweepTargetCompound(ConvexShape sourceShape, LSCompoundCollider compound, out Physics3DHit hit)
+    private bool TrySweepTargetCompound(
+        ConvexShape sourceShape,
+        LSCompoundCollider compound,
+        out Physics3DHit hit,
+        out Fixed64 hitNumerator)
     {
         hit = default;
+        hitNumerator = default;
         bool found = false;
-        Fixed64 closestDistance = Fixed64.MaxValue;
+        Fixed64 closestNumerator = Fixed64.MaxValue;
         int closestPartIndex = int.MaxValue;
 
         for (int i = 0; i < compound.PartCount; i++)
         {
             LSCollider part = compound.GetPartCollider(i);
-            if (!TrySweepSourceShape(sourceShape, part, out Physics3DHit partHit)
-                || !ComesBeforeReducerCandidate(partHit, i, found, closestDistance, closestPartIndex))
+            if (!TrySweepSourceShape(
+                    sourceShape,
+                    part,
+                    out Physics3DHit partHit,
+                    out Fixed64 partNumerator)
+                || !ComesBeforeReducerCandidate(
+                    partNumerator,
+                    i,
+                    found,
+                    closestNumerator,
+                    closestPartIndex))
             {
                 continue;
             }
 
-            hit = new Physics3DHit(compound, partHit.Point, partHit.Normal, partHit.Distance, partHit.Direction);
-            closestDistance = partHit.Distance;
+            hit = new Physics3DHit(compound, partHit.Anchor, partHit.Normal, partHit.Distance, partHit.Direction);
+            hitNumerator = partNumerator;
+            closestNumerator = partNumerator;
             closestPartIndex = i;
             found = true;
         }
@@ -197,15 +273,30 @@ internal sealed partial class ConvexSweepQueryWorker
         return found;
     }
 
-    private bool TrySweepConcaveMeshTarget(ConvexShape sourceShape, LSMeshCollider mesh, out Physics3DHit hit)
+    private bool TrySweepConcaveMeshTarget(
+        ConvexShape sourceShape,
+        LSMeshCollider mesh,
+        out Physics3DHit hit,
+        out Fixed64 hitNumerator)
     {
         hit = default;
+        hitNumerator = default;
         bool found = false;
-        Fixed64 closestDistance = Fixed64.MaxValue;
+        Fixed64 closestNumerator = Fixed64.MaxValue;
         int closestTriangleIndex = int.MaxValue;
 
-        CreateSweptSourceBounds(sourceShape, out Vector3d min, out Vector3d max);
-        mesh.GetTrianglesInBounds(new FixedBoundVolume(min, max), _triangleCandidates);
+        if (!TryCreateSweptSourceBoundsInMeshFrame(
+                sourceShape,
+                mesh,
+                out Vector3d min,
+                out Vector3d max))
+        {
+            return false;
+        }
+
+        mesh.Mesh.GetTrianglesInLocalBounds(
+            new FixedBoundVolume(min, max),
+            _triangleCandidates);
         LastMeshTriangleCandidateCount += _triangleCandidates.Count;
         BuildOrderedSweepTriangleCandidates(sourceShape, mesh);
 
@@ -213,24 +304,34 @@ internal sealed partial class ConvexSweepQueryWorker
         {
             SweepTriangleCandidate sweepCandidate = _sweepTriangleCandidates[i];
             if (RemainingSweepTrianglesCannotBeat(
-                sweepCandidate,
+                sweepCandidate.LowerBoundNumerator,
                 found,
-                closestDistance,
-                closestTriangleIndex))
+                closestNumerator))
             {
                 break;
             }
 
             int triangleIndex = sweepCandidate.TriangleIndex;
             ConvexShape triangle = CreateTriangleShape(mesh, triangleIndex);
-            if (!TrySweepConvexTarget(sourceShape, triangle, mesh, out Physics3DHit candidate)
-                || !ComesBeforeReducerCandidate(candidate, triangleIndex, found, closestDistance, closestTriangleIndex))
+            if (!TrySweepConvexTarget(
+                    sourceShape,
+                    triangle,
+                    mesh,
+                    out Physics3DHit candidate,
+                    out Fixed64 candidateNumerator)
+                || !ComesBeforeReducerCandidate(
+                    candidateNumerator,
+                    triangleIndex,
+                    found,
+                    closestNumerator,
+                    closestTriangleIndex))
             {
                 continue;
             }
 
             hit = candidate;
-            closestDistance = candidate.Distance;
+            hitNumerator = candidateNumerator;
+            closestNumerator = candidateNumerator;
             closestTriangleIndex = triangleIndex;
             found = true;
         }
@@ -245,68 +346,166 @@ internal sealed partial class ConvexSweepQueryWorker
         {
             int triangleIndex = _triangleCandidates[i];
             ConvexShape triangle = CreateTriangleShape(mesh, triangleIndex);
-            Fixed64 lowerBound = ComputeSweepLowerBound(sourceShape, triangle);
-            if (lowerBound <= _length + ContactTolerance)
-                _sweepTriangleCandidates.Add(new SweepTriangleCandidate(triangleIndex, lowerBound));
+            if (TryComputeSweepLowerBoundNumerator(
+                    sourceShape,
+                    triangle,
+                    out Fixed64 lowerBoundNumerator))
+            {
+                _sweepTriangleCandidates.Add(
+                    new SweepTriangleCandidate(
+                        triangleIndex,
+                        lowerBoundNumerator));
+            }
         }
 
         _sweepTriangleCandidates.SortInPlace(SweepTriangleComparer);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private Fixed64 ComputeSweepLowerBound(ConvexShape sourceShape, ConvexShape targetShape)
+    private bool TryComputeSweepLowerBoundNumerator(
+        ConvexShape sourceShape,
+        ConvexShape targetShape,
+        out Fixed64 lowerBoundNumerator)
     {
-        Vector3d sourceFront = sourceShape.Support(_direction);
-        Vector3d targetBack = targetShape.Support(-_direction);
-        Fixed64 projectedSeparation = Vector3d.ProjectNonNegativeDifference(
-            targetBack,
-            sourceFront,
-            _direction);
-        return FixedMath.Max(projectedSeparation - ContactTolerance, Fixed64.Zero);
+        sourceShape.GetSourceBounds(
+            out Vector3d sourceMin,
+            out Vector3d sourceMax);
+        targetShape.GetBounds(
+            out Vector3d targetMin,
+            out Vector3d targetMax);
+
+        Vector3d padding = Vector3d.One * ContactTolerance;
+        sourceMin -= padding;
+        sourceMax += padding;
+        lowerBoundNumerator = Fixed64.Zero;
+        return IncludeAxisEntryNumerator(
+                sourceMin.X,
+                sourceMax.X,
+                targetMin.X,
+                targetMax.X,
+                _displacement.X,
+                ref lowerBoundNumerator)
+            && IncludeAxisEntryNumerator(
+                sourceMin.Y,
+                sourceMax.Y,
+                targetMin.Y,
+                targetMax.Y,
+                _displacement.Y,
+                ref lowerBoundNumerator)
+            && IncludeAxisEntryNumerator(
+                sourceMin.Z,
+                sourceMax.Z,
+                targetMin.Z,
+                targetMax.Z,
+                _displacement.Z,
+                ref lowerBoundNumerator);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool RemainingSweepTrianglesCannotBeat(
-        SweepTriangleCandidate candidate,
+    private bool IncludeAxisEntryNumerator(
+        Fixed64 sourceMin,
+        Fixed64 sourceMax,
+        Fixed64 targetMin,
+        Fixed64 targetMax,
+        Fixed64 displacement,
+        ref Fixed64 entryNumerator)
+    {
+        if (sourceMax >= targetMin
+            && sourceMin <= targetMax)
+        {
+            return true;
+        }
+
+        Fixed64 gap;
+        Fixed64 span;
+        if (sourceMax < targetMin
+            && displacement > Fixed64.Zero)
+        {
+            // Saturation is safe here: an unrepresentable positive gap is
+            // necessarily farther than the representable sweep span.
+            gap = targetMin - sourceMax;
+            span = displacement;
+        }
+        else if (sourceMin > targetMax
+            && displacement < Fixed64.Zero)
+        {
+            gap = sourceMin - targetMax;
+            // Prepare admits only representable chord magnitudes, so no
+            // component can be Fixed64.MinValue here.
+            span = -displacement;
+        }
+        else
+        {
+            return false;
+        }
+
+        if (gap > span)
+            return false;
+
+        // With 0 <= gap <= span, the fused result is bounded by the already
+        // representable chord length.
+        _ = Fixed64.TryMultiplyDivide(
+            _length,
+            gap,
+            span,
+            out Fixed64 axisNumerator);
+
+        // Fused conversion keeps u = numerator / chord length exact until the
+        // final Q32.32 rounding. One raw unit makes that rounded result a
+        // conservative lower bound without moving an underflowed zero.
+        axisNumerator = FixedMath.Max(
+            Fixed64.Zero,
+            axisNumerator - Fixed64.Epsilon);
+
+        if (axisNumerator > entryNumerator)
+            entryNumerator = axisNumerator;
+        return true;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static bool RemainingSweepTrianglesCannotBeat(
+        Fixed64 candidateLowerBoundNumerator,
         bool found,
-        Fixed64 closestDistance,
-        int closestTriangleIndex)
+        Fixed64 closestNumerator)
     {
         if (!found)
             return false;
 
-        if (candidate.LowerBound > closestDistance + DistanceTolerance)
-            return true;
-
-        // Conservative advancement accepts contacts inside ContactTolerance;
-        // once the best lower-index triangle is already at that recognized TOI,
-        // later same-bound triangles cannot win the deterministic tie-break.
-        return closestTriangleIndex < candidate.TriangleIndex
-            && closestDistance <= candidate.LowerBound + ContactTolerance;
+        return candidateLowerBoundNumerator
+            > closestNumerator + Fixed64.Epsilon;
     }
 
     private bool TrySweepConvexTarget(
         ConvexShape sourceShape,
         ConvexShape targetShape,
         LSCollider targetCollider,
-        out Physics3DHit hit)
+        out Physics3DHit hit,
+        out Fixed64 hitNumerator)
     {
         hit = default;
-        Fixed64 travelDistance = Fixed64.Zero;
+        hitNumerator = default;
+        // u is retained as travelNumerator / _length. Keeping the common
+        // denominator exact preserves small chord components and physical
+        // distance resolution without exposing wide arithmetic.
+        Fixed64 travelNumerator = Fixed64.Zero;
         Vector3d normal = Vector3d.Zero;
         GjkResult result = default;
 
         for (int i = 0; i < _maxConservativeAdvancementIterations; i++)
         {
-            ConvexShape movedSource = sourceShape.WithSourceOffset(_direction * travelDistance);
+            ConvexShape movedSource =
+                sourceShape.WithSourceOffset(
+                    GetChordOffset(travelNumerator));
             result = ComputeDistance(movedSource, targetShape);
             if (result.Intersects || result.Distance <= ContactTolerance)
             {
-                Vector3d point = ResolveHitPoint(
+                ContactAnchor anchor = ResolveHitAnchor(
                     targetShape,
                     targetCollider,
                     movedSource,
                     result,
+                    out Vector3d point,
+                    out bool hasMaterializedPoint,
                     out bool hasRefinedSurfaceNormal);
                 Vector3d hitNormal = ResolveHitNormal(
                     targetShape,
@@ -314,31 +513,57 @@ internal sealed partial class ConvexSweepQueryWorker
                     point,
                     result.Normal,
                     normal,
-                    hasRefinedSurfaceNormal);
+                    hasRefinedSurfaceNormal,
+                    hasMaterializedPoint);
 
-                hit = new Physics3DHit(targetCollider, point, hitNormal, travelDistance, _direction);
+                hit = new Physics3DHit(
+                    targetCollider,
+                    anchor,
+                    hitNormal,
+                    travelNumerator,
+                    _outputDirection);
+                hitNumerator = travelNumerator;
                 return true;
             }
 
             normal = result.Normal;
-            Fixed64 closingSpeed = -Vector3d.Dot(_direction, normal);
-            if (closingSpeed <= Fixed64.Epsilon)
-                return false;
-
-            Fixed64 stepDistance = result.Distance / closingSpeed;
-            Fixed64 nextTravelDistance = travelDistance + stepDistance;
-            if (nextTravelDistance > _length)
+            // Projecting a representable chord onto a unit normal is bounded
+            // by the admitted chord length.
+            _ = _displacementAnchor.TryGetProjectedOffsetFrom(
+                ZeroAnchor,
+                -normal,
+                out Fixed64 closingPerFraction);
+            if (closingPerFraction <= Fixed64.Epsilon)
+            {
+                return TryResolveEndpointBracket(
+                    sourceShape,
+                    targetShape,
+                    targetCollider,
+                    travelNumerator,
+                    out hit,
+                    out hitNumerator);
+            }
+            bool hasStep = Fixed64.TryMultiplyDivide(
+                result.Distance,
+                _length,
+                closingPerFraction,
+                out Fixed64 stepNumerator);
+            Fixed64 nextTravelNumerator =
+                travelNumerator + stepNumerator;
+            if (!hasStep || nextTravelNumerator > _length)
             {
                 ConvexShape endpointSource = sourceShape.WithSourceOffset(_displacement);
                 GjkResult endpointResult = ComputeDistance(endpointSource, targetShape);
                 if (!endpointResult.Intersects && endpointResult.Distance > ContactTolerance)
                     return false;
 
-                Vector3d point = ResolveHitPoint(
+                ContactAnchor anchor = ResolveHitAnchor(
                     targetShape,
                     targetCollider,
                     endpointSource,
                     endpointResult,
+                    out Vector3d point,
+                    out bool hasMaterializedPoint,
                     out bool hasRefinedSurfaceNormal);
                 Vector3d hitNormal = ResolveHitNormal(
                     targetShape,
@@ -346,48 +571,168 @@ internal sealed partial class ConvexSweepQueryWorker
                     point,
                     endpointResult.Normal,
                     normal,
-                    hasRefinedSurfaceNormal);
-                hit = new Physics3DHit(targetCollider, point, hitNormal, _length, _direction);
+                    hasRefinedSurfaceNormal,
+                    hasMaterializedPoint);
+                hit = new Physics3DHit(
+                    targetCollider,
+                    anchor,
+                    hitNormal,
+                    _length,
+                    _outputDirection);
+                hitNumerator = _length;
                 return true;
             }
 
-            travelDistance = nextTravelDistance;
+            travelNumerator = nextTravelNumerator;
         }
 
-        return false;
+        return TryResolveEndpointBracket(
+            sourceShape,
+            targetShape,
+            targetCollider,
+            travelNumerator,
+            out hit,
+            out hitNumerator);
     }
 
-    private Vector3d ResolveHitPoint(
+    private bool TryResolveEndpointBracket(
+        ConvexShape sourceShape,
+        ConvexShape targetShape,
+        LSCollider targetCollider,
+        Fixed64 lowerNumerator,
+        out Physics3DHit hit,
+        out Fixed64 hitNumerator)
+    {
+        hit = default;
+        hitNumerator = default;
+        Fixed64 upperNumerator = _length;
+        ConvexShape upperSource =
+            sourceShape.WithSourceOffset(_displacement);
+        GjkResult upperResult =
+            ComputeDistance(upperSource, targetShape);
+        if (!upperResult.Intersects
+            && upperResult.Distance > ContactTolerance)
+        {
+            return false;
+        }
+
+        for (int iteration = 0;
+            iteration < _maxConservativeAdvancementIterations
+            && upperNumerator - lowerNumerator > DistanceTolerance;
+            iteration++)
+        {
+            Fixed64 middleNumerator =
+                FixedMath.Midpoint(
+                    lowerNumerator,
+                    upperNumerator);
+            ConvexShape middleSource =
+                sourceShape.WithSourceOffset(
+                    GetChordOffset(middleNumerator));
+            GjkResult middleResult =
+                ComputeDistance(middleSource, targetShape);
+            if (middleResult.Intersects
+                || middleResult.Distance <= ContactTolerance)
+            {
+                upperNumerator = middleNumerator;
+                upperSource = middleSource;
+                upperResult = middleResult;
+            }
+            else
+            {
+                lowerNumerator = middleNumerator;
+            }
+        }
+
+        ContactAnchor anchor = ResolveHitAnchor(
+            targetShape,
+            targetCollider,
+            upperSource,
+            upperResult,
+            out Vector3d point,
+            out bool hasMaterializedPoint,
+            out bool hasRefinedSurfaceNormal);
+        Vector3d hitNormal = ResolveHitNormal(
+            targetShape,
+            targetCollider,
+            point,
+            upperResult.Normal,
+            Vector3d.Zero,
+            hasRefinedSurfaceNormal,
+            hasMaterializedPoint);
+        hit = new Physics3DHit(
+            targetCollider,
+            anchor,
+            hitNormal,
+            upperNumerator,
+            _outputDirection);
+        hitNumerator = upperNumerator;
+        return true;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private Vector3d GetChordOffset(Fixed64 numerator) =>
+        _chord.GetPointAtDistance(
+            numerator,
+            _length);
+
+    private ContactAnchor ResolveHitAnchor(
         ConvexShape targetShape,
         LSCollider targetCollider,
         ConvexShape movedSource,
         GjkResult result,
+        out Vector3d point,
+        out bool hasMaterializedPoint,
         out bool hasRefinedSurfaceNormal)
     {
+        hasMaterializedPoint = true;
         hasRefinedSurfaceNormal = false;
         if (targetCollider is LSSphereCollider
-            && movedSource.TryGetClosestPointOnSurface(targetCollider.Center, out Vector3d sourcePoint))
+            && movedSource.TryGetClosestPointOnSurface(
+                targetCollider.Center,
+                out Vector3d sourcePoint)
+            && Vector3d.TrySubtract(
+                sourcePoint,
+                targetCollider.Center,
+                out Vector3d centerToSource)
+            && centerToSource.MagnitudeSquared > Fixed64.Epsilon)
         {
             // A sphere's closest pair is defined by its center and the closest
             // source feature. Refining that feature removes arbitrary support
             // tie bias without changing the conservative TOI.
-            hasRefinedSurfaceNormal = true;
-            return targetCollider.ClosestPointOnSurface(sourcePoint);
+            FixedPointAnchor sphereAnchor =
+                ConvexColliderSupport.GetSupportAnchor(
+                    targetCollider,
+                    centerToSource,
+                    Vector3d.Zero);
+            hasMaterializedPoint = sphereAnchor.TryGetPoint(out point);
+            hasRefinedSurfaceNormal = hasMaterializedPoint;
+            return new ContactAnchor(sphereAnchor);
         }
 
-        if ((movedSource.Center - targetCollider.Center).MagnitudeSquared <= Fixed64.Epsilon)
+        FixedPointAnchor movedSourceCenter = movedSource.GetCenterAnchor();
+        FixedPointAnchor targetCenter = targetShape.GetCenterAnchor();
+        if (movedSourceCenter.TryGetOffsetFrom(
+                targetCenter,
+                out Vector3d centerDifference)
+            && centerDifference.MagnitudeSquared <= Fixed64.Epsilon)
         {
-            Vector3d fallbackDirection = -_direction;
-            Vector3d surfaceProbe = targetCollider.Center + fallbackDirection * targetCollider.ScaledRadius;
-            return targetCollider.ClosestPointOnSurface(surfaceProbe);
+            FixedPointAnchor fallbackAnchor =
+                targetShape.GetFallbackSurfaceAnchor(-_displacement);
+            hasMaterializedPoint = fallbackAnchor.TryGetPoint(out point);
+            return new ContactAnchor(fallbackAnchor);
         }
 
         // GJK's target witness identifies the feature that stopped the sweep.
         // Center-to-center projection can select an unrelated feature for long,
         // offset shapes and therefore produce a non-physical response normal.
-        return targetShape.IsTriangle
-            ? result.PointB
-            : targetCollider.ClosestPointOnSurface(result.PointB);
+        if (!result.PointB.TryGetPoint(out point))
+        {
+            point = default;
+            hasMaterializedPoint = false;
+            return new ContactAnchor(result.PointB);
+        }
+
+        return new ContactAnchor(result.PointB);
     }
 
     private Vector3d ResolveHitNormal(
@@ -396,417 +741,21 @@ internal sealed partial class ConvexSweepQueryWorker
         Vector3d point,
         Vector3d resultNormal,
         Vector3d fallbackNormal,
-        bool hasRefinedSurfaceNormal)
+        bool hasRefinedSurfaceNormal,
+        bool hasMaterializedPoint)
     {
-        targetShape.TryGetPlanarSurfaceNormal(point, out Vector3d planarNormal);
+        Vector3d planarNormal = Vector3d.Zero;
+        if (hasMaterializedPoint)
+            targetShape.TryGetPlanarSurfaceNormal(point, out planarNormal);
         return ConvexSweepHitPolicy.ResolveHitNormal(
             targetCollider,
             point,
             resultNormal,
             fallbackNormal,
-            _direction,
+            _displacement,
             planarNormal,
-            hasRefinedSurfaceNormal);
-    }
-
-    private GjkResult ComputeDistance(ConvexShape sourceShape, ConvexShape targetShape)
-    {
-        sourceShape.GetBounds(out Vector3d sourceMin, out Vector3d sourceMax);
-        targetShape.GetBounds(out Vector3d targetMin, out Vector3d targetMax);
-        int workingShift = GjkSimplexScale.SelectTwoTermShift(sourceMin, sourceMax, targetMin, targetMax);
-        Fixed64 workingScale = GjkSimplexScale.GetCoordinateScale(workingShift);
-        Fixed64 workingDistanceTolerance = DistanceTolerance * workingScale;
-        int simplexCount = 0;
-        Vector3d direction = GjkSimplexScale.CreateWorkingDifference(
-            targetShape.Center,
-            sourceShape.Center,
-            workingShift);
-        if (direction == Vector3d.Zero)
-        {
-            if (sourceShape.ContainsCenter && targetShape.ContainsCenter)
-                return GjkResult.CreateIntersection(sourceShape.Center, targetShape.Center);
-
-            direction = Vector3d.Right;
-        }
-
-        bool hasPreviousDistance = false;
-        Fixed64 previousDistance = Fixed64.Zero;
-        ClosestSimplexResult closest = default;
-        bool distanceIsRepresentable = false;
-        Fixed64 workingDistance = Fixed64.MaxValue;
-
-        for (int i = 0; i < MaxGjkIterations; i++)
-        {
-            SupportPoint support = CreateSupportPoint(sourceShape, targetShape, direction, workingShift);
-            if (ContainsSupportPoint(_simplex, simplexCount, support.Point))
-                break;
-
-            ClosestSimplexResult previousClosest = closest;
-            _simplex[simplexCount++] = support;
-            closest = SolveClosestSimplex(_simplex, ref simplexCount, workingScale);
-            distanceIsRepresentable = Vector3d.TryGetMagnitude(closest.Point, out workingDistance);
-            if (closest.Intersects)
-            {
-                // Tetrahedron entry follows a valid one-to-three point simplex.
-                // Preserve that same-pose closest pair as the deterministic
-                // surface witness for the intersection result.
-                return GjkResult.CreateIntersection(previousClosest.PointA, previousClosest.PointB);
-            }
-
-            if (distanceIsRepresentable && workingDistance <= workingDistanceTolerance)
-                return GjkResult.CreateIntersection(closest.PointA, closest.PointB);
-
-            if (hasPreviousDistance
-                && distanceIsRepresentable
-                && previousDistance - workingDistance <= Fixed64.Epsilon)
-            {
-                break;
-            }
-
-            hasPreviousDistance = distanceIsRepresentable;
-            previousDistance = workingDistance;
-            direction = -closest.Point;
-        }
-
-        Fixed64 distance = GjkSimplexScale.RestoreDistance(workingDistance, workingShift);
-        Vector3d normal = closest.Point.Normalized;
-        return new GjkResult(false, distance, closest.PointA, closest.PointB, normal);
-    }
-
-    private static SupportPoint CreateSupportPoint(
-        ConvexShape sourceShape,
-        ConvexShape targetShape,
-        Vector3d direction,
-        int workingShift)
-    {
-        Vector3d supportDirection = direction.Normalized;
-        Vector3d pointA = sourceShape.Support(supportDirection);
-        Vector3d pointB = targetShape.Support(-supportDirection);
-        return new SupportPoint(pointA, pointB, workingShift);
-    }
-
-    private static ClosestSimplexResult SolveClosestSimplex(
-        SupportPoint[] simplex,
-        ref int count,
-        Fixed64 workingScale)
-    {
-        if (count == 1)
-            return ClosestSimplexResult.FromWeights(simplex, 1, Fixed64.One, Fixed64.Zero, Fixed64.Zero, Fixed64.Zero);
-
-        if (count == 2)
-            return ReduceSegment(simplex, ref count, workingScale);
-
-        if (count == 3)
-            return ReduceTriangle(simplex, ref count);
-
-        return ReduceTetrahedron(simplex, ref count, workingScale);
-    }
-
-    private static ClosestSimplexResult ReduceSegment(
-        SupportPoint[] simplex,
-        ref int count,
-        Fixed64 workingScale)
-    {
-        SupportPoint a = simplex[0];
-        SupportPoint b = simplex[1];
-        Span<Vector3d> scaled = stackalloc Vector3d[2];
-        scaled[0] = a.Point;
-        scaled[1] = b.Point;
-        Fixed64 productScale = GjkSimplexScale.ScaleForProducts(scaled);
-        Vector3d scaledA = scaled[0];
-        Vector3d ab = scaled[1] - scaledA;
-        Fixed64 denominator = ab.MagnitudeSquared;
-        Fixed64 workingScaleSqr = workingScale * workingScale;
-        Fixed64 productScaleSqr = productScale * productScale;
-        Fixed64 denominatorTolerance = Fixed64.Epsilon * workingScaleSqr * productScaleSqr;
-        Fixed64 t = denominator <= denominatorTolerance
-            ? Fixed64.Zero
-            : FixedMath.Clamp(-Vector3d.Dot(scaledA, ab) / denominator, Fixed64.Zero, Fixed64.One);
-
-        if (t <= Fixed64.Epsilon)
-        {
-            simplex[0] = a;
-            count = 1;
-            return ClosestSimplexResult.FromWeights(simplex, count, Fixed64.One, Fixed64.Zero, Fixed64.Zero, Fixed64.Zero);
-        }
-
-        if (t >= Fixed64.One - Fixed64.Epsilon)
-        {
-            simplex[0] = b;
-            count = 1;
-            return ClosestSimplexResult.FromWeights(simplex, count, Fixed64.One, Fixed64.Zero, Fixed64.Zero, Fixed64.Zero);
-        }
-
-        simplex[0] = a;
-        simplex[1] = b;
-        count = 2;
-        return ClosestSimplexResult.FromWeights(simplex, count, Fixed64.One - t, t, Fixed64.Zero, Fixed64.Zero);
-    }
-
-    private static ClosestSimplexResult ReduceTriangle(SupportPoint[] simplex, ref int count)
-    {
-        TriangleWeights weights = ClosestPointOnTriangleToOrigin(simplex[0].Point, simplex[1].Point, simplex[2].Point);
-        return ReduceByWeights(simplex, ref count, weights.A, weights.B, weights.C, Fixed64.Zero);
-    }
-
-    private static ClosestSimplexResult ReduceTetrahedron(
-        SupportPoint[] simplex,
-        ref int count,
-        Fixed64 workingScale)
-    {
-        if (IsOriginInsideTetrahedron(
-                simplex[0].Point,
-                simplex[1].Point,
-                simplex[2].Point,
-                simplex[3].Point,
-                workingScale))
-        {
-            count = 4;
-            return ClosestSimplexResult.Intersection;
-        }
-
-        ClosestSimplexResult best = default;
-        bool hasBest = false;
-        Span<int> bestIndices = stackalloc int[3];
-        Span<Fixed64> bestWeights = stackalloc Fixed64[3];
-        Span<int> face = stackalloc int[3];
-        Span<Fixed64> weights = stackalloc Fixed64[3];
-
-        EvaluateFace(simplex, 0, 1, 2, ref best, ref hasBest, bestIndices, bestWeights, face, weights);
-        EvaluateFace(simplex, 0, 3, 1, ref best, ref hasBest, bestIndices, bestWeights, face, weights);
-        EvaluateFace(simplex, 0, 2, 3, ref best, ref hasBest, bestIndices, bestWeights, face, weights);
-        EvaluateFace(simplex, 1, 3, 2, ref best, ref hasBest, bestIndices, bestWeights, face, weights);
-
-        SupportPoint first = simplex[bestIndices[0]];
-        SupportPoint second = simplex[bestIndices[1]];
-        SupportPoint third = simplex[bestIndices[2]];
-        simplex[0] = first;
-        simplex[1] = second;
-        simplex[2] = third;
-        count = 3;
-        return ClosestSimplexResult.FromWeights(simplex, count, bestWeights[0], bestWeights[1], bestWeights[2], Fixed64.Zero);
-    }
-
-    private static void EvaluateFace(
-        SupportPoint[] simplex,
-        int first,
-        int second,
-        int third,
-        ref ClosestSimplexResult best,
-        ref bool hasBest,
-        Span<int> bestIndices,
-        Span<Fixed64> bestWeights,
-        Span<int> face,
-        Span<Fixed64> weights)
-    {
-        face[0] = first;
-        face[1] = second;
-        face[2] = third;
-        TriangleWeights triangleWeights = ClosestPointOnTriangleToOrigin(
-            simplex[first].Point,
-            simplex[second].Point,
-            simplex[third].Point);
-        weights[0] = triangleWeights.A;
-        weights[1] = triangleWeights.B;
-        weights[2] = triangleWeights.C;
-        ClosestSimplexResult candidate = ClosestSimplexResult.FromIndexedWeights(simplex, face, weights);
-        if (hasBest && !IsCloser(
-                candidate.DistanceSqr,
-                candidate.Point,
-                best.DistanceSqr,
-                best.Point))
-            return;
-
-        best = candidate;
-        hasBest = true;
-        bestIndices[0] = first;
-        bestIndices[1] = second;
-        bestIndices[2] = third;
-        bestWeights[0] = weights[0];
-        bestWeights[1] = weights[1];
-        bestWeights[2] = weights[2];
-    }
-
-    internal static bool IsCloser(
-        Fixed64 candidateDistanceSqr,
-        Vector3d candidatePoint,
-        Fixed64 bestDistanceSqr,
-        Vector3d bestPoint)
-    {
-        if (candidateDistanceSqr != bestDistanceSqr || candidateDistanceSqr != Fixed64.MaxValue)
-            return candidateDistanceSqr < bestDistanceSqr;
-
-        return Vector3d.CompareMagnitudeSquared(candidatePoint, bestPoint) < 0;
-    }
-
-    private static ClosestSimplexResult ReduceByWeights(
-        SupportPoint[] simplex,
-        ref int count,
-        Fixed64 firstWeight,
-        Fixed64 secondWeight,
-        Fixed64 thirdWeight,
-        Fixed64 fourthWeight)
-    {
-        Span<SupportPoint> reduced = stackalloc SupportPoint[4];
-        Span<Fixed64> weights = stackalloc Fixed64[4];
-        int reducedCount = 0;
-        AddWeightedPoint(simplex[0], firstWeight, reduced, weights, ref reducedCount);
-        AddWeightedPoint(simplex[1], secondWeight, reduced, weights, ref reducedCount);
-        AddWeightedPoint(simplex[2], thirdWeight, reduced, weights, ref reducedCount);
-        AddWeightedPoint(simplex[3], fourthWeight, reduced, weights, ref reducedCount);
-
-        for (int i = 0; i < reducedCount; i++)
-            simplex[i] = reduced[i];
-
-        count = reducedCount;
-        return ClosestSimplexResult.FromSpanWeights(reduced, weights, reducedCount);
-    }
-
-    private static void AddWeightedPoint(
-        SupportPoint point,
-        Fixed64 weight,
-        Span<SupportPoint> reduced,
-        Span<Fixed64> weights,
-        ref int count)
-    {
-        if (weight <= Fixed64.Epsilon)
-            return;
-
-        reduced[count] = point;
-        weights[count] = weight;
-        count++;
-    }
-
-    /// <summary>
-    /// Returns barycentric weights for the point on a triangle closest to the origin.
-    /// </summary>
-    internal static TriangleWeights ClosestPointOnTriangleToOrigin(Vector3d a, Vector3d b, Vector3d c)
-    {
-        Span<Vector3d> scaled = stackalloc Vector3d[3];
-        scaled[0] = a;
-        scaled[1] = b;
-        scaled[2] = c;
-        GjkSimplexScale.ScaleForProducts(scaled);
-        a = scaled[0];
-        b = scaled[1];
-        c = scaled[2];
-
-        Vector3d ab = b - a;
-        Vector3d ac = c - a;
-        Vector3d ap = -a;
-        Fixed64 d1 = Vector3d.Dot(ab, ap);
-        Fixed64 d2 = Vector3d.Dot(ac, ap);
-        if (d1 <= Fixed64.Zero && d2 <= Fixed64.Zero)
-            return new TriangleWeights(Fixed64.One, Fixed64.Zero, Fixed64.Zero);
-
-        Vector3d bp = -b;
-        Fixed64 d3 = Vector3d.Dot(ab, bp);
-        Fixed64 d4 = Vector3d.Dot(ac, bp);
-        if (d3 >= Fixed64.Zero && d4 <= d3)
-            return new TriangleWeights(Fixed64.Zero, Fixed64.One, Fixed64.Zero);
-
-        Fixed64 vc = d1 * d4 - d3 * d2;
-        if (vc <= Fixed64.Zero && d1 >= Fixed64.Zero && d3 <= Fixed64.Zero)
-        {
-            Fixed64 v = d1 / (d1 - d3);
-            return new TriangleWeights(Fixed64.One - v, v, Fixed64.Zero);
-        }
-
-        Vector3d cp = -c;
-        Fixed64 d5 = Vector3d.Dot(ab, cp);
-        Fixed64 d6 = Vector3d.Dot(ac, cp);
-        if (d6 >= Fixed64.Zero && d5 <= d6)
-            return new TriangleWeights(Fixed64.Zero, Fixed64.Zero, Fixed64.One);
-
-        Fixed64 vb = d5 * d2 - d1 * d6;
-        if (vb <= Fixed64.Zero && d2 >= Fixed64.Zero && d6 <= Fixed64.Zero)
-        {
-            Fixed64 w = d2 / (d2 - d6);
-            return new TriangleWeights(Fixed64.One - w, Fixed64.Zero, w);
-        }
-
-        Fixed64 va = d3 * d6 - d5 * d4;
-        if (va <= Fixed64.Zero && (d4 - d3) >= Fixed64.Zero && (d5 - d6) >= Fixed64.Zero)
-        {
-            Fixed64 w = (d4 - d3) / ((d4 - d3) + (d5 - d6));
-            return new TriangleWeights(Fixed64.Zero, Fixed64.One - w, w);
-        }
-
-        Fixed64 denominator = Fixed64.One / (va + vb + vc);
-        Fixed64 vInside = vb * denominator;
-        Fixed64 wInside = vc * denominator;
-        return new TriangleWeights(Fixed64.One - vInside - wInside, vInside, wInside);
-    }
-
-    private static bool IsOriginInsideTetrahedron(
-        Vector3d a,
-        Vector3d b,
-        Vector3d c,
-        Vector3d d,
-        Fixed64 workingScale)
-    {
-        Span<Vector3d> scaled = stackalloc Vector3d[4];
-        scaled[0] = a;
-        scaled[1] = b;
-        scaled[2] = c;
-        scaled[3] = d;
-        Fixed64 productScale = GjkSimplexScale.ScaleForProducts(scaled);
-        a = scaled[0];
-        b = scaled[1];
-        c = scaled[2];
-        d = scaled[3];
-
-        Fixed64 productScaleSqr = productScale * productScale;
-        Fixed64 productScaleCubed = productScaleSqr * productScale;
-        Fixed64 workingScaleSqr = workingScale * workingScale;
-        Fixed64 workingScaleCubed = workingScaleSqr * workingScale;
-        Fixed64 volumeTolerance = DistanceTolerance * workingScaleCubed * productScaleCubed;
-        if (SignedTetrahedronVolume6(a, b, c, d).Abs() <= volumeTolerance)
-            return false;
-
-        Fixed64 workingScaleSixth = workingScaleCubed * workingScaleCubed;
-        Fixed64 sideTolerance =
-            DistanceTolerance * workingScaleSixth * productScaleCubed * productScaleCubed;
-        return IsSameSideOfFace(Vector3d.Zero, d, a, b, c, sideTolerance)
-            && IsSameSideOfFace(Vector3d.Zero, c, a, d, b, sideTolerance)
-            && IsSameSideOfFace(Vector3d.Zero, b, a, c, d, sideTolerance)
-            && IsSameSideOfFace(Vector3d.Zero, a, b, d, c, sideTolerance);
-    }
-
-    private static bool IsSameSideOfFace(
-        Vector3d point,
-        Vector3d opposite,
-        Vector3d a,
-        Vector3d b,
-        Vector3d c,
-        Fixed64 sideTolerance)
-    {
-        Vector3d normal = Vector3d.Cross(b - a, c - a);
-        if (normal.MagnitudeSquared <= Fixed64.Zero)
-            return false;
-
-        Fixed64 pointSide = Vector3d.Dot(normal, point - a);
-        Fixed64 oppositeSide = Vector3d.Dot(normal, opposite - a);
-        return pointSide * oppositeSide >= -sideTolerance;
-    }
-
-    private static Fixed64 SignedTetrahedronVolume6(Vector3d a, Vector3d b, Vector3d c, Vector3d d) =>
-        Vector3d.Dot(b - a, Vector3d.Cross(c - a, d - a));
-
-    private static bool ContainsSupportPoint(
-        SupportPoint[] simplex,
-        int count,
-        Vector3d point)
-    {
-        for (int i = 0; i < count; i++)
-        {
-            Vector3d difference = simplex[i].Point - point;
-            if (Vector3d.TryGetMagnitude(difference, out Fixed64 distance)
-                && distance <= Fixed64.Epsilon)
-                return true;
-        }
-
-        return false;
+            hasRefinedSurfaceNormal,
+            hasMaterializedPoint);
     }
 
     private static ConvexShape CreateColliderShape(LSCollider collider, Vector3d offset)
@@ -816,7 +765,11 @@ internal sealed partial class ConvexSweepQueryWorker
 
     private static ConvexShape CreateTriangleShape(LSMeshCollider mesh, int triangleIndex)
     {
-        mesh.Mesh.GetTriangleVertices(triangleIndex, out Vector3d first, out Vector3d second, out Vector3d third);
+        mesh.Mesh.GetLocalTriangleVertices(
+            triangleIndex,
+            out Vector3d first,
+            out Vector3d second,
+            out Vector3d third);
         return new ConvexShape(mesh, triangleIndex, first, second, third);
     }
 
@@ -826,20 +779,43 @@ internal sealed partial class ConvexSweepQueryWorker
             throw CreateConcaveSourceException(source);
     }
 
-    private void CreateSweptSourceBounds(ConvexShape sourceShape, out Vector3d min, out Vector3d max)
+    private bool TryCreateSweptSourceBoundsInMeshFrame(
+        ConvexShape sourceShape,
+        LSMeshCollider mesh,
+        out Vector3d min,
+        out Vector3d max)
     {
-        sourceShape.GetSourceBounds(out Vector3d sourceMin, out Vector3d sourceMax);
+        if (!sourceShape.TryGetBoundsRelativeTo(
+                mesh.Mesh.Origin,
+                mesh.Mesh.Rotation,
+                out Vector3d sourceMin,
+                out Vector3d sourceMax))
+        {
+            min = default;
+            max = default;
+            return false;
+        }
+
+        // Prepare admitted the chord magnitude, so a unit rotation preserves
+        // representability.
+        _ = mesh.Mesh.Rotation.Inverse().TryRotate(
+            _displacement,
+            out Vector3d localDisplacement);
         SweepBoundsUtility.CreateSweptBounds(
             sourceMin,
             sourceMax,
-            _displacement,
+            localDisplacement,
             ContactTolerance,
             out min,
             out max);
+        return true;
     }
 
     private bool CanSweptSourceShapeReachTarget(ConvexShape sourceShape, LSCollider target)
     {
+        if (!sourceShape.CanTranslateCenter(_displacement))
+            return false;
+
         sourceShape.GetSourceBounds(out Vector3d sourceMin, out Vector3d sourceMax);
         SweepBoundsUtility.CreateSweptBounds(
             sourceMin,
@@ -848,23 +824,28 @@ internal sealed partial class ConvexSweepQueryWorker
             ContactTolerance,
             out Vector3d min,
             out Vector3d max);
-        return SweepBoundsUtility.OverlapsInclusive(min, max, target.BoundsMin, target.BoundsMax);
+        return SweepBoundsUtility.OverlapsInclusive(
+            min,
+            max,
+            target.BoundsMin,
+            target.BoundsMax);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool ComesBeforeReducerCandidate(
-        Physics3DHit hit,
+        Fixed64 hitNumerator,
         int candidateOrdinal,
         bool found,
-        Fixed64 closestDistance,
+        Fixed64 closestNumerator,
         int closestOrdinal)
     {
         if (!found)
             return true;
 
-        int distanceCompare = hit.Distance.CompareTo(closestDistance);
-        if (distanceCompare != 0)
-            return distanceCompare < 0;
+        int numeratorCompare =
+            hitNumerator.CompareTo(closestNumerator);
+        if (numeratorCompare != 0)
+            return numeratorCompare < 0;
 
         return candidateOrdinal < closestOrdinal;
     }

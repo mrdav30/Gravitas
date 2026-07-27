@@ -114,7 +114,33 @@ public sealed partial class MixedNarrowPhaseTests
     }
 
     [Fact]
-    public void RotationalSeparationGap_ForTiltedCuboidOrUnsupportedPair_ShouldDeclineOwnership()
+    public void RotationalSeparationGap_ForYawCuboidCornerShouldUseCombinedPlanarDistance()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSCuboidCollider> cuboid = CreateCuboid3D(
+            context,
+            Vector3d.Zero);
+        SolidBody2D circle = CreateBody2D(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            new Vector2d(
+                Fixed64.FromFraction(11, 10),
+                Fixed64.FromFraction(11, 10)));
+
+        CollisionDetectionMixed.TryGetRotationalSeparationGap(
+                cuboid.Collider,
+                circle.Collider,
+                out Fixed64 gap,
+                out bool supported)
+            .Should()
+            .BeTrue();
+
+        supported.Should().BeTrue();
+        gap.Should().BeGreaterThan(Fixed64.FromFraction(3, 10));
+    }
+
+    [Fact]
+    public void RotationalSeparationGap_ForTiltedCuboidShouldRemainExactWhileUnsupportedPairDeclinesOwnership()
     {
         using GravitasWorldContext context = CreateMixedContext();
         ScenarioBody<LSCuboidCollider> tilted = CreateCuboid3D(
@@ -132,10 +158,10 @@ public sealed partial class MixedNarrowPhaseTests
         CollisionDetectionMixed.TryGetRotationalSeparationGap(
                 tilted.Collider,
                 circle.Collider,
-                out _,
+                out Fixed64 tiltedGap,
                 out bool tiltedSupported)
             .Should()
-            .BeFalse();
+            .BeTrue();
         CollisionDetectionMixed.TryGetRotationalSeparationGap(
                 sphere.Collider,
                 circle.Collider,
@@ -144,14 +170,15 @@ public sealed partial class MixedNarrowPhaseTests
             .Should()
             .BeFalse();
 
-        tiltedSupported.Should().BeFalse();
+        tiltedSupported.Should().BeTrue();
+        tiltedGap.Should().Be(Fixed64.Zero);
         pairSupported.Should().BeFalse();
     }
 
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void RotationalSeparationGap_ForCuboidAtVerticalDomainEdgeShouldNotCertifyOverflowedBounds(
+    public void RotationalSeparationGap_ForCuboidAtVerticalDomainEdgeShouldReturnConservativeFiniteDomainGap(
         bool positive)
     {
         using GravitasWorldContext context = CreateMixedContext();
@@ -169,11 +196,12 @@ public sealed partial class MixedNarrowPhaseTests
         bool calculated = CollisionDetectionMixed.TryGetRotationalSeparationGap(
             cuboid.Collider,
             circle.Collider,
-            out _,
+            out Fixed64 gap,
             out bool supported);
 
         supported.Should().BeTrue();
-        calculated.Should().BeFalse();
+        calculated.Should().BeTrue();
+        gap.Should().BeGreaterThan(Fixed64.Zero);
     }
 
     [Fact]
@@ -190,15 +218,16 @@ public sealed partial class MixedNarrowPhaseTests
         bool calculated = CollisionDetectionMixed.TryGetRotationalSeparationGap(
             cuboid.Collider,
             circle.Collider,
-            out _,
+            out Fixed64 gap,
             out bool supported);
 
         supported.Should().BeTrue();
-        calculated.Should().BeFalse();
+        calculated.Should().BeTrue();
+        gap.Should().BeGreaterThan(Fixed64.Zero);
     }
 
     [Fact]
-    public void RotationalSeparationGap_ForOppositeRepresentableCuboidAndSlabBounds_ShouldRejectUnrepresentableGap()
+    public void RotationalSeparationGap_ForOppositeRepresentableCuboidAndSlabBounds_ShouldClampConservatively()
     {
         using GravitasWorldContext context = CreateMixedContext();
         ScenarioBody<LSCuboidCollider> cuboid = CreateCuboid3D(context, Vector3d.Zero);
@@ -221,10 +250,11 @@ public sealed partial class MixedNarrowPhaseTests
         bool calculated = CollisionDetectionMixed.TryGetRotationalSeparationGap(
             cuboid.Collider,
             circle.Collider,
-            out _,
+            out Fixed64 gap,
             out bool supported);
 
         supported.Should().BeTrue();
-        calculated.Should().BeFalse();
+        calculated.Should().BeTrue();
+        gap.Should().Be(Fixed64.MaxValue);
     }
 }

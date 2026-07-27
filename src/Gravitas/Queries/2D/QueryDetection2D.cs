@@ -6,18 +6,17 @@
 //=======================================================================
 
 using FixedMathSharp;
-using FixedMathSharp.Bounds;
+using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using System;
-using System.Runtime.CompilerServices;
 
 namespace Gravitas.Queries;
 
 /// <summary>
 /// Deterministic pure 2D shape checks used by query services.
 /// </summary>
-internal static class QueryDetection2D
+internal static partial class QueryDetection2D
 {
     internal static bool TryOverlapCircle(
         Vector2d center,
@@ -29,57 +28,128 @@ internal static class QueryDetection2D
 
         if (collider is LSCompoundCollider2D compound)
             return TryOverlapCircleCompound(center, radius, compound, out hit);
+        if (collider is LSCircleCollider2D circle)
+            return TryOverlapCircleCenteredCapsule(
+                center,
+                radius,
+                circle.Center,
+                circle.Rotation,
+                Fixed64.Zero,
+                circle.ScaledRadius,
+                circle,
+                out hit);
         if (collider is LSCapsuleCollider2D capsule)
-            return TryOverlapCircleCapsule(center, radius, capsule, out hit);
-
-        Vector2d closest = collider.GetClosestPoint(center);
-        bool containsCenter = collider.ContainsPoint(center);
-        Vector2d toCenter = center - closest;
-        Fixed64 distanceSquared = containsCenter ? Fixed64.Zero : toCenter.MagnitudeSquared;
-        if (distanceSquared > radius * radius)
+            return TryOverlapCircleCenteredCapsule(
+                center,
+                radius,
+                capsule.Center,
+                capsule.Rotation,
+                capsule.AxisLength,
+                capsule.ScaledRadius,
+                capsule,
+                out hit);
+        if (collider is not IConvexVertexSource2D)
         {
             hit = default;
             return false;
         }
 
-        Fixed64 distance = distanceSquared > Fixed64.Zero ? FixedMath.Sqrt(distanceSquared) : Fixed64.Zero;
-        Vector2d normal = distance > Fixed64.Zero
-            ? toCenter / distance
-            : ResolveQueryFallbackNormal(center, collider.Center);
-        hit = new Physics2DHit(collider, closest, normal, distance);
+        Span<Vector2d> scratch = stackalloc Vector2d[4];
+        ReadOnlySpan<Vector2d> vertexOffsets =
+            GetConvexVertexOffsets(collider, scratch);
+        if (!FixedConvex2dRelations.TryGetCircleContact(
+                center,
+                Fixed64.Zero,
+                radius,
+                collider.Center,
+                collider.ConvexRotation,
+                vertexOffsets,
+                out _,
+                out FixedPointAnchor2d contactAnchor,
+                out Vector2d circleToColliderNormal,
+                out _,
+                out _))
+        {
+            hit = default;
+            return false;
+        }
+
+        bool containsCenter = FixedConvex2dRelations.ContainsPoint(
+            center,
+            collider.Center,
+            collider.ConvexRotation,
+            vertexOffsets);
+        Fixed64 distance = Fixed64.Zero;
+        Vector2d normal = -circleToColliderNormal;
+        if (!containsCenter)
+        {
+            contactAnchor = FixedConvex2dRelations.GetClosestPointAnchor(
+                center,
+                collider.Center,
+                collider.ConvexRotation,
+                vertexOffsets);
+
+            var anchor = new ContactAnchor2D(contactAnchor);
+            if (!anchor.TryGetOffsetFrom(center, out Vector2d centerToTarget)
+                || !Vector2d.TryGetMagnitude(centerToTarget, out distance))
+            {
+                hit = default;
+                return false;
+            }
+
+            normal = distance > Fixed64.Zero
+                ? -centerToTarget / distance
+                : ResolveQueryFallbackNormal(center, collider.Center);
+        }
+
+        hit = new Physics2DHit(
+            collider,
+            new ContactAnchor2D(contactAnchor),
+            normal,
+            distance);
         return true;
     }
 
-    private static bool TryOverlapCircleCapsule(
-        Vector2d center,
-        Fixed64 radius,
-        LSCapsuleCollider2D capsule,
+    private static bool TryOverlapCircleCenteredCapsule(
+        Vector2d queryCenter,
+        Fixed64 queryRadius,
+        Vector2d targetCenter,
+        Fixed64 targetRotation,
+        Fixed64 targetAxisLength,
+        Fixed64 targetRadius,
+        LSCollider2D target,
         out Physics2DHit hit)
     {
-        if (!FixedSegment2d.ContainsPointInCenteredCapsule(
-                center,
-                capsule.Center,
-                capsule.WorldAxis,
-                capsule.AxisHalfLength,
-                capsule.ScaledRadius,
-                radius))
+        if (!FixedSegment2d.TryGetCenteredCapsulesContact(
+                queryCenter,
+                Fixed64.Zero,
+                Fixed64.Zero,
+                queryRadius,
+                targetCenter,
+                targetRotation,
+                targetAxisLength,
+                targetRadius,
+                ResolveQueryFallbackNormal(queryCenter, targetCenter),
+                out FixedContactAnchors2d contact))
         {
             hit = default;
             return false;
         }
 
-        Vector2d normal = capsule.GetNormalFromCenteredAxis(center);
-        Vector2d closest = capsule.TryGetSurfacePointFromCenteredAxis(center, normal, out Vector2d surfacePoint)
-            ? surfacePoint
-            : center;
         Fixed64 distance = FixedSegment2d.GetDistanceToCenteredCapsule(
-            center,
-            capsule.Center,
-            capsule.WorldAxis,
-            capsule.AxisHalfLength,
-            capsule.ScaledRadius);
+            queryCenter,
+            targetCenter,
+            targetRotation,
+            targetAxisLength,
+            targetRadius);
 
-        hit = new Physics2DHit(capsule, closest, normal, distance);
+        hit = new Physics2DHit(
+            target,
+            new ContactAnchor2D(contact.SecondAnchor),
+            queryCenter == targetCenter
+                ? ResolveQueryFallbackNormal(queryCenter, targetCenter)
+                : -contact.Normal,
+            distance);
         return true;
     }
 
@@ -157,7 +227,7 @@ internal static class QueryDetection2D
             return TryRaycastCompound(start, end, compound, out hit);
 
         Vector2d direction = segment.Normalized;
-        if (collider.ContainsPoint(start))
+        if (ContainsPointExact(collider, start))
         {
             hit = new Physics2DHit(
                 collider,
@@ -171,8 +241,14 @@ internal static class QueryDetection2D
             return TryRaycastCircle(start, end, direction, segmentLength, circle, out hit);
         if (collider is LSCapsuleCollider2D capsule)
             return TryRaycastCapsule(start, end, segmentLength, capsule, out hit);
+        if (collider is not LSAABBoxCollider2D
+            && collider is not LSPolygonCollider2D)
+        {
+            hit = default;
+            return false;
+        }
 
-        return TryRaycastConvex(start, segment, direction, segmentLength, collider, out hit);
+        return TryRaycastConvex(start, direction, segmentLength, collider, out hit);
     }
 
     internal static bool TrySweepCircle(
@@ -215,8 +291,14 @@ internal static class QueryDetection2D
             return TrySweepCircleCircle(start, end, direction, segmentLength, radius, circle, out hit);
         if (collider is LSCapsuleCollider2D capsule)
             return TrySweepCircleCapsule(start, end, segmentLength, radius, capsule, out hit);
+        if (collider is not LSAABBoxCollider2D
+            && collider is not LSPolygonCollider2D)
+        {
+            hit = default;
+            return false;
+        }
 
-        return TrySweepCircleConvex(start, end, direction, segmentLength, radius, collider, out hit);
+        return TrySweepCircleConvex(start, direction, segmentLength, radius, collider, out hit);
     }
 
     internal static bool TrySweepMoverShape(
@@ -242,16 +324,47 @@ internal static class QueryDetection2D
             return TrySweepMoverAgainstCompound(mover, displacement, targetCompound, out hit);
 
         if (mover is LSCircleCollider2D circle)
-            return TrySweepCircle(circle.Center, circle.Center + displacement, circle.ScaledRadius, target, out hit);
+        {
+            if (!Vector2d.TryAdd(
+                    circle.Center,
+                    displacement,
+                    out Vector2d end))
+            {
+                hit = default;
+                return false;
+            }
+
+            return TrySweepCircle(
+                circle.Center,
+                end,
+                circle.ScaledRadius,
+                target,
+                out hit);
+        }
         if (mover is LSCapsuleCollider2D moverCapsule)
-            return TrySweepCapsuleMover(moverCapsule, displacement, target, out hit);
+            return TrySweepCapsuleMover(
+                moverCapsule,
+                displacement,
+                displacementLength,
+                target,
+                out hit);
 
         if (target is LSCircleCollider2D targetCircle)
             return TrySweepConvexMoverAgainstCircle(mover, displacement, targetCircle, out hit);
         if (target is LSCapsuleCollider2D targetCapsule)
-            return TrySweepConvexMoverAgainstCapsule(mover, displacement, targetCapsule, out hit);
+            return TrySweepConvexMoverAgainstCapsule(
+                mover,
+                displacement,
+                displacementLength,
+                targetCapsule,
+                out hit);
 
-        return TrySweepConvexMoverAgainstConvex(mover, displacement, target, out hit);
+        return TrySweepConvexMoverAgainstConvex(
+            mover,
+            displacement,
+            displacementLength,
+            target,
+            out hit);
     }
 
     private static bool TryRaycastCircle(
@@ -282,7 +395,13 @@ internal static class QueryDetection2D
             ? end
             : start + direction * distance;
         Vector2d normal = (point - circle.Center).Normalized;
-        hit = new Physics2DHit(circle, point, normal, distance);
+        hit = new Physics2DHit(
+            circle,
+            new ContactAnchor2D(
+                circle.Center,
+                normal * circle.ScaledRadius),
+            normal,
+            distance);
         return true;
     }
 
@@ -315,8 +434,13 @@ internal static class QueryDetection2D
             ? end
             : start + direction * distance;
         Vector2d normal = (sweptCenter - circle.Center).Normalized;
-        Vector2d point = circle.Center + normal * circle.ScaledRadius;
-        hit = new Physics2DHit(circle, point, normal, distance);
+        hit = new Physics2DHit(
+            circle,
+            new ContactAnchor2D(
+                circle.Center,
+                normal * circle.ScaledRadius),
+            normal,
+            distance);
         return true;
     }
 
@@ -330,8 +454,8 @@ internal static class QueryDetection2D
         var query = new FixedSegment2d(start, end);
         if (!query.TryGetCapsuleIntersectionDistanceInterval(
                 capsule.Center,
-                capsule.WorldAxis,
-                capsule.AxisHalfLength,
+                capsule.Rotation,
+                capsule.AxisLength,
                 capsule.ScaledRadius,
                 Fixed64.Zero,
                 segmentLength,
@@ -348,7 +472,7 @@ internal static class QueryDetection2D
         Vector2d normal = capsule.GetNormalFromCenteredAxis(pointOnRay);
         hit = new Physics2DHit(
             capsule,
-            pointOnRay,
+            ContactAnchor2D.FromWorldPoint(pointOnRay),
             normal,
             distance);
         return true;
@@ -365,8 +489,8 @@ internal static class QueryDetection2D
         var query = new FixedSegment2d(start, end);
         if (!query.TryGetCapsuleIntersectionDistanceInterval(
                 capsule.Center,
-                capsule.WorldAxis,
-                capsule.AxisHalfLength,
+                capsule.Rotation,
+                capsule.AxisLength,
                 capsule.ScaledRadius,
                 radius,
                 segmentLength,
@@ -381,12 +505,19 @@ internal static class QueryDetection2D
 
         Vector2d sweptCenter = query.GetPointAtDistance(distance, segmentLength);
         Vector2d normal = capsule.GetNormalFromCenteredAxis(sweptCenter);
-        Vector2d point = capsule.TryGetSurfacePointFromCenteredAxis(sweptCenter, normal, out Vector2d surfacePoint)
-            ? surfacePoint
-            : sweptCenter - normal * radius;
+        bool hasPoint = TryOffsetPoint(
+            sweptCenter,
+            -normal,
+            radius,
+            out Vector2d point);
+
         hit = new Physics2DHit(
             capsule,
-            point,
+            hasPoint
+                ? ContactAnchor2D.FromWorldPoint(point)
+                : new ContactAnchor2D(
+                    sweptCenter,
+                    -normal * radius),
             normal,
             distance);
         return true;
@@ -416,7 +547,7 @@ internal static class QueryDetection2D
             return false;
         }
 
-        hit = new Physics2DHit(compound, best.Point, best.Normal, best.Distance);
+        hit = new Physics2DHit(compound, best.Anchor, best.Normal, best.Distance);
         return true;
     }
 
@@ -429,20 +560,14 @@ internal static class QueryDetection2D
         if (collider is LSCompoundCollider2D compound)
             return TryOverlapConvexAreaCompound(center, vertices, compound, out hit);
 
-        bool overlaps = collider switch
+        return collider switch
         {
-            LSCircleCollider2D circle => TryOverlapConvexAreaCircle(vertices, circle),
-            LSCapsuleCollider2D capsule => TryOverlapConvexAreaCapsule(vertices, capsule),
-            _ => TryOverlapConvexAreaConvex(vertices, collider)
+            LSCircleCollider2D circle =>
+                TryOverlapConvexAreaCircle(center, vertices, circle, out hit),
+            LSCapsuleCollider2D capsule =>
+                TryOverlapConvexAreaCapsule(center, vertices, capsule, out hit),
+            _ => TryOverlapConvexAreaConvex(center, vertices, collider, out hit)
         };
-        if (!overlaps)
-        {
-            hit = default;
-            return false;
-        }
-
-        hit = BuildAreaOverlapHit(center, collider);
-        return true;
     }
 
     private static bool TryOverlapConvexAreaCompound(
@@ -468,371 +593,295 @@ internal static class QueryDetection2D
             return false;
         }
 
-        hit = new Physics2DHit(compound, best.Point, best.Normal, best.Distance);
+        hit = new Physics2DHit(compound, best.Anchor, best.Normal, best.Distance);
         return true;
     }
 
-    private static bool TryOverlapConvexAreaCircle(ReadOnlySpan<Vector2d> vertices, LSCircleCollider2D circle)
-    {
-        for (int i = 0; i < vertices.Length; i++)
-        {
-            Vector2d edge = vertices[(i + 1) % vertices.Length] - vertices[i];
-            if (!TryTestAreaCircleAxis(edge.RightHandNormal, vertices, circle))
-                return false;
-        }
-
-        Vector2d closest = ClosestPointOnConvexArea(circle.Center, vertices);
-        Vector2d circleAxis = closest - circle.Center;
-        return circleAxis.MagnitudeSquared <= Fixed64.Epsilon
-            || TryTestAreaCircleAxis(circleAxis, vertices, circle);
-    }
-
-    private static bool TryOverlapConvexAreaCapsule(ReadOnlySpan<Vector2d> vertices, LSCapsuleCollider2D capsule)
-    {
-        for (int i = 0; i < vertices.Length; i++)
-        {
-            Vector2d edge = vertices[(i + 1) % vertices.Length] - vertices[i];
-            if (!TryTestAreaCapsuleAxis(edge.RightHandNormal, vertices, capsule))
-                return false;
-        }
-
-        Vector2d closestAxis = FindCapsuleAreaClosestAxis(capsule, vertices);
-        return closestAxis.MagnitudeSquared <= Fixed64.Epsilon
-            || TryTestAreaCapsuleAxis(closestAxis, vertices, capsule);
-    }
-
-    private static bool TryOverlapConvexAreaConvex(ReadOnlySpan<Vector2d> vertices, LSCollider2D collider)
-    {
-        for (int i = 0; i < vertices.Length; i++)
-        {
-            Vector2d edge = vertices[(i + 1) % vertices.Length] - vertices[i];
-            if (!TryTestAreaConvexAxis(edge.RightHandNormal, vertices, collider))
-                return false;
-        }
-
-        for (int i = 0; i < collider.VertexCount; i++)
-        {
-            Vector2d edge = collider.GetVertexUnchecked((i + 1) % collider.VertexCount) - collider.GetVertexUnchecked(i);
-            if (!TryTestAreaConvexAxis(edge.RightHandNormal, vertices, collider))
-                return false;
-        }
-
-        return true;
-    }
-
-    private static Physics2DHit BuildAreaOverlapHit(Vector2d center, LSCollider2D collider)
-    {
-        Vector2d point = collider.ContainsPoint(center)
-            ? center
-            : collider.GetClosestPoint(center);
-        Vector2d delta = center - point;
-        Fixed64 distanceSquared = delta.MagnitudeSquared;
-        Fixed64 distance = distanceSquared > Fixed64.Zero ? FixedMath.Sqrt(distanceSquared) : Fixed64.Zero;
-        Vector2d normal = distance > Fixed64.Zero
-            ? delta / distance
-            : ResolveQueryFallbackNormal(center, collider.Center);
-        return new Physics2DHit(collider, point, normal, distance);
-    }
-
-    private static bool TryTestAreaCircleAxis(Vector2d axis, ReadOnlySpan<Vector2d> vertices, LSCircleCollider2D circle)
-    {
-        axis = axis.Normalized;
-        ProjectVertices(vertices, axis, out Fixed64 areaMin, out Fixed64 areaMax);
-        Fixed64 circleCenter = Vector2d.Dot(circle.Center, axis);
-        Fixed64 circleMin = circleCenter - circle.ScaledRadius;
-        Fixed64 circleMax = circleCenter + circle.ScaledRadius;
-        return areaMax >= circleMin && circleMax >= areaMin;
-    }
-
-    private static bool TryTestAreaCapsuleAxis(Vector2d axis, ReadOnlySpan<Vector2d> vertices, LSCapsuleCollider2D capsule)
-    {
-        axis = axis.Normalized;
-        ProjectVertices(vertices, axis, out Fixed64 areaMin, out Fixed64 areaMax);
-        ProjectCapsule(capsule, axis, out Fixed64 capsuleMin, out Fixed64 capsuleMax);
-        return areaMax >= capsuleMin && capsuleMax >= areaMin;
-    }
-
-    private static bool TryTestAreaConvexAxis(Vector2d axis, ReadOnlySpan<Vector2d> vertices, LSCollider2D collider)
-    {
-        axis = axis.Normalized;
-        ProjectVertices(vertices, axis, out Fixed64 areaMin, out Fixed64 areaMax);
-        ProjectConvex(collider, axis, out Fixed64 colliderMin, out Fixed64 colliderMax);
-        return areaMax >= colliderMin && colliderMax >= areaMin;
-    }
-
-    private static void ProjectVertices(ReadOnlySpan<Vector2d> vertices, Vector2d axis, out Fixed64 min, out Fixed64 max)
-    {
-        min = Vector2d.Dot(vertices[0], axis);
-        max = min;
-        for (int i = 1; i < vertices.Length; i++)
-        {
-            Fixed64 projection = Vector2d.Dot(vertices[i], axis);
-            if (projection < min)
-                min = projection;
-            else if (projection > max)
-                max = projection;
-        }
-    }
-
-    private static Vector2d ClosestPointOnConvexArea(Vector2d point, ReadOnlySpan<Vector2d> vertices)
-    {
-        if (ContainsPointInConvexArea(point, vertices))
-            return point;
-
-        Fixed64 bestDistance = Fixed64.MaxValue;
-        Vector2d bestPoint = vertices[0];
-        for (int i = 0; i < vertices.Length; i++)
-        {
-            Vector2d candidate = new FixedSegment2d(
-                vertices[i],
-                vertices[(i + 1) % vertices.Length]).ClosestPoint(point);
-            Fixed64 distance = Vector2d.DistanceSquared(point, candidate);
-            if (distance >= bestDistance)
-                continue;
-
-            bestDistance = distance;
-            bestPoint = candidate;
-        }
-
-        return bestPoint;
-    }
-
-    private static bool ContainsPointInConvexArea(Vector2d point, ReadOnlySpan<Vector2d> vertices)
-    {
-        bool hasPositive = false;
-        bool hasNegative = false;
-        for (int i = 0; i < vertices.Length; i++)
-        {
-            Vector2d a = vertices[i];
-            Vector2d b = vertices[(i + 1) % vertices.Length];
-            Fixed64 cross = Vector2d.CrossProduct(b - a, point - a);
-            if (cross > Fixed64.Epsilon)
-                hasPositive = true;
-            else if (cross < -Fixed64.Epsilon)
-                hasNegative = true;
-
-            if (hasPositive && hasNegative)
-                return false;
-        }
-
-        return true;
-    }
-
-    private static bool TryRaycastCompound(
-        Vector2d start,
-        Vector2d end,
-        LSCompoundCollider2D compound,
+    private static bool TryOverlapConvexAreaCircle(
+        Vector2d center,
+        ReadOnlySpan<Vector2d> vertices,
+        LSCircleCollider2D circle,
         out Physics2DHit hit)
     {
-        bool found = false;
-        Physics2DHit best = default;
-
-        for (int i = 0; i < compound.PartCount; i++)
-        {
-            LSCollider2D part = compound.GetPartCollider(i);
-            if (!TryRaycast(start, end, part, out Physics2DHit candidate))
-                continue;
-
-            TryKeepEarlierHit(candidate, ref found, ref best);
-        }
-
-        if (!found)
+        if (!FixedConvex2dRelations.TryGetCircleContact(
+                circle.Center,
+                circle.Rotation,
+                circle.ScaledRadius,
+                Vector2d.Zero,
+                Fixed64.Zero,
+                vertices,
+                out _,
+                out _,
+                out _,
+                out _,
+                out _))
         {
             hit = default;
             return false;
         }
 
-        hit = new Physics2DHit(compound, best.Point, best.Normal, best.Distance);
-        return true;
+        return TryBuildCenteredCapsuleAreaHit(
+            center,
+            circle.Center,
+            circle.Rotation,
+            Fixed64.Zero,
+            circle.ScaledRadius,
+            circle,
+            out hit);
     }
 
-    private static bool TrySweepCircleCompound(
-        Vector2d start,
-        Vector2d end,
-        Fixed64 radius,
-        LSCompoundCollider2D compound,
+    private static bool TryOverlapConvexAreaCapsule(
+        Vector2d center,
+        ReadOnlySpan<Vector2d> vertices,
+        LSCapsuleCollider2D capsule,
         out Physics2DHit hit)
     {
-        bool found = false;
-        Physics2DHit best = default;
-
-        for (int i = 0; i < compound.PartCount; i++)
-        {
-            LSCollider2D part = compound.GetPartCollider(i);
-            if (!TrySweepCircle(start, end, radius, part, out Physics2DHit candidate))
-                continue;
-
-            TryKeepEarlierHit(candidate, ref found, ref best);
-        }
-
-        if (!found)
+        if (!FixedSegment2d.TryGetCenteredCapsuleConvexMinimumTranslation(
+                capsule.Center,
+                capsule.Rotation,
+                capsule.AxisLength,
+                capsule.ScaledRadius,
+                Vector2d.Zero,
+                vertices,
+                out _,
+                out _))
         {
             hit = default;
             return false;
         }
 
-        hit = new Physics2DHit(compound, best.Point, best.Normal, best.Distance);
-        return true;
+        return TryBuildCenteredCapsuleAreaHit(
+            center,
+            capsule.Center,
+            capsule.Rotation,
+            capsule.AxisLength,
+            capsule.ScaledRadius,
+            capsule,
+            out hit);
     }
 
-    private static bool TrySweepMoverCompound(
-        LSCompoundCollider2D mover,
-        Vector2d displacement,
+    private static bool TryOverlapConvexAreaConvex(
+        Vector2d center,
+        ReadOnlySpan<Vector2d> vertices,
+        LSCollider2D collider,
+        out Physics2DHit hit)
+    {
+        Span<Vector2d> targetScratch = stackalloc Vector2d[4];
+        ReadOnlySpan<Vector2d> targetOffsets =
+            GetConvexVertexOffsets(collider, targetScratch);
+        Span<FixedPointAnchor2d> queryContacts =
+            stackalloc FixedPointAnchor2d[2];
+        Span<FixedPointAnchor2d> targetContacts =
+            stackalloc FixedPointAnchor2d[2];
+        if (!FixedConvex2dRelations.TryGetConvexContacts(
+                Vector2d.Zero,
+                Fixed64.Zero,
+                vertices,
+                collider.Center,
+                collider.ConvexRotation,
+                targetOffsets,
+                queryContacts,
+                targetContacts,
+                out _,
+                out _,
+                out _,
+                out _))
+        {
+            hit = default;
+            return false;
+        }
+
+        return TryBuildConvexAreaHit(
+            center,
+            collider,
+            targetOffsets,
+            out hit);
+    }
+
+    private static bool TryBuildCenteredCapsuleAreaHit(
+        Vector2d queryCenter,
+        Vector2d targetCenter,
+        Fixed64 targetRotation,
+        Fixed64 targetAxisLength,
+        Fixed64 targetRadius,
         LSCollider2D target,
         out Physics2DHit hit)
     {
-        bool found = false;
-        Physics2DHit best = default;
-
-        for (int i = 0; i < mover.PartCount; i++)
+        bool containsCenter = FixedSegment2d.ContainsPointInCenteredCapsule(
+            queryCenter,
+            targetCenter,
+            targetRotation,
+            targetAxisLength,
+            targetRadius,
+            Fixed64.Zero);
+        if (containsCenter)
         {
-            LSCollider2D part = mover.GetPartCollider(i);
-            if (!TrySweepMoverShape(part, displacement, target, out Physics2DHit candidate))
-                continue;
-
-            TryKeepEarlierHit(candidate, ref found, ref best);
+            hit = new Physics2DHit(
+                target,
+                ContactAnchor2D.FromWorldPoint(queryCenter),
+                ResolveQueryFallbackNormal(queryCenter, targetCenter),
+                Fixed64.Zero);
+            return true;
         }
 
-        hit = best;
-        return found;
+        Vector2d normal = FixedSegment2d.GetDirectionFromCenteredAxis(
+            queryCenter,
+            targetCenter,
+            targetRotation,
+            targetAxisLength);
+        if (normal == Vector2d.Zero)
+            normal = ResolveQueryFallbackNormal(queryCenter, targetCenter);
+
+        hit = new Physics2DHit(
+            target,
+            new ContactAnchor2D(
+                GetCenteredCapsuleSurfaceAnchor(
+                    queryCenter,
+                    targetCenter,
+                    targetRotation,
+                    targetAxisLength,
+                    targetRadius,
+                    normal)),
+            normal,
+            FixedSegment2d.GetDistanceToCenteredCapsule(
+                queryCenter,
+                targetCenter,
+                targetRotation,
+                targetAxisLength,
+                targetRadius));
+        return true;
     }
 
-    private static bool TrySweepMoverAgainstCompound(
-        LSCollider2D mover,
-        Vector2d displacement,
-        LSCompoundCollider2D target,
+    private static FixedPointAnchor2d GetCenteredCapsuleSurfaceAnchor(
+        Vector2d point,
+        Vector2d center,
+        Fixed64 rotation,
+        Fixed64 axisLength,
+        Fixed64 radius,
+        Vector2d worldNormal)
+    {
+        // A unit rotation preserves the admitted normalized direction.
+        _ = Vector2d.TryRotate(
+            worldNormal,
+            -rotation,
+            out Vector2d localNormal);
+        return FixedSegment2d.GetSurfaceAnchorOnCenteredCapsule(
+            point,
+            center,
+            rotation,
+            Vector2d.Forward,
+            axisLength,
+            radius,
+            localNormal.Normalized);
+    }
+
+    private static bool TryBuildConvexAreaHit(
+        Vector2d queryCenter,
+        LSCollider2D target,
+        ReadOnlySpan<Vector2d> targetVertexOffsets,
         out Physics2DHit hit)
     {
-        bool found = false;
-        Physics2DHit best = default;
-
-        for (int i = 0; i < target.PartCount; i++)
+        if (FixedConvex2dRelations.ContainsPoint(
+                queryCenter,
+                target.Center,
+                target.ConvexRotation,
+                targetVertexOffsets))
         {
-            LSCollider2D part = target.GetPartCollider(i);
-            if (!TrySweepMoverShape(mover, displacement, part, out Physics2DHit candidate))
-                continue;
-
-            TryKeepCloserHit(candidate, ref found, ref best);
+            hit = new Physics2DHit(
+                target,
+                ContactAnchor2D.FromWorldPoint(queryCenter),
+                ResolveQueryFallbackNormal(queryCenter, target.Center),
+                Fixed64.Zero);
+            return true;
         }
 
-        if (!found)
+        FixedPointAnchor2d targetAnchor =
+            FixedConvex2dRelations.GetClosestPointAnchor(
+                queryCenter,
+                target.Center,
+                target.ConvexRotation,
+                targetVertexOffsets);
+
+        var anchor = new ContactAnchor2D(targetAnchor);
+        if (!anchor.TryGetOffsetFrom(queryCenter, out Vector2d centerToTarget)
+            || !Vector2d.TryGetMagnitude(centerToTarget, out Fixed64 distance))
         {
             hit = default;
             return false;
         }
 
-        hit = new Physics2DHit(target, best.Point, best.Normal, best.Distance);
+        Vector2d normal = distance > Fixed64.Zero
+            ? -centerToTarget / distance
+            : ResolveQueryFallbackNormal(queryCenter, target.Center);
+        hit = new Physics2DHit(target, anchor, normal, distance);
         return true;
     }
 
     private static bool TryRaycastConvex(
         Vector2d start,
-        Vector2d segment,
         Vector2d direction,
         Fixed64 segmentLength,
         LSCollider2D collider,
         out Physics2DHit hit)
     {
-        bool found = false;
-        Fixed64 bestT = Fixed64.MaxValue;
-        Vector2d bestPoint = Vector2d.Zero;
-        Vector2d bestNormal = Vector2d.Right;
-        FixedSegment2d raySegment = new(start, start + segment);
-
-        for (int i = 0; i < collider.VertexCount; i++)
-        {
-            Vector2d a = collider.GetVertexUnchecked(i);
-            Vector2d b = collider.GetVertexUnchecked((i + 1) % collider.VertexCount);
-            if (!raySegment.TryGetUniqueIntersection(new FixedSegment2d(a, b), out Fixed64 t))
-                continue;
-
-            if (found && t >= bestT)
-                continue;
-
-            Vector2d edge = b - a;
-            Vector2d normal = edge.LeftHandNormal.Normalized;
-            if (Vector2d.Dot(normal, direction) > Fixed64.Zero)
-                normal = -normal;
-
-            found = true;
-            bestT = t;
-            bestPoint = start + segment * t;
-            bestNormal = normal;
-        }
-
-        if (!found)
+        Span<Vector2d> scratch = stackalloc Vector2d[4];
+        ReadOnlySpan<Vector2d> vertexOffsets =
+            GetConvexVertexOffsets(collider, scratch);
+        if (!FixedConvex2dRelations.TryGetSegmentFirstIntersectionDistance(
+                start,
+                direction,
+                segmentLength,
+                collider.Center,
+                collider.ConvexRotation,
+                vertexOffsets,
+                out Fixed64 distance,
+                out Vector2d normal,
+                out FixedPointAnchor2d contactAnchor))
         {
             hit = default;
             return false;
         }
 
-        hit = new Physics2DHit(collider, bestPoint, bestNormal, segmentLength * bestT);
+        hit = new Physics2DHit(
+            collider,
+            new ContactAnchor2D(contactAnchor),
+            normal,
+            distance);
         return true;
     }
 
     private static bool TrySweepCircleConvex(
         Vector2d start,
-        Vector2d end,
         Vector2d direction,
         Fixed64 segmentLength,
         Fixed64 radius,
         LSCollider2D collider,
         out Physics2DHit hit)
     {
-        bool found = false;
-        Fixed64 bestDistance = Fixed64.MaxValue;
-        Vector2d bestPoint = Vector2d.Zero;
-        Vector2d bestNormal = Vector2d.Right;
-
-        int vertexCount = collider.VertexCount;
-        for (int i = 0; i < vertexCount; i++)
-        {
-            Vector2d a = collider.GetVertexUnchecked(i);
-            Vector2d b = collider.GetVertexUnchecked((i + 1) % vertexCount);
-            if (TrySweepCircleEdge(
-                    start,
-                    direction,
-                    segmentLength,
-                    radius,
-                    collider.Center,
-                    a,
-                    b,
-                    out Fixed64 edgeDistance,
-                    out Vector2d edgePoint,
-                    out Vector2d edgeNormal)
-                && (!found || edgeDistance < bestDistance))
-            {
-                found = true;
-                bestDistance = edgeDistance;
-                bestPoint = edgePoint;
-                bestNormal = edgeNormal;
-            }
-
-            if (TrySweepCircleVertex(
-                    start,
-                    end,
-                    direction,
-                    segmentLength,
-                    radius,
-                    a,
-                    out Fixed64 vertexDistance,
-                    out Vector2d vertexNormal)
-                && (!found || vertexDistance < bestDistance))
-            {
-                found = true;
-                bestDistance = vertexDistance;
-                bestPoint = a;
-                bestNormal = vertexNormal;
-            }
-        }
-
-        if (!found)
+        Span<Vector2d> scratch = stackalloc Vector2d[4];
+        ReadOnlySpan<Vector2d> vertexOffsets =
+            GetConvexVertexOffsets(collider, scratch);
+        if (!FixedConvex2dRelations.TryGetSweptCircleFirstDistance(
+                start,
+                radius,
+                direction,
+                segmentLength,
+                collider.Center,
+                collider.ConvexRotation,
+                vertexOffsets,
+                out Fixed64 distance,
+                out Vector2d normal,
+                out FixedPointAnchor2d contactAnchor))
         {
             hit = default;
             return false;
         }
 
-        hit = new Physics2DHit(collider, bestPoint, bestNormal, bestDistance);
+        hit = new Physics2DHit(
+            collider,
+            new ContactAnchor2D(contactAnchor),
+            normal,
+            distance);
         return true;
     }
 
@@ -845,7 +894,11 @@ internal static class QueryDetection2D
         if (CollisionDetection2D.TryCollide(mover, target, out Contact2D overlap))
         {
             Vector2d normal = -overlap.Normal;
-            hit = new Physics2DHit(target, target.Center + normal * target.ScaledRadius, normal, Fixed64.Zero);
+            hit = new Physics2DHit(
+                target,
+                overlap.AnchorB,
+                normal,
+                Fixed64.Zero);
             return true;
         }
 
@@ -863,548 +916,12 @@ internal static class QueryDetection2D
         Vector2d hitNormal = -reverseHit.Normal;
         hit = new Physics2DHit(
             target,
-            target.Center + hitNormal * target.ScaledRadius,
+            new ContactAnchor2D(
+                target.Center,
+                hitNormal * target.ScaledRadius),
             hitNormal,
             reverseHit.Distance);
         return true;
     }
 
-    private static bool TrySweepCapsuleMover(
-        LSCapsuleCollider2D mover,
-        Vector2d displacement,
-        LSCollider2D target,
-        out Physics2DHit hit)
-    {
-        if (CollisionDetection2D.TryCollide(mover, target, out Contact2D overlap))
-        {
-            hit = new Physics2DHit(target, overlap.PointB, -overlap.Normal, Fixed64.Zero);
-            return true;
-        }
-
-        _ = Vector2d.TryGetMagnitude(displacement, out Fixed64 length);
-        Vector2d direction = displacement.Normalized;
-        bool found = false;
-        Physics2DHit best = default;
-
-        TryKeepCapsuleMoverCapHit(mover.SegmentStart, mover.ScaledRadius, displacement, target, ref found, ref best);
-        TryKeepCapsuleMoverCapHit(mover.SegmentEnd, mover.ScaledRadius, displacement, target, ref found, ref best);
-
-        if (target is LSCircleCollider2D circle)
-        {
-            TryKeepReversePointCapsuleHit(
-                circle.Center,
-                circle.ScaledRadius,
-                mover,
-                displacement,
-                length,
-                target,
-                ref found,
-                ref best);
-        }
-        else if (target is LSCapsuleCollider2D targetCapsule)
-        {
-            TryKeepReversePointCapsuleHit(
-                targetCapsule.SegmentStart,
-                targetCapsule.ScaledRadius,
-                mover,
-                displacement,
-                length,
-                target,
-                ref found,
-                ref best);
-            TryKeepReversePointCapsuleHit(
-                targetCapsule.SegmentEnd,
-                targetCapsule.ScaledRadius,
-                mover,
-                displacement,
-                length,
-                target,
-                ref found,
-                ref best);
-        }
-        else
-        {
-            TrySweepCapsuleSegmentAgainstConvexEdges(mover, direction, length, target, ref found, ref best);
-            for (int i = 0; i < target.VertexCount; i++)
-            {
-                TryKeepReversePointCapsuleHit(
-                    target.GetVertexUnchecked(i),
-                    Fixed64.Zero,
-                    mover,
-                    displacement,
-                    length,
-                    target,
-                    ref found,
-                    ref best);
-            }
-        }
-
-        if (!found)
-        {
-            hit = default;
-            return false;
-        }
-
-        hit = best;
-        return true;
-    }
-
-    private static bool TrySweepConvexMoverAgainstCapsule(
-        LSCollider2D mover,
-        Vector2d displacement,
-        LSCapsuleCollider2D target,
-        out Physics2DHit hit)
-    {
-        if (CollisionDetection2D.TryCollide(mover, target, out Contact2D overlap))
-        {
-            hit = new Physics2DHit(target, overlap.PointB, -overlap.Normal, Fixed64.Zero);
-            return true;
-        }
-
-        if (!TrySweepCapsuleMover(target, -displacement, mover, out Physics2DHit reverseHit))
-        {
-            hit = default;
-            return false;
-        }
-
-        Vector2d normal = -reverseHit.Normal;
-        hit = new Physics2DHit(target, target.GetSupportPoint(normal), normal, reverseHit.Distance);
-        return true;
-    }
-
-    private static bool TrySweepConvexMoverAgainstConvex(
-        LSCollider2D mover,
-        Vector2d displacement,
-        LSCollider2D target,
-        out Physics2DHit hit)
-    {
-        if (CollisionDetection2D.TryCollide(mover, target, out Contact2D overlap))
-        {
-            hit = new Physics2DHit(target, overlap.PointB, -overlap.Normal, Fixed64.Zero);
-            return true;
-        }
-
-        Fixed64 segmentLength = displacement.Magnitude;
-        Fixed64 entryTime = Fixed64.Zero;
-        Fixed64 exitTime = Fixed64.One;
-        Vector2d entryNormal = ResolveQueryFallbackNormal(mover.Center, target.Center);
-
-        if (!TrySweepConvexAxes(mover, mover, target, displacement, ref entryTime, ref exitTime, ref entryNormal)
-            || !TrySweepConvexAxes(target, mover, target, displacement, ref entryTime, ref exitTime, ref entryNormal)
-            || exitTime < Fixed64.Zero)
-        {
-            hit = default;
-            return false;
-        }
-
-        Vector2d point = target.GetSupportPoint(entryNormal);
-        hit = new Physics2DHit(target, point, entryNormal, segmentLength * entryTime);
-        return true;
-    }
-
-    private static void TryKeepCapsuleMoverCapHit(
-        Vector2d capCenter,
-        Fixed64 radius,
-        Vector2d displacement,
-        LSCollider2D target,
-        ref bool found,
-        ref Physics2DHit best)
-    {
-        if (!TrySweepCircle(capCenter, capCenter + displacement, radius, target, out Physics2DHit candidate))
-            return;
-
-        TryKeepEarlierHit(candidate, ref found, ref best);
-    }
-
-    private static void TryKeepReversePointCapsuleHit(
-        Vector2d targetPoint,
-        Fixed64 targetRadius,
-        LSCapsuleCollider2D mover,
-        Vector2d displacement,
-        Fixed64 length,
-        LSCollider2D target,
-        ref bool found,
-        ref Physics2DHit best)
-    {
-        if (!Vector2d.TrySubtract(targetPoint, displacement, out Vector2d reverseEnd)
-            || !new FixedSegment2d(targetPoint, reverseEnd).TryGetCapsuleIntersectionDistanceInterval(
-                mover.Center,
-                mover.WorldAxis,
-                mover.AxisHalfLength,
-                mover.ScaledRadius,
-                targetRadius,
-                length,
-                out Fixed64 distance,
-                out _,
-                out _,
-                out _))
-        {
-            return;
-        }
-
-        Vector2d reversePoint = new FixedSegment2d(targetPoint, reverseEnd)
-            .GetPointAtDistance(distance, length);
-        Vector2d normal = -mover.GetNormalFromCenteredAxis(reversePoint);
-        Vector2d point = targetRadius > Fixed64.Zero
-            ? targetPoint + normal * targetRadius
-            : targetPoint;
-        TryKeepEarlierHit(new Physics2DHit(target, point, normal, distance), ref found, ref best);
-    }
-
-    private static void TrySweepCapsuleSegmentAgainstConvexEdges(
-        LSCapsuleCollider2D mover,
-        Vector2d direction,
-        Fixed64 length,
-        LSCollider2D target,
-        ref bool found,
-        ref Physics2DHit best)
-    {
-        Vector2d segmentStart = mover.SegmentStart;
-        Vector2d segmentEnd = mover.SegmentEnd;
-        for (int i = 0; i < target.VertexCount; i++)
-        {
-            Vector2d edgeStart = target.GetVertexUnchecked(i);
-            Vector2d edgeEnd = target.GetVertexUnchecked((i + 1) % target.VertexCount);
-            Vector2d edge = edgeEnd - edgeStart;
-            Fixed64 edgeLengthSquared = edge.MagnitudeSquared;
-            Vector2d normal = ResolveOutwardEdgeNormal(edgeStart, edge, target.Center);
-            Fixed64 normalVelocity = Vector2d.Dot(direction, normal);
-            if (normalVelocity >= -Fixed64.Epsilon)
-                continue;
-
-            Fixed64 offsetStart = Vector2d.Dot(segmentStart - edgeStart, normal);
-            Fixed64 offsetEnd = Vector2d.Dot(segmentEnd - edgeStart, normal);
-            Fixed64 nearestOffset = FixedMath.Min(offsetStart, offsetEnd);
-            if (nearestOffset <= mover.ScaledRadius)
-                continue;
-
-            Fixed64 distance = (mover.ScaledRadius - nearestOffset) / normalVelocity;
-            if (distance > length)
-                continue;
-
-            Vector2d movedStart = segmentStart + direction * distance;
-            Vector2d movedEnd = segmentEnd + direction * distance;
-            Vector2d tangent = edge / FixedMath.Sqrt(edgeLengthSquared);
-            ProjectSegmentWithRadius(movedStart, movedEnd, tangent, mover.ScaledRadius, out Fixed64 moverMin, out Fixed64 moverMax);
-            Fixed64 edgeA = Vector2d.Dot(edgeStart, tangent);
-            Fixed64 edgeB = Vector2d.Dot(edgeEnd, tangent);
-            Fixed64 edgeMin = FixedMath.Min(edgeA, edgeB);
-            Fixed64 edgeMax = FixedMath.Max(edgeA, edgeB);
-            if (moverMax < edgeMin || edgeMax < moverMin)
-                continue;
-
-            (Vector2d moverPoint, Vector2d edgePoint) = new FixedSegment2d(
-                movedStart,
-                movedEnd).GetClosestPoints(new FixedSegment2d(edgeStart, edgeEnd));
-            Vector2d point = Vector2d.DistanceSquared(moverPoint, edgePoint) > Fixed64.Epsilon
-                ? moverPoint - normal * mover.ScaledRadius
-                : edgePoint;
-            TryKeepEarlierHit(new Physics2DHit(target, point, normal, distance), ref found, ref best);
-        }
-    }
-
-    private static bool TrySweepCircleEdge(
-        Vector2d start,
-        Vector2d direction,
-        Fixed64 segmentLength,
-        Fixed64 radius,
-        Vector2d colliderCenter,
-        Vector2d edgeStart,
-        Vector2d edgeEnd,
-        out Fixed64 distance,
-        out Vector2d point,
-        out Vector2d normal)
-    {
-        Vector2d edge = edgeEnd - edgeStart;
-        Fixed64 edgeLengthSquared = edge.MagnitudeSquared;
-        normal = ResolveOutwardEdgeNormal(edgeStart, edge, colliderCenter);
-        Fixed64 startOffset = Vector2d.Dot(start - edgeStart, normal);
-        Fixed64 directionOffset = Vector2d.Dot(direction, normal);
-        if (startOffset <= radius || directionOffset >= -Fixed64.Epsilon)
-        {
-            distance = default;
-            point = default;
-            return false;
-        }
-
-        distance = (radius - startOffset) / directionOffset;
-        if (distance > segmentLength)
-        {
-            point = default;
-            return false;
-        }
-
-        Vector2d sweptCenter = start + direction * distance;
-        point = sweptCenter - normal * radius;
-        Fixed64 edgeT = Vector2d.Dot(point - edgeStart, edge) / edgeLengthSquared;
-        if (edgeT < Fixed64.Zero || edgeT > Fixed64.One)
-        {
-            distance = default;
-            point = default;
-            normal = default;
-            return false;
-        }
-
-        return true;
-    }
-
-    private static bool TrySweepCircleVertex(
-        Vector2d start,
-        Vector2d end,
-        Vector2d direction,
-        Fixed64 segmentLength,
-        Fixed64 radius,
-        Vector2d vertex,
-        out Fixed64 distance,
-        out Vector2d normal)
-    {
-        if (!TryRaycastCircleDistance(start, end, direction, segmentLength, vertex, radius, out distance))
-        {
-            normal = default;
-            return false;
-        }
-
-        Vector2d sweptCenter = distance == segmentLength
-            ? end
-            : start + direction * distance;
-        normal = sweptCenter == vertex
-            ? ResolveQueryFallbackNormal(sweptCenter, vertex)
-            : (sweptCenter - vertex).Normalized;
-        return true;
-    }
-
-    private static bool TryRaycastCircleDistance(
-        Vector2d start,
-        Vector2d end,
-        Vector2d direction,
-        Fixed64 segmentLength,
-        Vector2d circleCenter,
-        Fixed64 radius,
-        out Fixed64 distance)
-    {
-        return TryRaycastCircleDistance(
-            start,
-            end,
-            direction,
-            segmentLength,
-            circleCenter,
-            radius,
-            Fixed64.Zero,
-            out distance);
-    }
-
-    private static bool TryRaycastCircleDistance(
-        Vector2d start,
-        Vector2d end,
-        Vector2d direction,
-        Fixed64 segmentLength,
-        Vector2d circleCenter,
-        Fixed64 radius,
-        Fixed64 radiusExpansion,
-        out Fixed64 distance)
-    {
-        return RadialSweepAdmission.TryIntersect(
-            start,
-            direction,
-            segmentLength,
-            circleCenter,
-            radius,
-            radiusExpansion,
-            end,
-            circleCenter,
-            out distance);
-    }
-
-    private static bool TrySweepConvexAxes(
-        LSCollider2D axisSource,
-        LSCollider2D mover,
-        LSCollider2D target,
-        Vector2d displacement,
-        ref Fixed64 entryTime,
-        ref Fixed64 exitTime,
-        ref Vector2d entryNormal)
-    {
-        int vertexCount = axisSource.VertexCount;
-        for (int i = 0; i < vertexCount; i++)
-        {
-            Vector2d edge = axisSource.GetVertexUnchecked((i + 1) % vertexCount) - axisSource.GetVertexUnchecked(i);
-            Vector2d axis = edge.RightHandNormal.Normalized;
-            ProjectConvex(mover, axis, out Fixed64 moverMin, out Fixed64 moverMax);
-            ProjectConvex(target, axis, out Fixed64 targetMin, out Fixed64 targetMax);
-
-            Fixed64 velocity = Vector2d.Dot(displacement, axis);
-            if (velocity.Abs() <= Fixed64.Epsilon)
-            {
-                if (moverMax < targetMin || targetMax < moverMin)
-                    return false;
-
-                continue;
-            }
-
-            Fixed64 axisEntry;
-            Fixed64 axisExit;
-            Vector2d axisNormal;
-            if (velocity > Fixed64.Zero)
-            {
-                axisEntry = (targetMin - moverMax) / velocity;
-                axisExit = (targetMax - moverMin) / velocity;
-                axisNormal = -axis;
-            }
-            else
-            {
-                axisEntry = (targetMax - moverMin) / velocity;
-                axisExit = (targetMin - moverMax) / velocity;
-                axisNormal = axis;
-            }
-
-            if (axisEntry > entryTime)
-            {
-                entryTime = axisEntry;
-                entryNormal = axisNormal;
-            }
-
-            if (axisExit < exitTime)
-                exitTime = axisExit;
-
-            if (entryTime > exitTime)
-                return false;
-        }
-
-        return true;
-    }
-
-    private static void ProjectConvex(LSCollider2D collider, Vector2d axis, out Fixed64 min, out Fixed64 max)
-    {
-        min = Vector2d.Dot(collider.GetVertexUnchecked(0), axis);
-        max = min;
-        for (int i = 1; i < collider.VertexCount; i++)
-        {
-            Fixed64 projection = Vector2d.Dot(collider.GetVertexUnchecked(i), axis);
-            if (projection < min)
-                min = projection;
-            else if (projection > max)
-                max = projection;
-        }
-    }
-
-    private static void ProjectCapsule(LSCapsuleCollider2D capsule, Vector2d axis, out Fixed64 min, out Fixed64 max)
-    {
-        Fixed64 start = Vector2d.Dot(capsule.SegmentStart, axis);
-        Fixed64 end = Vector2d.Dot(capsule.SegmentEnd, axis);
-        Fixed64 radius = capsule.ScaledRadius;
-        min = FixedMath.Min(start, end) - radius;
-        max = FixedMath.Max(start, end) + radius;
-    }
-
-    private static void ProjectSegmentWithRadius(
-        Vector2d segmentStart,
-        Vector2d segmentEnd,
-        Vector2d axis,
-        Fixed64 radius,
-        out Fixed64 min,
-        out Fixed64 max)
-    {
-        Fixed64 start = Vector2d.Dot(segmentStart, axis);
-        Fixed64 end = Vector2d.Dot(segmentEnd, axis);
-        min = FixedMath.Min(start, end) - radius;
-        max = FixedMath.Max(start, end) + radius;
-    }
-
-    private static Vector2d FindCapsuleAreaClosestAxis(LSCapsuleCollider2D capsule, ReadOnlySpan<Vector2d> vertices)
-    {
-        Vector2d segmentStart = capsule.SegmentStart;
-        Vector2d segmentEnd = capsule.SegmentEnd;
-        Fixed64 bestDistance = Fixed64.MaxValue;
-        Vector2d bestAxis = Vector2d.Zero;
-
-        for (int i = 0; i < vertices.Length; i++)
-        {
-            Vector2d vertex = vertices[i];
-            Vector2d segmentPoint = new FixedSegment2d(segmentStart, segmentEnd).ClosestPoint(vertex);
-            KeepClosestAxis(vertex - segmentPoint, ref bestDistance, ref bestAxis);
-        }
-
-        Vector2d closestToStart = ClosestPointOnConvexArea(segmentStart, vertices);
-        KeepClosestAxis(closestToStart - segmentStart, ref bestDistance, ref bestAxis);
-        Vector2d closestToEnd = ClosestPointOnConvexArea(segmentEnd, vertices);
-        KeepClosestAxis(closestToEnd - segmentEnd, ref bestDistance, ref bestAxis);
-
-        return bestAxis.MagnitudeSquared > Fixed64.Epsilon
-            ? bestAxis
-            : CalculateAverageCenter(vertices) - capsule.Center;
-    }
-
-    private static void KeepClosestAxis(Vector2d axis, ref Fixed64 bestDistance, ref Vector2d bestAxis)
-    {
-        Fixed64 distance = axis.MagnitudeSquared;
-        if (distance >= bestDistance)
-            return;
-
-        bestDistance = distance;
-        bestAxis = axis;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void TryKeepEarlierHit(Physics2DHit candidate, ref bool found, ref Physics2DHit best)
-    {
-        if (!PhysicsHitSelectionPolicy.ShouldReplace(candidate, found, best))
-            return;
-
-        found = true;
-        best = candidate;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void TryKeepCloserHit(Physics2DHit candidate, ref bool found, ref Physics2DHit best)
-    {
-        if (!PhysicsHitSelectionPolicy.ShouldReplaceDistance(candidate.Distance, found, best.Distance))
-            return;
-
-        found = true;
-        best = candidate;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool SegmentBoundsOverlap(Vector2d start, Vector2d end, LSCollider2D collider)
-    {
-        Fixed64 minX = FixedMath.Min(start.X, end.X);
-        Fixed64 maxX = FixedMath.Max(start.X, end.X);
-        Fixed64 minY = FixedMath.Min(start.Y, end.Y);
-        Fixed64 maxY = FixedMath.Max(start.Y, end.Y);
-        return maxX >= collider.MinX
-            && minX <= collider.MaxX
-            && maxY >= collider.MinY
-            && minY <= collider.MaxY;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool SweepBoundsOverlap(Vector2d start, Vector2d end, Fixed64 radius, LSCollider2D collider)
-    {
-        Fixed64 minX = FixedMath.Min(start.X, end.X) - radius;
-        Fixed64 maxX = FixedMath.Max(start.X, end.X) + radius;
-        Fixed64 minY = FixedMath.Min(start.Y, end.Y) - radius;
-        Fixed64 maxY = FixedMath.Max(start.Y, end.Y) + radius;
-        return maxX >= collider.MinX
-            && minX <= collider.MaxX
-            && maxY >= collider.MinY
-            && minY <= collider.MaxY;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Vector2d ResolveQueryFallbackNormal(Vector2d center, Vector2d colliderCenter)
-    {
-        Vector2d direction = center - colliderCenter;
-        return direction.MagnitudeSquared > Fixed64.Epsilon
-            ? direction.Normalized
-            : Vector2d.Right;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Vector2d ResolveOutwardEdgeNormal(Vector2d edgeStart, Vector2d edge, Vector2d colliderCenter)
-    {
-        Vector2d normal = edge.LeftHandNormal.Normalized;
-        if (Vector2d.Dot(colliderCenter - edgeStart, normal) > Fixed64.Zero)
-            normal = -normal;
-        return normal;
-    }
 }

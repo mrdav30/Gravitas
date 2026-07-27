@@ -40,8 +40,8 @@ public sealed class CylinderContactGeometryCoverageTests
             secondCapCenter - Fixed64.Half * Vector3d.Up
         };
 
-        first.Collider.LineDirection.Should().Be(Vector3d.Right);
-        second.Collider.LineDirection.Should().Be(Vector3d.Right);
+        first.Collider.WorldAxis.Should().Be(Vector3d.Right);
+        second.Collider.WorldAxis.Should().Be(Vector3d.Right);
         pair.CollisionType.Should().Be(CollisionType.Cylinder_Cylinder);
         CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
         AssertHorizontalCapManifold(pair.Manifold, expectedFirstPoints, expectedSecondPoints);

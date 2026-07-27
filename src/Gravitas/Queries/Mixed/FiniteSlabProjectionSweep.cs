@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using System;
@@ -488,6 +489,7 @@ internal static partial class FiniteSlabProjectionSweep
         private readonly LSConeCollider? _cone;
         private readonly FixedRange _slabY;
         private readonly Vector2d _center;
+        private readonly Vector3d _axis;
 
         private ProjectionTarget(
             LSCapsuleCollider? capsule,
@@ -495,13 +497,15 @@ internal static partial class FiniteSlabProjectionSweep
             LSConeCollider? cone,
             Fixed64 slabMinY,
             Fixed64 slabMaxY,
-            Vector2d center)
+            Vector2d center,
+            Vector3d axis)
         {
             _capsule = capsule;
             _cylinder = cylinder;
             _cone = cone;
             _slabY = new FixedRange(slabMinY, slabMaxY);
             _center = center;
+            _axis = axis;
         }
 
         public Vector2d Center => _center;
@@ -515,13 +519,34 @@ internal static partial class FiniteSlabProjectionSweep
         private Vector3d TargetBoundsMax => _capsule?.BoundsMax ?? _cylinder?.BoundsMax ?? _cone!.BoundsMax;
 
         public static ProjectionTarget CreateCapsule(LSCapsuleCollider capsule, Fixed64 slabMinY, Fixed64 slabMaxY) =>
-            new(capsule, null, null, slabMinY, slabMaxY, new Vector2d(capsule.Center.X, capsule.Center.Z));
+            new(
+                capsule,
+                null,
+                null,
+                slabMinY,
+                slabMaxY,
+                new Vector2d(capsule.Center.X, capsule.Center.Z),
+                GetRigidUpAxis(capsule.Rotation));
 
         public static ProjectionTarget CreateCylinder(LSCylinderCollider cylinder, Fixed64 slabMinY, Fixed64 slabMaxY) =>
-            new(null, cylinder, null, slabMinY, slabMaxY, new Vector2d(cylinder.Center.X, cylinder.Center.Z));
+            new(
+                null,
+                cylinder,
+                null,
+                slabMinY,
+                slabMaxY,
+                new Vector2d(cylinder.Center.X, cylinder.Center.Z),
+                GetRigidUpAxis(cylinder.Rotation));
 
         public static ProjectionTarget CreateCone(LSConeCollider cone, Fixed64 slabMinY, Fixed64 slabMaxY) =>
-            new(null, null, cone, slabMinY, slabMaxY, new Vector2d(cone.Center.X, cone.Center.Z));
+            new(
+                null,
+                null,
+                cone,
+                slabMinY,
+                slabMaxY,
+                new Vector2d(cone.Center.X, cone.Center.Z),
+                GetRigidUpAxis(cone.Rotation));
 
         public bool TrySupport(Vector2d direction, out Vector2d support)
         {
@@ -530,8 +555,8 @@ internal static partial class FiniteSlabProjectionSweep
             {
                 return FixedSlabProjection.TryGetCapsuleSupport(
                     _capsule.Center,
-                    _capsule.WorldAxis,
-                    _capsule.AxisHalfLength,
+                    _axis,
+                    _capsule.AxisLength,
                     _capsule.ScaledRadius,
                     _slabY,
                     normal,
@@ -542,8 +567,8 @@ internal static partial class FiniteSlabProjectionSweep
             {
                 return FixedSlabProjection.TryGetCylinderSupport(
                     _cylinder.Center,
-                    _cylinder.LineDirection,
-                    _cylinder.HalfHeight,
+                    _axis,
+                    _cylinder.Height,
                     _cylinder.ScaledRadius,
                     _slabY,
                     normal,
@@ -552,7 +577,7 @@ internal static partial class FiniteSlabProjectionSweep
 
             return FixedSlabProjection.TryGetConeSupport(
                 _cone!.Center,
-                _cone.Axis,
+                _axis,
                 _cone.Height,
                 _cone.ScaledRadius,
                 _slabY,
@@ -565,8 +590,7 @@ internal static partial class FiniteSlabProjectionSweep
             out Vector2d center,
             out Fixed64 radius)
         {
-            Vector3d axis = _capsule?.WorldAxis ?? _cylinder?.LineDirection ?? _cone!.Axis;
-            if ((axis.X != Fixed64.Zero) | (axis.Z != Fixed64.Zero))
+            if ((_axis.X != Fixed64.Zero) | (_axis.Z != Fixed64.Zero))
             {
                 center = default;
                 radius = default;
@@ -579,6 +603,10 @@ internal static partial class FiniteSlabProjectionSweep
         }
 
     }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Vector3d GetRigidUpAxis(FixedQuaternion rotation) =>
+        (rotation * Vector3d.Up).Normalized;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Fixed64 Cross(Vector2d origin, Vector2d first, Vector2d second) =>

@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
 using Gravitas.Constraints;
 
@@ -41,7 +42,7 @@ public sealed partial class GravitasDiagnosticSink
                     center: capsule.Center,
                     rotation: capsule.Rotation,
                     radius: capsule.ScaledRadius,
-                    height: capsule.ScaledSize.Y,
+                    axisLength: capsule.AxisLength,
                     color: color);
                 break;
             case LSCuboidCollider cuboid:
@@ -50,7 +51,7 @@ public sealed partial class GravitasDiagnosticSink
                     cuboid.Id,
                     cuboid.Shape,
                     center: cuboid.Center,
-                    size: cuboid.ScaledSize,
+                    halfExtents: cuboid.OrientedBox.HalfExtents,
                     rotation: cuboid.Rotation,
                     color: color);
                 break;
@@ -119,7 +120,10 @@ public sealed partial class GravitasDiagnosticSink
                     colliderDimension: GravitasColliderDimension.TwoD,
                     collider2DType: box.Shape,
                     center: center,
-                    size: new Vector3d(box.ScaledSize.X, height, box.ScaledSize.Y),
+                    halfExtents: new Vector3d(
+                        box.ScaledHalfExtents.X,
+                        collider.MixedHalfThickness,
+                        box.ScaledHalfExtents.Y),
                     color: color);
                 break;
             case LSCompoundCollider2D compound:
@@ -302,7 +306,14 @@ public sealed partial class GravitasDiagnosticSink
         int triangleCount = mesh.Mesh.TriangleCount;
         for (int i = 0; i < triangleCount; i++)
         {
-            mesh.Mesh.GetTriangleVertices(i, out Vector3d first, out Vector3d second, out Vector3d third);
+            if (!mesh.Mesh.TryGetTriangleVertices(
+                    i,
+                    out Vector3d first,
+                    out Vector3d second,
+                    out Vector3d third))
+            {
+                continue;
+            }
             AddDrawCommand(
                 GravitasDebugDrawKind.WireTriangle,
                 mesh.Id,
@@ -354,7 +365,7 @@ public sealed partial class GravitasDiagnosticSink
                         center: capsule.Center,
                         rotation: capsule.Rotation,
                         radius: capsule.ScaledRadius,
-                        height: capsule.ScaledSize.Y,
+                        axisLength: capsule.AxisLength,
                         color: color);
                     break;
                 case LSCuboidCollider cuboid:
@@ -363,7 +374,7 @@ public sealed partial class GravitasDiagnosticSink
                         compound.Id,
                         compound.Shape,
                         center: cuboid.Center,
-                        size: cuboid.ScaledSize,
+                        halfExtents: cuboid.OrientedBox.HalfExtents,
                         rotation: cuboid.Rotation,
                         color: color);
                     break;
@@ -404,7 +415,14 @@ public sealed partial class GravitasDiagnosticSink
         int triangleCount = mesh.Mesh.TriangleCount;
         for (int i = 0; i < triangleCount; i++)
         {
-            mesh.Mesh.GetTriangleVertices(i, out Vector3d first, out Vector3d second, out Vector3d third);
+            if (!mesh.Mesh.TryGetTriangleVertices(
+                    i,
+                    out Vector3d first,
+                    out Vector3d second,
+                    out Vector3d third))
+            {
+                continue;
+            }
             AddDrawCommand(
                 GravitasDebugDrawKind.WireTriangle,
                 compound.Id,
@@ -446,7 +464,10 @@ public sealed partial class GravitasDiagnosticSink
                         colliderDimension: GravitasColliderDimension.TwoD,
                         collider2DType: compound.Shape,
                         center: center,
-                        size: new Vector3d(box.ScaledSize.X, height, box.ScaledSize.Y),
+                        halfExtents: new Vector3d(
+                            box.ScaledHalfExtents.X,
+                            box.MixedHalfThickness,
+                            box.ScaledHalfExtents.Y),
                         color: color);
                     break;
                 default:
@@ -462,30 +483,48 @@ public sealed partial class GravitasDiagnosticSink
         int colliderId,
         ColliderType2D colliderType)
     {
-        Fixed64 height = capsule.MixedHalfThickness * 2;
-        Vector3d firstCenter = new(capsule.SegmentStart.X, capsule.MixedSlabCenterY, capsule.SegmentStart.Y);
-        Vector3d secondCenter = new(capsule.SegmentEnd.X, capsule.MixedSlabCenterY, capsule.SegmentEnd.Y);
-        AddDrawCommand(
-            GravitasDebugDrawKind.WireCylinder,
-            colliderId,
-            colliderDimension: GravitasColliderDimension.TwoD,
-            collider2DType: colliderType,
-            center: firstCenter,
-            radius: capsule.ScaledRadius,
-            height: height,
-            color: color);
-        AddDrawCommand(
-            GravitasDebugDrawKind.WireCylinder,
-            colliderId,
-            colliderDimension: GravitasColliderDimension.TwoD,
-            collider2DType: colliderType,
-            center: secondCenter,
-            radius: capsule.ScaledRadius,
-            height: height,
-            color: color);
+        bool hasFirstEndpoint = FixedSegment2d.TryGetCenteredAxisEndpoint(
+                capsule.Center,
+                capsule.WorldAxis,
+                capsule.AxisLength,
+                positive: false,
+                out Vector2d firstEndpoint);
+        bool hasSecondEndpoint = FixedSegment2d.TryGetCenteredAxisEndpoint(
+                capsule.Center,
+                capsule.WorldAxis,
+                capsule.AxisLength,
+                positive: true,
+                out Vector2d secondEndpoint);
 
-        Fixed64 segmentLength = Vector2d.Distance(capsule.SegmentStart, capsule.SegmentEnd);
-        if (segmentLength <= Fixed64.Epsilon)
+        Fixed64 height = capsule.MixedHalfThickness * 2;
+        if (hasFirstEndpoint)
+        {
+            AddDrawCommand(
+                GravitasDebugDrawKind.WireCylinder,
+                colliderId,
+                colliderDimension: GravitasColliderDimension.TwoD,
+                collider2DType: colliderType,
+                center: new Vector3d(firstEndpoint.X, capsule.MixedSlabCenterY, firstEndpoint.Y),
+                radius: capsule.ScaledRadius,
+                height: height,
+                color: color);
+        }
+
+        if (hasSecondEndpoint)
+        {
+            AddDrawCommand(
+                GravitasDebugDrawKind.WireCylinder,
+                colliderId,
+                colliderDimension: GravitasColliderDimension.TwoD,
+                collider2DType: colliderType,
+                center: new Vector3d(secondEndpoint.X, capsule.MixedSlabCenterY, secondEndpoint.Y),
+                radius: capsule.ScaledRadius,
+                height: height,
+                color: color);
+        }
+
+        Fixed64 segmentLength = capsule.AxisLength;
+        if (segmentLength <= Fixed64.Epsilon || !hasFirstEndpoint || !hasSecondEndpoint)
             return;
 
         AddDrawCommand(
@@ -494,7 +533,10 @@ public sealed partial class GravitasDiagnosticSink
             colliderDimension: GravitasColliderDimension.TwoD,
             collider2DType: colliderType,
             center: new Vector3d(capsule.Center.X, capsule.MixedSlabCenterY, capsule.Center.Y),
-            size: new Vector3d(capsule.ScaledRadius * 2, height, segmentLength),
+            halfExtents: new Vector3d(
+                capsule.ScaledRadius,
+                capsule.MixedHalfThickness,
+                segmentLength / Fixed64.Two),
             rotation: FixedQuaternion.FromEulerAngles(Fixed64.Zero, capsule.Rotation, Fixed64.Zero),
             color: color);
     }
@@ -509,41 +551,62 @@ public sealed partial class GravitasDiagnosticSink
         ColliderType2D colliderType)
     {
         int vertexCount = collider.VertexCount;
-        Fixed64 topY = collider.MixedSlabCenterY + collider.MixedHalfThickness;
-        Fixed64 bottomY = collider.MixedSlabCenterY - collider.MixedHalfThickness;
+        bool hasTop = Fixed64.TryAdd(
+            collider.MixedSlabCenterY,
+            collider.MixedHalfThickness,
+            out Fixed64 topY);
+        bool hasBottom = Fixed64.TrySubtract(
+            collider.MixedSlabCenterY,
+            collider.MixedHalfThickness,
+            out Fixed64 bottomY);
         for (int i = 0; i < vertexCount; i++)
         {
-            Vector2d current = collider.GetVertexUnchecked(i);
-            Vector2d next = collider.GetVertexUnchecked((i + 1) % vertexCount);
-            Vector3d currentTop = new(current.X, topY, current.Y);
-            Vector3d nextTop = new(next.X, topY, next.Y);
-            Vector3d currentBottom = new(current.X, bottomY, current.Y);
-            Vector3d nextBottom = new(next.X, bottomY, next.Y);
+            if (!collider.TryGetVertex(i, out Vector2d current))
+                continue;
 
-            AddDrawCommand(
-                GravitasDebugDrawKind.Line,
-                colliderId,
-                colliderDimension: GravitasColliderDimension.TwoD,
-                collider2DType: colliderType,
-                start: currentTop,
-                end: nextTop,
-                color: color);
-            AddDrawCommand(
-                GravitasDebugDrawKind.Line,
-                colliderId,
-                colliderDimension: GravitasColliderDimension.TwoD,
-                collider2DType: colliderType,
-                start: currentBottom,
-                end: nextBottom,
-                color: color);
-            AddDrawCommand(
-                GravitasDebugDrawKind.Line,
-                colliderId,
-                colliderDimension: GravitasColliderDimension.TwoD,
-                collider2DType: colliderType,
-                start: currentTop,
-                end: currentBottom,
-                color: color);
+            if (hasTop && hasBottom)
+            {
+                AddDrawCommand(
+                    GravitasDebugDrawKind.Line,
+                    colliderId,
+                    colliderDimension: GravitasColliderDimension.TwoD,
+                    collider2DType: colliderType,
+                    start: new Vector3d(current.X, topY, current.Y),
+                    end: new Vector3d(current.X, bottomY, current.Y),
+                    color: color);
+            }
+
+            if (!collider.TryGetVertex(
+                    (i + 1) % vertexCount,
+                    out Vector2d next))
+            {
+                continue;
+            }
+
+            if (hasTop)
+            {
+                AddDrawCommand(
+                    GravitasDebugDrawKind.Line,
+                    colliderId,
+                    colliderDimension: GravitasColliderDimension.TwoD,
+                    collider2DType: colliderType,
+                    start: new Vector3d(current.X, topY, current.Y),
+                    end: new Vector3d(next.X, topY, next.Y),
+                    color: color);
+            }
+
+            if (hasBottom)
+            {
+                AddDrawCommand(
+                    GravitasDebugDrawKind.Line,
+                    colliderId,
+                    colliderDimension: GravitasColliderDimension.TwoD,
+                    collider2DType: colliderType,
+                    start: new Vector3d(current.X, bottomY, current.Y),
+                    end: new Vector3d(next.X, bottomY, next.Y),
+                    color: color);
+            }
         }
     }
+
 }

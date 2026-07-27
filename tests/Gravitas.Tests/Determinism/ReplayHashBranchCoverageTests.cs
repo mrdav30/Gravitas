@@ -1,5 +1,6 @@
 using Chronicler;
 using FixedMathSharp;
+using FixedMathSharp.Geometry;
 using FixedMathSharp.Chronicler;
 using FluentAssertions;
 using Gravitas.Colliders;
@@ -14,6 +15,31 @@ namespace Gravitas.Tests.Determinism;
 
 public sealed partial class ReplayHashBranchCoverageTests
 {
+    [Fact]
+    public void Collider3DReplayHash_AuthoritativeMode_ShouldIgnoreDerivedBroadPhaseBounds()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<UnsupportedTestCollider3D> body = scenario.CreateBody(
+            new UnsupportedTestCollider3D(),
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+        ChronicleHash authoritative = HashCollider3D(
+            body.Collider,
+            GravitasReplayHashMode.Authoritative);
+        ChronicleHash withCaches = HashCollider3D(
+            body.Collider,
+            GravitasReplayHashMode.AuthoritativeWithSolverCaches);
+
+        body.Collider.OverrideDerivedBoundsForReplayTest(
+            new Vector3d((Fixed64)(-2), (Fixed64)(-3), (Fixed64)(-4)),
+            new Vector3d((Fixed64)2, (Fixed64)3, (Fixed64)4));
+
+        HashCollider3D(body.Collider, GravitasReplayHashMode.Authoritative)
+            .Should().Be(authoritative);
+        HashCollider3D(body.Collider, GravitasReplayHashMode.AuthoritativeWithSolverCaches)
+            .Should().NotBe(withCaches);
+    }
+
     [Fact]
     public void Joint2DReplayHash_AuthoritativeMode_ShouldIgnoreSolverCacheChanges()
     {
@@ -328,6 +354,141 @@ public sealed partial class ReplayHashBranchCoverageTests
     }
 
     [Fact]
+    public void CollisionPairReplayHashes_ShouldEncodeCompoundPartNamespaces()
+    {
+        using PhysicsScenarioBuilder scenario =
+            PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> first =
+            scenario.CreateSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> second =
+            scenario.CreateSphere(Vector3d.Right);
+        scenario.Context.Physics.PrepareReplayColliders();
+        CollisionPair first3D =
+            scenario.CreatePair(first.Collider, second.Collider);
+        CollisionPair second3D =
+            scenario.CreatePair(first.Collider, second.Collider);
+        ContactAnchor anchor3DA = new(
+            FixedSegment.GetCenteredFiniteCylinderSupportAnchor(
+                Vector3d.Zero,
+                FixedQuaternion.Identity,
+                Fixed64.FromRaw(1),
+                Fixed64.Zero,
+                Vector3d.Up));
+        ContactAnchor anchor3DB = new(
+            Vector3d.Right,
+            Vector3d.Left);
+        first3D.Manifold.AddContact(
+            anchor3DA,
+            anchor3DB,
+            Fixed64.Half,
+            Vector3d.Right,
+            PhysicsMaterial.Default,
+            PhysicsMaterial.Default,
+            featureNamespaceA: 1);
+        second3D.Manifold.AddContact(
+            anchor3DA,
+            anchor3DB,
+            Fixed64.Half,
+            Vector3d.Right,
+            PhysicsMaterial.Default,
+            PhysicsMaterial.Default,
+            featureNamespaceA: 2);
+
+        HashPair3D(first3D, GravitasReplayHashMode.Authoritative)
+            .Should()
+            .NotBe(HashPair3D(
+                second3D,
+                GravitasReplayHashMode.Authoritative));
+
+        using GravitasWorldContext context2D =
+            Physics2DTestWorld.CreateContext();
+        LSCircleCollider2D firstCollider2D =
+            CreateBodylessCircle2D(context2D, Vector2d.Zero);
+        SolidBody2D secondBody2D =
+            CreateBody2D(context2D, Vector2d.Right);
+        context2D.Physics2D.PrepareReplayColliders();
+        var first2D = new CollisionPair2D(
+            firstCollider2D,
+            secondBody2D.Collider);
+        var second2D = new CollisionPair2D(
+            firstCollider2D,
+            secondBody2D.Collider);
+        ContactAnchor2D anchor2DA = new(
+            Vector2d.Zero,
+            Vector2d.Right);
+        ContactAnchor2D anchor2DB = new(
+            Vector2d.Right,
+            Vector2d.Left);
+        first2D.Manifold.AddContact(
+            anchor2DA,
+            anchor2DB,
+            Fixed64.Half,
+            Vector2d.Right,
+            PhysicsMaterial.Default,
+            PhysicsMaterial.Default,
+            featureNamespaceA: 1);
+        second2D.Manifold.AddContact(
+            anchor2DA,
+            anchor2DB,
+            Fixed64.Half,
+            Vector2d.Right,
+            PhysicsMaterial.Default,
+            PhysicsMaterial.Default,
+            featureNamespaceA: 2);
+
+        HashPair2D(first2D).Should().NotBe(HashPair2D(second2D));
+    }
+
+    [Fact]
+    public void CollisionPair3DReplayHash_ShouldEncodeExactOddHalfContactFeatures()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> first =
+            scenario.CreateSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> second =
+            scenario.CreateSphere(Vector3d.Right);
+        scenario.Context.Physics.PrepareReplayColliders();
+        CollisionPair positivePair =
+            scenario.CreatePair(first.Collider, second.Collider);
+        CollisionPair negativePair =
+            scenario.CreatePair(first.Collider, second.Collider);
+        FixedPointAnchor positive =
+            FixedSegment.GetCenteredFiniteCylinderSupportAnchor(
+                Vector3d.Zero,
+                FixedQuaternion.Identity,
+                Fixed64.FromRaw(1),
+                Fixed64.Zero,
+                Vector3d.Up);
+        FixedPointAnchor negative =
+            FixedSegment.GetCenteredFiniteCylinderSupportAnchor(
+                Vector3d.Zero,
+                FixedQuaternion.Identity,
+                Fixed64.FromRaw(1),
+                Fixed64.Zero,
+                Vector3d.Down);
+        ContactAnchor common =
+            ContactAnchor.FromWorldPoint(Vector3d.Right);
+        positivePair.Manifold.SetContact(
+            new ContactAnchor(positive),
+            common,
+            Fixed64.One,
+            Vector3d.Up);
+        negativePair.Manifold.SetContact(
+            new ContactAnchor(negative),
+            common,
+            Fixed64.One,
+            Vector3d.Up);
+
+        HashPair3D(
+                positivePair,
+                GravitasReplayHashMode.Authoritative)
+            .Should()
+            .NotBe(HashPair3D(
+                negativePair,
+                GravitasReplayHashMode.Authoritative));
+    }
+
+    [Fact]
     public void CollisionPairMixedReplayHash_ShouldEncodeContactMaterialAndTriggerState()
     {
         using GravitasWorldContext context = CreateMixedContext();
@@ -338,10 +499,15 @@ public sealed partial class ReplayHashBranchCoverageTests
         var nonTriggerPair = new CollisionPairMixed(collider3D, collider2D);
         ChronicleHash empty = HashMixedPair(nonTriggerPair);
         var contact = new MixedContact(
-            Vector3d.Zero,
-            new Vector3d(Fixed64.Half, Fixed64.Zero, Fixed64.Zero),
+            new ContactAnchor(
+                new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero),
+                Vector3d.Right),
+            new ContactAnchor(
+                new Vector3d(Fixed64.MinValue, Fixed64.Zero, Fixed64.Zero),
+                Vector3d.Left),
             Vector3d.Right,
-            Fixed64.FromFraction(1, 4));
+            Fixed64.MaxValue,
+            depthIsClamped: true);
 
         nonTriggerPair.MarkColliding(frame: 5, contact);
         ChronicleHash nonTriggerContact = HashMixedPair(nonTriggerPair);

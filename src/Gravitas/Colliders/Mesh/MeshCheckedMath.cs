@@ -34,17 +34,29 @@ internal static class MeshCheckedMath
     }
 
     internal static bool TryAdd(Vector3d first, Vector3d second, out Vector3d result) =>
-        TryCreateVector(first.X + second.X, first.Y + second.Y, first.Z + second.Z, out result);
+        Vector3d.TryAdd(first, second, out result);
 
     internal static bool TrySubtract(Vector3d first, Vector3d second, out Vector3d result) =>
-        TryCreateVector(first.X - second.X, first.Y - second.Y, first.Z - second.Z, out result);
+        Vector3d.TrySubtract(first, second, out result);
 
     internal static bool TryMultiply(Vector3d first, Vector3d second, out Vector3d result)
     {
         result = default;
-        bool valid = TryMultiply(first.X, second.X, out Fixed64 x);
-        valid &= TryMultiply(first.Y, second.Y, out Fixed64 y);
-        valid &= TryMultiply(first.Z, second.Z, out Fixed64 z);
+        bool valid = Fixed64.TryMultiplyDivide(
+            first.X,
+            second.X,
+            Fixed64.One,
+            out Fixed64 x);
+        valid &= Fixed64.TryMultiplyDivide(
+            first.Y,
+            second.Y,
+            Fixed64.One,
+            out Fixed64 y);
+        valid &= Fixed64.TryMultiplyDivide(
+            first.Z,
+            second.Z,
+            Fixed64.One,
+            out Fixed64 z);
         if (!valid)
             return false;
 
@@ -52,11 +64,54 @@ internal static class MeshCheckedMath
         return true;
     }
 
-    internal static bool TryMultiply(Vector3d value, Fixed64 scalar, out Vector3d result) =>
-        TryCreateVector(value.X * scalar, value.Y * scalar, value.Z * scalar, out result);
+    internal static bool TryMultiply(
+        Vector3d value,
+        Fixed64 scalar,
+        out Vector3d result)
+        => TryMultiplyDivide(
+            value,
+            scalar,
+            Fixed64.One,
+            out result);
 
-    internal static bool TryDivide(Vector3d value, Fixed64 divisor, out Vector3d result) =>
-        TryCreateVector(value.X / divisor, value.Y / divisor, value.Z / divisor, out result);
+    internal static bool TryMultiplyDivide(
+        Vector3d value,
+        Fixed64 multiplier,
+        Fixed64 divisor,
+        out Vector3d result)
+    {
+        result = default;
+        bool valid = Fixed64.TryMultiplyDivide(
+            value.X,
+            multiplier,
+            divisor,
+            out Fixed64 x);
+        valid &= Fixed64.TryMultiplyDivide(
+            value.Y,
+            multiplier,
+            divisor,
+            out Fixed64 y);
+        valid &= Fixed64.TryMultiplyDivide(
+            value.Z,
+            multiplier,
+            divisor,
+            out Fixed64 z);
+        if (!valid)
+            return false;
+
+        result = new Vector3d(x, y, z);
+        return true;
+    }
+
+    internal static bool TryDivide(
+        Vector3d value,
+        Fixed64 divisor,
+        out Vector3d result) =>
+        TryMultiplyDivide(
+            value,
+            Fixed64.One,
+            divisor,
+            out result);
 
     internal static bool TryAdd(Fixed3x3 first, Fixed3x3 second, out Fixed3x3 result) =>
         TryCreateMatrix(first, second, add: true, out result);
@@ -65,57 +120,119 @@ internal static class MeshCheckedMath
         TryCreateMatrix(first, second, add: false, out result);
 
     internal static bool TryMultiply(Fixed3x3 value, Fixed64 scalar, out Fixed3x3 result)
+        => TryMultiplyDivide(
+            value,
+            scalar,
+            Fixed64.One,
+            out result);
+
+    internal static bool TryDivide(
+        Fixed3x3 value,
+        Fixed64 divisor,
+        out Fixed3x3 result) =>
+        TryMultiplyDivide(
+            value,
+            Fixed64.One,
+            divisor,
+            out result);
+
+    private static bool TryMultiplyDivide(
+        Fixed3x3 value,
+        Fixed64 multiplier,
+        Fixed64 divisor,
+        out Fixed3x3 result)
     {
         result = default;
-        Fixed3x3 product = value * scalar;
-        if (!IsRepresentable(product))
+        bool valid = Fixed64.TryMultiplyDivide(
+            value.M11,
+            multiplier,
+            divisor,
+            out Fixed64 m11);
+        valid &= Fixed64.TryMultiplyDivide(
+            value.M12,
+            multiplier,
+            divisor,
+            out Fixed64 m12);
+        valid &= Fixed64.TryMultiplyDivide(
+            value.M13,
+            multiplier,
+            divisor,
+            out Fixed64 m13);
+        valid &= Fixed64.TryMultiplyDivide(
+            value.M21,
+            multiplier,
+            divisor,
+            out Fixed64 m21);
+        valid &= Fixed64.TryMultiplyDivide(
+            value.M22,
+            multiplier,
+            divisor,
+            out Fixed64 m22);
+        valid &= Fixed64.TryMultiplyDivide(
+            value.M23,
+            multiplier,
+            divisor,
+            out Fixed64 m23);
+        valid &= Fixed64.TryMultiplyDivide(
+            value.M31,
+            multiplier,
+            divisor,
+            out Fixed64 m31);
+        valid &= Fixed64.TryMultiplyDivide(
+            value.M32,
+            multiplier,
+            divisor,
+            out Fixed64 m32);
+        valid &= Fixed64.TryMultiplyDivide(
+            value.M33,
+            multiplier,
+            divisor,
+            out Fixed64 m33);
+        if (!valid)
             return false;
 
-        result = product;
+        result = new Fixed3x3(
+            m11,
+            m12,
+            m13,
+            m21,
+            m22,
+            m23,
+            m31,
+            m32,
+            m33);
         return true;
     }
 
-    internal static bool TryAdd(Fixed64 first, Fixed64 second, out Fixed64 result)
-    {
-        result = first + second;
-        return IsRepresentable(result);
-    }
+    internal static bool TryAdd(
+        Fixed64 first,
+        Fixed64 second,
+        out Fixed64 result) =>
+        Fixed64.TryAdd(first, second, out result);
 
-    internal static bool TrySubtract(Fixed64 first, Fixed64 second, out Fixed64 result)
-    {
-        result = first - second;
-        return IsRepresentable(result);
-    }
+    internal static bool TrySubtract(
+        Fixed64 first,
+        Fixed64 second,
+        out Fixed64 result) =>
+        Fixed64.TrySubtract(first, second, out result);
 
-    internal static bool TryMultiply(Fixed64 first, Fixed64 second, out Fixed64 result)
-    {
-        result = first * second;
-        return IsRepresentable(result);
-    }
+    internal static bool TryMultiply(
+        Fixed64 first,
+        Fixed64 second,
+        out Fixed64 result) =>
+        Fixed64.TryMultiplyDivide(
+            first,
+            second,
+            Fixed64.One,
+            out result);
 
-    internal static bool TryNegate(Fixed64 value, out Fixed64 result)
-    {
-        result = -value;
-        return IsRepresentable(result);
-    }
-
-    internal static bool IsRepresentable(Fixed3x3 value) =>
-        IsRepresentable(value.M11) & IsRepresentable(value.M12) & IsRepresentable(value.M13)
-        & IsRepresentable(value.M21) & IsRepresentable(value.M22) & IsRepresentable(value.M23)
-        & IsRepresentable(value.M31) & IsRepresentable(value.M32) & IsRepresentable(value.M33);
+    internal static bool TryNegate(
+        Fixed64 value,
+        out Fixed64 result) =>
+        Fixed64.TrySubtract(Fixed64.Zero, value, out result);
 
     internal static bool IsRepresentable(Fixed64 value) =>
         value != Fixed64.MinValue & value != Fixed64.MaxValue;
-
-    private static bool TryCreateVector(Fixed64 x, Fixed64 y, Fixed64 z, out Vector3d result)
-    {
-        result = default;
-        if (!(IsRepresentable(x) & IsRepresentable(y) & IsRepresentable(z)))
-            return false;
-
-        result = new Vector3d(x, y, z);
-        return true;
-    }
 
     private static bool TryCreateMatrix(Fixed3x3 first, Fixed3x3 second, bool add, out Fixed3x3 result)
     {

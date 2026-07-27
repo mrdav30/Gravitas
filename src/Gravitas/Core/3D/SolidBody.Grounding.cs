@@ -13,6 +13,7 @@ using Gravitas.Support;
 using SwiftCollections;
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 
 namespace Gravitas;
 
@@ -60,7 +61,34 @@ public partial class SolidBody
     private Vector3d _hitPlatformPosition;
 
     private Vector3d _hitPoint;
-    public Vector3d HitPoint => _hitPoint;
+    private bool _hasHitPoint;
+
+    /// <summary>
+    /// Gets whether the current ground point is representable.
+    /// </summary>
+    public bool HasHitPoint => _hasHitPoint;
+
+    /// <summary>
+    /// Gets the current materialized ground point.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// No representable ground point is available.
+    /// </exception>
+    public Vector3d HitPoint =>
+        _hasHitPoint || !_isGrounded
+            ? _hitPoint
+            : throw new InvalidOperationException(
+                "No representable ground point is available. Use TryGetHitPoint.");
+
+    /// <summary>
+    /// Attempts to get the current materialized ground point.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool TryGetHitPoint(out Vector3d hitPoint)
+    {
+        hitPoint = _hitPoint;
+        return _hasHitPoint;
+    }
 
     public Action<bool>? OnGrounded;
 
@@ -221,7 +249,7 @@ public partial class SolidBody
             return;
         }
 
-        SetGroundingState(hit.Point, hit.Normal, hit.Collider!.Transform);
+        SetGroundingState(hit.Anchor, hit.Normal, hit.Collider!.Transform);
     }
 
     private bool TryFindGroundHit(
@@ -323,11 +351,12 @@ public partial class SolidBody
 
         return Collider switch
         {
-            LSSphereCollider sphere => sphere.ScaledRadius,
-            LSCapsuleCollider capsule => capsule.ScaledRadius,
-            LSCylinderCollider cylinder => cylinder.ScaledRadius,
-            LSCuboidCollider cuboid => FixedMath.Min(cuboid.Bounds.Scope.X, cuboid.Bounds.Scope.Z),
-            LSCompoundCollider compound => FixedMath.Min(compound.Bounds.Scope.X, compound.Bounds.Scope.Z),
+            LSSphereCollider or
+            LSCapsuleCollider or
+            LSCylinderCollider or
+            LSCuboidCollider or
+            LSCompoundCollider =>
+                Collider.CanonicalGroundProbeRadius,
             _ => Fixed64.Zero
         };
     }
@@ -338,11 +367,35 @@ public partial class SolidBody
         ResetGroundCalculations();
     }
 
+    private void ApplyGroundedHeightOrReset()
+    {
+        if (_isGrounded)
+        {
+            if (TryGetHitPoint(out Vector3d hitPoint))
+                HeightPos = hitPoint.Y;
+            return;
+        }
+
+        ResetGroundCalculations();
+    }
+
     private void SetGroundingState(Vector3d hitPoint, Vector3d groundNormal, FixedTransform? hitPlatform)
     {
         _hitPlatform = hitPlatform;
         _hitPlatformPosition = _hitPlatform?.WorldPosition ?? Vector3d.Zero;
         _hitPoint = hitPoint;
+        _hasHitPoint = true;
+        _groundNormal = groundNormal;
+
+        RefreshGroundNormalForce();
+        IsGrounded = true;
+    }
+
+    private void SetGroundingState(ContactAnchor anchor, Vector3d groundNormal, FixedTransform hitPlatform)
+    {
+        _hitPlatform = hitPlatform;
+        _hitPlatformPosition = hitPlatform.WorldPosition;
+        _hasHitPoint = anchor.TryGetWorldPoint(out _hitPoint);
         _groundNormal = groundNormal;
 
         RefreshGroundNormalForce();
@@ -367,6 +420,7 @@ public partial class SolidBody
         _hitPlatform = null;
         _hitPlatformPosition = Vector3d.Zero;
         _hitPoint = Vector3d.Zero;
+        _hasHitPoint = false;
         _groundNormal = Vector3d.Zero;
         _normalForce = Vector3d.Zero;
     }

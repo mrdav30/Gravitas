@@ -19,8 +19,6 @@ internal readonly struct SolverContact2D
         ulong contactId,
         ResponseBody2D bodyA,
         ResponseBody2D bodyB,
-        Vector2d pointA,
-        Vector2d pointB,
         Vector2d relativeA,
         Vector2d relativeB,
         Fixed64 depth,
@@ -33,8 +31,6 @@ internal readonly struct SolverContact2D
         ContactId = contactId;
         A = bodyA;
         B = bodyB;
-        PointA = pointA;
-        PointB = pointB;
         RelativeA = relativeA;
         RelativeB = relativeB;
         Depth = depth;
@@ -55,10 +51,6 @@ internal readonly struct SolverContact2D
     public ResponseBody2D A { get; }
 
     public ResponseBody2D B { get; }
-
-    public Vector2d PointA { get; }
-
-    public Vector2d PointB { get; }
 
     public Vector2d RelativeA { get; }
 

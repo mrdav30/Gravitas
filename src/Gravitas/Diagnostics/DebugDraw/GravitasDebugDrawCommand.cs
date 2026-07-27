@@ -27,12 +27,13 @@ public readonly struct GravitasDebugDrawCommand
         Vector3d start,
         Vector3d end,
         Vector3d center,
-        Vector3d size,
+        Vector3d halfExtents,
         Vector3d pointA,
         Vector3d pointB,
         Vector3d pointC,
         FixedQuaternion rotation,
         Fixed64 radius,
+        Fixed64 axisLength,
         Fixed64 height,
         GravitasDiagnosticColor color)
     {
@@ -46,12 +47,13 @@ public readonly struct GravitasDebugDrawCommand
         Start = start;
         End = end;
         Center = center;
-        Size = size;
+        HalfExtents = halfExtents;
         PointA = pointA;
         PointB = pointB;
         PointC = pointC;
         Rotation = rotation;
         Radius = radius;
+        AxisLength = axisLength;
         Height = height;
         Color = color;
     }
@@ -76,7 +78,11 @@ public readonly struct GravitasDebugDrawCommand
 
     public Vector3d Center { get; }
 
-    public Vector3d Size { get; }
+    /// <summary>
+    /// Gets the center-relative half-extents for
+    /// <see cref="GravitasDebugDrawKind.WireBox"/> commands.
+    /// </summary>
+    public Vector3d HalfExtents { get; }
 
     public Vector3d PointA { get; }
 
@@ -87,6 +93,12 @@ public readonly struct GravitasDebugDrawCommand
     public FixedQuaternion Rotation { get; }
 
     public Fixed64 Radius { get; }
+
+    /// <summary>
+    /// Gets the full distance between hemisphere centers for
+    /// <see cref="GravitasDebugDrawKind.WireCapsule"/> commands.
+    /// </summary>
+    public Fixed64 AxisLength { get; }
 
     public Fixed64 Height { get; }
 

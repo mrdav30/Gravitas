@@ -174,6 +174,8 @@ public partial class SolidBody
                             elapsedTime,
                             remainingTime,
                             sourceIsKinematic: false));
+                // Stable trajectories and candidate ownership make a retained
+                // witness rediscoverable or terminally clamped within this arbiter.
                 bool deferUnresolvedWitness = !responseWitnessIsEarliest
                     && witnessedTime > conservativeTime
                     && conservativeTime > Fixed64.Epsilon
@@ -297,7 +299,9 @@ public partial class SolidBody
                 displacement,
                 pivotRadius);
         if (angularDistance <= Fixed64.Epsilon && !targetRequiresRotationalSampling)
+        {
             return false;
+        }
 
         Fixed64 angularArcLength = angularDistance * pivotRadius;
         if (pivotRadius <= Fixed64.Epsilon

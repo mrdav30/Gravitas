@@ -6,7 +6,9 @@
 //=======================================================================
 
 using FixedMathSharp;
+using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
+using System;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas.CollisionHandling;
@@ -20,19 +22,43 @@ public static partial class CollisionDetection
         var cylinder = (LSCylinderCollider)pair.ColliderA;
         var sphere = (LSSphereCollider)pair.ColliderB;
 
-        Vector3d cylinderPoint = cylinder.ClosestPointOnSurface(sphere.Center);
-        Vector3d delta = sphere.Center - cylinderPoint;
-        if (delta.MagnitudeSquared > sphere.ScaledRadiusSqr)
+        if (!FixedSegment.TryGetClosestCenteredFiniteCylinderSurfaceAnchor(
+                sphere.Center,
+                cylinder.Center,
+                cylinder.Rotation,
+                Vector3d.Up,
+                cylinder.Height,
+                cylinder.ScaledRadius,
+                Vector3d.Right,
+                out FixedPointAnchor cylinderAnchor,
+                out Vector3d outwardNormal,
+                out Fixed64 signedDistance))
+        {
+            return false;
+        }
+        if (signedDistance > sphere.ScaledRadius)
             return false;
 
-        Fixed64 distance = delta.Magnitude;
-        Vector3d normal = ResolveNormal(delta, sphere.Center - cylinder.Center);
-        Vector3d spherePoint = sphere.Center - normal * sphere.ScaledRadius;
+        Vector3d normal = signedDistance < Fixed64.Zero
+            ? -outwardNormal
+            : outwardNormal;
+        ResolvePenetrationDepth(
+            sphere.ScaledRadius,
+            signedDistance,
+            out Fixed64 penetrationDepth,
+            out bool depthIsClamped);
         pair.Manifold.SetContact(
-            cylinderPoint,
-            spherePoint,
-            sphere.ScaledRadius - distance,
-            normal);
+            new ContactAnchor(cylinderAnchor),
+            new ContactAnchor(
+                FixedSegment.GetCenteredCapsuleSupportAnchor(
+                    sphere.Center,
+                    sphere.Rotation,
+                    Fixed64.Zero,
+                    sphere.ScaledRadius,
+                    -normal)),
+            penetrationDepth,
+            normal,
+            depthIsClamped);
 
         return true;
     }
@@ -52,23 +78,31 @@ public static partial class CollisionDetection
             capsule = (LSCapsuleCollider)pair.ColliderA;
         }
 
-        if (!TestCylinderCapsuleSeparatingAxes(cylinder, capsule, out AxisPenetration penetration))
+        if (!FixedSegment.TryGetCenteredFiniteCylinderCapsuleContact(
+                cylinder.Center,
+                cylinder.Rotation,
+                Vector3d.Up,
+                cylinder.Height,
+                cylinder.ScaledRadius,
+                capsule.Center,
+                capsule.Rotation,
+                Vector3d.Up,
+                capsule.AxisLength,
+                capsule.ScaledRadius,
+                out FixedContactAnchors contact))
+        {
             return false;
+        }
 
-        Vector3d capsuleLinePoint = Vector3d.ClosestPointOnLineSegment(
-            cylinder.Center,
-            capsule.LineSegmentStart,
-            capsule.LineSegmentEnd);
-        Vector3d cylinderPoint = cylinder.ClosestPointOnSurface(capsuleLinePoint);
-        Vector3d capsulePoint = capsule.ClosestPointOnSurface(cylinderPoint);
         SetContactInPairOrder(
             pair,
             cylinder,
-            cylinderPoint,
+            new ContactAnchor(contact.FirstAnchor),
             capsule,
-            capsulePoint,
-            penetration.Depth,
-            penetration.Axis);
+            new ContactAnchor(contact.SecondAnchor),
+            contact.Depth,
+            contact.Normal,
+            contact.DepthIsClamped);
 
         return true;
     }
@@ -78,19 +112,37 @@ public static partial class CollisionDetection
         var cylinderA = (LSCylinderCollider)pair.ColliderA;
         var cylinderB = (LSCylinderCollider)pair.ColliderB;
 
-        if (!TestCylinderCylinderSeparatingAxes(cylinderA, cylinderB, out AxisPenetration penetration))
+        if (!FixedSegment.TryGetCenteredFiniteCylindersContact(
+                cylinderA.Center,
+                cylinderA.Rotation,
+                Vector3d.Up,
+                cylinderA.Height,
+                cylinderA.ScaledRadius,
+                cylinderB.Center,
+                cylinderB.Rotation,
+                Vector3d.Up,
+                cylinderB.Height,
+                cylinderB.ScaledRadius,
+                out FixedContactAnchors contact))
+        {
             return false;
+        }
 
-        if (TryAddCylinderCylinderCapContacts(pair, cylinderA, cylinderB, penetration))
+        if (TryAddCylinderCylinderCapContacts(
+                pair,
+                cylinderA,
+                cylinderB,
+                contact))
+        {
             return true;
+        }
 
-        Vector3d cylinderAPoint = cylinderA.ClosestPointOnSurface(cylinderB.Center);
-        Vector3d cylinderBPoint = cylinderB.ClosestPointOnSurface(cylinderAPoint);
         pair.Manifold.SetContact(
-            cylinderAPoint,
-            cylinderBPoint,
-            penetration.Depth,
-            penetration.Axis);
+            new ContactAnchor(contact.FirstAnchor),
+            new ContactAnchor(contact.SecondAnchor),
+            contact.Depth,
+            contact.Normal,
+            contact.DepthIsClamped);
 
         return true;
     }
@@ -100,20 +152,48 @@ public static partial class CollisionDetection
         var cuboid = (LSCuboidCollider)pair.ColliderA;
         var cylinder = (LSCylinderCollider)pair.ColliderB;
 
-        if (!TestCuboidCylinderSeparatingAxes(cuboid, cylinder, out AxisPenetration penetration))
+        Span<FixedContactLocalPoints> capFaceContacts =
+            stackalloc FixedContactLocalPoints[ContactManifold.MaxContactCount];
+        if (!cuboid.OrientedBox.TryGetCenteredCylinderContact(
+                cylinder.Center,
+                cylinder.Rotation,
+                Vector3d.Up,
+                cylinder.Height,
+                cylinder.ScaledRadius,
+                capFaceContacts,
+                out FixedContactAnchors contact,
+                out int capFaceContactCount))
+        {
             return false;
+        }
 
-        if (TryAddCuboidCylinderCapContacts(pair, cuboid, cylinder, penetration))
+        if (capFaceContactCount > 0)
+        {
+            for (int index = 0; index < capFaceContactCount; index++)
+            {
+                FixedContactLocalPoints capContact = capFaceContacts[index];
+                pair.Manifold.AddContact(
+                    new ContactAnchor(
+                        contact.FirstAnchor.Origin,
+                        contact.FirstAnchor.Rotation,
+                        capContact.FirstLocalPoint),
+                    new ContactAnchor(
+                        contact.SecondAnchor.Origin,
+                        contact.SecondAnchor.Rotation,
+                        capContact.SecondLocalPoint),
+                    contact.Depth,
+                    contact.Normal,
+                    contact.DepthIsClamped);
+            }
             return true;
+        }
 
-        Vector3d cuboidPoint = cuboid.ClosestPointOnSurface(cylinder.Center);
-        Vector3d cylinderPoint = cylinder.ClosestPointOnSurface(cuboidPoint);
         pair.Manifold.SetContact(
-            cuboidPoint,
-            cylinderPoint,
-            penetration.Depth,
-            penetration.Axis);
-
+            new ContactAnchor(contact.FirstAnchor),
+            new ContactAnchor(contact.SecondAnchor),
+            contact.Depth,
+            contact.Normal,
+            contact.DepthIsClamped);
         return true;
     }
 
@@ -121,283 +201,96 @@ public static partial class CollisionDetection
         CollisionWorkItem pair,
         LSCylinderCollider cylinderA,
         LSCylinderCollider cylinderB,
-        AxisPenetration penetration)
+        FixedContactAnchors contact)
     {
-        if (!CylinderContactGeometry.IsAxisAligned(penetration.Axis, cylinderA.LineDirection)
-            || !CylinderContactGeometry.IsAxisAligned(penetration.Axis, cylinderB.LineDirection))
+        if (contact.FirstAnchor.LocalDisplacement != Vector3d.Zero
+            || contact.SecondAnchor.LocalDisplacement != Vector3d.Zero)
         {
             return false;
         }
 
-        Vector3d capCenter = CylinderContactGeometry.GetCapCenter(cylinderA, penetration.Axis);
         CylinderContactGeometry.GetCapBasis(cylinderA, out Vector3d tangentA, out Vector3d tangentB);
-        AddCylinderCylinderCapContact(pair, capCenter + tangentA * cylinderA.ScaledRadius, penetration);
-        AddCylinderCylinderCapContact(pair, capCenter - tangentA * cylinderA.ScaledRadius, penetration);
-        AddCylinderCylinderCapContact(pair, capCenter + tangentB * cylinderA.ScaledRadius, penetration);
-        AddCylinderCylinderCapContact(pair, capCenter - tangentB * cylinderA.ScaledRadius, penetration);
-        return pair.Manifold.HasContact;
-    }
-
-    private static bool TryAddCuboidCylinderCapContacts(
-        CollisionWorkItem pair,
-        LSCuboidCollider cuboid,
-        LSCylinderCollider cylinder,
-        AxisPenetration penetration)
-    {
-        if (!CylinderContactGeometry.IsAxisAligned(penetration.Axis, cylinder.LineDirection))
-            return false;
-
-        Vector3d capCenter = CylinderContactGeometry.GetCapCenter(cylinder, -penetration.Axis);
-        CylinderContactGeometry.GetCapBasis(cylinder, out Vector3d tangentA, out Vector3d tangentB);
-        AddCuboidCylinderCapContact(pair, cuboid, cylinder, capCenter + tangentA * cylinder.ScaledRadius, penetration);
-        AddCuboidCylinderCapContact(pair, cuboid, cylinder, capCenter - tangentA * cylinder.ScaledRadius, penetration);
-        AddCuboidCylinderCapContact(pair, cuboid, cylinder, capCenter + tangentB * cylinder.ScaledRadius, penetration);
-        AddCuboidCylinderCapContact(pair, cuboid, cylinder, capCenter - tangentB * cylinder.ScaledRadius, penetration);
-        return pair.Manifold.HasContact;
+        int initialCount = pair.Manifold.Count;
+        TryAddCylinderCylinderCapContact(pair, cylinderA, cylinderB, tangentA, contact);
+        TryAddCylinderCylinderCapContact(pair, cylinderA, cylinderB, -tangentA, contact);
+        TryAddCylinderCylinderCapContact(pair, cylinderA, cylinderB, tangentB, contact);
+        TryAddCylinderCylinderCapContact(pair, cylinderA, cylinderB, -tangentB, contact);
+        return pair.Manifold.Count > initialCount;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void AddCylinderCylinderCapContact(
+    private static void TryAddCylinderCylinderCapContact(
         CollisionWorkItem pair,
-        Vector3d pointOnA,
-        AxisPenetration penetration)
-    {
-        pair.Manifold.AddContact(
-            pointOnA,
-            pointOnA - penetration.Axis * penetration.Depth,
-            penetration.Depth,
-            penetration.Axis);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void AddCuboidCylinderCapContact(
-        CollisionWorkItem pair,
-        LSCuboidCollider cuboid,
-        LSCylinderCollider cylinder,
-        Vector3d pointOnCylinder,
-        AxisPenetration penetration)
-    {
-        Vector3d pointOnCuboid = pointOnCylinder + penetration.Axis * penetration.Depth;
-        pair.Manifold.AddContact(
-            pointOnCuboid,
-            pointOnCylinder,
-            penetration.Depth,
-            penetration.Axis);
-    }
-
-    private static bool TestCylinderCapsuleSeparatingAxes(
-        LSCylinderCollider cylinder,
-        LSCapsuleCollider capsule,
-        out AxisPenetration penetration)
-    {
-        penetration = default;
-
-        if (!CheckCylinderCapsuleAxis(cylinder, capsule, cylinder.LineDirection, ref penetration))
-            return false;
-
-        if (!CheckCylinderCapsuleAxis(cylinder, capsule, capsule.LineDirection, ref penetration))
-            return false;
-
-        Vector3d crossAxis = Vector3d.Cross(cylinder.LineDirection, capsule.LineDirection);
-        if (!CheckCylinderCapsuleAxis(cylinder, capsule, crossAxis, ref penetration))
-            return false;
-
-        (Vector3d CylinderPoint, Vector3d CapsulePoint) closestPoints = ClosestPointsOnSegments(
-            cylinder.LineSegmentStart,
-            cylinder.LineSegmentEnd,
-            capsule.LineSegmentStart,
-            capsule.LineSegmentEnd);
-        if (!CheckCylinderCapsuleAxis(cylinder, capsule, closestPoints.CapsulePoint - closestPoints.CylinderPoint, ref penetration))
-            return false;
-
-        return penetration.HasValue;
-    }
-
-    private static bool TestCylinderCylinderSeparatingAxes(
         LSCylinderCollider cylinderA,
         LSCylinderCollider cylinderB,
-        out AxisPenetration penetration)
+        Vector3d radialDirection,
+        FixedContactAnchors contact)
     {
-        penetration = default;
-
-        if (!CheckCylinderCylinderAxis(cylinderA, cylinderB, cylinderA.LineDirection, ref penetration))
-            return false;
-
-        if (!CheckCylinderCylinderAxis(cylinderA, cylinderB, cylinderB.LineDirection, ref penetration))
-            return false;
-
-        // The closest-segment axis below also rejects cross-axis separation, but this ordered
-        // early-out avoids the more expensive segment solve for skew separated cylinders.
-        Vector3d crossAxis = Vector3d.Cross(cylinderA.LineDirection, cylinderB.LineDirection);
-        if (!CheckCylinderCylinderAxis(cylinderA, cylinderB, crossAxis, ref penetration))
-            return false;
-
-        (Vector3d PointA, Vector3d PointB) closestPoints = ClosestPointsOnSegments(
-            cylinderA.LineSegmentStart,
-            cylinderA.LineSegmentEnd,
-            cylinderB.LineSegmentStart,
-            cylinderB.LineSegmentEnd);
-        if (!CheckCylinderCylinderAxis(cylinderA, cylinderB, closestPoints.PointB - closestPoints.PointA, ref penetration))
-            return false;
-
-        return penetration.HasValue;
-    }
-
-    private static bool TestCuboidCylinderSeparatingAxes(
-        LSCuboidCollider cuboid,
-        LSCylinderCollider cylinder,
-        out AxisPenetration penetration)
-    {
-        penetration = default;
-
-        if (!CheckCuboidCylinderAxis(cuboid, cylinder, cylinder.LineDirection, ref penetration))
-            return false;
-
-        for (int i = 0; i < cuboid.FaceNormals.Length; i++)
-        {
-            if (!CheckCuboidCylinderAxis(cuboid, cylinder, cuboid.FaceNormals[i], ref penetration))
-                return false;
-        }
-
-        for (int i = 0; i < cuboid.EdgeDirections.Length; i++)
-        {
-            Vector3d crossAxis = Vector3d.Cross(cuboid.EdgeDirections[i], cylinder.LineDirection);
-            if (!CheckCuboidCylinderAxis(cuboid, cylinder, crossAxis, ref penetration))
-                return false;
-        }
-
-        Vector3d linePoint = Vector3d.ClosestPointOnLineSegment(
-            cuboid.Center,
-            cylinder.LineSegmentStart,
-            cylinder.LineSegmentEnd);
-        Vector3d cuboidPoint = cuboid.ClosestPointOnSurface(linePoint);
-        if (!CheckCuboidCylinderAxis(cuboid, cylinder, linePoint - cuboidPoint, ref penetration))
-            return false;
-
-        return penetration.HasValue;
-    }
-
-    private static bool CheckCylinderCapsuleAxis(
-        LSCylinderCollider cylinder,
-        LSCapsuleCollider capsule,
-        Vector3d axis,
-        ref AxisPenetration penetration)
-    {
-        if (!TryNormalizeAxis(axis, out Vector3d normalizedAxis))
-            return true;
-
-        FixedRange cylinderProjection = AxisProjectionHelper.ProjectCylinderOntoAxis(
-            normalizedAxis,
-            cylinder.LineSegmentStart,
-            cylinder.LineSegmentEnd,
-            cylinder.LineDirection,
-            cylinder.ScaledRadius);
-        FixedRange capsuleProjection = AxisProjectionHelper.ProjectCapsuleOntoAxis(
-            normalizedAxis,
-            capsule.LineSegmentStart,
-            capsule.LineSegmentEnd,
-            capsule.ScaledRadius);
-
-        return CheckProjectedAxis(
-            cylinderProjection,
-            capsuleProjection,
-            normalizedAxis,
-            capsule.Center - cylinder.Center,
-            ref penetration);
-    }
-
-    private static bool CheckCylinderCylinderAxis(
-        LSCylinderCollider cylinderA,
-        LSCylinderCollider cylinderB,
-        Vector3d axis,
-        ref AxisPenetration penetration)
-    {
-        if (!TryNormalizeAxis(axis, out Vector3d normalizedAxis))
-            return true;
-
-        FixedRange projectionA = AxisProjectionHelper.ProjectCylinderOntoAxis(
-            normalizedAxis,
-            cylinderA.LineSegmentStart,
-            cylinderA.LineSegmentEnd,
-            cylinderA.LineDirection,
-            cylinderA.ScaledRadius);
-        FixedRange projectionB = AxisProjectionHelper.ProjectCylinderOntoAxis(
-            normalizedAxis,
-            cylinderB.LineSegmentStart,
-            cylinderB.LineSegmentEnd,
-            cylinderB.LineDirection,
-            cylinderB.ScaledRadius);
-
-        return CheckProjectedAxis(
-            projectionA,
-            projectionB,
-            normalizedAxis,
-            cylinderB.Center - cylinderA.Center,
-            ref penetration);
-    }
-
-    private static bool CheckCuboidCylinderAxis(
-        LSCuboidCollider cuboid,
-        LSCylinderCollider cylinder,
-        Vector3d axis,
-        ref AxisPenetration penetration)
-    {
-        if (!TryNormalizeAxis(axis, out Vector3d normalizedAxis))
-            return true;
-
-        FixedRange cuboidProjection = FixedRange.MinRange;
-        AxisProjectionHelper.ProjectPolygonOntoAxis(normalizedAxis, cuboid.Vertices, ref cuboidProjection);
-        FixedRange cylinderProjection = AxisProjectionHelper.ProjectCylinderOntoAxis(
-            normalizedAxis,
-            cylinder.LineSegmentStart,
-            cylinder.LineSegmentEnd,
-            cylinder.LineDirection,
-            cylinder.ScaledRadius);
-
-        return CheckProjectedAxis(
-            cuboidProjection,
-            cylinderProjection,
-            normalizedAxis,
-            cylinder.Center - cuboid.Center,
-            ref penetration);
+        pair.Manifold.AddContact(
+            new ContactAnchor(ConvexColliderSupport.GetSupportAnchor(
+                cylinderA,
+                contact.Normal + radialDirection,
+                Vector3d.Zero)),
+            new ContactAnchor(ConvexColliderSupport.GetSupportAnchor(
+                cylinderB,
+                -contact.Normal + radialDirection,
+                Vector3d.Zero)),
+            contact.Depth,
+            contact.Normal,
+            contact.DepthIsClamped);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Vector3d ResolveNormal(Vector3d delta, Vector3d fallback)
+    private static void ResolvePenetrationDepth(
+        Fixed64 radius,
+        Fixed64 signedDistance,
+        out Fixed64 depth,
+        out bool depthIsClamped)
     {
-        if (delta.MagnitudeSquared > Fixed64.Epsilon)
-            return delta.Normalized;
+        if (Fixed64.TrySubtract(radius, signedDistance, out depth))
+        {
+            depthIsClamped = false;
+            return;
+        }
 
-        if (fallback.MagnitudeSquared > Fixed64.Epsilon)
-            return fallback.Normalized;
-
-        return Vector3d.Right;
+        depth = Fixed64.MaxValue;
+        depthIsClamped = true;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Vector3d OrientNormal(Vector3d normal, Vector3d desiredDirection)
-    {
-        Vector3d resolved = ResolveNormal(normal, desiredDirection);
-        return Vector3d.Dot(resolved, desiredDirection) < Fixed64.Zero ? -resolved : resolved;
-    }
+    private static Vector3d ResolveNormal(Vector3d delta) =>
+        delta.MagnitudeSquared > Fixed64.Epsilon
+            ? delta.Normalized
+            : Vector3d.Right;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void SetContactInPairOrder(
         CollisionWorkItem pair,
         LSCollider first,
-        Vector3d pointOnFirst,
+        ContactAnchor anchorOnFirst,
         LSCollider second,
-        Vector3d pointOnSecond,
+        ContactAnchor anchorOnSecond,
         Fixed64 depth,
-        Vector3d normalFirstToSecond)
+        Vector3d normalFirstToSecond,
+        bool depthIsClamped)
     {
         if (ReferenceEquals(pair.ColliderA, first))
         {
-            pair.Manifold.SetContact(pointOnFirst, pointOnSecond, depth, normalFirstToSecond);
+            pair.Manifold.SetContact(
+                anchorOnFirst,
+                anchorOnSecond,
+                depth,
+                normalFirstToSecond,
+                depthIsClamped);
             return;
         }
 
-        pair.Manifold.SetContact(pointOnSecond, pointOnFirst, depth, -normalFirstToSecond);
+        pair.Manifold.SetContact(
+            anchorOnSecond,
+            anchorOnFirst,
+            depth,
+            -normalFirstToSecond,
+            depthIsClamped);
     }
 
     #endregion

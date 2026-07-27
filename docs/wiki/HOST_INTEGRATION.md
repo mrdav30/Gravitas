@@ -275,23 +275,39 @@ atomic runtime operation rather than transitioning links individually.
 Static bodies do not poll their host transforms. `SetPosition(...)`,
 `SetRotation(...)`, and 3D `UpdateRotation(...)` are the authoritative explicit
 repositioning surface; they refresh pure and mixed partition membership
-immediately so queries observe the new pose without a simulation step.
+immediately so queries observe the new pose without a simulation step. A pose
+change first prepares the complete collider candidate, including exact scale,
+canonical geometry, bounds, and mass properties. If that candidate is invalid,
+the body pose, host transform, committed collider state, and partitions remain
+unchanged.
 
 Bodyless 3D and 2D colliders rebuild from their agent transform during the next
 fixed-step partition preparation. If the host mutates a bodyless collider's
 transform and needs query results before the next step, call
 `collider.Simulate()` after the mutation to refresh bounds and partition
-membership immediately.
+membership immediately. The bodyless 3D `LSCollider.Position` and `Rotation`
+setters are the transactional alternative: they validate the tentative world
+pose and publish the host transform, canonical geometry, mass properties, and
+partitions only after the whole candidate succeeds.
 
 Authored `FixedTransform.LocalScale` may be signed or zero, but physical
 collider dimensions may not. Gravitas requires every consumed authored local
-axis throughout the transform ancestry, plus the resulting hierarchy-derived
-`LossyScale`, to remain positive: X/Z for 2D colliders and X/Y/Z for 3D
-colliders. This deliberately rejects canceled pairs of reflections because
-`WorldRotation` plus canonical `LossyScale` cannot preserve which authored axes
-were reflected. Initialization and runtime rebuild reject invalid scale before
-changing body registration, shape, or partition state; the host's local scale
-remains untouched so an adapter or authoring tool can correct it explicitly.
+axis throughout the transform ancestry to remain positive: X/Z for 2D colliders
+and X/Y/Z for 3D colliders. Gravitas then composes the hierarchy's strict
+local-to-world matrices and admits only a representable, nonsingular TRS
+decomposition. This rejects canceled reflections and genuine hierarchy shear
+instead of approximating either as a rotation plus diagonal scale. Pure 2D also
+requires the composed X/Z basis to remain in the simulation plane.
+Initialization and runtime rebuild reject invalid scale before changing body
+registration, host pose, canonical geometry, mass properties, or partition
+state. The host's authored local transforms remain untouched so an adapter or
+authoring tool can correct them explicitly.
+
+Owner scale and compound-part scale stay separate through shape preparation.
+Each final radius, axis length, half-extent, offset, mesh coordinate, or mass
+property is formed with an exact fused operation and rejected only when that
+final canonical value is not representable or physically valid. Intermediate
+Q32.32 saturation is never accepted as a plausible runtime dimension.
 
 `SolidBody.TransformPoint(...)` and `InverseTransformPoint(...)` combine the
 body's authoritative position and rotation with the host transform's

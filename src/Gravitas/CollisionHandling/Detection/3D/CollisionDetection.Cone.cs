@@ -6,7 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
-using FixedMathSharp.Bounds;
+using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
 using SwiftCollections.Query;
 using System.Runtime.CompilerServices;
@@ -20,19 +20,43 @@ public static partial class CollisionDetection
         var cone = (LSConeCollider)pair.ColliderA;
         var sphere = (LSSphereCollider)pair.ColliderB;
 
-        Vector3d conePoint = cone.ClosestPointOnSurface(sphere.Center);
-        Vector3d delta = sphere.Center - conePoint;
-        if (delta.MagnitudeSquared > sphere.ScaledRadiusSqr)
+        if (!FixedSegment.TryGetClosestCenteredFiniteConeSurfaceAnchor(
+                sphere.Center,
+                cone.Center,
+                cone.Rotation,
+                Vector3d.Up,
+                cone.Height,
+                cone.ScaledRadius,
+                Vector3d.Right,
+                out FixedPointAnchor coneAnchor,
+                out Vector3d outwardNormal,
+                out Fixed64 signedDistance))
+        {
+            return false;
+        }
+        if (signedDistance > sphere.ScaledRadius)
             return false;
 
-        Fixed64 distance = delta.Magnitude;
-        Vector3d normal = ResolveNormal(delta, sphere.Center - cone.Center);
-        Vector3d spherePoint = sphere.Center - normal * sphere.ScaledRadius;
+        Vector3d normal = signedDistance < Fixed64.Zero
+            ? -outwardNormal
+            : outwardNormal;
+        ResolvePenetrationDepth(
+            sphere.ScaledRadius,
+            signedDistance,
+            out Fixed64 penetrationDepth,
+            out bool depthIsClamped);
         pair.Manifold.SetContact(
-            conePoint,
-            spherePoint,
-            sphere.ScaledRadius - distance,
-            normal);
+            new ContactAnchor(coneAnchor),
+            new ContactAnchor(
+                FixedSegment.GetCenteredCapsuleSupportAnchor(
+                    sphere.Center,
+                    sphere.Rotation,
+                    Fixed64.Zero,
+                    sphere.ScaledRadius,
+                    -normal)),
+            penetrationDepth,
+            normal,
+            depthIsClamped);
 
         return true;
     }
@@ -44,22 +68,29 @@ public static partial class CollisionDetection
         if (!ConvexColliderSupport.Intersects(cone, convex))
             return false;
 
-        Vector3d normalConeToConvex = OrientNormal(convex.Center - cone.Center, convex.Center - cone.Center);
+        Vector3d normalConeToConvex = ResolveNormal(convex.Center - cone.Center);
         normalConeToConvex = normalConeToConvex.Normalized;
-        Vector3d pointOnCone = ConvexColliderSupport.Support(cone, normalConeToConvex);
-        Vector3d pointOnConvex = ConvexColliderSupport.Support(convex, -normalConeToConvex);
-        Fixed64 depth = Vector3d.Dot(pointOnCone - pointOnConvex, normalConeToConvex);
-        if (depth < Fixed64.Zero)
-            depth = Fixed64.Zero;
+        FixedPointAnchor pointOnCone = ConvexColliderSupport.GetSupportAnchor(
+            cone,
+            normalConeToConvex,
+            Vector3d.Zero);
+        FixedPointAnchor pointOnConvex = ConvexColliderSupport.GetSupportAnchor(
+            convex,
+            -normalConeToConvex,
+            Vector3d.Zero);
+        Fixed64 depth = pointOnCone.ProjectNonNegativeOffsetFrom(
+            pointOnConvex,
+            normalConeToConvex);
 
         SetContactInPairOrder(
             pair,
             cone,
-            pointOnCone,
+            new ContactAnchor(pointOnCone),
             convex,
-            pointOnConvex,
+            new ContactAnchor(pointOnConvex),
             depth,
-            normalConeToConvex);
+            normalConeToConvex,
+            depthIsClamped: false);
         return true;
     }
 
@@ -72,26 +103,42 @@ public static partial class CollisionDetection
                 mesh,
                 cone,
                 pair.Context.CollisionScratch.MeshTriangleCandidatesA,
-                out Vector3d pointOnMesh,
-                out Vector3d pointOnCone,
+                out ContactAnchor meshAnchor,
+                out ContactAnchor coneAnchor,
                 out Vector3d normalMeshToCone,
-                out Fixed64 depth))
+                out Fixed64 depth,
+                out bool depthIsClamped))
         {
-            pair.Manifold.SetContact(pointOnMesh, pointOnCone, depth, normalMeshToCone);
+            pair.Manifold.SetContact(
+                meshAnchor,
+                coneAnchor,
+                depth,
+                normalMeshToCone,
+                depthIsClamped);
             return true;
         }
 
         if (mesh.Mode == MeshColliderMode.Concave || !ConvexColliderSupport.Intersects(mesh, cone))
             return false;
 
-        normalMeshToCone = OrientNormal(cone.Center - mesh.Center, cone.Center - mesh.Center).Normalized;
-        pointOnMesh = ConvexColliderSupport.Support(mesh, normalMeshToCone);
-        pointOnCone = ConvexColliderSupport.Support(cone, -normalMeshToCone);
-        depth = Vector3d.Dot(pointOnMesh - pointOnCone, normalMeshToCone);
-        if (depth < Fixed64.Zero)
-            depth = Fixed64.Zero;
+        normalMeshToCone = ResolveNormal(cone.Center - mesh.Center);
+        FixedPointAnchor pointOnMesh = ConvexColliderSupport.GetSupportAnchor(
+            mesh,
+            normalMeshToCone,
+            Vector3d.Zero);
+        FixedPointAnchor pointOnCone = ConvexColliderSupport.GetSupportAnchor(
+            cone,
+            -normalMeshToCone,
+            Vector3d.Zero);
+        depth = pointOnMesh.ProjectNonNegativeOffsetFrom(
+            pointOnCone,
+            normalMeshToCone);
 
-        pair.Manifold.SetContact(pointOnMesh, pointOnCone, depth, normalMeshToCone);
+        pair.Manifold.SetContact(
+            new ContactAnchor(pointOnMesh),
+            new ContactAnchor(pointOnCone),
+            depth,
+            normalMeshToCone);
         return true;
     }
 
@@ -99,15 +146,17 @@ public static partial class CollisionDetection
         LSMeshCollider mesh,
         LSConeCollider cone,
         SwiftCollections.SwiftList<int> triangleBuffer,
-        out Vector3d pointOnMesh,
-        out Vector3d pointOnCone,
+        out ContactAnchor meshAnchor,
+        out ContactAnchor coneAnchor,
         out Vector3d normalMeshToCone,
-        out Fixed64 depth)
+        out Fixed64 depth,
+        out bool depthIsClamped)
     {
-        pointOnMesh = Vector3d.Zero;
-        pointOnCone = Vector3d.Zero;
+        meshAnchor = default;
+        coneAnchor = default;
         normalMeshToCone = Vector3d.Zero;
         depth = Fixed64.Zero;
+        depthIsClamped = false;
 
         mesh.GetTrianglesInBounds(new FixedBoundVolume(cone.BoundsMin, cone.BoundsMax), triangleBuffer);
         bool found = false;
@@ -116,61 +165,109 @@ public static partial class CollisionDetection
         for (int i = 0; i < triangleBuffer.Count; i++)
         {
             int triangleIndex = triangleBuffer[i];
-            mesh.Mesh.GetTriangleVertices(triangleIndex, out Vector3d first, out Vector3d second, out Vector3d third);
+            mesh.Mesh.GetLocalTriangleVertices(
+                triangleIndex,
+                out Vector3d first,
+                out Vector3d second,
+                out Vector3d third);
             Vector3d windingNormal = mesh.Mesh.GetFaceNormalWorld(triangleIndex);
             var triangle = new FixedTriangle(first, second, third);
-            Vector3d candidatePointOnMesh = triangle.ClosestPoint(cone.Center);
-            Vector3d candidateNormalMeshToCone = OrientNormal(
-                windingNormal,
-                cone.Center - candidatePointOnMesh).Normalized;
-            Vector3d candidatePointOnCone = Vector3d.Zero;
-            bool closestMeshPointInsideCone = cone.ContainsWorldPoint(candidatePointOnMesh, Fixed64.Epsilon);
-            if (!closestMeshPointInsideCone
-                && !TryFindConeTriangleSupportContact(
-                    cone,
-                    in triangle,
-                    candidateNormalMeshToCone,
-                    out candidatePointOnMesh,
-                    out candidatePointOnCone))
+            var coneCenterAnchor = new FixedPointAnchor(
+                cone.Center,
+                FixedQuaternion.Identity,
+                Vector3d.Zero);
+            if (!coneCenterAnchor.TryGetLocalPointIn(
+                    mesh.Mesh.Origin,
+                    mesh.Mesh.Rotation,
+                    out Vector3d localConeCenter))
             {
                 continue;
             }
 
+            Vector3d candidatePointOnMesh =
+                triangle.ClosestPoint(localConeCenter);
+            FixedPointAnchor candidateMeshAnchor =
+                mesh.Mesh.CreatePointAnchor(candidatePointOnMesh);
+            Vector3d candidateNormalMeshToCone =
+                OrientNormal(
+                    candidateMeshAnchor,
+                    coneCenterAnchor,
+                    windingNormal).Normalized;
+            FixedPointAnchor candidateConeAnchor;
+            Fixed64 candidateDepth;
+            bool candidateDepthIsClamped;
+            bool closestMeshPointInsideCone =
+                candidateMeshAnchor.TryGetLocalPointIn(
+                    cone.Center,
+                    cone.Rotation,
+                    out Vector3d localPointInCone)
+                && FixedSegment.ContainsPointInCenteredFiniteCone(
+                    localPointInCone,
+                    Vector3d.Zero,
+                    Vector3d.Up,
+                    cone.Height,
+                    cone.ScaledRadius);
             if (closestMeshPointInsideCone)
-                candidatePointOnCone = cone.ClosestPointOnSurface(candidatePointOnMesh);
-            else
-                candidatePointOnMesh = triangle.ClosestPoint(candidatePointOnCone);
+            {
+                if (!FixedSegment.TryGetClosestCenteredFiniteConeSurfaceOffset(
+                        localPointInCone,
+                        Vector3d.Zero,
+                        Vector3d.Up,
+                        cone.Height,
+                        cone.ScaledRadius,
+                        Vector3d.Right,
+                        out Vector3d localConePoint,
+                        out _,
+                        out Fixed64 signedDistance))
+                {
+                    continue;
+                }
 
-            Fixed64 candidateDepth = Vector3d.Distance(candidatePointOnMesh, candidatePointOnCone);
+                candidateDepthIsClamped = !Fixed64.TrySubtract(
+                    Fixed64.Zero,
+                    signedDistance,
+                    out candidateDepth);
+                if (candidateDepthIsClamped)
+                    candidateDepth = Fixed64.MaxValue;
+                candidateConeAnchor = new FixedPointAnchor(
+                    cone.Center,
+                    cone.Rotation,
+                    localConePoint);
+            }
+            else if (triangle.TryGetCenteredFiniteConeSupportContact(
+                         mesh.Mesh.Origin,
+                         mesh.Mesh.Rotation,
+                         cone.Center,
+                         cone.Rotation,
+                         cone.Height,
+                         cone.ScaledRadius,
+                         -candidateNormalMeshToCone,
+                         candidateNormalMeshToCone,
+                         out FixedContactAnchors contact))
+            {
+                candidateMeshAnchor = contact.FirstAnchor;
+                candidateConeAnchor = contact.SecondAnchor;
+                candidateDepth = contact.Depth;
+                candidateDepthIsClamped = contact.DepthIsClamped;
+            }
+            else
+            {
+                continue;
+            }
+
             if (found && candidateDepth >= bestDepth)
                 continue;
 
             found = true;
             bestDepth = candidateDepth;
-            pointOnMesh = candidatePointOnMesh;
-            pointOnCone = candidatePointOnCone;
+            meshAnchor = new ContactAnchor(candidateMeshAnchor);
+            coneAnchor = new ContactAnchor(candidateConeAnchor);
             normalMeshToCone = candidateNormalMeshToCone;
             depth = candidateDepth;
+            depthIsClamped = candidateDepthIsClamped;
         }
 
         return found;
-    }
-
-    private static bool TryFindConeTriangleSupportContact(
-        LSConeCollider cone,
-        in FixedTriangle triangle,
-        Vector3d normalMeshToCone,
-        out Vector3d pointOnMesh,
-        out Vector3d pointOnCone)
-    {
-        pointOnMesh = Vector3d.Zero;
-        pointOnCone = ConvexColliderSupport.Support(cone, -normalMeshToCone);
-        Fixed64 signedDistance = Vector3d.Dot(pointOnCone - triangle.A, normalMeshToCone);
-        if (signedDistance > Fixed64.Epsilon)
-            return false;
-
-        pointOnMesh = pointOnCone - normalMeshToCone * signedDistance;
-        return triangle.ContainsProjection(pointOnMesh);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -188,6 +285,19 @@ public static partial class CollisionDetection
 
         cone = (LSConeCollider)pair.ColliderB;
         convex = pair.ColliderA;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Vector3d OrientNormal(
+        in FixedPointAnchor source,
+        in FixedPointAnchor target,
+        Vector3d normal)
+    {
+        Vector3d resolved = normal.Normalized;
+        return source.ProjectNonNegativeOffsetFrom(target, resolved)
+                > Fixed64.Zero
+            ? -resolved
+            : resolved;
     }
 
 }

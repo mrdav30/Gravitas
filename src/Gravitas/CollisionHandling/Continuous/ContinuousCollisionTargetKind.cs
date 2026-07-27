@@ -13,5 +13,6 @@ internal enum ContinuousCollisionTargetKind : byte
     Static3D,
     Dynamic3D,
     Static2D,
-    Dynamic2D
+    Dynamic2D,
+    UnresolvedMixed,
 }

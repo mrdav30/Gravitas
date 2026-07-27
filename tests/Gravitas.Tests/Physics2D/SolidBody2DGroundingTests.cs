@@ -23,7 +23,7 @@ public sealed partial class SolidBody2DGroundingTests
         body.IsGrounded.Should().BeFalse();
         body.WasGrounded.Should().BeFalse();
         body.GroundNormal.Should().Be(Vector2d.Zero);
-        body.GroundPoint.Should().Be(Vector2d.Zero);
+        body.HasGroundPoint.Should().BeFalse();
     }
 
     [Fact]
@@ -40,6 +40,8 @@ public sealed partial class SolidBody2DGroundingTests
         body.IsGrounded.Should().BeTrue();
         body.WasGrounded.Should().BeFalse();
         body.GroundPoint.Should().Be(point);
+        body.TryGetGroundPoint(out Vector2d resolvedPoint).Should().BeTrue();
+        resolvedPoint.Should().Be(point);
         body.GroundNormal.Should().Be(Up);
 
         body.ClearManualGrounding();
@@ -48,6 +50,8 @@ public sealed partial class SolidBody2DGroundingTests
         body.GroundingMode.Should().Be(GroundingMode.Manual);
         body.IsGrounded.Should().BeFalse();
         body.WasGrounded.Should().BeTrue();
+        body.TryGetGroundPoint(out Vector2d clearedPoint).Should().BeFalse();
+        clearedPoint.Should().Be(Vector2d.Zero);
     }
 
     [Fact]
@@ -142,7 +146,7 @@ public sealed partial class SolidBody2DGroundingTests
 
         body.GroundingMode.Should().Be(GroundingMode.Manual);
         body.IsGrounded.Should().BeFalse();
-        body.GroundPoint.Should().Be(Vector2d.Zero);
+        body.HasGroundPoint.Should().BeFalse();
         body.GroundNormal.Should().Be(Vector2d.Zero);
     }
 
@@ -361,7 +365,7 @@ public sealed partial class SolidBody2DGroundingTests
 
         body.IsGrounded.Should().BeFalse();
         body.WasGrounded.Should().BeTrue();
-        body.GroundPoint.Should().Be(Vector2d.Zero);
+        body.HasGroundPoint.Should().BeFalse();
         body.GroundNormal.Should().Be(Vector2d.Zero);
     }
 
@@ -416,8 +420,44 @@ public sealed partial class SolidBody2DGroundingTests
         body.CompleteAutomaticGroundingRefresh();
 
         body.IsGrounded.Should().BeFalse();
-        body.GroundPoint.Should().Be(Vector2d.Zero);
+        body.HasGroundPoint.Should().BeFalse();
         body.GroundNormal.Should().Be(Vector2d.Zero);
+    }
+
+    [Fact]
+    public void ContactGroundCandidate_WithoutRepresentableWorldPoint_ShouldStillGround()
+    {
+        using GravitasWorldContext context = CreateContext();
+        SolidBody2D body = CreateCircle(context, Vector2d.Zero);
+        LSAABBoxCollider2D support = CreateStaticFloor(context);
+        DisableProbeFallback(body);
+        var unavailablePoint = new ContactAnchor2D(
+            new Vector2d(Fixed64.MaxValue, Fixed64.Zero),
+            Vector2d.Right);
+        var contact = new ManifoldContact2D(
+            1,
+            unavailablePoint,
+            unavailablePoint,
+            Fixed64.Half,
+            -Up);
+
+        contact.TryGetPointA(out _).Should().BeFalse();
+        body.BeginAutomaticGroundingRefresh();
+        body.TryAcceptContactGroundCandidate(
+            body.Collider,
+            support,
+            contact,
+            ownColliderIsA: true);
+        body.CompleteAutomaticGroundingRefresh();
+
+        body.IsGrounded.Should().BeTrue();
+        body.GroundNormal.Should().Be(Up);
+        body.HasGroundPoint.Should().BeFalse();
+        body.TryGetGroundPoint(out Vector2d point).Should().BeFalse();
+        point.Should().Be(Vector2d.Zero);
+        Action getGroundPoint = () => _ = body.GroundPoint;
+        getGroundPoint.Should().Throw<InvalidOperationException>()
+            .WithMessage("*TryGetGroundPoint*");
     }
 
     [Fact]

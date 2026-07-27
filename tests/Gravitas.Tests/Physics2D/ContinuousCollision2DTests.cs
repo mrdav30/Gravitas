@@ -1135,10 +1135,12 @@ public sealed partial class ContinuousCollision2DTests
         context.Environment.MaxFallSpeed = Fixed64.MaxValue;
         Fixed64 normalOffset = Fixed64.FromFraction(1, 65536);
         Vector2d direction = new Vector2d(Fixed64.One, normalOffset).Normalized;
+        Fixed64 sourceStartDistance =
+            Fixed64.FromFraction(3, 2) - normalOffset;
         SolidBody2D source = CreateBody(
             context,
             new LSCircleCollider2D(Fixed64.Half),
-            direction * Fixed64.FromFraction(-3, 2),
+            direction * -sourceStartDistance,
             immovable: false);
         SolidBody2D target = CreateBody(
             context,
@@ -1799,6 +1801,43 @@ public sealed partial class ContinuousCollision2DTests
         source.Collider.RebuildRuntimeShapeOnly();
 
         source.ResolveContinuousCollisionProxyRadius().Should().Be((Fixed64)100000);
+    }
+
+    [Fact]
+    public void AabbProxyRadius_WithIrrationalLowRawMagnitude_ShouldRoundOutward()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        var collider = new LSAABBoxCollider2D(
+            new Vector2d(
+                Fixed64.FromRaw(2),
+                Fixed64.FromRaw(2)));
+        SolidBody2D source = CreateBody(
+            context,
+            collider,
+            Vector2d.Zero,
+            immovable: false);
+
+        source.ResolveContinuousCollisionProxyRadius()
+            .Should().Be(Fixed64.FromRaw(2));
+    }
+
+    [Fact]
+    public void CapsuleProxyRadius_WithOddRawAxisLength_ShouldRoundOutward()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        Fixed64 radius = Fixed64.FromRaw(1);
+        var collider = new LSCapsuleCollider2D(
+            radius,
+            Fixed64.FromRaw(5));
+        SolidBody2D source = CreateBody(
+            context,
+            collider,
+            Vector2d.Zero,
+            immovable: false);
+
+        collider.AxisLength.Should().Be(Fixed64.FromRaw(3));
+        source.ResolveContinuousCollisionProxyRadius()
+            .Should().Be(Fixed64.FromRaw(3));
     }
 
     [Fact]

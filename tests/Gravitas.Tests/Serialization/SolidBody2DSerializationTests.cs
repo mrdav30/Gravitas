@@ -347,7 +347,7 @@ public sealed class SolidBody2DSerializationTests
         manualTarget.IsGrounded.Should().BeFalse();
         manualTarget.WasGrounded.Should().BeTrue();
         manualTarget.GroundNormal.Should().Be(Vector2d.Zero);
-        manualTarget.GroundPoint.Should().Be(Vector2d.Zero);
+        manualTarget.HasGroundPoint.Should().BeFalse();
     }
 
     [Fact]
@@ -407,8 +407,9 @@ public sealed class SolidBody2DSerializationTests
         targetCollider.Height.Should().Be(sourceCollider.Height);
         targetCollider.LocalOffset.Should().Be(sourceCollider.LocalOffset);
         targetCollider.Bounds.Should().Be(sourceCollider.Bounds);
-        targetCollider.SegmentStart.Should().Be(sourceCollider.SegmentStart);
-        targetCollider.SegmentEnd.Should().Be(sourceCollider.SegmentEnd);
+        targetCollider.Center.Should().Be(sourceCollider.Center);
+        targetCollider.WorldAxis.Should().Be(sourceCollider.WorldAxis);
+        targetCollider.AxisLength.Should().Be(sourceCollider.AxisLength);
     }
 
     [Theory]

@@ -64,8 +64,8 @@ public sealed class ContactManifold2D : IEnumerable<ManifoldContact2D>
             if (_count == 1)
                 return _contact0;
 
-            return _contact1.Depth > _contact0.Depth
-                || _contact1.Depth == _contact0.Depth && _contact1.ContactId < _contact0.ContactId
+            return IsDeeper(_contact1, _contact0)
+                || HasEqualDepth(_contact1, _contact0) && _contact1.ContactId < _contact0.ContactId
                 ? _contact1
                 : _contact0;
         }
@@ -111,11 +111,53 @@ public sealed class ContactManifold2D : IEnumerable<ManifoldContact2D>
     }
 
     /// <summary>
+    /// Replaces the manifold with one canonical rigid-frame planar contact.
+    /// </summary>
+    public void SetContact(
+        ContactAnchor2D anchorA,
+        ContactAnchor2D anchorB,
+        Fixed64 depth,
+        Vector2d normal,
+        bool depthIsClamped = false)
+    {
+        _count = 0;
+        AddContact(anchorA, anchorB, depth, normal, depthIsClamped);
+    }
+
+    /// <summary>
     /// Adds a contact, keeping the deepest two contacts and exposing them by stable contact identity.
     /// </summary>
     public void AddContact(Vector2d pointA, Vector2d pointB, Fixed64 depth, Vector2d normal)
     {
-        AddContactCore(pointA, pointB, depth, normal, hasMaterialOverride: false, default, default);
+        AddContact(
+            ContactAnchor2D.FromWorldPoint(pointA),
+            ContactAnchor2D.FromWorldPoint(pointB),
+            depth,
+            normal);
+    }
+
+    /// <summary>
+    /// Adds a canonical rigid-frame contact, keeping the deepest two contacts and
+    /// exposing them by stable anchor identity.
+    /// </summary>
+    public void AddContact(
+        ContactAnchor2D anchorA,
+        ContactAnchor2D anchorB,
+        Fixed64 depth,
+        Vector2d normal,
+        bool depthIsClamped = false)
+    {
+        AddContactCore(
+            anchorA,
+            anchorB,
+            depth,
+            normal,
+            hasMaterialOverride: false,
+            default,
+            default,
+            depthIsClamped,
+            featureNamespaceA: 0,
+            featureNamespaceB: 0);
     }
 
     internal void AddContact(
@@ -124,30 +166,75 @@ public sealed class ContactManifold2D : IEnumerable<ManifoldContact2D>
         Fixed64 depth,
         Vector2d normal,
         PhysicsMaterial materialA,
-        PhysicsMaterial materialB)
+        PhysicsMaterial materialB,
+        bool depthIsClamped = false)
     {
-        AddContactCore(pointA, pointB, depth, normal, hasMaterialOverride: true, materialA, materialB);
+        AddContactCore(
+            ContactAnchor2D.FromWorldPoint(pointA),
+            ContactAnchor2D.FromWorldPoint(pointB),
+            depth,
+            normal,
+            hasMaterialOverride: true,
+            materialA,
+            materialB,
+            depthIsClamped,
+            featureNamespaceA: 0,
+            featureNamespaceB: 0);
+    }
+
+    internal void AddContact(
+        ContactAnchor2D anchorA,
+        ContactAnchor2D anchorB,
+        Fixed64 depth,
+        Vector2d normal,
+        PhysicsMaterial materialA,
+        PhysicsMaterial materialB,
+        bool depthIsClamped = false,
+        int featureNamespaceA = 0,
+        int featureNamespaceB = 0)
+    {
+        AddContactCore(
+            anchorA,
+            anchorB,
+            depth,
+            normal,
+            hasMaterialOverride: true,
+            materialA,
+            materialB,
+            depthIsClamped,
+            featureNamespaceA,
+            featureNamespaceB);
     }
 
     private void AddContactCore(
-        Vector2d pointA,
-        Vector2d pointB,
+        ContactAnchor2D anchorA,
+        ContactAnchor2D anchorB,
         Fixed64 depth,
         Vector2d normal,
         bool hasMaterialOverride,
         PhysicsMaterial materialA,
-        PhysicsMaterial materialB)
+        PhysicsMaterial materialB,
+        bool depthIsClamped,
+        int featureNamespaceA,
+        int featureNamespaceB)
     {
-        ulong contactId = CreateContactId(pointA, pointB);
+        ulong contactId = CreateContactId(
+            anchorA,
+            featureNamespaceA,
+            anchorB,
+            featureNamespaceB);
         var contact = new ManifoldContact2D(
             contactId,
-            pointA,
-            pointB,
+            anchorA,
+            anchorB,
             depth,
             normal,
             hasMaterialOverride,
             materialA,
-            materialB);
+            materialB,
+            depthIsClamped,
+            featureNamespaceA,
+            featureNamespaceB);
 
         for (int i = 0; i < _count; i++)
         {
@@ -155,7 +242,7 @@ public sealed class ContactManifold2D : IEnumerable<ManifoldContact2D>
             if (existing.ContactId != contactId)
                 continue;
 
-            if (contact.Depth > existing.Depth)
+            if (IsDeeper(contact, existing))
                 SetContactUnchecked(i, contact);
             SortContactsById();
             return;
@@ -185,19 +272,31 @@ public sealed class ContactManifold2D : IEnumerable<ManifoldContact2D>
 
     private int FindShallowestReplacementIndex(ManifoldContact2D candidate)
     {
-        int replaceIndex = _contact1.Depth <= _contact0.Depth
+        int replaceIndex = !IsDeeper(_contact1, _contact0)
             ? 1
             : 0;
 
         ManifoldContact2D shallowest = GetContactUnchecked(replaceIndex);
-        if (candidate.Depth > shallowest.Depth)
+        if (IsDeeper(candidate, shallowest))
             return replaceIndex;
 
-        if (candidate.Depth == shallowest.Depth && candidate.ContactId < shallowest.ContactId)
+        if (HasEqualDepth(candidate, shallowest) && candidate.ContactId < shallowest.ContactId)
             return replaceIndex;
 
         return -1;
     }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool IsDeeper(ManifoldContact2D candidate, ManifoldContact2D existing) =>
+        candidate.Depth > existing.Depth
+        || candidate.Depth == existing.Depth
+        && candidate.DepthIsClamped
+        && !existing.DepthIsClamped;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool HasEqualDepth(ManifoldContact2D left, ManifoldContact2D right) =>
+        left.Depth == right.Depth
+        && left.DepthIsClamped == right.DepthIsClamped;
 
     private void SortContactsById()
     {
@@ -223,26 +322,45 @@ public sealed class ContactManifold2D : IEnumerable<ManifoldContact2D>
         _contact1 = contact;
     }
 
-    private static ulong CreateContactId(Vector2d pointA, Vector2d pointB)
+    private static ulong CreateContactId(
+        ContactAnchor2D anchorA,
+        int featureNamespaceA,
+        ContactAnchor2D anchorB,
+        int featureNamespaceB)
     {
-        if (CompareVector(pointB, pointA) < 0)
-            (pointA, pointB) = (pointB, pointA);
+        if (CompareLocalFeature(
+                featureNamespaceB,
+                anchorB,
+                featureNamespaceA,
+                anchorA) < 0)
+        {
+            (anchorA, anchorB) = (anchorB, anchorA);
+            (featureNamespaceA, featureNamespaceB) =
+                (featureNamespaceB, featureNamespaceA);
+        }
 
         ulong hash = 14695981039346656037UL;
-        Mix(ref hash, pointA.X.m_rawValue);
-        Mix(ref hash, pointA.Y.m_rawValue);
-        Mix(ref hash, pointB.X.m_rawValue);
-        Mix(ref hash, pointB.Y.m_rawValue);
+        Mix(ref hash, featureNamespaceA);
+        Mix(
+            ref hash,
+            unchecked((long)anchorA.GetLocalFeatureHash64()));
+        Mix(ref hash, featureNamespaceB);
+        Mix(
+            ref hash,
+            unchecked((long)anchorB.GetLocalFeatureHash64()));
         return hash;
     }
 
-    private static int CompareVector(Vector2d left, Vector2d right)
+    private static int CompareLocalFeature(
+        int leftNamespace,
+        ContactAnchor2D left,
+        int rightNamespace,
+        ContactAnchor2D right)
     {
-        int compare = left.X.m_rawValue.CompareTo(right.X.m_rawValue);
-        if (compare != 0)
-            return compare;
-
-        return left.Y.m_rawValue.CompareTo(right.Y.m_rawValue);
+        int comparison = leftNamespace.CompareTo(rightNamespace);
+        return comparison != 0
+            ? comparison
+            : left.CompareLocalFeature(right);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

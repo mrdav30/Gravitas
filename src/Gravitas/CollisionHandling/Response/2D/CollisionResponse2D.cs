@@ -146,6 +146,21 @@ public static class CollisionResponse2D
             pair.ColliderB.Center - pair.ColliderA.Center);
         if (normal == Vector2d.Zero)
             return false;
+        Vector2d relativeA = default;
+        Vector2d relativeB = default;
+        if ((bodyA.Body != null
+                && !bodyA.Body.TryGetOffsetFromCenterOfMass(
+                    manifoldContact.AnchorA,
+                    out relativeA))
+            || (bodyB.Body != null
+                && !bodyB.Body.TryGetOffsetFromCenterOfMass(
+                    manifoldContact.AnchorB,
+                    out relativeB)))
+        {
+            GravitasLogger.Channel.Error(
+                $"2D contact {manifoldContact.ContactId} cannot be rebased onto its response centers.");
+            return false;
+        }
         PhysicsMaterial materialA = manifoldContact.HasMaterialOverride
             ? manifoldContact.MaterialA
             : pair.ColliderA.Material;
@@ -165,10 +180,8 @@ public static class CollisionResponse2D
             manifoldContact.ContactId,
             bodyA,
             bodyB,
-            manifoldContact.PointA,
-            manifoldContact.PointB,
-            bodyA.Body == null ? Vector2d.Zero : manifoldContact.PointA - bodyA.Body.WorldCenterOfMass,
-            bodyB.Body == null ? Vector2d.Zero : manifoldContact.PointB - bodyB.Body.WorldCenterOfMass,
+            bodyA.Body == null ? Vector2d.Zero : relativeA,
+            bodyB.Body == null ? Vector2d.Zero : relativeB,
             manifoldContact.Depth,
             normal,
             materialA,

@@ -1,4 +1,5 @@
 using FixedMathSharp;
+using FixedMathSharp.Geometry;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
@@ -25,48 +26,49 @@ public sealed class ConvexColliderSupportTests
     }
 
     [Fact]
-    public void ProjectOntoAxis_WithZeroAxis_ShouldUseRightAxisFallback()
-    {
-        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
-        ScenarioBody<LSSphereCollider> sphere = scenario.CreateSphere(new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.Zero));
-
-        FixedRange range = ConvexColliderSupport.ProjectOntoAxis(sphere.Collider, Vector3d.Zero);
-
-        range.Min.Should().Be(Fixed64.FromFraction(3, 2));
-        range.Max.Should().Be(Fixed64.FromFraction(5, 2));
-    }
-
-    [Fact]
-    public void ProjectOntoAxis_WithNonZeroAxis_ShouldUseRequestedAxis()
-    {
-        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
-        ScenarioBody<LSSphereCollider> sphere = scenario.CreateSphere(
-            new Vector3d(Fixed64.Zero, (Fixed64)2, Fixed64.Zero));
-
-        FixedRange range = ConvexColliderSupport.ProjectOntoAxis(sphere.Collider, Vector3d.Up);
-
-        range.Min.Should().Be(Fixed64.FromFraction(3, 2));
-        range.Max.Should().Be(Fixed64.FromFraction(5, 2));
-    }
-
-    [Fact]
     public void Support_WithZeroDirection_ShouldUseRightAxisFallback()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSSphereCollider> sphere = scenario.CreateSphere(Vector3d.Zero);
 
-        ConvexColliderSupport.Support(sphere.Collider, Vector3d.Zero)
+        GetSupport(sphere.Collider, Vector3d.Zero)
             .Should().Be(new Vector3d(Fixed64.Half, Fixed64.Zero, Fixed64.Zero));
     }
 
     [Fact]
-    public void Support_WithCylinderAxisDirection_ShouldUseStableRadialTie()
+    public void Support_WithCylinderAxisDirection_ShouldUseStableCapCenterTie()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSCylinderCollider> cylinder = scenario.CreateCylinder(Vector3d.Zero);
 
-        ConvexColliderSupport.Support(cylinder.Collider, Vector3d.Up)
-            .Should().Be(new Vector3d(Fixed64.Half, Fixed64.Half, Fixed64.Zero));
+        GetSupport(cylinder.Collider, Vector3d.Up)
+            .Should().Be(new Vector3d(Fixed64.Zero, Fixed64.Half, Fixed64.Zero));
+    }
+
+    [Fact]
+    public void Support_WithOddRawCylinderHeight_ShouldRoundThePositiveEndpointOutward()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        var cylinder = new LSCylinderCollider
+        {
+            Radius = Fixed64.FromRaw(1),
+            Size = new Vector3d(
+                Fixed64.FromRaw(2),
+                Fixed64.FromRaw(1),
+                Fixed64.FromRaw(2))
+        };
+        scenario.InitializeStaticCollider(
+            cylinder,
+            new Vector3d(
+                Fixed64.Zero,
+                Fixed64.FromRaw(1),
+                Fixed64.Zero));
+
+        GetSupport(cylinder, Vector3d.Up)
+            .Should().Be(new Vector3d(
+                Fixed64.Zero,
+                Fixed64.FromRaw(2),
+                Fixed64.Zero));
     }
 
     [Fact]
@@ -78,7 +80,7 @@ public sealed class ConvexColliderSupportTests
             new Vector3d(offset, offset, Fixed64.Zero));
         Vector3d direction = new Vector3d(Fixed64.One, Fixed64.One, Fixed64.Zero).Normalized;
 
-        Vector3d support = ConvexColliderSupport.Support(cuboid.Collider, direction);
+        Vector3d support = GetSupport(cuboid.Collider, direction);
 
         support.Should().Be(new Vector3d(offset + Fixed64.Half, offset + Fixed64.Half, -Fixed64.Half));
     }
@@ -94,7 +96,7 @@ public sealed class ConvexColliderSupportTests
             FixedQuaternion.Identity);
         Vector3d direction = new Vector3d(Fixed64.One, Fixed64.One, Fixed64.Zero).Normalized;
 
-        Vector3d support = ConvexColliderSupport.Support(mesh.Collider, direction);
+        Vector3d support = GetSupport(mesh.Collider, direction);
 
         support.X.Should().Be(offset + Fixed64.Half);
         support.Y.Should().Be(offset + Fixed64.Half);
@@ -109,11 +111,127 @@ public sealed class ConvexColliderSupportTests
             new LSCapsuleCollider { Size = new Vector3d(Fixed64.One, (Fixed64)3, Fixed64.One) },
             new Vector3d(offset, offset, Fixed64.Zero),
             FixedQuaternion.FromEulerAnglesInDegrees(Fixed64.Zero, Fixed64.Zero, (Fixed64)(-45)));
-        Vector3d direction = capsule.Collider.LineDirection;
+        Vector3d direction = capsule.Collider.WorldAxis;
 
-        Vector3d support = ConvexColliderSupport.Support(capsule.Collider, direction);
+        Vector3d support = GetSupport(capsule.Collider, direction);
 
-        support.Should().Be(capsule.Collider.LineSegmentEnd + direction * capsule.Collider.ScaledRadius);
+        FixedPointAnchor expectedAnchor =
+            FixedSegment.GetCenteredCapsuleSupportAnchor(
+            capsule.Collider.Center,
+            capsule.Collider.Rotation,
+            capsule.Collider.AxisLength,
+            capsule.Collider.ScaledRadius,
+            direction);
+        expectedAnchor.TryGetPoint(out Vector3d expected).Should().BeTrue();
+        support.Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData(FiniteAxisShape.Capsule)]
+    [InlineData(FiniteAxisShape.Cylinder)]
+    [InlineData(FiniteAxisShape.Cone)]
+    public void OffsetSupportAnchor_ShouldPreserveCanonicalFeatureAndTranslation(
+        FiniteAxisShape shape)
+    {
+        using PhysicsScenarioBuilder scenario =
+            PhysicsScenarioBuilder.Create();
+        FixedQuaternion rotation =
+            PhysicsScenarioBuilder.Yaw(35);
+        LSCollider collider = CreateFiniteAxisCollider(
+            scenario,
+            shape,
+            Vector3d.Zero,
+            rotation);
+        Vector3d direction = rotation.Rotate(
+            new Vector3d(1, -1, 1)).Normalized;
+        Vector3d worldTranslation = new(3, -2, 1);
+        rotation.Inverse().TryRotate(
+                worldTranslation,
+                out Vector3d localTranslation)
+            .Should()
+            .BeTrue();
+        FixedPointAnchor canonical =
+            GetCanonicalSupportAnchor(collider, direction);
+
+        FixedPointAnchor translated =
+            ConvexColliderSupport.GetSupportAnchor(
+                collider,
+                direction,
+                worldTranslation);
+
+        translated.CompareLocalFeature(canonical).Should().Be(0);
+        translated.LocalTranslation.Should().Be(localTranslation);
+        translated.TryGetOffsetFrom(
+                canonical,
+                out Vector3d resolvedTranslation)
+            .Should()
+            .BeTrue();
+        resolvedTranslation.Should().Be(worldTranslation);
+    }
+
+    [Theory]
+    [InlineData(FiniteAxisShape.Capsule, true)]
+    [InlineData(FiniteAxisShape.Capsule, false)]
+    [InlineData(FiniteAxisShape.Cylinder, true)]
+    [InlineData(FiniteAxisShape.Cylinder, false)]
+    [InlineData(FiniteAxisShape.Cone, true)]
+    [InlineData(FiniteAxisShape.Cone, false)]
+    public void OffsetSupportAnchor_AtScalarFaceShouldRetainExactFeature(
+        FiniteAxisShape shape,
+        bool positiveFace)
+    {
+        using PhysicsScenarioBuilder scenario =
+            PhysicsScenarioBuilder.Create();
+        Fixed64 face = positiveFace
+            ? Fixed64.MaxValue
+            : Fixed64.MinValue;
+        Fixed64 inward = positiveFace
+            ? -Fixed64.One
+            : Fixed64.One;
+        Vector3d center = new(
+            face + inward,
+            Fixed64.Zero,
+            Fixed64.Zero);
+        LSCollider collider = CreateFiniteAxisCollider(
+            scenario,
+            shape,
+            center,
+            FixedQuaternion.Identity);
+        Vector3d direction = new Vector3d(
+            inward,
+            -Fixed64.One,
+            Fixed64.One).Normalized;
+        Vector3d translation = new(
+            -inward,
+            Fixed64.Zero,
+            Fixed64.Zero);
+        FixedPointAnchor canonical =
+            GetCanonicalSupportAnchor(collider, direction);
+
+        FixedPointAnchor translated =
+            ConvexColliderSupport.GetSupportAnchor(
+                collider,
+                direction,
+                translation);
+
+        translated.CompareLocalFeature(canonical).Should().Be(0);
+        translated.TryGetOffsetFrom(
+                canonical,
+                out Vector3d resolvedTranslation)
+            .Should()
+            .BeTrue();
+        resolvedTranslation.Should().Be(translation);
+        translated.TryGetPoint(out Vector3d point).Should().BeTrue();
+        canonical.TryGetPoint(out Vector3d canonicalPoint)
+            .Should()
+            .BeTrue();
+        Vector3d.TryAdd(
+                canonicalPoint,
+                translation,
+                out Vector3d expectedPoint)
+            .Should()
+            .BeTrue();
+        point.Should().Be(expectedPoint);
     }
 
     [Fact]
@@ -127,8 +245,11 @@ public sealed class ConvexColliderSupportTests
         var unsupported = new UnsupportedTestCollider3D();
         scenario.InitializeStaticCollider(unsupported, Vector3d.Zero);
 
-        Vector3d support = ConvexColliderSupport.Support(mesh.Collider, Vector3d.Right);
-        Action unsupportedSupport = () => ConvexColliderSupport.Support(unsupported, Vector3d.Right);
+        Vector3d support = GetSupport(mesh.Collider, Vector3d.Right);
+        Action unsupportedSupport = () => ConvexColliderSupport.GetSupportAnchor(
+            unsupported,
+            Vector3d.Right,
+            Vector3d.Zero);
 
         support.X.Should().Be(Fixed64.FromFraction(5, 2));
         unsupportedSupport.Should().Throw<NotSupportedException>();
@@ -165,6 +286,97 @@ public sealed class ConvexColliderSupportTests
     }
 
     [Fact]
+    public void Intersects_WithUnrepresentableSupportDifference_ShouldRejectCandidate()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSCuboidCollider> first =
+            scenario.CreateCuboid(Vector3d.Zero);
+        ScenarioBody<LSCuboidCollider> second =
+            scenario.CreateCuboid(Vector3d.Zero);
+        first.Collider.LocalOffset = new Vector3d(
+            Fixed64.MinValue + Fixed64.One,
+            Fixed64.Zero,
+            Fixed64.Zero);
+        second.Collider.LocalOffset = new Vector3d(
+            Fixed64.MaxValue - Fixed64.One,
+            Fixed64.Zero,
+            Fixed64.Zero);
+        first.Collider.RebuildRuntimeShapeOnly().Should().BeTrue();
+        second.Collider.RebuildRuntimeShapeOnly().Should().BeTrue();
+
+        ConvexColliderSupport.Intersects(first.Collider, second.Collider)
+            .Should().BeFalse();
+    }
+
+    [Fact]
+    public void Intersects_WhenLaterSupportDifferenceLeavesDomain_ShouldRejectCandidate()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        var huge = new LSSphereCollider
+        {
+            Radius = Fixed64.MaxValue,
+        };
+        scenario.InitializeStaticCollider(huge, Vector3d.Zero);
+        LSSphereCollider small = scenario.CreateStaticSphere(
+            new Vector3d(Fixed64.Half, Fixed64.Zero, Fixed64.Zero));
+
+        ConvexColliderSupport.Intersects(huge, small).Should().BeFalse();
+    }
+
+    [Fact]
+    public void IntersectsConeVolume_WhenSupportDifferenceLeavesDomain_ShouldRejectCandidate()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSSphereCollider sphere = scenario.CreateStaticSphere(
+            Vector3d.Zero);
+
+        ConvexColliderSupport.IntersectsConeVolume(
+            sphere,
+            Vector3d.Zero,
+            Vector3d.Zero,
+            Vector3d.Up,
+            Fixed64.MaxValue).Should().BeFalse();
+    }
+
+    [Fact]
+    public void IntersectsConeVolume_WhenLaterSupportDifferenceLeavesDomain_ShouldRejectCandidate()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSSphereCollider sphere = scenario.CreateStaticSphere(
+            new Vector3d(Fixed64.Half, Fixed64.Zero, Fixed64.Zero));
+
+        ConvexColliderSupport.IntersectsConeVolume(
+            sphere,
+            Vector3d.Zero,
+            Vector3d.Zero,
+            Vector3d.Up,
+            Fixed64.MaxValue).Should().BeFalse();
+    }
+
+    [Fact]
+    public void OffsetSupportAnchor_WithUnrepresentableLocalTranslation_ShouldReject()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> sphere = scenario.CreateBody(
+            new LSSphereCollider(),
+            Vector3d.Zero,
+            FixedQuaternion.FromAxisAngle(
+                Vector3d.Forward,
+                Fixed64.PiOver4));
+        Vector3d displacement = new(
+            Fixed64.MaxValue,
+            Fixed64.MaxValue,
+            Fixed64.Zero);
+
+        Action getSupport = () => ConvexColliderSupport.GetSupportAnchor(
+            sphere.Collider,
+            Vector3d.Right,
+            displacement);
+
+        getSupport.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
     public void Intersects_WithOverlappingRotatedConvexShapes_ShouldReturnTrue()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
@@ -181,6 +393,51 @@ public sealed class ConvexColliderSupportTests
             PhysicsScenarioBuilder.Yaw(-20));
 
         ConvexColliderSupport.Intersects(cone.Collider, cuboid.Collider).Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Intersects_WithRotatedCuboidAtScalarFace_ShouldUseRelativeSupportDifferences(
+        bool positiveFace)
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        Vector3d cuboidCenter = positiveFace
+            ? new Vector3d(
+                Fixed64.MaxValue - Fixed64.One,
+                Fixed64.Zero,
+                Fixed64.Zero)
+            : new Vector3d(
+                Fixed64.MinValue + Fixed64.One,
+                Fixed64.Zero,
+                Fixed64.Zero);
+        ScenarioBody<LSCuboidCollider> cuboid = scenario.CreateBody(
+            new LSCuboidCollider
+            {
+                Size = new Vector3d((Fixed64)4, Fixed64.One, Fixed64.One)
+            },
+            cuboidCenter,
+            PhysicsScenarioBuilder.Yaw(45));
+        Vector3d sphereCenter = positiveFace
+            ? new Vector3d(
+                Fixed64.MaxValue - Fixed64.FromFraction(1, 200),
+                Fixed64.Zero,
+                -Fixed64.One)
+            : new Vector3d(
+                Fixed64.MinValue + Fixed64.FromFraction(1, 200),
+                Fixed64.Zero,
+                Fixed64.One);
+        ScenarioBody<LSSphereCollider> sphere = scenario.CreateBody(
+            new LSSphereCollider
+            {
+                Radius = Fixed64.FromFraction(1, 100)
+            },
+            sphereCenter,
+            FixedQuaternion.Identity);
+
+        cuboid.Collider.OrientedBox.Contains(sphereCenter).Should().BeTrue();
+        ConvexColliderSupport.Intersects(cuboid.Collider, sphere.Collider).Should().BeTrue();
+        ConvexColliderSupport.Intersects(sphere.Collider, cuboid.Collider).Should().BeTrue();
     }
 
     [Fact]
@@ -255,7 +512,13 @@ public sealed class ConvexColliderSupportTests
         ConvexColliderSupport.Intersects(cone.Collider, cuboid.Collider).Should().BeTrue();
         CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
         pair.Manifold.HasContact.Should().BeTrue();
-        cone.Collider.WorldBaseCenter.Y.Should().Be(touchingPoint.Y);
+        FixedSegment.TryGetCenteredAxisEndpoint(
+            cone.Collider.Center,
+            cone.Collider.WorldAxis,
+            cone.Collider.Height,
+            positive: false,
+            out Vector3d baseCenter).Should().BeTrue();
+        baseCenter.Y.Should().Be(touchingPoint.Y);
         cuboid.Collider.BoundsMax.X.Should().Be(touchingPoint.X);
     }
 
@@ -282,7 +545,13 @@ public sealed class ConvexColliderSupportTests
         CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
         pair.Manifold.HasContact.Should().BeTrue();
         ConvexColliderSupport.Intersects(cone.Collider, separated.Collider).Should().BeFalse();
-        cone.Collider.WorldBaseCenter.Y.Should().Be(touchingPoint.Y);
+        FixedSegment.TryGetCenteredAxisEndpoint(
+            cone.Collider.Center,
+            cone.Collider.WorldAxis,
+            cone.Collider.Height,
+            positive: false,
+            out Vector3d baseCenter).Should().BeTrue();
+        baseCenter.Y.Should().Be(touchingPoint.Y);
         cuboid.Collider.BoundsMax.X.Should().Be(touchingPoint.X);
         cuboid.Collider.BoundsMin.Y.Should().Be(touchingPoint.Y);
         cuboid.Collider.BoundsMax.Z.Should().Be(touchingPoint.Z);
@@ -367,5 +636,83 @@ public sealed class ConvexColliderSupportTests
             Vector3d.Up,
             Fixed64.One,
             maxIterations: 0).Should().BeTrue();
+    }
+
+    private static LSCollider CreateFiniteAxisCollider(
+        PhysicsScenarioBuilder scenario,
+        FiniteAxisShape shape,
+        Vector3d center,
+        FixedQuaternion rotation) =>
+        shape switch
+        {
+            FiniteAxisShape.Capsule => scenario.CreateBody(
+                new LSCapsuleCollider
+                {
+                    Size = new Vector3d(2, 4, 2)
+                },
+                center,
+                rotation).Collider,
+            FiniteAxisShape.Cylinder => scenario.CreateBody(
+                new LSCylinderCollider
+                {
+                    Size = new Vector3d(2, 4, 2)
+                },
+                center,
+                rotation).Collider,
+            _ => scenario.CreateBody(
+                new LSConeCollider
+                {
+                    Size = new Vector3d(2, 4, 2)
+                },
+                center,
+                rotation).Collider,
+        };
+
+    private static FixedPointAnchor GetCanonicalSupportAnchor(
+        LSCollider collider,
+        Vector3d direction) =>
+        collider switch
+        {
+            LSCapsuleCollider capsule =>
+                FixedSegment.GetCenteredCapsuleSupportAnchor(
+                    capsule.Center,
+                    capsule.Rotation,
+                    capsule.AxisLength,
+                    capsule.ScaledRadius,
+                    direction),
+            LSCylinderCollider cylinder =>
+                FixedSegment.GetCenteredFiniteCylinderSupportAnchor(
+                    cylinder.Center,
+                    cylinder.Rotation,
+                    cylinder.Height,
+                    cylinder.ScaledRadius,
+                    direction),
+            LSConeCollider cone =>
+                FixedSegment.GetCenteredFiniteConeSupportAnchor(
+                    cone.Center,
+                    cone.Rotation,
+                    cone.Height,
+                    cone.ScaledRadius,
+                    direction),
+            _ => throw new InvalidOperationException(),
+        };
+
+    private static Vector3d GetSupport(
+        LSCollider collider,
+        Vector3d direction)
+    {
+        FixedPointAnchor anchor = ConvexColliderSupport.GetSupportAnchor(
+            collider,
+            direction,
+            Vector3d.Zero);
+        anchor.TryGetPoint(out Vector3d point).Should().BeTrue();
+        return point;
+    }
+
+    public enum FiniteAxisShape
+    {
+        Capsule,
+        Cylinder,
+        Cone,
     }
 }

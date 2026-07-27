@@ -6,8 +6,9 @@
 //=======================================================================
 
 using FixedMathSharp;
-using FixedMathSharp.Bounds;
+using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
+using System;
 
 namespace Gravitas.CollisionHandling;
 
@@ -16,38 +17,128 @@ namespace Gravitas.CollisionHandling;
 /// </summary>
 internal static class MixedEmbedded2DGeometry
 {
-    public static Vector3d GetClosestPointOnEmbeddedVolume(LSCollider2D embedded, Vector3d point)
+    public static Vector3d GetCenter3D(LSCollider2D embedded) =>
+        new(embedded.Center.X, embedded.MixedSlabCenterY, embedded.Center.Y);
+
+    public static ContactAnchor GetSupportAnchor(LSCollider2D embedded, Vector3d worldDirection)
+    {
+        Vector2d planarDirection = new(worldDirection.X, worldDirection.Z);
+        if (!TryGetPlanarSupportAnchor(
+                embedded,
+                planarDirection,
+                out ContactAnchor2D planarAnchor))
+        {
+            throw new InvalidOperationException(
+                "Committed embedded 2D geometry has no representable owner-relative support anchor.");
+        }
+
+        Fixed64 yOffset = worldDirection.Y > Fixed64.Zero
+            ? embedded.MixedHalfThickness
+            : worldDirection.Y < Fixed64.Zero
+                ? -embedded.MixedHalfThickness
+                : Fixed64.Zero;
+        return EmbedPlanarAnchor(
+            planarAnchor,
+            embedded.MixedSlabCenterY,
+            yOffset);
+    }
+
+    public static ContactAnchor GetClosestAnchorOnEmbeddedVolume(
+        LSCollider2D embedded,
+        Vector3d point)
     {
         Vector2d planarPoint = new(point.X, point.Z);
-        Fixed64 slabMinY = embedded.MixedBounds3D.Min.Y;
-        Fixed64 slabMaxY = embedded.MixedBounds3D.Max.Y;
         bool planarInside = embedded.ContainsPoint(planarPoint);
-        bool yInside = point.Y >= slabMinY && point.Y <= slabMaxY;
+        GetClosestSlabOffset(
+            point.Y,
+            embedded.MixedSlabCenterY,
+            embedded.MixedHalfThickness,
+            out Fixed64 closestYOffset,
+            out bool yInside,
+            out Fixed64 signedCenterOffset);
 
         if (!planarInside || !yInside)
         {
-            Vector2d closestPlanar = planarInside ? planarPoint : embedded.GetClosestPoint(planarPoint);
-            return new Vector3d(closestPlanar.X, FixedMath.Clamp(point.Y, slabMinY, slabMaxY), closestPlanar.Y);
+            if (planarInside)
+            {
+                return new ContactAnchor(
+                    new Vector3d(
+                        planarPoint.X,
+                        embedded.MixedSlabCenterY,
+                        planarPoint.Y),
+                    new Vector3d(
+                        Fixed64.Zero,
+                        closestYOffset,
+                        Fixed64.Zero));
+            }
+
+            if (TryGetPlanarBoundaryAnchor(
+                    embedded,
+                    planarPoint,
+                    out ContactAnchor2D closestPlanar,
+                    out _))
+            {
+                return EmbedPlanarAnchor(
+                    closestPlanar,
+                    embedded.MixedSlabCenterY,
+                    closestYOffset);
+            }
+
+            Vector2d fallback = embedded.GetClosestPoint(planarPoint);
+            return new ContactAnchor(
+                new Vector3d(
+                    fallback.X,
+                    embedded.MixedSlabCenterY,
+                    fallback.Y),
+                new Vector3d(
+                    Fixed64.Zero,
+                    closestYOffset,
+                    Fixed64.Zero));
         }
 
-        Fixed64 minYDistance = point.Y - slabMinY;
-        Fixed64 maxYDistance = slabMaxY - point.Y;
-        Fixed64 bestDistance = minYDistance;
-        Vector3d closest = new(planarPoint.X, slabMinY, planarPoint.Y);
+        bool upperYBoundary = signedCenterOffset > Fixed64.Zero;
+        Fixed64 yBoundaryOffset = upperYBoundary
+            ? embedded.MixedHalfThickness
+            : -embedded.MixedHalfThickness;
+        Fixed64 bestDistance = upperYBoundary
+            ? embedded.MixedHalfThickness - signedCenterOffset
+            : embedded.MixedHalfThickness + signedCenterOffset;
+        ContactAnchor closest = new(
+            new Vector3d(
+                planarPoint.X,
+                embedded.MixedSlabCenterY,
+                planarPoint.Y),
+            new Vector3d(
+                Fixed64.Zero,
+                yBoundaryOffset,
+                Fixed64.Zero));
 
-        if (maxYDistance < bestDistance)
-        {
-            bestDistance = maxYDistance;
-            closest = new Vector3d(planarPoint.X, slabMaxY, planarPoint.Y);
-        }
-
-        if (TryGetPlanarBoundaryPoint(embedded, planarPoint, out Vector2d planarBoundary, out Fixed64 planarDistance)
+        if (TryGetPlanarBoundaryAnchor(
+                embedded,
+                planarPoint,
+                out ContactAnchor2D planarBoundary,
+                out Fixed64 planarDistance)
             && planarDistance < bestDistance)
         {
-            closest = new Vector3d(planarBoundary.X, point.Y, planarBoundary.Y);
+            closest = EmbedPlanarAnchor(
+                planarBoundary,
+                embedded.MixedSlabCenterY,
+                signedCenterOffset);
         }
 
         return closest;
+    }
+
+    public static bool ContainsPointInSlab(LSCollider2D embedded, Fixed64 y)
+    {
+        GetClosestSlabOffset(
+            y,
+            embedded.MixedSlabCenterY,
+            embedded.MixedHalfThickness,
+            out _,
+            out bool inside,
+            out _);
+        return inside;
     }
 
     public static bool TryGetPlanarBoundaryPoint(
@@ -56,158 +147,157 @@ internal static class MixedEmbedded2DGeometry
         out Vector2d boundary,
         out Fixed64 distance)
     {
+        if (TryGetPlanarBoundaryAnchor(
+                embedded,
+                point,
+                out ContactAnchor2D anchor,
+                out distance)
+            && anchor.TryGetWorldPoint(out boundary))
+        {
+            return true;
+        }
+
+        boundary = default;
+        return false;
+    }
+
+    public static bool TryGetPlanarBoundaryAnchor(
+        LSCollider2D embedded,
+        Vector2d point,
+        out ContactAnchor2D boundary,
+        out Fixed64 distance)
+    {
+        if (embedded.TryGetClosestBoundaryAnchor(
+                point,
+                out FixedPointAnchor2d anchor,
+                out distance))
+        {
+            boundary = new ContactAnchor2D(anchor);
+            return true;
+        }
+
+        boundary = default;
+        return false;
+    }
+
+    private static bool TryGetPlanarSupportAnchor(
+        LSCollider2D embedded,
+        Vector2d direction,
+        out ContactAnchor2D anchor)
+    {
         switch (embedded.Shape)
         {
             case ColliderType2D.Circle:
-                return TryGetCircleBoundary((LSCircleCollider2D)embedded, point, out boundary, out distance);
+                {
+                    var circle = (LSCircleCollider2D)embedded;
+                    return TryGetRoundSupportAnchor(
+                        circle.Center,
+                        circle.Rotation,
+                        Fixed64.Zero,
+                        circle.ScaledRadius,
+                        direction,
+                        out anchor);
+                }
             case ColliderType2D.Capsule:
-                return TryGetCapsuleBoundary((LSCapsuleCollider2D)embedded, point, out boundary, out distance);
+                {
+                    var capsule = (LSCapsuleCollider2D)embedded;
+                    return TryGetRoundSupportAnchor(
+                        capsule.Center,
+                        capsule.Rotation,
+                        capsule.AxisLength,
+                        capsule.ScaledRadius,
+                        direction,
+                        out anchor);
+                }
             case ColliderType2D.AABox:
-                return TryGetAABoxBoundary((LSAABBoxCollider2D)embedded, point, out boundary, out distance);
             case ColliderType2D.ConvexPolygon:
-                return TryGetConvexBoundary(embedded, point, out boundary, out distance);
-            case ColliderType2D.Compound:
-                return TryGetCompoundBoundary((LSCompoundCollider2D)embedded, point, out boundary, out distance);
+                anchor = new ContactAnchor2D(
+                    embedded.GetConvexSupportAnchor(
+                        direction == Vector2d.Zero
+                            ? Vector2d.Right
+                            : direction));
+                return true;
             default:
-                boundary = default;
-                distance = Fixed64.Zero;
+                anchor = default;
                 return false;
         }
     }
 
-    private static bool TryGetCircleBoundary(
-        LSCircleCollider2D circle,
-        Vector2d point,
-        out Vector2d boundary,
-        out Fixed64 distance)
+    private static bool TryGetRoundSupportAnchor(
+        Vector2d center,
+        Fixed64 rotation,
+        Fixed64 axisLength,
+        Fixed64 radius,
+        Vector2d direction,
+        out ContactAnchor2D anchor)
     {
-        Vector2d delta = point - circle.Center;
-        Fixed64 magnitude = delta.Magnitude;
-        Vector2d direction = magnitude > Fixed64.Epsilon ? delta / magnitude : Vector2d.Right;
-        Fixed64 radius = circle.ScaledRadius;
-        boundary = circle.Center + direction * radius;
-        distance = (radius - magnitude).Abs();
+        Vector2d localDirection = direction == Vector2d.Zero
+            ? Vector2d.Zero
+            : Vector2d.Rotate(direction.Normalized, -rotation);
+
+        FixedPointAnchor2d localAnchor =
+            FixedSegment2d.GetCenteredCapsuleSupportAnchor(
+                center,
+                rotation,
+                Vector2d.Forward,
+                axisLength,
+                radius,
+                localDirection);
+        anchor = new ContactAnchor2D(localAnchor);
         return true;
     }
 
-    private static bool TryGetCapsuleBoundary(
-        LSCapsuleCollider2D capsule,
-        Vector2d point,
-        out Vector2d boundary,
-        out Fixed64 distance)
+    private static ContactAnchor EmbedPlanarAnchor(
+        ContactAnchor2D planar,
+        Fixed64 slabCenterY,
+        Fixed64 localYDisplacement = default)
     {
-        Vector2d segmentPoint = new FixedSegment2d(capsule.SegmentStart, capsule.SegmentEnd).ClosestPoint(point);
-        Vector2d delta = point - segmentPoint;
-        Fixed64 magnitude = delta.Magnitude;
-        Vector2d direction = magnitude > Fixed64.Epsilon ? delta / magnitude : Vector2d.Right;
-        Fixed64 radius = capsule.ScaledRadius;
-        boundary = segmentPoint + direction * radius;
-        distance = (radius - magnitude).Abs();
-        return true;
+        return new ContactAnchor(
+            new Vector3d(planar.Origin.X, slabCenterY, planar.Origin.Y),
+            FixedQuaternion.FromAxisAngle(Vector3d.Up, -planar.Rotation),
+            new Vector3d(
+                planar.LocalPoint.X,
+                Fixed64.Zero,
+                planar.LocalPoint.Y),
+            new Vector3d(
+                planar.LocalDisplacement.X,
+                localYDisplacement,
+                planar.LocalDisplacement.Y));
     }
 
-    private static bool TryGetAABoxBoundary(
-        LSAABBoxCollider2D box,
-        Vector2d point,
-        out Vector2d boundary,
-        out Fixed64 distance)
+    private static void GetClosestSlabOffset(
+        Fixed64 y,
+        Fixed64 slabCenterY,
+        Fixed64 halfThickness,
+        out Fixed64 closestOffset,
+        out bool inside,
+        out Fixed64 signedCenterOffset)
     {
-        Fixed64 distanceMinX = (point.X - box.MinX).Abs();
-        Fixed64 distanceMaxX = (box.MaxX - point.X).Abs();
-        Fixed64 distanceMinY = (point.Y - box.MinY).Abs();
-        Fixed64 distanceMaxY = (box.MaxY - point.Y).Abs();
-
-        distance = distanceMinX;
-        boundary = new Vector2d(box.MinX, point.Y);
-
-        if (distanceMaxX < distance)
+        if (!Fixed64.TrySubtract(y, slabCenterY, out signedCenterOffset))
         {
-            distance = distanceMaxX;
-            boundary = new Vector2d(box.MaxX, point.Y);
+            closestOffset = y < slabCenterY
+                ? -halfThickness
+                : halfThickness;
+            inside = false;
+            signedCenterOffset = closestOffset;
+            return;
         }
 
-        if (distanceMinY < distance)
+        if (signedCenterOffset < -halfThickness)
         {
-            distance = distanceMinY;
-            boundary = new Vector2d(point.X, box.MinY);
+            closestOffset = -halfThickness;
+            inside = false;
+            return;
         }
 
-        if (distanceMaxY < distance)
+        if (signedCenterOffset > halfThickness)
         {
-            distance = distanceMaxY;
-            boundary = new Vector2d(point.X, box.MaxY);
+            closestOffset = halfThickness;
+            inside = false;
+            return;
         }
 
-        return true;
-    }
-
-    private static bool TryGetConvexBoundary(
-        LSCollider2D convex,
-        Vector2d point,
-        out Vector2d boundary,
-        out Fixed64 distance)
-    {
-        int vertexCount = convex.VertexCount;
-        Vector2d bestPoint = convex.GetVertexUnchecked(0);
-        Fixed64 bestDistanceSquared = Fixed64.MaxValue;
-        for (int i = 0; i < vertexCount; i++)
-        {
-            Vector2d a = convex.GetVertexUnchecked(i);
-            Vector2d b = convex.GetVertexUnchecked((i + 1) % vertexCount);
-            Vector2d candidate = new FixedSegment2d(a, b).ClosestPoint(point);
-            Fixed64 candidateDistanceSquared = Vector2d.DistanceSquared(point, candidate);
-            if (candidateDistanceSquared >= bestDistanceSquared)
-                continue;
-
-            bestDistanceSquared = candidateDistanceSquared;
-            bestPoint = candidate;
-        }
-
-        boundary = bestPoint;
-        distance = bestDistanceSquared > Fixed64.Epsilon ? FixedMath.Sqrt(bestDistanceSquared) : Fixed64.Zero;
-        return true;
-    }
-
-    private static bool TryGetCompoundBoundary(
-        LSCompoundCollider2D compound,
-        Vector2d point,
-        out Vector2d boundary,
-        out Fixed64 distance)
-    {
-        if (TryGetCompoundBoundary(compound, point, containingPartsOnly: true, out boundary, out distance))
-            return true;
-
-        return TryGetCompoundBoundary(compound, point, containingPartsOnly: false, out boundary, out distance);
-    }
-
-    private static bool TryGetCompoundBoundary(
-        LSCompoundCollider2D compound,
-        Vector2d point,
-        bool containingPartsOnly,
-        out Vector2d boundary,
-        out Fixed64 distance)
-    {
-        boundary = default;
-        distance = Fixed64.Zero;
-        bool found = false;
-        Fixed64 bestDistance = Fixed64.MaxValue;
-
-        for (int i = 0; i < compound.PartCount; i++)
-        {
-            LSCollider2D part = compound.GetPartCollider(i);
-            if (containingPartsOnly && !part.ContainsPoint(point))
-                continue;
-
-            TryGetPlanarBoundaryPoint(part, point, out Vector2d candidate, out Fixed64 candidateDistance);
-            if (found && candidateDistance >= bestDistance)
-                continue;
-
-            boundary = candidate;
-            distance = candidateDistance;
-            bestDistance = candidateDistance;
-            found = true;
-        }
-
-        return found;
+        closestOffset = signedCenterOffset;
+        inside = true;
     }
 }

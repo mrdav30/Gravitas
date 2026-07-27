@@ -77,7 +77,7 @@ public sealed class CompoundColliderCollisionTests
     }
 
     [Fact]
-    public void CompoundInternalOverlap_ShouldReduceDuplicateContactsDeterministically()
+    public void CompoundInternalOverlap_ShouldPreserveDistinctPartContactIdentity()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         var compoundCollider = new LSCompoundCollider(
@@ -94,12 +94,18 @@ public sealed class CompoundColliderCollisionTests
         CollisionPair pair = scenario.CreatePair(compound.Collider, sphere.Collider);
 
         pair.UpdateCollision();
-        ulong firstContactId = pair.Manifold.PrimaryContact.ContactId;
+        ulong[] firstContactIds = pair.Manifold
+            .Select(contact => contact.ContactId)
+            .ToArray();
 
         pair.UpdateCollision();
 
-        pair.Manifold.Count.Should().Be(1);
-        pair.Manifold.PrimaryContact.ContactId.Should().Be(firstContactId);
+        pair.Manifold.Count.Should().Be(2);
+        pair.Manifold
+            .Select(contact => contact.ContactId)
+            .Should()
+            .Equal(firstContactIds);
+        firstContactIds.Should().OnlyHaveUniqueItems();
         pair.Manifold.Select(contact => contact.ContactId).Should().BeInAscendingOrder();
     }
 

@@ -29,6 +29,7 @@ internal sealed partial class GravitasMixedCollisionService
     private readonly GravitasWorldContext _context;
     private readonly SwiftBucket<PhysicsMixedPartition> _activePartitions = new(DefaultPartitionPoolCapacity);
     private readonly SwiftStack<PhysicsMixedPartition> _inactivePartitionPool = new(DefaultPartitionPoolCapacity);
+    private readonly SwiftStack<SwiftSparseSet> _inactivePartitionMembershipPool = new(DefaultPartitionPoolCapacity);
     private readonly SwiftHashSet<ulong> _processedPairKeys = new();
     private readonly SwiftList<Voxel> _coveredVoxels = new();
     private readonly GridTraceScratch _traceScratch = new();
@@ -72,6 +73,8 @@ internal sealed partial class GravitasMixedCollisionService
     internal int ActivePartitionCount => _activePartitions.Count;
 
     internal int InactivePartitionCount => _inactivePartitionPool.Count;
+
+    internal int InactivePartitionMembershipCount => _inactivePartitionMembershipPool.Count;
 
     internal int RetainedPartitionCount => _retainedPartitions.Count;
 
@@ -149,6 +152,7 @@ internal sealed partial class GravitasMixedCollisionService
         DetachRetainedPartitions();
         _activePartitions.Clear();
         _inactivePartitionPool.Clear();
+        _inactivePartitionMembershipPool.Clear();
         _processedPairKeys.Clear();
         _coveredVoxels.FastClear();
         _traceScratch.Clear();

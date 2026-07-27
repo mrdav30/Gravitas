@@ -266,9 +266,10 @@ public sealed partial class ContinuousCollision2DTests
     public void FrozenAxisHandoff2D_ShouldPublishProjectedPositionAndCandidateBounds()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
+        var collider = new LSCircleCollider2D(Fixed64.Half);
         SolidBody2D mover = CreateBody(
             context,
-            new LSCircleCollider2D(Fixed64.Half),
+            collider,
             Vector2d.Zero,
             immovable: false);
         mover.FreezeAxes = BodyFreezeAxes2D.PositionX;
@@ -287,9 +288,17 @@ public sealed partial class ContinuousCollision2DTests
             .BeTrue();
 
         mover.Position.Should().Be(projectedImpactPosition);
+        collider.Center.Should().Be(projectedImpactPosition);
         mover.SampleContinuousCollisionPosition(Fixed64.Half)
             .Should()
             .Be(projectedImpactPosition);
+        DynamicCcdPlanarBounds projectedImpactBounds = DynamicCcdCandidateIndex2D.CreateBoundsBetween(
+            projectedImpactPosition,
+            projectedImpactPosition,
+            Fixed64.FromFraction(1, 10));
+        context.Physics2D.QueryPlanarContinuousCollisionCandidates(projectedImpactBounds)
+            .Should()
+            .Contain(mover.DynamicId);
         DynamicCcdPlanarBounds rawImpactBounds = DynamicCcdCandidateIndex2D.CreateBoundsBetween(
             rawImpactPosition,
             rawImpactPosition,
@@ -297,6 +306,71 @@ public sealed partial class ContinuousCollision2DTests
         context.Physics2D.QueryPlanarContinuousCollisionCandidates(rawImpactBounds)
             .Should()
             .NotContain(mover.DynamicId);
+    }
+
+    [Fact]
+    public void Handoff2D_WhenRequestedPoseCannotPublishCollider_ShouldRemainAtomic()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        var collider = new LSCircleCollider2D(Fixed64.Half)
+        {
+            LocalOffset = Vector2d.Right
+        };
+        SolidBody2D mover = CreateBody(
+            context,
+            collider,
+            Vector2d.Zero,
+            immovable: false);
+        Vector2d originalCenter = collider.Center;
+        var originalBounds = collider.Bounds;
+
+        mover.ApplyContinuousCollisionHandoff(
+                new Vector2d(Fixed64.MaxValue, Fixed64.Zero),
+                Fixed64.Zero,
+                Vector2d.Zero,
+                Fixed64.Zero,
+                Fixed64.Half)
+            .Should()
+            .BeFalse();
+
+        mover.Position.Should().Be(Vector2d.Zero);
+        collider.Center.Should().Be(originalCenter);
+        collider.Bounds.Should().Be(originalBounds);
+    }
+
+    [Fact]
+    public void ProxyRadius2D_WhenPublishedPoseLeadsBody_ShouldRemainCanonicalForOffsetCompound()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        var collider = new LSCompoundCollider2D(
+            CompoundColliderPart2D.Circle(
+                Fixed64.Half,
+                Vector2d.Right))
+        {
+            LocalOffset = Vector2d.Right * (Fixed64)3
+        };
+        SolidBody2D mover = CreateBody(
+            context,
+            collider,
+            Vector2d.Zero,
+            immovable: false);
+        Fixed64 expectedRadius = Fixed64.FromFraction(9, 2);
+        mover.ResolveContinuousCollisionProxyRadius()
+            .Should()
+            .Be(expectedRadius);
+
+        collider.TryPrepareBodyPose(
+                Vector2d.Right * (Fixed64)10,
+                Fixed64.Zero)
+            .Should()
+            .BeTrue();
+        collider.PublishPreparedBodyPose();
+
+        mover.Position.Should().Be(Vector2d.Zero);
+        collider.Center.Should().Be(Vector2d.Right * (Fixed64)13);
+        mover.ResolveContinuousCollisionProxyRadius()
+            .Should()
+            .Be(expectedRadius);
     }
 
     [Fact]

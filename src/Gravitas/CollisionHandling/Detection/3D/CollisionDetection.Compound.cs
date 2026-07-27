@@ -34,7 +34,12 @@ public static partial class CollisionDetection
         for (int i = 0; i < compound.PartCount; i++)
         {
             LSCollider part = compound.GetPartCollider(i);
-            collided |= TryBuildCompoundPartContact(pair, part, other);
+            collided |= TryBuildCompoundPartContact(
+                pair,
+                part,
+                featureNamespaceA: i + 1,
+                other,
+                featureNamespaceB: 0);
         }
 
         return collided;
@@ -50,7 +55,14 @@ public static partial class CollisionDetection
         {
             LSCollider partA = compoundA.GetPartCollider(i);
             for (int j = 0; j < compoundB.PartCount; j++)
-                collided |= TryBuildCompoundPartContact(pair, partA, compoundB.GetPartCollider(j));
+            {
+                collided |= TryBuildCompoundPartContact(
+                    pair,
+                    partA,
+                    featureNamespaceA: i + 1,
+                    compoundB.GetPartCollider(j),
+                    featureNamespaceB: -(j + 1));
+            }
         }
 
         return collided;
@@ -59,12 +71,22 @@ public static partial class CollisionDetection
     private static bool TryBuildCompoundPartContact(
         CollisionWorkItem ownerPair,
         LSCollider first,
-        LSCollider second)
+        int featureNamespaceA,
+        LSCollider second,
+        int featureNamespaceB)
     {
         if (!BoundsOverlapInclusive(first, second))
             return false;
 
-        OrderPartPairForDetection(first, second, out LSCollider colliderA, out LSCollider colliderB);
+        OrderPartPairForDetection(
+            first,
+            featureNamespaceA,
+            second,
+            featureNamespaceB,
+            out LSCollider colliderA,
+            out int orderedNamespaceA,
+            out LSCollider colliderB,
+            out int orderedNamespaceB);
         CollisionType collisionType = ColliderSettings.GetCollisionType(colliderA.Shape, colliderB.Shape);
         ContactManifold scratch = ownerPair.Context.CollisionScratch.CompoundPartManifold;
         scratch.BeginUpdate(ownerPair.Context.FrameCount);
@@ -72,13 +94,19 @@ public static partial class CollisionDetection
         if (!DoCollisionCheck(partPair))
             return false;
 
-        AddCompoundPartContactsInOwnerOrder(ownerPair, partPair);
+        AddCompoundPartContactsInOwnerOrder(
+            ownerPair,
+            partPair,
+            orderedNamespaceA,
+            orderedNamespaceB);
         return true;
     }
 
     private static void AddCompoundPartContactsInOwnerOrder(
         CollisionWorkItem ownerPair,
-        CollisionWorkItem partPair)
+        CollisionWorkItem partPair,
+        int featureNamespaceA,
+        int featureNamespaceB)
     {
         bool addInPartOrder = ((LSCompoundCollider)ownerPair.ColliderA).ContainsPartCollider(partPair.ColliderA);
 
@@ -89,41 +117,55 @@ public static partial class CollisionDetection
             if (addInPartOrder)
             {
                 ownerPair.Manifold.AddContact(
-                    contact.PointA,
-                    contact.PointB,
+                    contact.AnchorA,
+                    contact.AnchorB,
                     contact.Depth,
                     contact.Normal,
                     partPair.ColliderA.Material,
-                    partPair.ColliderB.Material);
+                    partPair.ColliderB.Material,
+                    contact.DepthIsClamped,
+                    featureNamespaceA,
+                    featureNamespaceB);
                 continue;
             }
 
             ownerPair.Manifold.AddContact(
-                contact.PointB,
-                contact.PointA,
+                contact.AnchorB,
+                contact.AnchorA,
                 contact.Depth,
                 -contact.Normal,
                 partPair.ColliderB.Material,
-                partPair.ColliderA.Material);
+                partPair.ColliderA.Material,
+                contact.DepthIsClamped,
+                featureNamespaceB,
+                featureNamespaceA);
         }
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void OrderPartPairForDetection(
         LSCollider first,
+        int firstFeatureNamespace,
         LSCollider second,
+        int secondFeatureNamespace,
         out LSCollider colliderA,
-        out LSCollider colliderB)
+        out int featureNamespaceA,
+        out LSCollider colliderB,
+        out int featureNamespaceB)
     {
         if (first.Priority >= second.Priority)
         {
             colliderA = first;
+            featureNamespaceA = firstFeatureNamespace;
             colliderB = second;
+            featureNamespaceB = secondFeatureNamespace;
             return;
         }
 
         colliderA = second;
+        featureNamespaceA = secondFeatureNamespace;
         colliderB = first;
+        featureNamespaceB = firstFeatureNamespace;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

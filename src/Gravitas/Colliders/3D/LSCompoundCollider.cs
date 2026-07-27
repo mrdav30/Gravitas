@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using FixedMathSharp.Geometry;
 using Gravitas.Materials;
 using Gravitas.Queries;
 using SwiftCollections;
@@ -37,7 +38,10 @@ public sealed class LSCompoundCollider : LSCollider
         {
             _parts[i] = parts[i];
             _partColliders[i] = MaterializePartCollider(parts[i]);
-            _partColliders[i].ReserveCompoundPart(this);
+            _partColliders[i].ReserveCompoundPart(
+                this,
+                parts[i].LocalRotation,
+                parts[i].LocalScale);
         }
     }
 
@@ -48,15 +52,10 @@ public sealed class LSCompoundCollider : LSCollider
     public override Fixed64 ScaledRadius
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        get
-        {
-            Vector3d center = Center;
-            Vector3d farthestExtent = new(
-                FixedMath.Max((BoundsMin.X - center.X).Abs(), (BoundsMax.X - center.X).Abs()),
-                FixedMath.Max((BoundsMin.Y - center.Y).Abs(), (BoundsMax.Y - center.Y).Abs()),
-                FixedMath.Max((BoundsMin.Z - center.Z).Abs(), (BoundsMax.Z - center.Z).Abs()));
-            return farthestExtent.Magnitude;
-        }
+        get => HasCommittedShape
+            ? CanonicalCenteredProxyRadius
+            : ColliderCanonicalBounds
+                .GetCurrentCenteredProxyRadius(this);
     }
 
     public ReadOnlySpan<CompoundColliderPart> Parts => _parts;
@@ -81,14 +80,8 @@ public sealed class LSCompoundCollider : LSCollider
         return _partColliders[index];
     }
 
-    protected override void RebuildRuntimeShape() => BuildShape();
-
-    internal override void ValidateRuntimeTransform(Vector3d scale, FixedQuaternion rotation) =>
-        ValidatePartTransforms(scale, rotation);
-
-    protected override void BuildShape()
+    private protected override void PrepareShape(in ColliderShapeSnapshot snapshot)
     {
-        Area = Fixed64.Zero;
         Vector3d min = Vector3d.Zero;
         Vector3d max = Vector3d.Zero;
 
@@ -96,37 +89,41 @@ public sealed class LSCompoundCollider : LSCollider
         {
             CompoundColliderPart part = _parts[i];
             LSCollider partCollider = _partColliders[i];
-            partCollider.LocalOffset = part.LocalOffset;
-            partCollider.Material = part.ResolveMaterial(Material);
-            partCollider.BindCompoundPart(this, part.LocalRotation, part.LocalScale, Context);
+            partCollider.PrepareCompoundPart(
+                snapshot,
+                part.LocalRotation,
+                part.LocalScale,
+                PreparedContext);
 
             if (i == 0)
             {
-                min = partCollider.BoundsMin;
-                max = partCollider.BoundsMax;
+                min = partCollider.PreparedShapeBounds.Min;
+                max = partCollider.PreparedShapeBounds.Max;
             }
             else
             {
-                min = Vector3d.Min(min, partCollider.BoundsMin);
-                max = Vector3d.Max(max, partCollider.BoundsMax);
+                min = Vector3d.Min(min, partCollider.PreparedShapeBounds.Min);
+                max = Vector3d.Max(max, partCollider.PreparedShapeBounds.Max);
             }
-
-            Area += partCollider.Area;
         }
 
-        SetBoundsMinMax(min, max);
+        SetPreparedBounds(FixedBoundBox.FromMinMax(min, max));
     }
 
-    private void ValidatePartTransforms(Vector3d ownerScale, FixedQuaternion ownerRotation)
+    private protected override void PublishShape()
     {
+        Fixed64 area = Fixed64.Zero;
         for (int i = 0; i < _parts.Length; i++)
         {
-            Vector3d partScale = Vector3d.Multiply(ownerScale, _parts[i].LocalScale);
-            ColliderScalePolicy.Validate(partScale);
-            _partColliders[i].ValidateRuntimeTransform(
-                partScale,
-                ownerRotation * _parts[i].LocalRotation);
+            CompoundColliderPart part = _parts[i];
+            _partColliders[i].PublishCompoundPart(
+                part.LocalRotation,
+                part.LocalScale,
+                PreparedContext);
+            area += _partColliders[i].Area;
         }
+
+        Area = area;
     }
 
     public override Vector3d CalculateLocalCenterOfMassOffset()

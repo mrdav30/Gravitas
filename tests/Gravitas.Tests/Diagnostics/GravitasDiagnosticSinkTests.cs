@@ -7,6 +7,7 @@ using Gravitas.Diagnostics;
 using Gravitas.Queries;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
+using GridForge.Configuration;
 using System;
 using Xunit;
 
@@ -14,6 +15,45 @@ namespace Gravitas.Tests.Diagnostics;
 
 public sealed class GravitasDiagnosticSinkTests
 {
+    [Fact]
+    public void MixedContactDiagnostics_ShouldExposeUnavailableWorldPointsWithoutFabricatingThem()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> sphere = scenario.CreateSphere(Vector3d.Zero);
+        SolidBody2D body2D = CreateBody2D(scenario.Context, Vector2d.Zero);
+        var pair = new CollisionPairMixed(sphere.Collider, body2D.Collider);
+        var contact = new MixedContact(
+            new ContactAnchor(
+                new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero),
+                Vector3d.Right),
+            new ContactAnchor(
+                new Vector3d(Fixed64.MinValue, Fixed64.Zero, Fixed64.Zero),
+                Vector3d.Left),
+            Vector3d.Right,
+            Fixed64.One);
+        scenario.Context.Diagnostics.Enable(eventCapacity: 2, drawCommandCapacity: 0);
+
+        pair.MarkColliding(frame: 1, contact);
+        scenario.Context.Diagnostics.EmitMixedResponseImpulse(
+            pair,
+            contact,
+            Vector3d.Right,
+            Fixed64.One,
+            iteration: 0,
+            iterationLimit: 1);
+
+        ReadOnlySpan<GravitasDiagnosticEvent> events = scenario.Context.Diagnostics.Events;
+        events.Length.Should().Be(2);
+        events[0].Kind.Should().Be(GravitasDiagnosticEventKind.MixedContact);
+        events[0].HasPointA.Should().BeFalse();
+        events[0].HasPointB.Should().BeFalse();
+        events[0].PointA.Should().Be(Vector3d.Zero);
+        events[0].PointB.Should().Be(Vector3d.Zero);
+        events[1].Kind.Should().Be(GravitasDiagnosticEventKind.MixedResponseImpulse);
+        events[1].HasPointA.Should().BeFalse();
+        events[1].HasPointB.Should().BeFalse();
+    }
+
     [Fact]
     public void DisabledDiagnostics_ShouldNotAllocateFromRuntimeHooks()
     {
@@ -354,8 +394,11 @@ public sealed class GravitasDiagnosticSinkTests
         commands[0].Kind.Should().Be(GravitasDebugDrawKind.WireSphere);
         commands[0].ColliderId.Should().Be(sphere.Collider.Id);
         commands[1].Kind.Should().Be(GravitasDebugDrawKind.WireCapsule);
+        commands[1].Radius.Should().Be(capsule.Collider.ScaledRadius);
+        commands[1].AxisLength.Should().Be(capsule.Collider.AxisLength);
         commands[2].Kind.Should().Be(GravitasDebugDrawKind.WireBox);
         commands[2].Rotation.Should().Be(cuboid.Collider.Rotation);
+        commands[2].HalfExtents.Should().Be(cuboid.Collider.OrientedBox.HalfExtents);
         commands[3].Kind.Should().Be(GravitasDebugDrawKind.WireCylinder);
         commands[4].Kind.Should().Be(GravitasDebugDrawKind.WireCone);
         commands[4].ColliderId.Should().Be(cone.Collider.Id);
@@ -371,9 +414,9 @@ public sealed class GravitasDiagnosticSinkTests
         commands[7].ColliderId.Should().Be(compound.Collider.Id);
         commands[7].ColliderType.Should().Be(ColliderType.Compound);
         commands[8].Kind.Should().Be(GravitasDebugDrawKind.WireTriangle);
-        commands[8].PointA.Should().Be(mesh.Collider.Mesh.Vertices[0]);
-        commands[8].PointB.Should().Be(mesh.Collider.Mesh.Vertices[1]);
-        commands[8].PointC.Should().Be(mesh.Collider.Mesh.Vertices[2]);
+        commands[8].PointA.Should().Be(mesh.Collider.Mesh.GetVertexWorld(0));
+        commands[8].PointB.Should().Be(mesh.Collider.Mesh.GetVertexWorld(1));
+        commands[8].PointC.Should().Be(mesh.Collider.Mesh.GetVertexWorld(2));
         commands[9].Kind.Should().Be(GravitasDebugDrawKind.Line);
         commands[9].Start.Should().Be(PhysicsScenarioBuilder.Vector(0, 0, 0));
         commands[9].End.Should().Be(PhysicsScenarioBuilder.Vector(1, 0, 0));
@@ -459,6 +502,7 @@ public sealed class GravitasDiagnosticSinkTests
         ReadOnlySpan<GravitasDebugDrawCommand> commands = scenario.Context.Diagnostics.DrawCommands;
         commands.Length.Should().Be(3);
         AssertDrawCommandMetadata(commands[0], GravitasDebugDrawKind.WireCapsule, compound.Collider.Id, ColliderType.Compound);
+        commands[0].AxisLength.Should().Be(((LSCapsuleCollider)compound.Collider.GetPartCollider(0)).AxisLength);
         AssertDrawCommandMetadata(commands[1], GravitasDebugDrawKind.WireCylinder, compound.Collider.Id, ColliderType.Compound);
         AssertDrawCommandMetadata(commands[2], GravitasDebugDrawKind.WireTriangle, compound.Collider.Id, ColliderType.Compound);
     }
@@ -503,6 +547,85 @@ public sealed class GravitasDiagnosticSinkTests
         commands[18].Kind.Should().Be(GravitasDebugDrawKind.WireCylinder);
         commands[19].Kind.Should().Be(GravitasDebugDrawKind.WireBox);
         Assert2DDrawCommandRange(commands, 20, 12, GravitasDebugDrawKind.Line, compound.Id, ColliderType2D.Compound);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void CaptureMixedCollider_WithPolygonCrossingScalarFace_ShouldEmitRepresentableEdges(
+        bool positiveFace)
+    {
+        Fixed64 centerX = positiveFace
+            ? Fixed64.MaxValue - Fixed64.FromFraction(1, 4)
+            : Fixed64.MinValue + Fixed64.FromFraction(1, 4);
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        context.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
+        Fixed64 minX = positiveFace
+            ? Fixed64.MaxValue - (Fixed64)4
+            : Fixed64.MinValue;
+        Fixed64 maxX = positiveFace
+            ? Fixed64.MaxValue
+            : Fixed64.MinValue + (Fixed64)4;
+        context.World.TryAddGrid(
+            new GridConfiguration(
+                new Vector3d(minX, (Fixed64)(-2), (Fixed64)(-2)),
+                new Vector3d(maxX, (Fixed64)2, (Fixed64)2)),
+            out _).Should().BeTrue();
+        var polygon = new LSPolygonCollider2D(
+            new Vector2d(-Fixed64.Half, -Fixed64.Half),
+            new Vector2d(Fixed64.Half, -Fixed64.Half),
+            new Vector2d(Fixed64.Half, Fixed64.Half),
+            new Vector2d(-Fixed64.Half, Fixed64.Half));
+        InitializeBodylessCollider(
+            context,
+            polygon,
+            new Vector2d(centerX, Fixed64.Zero));
+
+        context.Diagnostics.Enable(eventCapacity: 0, drawCommandCapacity: 4);
+        context.Diagnostics.CaptureMixedCollider(
+            polygon,
+            GravitasDiagnosticColor.Cyan);
+
+        ReadOnlySpan<GravitasDebugDrawCommand> commands =
+            context.Diagnostics.DrawCommands;
+        commands.Length.Should().Be(4);
+        Assert2DDrawCommandRange(
+            commands,
+            0,
+            4,
+            GravitasDebugDrawKind.Line,
+            polygon.Id,
+            ColliderType2D.ConvexPolygon);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CaptureMixedCollider_WithOneRepresentableCapsuleCap_ShouldEmitThatCap(bool positiveFace)
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        context.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
+        var capsule = new LSCapsuleCollider2D(Fixed64.One, (Fixed64)22);
+        Fixed64 centerX = positiveFace
+            ? Fixed64.MaxValue - (Fixed64)5
+            : Fixed64.MinValue + (Fixed64)5;
+        var agent = new TestMatterAgent(
+            context,
+            new FixedTransform(
+                new Vector3d(centerX, Fixed64.Zero, Fixed64.Zero),
+                FixedQuaternion.FromEulerAnglesInDegrees(Fixed64.Zero, (Fixed64)45, Fixed64.Zero),
+                Vector3d.One));
+        capsule.InitializeWithNoBody(agent);
+
+        context.Diagnostics.Enable(eventCapacity: 0, drawCommandCapacity: 3);
+        context.Diagnostics.CaptureMixedCollider(capsule, GravitasDiagnosticColor.Cyan);
+
+        GravitasDebugDrawCommand command = context.Diagnostics.DrawCommands.Should().ContainSingle().Which;
+        Assert2DDrawCommandMetadata(command, GravitasDebugDrawKind.WireCylinder, capsule.Id, ColliderType2D.Capsule);
+        if (positiveFace)
+            command.Center.X.Should().BeLessThan(centerX);
+        else
+            command.Center.X.Should().BeGreaterThan(centerX);
     }
 
     [Fact]

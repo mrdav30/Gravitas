@@ -44,7 +44,7 @@ public sealed class CompoundColliderTests
         body.Collider.Parts[0].LocalRotation.Should().Be(expected);
         runtimePart.CompoundLocalRotation.Should().Be(expected);
         runtimePart.Rotation.Should().Be(expected);
-        runtimePart.Axis.IsNormalized().Should().BeTrue();
+        runtimePart.WorldAxis.IsNormalized().Should().BeTrue();
     }
 
     [Fact]
@@ -63,7 +63,7 @@ public sealed class CompoundColliderTests
 
         Action initialize = () => compound.InitializeWithNoBody(new TestMatterAgent(context, transform));
 
-        initialize.Should().Throw<ArgumentException>().WithParameterName("scale");
+        initialize.Should().Throw<ArgumentException>().WithParameterName("dimension");
         compound.Id.Should().Be(-1);
         compound.HasHostBinding.Should().BeFalse();
         context.Physics.ColliderCount.Should().Be(0);
@@ -86,7 +86,7 @@ public sealed class CompoundColliderTests
 
         Action initialize = () => body.Initialize(Vector3d.Zero, FixedQuaternion.Identity);
 
-        initialize.Should().Throw<ArgumentException>().WithParameterName("scale");
+        initialize.Should().Throw<ArgumentException>().WithParameterName("dimension");
         body.Active.Should().BeFalse();
         body.DynamicId.Should().Be(-1);
         compound.Id.Should().Be(-1);
@@ -97,7 +97,7 @@ public sealed class CompoundColliderTests
     }
 
     [Fact]
-    public void BodyInitialize_WithCylinderPartWhoseScaledHalfHeightCollapses_ShouldRejectBeforeRuntimeMutation()
+    public void BodyInitialize_WithCylinderPartWhoseOddRawHeightHasNoRepresentableHalf_ShouldPreserveFullHeight()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         var compound = new LSCompoundCollider(CompoundColliderPart.Cylinder(
@@ -107,17 +107,154 @@ public sealed class CompoundColliderTests
         var transform = new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One);
         var body = new SolidBody(new TestMatterAgent(context, transform), compound);
 
-        Action initialize = () => body.Initialize(Vector3d.Zero, FixedQuaternion.Identity);
+        body.Initialize(Vector3d.Zero, FixedQuaternion.Identity);
 
-        initialize.Should().Throw<ArgumentException>()
-            .WithParameterName("Size")
-            .WithMessage("*positive half-height*");
-        body.Active.Should().BeFalse();
-        body.DynamicId.Should().Be(-1);
-        compound.Id.Should().Be(-1);
-        compound.HasHostBinding.Should().BeFalse();
-        context.Physics.BodyCount.Should().Be(0);
-        context.Physics.ColliderCount.Should().Be(0);
+        var cylinder = (LSCylinderCollider)compound.GetPartCollider(0);
+        cylinder.Height.Should().Be(Fixed64.FromRaw(1));
+        body.Active.Should().BeTrue();
+        body.DynamicId.Should().BeGreaterThanOrEqualTo(0);
+        compound.Id.Should().BeGreaterThanOrEqualTo(0);
+        context.Physics.BodyCount.Should().Be(1);
+        context.Physics.ColliderCount.Should().Be(1);
+    }
+
+    [Theory]
+    [InlineData(ColliderType.Capsule)]
+    [InlineData(ColliderType.Cylinder)]
+    [InlineData(ColliderType.Cone)]
+    public void ScaledRadius_BeforeInitialization_ShouldIncludeFiniteAxisLength(
+        ColliderType shape)
+    {
+        CompoundColliderPart part = shape switch
+        {
+            ColliderType.Capsule => CompoundColliderPart.Capsule(
+                Fixed64.One,
+                (Fixed64)10,
+                Vector3d.Right * Fixed64.Two),
+            ColliderType.Cylinder => CompoundColliderPart.Cylinder(
+                Fixed64.One,
+                (Fixed64)10,
+                Vector3d.Right * Fixed64.Two),
+            ColliderType.Cone => CompoundColliderPart.Cone(
+                Fixed64.One,
+                (Fixed64)10,
+                Vector3d.Right * Fixed64.Two),
+            _ => throw new ArgumentOutOfRangeException(nameof(shape))
+        };
+        var compound = new LSCompoundCollider(part);
+
+        Fixed64 beforeInitialization = compound.ScaledRadius;
+
+        using PhysicsScenarioBuilder scenario =
+            PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSCompoundCollider> body = scenario.CreateBody(
+            compound,
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            immovable: true);
+
+        beforeInitialization.Should().Be(body.Collider.ScaledRadius);
+        beforeInitialization.Should().BeGreaterThan((Fixed64)5);
+    }
+
+    [Fact]
+    public void ScaledRadius_BeforeInitialization_ShouldIncludeScaledMeshVertices()
+    {
+        Vector3d[] vertices =
+        {
+            new(Fixed64.One, Fixed64.One, Fixed64.One),
+            new(-Fixed64.One, -Fixed64.One, Fixed64.One),
+            new(-Fixed64.One, Fixed64.One, -Fixed64.One),
+            new(Fixed64.One, -Fixed64.One, -Fixed64.One)
+        };
+        int[] triangles =
+        {
+            0, 2, 1,
+            0, 1, 3,
+            0, 3, 2,
+            1, 2, 3
+        };
+        var compound = new LSCompoundCollider(
+            CompoundColliderPart.ConvexMesh(
+                vertices,
+                triangles,
+                Vector3d.Right * Fixed64.Two,
+                FixedQuaternion.Identity,
+                new Vector3d(
+                    Fixed64.One,
+                    (Fixed64)3,
+                    Fixed64.One)));
+
+        Fixed64 beforeInitialization = compound.ScaledRadius;
+
+        using PhysicsScenarioBuilder scenario =
+            PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSCompoundCollider> body = scenario.CreateBody(
+            compound,
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            immovable: true);
+        var mesh = (LSMeshCollider)compound.GetPartCollider(0);
+
+        beforeInitialization.Should().Be(body.Collider.ScaledRadius);
+        beforeInitialization.Should().BeGreaterThan((Fixed64)5);
+        mesh.Mesh.GetScaledLocalRadius(
+                Vector3d.One,
+                new Vector3d(
+                    Fixed64.One,
+                    (Fixed64)3,
+                    Fixed64.One))
+            .Should()
+            .Be(mesh.ScaledRadius);
+    }
+
+    [Fact]
+    public void ScaledRadius_BeforeInitializationWithFullDomainParts_ShouldRemainConservative()
+    {
+        Vector3d[] vertices =
+        {
+            Vector3d.One,
+            new Vector3d(-Fixed64.One, -Fixed64.One, Fixed64.One),
+            new Vector3d(-Fixed64.One, Fixed64.One, -Fixed64.One),
+            new Vector3d(Fixed64.One, -Fixed64.One, -Fixed64.One)
+        };
+        int[] triangles =
+        {
+            0, 2, 1,
+            0, 1, 3,
+            0, 3, 2,
+            1, 2, 3
+        };
+        var compound = new LSCompoundCollider(
+            CompoundColliderPart.Cuboid(
+                Vector3d.One * Fixed64.MaxValue,
+                Vector3d.Zero,
+                FixedQuaternion.Identity,
+                Vector3d.One * Fixed64.Two),
+            CompoundColliderPart.Capsule(
+                Fixed64.Half,
+                Fixed64.MaxValue,
+                Vector3d.Zero,
+                FixedQuaternion.Identity,
+                new Vector3d(
+                    Fixed64.One,
+                    Fixed64.Two,
+                    Fixed64.One)),
+            CompoundColliderPart.ConvexMesh(
+                vertices,
+                triangles,
+                Vector3d.Zero,
+                FixedQuaternion.Identity,
+                Vector3d.One * Fixed64.MaxValue,
+                MeshInertiaPolicy.SurfaceApproximation),
+            CompoundColliderPart.Sphere(
+                Fixed64.Half,
+                new Vector3d(
+                    Fixed64.MaxValue,
+                    Fixed64.Zero,
+                    Fixed64.Zero)));
+
+        compound.ScaledRadius.Should().Be(Fixed64.MaxValue);
     }
 
     [Fact]

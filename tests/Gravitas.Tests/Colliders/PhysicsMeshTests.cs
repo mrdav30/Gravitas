@@ -56,6 +56,48 @@ public sealed class PhysicsMeshTests
     }
 
     [Fact]
+    public void Constructor_ShouldAdmitFullDomainTriangleArea()
+    {
+        Vector3d[] vertices =
+        {
+            new(Fixed64.MinValue, Fixed64.MinValue, Fixed64.Zero),
+            new(Fixed64.MaxValue, Fixed64.MinValue, Fixed64.Zero),
+            new(Fixed64.MinValue, Fixed64.MaxValue, Fixed64.Zero)
+        };
+
+        Action create = () => _ = new PhysicsMesh(
+            vertices,
+            ValidTriangles(),
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            MeshColliderMode.Concave);
+
+        create.Should().NotThrow();
+    }
+
+    [Fact]
+    public void Constructor_ShouldRejectFullDomainCollinearTriangle()
+    {
+        Vector3d[] vertices =
+        {
+            new(Fixed64.MinValue, Fixed64.Zero, Fixed64.Zero),
+            new(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero),
+            Vector3d.Zero
+        };
+
+        Action create = () => _ = new PhysicsMesh(
+            vertices,
+            ValidTriangles(),
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            MeshColliderMode.Concave);
+
+        create.Should().Throw<ArgumentException>()
+            .WithParameterName("triangles")
+            .WithMessage("*Degenerate triangles*");
+    }
+
+    [Fact]
     public void SameSignExtremeBounds_UseExactCenterDuringScaleAndSurfaceValidation()
     {
         Fixed64 coordinate = Fixed64.MaxValue - (Fixed64)4;
@@ -74,9 +116,107 @@ public sealed class PhysicsMeshTests
 
         Fixed64 expectedCenter = FixedMath.Midpoint(coordinate, coordinate + Fixed64.One);
         mesh.LocalBounds.Center.X.Should().Be(expectedCenter);
-        mesh.ScaledLocalBounds.Center.X.Should().Be(expectedCenter);
-        mesh.SurfaceMassProperties.CenterOfMass.X.Should().BeGreaterThanOrEqualTo(coordinate);
-        mesh.SurfaceMassProperties.CenterOfMass.X.Should().BeLessThanOrEqualTo(coordinate + Fixed64.One);
+        mesh.ScaledLocalBounds.Center.X.Should().Be(Fixed64.Zero);
+        mesh.SurfaceMassProperties.CenterOfMass.X.Should().BeGreaterThanOrEqualTo(-Fixed64.Half);
+        mesh.SurfaceMassProperties.CenterOfMass.X.Should().BeLessThanOrEqualTo(Fixed64.Half);
+    }
+
+    [Fact]
+    public void OpenSurface_ShouldReportItsClosureFailureForVolumeMassProperties()
+    {
+        var mesh = new PhysicsMesh(
+            ValidVertices(),
+            ValidTriangles(),
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+
+        mesh.TryGetClosedVolumeMassProperties(
+                out _,
+                out MeshVolumeValidationResult result)
+            .Should().BeFalse();
+        result.Should().NotBe(MeshVolumeValidationResult.Valid);
+    }
+
+    [Fact]
+    public void ScaleValidators_ShouldRejectMismatchedOwnerAndCompoundPartScale()
+    {
+        var standalone = new PhysicsMesh(
+            ValidVertices(),
+            ValidTriangles(),
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+        Action invalidSurfaceOwner =
+            () => standalone.ValidateSurfaceMassProperties(Vector3d.One * Fixed64.Two);
+        Action invalidVolumeOwner =
+            () => standalone.ValidateClosedVolumeScaleRepresentability(
+                Vector3d.One * Fixed64.Two);
+
+        invalidSurfaceOwner.Should().Throw<ArgumentException>()
+            .WithParameterName("scale");
+        invalidVolumeOwner.Should().Throw<ArgumentException>()
+            .WithParameterName("scale");
+
+        var compoundPart = new PhysicsMesh(
+            ValidVertices(),
+            ValidTriangles(),
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+        compoundPart.PrepareTransformation(
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            Vector3d.One,
+            Vector3d.One * Fixed64.Two,
+            inertiaPolicy: null);
+        compoundPart.PublishPreparedTransformation();
+        Action invalidSurfacePart =
+            () => compoundPart.ValidateSurfaceMassProperties(Vector3d.One);
+        Action invalidVolumePart =
+            () => compoundPart.ValidateClosedVolumeScaleRepresentability(Vector3d.One);
+
+        invalidSurfacePart.Should().Throw<ArgumentException>()
+            .WithParameterName("scale");
+        invalidVolumePart.Should().Throw<ArgumentException>()
+            .WithParameterName("scale");
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void ScaleAdmission_ShouldRejectCenteredVertexOverflowOnEveryAxis(
+        int axis)
+    {
+        Vector3d extreme = axis switch
+        {
+            0 => new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero),
+            1 => new Vector3d(Fixed64.Zero, Fixed64.MaxValue, Fixed64.Zero),
+            _ => new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.MaxValue)
+        };
+        Vector3d transverse = axis switch
+        {
+            0 => Vector3d.Up,
+            1 => Vector3d.Forward,
+            _ => Vector3d.Right
+        };
+        var mesh = new PhysicsMesh(
+            new[] { Vector3d.Zero, extreme, transverse },
+            ValidTriangles(),
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            MeshColliderMode.Concave);
+        Vector3d scale = Vector3d.One * (Fixed64)3;
+
+        mesh.GetScaledLocalRadius(scale, Vector3d.One)
+            .Should().Be(Fixed64.MaxValue);
+        Action prepare = () => mesh.PrepareTransformation(
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            scale,
+            Vector3d.One,
+            inertiaPolicy: null);
+
+        prepare.Should().Throw<ArgumentException>()
+            .WithParameterName("ownerScale");
     }
 
     [Fact]
@@ -413,8 +553,8 @@ public sealed class PhysicsMeshTests
 
         mesh.TriangleBVH.Query(
             new FixedBoundVolume(
-                new Vector3d((Fixed64)10, Fixed64.Zero, Fixed64.Zero),
-                new Vector3d((Fixed64)11, Fixed64.One, Fixed64.Zero)),
+                new Vector3d(Fixed64.FromFraction(9, 2), -Fixed64.Half, Fixed64.Zero),
+                new Vector3d(Fixed64.FromFraction(11, 2), Fixed64.Half, Fixed64.Zero)),
             hits);
 
         hits.Should().Contain(1);
@@ -454,7 +594,9 @@ public sealed class PhysicsMeshTests
         var hits = new SwiftList<int>();
 
         mesh.TriangleBVH.Query(
-            new FixedBoundVolume(Vector3d.Zero, Vector3d.One),
+            new FixedBoundVolume(
+                new Vector3d(Fixed64.FromFraction(-3, 2), -Fixed64.Half, Fixed64.Zero),
+                new Vector3d(-Fixed64.Half, Fixed64.Half, Fixed64.Zero)),
             hits);
         int buildCount = mesh.TriangleBvhBuildCount;
 
@@ -462,7 +604,9 @@ public sealed class PhysicsMeshTests
             new Vector3d((Fixed64)10, Fixed64.Zero, Fixed64.Zero),
             FixedQuaternion.FromEulerAnglesInDegrees(Fixed64.Zero, Fixed64.Zero, (Fixed64)90));
         mesh.TriangleBVH.Query(
-            new FixedBoundVolume(Vector3d.Zero, Vector3d.One),
+            new FixedBoundVolume(
+                new Vector3d(Fixed64.FromFraction(-3, 2), -Fixed64.Half, Fixed64.Zero),
+                new Vector3d(-Fixed64.Half, Fixed64.Half, Fixed64.Zero)),
             hits);
 
         mesh.TriangleBvhBuildCount.Should().Be(buildCount);
@@ -822,9 +966,9 @@ public sealed class PhysicsMeshTests
         valid.Should().BeTrue();
         result.Should().Be(MeshVolumeValidationResult.Valid);
         AssertNear(properties.Volume, Fixed64.FromFraction(1, 6));
-        AssertNear(properties.CenterOfMass.X, Fixed64.FromFraction(1, 4));
-        AssertNear(properties.CenterOfMass.Y, Fixed64.FromFraction(1, 4));
-        AssertNear(properties.CenterOfMass.Z, Fixed64.FromFraction(1, 4));
+        AssertNear(properties.CenterOfMass.X, Fixed64.FromFraction(-1, 4));
+        AssertNear(properties.CenterOfMass.Y, Fixed64.FromFraction(-1, 4));
+        AssertNear(properties.CenterOfMass.Z, Fixed64.FromFraction(-1, 4));
     }
 
     [Fact]

@@ -176,6 +176,40 @@ public sealed class CollisionPairCullingTests
     }
 
     [Fact]
+    public void UpdateCollision_WithDomainClippedOverlappingBounds_ShouldNotUseShortenedScopeAsARejector()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        Fixed64 halfExtent = (Fixed64)10;
+        Vector3d size = new(
+            halfExtent * Fixed64.Two,
+            Fixed64.FromRaw(2),
+            Fixed64.FromRaw(2));
+        ScenarioBody<LSCuboidCollider> first = scenario.CreateBody(
+            new LSCuboidCollider { Size = size },
+            new Vector3d(
+                Fixed64.MaxValue - Fixed64.One,
+                Fixed64.Zero,
+                Fixed64.Zero),
+            FixedQuaternion.Identity);
+        ScenarioBody<LSCuboidCollider> second = scenario.CreateBody(
+            new LSCuboidCollider { Size = size },
+            new Vector3d(
+                Fixed64.MaxValue - (Fixed64)19,
+                Fixed64.Zero,
+                Fixed64.Zero),
+            FixedQuaternion.Identity);
+        CollisionPair pair = scenario.CreatePair(first.Collider, second.Collider);
+        ClearPartitionFlags(first.Collider, second.Collider);
+
+        first.Collider.BoundsMax.X.Should().Be(Fixed64.MaxValue);
+        first.Collider.Bounds.Scope.X.Should().BeLessThan(halfExtent);
+        pair.UpdateCollision();
+
+        pair.Manifold.HasContact.Should().BeTrue();
+        pair.Manifold.PrimaryContact.Depth.Should().Be(Fixed64.FromRaw(2));
+    }
+
+    [Fact]
     public void WakeSleepingBodiesForCollision_ShouldWakeOnlyLinkedSleepingBodyWhenOtherCanDriveCollision()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();

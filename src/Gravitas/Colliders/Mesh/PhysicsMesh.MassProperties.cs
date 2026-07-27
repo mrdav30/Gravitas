@@ -6,19 +6,23 @@
 //=======================================================================
 
 using FixedMathSharp;
+using FixedMathSharp.Geometry;
 using System;
 
 namespace Gravitas.Colliders;
 
 public partial class PhysicsMesh
 {
+    private bool _closedVolumeMassPropertiesEvaluated;
+    private MeshMassProperties _closedVolumeMassProperties;
+    private MeshVolumeValidationResult _closedVolumeValidationResult;
     private bool _scaledClosedVolumeMassPropertiesEvaluated;
-    private Vector3d _scaledClosedVolumeMassPropertiesScale;
     private MeshMassProperties _scaledClosedVolumeMassProperties;
     private MeshVolumeValidationResult _scaledClosedVolumeValidationResult;
-    private bool _validatedClosedVolumeMassPropertiesValid;
-    private Vector3d _validatedClosedVolumeMassPropertiesScale;
-    private MeshMassProperties _validatedClosedVolumeMassProperties;
+    private bool _preparedClosedVolumeMassPropertiesEvaluated;
+    private MeshMassProperties _preparedClosedVolumeMassProperties;
+    private MeshVolumeValidationResult _preparedClosedVolumeValidationResult;
+    private bool _preparedClosedVolumeEvaluationIncrement;
     private MeshVolumeValidationResult _surfaceClosureValidationResult;
 
     internal int ClosedVolumeScaleEvaluationCount { get; private set; }
@@ -79,63 +83,127 @@ public partial class PhysicsMesh
         return result == MeshVolumeValidationResult.Valid;
     }
 
-    internal void ValidateClosedVolumeScaleRepresentability(Vector3d scale)
-    {
-        EnsureClosedVolumeMassProperties();
-        if (_closedVolumeValidationResult != MeshVolumeValidationResult.Valid)
-            return;
-
-        if (_validatedClosedVolumeMassPropertiesValid
-            & _validatedClosedVolumeMassPropertiesScale == scale)
-        {
-            return;
-        }
-
-        if (_scaledClosedVolumeMassPropertiesEvaluated
-            & _scaledClosedVolumeMassPropertiesScale == scale)
-        {
-            if (_scaledClosedVolumeValidationResult != MeshVolumeValidationResult.Valid)
-            {
-                throw new ArgumentException(
-                    $"Mesh scale must preserve a representable closed volume. Validation result: {_scaledClosedVolumeValidationResult}.",
-                    nameof(scale));
-            }
-
-            _validatedClosedVolumeMassPropertiesScale = scale;
-            _validatedClosedVolumeMassProperties = _scaledClosedVolumeMassProperties;
-            _validatedClosedVolumeMassPropertiesValid = true;
-            return;
-        }
-
-        if (!TryCalculateScaledClosedVolumeMassProperties(scale, out MeshMassProperties properties, out MeshVolumeValidationResult result))
-        {
-            throw new ArgumentException(
-                $"Mesh scale must preserve a representable closed volume. Validation result: {result}.",
-                nameof(scale));
-        }
-
-        _validatedClosedVolumeMassPropertiesScale = scale;
-        _validatedClosedVolumeMassProperties = properties;
-        _validatedClosedVolumeMassPropertiesValid = true;
-    }
-
-    private bool TryCalculateScaledClosedVolumeMassProperties(
-        Vector3d scale,
+    internal bool TryGetPreparedClosedVolumeMassProperties(
         out MeshMassProperties properties,
         out MeshVolumeValidationResult result)
     {
-        EnsureClosedVolumeMassProperties();
-        if (_closedVolumeValidationResult != MeshVolumeValidationResult.Valid)
+        properties = _preparedClosedVolumeMassProperties;
+        result = _preparedClosedVolumeValidationResult;
+        return _preparedClosedVolumeMassPropertiesEvaluated
+            && result == MeshVolumeValidationResult.Valid;
+    }
+
+    private void PrepareClosedVolumeMassProperties(
+        MeshInertiaPolicy? inertiaPolicy,
+        bool geometryChanged,
+        Vector3d ownerScale,
+        Vector3d partScale)
+    {
+        _preparedClosedVolumeEvaluationIncrement = false;
+        if (!geometryChanged)
         {
-            properties = default;
-            result = _closedVolumeValidationResult;
-            return false;
+            _preparedClosedVolumeMassPropertiesEvaluated =
+                _scaledClosedVolumeMassPropertiesEvaluated;
+            _preparedClosedVolumeMassProperties =
+                _scaledClosedVolumeMassProperties;
+            _preparedClosedVolumeValidationResult =
+                _scaledClosedVolumeValidationResult;
+            return;
         }
 
-        ClosedVolumeScaleEvaluationCount++;
-        MeshMassScaleResult scaleResult = _closedVolumeMassProperties.TryScale(scale, out properties);
-        if (scaleResult != MeshMassScaleResult.Valid)
+        _preparedClosedVolumeMassPropertiesEvaluated = false;
+        if (!IsClosedSurface)
         {
+            _preparedClosedVolumeMassPropertiesEvaluated = true;
+            _preparedClosedVolumeValidationResult = _surfaceClosureValidationResult;
+            _preparedClosedVolumeMassProperties = default;
+            return;
+        }
+
+        if (inertiaPolicy != MeshInertiaPolicy.RequireClosedVolume)
+            return;
+
+        _preparedClosedVolumeMassPropertiesEvaluated = true;
+        _preparedClosedVolumeEvaluationIncrement = true;
+        if (!TryCalculateCandidateClosedVolumeMassProperties(
+                ownerScale,
+                partScale,
+                usePreparedVertices: true,
+                out _preparedClosedVolumeMassProperties,
+                out _preparedClosedVolumeValidationResult))
+        {
+            throw new ArgumentException(
+                $"Mesh scale must preserve a representable closed volume. Validation result: {_preparedClosedVolumeValidationResult}.",
+                nameof(inertiaPolicy));
+        }
+    }
+
+    private bool TryCalculateCandidateClosedVolumeMassProperties(
+        Vector3d ownerScale,
+        Vector3d partScale,
+        bool usePreparedVertices,
+        out MeshMassProperties properties,
+        out MeshVolumeValidationResult result)
+    {
+        Fixed64 x = default;
+        Fixed64 y = default;
+        Fixed64 z = default;
+        if (Fixed64.TryMultiplyDivide(
+                ownerScale.X,
+                partScale.X,
+                Fixed64.One,
+                out x)
+            && Fixed64.TryMultiplyDivide(
+                ownerScale.Y,
+                partScale.Y,
+                Fixed64.One,
+                out y)
+            && Fixed64.TryMultiplyDivide(
+                ownerScale.Z,
+                partScale.Z,
+                Fixed64.One,
+                out z)
+            && TryScalePoint(
+                _localBounds.Center,
+                ownerScale,
+                partScale,
+                out Vector3d scaledSourceCenter))
+        {
+            EnsureClosedVolumeMassProperties();
+            if (_closedVolumeValidationResult != MeshVolumeValidationResult.Valid)
+            {
+                properties = default;
+                result = _closedVolumeValidationResult;
+                return false;
+            }
+
+            MeshMassScaleResult scaleResult = _closedVolumeMassProperties.TryScale(
+                new Vector3d(x, y, z),
+                out properties);
+            if (scaleResult == MeshMassScaleResult.Valid)
+            {
+                // Both differences lie inside the admitted centered vertex
+                // bounds, so candidate scaling guarantees representability.
+                _ = Vector3d.TrySubtract(
+                    properties.CenterOfMass,
+                    scaledSourceCenter,
+                    out Vector3d centeredMass);
+                _ = Vector3d.TrySubtract(
+                    properties.InertiaReferencePoint,
+                    scaledSourceCenter,
+                    out Vector3d centeredReference);
+
+                properties = new MeshMassProperties(
+                    properties.Volume,
+                    centeredMass,
+                    centeredReference,
+                    properties.UnitMassInertiaTensor);
+                result = properties.Volume > Fixed64.Epsilon
+                    ? MeshVolumeValidationResult.Valid
+                    : MeshVolumeValidationResult.ZeroVolume;
+                return result == MeshVolumeValidationResult.Valid;
+            }
+
             properties = default;
             result = scaleResult == MeshMassScaleResult.NonRepresentableVolume
                 ? MeshVolumeValidationResult.NonRepresentableVolume
@@ -143,57 +211,71 @@ public partial class PhysicsMesh
             return false;
         }
 
-        if (properties.Volume <= Fixed64.Epsilon)
+        return TryCalculateClosedVolumeMassProperties(
+            usePreparedVertices ? _preparedScaledLocalVertices : _scaledLocalVertices,
+            usePreparedVertices ? _preparedScaledLocalBounds : _scaledLocalBounds,
+            out properties,
+            out result);
+    }
+
+    private static bool TryScalePoint(
+        Vector3d point,
+        Vector3d ownerScale,
+        Vector3d partScale,
+        out Vector3d result)
+    {
+        result = default;
+        if (!Fixed64.TryMultiplyDivide(
+                point.X,
+                ownerScale.X,
+                partScale.X,
+                Fixed64.One,
+                out Fixed64 x)
+            || !Fixed64.TryMultiplyDivide(
+                point.Y,
+                ownerScale.Y,
+                partScale.Y,
+                Fixed64.One,
+                out Fixed64 y)
+            || !Fixed64.TryMultiplyDivide(
+                point.Z,
+                ownerScale.Z,
+                partScale.Z,
+                Fixed64.One,
+                out Fixed64 z))
         {
-            properties = default;
-            result = MeshVolumeValidationResult.ZeroVolume;
             return false;
         }
 
-        result = MeshVolumeValidationResult.Valid;
+        result = new Vector3d(x, y, z);
         return true;
+    }
+
+    private void PublishPreparedClosedVolumeMassProperties()
+    {
+        _scaledClosedVolumeMassPropertiesEvaluated =
+            _preparedClosedVolumeMassPropertiesEvaluated;
+        _scaledClosedVolumeMassProperties =
+            _preparedClosedVolumeMassProperties;
+        _scaledClosedVolumeValidationResult =
+            _preparedClosedVolumeValidationResult;
+        if (_preparedClosedVolumeEvaluationIncrement)
+            ClosedVolumeScaleEvaluationCount++;
     }
 
     private void EnsureScaledClosedVolumeMassProperties()
     {
-        if (_scaledClosedVolumeMassPropertiesEvaluated
-            & _scaledClosedVolumeMassPropertiesScale == _scale)
-        {
+        if (_scaledClosedVolumeMassPropertiesEvaluated)
             return;
-        }
 
-        TryCalculateScaledClosedVolumeMassProperties(
-            _scale,
+        _scaledClosedVolumeMassPropertiesEvaluated = true;
+        ClosedVolumeScaleEvaluationCount++;
+        TryCalculateCandidateClosedVolumeMassProperties(
+            _ownerScale,
+            _partScale,
+            usePreparedVertices: false,
             out _scaledClosedVolumeMassProperties,
             out _scaledClosedVolumeValidationResult);
-        _scaledClosedVolumeMassPropertiesScale = _scale;
-        _scaledClosedVolumeMassPropertiesEvaluated = true;
-    }
-
-    private void UpdateClosedVolumeMassPropertiesScaleCache()
-    {
-        _scaledClosedVolumeMassPropertiesEvaluated = false;
-        PromoteValidatedClosedVolumeMassProperties();
-    }
-
-    private void PromoteValidatedClosedVolumeMassProperties()
-    {
-        if (!_validatedClosedVolumeMassPropertiesValid
-            | _validatedClosedVolumeMassPropertiesScale != _scale)
-        {
-            return;
-        }
-
-        if (_scaledClosedVolumeMassPropertiesEvaluated
-            & _scaledClosedVolumeMassPropertiesScale == _scale)
-        {
-            return;
-        }
-
-        _scaledClosedVolumeMassPropertiesScale = _scale;
-        _scaledClosedVolumeMassProperties = _validatedClosedVolumeMassProperties;
-        _scaledClosedVolumeValidationResult = MeshVolumeValidationResult.Valid;
-        _scaledClosedVolumeMassPropertiesEvaluated = true;
     }
 
     private void EnsureClosedVolumeMassProperties()
@@ -202,29 +284,11 @@ public partial class PhysicsMesh
             return;
 
         _closedVolumeMassPropertiesEvaluated = true;
-
-        if (!ValidateClosedVolumeTopology(out MeshVolumeValidationResult topologyResult))
-        {
-            _closedVolumeValidationResult = topologyResult;
-            _closedVolumeMassProperties = default;
-            return;
-        }
-
-        if (!TryCalculateClosedVolumeMassProperties(out MeshMassProperties properties, out MeshVolumeValidationResult volumeResult))
-        {
-            _closedVolumeValidationResult = volumeResult;
-            _closedVolumeMassProperties = default;
-            return;
-        }
-
-        _closedVolumeValidationResult = MeshVolumeValidationResult.Valid;
-        _closedVolumeMassProperties = properties;
-    }
-
-    private bool ValidateClosedVolumeTopology(out MeshVolumeValidationResult result)
-    {
-        result = _surfaceClosureValidationResult;
-        return IsClosedSurface;
+        TryCalculateClosedVolumeMassProperties(
+            _localVertices,
+            _localBounds,
+            out _closedVolumeMassProperties,
+            out _closedVolumeValidationResult);
     }
 
     private bool EvaluateClosedVolumeTopology(int[] triangles, out MeshVolumeValidationResult result)
@@ -308,10 +372,19 @@ public partial class PhysicsMesh
     }
 
     private bool TryCalculateClosedVolumeMassProperties(
+        ReadOnlySpan<Vector3d> vertices,
+        FixedBoundBox bounds,
         out MeshMassProperties properties,
         out MeshVolumeValidationResult result)
     {
-        Vector3d reference = _localBounds.Center;
+        if (!IsClosedSurface)
+        {
+            properties = default;
+            result = _surfaceClosureValidationResult;
+            return false;
+        }
+
+        Vector3d reference = bounds.Center;
         Fixed64 signedVolume = Fixed64.Zero;
         Vector3d firstMoment = Vector3d.Zero;
         Fixed64 integralX2 = Fixed64.Zero;
@@ -324,9 +397,9 @@ public partial class PhysicsMesh
         for (int i = 0; i < _triangleCount; i++)
         {
             int triangleIndex = i * 3;
-            Vector3d a = _localVertices[_triangles[triangleIndex]] - reference;
-            Vector3d b = _localVertices[_triangles[triangleIndex + 1]] - reference;
-            Vector3d c = _localVertices[_triangles[triangleIndex + 2]] - reference;
+            Vector3d a = vertices[_triangles[triangleIndex]] - reference;
+            Vector3d b = vertices[_triangles[triangleIndex + 1]] - reference;
+            Vector3d c = vertices[_triangles[triangleIndex + 2]] - reference;
 
             Fixed64 volume = Vector3d.Dot(a, Vector3d.Cross(b, c)) / TetrahedronVolumeDivisor;
             signedVolume += volume;

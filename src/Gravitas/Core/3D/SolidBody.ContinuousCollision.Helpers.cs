@@ -71,46 +71,18 @@ public partial class SolidBody
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal Fixed64 ResolveContinuousCollisionProxyRadius()
     {
-        if (Collider is LSSphereCollider sphere)
-        {
-            bool offsetResolved = Vector3d.TrySubtract(
-                sphere.Center,
-                Position3d,
-                out Vector3d centerOffset);
-            bool distanceResolved = Vector3d.TryGetMagnitude(
-                centerOffset,
+        bool offsetResolved =
+            Collider.TryGetCurrentScaledOffset(out Vector3d centerOffset);
+        bool distanceResolved =
+            centerOffset.TryGetMagnitudeCeiling(
                 out Fixed64 offsetDistance);
-            bool radiusResolved = Fixed64.TryAdd(
-                offsetDistance,
-                sphere.ScaledRadius,
-                out Fixed64 sphereRadius);
-            if (!(offsetResolved & distanceResolved & radiusResolved))
-            {
-                return Fixed64.MaxValue;
-            }
-
-            return sphereRadius;
-        }
-
-        Span<Vector3d> corners = stackalloc Vector3d[FixedMathSharp.Bounds.FixedBoundBox.CornerCount];
-        Collider.Bounds.CopyCorners(corners);
-        Fixed64 bestDistance = Fixed64.Zero;
-        for (int i = 0; i < corners.Length; i++)
-        {
-            bool offsetResolved = Vector3d.TrySubtract(
-                corners[i],
-                Position3d,
-                out Vector3d offset);
-            bool distanceResolved = Vector3d.TryGetMagnitude(offset, out Fixed64 distance);
-            if (!(offsetResolved & distanceResolved))
-            {
-                return Fixed64.MaxValue;
-            }
-
-            bestDistance = FixedMath.Max(bestDistance, distance);
-        }
-
-        return bestDistance;
+        bool radiusResolved = Fixed64.TryAdd(
+            offsetDistance,
+            Collider.CanonicalCenteredProxyRadius,
+            out Fixed64 radius);
+        return offsetResolved & distanceResolved & radiusResolved
+            ? radius
+            : Fixed64.MaxValue;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

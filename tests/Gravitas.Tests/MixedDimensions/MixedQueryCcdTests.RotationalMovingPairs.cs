@@ -166,12 +166,41 @@ public sealed partial class MixedQueryCcdTests
     }
 
     [Fact]
-    public void MixedMode_Kinematic3DRotation_WithUnrepresentableSourceCenterOfMass_ShouldRejectResponseAtomically()
+    public void MixedMode_Kinematic3DRotation_WithFullDomainSourceCenterOfMass_ShouldResolveRepresentableContactArm()
     {
         using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
         ScenarioBody<LSCuboidCollider> blade = CreateRotationalMixedBlade3D(context);
         SolidBody2D target = CreateRotationalMixedTarget2D(context);
         blade.Body.LocalCenterOfMassOffset = Vector3d.Up * Fixed64.MaxValue;
+        blade.Body.ResetPosition(Vector3d.Up, FixedQuaternion.Identity);
+        target.Agent.Transform.LocalPosition = new Vector3d(
+            target.Position.X,
+            Fixed64.One,
+            target.Position.Y);
+        target.Collider.RebuildRuntimeShapeOnly();
+
+        blade.Body.Agent.Transform.LocalRotation = RotationalMixedQuarterTurn3D;
+        context.LateSimulate();
+
+        blade.Body.Rotation.Should().Be(RotationalMixedQuarterTurn3D);
+        blade.Body.LastContinuousCollisionToiIterationCount.Should().BeGreaterThan(0);
+        blade.Body.LastContinuousCollisionToiIterationLimitReached.Should().BeFalse();
+        target.LinearVelocity.Should().Be(new Vector2d(
+            (Fixed64)0.45798352430574596,
+            (Fixed64)(-2.9263750039972365)));
+        target.AngularVelocity.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void MixedMode_Kinematic3DRotation_WithUnrepresentableFinalContactArm_ShouldRejectResponseAtomically()
+    {
+        using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
+        ScenarioBody<LSCuboidCollider> blade = CreateRotationalMixedBlade3D(context);
+        SolidBody2D target = CreateRotationalMixedTarget2D(context);
+        blade.Body.LocalCenterOfMassOffset = new Vector3d(
+            Fixed64.Zero,
+            Fixed64.MinValue,
+            Fixed64.Zero);
         blade.Body.ResetPosition(Vector3d.Up, FixedQuaternion.Identity);
         target.Agent.Transform.LocalPosition = new Vector3d(
             target.Position.X,
@@ -466,15 +495,17 @@ public sealed partial class MixedQueryCcdTests
         SolidBody2D target = CreateRotationalMixedTarget2D(context);
         Vector2d targetPosition = target.Position;
 
+        void RunIteration()
+        {
+            blade.Body.ResetPosition(Vector3d.Zero, FixedQuaternion.Identity);
+            target.ResetPosition(targetPosition);
+            target.Sleep();
+            blade.Body.Agent.Transform.LocalRotation = RotationalMixedQuarterTurn3D;
+            context.LateSimulate();
+        }
+
         long allocatedBytes = AllocationTestHelper.MeasureSteadyState(
-            () =>
-            {
-                blade.Body.ResetPosition(Vector3d.Zero, FixedQuaternion.Identity);
-                target.ResetPosition(targetPosition);
-                target.Sleep();
-                blade.Body.Agent.Transform.LocalRotation = RotationalMixedQuarterTurn3D;
-                context.LateSimulate();
-            },
+            RunIteration,
             warmupIterations: 16,
             stabilizationIterations: 4,
             measurementIterations: 16);

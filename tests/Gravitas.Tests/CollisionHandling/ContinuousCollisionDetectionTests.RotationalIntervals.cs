@@ -81,6 +81,7 @@ public sealed partial class ContinuousCollisionDetectionTests
         _ = scenario.CreateStaticSphere(Vector3d.Zero);
         source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
         sourceCollider.LocalOffset = new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero);
+        sourceCollider.RebuildRuntimeShapeOnly();
         source.Body.ResolveContinuousCollisionProxyRadius().Should().Be(Fixed64.MaxValue);
 
         source.Body.GatherRotationalContinuousCollisionCandidates(

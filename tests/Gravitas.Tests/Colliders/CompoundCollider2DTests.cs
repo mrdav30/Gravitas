@@ -3,6 +3,7 @@ using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Materials;
 using Gravitas.Tests.Support;
+using GridForge.Configuration;
 using System;
 using System.Collections.Generic;
 using Xunit;
@@ -27,7 +28,7 @@ public sealed class CompoundCollider2DTests
 
         Action initialize = () => compound.InitializeWithNoBody(new TestMatterAgent(context, transform));
 
-        initialize.Should().Throw<ArgumentException>().WithParameterName("scale");
+        initialize.Should().Throw<ArgumentException>().WithParameterName("dimension");
         compound.Id.Should().Be(-1);
         compound.HasHostBinding.Should().BeFalse();
         context.Physics2D.ColliderCount.Should().Be(0);
@@ -50,7 +51,7 @@ public sealed class CompoundCollider2DTests
 
         Action initialize = () => body.Initialize(Vector2d.Zero);
 
-        initialize.Should().Throw<ArgumentException>().WithParameterName("scale");
+        initialize.Should().Throw<ArgumentException>().WithParameterName("dimension");
         body.Active.Should().BeFalse();
         body.DynamicId.Should().Be(-1);
         compound.Id.Should().Be(-1);
@@ -269,7 +270,7 @@ public sealed class CompoundCollider2DTests
     }
 
     [Fact]
-    public void ScaledRadius_ShouldUseFarthestCircleCapsuleAndVertexPart()
+    public void ScaledRadius_ShouldUseFarthestCanonicalPartProxy()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
         var compound = new LSCompoundCollider2D(
@@ -280,7 +281,40 @@ public sealed class CompoundCollider2DTests
 
         _ = CreateBody(context, compound, Vector2d.Zero);
 
-        compound.ScaledRadius.Should().Be(FixedMath.Sqrt((Fixed64)17));
+        new Vector2d(Fixed64.One, Fixed64.One)
+            .TryGetMagnitudeCeiling(out Fixed64 boxRadius)
+            .Should().BeTrue();
+        compound.ScaledRadius.Should().Be((Fixed64)3 + boxRadius);
+    }
+
+    [Fact]
+    public void PreInitializationQueries_WithRotatedOffsetPart_ShouldMatchCommittedGeometry()
+    {
+        var offset = new Vector2d((Fixed64)3, Fixed64.Zero);
+        var compound = new LSCompoundCollider2D(
+            CompoundColliderPart2D.Circle(
+                Fixed64.One,
+                offset,
+                Fixed64.HalfPi,
+                Vector2d.One));
+
+        Fixed64 preInitializationRadius = compound.ScaledRadius;
+        bool preInitializationContains = compound.ContainsPoint(offset);
+        Vector2d preInitializationSupport =
+            compound.GetSupportPoint(Vector2d.Right);
+
+        using GravitasWorldContext context =
+            Physics2DTestWorld.CreateContext();
+        _ = CreateBody(context, compound, Vector2d.Zero);
+
+        preInitializationRadius.Should().Be((Fixed64)4);
+        preInitializationRadius.Should().Be(compound.ScaledRadius);
+        preInitializationContains.Should().BeTrue();
+        compound.ContainsPoint(offset).Should().BeTrue();
+        preInitializationSupport.Should().Be(
+            offset + Vector2d.Right);
+        compound.GetSupportPoint(Vector2d.Right).Should().Be(
+            preInitializationSupport);
     }
 
     [Fact]
@@ -296,7 +330,7 @@ public sealed class CompoundCollider2DTests
     }
 
     [Fact]
-    public void CapsulePart_WithWideLocalScale_ShouldClampScaledHeightToScaledDiameter()
+    public void CapsulePart_WithScaledHeightBelowDiameter_ShouldRejectInitializationAtomically()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
         var compound = new LSCompoundCollider2D(
@@ -306,11 +340,25 @@ public sealed class CompoundCollider2DTests
                 Vector2d.Zero,
                 Fixed64.Zero,
                 new Vector2d((Fixed64)2, Fixed64.Half)));
+        var transform = new FixedTransform(
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            Vector3d.One);
+        var body = new SolidBody2D(
+            new TestMatterAgent(context, transform),
+            compound);
 
-        _ = CreateBody(context, compound, Vector2d.Zero);
+        Action initialize = () => body.Initialize(
+            Vector2d.Zero,
+            motionType: BodyMotionType.Static);
 
-        var capsule = (LSCapsuleCollider2D)compound.GetPartCollider(0);
-        capsule.ScaledHeight.Should().Be((Fixed64)4);
+        initialize.Should()
+            .Throw<ArgumentException>()
+            .WithParameterName("snapshot")
+            .WithMessage("*Scaled 2D capsule height must be at least the capsule diameter.*");
+        body.Active.Should().BeFalse();
+        compound.Body.Should().BeNull();
+        compound.Id.Should().Be(-1);
     }
 
     [Fact]
@@ -373,6 +421,71 @@ public sealed class CompoundCollider2DTests
         _ = CreateBody(context, compound, Vector2d.Zero);
 
         compound.ScaledRadius.Should().Be((Fixed64)100000);
+    }
+
+    [Fact]
+    public void ScaledRadius_WithConceptualVertexBeyondScalarFace_ShouldUseCanonicalOffset()
+    {
+        Fixed64 centerX = Fixed64.MaxValue - Fixed64.FromFraction(1, 4);
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        context.World.TryAddGrid(
+            new GridConfiguration(
+                new Vector3d(
+                    Fixed64.MaxValue - (Fixed64)4,
+                    (Fixed64)(-2),
+                    (Fixed64)(-2)),
+                new Vector3d(
+                    Fixed64.MaxValue,
+                    (Fixed64)2,
+                    (Fixed64)2)),
+            out _).Should().BeTrue();
+        var compound = new LSCompoundCollider2D(
+            CompoundColliderPart2D.AABBox(
+                new Vector2d((Fixed64)2, (Fixed64)2),
+                Vector2d.Zero));
+        _ = CreateBody(context, compound, new Vector2d(centerX, Fixed64.Zero));
+
+        compound.ScaledRadius.Should().Be(FixedMath.Sqrt((Fixed64)2));
+    }
+
+    [Fact]
+    public void ScaledRadius_WithSubUnitDiagonalPartOffset_ShouldRoundOutward()
+    {
+        Fixed64 raw = Fixed64.MinIncrement;
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        var compound = new LSCompoundCollider2D(
+            CompoundColliderPart2D.Circle(
+                raw,
+                new Vector2d(raw, raw)));
+        _ = CreateBody(context, compound, Vector2d.Zero);
+
+        compound.ScaledRadius.Should().Be(Fixed64.FromRaw(3));
+    }
+
+    [Fact]
+    public void ScaledRadius_WithOddRawCapsuleAxis_ShouldRoundOutward()
+    {
+        Fixed64 raw = Fixed64.MinIncrement;
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        var compound = new LSCompoundCollider2D(
+            CompoundColliderPart2D.Capsule(
+                raw,
+                Fixed64.FromRaw(3),
+                Vector2d.Zero));
+        _ = CreateBody(context, compound, Vector2d.Zero);
+
+        compound.ScaledRadius.Should().Be(Fixed64.FromRaw(2));
+    }
+
+    [Fact]
+    public void ScaledRadius_WhenFinalPartRadiusExceedsDomain_ShouldReturnMaximum()
+    {
+        var compound = new LSCompoundCollider2D(
+            CompoundColliderPart2D.Circle(
+                Fixed64.MinIncrement,
+                new Vector2d(Fixed64.MaxValue, Fixed64.Zero)));
+
+        compound.ScaledRadius.Should().Be(Fixed64.MaxValue);
     }
 
     private static SolidBody2D CreateBody(GravitasWorldContext context, LSCollider2D collider, Vector2d position)

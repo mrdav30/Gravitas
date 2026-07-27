@@ -6,7 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
-using FixedMathSharp.Bounds;
+using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
 using Gravitas.Support;
 using GridForge.Grids;
@@ -341,6 +341,24 @@ internal sealed partial class GravitasMixedCollisionService
         _inactivePartitionPool.Push(partition);
     }
 
+    internal SwiftSparseSet RentPartitionMembership()
+    {
+        return _inactivePartitionMembershipPool.Count > 0
+            ? _inactivePartitionMembershipPool.Pop()
+            : new SwiftSparseSet();
+    }
+
+    internal void ReleasePartitionMembership(ref SwiftSparseSet? membership)
+    {
+        if (membership == null)
+            return;
+
+        SwiftSparseSet released = membership;
+        membership = null;
+        released.Clear();
+        _inactivePartitionMembershipPool.Push(released);
+    }
+
     private void Refresh3DColliderPartitions()
     {
         int count = _context.Physics.ColliderCount;
@@ -390,7 +408,10 @@ internal sealed partial class GravitasMixedCollisionService
         if (_cached2DQueryRefreshFrame == frame && _cached2DQueryRefreshLateToken == lateToken)
             return;
 
-        Refresh2DColliderPartitions();
+        // CCD callers request a cached refresh only after the 2D frame has
+        // prepared its authoritative target poses. Rebuilding those shapes
+        // again here duplicates work and can churn shape-owned scratch state.
+        Refresh2DColliderPartitions(rebuildShapes: false);
         _cached2DQueryRefreshFrame = frame;
         _cached2DQueryRefreshLateToken = lateToken;
     }

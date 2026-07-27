@@ -148,7 +148,7 @@ internal sealed class PhysicsMixedPartition : IVoxelPartition, IRetainedPhysicsP
 
     public void AddDynamic3DObject(int id)
     {
-        ContainedDynamic3DObjects ??= new();
+        ContainedDynamic3DObjects ??= Owner.RentPartitionMembership();
         bool shouldActivate = MovableDynamicObjectCount == 0;
         if (!ContainedDynamic3DObjects.Add(id))
             return;
@@ -161,21 +161,21 @@ internal sealed class PhysicsMixedPartition : IVoxelPartition, IRetainedPhysicsP
 
     public void AddStatic3DObject(int id)
     {
-        ContainedStatic3DObjects ??= new();
+        ContainedStatic3DObjects ??= Owner.RentPartitionMembership();
         if (ContainedStatic3DObjects.Add(id))
             MarkOccupied();
     }
 
     public void AddKinematic3DObject(int id)
     {
-        ContainedKinematic3DObjects ??= new();
+        ContainedKinematic3DObjects ??= Owner.RentPartitionMembership();
         if (ContainedKinematic3DObjects.Add(id))
             MarkOccupied();
     }
 
     public void AddDynamic2DObject(int id)
     {
-        ContainedDynamic2DObjects ??= new();
+        ContainedDynamic2DObjects ??= Owner.RentPartitionMembership();
         bool shouldActivate = MovableDynamicObjectCount == 0;
         if (!ContainedDynamic2DObjects.Add(id))
             return;
@@ -188,14 +188,14 @@ internal sealed class PhysicsMixedPartition : IVoxelPartition, IRetainedPhysicsP
 
     public void AddStatic2DObject(int id)
     {
-        ContainedStatic2DObjects ??= new();
+        ContainedStatic2DObjects ??= Owner.RentPartitionMembership();
         if (ContainedStatic2DObjects.Add(id))
             MarkOccupied();
     }
 
     public void AddKinematic2DObject(int id)
     {
-        ContainedKinematic2DObjects ??= new();
+        ContainedKinematic2DObjects ??= Owner.RentPartitionMembership();
         if (ContainedKinematic2DObjects.Add(id))
             MarkOccupied();
     }
@@ -205,7 +205,8 @@ internal sealed class PhysicsMixedPartition : IVoxelPartition, IRetainedPhysicsP
         if (ContainedDynamic3DObjects?.Remove(id) != true)
             return;
 
-        ContainedAwakeDynamic3DObjects?.Remove(id);
+        RemoveAndReleaseIfEmpty(ref ContainedAwakeDynamic3DObjects, id);
+        ReleaseIfEmpty(ref ContainedDynamic3DObjects);
         DeactivateIfNoDynamicMembers();
         MarkEmptyIfUnoccupied();
     }
@@ -213,13 +214,19 @@ internal sealed class PhysicsMixedPartition : IVoxelPartition, IRetainedPhysicsP
     public void RemoveStatic3DObject(int id)
     {
         if (ContainedStatic3DObjects?.Remove(id) == true)
+        {
+            ReleaseIfEmpty(ref ContainedStatic3DObjects);
             MarkEmptyIfUnoccupied();
+        }
     }
 
     public void RemoveKinematic3DObject(int id)
     {
         if (ContainedKinematic3DObjects?.Remove(id) == true)
+        {
+            ReleaseIfEmpty(ref ContainedKinematic3DObjects);
             MarkEmptyIfUnoccupied();
+        }
     }
 
     public void RemoveDynamic2DObject(int id)
@@ -227,7 +234,8 @@ internal sealed class PhysicsMixedPartition : IVoxelPartition, IRetainedPhysicsP
         if (ContainedDynamic2DObjects?.Remove(id) != true)
             return;
 
-        ContainedAwakeDynamic2DObjects?.Remove(id);
+        RemoveAndReleaseIfEmpty(ref ContainedAwakeDynamic2DObjects, id);
+        ReleaseIfEmpty(ref ContainedDynamic2DObjects);
         DeactivateIfNoDynamicMembers();
         MarkEmptyIfUnoccupied();
     }
@@ -235,13 +243,19 @@ internal sealed class PhysicsMixedPartition : IVoxelPartition, IRetainedPhysicsP
     public void RemoveStatic2DObject(int id)
     {
         if (ContainedStatic2DObjects?.Remove(id) == true)
+        {
+            ReleaseIfEmpty(ref ContainedStatic2DObjects);
             MarkEmptyIfUnoccupied();
+        }
     }
 
     public void RemoveKinematic2DObject(int id)
     {
         if (ContainedKinematic2DObjects?.Remove(id) == true)
+        {
+            ReleaseIfEmpty(ref ContainedKinematic2DObjects);
             MarkEmptyIfUnoccupied();
+        }
     }
 
     public void SetDynamic3DObjectAwake(int id, bool awake)
@@ -251,12 +265,12 @@ internal sealed class PhysicsMixedPartition : IVoxelPartition, IRetainedPhysicsP
 
         if (awake)
         {
-            ContainedAwakeDynamic3DObjects ??= new();
+            ContainedAwakeDynamic3DObjects ??= Owner.RentPartitionMembership();
             ContainedAwakeDynamic3DObjects.Add(id);
             return;
         }
 
-        ContainedAwakeDynamic3DObjects?.Remove(id);
+        RemoveAndReleaseIfEmpty(ref ContainedAwakeDynamic3DObjects, id);
     }
 
     public void SetDynamic2DObjectAwake(int id, bool awake)
@@ -266,12 +280,12 @@ internal sealed class PhysicsMixedPartition : IVoxelPartition, IRetainedPhysicsP
 
         if (awake)
         {
-            ContainedAwakeDynamic2DObjects ??= new();
+            ContainedAwakeDynamic2DObjects ??= Owner.RentPartitionMembership();
             ContainedAwakeDynamic2DObjects.Add(id);
             return;
         }
 
-        ContainedAwakeDynamic2DObjects?.Remove(id);
+        RemoveAndReleaseIfEmpty(ref ContainedAwakeDynamic2DObjects, id);
     }
 
     public void OnRemoveFromVoxel(Voxel voxel)
@@ -316,32 +330,17 @@ internal sealed class PhysicsMixedPartition : IVoxelPartition, IRetainedPhysicsP
 
     internal void ResetRetainedMembership()
     {
-        ContainedDynamic3DObjects?.Clear();
-        ContainedAwakeDynamic3DObjects?.Clear();
-        ContainedKinematic3DObjects?.Clear();
-        ContainedStatic3DObjects?.Clear();
-        ContainedDynamic2DObjects?.Clear();
-        ContainedAwakeDynamic2DObjects?.Clear();
-        ContainedKinematic2DObjects?.Clear();
-        ContainedStatic2DObjects?.Clear();
+        ReleaseAllMembership();
         ActivationId = -1;
-        MarkEmpty(_owner?.Context.FrameCount ?? 0);
+        MarkEmpty(Owner.Context.FrameCount);
     }
 
     internal void ResetForPool()
     {
-        ContainedDynamic3DObjects?.Clear();
-        ContainedAwakeDynamic3DObjects?.Clear();
-        ContainedKinematic3DObjects?.Clear();
-        ContainedStatic3DObjects?.Clear();
-        ContainedDynamic2DObjects?.Clear();
-        ContainedAwakeDynamic2DObjects?.Clear();
-        ContainedKinematic2DObjects?.Clear();
-        ContainedStatic2DObjects?.Clear();
-
         if (ActivationId != -1)
             Owner.DeactivatePartition(ActivationId);
 
+        ReleaseAllMembership();
         _owner = null;
         ActivationId = -1;
         IsPartitioned = false;
@@ -403,6 +402,33 @@ internal sealed class PhysicsMixedPartition : IVoxelPartition, IRetainedPhysicsP
         }
 
         source.CopySortedKeysTo(destination);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void RemoveAndReleaseIfEmpty(ref SwiftSparseSet? membership, int id)
+    {
+        membership?.Remove(id);
+        ReleaseIfEmpty(ref membership);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void ReleaseIfEmpty(ref SwiftSparseSet? membership)
+    {
+        if (membership?.Count == 0)
+            Owner.ReleasePartitionMembership(ref membership);
+    }
+
+    private void ReleaseAllMembership()
+    {
+        GravitasMixedCollisionService owner = Owner;
+        owner.ReleasePartitionMembership(ref ContainedDynamic3DObjects);
+        owner.ReleasePartitionMembership(ref ContainedAwakeDynamic3DObjects);
+        owner.ReleasePartitionMembership(ref ContainedKinematic3DObjects);
+        owner.ReleasePartitionMembership(ref ContainedStatic3DObjects);
+        owner.ReleasePartitionMembership(ref ContainedDynamic2DObjects);
+        owner.ReleasePartitionMembership(ref ContainedAwakeDynamic2DObjects);
+        owner.ReleasePartitionMembership(ref ContainedKinematic2DObjects);
+        owner.ReleasePartitionMembership(ref ContainedStatic2DObjects);
     }
 
     private bool IsDynamic3DObjectAwake(int id)

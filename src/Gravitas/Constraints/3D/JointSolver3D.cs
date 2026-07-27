@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using Gravitas.CollisionHandling;
 using System;
 
 namespace Gravitas.Constraints;
@@ -89,11 +90,33 @@ internal static class JointSolver3D
 
         FixedQuaternion worldRotationA = (bodyA.Rotation * joint.LocalFrameA.Rotation).Normalized;
         FixedQuaternion worldRotationB = (bodyB.Rotation * joint.LocalFrameB.Rotation).Normalized;
-        Vector3d anchorA = bodyA.Position3d + bodyA.Rotation * joint.LocalFrameA.Position;
-        Vector3d anchorB = bodyB.Position3d + bodyB.Rotation * joint.LocalFrameB.Position;
-        Vector3d relativeAnchorA = anchorA - bodyA.WorldCenterOfMass;
-        Vector3d relativeAnchorB = anchorB - bodyB.WorldCenterOfMass;
-        Vector3d anchorError = anchorB - anchorA;
+        if (!bodyA.Rotation.TryRotate(
+                joint.LocalFrameA.Position,
+                out Vector3d anchorOffsetA)
+            || !bodyB.Rotation.TryRotate(
+                joint.LocalFrameB.Position,
+                out Vector3d anchorOffsetB)
+            || !bodyA.TryGetOffsetFromCenterOfMass(
+                new ContactAnchor(bodyA.Position3d, anchorOffsetA),
+                out Vector3d relativeAnchorA)
+            || !bodyB.TryGetOffsetFromCenterOfMass(
+                new ContactAnchor(bodyB.Position3d, anchorOffsetB),
+                out Vector3d relativeAnchorB)
+            || !Vector3d.TrySubtractSums(
+                bodyB.Position3d,
+                anchorOffsetB,
+                bodyA.Position3d,
+                anchorOffsetA,
+                out Vector3d anchorError))
+        {
+            linearAnchorErrorMagnitude = Fixed64.Zero;
+            GravitasLogger.Channel.Write(
+                DiagnosticLevel.Error,
+                "A 3D joint's anchors cannot be represented in response space.",
+                nameof(JointSolver3D));
+            return 0;
+        }
+
         linearAnchorErrorMagnitude = anchorError.Magnitude;
 
         AddLinearAnchorRow(rows, ref count, Vector3d.Right, anchorError, relativeAnchorA, relativeAnchorB);

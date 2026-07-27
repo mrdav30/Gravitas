@@ -18,7 +18,7 @@ public abstract partial class LSCollider
         ref ChronicleHashWriter writer,
         GravitasReplayHashMode mode)
     {
-        writer.WriteSection("collider.3d", 3);
+        writer.WriteSection("collider.3d", 4);
         writer.WriteInt32(_replayOrdinal);
         writer.WriteBool(_active);
         writer.WriteBool(_isTrigger);
@@ -32,10 +32,9 @@ public abstract partial class LSCollider
         writer.WriteVector3d(_size);
         writer.WriteVector3d(Position);
         writer.WriteQuaternion(Rotation);
-        writer.WriteVector3d(LocalScale);
+        writer.WriteVector3d(_committedOwnerScale);
+        writer.WriteVector3d(_committedPartScale);
         writer.WriteVector3d(Center);
-        writer.WriteVector3d(BoundsMin);
-        writer.WriteVector3d(BoundsMax);
         writer.WriteInt32(HierarchyChildCount);
         WriteReplayHierarchyKey(ref writer, HierarchyKey);
         WriteReplayHierarchyKey(ref writer, ParentKey);
@@ -47,6 +46,8 @@ public abstract partial class LSCollider
             return;
 
         writer.WriteSection("collider.3d.caches", 1);
+        writer.WriteVector3d(BoundsMin);
+        writer.WriteVector3d(BoundsMax);
         writer.WriteUInt32(RuntimeShapeVersion);
         writer.WriteBool(IsPartitioned);
         writer.WriteBool(IsMixedPartitioned);
@@ -61,9 +62,33 @@ public abstract partial class LSCollider
 
     private void ContributeShapeReplayHash(ref ChronicleHashWriter writer)
     {
-        writer.WriteSection("collider.3d.shape", 1);
+        writer.WriteSection("collider.3d.shape", 3);
         switch (this)
         {
+            case LSCapsuleCollider capsule:
+                writer.WriteVector3d(capsule.Center);
+                writer.WriteFixed64(capsule.AxisLength);
+                writer.WriteFixed64(capsule.ScaledRadius);
+                break;
+
+            case LSCylinderCollider cylinder:
+                writer.WriteVector3d(cylinder.Center);
+                writer.WriteFixed64(cylinder.Height);
+                writer.WriteFixed64(cylinder.ScaledRadius);
+                break;
+
+            case LSConeCollider cone:
+                writer.WriteVector3d(cone.Center);
+                writer.WriteFixed64(cone.Height);
+                writer.WriteFixed64(cone.ScaledRadius);
+                break;
+
+            case LSCuboidCollider cuboid:
+                writer.WriteVector3d(cuboid.OrientedBox.Center);
+                writer.WriteQuaternion(cuboid.OrientedBox.Orientation);
+                writer.WriteVector3d(cuboid.OrientedBox.HalfExtents);
+                break;
+
             case LSMeshCollider mesh:
                 writer.WriteEnum(mesh.Mode);
                 writer.WriteEnum(mesh.InertiaPolicy);

@@ -52,10 +52,10 @@ public interface IHostDebugDrawSink
     void DrawLine(Vector3d start, Vector3d end, GravitasDiagnosticColor color);
     void DrawPoint(Vector3d center, Fixed64 radius, GravitasDiagnosticColor color);
     void DrawWireSphere(Vector3d center, Fixed64 radius, GravitasDiagnosticColor color);
-    void DrawWireBox(Vector3d center, Vector3d size, FixedQuaternion rotation, GravitasDiagnosticColor color);
+    void DrawWireBox(Vector3d center, Vector3d halfExtents, FixedQuaternion rotation, GravitasDiagnosticColor color);
     void DrawWireCylinder(Vector3d center, Fixed64 radius, Fixed64 height, FixedQuaternion rotation, GravitasDiagnosticColor color);
     void DrawWireCone(Vector3d center, Fixed64 radius, Fixed64 height, FixedQuaternion rotation, GravitasDiagnosticColor color);
-    void DrawWireCapsule(Vector3d center, Fixed64 radius, Fixed64 height, FixedQuaternion rotation, GravitasDiagnosticColor color);
+    void DrawWireCapsule(Vector3d center, Fixed64 radius, Fixed64 axisLength, FixedQuaternion rotation, GravitasDiagnosticColor color);
     void DrawWireTriangle(Vector3d a, Vector3d b, Vector3d c, GravitasDiagnosticColor color);
 }
 ```
@@ -83,7 +83,7 @@ public sealed class HostDebugDrawAdapter : GravitasDebugDrawCommandVisitor
         _sink.DrawWireSphere(view.Center, view.Radius, view.Color);
 
     public override void VisitWireBox(in GravitasWireBoxDebugDrawView view) =>
-        _sink.DrawWireBox(view.Center, view.Size, view.Rotation, view.Color);
+        _sink.DrawWireBox(view.Center, view.HalfExtents, view.Rotation, view.Color);
 
     public override void VisitWireCylinder(in GravitasWireCylinderDebugDrawView view) =>
         _sink.DrawWireCylinder(
@@ -105,7 +105,7 @@ public sealed class HostDebugDrawAdapter : GravitasDebugDrawCommandVisitor
         _sink.DrawWireCapsule(
             view.Center,
             view.Radius,
-            view.Height,
+            view.AxisLength,
             view.Rotation,
             view.Color);
 

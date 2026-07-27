@@ -1,5 +1,6 @@
+using Chronicler;
 using FixedMathSharp;
-using FixedMathSharp.Bounds;
+using FixedMathSharp.Geometry;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Support;
@@ -15,6 +16,49 @@ namespace Gravitas.Tests.Colliders;
 
 public sealed class ColliderOwnershipStateTests
 {
+    [Fact]
+    public void PlanarColliderContextBinding_ShouldRejectNullAndRebinding()
+    {
+        using GravitasWorldContext first = GravitasWorldContext.CreateOwned();
+        using GravitasWorldContext second = GravitasWorldContext.CreateOwned();
+        var collider = new LSCircleCollider2D(Fixed64.Half);
+
+        Action bindNull = () => collider.BindContext(null!);
+        bindNull.Should().Throw<ArgumentNullException>();
+
+        collider.BindContext(first);
+        collider.BindContext(first);
+        Action rebind = () => collider.BindContext(second);
+
+        rebind.Should().Throw<ArgumentException>()
+            .WithParameterName("context");
+    }
+
+    [Fact]
+    public void UninitializedCuboid_ShouldExposeAuthoredProxyRadius()
+    {
+        var collider = new LSCuboidCollider { Size = Vector3d.One * Fixed64.Two };
+        Vector3d.One.TryGetMagnitudeCeiling(out Fixed64 expected).Should().BeTrue();
+
+        collider.ScaledRadius.Should().Be(expected);
+    }
+
+    [Fact]
+    public void ReplayHash_ShouldIncludeAllFiniteAxisShapeFamilies()
+    {
+        var baseline = HashFiniteAxisShapes(
+            Fixed64.Two,
+            Fixed64.Two,
+            Fixed64.Two);
+
+        HashFiniteAxisShapes((Fixed64)3, Fixed64.Two, Fixed64.Two)
+            .Should().NotBe(baseline);
+        HashFiniteAxisShapes(Fixed64.Two, (Fixed64)3, Fixed64.Two)
+            .Should().NotBe(baseline);
+        HashFiniteAxisShapes(Fixed64.Two, Fixed64.Two, (Fixed64)3)
+            .Should().NotBe(baseline);
+    }
+
     [Fact]
     public void BodyInitialization_ShouldRejectNonPositiveConsumedScaleBeforeRuntimeMutation()
     {
@@ -650,9 +694,15 @@ public sealed class ColliderOwnershipStateTests
         scenario.InitializeStaticCollider(standalone3D, Vector3d.Zero);
         standalone2D.InitializeWithNoBody(new TestMatterAgent(scenario.Context));
 
-        Action reserveBound3D = () => standalone3D.ReserveCompoundPart(owner3D);
+        Action reserveBound3D = () => standalone3D.ReserveCompoundPart(
+            owner3D,
+            FixedQuaternion.Identity,
+            Vector3d.One);
         Action reserveBound2D = () => standalone2D.ReserveCompoundPart(owner2D, Fixed64.Zero, Vector2d.One);
-        Action rebindPart3D = () => part3D.ReserveCompoundPart(foreign3D);
+        Action rebindPart3D = () => part3D.ReserveCompoundPart(
+            foreign3D,
+            FixedQuaternion.Identity,
+            Vector3d.One);
         Action rebindPart2D = () => part2D.ReserveCompoundPart(foreign2D, Fixed64.Zero, Vector2d.One);
 
         reserveBound3D.Should().Throw<ArgumentException>().WithParameterName("owner");
@@ -960,7 +1010,7 @@ public sealed class ColliderOwnershipStateTests
     }
 
     [Fact]
-    public void StaticColliderPartitionRefresh_ShouldAdvanceRuntimeAndBroadPhaseVersionsOnce()
+    public void StaticColliderPoseSetters_ShouldPublishImmediatelyAndLeaveSimulateAsNoOp()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         LSSphereCollider collider = scenario.CreateStaticSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
@@ -968,11 +1018,12 @@ public sealed class ColliderOwnershipStateTests
         uint initialBroadPhaseVersion = collider.BroadPhaseVersion;
 
         collider.Position = new Vector3d(Fixed64.One, Fixed64.Zero, Fixed64.Zero);
-        collider.Rotation = PhysicsScenarioBuilder.Yaw(45);
-        collider.Simulate();
-
         collider.RuntimeShapeVersion.Should().Be(initialRuntimeVersion + 1);
         collider.BroadPhaseVersion.Should().Be(initialBroadPhaseVersion + 1);
+        collider.Rotation = PhysicsScenarioBuilder.Yaw(45);
+
+        collider.RuntimeShapeVersion.Should().Be(initialRuntimeVersion + 2);
+        collider.BroadPhaseVersion.Should().Be(initialBroadPhaseVersion + 2);
         collider.PartitionChanged.Should().BeTrue();
         collider.Bounds.Center.Should().Be(new Vector3d(Fixed64.One, Fixed64.Zero, Fixed64.Zero));
 
@@ -1175,6 +1226,44 @@ public sealed class ColliderOwnershipStateTests
         mixedStayed3D.Should().Be(1);
         mixedEntered2D.Should().Be(1);
         mixedStayed2D.Should().Be(1);
+    }
+
+    private static ChronicleHash HashFiniteAxisShapes(
+        Fixed64 capsuleHeight,
+        Fixed64 cylinderHeight,
+        Fixed64 coneHeight)
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSCollider[] colliders =
+        {
+            new LSCapsuleCollider
+            {
+                Radius = Fixed64.Half,
+                Size = new Vector3d(Fixed64.One, capsuleHeight, Fixed64.One)
+            },
+            new LSCylinderCollider
+            {
+                Radius = Fixed64.Half,
+                Size = new Vector3d(Fixed64.One, cylinderHeight, Fixed64.One)
+            },
+            new LSConeCollider
+            {
+                Radius = Fixed64.Half,
+                Size = new Vector3d(Fixed64.One, coneHeight, Fixed64.One)
+            }
+        };
+
+        for (int i = 0; i < colliders.Length; i++)
+        {
+            colliders[i].InitializeWithNoBody(new TestMatterAgent(
+                context,
+                new FixedTransform(
+                    Vector3d.Right * (Fixed64)(i * 4),
+                    FixedQuaternion.Identity,
+                    Vector3d.One)));
+        }
+
+        return context.ComputeReplayHash();
     }
 
     private static void AdvancePhysicsStep(PhysicsScenarioBuilder scenario)

@@ -42,6 +42,7 @@ public class QueryServiceBenchmarks
     private SwiftList<Physics3DHit> _circlecastHits;
     private SwiftList<Physics3DHit> _coneVolumeHits;
     private SwiftList<Physics3DHit> _sweepSphereHits;
+    private SwiftList<Physics3DHit> _coneTargetSweepSphereHits;
     private SwiftList<Physics3DHit> _meshSweepSphereHits;
     private SwiftList<Physics3DHit> _capsuleSourceHits;
     private SwiftList<Physics3DHit> _cuboidSourceHits;
@@ -131,6 +132,7 @@ public class QueryServiceBenchmarks
         _circlecastHits = new SwiftList<Physics3DHit>(ColliderCount);
         _coneVolumeHits = new SwiftList<Physics3DHit>(ColliderCount);
         _sweepSphereHits = new SwiftList<Physics3DHit>(ColliderCount);
+        _coneTargetSweepSphereHits = new SwiftList<Physics3DHit>(ColliderCount);
         _meshSweepSphereHits = new SwiftList<Physics3DHit>(ColliderCount);
         _capsuleSourceHits = new SwiftList<Physics3DHit>(ColliderCount);
         _cuboidSourceHits = new SwiftList<Physics3DHit>(ColliderCount);
@@ -181,6 +183,7 @@ public class QueryServiceBenchmarks
         _circlecastHits = null;
         _coneVolumeHits = null;
         _sweepSphereHits = null;
+        _coneTargetSweepSphereHits = null;
         _meshSweepSphereHits = null;
         _capsuleSourceHits = null;
         _cuboidSourceHits = null;
@@ -275,6 +278,15 @@ public class QueryServiceBenchmarks
     [Benchmark]
     public int SweepSphereAllAcrossPopulatedContext() =>
         _context.Query3D.SweepSphereAll(_rayStart, _rayEnd, Fixed64.Half, IncludeLayerZero, _sweepSphereHits);
+
+    [Benchmark]
+    public int SweepSphereAllAcrossConeTargets() =>
+        _coneTargetContext.Query3D.SweepSphereAll(
+            _rayStart,
+            _rayEnd,
+            Fixed64.Half,
+            IncludeLayerZero,
+            _coneTargetSweepSphereHits);
 
     [Benchmark]
     public int SweepSphereAllAcrossMeshTargetContext() =>

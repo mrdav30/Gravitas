@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using Gravitas.CollisionHandling;
 using System;
 using System.Runtime.CompilerServices;
 
@@ -117,11 +118,36 @@ internal static class JointSolver2D
         SolidBody2D bodyB = joint.BodyB;
         Fixed64 frameAngleA = bodyA.Rotation + joint.LocalFrameA.Angle;
         Fixed64 frameAngleB = bodyB.Rotation + joint.LocalFrameB.Angle;
-        Vector2d anchorA = bodyA.Position + Vector2d.Rotate(joint.LocalFrameA.Anchor, bodyA.Rotation);
-        Vector2d anchorB = bodyB.Position + Vector2d.Rotate(joint.LocalFrameB.Anchor, bodyB.Rotation);
-        Vector2d relativeAnchorA = anchorA - bodyA.WorldCenterOfMass;
-        Vector2d relativeAnchorB = anchorB - bodyB.WorldCenterOfMass;
-        Vector2d anchorError = anchorB - anchorA;
+        if (!Vector2d.TryRotate(
+                joint.LocalFrameA.Anchor,
+                bodyA.Rotation,
+                out Vector2d anchorOffsetA)
+            || !Vector2d.TryRotate(
+                joint.LocalFrameB.Anchor,
+                bodyB.Rotation,
+                out Vector2d anchorOffsetB)
+            || !bodyA.TryGetOffsetFromCenterOfMass(
+                new ContactAnchor2D(bodyA.Position, anchorOffsetA),
+                out Vector2d relativeAnchorA)
+            || !bodyB.TryGetOffsetFromCenterOfMass(
+                new ContactAnchor2D(bodyB.Position, anchorOffsetB),
+                out Vector2d relativeAnchorB)
+            || !Vector2d.TrySubtractSums(
+                bodyB.Position,
+                anchorOffsetB,
+                bodyA.Position,
+                anchorOffsetA,
+                out Vector2d anchorError))
+        {
+            linearAnchorErrorMagnitude = Fixed64.Zero;
+            angularErrorMagnitude = Fixed64.Zero;
+            GravitasLogger.Channel.Write(
+                DiagnosticLevel.Error,
+                "A 2D joint's anchors cannot be represented in response space.",
+                nameof(JointSolver2D));
+            return 0;
+        }
+
         linearAnchorErrorMagnitude = anchorError.Magnitude;
         angularErrorMagnitude = NormalizeAngle(frameAngleB - frameAngleA).Abs();
 

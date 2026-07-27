@@ -745,13 +745,43 @@ public sealed partial class SolidBody2D
         out Fixed64 separationGap)
     {
         LSCircleCollider2D? otherCircle = other as LSCircleCollider2D;
-        Vector2d closestPoint = otherCircle?.Center ?? other.GetClosestPoint(circle.Center);
         Fixed64 otherRadius = otherCircle?.ScaledRadius ?? Fixed64.Zero;
+        Fixed64 distance;
+        if (otherCircle != null)
+        {
+            if (!Vector2d.TryGetDistance(
+                    circle.Center,
+                    otherCircle.Center,
+                    out distance))
+            {
+                separationGap = default;
+                return false;
+            }
+        }
+        else if (other.ContainsPoint(circle.Center))
+        {
+            distance = Fixed64.Zero;
+        }
+        else if (!other.TryGetClosestBoundaryAnchor(
+                     circle.Center,
+                     out _,
+                     out distance))
+        {
+            separationGap = default;
+            return false;
+        }
 
-        // Unrepresentable distance and saturating sums remain conservative:
-        // they cannot enlarge the certified gap relative to its uncertainty.
-        _ = Vector2d.TryGetDistance(circle.Center, closestPoint, out Fixed64 distance);
-        Fixed64 combinedRadius = circle.ScaledRadius + otherRadius;
+        // An unrepresentable center distance or radius sum cannot certify
+        // separation. The uncertainty scale below may saturate only upward.
+        if (!Fixed64.TryAdd(
+                circle.ScaledRadius,
+                otherRadius,
+                out Fixed64 combinedRadius))
+        {
+            separationGap = default;
+            return false;
+        }
+
         Fixed64 rawGap = distance - combinedRadius;
         Fixed64 characteristicScale = distance
             + combinedRadius

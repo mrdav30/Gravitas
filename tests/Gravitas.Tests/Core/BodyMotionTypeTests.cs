@@ -1,5 +1,5 @@
 using FixedMathSharp;
-using FixedMathSharp.Bounds;
+using FixedMathSharp.Geometry;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
@@ -764,11 +764,179 @@ public sealed class BodyMotionTypeTests
         collider.Bounds.Should().Be(originalBounds);
     }
 
+    [Fact]
+    public void SolidBody2D_SetPositionWithUnrepresentableColliderCenter_ShouldRejectBeforeMutation()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        var collider = new LSCircleCollider2D(Fixed64.One)
+        {
+            LocalOffset = Vector2d.Right
+        };
+        var body = Create2DBody(context, collider, Vector2d.Zero, Fixed64.Zero);
+        Vector2d originalPosition = body.Position;
+        FixedBoundArea originalBounds = collider.Bounds;
+
+        Action move = () => body.SetPosition(new Vector2d(
+            Fixed64.MaxValue,
+            Fixed64.Zero));
+
+        move.Should().Throw<InvalidOperationException>();
+        body.Position.Should().Be(originalPosition);
+        collider.Center.Should().Be(Vector2d.Right);
+        collider.Bounds.Should().Be(originalBounds);
+    }
+
+    [Fact]
+    public void SolidBody2D_SetRotationWithUnrepresentableColliderCenter_ShouldRejectBeforeMutation()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        var collider = new LSCircleCollider2D(Fixed64.One)
+        {
+            LocalOffset = new Vector2d((Fixed64)2, Fixed64.Zero)
+        };
+        Vector2d position = new(
+            Fixed64.MaxValue - Fixed64.One,
+            Fixed64.Zero);
+        var body = Create2DBody(context, collider, position, -Fixed64.Pi);
+        Fixed64 originalRotation = body.Rotation;
+        Vector2d originalCenter = collider.Center;
+        FixedBoundArea originalBounds = collider.Bounds;
+
+        Action rotate = () => body.SetRotation(Fixed64.Zero);
+
+        rotate.Should().Throw<InvalidOperationException>();
+        body.Rotation.Should().Be(originalRotation);
+        collider.Center.Should().Be(originalCenter);
+        collider.Bounds.Should().Be(originalBounds);
+    }
+
+    [Fact]
+    public void SolidBody2D_ResetPositionWithUnrepresentableColliderCenter_ShouldPreservePoseAndMotion()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        var collider = new LSCircleCollider2D(Fixed64.One)
+        {
+            LocalOffset = Vector2d.Right
+        };
+        var body = Create2DBody(context, collider, Vector2d.Zero, Fixed64.Zero);
+        body.AddLinearImpulse(Vector2d.Right);
+        body.AddAngularImpulse(Fixed64.One);
+        Vector2d originalPosition = body.Position;
+        Fixed64 originalRotation = body.Rotation;
+        Vector2d originalVelocity = body.LinearVelocity;
+        Fixed64 originalAngularVelocity = body.AngularVelocity;
+        FixedBoundArea originalBounds = collider.Bounds;
+
+        Action reset = () => body.ResetPosition(
+            new Vector2d(Fixed64.MaxValue, Fixed64.Zero),
+            Fixed64.Zero);
+
+        reset.Should().Throw<InvalidOperationException>();
+        body.Position.Should().Be(originalPosition);
+        body.Rotation.Should().Be(originalRotation);
+        body.LinearVelocity.Should().Be(originalVelocity);
+        body.AngularVelocity.Should().Be(originalAngularVelocity);
+        collider.Bounds.Should().Be(originalBounds);
+    }
+
+    [Fact]
+    public void SolidBody_SetPositionWithUnrepresentableColliderCenter_ShouldRejectBeforeMutation()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        var collider = new LSSphereCollider
+        {
+            Radius = Fixed64.One,
+            LocalOffset = Vector3d.Right
+        };
+        var body = new SolidBody(new TestMatterAgent(context), collider);
+        body.Initialize(Vector3d.Zero, FixedQuaternion.Identity);
+        Vector3d originalPosition = body.Position3d;
+        Vector3d originalCenter = collider.Center;
+        FixedBoundBox originalBounds = collider.Bounds;
+
+        Action move = () => body.SetPosition(new Vector3d(
+            Fixed64.MaxValue,
+            Fixed64.Zero,
+            Fixed64.Zero));
+
+        move.Should().Throw<InvalidOperationException>();
+        body.Position3d.Should().Be(originalPosition);
+        collider.Center.Should().Be(originalCenter);
+        collider.Bounds.Should().Be(originalBounds);
+    }
+
+    [Fact]
+    public void SolidBody_SetRotationWithUnrepresentableColliderCenter_ShouldRejectBeforeMutation()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        var collider = new LSSphereCollider
+        {
+            Radius = Fixed64.One,
+            LocalOffset = Vector3d.Right * (Fixed64)2
+        };
+        Vector3d position = new(
+            Fixed64.MaxValue - Fixed64.One,
+            Fixed64.Zero,
+            Fixed64.Zero);
+        FixedQuaternion halfTurn = new(
+            Fixed64.Zero,
+            Fixed64.One,
+            Fixed64.Zero,
+            Fixed64.Zero);
+        var body = new SolidBody(new TestMatterAgent(context), collider);
+        body.Initialize(position, halfTurn);
+        FixedQuaternion originalRotation = body.Rotation;
+        Vector3d originalCenter = collider.Center;
+        FixedBoundBox originalBounds = collider.Bounds;
+
+        Action rotate = () => body.SetRotation(FixedQuaternion.Identity);
+
+        rotate.Should().Throw<InvalidOperationException>();
+        body.Rotation.Should().Be(originalRotation);
+        collider.Center.Should().Be(originalCenter);
+        collider.Bounds.Should().Be(originalBounds);
+    }
+
+    [Fact]
+    public void SolidBody_ResetPositionWithUnrepresentableColliderCenter_ShouldPreservePoseAndMotion()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        var collider = new LSSphereCollider
+        {
+            Radius = Fixed64.One,
+            LocalOffset = Vector3d.Right
+        };
+        var body = new SolidBody(new TestMatterAgent(context), collider);
+        body.Initialize(Vector3d.Zero, FixedQuaternion.Identity);
+        body.AddLinearImpulse(Vector3d.Right);
+        body.AddAngularImpulse(Vector3d.Up);
+        Vector3d originalPosition = body.Position3d;
+        FixedQuaternion originalRotation = body.Rotation;
+        Vector3d originalVelocity = body.LinearVelocity;
+        Vector3d originalAngularVelocity = body.AngularVelocity;
+        Vector3d originalHostPosition = body.PositionTransform.WorldPosition;
+        FixedQuaternion originalHostRotation = body.RotationTransform.WorldRotation;
+        FixedBoundBox originalBounds = collider.Bounds;
+
+        Action reset = () => body.ResetPosition(
+            new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero),
+            FixedQuaternion.Identity);
+
+        reset.Should().Throw<InvalidOperationException>();
+        body.Position3d.Should().Be(originalPosition);
+        body.Rotation.Should().Be(originalRotation);
+        body.LinearVelocity.Should().Be(originalVelocity);
+        body.AngularVelocity.Should().Be(originalAngularVelocity);
+        body.PositionTransform.WorldPosition.Should().Be(originalHostPosition);
+        body.RotationTransform.WorldRotation.Should().Be(originalHostRotation);
+        collider.Bounds.Should().Be(originalBounds);
+    }
+
     [Theory]
     [InlineData(BodyMotionType.Dynamic)]
     [InlineData(BodyMotionType.Kinematic)]
     [InlineData(BodyMotionType.Static)]
-    public void SolidBody_ResetPositionWithInvalidPostPoseMeshScale_ShouldRejectBeforeMutation(
+    public void SolidBody_ResetPositionWithShearedHostPose_ShouldRejectBeforeMutation(
         BodyMotionType motionType)
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
@@ -791,20 +959,20 @@ public sealed class BodyMotionTypeTests
         body.Initialize(Vector3d.Zero, FixedQuaternion.Identity, motionType);
         Vector3d originalPosition = body.Position3d;
         FixedQuaternion originalRotation = body.Rotation;
-        Vector3d originalLocalPosition = transform.LocalPosition;
-        FixedQuaternion originalLocalRotation = transform.LocalRotation;
+        Vector3d originalHostPosition = transform.WorldPosition;
+        FixedQuaternion originalHostRotation = transform.WorldRotation;
         FixedBoundBox originalBounds = collider.Bounds;
         uint originalShapeVersion = collider.RuntimeShapeVersion;
+        FixedQuaternion rotation =
+            FixedQuaternion.FromAxisAngle(Vector3d.Forward, Fixed64.HalfPi * Fixed64.Half);
 
-        Action reset = () => body.ResetPosition(
-            Vector3d.Right,
-            FixedQuaternion.FromAxisAngle(Vector3d.Forward, Fixed64.HalfPi * Fixed64.Half));
+        Action reset = () => body.ResetPosition(Vector3d.Right, rotation);
 
-        reset.Should().Throw<ArgumentException>().WithMessage("*representable*");
+        reset.Should().Throw<InvalidOperationException>();
         body.Position3d.Should().Be(originalPosition);
         body.Rotation.Should().Be(originalRotation);
-        transform.LocalPosition.Should().Be(originalLocalPosition);
-        transform.LocalRotation.Should().Be(originalLocalRotation);
+        transform.WorldPosition.Should().Be(originalHostPosition);
+        transform.WorldRotation.Should().Be(originalHostRotation);
         collider.Bounds.Should().Be(originalBounds);
         collider.RuntimeShapeVersion.Should().Be(originalShapeVersion);
     }
@@ -916,5 +1084,26 @@ public sealed class BodyMotionTypeTests
         };
         body.Initialize(Vector2d.Zero, motionType: motionType);
         return (body, collider);
+    }
+
+    private static SolidBody2D Create2DBody(
+        GravitasWorldContext context,
+        LSCircleCollider2D collider,
+        Vector2d position,
+        Fixed64 rotation)
+    {
+        var body = new SolidBody2D(
+            new TestMatterAgent(
+                context,
+                new FixedTransform(
+                    position.ToVector3d(Fixed64.Zero),
+                    FixedQuaternion.Identity,
+                    Vector3d.One)),
+            collider)
+        {
+            Mass = Fixed64.One
+        };
+        body.Initialize(position, rotation, BodyMotionType.Dynamic);
+        return body;
     }
 }

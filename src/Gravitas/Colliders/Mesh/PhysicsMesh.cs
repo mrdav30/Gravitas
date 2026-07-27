@@ -6,7 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
-using FixedMathSharp.Bounds;
+using FixedMathSharp.Geometry;
 using SwiftCollections;
 using SwiftCollections.Query;
 using System;
@@ -37,28 +37,28 @@ namespace Gravitas.Colliders
 
         private readonly Vector3d[] _localVertices;
 
-        private readonly Vector3d[] _worldVertices;
-        private bool _worldVerticesValid;
-        private readonly int[]? _supportVertexIndices;
-        private readonly SupportTreeNode[]? _supportTreeNodes;
+        private Vector3d[] _scaledLocalVertices;
+        private Vector3d[] _preparedScaledLocalVertices;
+        private int[]? _supportVertexIndices;
+        private int[]? _preparedSupportVertexIndices;
+        private SupportTreeNode[]? _supportTreeNodes;
+        private SupportTreeNode[]? _preparedSupportTreeNodes;
         private int _supportTreeNodeCount;
-
-        /// <summary>
-        /// Holds all vertices transformed to world space. Prefer point-specific helpers on hot paths.
-        /// </summary>
-        public ReadOnlySpan<Vector3d> Vertices
-        {
-            get
-            {
-                EnsureWorldVertices();
-                return _worldVertices;
-            }
-        }
+        private int _preparedSupportTreeNodeCount;
+        private readonly SupportVertexIndexComparer? _supportVertexIndexComparer;
 
         /// <summary>
         /// Holds the source vertices in local mesh space.
         /// </summary>
         internal ReadOnlySpan<Vector3d> LocalVertices => _localVertices;
+
+        /// <summary>
+        /// Holds the committed scaled vertices as center-relative local
+        /// offsets. Collision relations apply <see cref="Rotation"/> without
+        /// materializing absolute world points.
+        /// </summary>
+        internal ReadOnlySpan<Vector3d> ScaledLocalVertices =>
+            _scaledLocalVertices;
 
         /// <summary>
         /// Number of vertices in the immutable local mesh topology.
@@ -106,55 +106,30 @@ namespace Gravitas.Colliders
         /// </summary>
         public Fixed64 TotalArea => _scaledTotalArea;
 
-        private bool _closedVolumeMassPropertiesEvaluated;
-        private MeshMassProperties _closedVolumeMassProperties;
-        private MeshVolumeValidationResult _closedVolumeValidationResult;
-
-        private bool _triangleBVHValid;
         private int _triangleBvhBuildCount;
-        private readonly SwiftFixedBVH<int> _triangleBVH;
+        private SwiftFixedBVH<int> _triangleBVH;
+        private SwiftFixedBVH<int> _preparedTriangleBVH;
 
         /// <summary>
         /// Triangle acceleration structure in local mesh space.
         /// </summary>
-        internal SwiftFixedBVH<int> TriangleBVH => !_triangleBVHValid
-            ? UpdateTriangleBVH()
-            : _triangleBVH;
+        internal SwiftFixedBVH<int> TriangleBVH => _triangleBVH;
 
         public int TriangleBvhBuildCount => _triangleBvhBuildCount;
 
         private FixedQuaternion _rotation = FixedQuaternion.Identity;
 
-        private Fixed4x4 _transformationMatrix;
-        public Fixed4x4 TransformationMatrix
-        {
-            get => _transformationMatrix;
-            private set
-            {
-                _transformationMatrix = value;
-                _inverseMatrixValid = false;
-                _worldVerticesValid = false;
-            }
-        }
+        /// <summary>
+        /// Gets the committed world-space origin of the mesh's rigid frame.
+        /// </summary>
+        internal Vector3d Origin => _position;
 
-        private bool _inverseMatrixValid;
-        private Fixed4x4 _inverseTransformationMatrix;
-        public Fixed4x4 InverseTransformationMatrix
-        {
-            get
-            {
-                if (_inverseMatrixValid)
-                    return _inverseTransformationMatrix;
-
-                Fixed4x4 inverse = BuildInverseTransformationMatrix();
-                _inverseTransformationMatrix = inverse;
-                _inverseMatrixValid = true;
-                return inverse;
-            }
-        }
+        /// <summary>
+        /// Gets the committed local-to-world mesh orientation.
+        /// </summary>
+        internal FixedQuaternion Rotation => _rotation;
 
         private FixedBoundBox _bounds;
-        private bool _boundsInitialized;
         public FixedBoundBox Bounds => _bounds;
 
         private readonly FixedBoundBox _localBounds;
@@ -184,18 +159,20 @@ namespace Gravitas.Colliders
             Mode = mode;
             _localVertices = new Vector3d[vertices.Length];
             Array.Copy(vertices, _localVertices, vertices.Length);
-            _worldVertices = new Vector3d[vertices.Length];
+            _scaledLocalVertices = new Vector3d[vertices.Length];
+            _preparedScaledLocalVertices = new Vector3d[vertices.Length];
             _triangles = new int[triangles.Length];
             Array.Copy(triangles, _triangles, triangles.Length);
             _triangleCount = triangles.Length / 3; // 3 vertices per triangle
             _triangleBVH = new SwiftFixedBVH<int>(2 * TriangleCount - 1);
+            _preparedTriangleBVH = new SwiftFixedBVH<int>(2 * TriangleCount - 1);
             _faceNormals = new Vector3d[TriangleCount];
             _scaledFaceAreas = new Fixed64[TriangleCount];
-            _surfaceValidationFaceAreas = new Fixed64[TriangleCount];
+            _preparedScaledFaceAreas = new Fixed64[TriangleCount];
             _scaledFaceNormals = new Vector3d[TriangleCount];
+            _preparedScaledFaceNormals = new Vector3d[TriangleCount];
 
             _localBounds = CalculateBounds(_localVertices);
-            UpdateTransformation(position, rotation, Vector3d.One);
 
             // Scale validation proves every vertex span and triangle cross product used
             // by the exact topology predicates below is representable.
@@ -211,37 +188,29 @@ namespace Gravitas.Colliders
             if (Mode == MeshColliderMode.Convex && _localVertices.Length > SupportTreeVertexThreshold)
             {
                 _supportVertexIndices = CreateSupportVertexIndices(_localVertices.Length);
+                _preparedSupportVertexIndices = new int[_localVertices.Length];
                 _supportTreeNodes = new SupportTreeNode[(2 * _localVertices.Length) - 1];
-                _supportTreeNodeCount = BuildSupportTreeNode(0, _localVertices.Length);
+                _preparedSupportTreeNodes = new SupportTreeNode[(2 * _localVertices.Length) - 1];
+                _supportVertexIndexComparer = new SupportVertexIndexComparer();
             }
 
-            UpdateBounds();
+            PrepareTransformation(position, rotation, Vector3d.One, Vector3d.One, null);
+            PublishPreparedTransformation();
         }
 
         public void UpdatePosition(Vector3d position, FixedQuaternion rotation)
         {
-            UpdateTransformation(position, rotation, _scale);
-            UpdateBounds();
+            PrepareTransformation(position, rotation, _ownerScale, _partScale, null);
+            PublishPreparedTransformation();
         }
 
         /// <summary>
-        /// Updates the mesh origin, normalized rigid rotation, and strictly positive mesh-local scale.
+        /// Updates the mesh center, normalized rigid rotation, and strictly positive authored scale.
         /// </summary>
         public void UpdateTransform(Vector3d position, FixedQuaternion rotation, Vector3d scale)
         {
-            UpdateTransformation(position, rotation, scale);
-            UpdateBounds();
-        }
-
-        private void EnsureWorldVertices()
-        {
-            if (_worldVerticesValid)
-                return;
-
-            for (int i = 0; i < _localVertices.Length; i++)
-                _worldVertices[i] = TransformLocalPoint(_localVertices[i]);
-
-            _worldVerticesValid = true;
+            PrepareTransformation(position, rotation, scale, Vector3d.One, null);
+            PublishPreparedTransformation();
         }
 
         private static void ValidateInput(Vector3d[] vertices, int[] triangles)
@@ -271,7 +240,10 @@ namespace Gravitas.Colliders
                     nameof(triangles),
                     "Triangle indices must be unique within each triangle.");
 
-                Fixed64 area = CalculateTriangleArea(vertices[index0], vertices[index1], vertices[index0], vertices[index2]);
+                Fixed64 area = new FixedTriangle(
+                    vertices[index0],
+                    vertices[index1],
+                    vertices[index2]).Area;
                 SwiftThrowHelper.ThrowIfArgument(area <= Fixed64.Epsilon, nameof(triangles), "Degenerate triangles are not supported.");
 
                 referencedVertices[index0] = true;
@@ -282,12 +254,6 @@ namespace Gravitas.Colliders
             for (int i = 0; i < referencedVertices.Length; i++)
                 SwiftThrowHelper.ThrowIfArgument(!referencedVertices[i], nameof(vertices), "Every mesh vertex must be referenced by at least one triangle.");
         }
-
-        private static Fixed64 CalculateTriangleArea(
-            Vector3d startEdgeA,
-            Vector3d endEdgeA,
-            Vector3d startEdgeB,
-            Vector3d endEdgeB) => Vector3d.Cross(endEdgeA - startEdgeA, endEdgeB - startEdgeB).Magnitude * Fixed64.Half;
 
         private static Vector3d CalculateLocalTriangleNormal(
             Vector3d[] vertices,
@@ -310,35 +276,20 @@ namespace Gravitas.Colliders
             return _faceNormals;
         }
 
-        private SwiftFixedBVH<int> UpdateTriangleBVH()
+        private void BuildTriangleBVH(
+            SwiftFixedBVH<int> bvh,
+            ReadOnlySpan<Vector3d> vertices)
         {
-            _triangleBVH.Clear();
+            bvh.Clear();
             for (int i = 0; i < _triangleCount; i++)
             {
                 int index0 = _triangles[i * 3];
                 int index1 = _triangles[i * 3 + 1];
                 int index2 = _triangles[i * 3 + 2];
-                Vector3d min = Vector3d.Min(Vector3d.Min(_localVertices[index0], _localVertices[index1]), _localVertices[index2]);
-                Vector3d max = Vector3d.Max(Vector3d.Max(_localVertices[index0], _localVertices[index1]), _localVertices[index2]);
-                _triangleBVH.Insert(i, new FixedBoundVolume(min, max));
+                Vector3d min = Vector3d.Min(Vector3d.Min(vertices[index0], vertices[index1]), vertices[index2]);
+                Vector3d max = Vector3d.Max(Vector3d.Max(vertices[index0], vertices[index1]), vertices[index2]);
+                bvh.Insert(i, new FixedBoundVolume(min, max));
             }
-
-            _triangleBvhBuildCount++;
-            _triangleBVHValid = true;
-            return _triangleBVH;
-        }
-
-        private void UpdateBounds()
-        {
-            FixedBoundVolume volume = TransformBounds(_localBounds.Min, _localBounds.Max, TransformationMatrix);
-            if (!_boundsInitialized)
-            {
-                _bounds = FixedBoundBox.FromMinMax(volume.Min, volume.Max);
-                _boundsInitialized = true;
-                return;
-            }
-
-            _bounds.SetMinMax(volume.Min, volume.Max);
         }
 
         private static FixedBoundBox CalculateBounds(Vector3d[] vertices)
@@ -352,32 +303,6 @@ namespace Gravitas.Colliders
             }
 
             return FixedBoundBox.FromMinMax(min, max);
-        }
-
-        private static FixedBoundVolume TransformBounds(Vector3d min, Vector3d max, Fixed4x4 transform)
-        {
-            Vector3d first = transform * min;
-            Vector3d transformedMin = first;
-            Vector3d transformedMax = first;
-
-            IncludeTransformedPoint(transform * new Vector3d(max.X, min.Y, min.Z), ref transformedMin, ref transformedMax);
-            IncludeTransformedPoint(transform * new Vector3d(min.X, max.Y, min.Z), ref transformedMin, ref transformedMax);
-            IncludeTransformedPoint(transform * new Vector3d(max.X, max.Y, min.Z), ref transformedMin, ref transformedMax);
-            IncludeTransformedPoint(transform * new Vector3d(min.X, min.Y, max.Z), ref transformedMin, ref transformedMax);
-            IncludeTransformedPoint(transform * new Vector3d(max.X, min.Y, max.Z), ref transformedMin, ref transformedMax);
-            IncludeTransformedPoint(transform * new Vector3d(min.X, max.Y, max.Z), ref transformedMin, ref transformedMax);
-            IncludeTransformedPoint(transform * max, ref transformedMin, ref transformedMax);
-
-            return new FixedBoundVolume(transformedMin, transformedMax);
-        }
-
-        private static void IncludeTransformedPoint(
-            Vector3d transformed,
-            ref Vector3d min,
-            ref Vector3d max)
-        {
-            min = Vector3d.Min(min, transformed);
-            max = Vector3d.Max(max, transformed);
         }
 
         /// <summary>
@@ -415,10 +340,52 @@ namespace Gravitas.Colliders
 
         public void GetTriangleVertices(int index, out Vector3d first, out Vector3d second, out Vector3d third)
         {
-            GetLocalTriangleVertices(index, out Vector3d localFirst, out Vector3d localSecond, out Vector3d localThird);
-            first = TransformLocalPoint(localFirst);
-            second = TransformLocalPoint(localSecond);
-            third = TransformLocalPoint(localThird);
+            if (TryGetTriangleVertices(index, out first, out second, out third))
+                return;
+
+            throw new InvalidOperationException(
+                "At least one triangle vertex lies outside the Fixed64 world-coordinate domain.");
+        }
+
+        /// <summary>
+        /// Attempts to materialize one triangle's absolute world vertices.
+        /// Canonical collision and query paths should consume scaled-local
+        /// geometry instead.
+        /// </summary>
+        public bool TryGetTriangleVertices(
+            int index,
+            out Vector3d first,
+            out Vector3d second,
+            out Vector3d third)
+        {
+            GetLocalTriangleVertices(
+                index,
+                out Vector3d localFirst,
+                out Vector3d localSecond,
+                out Vector3d localThird);
+            var firstAnchor = new FixedPointAnchor(
+                _position,
+                _rotation,
+                localFirst);
+            var secondAnchor = new FixedPointAnchor(
+                _position,
+                _rotation,
+                localSecond);
+            var thirdAnchor = new FixedPointAnchor(
+                _position,
+                _rotation,
+                localThird);
+            bool representable =
+                firstAnchor.TryGetPoint(out first)
+                & secondAnchor.TryGetPoint(out second)
+                & thirdAnchor.TryGetPoint(out third);
+            if (representable)
+                return true;
+
+            first = default;
+            second = default;
+            third = default;
+            return false;
         }
 
         public void GetLocalTriangleVertices(int index, out Vector3d first, out Vector3d second, out Vector3d third)
@@ -426,22 +393,69 @@ namespace Gravitas.Colliders
             SwiftThrowHelper.ThrowIfArrayIndexInvalid(index, _triangleCount, nameof(index));
 
             int triangleIndex = index * 3;
-            first = _localVertices[_triangles[triangleIndex]];
-            second = _localVertices[_triangles[triangleIndex + 1]];
-            third = _localVertices[_triangles[triangleIndex + 2]];
-        }
-
-        public Vector3d GetVertexWorld(int index)
-        {
-            SwiftThrowHelper.ThrowIfArrayIndexInvalid(index, _localVertices.Length, nameof(index));
-            return TransformLocalPoint(_localVertices[index]);
+            first = _scaledLocalVertices[_triangles[triangleIndex]];
+            second = _scaledLocalVertices[_triangles[triangleIndex + 1]];
+            third = _scaledLocalVertices[_triangles[triangleIndex + 2]];
         }
 
         /// <summary>
-        /// Finds the world-space vertex with the greatest projection onto
-        /// <paramref name="direction"/>, preserving source vertex order for ties.
+        /// Attempts to materialize one scaled vertex in world space.
         /// </summary>
+        public bool TryGetVertexWorld(int index, out Vector3d vertex)
+        {
+            SwiftThrowHelper.ThrowIfArrayIndexInvalid(index, _localVertices.Length, nameof(index));
+            return CreatePointAnchor(_scaledLocalVertices[index])
+                .TryGetPoint(out vertex);
+        }
+
+        /// <summary>
+        /// Materializes one scaled vertex in world space.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">
+        /// The conceptual vertex lies outside the representable world-coordinate
+        /// domain.
+        /// </exception>
+        public Vector3d GetVertexWorld(int index)
+        {
+            if (TryGetVertexWorld(index, out Vector3d vertex))
+                return vertex;
+
+            throw new InvalidOperationException(
+                "The selected vertex lies outside the Fixed64 world-coordinate domain.");
+        }
+
+        /// <summary>
+        /// Attempts to materialize the world-space vertex with the greatest
+        /// projection onto <paramref name="direction"/>, preserving source
+        /// vertex order for ties.
+        /// </summary>
+        public bool TryGetSupportVertexWorld(
+            Vector3d direction,
+            out Vector3d vertex)
+        {
+            Vector3d localPoint = GetSupportVertexLocal(direction);
+            return CreatePointAnchor(localPoint).TryGetPoint(out vertex);
+        }
+
+        /// <summary>
+        /// Materializes the world-space vertex with the greatest projection
+        /// onto <paramref name="direction"/>, preserving source vertex order
+        /// for ties.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">
+        /// The conceptual support vertex lies outside the representable
+        /// world-coordinate domain.
+        /// </exception>
         public Vector3d GetSupportVertexWorld(Vector3d direction)
+        {
+            if (TryGetSupportVertexWorld(direction, out Vector3d vertex))
+                return vertex;
+
+            throw new InvalidOperationException(
+                "The selected support vertex lies outside the Fixed64 world-coordinate domain.");
+        }
+
+        internal Vector3d GetSupportVertexLocal(Vector3d direction)
         {
             Vector3d localDirection = ConvertWorldDirectionToLocal(direction);
             localDirection = localDirection != Vector3d.Zero
@@ -449,21 +463,21 @@ namespace Gravitas.Colliders
                 : Vector3d.Right;
 
             if (_supportTreeNodes != null && _supportVertexIndices != null)
-                return TransformLocalPoint(_localVertices[FindSupportVertexIndex(localDirection)]);
+                return _scaledLocalVertices[FindSupportVertexIndex(localDirection)];
 
             int bestIndex = 0;
-            for (int i = 1; i < _localVertices.Length; i++)
+            for (int i = 1; i < _scaledLocalVertices.Length; i++)
             {
                 if (Vector3d.CompareProjection(
-                        _localVertices[i],
-                        _localVertices[bestIndex],
+                        _scaledLocalVertices[i],
+                        _scaledLocalVertices[bestIndex],
                         localDirection) <= 0)
                     continue;
 
                 bestIndex = i;
             }
 
-            return TransformLocalPoint(_localVertices[bestIndex]);
+            return _scaledLocalVertices[bestIndex];
         }
 
         private int FindSupportVertexIndex(Vector3d localDirection)
@@ -480,7 +494,7 @@ namespace Gravitas.Colliders
                 Vector3d upperPoint = GetBoundsSupportPoint(node.Min, node.Max, localDirection);
                 int upperComparison = Vector3d.CompareProjection(
                     upperPoint,
-                    _localVertices[bestIndex],
+                    _scaledLocalVertices[bestIndex],
                     localDirection);
                 if (upperComparison < 0 || (upperComparison == 0 && node.MinVertexIndex >= bestIndex))
                     continue;
@@ -516,10 +530,10 @@ namespace Gravitas.Colliders
             for (int i = 0; i < node.Count; i++)
             {
                 int vertexIndex = _supportVertexIndices![node.Start + i];
-                Vector3d vertex = _localVertices[vertexIndex];
+                Vector3d vertex = _scaledLocalVertices[vertexIndex];
                 int projectionComparison = Vector3d.CompareProjection(
                     vertex,
-                    _localVertices[bestIndex],
+                    _scaledLocalVertices[bestIndex],
                     localDirection);
                 if (projectionComparison < 0 || (projectionComparison == 0 && vertexIndex >= bestIndex))
                     continue;
@@ -538,7 +552,7 @@ namespace Gravitas.Colliders
             Vector3d upperPoint = GetBoundsSupportPoint(node.Min, node.Max, localDirection);
             int upperComparison = Vector3d.CompareProjection(
                 upperPoint,
-                _localVertices[bestIndex],
+                _scaledLocalVertices[bestIndex],
                 localDirection);
             if (upperComparison < 0 || (upperComparison == 0 && node.MinVertexIndex >= bestIndex))
                 return;
@@ -563,15 +577,27 @@ namespace Gravitas.Colliders
             return left.MinVertexIndex < right.MinVertexIndex;
         }
 
-        private int BuildSupportTreeNode(int start, int count)
+        private int BuildSupportTreeNode(
+            Vector3d[] vertices,
+            int[] vertexIndices,
+            SupportTreeNode[] nodes,
+            ref int nodeCount,
+            int start,
+            int count)
         {
-            int nodeIndex = _supportTreeNodeCount;
-            _supportTreeNodeCount++;
+            int nodeIndex = nodeCount++;
 
-            CalculateSupportRangeBounds(start, count, out Vector3d min, out Vector3d max, out int minVertexIndex);
+            CalculateSupportRangeBounds(
+                vertices,
+                vertexIndices,
+                start,
+                count,
+                out Vector3d min,
+                out Vector3d max,
+                out int minVertexIndex);
             if (count <= SupportTreeLeafVertexCount)
             {
-                _supportTreeNodes![nodeIndex] = SupportTreeNode.CreateLeaf(
+                nodes[nodeIndex] = SupportTreeNode.CreateLeaf(
                     nodeIndex,
                     min,
                     max,
@@ -582,17 +608,30 @@ namespace Gravitas.Colliders
             }
 
             int axis = GetDominantAxis(max - min);
+            _supportVertexIndexComparer!.Reset(vertices, axis);
             Array.Sort(
-                _supportVertexIndices!,
+                vertexIndices,
                 start,
                 count,
-                new SupportVertexIndexComparer(_localVertices, axis));
+                _supportVertexIndexComparer);
 
             int leftCount = count / 2;
             int rightCount = count - leftCount;
-            int leftIndex = BuildSupportTreeNode(start, leftCount);
-            int rightIndex = BuildSupportTreeNode(start + leftCount, rightCount);
-            _supportTreeNodes![nodeIndex] = SupportTreeNode.CreateBranch(
+            int leftIndex = BuildSupportTreeNode(
+                vertices,
+                vertexIndices,
+                nodes,
+                ref nodeCount,
+                start,
+                leftCount);
+            int rightIndex = BuildSupportTreeNode(
+                vertices,
+                vertexIndices,
+                nodes,
+                ref nodeCount,
+                start + leftCount,
+                rightCount);
+            nodes[nodeIndex] = SupportTreeNode.CreateBranch(
                 nodeIndex,
                 min,
                 max,
@@ -602,21 +641,23 @@ namespace Gravitas.Colliders
             return nodeIndex;
         }
 
-        private void CalculateSupportRangeBounds(
+        private static void CalculateSupportRangeBounds(
+            Vector3d[] vertices,
+            int[] vertexIndices,
             int start,
             int count,
             out Vector3d min,
             out Vector3d max,
             out int minVertexIndex)
         {
-            int firstIndex = _supportVertexIndices![start];
+            int firstIndex = vertexIndices[start];
             minVertexIndex = firstIndex;
-            min = _localVertices[firstIndex];
+            min = vertices[firstIndex];
             max = min;
             for (int i = 1; i < count; i++)
             {
-                int vertexIndex = _supportVertexIndices[start + i];
-                Vector3d vertex = _localVertices[vertexIndex];
+                int vertexIndex = vertexIndices[start + i];
+                Vector3d vertex = vertices[vertexIndex];
                 min = Vector3d.Min(min, vertex);
                 max = Vector3d.Max(max, vertex);
                 if (vertexIndex < minVertexIndex)
@@ -650,14 +691,26 @@ namespace Gravitas.Colliders
         public Vector3d GetFaceNormalWorld(int index)
         {
             SwiftThrowHelper.ThrowIfArrayIndexInvalid(index, _triangleCount, nameof(index));
-            return Fixed3x3.TransformDirection(_rotationMatrix, _scaledFaceNormals[index]).Normalized;
+            _ = _rotation.TryRotate(
+                _scaledFaceNormals[index],
+                out Vector3d worldNormal);
+            return worldNormal.Normalized;
         }
 
         public void GetTrianglesInWorldBounds(FixedBoundVolume worldBounds, SwiftList<int> result)
         {
             result.FastClear();
-            FixedBoundVolume localBounds = TransformBounds(worldBounds.Min, worldBounds.Max, InverseTransformationMatrix);
-            TriangleBVH.Query(localBounds, result);
+            FixedBoundBox localBounds =
+                FixedBoundBox.FromRelativeRotatedBoundsClippedToDomain(
+                    Vector3d.Zero,
+                    FixedQuaternion.Identity,
+                    worldBounds.Min,
+                    worldBounds.Max,
+                    _position,
+                    _rotation);
+            TriangleBVH.Query(
+                new FixedBoundVolume(localBounds.Min, localBounds.Max),
+                result);
         }
 
         public void GetTrianglesInLocalBounds(FixedBoundVolume localBounds, SwiftList<int> result)
@@ -666,24 +719,101 @@ namespace Gravitas.Colliders
             TriangleBVH.Query(localBounds, result);
         }
 
-        public Vector3d ConvertWorldToLocal(Vector3d worldPoint) =>
-            InverseTransformWorldPoint(worldPoint);
+        /// <summary>
+        /// Attempts to express a world point in the committed scaled-local
+        /// mesh frame without saturating the relative displacement.
+        /// </summary>
+        public bool TryConvertWorldToScaledLocal(
+            Vector3d worldPoint,
+            out Vector3d localPoint) =>
+            new FixedPointAnchor(
+                worldPoint,
+                FixedQuaternion.Identity,
+                Vector3d.Zero)
+            .TryGetLocalPointIn(
+                _position,
+                _rotation,
+                out localPoint);
 
-        public Vector3d ConvertLocalToWorld(Vector3d localPoint) =>
-            TransformLocalPoint(localPoint);
+        /// <summary>
+        /// Expresses a world point in the committed scaled-local mesh frame.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">
+        /// The exact relative displacement lies outside the representable
+        /// coordinate domain.
+        /// </exception>
+        public Vector3d ConvertWorldToScaledLocal(Vector3d worldPoint)
+        {
+            if (TryConvertWorldToScaledLocal(worldPoint, out Vector3d localPoint))
+                return localPoint;
 
-        internal Vector3d ConvertScaledLocalToWorld(Vector3d scaledLocalPoint) =>
-            _position + Fixed3x3.TransformDirection(_rotationMatrix, scaledLocalPoint);
+            throw new InvalidOperationException(
+                "The world point cannot be represented in the mesh's scaled-local frame.");
+        }
 
-        public Vector3d ConvertWorldDirectionToLocal(Vector3d worldDirection) =>
-            Vector3d.Multiply(
-                _scale,
-                Fixed3x3.TransformDirection(_inverseRotationMatrix, worldDirection));
+        /// <summary>
+        /// Attempts to materialize a scaled-local mesh point in world space.
+        /// </summary>
+        public bool TryConvertScaledLocalToWorld(
+            Vector3d scaledLocalPoint,
+            out Vector3d worldPoint) =>
+            CreatePointAnchor(scaledLocalPoint).TryGetPoint(out worldPoint);
 
-        private Vector3d TransformLocalPoint(Vector3d localPoint) =>
-            _position + Fixed3x3.TransformDirection(
-                _rotationMatrix,
-                Vector3d.Multiply(_scale, localPoint));
+        /// <summary>
+        /// Materializes a scaled-local mesh point in world space.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">
+        /// The conceptual world point lies outside the representable
+        /// coordinate domain.
+        /// </exception>
+        public Vector3d ConvertScaledLocalToWorld(Vector3d scaledLocalPoint)
+        {
+            if (TryConvertScaledLocalToWorld(
+                    scaledLocalPoint,
+                    out Vector3d worldPoint))
+            {
+                return worldPoint;
+            }
+
+            throw new InvalidOperationException(
+                "The scaled-local point lies outside the Fixed64 world-coordinate domain.");
+        }
+
+        internal FixedPointAnchor CreatePointAnchor(
+            Vector3d scaledLocalPoint) =>
+            new(
+                _position,
+                _rotation,
+                scaledLocalPoint);
+
+        /// <summary>
+        /// Attempts to express a world-space direction in the committed
+        /// scaled-local mesh frame.
+        /// </summary>
+        public bool TryConvertWorldDirectionToLocal(
+            Vector3d worldDirection,
+            out Vector3d localDirection) =>
+            _rotation.Inverse().TryRotate(
+                worldDirection,
+                out localDirection);
+
+        /// <summary>
+        /// Expresses a world-space direction in the committed scaled-local
+        /// mesh frame.
+        /// </summary>
+        public Vector3d ConvertWorldDirectionToLocal(
+            Vector3d worldDirection)
+        {
+            if (TryConvertWorldDirectionToLocal(
+                    worldDirection,
+                    out Vector3d localDirection))
+            {
+                return localDirection;
+            }
+
+            throw new InvalidOperationException(
+                "The world direction cannot be represented in the mesh's scaled-local frame.");
+        }
 
         private readonly struct EdgeUse
         {
@@ -807,10 +937,10 @@ namespace Gravitas.Colliders
 
         private sealed class SupportVertexIndexComparer : IComparer<int>
         {
-            private readonly Vector3d[] _vertices;
-            private readonly int _axis;
+            private Vector3d[] _vertices = Array.Empty<Vector3d>();
+            private int _axis;
 
-            public SupportVertexIndexComparer(Vector3d[] vertices, int axis)
+            public void Reset(Vector3d[] vertices, int axis)
             {
                 _vertices = vertices;
                 _axis = axis;

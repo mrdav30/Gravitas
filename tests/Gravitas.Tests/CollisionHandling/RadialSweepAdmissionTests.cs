@@ -70,4 +70,39 @@ public sealed class RadialSweepAdmissionTests
         parameter2D.Should().Be(Fixed64.Zero);
         parameter3D.Should().Be(Fixed64.Zero);
     }
+
+    [Fact]
+    public void UnrepresentableEndpointDistanceWithoutExactRoot_ShouldBeRejectedInBothDimensions()
+    {
+        RadialSweepAdmission.TryIntersect(
+                Vector2d.Zero,
+                Vector2d.Zero,
+                Fixed64.One,
+                Vector2d.Right,
+                Fixed64.Zero,
+                Fixed64.Zero,
+                new Vector2d(Fixed64.MinValue, Fixed64.MinValue),
+                new Vector2d(Fixed64.MaxValue, Fixed64.MaxValue),
+                out _)
+            .Should()
+            .BeFalse();
+        RadialSweepAdmission.TryIntersect(
+                Vector3d.Zero,
+                Vector3d.Zero,
+                Fixed64.One,
+                Vector3d.Right,
+                Fixed64.Zero,
+                Fixed64.Zero,
+                new Vector3d(
+                    Fixed64.MinValue,
+                    Fixed64.MinValue,
+                    Fixed64.MinValue),
+                new Vector3d(
+                    Fixed64.MaxValue,
+                    Fixed64.MaxValue,
+                    Fixed64.MaxValue),
+                out _)
+            .Should()
+            .BeFalse();
+    }
 }

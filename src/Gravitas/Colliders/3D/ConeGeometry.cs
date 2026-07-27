@@ -6,7 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
-using FixedMathSharp.Bounds;
+using FixedMathSharp.Geometry;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas.Colliders;
@@ -35,25 +35,5 @@ internal static class ConeGeometry
             baseRadius);
         min = bounds.Min;
         max = bounds.Max;
-    }
-
-    /// <summary>
-    /// Returns the finite-cone support point in a nonzero search direction.
-    /// </summary>
-    public static Vector3d GetFiniteConeSupportPoint(
-        Vector3d apex,
-        Vector3d baseCenter,
-        Vector3d axis,
-        Fixed64 baseRadius,
-        Vector3d direction)
-    {
-        Vector3d radialDirection = Vector3d.GetNormalizedProjectionOnPlane(direction, axis);
-        Vector3d baseSupport = radialDirection != Vector3d.Zero
-            ? baseCenter + radialDirection * baseRadius
-            : baseCenter;
-
-        return Vector3d.CompareProjection(baseSupport, apex, direction) >= 0
-            ? baseSupport
-            : apex;
     }
 }

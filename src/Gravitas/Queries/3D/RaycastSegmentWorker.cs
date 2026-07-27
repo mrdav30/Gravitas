@@ -6,7 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
-using FixedMathSharp.Bounds;
+using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
 using SwiftCollections;
 using SwiftCollections.Query;
@@ -115,8 +115,8 @@ public sealed class RaycastSegmentWorker
         var query = new FixedSegment(_cachedOrigin, _cachedEnd);
         if (!query.TryGetCapsuleIntersectionDistanceInterval(
                 capsuleCollider.Center,
-                capsuleCollider.WorldAxis,
-                capsuleCollider.AxisHalfLength,
+                capsuleCollider.Rotation,
+                capsuleCollider.AxisLength,
                 capsuleCollider.ScaledRadius,
                 Fixed64.Zero,
                 _segmentLength,
@@ -148,8 +148,8 @@ public sealed class RaycastSegmentWorker
         var query = new FixedSegment(_cachedOrigin, _cachedEnd);
         if (!query.TryGetFiniteCylinderIntersectionDistanceInterval(
                 cylinderCollider.Center,
-                cylinderCollider.WorldAxis,
-                cylinderCollider.HalfHeight,
+                cylinderCollider.Rotation,
+                cylinderCollider.Height,
                 cylinderCollider.ScaledRadius,
                 Fixed64.Zero,
                 Fixed64.Zero,
@@ -182,7 +182,7 @@ public sealed class RaycastSegmentWorker
         var query = new FixedSegment(_cachedOrigin, _cachedEnd);
         if (!query.TryGetCenteredFiniteConeIntersectionDistanceInterval(
                 coneCollider.Center,
-                coneCollider.Axis,
+                coneCollider.Rotation,
                 coneCollider.Height,
                 coneCollider.ScaledRadius,
                 _segmentLength,
@@ -212,8 +212,15 @@ public sealed class RaycastSegmentWorker
         if (!_segmentIsValid)
             return false;
 
-        Vector3d localOrigin = meshCollider.Mesh.ConvertWorldToLocal(_cachedOrigin);
-        Vector3d localEnd = meshCollider.Mesh.ConvertWorldToLocal(_cachedEnd);
+        if (!meshCollider.Mesh.TryConvertWorldToScaledLocal(
+                _cachedOrigin,
+                out Vector3d localOrigin)
+            || !meshCollider.Mesh.TryConvertWorldToScaledLocal(
+                _cachedEnd,
+                out Vector3d localEnd))
+        {
+            return false;
+        }
         Vector3d localSegment = localEnd - localOrigin;
         Fixed64 localSegmentLengthSqr = localSegment.MagnitudeSquared;
         Fixed64 localSegmentLength = localSegmentLengthSqr == Fixed64.Zero ? Fixed64.Zero : localSegment.Magnitude;
@@ -294,85 +301,29 @@ public sealed class RaycastSegmentWorker
         if (!_segmentIsValid)
             return false;
 
-        FixedQuaternion inverseRotation = oobox.Rotation.Inverse();
-        Vector3d halfExtents = oobox.ScaledSize * Fixed64.Half;
-        Vector3d min = -halfExtents;
-        Vector3d max = halfExtents;
-        if (!SweepBoundsUtility.TryTransformOrientedBoxSegmentToLocal(
-                _cachedOrigin,
-                _cachedEnd,
-                oobox.Center,
-                oobox.Rotation,
-                inverseRotation,
-                out Vector3d transformedOrigin,
-                out Vector3d transformedEnd))
-        {
+        var ray = new FixedRay(_cachedOrigin, _cachedSegment);
+        if (!oobox.OrientedBox.TryGetRayIntersectionInterval(
+                ray,
+                Fixed64.One,
+                out Fixed64 entry,
+                out Fixed64 exit))
             return false;
-        }
-
-        Vector3d localOrigin = SnapLocalPointToBounds(
-            transformedOrigin,
-            min,
-            max);
-        Vector3d localEnd = SnapLocalPointToBounds(
-            transformedEnd,
-            min,
-            max);
-
-        if (!Vector3d.TrySubtract(localEnd, localOrigin, out Vector3d localSegment)
-            || !Vector3d.TryGetMagnitude(localSegment, out Fixed64 localLength))
-        {
-            return false;
-        }
-
-        if (localLength == Fixed64.Zero)
-        {
-            if (localOrigin.X < min.X || localOrigin.X > max.X
-                || localOrigin.Y < min.Y || localOrigin.Y > max.Y
-                || localOrigin.Z < min.Z || localOrigin.Z > max.Z)
-            {
-                return false;
-            }
-
-            AddLocalIntersectionPoint(oobox.Center, oobox.Rotation, localOrigin, ref outputIntersectionPoints);
-            return true;
-        }
-
-        Vector3d localDirection = localSegment / localLength;
-        if (!SweepBoundsUtility.TryClipSegment(
-            localOrigin,
-            localDirection,
-            localLength,
-            min,
-            max,
-            out Fixed64 entry,
-            out Fixed64 exit))
-        {
-            return false;
-        }
 
         if (_calculateIntersections)
         {
-            AddLocalIntersectionPoint(oobox.Center, oobox.Rotation, localOrigin + localDirection * entry, ref outputIntersectionPoints);
+            // The interval is clipped to this segment, so both parameters are
+            // convex combinations of its representable endpoints.
+            _ = ray.TryGetPoint(entry, out Vector3d entryPoint);
+            Vector3d exitPoint = default;
             if (exit != entry)
-                AddLocalIntersectionPoint(oobox.Center, oobox.Rotation, localOrigin + localDirection * exit, ref outputIntersectionPoints);
+                _ = ray.TryGetPoint(exit, out exitPoint);
+
+            AddIntersectionPoint(entryPoint, ref outputIntersectionPoints);
+            if (exit != entry)
+                AddIntersectionPoint(exitPoint, ref outputIntersectionPoints);
         }
 
         return true;
-    }
-
-    private static Vector3d SnapLocalPointToBounds(Vector3d point, Vector3d min, Vector3d max) =>
-        new(
-            SnapLocalCoordinateToBounds(point.X, min.X, max.X),
-            SnapLocalCoordinateToBounds(point.Y, min.Y, max.Y),
-            SnapLocalCoordinateToBounds(point.Z, min.Z, max.Z));
-
-    private static Fixed64 SnapLocalCoordinateToBounds(Fixed64 value, Fixed64 min, Fixed64 max)
-    {
-        if ((value - min).Abs() <= Fixed64.Epsilon)
-            return min;
-
-        return (value - max).Abs() <= Fixed64.Epsilon ? max : value;
     }
 
     private bool TryAddLocalTriangleIntersection(
@@ -397,7 +348,12 @@ public sealed class RaycastSegmentWorker
                 return false;
             }
 
-            AddIntersectionPoint(mesh.ConvertLocalToWorld(localOrigin), ref outputIntersectionPoints);
+            // localOrigin was obtained from this representable world endpoint.
+            _ = mesh.TryConvertScaledLocalToWorld(
+                localOrigin,
+                out Vector3d worldOrigin);
+
+            AddIntersectionPoint(worldOrigin, ref outputIntersectionPoints);
             return true;
         }
 
@@ -410,13 +366,21 @@ public sealed class RaycastSegmentWorker
             bool found = false;
             if (triangle.ContainsProjection(localOrigin))
             {
-                AddIntersectionPoint(mesh.ConvertLocalToWorld(localOrigin), ref outputIntersectionPoints);
+                _ = mesh.TryConvertScaledLocalToWorld(
+                    localOrigin,
+                    out Vector3d worldOrigin);
+
+                AddIntersectionPoint(worldOrigin, ref outputIntersectionPoints);
                 found = true;
             }
 
             if (triangle.ContainsProjection(localEnd))
             {
-                AddIntersectionPoint(mesh.ConvertLocalToWorld(localEnd), ref outputIntersectionPoints);
+                _ = mesh.TryConvertScaledLocalToWorld(
+                    localEnd,
+                    out Vector3d worldEnd);
+
+                AddIntersectionPoint(worldEnd, ref outputIntersectionPoints);
                 found = true;
             }
 
@@ -431,7 +395,13 @@ public sealed class RaycastSegmentWorker
         if (!triangle.ContainsProjection(localPoint))
             return false;
 
-        AddIntersectionPoint(mesh.ConvertLocalToWorld(localPoint), ref outputIntersectionPoints);
+        // A point on the local segment maps to the same convex combination of
+        // the already-representable world endpoints.
+        _ = mesh.TryConvertScaledLocalToWorld(
+            localPoint,
+            out Vector3d worldPoint);
+
+        AddIntersectionPoint(worldPoint, ref outputIntersectionPoints);
         return true;
     }
 
@@ -454,16 +424,6 @@ public sealed class RaycastSegmentWorker
         Vector3d min = Vector3d.Min(origin, end);
         Vector3d max = Vector3d.Max(origin, end);
         return new FixedBoundVolume(min, max);
-    }
-
-    private void AddLocalIntersectionPoint(
-        Vector3d center,
-        FixedQuaternion rotation,
-        Vector3d localPoint,
-        ref SwiftList<Vector3d> outputIntersectionPoints)
-    {
-        Vector3d worldPoint = center + rotation * localPoint;
-        AddIntersectionPoint(worldPoint, ref outputIntersectionPoints);
     }
 
     private bool CheckPointInsideSphere(

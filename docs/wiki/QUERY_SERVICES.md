@@ -74,6 +74,19 @@ used for queries, compound cuboid parts, grounding, or CCD.
 `Query2D` and `Query3D` stay dimension-local and never report cross-dimensional
 hits. Mixed queries are always explicit.
 
+## Hit Witnesses
+
+`Physics3DHit`, `Physics2DHit`, and `PhysicsMixedHit` retain surface witnesses
+as rigid-frame anchors with separate local feature terms. Classification,
+distance, ordering, diagnostics, and deterministic replay do not require an
+absolute point to be representable.
+The familiar `Point`, `Point3D`, and `Point2D` properties remain convenient for
+ordinary coordinates, but throw `InvalidOperationException` when the
+conceptual witness lies outside the `Fixed64` scalar range. Use `TryGetPoint`,
+`TryGetPoint3D`, or `TryGetPoint2D` when a query may approach a scalar face.
+Returning `false` from a witness materialization method does not invalidate the
+query hit.
+
 ## Common Usage
 
 ```csharp
@@ -105,6 +118,11 @@ int mixedHitCount = context.QueryMixed.SweepSphereAgainst2DAll(
     mask,
     mixedHits,
     excludedCollider: null);
+
+if (hit && rayHit.TryGetPoint(out Vector3d worldPoint))
+{
+    PublishWorldPoint(worldPoint);
+}
 ```
 
 All-hit methods clear the caller-provided list, write sorted hits, and return

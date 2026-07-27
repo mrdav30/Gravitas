@@ -184,7 +184,7 @@ public sealed class SolidBody2DAngularDynamicsTests
     }
 
     [Fact]
-    public void ShapeMutation_ShouldRefreshMomentUsedByAngularImpulse()
+    public void ShapeMutation_ShouldPublishMassPropertiesAtomicallyOnSimulate()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext(frameRate: 4);
         var collider = new LSCircleCollider2D(Fixed64.One);
@@ -192,11 +192,17 @@ public sealed class SolidBody2DAngularDynamicsTests
 
         body.AddAngularImpulse(Fixed64.One);
         collider.Radius = (Fixed64)2;
-        body.AddAngularImpulse((Fixed64)4);
 
+        body.MomentOfInertia.Should().Be(Fixed64.One);
+        body.EffectiveInverseMomentOfInertia.Should().Be(Fixed64.One);
+        body.AddAngularImpulse(Fixed64.One);
+        body.AngularVelocity.Should().Be((Fixed64)2);
+
+        collider.Simulate();
         body.MomentOfInertia.Should().Be((Fixed64)4);
         body.EffectiveInverseMomentOfInertia.Should().Be(Fixed64.FromFraction(1, 4));
-        body.AngularVelocity.Should().Be((Fixed64)2);
+        body.AddAngularImpulse((Fixed64)4);
+        body.AngularVelocity.Should().Be((Fixed64)3);
     }
 
     [Fact]

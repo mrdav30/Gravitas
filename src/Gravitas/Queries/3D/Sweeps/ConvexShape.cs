@@ -6,9 +6,11 @@
 //=======================================================================
 
 using FixedMathSharp;
+using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using SwiftCollections;
+using System;
 
 namespace Gravitas.Queries;
 
@@ -18,7 +20,8 @@ internal readonly struct ConvexShape
     {
         Collider,
         Triangle,
-        CircleSlab
+        CircleSlab,
+        Sphere
     }
 
     private readonly ConvexShapeKind _kind;
@@ -68,9 +71,14 @@ internal readonly struct ConvexShape
         _halfHeight = Fixed64.Zero;
     }
 
-    private ConvexShape(Vector3d center, Fixed64 radius, Fixed64 halfHeight, Vector3d offset)
+    private ConvexShape(
+        ConvexShapeKind kind,
+        Vector3d center,
+        Fixed64 radius,
+        Fixed64 halfHeight,
+        Vector3d offset)
     {
-        _kind = ConvexShapeKind.CircleSlab;
+        _kind = kind;
         _collider = null;
         _triangleOwner = null;
         _triangleIndex = -1;
@@ -83,33 +91,57 @@ internal readonly struct ConvexShape
         _halfHeight = halfHeight;
     }
 
-    public Vector3d Center => _kind switch
-    {
-        ConvexShapeKind.Triangle => new Vector3d(
-            FixedMath.Average(_triangleA.X, _triangleB.X, _triangleC.X),
-            FixedMath.Average(_triangleA.Y, _triangleB.Y, _triangleC.Y),
-            FixedMath.Average(_triangleA.Z, _triangleB.Z, _triangleC.Z)),
-        ConvexShapeKind.CircleSlab => _center + _offset,
-        _ => _collider!.Center + _offset
-    };
-
-    public bool IsTriangle => _kind == ConvexShapeKind.Triangle;
-
     public bool ContainsCenter =>
         _kind != ConvexShapeKind.Collider || _collider is not LSMeshCollider;
 
+    public FixedPointAnchor GetCenterAnchor()
+    {
+        if (_kind == ConvexShapeKind.Triangle)
+        {
+            return new FixedPointAnchor(
+                _triangleOwner!.Mesh.Origin,
+                _triangleOwner.Mesh.Rotation,
+                new Vector3d(
+                    FixedMath.Average(
+                        _triangleA.X,
+                        _triangleB.X,
+                        _triangleC.X),
+                    FixedMath.Average(
+                        _triangleA.Y,
+                        _triangleB.Y,
+                        _triangleC.Y),
+                    FixedMath.Average(
+                        _triangleA.Z,
+                        _triangleB.Z,
+                        _triangleC.Z)));
+        }
+
+        return new FixedPointAnchor(
+            _kind is ConvexShapeKind.CircleSlab or ConvexShapeKind.Sphere
+                ? _center
+                : _collider!.Center,
+            FixedQuaternion.Identity,
+            Vector3d.Zero,
+            _offset);
+    }
+
     public static ConvexShape CreateCircleSlab(Vector3d center, Fixed64 radius, Fixed64 halfHeight) =>
-        new(center, radius, halfHeight, Vector3d.Zero);
+        new(ConvexShapeKind.CircleSlab, center, radius, halfHeight, Vector3d.Zero);
+
+    public static ConvexShape CreateSphere(Vector3d center, Fixed64 radius) =>
+        new(ConvexShapeKind.Sphere, center, radius, Fixed64.Zero, Vector3d.Zero);
 
     public void GetSourceBounds(out Vector3d min, out Vector3d max) =>
         GetBounds(out min, out max);
 
     public void GetBounds(out Vector3d min, out Vector3d max)
     {
-        if (_kind == ConvexShapeKind.CircleSlab)
+        if (_kind is ConvexShapeKind.CircleSlab or ConvexShapeKind.Sphere)
         {
             Vector3d center = _center + _offset;
-            Vector3d extents = new(_radius, _halfHeight, _radius);
+            Vector3d extents = _kind == ConvexShapeKind.Sphere
+                ? Vector3d.One * _radius
+                : new Vector3d(_radius, _halfHeight, _radius);
             min = center - extents;
             max = center + extents;
             return;
@@ -117,14 +149,22 @@ internal readonly struct ConvexShape
 
         if (_kind == ConvexShapeKind.Triangle)
         {
-            min = new Vector3d(
-                FixedMath.Min(_triangleA.X, FixedMath.Min(_triangleB.X, _triangleC.X)),
-                FixedMath.Min(_triangleA.Y, FixedMath.Min(_triangleB.Y, _triangleC.Y)),
-                FixedMath.Min(_triangleA.Z, FixedMath.Min(_triangleB.Z, _triangleC.Z)));
-            max = new Vector3d(
-                FixedMath.Max(_triangleA.X, FixedMath.Max(_triangleB.X, _triangleC.X)),
-                FixedMath.Max(_triangleA.Y, FixedMath.Max(_triangleB.Y, _triangleC.Y)),
-                FixedMath.Max(_triangleA.Z, FixedMath.Max(_triangleB.Z, _triangleC.Z)));
+            Vector3d localMin = Vector3d.Min(
+                _triangleA,
+                Vector3d.Min(_triangleB, _triangleC));
+            Vector3d localMax = Vector3d.Max(
+                _triangleA,
+                Vector3d.Max(_triangleB, _triangleC));
+            FixedBoundBox bounds =
+                FixedBoundBox.FromRelativeRotatedBoundsClippedToDomain(
+                    _triangleOwner!.Mesh.Origin,
+                    _triangleOwner.Mesh.Rotation,
+                    localMin,
+                    localMax,
+                    Vector3d.Zero,
+                    FixedQuaternion.Identity);
+            min = bounds.Min;
+            max = bounds.Max;
             return;
         }
 
@@ -132,20 +172,167 @@ internal readonly struct ConvexShape
         max = _collider.Bounds.Max + _offset;
     }
 
+    public bool CanTranslateCenter(Vector3d displacement)
+    {
+        Vector3d canonicalCenter =
+            _kind is ConvexShapeKind.CircleSlab or ConvexShapeKind.Sphere
+                ? _center
+                : _collider!.Center;
+        return Vector3d.TryAdd(
+                canonicalCenter,
+                _offset,
+                out Vector3d currentCenter)
+            && Vector3d.TryAdd(
+                currentCenter,
+                displacement,
+                out _);
+    }
+
+    public bool TryGetBoundsRelativeTo(
+        Vector3d referenceOrigin,
+        FixedQuaternion referenceRotation,
+        out Vector3d min,
+        out Vector3d max)
+    {
+        FixedBoundBox relativeBounds;
+        if (_kind is ConvexShapeKind.CircleSlab or ConvexShapeKind.Sphere)
+        {
+            Vector3d extents = _kind == ConvexShapeKind.Sphere
+                ? Vector3d.One * _radius
+                : new Vector3d(_radius, _halfHeight, _radius);
+            relativeBounds =
+                FixedBoundBox.FromRelativeRotatedBoundsClippedToDomain(
+                    _center,
+                    FixedQuaternion.Identity,
+                    -extents,
+                    extents,
+                    referenceOrigin,
+                    referenceRotation);
+        }
+        else
+        {
+            relativeBounds = ColliderCanonicalBounds.GetRelativeBounds(
+                _collider!,
+                referenceOrigin,
+                referenceRotation);
+        }
+
+        if (_offset == Vector3d.Zero)
+        {
+            min = relativeBounds.Min;
+            max = relativeBounds.Max;
+            return true;
+        }
+
+        // Source offsets come from a chord whose magnitude was admitted by
+        // Prepare, so a unit rotation cannot move them outside Fixed64.
+        _ = referenceRotation.Inverse().TryRotate(
+            _offset,
+            out Vector3d localOffset);
+        if (!Vector3d.TryAdd(relativeBounds.Min, localOffset, out min)
+            || !Vector3d.TryAdd(relativeBounds.Max, localOffset, out max))
+        {
+            min = default;
+            max = default;
+            return false;
+        }
+
+        return true;
+    }
+
     public ConvexShape WithSourceOffset(Vector3d additionalOffset) =>
-        _kind == ConvexShapeKind.CircleSlab
-            ? new ConvexShape(_center, _radius, _halfHeight, _offset + additionalOffset)
+        _kind is ConvexShapeKind.CircleSlab or ConvexShapeKind.Sphere
+            ? new ConvexShape(
+                _kind,
+                _center,
+                _radius,
+                _halfHeight,
+                _offset + additionalOffset)
             : new ConvexShape(_collider!, _offset + additionalOffset);
 
-    public Vector3d Support(Vector3d direction)
+    public FixedPointAnchor GetSupportAnchor(Vector3d direction)
     {
         if (_kind == ConvexShapeKind.Triangle)
-            return SupportTriangle(direction);
+        {
+            return new FixedPointAnchor(
+                _triangleOwner!.Mesh.Origin,
+                _triangleOwner.Mesh.Rotation,
+                GetTriangleSupportLocalPoint(direction));
+        }
 
-        if (_kind == ConvexShapeKind.CircleSlab)
-            return SupportCircleSlab(direction);
+        if (_kind is ConvexShapeKind.CircleSlab or ConvexShapeKind.Sphere)
+        {
+            if (_kind == ConvexShapeKind.Sphere)
+            {
+                return FixedSegment.GetCenteredCapsuleSupportAnchor(
+                        _center,
+                        FixedQuaternion.Identity,
+                        Fixed64.Zero,
+                        _radius,
+                        direction)
+                    .WithLocalTranslation(_offset);
+            }
 
-        return ConvexColliderSupport.Support(_collider!, direction) + _offset;
+            return new FixedPointAnchor(
+                _center,
+                FixedQuaternion.Identity,
+                GetCircleSlabSupportLocalPoint(direction),
+                _offset);
+        }
+
+        return ConvexColliderSupport.GetSupportAnchor(
+            _collider!,
+            direction,
+            _offset);
+    }
+
+    public FixedPointAnchor GetFallbackSurfaceAnchor(Vector3d direction)
+    {
+        if (_kind == ConvexShapeKind.Collider
+            && _collider is LSCuboidCollider cuboid)
+        {
+            Vector3d localDirection =
+                cuboid.Rotation.Inverse().Rotate(direction);
+            Vector3d absoluteDirection = Vector3d.Abs(localDirection);
+            Vector3d halfExtents = cuboid.OrientedBox.HalfExtents;
+            Vector3d localPoint;
+            if (absoluteDirection.X >= absoluteDirection.Y
+                && absoluteDirection.X >= absoluteDirection.Z)
+            {
+                localPoint = new Vector3d(
+                    localDirection.X >= Fixed64.Zero
+                        ? halfExtents.X
+                        : -halfExtents.X,
+                    Fixed64.Zero,
+                    Fixed64.Zero);
+            }
+            else if (absoluteDirection.Y >= absoluteDirection.Z)
+            {
+                localPoint = new Vector3d(
+                    Fixed64.Zero,
+                    localDirection.Y >= Fixed64.Zero
+                        ? halfExtents.Y
+                        : -halfExtents.Y,
+                    Fixed64.Zero);
+            }
+            else
+            {
+                localPoint = new Vector3d(
+                    Fixed64.Zero,
+                    Fixed64.Zero,
+                    localDirection.Z >= Fixed64.Zero
+                        ? halfExtents.Z
+                        : -halfExtents.Z);
+            }
+
+            return new FixedPointAnchor(
+                cuboid.Center,
+                cuboid.Rotation,
+                localPoint,
+                _offset);
+        }
+
+        return GetSupportAnchor(direction);
     }
 
     public bool TryGetClosestPointOnSurface(Vector3d point, out Vector3d closest)
@@ -168,6 +355,13 @@ internal readonly struct ConvexShape
         }
 
         Vector3d center = _center + _offset;
+        if (_kind == ConvexShapeKind.Sphere)
+        {
+            Vector3d direction = point - center;
+            closest = center + GetSphereSupportLocalPoint(direction);
+            return true;
+        }
+
         Vector3d local = point - center;
         Vector3d radial = new(local.X, Fixed64.Zero, local.Z);
         Fixed64 radialDistance = radial.Magnitude;
@@ -196,10 +390,16 @@ internal readonly struct ConvexShape
 
     public bool TryGetPlanarSurfaceNormal(Vector3d point, out Vector3d normal)
     {
-        SwiftThrowHelper.ThrowIfTrue(
-            _kind == ConvexShapeKind.CircleSlab,
-            nameof(ConvexShape),
-            "Circle slabs are sweep sources and cannot be target shapes.");
+        if (_kind == ConvexShapeKind.CircleSlab)
+        {
+            throw new InvalidOperationException(
+                "Circle slabs are sweep sources and cannot be target shapes.");
+        }
+        if (_kind == ConvexShapeKind.Sphere)
+        {
+            throw new InvalidOperationException(
+                "Sphere query sources cannot be target shapes.");
+        }
 
         if (_kind == ConvexShapeKind.Triangle)
         {
@@ -210,7 +410,7 @@ internal readonly struct ConvexShape
         return _collider!.TryGetPlanarSurfaceNormal(point, out normal);
     }
 
-    private Vector3d SupportCircleSlab(Vector3d direction)
+    private Vector3d GetCircleSlabSupportLocalPoint(Vector3d direction)
     {
         Vector3d radial = new(direction.X, Fixed64.Zero, direction.Z);
         Fixed64 radialMagnitude = radial.Magnitude;
@@ -218,16 +418,26 @@ internal readonly struct ConvexShape
             ? radial / radialMagnitude * _radius
             : Vector3d.Right * _radius;
         Fixed64 y = direction.Y >= Fixed64.Zero ? _halfHeight : -_halfHeight;
-        return _center + _offset + new Vector3d(radialSupport.X, y, radialSupport.Z);
+        return new Vector3d(radialSupport.X, y, radialSupport.Z);
     }
 
-    private Vector3d SupportTriangle(Vector3d direction)
+    private Vector3d GetSphereSupportLocalPoint(Vector3d direction)
     {
+        Vector3d normal = direction.IsZero
+            ? Vector3d.Right
+            : direction.Normalized;
+        return normal * _radius;
+    }
+
+    private Vector3d GetTriangleSupportLocalPoint(Vector3d direction)
+    {
+        Vector3d localDirection =
+            _triangleOwner!.Mesh.Rotation.Inverse().Rotate(direction);
         Vector3d best = _triangleA;
-        if (Vector3d.CompareProjection(_triangleB, best, direction) > 0)
+        if (Vector3d.CompareProjection(_triangleB, best, localDirection) > 0)
             best = _triangleB;
 
-        if (Vector3d.CompareProjection(_triangleC, best, direction) > 0)
+        if (Vector3d.CompareProjection(_triangleC, best, localDirection) > 0)
             best = _triangleC;
 
         return best;

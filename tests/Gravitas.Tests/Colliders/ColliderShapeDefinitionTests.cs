@@ -1,5 +1,5 @@
 using FixedMathSharp;
-using FixedMathSharp.Bounds;
+using FixedMathSharp.Geometry;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Materials;
@@ -50,7 +50,7 @@ public sealed class ColliderShapeDefinitionTests
 
         definition.Kind.Should().Be(ColliderShapeDefinitionKind.Cuboid);
         definition.Size.Should().Be(size);
-        body.Collider.ScaledSize.Should().Be(size);
+        body.Collider.OrientedBox.HalfExtents.Should().Be(size / 2);
         body.Collider.BoundsMin.Should().Be(new Vector3d(-Fixed64.One, Fixed64.FromFraction(-3, 2), (Fixed64)(-2)));
         body.Collider.BoundsMax.Should().Be(new Vector3d(Fixed64.One, Fixed64.FromFraction(3, 2), (Fixed64)2));
     }
@@ -71,8 +71,20 @@ public sealed class ColliderShapeDefinitionTests
         definition.Height.Should().Be((Fixed64)2);
         definition.Size.Should().Be(new Vector3d(Fixed64.One, (Fixed64)2, Fixed64.One));
         body.Collider.Shape.Should().Be(ColliderType.Cone);
-        body.Collider.BaseCenter.Should().Be(new Vector3d(Fixed64.Zero, -Fixed64.One, Fixed64.Zero));
-        body.Collider.Apex.Should().Be(new Vector3d(Fixed64.Zero, Fixed64.One, Fixed64.Zero));
+        FixedSegment.TryGetCenteredAxisEndpoint(
+            body.Collider.Center,
+            body.Collider.WorldAxis,
+            body.Collider.Height,
+            positive: false,
+            out Vector3d baseCenter).Should().BeTrue();
+        FixedSegment.TryGetCenteredAxisEndpoint(
+            body.Collider.Center,
+            body.Collider.WorldAxis,
+            body.Collider.Height,
+            positive: true,
+            out Vector3d apex).Should().BeTrue();
+        baseCenter.Should().Be(new Vector3d(Fixed64.Zero, -Fixed64.One, Fixed64.Zero));
+        apex.Should().Be(new Vector3d(Fixed64.Zero, Fixed64.One, Fixed64.Zero));
         body.Body.LocalCenterOfMassOffset.Should().Be(new Vector3d(Fixed64.Zero, -Fixed64.Half, Fixed64.Zero));
     }
 
@@ -103,7 +115,7 @@ public sealed class ColliderShapeDefinitionTests
         body.Initialize(Vector3d.Zero, collapsedRotation);
 
         body.Rotation.Should().Be(collapsedRotation.Normalized);
-        collider.Axis.Should().Be(Vector3d.Down);
+        collider.WorldAxis.Should().Be(Vector3d.Down);
         collider.BoundsMin.Should().Be(new Vector3d(-Fixed64.Half, -Fixed64.One, -Fixed64.Half));
         collider.BoundsMax.Should().Be(new Vector3d(Fixed64.Half, Fixed64.One, Fixed64.Half));
     }
@@ -116,6 +128,22 @@ public sealed class ColliderShapeDefinitionTests
 
         zeroRadius.Should().Throw<ArgumentException>().WithParameterName("radius");
         zeroHeight.Should().Throw<ArgumentException>().WithParameterName("height");
+    }
+
+    [Fact]
+    public void CapsuleDefinition_ShouldRejectHeightBelowExactDiameter()
+    {
+        Fixed64 oversizedRadius = Fixed64.FromRaw(
+            (Fixed64.MaxValue.m_rawValue / 2L) + 1L);
+
+        Action create = () =>
+            ColliderShapeDefinition.Capsule(
+                oversizedRadius,
+                Fixed64.MaxValue);
+
+        create.Should()
+            .Throw<ArgumentException>()
+            .WithParameterName("height");
     }
 
     [Theory]
@@ -333,7 +361,7 @@ public sealed class ColliderShapeDefinitionTests
     }
 
     [Fact]
-    public void CylinderRuntimeShape_ShouldRejectAHeightThatQuantizesToZeroHalfHeight()
+    public void CylinderRuntimeShape_ShouldPreserveAFullHeightWithNoRepresentableHalf()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         var transform = new FixedTransform(
@@ -343,62 +371,39 @@ public sealed class ColliderShapeDefinitionTests
         var agent = new TestMatterAgent(scenario.Context, transform);
         var body = new SolidBody(agent, new LSCylinderCollider());
 
-        Action initialize = () => body.Initialize(Vector3d.Zero, FixedQuaternion.Identity);
+        body.Initialize(Vector3d.Zero, FixedQuaternion.Identity);
 
-        initialize.Should().Throw<ArgumentException>()
-            .WithParameterName("Size")
-            .WithMessage("*positive half-height*");
-        scenario.Context.Physics.BodyCount.Should().Be(0);
-        scenario.Context.Physics.ColliderCount.Should().Be(0);
+        var cylinder = (LSCylinderCollider)body.Collider;
+        cylinder.Height.Should().Be(Fixed64.FromRaw(1));
+        cylinder.Bounds.Min.Y.Should().Be(Fixed64.FromRaw(-1));
+        cylinder.Bounds.Max.Y.Should().Be(Fixed64.FromRaw(1));
+        scenario.Context.Physics.BodyCount.Should().Be(1);
+        scenario.Context.Physics.ColliderCount.Should().Be(1);
     }
 
     [Fact]
-    public void CylinderRuntimeShape_ShouldValidateChangedScaleBeforeMutatingCommittedState()
+    public void CylinderRuntimeShape_ShouldCommitAnOddRawFullHeightWithoutEndpointAuthority()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSCylinderCollider> source = scenario.CreateCylinder(Vector3d.Zero);
         LSCylinderCollider collider = source.Collider;
         FixedTransform transform = source.Body.Agent.Transform;
-        FixedBoundBox bounds = collider.Bounds;
-        Fixed64 area = collider.Area;
-        Fixed64 height = collider.Height;
-        Fixed64 halfHeight = collider.HalfHeight;
-        Vector3d bottom = collider.CapCenterBottom;
-        Vector3d top = collider.CapCenterTop;
-        Vector3d segmentStart = collider.LineSegmentStart;
-        Vector3d segmentEnd = collider.LineSegmentEnd;
-        Vector3d axis = collider.WorldAxis;
         uint version = collider.RuntimeShapeVersion;
-        Fixed3x3 inverseInertia = source.Body.InverseInertiaTensor;
-        bool wasPartitioned = collider.IsPartitioned;
-        int partitionCoordinateCount = collider.PartitionCoordinates?.Count ?? 0;
 
         transform.LocalScale = new Vector3d(Fixed64.One, Fixed64.FromRaw(1), Fixed64.One);
-        Action rebuild = collider.Simulate;
+        collider.Simulate();
 
-        rebuild.Should().Throw<ArgumentException>()
-            .WithParameterName("Size")
-            .WithMessage("*positive half-height*");
-        collider.Bounds.Should().Be(bounds);
-        collider.Area.Should().Be(area);
-        collider.Height.Should().Be(height);
-        collider.HalfHeight.Should().Be(halfHeight);
-        collider.CapCenterBottom.Should().Be(bottom);
-        collider.CapCenterTop.Should().Be(top);
-        collider.LineSegmentStart.Should().Be(segmentStart);
-        collider.LineSegmentEnd.Should().Be(segmentEnd);
-        collider.WorldAxis.Should().Be(axis);
-        collider.RuntimeShapeVersion.Should().Be(version);
-        source.Body.InverseInertiaTensor.Should().Be(inverseInertia);
-        collider.IsPartitioned.Should().Be(wasPartitioned);
-        (collider.PartitionCoordinates?.Count ?? 0).Should().Be(partitionCoordinateCount);
+        collider.Height.Should().Be(Fixed64.FromRaw(1));
+        collider.Bounds.Min.Y.Should().Be(Fixed64.FromRaw(-1));
+        collider.Bounds.Max.Y.Should().Be(Fixed64.FromRaw(1));
+        collider.RuntimeShapeVersion.Should().Be(version + 1);
+        collider.IsPartitioned.Should().BeTrue();
 
         transform.LocalScale = new Vector3d(Fixed64.One, (Fixed64)2, Fixed64.One);
         collider.Simulate();
 
-        collider.RuntimeShapeVersion.Should().Be(version + 1);
-        collider.HalfHeight.Should().Be(halfHeight * (Fixed64)2);
-        collider.Bounds.Should().NotBe(bounds);
+        collider.RuntimeShapeVersion.Should().Be(version + 2);
+        collider.Height.Should().Be((Fixed64)2);
     }
 
     [Fact]
@@ -430,13 +435,71 @@ public sealed class ColliderShapeDefinitionTests
     }
 
     [Fact]
+    public void CuboidCanonicalHalfExtents_ShouldSurviveWhenDerivedPropertiesExceedTheScalarDomain()
+    {
+        Fixed64.TryMultiplyDivide(
+            Fixed64.MaxValue,
+            Fixed64.One,
+            Fixed64.Two,
+            out Fixed64 expectedHalfExtent).Should().BeTrue();
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        var collider = new LSCuboidCollider
+        {
+            Size = new Vector3d(
+                Fixed64.MaxValue,
+                Fixed64.MaxValue,
+                Fixed64.MaxValue)
+        };
+        var ownerSnapshot = new ColliderShapeSnapshot(
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            Vector3d.One,
+            Vector3d.One,
+            Vector3d.Zero,
+            Vector3d.One,
+            Fixed64.Half);
+        collider.PrepareCompoundPart(
+            ownerSnapshot,
+            FixedQuaternion.Identity,
+            Vector3d.One,
+            context);
+        collider.PublishCompoundPart(
+            FixedQuaternion.Identity,
+            Vector3d.One,
+            context);
+
+        collider.OrientedBox.HalfExtents.Should().Be(
+            new Vector3d(expectedHalfExtent, expectedHalfExtent, expectedHalfExtent));
+        collider.Area.Should().Be(Fixed64.MaxValue);
+        collider.CalculateMassPropertyWeight().Should().Be(Fixed64.MaxValue);
+        collider.GetFrontalArea(Vector3d.Right).Should().Be(Fixed64.MaxValue);
+
+        Fixed3x3 inertia = collider.CalculateInertiaTensor(
+            Fixed64.One,
+            Vector3d.Zero);
+        inertia.M11.Should().Be(Fixed64.MaxValue);
+        inertia.M22.Should().Be(Fixed64.MaxValue);
+        inertia.M33.Should().Be(Fixed64.MaxValue);
+    }
+
+    [Fact]
     public void CapsuleNormal_ShouldUseDeterministicFallbacksAtCapCentersAndAxis()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSCapsuleCollider> capsule = scenario.CreateCapsule(Vector3d.Zero);
 
-        Vector3d topCenter = capsule.Collider.Center + capsule.Collider.Rotation * capsule.Collider.HemisphereCenterTop;
-        Vector3d bottomCenter = capsule.Collider.Center + capsule.Collider.Rotation * capsule.Collider.HemisphereCenterBottom;
+        FixedSegment.TryGetCenteredAxisEndpoint(
+            capsule.Collider.Center,
+            capsule.Collider.WorldAxis,
+            capsule.Collider.AxisLength,
+            positive: true,
+            out Vector3d topCenter).Should().BeTrue();
+        FixedSegment.TryGetCenteredAxisEndpoint(
+            capsule.Collider.Center,
+            capsule.Collider.WorldAxis,
+            capsule.Collider.AxisLength,
+            positive: false,
+            out Vector3d bottomCenter).Should().BeTrue();
 
         capsule.Collider.GetNormalAtPoint(topCenter).Should().Be(Vector3d.Right);
         capsule.Collider.GetNormalAtPoint(bottomCenter).Should().Be(Vector3d.Right);

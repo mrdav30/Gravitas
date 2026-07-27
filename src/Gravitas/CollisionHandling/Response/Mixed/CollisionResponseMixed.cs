@@ -37,16 +37,31 @@ public static class CollisionResponseMixed
         SolidBody? body3D = pair.Collider3D.Body;
         SolidBody2D? body2D = pair.Collider2D.Body;
         Vector3d normal = ResolveNormal(pair, contact);
+        bool hasPlanarResponseCoupling = normal.ToVector2d() != Vector2d.Zero;
 
         Fixed64 inverseMass3D = body3D?.EffectiveInverseMass ?? Fixed64.Zero;
         Fixed64 inverseMass2D = body2D?.EffectiveInverseMass ?? Fixed64.Zero;
         Fixed64 correctionInverseMass = GetConstrainedInverseMass(body3D, normal)
             + GetConstrainedPlanarInverseMass(body2D, normal);
 
-        Vector3d relative3D = contact.Point3D - (body3D?.WorldCenterOfMass ?? pair.Collider3D.Center);
-        Vector2d relative2D = body2D == null
-            ? Vector2d.Zero
-            : contact.Point2D.ToVector2d() - body2D.WorldCenterOfMass;
+        Vector2d relative2D = default;
+        bool resolved3D = body3D != null
+            ? body3D.TryGetOffsetFromCenterOfMass(contact.Anchor3D, out Vector3d relative3D)
+            : contact.Anchor3D.TryGetOffsetFrom(pair.Collider3D.Center, out relative3D);
+        if (!resolved3D
+            || (body2D != null
+                && !contact.TryGetPlanarOffset2DFrom(
+                    body2D.Position,
+                    body2D.Rotation,
+                    body2D.LocalCenterOfMassOffset,
+                    out relative2D)))
+        {
+            GravitasLogger.Channel.Error(
+                $"Mixed contact for colliders {pair.Collider3DId}/{pair.Collider2DId} cannot be rebased onto its response centers.");
+            return false;
+        }
+        if (body2D == null)
+            relative2D = Vector2d.Zero;
         Fixed64 inverseMoment2D = body2D?.EffectiveInverseMomentOfInertia ?? Fixed64.Zero;
 
         if (applyPositionCorrection && correctionInverseMass > Fixed64.Zero)
@@ -81,10 +96,15 @@ public static class CollisionResponseMixed
             inverseMoment2D,
             material3D,
             material2D,
-            normalImpulse);
+            normalImpulse,
+            hasPlanarResponseCoupling);
 
         return appliedImpulse;
     }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static bool HasPlanarResponseCoupling(CollisionPairMixed pair, MixedContact contact) =>
+        ResolveNormal(pair, contact).ToVector2d() != Vector2d.Zero;
 
     private static void ApplyPositionCorrection(
         SolidBody? body3D,
@@ -185,7 +205,8 @@ public static class CollisionResponseMixed
         Fixed64 inverseMoment2D,
         PhysicsMaterial material3D,
         PhysicsMaterial material2D,
-        Fixed64 normalImpulse)
+        Fixed64 normalImpulse,
+        bool applyTo2D)
     {
         if (normalImpulse <= Fixed64.Zero)
             return false;
@@ -201,9 +222,12 @@ public static class CollisionResponseMixed
 
         Vector3d tangent = tangentVelocity.Normalized;
         Fixed64 denominator = GetConstrainedInverseMass(body3D, tangent)
-            + GetConstrainedPlanarInverseMass(body2D, tangent)
-            + ComputeAngularDenominator(body3D, relative3D, tangent)
-            + ComputePlanarAngularDenominator(relative2D, tangent.ToVector2d(), inverseMoment2D);
+            + ComputeAngularDenominator(body3D, relative3D, tangent);
+        if (applyTo2D)
+        {
+            denominator += GetConstrainedPlanarInverseMass(body2D, tangent)
+                + ComputePlanarAngularDenominator(relative2D, tangent.ToVector2d(), inverseMoment2D);
+        }
         if (denominator <= Fixed64.Epsilon)
             return false;
 
@@ -218,7 +242,17 @@ public static class CollisionResponseMixed
         if (impulseScalar == Fixed64.Zero)
             return false;
 
-        ApplyImpulse(body3D, body2D, tangent, relative3D, relative2D, inverseMass3D, inverseMass2D, inverseMoment2D, impulseScalar);
+        ApplyImpulse(
+            body3D,
+            body2D,
+            tangent,
+            relative3D,
+            relative2D,
+            inverseMass3D,
+            inverseMass2D,
+            inverseMoment2D,
+            impulseScalar,
+            applyTo2D);
         return true;
     }
 
@@ -231,7 +265,8 @@ public static class CollisionResponseMixed
         Fixed64 inverseMass3D,
         Fixed64 inverseMass2D,
         Fixed64 inverseMoment2D,
-        Fixed64 impulseScalar)
+        Fixed64 impulseScalar,
+        bool applyTo2D)
     {
         if (body3D != null)
         {
@@ -242,7 +277,7 @@ public static class CollisionResponseMixed
             body3D.ApplyCollisionAngularVelocityDelta(angularVelocityDelta);
         }
 
-        if (body2D == null)
+        if (!applyTo2D || body2D == null)
             return;
 
         Vector2d planarAxis = axis.ToVector2d();
@@ -347,10 +382,15 @@ public static class CollisionResponseMixed
         if (centerDirection.MagnitudeSquared > Fixed64.Epsilon)
             return centerDirection.Normalized;
 
-        Vector3d pointDirection = contact.Point2D - contact.Point3D;
-        return pointDirection.MagnitudeSquared > Fixed64.Epsilon
-            ? pointDirection.Normalized
-            : Vector3d.Zero;
+        if (contact.TryGetPoint2D(out Vector3d point2D)
+            && contact.TryGetPoint3D(out Vector3d point3D))
+        {
+            Vector3d pointDirection = point2D - point3D;
+            if (pointDirection.MagnitudeSquared > Fixed64.Epsilon)
+                return pointDirection.Normalized;
+        }
+
+        return Vector3d.Zero;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

@@ -15,6 +15,20 @@ short guide, read [Query Services](QUERY_SERVICES.md).
 Mixed query hits expose this through `PhysicsMixedHit.ReducerKind`. 2D and 3D
 public query paths expose exact public hits.
 
+## Query Witnesses
+
+`Physics2DHit`, `Physics3DHit`, and `PhysicsMixedHit` retain authoritative
+surface witnesses as local-frame contact anchors. An anchor keeps its
+representable origin and rotation separate from two additive local feature
+terms, so collision classification does not require a rotated offset or
+absolute point to fit in one `Fixed64` coordinate.
+
+The `Point`, `Point3D`, and `Point2D` convenience properties return a world
+point when the final coordinate is representable and throw otherwise. Use the
+matching `TryGetPoint*` method when a query can reach a scalar face. A failed
+materialization does not turn an accepted hit into a miss, fabricate a clipped
+point, or change deterministic hit ordering.
+
 ## Public Query Surface
 
 ### 3D
@@ -240,7 +254,7 @@ overlap.
 `Raycast` returns the closest segment hit from `start` to `end`. Zero-length
 segments miss. Starting inside a collider returns a zero-distance hit. Capsule
 targets use one exact finite-segment interval rather than independent side and
-endpoint tests, so authored center/axis/half-length geometry and the nearest
+endpoint tests, so authored center/axis/full-length geometry and the nearest
 outer feature remain authoritative even at extreme scale.
 
 `SweepCircle` is the 2D swept movement/query path used by 2D CCD. It is not a

@@ -122,11 +122,53 @@ public sealed class ContactManifold : IEnumerable<ManifoldContact>
     }
 
     /// <summary>
+    /// Replaces the manifold with one rigid-frame contact.
+    /// </summary>
+    public void SetContact(
+        ContactAnchor anchorA,
+        ContactAnchor anchorB,
+        Fixed64 depth,
+        Vector3d normal,
+        bool depthIsClamped = false)
+    {
+        _count = 0;
+        AddContact(anchorA, anchorB, depth, normal, depthIsClamped);
+    }
+
+    /// <summary>
     /// Adds a contact, keeping the deepest four contacts and exposing them by stable contact identity.
     /// </summary>
     public void AddContact(Vector3d pointA, Vector3d pointB, Fixed64 depth, Vector3d normal)
     {
-        AddContactCore(pointA, pointB, depth, normal, hasMaterialOverride: false, default, default);
+        AddContact(
+            ContactAnchor.FromWorldPoint(pointA),
+            ContactAnchor.FromWorldPoint(pointB),
+            depth,
+            normal);
+    }
+
+    /// <summary>
+    /// Adds a rigid-frame contact, keeping the deepest four contacts and
+    /// exposing them by stable anchor identity.
+    /// </summary>
+    public void AddContact(
+        ContactAnchor anchorA,
+        ContactAnchor anchorB,
+        Fixed64 depth,
+        Vector3d normal,
+        bool depthIsClamped = false)
+    {
+        AddContactCore(
+            anchorA,
+            anchorB,
+            depth,
+            normal,
+            hasMaterialOverride: false,
+            default,
+            default,
+            depthIsClamped,
+            featureNamespaceA: 0,
+            featureNamespaceB: 0);
     }
 
     internal void AddContact(
@@ -135,30 +177,75 @@ public sealed class ContactManifold : IEnumerable<ManifoldContact>
         Fixed64 depth,
         Vector3d normal,
         PhysicsMaterial materialA,
-        PhysicsMaterial materialB)
+        PhysicsMaterial materialB,
+        bool depthIsClamped = false)
     {
-        AddContactCore(pointA, pointB, depth, normal, hasMaterialOverride: true, materialA, materialB);
+        AddContactCore(
+            ContactAnchor.FromWorldPoint(pointA),
+            ContactAnchor.FromWorldPoint(pointB),
+            depth,
+            normal,
+            hasMaterialOverride: true,
+            materialA,
+            materialB,
+            depthIsClamped,
+            featureNamespaceA: 0,
+            featureNamespaceB: 0);
+    }
+
+    internal void AddContact(
+        ContactAnchor anchorA,
+        ContactAnchor anchorB,
+        Fixed64 depth,
+        Vector3d normal,
+        PhysicsMaterial materialA,
+        PhysicsMaterial materialB,
+        bool depthIsClamped = false,
+        int featureNamespaceA = 0,
+        int featureNamespaceB = 0)
+    {
+        AddContactCore(
+            anchorA,
+            anchorB,
+            depth,
+            normal,
+            hasMaterialOverride: true,
+            materialA,
+            materialB,
+            depthIsClamped,
+            featureNamespaceA,
+            featureNamespaceB);
     }
 
     private void AddContactCore(
-        Vector3d pointA,
-        Vector3d pointB,
+        ContactAnchor anchorA,
+        ContactAnchor anchorB,
         Fixed64 depth,
         Vector3d normal,
         bool hasMaterialOverride,
         PhysicsMaterial materialA,
-        PhysicsMaterial materialB)
+        PhysicsMaterial materialB,
+        bool depthIsClamped,
+        int featureNamespaceA,
+        int featureNamespaceB)
     {
-        ulong contactId = CreateContactId(pointA, pointB);
+        ulong contactId = CreateContactId(
+            anchorA,
+            featureNamespaceA,
+            anchorB,
+            featureNamespaceB);
         var contact = new ManifoldContact(
             contactId,
-            pointA,
-            pointB,
+            anchorA,
+            anchorB,
             depth,
             normal,
             hasMaterialOverride,
             materialA,
-            materialB);
+            materialB,
+            depthIsClamped,
+            featureNamespaceA,
+            featureNamespaceB);
 
         for (int i = 0; i < _count; i++)
         {
@@ -166,7 +253,7 @@ public sealed class ContactManifold : IEnumerable<ManifoldContact>
             if (existing.ContactId != contactId)
                 continue;
 
-            if (contact.Depth > existing.Depth)
+            if (IsDeeper(contact, existing))
                 SetContactUnchecked(i, contact);
             SortContactsById();
             return;
@@ -209,14 +296,26 @@ public sealed class ContactManifold : IEnumerable<ManifoldContact>
             }
         }
 
-        if (candidate.Depth > shallowest.Depth)
+        if (IsDeeper(candidate, shallowest))
             return replaceIndex;
 
-        if (candidate.Depth == shallowest.Depth && candidate.ContactId < shallowest.ContactId)
+        if (HasEqualDepth(candidate, shallowest) && candidate.ContactId < shallowest.ContactId)
             return replaceIndex;
 
         return -1;
     }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool IsDeeper(ManifoldContact candidate, ManifoldContact existing) =>
+        candidate.Depth > existing.Depth
+        || candidate.Depth == existing.Depth
+        && candidate.DepthIsClamped
+        && !existing.DepthIsClamped;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool HasEqualDepth(ManifoldContact left, ManifoldContact right) =>
+        left.Depth == right.Depth
+        && left.DepthIsClamped == right.DepthIsClamped;
 
     private void SortContactsById()
     {
@@ -264,32 +363,41 @@ public sealed class ContactManifold : IEnumerable<ManifoldContact>
         }
     }
 
-    private static ulong CreateContactId(Vector3d pointA, Vector3d pointB)
+    private static ulong CreateContactId(
+        ContactAnchor anchorA,
+        int featureNamespaceA,
+        ContactAnchor anchorB,
+        int featureNamespaceB)
     {
-        if (CompareVector(pointB, pointA) < 0)
-            (pointA, pointB) = (pointB, pointA);
+        if (CompareLocalFeature(
+                featureNamespaceB,
+                anchorB,
+                featureNamespaceA,
+                anchorA) < 0)
+        {
+            (anchorA, anchorB) = (anchorB, anchorA);
+            (featureNamespaceA, featureNamespaceB) =
+                (featureNamespaceB, featureNamespaceA);
+        }
 
         ulong hash = 14695981039346656037UL;
-        Mix(ref hash, pointA.X.m_rawValue);
-        Mix(ref hash, pointA.Y.m_rawValue);
-        Mix(ref hash, pointA.Z.m_rawValue);
-        Mix(ref hash, pointB.X.m_rawValue);
-        Mix(ref hash, pointB.Y.m_rawValue);
-        Mix(ref hash, pointB.Z.m_rawValue);
+        Mix(ref hash, featureNamespaceA);
+        MixLocalFeature(ref hash, anchorA);
+        Mix(ref hash, featureNamespaceB);
+        MixLocalFeature(ref hash, anchorB);
         return hash;
     }
 
-    private static int CompareVector(Vector3d left, Vector3d right)
+    private static int CompareLocalFeature(
+        int leftNamespace,
+        ContactAnchor left,
+        int rightNamespace,
+        ContactAnchor right)
     {
-        int compare = left.X.m_rawValue.CompareTo(right.X.m_rawValue);
-        if (compare != 0)
-            return compare;
-
-        compare = left.Y.m_rawValue.CompareTo(right.Y.m_rawValue);
-        if (compare != 0)
-            return compare;
-
-        return left.Z.m_rawValue.CompareTo(right.Z.m_rawValue);
+        int comparison = leftNamespace.CompareTo(rightNamespace);
+        return comparison != 0
+            ? comparison
+            : left.CompareLocalFeature(right);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -300,6 +408,15 @@ public sealed class ContactManifold : IEnumerable<ManifoldContact>
             hash ^= (ulong)value;
             hash *= 1099511628211UL;
         }
+    }
+
+    private static void MixLocalFeature(
+        ref ulong hash,
+        ContactAnchor anchor)
+    {
+        Mix(
+            ref hash,
+            unchecked((long)anchor.GetLocalFeatureHash64()));
     }
 
     public struct Enumerator : IEnumerator<ManifoldContact>
