@@ -27,14 +27,29 @@ instead of burying it in notes.
   - Resolve release-blocking issues in dependency order: `FixedMathSharp`,
     `SwiftCollections`, `GridForge`, then Gravitas. Use the `develop` worktrees
     under `F:/gamedevrepos` and temporary local project references throughout
-    the consumer chain while validating lower-stack changes. Release each lower
-    library sequentially, restore package references as releases become
-    available, then remove all remaining local links and revalidate Gravitas
-    before resolving its library-local issues. Treat local links as temporary
-    validation scaffolding, not release dependency changes.
+    the consumer chain while validating lower-stack changes. Retain those links
+    until the complete cross-stack issue queue and final ownership pass are
+    closed, then release each library sequentially, restore package references
+    as releases become available, and revalidate every downstream consumer.
+    Treat local links as temporary validation scaffolding, not release
+    dependency changes.
 - [`Benchmark Signal Hardening`](benchmark-signal-hardening-backlog.md)
   - Reproduce and close confirmed release-relevant signals alongside the owning
     library change. Do not broaden this into speculative optimization work.
+- **Final FixedMathSharp / Gravitas Ownership Boundary Pass**
+  - After the remaining cross-stack work is complete, audit the exact
+    point-anchor and lever-response additions before releasing FixedMathSharp.
+    Keep reusable exact geometry, lever algebra, fused arithmetic, and internal
+    wide representations in FixedMathSharp. Move rigid-body solver policy such
+    as restitution, unilateral impulse accumulation, inverse-mass/inertia
+    response operands, and solver response results into Gravitas.
+  - If Gravitas still requires the internal wide implementation, use a tightly
+    contained `InternalsVisibleTo("Gravitas")` boundary rather than publishing
+    raw wide arithmetic or adding another integration package. Direct wide
+    access must remain isolated behind one Gravitas-owned response component so
+    FixedMathSharp internals do not become an informal API throughout the
+    engine. Re-run both libraries' full coverage, package, Lean, allocation,
+    and downstream validation gates after the split.
 
 ## Recently Completed
 
@@ -270,13 +285,17 @@ host-facing need appears.
 1. Keep the benchmark backlog and issue tracker as intake buckets; promote new
    measured risks into dated plans only when they are broader than a focused
    patch.
-2. Release FixedMathSharp from the reviewed foundation-hardening tree.
-3. Update SwiftCollections to the released FixedMathSharp package, run its full
+2. Resolve the remaining cross-stack issues, including Gravitas-owned
+   lifecycle, admission, geometry, and numeric-range blocks, while retaining
+   the temporary local project references.
+3. Complete the final FixedMathSharp / Gravitas ownership boundary pass and
+   revalidate the locally linked stack.
+4. Release FixedMathSharp from the reviewed hardening tree.
+5. Update SwiftCollections to the released FixedMathSharp package, run its full
    validation, and release SwiftCollections before advancing the chain.
-4. Update GridForge to the released lower-stack packages, validate its resolved
+6. Update GridForge to the released lower-stack packages, validate its resolved
    runtime-identity hardening and downstream consumers, and release GridForge.
-5. Update Gravitas to the released package versions, remove every temporary
-   local link, and rerun `Release`, `ReleaseLean`, coverage, replay, and
-   relevant benchmark gates against package-only dependencies.
-6. Resolve the remaining Gravitas-owned issues in cohesive lifecycle, admission,
-   geometry, and numeric-range blocks before first public release.
+7. Update Gravitas to the released package versions, remove every temporary
+   local link, and rerun `Release`, `ReleaseLean`, coverage, replay, allocation,
+   and relevant benchmark gates against package-only dependencies before its
+   first public release.
