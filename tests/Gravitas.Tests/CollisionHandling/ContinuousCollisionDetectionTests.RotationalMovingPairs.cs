@@ -145,25 +145,6 @@ public sealed partial class ContinuousCollisionDetectionTests
     }
 
     [Fact]
-    public void ContinuousMode_KinematicPureRotation_WithUnrepresentableTargetContactArm_ShouldRejectResponseAtomically()
-    {
-        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
-        ScenarioBody<LSCuboidCollider> blade = CreateKinematicRotationalCcdBlade(scenario);
-        ScenarioBody<LSSphereCollider> target = CreateDynamicRotationalTarget3D(scenario);
-        blade.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
-        target.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
-        target.Body.LocalCenterOfMassOffset = Vector3d.Right * Fixed64.MaxValue;
-        target.Body.Sleep();
-
-        blade.Body.Agent.Transform.LocalRotation = RotationalMovingPairQuarterTurn3D;
-        scenario.Context.LateSimulate();
-
-        target.Body.IsSleeping.Should().BeTrue();
-        target.Body.LinearVelocity.Should().Be(Vector3d.Zero);
-        target.Body.AngularVelocity.Should().Be(Vector3d.Zero);
-    }
-
-    [Fact]
     public void ContinuousMode_DynamicPureRotation_ShouldRespondToMovingKinematic3DTarget()
     {
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();

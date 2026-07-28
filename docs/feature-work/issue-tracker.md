@@ -29,17 +29,17 @@ records follow with their original discovery context.
 - Treat local links as unstaged validation scaffolding. Do not publish or
   release with them in place.
 - FixedMathSharp foundation hardening is complete. The current locally linked
-  geometry and arithmetic extensions pass 2,575 Release tests at
-  44,047/44,047 lines, 8,422/8,422 branches, and 3,312/3,312 ReportGenerator
-  methods. ReleaseLean passes 2,554 tests. Retain the local link while the
+  geometry and arithmetic extensions pass 2,601 Release tests at
+  45,552/45,552 lines, 8,554/8,554 branches, and 3,396/3,396 ReportGenerator
+  methods. ReleaseLean passes 2,580 tests. Retain the local link while the
   remaining Gravitas queue is hardened.
 - SwiftCollections has no library-specific active issue at this checkpoint; its
   place in the sequence is a full downstream compatibility and release gate.
 - GridForge's runtime-identity defect is resolved. Keep the lower stack locally
   linked while the remaining Gravitas queue is hardened so another downstream
   discovery does not force a partial release cycle.
-- Gravitas's current Release run passes 3,669 tests at 37,548/37,548 lines,
-  11,865/11,865 branches, and 4,246/4,246 methods. ReleaseLean passes 3,614
+- Gravitas's current Release run passes 3,713 tests at 38,695/38,695 lines,
+  12,069/12,069 branches, and 4,310/4,310 methods. ReleaseLean passes 3,658
   tests. Canonical-geometry correctness, replay, allocation, coverage, and
   documentation gates are closed; the measured exact-OBB throughput signal
   remains in the benchmark backlog.
@@ -52,12 +52,14 @@ records follow with their original discovery context.
 1. **Gravitas:**
    [True Unrepresentable Contact Lever Arms Can Drop Physical Response](#true-unrepresentable-contact-lever-arms-can-drop-physical-response).
 2. **Gravitas:**
-   [SolidBody Point Transforms Can Saturate Before Their Final World Or Local Coordinate](#solidbody-point-transforms-can-saturate-before-their-final-world-or-local-coordinate).
+   [Extreme Friction Accumulation And Cone Clamping Are Not Full-Domain](#extreme-friction-accumulation-and-cone-clamping-are-not-full-domain).
 3. **Gravitas:**
+   [SolidBody Point Transforms Can Saturate Before Their Final World Or Local Coordinate](#solidbody-point-transforms-can-saturate-before-their-final-world-or-local-coordinate).
+4. **Gravitas:**
    [3D Overlap-Circle Classification Depends On A Full-3D Surface Witness](#3d-overlap-circle-classification-depends-on-a-full-3d-surface-witness).
-4. **FixedMathSharp / Gravitas:**
-   [Radial Segment Parameters Can Collapse Spatially Distinct Query Hits](#radial-segment-parameters-can-collapse-spatially-distinct-query-hits).
 5. **FixedMathSharp / Gravitas:**
+   [Radial Segment Parameters Can Collapse Spatially Distinct Query Hits](#radial-segment-parameters-can-collapse-spatially-distinct-query-hits).
+6. **FixedMathSharp / Gravitas:**
    [Mesh Triangle-Triangle SAT Can Saturate Before Axis Classification](#mesh-triangle-triangle-sat-can-saturate-before-axis-classification).
 
 ### True Unrepresentable Contact Lever Arms Can Drop Physical Response
@@ -123,6 +125,39 @@ most apparent overflows cancel once the complete relative expression is
 evaluated. Cover mirrored scalar faces, primitive and nested-compound weight
 ratios, compound weighted-COM cancellation, 2D/3D/mixed parity, rotational CCD,
 stable replay/diagnostics, and warmed zero-allocation behavior.
+
+**Phase 2 progress (2026-07-28):** FixedMathSharp now owns an allocation-free
+semantic 3D normal-response operation that carries point velocity, effective
+mass, shared impulse, cache completion, and final body deltas through bounded
+wide arithmetic. Gravitas 3D discrete response and rotational CCD consume it
+only when compact levers or intermediate scalar projections are insufficient.
+Unrepresentable diagnostic/cache projections no longer discard physical
+response; a truly unrepresentable final velocity delta still rejects the pair
+atomically. Pure 2D, mixed response, compound semantic mass points/weights, and
+the far-circle mixed-query boundary remain in later phases of the active plan.
+
+### Extreme Friction Accumulation And Cone Clamping Are Not Full-Domain
+
+**Discovered:** 2026-07-28  
+**Source:** exact 3D contact-lever response review  
+**Affected area:** 3D contact friction; 2D and mixed response parity
+
+The 3D response solver now carries cached and newly solved tangent directions
+through each body's final linear and angular delta before atomically mutating
+either body. The scalar friction solve still uses ordinary saturating
+`Fixed64` arithmetic for point-velocity construction, tangent projection,
+angular effective mass, cached-plus-delta accumulation, cache removal,
+friction-limit multiplication, squared two-axis magnitude, delta subtraction,
+and final cone scaling. Extreme representable inputs can therefore clamp,
+negate, or saturate before the final friction result is known, changing the
+direction or magnitude of an otherwise representable tangential response.
+
+Define the minimum fused scalar/vector operations needed to evaluate and clamp
+the complete tangent solve and two-axis Coulomb friction disk before narrowing.
+Apply the same contract to pure 2D and mixed response where equivalent
+arithmetic exists. Cover static and dynamic limits, cached impulse
+cancellation and removal, `Fixed64.MinValue`, mirrored extremes, true final
+overflow, atomic rejection, deterministic replay, and warmed zero allocation.
 
 ### SolidBody Point Transforms Can Saturate Before Their Final World Or Local Coordinate
 

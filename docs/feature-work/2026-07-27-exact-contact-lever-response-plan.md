@@ -13,8 +13,8 @@ domain, without saturation, lost torque, or query-local workarounds.
 coordinate ratio once. Those types expose only the vector, cross, quadratic,
 and fused-scale operations required by consumers. Common representable
 Gravitas contacts will retain their compact vector path; only true
-scalar-domain overflow will retain the larger exact lever. Raw wide integers
-will remain internal.
+scalar-domain overflow will reconstruct the larger exact lever from the
+manifold's semantic anchors. Raw wide integers will remain internal.
 
 **Tech Stack:** C# 11, Q32.32 `Fixed64`, FixedMathSharp fixed-width wide
 arithmetic, xUnit v3, BenchmarkDotNet, Gravitas 2D/3D/mixed solvers and CCD.
@@ -25,7 +25,8 @@ arithmetic, xUnit v3, BenchmarkDotNet, Gravitas 2D/3D/mixed solvers and CCD.
   remove angular response.
 - Keep FixedMathSharp engine agnostic and expose no raw wide-number types.
 - Preserve the compact representable lever path. Exact fallback work must be
-  allocation-free and entered only when materialization fails.
+  allocation-free and entered only when lever materialization or the complete
+  compact-expression proof fails.
 - Round once, half to even, at each final public scalar or vector result.
 - A truly unrepresentable final velocity update fails atomically and
   diagnostically; it does not partially mutate a body.
@@ -102,20 +103,34 @@ arithmetic, xUnit v3, BenchmarkDotNet, Gravitas 2D/3D/mixed solvers and CCD.
 ### Phase 2: Gravitas 3D Response And Rotational CCD
 
 **Files:**
-- Modify: `src/Gravitas/CollisionHandling/Response/CollisionResponse.cs`
-- Modify: `src/Gravitas/CollisionHandling/Response/ContactNormalImpulse3D.cs`
-- Modify: `src/Gravitas/CollisionHandling/CCD/RotationalCcdContactSolver.cs`
+- Modify: `F:/gamedevrepos/FixedMathSharp/src/FixedMathSharp/Geometry/Primitives/FixedLever.cs`
+- Modify: `F:/gamedevrepos/FixedMathSharp/src/FixedMathSharp/Geometry/Wide/WideOrientedBox.PointAnchorResponse.cs`
+- Modify: `src/Gravitas/CollisionHandling/Response/3D/CollisionResponse.cs`
+- Modify: `src/Gravitas/CollisionHandling/Response/3D/ContactNormalImpulse3D.cs`
+- Create: `src/Gravitas/CollisionHandling/Response/3D/ExactContactLever3D.cs`
+- Modify: `src/Gravitas/CollisionHandling/Contacts/3D/ContactWarmStartCache.cs`
+- Modify: `src/Gravitas/CollisionHandling/Pairs/3D/CollisionPair.cs`
+- Modify: `src/Gravitas/Core/3D/SolidBody.ContinuousCollision.Rotational.Response.cs`
 - Modify: matching 3D response and CCD tests and benchmarks
 
-- [ ] Keep materialized `Vector3d` levers as the common solver path and retain
+- [x] Keep materialized `Vector3d` levers as the common solver path and retain
   semantic anchors only for overflow fallback.
-- [ ] Route point velocity, angular effective mass, and angular updates through
-  the exact anchor operations when a lever cannot materialize.
-- [ ] Preserve linear and angular response, warm-start state, friction,
+- [x] Route point velocity, angular effective mass, and angular updates through
+  exact anchor operations when a lever cannot materialize or the compact
+  expression cannot be proven representable.
+- [x] Preserve linear and angular response, warm-start state, friction,
   restitution, support/grounding, and deterministic contact ordering.
-- [ ] Reject only a truly unrepresentable final state, atomically and with one
+- [x] Reject only a truly unrepresentable final state, atomically and with one
   stable diagnostic.
-- [ ] Cover discrete response, rotational CCD, replay, mirrored scalar faces,
+- [x] Discard an unrepresentable stale warm start and cold-solve the contact
+  instead of permanently stranding an otherwise representable response.
+- [x] Fuse exact relative point-velocity projection so individually
+  unrepresentable linear/angular terms may cancel before the one final scalar
+  conversion.
+- [x] Keep exact point velocity, effective mass, shared impulse, and cache
+  completion wide until each final body delta; scalar impulse and velocity
+  projections are optional diagnostics, not response admission gates.
+- [x] Cover discrete response, rotational CCD, replay, mirrored scalar faces,
   and warmed zero-allocation behavior; pause for review.
 
 ### Phase 3: 2D And Mixed Response Parity
@@ -176,7 +191,10 @@ arithmetic, xUnit v3, BenchmarkDotNet, Gravitas 2D/3D/mixed solvers and CCD.
 - [x] Root-cause audit and first-class semantic design approved.
 - [x] Phase 1 complete and paused for review: semantic lever APIs, exact
   arithmetic, tests, benchmarks, coverage, and independent review are closed.
-- [ ] Phases 2-5 pending.
+- [x] Phase 2 complete and paused for review: 3D discrete response and
+  rotational CCD preserve full-domain lever behavior through a compact
+  descriptor and no-inline exact fallback.
+- [ ] Phases 3-5 pending.
 
 ## Evidence To Date
 
@@ -187,13 +205,13 @@ arithmetic, xUnit v3, BenchmarkDotNet, Gravitas 2D/3D/mixed solvers and CCD.
   `8,422/8,422` branches, and `3,312/3,312` methods.
 - Gravitas enters this work at `37,548/37,548` lines,
   `11,865/11,865` branches, and `4,246/4,246` methods.
-- FixedMathSharp focused semantic-lever contracts pass `8/8`; the complete
-  Release test project passes `2,583/2,583`.
+- FixedMathSharp focused semantic-response contracts pass `11/11`; the complete
+  Release test project passes `2,601/2,601`.
 - FixedMathSharp `Release` and `ReleaseLean` build both `net8.0` and
   `netstandard2.1` with zero warnings or errors. `ReleaseLean` tests pass
-  `2,562/2,562`; Chronicler adapter tests pass `8/8` in both configurations.
-- Final coverage is `44,509/44,509` lines, `8,434/8,434` branches, and
-  `3,346/3,346` methods.
+  `2,580/2,580`.
+- Final coverage is `45,552/45,552` lines, `8,554/8,554` branches, and
+  `3,396/3,396` fully covered methods.
 - Short-run medians are `33.28 ns` for compact cross projection, `711.14 ns`
   for the equivalent exact representable projection, `1.876 us` to create a
   full-domain lever, `869.19 ns` for full-domain cross projection, `1.490 us`
@@ -203,3 +221,37 @@ arithmetic, xUnit v3, BenchmarkDotNet, Gravitas 2D/3D/mixed solvers and CCD.
 - Independent review found no critical or important findings. Its width review
   replaced an initial arbitrary 26-word accumulator with the existing signed
   832-bit representation and removed the now-unneeded generic span-ratio path.
+- Gravitas exact-response regressions cover mirrored scalar faces, warm start,
+  restitution, dynamic friction, frozen axes, final-overflow diagnostics,
+  atomic rejection, stale-cache cold fallback, deterministic pair priority,
+  rotational CCD, different exact-lever denominators, wide shared impulses,
+  zero-rounded impulse projections, and replay.
+- FixedMathSharp's semantic normal-response operation retains signed
+  fixed-width ratios through all four final velocity deltas. An
+  unrepresentable diagnostic projection or completed warm-start cache no
+  longer discards an otherwise representable physical response.
+- Compact response arithmetic is retained only when conservative raw-magnitude
+  bounds prove the complete chained expression representable; otherwise the
+  same operation uses checked full-domain FixedMathSharp primitives.
+- Gravitas Release coverage is `38,695/38,695` lines,
+  `12,069/12,069` branches, and `4,310/4,310` fully covered methods; the
+  complete Release test project passes `3,713/3,713`.
+- Gravitas `Release` and `ReleaseLean` build both `net8.0` and
+  `netstandard2.1` with zero warnings or errors; `ReleaseLean` tests pass
+  `3,658/3,658`.
+- Collision-response short-run benchmarks retain zero managed allocation.
+  The stable 16-pair cells are `9.5-21.6%` slower than the pre-Phase-2 compact
+  baseline after optimization; that honest throughput signal is retained in
+  the benchmark backlog rather than weakening atomic/full-domain behavior.
+- Rotational moving-pair CCD reports zero managed allocation at 1, 8, and 32
+  pairs; pure 3D medians are `626.9 us`, `4.980 ms`, and `21.680 ms`.
+- Independent review drove closure of stale exact warm-start recovery, paired
+  current-state preflight, checked impulse composition, immutable
+  pre-correction contact geometry, fused relative-point-velocity cancellation,
+  different-denominator projection parity, and duplicate compact friction
+  evaluation.
+- Final semantic-kernel review found one public contract gap: response normals
+  were assumed unit length but only checked for nonzero magnitude.
+  FixedMathSharp now rejects non-normalized normals and documents the matching
+  signed mobility-projected axes. The reviewer found no remaining material
+  Phase 2 issue.

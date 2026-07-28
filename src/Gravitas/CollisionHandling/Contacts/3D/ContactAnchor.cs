@@ -175,6 +175,13 @@ public readonly struct ContactAnchor
         out Vector3d offset) =>
         _point.TryGetOffsetFrom(other._point, out offset);
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal FixedLever GetLeverFrom(in ContactAnchor other)
+    {
+        _ = _point.TryGetLeverFrom(other._point, out FixedLever lever);
+        return lever;
+    }
+
     /// <summary>
     /// Attempts to express the same conceptual point relative to another
     /// representable origin.

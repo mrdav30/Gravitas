@@ -473,6 +473,12 @@ public partial class SolidBody : IRecordable
         return ProjectAngularMotion(_inverseInertiaTensor * torqueAxis);
     }
 
+    internal Fixed3x3 GetConstrainedInverseInertiaTensor() =>
+        new(
+            ApplyConstrainedInverseInertia(Vector3d.Right),
+            ApplyConstrainedInverseInertia(Vector3d.Up),
+            ApplyConstrainedInverseInertia(Vector3d.Forward));
+
     private Fixed64 _gravityScale = Fixed64.One;
 
     /// <summary>

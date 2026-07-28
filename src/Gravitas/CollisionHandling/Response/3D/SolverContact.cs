@@ -10,17 +10,41 @@ using Gravitas.Materials;
 
 namespace Gravitas.CollisionHandling;
 
+internal readonly struct ContactLever3D
+{
+    private ContactLever3D(Vector3d vector, bool isExact)
+    {
+        Vector = vector;
+        IsExact = isExact;
+    }
+
+    internal bool IsExact { get; }
+
+    internal Vector3d Vector { get; }
+
+    internal static ContactLever3D Create(
+        in ContactAnchor point,
+        in ContactAnchor origin)
+    {
+        if (point.TryGetOffsetFrom(origin, out Vector3d vector))
+            return new ContactLever3D(vector, isExact: false);
+
+        return new ContactLever3D(default, isExact: true);
+    }
+}
+
 /// <summary>
 /// Solver-ready 3D contact data, including the deterministic tangent frame and cached impulses.
 /// </summary>
 internal readonly struct SolverContact
 {
     public SolverContact(
+        int manifoldIndex,
         ulong contactId,
         ResponseBody bodyA,
         ResponseBody bodyB,
-        Vector3d relativeA,
-        Vector3d relativeB,
+        ContactLever3D relativeA,
+        ContactLever3D relativeB,
         Fixed64 depth,
         Vector3d normal,
         PhysicsMaterial materialA,
@@ -29,6 +53,7 @@ internal readonly struct SolverContact
         Fixed64 cachedTangentImpulse,
         Fixed64 cachedSecondaryTangentImpulse)
     {
+        ManifoldIndex = manifoldIndex;
         ContactId = contactId;
         A = bodyA;
         B = bodyB;
@@ -49,15 +74,17 @@ internal readonly struct SolverContact
         CachedSecondaryTangentImpulse = cachedSecondaryTangentImpulse;
     }
 
+    public int ManifoldIndex { get; }
+
     public ulong ContactId { get; }
 
     public ResponseBody A { get; }
 
     public ResponseBody B { get; }
 
-    public Vector3d RelativeA { get; }
+    public ContactLever3D RelativeA { get; }
 
-    public Vector3d RelativeB { get; }
+    public ContactLever3D RelativeB { get; }
 
     public Fixed64 Depth { get; }
 

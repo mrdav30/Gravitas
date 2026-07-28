@@ -128,6 +128,23 @@ public sealed class CollisionWarmStartTests
         second.Should().Be(first);
     }
 
+    [Fact]
+    public void WarmStartCache_Remove_ShouldPreserveRemainingStableOrder()
+    {
+        ContactWarmStartCache cache = default;
+        cache.Set(11UL, Vector3d.Right, Fixed64.One, Fixed64.Zero);
+        cache.Set(22UL, Vector3d.Up, Fixed64.Two, Fixed64.Zero);
+        cache.Set(33UL, Vector3d.Forward, (Fixed64)3, Fixed64.Zero);
+
+        cache.Remove(22UL).Should().BeTrue();
+
+        cache.Count.Should().Be(2);
+        cache.GetContactIdForReplayHash(0).Should().Be(11UL);
+        cache.GetContactIdForReplayHash(1).Should().Be(33UL);
+        cache.TryGet(22UL, out _).Should().BeFalse();
+        cache.Remove(44UL).Should().BeFalse();
+    }
+
     private static void StoreWarmStartNormalLoad(CollisionPair pair, Fixed64 normalImpulse)
     {
         for (int i = 0; i < pair.Manifold.Count; i++)

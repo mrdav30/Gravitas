@@ -68,22 +68,18 @@ public partial class SolidBody
         Vector3d linearVelocityB = sourceIsA ? targetLinearVelocity : sourceLinearVelocity;
         Vector3d angularVelocityA = sourceIsA ? sourceAngularVelocity : targetAngularVelocity;
         Vector3d angularVelocityB = sourceIsA ? targetAngularVelocity : sourceAngularVelocity;
-        bool armAResolved = contact.AnchorA.TryGetOffsetFrom(
+        ContactLever3D contactArmA = ContactLever3D.Create(
+            contact.AnchorA,
             new ContactAnchor(
                 positionA,
                 rotationA,
-                bodyA._localCenterOfMassOffset),
-            out Vector3d contactArmA);
-        bool armBResolved = contact.AnchorB.TryGetOffsetFrom(
+                bodyA._localCenterOfMassOffset));
+        ContactLever3D contactArmB = ContactLever3D.Create(
+            contact.AnchorB,
             new ContactAnchor(
                 positionB,
                 rotationB,
-                bodyB._localCenterOfMassOffset),
-            out Vector3d contactArmB);
-        if (!(armAResolved & armBResolved))
-        {
-            return false;
-        }
+                bodyB._localCenterOfMassOffset));
 
         Fixed64 restitution = PhysicsMaterial.CombineRestitution(
             Collider.Material,
@@ -96,19 +92,56 @@ public partial class SolidBody
         {
             _inverseInertiaTensor = ResolveContinuousCollisionInverseInertia(sourceRotation);
             target._inverseInertiaTensor = target.ResolveContinuousCollisionInverseInertia(targetRotation);
-            calculated = ContactNormalImpulse3D.TryCalculateVelocityDeltas(
-                bodyA,
-                linearVelocityA,
-                angularVelocityA,
-                contactArmA,
-                bodyB,
-                linearVelocityB,
-                angularVelocityB,
-                contactArmB,
-                contact.Normal,
-                restitution,
-                Context.Settings.RestitutionVelocityThreshold,
-                out result);
+            if (contactArmA.IsExact || contactArmB.IsExact)
+            {
+                calculated = TryCalculateExactRotationalVelocityDeltas(
+                    contact,
+                    bodyA,
+                    positionA,
+                    rotationA,
+                    linearVelocityA,
+                    angularVelocityA,
+                    bodyB,
+                    positionB,
+                    rotationB,
+                    linearVelocityB,
+                    angularVelocityB,
+                    restitution,
+                    out result);
+            }
+            else
+            {
+                calculated = ContactNormalImpulse3D.TryCalculateVelocityDeltas(
+                    bodyA,
+                    linearVelocityA,
+                    angularVelocityA,
+                    contactArmA.Vector,
+                    bodyB,
+                    linearVelocityB,
+                    angularVelocityB,
+                    contactArmB.Vector,
+                    contact.Normal,
+                    restitution,
+                    Context.Settings.RestitutionVelocityThreshold,
+                    out result);
+                if (!calculated)
+                {
+                    calculated = TryCalculateExactRotationalVelocityDeltas(
+                        contact,
+                        bodyA,
+                        positionA,
+                        rotationA,
+                        linearVelocityA,
+                        angularVelocityA,
+                        bodyB,
+                        positionB,
+                        rotationB,
+                        linearVelocityB,
+                        angularVelocityB,
+                        restitution,
+                        out result);
+                }
+            }
         }
         finally
         {
@@ -116,7 +149,10 @@ public partial class SolidBody
             target._inverseInertiaTensor = originalTargetInverseInertia;
         }
 
-        if (!calculated || result.NormalVelocity >= -Fixed64.Epsilon)
+        if (!calculated
+            || !result.IsClosing
+            || (result.HasRepresentableNormalVelocity
+                && result.NormalVelocity >= -Fixed64.Epsilon))
         {
             return false;
         }
@@ -207,6 +243,50 @@ public partial class SolidBody
         }
 
         return true;
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(
+        System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private bool TryCalculateExactRotationalVelocityDeltas(
+        ManifoldContact contact,
+        SolidBody bodyA,
+        Vector3d positionA,
+        FixedQuaternion rotationA,
+        Vector3d linearVelocityA,
+        Vector3d angularVelocityA,
+        SolidBody bodyB,
+        Vector3d positionB,
+        FixedQuaternion rotationB,
+        Vector3d linearVelocityB,
+        Vector3d angularVelocityB,
+        Fixed64 restitution,
+        out ContactNormalVelocityDeltaResult3D result)
+    {
+        var centerA = new ContactAnchor(
+            positionA,
+            rotationA,
+            bodyA._localCenterOfMassOffset);
+        var centerB = new ContactAnchor(
+            positionB,
+            rotationB,
+            bodyB._localCenterOfMassOffset);
+        FixedMathSharp.Geometry.FixedLever exactA =
+            contact.AnchorA.GetLeverFrom(centerA);
+        FixedMathSharp.Geometry.FixedLever exactB =
+            contact.AnchorB.GetLeverFrom(centerB);
+        return ContactNormalImpulse3D.TryCalculateVelocityDeltasExact(
+                bodyA,
+                linearVelocityA,
+                angularVelocityA,
+                exactA,
+                bodyB,
+                linearVelocityB,
+                angularVelocityB,
+                exactB,
+                contact.Normal,
+                restitution,
+                Context.Settings.RestitutionVelocityThreshold,
+                out result);
     }
 
     private Fixed3x3 ResolveContinuousCollisionInverseInertia(FixedQuaternion rotation)

@@ -84,6 +84,32 @@ internal struct ContactWarmStartCache
         return false;
     }
 
+    public bool Remove(ulong contactId)
+    {
+        for (int index = 0; index < Count; index++)
+        {
+            if (GetContactId(index) != contactId)
+                continue;
+
+            Count--;
+            for (int shift = index; shift < Count; shift++)
+            {
+                SetContactIdUnchecked(
+                    shift,
+                    GetContactId(shift + 1));
+                SetImpulseUnchecked(
+                    shift,
+                    GetImpulseUnchecked(shift + 1));
+            }
+
+            SetContactIdUnchecked(Count, 0UL);
+            SetImpulseUnchecked(Count, default);
+            return true;
+        }
+
+        return false;
+    }
+
     internal ulong GetContactIdForReplayHash(int index)
     {
         SwiftThrowHelper.ThrowIfArrayIndexInvalid(index, Count, nameof(index));

@@ -4,7 +4,6 @@ using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Materials;
 using Gravitas.Tests.Support;
-using SwiftCollections.Diagnostics;
 using System;
 using Xunit;
 
@@ -74,65 +73,6 @@ public sealed class CollisionResponseInvariantTests
         right.Body.Position3d.Should().Be(rightPositionBefore);
         left.Body.LinearVelocity.Should().Be(leftVelocityBefore);
         right.Body.LinearVelocity.Should().Be(rightVelocityBefore);
-    }
-
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void CalculateImpulse_WithUnrepresentableLeverArm_ShouldRejectContactAtomically(
-        bool loggingEnabled)
-    {
-        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
-        ScenarioBody<LSSphereCollider> left =
-            scenario.CreateSphere(Vector3d.Zero);
-        ScenarioBody<LSSphereCollider> right =
-            scenario.CreateSphere(Vector3d.Right);
-        CollisionPair pair =
-            scenario.CreatePair(left.Collider, right.Collider);
-        pair.Manifold.SetContact(
-            new ContactAnchor(
-                new Vector3d(
-                    Fixed64.MaxValue,
-                    Fixed64.Zero,
-                    Fixed64.Zero),
-                Vector3d.Right),
-            ContactAnchor.FromWorldPoint(right.Collider.Center),
-            Fixed64.Half,
-            Vector3d.Right);
-        Vector3d leftVelocity = left.Body.LinearVelocity;
-        Vector3d rightVelocity = right.Body.LinearVelocity;
-        string? loggedMessage = null;
-        var originalLevel = GravitasLogger.MinimumLevel;
-        Action<DiagnosticLevel, string, string> originalHandler =
-            GravitasLogger.LogHandler;
-
-        try
-        {
-            GravitasLogger.MinimumLevel = loggingEnabled
-                ? DiagnosticLevel.Error
-                : DiagnosticLevel.None;
-            GravitasLogger.LogHandler =
-                (_, message, _) => loggedMessage = message;
-
-            CollisionResponse.CalculateImpulse(pair);
-        }
-        finally
-        {
-            GravitasLogger.MinimumLevel = originalLevel;
-            GravitasLogger.LogHandler = originalHandler;
-        }
-
-        left.Body.LinearVelocity.Should().Be(leftVelocity);
-        right.Body.LinearVelocity.Should().Be(rightVelocity);
-        if (loggingEnabled)
-        {
-            loggedMessage.Should().Contain(
-                "cannot be rebased onto its response centers");
-        }
-        else
-        {
-            loggedMessage.Should().BeNull();
-        }
     }
 
     [Fact]

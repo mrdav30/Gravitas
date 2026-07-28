@@ -59,6 +59,7 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 | Signal | Status | Priority | Tracking |
 | ------ | ------ | -------- | -------- |
 | Exact canonical OBB contacts regress ordinary narrow-phase throughput | Partially corrected | High | Add a proven exact ordinary-domain path in FixedMathSharp with the current wide kernels as fallback |
+| Exact 3D contact response adds measurable ordinary-domain cost | Optimized, still observed | Medium | Profile the paired atomic preflight and friction stages without weakening full-domain rejection |
 | Mixed public sweep traversal stalls on extreme sparse-grid spans | Observed | Medium | Isolate GridTracer clipping and cell-visit scaling independently of narrow phase |
 | Mixed discrete broad-phase refresh allocates at 32 moving CCD pairs | Isolated | Low | Reproduce capacity-growth threshold independently of rotational CCD |
 
@@ -104,6 +105,46 @@ and scalar-face cases. Do not restore Gravitas-local SAT, cached world geometry,
 or an approximate early answer. The preserved artifacts are:
 `artifacts/benchmarks/task9-canonical-geometry-baseline-20260722` and
 `artifacts/benchmarks/task9-canonical-geometry-final-optimized-20260727`.
+
+### Signal: Exact 3D Contact Response Adds Measurable Ordinary-Domain Cost
+
+**Discovered:** 2026-07-28  
+**Source:** exact contact-lever Phase 2 comparison against the preserved
+pre-Phase-2 collision-response ShortRun  
+**Status:** Optimized compact proof path retained; zero allocation and exact
+behavior are closed, while the remaining timing gap is still measurable.
+
+Phase 2 added checked impulse composition, paired current-state preflight,
+atomic application, and exact semantic-lever fallback. An initial
+checked-everywhere implementation regressed ordinary response substantially.
+The final implementation proves conservative compact bounds for ordinary
+point-velocity and angular-response chains, then uses checked FixedMathSharp
+arithmetic only outside those bounds.
+
+Across the more stable 16-pair cells, final medians remain `9.5-21.6%` above
+the preserved compact baseline:
+
+| Contact shape | Default material | Distinct material |
+| --- | ---: | ---: |
+| Single | `860.8 -> 976.3 us` | `851.3 -> 948.4 us` |
+| Face manifold | `2.735 -> 3.326 ms` | `2.995 -> 3.281 ms` |
+| Resting face manifold | `2.508 -> 2.867 ms` | `2.488 -> 2.786 ms` |
+| Cylinder | `506.9 -> 584.1 us` | `501.6 -> 595.8 us` |
+| Mesh | `2.203 -> 2.595 ms` | `2.286 -> 2.641 ms` |
+| Compound part | `511.4 -> 605.2 us` | `552.3 -> 604.9 us` |
+
+All 24 final benchmark cells report zero managed allocation. The 64-pair
+ShortRun cells remain too noisy for a trustworthy ratio because the benchmark
+uses one invocation and three iterations. The smallest next step is a profiler
+or longer-run decomposition of contact construction, normal solve, atomic
+preflight, and friction response. Do not remove paired atomicity, restore
+saturating intermediate arithmetic, or widen FixedMathSharp's public surface
+solely to chase this signal.
+
+The final semantic-response review changed only the no-inline exact fallback;
+the benchmarked compact proof path and the medians above are unchanged. Focused
+wide-response and rotational-CCD allocation guards remain at zero managed bytes
+after warmup.
 
 ### Signal: Mixed Public Sweep Traversal Stalls On Extreme Sparse-Grid Spans
 

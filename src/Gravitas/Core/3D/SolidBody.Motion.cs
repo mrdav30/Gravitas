@@ -184,20 +184,34 @@ public partial class SolidBody
 
     internal bool CanApplyCollisionVelocityDeltas(
         Vector3d linearVelocityDelta,
-        Vector3d angularVelocityDelta)
+        Vector3d angularVelocityDelta) =>
+        TryPrepareCollisionVelocityState(
+            linearVelocityDelta,
+            angularVelocityDelta,
+            out _,
+            out _);
+
+    internal bool TryPrepareCollisionVelocityState(
+        Vector3d linearVelocityDelta,
+        Vector3d angularVelocityDelta,
+        out Vector3d linearVelocity,
+        out Vector3d angularVelocity)
     {
         linearVelocityDelta = ProjectLinearMotion(linearVelocityDelta);
         angularVelocityDelta = ProjectAngularMotion(angularVelocityDelta);
-        bool linearVelocityFits = Vector3d.TryAdd(
-            _linearVelocity,
-            linearVelocityDelta,
-            out _);
-        bool angularVelocityFits = Vector3d.TryAdd(
-            _angularVelocity,
-            angularVelocityDelta,
-            out _);
-        return (!CanTranslate | linearVelocityFits)
-            & (!CanRotate | angularVelocityFits);
+        linearVelocity = _linearVelocity;
+        angularVelocity = _angularVelocity;
+        bool linearVelocityFits = !CanTranslate
+            || Vector3d.TryAdd(
+                _linearVelocity,
+                linearVelocityDelta,
+                out linearVelocity);
+        bool angularVelocityFits = !CanRotate
+            || Vector3d.TryAdd(
+                _angularVelocity,
+                angularVelocityDelta,
+                out angularVelocity);
+        return linearVelocityFits & angularVelocityFits;
     }
 
     internal void ApplyCollisionVelocityState(

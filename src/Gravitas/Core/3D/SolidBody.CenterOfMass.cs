@@ -71,12 +71,15 @@ public partial class SolidBody
     internal bool TryGetOffsetFromCenterOfMass(
         ContactAnchor anchor,
         out Vector3d offset)
-        => anchor.TryGetOffsetFrom(
-            new ContactAnchor(
-                Position3d,
-                Rotation,
-                _localCenterOfMassOffset),
-            out offset);
+        => anchor.TryGetOffsetFrom(GetCenterOfMassAnchor(), out offset);
+
+    [System.Runtime.CompilerServices.MethodImpl(
+        System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+    internal ContactAnchor GetCenterOfMassAnchor() =>
+        new(
+            Position3d,
+            Rotation,
+            _localCenterOfMassOffset);
 
     /// <summary>
     /// Clears an explicit center-of-mass override and derives the offset from the bound collider again.

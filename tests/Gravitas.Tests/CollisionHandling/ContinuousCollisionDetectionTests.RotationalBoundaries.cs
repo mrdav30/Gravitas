@@ -1,7 +1,9 @@
+using Chronicler;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
+using Gravitas.Materials;
 using Gravitas.Tests.Support;
 using GridForge.Configuration;
 using System;
@@ -11,6 +13,124 @@ namespace Gravitas.Tests.CollisionHandlingTests;
 
 public sealed partial class ContinuousCollisionDetectionTests
 {
+    [Fact]
+    public void RotationalDynamicResponse_WithUnrepresentableParallelLeverComponent_ShouldPreserveResponse3D()
+    {
+        var first = RunUnrepresentableParallelLeverRotationalResponse3D();
+        var second = RunUnrepresentableParallelLeverRotationalResponse3D();
+
+        first.Applied.Should().BeTrue();
+        first.SourceLinearVelocity.X.Should().BeLessThan((Fixed64)4);
+        first.SourceAngularVelocity.Z.Should().BeGreaterThan(Fixed64.Zero);
+        first.TargetLinearVelocity.Should().Be(Vector3d.Zero);
+        first.TargetAngularVelocity.Should().Be(Vector3d.Zero);
+        first.Should().Be(second);
+    }
+
+    [Fact]
+    public void RotationalDynamicResponse_WithUnrepresentablePointSpeed_ShouldApplyFinalAngularDelta3D()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        Fixed64 minimum = Fixed64.MinIncrement;
+        var sourceCollider = new UnsupportedTestCollider3D
+        {
+            InertiaTensor = new Fixed3x3(
+                minimum, Fixed64.Zero, Fixed64.Zero,
+                Fixed64.Zero, minimum, Fixed64.Zero,
+                Fixed64.Zero, Fixed64.Zero, minimum)
+        };
+        ScenarioBody<UnsupportedTestCollider3D> source =
+            scenario.CreateBody(
+                sourceCollider,
+                -Vector3d.Right * Fixed64.Two,
+                FixedQuaternion.Identity);
+        ScenarioBody<LSSphereCollider> target =
+            scenario.CreateSphere(Vector3d.Zero);
+        source.Body.FreezeAxes = BodyFreezeAxes3D.Position;
+        target.Body.FreezeAxes = BodyFreezeAxes3D.All;
+        source.Collider.Material = PhysicsMaterial.Frictionless;
+        target.Collider.Material = PhysicsMaterial.Frictionless;
+        scenario.Context.AdvanceLateSimulateToken();
+        scenario.Context.Physics.PrepareContinuousCollisionFrame();
+        source.Body.ApplyCollisionAngularVelocityDelta(-Vector3d.Forward);
+        var contact = new ManifoldContact(
+            contactId: 1,
+            anchorA: new ContactAnchor(
+                Vector3d.Up * Fixed64.MaxValue,
+                Vector3d.Up * Fixed64.MaxValue),
+            anchorB: ContactAnchor.FromWorldPoint(target.Body.WorldCenterOfMass),
+            depth: Fixed64.Zero,
+            normal: Vector3d.Right);
+        bool applied =
+            source.Body.TryApplyRotationalContinuousCollisionResponse(
+                target.Body,
+                contact,
+                Fixed64.Zero,
+                source.Body.Position3d,
+                Vector3d.Zero,
+                source.Body.Rotation,
+                scenario.Context.DeltaTime * Fixed64.Half,
+                scenario.Context.DeltaTime * Fixed64.Half,
+                sourceIsKinematic: false);
+
+        applied.Should().BeTrue();
+        source.Body.AngularVelocity.Should().Be(Vector3d.Zero);
+        target.Body.LinearVelocity.Should().Be(Vector3d.Zero);
+        target.Body.AngularVelocity.Should().Be(Vector3d.Zero);
+    }
+
+    private static (
+        bool Applied,
+        Vector3d SourceLinearVelocity,
+        Vector3d SourceAngularVelocity,
+        Vector3d TargetLinearVelocity,
+        Vector3d TargetAngularVelocity,
+        ChronicleHash ReplayHash)
+        RunUnrepresentableParallelLeverRotationalResponse3D()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        ScenarioBody<LSSphereCollider> source =
+            scenario.CreateSphere(-Vector3d.Right * (Fixed64)2);
+        ScenarioBody<LSSphereCollider> target =
+            scenario.CreateSphere(Vector3d.Zero);
+        target.Body.FreezeAxes = BodyFreezeAxes3D.All;
+        scenario.Context.AdvanceLateSimulateToken();
+        scenario.Context.Physics.PrepareContinuousCollisionFrame();
+        source.Body.ApplyCollisionLinearVelocityDelta(
+            Vector3d.Right * (Fixed64)4);
+        var contact = new ManifoldContact(
+            contactId: 1,
+            anchorA: new ContactAnchor(
+                new Vector3d(
+                    Fixed64.MaxValue,
+                    Fixed64.One,
+                    Fixed64.Zero),
+                Vector3d.Right * Fixed64.MinIncrement),
+            anchorB: ContactAnchor.FromWorldPoint(Vector3d.Up),
+            depth: Fixed64.Zero,
+            normal: Vector3d.Right);
+
+        bool applied = source.Body.TryApplyRotationalContinuousCollisionResponse(
+            target.Body,
+            contact,
+            Fixed64.Half,
+            source.Body.Position3d,
+            Vector3d.Right * Fixed64.Two,
+            source.Body.Rotation,
+            Fixed64.Zero,
+            scenario.Context.DeltaTime,
+            sourceIsKinematic: false);
+
+        return (
+            applied,
+            source.Body.LinearVelocity,
+            source.Body.AngularVelocity,
+            target.Body.LinearVelocity,
+            target.Body.AngularVelocity,
+            scenario.Context.ComputeReplayHash(
+                GravitasReplayHashMode.AuthoritativeWithSolverCaches));
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
