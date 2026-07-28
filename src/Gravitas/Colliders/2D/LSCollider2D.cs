@@ -738,25 +738,27 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    protected Vector2d TransformRelativeMassPropertyPoint(
+    protected FixedMassPoint2d TransformRelativeMassPropertyPointExact(
         Vector2d partRelativePoint)
     {
-        bool representable = _compoundOwner == null
-            ? Vector2d.TryAdd(
-                ScaledLocalOffset,
+        GetCurrentScaleFactors(
+            out Vector2d ownerScale,
+            out _);
+        return _compoundOwner == null
+            ? FixedMassPoint2d.CreateScaledLocalComposition(
+                LocalOffset,
+                ownerScale,
+                Vector2d.Zero,
+                Vector2d.One,
                 partRelativePoint,
-                out Vector2d transformed)
-            : Vector2d.TryTransformPoint(
-                _compoundOwner.ScaledLocalOffset,
-                ScaledLocalOffset,
+                Fixed64.Zero)
+            : FixedMassPoint2d.CreateScaledLocalComposition(
+                _compoundOwner.LocalOffset,
+                ownerScale,
+                LocalOffset,
+                ownerScale,
                 partRelativePoint,
-                _compoundLocalRotation,
-                out transformed);
-        if (representable)
-            return transformed;
-
-        throw new System.InvalidOperationException(
-            "2D collider mass-property point is outside the Fixed64 coordinate domain.");
+                _compoundLocalRotation);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

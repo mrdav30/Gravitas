@@ -106,21 +106,32 @@ public sealed class LSCircleCollider2D : LSCollider2D
             "The circle support point is outside the Fixed64 coordinate domain.");
     }
 
-    internal override Fixed64 CalculateAreaForMassProperties()
+    internal override FixedMassWeight CalculateAreaForMassProperties()
     {
         Fixed64 radius = GetMassPropertyRadius();
-        return Fixed64.Pi * radius * radius;
+        return FixedMassWeight.FromProduct(
+            Fixed64.Pi,
+            radius,
+            radius);
     }
 
-    public override Fixed64 CalculateMomentOfInertia(Fixed64 mass, Vector2d localReferencePoint)
-    {
-        if (mass <= Fixed64.Zero)
-            return Fixed64.Zero;
+    internal override FixedMassWeight CalculatePreparedAreaForMassProperties() =>
+        FixedMassWeight.FromProduct(
+            Fixed64.Pi,
+            _preparedRadius,
+            _preparedRadius);
 
+    internal override Fixed64 CalculateCenterOfMassMoment(Fixed64 mass)
+    {
         Fixed64 radius = GetMassPropertyRadius();
-        Vector2d centerOfMass = CalculateLocalCenterOfMassOffset();
-        Fixed64 momentAboutCenterOfMass = mass * radius * radius * Fixed64.Half;
-        return ApplyParallelAxis(momentAboutCenterOfMass, mass, centerOfMass, localReferencePoint);
+        return Fixed64.TryMultiplyDivide(
+            mass,
+            radius,
+            radius,
+            Fixed64.Two,
+            out Fixed64 moment)
+            ? moment
+            : Fixed64.MaxValue;
     }
 
     private Fixed64 GetMassPropertyRadius()

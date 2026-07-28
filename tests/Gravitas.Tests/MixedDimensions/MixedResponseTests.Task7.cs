@@ -1,5 +1,6 @@
 using Chronicler;
 using FixedMathSharp;
+using FixedMathSharp.Geometry;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
@@ -699,7 +700,7 @@ public sealed partial class MixedResponseTests
         var collider3D = new UnsupportedTestCollider3D
         {
             InertiaTensor = inertiaTensor!.Value,
-            MassPropertyWeight = Fixed64.One
+            MassPropertyWeight = FixedMassWeight.One
         };
         var agent3D = new TestMatterAgent(
             context,

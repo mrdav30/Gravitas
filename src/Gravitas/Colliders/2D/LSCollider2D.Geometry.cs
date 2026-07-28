@@ -359,24 +359,81 @@ public abstract partial class LSCollider2D
     /// </summary>
     public virtual Vector2d CalculateLocalCenterOfMassOffset()
     {
-        if (!_hasCommittedShape)
-            return TransformRelativeMassPropertyPoint(Vector2d.Zero);
-
+        FixedMassPoint2d point = CalculateLocalMassPoint();
         SwiftThrowHelper.ThrowIfTrue(
-            !_hasCommittedDefaultCenterOfMassOffset,
+            !point.TryGetPoint(out Vector2d center),
             nameof(CalculateLocalCenterOfMassOffset),
             "The 2D collider's body-local center of mass is outside the Fixed64 coordinate domain.");
-        return _defaultCenterOfMassOffset;
+        return center;
     }
+
+    internal virtual FixedMassPoint2d CalculateLocalMassPoint() =>
+        TransformRelativeMassPropertyPointExact(Vector2d.Zero);
+
+    internal virtual FixedMassPoint2d CalculatePreparedLocalMassPoint() =>
+        TransformPreparedRelativeMassPropertyPointExact(Vector2d.Zero);
 
     /// <summary>
     /// Calculates the scalar moment of inertia about a requested body-local reference point.
     /// </summary>
-    public abstract Fixed64 CalculateMomentOfInertia(Fixed64 mass, Vector2d localReferencePoint);
+    public virtual Fixed64 CalculateMomentOfInertia(
+        Fixed64 mass,
+        Vector2d localReferencePoint)
+    {
+        if (mass <= Fixed64.Zero)
+            return Fixed64.Zero;
 
-    internal abstract Fixed64 CalculateAreaForMassProperties();
+        Fixed64 centerMoment =
+            CalculateCenterOfMassMoment(mass);
+        FixedMassPoint2d massPoint = CalculateLocalMassPoint();
+        if (massPoint.TryAddParallelAxisMoment(
+                centerMoment,
+                mass,
+                localReferencePoint,
+                out Fixed64 moment))
+        {
+            return moment;
+        }
+
+        if (!massPoint.TryGetPoint(out Vector2d center))
+        {
+            SwiftThrowHelper.ThrowIfTrue(
+                true,
+                nameof(localReferencePoint),
+                "The requested moment of inertia is outside the Fixed64 scalar domain.");
+        }
+
+        Vector2d delta = localReferencePoint - center;
+        return centerMoment
+            + mass * delta.MagnitudeSquared;
+    }
+
+    internal abstract Fixed64 CalculateCenterOfMassMoment(Fixed64 mass);
+
+    internal abstract FixedMassWeight CalculateAreaForMassProperties();
+
+    internal abstract FixedMassWeight CalculatePreparedAreaForMassProperties();
 
     protected virtual void OnMaterialChanged() { }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    protected FixedMassPoint2d TransformPreparedRelativeMassPropertyPointExact(
+        Vector2d partRelativePoint) =>
+        _compoundOwner == null
+            ? FixedMassPoint2d.CreateScaledLocalComposition(
+                _preparedSnapshot.LocalOffset,
+                _preparedSnapshot.OwnerScale,
+                Vector2d.Zero,
+                Vector2d.One,
+                partRelativePoint,
+                Fixed64.Zero)
+            : FixedMassPoint2d.CreateScaledLocalComposition(
+                _compoundOwner._preparedSnapshot.LocalOffset,
+                _preparedSnapshot.OwnerScale,
+                _preparedSnapshot.LocalOffset,
+                _preparedSnapshot.OwnerScale,
+                partRelativePoint,
+                _preparedCompoundLocalRotation);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     protected void MarkShapeDirty()
@@ -390,16 +447,6 @@ public abstract partial class LSCollider2D
         }
 
         _body?.Wake();
-    }
-
-    protected static Fixed64 ApplyParallelAxis(
-        Fixed64 momentAboutCenterOfMass,
-        Fixed64 mass,
-        Vector2d centerOfMass,
-        Vector2d localReferencePoint)
-    {
-        Vector2d delta = localReferencePoint - centerOfMass;
-        return momentAboutCenterOfMass + mass * delta.MagnitudeSquared;
     }
 
     private bool RebuildRuntimeShapeState()

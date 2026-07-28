@@ -152,7 +152,11 @@ public sealed class PhysicsMeshScaleTests
 
         AssertVectorNear(collider.Bounds.Proportions, scale);
         AssertNear(collider.Area, (Fixed64)52);
-        AssertNear(collider.CalculateMassPropertyWeight(), (Fixed64)24);
+        collider.CalculateMassPropertyWeight()
+            .TryGetMeasure(out Fixed64 weight)
+            .Should()
+            .BeTrue();
+        AssertNear(weight, (Fixed64)24);
         AssertVectorNear(collider.CalculateLocalCenterOfMassOffset(), Vector3d.Zero);
 
         Fixed3x3 tensor = collider.CalculateInertiaTensor((Fixed64)12, Vector3d.Zero);
@@ -840,7 +844,7 @@ public sealed class PhysicsMeshScaleTests
     }
 
     [Fact]
-    public void SurfaceApproximation_WithLongThinTriangle_ShouldRejectNonRepresentableShellBeforeRegistration()
+    public void SurfaceApproximation_WithLongThinTriangle_ShouldRetainRepresentableFinalShell()
     {
         Vector3d[] vertices =
         {
@@ -850,17 +854,61 @@ public sealed class PhysicsMeshScaleTests
         };
         int[] triangles = { 0, 1, 2 };
         var directMesh = new PhysicsMesh(vertices, triangles, Vector3d.Zero, FixedQuaternion.Identity);
-        Action readProperties = () => _ = directMesh.SurfaceMassProperties;
-        readProperties.Should().Throw<InvalidOperationException>().WithMessage("*not representable*");
+        MeshSurfaceMassProperties properties =
+            directMesh.SurfaceMassProperties;
 
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         var collider = new LSMeshCollider(vertices, triangles, MeshColliderMode.Convex, MeshInertiaPolicy.SurfaceApproximation);
-        Action initialize = () => collider.InitializeWithNoBody(new TestMatterAgent(context));
+        collider.InitializeWithNoBody(new TestMatterAgent(context));
 
-        initialize.Should().Throw<ArgumentException>().WithMessage("*surface mass properties*");
+        properties.UnitMassInertiaTensor.M22
+            .Should()
+            .BeGreaterThan(Fixed64.Zero);
+        properties.UnitMassInertiaTensor.M33
+            .Should()
+            .BeGreaterThan(properties.UnitMassInertiaTensor.M22);
+        collider.Id.Should().BeGreaterThanOrEqualTo(0);
+        collider.HasHostBinding.Should().BeTrue();
+        context.Physics.ColliderCount.Should().Be(1);
+    }
+
+    [Fact]
+    public void StandaloneSurfaceMesh_ShouldRejectAnUnrepresentableAuthoredCenterOfMass()
+    {
+        using GravitasWorldContext context =
+            GravitasWorldContext.CreateOwned();
+        var collider = new LSMeshCollider(
+            new[]
+            {
+                Vector3d.Zero,
+                Vector3d.Right,
+                Vector3d.One
+            },
+            new[] { 0, 1, 2 },
+            MeshColliderMode.Convex,
+            MeshInertiaPolicy.SurfaceApproximation)
+        {
+            LocalOffset = new Vector3d(
+                Fixed64.MaxValue,
+                Fixed64.Zero,
+                Fixed64.Zero)
+        };
+        var transform = new FixedTransform(
+            new Vector3d(
+                Fixed64.MinValue,
+                Fixed64.Zero,
+                Fixed64.Zero),
+            FixedQuaternion.Identity,
+            Vector3d.One);
+
+        Action initialize = () =>
+            collider.InitializeWithNoBody(
+                new TestMatterAgent(context, transform));
+
+        initialize.Should().Throw<InvalidOperationException>()
+            .WithMessage("*Prepared collider mass-property point*");
         collider.Id.Should().Be(-1);
         collider.HasHostBinding.Should().BeFalse();
-        context.Physics.ColliderCount.Should().Be(0);
     }
 
     [Fact]
@@ -1108,6 +1156,17 @@ public sealed class PhysicsMeshScaleTests
             MeshColliderMode.Concave);
         totalAreaOverflow.Should().NotThrow();
         repeatedTriangleMesh!.TotalArea.Should().Be(Fixed64.MaxValue);
+        repeatedTriangleMesh.TotalArea
+            .Should()
+            .Be(repeatedTriangleMesh.SurfaceMassProperties.Area);
+        repeatedTriangleMesh.SurfaceMassWeight
+            .TryGetMeasure(out _)
+            .Should().BeFalse();
+        repeatedTriangleMesh.SurfaceMassProperties.CenterOfMass
+            .Should().Be(new Vector3d(
+                (Fixed64)(-7500),
+                -Fixed64.FromFraction(1, 6),
+                Fixed64.Zero));
     }
 
     [Fact]
@@ -1165,7 +1224,7 @@ public sealed class PhysicsMeshScaleTests
     }
 
     [Fact]
-    public void SurfaceApproximation_WithSaturatedAreaNearScalarFace_ShouldRejectUnrepresentableCenter()
+    public void SurfaceApproximation_WithSaturatedAreaNearScalarFace_ShouldPreserveSemanticCenter()
     {
         Fixed64 edge = Fixed64.MaxValue;
         var mesh = new PhysicsMesh(
@@ -1186,10 +1245,29 @@ public sealed class PhysicsMeshScaleTests
             FixedQuaternion.Identity,
             MeshColliderMode.Concave);
 
-        Action read = () => _ = mesh.SurfaceMassProperties;
+        var points = new FixedMassPoint[mesh.TriangleCount];
+        var weights = new FixedMassWeight[mesh.TriangleCount];
+        for (int i = 0; i < mesh.TriangleCount; i++)
+        {
+            mesh.GetLocalTriangleVertices(
+                i,
+                out Vector3d first,
+                out Vector3d second,
+                out Vector3d third);
+            var triangle = new FixedTriangle(first, second, third);
+            points[i] = FixedMassPoint.FromPoint(triangle.Centroid);
+            weights[i] = triangle.AreaWeight;
+        }
+        FixedMassPoint.TryGetWeightedAverage(
+            points,
+            weights,
+            out Vector3d expectedCenter)
+            .Should().BeTrue();
 
-        read.Should().Throw<InvalidOperationException>()
-            .WithMessage("*not representable*");
+        mesh.SurfaceMassWeight.TryGetMeasure(out _)
+            .Should().BeFalse();
+        mesh.SurfaceMassProperties.CenterOfMass
+            .Should().Be(expectedCenter);
     }
 
     [Fact]
@@ -1229,12 +1307,6 @@ public sealed class PhysicsMeshScaleTests
             out Vector3d vectorProduct).Should().BeFalse();
         vectorProduct.Should().Be(Vector3d.Zero);
 
-        MeshCheckedMath.TryMultiply(
-            Fixed3x3.Identity * (Fixed64)1500000000,
-            (Fixed64)2,
-            out Fixed3x3 matrixProduct).Should().BeFalse();
-        matrixProduct.Should().Be(default(Fixed3x3));
-
         MeshCheckedMath.TryAdd(
             new Vector3d((Fixed64)1500000000, Fixed64.Zero, Fixed64.Zero),
             new Vector3d((Fixed64)1000000000, Fixed64.Zero, Fixed64.Zero),
@@ -1264,13 +1336,6 @@ public sealed class PhysicsMeshScaleTests
             .BeTrue();
         difference.Should().Be(endpoint);
 
-        MeshCheckedMath.TryMultiply(
-                difference,
-                Fixed64.One,
-                out Vector3d product)
-            .Should()
-            .BeTrue();
-        product.Should().Be(endpoint);
     }
 
     private static PhysicsMesh CreateOffsetTriangleMesh() =>

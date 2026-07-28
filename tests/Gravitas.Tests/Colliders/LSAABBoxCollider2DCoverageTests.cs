@@ -59,14 +59,14 @@ public sealed class LSAABBoxCollider2DCoverageTests
     }
 
     [Fact]
-    public void Area_WhenTheExactProductExceedsFixed64_ShouldSaturate()
+    public void Area_WhenTheExactProductExceedsFixed64_ShouldRemainSemantic()
     {
         var collider = new LSAABBoxCollider2D(
             new Vector2d(Fixed64.MaxValue, Fixed64.MaxValue));
 
         collider.CalculateAreaForMassProperties()
-            .Should()
-            .Be(Fixed64.MaxValue);
+            .TryGetMeasure(out _)
+            .Should().BeFalse();
     }
 
     [Fact]

@@ -210,25 +210,25 @@ public sealed class LSCapsuleCollider2D : LSCollider2D
             worldNormal,
             out surfacePoint);
 
-    internal override Fixed64 CalculateAreaForMassProperties()
+    internal override FixedMassWeight CalculateAreaForMassProperties()
     {
         GetMassPropertyGeometry(
             out Fixed64 radius,
             out Fixed64 cylinderLength);
-        return cylinderLength * radius * (Fixed64)2 + Fixed64.Pi * radius * radius;
+        return GetRectangleWeight(radius, cylinderLength)
+            .Add(GetCircleWeight(radius));
     }
 
-    public override Fixed64 CalculateMomentOfInertia(Fixed64 mass, Vector2d localReferencePoint)
-    {
-        if (mass <= Fixed64.Zero)
-            return Fixed64.Zero;
+    internal override FixedMassWeight CalculatePreparedAreaForMassProperties() =>
+        GetRectangleWeight(_preparedRadius, _preparedAxisLength)
+            .Add(GetCircleWeight(_preparedRadius));
 
+    internal override Fixed64 CalculateCenterOfMassMoment(Fixed64 mass)
+    {
         GetMassPropertyGeometry(
             out Fixed64 radius,
             out Fixed64 cylinderLength);
-        Vector2d centerOfMass = CalculateLocalCenterOfMassOffset();
-        Fixed64 momentAboutCenterOfMass = CalculateCenteredMoment(mass, radius, cylinderLength);
-        return ApplyParallelAxis(momentAboutCenterOfMass, mass, centerOfMass, localReferencePoint);
+        return CalculateCenteredMoment(mass, radius, cylinderLength);
     }
 
     private protected override void PrepareShape(in ColliderShapeSnapshot2D snapshot)
@@ -366,14 +366,19 @@ public sealed class LSCapsuleCollider2D : LSCollider2D
         if (cylinderLength <= Fixed64.Epsilon)
             return mass * radius * radius * Fixed64.Half;
 
-        Fixed64 rectangleArea = cylinderLength * radius * (Fixed64)2;
-        Fixed64 circleArea = Fixed64.Pi * radius * radius;
-        Fixed64 totalArea = rectangleArea + circleArea;
-        if (totalArea <= Fixed64.Zero)
+        FixedMassWeight rectangleWeight =
+            GetRectangleWeight(radius, cylinderLength);
+        FixedMassWeight circleWeight = GetCircleWeight(radius);
+        FixedMassWeight totalWeight =
+            rectangleWeight.Add(circleWeight);
+        if (totalWeight.IsZero)
             return mass * cylinderLength * cylinderLength / (Fixed64)12;
 
-        Fixed64 rectangleMass = mass * (rectangleArea / totalArea);
-        Fixed64 capMass = mass * ((circleArea * Fixed64.Half) / totalArea);
+        _ = rectangleWeight.TryGetProportionalShare(
+            mass,
+            totalWeight,
+            out Fixed64 rectangleMass);
+        Fixed64 capMass = (mass - rectangleMass) * Fixed64.Half;
         Fixed64 rectangleMoment =
             rectangleMass * ((radius * (Fixed64)2 * radius * (Fixed64)2) + (cylinderLength * cylinderLength)) / (Fixed64)12;
 
@@ -389,6 +394,20 @@ public sealed class LSCapsuleCollider2D : LSCollider2D
 
         return rectangleMoment + capMomentAboutCapsuleCenter * (Fixed64)2;
     }
+
+    private static FixedMassWeight GetRectangleWeight(
+        Fixed64 radius,
+        Fixed64 cylinderLength) =>
+        FixedMassWeight.FromProduct(
+            Fixed64.Two,
+            radius,
+            cylinderLength);
+
+    private static FixedMassWeight GetCircleWeight(Fixed64 radius) =>
+        FixedMassWeight.FromProduct(
+            Fixed64.Pi,
+            radius,
+            radius);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void ValidateDimensions(Fixed64 radius, Fixed64 height)

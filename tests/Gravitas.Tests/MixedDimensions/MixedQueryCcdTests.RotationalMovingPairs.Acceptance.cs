@@ -1,4 +1,5 @@
 using FixedMathSharp;
+using FixedMathSharp.Geometry;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
@@ -218,7 +219,7 @@ public sealed partial class MixedQueryCcdTests
         var sourceCollider = new UnsupportedTestCollider3D
         {
             InertiaTensor = Fixed3x3.Identity,
-            MassPropertyWeight = Fixed64.One
+            MassPropertyWeight = FixedMassWeight.One
         };
         ScenarioBody<UnsupportedTestCollider3D> blade = CreateBody3D(
             context,

@@ -136,14 +136,18 @@ public class LSCapsuleCollider : LSCollider
         Area = _preparedArea;
     }
 
-    protected internal override Fixed64 CalculateMassPropertyWeight() =>
-        Fixed64.Pi * ScaledRadiusSqr * AxisLength
-        + Fixed64.FromFraction(4, 3) * Fixed64.Pi * ScaledRadiusSqr * ScaledRadius;
+    protected internal override FixedMassWeight CalculateMassPropertyWeight() =>
+        GetCylinderWeight(ScaledRadius, AxisLength)
+            .Add(GetCapWeight(ScaledRadius));
+
+    internal override FixedMassWeight CalculatePreparedMassPropertyWeight() =>
+        GetCylinderWeight(_preparedRadius, _preparedAxisLength)
+            .Add(GetCapWeight(_preparedRadius));
 
     // The capsule is split into a cylinder and a pair of solid hemispheres with masses
     // proportional to their volumes. Each hemisphere's centroid lies 3r/8 outward from
     // its sphere center, which contributes the 3dr/4 cross term to transverse cap inertia.
-    public override Fixed3x3 CalculateInertiaTensor(Fixed64 mass, Vector3d localCenterOfMassOffset)
+    internal override Fixed3x3 CalculateCenterOfMassInertiaTensor(Fixed64 mass)
     {
         if (AxisLength <= Fixed64.Epsilon)
         {
@@ -153,27 +157,19 @@ public class LSCapsuleCollider : LSCollider
                 Fixed64.Zero, sphereDiagonal, Fixed64.Zero,
                 Fixed64.Zero, Fixed64.Zero, sphereDiagonal
             );
-            return ShiftInertiaTensorFromLocalCenterOfMass(sphereTensor, mass, localCenterOfMassOffset);
+            return sphereTensor;
         }
 
         // Masses of the cylinder and spheres (proportional to their volumes)
-        Fixed64 cylinderVolume = Fixed64.Pi * ScaledRadiusSqr * AxisLength;
-        Fixed64 sphereVolume = Fixed64.FromFraction(4, 3) * Fixed64.Pi * ScaledRadiusSqr * ScaledRadius;
-        Fixed64 totalVolume = cylinderVolume + sphereVolume;
-        if (totalVolume <= Fixed64.Zero)
-        {
-            // Fixed-point scaling can quantize a positive radius and both volumes to zero.
-            // The remaining shape is the zero-radius limit: a thin rod along local Y.
-            Fixed64 rodInertiaXZ = Fixed64.FromFraction(1, 12) * mass * AxisLength * AxisLength;
-            Fixed3x3 rodTensor = new(
-                rodInertiaXZ, Fixed64.Zero, Fixed64.Zero,
-                Fixed64.Zero, Fixed64.Zero, Fixed64.Zero,
-                Fixed64.Zero, Fixed64.Zero, rodInertiaXZ
-            );
-            return ShiftInertiaTensorFromLocalCenterOfMass(rodTensor, mass, localCenterOfMassOffset);
-        }
+        FixedMassWeight cylinderWeight =
+            GetCylinderWeight(ScaledRadius, AxisLength);
+        FixedMassWeight capWeight = GetCapWeight(ScaledRadius);
+        FixedMassWeight totalWeight = cylinderWeight.Add(capWeight);
 
-        Fixed64 cylinderMass = mass * (cylinderVolume / totalVolume);
+        _ = cylinderWeight.TryGetProportionalShare(
+            mass,
+            totalWeight,
+            out Fixed64 cylinderMass);
         Fixed64 sphereMass = mass - cylinderMass;
 
         // Distance from the center of the hemisphere to the center of the capsule
@@ -197,8 +193,24 @@ public class LSCapsuleCollider : LSCollider
             Fixed64.Zero, totalInertia_y, Fixed64.Zero,
             Fixed64.Zero, Fixed64.Zero, totalInertia_xz
         );
-        return ShiftInertiaTensorFromLocalCenterOfMass(tensor, mass, localCenterOfMassOffset);
+        return tensor;
     }
+
+    private static FixedMassWeight GetCylinderWeight(
+        Fixed64 radius,
+        Fixed64 axisLength) =>
+        FixedMassWeight.FromProduct(
+            Fixed64.Pi,
+            radius,
+            radius,
+            axisLength);
+
+    private static FixedMassWeight GetCapWeight(Fixed64 radius) =>
+        FixedMassWeight.FromProduct(
+            Fixed64.FromFraction(4, 3) * Fixed64.Pi,
+            radius,
+            radius,
+            radius);
 
     // If the capsule is moving in the direction of its main axis,
     // the frontal area would be a circle (the end cap of the capsule).

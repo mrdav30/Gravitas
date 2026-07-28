@@ -19,8 +19,6 @@ namespace Gravitas.Colliders;
 /// </summary>
 public sealed class LSConeCollider : LSCollider
 {
-    private Vector3d _preparedCenterOfMassOffset;
-    private Vector3d _centerOfMassOffset;
     private Fixed64 _scaledRadius = Fixed64.Half;
     private Fixed64 _preparedRadius;
     private Fixed64 _preparedHeight;
@@ -86,8 +84,12 @@ public sealed class LSConeCollider : LSCollider
         _preparedAxis = (snapshot.Rotation * Vector3d.Up).Normalized;
         _preparedVolume = Fixed64.Pi * _preparedRadius * _preparedRadius
             * _preparedHeight / (Fixed64)3;
-        _preparedCenterOfMassOffset = GetPreparedMassPropertyPoint(
-            GetLocalCenterOfMass(_preparedHeight));
+        if (CompoundOwner == null
+            && !CalculatePreparedLocalMassPoint().TryGetPoint(out _))
+        {
+            throw new InvalidOperationException(
+                "Prepared collider mass-property point is outside the Fixed64 coordinate domain.");
+        }
         SetPreparedBounds(FixedBoundBox.FromCenteredFiniteConeClippedToDomain(
             snapshot.Center,
             snapshot.Rotation,
@@ -103,19 +105,40 @@ public sealed class LSConeCollider : LSCollider
         WorldAxis = _preparedAxis;
         Volume = _preparedVolume;
         Area = _preparedVolume;
-        _centerOfMassOffset = _preparedCenterOfMassOffset;
     }
 
-    protected internal override Fixed64 CalculateMassPropertyWeight() => Volume;
-
-    public override Vector3d CalculateLocalCenterOfMassOffset()
+    protected internal override FixedMassWeight CalculateMassPropertyWeight()
     {
-        if (HasCommittedShape)
-            return _centerOfMassOffset;
-
-        return TransformRelativeMassPropertyPoint(
-            GetLocalCenterOfMass(GetCurrentHeight()));
+        Fixed64 radius = HasCommittedShape
+            ? ScaledRadius
+            : GetCurrentScaledRadius();
+        Fixed64 height = HasCommittedShape
+            ? Height
+            : GetCurrentHeight();
+        return FixedMassWeight.FromProduct(
+            Fixed64.Pi / (Fixed64)3,
+            radius,
+            radius,
+            height);
     }
+
+    internal override FixedMassWeight CalculatePreparedMassPropertyWeight() =>
+        FixedMassWeight.FromProduct(
+            Fixed64.Pi / (Fixed64)3,
+            _preparedRadius,
+            _preparedRadius,
+            _preparedHeight);
+
+    internal override FixedMassPoint CalculateLocalMassPoint() =>
+        TransformRelativeMassPropertyPointExact(
+            GetLocalCenterOfMass(
+                HasCommittedShape
+                    ? Height
+                    : GetCurrentHeight()));
+
+    internal override FixedMassPoint CalculatePreparedLocalMassPoint() =>
+        TransformPreparedRelativeMassPropertyPointExact(
+            GetLocalCenterOfMass(_preparedHeight));
 
     private Fixed64 GetCurrentHeight()
     {
@@ -134,7 +157,7 @@ public sealed class LSConeCollider : LSCollider
             -height * Fixed64.FromFraction(1, 4),
             Fixed64.Zero);
 
-    public override Fixed3x3 CalculateInertiaTensor(Fixed64 mass, Vector3d localCenterOfMassOffset)
+    internal override Fixed3x3 CalculateCenterOfMassInertiaTensor(Fixed64 mass)
     {
         Fixed64 radiusSqr = ScaledRadiusSqr;
         Fixed64 heightSqr = Height * Height;
@@ -147,7 +170,7 @@ public sealed class LSConeCollider : LSCollider
             inertiaXZ, Fixed64.Zero, Fixed64.Zero,
             Fixed64.Zero, inertiaY, Fixed64.Zero,
             Fixed64.Zero, Fixed64.Zero, inertiaXZ);
-        return ShiftInertiaTensorFromLocalCenterOfMass(tensor, mass, localCenterOfMassOffset);
+        return tensor;
     }
 
     public override Fixed64 GetFrontalArea(Vector3d direction)

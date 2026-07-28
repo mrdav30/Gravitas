@@ -22,10 +22,6 @@ public abstract partial class LSCollider
 
     private ColliderShapeSnapshot _preparedSnapshot;
     private FixedBoundBox _preparedBounds;
-    private Vector3d _preparedDefaultCenterOfMassOffset;
-    private bool _hasPreparedDefaultCenterOfMassOffset;
-    private Vector3d _defaultCenterOfMassOffset;
-    private bool _hasCommittedDefaultCenterOfMassOffset = true;
     private Fixed64 _canonicalCenteredProxyRadius = Fixed64.MaxValue;
     private Fixed64 _canonicalGroundProbeRadius;
     private GravitasWorldContext? _preparedContext;
@@ -217,17 +213,13 @@ public abstract partial class LSCollider
         _preparedContext ??= _context;
         ValidateShapeCandidate(snapshot);
         _preparedSnapshot = snapshot;
-        _hasPreparedDefaultCenterOfMassOffset =
-            TryGetPreparedMassPropertyPoint(
-                Vector3d.Zero,
-                out _preparedDefaultCenterOfMassOffset);
-        if (!_hasPreparedDefaultCenterOfMassOffset
-            && requireRepresentableMassPoint)
+        PrepareShape(snapshot);
+        if (requireRepresentableMassPoint
+            && !CalculatePreparedLocalMassPoint().TryGetPoint(out _))
         {
             throw new System.InvalidOperationException(
                 "The collider's body-local center of mass is outside the Fixed64 coordinate domain.");
         }
-        PrepareShape(snapshot);
     }
 
     private void PublishPreparedShape()
@@ -236,9 +228,6 @@ public abstract partial class LSCollider
         _committedRotation = _preparedSnapshot.Rotation;
         _committedOwnerScale = _preparedSnapshot.OwnerScale;
         _committedPartScale = _preparedSnapshot.PartScale;
-        _hasCommittedDefaultCenterOfMassOffset =
-            _hasPreparedDefaultCenterOfMassOffset;
-        _defaultCenterOfMassOffset = _preparedDefaultCenterOfMassOffset;
         _bounds = _preparedBounds;
         PublishShape();
         _canonicalCenteredProxyRadius =
@@ -321,7 +310,7 @@ public abstract partial class LSCollider
         _preparedCompoundLocalRotation = localRotation;
         PrepareRuntimeShape(
             snapshot,
-            requireRepresentableMassPoint: true);
+            requireRepresentableMassPoint: false);
     }
 
     internal void PublishCompoundPart(
@@ -337,54 +326,6 @@ public abstract partial class LSCollider
 
     protected void SetPreparedBounds(FixedBoundBox bounds) =>
         _preparedBounds = bounds;
-
-    protected Vector3d GetPreparedMassPropertyPoint(Vector3d scaledLocalPoint)
-    {
-        if (TryGetPreparedMassPropertyPoint(
-                scaledLocalPoint,
-                out Vector3d point))
-        {
-            return point;
-        }
-
-        throw new System.InvalidOperationException(
-            _compoundOwner == null
-                ? "Prepared collider mass-property point is outside the Fixed64 coordinate domain."
-                : "Prepared compound mass-property point is outside the Fixed64 coordinate domain.");
-    }
-
-    private bool TryGetPreparedMassPropertyPoint(
-        Vector3d scaledLocalPoint,
-        out Vector3d point)
-    {
-        if (_compoundOwner == null)
-        {
-            if (_preparedSnapshot.LocalOffset == Vector3d.Zero
-                && scaledLocalPoint == Vector3d.Zero)
-            {
-                point = Vector3d.Zero;
-                return true;
-            }
-
-            return Vector3d.TryComposeScaledLocalPoints(
-                _preparedSnapshot.LocalOffset,
-                _preparedSnapshot.OwnerScale,
-                Vector3d.Zero,
-                Vector3d.One,
-                scaledLocalPoint,
-                FixedQuaternion.Identity,
-                out point);
-        }
-
-        return Vector3d.TryComposeScaledLocalPoints(
-            _compoundOwner._preparedSnapshot.LocalOffset,
-            _preparedSnapshot.OwnerScale,
-            _preparedSnapshot.LocalOffset,
-            _preparedSnapshot.OwnerScale,
-            scaledLocalPoint,
-            _preparedCompoundLocalRotation,
-            out point);
-    }
 
     private protected virtual void ValidateShapeCandidate(in ColliderShapeSnapshot snapshot) { }
 

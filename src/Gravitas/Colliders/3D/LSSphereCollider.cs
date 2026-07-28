@@ -66,10 +66,21 @@ public class LSSphereCollider : LSCollider
         Area = _preparedArea;
     }
 
-    protected internal override Fixed64 CalculateMassPropertyWeight() =>
-        Fixed64.FromFraction(4, 3) * Fixed64.Pi * ScaledRadiusSqr * ScaledRadius;
+    protected internal override FixedMassWeight CalculateMassPropertyWeight() =>
+        FixedMassWeight.FromProduct(
+            Fixed64.FromFraction(4, 3) * Fixed64.Pi,
+            ScaledRadius,
+            ScaledRadius,
+            ScaledRadius);
 
-    public override Fixed3x3 CalculateInertiaTensor(Fixed64 mass, Vector3d localCenterOfMassOffset)
+    internal override FixedMassWeight CalculatePreparedMassPropertyWeight() =>
+        FixedMassWeight.FromProduct(
+            Fixed64.FromFraction(4, 3) * Fixed64.Pi,
+            _preparedRadius,
+            _preparedRadius,
+            _preparedRadius);
+
+    internal override Fixed3x3 CalculateCenterOfMassInertiaTensor(Fixed64 mass)
     {
         // For a solid sphere, the inertia tensor is (2/5)*m*r^2 for the diagonal elements
         Fixed64 diagonalElement = Fixed64.FromFraction(2, 5) * mass * ScaledRadiusSqr;
@@ -79,7 +90,7 @@ public class LSSphereCollider : LSCollider
             Fixed64.Zero, diagonalElement, Fixed64.Zero,
             Fixed64.Zero, Fixed64.Zero, diagonalElement
         );
-        return ShiftInertiaTensorFromLocalCenterOfMass(tensor, mass, localCenterOfMassOffset);
+        return tensor;
     }
 
     public override Vector3d ClosestPointOnSurface(Vector3d other)

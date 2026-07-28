@@ -22,8 +22,8 @@ public sealed class LSCompoundCollider2D : LSCollider2D
 {
     private readonly CompoundColliderPart2D[] _parts;
     private readonly LSCollider2D[] _partColliders;
-    private readonly Vector2d[] _massCenterScratch;
-    private readonly Fixed64[] _massWeightScratch;
+    private readonly FixedMassPoint2d[] _massPointScratch;
+    private readonly FixedMassWeight[] _massWeightScratch;
     private readonly ContactManifold2D _partManifoldScratch = new();
 
     public LSCompoundCollider2D(params CompoundColliderPart2D[] parts)
@@ -36,8 +36,8 @@ public sealed class LSCompoundCollider2D : LSCollider2D
 
         _parts = new CompoundColliderPart2D[parts.Length];
         _partColliders = new LSCollider2D[parts.Length];
-        _massCenterScratch = new Vector2d[parts.Length];
-        _massWeightScratch = new Fixed64[parts.Length];
+        _massPointScratch = new FixedMassPoint2d[parts.Length];
+        _massWeightScratch = new FixedMassWeight[parts.Length];
         for (int i = 0; i < parts.Length; i++)
         {
             _parts[i] = parts[i];
@@ -124,64 +124,131 @@ public sealed class LSCompoundCollider2D : LSCollider2D
         return bestPoint;
     }
 
-    public override Vector2d CalculateLocalCenterOfMassOffset()
+    internal override FixedMassPoint2d CalculateLocalMassPoint() =>
+        CalculateAggregateMassPoint(usePrepared: false);
+
+    internal override FixedMassPoint2d CalculatePreparedLocalMassPoint() =>
+        CalculateAggregateMassPoint(usePrepared: true);
+
+    private FixedMassPoint2d CalculateAggregateMassPoint(bool usePrepared)
     {
-        bool hasPositiveArea = false;
+        bool hasPositiveWeight = false;
         for (int i = 0; i < _partColliders.Length; i++)
         {
             LSCollider2D partCollider = _partColliders[i];
-            Fixed64 partArea = partCollider.CalculateAreaForMassProperties();
-            _massCenterScratch[i] =
-                partCollider.CalculateLocalCenterOfMassOffset();
-            _massWeightScratch[i] = partArea;
-            hasPositiveArea |= partArea > Fixed64.Zero;
+            FixedMassWeight weight = usePrepared
+                ? partCollider.CalculatePreparedAreaForMassProperties()
+                : partCollider.CalculateAreaForMassProperties();
+            _massPointScratch[i] = usePrepared
+                ? partCollider.CalculatePreparedLocalMassPoint()
+                : partCollider.CalculateLocalMassPoint();
+            _massWeightScratch[i] = weight;
+            hasPositiveWeight |= !weight.IsZero;
         }
 
-        if (hasPositiveArea)
+        if (!hasPositiveWeight)
         {
-            Vector2d.TryGetWeightedAverage(
-                _massCenterScratch,
-                _massWeightScratch,
-                out Vector2d weightedCenter);
-            return weightedCenter;
+            for (int i = 0; i < _massWeightScratch.Length; i++)
+                _massWeightScratch[i] = FixedMassWeight.One;
         }
 
-        for (int i = 0; i < _partColliders.Length; i++)
-            _massWeightScratch[i] = Fixed64.One;
-
-        Vector2d.TryGetWeightedAverage(
-            _massCenterScratch,
+        if (!FixedMassPoint2d.TryGetWeightedAverage(
+            _massPointScratch,
             _massWeightScratch,
-            out Vector2d equalWeightedCenter);
-        return equalWeightedCenter;
+            out Vector2d center))
+        {
+            throw new InvalidOperationException(
+                usePrepared
+                    ? "Prepared 2D compound mass-property point is outside the Fixed64 coordinate domain."
+                    : "The 2D compound collider's center of mass is outside the Fixed64 coordinate domain.");
+        }
+        return FixedMassPoint2d.FromPoint(center);
     }
 
-    internal override Fixed64 CalculateAreaForMassProperties()
+    internal override FixedMassWeight CalculateAreaForMassProperties() =>
+        CalculateAggregateMassWeight(usePrepared: false);
+
+    internal override FixedMassWeight CalculatePreparedAreaForMassProperties() =>
+        CalculateAggregateMassWeight(usePrepared: true);
+
+    private FixedMassWeight CalculateAggregateMassWeight(bool usePrepared)
     {
-        Fixed64 totalArea = Fixed64.Zero;
+        FixedMassWeight totalWeight = FixedMassWeight.Zero;
         for (int i = 0; i < _partColliders.Length; i++)
-            totalArea += _partColliders[i].CalculateAreaForMassProperties();
+        {
+            FixedMassWeight weight = usePrepared
+                ? _partColliders[i].CalculatePreparedAreaForMassProperties()
+                : _partColliders[i].CalculateAreaForMassProperties();
+            totalWeight = totalWeight.Add(weight);
+        }
 
-        return totalArea;
+        return totalWeight;
     }
 
-    public override Fixed64 CalculateMomentOfInertia(Fixed64 mass, Vector2d localReferencePoint)
+    internal override Fixed64 CalculateCenterOfMassMoment(Fixed64 mass)
     {
-        if (mass <= Fixed64.Zero)
-            return Fixed64.Zero;
+        Vector2d center = CalculateLocalCenterOfMassOffset();
+        FixedMassWeight totalWeight = FixedMassWeight.Zero;
+        int residualPartIndex = _partColliders.Length - 1;
+        for (int i = 0; i < _partColliders.Length; i++)
+        {
+            FixedMassWeight weight =
+                _partColliders[i].CalculateAreaForMassProperties();
+            totalWeight = totalWeight.Add(weight);
+            residualPartIndex = i;
+        }
 
-        Fixed64 totalArea = CalculateAreaForMassProperties();
-        Fixed64 equalPartMass = mass / (Fixed64)_partColliders.Length;
+        bool useEqualWeights = totalWeight.IsZero;
+        if (useEqualWeights)
+        {
+            totalWeight = FixedMassWeight.Zero;
+            for (int i = 0; i < _partColliders.Length; i++)
+                totalWeight = totalWeight.Add(FixedMassWeight.One);
+        }
 
+        FixedMassWeight cumulativeWeight = FixedMassWeight.Zero;
+        Fixed64 assignedMass = Fixed64.Zero;
         Fixed64 moment = Fixed64.Zero;
         for (int i = 0; i < _partColliders.Length; i++)
         {
-            LSCollider2D partCollider = _partColliders[i];
-            Fixed64 partArea = partCollider.CalculateAreaForMassProperties();
-            Fixed64 partMass = totalArea > Fixed64.Zero
-                ? mass * (partArea / totalArea)
-                : equalPartMass;
-            moment += partCollider.CalculateMomentOfInertia(partMass, localReferencePoint);
+            LSCollider2D part = _partColliders[i];
+            FixedMassWeight weight = useEqualWeights
+                ? FixedMassWeight.One
+                : part.CalculateAreaForMassProperties();
+            cumulativeWeight = cumulativeWeight.Add(weight);
+            Fixed64 partMass;
+            if (i == residualPartIndex)
+            {
+                partMass = mass - assignedMass;
+                assignedMass = mass;
+            }
+            else
+            {
+                _ = cumulativeWeight.TryGetProportionalShare(
+                    mass,
+                    totalWeight,
+                    out Fixed64 cumulativeMass);
+                partMass = cumulativeMass - assignedMass;
+                assignedMass = cumulativeMass;
+            }
+
+            if (partMass == Fixed64.Zero)
+                continue;
+
+            if (!part.CalculateLocalMassPoint()
+                    .TryAddParallelAxisMoment(
+                        part.CalculateCenterOfMassMoment(partMass),
+                        partMass,
+                        center,
+                        out Fixed64 contribution)
+                || !Fixed64.TryAdd(
+                    moment,
+                    contribution,
+                    out moment))
+            {
+                throw new InvalidOperationException(
+                    "The 2D compound collider's moment of inertia is outside the Fixed64 scalar domain.");
+            }
         }
 
         return moment;
@@ -215,6 +282,8 @@ public sealed class LSCompoundCollider2D : LSCollider2D
             max = new Vector2d(FixedMath.Max(max.X, partMax.X), FixedMath.Max(max.Y, partMax.Y));
         }
 
+        _ = CalculatePreparedLocalMassPoint();
+        _ = CalculatePreparedAreaForMassProperties();
         SetPreparedBounds(FixedBoundArea.FromMinMax(min, max));
     }
 

@@ -6,8 +6,8 @@
 //=======================================================================
 
 using FixedMathSharp;
+using FixedMathSharp.Geometry;
 using System;
-using static Gravitas.Colliders.MeshCheckedMath;
 
 namespace Gravitas.Colliders;
 
@@ -57,178 +57,26 @@ public readonly struct MeshSurfaceMassProperties
     internal static bool TryCreate(
         ReadOnlySpan<Vector3d> localVertices,
         ReadOnlySpan<int> triangles,
-        ReadOnlySpan<Fixed64> scaledFaceAreas,
-        Vector3d reference,
         Fixed64 totalArea,
+        out FixedMassWeight totalWeight,
         out MeshSurfaceMassProperties properties)
     {
         properties = default;
-        Vector3d firstMoment = Vector3d.Zero;
-
-        for (int i = 0; i < scaledFaceAreas.Length; i++)
-        {
-            int triangleIndex = i * 3;
-            bool valid = TrySubtract(
-                localVertices[triangles[triangleIndex]],
-                reference,
-                out Vector3d a);
-            valid &= TrySubtract(
-                localVertices[triangles[triangleIndex + 1]],
-                reference,
-                out Vector3d b);
-            valid &= TrySubtract(
-                localVertices[triangles[triangleIndex + 2]],
-                reference,
-                out Vector3d c);
-            Fixed64 area = scaledFaceAreas[i];
-            valid &= TryAdd(a, b, out Vector3d vertexSum);
-            valid &= TryAdd(vertexSum, c, out vertexSum);
-            valid &= TryMultiplyDivide(
-                vertexSum,
-                area,
-                (Fixed64)3,
-                out Vector3d triangleMoment);
-            valid &= TryAdd(firstMoment, triangleMoment, out firstMoment);
-            if (!valid)
-            {
-                return false;
-            }
-        }
-
-        // Positive face-area weights keep the centroid inside the admitted
-        // vertex bounds, so both materializations are representable.
-        _ = TryDivide(
-            firstMoment,
-            totalArea,
-            out Vector3d centerRelativeToReference);
-        _ = TryAdd(
-            reference,
-            centerRelativeToReference,
-            out Vector3d centerOfMass);
-
-        Fixed3x3 areaWeightedTensor = Fixed3x3.Zero;
-        for (int i = 0; i < scaledFaceAreas.Length; i++)
-        {
-            int triangleIndex = i * 3;
-            bool valid = TrySubtract(
-                localVertices[triangles[triangleIndex]],
-                reference,
-                out Vector3d a);
-            valid &= TrySubtract(
-                localVertices[triangles[triangleIndex + 1]],
-                reference,
-                out Vector3d b);
-            valid &= TrySubtract(
-                localVertices[triangles[triangleIndex + 2]],
-                reference,
-                out Vector3d c);
-            valid &= TryAdd(a, b, out Vector3d triangleSum);
-            valid &= TryAdd(triangleSum, c, out triangleSum);
-            valid &= TryDivide(triangleSum, (Fixed64)3, out Vector3d triangleCenter);
-            valid &= TrySubtract(a, triangleCenter, out Vector3d relativeA);
-            valid &= TrySubtract(b, triangleCenter, out Vector3d relativeB);
-            valid &= TrySubtract(c, triangleCenter, out Vector3d relativeC);
-            valid &= TryCreateBarycentricProductSums(relativeA, relativeB, relativeC, out Fixed3x3 productSums);
-            if (!valid)
-            {
-                return false;
-            }
-
-            Fixed64 x2 = productSums.M11 / (Fixed64)6;
-            Fixed64 y2 = productSums.M22 / (Fixed64)6;
-            Fixed64 z2 = productSums.M33 / (Fixed64)6;
-            Fixed64 xy = productSums.M12 / (Fixed64)12;
-            Fixed64 xz = productSums.M13 / (Fixed64)12;
-            Fixed64 yz = productSums.M23 / (Fixed64)12;
-            Fixed3x3 triangleCentralTensor = new(
-                y2 + z2, -xy, -xz,
-                -xy, x2 + z2, -yz,
-                -xz, -yz, x2 + y2);
-            valid = TrySubtract(triangleCenter, centerRelativeToReference, out Vector3d centerOffset);
-            valid &= TryCreateParallelAxisTensor(centerOffset, out Fixed3x3 parallelAxisTensor);
-            valid &= TryAdd(triangleCentralTensor, parallelAxisTensor, out Fixed3x3 triangleTensor);
-            valid &= TryMultiply(triangleTensor, scaledFaceAreas[i], out Fixed3x3 weightedTriangleTensor);
-            valid &= TryAdd(areaWeightedTensor, weightedTriangleTensor, out areaWeightedTensor);
-            if (!valid)
-            {
-                return false;
-            }
-        }
-
-        // Every accumulated tensor component is an area-weighted average of
-        // representable per-triangle components. With positive admitted face
-        // areas, dividing the representable sum by their positive total cannot
-        // leave the Fixed64 component domain.
-        _ = TryDivide(
-            areaWeightedTensor,
-            totalArea,
-            out Fixed3x3 unitCenterTensor);
-
-        properties = new MeshSurfaceMassProperties(totalArea, centerOfMass, centerOfMass, unitCenterTensor);
-        return true;
-    }
-
-    private static bool TryCreateBarycentricProductSums(
-        Vector3d a,
-        Vector3d b,
-        Vector3d c,
-        out Fixed3x3 sums)
-    {
-        sums = default;
-        bool valid = TrySquaredBarycentricSum(a.X, b.X, c.X, out Fixed64 xx);
-        valid &= TrySquaredBarycentricSum(a.Y, b.Y, c.Y, out Fixed64 yy);
-        valid &= TrySquaredBarycentricSum(a.Z, b.Z, c.Z, out Fixed64 zz);
-        valid &= TryBarycentricCrossSum(a.X, b.X, c.X, a.Y, b.Y, c.Y, out Fixed64 xy);
-        valid &= TryBarycentricCrossSum(a.X, b.X, c.X, a.Z, b.Z, c.Z, out Fixed64 xz);
-        valid &= TryBarycentricCrossSum(a.Y, b.Y, c.Y, a.Z, b.Z, c.Z, out Fixed64 yz);
-        if (!valid)
+        if (!FixedTriangle.TryGetUniformShellMassProperties(
+                localVertices,
+                triangles,
+                out totalWeight,
+                out Vector3d centerOfMass,
+                out Fixed3x3 unitCenterTensor))
         {
             return false;
         }
 
-        sums = new Fixed3x3(xx, xy, xz, xy, yy, yz, xz, yz, zz);
+        properties = new MeshSurfaceMassProperties(
+            totalArea,
+            centerOfMass,
+            centerOfMass,
+            unitCenterTensor);
         return true;
     }
-
-    private static bool TrySquaredBarycentricSum(Fixed64 a, Fixed64 b, Fixed64 c, out Fixed64 sum)
-    {
-        sum = default;
-        bool valid = TryMultiply(a, a, out Fixed64 aa);
-        valid &= TryMultiply(b, b, out Fixed64 bb);
-        valid &= TryMultiply(c, c, out Fixed64 cc);
-        valid &= TryMultiply(a, b, out Fixed64 ab);
-        valid &= TryMultiply(a, c, out Fixed64 ac);
-        valid &= TryMultiply(b, c, out Fixed64 bc);
-        valid &= TryAdd(aa, bb, out sum);
-        valid &= TryAdd(sum, cc, out sum);
-        valid &= TryAdd(sum, ab, out sum);
-        valid &= TryAdd(sum, ac, out sum);
-        valid &= TryAdd(sum, bc, out sum);
-        return valid;
-    }
-
-    private static bool TryBarycentricCrossSum(
-        Fixed64 firstA,
-        Fixed64 firstB,
-        Fixed64 firstC,
-        Fixed64 secondA,
-        Fixed64 secondB,
-        Fixed64 secondC,
-        out Fixed64 sum)
-    {
-        sum = default;
-        bool valid = TryAdd(firstA, firstB, out Fixed64 firstSum);
-        valid &= TryAdd(firstSum, firstC, out firstSum);
-        valid &= TryAdd(secondA, secondB, out Fixed64 secondSum);
-        valid &= TryAdd(secondSum, secondC, out secondSum);
-        valid &= TryMultiply(firstSum, secondSum, out Fixed64 sumProduct);
-        valid &= TryMultiply(firstA, secondA, out Fixed64 firstProduct);
-        valid &= TryMultiply(firstB, secondB, out Fixed64 secondProduct);
-        valid &= TryMultiply(firstC, secondC, out Fixed64 thirdProduct);
-        valid &= TryAdd(firstProduct, secondProduct, out Fixed64 matchingProducts);
-        valid &= TryAdd(matchingProducts, thirdProduct, out matchingProducts);
-        valid &= TryAdd(sumProduct, matchingProducts, out sum);
-        return valid;
-    }
-
 }

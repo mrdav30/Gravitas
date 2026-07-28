@@ -16,7 +16,6 @@ public abstract partial class LSCollider2D
     private Fixed64 _committedRotation;
     private Vector2d _committedOwnerScale = Vector2d.One;
     private Vector2d _committedPartScale = Vector2d.One;
-    private bool _hasCommittedDefaultCenterOfMassOffset = true;
     private bool _hasCommittedShape;
 
     protected bool HasCommittedShape => _hasCommittedShape;
@@ -24,9 +23,6 @@ public abstract partial class LSCollider2D
     private ColliderShapeSnapshot2D _preparedSnapshot;
     private FixedBoundArea _preparedBounds;
     private FixedBoundBox _preparedMixedBounds;
-    private Vector2d _preparedDefaultCenterOfMassOffset;
-    private bool _hasPreparedDefaultCenterOfMassOffset;
-    private Vector2d _defaultCenterOfMassOffset;
     private Fixed64 _canonicalCenteredProxyRadius = Fixed64.MaxValue;
     private Fixed64 _canonicalGroundProbeRadius;
     private GravitasWorldContext? _preparedContext;
@@ -244,17 +240,13 @@ public abstract partial class LSCollider2D
     {
         _preparedContext ??= _context;
         _preparedSnapshot = snapshot;
-        _hasPreparedDefaultCenterOfMassOffset =
-            TryGetPreparedMassPropertyPoint(
-                Vector2d.Zero,
-                out _preparedDefaultCenterOfMassOffset);
-        if (!_hasPreparedDefaultCenterOfMassOffset
-            && requireRepresentableMassPoint)
+        PrepareShape(snapshot);
+        if (requireRepresentableMassPoint
+            && !CalculatePreparedLocalMassPoint().TryGetPoint(out _))
         {
             throw new System.InvalidOperationException(
                 "The 2D collider's body-local center of mass is outside the Fixed64 coordinate domain.");
         }
-        PrepareShape(snapshot);
         Vector2d min = _preparedBounds.Min;
         Vector2d max = _preparedBounds.Max;
         _preparedMixedBounds = FixedBoundBox.FromMinMax(
@@ -274,9 +266,6 @@ public abstract partial class LSCollider2D
         _committedRotation = _preparedSnapshot.Rotation;
         _committedOwnerScale = _preparedSnapshot.OwnerScale;
         _committedPartScale = _preparedSnapshot.PartScale;
-        _hasCommittedDefaultCenterOfMassOffset =
-            _hasPreparedDefaultCenterOfMassOffset;
-        _defaultCenterOfMassOffset = _preparedDefaultCenterOfMassOffset;
         _bounds = _preparedBounds;
         _mixedBounds3D = _preparedMixedBounds;
         _mixedSlabCenterY = _preparedSnapshot.MixedSlabCenterY;
@@ -391,7 +380,7 @@ public abstract partial class LSCollider2D
         _preparedCompoundLocalRotation = localRotation;
         PrepareRuntimeShape(
             snapshot,
-            requireRepresentableMassPoint: true);
+            requireRepresentableMassPoint: false);
     }
 
     internal void PublishCompoundPart(
@@ -407,46 +396,6 @@ public abstract partial class LSCollider2D
 
     protected void SetPreparedBounds(FixedBoundArea bounds) =>
         _preparedBounds = bounds;
-
-    private bool TryGetPreparedMassPropertyPoint(
-        Vector2d scaledLocalPoint,
-        out Vector2d point)
-    {
-        if (_compoundOwner == null)
-        {
-            if (Vector2d.TryTransformScaledPoint(
-                    Vector2d.Zero,
-                    _preparedSnapshot.LocalOffset,
-                    _preparedSnapshot.OwnerScale,
-                    scaledLocalPoint,
-                    Fixed64.Zero,
-                    out point))
-            {
-                return true;
-            }
-
-            point = default;
-            return false;
-        }
-
-        return TryGetPreparedCompoundMassPropertyPoint(
-                scaledLocalPoint,
-                out point);
-    }
-
-    private bool TryGetPreparedCompoundMassPropertyPoint(
-        Vector2d scaledLocalPoint,
-        out Vector2d point)
-    {
-        return Vector2d.TryComposeScaledLocalPoints(
-            _compoundOwner!._preparedSnapshot.LocalOffset,
-            _preparedSnapshot.OwnerScale,
-            _preparedSnapshot.LocalOffset,
-            _preparedSnapshot.OwnerScale,
-            scaledLocalPoint,
-            _preparedCompoundLocalRotation,
-            out point);
-    }
 
     private protected abstract void PrepareShape(in ColliderShapeSnapshot2D snapshot);
 

@@ -726,6 +726,25 @@ public sealed class PhysicsMeshTests
 
         mesh.GetFrontalArea(Vector3d.Left).Should().Be(mesh.TotalArea);
         mesh.GetFrontalArea(Vector3d.Up).Should().Be(Fixed64.Zero);
+
+        Fixed64 fractionalHeight =
+            Fixed64.Epsilon * Fixed64.Two + Fixed64.FromRaw(3);
+        var fractionalMesh = new PhysicsMesh(
+            new[]
+            {
+                Vector3d.Zero,
+                Vector3d.Right,
+                Vector3d.Up * fractionalHeight
+            },
+            new[] { 0, 1, 2, 0, 1, 2, 0, 1, 2 },
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            MeshColliderMode.Concave);
+
+        fractionalMesh.GetFrontalArea(Vector3d.Forward)
+            .Should().Be(fractionalMesh.TotalArea);
+        fractionalMesh.SurfaceMassProperties.Area
+            .Should().Be(fractionalMesh.TotalArea);
     }
 
     [Fact]

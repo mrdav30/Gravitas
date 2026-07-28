@@ -1,4 +1,5 @@
 using FixedMathSharp;
+using FixedMathSharp.Geometry;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Queries;
@@ -12,24 +13,109 @@ namespace Gravitas.Tests.Colliders;
 public sealed class LSCompoundColliderMassPropertyTests
 {
     [Fact]
-    public void DetachedCompoundPartCenterOfMass_ShouldRejectUnrepresentableLocalComposition()
+    public void DetachedCompound_ShouldAggregateAnUnrepresentableChildCenter()
     {
         var compound = new LSCompoundCollider(
-            CompoundColliderPart.Sphere(
-                Fixed64.Half,
-                Vector3d.Right))
+            CompoundColliderPart.Sphere(Fixed64.Half, Vector3d.Right),
+            CompoundColliderPart.Sphere(Fixed64.Half, -Vector3d.Right))
         {
             LocalOffset = new Vector3d(
                 Fixed64.MaxValue,
                 Fixed64.Zero,
                 Fixed64.Zero)
         };
-        LSCollider part = compound.GetPartCollider(0);
+        LSCollider unrepresentablePart = compound.GetPartCollider(0);
 
-        Action calculate = () => part.CalculateLocalCenterOfMassOffset();
+        Action calculatePart =
+            () => unrepresentablePart.CalculateLocalCenterOfMassOffset();
+        Action calculatePartTensor =
+            () => unrepresentablePart.CalculateInertiaTensor(
+                Fixed64.One,
+                Vector3d.Zero);
+        Vector3d center = compound.CalculateLocalCenterOfMassOffset();
+        Fixed3x3 tensor = compound.CalculateInertiaTensor(
+            Fixed64.One,
+            center);
+
+        calculatePart.Should().Throw<InvalidOperationException>()
+            .WithMessage("*outside*coordinate*domain*");
+        calculatePartTensor.Should().Throw<InvalidOperationException>()
+            .WithMessage("*outside the Fixed64 scalar domain*");
+        center.Should().Be(new Vector3d(
+            Fixed64.MaxValue,
+            Fixed64.Zero,
+            Fixed64.Zero));
+        tensor.M11.Should().BeGreaterThan(Fixed64.Zero);
+        tensor.M22.Should().BeGreaterThan(tensor.M11);
+        tensor.M33.Should().Be(tensor.M22);
+    }
+
+    [Fact]
+    public void DetachedCompound_ShouldRejectAnUnrepresentableAggregateCenter()
+    {
+        var compound = new LSCompoundCollider(
+            CompoundColliderPart.Sphere(Fixed64.Half, Vector3d.Right),
+            CompoundColliderPart.Sphere(
+                Fixed64.Half,
+                new Vector3d((Fixed64)3, Fixed64.Zero, Fixed64.Zero)))
+        {
+            LocalOffset = new Vector3d(
+                Fixed64.MaxValue,
+                Fixed64.Zero,
+                Fixed64.Zero)
+        };
+
+        Action calculate = () =>
+            compound.CalculateLocalCenterOfMassOffset();
 
         calculate.Should().Throw<InvalidOperationException>()
-            .WithMessage("*outside*coordinate*domain*");
+            .WithMessage("*compound collider's center of mass*");
+    }
+
+    [Fact]
+    public void InitializedCompound_ShouldAggregateAnUnrepresentableBodyLocalChildCenter()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        var compound = new LSCompoundCollider(
+            CompoundColliderPart.Sphere(Fixed64.Half, Vector3d.Right),
+            CompoundColliderPart.Sphere(Fixed64.Half, -Vector3d.Right))
+        {
+            LocalOffset = new Vector3d(
+                Fixed64.MaxValue,
+                Fixed64.Zero,
+                Fixed64.Zero)
+        };
+
+        scenario.CreateBody(
+            compound,
+            new Vector3d(
+                Fixed64.MinValue,
+                Fixed64.Zero,
+                Fixed64.Zero),
+            FixedQuaternion.Identity,
+            mass: Fixed64.One);
+
+        compound.CalculateLocalCenterOfMassOffset().Should().Be(
+            new Vector3d(
+                Fixed64.MaxValue,
+                Fixed64.Zero,
+                Fixed64.Zero));
+    }
+
+    [Fact]
+    public void Compound_ShouldPreserveWideVolumeRatios()
+    {
+        Fixed64 extent = (Fixed64)1_500_000;
+        var compound = new LSCompoundCollider(
+            CompoundColliderPart.Cuboid(
+                new Vector3d(extent, extent, extent),
+                Vector3d.Zero),
+            CompoundColliderPart.Cuboid(
+                new Vector3d(extent, extent, extent * Fixed64.Two),
+                new Vector3d((Fixed64)3, Fixed64.Zero, Fixed64.Zero)));
+
+        compound.CalculateLocalCenterOfMassOffset().Should().Be(
+            new Vector3d(Fixed64.Two, Fixed64.Zero, Fixed64.Zero));
     }
 
     [Fact]
@@ -87,7 +173,7 @@ public sealed class LSCompoundColliderMassPropertyTests
     }
 
     [Fact]
-    public void MassProperties_WhenAllVolumesQuantizeToZero_ShouldConserveMassInAuthoredOrder()
+    public void MassProperties_WhenAllVolumeMeasuresRoundToZero_ShouldConserveMassInAuthoredOrder()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         Fixed64 tinyRadius = Fixed64.FromRaw(1);
@@ -99,9 +185,17 @@ public sealed class LSCompoundColliderMassPropertyTests
         Fixed64 mass = Fixed64.One;
         Vector3d center = compound.CalculateLocalCenterOfMassOffset();
         Fixed64 firstMass = mass / (Fixed64)3;
-        Fixed64 lastMass = mass - firstMass - firstMass;
+        Fixed64.TryMultiplyDivide(
+                mass,
+                Fixed64.Two,
+                (Fixed64)3,
+                out Fixed64 cumulativeSecondMass)
+            .Should()
+            .BeTrue();
+        Fixed64 secondMass = cumulativeSecondMass - firstMass;
+        Fixed64 lastMass = mass - cumulativeSecondMass;
         Fixed64 expectedTransverse = firstMass * (center.X + Fixed64.One) * (center.X + Fixed64.One)
-            + firstMass * center.X * center.X
+            + secondMass * center.X * center.X
             + lastMass * ((Fixed64)4 - center.X) * ((Fixed64)4 - center.X);
         Fixed3x3 expected = new(
             Fixed64.Zero, Fixed64.Zero, Fixed64.Zero,
@@ -128,6 +222,40 @@ public sealed class LSCompoundColliderMassPropertyTests
             Fixed64.FromFraction(2, 5), Fixed64.Zero, Fixed64.Zero,
             Fixed64.Zero, Fixed64.FromFraction(2, 5), Fixed64.Zero,
             Fixed64.Zero, Fixed64.Zero, Fixed64.FromFraction(2, 5)));
+    }
+
+    [Fact]
+    public void MassProperties_ShouldApportionTinyMassFromCumulativeWeightShares()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        var compound = new LSCompoundCollider(
+            CompoundColliderPart.Cuboid(
+                new Vector3d((Fixed64)3, Fixed64.One, Fixed64.One),
+                Vector3d.Zero),
+            CompoundColliderPart.Cuboid(
+                new Vector3d((Fixed64)3, Fixed64.One, Fixed64.One),
+                Vector3d.Zero),
+            CompoundColliderPart.Cuboid(
+                new Vector3d((Fixed64)3, Fixed64.One, Fixed64.One),
+                Vector3d.Zero),
+            CompoundColliderPart.Cuboid(Vector3d.One, Vector3d.Zero));
+        scenario.CreateBody(
+            compound,
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            preventAngularForces: true);
+        Fixed64 apportionedMass = Fixed64.FromRaw(1);
+        Fixed3x3 expected =
+            compound.GetPartCollider(0)
+                .CalculateCenterOfMassInertiaTensor(apportionedMass)
+            + compound.GetPartCollider(2)
+                .CalculateCenterOfMassInertiaTensor(apportionedMass);
+
+        compound.CalculateInertiaTensor(
+                Fixed64.FromRaw(2),
+                Vector3d.Zero)
+            .Should()
+            .Be(expected);
     }
 
     [Fact]
@@ -199,20 +327,23 @@ public sealed class LSCompoundColliderMassPropertyTests
         var closedMesh = (LSMeshCollider)compound.GetPartCollider(5);
         var shellMesh = (LSMeshCollider)compound.GetPartCollider(6);
 
-        sphere.CalculateMassPropertyWeight().Should().Be(
+        GetMeasure(sphere.CalculateMassPropertyWeight()).Should().Be(
             Fixed64.FromFraction(4, 3) * Fixed64.Pi * sphere.ScaledRadiusSqr * sphere.ScaledRadius);
-        capsule.CalculateMassPropertyWeight().Should().Be(
+        GetMeasure(capsule.CalculateMassPropertyWeight()).Should().Be(
             Fixed64.Pi * capsule.ScaledRadiusSqr * capsule.AxisLength
             + Fixed64.FromFraction(4, 3) * Fixed64.Pi * capsule.ScaledRadiusSqr * capsule.ScaledRadius);
-        box.CalculateMassPropertyWeight().Should().Be((Fixed64)24);
-        cylinder.CalculateMassPropertyWeight().Should().Be(
+        GetMeasure(box.CalculateMassPropertyWeight()).Should().Be((Fixed64)24);
+        GetMeasure(cylinder.CalculateMassPropertyWeight()).Should().Be(
             Fixed64.Pi * cylinder.ScaledRadiusSqr * cylinder.Height);
-        cone.CalculateMassPropertyWeight().Should().Be(cone.Volume);
+        AssertNear(
+            GetMeasure(cone.CalculateMassPropertyWeight()),
+            cone.Volume);
         closedMesh.Mesh.TryGetClosedVolumeMassProperties(out MeshMassProperties closedProperties, out _)
             .Should().BeTrue();
-        closedMesh.CalculateMassPropertyWeight().Should().Be(closedProperties.Volume);
-        shellMesh.CalculateMassPropertyWeight().Should().Be(shellMesh.Mesh.TotalArea);
-        shellMesh.CalculateMassPropertyWeight().Should().NotBe(closedMesh.CalculateMassPropertyWeight());
+        GetMeasure(closedMesh.CalculateMassPropertyWeight()).Should().Be(closedProperties.Volume);
+        GetMeasure(shellMesh.CalculateMassPropertyWeight()).Should().Be(shellMesh.Mesh.TotalArea);
+        GetMeasure(shellMesh.CalculateMassPropertyWeight())
+            .Should().NotBe(GetMeasure(closedMesh.CalculateMassPropertyWeight()));
     }
 
     [Fact]
@@ -240,13 +371,19 @@ public sealed class LSCompoundColliderMassPropertyTests
             preventAngularForces: true);
         var mesh = (LSMeshCollider)compound.GetPartCollider(0);
 
-        mesh.CalculateMassPropertyWeight().Should().Be(Fixed64.Zero);
-        compound.CalculateMassPropertyWeight().Should().Be(Fixed64.Zero);
+        GetMeasure(mesh.CalculateMassPropertyWeight()).Should().Be(Fixed64.Zero);
+        GetMeasure(compound.CalculateMassPropertyWeight()).Should().Be(Fixed64.Zero);
         compound.CalculateLocalCenterOfMassOffset().Should().Be(Vector3d.Zero);
+        FluentActions.Invoking(
+                () => compound.CalculateInertiaTensor(
+                    Fixed64.One,
+                    Vector3d.Zero))
+            .Should().Throw<InvalidOperationException>()
+            .WithMessage("*valid mass properties*");
     }
 
     [Fact]
-    public void QuantizedConePart_ShouldUseDeterministicDegenerateSideProjection()
+    public void MinimumRepresentableConePart_ShouldUseDeterministicDegenerateSideProjection()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         Vector3d tinyScale = new(
@@ -265,7 +402,7 @@ public sealed class LSCompoundColliderMassPropertyTests
         cone.WorldAxis.Should().Be(Vector3d.Up);
         cone.Height.Should().Be(Fixed64.FromRaw(1));
         cone.ScaledRadius.Should().Be(Fixed64.FromRaw(1));
-        cone.CalculateMassPropertyWeight().Should().Be(Fixed64.Zero);
+        GetMeasure(cone.CalculateMassPropertyWeight()).Should().Be(Fixed64.Zero);
         cone.ClosestPointOnSurface(Vector3d.Right)
             .Should().Be(new Vector3d(Fixed64.FromRaw(1), Fixed64.Zero, Fixed64.Zero));
     }
@@ -335,9 +472,60 @@ public sealed class LSCompoundColliderMassPropertyTests
         AssertMatrixNear(tensor, expectedTensor);
     }
 
+    [Fact]
+    public void Compound_ShouldRejectAnUnrepresentablePartParallelAxisTensor()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        var compound = new LSCompoundCollider(
+            CompoundColliderPart.Sphere(
+                Fixed64.One,
+                new Vector3d((Fixed64)(-50000), Fixed64.Zero, Fixed64.Zero)),
+            CompoundColliderPart.Sphere(
+                Fixed64.One,
+                new Vector3d((Fixed64)50000, Fixed64.Zero, Fixed64.Zero)));
+        scenario.CreateBody(
+            compound,
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            preventAngularForces: true);
+
+        FluentActions.Invoking(
+                () => compound.CalculateInertiaTensor(
+                    Fixed64.Two,
+                    Vector3d.Zero))
+            .Should().Throw<InvalidOperationException>()
+            .WithMessage("*outside the Fixed64 scalar domain*");
+    }
+
+    [Fact]
+    public void Compound_ShouldRejectAnUnrepresentableFinalTensorSum()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        var compound = new LSCompoundCollider(
+            CompoundColliderPart.Sphere((Fixed64)2, Vector3d.Zero),
+            CompoundColliderPart.Sphere((Fixed64)2, Vector3d.Zero));
+        scenario.CreateBody(
+            compound,
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+
+        FluentActions.Invoking(
+                () => compound.CalculateInertiaTensor(
+                    Fixed64.MaxValue,
+                    Vector3d.Zero))
+            .Should().Throw<InvalidOperationException>()
+            .WithMessage("*outside the Fixed64 scalar domain*");
+    }
+
     private static void AssertNear(Fixed64 actual, Fixed64 expected) =>
         FixedMath.Abs(actual - expected)
             .Should().BeLessThanOrEqualTo(Fixed64.Epsilon * (Fixed64)512);
+
+    private static Fixed64 GetMeasure(FixedMassWeight weight)
+    {
+        weight.TryGetMeasure(out Fixed64 measure).Should().BeTrue();
+        return measure;
+    }
 
     private static void AssertVectorNear(Vector3d actual, Vector3d expected)
     {

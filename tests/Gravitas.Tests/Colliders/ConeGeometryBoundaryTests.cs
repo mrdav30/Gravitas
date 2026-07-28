@@ -23,6 +23,14 @@ public sealed class ConeGeometryBoundaryTests
 
         cone.CalculateLocalCenterOfMassOffset()
             .Should().Be(-Vector3d.Up);
+        cone.CalculateMassPropertyWeight()
+            .TryGetMeasure(out Fixed64 volume)
+            .Should().BeTrue();
+        FixedMath.Abs(
+                volume
+                - Fixed64.FromFraction(4, 3) * Fixed64.Pi)
+            .Should().BeLessThanOrEqualTo(
+                Fixed64.MinIncrement * Fixed64.Two);
     }
 
     [Fact]

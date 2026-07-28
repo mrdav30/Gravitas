@@ -23,6 +23,8 @@ public sealed class LSCompoundCollider : LSCollider
 {
     private readonly CompoundColliderPart[] _parts;
     private readonly LSCollider[] _partColliders;
+    private readonly FixedMassPoint[] _massPointScratch;
+    private readonly FixedMassWeight[] _massWeightScratch;
 
     public LSCompoundCollider(params CompoundColliderPart[] parts)
     {
@@ -34,6 +36,8 @@ public sealed class LSCompoundCollider : LSCollider
 
         _parts = new CompoundColliderPart[parts.Length];
         _partColliders = new LSCollider[parts.Length];
+        _massPointScratch = new FixedMassPoint[parts.Length];
+        _massWeightScratch = new FixedMassWeight[parts.Length];
         for (int i = 0; i < parts.Length; i++)
         {
             _parts[i] = parts[i];
@@ -107,6 +111,8 @@ public sealed class LSCompoundCollider : LSCollider
             }
         }
 
+        _ = CalculatePreparedLocalMassPoint();
+        _ = CalculatePreparedMassPropertyWeight();
         SetPreparedBounds(FixedBoundBox.FromMinMax(min, max));
     }
 
@@ -126,80 +132,180 @@ public sealed class LSCompoundCollider : LSCollider
         Area = area;
     }
 
-    public override Vector3d CalculateLocalCenterOfMassOffset()
-    {
-        Fixed64 totalWeight = CalculateMassPropertyWeight();
-        Vector3d weightedCenter = Vector3d.Zero;
-        if (totalWeight > Fixed64.Zero)
-        {
-            for (int i = 0; i < _parts.Length; i++)
-            {
-                LSCollider part = _partColliders[i];
-                weightedCenter += part.CalculateLocalCenterOfMassOffset()
-                    * part.CalculateMassPropertyWeight();
-            }
+    internal override FixedMassPoint CalculateLocalMassPoint() =>
+        CalculateAggregateMassPoint(usePrepared: false);
 
-            return weightedCenter / totalWeight;
+    internal override FixedMassPoint CalculatePreparedLocalMassPoint() =>
+        CalculateAggregateMassPoint(usePrepared: true);
+
+    private FixedMassPoint CalculateAggregateMassPoint(bool usePrepared)
+    {
+        bool hasPositiveWeight = false;
+        for (int i = 0; i < _partColliders.Length; i++)
+        {
+            LSCollider part = _partColliders[i];
+            FixedMassWeight weight = usePrepared
+                ? part.CalculatePreparedMassPropertyWeight()
+                : part.CalculateMassPropertyWeight();
+            _massPointScratch[i] = usePrepared
+                ? part.CalculatePreparedLocalMassPoint()
+                : part.CalculateLocalMassPoint();
+            _massWeightScratch[i] = weight;
+            hasPositiveWeight |= !weight.IsZero;
         }
 
-        for (int i = 0; i < _parts.Length; i++)
-            weightedCenter += _partColliders[i].CalculateLocalCenterOfMassOffset();
+        if (!hasPositiveWeight)
+        {
+            int supportedPartCount = 0;
+            for (int i = 0; i < _massWeightScratch.Length; i++)
+            {
+                if (_partColliders[i].SupportsMassProperties)
+                {
+                    _massWeightScratch[i] = FixedMassWeight.One;
+                    supportedPartCount++;
+                }
+            }
 
-        return weightedCenter / (Fixed64)_parts.Length;
+            if (supportedPartCount == 0)
+            {
+                for (int i = 0; i < _massWeightScratch.Length; i++)
+                    _massWeightScratch[i] = FixedMassWeight.One;
+            }
+        }
+
+        if (!FixedMassPoint.TryGetWeightedAverage(
+                _massPointScratch,
+                _massWeightScratch,
+                out Vector3d center))
+        {
+            throw new InvalidOperationException(
+                usePrepared
+                    ? "Prepared compound mass-property point is outside the Fixed64 coordinate domain."
+                    : "The compound collider's center of mass is outside the Fixed64 coordinate domain.");
+        }
+        return FixedMassPoint.FromPoint(center);
     }
 
-    protected internal override Fixed64 CalculateMassPropertyWeight()
+    protected internal override FixedMassWeight CalculateMassPropertyWeight() =>
+        CalculateAggregateMassWeight(usePrepared: false);
+
+    internal override FixedMassWeight CalculatePreparedMassPropertyWeight() =>
+        CalculateAggregateMassWeight(usePrepared: true);
+
+    private FixedMassWeight CalculateAggregateMassWeight(bool usePrepared)
     {
-        Fixed64 totalWeight = Fixed64.Zero;
+        FixedMassWeight totalWeight = FixedMassWeight.Zero;
         for (int i = 0; i < _parts.Length; i++)
-            totalWeight += _partColliders[i].CalculateMassPropertyWeight();
+        {
+            FixedMassWeight weight = usePrepared
+                ? _partColliders[i].CalculatePreparedMassPropertyWeight()
+                : _partColliders[i].CalculateMassPropertyWeight();
+            totalWeight = totalWeight.Add(weight);
+        }
         return totalWeight;
     }
 
-    public override Fixed3x3 CalculateInertiaTensor(Fixed64 mass, Vector3d localCenterOfMassOffset)
+    internal override Fixed3x3 CalculateCenterOfMassInertiaTensor(
+        Fixed64 mass)
     {
-        Fixed64 totalWeight = Fixed64.Zero;
+        Vector3d center = CalculateLocalCenterOfMassOffset();
+        FixedMassWeight totalWeight = FixedMassWeight.Zero;
         int residualPartIndex = _parts.Length - 1;
+        int eligiblePartCount = 0;
         for (int i = 0; i < _parts.Length; i++)
         {
-            Fixed64 weight = _partColliders[i].CalculateMassPropertyWeight();
-            totalWeight += weight;
-            if (weight > Fixed64.Zero)
-                residualPartIndex = i;
+            LSCollider part = _partColliders[i];
+            if (!part.SupportsMassProperties)
+            {
+                _massWeightScratch[i] = FixedMassWeight.Zero;
+                continue;
+            }
+
+            eligiblePartCount++;
+            FixedMassWeight weight = part.CalculateMassPropertyWeight();
+            _massWeightScratch[i] = weight;
+            totalWeight = totalWeight.Add(weight);
+            residualPartIndex = i;
         }
 
+        if (eligiblePartCount == 0)
+        {
+            throw new InvalidOperationException(
+                "Compound inertia requires at least one part with valid mass properties.");
+        }
+
+        FixedMassWeight cumulativeWeight = FixedMassWeight.Zero;
         Fixed64 assignedMass = Fixed64.Zero;
         Fixed3x3 tensor = Fixed3x3.Zero;
 
         for (int i = 0; i < _parts.Length; i++)
         {
             LSCollider part = _partColliders[i];
-            Fixed64 weight = part.CalculateMassPropertyWeight();
+            FixedMassWeight weight = _massWeightScratch[i];
+            cumulativeWeight = cumulativeWeight.Add(weight);
             Fixed64 partMass;
             if (i == residualPartIndex)
             {
                 partMass = mass - assignedMass;
-            }
-            else if (totalWeight > Fixed64.Zero)
-            {
-                partMass = weight > Fixed64.Zero
-                    ? (mass * weight) / totalWeight
-                    : Fixed64.Zero;
-                assignedMass += partMass;
+                assignedMass = mass;
             }
             else
             {
-                partMass = mass / (Fixed64)_parts.Length;
-                assignedMass += partMass;
+                _ = cumulativeWeight.TryGetProportionalShare(
+                    mass,
+                    totalWeight,
+                    out Fixed64 cumulativeMass);
+                partMass = cumulativeMass - assignedMass;
+                assignedMass = cumulativeMass;
             }
 
-            Vector3d partCenterOfMass = part.CalculateLocalCenterOfMassOffset();
-            Fixed3x3 partTensor = part.CalculateInertiaTensor(partMass, partCenterOfMass);
+            if (partMass == Fixed64.Zero)
+                continue;
+
+            FixedMassPoint partCenterOfMass =
+                part.CalculateLocalMassPoint();
+            Fixed3x3 partTensor =
+                part.CalculateCenterOfMassInertiaTensor(partMass);
             partTensor = InertiaTensorMath.RotateToFrame(partTensor, part.CompoundLocalRotation);
-            tensor += AddParallelAxisTensor(partTensor, partMass, localCenterOfMassOffset - partCenterOfMass);
+            if (!partCenterOfMass.TryAddParallelAxisTensor(
+                    partTensor,
+                    partMass,
+                    center,
+                    out Fixed3x3 contribution)
+                || !TryAddTensor(
+                    tensor,
+                    contribution,
+                    out tensor))
+            {
+                throw new InvalidOperationException(
+                    "The compound collider's inertia tensor is outside the Fixed64 scalar domain.");
+            }
         }
 
         return tensor;
+    }
+
+    private static bool TryAddTensor(
+        Fixed3x3 first,
+        Fixed3x3 second,
+        out Fixed3x3 result)
+    {
+        bool representable = Fixed64.TryAdd(first.M11, second.M11, out Fixed64 m11)
+            & Fixed64.TryAdd(first.M12, second.M12, out Fixed64 m12)
+            & Fixed64.TryAdd(first.M13, second.M13, out Fixed64 m13)
+            & Fixed64.TryAdd(first.M21, second.M21, out Fixed64 m21)
+            & Fixed64.TryAdd(first.M22, second.M22, out Fixed64 m22)
+            & Fixed64.TryAdd(first.M23, second.M23, out Fixed64 m23)
+            & Fixed64.TryAdd(first.M31, second.M31, out Fixed64 m31)
+            & Fixed64.TryAdd(first.M32, second.M32, out Fixed64 m32)
+            & Fixed64.TryAdd(first.M33, second.M33, out Fixed64 m33);
+        result = representable
+            ? new Fixed3x3(
+                m11, m12, m13,
+                m21, m22, m23,
+                m31, m32, m33)
+            : default;
+        return representable;
     }
 
     public override Fixed64 GetFrontalArea(Vector3d direction)

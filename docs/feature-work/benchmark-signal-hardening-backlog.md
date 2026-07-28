@@ -60,6 +60,7 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 | ------ | ------ | -------- | -------- |
 | Exact canonical OBB contacts regress ordinary narrow-phase throughput | Partially corrected | High | Add a proven exact ordinary-domain path in FixedMathSharp with the current wide kernels as fallback |
 | Exact 3D contact response adds measurable ordinary-domain cost | Optimized, still observed | Medium | Profile the paired atomic preflight and friction stages without weakening full-domain rejection |
+| Mesh scale rebuild allocates with subdivision count | Observed | Low | Isolate prepared BVH rebuild and scale-validation buffers before changing capacity policy |
 | Mixed public sweep traversal stalls on extreme sparse-grid spans | Observed | Medium | Isolate GridTracer clipping and cell-visit scaling independently of narrow phase |
 | Mixed discrete broad-phase refresh allocates at 32 moving CCD pairs | Isolated | Low | Reproduce capacity-growth threshold independently of rotational CCD |
 
@@ -145,6 +146,37 @@ The final semantic-response review changed only the no-inline exact fallback;
 the benchmarked compact proof path and the medians above are unchanged. Focused
 wide-response and rotational-CCD allocation guards remain at zero managed bytes
 after warmup.
+
+### Signal: Mesh Scale Rebuild Allocates With Subdivision Count
+
+**Discovered:** 2026-07-28  
+**Source:** exact contact-lever Phase 4 mesh mass-property ShortRun  
+**Status:** Observed outside the semantic mass-property kernel
+
+The final one-pass
+`MeshMassPropertyBenchmarks.UpdateNonUniformMeshScaleAndCalculateSurfaceInertia`
+row reports `0 B/op` at subdivision 1, `4,032 B/op` at subdivision 8, and
+`16,320 B/op` at subdivision 16. Mean times are `39.244 us`, `2.179 ms`, and
+`8.718 ms`, respectively, about `61-65%` faster than the pre-review Phase 4
+baseline of `101.3 us`, `6.178 ms`, and `24.505 ms`.
+
+Phase 4 now computes uniform shell mass properties in one wide
+FixedMathSharp pass and retains no semantic per-face weights or mass-property
+scratch on `PhysicsMesh`. Its two-part compound inertia benchmark also remains
+allocation-free. The unchanged scale-dependent allocation therefore belongs
+outside the semantic mass-property kernel and still needs isolation across
+prepared triangle-BVH rebuild and retained-capacity behavior.
+
+Command:
+
+```powershell
+dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll mesh-mass-property --filter "*UpdateNonUniformMeshScaleAndCalculateSurfaceInertia*" --job short --warmupCount 1 --iterationCount 3
+```
+
+The smallest next step is a profiler or allocation guard that measures
+`PrepareScaledGeometry` with and without prepared BVH reconstruction. Do not add
+speculative preallocation until the allocating owner and representative rebuild
+frequency are proven.
 
 ### Signal: Mixed Public Sweep Traversal Stalls On Extreme Sparse-Grid Spans
 

@@ -69,6 +69,35 @@ public sealed class InertiaTensorMathTests
     }
 
     [Fact]
+    public void AddParallelAxisTensor_WithNoEffectiveShift_ShouldPreserveTensor()
+    {
+        Fixed3x3 tensor = Fixed3x3.Identity;
+
+        InertiaTensorMath.AddParallelAxisTensor(
+            tensor,
+            Fixed64.Zero,
+            Vector3d.One).Should().Be(tensor);
+        InertiaTensorMath.AddParallelAxisTensor(
+            tensor,
+            Fixed64.One,
+            Vector3d.Zero).Should().Be(tensor);
+    }
+
+    [Fact]
+    public void InvertForSolver_WithNonPositiveDiagonalAxes_ShouldFreezeThoseAxes()
+    {
+        var tensor = new Fixed3x3(
+            Fixed64.One, Fixed64.Zero, Fixed64.Zero,
+            Fixed64.Zero, Fixed64.Zero, Fixed64.Zero,
+            Fixed64.Zero, Fixed64.Zero, -Fixed64.One);
+
+        InertiaTensorMath.InvertForSolver(tensor).Should().Be(new Fixed3x3(
+            Fixed64.One, Fixed64.Zero, Fixed64.Zero,
+            Fixed64.Zero, Fixed64.Zero, Fixed64.Zero,
+            Fixed64.Zero, Fixed64.Zero, Fixed64.Zero));
+    }
+
+    [Fact]
     public void SubtractParallelAxisTensor_WithZeroMass_ShouldPreserveTensor()
     {
         Fixed3x3 tensor = Fixed3x3.Identity;

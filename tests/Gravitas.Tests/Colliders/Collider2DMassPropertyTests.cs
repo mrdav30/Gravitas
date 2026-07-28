@@ -1,4 +1,5 @@
 using FixedMathSharp;
+using FixedMathSharp.Geometry;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Tests.Support;
@@ -10,21 +11,116 @@ namespace Gravitas.Tests.Colliders;
 public sealed class Collider2DMassPropertyTests
 {
     [Fact]
-    public void DetachedCompoundPartCenterOfMass_ShouldRejectUnrepresentableLocalComposition()
+    public void DetachedCompound_ShouldAggregateAnUnrepresentableChildCenter()
     {
         var compound = new LSCompoundCollider2D(
-            CompoundColliderPart2D.Circle(
-                Fixed64.Half,
-                Vector2d.Right))
+            CompoundColliderPart2D.Circle(Fixed64.Half, Vector2d.Right),
+            CompoundColliderPart2D.Circle(Fixed64.Half, -Vector2d.Right))
         {
             LocalOffset = new Vector2d(Fixed64.MaxValue, Fixed64.Zero)
         };
-        LSCollider2D part = compound.GetPartCollider(0);
+        LSCollider2D unrepresentablePart = compound.GetPartCollider(0);
 
-        Action calculate = () => part.CalculateLocalCenterOfMassOffset();
+        Action calculatePart =
+            () => unrepresentablePart.CalculateLocalCenterOfMassOffset();
+        Action calculatePartMoment =
+            () => unrepresentablePart.CalculateMomentOfInertia(
+                Fixed64.One,
+                Vector2d.Zero);
+        Vector2d center = compound.CalculateLocalCenterOfMassOffset();
+        Fixed64 moment = compound.CalculateMomentOfInertia(
+            Fixed64.One,
+            center);
+
+        calculatePart.Should().Throw<InvalidOperationException>()
+            .WithMessage("*outside*coordinate*domain*");
+        calculatePartMoment.Should().Throw<InvalidOperationException>()
+            .WithMessage("*outside the Fixed64 scalar domain*");
+        center.Should().Be(new Vector2d(
+            Fixed64.MaxValue,
+            Fixed64.Zero));
+        moment.Should().BeGreaterThan(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void Compound_ShouldRejectAnUnrepresentableAggregateCenterBeforeAdmission()
+    {
+        using GravitasWorldContext context =
+            Physics2DTestWorld.CreateContext();
+        var compound = new LSCompoundCollider2D(
+            CompoundColliderPart2D.Circle(Fixed64.Half, Vector2d.Right),
+            CompoundColliderPart2D.Circle(
+                Fixed64.Half,
+                new Vector2d((Fixed64)3, Fixed64.Zero)))
+        {
+            LocalOffset = new Vector2d(
+                Fixed64.MaxValue,
+                Fixed64.Zero)
+        };
+
+        Action calculate = () =>
+            compound.CalculateLocalCenterOfMassOffset();
+        var transform = new FixedTransform(
+            new Vector3d(
+                Fixed64.MinValue,
+                Fixed64.Zero,
+                Fixed64.Zero),
+            FixedQuaternion.Identity,
+            Vector3d.One);
+        Action initialize = () =>
+            compound.InitializeWithNoBody(
+                new TestMatterAgent(context, transform));
 
         calculate.Should().Throw<InvalidOperationException>()
-            .WithMessage("*outside*coordinate*domain*");
+            .WithMessage("*2D compound collider's center of mass*");
+        initialize.Should().Throw<InvalidOperationException>()
+            .WithMessage("*Prepared 2D compound mass-property point*");
+    }
+
+    [Fact]
+    public void InitializedCompound_ShouldAggregateAnUnrepresentableBodyLocalChildCenter()
+    {
+        using GravitasWorldContext context =
+            Physics2DTestWorld.CreateContext();
+        var compound = new LSCompoundCollider2D(
+            CompoundColliderPart2D.Circle(Fixed64.Half, Vector2d.Right),
+            CompoundColliderPart2D.Circle(Fixed64.Half, -Vector2d.Right))
+        {
+            LocalOffset = new Vector2d(
+                Fixed64.MaxValue,
+                Fixed64.Zero)
+        };
+        var body = new SolidBody2D(
+            new TestMatterAgent(context),
+            compound)
+        {
+            Mass = Fixed64.One
+        };
+
+        body.Initialize(
+            new Vector2d(Fixed64.MinValue, Fixed64.Zero),
+            Fixed64.Zero);
+
+        compound.CalculateLocalCenterOfMassOffset().Should().Be(
+            new Vector2d(
+                Fixed64.MaxValue,
+                Fixed64.Zero));
+    }
+
+    [Fact]
+    public void Compound_ShouldPreserveWideAreaRatios()
+    {
+        Fixed64 extent = (Fixed64)1_000_000_000;
+        var compound = new LSCompoundCollider2D(
+            CompoundColliderPart2D.AABBox(
+                new Vector2d(extent, extent),
+                Vector2d.Zero),
+            CompoundColliderPart2D.AABBox(
+                new Vector2d(extent * Fixed64.Two, extent),
+                new Vector2d((Fixed64)3, Fixed64.Zero)));
+
+        compound.CalculateLocalCenterOfMassOffset().Should().Be(
+            new Vector2d(Fixed64.Two, Fixed64.Zero));
     }
 
     [Fact]
@@ -40,10 +136,15 @@ public sealed class Collider2DMassPropertyTests
             collider.CalculateLocalCenterOfMassOffset());
         Fixed64 momentAboutOrigin = collider.CalculateMomentOfInertia((Fixed64)4, Vector2d.Zero);
 
-        collider.CalculateAreaForMassProperties().Should().Be(Fixed64.Pi * (Fixed64)4);
+        GetMeasure(collider.CalculateAreaForMassProperties())
+            .Should().Be(Fixed64.Pi * (Fixed64)4);
         collider.CalculateLocalCenterOfMassOffset().Should().Be(new Vector2d((Fixed64)3, Fixed64.Zero));
         momentAboutCom.Should().Be((Fixed64)8);
         momentAboutOrigin.Should().Be((Fixed64)44);
+        collider.CalculateMomentOfInertia(
+                Fixed64.MaxValue,
+                collider.CalculateLocalCenterOfMassOffset())
+            .Should().Be(Fixed64.MaxValue);
     }
 
     [Fact]
@@ -78,7 +179,8 @@ public sealed class Collider2DMassPropertyTests
             collider.CalculateLocalCenterOfMassOffset());
         Fixed64 momentAboutOrigin = collider.CalculateMomentOfInertia((Fixed64)6, Vector2d.Zero);
 
-        collider.CalculateAreaForMassProperties().Should().Be((Fixed64)8);
+        GetMeasure(collider.CalculateAreaForMassProperties())
+            .Should().Be((Fixed64)8);
         collider.CalculateLocalCenterOfMassOffset().Should().Be(new Vector2d(Fixed64.One, (Fixed64)(-2)));
         momentAboutCom.Should().Be((Fixed64)10);
         momentAboutOrigin.Should().Be((Fixed64)40);
@@ -99,7 +201,11 @@ public sealed class Collider2DMassPropertyTests
         Fixed64 momentAboutOrigin = collider.CalculateMomentOfInertia(mass, Vector2d.Zero);
         Fixed64 expectedArea = (Fixed64)4 + Fixed64.Pi;
 
-        AssertNear(collider.CalculateAreaForMassProperties(), expectedArea);
+        collider.CalculateAreaForMassProperties()
+            .TryGetMeasure(out Fixed64 area)
+            .Should()
+            .BeTrue();
+        AssertNear(area, expectedArea);
         collider.CalculateLocalCenterOfMassOffset().Should().Be(new Vector2d((Fixed64)3, -Fixed64.One));
         collider.CalculateMomentOfInertia(Fixed64.Zero, Vector2d.Zero).Should().Be(Fixed64.Zero);
         momentAboutCom.Should().BeGreaterThan(mass * Fixed64.Half);
@@ -112,7 +218,8 @@ public sealed class Collider2DMassPropertyTests
         var capsule = new LSCapsuleCollider2D(Fixed64.One, (Fixed64)2);
         var circle = new LSCircleCollider2D(Fixed64.One);
 
-        capsule.CalculateAreaForMassProperties().Should().Be(circle.CalculateAreaForMassProperties());
+        GetMeasure(capsule.CalculateAreaForMassProperties())
+            .Should().Be(GetMeasure(circle.CalculateAreaForMassProperties()));
         capsule.CalculateLocalCenterOfMassOffset().Should().Be(circle.CalculateLocalCenterOfMassOffset());
         capsule.CalculateMomentOfInertia((Fixed64)8, Vector2d.Zero)
             .Should()
@@ -133,7 +240,8 @@ public sealed class Collider2DMassPropertyTests
             collider.CalculateLocalCenterOfMassOffset());
         Fixed64 momentAboutOrigin = collider.CalculateMomentOfInertia((Fixed64)12, Vector2d.Zero);
 
-        collider.CalculateAreaForMassProperties().Should().Be((Fixed64)2);
+        GetMeasure(collider.CalculateAreaForMassProperties())
+            .Should().Be((Fixed64)2);
         collider.CalculateLocalCenterOfMassOffset().Should().Be(new Vector2d(Fixed64.One, Fixed64.Half));
         momentAboutCom.Should().Be((Fixed64)5);
         momentAboutOrigin.Should().Be((Fixed64)20);
@@ -153,7 +261,8 @@ public sealed class Collider2DMassPropertyTests
             collider.CalculateLocalCenterOfMassOffset());
         Fixed64 momentAboutOrigin = collider.CalculateMomentOfInertia((Fixed64)12, Vector2d.Zero);
 
-        collider.CalculateAreaForMassProperties().Should().Be((Fixed64)2);
+        GetMeasure(collider.CalculateAreaForMassProperties())
+            .Should().Be((Fixed64)2);
         collider.CalculateLocalCenterOfMassOffset().Should().Be(new Vector2d(Fixed64.One, Fixed64.Half));
         collider.CalculateMomentOfInertia(Fixed64.Zero, Vector2d.Zero).Should().Be(Fixed64.Zero);
         momentAboutCom.Should().Be((Fixed64)5);
@@ -294,22 +403,24 @@ public sealed class Collider2DMassPropertyTests
     }
 
     [Fact]
-    public void Compound_ShouldIgnoreQuantizedZeroAreaPartForCenterAndMoment()
+    public void Compound_ShouldRetainTinyAreaWeightWithoutChangingRoundedResult()
     {
         Fixed64 tinyRadius = Fixed64.FromRaw(1);
         var collider = new LSCompoundCollider2D(
             CompoundColliderPart2D.Circle(tinyRadius, new Vector2d((Fixed64)100, Fixed64.Zero)),
             CompoundColliderPart2D.Circle(Fixed64.One, new Vector2d((Fixed64)2, Fixed64.Zero)));
 
-        collider.GetPartCollider(0).CalculateAreaForMassProperties().Should().Be(Fixed64.Zero);
-        collider.CalculateAreaForMassProperties().Should().Be(Fixed64.Pi);
+        GetMeasure(collider.GetPartCollider(0).CalculateAreaForMassProperties())
+            .Should().Be(Fixed64.Zero);
+        GetMeasure(collider.CalculateAreaForMassProperties())
+            .Should().Be(Fixed64.Pi);
         collider.CalculateLocalCenterOfMassOffset().Should().Be(new Vector2d((Fixed64)2, Fixed64.Zero));
         collider.CalculateMomentOfInertia((Fixed64)4, new Vector2d((Fixed64)2, Fixed64.Zero))
             .Should().Be((Fixed64)2);
     }
 
     [Fact]
-    public void Compound_WhenAllPartAreasQuantizeToZero_ShouldUseEqualMassFallback()
+    public void Compound_WhenAllPartAreaMeasuresRoundToZero_ShouldRetainExactEqualWeights()
     {
         Fixed64 tinyRadius = Fixed64.FromRaw(1);
         var collider = new LSCompoundCollider2D(
@@ -325,7 +436,92 @@ public sealed class Collider2DMassPropertyTests
     }
 
     [Fact]
-    public void Compound_WithQuantizedZeroRadiusCapsule_ShouldUseThinRodMomentLimit()
+    public void Compound_ShouldApportionTinyMassFromCumulativeWeightShares()
+    {
+        using GravitasWorldContext context =
+            Physics2DTestWorld.CreateContext();
+        var collider = new LSCompoundCollider2D(
+            CompoundColliderPart2D.AABBox(
+                new Vector2d((Fixed64)3, Fixed64.One),
+                Vector2d.Zero),
+            CompoundColliderPart2D.AABBox(
+                new Vector2d((Fixed64)3, Fixed64.One),
+                Vector2d.Zero),
+            CompoundColliderPart2D.AABBox(
+                new Vector2d((Fixed64)3, Fixed64.One),
+                Vector2d.Zero),
+            CompoundColliderPart2D.AABBox(Vector2d.One, Vector2d.Zero));
+        collider.InitializeWithNoBody(new TestMatterAgent(context));
+        Fixed64 apportionedMass = Fixed64.FromRaw(1);
+        Fixed64 expected =
+            collider.GetPartCollider(0)
+                .CalculateCenterOfMassMoment(apportionedMass)
+            + collider.GetPartCollider(2)
+                .CalculateCenterOfMassMoment(apportionedMass);
+
+        collider.CalculateMomentOfInertia(
+                Fixed64.FromRaw(2),
+                Vector2d.Zero)
+            .Should()
+            .Be(expected);
+    }
+
+    [Fact]
+    public void Compound_WhenDetachedPartsHaveZeroSemanticArea_ShouldUseEqualNominalShares()
+    {
+        Vector2d tinyScale =
+            Vector2d.One * Fixed64.FromRaw(1);
+        var collider = new LSCompoundCollider2D(
+            CompoundColliderPart2D.Capsule(
+                Fixed64.Half,
+                (Fixed64)1_000_000_000,
+                new Vector2d(-Fixed64.One, Fixed64.Zero),
+                Fixed64.Zero,
+                tinyScale),
+            CompoundColliderPart2D.Capsule(
+                Fixed64.Half,
+                (Fixed64)1_000_000_000,
+                Vector2d.Zero,
+                Fixed64.Zero,
+                tinyScale),
+            CompoundColliderPart2D.Capsule(
+                Fixed64.Half,
+                (Fixed64)1_000_000_000,
+                new Vector2d((Fixed64)4, Fixed64.Zero),
+                Fixed64.Zero,
+                tinyScale));
+        Vector2d center =
+            collider.CalculateLocalCenterOfMassOffset();
+        Fixed64 expected = Fixed64.Zero;
+        for (int i = 0; i < 3; i++)
+        {
+            LSCollider2D part = collider.GetPartCollider(i);
+            part.CalculateAreaForMassProperties().IsZero
+                .Should()
+                .BeTrue();
+            part.CalculateLocalMassPoint()
+                .TryAddParallelAxisMoment(
+                    part.CalculateCenterOfMassMoment(Fixed64.One),
+                    Fixed64.One,
+                    center,
+                    out Fixed64 contribution)
+                .Should()
+                .BeTrue();
+            expected += contribution;
+        }
+
+        center.Should().Be(new Vector2d(
+            Fixed64.One,
+            Fixed64.Zero));
+        collider.CalculateMomentOfInertia(
+                (Fixed64)3,
+                center)
+            .Should()
+            .Be(expected);
+    }
+
+    [Fact]
+    public void Compound_WithZeroScaledRadiusCapsule_ShouldUseThinRodMomentLimit()
     {
         var collider = new LSCompoundCollider2D(
             CompoundColliderPart2D.Capsule(
@@ -340,12 +536,13 @@ public sealed class Collider2DMassPropertyTests
         Fixed64 expectedMoment = mass * scaledLength * scaledLength / (Fixed64)12;
 
         capsule.ScaledRadius.Should().Be(Fixed64.Zero);
-        capsule.CalculateAreaForMassProperties().Should().Be(Fixed64.Zero);
+        GetMeasure(capsule.CalculateAreaForMassProperties())
+            .Should().Be(Fixed64.Zero);
         collider.CalculateMomentOfInertia(mass, Vector2d.Zero).Should().Be(expectedMoment);
     }
 
     [Fact]
-    public void Compound_WithQuantizedZeroAreaPolygons_ShouldKeepParallelAxisMoment()
+    public void Compound_WithAreaMeasuresRoundedToZeroPolygons_ShouldRejectUnrepresentableParallelAxisMoment()
     {
         Vector2d[] square =
         {
@@ -368,23 +565,27 @@ public sealed class Collider2DMassPropertyTests
                 Fixed64.Zero,
                 tinyScale));
         Fixed64 mass = (Fixed64)2;
-        Fixed64 partMass = mass / (Fixed64)collider.PartCount;
-        Fixed64 expectedMoment = Fixed64.Zero;
-        for (int i = 0; i < collider.PartCount; i++)
-        {
-            Vector2d partCenter = collider.GetPartCollider(i).CalculateLocalCenterOfMassOffset();
-            expectedMoment += partMass * partCenter.MagnitudeSquared;
-        }
 
-        collider.CalculateAreaForMassProperties().Should().Be(Fixed64.Zero);
+        GetMeasure(collider.CalculateAreaForMassProperties())
+            .Should().Be(Fixed64.Zero);
         collider.CalculateLocalCenterOfMassOffset().Should().Be(Vector2d.Zero);
-        expectedMoment.Should().BeGreaterThan(Fixed64.Zero);
-        collider.CalculateMomentOfInertia(mass, Vector2d.Zero).Should().Be(expectedMoment);
+        FluentActions.Invoking(
+                () => collider.CalculateMomentOfInertia(
+                    mass,
+                    Vector2d.Zero))
+            .Should().Throw<InvalidOperationException>()
+            .WithMessage("*outside*scalar domain*");
     }
 
     private static void AssertNear(Fixed64 actual, Fixed64 expected)
     {
         Fixed64 tolerance = Fixed64.Epsilon * (Fixed64)16;
         FixedMath.Abs(actual - expected).Should().BeLessThanOrEqualTo(tolerance);
+    }
+
+    private static Fixed64 GetMeasure(FixedMassWeight weight)
+    {
+        weight.TryGetMeasure(out Fixed64 measure).Should().BeTrue();
+        return measure;
     }
 }

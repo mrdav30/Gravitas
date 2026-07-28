@@ -136,42 +136,52 @@ public sealed class LSPolygonCollider2D : LSCollider2D, IConvexVertexSource2D
             _scaledLocalVertices,
             direction);
 
-    public override Vector2d CalculateLocalCenterOfMassOffset()
+    internal override FixedMassPoint2d CalculateLocalMassPoint()
     {
         _ = TryCalculateIntrinsicSignedAreaAndCentroid(
             out _,
             out Vector2d intrinsicCentroid);
-        return TransformRelativeMassPropertyPoint(intrinsicCentroid);
+        return TransformRelativeMassPropertyPointExact(intrinsicCentroid);
     }
 
-    internal override Fixed64 CalculateAreaForMassProperties()
+    internal override FixedMassPoint2d CalculatePreparedLocalMassPoint()
+    {
+        _ = FixedConvex2dRelations.TryGetMassWeightAndCentroid(
+            _scaledLocalVerticesScratch,
+            out _,
+            out Vector2d intrinsicCentroid);
+        return TransformPreparedRelativeMassPropertyPointExact(
+            intrinsicCentroid);
+    }
+
+    internal override FixedMassWeight CalculateAreaForMassProperties()
     {
         ReadOnlySpan<Vector2d> vertices = GetMassPropertyVertices();
-        _ = FixedConvex2dRelations.TryGetAreaAndCentroid(
+        _ = FixedConvex2dRelations.TryGetMassWeightAndCentroid(
             vertices,
-            out Fixed64 area,
+            out FixedMassWeight weight,
             out _);
-        return area;
+        return weight;
     }
 
-    public override Fixed64 CalculateMomentOfInertia(Fixed64 mass, Vector2d localReferencePoint)
+    internal override FixedMassWeight CalculatePreparedAreaForMassProperties()
     {
-        if (mass <= Fixed64.Zero)
-            return Fixed64.Zero;
+        _ = FixedConvex2dRelations.TryGetMassWeightAndCentroid(
+            _scaledLocalVerticesScratch,
+            out FixedMassWeight weight,
+            out _);
+        return weight;
+    }
 
+    internal override Fixed64 CalculateCenterOfMassMoment(Fixed64 mass)
+    {
         ReadOnlySpan<Vector2d> vertices = GetMassPropertyVertices();
         _ = FixedConvex2dRelations.TryGetAreaAndCentroid(
             vertices,
             out Fixed64 area,
             out Vector2d intrinsicCenterOfMass);
         if (area <= Fixed64.Zero)
-        {
-            return ApplyParallelAxis(
-                Fixed64.Zero,
-                mass,
-                base.CalculateLocalCenterOfMassOffset(),
-                localReferencePoint);
-        }
+            return Fixed64.Zero;
 
         Fixed64 density = mass / area;
         Fixed64 centeredIntegral = Fixed64.Zero;
@@ -188,15 +198,7 @@ public sealed class LSPolygonCollider2D : LSCollider2D, IConvexVertexSource2D
             centeredIntegral += cross * term;
         }
 
-        Fixed64 momentAboutCenterOfMass = (density * centeredIntegral).Abs() / (Fixed64)12;
-        Vector2d centerOfMass =
-            TransformRelativeMassPropertyPoint(intrinsicCenterOfMass);
-
-        return ApplyParallelAxis(
-            momentAboutCenterOfMass,
-            mass,
-            centerOfMass,
-            localReferencePoint);
+        return (density * centeredIntegral).Abs() / (Fixed64)12;
     }
 
     private protected override void PrepareShape(in ColliderShapeSnapshot2D snapshot)

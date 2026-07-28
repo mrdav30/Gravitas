@@ -156,15 +156,15 @@ arithmetic, xUnit v3, BenchmarkDotNet, Gravitas 2D/3D/mixed solvers and CCD.
 - Modify: matching FixedMathSharp and Gravitas compound mass-property tests and
   benchmarks
 
-- [ ] Define the minimum semantic mass-point and positive-weight operations
-  needed for primitive, shell, and nested-compound aggregation.
-- [ ] Carry exact weights through weighted center and inertia distribution so
+- [x] Define the minimum semantic mass-point and positive-weight operations
+  needed for primitive, shell, and composed-part aggregation.
+- [x] Carry exact weights through weighted center and inertia distribution so
   no relative ratio is lost to early saturation.
-- [ ] Support child centers outside Q32.32 when the final compound center and
+- [x] Support child centers outside Q32.32 when the final compound center and
   inertia are representable.
-- [ ] Cover primitive/nested ratios, cancellation, parallel-axis terms,
+- [x] Cover primitive and composed-part ratios, cancellation, parallel-axis terms,
   mirrored scalar faces, final overflow, replay, and warmed allocation.
-- [ ] Restore both repositories to 100% coverage and pause for review.
+- [x] Restore both repositories to 100% coverage and pause for review.
 
 ### Phase 5: Mixed Query Boundary And Release Closure
 
@@ -197,7 +197,11 @@ arithmetic, xUnit v3, BenchmarkDotNet, Gravitas 2D/3D/mixed solvers and CCD.
 - [x] Phase 3 complete and paused for review: pure 2D and mixed discrete
   response, warm starts, friction, diagnostics, and rotational CCD share the
   compact/exact contract while preserving atomic constrained-body mutation.
-- [ ] Phases 4-5 pending.
+- [x] Phase 4 complete and paused for review: primitive, mesh-shell, and flat
+  authored compound paths now retain semantic mass points and exact positive
+  weights through final center, mass distribution, and parallel-axis
+  materialization.
+- [ ] Phase 5 pending.
 
 ## Evidence To Date
 
@@ -282,3 +286,44 @@ arithmetic, xUnit v3, BenchmarkDotNet, Gravitas 2D/3D/mixed solvers and CCD.
   warnings or errors.
 - Independent Phase 3 review found no remaining material issue after the
   separating warm-start correction.
+- Phase 4 adds the minimum public mass-property surface to FixedMathSharp:
+  `FixedMassWeight`, `FixedMassPoint`, and `FixedMassPoint2d`. Wide arithmetic
+  remains internal, normalized 3D rotation follows the existing rational-basis
+  contract, and each public type has a dedicated source file.
+- Gravitas primitive, mesh-shell, 2D, and 3D compound paths retain exact
+  relative weights until final scalar mass distribution. Child centers may
+  remain outside Q32.32 when their aggregate center and parallel-axis response
+  are representable; true final center and tensor overflow reject atomically.
+- Runtime scope remains the existing flat authored compound model. Nested
+  runtime compounds were not introduced merely to exercise the semantic API.
+- Compound mass distribution rounds cumulative positive-weight prefixes and
+  derives each child mass from the prior prefix. This preserves the exact
+  parent total without independently rounded shares oversubscribing small
+  masses. Detached 2D parts whose representable areas all round to zero retain
+  the existing equal-share fallback.
+- Uniform mesh-shell mass properties use one FixedMathSharp wide kernel. It
+  accumulates area, first moments, and origin moments in one pass, then shifts
+  once to the returned center. `PhysicsMesh` retains no semantic per-face
+  weights or mass-property scratch buffers.
+- FixedMathSharp's complete Release suite passes `2,635/2,635`; coverage is
+  `47,164/47,164` lines, `8,664/8,664` branches, and `3,434/3,434` methods.
+  ReleaseLean passes `2,614/2,614`.
+- Gravitas's complete Release suite passes `3,774/3,774`; coverage is
+  `40,111/40,111` lines, `12,379/12,379` branches, and `4,368/4,368` methods.
+  ReleaseLean passes `3,719/3,719`.
+- FixedMathSharp and Gravitas `Release` and `ReleaseLean` packages build
+  `net8.0` and `netstandard2.1` with zero warnings or errors.
+- The short-run two-part compound inertia benchmark reports a `20.967 ms`
+  mean batch for `1,024` calculations (about `20.5 us` each) with zero
+  managed allocation.
+- The final one-pass mesh scale-and-surface-inertia row reports `39.244 us`,
+  `2.179 ms`, and `8.718 ms` at subdivisions 1, 8, and 16. That is about
+  `61-65%` faster than the pre-review Phase 4 baseline. Allocations remain
+  `0 B`, `4,032 B`, and `16,320 B`, confirming that the remaining
+  scale-dependent signal belongs to prepared BVH rebuild rather than semantic
+  mass-property arithmetic; its isolation step remains in the benchmark
+  backlog.
+- Independent review drove cumulative mass apportionment, detached 2D
+  zero-area parity, analytic shell-tensor and translation-invariance coverage,
+  preservation of scalar total/frontal-area parity, and removal of the
+  duplicate triangle-area pass. No material Phase 4 finding remains.

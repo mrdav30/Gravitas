@@ -471,7 +471,9 @@ public sealed class ColliderShapeDefinitionTests
         collider.OrientedBox.HalfExtents.Should().Be(
             new Vector3d(expectedHalfExtent, expectedHalfExtent, expectedHalfExtent));
         collider.Area.Should().Be(Fixed64.MaxValue);
-        collider.CalculateMassPropertyWeight().Should().Be(Fixed64.MaxValue);
+        collider.CalculateMassPropertyWeight()
+            .TryGetMeasure(out _)
+            .Should().BeFalse();
         collider.GetFrontalArea(Vector3d.Right).Should().Be(Fixed64.MaxValue);
 
         Fixed3x3 inertia = collider.CalculateInertiaTensor(

@@ -122,16 +122,16 @@ public sealed class LSCapsuleColliderTests
 
         Fixed3x3 tensor = capsule.CalculateInertiaTensor(mass, Vector3d.Zero);
 
-        tensor.M11.Should().Be(expectedTransverse);
-        tensor.M22.Should().Be(expectedAxial);
-        tensor.M33.Should().Be(expectedTransverse);
+        AssertNear(tensor.M11, expectedTransverse);
+        AssertNear(tensor.M22, expectedAxial);
+        AssertNear(tensor.M33, expectedTransverse);
         tensor.M12.Should().Be(Fixed64.Zero);
         tensor.M13.Should().Be(Fixed64.Zero);
         tensor.M23.Should().Be(Fixed64.Zero);
     }
 
     [Fact]
-    public void CalculateInertiaTensor_WithQuantizedZeroVolume_ShouldUseThinRodLimit()
+    public void CalculateInertiaTensor_WithVolumeMeasureRoundedToZero_ShouldApproachThinRodLimit()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         var compound = new LSCompoundCollider(
@@ -158,9 +158,9 @@ public sealed class LSCapsuleColliderTests
 
         capsule.ScaledRadius.Should().Be(Fixed64.FromRaw(1));
         capsule.AxisLength.Should().BeGreaterThan(Fixed64.Epsilon);
-        tensor.M11.Should().Be(expectedTransverse);
+        AssertNear(tensor.M11, expectedTransverse);
         tensor.M22.Should().Be(Fixed64.Zero);
-        tensor.M33.Should().Be(expectedTransverse);
+        AssertNear(tensor.M33, expectedTransverse);
     }
 
     [Fact]

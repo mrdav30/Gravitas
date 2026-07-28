@@ -34,17 +34,39 @@ public class LSCuboidCollider : LSCollider
             : ColliderCanonicalBounds
                 .GetCurrentCenteredProxyRadius(this);
 
-    protected internal override Fixed64 CalculateMassPropertyWeight()
+    protected internal override FixedMassWeight CalculateMassPropertyWeight()
     {
-        Vector3d halfExtents = _orientedBox.HalfExtents;
-        return Fixed64.TryMultiplyDivide(
+        Vector3d halfExtents;
+        if (HasCommittedShape)
+        {
+            halfExtents = _orientedBox.HalfExtents;
+        }
+        else
+        {
+            GetCurrentShapeScales(
+                out Vector3d ownerScale,
+                out Vector3d partScale);
+            halfExtents = ColliderScalePolicy.ScalePositive(
+                Size,
+                ownerScale,
+                partScale,
+                Fixed64.Two);
+        }
+        return FixedMassWeight.FromProduct(
             halfExtents.X,
             halfExtents.Y,
             halfExtents.Z,
-            Fixed64.FromFraction(1, 8),
-            out Fixed64 volume)
-            ? volume
-            : Fixed64.MaxValue;
+            (Fixed64)8);
+    }
+
+    internal override FixedMassWeight CalculatePreparedMassPropertyWeight()
+    {
+        Vector3d halfExtents = _preparedOrientedBox.HalfExtents;
+        return FixedMassWeight.FromProduct(
+            halfExtents.X,
+            halfExtents.Y,
+            halfExtents.Z,
+            (Fixed64)8);
     }
 
     public LSCuboidCollider() { }
@@ -78,7 +100,7 @@ public class LSCuboidCollider : LSCollider
         Area = _preparedArea;
     }
 
-    public override Fixed3x3 CalculateInertiaTensor(Fixed64 mass, Vector3d localCenterOfMassOffset)
+    internal override Fixed3x3 CalculateCenterOfMassInertiaTensor(Fixed64 mass)
     {
         Vector3d halfExtents = _orientedBox.HalfExtents;
         Fixed64 xContribution = GetInertiaContribution(mass, halfExtents.X);
@@ -93,7 +115,7 @@ public class LSCuboidCollider : LSCollider
             Fixed64.Zero, yy, Fixed64.Zero,
             Fixed64.Zero, Fixed64.Zero, zz
         );
-        return ShiftInertiaTensorFromLocalCenterOfMass(tensor, mass, localCenterOfMassOffset);
+        return tensor;
     }
 
     public override Fixed64 GetFrontalArea(Vector3d direction)

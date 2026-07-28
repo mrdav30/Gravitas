@@ -627,16 +627,18 @@ public sealed class ColliderExactScaleAdmissionTests
 
         public override Vector2d GetSupportPoint(Vector2d direction) => Center;
 
-        public override Fixed64 CalculateMomentOfInertia(
-            Fixed64 mass,
-            Vector2d localReferencePoint) =>
+        internal override Fixed64 CalculateCenterOfMassMoment(
+            Fixed64 mass) =>
             Fixed64.Zero;
 
         internal static Vector2d ClampForTest(Vector2d value) =>
             ClampNearZero(value);
 
-        internal override Fixed64 CalculateAreaForMassProperties() =>
-            Fixed64.Zero;
+        internal override FixedMassWeight CalculateAreaForMassProperties() =>
+            FixedMassWeight.Zero;
+
+        internal override FixedMassWeight CalculatePreparedAreaForMassProperties() =>
+            FixedMassWeight.Zero;
 
         private protected override void PrepareShape(
             in ColliderShapeSnapshot2D snapshot) =>

@@ -158,24 +158,23 @@ public sealed class LSAABBoxCollider2D : LSCollider2D, IConvexVertexSource2D
         offsets[3] = new Vector2d(-halfExtents.X, halfExtents.Y);
     }
 
-    internal override Fixed64 CalculateAreaForMassProperties()
+    internal override FixedMassWeight CalculateAreaForMassProperties()
     {
         Vector2d halfExtents = ScaledHalfExtents;
-        return Fixed64.TryMultiplyDivide(
-            halfExtents.X,
-            halfExtents.Y,
+        return FixedMassWeight.FromProduct(
             (Fixed64)4,
-            Fixed64.One,
-            out Fixed64 area)
-            ? area
-            : Fixed64.MaxValue;
+            halfExtents.X,
+            halfExtents.Y);
     }
 
-    public override Fixed64 CalculateMomentOfInertia(Fixed64 mass, Vector2d localReferencePoint)
-    {
-        if (mass <= Fixed64.Zero)
-            return Fixed64.Zero;
+    internal override FixedMassWeight CalculatePreparedAreaForMassProperties() =>
+        FixedMassWeight.FromProduct(
+            (Fixed64)4,
+            _preparedHalfExtents.X,
+            _preparedHalfExtents.Y);
 
+    internal override Fixed64 CalculateCenterOfMassMoment(Fixed64 mass)
+    {
         Vector2d halfExtents = ScaledHalfExtents;
         bool representable = Fixed64.TryMultiplyDivide(
                 mass,
@@ -193,11 +192,7 @@ public sealed class LSAABBoxCollider2D : LSCollider2D, IConvexVertexSource2D
         if (!representable)
             momentAboutCenterOfMass = Fixed64.MaxValue;
 
-        return ApplyParallelAxis(
-            momentAboutCenterOfMass,
-            mass,
-            CalculateLocalCenterOfMassOffset(),
-            localReferencePoint);
+        return momentAboutCenterOfMass;
     }
 
     private protected override void PrepareShape(in ColliderShapeSnapshot2D snapshot)
