@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using FixedMathSharp.Geometry;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas.CollisionHandling;
@@ -22,18 +23,48 @@ internal readonly struct ContactNormalImpulseResultMixed
         Vector3d angularVelocityDelta3D,
         Vector2d linearVelocityDelta2D,
         Fixed64 angularVelocityDelta2D)
+        : this(
+            normalVelocity,
+            impulseScalar,
+            impulseScalar,
+            linearVelocityDelta3D,
+            angularVelocityDelta3D,
+            linearVelocityDelta2D,
+            angularVelocityDelta2D)
+    {
+    }
+
+    public ContactNormalImpulseResultMixed(
+        Fixed64 normalVelocity,
+        Fixed64 impulseScalar,
+        Fixed64 appliedImpulseScalar,
+        Vector3d linearVelocityDelta3D,
+        Vector3d angularVelocityDelta3D,
+        Vector2d linearVelocityDelta2D,
+        Fixed64 angularVelocityDelta2D,
+        bool hasRepresentableNormalVelocity = true,
+        bool hasRepresentableAppliedImpulse = true)
     {
         NormalVelocity = normalVelocity;
         ImpulseScalar = impulseScalar;
+        AppliedImpulseScalar = appliedImpulseScalar;
         LinearVelocityDelta3D = linearVelocityDelta3D;
         AngularVelocityDelta3D = angularVelocityDelta3D;
         LinearVelocityDelta2D = linearVelocityDelta2D;
         AngularVelocityDelta2D = angularVelocityDelta2D;
+        HasRepresentableNormalVelocity = hasRepresentableNormalVelocity;
+        HasRepresentableAppliedImpulse = hasRepresentableAppliedImpulse;
     }
 
     public Fixed64 NormalVelocity { get; }
 
     public Fixed64 ImpulseScalar { get; }
+
+    public Fixed64 AppliedImpulseScalar { get; }
+
+    public bool HasRepresentableNormalVelocity { get; }
+
+    public bool HasRepresentableAppliedImpulse { get; }
 
     public Vector3d LinearVelocityDelta3D { get; }
 
@@ -56,15 +87,40 @@ internal readonly struct ContactNormalVelocityDeltaResultMixed
         Vector3d angularVelocityDelta3D,
         Vector2d linearVelocityDelta2D,
         Fixed64 angularVelocityDelta2D)
+        : this(
+            normalVelocity,
+            linearVelocityDelta3D,
+            angularVelocityDelta3D,
+            linearVelocityDelta2D,
+            angularVelocityDelta2D,
+            normalVelocity < Fixed64.Zero,
+            hasRepresentableNormalVelocity: true)
+    {
+    }
+
+    public ContactNormalVelocityDeltaResultMixed(
+        Fixed64 normalVelocity,
+        Vector3d linearVelocityDelta3D,
+        Vector3d angularVelocityDelta3D,
+        Vector2d linearVelocityDelta2D,
+        Fixed64 angularVelocityDelta2D,
+        bool isClosing,
+        bool hasRepresentableNormalVelocity)
     {
         NormalVelocity = normalVelocity;
         LinearVelocityDelta3D = linearVelocityDelta3D;
         AngularVelocityDelta3D = angularVelocityDelta3D;
         LinearVelocityDelta2D = linearVelocityDelta2D;
         AngularVelocityDelta2D = angularVelocityDelta2D;
+        IsClosing = isClosing;
+        HasRepresentableNormalVelocity = hasRepresentableNormalVelocity;
     }
 
     public Fixed64 NormalVelocity { get; }
+
+    public bool IsClosing { get; }
+
+    public bool HasRepresentableNormalVelocity { get; }
 
     public Vector3d LinearVelocityDelta3D { get; }
 
@@ -81,6 +137,41 @@ internal readonly struct ContactNormalVelocityDeltaResultMixed
 /// </summary>
 internal static class ContactNormalImpulseMixed
 {
+    internal static bool CanUseCompactResponse(
+        SolidBody? body3D,
+        Vector3d linearVelocity3D,
+        Vector3d angularVelocity3D,
+        Vector3d relativeContactPoint3D,
+        SolidBody2D? body2D,
+        Vector2d linearVelocity2D,
+        Fixed64 angularVelocity2D,
+        Vector2d relativeContactPoint2D,
+        Vector3d axis)
+    {
+        Vector3d planarLever =
+            ExactContactLever2D.ToSpatial(relativeContactPoint2D);
+        return ContactResponseArithmetic3D.CanUseFastPointVelocity(
+                linearVelocity3D,
+                angularVelocity3D,
+                relativeContactPoint3D,
+                ExactContactLever2D.ToSpatial(linearVelocity2D),
+                new Vector3d(
+                    Fixed64.Zero,
+                    -angularVelocity2D,
+                    Fixed64.Zero),
+                planarLever,
+                axis)
+            && ContactResponseArithmetic3D.CanUseFastAngularResponse(
+                relativeContactPoint3D,
+                axis,
+                body3D?.GetConstrainedInverseInertiaTensor()
+                    ?? Fixed3x3.Zero)
+            && ContactResponseArithmetic3D.CanUseFastAngularResponse(
+                planarLever,
+                axis,
+                ExactContactLever2D.CreateInverseInertia(body2D));
+    }
+
     internal static bool TryCalculateVelocityDeltas(
         SolidBody? body3D,
         Vector3d linearVelocity3D,
@@ -96,26 +187,34 @@ internal static class ContactNormalImpulseMixed
         out ContactNormalVelocityDeltaResultMixed result)
     {
         result = default;
-        Fixed64 normalVelocity = ComputeNormalVelocity(
-            linearVelocity3D,
-            angularVelocity3D,
-            relativeContactPoint3D,
-            linearVelocity2D,
-            angularVelocity2D,
-            relativeContactPoint2D,
-            normal);
+        if (!TryComputeNormalVelocity(
+                linearVelocity3D,
+                angularVelocity3D,
+                relativeContactPoint3D,
+                linearVelocity2D,
+                angularVelocity2D,
+                relativeContactPoint2D,
+                normal,
+                out Fixed64 normalVelocity))
+        {
+            return false;
+        }
         if (normalVelocity >= Fixed64.Zero)
         {
             result = ZeroVelocityDelta(normalVelocity);
             return true;
         }
 
-        Fixed64 denominator = ComputeDenominator(
-            body3D,
-            relativeContactPoint3D,
-            body2D,
-            relativeContactPoint2D,
-            normal);
+        if (!TryComputeDenominator(
+                body3D,
+                relativeContactPoint3D,
+                body2D,
+                relativeContactPoint2D,
+                normal,
+                out Fixed64 denominator))
+        {
+            return false;
+        }
         if (denominator <= Fixed64.Zero)
             return false;
 
@@ -171,7 +270,7 @@ internal static class ContactNormalImpulseMixed
         return true;
     }
 
-    internal static ContactNormalImpulseResultMixed CalculateAccumulatedDelta(
+    internal static bool TryCalculateAccumulatedDelta(
         SolidBody? body3D,
         Vector3d linearVelocity3D,
         Vector3d angularVelocity3D,
@@ -185,24 +284,40 @@ internal static class ContactNormalImpulseMixed
         Fixed64 restitutionVelocityThreshold,
         Fixed64 accumulatedImpulse,
         Fixed64 positiveImpulseScale,
-        Fixed64 negativeImpulseScale)
+        Fixed64 negativeImpulseScale,
+        out ContactNormalImpulseResultMixed result)
     {
-        Fixed64 normalVelocity = ComputeNormalVelocity(
-            linearVelocity3D,
-            angularVelocity3D,
-            relativeContactPoint3D,
-            linearVelocity2D,
-            angularVelocity2D,
-            relativeContactPoint2D,
-            normal);
-        Fixed64 denominator = ComputeDenominator(
-            body3D,
-            relativeContactPoint3D,
-            body2D,
-            relativeContactPoint2D,
-            normal);
-        if (denominator <= Fixed64.Epsilon)
-            return ZeroImpulse(normalVelocity);
+        result = default;
+        bool inputsValid =
+            accumulatedImpulse >= Fixed64.Zero
+            & positiveImpulseScale >= Fixed64.Zero
+            & negativeImpulseScale >= Fixed64.Zero;
+        if (!inputsValid)
+            return false;
+        if (!TryComputeNormalVelocity(
+                linearVelocity3D,
+                angularVelocity3D,
+                relativeContactPoint3D,
+                linearVelocity2D,
+                angularVelocity2D,
+                relativeContactPoint2D,
+                normal,
+                out Fixed64 normalVelocity)
+            || !TryComputeDenominator(
+                body3D,
+                relativeContactPoint3D,
+                body2D,
+                relativeContactPoint2D,
+                normal,
+                out Fixed64 denominator))
+        {
+            return false;
+        }
+        if (denominator <= Fixed64.Zero)
+        {
+            result = ZeroImpulse(normalVelocity);
+            return true;
+        }
 
         Fixed64 appliedRestitution = normalVelocity < -restitutionVelocityThreshold
             ? restitution
@@ -211,66 +326,258 @@ internal static class ContactNormalImpulseMixed
         Fixed64 impulseScale = normalVelocity < Fixed64.Zero
             ? positiveImpulseScale
             : negativeImpulseScale;
-        Fixed64 scaledImpulse;
+        Fixed64 impulseScalar;
         if (!Fixed64.TryMultiplyDivide(
                 normalVelocity,
                 responseFactor,
                 impulseScale,
                 denominator,
-                out scaledImpulse))
+                out Fixed64 scaledImpulse))
         {
-            scaledImpulse = normalVelocity < Fixed64.Zero
-                ? Fixed64.MaxValue
-                : Fixed64.MinValue;
+            if (normalVelocity < Fixed64.Zero)
+                return false;
+            impulseScalar = -accumulatedImpulse;
         }
-        Fixed64 impulseScalar = FixedMath.Max(Fixed64.Zero, accumulatedImpulse + scaledImpulse)
-            - accumulatedImpulse;
+        else if (!Fixed64.TryAdd(
+                    accumulatedImpulse,
+                    scaledImpulse,
+                    out Fixed64 accumulated)
+                || !Fixed64.TrySubtract(
+                    FixedMath.Max(Fixed64.Zero, accumulated),
+                    accumulatedImpulse,
+                    out impulseScalar))
+        {
+            return false;
+        }
         if (impulseScalar == Fixed64.Zero)
-            return ZeroImpulse(normalVelocity);
+        {
+            result = ZeroImpulse(normalVelocity);
+            return true;
+        }
 
-        Vector3d impulse3D = -normal * impulseScalar;
-        Vector2d impulse2D = normal.ToVector2d() * impulseScalar;
-        return new ContactNormalImpulseResultMixed(
+        Vector2d planarNormal = normal.ToVector2d();
+        bool impulse3DResolved = ContactResponseArithmetic3D.TryScale(
+            -normal,
+            impulseScalar,
+            out Vector3d impulse3D);
+        bool linear3DResolved =
+            ContactNormalImpulse3D.TryComputeLinearVelocityDelta(
+                body3D,
+                impulse3D,
+                out Vector3d linearVelocityDelta3D);
+        bool angular3DResolved =
+            ContactNormalImpulse3D.TryComputeAngularVelocityDelta(
+                body3D,
+                relativeContactPoint3D,
+                impulse3D,
+                out Vector3d angularVelocityDelta3D);
+        bool linear2DResolved =
+            ContactNormalImpulse2D.TryComputeLinearVelocityDelta(
+                body2D,
+                planarNormal,
+                impulseScalar,
+                out Vector2d linearVelocityDelta2D);
+        bool angular2DResolved =
+            ContactNormalImpulse2D.TryComputeAngularVelocityDelta(
+                body2D,
+                relativeContactPoint2D,
+                planarNormal,
+                impulseScalar,
+                out Fixed64 angularVelocityDelta2D);
+        if (!(impulse3DResolved
+            & linear3DResolved
+            & angular3DResolved
+            & linear2DResolved
+            & angular2DResolved))
+        {
+            return false;
+        }
+
+        result = new ContactNormalImpulseResultMixed(
             normalVelocity,
             impulseScalar,
-            ComputeLinearVelocityDelta3D(body3D, impulse3D),
-            ComputeAngularVelocityDelta3D(body3D, relativeContactPoint3D, impulse3D),
-            ComputeLinearVelocityDelta2D(body2D, impulse2D),
-            ComputeAngularVelocityDelta2D(body2D, relativeContactPoint2D, impulse2D));
+            linearVelocityDelta3D,
+            angularVelocityDelta3D,
+            linearVelocityDelta2D,
+            angularVelocityDelta2D);
+        return true;
+    }
+
+    internal static bool TryCalculateVelocityDeltasExact(
+        SolidBody? body3D,
+        Vector3d linearVelocity3D,
+        Vector3d angularVelocity3D,
+        in FixedLever relativeContactPoint3D,
+        SolidBody2D? body2D,
+        Vector2d linearVelocity2D,
+        Fixed64 angularVelocity2D,
+        in FixedLever relativeContactPoint2D,
+        Vector3d normal,
+        Fixed64 restitution,
+        Fixed64 restitutionVelocityThreshold,
+        out ContactNormalVelocityDeltaResultMixed result)
+    {
+        result = default;
+        FixedLeverResponseOperand3d first =
+            ExactContactLever3D.CreateResponseOperand(
+                body3D,
+                linearVelocity3D,
+                angularVelocity3D,
+                relativeContactPoint3D,
+                -normal);
+        FixedLeverResponseOperand3d second =
+            ExactContactLever2D.CreateResponseOperand(
+                body2D,
+                linearVelocity2D,
+                angularVelocity2D,
+                relativeContactPoint2D,
+                normal);
+        if (!FixedLever.TryGetNormalResponse(
+                first,
+                second,
+                normal,
+                restitution,
+                restitutionVelocityThreshold,
+                out FixedLeverNormalResponse3d response))
+        {
+            return false;
+        }
+
+        bool hasNormalVelocity =
+            response.TryGetNormalVelocity(out Fixed64 normalVelocity);
+        result = new ContactNormalVelocityDeltaResultMixed(
+            normalVelocity,
+            response.FirstLinearVelocityDelta,
+            response.FirstAngularVelocityDelta,
+            ExactContactLever2D.ToPlanar(response.SecondLinearVelocityDelta),
+            ExactContactLever2D.ToPlanarAngular(response.SecondAngularVelocityDelta),
+            response.IsClosing,
+            hasNormalVelocity);
+        return true;
+    }
+
+    internal static bool TryCalculateAccumulatedDeltaExact(
+        SolidBody? body3D,
+        Vector3d linearVelocity3D,
+        Vector3d angularVelocity3D,
+        in FixedLever relativeContactPoint3D,
+        SolidBody2D? body2D,
+        Vector2d linearVelocity2D,
+        Fixed64 angularVelocity2D,
+        in FixedLever relativeContactPoint2D,
+        Vector3d normal,
+        Fixed64 restitution,
+        Fixed64 restitutionVelocityThreshold,
+        Fixed64 accumulatedImpulse,
+        Fixed64 positiveImpulseScale,
+        Fixed64 negativeImpulseScale,
+        out ContactNormalImpulseResultMixed result)
+    {
+        result = default;
+        FixedLeverResponseOperand3d first =
+            ExactContactLever3D.CreateResponseOperand(
+                body3D,
+                linearVelocity3D,
+                angularVelocity3D,
+                relativeContactPoint3D,
+                -normal);
+        FixedLeverResponseOperand3d second =
+            ExactContactLever2D.CreateResponseOperand(
+                body2D,
+                linearVelocity2D,
+                angularVelocity2D,
+                relativeContactPoint2D,
+                normal);
+        if (!FixedLever.TryGetAccumulatedNormalResponse(
+                first,
+                second,
+                normal,
+                restitution,
+                restitutionVelocityThreshold,
+                accumulatedImpulse,
+                positiveImpulseScale,
+                negativeImpulseScale,
+                out FixedLeverNormalResponse3d response))
+        {
+            return false;
+        }
+
+        bool hasNormalVelocity =
+            response.TryGetNormalVelocity(out Fixed64 normalVelocity);
+        bool hasAppliedImpulse =
+            response.TryGetAppliedImpulse(out Fixed64 appliedImpulse);
+        Fixed64 impulseScalar = response.TryGetAccumulatedImpulse(
+                out Fixed64 newAccumulatedImpulse)
+            ? newAccumulatedImpulse - accumulatedImpulse
+            : -accumulatedImpulse;
+        result = new ContactNormalImpulseResultMixed(
+            normalVelocity,
+            impulseScalar,
+            appliedImpulse,
+            response.FirstLinearVelocityDelta,
+            response.FirstAngularVelocityDelta,
+            ExactContactLever2D.ToPlanar(response.SecondLinearVelocityDelta),
+            ExactContactLever2D.ToPlanarAngular(response.SecondAngularVelocityDelta),
+            hasNormalVelocity,
+            hasAppliedImpulse);
+        return true;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Fixed64 ComputeNormalVelocity(
+    private static bool TryComputeNormalVelocity(
         Vector3d linearVelocity3D,
         Vector3d angularVelocity3D,
         Vector3d relativeContactPoint3D,
         Vector2d linearVelocity2D,
         Fixed64 angularVelocity2D,
         Vector2d relativeContactPoint2D,
-        Vector3d normal)
-    {
-        Vector3d pointVelocity3D = linearVelocity3D
-            + Vector3d.Cross(angularVelocity3D, relativeContactPoint3D);
-        Vector2d pointVelocity2D = linearVelocity2D
-            + AngularVelocityAtPoint(relativeContactPoint2D, angularVelocity2D);
-        return Vector3d.Dot(
-            pointVelocity2D.ToVector3d(Fixed64.Zero) - pointVelocity3D,
-            normal);
-    }
+        Vector3d normal,
+        out Fixed64 normalVelocity) =>
+        ContactNormalImpulse3D.TryComputeNormalVelocity(
+            linearVelocity3D,
+            angularVelocity3D,
+            relativeContactPoint3D,
+            ExactContactLever2D.ToSpatial(linearVelocity2D),
+            new Vector3d(Fixed64.Zero, -angularVelocity2D, Fixed64.Zero),
+            ExactContactLever2D.ToSpatial(relativeContactPoint2D),
+            normal,
+            out normalVelocity);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Fixed64 ComputeDenominator(
+    private static bool TryComputeDenominator(
         SolidBody? body3D,
         Vector3d relativeContactPoint3D,
         SolidBody2D? body2D,
         Vector2d relativeContactPoint2D,
-        Vector3d normal)
+        Vector3d normal,
+        out Fixed64 denominator)
     {
         Vector2d planarNormal = normal.ToVector2d();
-        return GetConstrainedInverseMass3D(body3D, normal)
-            + GetConstrainedInverseMass2D(body2D, normal)
-            + ComputeAngularDenominator3D(body3D, relativeContactPoint3D, normal)
-            + ComputeAngularDenominator2D(body2D, relativeContactPoint2D, planarNormal);
+        bool angular3DResolved =
+            ContactNormalImpulse3D.TryComputeAngularDenominator(
+                body3D,
+                relativeContactPoint3D,
+                normal,
+                out Fixed64 angular3D);
+        bool angular2DResolved =
+            ContactNormalImpulse2D.TryComputeAngularDenominator(
+                body2D,
+                relativeContactPoint2D,
+                planarNormal,
+                out Fixed64 angular2D);
+        bool sumResolved = Fixed64.TryAdd(
+                GetConstrainedInverseMass3D(body3D, normal),
+                GetConstrainedInverseMass2D(body2D, normal),
+                out Fixed64 linear)
+            & Fixed64.TryAdd(linear, angular3D, out Fixed64 first)
+            & Fixed64.TryAdd(first, angular2D, out denominator);
+        if (!(angular3DResolved & angular2DResolved & sumResolved))
+        {
+            denominator = default;
+            return false;
+        }
+
+        return true;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -288,65 +595,6 @@ internal static class ContactNormalImpulseMixed
             ? Fixed64.Zero
             : body.GetConstrainedInverseMass(planarAxis) * planarAxis.MagnitudeSquared;
     }
-
-    private static Fixed64 ComputeAngularDenominator3D(
-        SolidBody? body,
-        Vector3d relativeContactPoint,
-        Vector3d axis)
-    {
-        if (body?.CanRotate != true)
-            return Fixed64.Zero;
-
-        Vector3d angularVelocityDelta = body.ApplyConstrainedInverseInertia(
-            Vector3d.Cross(relativeContactPoint, axis));
-        Fixed64 denominator = Vector3d.Dot(
-            Vector3d.Cross(angularVelocityDelta, relativeContactPoint),
-            axis);
-        return denominator > Fixed64.Zero ? denominator : Fixed64.Zero;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Fixed64 ComputeAngularDenominator2D(
-        SolidBody2D? body,
-        Vector2d relativeContactPoint,
-        Vector2d axis)
-    {
-        if (body?.CanRotate != true || axis == Vector2d.Zero)
-            return Fixed64.Zero;
-
-        Fixed64 cross = Vector2d.CrossProduct(relativeContactPoint, axis);
-        return cross * cross * body.EffectiveInverseMomentOfInertia;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Vector3d ComputeLinearVelocityDelta3D(SolidBody? body, Vector3d impulse) =>
-        body == null
-            ? Vector3d.Zero
-            : body.ProjectLinearMotion(impulse * body.EffectiveInverseMass);
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Vector3d ComputeAngularVelocityDelta3D(
-        SolidBody? body,
-        Vector3d relativeContactPoint,
-        Vector3d impulse) =>
-        body?.ApplyConstrainedInverseInertia(Vector3d.Cross(relativeContactPoint, impulse))
-            ?? Vector3d.Zero;
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Vector2d ComputeLinearVelocityDelta2D(SolidBody2D? body, Vector2d impulse) =>
-        body == null
-            ? Vector2d.Zero
-            : body.ProjectLinearMotion(impulse * body.EffectiveInverseMass);
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Fixed64 ComputeAngularVelocityDelta2D(
-        SolidBody2D? body,
-        Vector2d relativeContactPoint,
-        Vector2d impulse) =>
-        body?.CanRotate == true
-            ? Vector2d.CrossProduct(relativeContactPoint, impulse)
-                * body.EffectiveInverseMomentOfInertia
-            : Fixed64.Zero;
 
     private static bool TryResolveAngularVelocityDelta3D(
         SolidBody? body,
@@ -418,10 +666,6 @@ internal static class ContactNormalImpulseMixed
             & (angularScale != Fixed64.Zero | torqueScale.Abs() <= Fixed64.One)
             & velocityDeltaResolved;
     }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Vector2d AngularVelocityAtPoint(Vector2d relativePoint, Fixed64 angularVelocity) =>
-        new(-angularVelocity * relativePoint.Y, angularVelocity * relativePoint.X);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static ContactNormalImpulseResultMixed ZeroImpulse(Fixed64 normalVelocity) =>

@@ -1,3 +1,4 @@
+using Chronicler;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
@@ -8,6 +9,20 @@ namespace Gravitas.Tests.Physics2D;
 
 public sealed partial class ContinuousCollision2DTests
 {
+    [Fact]
+    public void RotationalDynamicResponse_WithUnrepresentableLever_ShouldPreserveResponse2D()
+    {
+        var first = RunUnrepresentableLeverRotationalResponse2D();
+        var second = RunUnrepresentableLeverRotationalResponse2D();
+
+        first.Applied.Should().BeTrue();
+        first.SourceLinearVelocity.X.Should().BeLessThan((Fixed64)4);
+        first.SourceAngularVelocity.Should().BeGreaterThan(Fixed64.Zero);
+        first.TargetLinearVelocity.Should().Be(Vector2d.Zero);
+        first.TargetAngularVelocity.Should().Be(Fixed64.Zero);
+        first.Should().Be(second);
+    }
+
     [Fact]
     public void RotationalDynamicResponse_WithFullyLockedDynamicTarget_ShouldApplyOnlySourceState2D()
     {
@@ -48,6 +63,111 @@ public sealed partial class ContinuousCollision2DTests
         target.Position.Should().Be(Vector2d.Zero);
         target.LinearVelocity.Should().Be(Vector2d.Zero);
         target.AngularVelocity.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void RotationalDynamicResponse_WithUnrepresentableSeparatingPointVelocity_ShouldRejectAtomically2D()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        SolidBody2D source = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            Vector2d.Zero,
+            immovable: false);
+        SolidBody2D target = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            Vector2d.Zero,
+            immovable: false);
+        source.FreezeAxes = BodyFreezeAxes2D.Position;
+        target.FreezeAxes = BodyFreezeAxes2D.All;
+        source.ApplyCollisionAngularVelocityDelta(Fixed64.Two);
+        context.AdvanceLateSimulateToken();
+        context.Physics2D.PrepareContinuousCollisionFrame();
+        ChronicleHash before = context.ComputeReplayHash(
+            GravitasReplayHashMode.AuthoritativeWithSolverCaches);
+        ContactAnchor2D anchor = ContactAnchor2D.FromWorldPoint(
+            Vector2d.Forward * Fixed64.MaxValue);
+        var contact = new Contact2D(
+            anchor,
+            anchor,
+            Vector2d.Right,
+            Fixed64.Zero);
+
+        source.TryApplyRotationalContinuousCollisionResponse(
+                target,
+                contact,
+                Fixed64.Half,
+                source.Position,
+                source.Rotation,
+                Vector2d.Zero,
+                Fixed64.Zero,
+                Fixed64.Zero,
+                context.DeltaTime)
+            .Should()
+            .BeFalse();
+
+        source.AngularVelocity.Should().Be(Fixed64.Two);
+        context.ComputeReplayHash(
+                GravitasReplayHashMode.AuthoritativeWithSolverCaches)
+            .Should()
+            .Be(before);
+    }
+
+    private static (
+        bool Applied,
+        Vector2d SourceLinearVelocity,
+        Fixed64 SourceAngularVelocity,
+        Vector2d TargetLinearVelocity,
+        Fixed64 TargetAngularVelocity,
+        ChronicleHash ReplayHash)
+        RunUnrepresentableLeverRotationalResponse2D()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1);
+        SolidBody2D source = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            -Vector2d.Right * Fixed64.Two,
+            immovable: false);
+        SolidBody2D target = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            Vector2d.Zero,
+            immovable: false);
+        target.FreezeAxes = BodyFreezeAxes2D.All;
+        context.AdvanceLateSimulateToken();
+        context.Physics2D.PrepareContinuousCollisionFrame();
+        source.ApplyCollisionLinearVelocityDelta(
+            Vector2d.Right * (Fixed64)4);
+        var contact = new Contact2D(
+            new ContactAnchor2D(
+                new Vector2d(
+                    Fixed64.MaxValue,
+                    Fixed64.One),
+                Vector2d.Right * Fixed64.MinIncrement),
+            ContactAnchor2D.FromWorldPoint(Vector2d.Forward),
+            Vector2d.Right,
+            Fixed64.Zero);
+
+        bool applied = source.TryApplyRotationalContinuousCollisionResponse(
+            target,
+            contact,
+            Fixed64.Half,
+            source.Position,
+            Fixed64.Zero,
+            Vector2d.Right * Fixed64.Two,
+            Fixed64.Zero,
+            Fixed64.Zero,
+            context.DeltaTime);
+
+        return (
+            applied,
+            source.LinearVelocity,
+            source.AngularVelocity,
+            target.LinearVelocity,
+            target.AngularVelocity,
+            context.ComputeReplayHash(
+                GravitasReplayHashMode.AuthoritativeWithSolverCaches));
     }
 
     [Fact]

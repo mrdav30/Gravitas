@@ -113,7 +113,7 @@ internal readonly struct SolverContact
     public Fixed64 GetTotalInverseMass(Vector3d axis) =>
         A.GetConstrainedInverseMass(axis) + B.GetConstrainedInverseMass(axis);
 
-    private static Vector3d CreateTangent(Vector3d normal)
+    internal static Vector3d CreateTangent(Vector3d normal)
     {
         Vector3d absolute = Vector3d.Abs(normal);
         Vector3d reference = absolute.X <= absolute.Y && absolute.X <= absolute.Z

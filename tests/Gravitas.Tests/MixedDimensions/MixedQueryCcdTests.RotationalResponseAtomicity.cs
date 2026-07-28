@@ -72,6 +72,150 @@ public sealed partial class MixedQueryCcdTests
     }
 
     [Fact]
+    public void RotationalMixedResponse_From2D_WithUnrepresentableSeparatingPointVelocity_ShouldRejectAtomically()
+    {
+        using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
+        context.Environment.Gravity = Fixed64.Zero;
+        context.Environment.DampingFactor = Fixed64.Zero;
+        SolidBody2D source = CreateMixedTranslationSource2D(
+            context,
+            Vector2d.Zero);
+        LSCollider target = CreateBodyless3D(
+            context,
+            new LSSphereCollider(),
+            Vector3d.Zero);
+        source.FreezeAxes = BodyFreezeAxes2D.Position;
+        source.ApplyCollisionAngularVelocityDelta(-Fixed64.Two);
+        PrepareMixedContinuousCollisionFrame(context);
+        ChronicleHash before = context.ComputeReplayHash(
+            GravitasReplayHashMode.AuthoritativeWithSolverCaches);
+        ContactAnchor anchor = ContactAnchor.FromWorldPoint(
+            Vector3d.Forward * Fixed64.MaxValue);
+        var contact = new MixedContact(
+            anchor,
+            anchor,
+            Vector3d.Right,
+            Fixed64.Zero);
+
+        source.TryApplyMixedRotationalContinuousCollisionResponse(
+                target,
+                contact,
+                Fixed64.Half,
+                source.Position,
+                Vector2d.Zero,
+                source.Rotation,
+                Fixed64.Zero,
+                Fixed64.Zero,
+                context.DeltaTime)
+            .Should()
+            .BeFalse();
+
+        source.AngularVelocity.Should().Be(-Fixed64.Two);
+        context.ComputeReplayHash(
+                GravitasReplayHashMode.AuthoritativeWithSolverCaches)
+            .Should()
+            .Be(before);
+    }
+
+    [Fact]
+    public void RotationalMixedResponse_From3D_WithUnrepresentableClosingPointVelocity_ShouldApplyExactDelta()
+    {
+        using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
+        context.Environment.Gravity = Fixed64.Zero;
+        context.Environment.DampingFactor = Fixed64.Zero;
+        ScenarioBody<LSSphereCollider> source =
+            CreateSphere3D(context, Vector3d.Zero);
+        LSCollider2D target =
+            CreateBodylessCircle2D(context, Vector2d.Zero);
+        source.Body.FreezeAxes = BodyFreezeAxes3D.Position;
+        source.Body.ApplyCollisionAngularVelocityDelta(
+            -Vector3d.Forward * Fixed64.Two);
+        PrepareMixedContinuousCollisionFrame(context);
+        ContactAnchor anchor = ContactAnchor.FromWorldPoint(
+            Vector3d.Up * Fixed64.MaxValue);
+        var contact = new MixedContact(
+            anchor,
+            anchor,
+            Vector3d.Right,
+            Fixed64.Zero);
+        Vector2d targetPosition = target.Center;
+
+        source.Body.TryApplyMixedRotationalContinuousCollisionResponse(
+                target,
+                contact,
+                Fixed64.Half,
+                source.Body.Position3d,
+                Vector3d.Zero,
+                source.Body.Rotation,
+                source.Body.Rotation,
+                Fixed64.Zero,
+                context.DeltaTime,
+                sourceIsKinematic: false)
+            .Should()
+            .BeTrue();
+
+        source.Body.AngularVelocity.Should().Be(Vector3d.Zero);
+        target.Center.Should().Be(targetPosition);
+    }
+
+    [Fact]
+    public void RotationalMixedResponse_From3D_WithSubEpsilonClosingSpeed_ShouldReject()
+    {
+        using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
+        context.Environment.Gravity = Fixed64.Zero;
+        context.Environment.DampingFactor = Fixed64.Zero;
+        context.Environment.MinSpeed = Fixed64.Zero;
+        ScenarioBody<LSSphereCollider> source =
+            CreateSphere3D(context, -Vector3d.Right);
+        LSCollider2D target =
+            CreateBodylessCircle2D(context, Vector2d.Zero);
+        source.Body.ApplyCollisionLinearVelocityDelta(
+            Vector3d.Right * (Fixed64.Epsilon / Fixed64.Two));
+        PrepareMixedContinuousCollisionFrame(context);
+        MixedContact contact = CreateMixedContact(Vector3d.Right);
+        ContactNormalImpulseMixed.TryCalculateVelocityDeltas(
+                source.Body,
+                source.Body.LinearVelocity,
+                Vector3d.Zero,
+                Vector3d.Right * Fixed64.Half,
+                null,
+                Vector2d.Zero,
+                Fixed64.Zero,
+                Vector2d.Left * Fixed64.Half,
+                contact.Normal3DTo2D,
+                Fixed64.Zero,
+                Fixed64.Zero,
+                out ContactNormalVelocityDeltaResultMixed response)
+            .Should()
+            .BeTrue();
+        response.IsClosing.Should().BeTrue();
+        response.HasRepresentableNormalVelocity.Should().BeTrue();
+        response.NormalVelocity.Should().BeLessThan(Fixed64.Zero);
+        response.NormalVelocity.Should().BeGreaterThan(-Fixed64.Epsilon);
+        ChronicleHash before = context.ComputeReplayHash(
+            GravitasReplayHashMode.AuthoritativeWithSolverCaches);
+
+        source.Body.TryApplyMixedRotationalContinuousCollisionResponse(
+                target,
+                contact,
+                Fixed64.Half,
+                source.Body.Position3d,
+                Vector3d.Zero,
+                source.Body.Rotation,
+                source.Body.Rotation,
+                Fixed64.Zero,
+                context.DeltaTime,
+                sourceIsKinematic: false)
+            .Should()
+            .BeFalse();
+
+        context.ComputeReplayHash(
+                GravitasReplayHashMode.AuthoritativeWithSolverCaches)
+            .Should()
+            .Be(before);
+    }
+
+    [Fact]
     public void RotationalMixedResponse_From2D_When3DTargetTrajectoryIsFull_ShouldRemainAtomic()
     {
         using GravitasWorldContext context = CreateMixedContext(frameRate: 1);

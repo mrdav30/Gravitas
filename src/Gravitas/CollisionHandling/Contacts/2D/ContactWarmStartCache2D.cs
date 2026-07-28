@@ -70,6 +70,32 @@ internal struct ContactWarmStartCache2D
         return false;
     }
 
+    public bool Remove(ulong contactId)
+    {
+        for (int i = 0; i < Count; i++)
+        {
+            if (GetContactId(i) != contactId)
+                continue;
+
+            Count--;
+            for (int shift = i; shift < Count; shift++)
+            {
+                SetContactIdUnchecked(
+                    shift,
+                    GetContactId(shift + 1));
+                SetImpulseUnchecked(
+                    shift,
+                    GetImpulseUnchecked(shift + 1));
+            }
+
+            SetContactIdUnchecked(Count, 0UL);
+            SetImpulseUnchecked(Count, default);
+            return true;
+        }
+
+        return false;
+    }
+
     internal ulong GetContactIdForReplayHash(int index)
     {
         SwiftThrowHelper.ThrowIfArrayIndexInvalid(index, Count, nameof(index));

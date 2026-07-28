@@ -391,7 +391,7 @@ internal static class ContactNormalImpulse3D
             return false;
         }
 
-        if (denominator.SaturatedSum <= Fixed64.Epsilon)
+        if (denominator.SaturatedSum <= Fixed64.Zero)
         {
             result = Zero(normalVelocity);
             return true;
@@ -581,7 +581,7 @@ internal static class ContactNormalImpulse3D
     private static Fixed64 GetConstrainedInverseMass(SolidBody? body, Vector3d axis) =>
         body?.GetConstrainedInverseMass(axis) ?? Fixed64.Zero;
 
-    private static bool TryComputeNormalVelocity(
+    internal static bool TryComputeNormalVelocity(
         Vector3d linearVelocityA,
         Vector3d angularVelocityA,
         Vector3d relativeContactPointA,
@@ -678,7 +678,7 @@ internal static class ContactNormalImpulse3D
         return true;
     }
 
-    private static bool TryComputeAngularDenominator(
+    internal static bool TryComputeAngularDenominator(
         SolidBody? body,
         Vector3d relativeContactPoint,
         Vector3d axis,
@@ -735,7 +735,7 @@ internal static class ContactNormalImpulse3D
         return true;
     }
 
-    private static bool TryComputeLinearVelocityDelta(
+    internal static bool TryComputeLinearVelocityDelta(
         SolidBody? body,
         Vector3d impulse,
         out Vector3d velocityDelta)
@@ -754,7 +754,7 @@ internal static class ContactNormalImpulse3D
         return true;
     }
 
-    private static bool TryComputeAngularVelocityDelta(
+    internal static bool TryComputeAngularVelocityDelta(
         SolidBody? body,
         Vector3d relativeContactPoint,
         Vector3d impulse,

@@ -187,12 +187,12 @@ public sealed partial class MixedQueryCcdTests
         blade.Body.LastContinuousCollisionToiIterationLimitReached.Should().BeFalse();
         target.LinearVelocity.Should().Be(new Vector2d(
             (Fixed64)0.45798352430574596,
-            (Fixed64)(-2.9263750039972365)));
+            (Fixed64)(-2.9263750046957284)));
         target.AngularVelocity.Should().Be(Fixed64.Zero);
     }
 
     [Fact]
-    public void MixedMode_Kinematic3DRotation_WithUnrepresentableFinalContactArm_ShouldRejectResponseAtomically()
+    public void MixedMode_Kinematic3DRotation_WithUnrepresentableFinalContactArm_ShouldPreserveResponse()
     {
         using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
         ScenarioBody<LSCuboidCollider> blade = CreateRotationalMixedBlade3D(context);
@@ -211,13 +211,11 @@ public sealed partial class MixedQueryCcdTests
         blade.Body.Agent.Transform.LocalRotation = RotationalMixedQuarterTurn3D;
         context.LateSimulate();
 
-        blade.Body.Rotation.Should().NotBe(RotationalMixedQuarterTurn3D);
-        target.LinearVelocity.Should().Be(Vector2d.Zero);
-        target.AngularVelocity.Should().Be(Fixed64.Zero);
+        blade.Body.Rotation.Should().Be(RotationalMixedQuarterTurn3D);
     }
 
     [Fact]
-    public void MixedMode_Kinematic3DRotation_WithUnrepresentable2DCenterOfMass_ShouldRejectResponseAtomically()
+    public void MixedMode_Kinematic3DRotation_WithUnrepresentable2DCenterOfMass_ShouldPreserveResponse()
     {
         using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
         ScenarioBody<LSCuboidCollider> blade = CreateRotationalMixedBlade3D(context);
@@ -227,9 +225,7 @@ public sealed partial class MixedQueryCcdTests
         blade.Body.Agent.Transform.LocalRotation = RotationalMixedQuarterTurn3D;
         context.LateSimulate();
 
-        blade.Body.Rotation.Should().NotBe(RotationalMixedQuarterTurn3D);
-        target.LinearVelocity.Should().Be(Vector2d.Zero);
-        target.AngularVelocity.Should().Be(Fixed64.Zero);
+        blade.Body.Rotation.Should().Be(RotationalMixedQuarterTurn3D);
     }
 
     [Fact]
@@ -250,7 +246,7 @@ public sealed partial class MixedQueryCcdTests
     }
 
     [Fact]
-    public void MixedMode_Kinematic2DRotation_WithUnrepresentable3DCenterOfMass_ShouldRejectResponseAtomically()
+    public void MixedMode_Kinematic2DRotation_WithUnrepresentable3DCenterOfMass_ShouldPreserveResponse()
     {
         using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
         context.Environment.Gravity = Fixed64.Zero;
@@ -261,9 +257,7 @@ public sealed partial class MixedQueryCcdTests
         blade.Agent.Transform.LocalRotationXZRadians = RotationalMixedQuarterTurn;
         context.LateSimulate();
 
-        blade.Rotation.Should().BeLessThan(RotationalMixedQuarterTurn);
-        target.Body.LinearVelocity.Should().Be(Vector3d.Zero);
-        target.Body.AngularVelocity.Should().Be(Vector3d.Zero);
+        blade.Rotation.Should().Be(RotationalMixedQuarterTurn);
     }
 
     [Fact]

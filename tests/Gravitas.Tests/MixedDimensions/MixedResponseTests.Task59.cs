@@ -11,7 +11,7 @@ namespace Gravitas.Tests.MixedDimensions;
 public sealed partial class MixedResponseTests
 {
     [Fact]
-    public void Resolve_WithSubEpsilonNormalMobility_ShouldSkipSingularImpulse()
+    public void Resolve_WithSubEpsilonNormalMobility_ShouldResolveExactImpulse()
     {
         using GravitasWorldContext context = CreateMixedContext();
         ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(
@@ -40,14 +40,14 @@ public sealed partial class MixedResponseTests
             iterationLimit: 1,
             applyPositionCorrection: false);
 
-        appliedImpulse.Should().BeFalse();
-        body3D.Body.LinearVelocity.Should().Be(velocityBefore);
+        appliedImpulse.Should().BeTrue();
+        body3D.Body.LinearVelocity.Should().Be(Vector3d.Zero);
         body3D.Body.AngularVelocity.Should().Be(Vector3d.Zero);
         body3D.Body.Position3d.Should().Be(new Vector3d(Fixed64.Zero, Fixed64.Zero, -Fixed64.Half));
     }
 
     [Fact]
-    public void Resolve_WithEpsilonFrictionMobility_ShouldPreserveNormalOnlyResponse()
+    public void Resolve_WithEpsilonFrictionMobility_ShouldRetainFrictionResponse()
     {
         Fixed64 residual = Fixed64.FromFraction(1, 4096);
         Vector3d normal = new(
@@ -67,7 +67,9 @@ public sealed partial class MixedResponseTests
         normalOnly.TangentMagnitudeSquared.Should().BeGreaterThan(Fixed64.Epsilon);
         normalOnly.TangentInverseMass.Should().Be(Fixed64.Epsilon);
         frictional.AppliedImpulse.Should().BeTrue();
-        frictional.Velocity.Should().Be(normalOnly.Velocity);
+        frictional.TangentMagnitudeSquared
+            .Should()
+            .BeLessThan(normalOnly.TangentMagnitudeSquared);
     }
 
     private static (bool AppliedImpulse, Vector3d Velocity, Fixed64 TangentMagnitudeSquared, Fixed64 TangentInverseMass)

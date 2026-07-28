@@ -145,6 +145,9 @@ internal sealed partial class CollisionPair2D
     internal bool TryGetWarmStartImpulse(ulong contactId, out ContactWarmStartImpulse impulse) =>
         _warmStart.TryGet(contactId, out impulse);
 
+    internal void RemoveWarmStartImpulse(ulong contactId) =>
+        _warmStart.Remove(contactId);
+
     internal void ClearWarmStart() => _warmStart.Clear();
 
     private void ResetPairState()

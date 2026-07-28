@@ -140,11 +140,11 @@ arithmetic, xUnit v3, BenchmarkDotNet, Gravitas 2D/3D/mixed solvers and CCD.
 - Modify: `src/Gravitas/CollisionHandling/Response/Mixed`
 - Modify: matching 2D/mixed response, replay, diagnostic, and allocation tests
 
-- [ ] Apply the same compact/fallback contract to pure 2D.
-- [ ] Apply the 3D and planar exact operations to mixed contacts without
+- [x] Apply the same compact/fallback contract to pure 2D.
+- [x] Apply the 3D and planar exact operations to mixed contacts without
   duplicating FixedMathSharp arithmetic inside Gravitas.
-- [ ] Preserve constrained mixed impulse semantics and atomic body mutation.
-- [ ] Prove 2D/3D/mixed diagnostic, replay, mirrored-face, and warmed allocation
+- [x] Preserve constrained mixed impulse semantics and atomic body mutation.
+- [x] Prove 2D/3D/mixed diagnostic, replay, mirrored-face, and warmed allocation
   parity; pause for review.
 
 ### Phase 4: Semantic Compound Mass Points And Wide Weights
@@ -194,7 +194,10 @@ arithmetic, xUnit v3, BenchmarkDotNet, Gravitas 2D/3D/mixed solvers and CCD.
 - [x] Phase 2 complete and paused for review: 3D discrete response and
   rotational CCD preserve full-domain lever behavior through a compact
   descriptor and no-inline exact fallback.
-- [ ] Phases 3-5 pending.
+- [x] Phase 3 complete and paused for review: pure 2D and mixed discrete
+  response, warm starts, friction, diagnostics, and rotational CCD share the
+  compact/exact contract while preserving atomic constrained-body mutation.
+- [ ] Phases 4-5 pending.
 
 ## Evidence To Date
 
@@ -255,3 +258,27 @@ arithmetic, xUnit v3, BenchmarkDotNet, Gravitas 2D/3D/mixed solvers and CCD.
   FixedMathSharp now rejects non-normalized normals and documents the matching
   signed mobility-projected axes. The reviewer found no remaining material
   Phase 2 issue.
+- Phase 3 adds allocation-free exact line/disk Coulomb response to
+  FixedMathSharp and consumes it from pure 2D and mixed response without
+  exposing raw wide arithmetic or duplicating it in Gravitas.
+- Pure 2D and mixed response now retain semantic contact anchors, recover stale
+  warm starts, preflight final body deltas atomically, and use exact fallback
+  for point velocity, effective mass, normal response, friction, and rotational
+  CCD when compact expressions cannot be proven representable.
+- Review found and closed an overflowing separating-contact edge: compact 2D
+  and mixed kernels now cancel the previously applied warm start with checked
+  velocity deltas rather than leaving stale velocity or forcing an unnecessary
+  exact fallback.
+- Phase 3 regressions cover bodyless and frozen-axis participants, mirrored
+  faces, different exact denominators, diagnostic projection boundaries,
+  replay, stale-cache recovery, compact/exact parity, and warmed zero-allocation
+  behavior.
+- FixedMathSharp's complete Release suite passes `2,615/2,615`; coverage remains
+  `52,319/52,319` lines and `8,704/8,704` branches.
+- Gravitas's complete Release suite passes `3,760/3,760`; coverage is
+  `40,107/40,107` lines, `12,337/12,337` branches, and `4,346/4,346` methods.
+- Gravitas `ReleaseLean` passes `3,705/3,705` tests. `Release` and
+  `ReleaseLean` both build and package `net8.0` and `netstandard2.1` with zero
+  warnings or errors.
+- Independent Phase 3 review found no remaining material issue after the
+  separating warm-start correction.

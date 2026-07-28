@@ -554,7 +554,7 @@ public sealed class CollisionResponseInvariantTests
     }
 
     [Fact]
-    public void CalculateImpulse_WithKinematicTangentialMotionAndQuantizedTargetMass_ShouldSkipUndefinedFrictionImpulse()
+    public void CalculateImpulse_WithKinematicTangentialMotionAndQuantizedTargetMass_ShouldResolveNormalOnly()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSSphereCollider> driver = scenario.CreateSphere(
@@ -579,7 +579,13 @@ public sealed class CollisionResponseInvariantTests
         CollisionResponse.CalculateImpulse(pair);
 
         driver.Body.LinearVelocity.Should().Be(Vector3d.Zero);
-        target.Body.LinearVelocity.Should().Be(Vector3d.Zero);
+        Fixed64 normalVelocity = Vector3d.Dot(
+            target.Body.LinearVelocity,
+            contact.Normal);
+        normalVelocity.Should().BeGreaterThan(Fixed64.Zero);
+        (target.Body.LinearVelocity - contact.Normal * normalVelocity)
+            .Should()
+            .Be(Vector3d.Zero);
     }
 
     [Fact]

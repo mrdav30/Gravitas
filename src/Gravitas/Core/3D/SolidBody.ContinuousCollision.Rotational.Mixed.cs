@@ -701,49 +701,81 @@ public partial class SolidBody
             ?? Vector2d.Zero;
         Fixed64 targetAngularVelocity = target?.SampleContinuousCollisionAngularVelocity(frameFraction)
             ?? Fixed64.Zero;
+        Vector2d targetLocalCenterOfMassOffset =
+            target?.LocalCenterOfMassOffset ?? Vector2d.Zero;
         SolidBody? sourceResponseBody = HasSolverMobility ? this : null;
         SolidBody2D? targetResponseBody = target?.HasSolverMobility == true ? target : null;
         Fixed64 restitution = PhysicsMaterial.CombineRestitution(
             Collider.Material,
             targetCollider.Material);
+        var sourceCenter = new ContactAnchor(
+            sourcePosition,
+            sourceRotation,
+            LocalCenterOfMassOffset);
         bool sourceContactArmResolved = contact.Anchor3D.TryGetOffsetFrom(
-            new ContactAnchor(
-                sourcePosition,
-                sourceRotation,
-                LocalCenterOfMassOffset),
+            sourceCenter,
             out Vector3d sourceContactArm);
-        bool targetContactArmResolved = target == null
-            ? contact.TryGetPlanarOffset2DFrom(
-                targetPosition,
-                Fixed64.Zero,
-                Vector2d.Zero,
-                out Vector2d targetContactArm)
-            : contact.TryGetPlanarOffset2DFrom(
+        bool targetContactArmResolved =
+            contact.TryGetPlanarOffset2DFrom(
                 targetPosition,
                 targetRotation,
-                target.LocalCenterOfMassOffset,
-                out targetContactArm);
-        bool responseResolved = ContactNormalImpulseMixed.TryCalculateVelocityDeltas(
-            sourceResponseBody,
-            sourceLinearVelocity,
-            sourceAngularVelocity,
-            sourceContactArm,
-            targetResponseBody,
-            targetLinearVelocity,
-            targetAngularVelocity,
-            targetContactArm,
-            contact.Normal3DTo2D,
-            restitution,
-            Context.Settings.RestitutionVelocityThreshold,
-            out ContactNormalVelocityDeltaResultMixed response);
-        bool responseAdmissible = sourceContactArmResolved
-            & targetContactArmResolved
-            & responseResolved
-            & response.NormalVelocity < -Fixed64.Epsilon;
-        if (!responseAdmissible)
+                targetLocalCenterOfMassOffset,
+                out Vector2d targetContactArm);
+        ContactNormalVelocityDeltaResultMixed response = default;
+        bool responseResolved = sourceContactArmResolved
+            && targetContactArmResolved
+            && ContactNormalImpulseMixed.CanUseCompactResponse(
+                sourceResponseBody,
+                sourceLinearVelocity,
+                sourceAngularVelocity,
+                sourceContactArm,
+                targetResponseBody,
+                targetLinearVelocity,
+                targetAngularVelocity,
+                targetContactArm,
+                contact.Normal3DTo2D)
+            && ContactNormalImpulseMixed.TryCalculateVelocityDeltas(
+                sourceResponseBody,
+                sourceLinearVelocity,
+                sourceAngularVelocity,
+                sourceContactArm,
+                targetResponseBody,
+                targetLinearVelocity,
+                targetAngularVelocity,
+                targetContactArm,
+                contact.Normal3DTo2D,
+                restitution,
+                Context.Settings.RestitutionVelocityThreshold,
+                out response);
+        if (!responseResolved)
         {
-            return false;
+            FixedLever exactSource =
+                contact.Anchor3D.GetLeverFrom(sourceCenter);
+            FixedLever exactTarget =
+                contact.GetPlanarXZLeverFrom(
+                    targetPosition,
+                    targetRotation,
+                    targetLocalCenterOfMassOffset);
+            responseResolved =
+                ContactNormalImpulseMixed.TryCalculateVelocityDeltasExact(
+                    sourceResponseBody,
+                    sourceLinearVelocity,
+                    sourceAngularVelocity,
+                    exactSource,
+                    targetResponseBody,
+                    targetLinearVelocity,
+                    targetAngularVelocity,
+                    exactTarget,
+                    contact.Normal3DTo2D,
+                    restitution,
+                    Context.Settings.RestitutionVelocityThreshold,
+                    out response);
         }
+        if (!responseResolved || !response.IsClosing)
+            return false;
+        if (response.HasRepresentableNormalVelocity
+            && response.NormalVelocity >= -Fixed64.Epsilon)
+            return false;
 
         Vector3d postSourceLinearVelocity = sourceLinearVelocity;
         Vector3d postSourceAngularVelocity = sourceAngularVelocity;

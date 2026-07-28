@@ -143,6 +143,23 @@ public sealed class CollisionWarmStartTests
         cache.GetContactIdForReplayHash(1).Should().Be(33UL);
         cache.TryGet(22UL, out _).Should().BeFalse();
         cache.Remove(44UL).Should().BeFalse();
+
+        ContactWarmStartCache2D cache2D = default;
+        cache2D.Set(
+            11UL,
+            Fixed64.One,
+            Fixed64.Zero);
+        cache2D.Set(
+            22UL,
+            Fixed64.Two,
+            Fixed64.Zero);
+
+        cache2D.Remove(11UL).Should().BeTrue();
+
+        cache2D.Count.Should().Be(1);
+        cache2D.GetContactIdForReplayHash(0).Should().Be(22UL);
+        cache2D.TryGet(11UL, out _).Should().BeFalse();
+        cache2D.Remove(33UL).Should().BeFalse();
     }
 
     private static void StoreWarmStartNormalLoad(CollisionPair pair, Fixed64 normalImpulse)

@@ -424,8 +424,11 @@ public sealed class ContactNormalImpulseBoundaryTests
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSSphereCollider> body =
             scenario.CreateSphere(Vector3d.Zero);
+        SolidBody2D body2D =
+            CreateBody2D(scenario.Context, Fixed64.MinIncrement);
         body.Body.Mass = Fixed64.MinIncrement;
         body.Body.FreezeAxes = BodyFreezeAxes3D.Rotation;
+        body2D.FreezeAxes = BodyFreezeAxes2D.Rotation;
         FixedLever exactParallel = CreateLever(
             new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero),
             Vector3d.Right * Fixed64.MinIncrement);
@@ -449,6 +452,42 @@ public sealed class ContactNormalImpulseBoundaryTests
                 out _)
             .Should()
             .BeFalse();
+        ContactNormalImpulse2D.TryCalculateAccumulatedDeltaExact(
+                body2D,
+                Vector2d.Right * Fixed64.MaxValue,
+                Fixed64.Zero,
+                exactParallel,
+                null,
+                Vector2d.Zero,
+                Fixed64.Zero,
+                zero,
+                Vector2d.Right,
+                Fixed64.Zero,
+                Fixed64.Zero,
+                Fixed64.Zero,
+                Fixed64.MaxValue,
+                Fixed64.One,
+                out _)
+            .Should()
+            .BeFalse();
+        ContactNormalImpulseMixed.TryCalculateAccumulatedDeltaExact(
+                body.Body,
+                Vector3d.Right * Fixed64.MaxValue,
+                Vector3d.Zero,
+                exactParallel,
+                null,
+                Vector2d.Zero,
+                Fixed64.Zero,
+                zero,
+                Vector3d.Right,
+                Fixed64.Zero,
+                Fixed64.Zero,
+                Fixed64.Zero,
+                Fixed64.MaxValue,
+                Fixed64.One,
+                out _)
+            .Should()
+            .BeFalse();
     }
 
     [Fact]
@@ -457,8 +496,11 @@ public sealed class ContactNormalImpulseBoundaryTests
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSSphereCollider> body =
             scenario.CreateSphere(Vector3d.Zero);
+        SolidBody2D body2D =
+            CreateBody2D(scenario.Context, Fixed64.MinIncrement);
         body.Body.Mass = Fixed64.MinIncrement;
         body.Body.FreezeAxes = BodyFreezeAxes3D.Rotation;
+        body2D.FreezeAxes = BodyFreezeAxes2D.Rotation;
 
         ContactNormalImpulse3D.TryCalculateAccumulatedDelta(
                 body.Body,
@@ -478,6 +520,42 @@ public sealed class ContactNormalImpulseBoundaryTests
                 out _)
             .Should()
             .BeFalse();
+        ContactNormalImpulse2D.TryCalculateAccumulatedDelta(
+                body2D,
+                Vector2d.Right * Fixed64.MaxValue,
+                Fixed64.Zero,
+                Vector2d.Zero,
+                null,
+                Vector2d.Zero,
+                Fixed64.Zero,
+                Vector2d.Zero,
+                Vector2d.Right,
+                Fixed64.Zero,
+                Fixed64.Zero,
+                Fixed64.Zero,
+                Fixed64.MaxValue,
+                Fixed64.One,
+                out _)
+            .Should()
+            .BeFalse();
+        ContactNormalImpulseMixed.TryCalculateAccumulatedDelta(
+                body.Body,
+                Vector3d.Right * Fixed64.MaxValue,
+                Vector3d.Zero,
+                Vector3d.Zero,
+                null,
+                Vector2d.Zero,
+                Fixed64.Zero,
+                Vector2d.Zero,
+                Vector3d.Right,
+                Fixed64.Zero,
+                Fixed64.Zero,
+                Fixed64.Zero,
+                Fixed64.MaxValue,
+                Fixed64.One,
+                out _)
+            .Should()
+            .BeFalse();
     }
 
     [Fact]
@@ -486,7 +564,10 @@ public sealed class ContactNormalImpulseBoundaryTests
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSSphereCollider> body =
             scenario.CreateSphere(Vector3d.Zero);
+        SolidBody2D body2D =
+            CreateBody2D(scenario.Context, Fixed64.One);
         body.Body.FreezeAxes = BodyFreezeAxes3D.Rotation;
+        body2D.FreezeAxes = BodyFreezeAxes2D.Rotation;
         FixedLever zero = CreateLever(Vector3d.Zero, Vector3d.Zero);
 
         ContactNormalImpulse3D.TryCalculateAccumulatedDelta(
@@ -528,6 +609,86 @@ public sealed class ContactNormalImpulseBoundaryTests
         exact.ImpulseScalar.Should().Be(-Fixed64.MaxValue);
         exact.AppliedImpulseScalar.Should().Be(Fixed64.One);
         exact.LinearVelocityDeltaA.Should().Be(Vector3d.Left);
+
+        ContactNormalImpulse2D.TryCalculateAccumulatedDelta(
+                body2D,
+                Vector2d.Right,
+                Fixed64.Zero,
+                Vector2d.Zero,
+                null,
+                Vector2d.Zero,
+                Fixed64.Zero,
+                Vector2d.Zero,
+                Vector2d.Right,
+                Fixed64.Zero,
+                Fixed64.Zero,
+                Fixed64.MaxValue,
+                Fixed64.One,
+                Fixed64.One,
+                out _)
+            .Should()
+            .BeFalse();
+        ContactNormalImpulse2D.TryCalculateAccumulatedDeltaExact(
+                body2D,
+                Vector2d.Right,
+                Fixed64.Zero,
+                zero,
+                null,
+                Vector2d.Zero,
+                Fixed64.Zero,
+                zero,
+                Vector2d.Right,
+                Fixed64.Zero,
+                Fixed64.Zero,
+                Fixed64.MaxValue,
+                Fixed64.One,
+                Fixed64.One,
+                out ContactNormalImpulseResult2D exact2D)
+            .Should()
+            .BeTrue();
+        exact2D.HasRepresentableAccumulatedImpulse.Should().BeFalse();
+        exact2D.AppliedImpulseScalar.Should().Be(Fixed64.One);
+        exact2D.LinearVelocityDeltaA.Should().Be(Vector2d.Left);
+
+        ContactNormalImpulseMixed.TryCalculateAccumulatedDelta(
+                body.Body,
+                Vector3d.Right,
+                Vector3d.Zero,
+                Vector3d.Zero,
+                null,
+                Vector2d.Zero,
+                Fixed64.Zero,
+                Vector2d.Zero,
+                Vector3d.Right,
+                Fixed64.Zero,
+                Fixed64.Zero,
+                Fixed64.MaxValue,
+                Fixed64.One,
+                Fixed64.One,
+                out _)
+            .Should()
+            .BeFalse();
+        ContactNormalImpulseMixed.TryCalculateAccumulatedDeltaExact(
+                body.Body,
+                Vector3d.Right,
+                Vector3d.Zero,
+                zero,
+                null,
+                Vector2d.Zero,
+                Fixed64.Zero,
+                zero,
+                Vector3d.Right,
+                Fixed64.Zero,
+                Fixed64.Zero,
+                Fixed64.MaxValue,
+                Fixed64.One,
+                Fixed64.One,
+                out ContactNormalImpulseResultMixed exactMixed)
+            .Should()
+            .BeTrue();
+        exactMixed.HasRepresentableAppliedImpulse.Should().BeTrue();
+        exactMixed.AppliedImpulseScalar.Should().Be(Fixed64.One);
+        exactMixed.LinearVelocityDelta3D.Should().Be(Vector3d.Left);
     }
 
     [Fact]
@@ -587,6 +748,73 @@ public sealed class ContactNormalImpulseBoundaryTests
             Vector3d.Zero,
             Vector3d.Right,
             Fixed64.Zero);
+
+        ContactNormalImpulse2D.TryCalculateVelocityDeltas(
+                null,
+                Vector2d.Zero,
+                Fixed64.MaxValue,
+                Vector2d.Forward * Fixed64.MaxValue,
+                null,
+                Vector2d.Zero,
+                Fixed64.Zero,
+                Vector2d.Zero,
+                Vector2d.Right,
+                Fixed64.Zero,
+                Fixed64.Zero,
+                out _)
+            .Should()
+            .BeFalse();
+        ContactNormalImpulse2D.TryCalculateAccumulatedDelta(
+                null,
+                Vector2d.Zero,
+                Fixed64.MaxValue,
+                Vector2d.Forward * Fixed64.MaxValue,
+                null,
+                Vector2d.Zero,
+                Fixed64.Zero,
+                Vector2d.Zero,
+                Vector2d.Right,
+                Fixed64.Zero,
+                Fixed64.Zero,
+                Fixed64.Zero,
+                Fixed64.One,
+                Fixed64.One,
+                out _)
+            .Should()
+            .BeFalse();
+        ContactNormalImpulseMixed.TryCalculateVelocityDeltas(
+                null,
+                Vector3d.Zero,
+                Vector3d.Forward * Fixed64.MaxValue,
+                Vector3d.Up * Fixed64.MaxValue,
+                null,
+                Vector2d.Zero,
+                Fixed64.Zero,
+                Vector2d.Zero,
+                Vector3d.Right,
+                Fixed64.Zero,
+                Fixed64.Zero,
+                out _)
+            .Should()
+            .BeFalse();
+        ContactNormalImpulseMixed.TryCalculateAccumulatedDelta(
+                null,
+                Vector3d.Zero,
+                Vector3d.Forward * Fixed64.MaxValue,
+                Vector3d.Up * Fixed64.MaxValue,
+                null,
+                Vector2d.Zero,
+                Fixed64.Zero,
+                Vector2d.Zero,
+                Vector3d.Right,
+                Fixed64.Zero,
+                Fixed64.Zero,
+                Fixed64.Zero,
+                Fixed64.One,
+                Fixed64.One,
+                out _)
+            .Should()
+            .BeFalse();
     }
 
     [Fact]
@@ -1098,7 +1326,7 @@ public sealed class ContactNormalImpulseBoundaryTests
     }
 
     [Fact]
-    public void AccumulatedKernels_ShouldPreserveDimensionSpecificUnrepresentableImpulseContracts()
+    public void AccumulatedKernels_ShouldRejectUnrepresentableCompactImpulse()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         Fixed64 largeFiniteMass = (Fixed64)1_000_000;
@@ -1150,70 +1378,82 @@ public sealed class ContactNormalImpulseBoundaryTests
         closing3D.Should().Be(default(ContactNormalImpulseResult3D));
         separating3D.ImpulseScalar.Should().Be(Fixed64.Zero);
 
-        ContactNormalImpulseResult2D closing2D = ContactNormalImpulse2D.CalculateAccumulatedDelta(
-            body2D,
-            Vector2d.Right * Fixed64.MaxValue,
-            Fixed64.Zero,
-            Vector2d.Zero,
-            target2D,
-            Vector2d.Zero,
-            Fixed64.Zero,
-            Vector2d.Zero,
-            Vector2d.Right,
-            Fixed64.One,
-            Fixed64.Zero,
-            Fixed64.Zero,
-            Fixed64.One,
-            Fixed64.One);
-        ContactNormalImpulseResult2D separating2D = ContactNormalImpulse2D.CalculateAccumulatedDelta(
-            body2D,
-            Vector2d.Left * Fixed64.MaxValue,
-            Fixed64.Zero,
-            Vector2d.Zero,
-            target2D,
-            Vector2d.Zero,
-            Fixed64.Zero,
-            Vector2d.Zero,
-            Vector2d.Right,
-            Fixed64.One,
-            Fixed64.Zero,
-            Fixed64.Zero,
-            Fixed64.One,
-            Fixed64.One);
-        closing2D.ImpulseScalar.Should().Be(Fixed64.MaxValue);
+        ContactNormalImpulse2D.TryCalculateAccumulatedDelta(
+                body2D,
+                Vector2d.Right * Fixed64.MaxValue,
+                Fixed64.Zero,
+                Vector2d.Zero,
+                target2D,
+                Vector2d.Zero,
+                Fixed64.Zero,
+                Vector2d.Zero,
+                Vector2d.Right,
+                Fixed64.One,
+                Fixed64.Zero,
+                Fixed64.Zero,
+                Fixed64.One,
+                Fixed64.One,
+                out ContactNormalImpulseResult2D closing2D)
+            .Should()
+            .BeFalse();
+        ContactNormalImpulse2D.TryCalculateAccumulatedDelta(
+                body2D,
+                Vector2d.Left * Fixed64.MaxValue,
+                Fixed64.Zero,
+                Vector2d.Zero,
+                target2D,
+                Vector2d.Zero,
+                Fixed64.Zero,
+                Vector2d.Zero,
+                Vector2d.Right,
+                Fixed64.One,
+                Fixed64.Zero,
+                Fixed64.Zero,
+                Fixed64.One,
+                Fixed64.One,
+                out ContactNormalImpulseResult2D separating2D)
+            .Should()
+            .BeTrue();
+        closing2D.Should().Be(default(ContactNormalImpulseResult2D));
         separating2D.ImpulseScalar.Should().Be(Fixed64.Zero);
 
-        ContactNormalImpulseResultMixed closingMixed = ContactNormalImpulseMixed.CalculateAccumulatedDelta(
-            body3D.Body,
-            Vector3d.Right * Fixed64.MaxValue,
-            Vector3d.Zero,
-            Vector3d.Zero,
-            body2D,
-            Vector2d.Zero,
-            Fixed64.Zero,
-            Vector2d.Zero,
-            Vector3d.Right,
-            Fixed64.One,
-            Fixed64.Zero,
-            Fixed64.Zero,
-            Fixed64.One,
-            Fixed64.One);
-        ContactNormalImpulseResultMixed separatingMixed = ContactNormalImpulseMixed.CalculateAccumulatedDelta(
-            body3D.Body,
-            Vector3d.Left * Fixed64.MaxValue,
-            Vector3d.Zero,
-            Vector3d.Zero,
-            body2D,
-            Vector2d.Zero,
-            Fixed64.Zero,
-            Vector2d.Zero,
-            Vector3d.Right,
-            Fixed64.One,
-            Fixed64.Zero,
-            Fixed64.Zero,
-            Fixed64.One,
-            Fixed64.One);
-        closingMixed.ImpulseScalar.Should().Be(Fixed64.MaxValue);
+        ContactNormalImpulseMixed.TryCalculateAccumulatedDelta(
+                body3D.Body,
+                Vector3d.Right * Fixed64.MaxValue,
+                Vector3d.Zero,
+                Vector3d.Zero,
+                body2D,
+                Vector2d.Zero,
+                Fixed64.Zero,
+                Vector2d.Zero,
+                Vector3d.Right,
+                Fixed64.One,
+                Fixed64.Zero,
+                Fixed64.Zero,
+                Fixed64.One,
+                Fixed64.One,
+                out ContactNormalImpulseResultMixed closingMixed)
+            .Should()
+            .BeFalse();
+        ContactNormalImpulseMixed.TryCalculateAccumulatedDelta(
+                body3D.Body,
+                Vector3d.Left * Fixed64.MaxValue,
+                Vector3d.Zero,
+                Vector3d.Zero,
+                body2D,
+                Vector2d.Zero,
+                Fixed64.Zero,
+                Vector2d.Zero,
+                Vector3d.Right,
+                Fixed64.One,
+                Fixed64.Zero,
+                Fixed64.Zero,
+                Fixed64.One,
+                Fixed64.One,
+                out ContactNormalImpulseResultMixed separatingMixed)
+            .Should()
+            .BeTrue();
+        closingMixed.Should().Be(default(ContactNormalImpulseResultMixed));
         separatingMixed.ImpulseScalar.Should().Be(Fixed64.Zero);
     }
 
@@ -1246,25 +1486,384 @@ public sealed class ContactNormalImpulseBoundaryTests
         result3D.AngularVelocityDeltaA.Should().Be(Vector3d.Zero);
         result3D.LinearVelocityDeltaB.Should().NotBe(Vector3d.Zero);
 
-        ContactNormalImpulseResult2D result2D = ContactNormalImpulse2D.CalculateAccumulatedDelta(
-            null,
-            Vector2d.Right,
-            Fixed64.Zero,
-            Vector2d.Zero,
-            body2D,
-            Vector2d.Zero,
-            Fixed64.Zero,
-            Vector2d.Zero,
-            Vector2d.Right,
-            Fixed64.Zero,
-            Fixed64.Zero,
-            Fixed64.Zero,
-            Fixed64.One,
-            Fixed64.One);
+        ContactNormalImpulse2D.TryCalculateAccumulatedDelta(
+                null,
+                Vector2d.Right,
+                Fixed64.Zero,
+                Vector2d.Zero,
+                body2D,
+                Vector2d.Zero,
+                Fixed64.Zero,
+                Vector2d.Zero,
+                Vector2d.Right,
+                Fixed64.Zero,
+                Fixed64.Zero,
+                Fixed64.Zero,
+                Fixed64.One,
+                Fixed64.One,
+                out ContactNormalImpulseResult2D result2D)
+            .Should()
+            .BeTrue();
         result2D.ImpulseScalar.Should().BeGreaterThan(Fixed64.Zero);
         result2D.LinearVelocityDeltaA.Should().Be(Vector2d.Zero);
         result2D.AngularVelocityDeltaA.Should().Be(Fixed64.Zero);
         result2D.LinearVelocityDeltaB.Should().NotBe(Vector2d.Zero);
+
+        ContactNormalImpulse2D.TryCalculateVelocityDeltas(
+                null,
+                Vector2d.Zero,
+                Fixed64.Zero,
+                Vector2d.Zero,
+                body2D,
+                Vector2d.Left,
+                Fixed64.Zero,
+                Vector2d.Zero,
+                Vector2d.Right,
+                Fixed64.Zero,
+                Fixed64.Zero,
+                out ContactNormalVelocityDeltaResult2D
+                    unaccumulated2D)
+            .Should()
+            .BeTrue();
+        unaccumulated2D.LinearVelocityDeltaA.Should()
+            .Be(Vector2d.Zero);
+        unaccumulated2D.AngularVelocityDeltaA.Should()
+            .Be(Fixed64.Zero);
+        unaccumulated2D.LinearVelocityDeltaB.X.Should()
+            .BeGreaterThan(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void CompactPlanarKernels_ShouldRejectUnrepresentableEffectiveMassSum()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> body3D =
+            scenario.CreateSphere(Vector3d.Zero);
+        SolidBody2D first2D =
+            CreateBody2D(scenario.Context, Fixed64.MinIncrement);
+        SolidBody2D second2D =
+            CreateBody2D(scenario.Context, Fixed64.MinIncrement);
+        body3D.Body.Mass = Fixed64.MinIncrement;
+        body3D.Body.FreezeAxes = BodyFreezeAxes3D.Rotation;
+        first2D.FreezeAxes = BodyFreezeAxes2D.Rotation;
+        second2D.FreezeAxes = BodyFreezeAxes2D.Rotation;
+
+        ContactNormalImpulse2D.TryCalculateVelocityDeltas(
+                first2D,
+                Vector2d.Right,
+                Fixed64.Zero,
+                Vector2d.Zero,
+                second2D,
+                Vector2d.Zero,
+                Fixed64.Zero,
+                Vector2d.Zero,
+                Vector2d.Right,
+                Fixed64.Zero,
+                Fixed64.Zero,
+                out _)
+            .Should()
+            .BeFalse();
+        ContactNormalImpulse2D.TryCalculateAccumulatedDelta(
+                first2D,
+                Vector2d.Right,
+                Fixed64.Zero,
+                Vector2d.Zero,
+                second2D,
+                Vector2d.Zero,
+                Fixed64.Zero,
+                Vector2d.Zero,
+                Vector2d.Right,
+                Fixed64.Zero,
+                Fixed64.Zero,
+                Fixed64.Zero,
+                Fixed64.One,
+                Fixed64.One,
+                out _)
+            .Should()
+            .BeFalse();
+        ContactNormalImpulseMixed.TryCalculateVelocityDeltas(
+                body3D.Body,
+                Vector3d.Right,
+                Vector3d.Zero,
+                Vector3d.Zero,
+                first2D,
+                Vector2d.Zero,
+                Fixed64.Zero,
+                Vector2d.Zero,
+                Vector3d.Right,
+                Fixed64.Zero,
+                Fixed64.Zero,
+                out _)
+            .Should()
+            .BeFalse();
+        ContactNormalImpulseMixed.TryCalculateAccumulatedDelta(
+                body3D.Body,
+                Vector3d.Right,
+                Vector3d.Zero,
+                Vector3d.Zero,
+                first2D,
+                Vector2d.Zero,
+                Fixed64.Zero,
+                Vector2d.Zero,
+                Vector3d.Right,
+                Fixed64.Zero,
+                Fixed64.Zero,
+                Fixed64.Zero,
+                Fixed64.One,
+                Fixed64.One,
+                out _)
+            .Should()
+            .BeFalse();
+    }
+
+    [Fact]
+    public void CompactPlanarKernel_ShouldRejectUnrepresentableLeverCross()
+    {
+        using PhysicsScenarioBuilder scenario =
+            PhysicsScenarioBuilder.Create();
+        SolidBody2D body =
+            CreateBody2D(scenario.Context, Fixed64.One);
+        Vector2d diagonal =
+            new Vector2d(Fixed64.One, Fixed64.One).Normalized;
+
+        ContactNormalImpulse2D.TryCalculateVelocityDeltas(
+                body,
+                Vector2d.Right,
+                Fixed64.Zero,
+                new Vector2d(
+                    Fixed64.MaxValue,
+                    Fixed64.MinValue),
+                null,
+                Vector2d.Zero,
+                Fixed64.Zero,
+                Vector2d.Zero,
+                diagonal,
+                Fixed64.Zero,
+                Fixed64.Zero,
+                out ContactNormalVelocityDeltaResult2D result)
+            .Should()
+            .BeFalse();
+
+        result.Should().Be(default(ContactNormalVelocityDeltaResult2D));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CompactPlanarKernel_ShouldRejectUnrepresentableAngularVelocityDelta(
+        bool crossIsUnrepresentable)
+    {
+        using PhysicsScenarioBuilder scenario =
+            PhysicsScenarioBuilder.Create();
+        SolidBody2D body =
+            CreateBody2D(scenario.Context, Fixed64.One);
+        Vector2d relativeContactPoint = crossIsUnrepresentable
+            ? new Vector2d(Fixed64.MaxValue, Fixed64.MinValue)
+            : Vector2d.Forward;
+        Vector2d axis = crossIsUnrepresentable
+            ? new Vector2d(Fixed64.One, Fixed64.One).Normalized
+            : Vector2d.Right;
+        Fixed64 impulse = crossIsUnrepresentable
+            ? Fixed64.One
+            : Fixed64.MaxValue;
+
+        ContactNormalImpulse2D.TryComputeAngularVelocityDelta(
+                body,
+                relativeContactPoint,
+                axis,
+                impulse,
+                out Fixed64 delta)
+            .Should()
+            .BeFalse();
+
+        delta.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void AccumulatedMixedKernel_ShouldCancelOverflowingSeparatingWarmStart()
+    {
+        using PhysicsScenarioBuilder scenario =
+            PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(
+            Vector3d.Zero,
+            mass: Fixed64.MaxValue);
+
+        ContactNormalImpulseMixed.TryCalculateAccumulatedDelta(
+                body.Body,
+                Vector3d.Left * Fixed64.Two,
+                Vector3d.Zero,
+                Vector3d.Zero,
+                null,
+                Vector2d.Zero,
+                Fixed64.Zero,
+                Vector2d.Zero,
+                Vector3d.Right,
+                Fixed64.Zero,
+                Fixed64.Zero,
+                Fixed64.One,
+                Fixed64.One,
+                Fixed64.One,
+                out ContactNormalImpulseResultMixed compact)
+            .Should()
+            .BeTrue();
+
+        FixedLever zero =
+            CreateLever(Vector3d.Zero, Vector3d.Zero);
+        ContactNormalImpulseMixed.TryCalculateAccumulatedDeltaExact(
+                body.Body,
+                Vector3d.Left * Fixed64.Two,
+                Vector3d.Zero,
+                zero,
+                null,
+                Vector2d.Zero,
+                Fixed64.Zero,
+                zero,
+                Vector3d.Right,
+                Fixed64.Zero,
+                Fixed64.Zero,
+                Fixed64.One,
+                Fixed64.One,
+                Fixed64.One,
+                out ContactNormalImpulseResultMixed result)
+            .Should()
+            .BeTrue();
+
+        result.ImpulseScalar.Should().Be(-Fixed64.One);
+        compact.ImpulseScalar.Should().Be(result.ImpulseScalar);
+        compact.LinearVelocityDelta3D.Should().Be(
+            result.LinearVelocityDelta3D);
+        compact.AngularVelocityDelta3D.Should().Be(
+            result.AngularVelocityDelta3D);
+        compact.LinearVelocityDelta2D.Should().Be(
+            result.LinearVelocityDelta2D);
+        compact.AngularVelocityDelta2D.Should().Be(
+            result.AngularVelocityDelta2D);
+        result.LinearVelocityDelta3D.Should().Be(
+            Vector3d.Right * body.Body.EffectiveInverseMass);
+        result.AngularVelocityDelta3D.Should().Be(Vector3d.Zero);
+        result.LinearVelocityDelta2D.Should().Be(Vector2d.Zero);
+        result.AngularVelocityDelta2D.Should().Be(Fixed64.Zero);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void AccumulatedPlanarKernels_ShouldRejectNegativeSolverInputs(
+        int invalidInput)
+    {
+        Fixed64 accumulatedImpulse =
+            invalidInput == 0 ? -Fixed64.One : Fixed64.Zero;
+        Fixed64 positiveImpulseScale =
+            invalidInput == 1 ? -Fixed64.One : Fixed64.One;
+        Fixed64 negativeImpulseScale =
+            invalidInput == 2 ? -Fixed64.One : Fixed64.One;
+
+        ContactNormalImpulse2D.TryCalculateAccumulatedDelta(
+                null,
+                Vector2d.Zero,
+                Fixed64.Zero,
+                Vector2d.Zero,
+                null,
+                Vector2d.Zero,
+                Fixed64.Zero,
+                Vector2d.Zero,
+                Vector2d.Right,
+                Fixed64.Zero,
+                Fixed64.Zero,
+                accumulatedImpulse,
+                positiveImpulseScale,
+                negativeImpulseScale,
+                out _)
+            .Should()
+            .BeFalse();
+        ContactNormalImpulseMixed.TryCalculateAccumulatedDelta(
+                null,
+                Vector3d.Zero,
+                Vector3d.Zero,
+                Vector3d.Zero,
+                null,
+                Vector2d.Zero,
+                Fixed64.Zero,
+                Vector2d.Zero,
+                Vector3d.Right,
+                Fixed64.Zero,
+                Fixed64.Zero,
+                accumulatedImpulse,
+                positiveImpulseScale,
+                negativeImpulseScale,
+                out _)
+            .Should()
+            .BeFalse();
+    }
+
+    [Fact]
+    public void ExactPlanarParticipant_ShouldRespectIndependentMobility()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        SolidBody2D body =
+            CreateBody2D(scenario.Context, Fixed64.One);
+        FixedLever lever =
+            CreateLever(Vector3d.Zero, Vector3d.Forward);
+
+        body.FreezeAxes = BodyFreezeAxes2D.Position;
+        ExactContactLever2D.TryGetParticipantVelocityDeltas(
+                body,
+                lever,
+                Vector3d.Right,
+                Fixed64.One,
+                Vector3d.Zero,
+                Fixed64.Zero,
+                out Vector2d rotationOnlyLinear,
+                out Fixed64 rotationOnlyAngular)
+            .Should()
+            .BeTrue();
+        rotationOnlyLinear.Should().Be(Vector2d.Zero);
+        rotationOnlyAngular.Should().NotBe(Fixed64.Zero);
+
+        body.FreezeAxes = BodyFreezeAxes2D.Rotation;
+        ExactContactLever2D.TryGetParticipantVelocityDeltas(
+                body,
+                lever,
+                Vector3d.Right,
+                Fixed64.One,
+                Vector3d.Zero,
+                Fixed64.Zero,
+                out Vector2d translationOnlyLinear,
+                out Fixed64 translationOnlyAngular)
+            .Should()
+            .BeTrue();
+        translationOnlyLinear.Should().NotBe(Vector2d.Zero);
+        translationOnlyAngular.Should().Be(Fixed64.Zero);
+
+        body.FreezeAxes = BodyFreezeAxes2D.All;
+        ExactContactLever2D.TryGetParticipantVelocityDeltas(
+                body,
+                lever,
+                Vector3d.Right,
+                Fixed64.One,
+                Vector3d.Zero,
+                Fixed64.Zero,
+                out Vector2d frozenLinear,
+                out Fixed64 frozenAngular)
+            .Should()
+            .BeTrue();
+        frozenLinear.Should().Be(Vector2d.Zero);
+        frozenAngular.Should().Be(Fixed64.Zero);
+
+        ExactContactLever2D.TryGetParticipantVelocityDeltas(
+                null,
+                lever,
+                Vector3d.Right,
+                Fixed64.One,
+                Vector3d.Zero,
+                Fixed64.Zero,
+                out Vector2d bodylessLinear,
+                out Fixed64 bodylessAngular)
+            .Should()
+            .BeTrue();
+        bodylessLinear.Should().Be(Vector2d.Zero);
+        bodylessAngular.Should().Be(Fixed64.Zero);
     }
 
     [Fact]

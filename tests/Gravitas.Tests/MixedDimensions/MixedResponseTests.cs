@@ -575,8 +575,11 @@ public sealed partial class MixedResponseTests
         body2D.Position.X.Should().BeGreaterThan(Fixed64.Zero);
     }
 
-    [Fact]
-    public void Resolve_WithBodyless3DAndDynamic2D_ShouldApplyPlanarImpulseOnlyTo2DParticipant()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Resolve_WithBodyless3D_ShouldApplyPlanarImpulseOnlyTo2DParticipant(
+        bool exactLever)
     {
         using GravitasWorldContext context = CreateMixedContext();
         LSSphereCollider collider3D = CreateBodylessSphere3D(context, new Vector3d(-Fixed64.Half, Fixed64.Zero, Fixed64.Zero));
@@ -586,9 +589,20 @@ public sealed partial class MixedResponseTests
         body2D.Collider.Material = sliding;
         body2D.ApplyCollisionLinearVelocityDelta(new Vector2d((Fixed64)(-4), Fixed64.One));
         var pair = new CollisionPairMixed(collider3D, body2D.Collider);
+        ContactAnchor anchor3D = exactLever
+            ? new ContactAnchor(
+                new Vector3d(
+                    Fixed64.MaxValue,
+                    Fixed64.Zero,
+                    Fixed64.Zero),
+                new Vector3d(
+                    Fixed64.MinIncrement,
+                    Fixed64.One,
+                    Fixed64.Zero))
+            : ContactAnchor.FromWorldPoint(collider3D.Center);
         var contact = new MixedContact(
-            collider3D.Center,
-            new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.Zero),
+            anchor3D,
+            ContactAnchor.FromWorldPoint(Vector3d.Zero),
             Vector3d.Right,
             Fixed64.FromFraction(1, 5));
 
@@ -602,7 +616,7 @@ public sealed partial class MixedResponseTests
     }
 
     [Fact]
-    public void Resolve_WithDynamic3DAndBodyless2D_ShouldApplyImpulseOnlyTo3DParticipant()
+    public void Resolve_WithBodyless2DExactLever_ShouldApplyImpulseOnlyTo3DParticipant()
     {
         using GravitasWorldContext context = CreateMixedContext();
         ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(
@@ -612,12 +626,29 @@ public sealed partial class MixedResponseTests
         PhysicsMaterial sliding = new(Fixed64.Half, Fixed64.Half, Fixed64.Zero);
         body3D.Collider.Material = sliding;
         collider2D.Material = sliding;
+        body3D.Body.FreezeAxes = BodyFreezeAxes3D.Rotation;
         body3D.Body.ApplyCollisionLinearVelocityDelta(
             new Vector3d((Fixed64)4, Fixed64.Zero, Fixed64.One));
         var pair = new CollisionPairMixed(body3D.Collider, collider2D);
         var contact = new MixedContact(
-            body3D.Collider.Center,
-            new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.Zero),
+            new ContactAnchor(
+                new Vector3d(
+                    Fixed64.MaxValue,
+                    Fixed64.Zero,
+                    Fixed64.Zero),
+                new Vector3d(
+                    Fixed64.MinIncrement,
+                    Fixed64.One,
+                    Fixed64.Zero)),
+            new ContactAnchor(
+                new Vector3d(
+                    Fixed64.MaxValue,
+                    Fixed64.Zero,
+                    Fixed64.Zero),
+                new Vector3d(
+                    Fixed64.MinIncrement,
+                    Fixed64.Zero,
+                    Fixed64.One)),
             Vector3d.Right,
             Fixed64.FromFraction(1, 5));
 

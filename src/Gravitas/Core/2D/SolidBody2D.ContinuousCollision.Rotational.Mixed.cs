@@ -706,15 +706,18 @@ public sealed partial class SolidBody2D
         Fixed64 restitution = PhysicsMaterial.CombineRestitution(
             targetCollider.Material,
             Collider.Material);
+        ContactAnchor targetCenter = target == null
+            ? ContactAnchor.FromWorldPoint(targetPosition)
+            : new ContactAnchor(
+                targetPosition,
+                targetRotation,
+                target.LocalCenterOfMassOffset);
         bool targetContactArmResolved = target == null
             ? contact.Anchor3D.TryGetOffsetFrom(
                 targetPosition,
                 out Vector3d targetContactArm)
             : contact.Anchor3D.TryGetOffsetFrom(
-                new ContactAnchor(
-                    targetPosition,
-                    targetRotation,
-                    target.LocalCenterOfMassOffset),
+                targetCenter,
                 out targetContactArm);
         bool sourceContactArmResolved =
             contact.TryGetPlanarOffset2DFrom(
@@ -722,7 +725,20 @@ public sealed partial class SolidBody2D
             sourceRotation,
             LocalCenterOfMassOffset,
             out Vector2d sourceContactArm);
-        bool responseResolved = ContactNormalImpulseMixed.TryCalculateVelocityDeltas(
+        ContactNormalVelocityDeltaResultMixed response = default;
+        bool responseResolved = targetContactArmResolved
+            && sourceContactArmResolved
+            && ContactNormalImpulseMixed.CanUseCompactResponse(
+                targetResponseBody,
+                targetLinearVelocity,
+                targetAngularVelocity,
+                targetContactArm,
+                sourceResponseBody,
+                sourceLinearVelocity,
+                sourceAngularVelocity,
+                sourceContactArm,
+                contact.Normal3DTo2D)
+            && ContactNormalImpulseMixed.TryCalculateVelocityDeltas(
                 targetResponseBody,
                 targetLinearVelocity,
                 targetAngularVelocity,
@@ -734,11 +750,31 @@ public sealed partial class SolidBody2D
                 contact.Normal3DTo2D,
                 restitution,
                 Context.Settings.RestitutionVelocityThreshold,
-                out ContactNormalVelocityDeltaResultMixed response);
-        if (!(targetContactArmResolved
-                & sourceContactArmResolved
-                & responseResolved)
-            || response.NormalVelocity >= -Fixed64.Epsilon)
+                out response);
+        if (!responseResolved)
+        {
+            responseResolved =
+                ContactNormalImpulseMixed.TryCalculateVelocityDeltasExact(
+                    targetResponseBody,
+                    targetLinearVelocity,
+                    targetAngularVelocity,
+                    contact.Anchor3D.GetLeverFrom(targetCenter),
+                    sourceResponseBody,
+                    sourceLinearVelocity,
+                    sourceAngularVelocity,
+                    contact.GetPlanarXZLeverFrom(
+                        sourcePosition,
+                        sourceRotation,
+                        LocalCenterOfMassOffset),
+                    contact.Normal3DTo2D,
+                    restitution,
+                    Context.Settings.RestitutionVelocityThreshold,
+                    out response);
+        }
+        if (!responseResolved
+            || !response.IsClosing
+            || (response.HasRepresentableNormalVelocity
+                && response.NormalVelocity >= -Fixed64.Epsilon))
         {
             return false;
         }

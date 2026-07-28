@@ -9,6 +9,7 @@ using FixedMathSharp;
 using Gravitas.CollisionHandling;
 using SwiftCollections.Diagnostics;
 using System;
+using System.Runtime.CompilerServices;
 
 namespace Gravitas;
 
@@ -69,12 +70,14 @@ public sealed partial class SolidBody2D
     internal bool TryGetOffsetFromCenterOfMass(
         ContactAnchor2D anchor,
         out Vector2d offset)
-        => anchor.TryGetOffsetFrom(
-            new ContactAnchor2D(
-                _position,
-                _rotation,
-                _localCenterOfMassOffset),
-            out offset);
+        => anchor.TryGetOffsetFrom(GetCenterOfMassAnchor(), out offset);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal ContactAnchor2D GetCenterOfMassAnchor() =>
+        new(
+            _position,
+            _rotation,
+            _localCenterOfMassOffset);
 
     /// <summary>
     /// Clears an explicit center-of-mass override and derives the offset from the bound collider again.

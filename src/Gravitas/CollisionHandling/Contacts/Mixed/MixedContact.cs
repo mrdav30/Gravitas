@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using FixedMathSharp.Geometry;
 using Gravitas.Materials;
 using System;
 using System.Runtime.CompilerServices;
@@ -154,16 +155,8 @@ public readonly struct MixedContact
         Vector2d localPoint,
         out Vector2d offset)
     {
-        var reference = new ContactAnchor(
-            new Vector3d(
-                origin.X,
-                Anchor2D.Origin.Y,
-                origin.Y),
-            FixedQuaternion.FromAxisAngle(Vector3d.Up, -rotation),
-            new Vector3d(
-                localPoint.X,
-                Fixed64.Zero,
-                localPoint.Y));
+        ContactAnchor reference =
+            CreatePlanarReference(origin, rotation, localPoint);
         if (!Anchor2D.TryGetOffsetFrom(
                 reference,
                 out Vector3d offset3D))
@@ -175,6 +168,14 @@ public readonly struct MixedContact
         offset = new Vector2d(offset3D.X, offset3D.Z);
         return true;
     }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal FixedLever GetPlanarXZLeverFrom(
+        Vector2d origin,
+        Fixed64 rotation,
+        Vector2d localPoint) =>
+        Anchor2D.GetLeverFrom(
+            CreatePlanarReference(origin, rotation, localPoint));
 
     /// <summary>
     /// Contact normal pointing from the 3D collider toward the embedded 2D collider volume.
@@ -207,6 +208,21 @@ public readonly struct MixedContact
 
     internal MixedContact WithFallbackMaterials(PhysicsMaterial material3D, PhysicsMaterial material2D) =>
         HasMaterialOverride ? this : WithMaterialOverride(material3D, material2D);
+
+    private ContactAnchor CreatePlanarReference(
+        Vector2d origin,
+        Fixed64 rotation,
+        Vector2d localPoint) =>
+        new(
+            new Vector3d(
+                origin.X,
+                Anchor2D.Origin.Y,
+                origin.Y),
+            FixedQuaternion.FromAxisAngle(Vector3d.Up, -rotation),
+            new Vector3d(
+                localPoint.X,
+                Fixed64.Zero,
+                localPoint.Y));
 
     private static Vector3d GetRequiredWorldPoint(ContactAnchor anchor, string propertyName)
     {

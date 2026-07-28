@@ -46,35 +46,65 @@ public partial class SolidBody2D
         Fixed64 restitution = PhysicsMaterial.CombineRestitution(
             Collider.Material,
             target.Collider.Material);
-        bool sourceContactArmResolved = contact.AnchorA.TryGetOffsetFrom(
-            new ContactAnchor2D(
-                sourcePositionAtImpact,
-                sourceRotationAtImpact,
-                _localCenterOfMassOffset),
-            out Vector2d relativeContactPointA);
-        bool targetContactArmResolved = contact.AnchorB.TryGetOffsetFrom(
-            new ContactAnchor2D(
-                targetPositionAtImpact,
-                targetRotationAtImpact,
-                target._localCenterOfMassOffset),
-            out Vector2d relativeContactPointB);
-        bool responseResolved = ContactNormalImpulse2D.TryCalculateVelocityDeltas(
+        var sourceCenter = new ContactAnchor2D(
+            sourcePositionAtImpact,
+            sourceRotationAtImpact,
+            _localCenterOfMassOffset);
+        var targetCenter = new ContactAnchor2D(
+            targetPositionAtImpact,
+            targetRotationAtImpact,
+            target._localCenterOfMassOffset);
+        ContactLever2D sourceContactArm =
+            ContactLever2D.Create(contact.AnchorA, sourceCenter);
+        ContactLever2D targetContactArm =
+            ContactLever2D.Create(contact.AnchorB, targetCenter);
+        ContactNormalVelocityDeltaResult2D response = default;
+        bool responseResolved = !sourceContactArm.IsExact
+            && !targetContactArm.IsExact
+            && ExactContactLever2D.CanUseCompactResponse(
                 sourceResponseBody,
                 sourceLinearVelocity,
                 sourceAngularVelocity,
-                relativeContactPointA,
+                sourceContactArm.Vector,
                 targetResponseBody,
                 targetLinearVelocity,
                 targetAngularVelocity,
-                relativeContactPointB,
+                targetContactArm.Vector,
+                contact.Normal)
+            && ContactNormalImpulse2D.TryCalculateVelocityDeltas(
+                sourceResponseBody,
+                sourceLinearVelocity,
+                sourceAngularVelocity,
+                sourceContactArm.Vector,
+                targetResponseBody,
+                targetLinearVelocity,
+                targetAngularVelocity,
+                targetContactArm.Vector,
                 contact.Normal,
                 restitution,
                 Context.Settings.RestitutionVelocityThreshold,
-                out ContactNormalVelocityDeltaResult2D response);
-        if (!(sourceContactArmResolved
-                & targetContactArmResolved
-                & responseResolved)
-            || response.NormalVelocity >= -Fixed64.Epsilon)
+                out response);
+        if (!responseResolved)
+        {
+            responseResolved =
+                ContactNormalImpulse2D.TryCalculateVelocityDeltasExact(
+                    sourceResponseBody,
+                    sourceLinearVelocity,
+                    sourceAngularVelocity,
+                    contact.AnchorA.GetXZLeverFrom(sourceCenter),
+                    targetResponseBody,
+                    targetLinearVelocity,
+                    targetAngularVelocity,
+                    contact.AnchorB.GetXZLeverFrom(targetCenter),
+                    contact.Normal,
+                    restitution,
+                    Context.Settings.RestitutionVelocityThreshold,
+                    out response);
+        }
+        if (!responseResolved
+            || !response.IsClosing
+            || (response.HasRepresentableNormalVelocity
+                && response.NormalVelocity >= -Fixed64.Epsilon))
         {
             return false;
         }

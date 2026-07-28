@@ -1,7 +1,9 @@
+using Chronicler;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
+using Gravitas.Diagnostics;
 using Gravitas.Materials;
 using Gravitas.Tests.Support;
 using SwiftCollections.Diagnostics;
@@ -15,13 +17,34 @@ public sealed class CollisionResponse2DManifoldTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void Resolve_WithUnrepresentableLeverArm_ShouldRejectContactAtomically(
-        bool loggingEnabled)
+    public void Resolve_WithUnrepresentableLeverArm_ShouldPreserveResponse(
+        bool positiveFace)
+    {
+        var first = RunUnrepresentableLeverResponse(positiveFace);
+        var second = RunUnrepresentableLeverResponse(positiveFace);
+
+        first.LeftLinearVelocity.X.Should().BeLessThan(Fixed64.Two);
+        first.RightLinearVelocity.X.Should().BeGreaterThan(-Fixed64.Two);
+        first.LeftAngularVelocity.Should().BeGreaterThan(Fixed64.Zero);
+        first.RightAngularVelocity.Should().BeLessThan(Fixed64.Zero);
+        first.Should().Be(second);
+    }
+
+    [Fact]
+    public void Resolve_WithUnrepresentableLeverArm_ShouldApplyFriction()
     {
         using GravitasWorldContext context =
             Physics2DTestWorld.CreateContext();
         SolidBody2D left = CreateBox(context, Vector2d.Zero);
         SolidBody2D right = CreateBox(context, Vector2d.Right);
+        left.Collider.Material = new PhysicsMaterial(
+            Fixed64.One,
+            Fixed64.One,
+            Fixed64.Zero);
+        right.Collider.Material = left.Collider.Material;
+        left.ApplyCollisionLinearVelocityDelta(
+            new Vector2d(Fixed64.Two, (Fixed64)4));
+        right.ApplyCollisionLinearVelocityDelta(Vector2d.Left * Fixed64.Two);
         var pair = new CollisionPair2D(
             left.Collider,
             right.Collider);
@@ -30,27 +53,165 @@ public sealed class CollisionResponse2DManifoldTests
                 new Vector2d(
                     Fixed64.MaxValue,
                     Fixed64.Zero),
-                Vector2d.Right),
+                new Vector2d(
+                    Fixed64.MinIncrement,
+                    Fixed64.One)),
             ContactAnchor2D.FromWorldPoint(
-                right.Collider.Center),
+                right.Collider.Center + Vector2d.Forward),
             Fixed64.Half,
             Vector2d.Right);
-        Vector2d leftVelocity = left.LinearVelocity;
-        Vector2d rightVelocity = right.LinearVelocity;
-        string? loggedMessage = null;
-        var originalLevel = GravitasLogger.MinimumLevel;
+        Fixed64 tangentialVelocity =
+            (left.LinearVelocity - right.LinearVelocity).Y.Abs();
+
+        CollisionResponse2D.Resolve(
+            pair,
+            applyCachedImpulse: false,
+            applyPositionCorrection: false);
+
+        (left.LinearVelocity - right.LinearVelocity)
+            .Y.Abs()
+            .Should()
+            .BeLessThan(tangentialVelocity);
+    }
+
+    [Fact]
+    public void Resolve_WithUnrepresentableNormalAndFrictionImpulses_ShouldRetainStaticFriction()
+    {
+        using GravitasWorldContext context =
+            Physics2DTestWorld.CreateContext();
+        SolidBody2D moving = CreateBox(context, Vector2d.Zero);
+        SolidBody2D wall = CreateBox(
+            context,
+            new Vector2d((Fixed64)2, Fixed64.Zero),
+            immovable: false);
+        var material = new PhysicsMaterial(
+            Fixed64.One,
+            Fixed64.One,
+            Fixed64.Zero);
+        moving.Collider.Material = material;
+        wall.Collider.Material = material;
+        moving.Mass = Fixed64.MaxValue;
+        wall.Mass = Fixed64.MaxValue;
+        moving.FreezeAxes = BodyFreezeAxes2D.Rotation;
+        wall.FreezeAxes = BodyFreezeAxes2D.Rotation;
+        moving.ApplyCollisionLinearVelocityDelta(
+            new Vector2d((Fixed64)6, (Fixed64)4));
+        var pair = new CollisionPair2D(
+            moving.Collider,
+            wall.Collider);
+        pair.Manifold.SetContact(
+            Vector2d.Right,
+            Vector2d.Right,
+            Fixed64.Half,
+            Vector2d.Right);
+        ulong contactId = pair.Manifold.PrimaryContact.ContactId;
+        Fixed64 tangentialVelocity = moving.LinearVelocity.Y.Abs();
+
+        CollisionResponse2D.Resolve(
+            pair,
+            applyCachedImpulse: false,
+            applyPositionCorrection: false);
+
+        moving.LinearVelocity.X.Should().Be((Fixed64)3);
+        wall.LinearVelocity.X.Should().Be((Fixed64)3);
+        (moving.LinearVelocity - wall.LinearVelocity)
+            .Y.Abs()
+            .Should()
+            .BeLessThan(tangentialVelocity);
+        pair.TryGetWarmStartImpulse(
+                contactId,
+                out ContactWarmStartImpulse impulse)
+            .Should()
+            .BeTrue();
+        impulse.TangentImpulse.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void Resolve_WithUnrepresentableFrictionLimit_ShouldUseExactFriction()
+    {
+        using GravitasWorldContext context =
+            Physics2DTestWorld.CreateContext();
+        SolidBody2D moving = CreateBox(context, Vector2d.Zero);
+        SolidBody2D wall = CreateBox(
+            context,
+            new Vector2d((Fixed64)2, Fixed64.Zero),
+            immovable: true);
+        var material = new PhysicsMaterial(
+            Fixed64.MaxValue,
+            Fixed64.MaxValue,
+            Fixed64.Zero);
+        moving.Collider.Material = material;
+        wall.Collider.Material = material;
+        moving.FreezeAxes = BodyFreezeAxes2D.Rotation;
+        moving.ApplyCollisionLinearVelocityDelta(
+            new Vector2d((Fixed64)4, Fixed64.One));
+        var pair = new CollisionPair2D(
+            moving.Collider,
+            wall.Collider);
+        pair.Manifold.SetContact(
+            Vector2d.Right,
+            Vector2d.Right,
+            Fixed64.Zero,
+            Vector2d.Right);
+
+        CollisionResponse2D.Resolve(
+            pair,
+            applyCachedImpulse: false,
+            applyPositionCorrection: false);
+
+        moving.LinearVelocity.X.Should().Be(Fixed64.Zero);
+        moving.LinearVelocity.Y.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void Resolve_WhenExactNormalDeltaWouldOverflowCurrentVelocity_ShouldRejectAtomically()
+    {
+        using GravitasWorldContext context =
+            Physics2DTestWorld.CreateContext();
+        SolidBody2D left = CreateBox(context, Vector2d.Zero);
+        SolidBody2D right = CreateBox(context, Vector2d.Right);
+        left.Collider.Material = PhysicsMaterial.Frictionless;
+        right.Collider.Material = PhysicsMaterial.Frictionless;
+        left.ApplyCollisionLinearVelocityDelta(
+            Vector2d.Right * Fixed64.MaxValue);
+        right.ApplyCollisionLinearVelocityDelta(
+            Vector2d.Right * Fixed64.MaxValue);
+        right.ApplyCollisionAngularVelocityDelta(Fixed64.One);
+        var pair = new CollisionPair2D(
+            left.Collider,
+            right.Collider);
+        pair.Manifold.SetContact(
+            new ContactAnchor2D(
+                new Vector2d(Fixed64.MaxValue, Fixed64.Zero),
+                new Vector2d(Fixed64.MinIncrement, Fixed64.Zero)),
+            ContactAnchor2D.FromWorldPoint(
+                right.Position + Vector2d.Forward),
+            Fixed64.Zero,
+            Vector2d.Right);
+        Vector2d leftLinear = left.LinearVelocity;
+        Fixed64 leftAngular = left.AngularVelocity;
+        Vector2d rightLinear = right.LinearVelocity;
+        Fixed64 rightAngular = right.AngularVelocity;
+        int errorCount = 0;
+        string? error = null;
+        DiagnosticLevel originalLevel = GravitasLogger.MinimumLevel;
         Action<DiagnosticLevel, string, string> originalHandler =
             GravitasLogger.LogHandler;
-
         try
         {
-            GravitasLogger.MinimumLevel = loggingEnabled
-                ? DiagnosticLevel.Error
-                : DiagnosticLevel.None;
-            GravitasLogger.LogHandler =
-                (_, message, _) => loggedMessage = message;
+            GravitasLogger.MinimumLevel = DiagnosticLevel.Error;
+            GravitasLogger.LogHandler = (level, message, _) =>
+            {
+                if (level != DiagnosticLevel.Error)
+                    return;
 
-            pair.MarkColliding(context.FrameCount);
+                errorCount++;
+                error = message;
+            };
+            CollisionResponse2D.Resolve(
+                pair,
+                applyCachedImpulse: false,
+                applyPositionCorrection: false);
         }
         finally
         {
@@ -58,17 +219,83 @@ public sealed class CollisionResponse2DManifoldTests
             GravitasLogger.LogHandler = originalHandler;
         }
 
-        left.LinearVelocity.Should().Be(leftVelocity);
-        right.LinearVelocity.Should().Be(rightVelocity);
-        if (loggingEnabled)
+        left.LinearVelocity.Should().Be(leftLinear);
+        left.AngularVelocity.Should().Be(leftAngular);
+        right.LinearVelocity.Should().Be(rightLinear);
+        right.AngularVelocity.Should().Be(rightAngular);
+        pair.TryGetWarmStartImpulse(
+                pair.Manifold.PrimaryContact.ContactId,
+                out _)
+            .Should()
+            .BeFalse();
+        errorCount.Should().Be(1);
+        error.Should().Be(
+            "2D contact response is outside the representable velocity domain.");
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Resolve_WhenBounceDeltaIsUnrepresentable_ShouldRejectBeforeMutation(
+        bool diagnosticsEnabled)
+    {
+        using GravitasWorldContext context =
+            Physics2DTestWorld.CreateContext();
+        context.Environment.MaxSpeed = Fixed64.MaxValue;
+        SolidBody2D moving = CreateBox(context, Vector2d.Zero);
+        SolidBody2D wall = CreateBox(
+            context,
+            new Vector2d((Fixed64)2, Fixed64.Zero),
+            immovable: true);
+        PhysicsMaterial bouncy =
+            PhysicsMaterialTestHelper.WithRestitution(Fixed64.One);
+        moving.Collider.Material = bouncy;
+        wall.Collider.Material = bouncy;
+        moving.FreezeAxes = BodyFreezeAxes2D.Rotation;
+        moving.ApplyCollisionLinearVelocityDelta(
+            Vector2d.Right * Fixed64.MaxValue);
+        var pair = new CollisionPair2D(
+            moving.Collider,
+            wall.Collider);
+        pair.Manifold.SetContact(
+            Vector2d.Right,
+            Vector2d.Right,
+            Fixed64.Zero,
+            Vector2d.Right);
+        Vector2d velocity = moving.LinearVelocity;
+        int errorCount = 0;
+        DiagnosticLevel originalLevel = GravitasLogger.MinimumLevel;
+        Action<DiagnosticLevel, string, string> originalHandler =
+            GravitasLogger.LogHandler;
+        try
         {
-            loggedMessage.Should().Contain(
-                "cannot be rebased onto its response centers");
+            GravitasLogger.MinimumLevel = diagnosticsEnabled
+                ? DiagnosticLevel.Error
+                : DiagnosticLevel.None;
+            GravitasLogger.LogHandler = (level, _, _) =>
+            {
+                if (level == DiagnosticLevel.Error)
+                    errorCount++;
+            };
+            CollisionResponse2D.Resolve(
+                pair,
+                applyCachedImpulse: false,
+                applyPositionCorrection: false);
         }
-        else
+        finally
         {
-            loggedMessage.Should().BeNull();
+            GravitasLogger.MinimumLevel = originalLevel;
+            GravitasLogger.LogHandler = originalHandler;
         }
+
+        moving.LinearVelocity.Should().Be(velocity);
+        moving.AngularVelocity.Should().Be(Fixed64.Zero);
+        pair.TryGetWarmStartImpulse(
+                pair.Manifold.PrimaryContact.ContactId,
+                out _)
+            .Should()
+            .BeFalse();
+        errorCount.Should().Be(diagnosticsEnabled ? 1 : 0);
     }
 
     [Fact]
@@ -224,6 +451,64 @@ public sealed class CollisionResponse2DManifoldTests
         frozenPair.TryGetWarmStartImpulse(
             frozenPair.Manifold.PrimaryContact.ContactId,
             out _).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Resolve_WithBodylessExactParticipant_ShouldPreserveDynamicResponse(
+        bool bodylessFirst)
+    {
+        using GravitasWorldContext context =
+            Physics2DTestWorld.CreateContext();
+        SolidBody2D? moving = null;
+        LSAABBoxCollider2D? bodyless = null;
+        if (bodylessFirst)
+        {
+            bodyless = CreateBodylessBox(
+                context,
+                new Vector2d((Fixed64)2, Fixed64.Zero));
+            moving = CreateBox(context, Vector2d.Zero);
+        }
+        else
+        {
+            moving = CreateBox(context, Vector2d.Zero);
+            bodyless = CreateBodylessBox(
+                context,
+                new Vector2d((Fixed64)2, Fixed64.Zero));
+        }
+
+        moving.Collider.Material = PhysicsMaterial.Frictionless;
+        bodyless.Material = PhysicsMaterial.Frictionless;
+        moving.FreezeAxes = BodyFreezeAxes2D.Rotation;
+        moving.ApplyCollisionLinearVelocityDelta(
+            Vector2d.Right * Fixed64.Two);
+        var pair = new CollisionPair2D(
+            moving.Collider,
+            bodyless);
+        Vector2d normal =
+            (pair.ColliderB.Center - pair.ColliderA.Center).Normalized;
+        ContactAnchor2D exact = new(
+            new Vector2d(Fixed64.MaxValue, Fixed64.Zero),
+            new Vector2d(Fixed64.MinIncrement, Fixed64.Zero));
+        pair.Manifold.SetContact(
+            pair.ColliderA.Body == null
+                ? ContactAnchor2D.FromWorldPoint(pair.ColliderA.Center)
+                : exact,
+            pair.ColliderB.Body == null
+                ? ContactAnchor2D.FromWorldPoint(pair.ColliderB.Center)
+                : exact,
+            Fixed64.Zero,
+            normal);
+
+        CollisionResponse2D.Resolve(
+            pair,
+            applyCachedImpulse: false,
+            applyPositionCorrection: false);
+
+        moving.LinearVelocity.X.Should().BeLessThan(Fixed64.Two);
+        moving.LinearVelocity.X.Should().BeGreaterThanOrEqualTo(
+            Fixed64.Zero);
     }
 
     [Fact]
@@ -446,6 +731,67 @@ public sealed class CollisionResponse2DManifoldTests
     }
 
     [Fact]
+    public void Resolve_WithExactFrictionFallback_ShouldNotAllocateAfterWarmup()
+    {
+        using GravitasWorldContext context =
+            Physics2DTestWorld.CreateContext();
+        SolidBody2D left = CreateBox(context, Vector2d.Zero);
+        SolidBody2D right = CreateBox(context, Vector2d.Right);
+        var material = new PhysicsMaterial(
+            Fixed64.One,
+            Fixed64.One,
+            Fixed64.Zero);
+        left.Collider.Material = material;
+        right.Collider.Material = material;
+        var pair = new CollisionPair2D(
+            left.Collider,
+            right.Collider);
+        pair.Manifold.SetContact(
+            new ContactAnchor2D(
+                new Vector2d(
+                    Fixed64.MaxValue,
+                    Fixed64.Zero),
+                new Vector2d(
+                    Fixed64.MinIncrement,
+                    Fixed64.One)),
+            ContactAnchor2D.FromWorldPoint(
+                right.Collider.Center + Vector2d.Forward),
+            Fixed64.Zero,
+            Vector2d.Right);
+        ulong contactId = pair.Manifold.PrimaryContact.ContactId;
+        Vector2d leftVelocity =
+            new(Fixed64.Two, (Fixed64)4);
+        Vector2d rightVelocity =
+            Vector2d.Left * Fixed64.Two;
+
+        long allocatedBytes = AllocationTestHelper.MeasureSteadyState(
+            () =>
+            {
+                pair.StoreWarmStartImpulse(
+                    contactId,
+                    Fixed64.Zero,
+                    Fixed64.Zero);
+                left.ApplyCollisionLinearVelocityDelta(
+                    leftVelocity - left.LinearVelocity);
+                left.ApplyCollisionAngularVelocityDelta(
+                    -left.AngularVelocity);
+                right.ApplyCollisionLinearVelocityDelta(
+                    rightVelocity - right.LinearVelocity);
+                right.ApplyCollisionAngularVelocityDelta(
+                    -right.AngularVelocity);
+                CollisionResponse2D.Resolve(
+                    pair,
+                    applyCachedImpulse: false,
+                    applyPositionCorrection: false);
+            },
+            warmupIterations: 4,
+            stabilizationIterations: 2,
+            measurementIterations: 4);
+
+        allocatedBytes.Should().Be(0);
+    }
+
+    [Fact]
     public void Resolve_WithPositionCorrectionCrossing2DPartitions_ShouldNotAllocateAfterWarmup()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext(extent: 128);
@@ -565,6 +911,366 @@ public sealed class CollisionResponse2DManifoldTests
     }
 
     [Fact]
+    public void Resolve_WithOverflowingSeparatingSolve_ShouldCancelWarmStartVelocity()
+    {
+        using GravitasWorldContext context =
+            Physics2DTestWorld.CreateContext();
+        SolidBody2D moving = CreateBox(context, Vector2d.Zero);
+        SolidBody2D wall = CreateBox(
+            context,
+            new Vector2d((Fixed64)2, Fixed64.Zero),
+            immovable: true);
+        moving.Collider.Material = PhysicsMaterial.Frictionless;
+        wall.Collider.Material = PhysicsMaterial.Frictionless;
+        moving.Mass = Fixed64.MaxValue;
+        moving.FreezeAxes = BodyFreezeAxes2D.Rotation;
+        moving.ApplyCollisionLinearVelocityDelta(
+            Vector2d.Left * Fixed64.Two);
+        var pair = new CollisionPair2D(
+            moving.Collider,
+            wall.Collider);
+        pair.Manifold.SetContact(
+            Vector2d.Right,
+            Vector2d.Right,
+            Fixed64.Zero,
+            Vector2d.Right);
+        ulong contactId = pair.Manifold.PrimaryContact.ContactId;
+        pair.StoreWarmStartImpulse(
+            contactId,
+            Fixed64.One,
+            Fixed64.Zero);
+
+        CollisionResponse2D.Resolve(
+            pair,
+            applyCachedImpulse: true,
+            applyPositionCorrection: false);
+
+        moving.LinearVelocity.Should().Be(
+            Vector2d.Left * Fixed64.Two);
+        moving.AngularVelocity.Should().Be(Fixed64.Zero);
+        pair.TryGetWarmStartImpulse(
+                contactId,
+                out ContactWarmStartImpulse impulse)
+            .Should()
+            .BeTrue();
+        impulse.NormalImpulse.Should().Be(Fixed64.Zero);
+        impulse.TangentImpulse.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void Resolve_WhenCompactFrictionAccumulatorOverflows_ShouldUseExactClamp()
+    {
+        using GravitasWorldContext context =
+            Physics2DTestWorld.CreateContext();
+        SolidBody2D first = CreateBox(context, Vector2d.Zero);
+        SolidBody2D second = CreateBox(context, Vector2d.Right);
+        var material = new PhysicsMaterial(
+            Fixed64.One,
+            Fixed64.One,
+            Fixed64.Zero);
+        first.Collider.Material = material;
+        second.Collider.Material = material;
+        second.ApplyCollisionLinearVelocityDelta(
+            new Vector2d(Fixed64.One, -Fixed64.One));
+        var pair = new CollisionPair2D(
+            first.Collider,
+            second.Collider);
+        pair.Manifold.SetContact(
+            Vector2d.Right,
+            Vector2d.Right,
+            Fixed64.Zero,
+            Vector2d.Right);
+        ulong contactId = pair.Manifold.PrimaryContact.ContactId;
+        pair.StoreWarmStartImpulse(
+            contactId,
+            Fixed64.MaxValue,
+            Fixed64.MaxValue);
+        int errorCount = 0;
+        DiagnosticLevel originalLevel = GravitasLogger.MinimumLevel;
+        Action<DiagnosticLevel, string, string> originalHandler =
+            GravitasLogger.LogHandler;
+        try
+        {
+            GravitasLogger.MinimumLevel = DiagnosticLevel.Error;
+            GravitasLogger.LogHandler = (level, _, _) =>
+            {
+                if (level == DiagnosticLevel.Error)
+                    errorCount++;
+            };
+            CollisionResponse2D.Resolve(
+                pair,
+                applyCachedImpulse: false,
+                applyPositionCorrection: false);
+        }
+        finally
+        {
+            GravitasLogger.MinimumLevel = originalLevel;
+            GravitasLogger.LogHandler = originalHandler;
+        }
+
+        errorCount.Should().Be(0);
+        pair.TryGetWarmStartImpulse(
+                contactId,
+                out ContactWarmStartImpulse impulse)
+            .Should()
+            .BeTrue();
+        impulse.NormalImpulse.Should().BeLessThan(Fixed64.MaxValue);
+        impulse.TangentImpulse.Should().BeLessThan(Fixed64.MaxValue);
+        impulse.TangentImpulse.Should().BeGreaterThan(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void Resolve_WhenCompactTangentMassIsNearSingular_ShouldUseExactFriction()
+    {
+        using GravitasWorldContext context =
+            Physics2DTestWorld.CreateContext();
+        SolidBody2D moving = CreateBox(context, Vector2d.Zero);
+        SolidBody2D wall = CreateBox(
+            context,
+            new Vector2d((Fixed64)2, Fixed64.Zero),
+            immovable: true);
+        var material = new PhysicsMaterial(
+            Fixed64.One,
+            Fixed64.One,
+            Fixed64.Zero);
+        moving.Collider.Material = material;
+        wall.Collider.Material = material;
+        moving.Mass = Fixed64.MaxValue;
+        moving.FreezeAxes = BodyFreezeAxes2D.Rotation;
+        moving.ApplyCollisionLinearVelocityDelta(
+            new Vector2d(
+                Fixed64.FromFraction(1, 4),
+                Fixed64.One));
+        var pair = new CollisionPair2D(
+            moving.Collider,
+            wall.Collider);
+        pair.Manifold.SetContact(
+            Vector2d.Right,
+            Vector2d.Right,
+            Fixed64.Zero,
+            Vector2d.Right);
+        Fixed64 tangentialSpeed = moving.LinearVelocity.Y;
+
+        CollisionResponse2D.Resolve(
+            pair,
+            applyCachedImpulse: false,
+            applyPositionCorrection: false);
+
+        moving.LinearVelocity.Y.Should().BeLessThan(tangentialSpeed);
+        moving.LinearVelocity.Y.Should().BeGreaterThanOrEqualTo(
+            Fixed64.Zero);
+    }
+
+    [Fact]
+    public void Resolve_WhenExactFrictionRemovalDeltaIsUnrepresentable_ShouldClearCache()
+    {
+        using GravitasWorldContext context =
+            Physics2DTestWorld.CreateContext();
+        SolidBody2D moving = CreateBox(context, Vector2d.Zero);
+        SolidBody2D wall = CreateBox(
+            context,
+            new Vector2d((Fixed64)2, Fixed64.Zero),
+            immovable: true);
+        var material = new PhysicsMaterial(
+            Fixed64.One,
+            Fixed64.Zero,
+            Fixed64.Zero);
+        moving.Collider.Material = material;
+        wall.Collider.Material = material;
+        moving.Mass = Fixed64.Half;
+        moving.FreezeAxes = BodyFreezeAxes2D.Rotation;
+        moving.ApplyCollisionLinearVelocityDelta(Vector2d.One);
+        var pair = new CollisionPair2D(
+            moving.Collider,
+            wall.Collider);
+        pair.Manifold.SetContact(
+            Vector2d.Right,
+            Vector2d.Right,
+            Fixed64.Zero,
+            Vector2d.Right);
+        ulong contactId = pair.Manifold.PrimaryContact.ContactId;
+        pair.StoreWarmStartImpulse(
+            contactId,
+            Fixed64.One,
+            Fixed64.MinValue);
+        int errorCount = 0;
+        DiagnosticLevel originalLevel = GravitasLogger.MinimumLevel;
+        Action<DiagnosticLevel, string, string> originalHandler =
+            GravitasLogger.LogHandler;
+        try
+        {
+            GravitasLogger.MinimumLevel = DiagnosticLevel.Error;
+            GravitasLogger.LogHandler = (level, _, _) =>
+            {
+                if (level == DiagnosticLevel.Error)
+                    errorCount++;
+            };
+            CollisionResponse2D.Resolve(
+                pair,
+                applyCachedImpulse: false,
+                applyPositionCorrection: false);
+        }
+        finally
+        {
+            GravitasLogger.MinimumLevel = originalLevel;
+            GravitasLogger.LogHandler = originalHandler;
+        }
+
+        errorCount.Should().Be(1);
+        pair.TryGetWarmStartImpulse(contactId, out _)
+            .Should()
+            .BeFalse();
+    }
+
+    [Fact]
+    public void Resolve_WithUnrepresentableFirstWarmStart_ShouldColdSolveBothContacts()
+    {
+        using GravitasWorldContext context =
+            Physics2DTestWorld.CreateContext();
+        SolidBody2D moving = CreateBox(context, Vector2d.Zero);
+        SolidBody2D wall = CreateBox(
+            context,
+            new Vector2d((Fixed64)2, Fixed64.Zero),
+            immovable: true);
+        var pair = new CollisionPair2D(
+            moving.Collider,
+            wall.Collider);
+        pair.Manifold.SetContact(
+            new Vector2d(Fixed64.One, Fixed64.One),
+            new Vector2d(Fixed64.One, Fixed64.One),
+            Fixed64.Zero,
+            Vector2d.Right);
+        pair.Manifold.AddContact(
+            new Vector2d(Fixed64.One, -Fixed64.One),
+            new Vector2d(Fixed64.One, -Fixed64.One),
+            Fixed64.Zero,
+            Vector2d.Right);
+        ulong firstId = pair.Manifold[0].ContactId;
+        ulong secondId = pair.Manifold[1].ContactId;
+        pair.StoreWarmStartImpulse(
+            firstId,
+            Fixed64.MaxValue,
+            Fixed64.Zero);
+        pair.StoreWarmStartImpulse(
+            secondId,
+            Fixed64.Zero,
+            Fixed64.Zero);
+
+        CollisionResponse2D.Resolve(
+            pair,
+            applyCachedImpulse: true,
+            applyPositionCorrection: false);
+
+        moving.LinearVelocity.Should().Be(Vector2d.Zero);
+        moving.AngularVelocity.Should().Be(Fixed64.Zero);
+        pair.TryGetWarmStartImpulse(
+                firstId,
+                out ContactWarmStartImpulse first)
+            .Should()
+            .BeTrue();
+        pair.TryGetWarmStartImpulse(
+                secondId,
+                out ContactWarmStartImpulse second)
+            .Should()
+            .BeTrue();
+        first.NormalImpulse.Should().Be(Fixed64.Zero);
+        first.TangentImpulse.Should().Be(Fixed64.Zero);
+        second.NormalImpulse.Should().Be(Fixed64.Zero);
+        second.TangentImpulse.Should().Be(Fixed64.Zero);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Resolve_WithUnrepresentableCachedTorque_ShouldColdSolveWithoutPartialMutation(
+        bool crossIsUnrepresentable)
+    {
+        using GravitasWorldContext context =
+            Physics2DTestWorld.CreateContext();
+        SolidBody2D moving = CreateBox(context, Vector2d.Zero);
+        SolidBody2D wall = CreateBox(
+            context,
+            new Vector2d((Fixed64)2, Fixed64.Zero),
+            immovable: true);
+        var pair = new CollisionPair2D(
+            moving.Collider,
+            wall.Collider);
+        Vector2d distantPoint =
+            Vector2d.Right * (Fixed64.MaxValue / Fixed64.Two);
+        pair.Manifold.SetContact(
+            distantPoint,
+            distantPoint,
+            Fixed64.Zero,
+            Vector2d.Right);
+        ulong contactId = pair.Manifold.PrimaryContact.ContactId;
+        pair.StoreWarmStartImpulse(
+            contactId,
+            Fixed64.Zero,
+            crossIsUnrepresentable
+                ? Fixed64.MaxValue
+                : Fixed64.One);
+
+        CollisionResponse2D.Resolve(
+            pair,
+            applyCachedImpulse: true,
+            applyPositionCorrection: false);
+
+        moving.LinearVelocity.Should().Be(Vector2d.Zero);
+        moving.AngularVelocity.Should().Be(Fixed64.Zero);
+        pair.TryGetWarmStartImpulse(
+                contactId,
+                out ContactWarmStartImpulse impulse)
+            .Should()
+            .BeTrue();
+        impulse.NormalImpulse.Should().Be(Fixed64.Zero);
+        impulse.TangentImpulse.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void Resolve_WithExactCachedNormalImpulse_ShouldWarmStart()
+    {
+        using GravitasWorldContext context =
+            Physics2DTestWorld.CreateContext();
+        SolidBody2D moving = CreateBox(context, Vector2d.Zero);
+        SolidBody2D wall = CreateBox(
+            context,
+            new Vector2d((Fixed64)2, Fixed64.Zero),
+            immovable: true);
+        moving.FreezeAxes = BodyFreezeAxes2D.Rotation;
+        moving.ApplyCollisionLinearVelocityDelta(
+            Vector2d.Right * Fixed64.Two);
+        var pair = new CollisionPair2D(
+            moving.Collider,
+            wall.Collider);
+        pair.Manifold.SetContact(
+            new ContactAnchor2D(
+                new Vector2d(Fixed64.MaxValue, Fixed64.Zero),
+                new Vector2d(Fixed64.MinIncrement, Fixed64.Zero)),
+            ContactAnchor2D.FromWorldPoint(wall.Collider.Center),
+            Fixed64.Zero,
+            Vector2d.Right);
+        ulong contactId = pair.Manifold.PrimaryContact.ContactId;
+        pair.StoreWarmStartImpulse(
+            contactId,
+            Fixed64.One,
+            Fixed64.Zero);
+
+        CollisionResponse2D.Resolve(
+            pair,
+            applyCachedImpulse: true,
+            applyPositionCorrection: false);
+
+        moving.LinearVelocity.X.Should().BeLessThan(Fixed64.Two);
+        moving.AngularVelocity.Should().Be(Fixed64.Zero);
+        pair.TryGetWarmStartImpulse(
+                contactId,
+                out ContactWarmStartImpulse impulse)
+            .Should()
+            .BeTrue();
+        impulse.NormalImpulse.Should().BeGreaterThan(Fixed64.Zero);
+    }
+
+    [Fact]
     public void Resolve_WithClosingVelocity_ShouldRefreshWarmStartCache()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
@@ -593,6 +1299,71 @@ public sealed class CollisionResponse2DManifoldTests
             new Vector2d(Fixed64.One, Fixed64.One),
             depth,
             Vector2d.Right);
+    }
+
+    private static LSAABBoxCollider2D CreateBodylessBox(
+        GravitasWorldContext context,
+        Vector2d position)
+    {
+        var collider = new LSAABBoxCollider2D(Vector2d.One);
+        collider.InitializeWithNoBody(
+            new TestMatterAgent(
+                context,
+                new FixedTransform(
+                    position.ToVector3d(Fixed64.Zero),
+                    FixedQuaternion.Identity,
+                    Vector3d.One)));
+        return collider;
+    }
+
+    private static (
+        Vector2d LeftLinearVelocity,
+        Fixed64 LeftAngularVelocity,
+        Vector2d RightLinearVelocity,
+        Fixed64 RightAngularVelocity,
+        ChronicleHash ReplayHash) RunUnrepresentableLeverResponse(
+            bool positiveFace)
+    {
+        using GravitasWorldContext context =
+            Physics2DTestWorld.CreateContext();
+        SolidBody2D left = CreateBox(context, Vector2d.Zero);
+        SolidBody2D right = CreateBox(context, Vector2d.Right);
+        left.Collider.Material = PhysicsMaterial.Frictionless;
+        right.Collider.Material = PhysicsMaterial.Frictionless;
+        left.ApplyCollisionLinearVelocityDelta(
+            Vector2d.Right * Fixed64.Two);
+        right.ApplyCollisionLinearVelocityDelta(
+            Vector2d.Left * Fixed64.Two);
+        var pair = new CollisionPair2D(
+            left.Collider,
+            right.Collider);
+        Fixed64 face = positiveFace
+            ? Fixed64.MaxValue
+            : Fixed64.MinValue;
+        Fixed64 outward = positiveFace
+            ? Fixed64.MinIncrement
+            : -Fixed64.MinIncrement;
+        pair.Manifold.SetContact(
+            new ContactAnchor2D(
+                new Vector2d(face, Fixed64.Zero),
+                new Vector2d(outward, Fixed64.One)),
+            ContactAnchor2D.FromWorldPoint(
+                right.Collider.Center + Vector2d.Forward),
+            Fixed64.Half,
+            Vector2d.Right);
+
+        CollisionResponse2D.Resolve(
+            pair,
+            applyCachedImpulse: false,
+            applyPositionCorrection: false);
+
+        return (
+            left.LinearVelocity,
+            left.AngularVelocity,
+            right.LinearVelocity,
+            right.AngularVelocity,
+            context.ComputeReplayHash(
+                GravitasReplayHashMode.AuthoritativeWithSolverCaches));
     }
 
     private static Fixed64 ResolveClosingVelocityAfterResponse(Fixed64 threshold, Fixed64 initialVelocity)

@@ -92,7 +92,7 @@ internal static class ExactContactLever3D
             out response);
     }
 
-    private static FixedLeverResponseOperand3d CreateResponseOperand(
+    internal static FixedLeverResponseOperand3d CreateResponseOperand(
         SolidBody? body,
         Vector3d linearVelocity,
         Vector3d angularVelocity,
