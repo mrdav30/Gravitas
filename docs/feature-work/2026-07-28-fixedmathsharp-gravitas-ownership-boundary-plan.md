@@ -894,16 +894,16 @@ Geometry/
   behavior changes.
 - Fewer misleading partials, not merely fewer partial files.
 
-- [ ] Move `FixedSegment*` into `Geometry/Primitives/Segments`,
+- [x] Move `FixedSegment*` into `Geometry/Primitives/Segments`,
   `FixedTriangle*` into `Geometry/Primitives/Triangles`, `FixedRay*` into
   `Geometry/Primitives/Rays`, and reusable relation families into
   `Geometry/Primitives/Relations`. Keep dimensional counterparts adjacent.
-- [ ] Move common wide geometry, convex relations, finite-axis algorithms,
+- [x] Move common wide geometry, convex relations, finite-axis algorithms,
   mass-property algorithms, and remaining true oriented-box algorithms into
   their corresponding `Geometry/Wide` subdirectories.
-- [ ] Keep small standalone query/intersection files at `Geometry/Wide` root
+- [x] Keep small standalone query/intersection files at `Geometry/Wide` root
   when an additional one-file directory would add no navigation value.
-- [ ] Merge only small cohesive partials whose combined file remains focused,
+- [x] Merge only small cohesive partials whose combined file remains focused,
   with initial candidates:
   - `FixedBoundArea`
   - `FixedRay`
@@ -912,34 +912,89 @@ Geometry/
   - `WideFiniteAxisProjection`
   - `WideFiniteConeIntersection`
   - `WideSlabProjection`
-- [ ] Reduce `FixedSegment`, `FixedSegment2d`, and `FixedTriangle` partials into
+- [x] Reduce `FixedSegment`, `FixedSegment2d`, and `FixedTriangle` partials into
   a few behavior-oriented files rather than one monolith or one file per
   method.
-- [ ] Reassess `WideOrientedBox`, `WideFiniteAxisIntersection`, and
+- [x] Reassess `WideOrientedBox`, `WideFiniteAxisIntersection`, and
   `WideConvexPrismRelations` after Phases 1-4 have removed misplaced behavior.
   Split remaining code only where a new type has an independent invariant and
   reason to change.
-- [ ] Keep width-specific `WideArithmetic` partials. Merge
+- [x] Keep width-specific `WideArithmetic` partials. Merge
   `WideArithmetic.Ratio.cs` into the core file only if the resulting owner
   remains clearer; do not merge width-specific files to reduce a count.
-- [ ] Move normalization code out of `WideGeometry` and into a focused internal
+- [x] Move normalization code out of `WideGeometry` and into a focused internal
   numeric normalization owner if its responsibility remains independent after
   the anchor extraction. Keep exact geometry differences, dot/cross products,
   and distance predicates in `WideGeometry`.
-- [ ] Update `docs/complexity-exceptions.md` with the approximately 1,200-line
+- [x] Update `docs/complexity-exceptions.md` with the approximately 1,200-line
   review warning and evergreen owner-cohesion rule. Record exceptions only for
   measured cohesive algorithms, not current task status or machine-local
   paths.
-- [ ] Run a namespace/API diff and confirm the phase performs no public
+- [x] Run a namespace/API diff and confirm the phase performs no public
   namespace, signature, serialization, or behavior change.
-- [ ] Run complete FixedMathSharp `Release`, `ReleaseLean`, and 100% coverage
+- [x] Run complete FixedMathSharp `Release`, `ReleaseLean`, and 100% coverage
   gates after the mechanical moves.
-- [ ] Build Gravitas against the moved locally linked source and run focused
+- [x] Build Gravitas against the moved locally linked source and run focused
   exact-response tests to catch accidental internal path/owner errors.
-- [ ] Request independent navigation and over-engineering review. Remove any
+- [x] Request independent navigation and over-engineering review. Remove any
   new folder or type whose only benefit is satisfying the plan's proposed
   diagram.
-- [ ] Update this plan with results and pause for owner review.
+- [x] Update this plan with results and pause for owner review.
+
+### Phase 5 Evidence
+
+- `Geometry/Primitives` now keeps standalone plane, oriented-box, contact-point,
+  and slab-projection owners at its root while grouping rays, reusable
+  relations, segments, and triangles into focused directories. `Geometry/Wide`
+  groups common, convex, finite-axis, and oriented-box algorithms while keeping
+  the standalone `WideRayIntersection` query at the root.
+- No `Geometry/Wide/MassProperties` directory was created. Phase 4 removed that
+  FixedMathSharp ownership, so an empty or ceremonial folder would only satisfy
+  the proposed diagram.
+- The seven reviewed small-partial candidates are single focused files.
+  `FixedSegment` now has six behavior-oriented files, `FixedSegment2d` has
+  three, and `FixedTriangle` has three plus its adjacent 2D counterpart. Across
+  production, the phase reduces 208 files to 188, 177 partial declarations to
+  151, and 83,801 source lines to 83,462 without adding an abstraction or
+  layout-only test.
+- `WideOrientedBox`, `WideFiniteAxisIntersection`, and
+  `WideConvexPrismRelations` remain behavior-oriented partial families. Each
+  owns one shared exact algorithmic invariant; extracting another type would
+  duplicate state or add forwarding. Their dedicated directories provide the
+  navigation boundary. `WideArithmetic.Ratio.cs` also remains separate because
+  its live exact-ratio responsibility is clearer than folding it into the
+  general arithmetic file.
+- Wide vector/quaternion normalization now lives in the focused internal
+  numeric `WideNormalization` owner. It reuses `WideGeometry`'s exact
+  squared-coordinate product instead of copying that arithmetic; exact
+  differences, dot/cross products, projections, anchors, and distance
+  predicates remain geometry-owned.
+- The largest production source file is 1,151 lines. `AGENTS.md` and
+  `docs/complexity-exceptions.md` now treat roughly 1,200 lines as a hard
+  review warning rather than an automatic split point, require an independent
+  reason to change, and preserve the main-`<summary>`/partial-`<content>`
+  convention.
+- A built `HEAD` versus working-tree reflection snapshot compared 2,043 public
+  type, interface, constructor, method, property, field, event, generic-
+  constraint, and serialization-attribute entries with zero differences.
+  Public namespaces, signatures, and serialization shape are unchanged.
+- FixedMathSharp `Release` passes 2,590 core plus 8 Chronicler tests;
+  `ReleaseLean` passes 2,569 core plus 8 Chronicler tests. Both configurations
+  build with zero warnings.
+- Generated-serializer sources excluded, coverage is exactly 44,256/44,256
+  lines, 8,399/8,399 branches, and 3,327/3,327 ReportGenerator methods. The
+  method-level analyzer finds no coverage gap and only the ten fully covered
+  complexity floors already registered in `docs/complexity-exceptions.md`.
+- With all local stack links retained, Gravitas `Release` passes all 3,818
+  tests and `ReleaseLean` passes all 3,763 tests; both benchmark projects build.
+  The Lean test compilation reports only the established local-link MemoryPack
+  shim type-conflict warnings already recorded in Phase 4.
+- Independent review matched all 450 members across the 15 merged partial groups
+  without loss, duplication, attribute change, or body change and found no
+  correctness, ownership, API, serialization, ordering, test-quality, or
+  over-engineering issue. Its only cosmetic finding was column-zero member
+  documentation at mechanical merge boundaries; all 15 summaries now retain
+  normal member indentation.
 
 ## Phase 6: Documentation, Package, And Cross-Stack Closure
 
@@ -1001,7 +1056,7 @@ Geometry/
 - [x] Phase 2 policy-neutral anchor and lever owners extracted.
 - [x] Phase 3 Gravitas exact response policy migrated and parity-proven.
 - [x] Phase 4 intermediate v7 FixedMathSharp response surface removed.
-- [ ] Phase 5 directory and partial ownership cleanup complete.
+- [x] Phase 5 directory and partial ownership cleanup complete.
 - [ ] Phase 6 documentation, package, and cross-stack closure complete.
 
 ## Exit Criteria
