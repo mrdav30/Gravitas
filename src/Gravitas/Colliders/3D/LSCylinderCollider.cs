@@ -13,7 +13,7 @@ using System;
 
 namespace Gravitas.Colliders;
 
-public class LSCylinderCollider : LSCollider
+public sealed class LSCylinderCollider : LSCollider
 {
     private Fixed64 _scaledRadius = Fixed64.Half;
     private Fixed64 _preparedRadius;

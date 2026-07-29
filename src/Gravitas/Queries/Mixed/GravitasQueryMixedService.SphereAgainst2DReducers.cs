@@ -9,6 +9,7 @@ using FixedMathSharp;
 using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
+using System;
 
 namespace Gravitas.Queries;
 
@@ -38,7 +39,8 @@ public sealed partial class GravitasQueryMixedService
         if (collider is LSAABBoxCollider2D || collider is LSPolygonCollider2D)
             return TrySweepSphereAgainstConvexSlab(start, end, direction, length, radius, collider, out hit);
 
-        return TrySweepSphereAgainstPrismBounds(start, end, direction, length, radius, collider, out hit);
+        throw new InvalidOperationException(
+            "The embedded 2D collider type is not supported by mixed queries.");
     }
 
     private static bool TrySweepSphereAgainstCompound2D(

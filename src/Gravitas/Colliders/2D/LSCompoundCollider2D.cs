@@ -102,8 +102,16 @@ public sealed class LSCompoundCollider2D : LSCollider2D
 
     public override Vector2d GetClosestPoint(Vector2d point)
     {
-        int bestIndex = FindClosestPartIndex(point);
-        return _partColliders[bestIndex].GetClosestPoint(point);
+        _ = TryGetClosestBoundaryAnchor(
+            point,
+            out FixedPointAnchor2d anchor);
+        if (anchor.TryGetPoint(out Vector2d closest))
+        {
+            return closest;
+        }
+
+        throw new InvalidOperationException(
+            "The closest compound surface point is outside the Fixed64 coordinate domain.");
     }
 
     public override Vector2d GetSupportPoint(Vector2d direction)
@@ -297,26 +305,6 @@ public sealed class LSCompoundCollider2D : LSCollider2D
                 part.LocalScale,
                 PreparedContext);
         }
-    }
-
-    private int FindClosestPartIndex(Vector2d point)
-    {
-        int bestIndex = 0;
-        Vector2d closest = _partColliders[0].GetClosestPoint(point);
-        Fixed64 bestDistance = Vector2d.DistanceSquared(point, closest);
-
-        for (int i = 1; i < _partColliders.Length; i++)
-        {
-            Vector2d candidate = _partColliders[i].GetClosestPoint(point);
-            Fixed64 distance = Vector2d.DistanceSquared(point, candidate);
-            if (distance >= bestDistance)
-                continue;
-
-            bestDistance = distance;
-            bestIndex = i;
-        }
-
-        return bestIndex;
     }
 
     private static LSCollider2D MaterializePartCollider(CompoundColliderPart2D part)

@@ -34,10 +34,14 @@ internal readonly struct ColliderLifetimeToken2D
 }
 
 /// <summary>
-/// Base type for pure 2D collider shapes.
+/// Common runtime type for the closed set of Gravitas-owned pure 2D collider
+/// shapes. Use <see cref="ColliderShapeDefinition2D.CreateCollider"/> when
+/// constructing from engine-adapter shape data.
 /// </summary>
 public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode, IPhysicsColliderRegistryItem
 {
+    internal LSCollider2D() { }
+
     private SolidBody2D? _body;
     private IMatterAgent? _agent;
     private GravitasWorldContext? _context;

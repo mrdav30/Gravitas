@@ -10,6 +10,7 @@ using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Queries;
 using Gravitas.Tests.Support;
+using System;
 using Xunit;
 
 namespace Gravitas.Tests.MixedDimensions;
@@ -207,12 +208,13 @@ public sealed class MixedQuerySupportTests
     }
 
     [Fact]
-    public void ClassifySweepSphereAgainst2D_WhenShapeIsUnsupported_ShouldMarkConservativeFallback()
+    public void ClassifySweepSphereAgainst2D_WhenShapeIsUnsupported_ShouldFailExplicitly()
     {
-        MixedQueryReducerClassifier
-            .ClassifySweepSphereAgainst2D(new UnsupportedTestCollider2D())
-            .Should()
-            .Be(PhysicsQueryReducerKind.ConservativeFallback);
+        Action classify = () => MixedQueryReducerClassifier
+            .ClassifySweepSphereAgainst2D(new UnsupportedTestCollider2D());
+
+        classify.Should().Throw<InvalidOperationException>()
+            .WithMessage("*not supported*");
     }
 
     [Fact]

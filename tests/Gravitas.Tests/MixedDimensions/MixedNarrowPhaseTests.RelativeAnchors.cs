@@ -485,14 +485,14 @@ public sealed partial class MixedNarrowPhaseTests
     }
 
     [Fact]
-    public void SphereCustomSlab_WithUnrepresentableDiagonalSeparation_ShouldRejectContact()
+    public void SphereCircleSlab_WithUnrepresentableDiagonalSeparation_ShouldRejectContact()
     {
         using GravitasWorldContext context = CreateMixedContext();
         ScenarioBody<LSSphereCollider> sphere =
             CreateSphere3D(context, Vector3d.Zero);
         SolidBody2D embedded = CreateBody2D(
             context,
-            new UnsupportedTestCollider2D(),
+            new LSCircleCollider2D(Fixed64.One),
             Vector2d.Zero);
         sphere.Collider.Radius = Fixed64.MaxValue;
         embedded.Collider.LocalOffset =

@@ -380,6 +380,39 @@ public sealed class CompoundCollider2DTests
     }
 
     [Fact]
+    public void GetClosestPoint_WithFarCompound_ShouldSelectExactNearestPart()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        context.World.TryAddGrid(
+            new GridConfiguration(
+                new Vector3d(
+                    Fixed64.MaxValue - (Fixed64)8,
+                    (Fixed64)(-4),
+                    (Fixed64)(-4)),
+                new Vector3d(
+                    Fixed64.MaxValue,
+                    (Fixed64)4,
+                    (Fixed64)4)),
+            out _).Should().BeTrue();
+        Vector2d center = new(
+            Fixed64.MaxValue - (Fixed64)4,
+            Fixed64.Zero);
+        var compound = new LSCompoundCollider2D(
+            CompoundColliderPart2D.Circle(
+                Fixed64.One,
+                Vector2d.Right),
+            CompoundColliderPart2D.Circle(
+                Fixed64.One,
+                Vector2d.Left));
+        _ = CreateBody(context, compound, center);
+
+        compound.GetClosestPoint(
+                new Vector2d(Fixed64.MinValue, Fixed64.Zero))
+            .Should().Be(
+                center - Vector2d.Right * Fixed64.Two);
+    }
+
+    [Fact]
     public void ContainsPoint_ShouldCheckAllParts()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();

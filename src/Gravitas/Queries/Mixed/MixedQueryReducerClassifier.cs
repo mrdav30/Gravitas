@@ -6,6 +6,7 @@
 //=======================================================================
 
 using Gravitas.Colliders;
+using System;
 
 namespace Gravitas.Queries;
 
@@ -27,7 +28,8 @@ internal static class MixedQueryReducerClassifier
         if (collider is LSCompoundCollider2D)
             return PhysicsQueryReducerKind.Exact;
 
-        return PhysicsQueryReducerKind.ConservativeFallback;
+        throw new InvalidOperationException(
+            "The embedded 2D collider type is not supported by mixed queries.");
     }
 
     internal static PhysicsQueryReducerKind ClassifySweepCircleAgainst3D(LSCollider collider)

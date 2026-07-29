@@ -113,13 +113,13 @@ public sealed class MixedEmbedded2DGeometryTests
     }
 
     [Fact]
-    public void GetClosestAnchorOnEmbeddedVolume_WithUnsupportedContainingShape_ShouldKeepLowerSlabFaceOnTie()
+    public void GetClosestAnchorOnEmbeddedVolume_WithPlanarInterior_ShouldKeepLowerSlabFaceOnTie()
     {
         using GravitasWorldContext context = CreateMixedContext();
         Fixed64 hostY = (Fixed64)4;
         SolidBody2D body = CreateBody(
             context,
-            new UnsupportedTestCollider2D(containsPoints: true),
+            new LSCircleCollider2D(Fixed64.One),
             new Vector2d((Fixed64)2, (Fixed64)(-3)),
             hostY);
         Vector3d point = new(body.Position.X, hostY, body.Position.Y);
@@ -134,6 +134,24 @@ public sealed class MixedEmbedded2DGeometryTests
             point.X,
             hostY - context.Settings.Mixed2DHalfThickness,
             point.Z));
+    }
+
+    [Fact]
+    public void GetClosestAnchorOnEmbeddedVolume_WithUnsupportedBoundaryShape_ShouldFailExplicitly()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        SolidBody2D body = CreateBody(
+            context,
+            new UnsupportedTestCollider2D(),
+            Vector2d.Zero);
+
+        Action getAnchor = () =>
+            MixedEmbedded2DGeometry.GetClosestAnchorOnEmbeddedVolume(
+                body.Collider,
+                new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.Zero));
+
+        getAnchor.Should().Throw<InvalidOperationException>()
+            .WithMessage("*no semantic boundary anchor*");
     }
 
     [Theory]
@@ -410,6 +428,105 @@ public sealed class MixedEmbedded2DGeometryTests
             + (positiveSlab ? -Fixed64.One : Fixed64.One));
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ClosestEmbeddedAnchor_WithFarCircle_ShouldKeepRepresentableBoundary(
+        bool positiveCircle)
+    {
+        using GravitasWorldContext context =
+            CreateXScalarFaceContext(positiveCircle);
+        Vector2d center = positiveCircle
+            ? new Vector2d(
+                Fixed64.MaxValue - Fixed64.Two,
+                Fixed64.Zero)
+            : new Vector2d(
+                Fixed64.MinValue + Fixed64.Two,
+                Fixed64.Zero);
+        Fixed64 queryX = positiveCircle
+            ? Fixed64.MinValue
+            : Fixed64.MaxValue;
+        SolidBody2D body = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.One),
+            center);
+        Vector2d planarQuery = new(queryX, Fixed64.Zero);
+
+        MixedEmbedded2DGeometry.TryGetPlanarBoundaryPoint(
+                body.Collider,
+                planarQuery,
+                out _,
+                out _)
+            .Should().BeFalse();
+        MixedEmbedded2DGeometry.TryGetPlanarBoundaryAnchor(
+                body.Collider,
+                planarQuery,
+                out _,
+                out _)
+            .Should().BeFalse();
+
+        ContactAnchor closest =
+            MixedEmbedded2DGeometry.GetClosestAnchorOnEmbeddedVolume(
+                body.Collider,
+                new Vector3d(
+                    queryX,
+                    Fixed64.Zero,
+                    Fixed64.Zero));
+
+        closest.TryGetWorldPoint(out Vector3d point).Should().BeTrue();
+        point.Should().Be(new Vector3d(
+            center.X
+                + (positiveCircle ? -Fixed64.One : Fixed64.One),
+            Fixed64.Zero,
+            Fixed64.Zero));
+    }
+
+    [Fact]
+    public void ClosestEmbeddedAnchor_WithFarCompound_ShouldSelectExactNearestPart()
+    {
+        using GravitasWorldContext context =
+            CreatePositiveXScalarFaceContext();
+        Vector2d center = new(
+            Fixed64.MaxValue - (Fixed64)4,
+            Fixed64.Zero);
+        var compound = new LSCompoundCollider2D(
+            CompoundColliderPart2D.Circle(
+                Fixed64.One,
+                Vector2d.Right),
+            CompoundColliderPart2D.Circle(
+                Fixed64.One,
+                Vector2d.Left));
+        SolidBody2D body = CreateBody(
+            context,
+            compound,
+            center);
+
+        ContactAnchor closest =
+            MixedEmbedded2DGeometry.GetClosestAnchorOnEmbeddedVolume(
+                body.Collider,
+                new Vector3d(
+                    Fixed64.MinValue,
+                    Fixed64.Zero,
+                    Fixed64.Zero));
+
+        closest.TryGetWorldPoint(out Vector3d point).Should().BeTrue();
+        point.Should().Be(new Vector3d(
+            center.X - Fixed64.Two,
+            Fixed64.Zero,
+            Fixed64.Zero));
+
+        long allocatedBytes = AllocationTestHelper.MeasureSteadyState(() =>
+            closest =
+                MixedEmbedded2DGeometry.GetClosestAnchorOnEmbeddedVolume(
+                    body.Collider,
+                    new Vector3d(
+                        Fixed64.MinValue,
+                        Fixed64.Zero,
+                        Fixed64.Zero)));
+
+        allocatedBytes.Should().Be(0);
+    }
+
     [Fact]
     public void TryGetPlanarBoundaryPoint_WithEqualDistanceCompoundParts_ShouldKeepFirstAuthoredPart()
     {
@@ -476,17 +593,24 @@ public sealed class MixedEmbedded2DGeometryTests
     }
 
     private static GravitasWorldContext CreatePositiveXScalarFaceContext()
+        => CreateXScalarFaceContext(positive: true);
+
+    private static GravitasWorldContext CreateXScalarFaceContext(bool positive)
     {
         GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         context.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
         context.World.TryAddGrid(
             new GridConfiguration(
                 new Vector3d(
-                    Fixed64.MaxValue - (Fixed64)8,
+                    positive
+                        ? Fixed64.MaxValue - (Fixed64)8
+                        : Fixed64.MinValue,
                     (Fixed64)(-4),
                     (Fixed64)(-4)),
                 new Vector3d(
-                    Fixed64.MaxValue,
+                    positive
+                        ? Fixed64.MaxValue
+                        : Fixed64.MinValue + (Fixed64)8,
                     (Fixed64)4,
                     (Fixed64)4)),
             out _).Should().BeTrue();

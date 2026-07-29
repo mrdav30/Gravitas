@@ -2849,10 +2849,7 @@ public sealed class GravitasQuery3DServiceSweepTests
     [Fact]
     public void ConvexSweepHitPolicy_WithUnavailableSurfaceNormal_ShouldUseGjkNormal()
     {
-        var target = new ConfigurableNormalSphereCollider
-        {
-            SurfaceNormal = Vector3d.Zero
-        };
+        var target = new LSSphereCollider();
 
         Vector3d normal = ConvexSweepHitPolicy.ResolveHitNormal(
             target,
@@ -3701,13 +3698,6 @@ public sealed class GravitasQuery3DServiceSweepTests
 
     private static FixedTransform LocalFrame(Vector3d position) =>
         new(position, FixedQuaternion.Identity, Vector3d.One);
-
-    private sealed class ConfigurableNormalSphereCollider : LSSphereCollider
-    {
-        internal Vector3d SurfaceNormal { get; init; }
-
-        public override Vector3d GetNormalAtPoint(Vector3d point) => SurfaceNormal;
-    }
 
     private static TCollider CreateDynamicCollider<TCollider>(
         GravitasWorldContext context,

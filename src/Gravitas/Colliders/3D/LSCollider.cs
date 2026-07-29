@@ -20,8 +20,15 @@ using System.Runtime.CompilerServices;
 
 namespace Gravitas.Colliders;
 
+/// <summary>
+/// Common runtime type for the closed set of Gravitas-owned 3D collider
+/// shapes. Use <see cref="ColliderShapeDefinition.CreateCollider"/> when
+/// constructing from engine-adapter shape data.
+/// </summary>
 public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, IPhysicsColliderRegistryItem
 {
+    internal LSCollider() { }
+
     #region Fields and Properties
 
     protected bool _debug;

@@ -48,8 +48,9 @@ public sealed partial class GravitasQueryMixedService
             end,
             reducerCounters.ExactReducerAttempts,
             reducerCounters.AcceptedHits,
-            reducerCounters.FallbackHits,
-            reducerCounters.RejectedConservativeCandidates);
+            fallbackHits: 0,
+            rejectedConservativeCandidates:
+                reducerCounters.RejectedConservativeCandidates);
     }
 
     private static bool TrySweepSphereAgainst2DCandidate(
@@ -87,7 +88,7 @@ public sealed partial class GravitasQueryMixedService
         }
 
         if (captureReducerDiagnostics)
-            reducerCounters.RecordAccepted(candidate.ReducerKind);
+            reducerCounters.RecordAccepted();
         return true;
     }
 
@@ -140,7 +141,7 @@ public sealed partial class GravitasQueryMixedService
         }
 
         if (captureReducerDiagnostics)
-            reducerCounters.RecordAccepted(candidate.ReducerKind);
+            reducerCounters.RecordAccepted();
         return true;
     }
 
@@ -149,7 +150,6 @@ public sealed partial class GravitasQueryMixedService
     {
         public int ExactReducerAttempts;
         public int AcceptedHits;
-        public int FallbackHits;
         public int RejectedConservativeCandidates;
 
         public void RecordAttempt(PhysicsQueryReducerKind reducerKind)
@@ -158,12 +158,7 @@ public sealed partial class GravitasQueryMixedService
                 ExactReducerAttempts++;
         }
 
-        public void RecordAccepted(PhysicsQueryReducerKind reducerKind)
-        {
-            AcceptedHits++;
-            if (reducerKind == PhysicsQueryReducerKind.ConservativeFallback)
-                FallbackHits++;
-        }
+        public void RecordAccepted() => AcceptedHits++;
 
         public void RecordRejected(PhysicsQueryReducerKind reducerKind)
         {

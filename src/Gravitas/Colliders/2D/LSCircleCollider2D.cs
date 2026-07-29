@@ -69,8 +69,7 @@ public sealed class LSCircleCollider2D : LSCollider2D
     {
         if (TryGetClosestBoundaryAnchor(
                 point,
-                out FixedPointAnchor2d anchor,
-                out _)
+                out FixedPointAnchor2d anchor)
             && anchor.TryGetPoint(out Vector2d closest))
         {
             return closest;

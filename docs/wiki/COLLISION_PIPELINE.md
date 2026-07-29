@@ -133,6 +133,21 @@ local intermediate.
 throw when the requested view is not representable; domain-edge callers should
 use `TryGetOffset` and the matching `TryGetPoint*` method.
 
+Response keeps materialized 2D/3D lever vectors as the ordinary fast path and
+reconstructs a semantic `FixedLever2d` or `FixedLever` from the contact anchors
+only when the complete compact expression cannot be proven representable.
+Point velocity, effective mass, warm-start completion, friction, and final
+body deltas then remain exact through one final checked narrowing. Compound
+mass properties use `FixedMassPoint`, `FixedMassPoint2d`, and
+`FixedMassWeight` for the equivalent weighted-center and parallel-axis
+contract; no saturated child center or weight is admitted as physical data.
+
+Embedded 2D mixed volumes also select planar boundary anchors semantically.
+Built-in circles, capsules, boxes, polygons, and compounds therefore do not
+require a public closest point or representable query-to-boundary distance to
+produce a contact witness. Exact compound candidate ranking preserves authored
+part order on ties.
+
 For shape state, pair matrices, SAT invariants, mesh policy, and compound
 ownership details, read [Collider Shape Reference](COLLIDER_SHAPE_REFERENCE.md).
 

@@ -57,36 +57,4 @@ public sealed partial class GravitasQueryMixedService
         return true;
     }
 
-    private static bool TrySweepSphereAgainstPrismBounds(
-        Vector3d start,
-        Vector3d end,
-        Vector3d direction,
-        Fixed64 length,
-        Fixed64 radius,
-        LSCollider2D collider,
-        out PhysicsMixedHit hit)
-    {
-        FixedBoundBox bounds = collider.MixedBounds3D;
-        Vector3d radiusExtents = Vector3d.One * radius;
-        Vector3d min = bounds.Min - radiusExtents;
-        Vector3d max = bounds.Max + radiusExtents;
-        Fixed64 distance = Fixed64.Zero;
-        if (!SweepBoundsUtility.OverlapsInclusive(start, start, min, max)
-            && !SweepBoundsUtility.TryClipSegment(start, direction, length, min, max, out distance, out _))
-        {
-            hit = default;
-            return false;
-        }
-
-        Vector3d sweepCenter = distance == length ? end : start + direction * distance;
-        hit = BuildSphereAgainst2DHit(
-            collider,
-            sweepCenter,
-            radius,
-            PhysicsQueryReducerKind.ConservativeFallback,
-            distance,
-            direction);
-        return true;
-    }
-
 }

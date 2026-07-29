@@ -13,7 +13,7 @@ using System;
 
 namespace Gravitas.Colliders;
 
-public class LSCuboidCollider : LSCollider
+public sealed class LSCuboidCollider : LSCollider
 {
     private FixedOrientedBox _orientedBox;
     private FixedOrientedBox _preparedOrientedBox;

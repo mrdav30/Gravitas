@@ -76,9 +76,9 @@ values are data-first authored descriptors, not independent runtime identities.
 
 | Authoring type              | Runtime owner                                              |
 | --------------------------- | ---------------------------------------------------------- |
-| `ColliderShapeDefinition`   | `LSCollider` subclasses and `LSCompoundCollider` parts     |
+| `ColliderShapeDefinition`   | built-in `LSCollider` implementations and `LSCompoundCollider` parts     |
 | `CompoundColliderPart`      | 3D compound authoring                                      |
-| `ColliderShapeDefinition2D` | `LSCollider2D` subclasses and `LSCompoundCollider2D` parts |
+| `ColliderShapeDefinition2D` | built-in `LSCollider2D` implementations and `LSCompoundCollider2D` parts |
 | `CompoundColliderPart2D`    | 2D compound authoring                                      |
 
 Shape definitions should be used by importers, tooling, and offline-authored

@@ -301,67 +301,20 @@ public sealed partial class MixedQueryCcdTests
     }
 
     [Fact]
-    public void SweepSphereAgainst2D_WithUnsupported2DTarget_ShouldReportConservativeFallback()
-    {
-        using GravitasWorldContext context = CreateMixedContext();
-        LSCollider2D target = CreateBodylessUnsupported2D(context, Vector2d.Zero);
-
-        bool mixedHit = context.QueryMixed.SweepSphereAgainst2D(
-            new Vector3d((Fixed64)(-3), Fixed64.Zero, Fixed64.Zero),
-            new Vector3d((Fixed64)3, Fixed64.Zero, Fixed64.Zero),
-            Fixed64.Half,
-            IncludeLayerZero,
-            out PhysicsMixedHit hit);
-
-        mixedHit.Should().BeTrue();
-        hit.Collider2D.Should().BeSameAs(target);
-        hit.Distance.Should().Be(Fixed64.FromFraction(3, 2));
-        hit.Point2D.Should().Be(new Vector3d(-Fixed64.One, Fixed64.Zero, Fixed64.Zero));
-        hit.Point3D.Should().Be(new Vector3d(-Fixed64.One, Fixed64.Zero, Fixed64.Zero));
-        hit.Normal3DTo2D.Should().Be(Vector3d.Right);
-        hit.ReducerKind.Should().Be(PhysicsQueryReducerKind.ConservativeFallback);
-    }
-
-    [Fact]
-    public void SweepSphereAgainst2D_WhenSmallestDirectionComponentReachesFallbackBoundsAtEndpoint_ShouldHit()
-    {
-        using GravitasWorldContext context = CreateMixedContext();
-        LSCollider2D target = CreateBodylessUnsupported2D(context, Vector2d.Zero);
-        Fixed64 radius = Fixed64.FromFraction(1, 4);
-        Fixed64 expandedMinX = -Fixed64.One - radius;
-        Vector3d start = new(expandedMinX - Fixed64.FromRaw(1), Fixed64.Zero, -Fixed64.Half);
-        Vector3d end = new(expandedMinX, Fixed64.Zero, Fixed64.Half);
-
-        bool mixedHit = context.QueryMixed.SweepSphereAgainst2D(
-            start,
-            end,
-            radius,
-            IncludeLayerZero,
-            out PhysicsMixedHit hit);
-
-        mixedHit.Should().BeTrue();
-        hit.Collider2D.Should().BeSameAs(target);
-        hit.Distance.Should().Be(Fixed64.One);
-        hit.Point2D.Should().Be(new Vector3d(-Fixed64.One, Fixed64.Zero, Fixed64.Half));
-        hit.ReducerKind.Should().Be(PhysicsQueryReducerKind.ConservativeFallback);
-    }
-
-    [Fact]
-    public void SweepSphereAgainst2D_WithUnsupportedFallbackBoundsOnlyCornerMiss_ShouldReject()
+    public void SweepSphereAgainst2D_WithUnsupportedInternalShape_ShouldFailExplicitly()
     {
         using GravitasWorldContext context = CreateMixedContext();
         _ = CreateBodylessUnsupported2D(context, Vector2d.Zero);
 
-        bool mixedHit = context.QueryMixed.SweepSphereAgainst2D(
-            new Vector3d((Fixed64)(-3), Fixed64.Zero, (Fixed64)6),
-            new Vector3d((Fixed64)6, Fixed64.Zero, (Fixed64)(-3)),
-            Fixed64.FromFraction(1, 4),
+        Action sweep = () => context.QueryMixed.SweepSphereAgainst2D(
+            new Vector3d((Fixed64)(-3), Fixed64.Zero, Fixed64.Zero),
+            new Vector3d((Fixed64)3, Fixed64.Zero, Fixed64.Zero),
+            Fixed64.Half,
             IncludeLayerZero,
-            out PhysicsMixedHit hit);
+            out _);
 
-        mixedHit.Should().BeFalse();
-        hit.Collider2D.Should().BeNull();
-        hit.Distance.Should().Be(Fixed64.Zero);
+        sweep.Should().Throw<InvalidOperationException>()
+            .WithMessage("*not supported*");
     }
 
     [Fact]
@@ -2465,14 +2418,27 @@ public sealed partial class MixedQueryCcdTests
     }
 
     [Fact]
-    public void SweepSphereAgainst2D_WithUnsupportedCenterOverlap_ShouldUseSweepDirectionFallbackNormal()
+    public void SweepSphereAgainst2D_WithSubEpsilonSlabOffset_ShouldUseSweepDirectionFallbackNormal()
     {
         using GravitasWorldContext context = CreateMixedContext();
-        LSCollider2D target = CreateBodylessUnsupported2D(context, Vector2d.Zero);
+        var target = new LSCircleCollider2D(Fixed64.Half)
+        {
+            MixedHalfThicknessOverride = Fixed64.MinIncrement
+        };
+        var agent = new TestMatterAgent(
+            context,
+            new FixedTransform(
+                Vector3d.Zero,
+                FixedQuaternion.Identity,
+                Vector3d.One));
+        target.InitializeWithNoBody(agent);
 
         bool mixedHit = context.QueryMixed.SweepSphereAgainst2D(
-            Vector3d.Zero,
-            new Vector3d((Fixed64)3, Fixed64.Zero, Fixed64.Zero),
+            -Vector3d.Up * Fixed64.MinIncrement,
+            new Vector3d(
+                (Fixed64)3,
+                -Fixed64.MinIncrement,
+                Fixed64.Zero),
             Fixed64.Half,
             IncludeLayerZero,
             out PhysicsMixedHit hit);
@@ -2481,7 +2447,7 @@ public sealed partial class MixedQueryCcdTests
         hit.Collider2D.Should().BeSameAs(target);
         hit.Distance.Should().Be(Fixed64.Zero);
         hit.Normal3DTo2D.Should().Be(Vector3d.Right);
-        hit.ReducerKind.Should().Be(PhysicsQueryReducerKind.ConservativeFallback);
+        hit.ReducerKind.Should().Be(PhysicsQueryReducerKind.Exact);
     }
 
     [Fact]
@@ -3839,37 +3805,6 @@ public sealed partial class MixedQueryCcdTests
         summary.AcceptedHits.Should().Be(0);
         summary.FallbackHits.Should().Be(0);
         summary.RejectedConservativeCandidates.Should().Be(1);
-        summary.HasConservativeFallback.Should().BeTrue();
-    }
-
-    [Fact]
-    public void MixedQueryDiagnostics_WithUnsupported2DTarget_ShouldRecordAcceptedConservativeFallback()
-    {
-        using GravitasWorldContext context = CreateMixedContext();
-        LSCollider2D target = CreateBodylessUnsupported2D(context, Vector2d.Zero);
-        var hits = new SwiftList<PhysicsMixedHit>();
-        context.Diagnostics.Enable(eventCapacity: 4, drawCommandCapacity: 0);
-
-        int count = context.QueryMixed.SweepSphereAgainst2DAll(
-            new Vector3d((Fixed64)(-3), Fixed64.Zero, Fixed64.Zero),
-            new Vector3d((Fixed64)3, Fixed64.Zero, Fixed64.Zero),
-            Fixed64.Half,
-            IncludeLayerZero,
-            hits);
-
-        count.Should().Be(1);
-        hits.Count.Should().Be(1);
-        hits[0].Collider2D.Should().BeSameAs(target);
-        hits[0].ReducerKind.Should().Be(PhysicsQueryReducerKind.ConservativeFallback);
-
-        GravitasDiagnosticEvent summaryEvent = FindDiagnosticEvent(context.Diagnostics.Events, GravitasDiagnosticEventKind.QuerySummary);
-        summaryEvent.TryAsQuerySummary(out GravitasQuerySummaryDiagnosticView summary).Should().BeTrue();
-        summary.SourceDimension.Should().Be(GravitasColliderDimension.ThreeD);
-        summary.TargetDimension.Should().Be(GravitasColliderDimension.TwoD);
-        summary.ExactReducerAttempts.Should().Be(0);
-        summary.AcceptedHits.Should().Be(1);
-        summary.FallbackHits.Should().Be(1);
-        summary.RejectedConservativeCandidates.Should().Be(0);
         summary.HasConservativeFallback.Should().BeTrue();
     }
 

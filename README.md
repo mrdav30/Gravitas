@@ -126,10 +126,12 @@ Gravitas is centered around explicit world-context ownership:
     solver-controlled `Dynamic`, host-controlled `Kinematic`, or immobile
     `Static` ownership; `FreezeAxes` independently constrains the degrees of
     freedom available to a dynamic body.
-11. `LSCollider` and `LSCollider2D` collider types own runtime shape data,
-    bounds, layers, collider-local physical ignore masks, trigger/contact
-    events, and GridForge partition coordinates; shape-definition APIs provide
-    data-only inputs for authored standalone and compound colliders.
+11. `LSCollider` and `LSCollider2D` are closed public runtime hierarchies that
+    own shape state, bounds, layers, collider-local physical ignore masks,
+    trigger/contact events, and GridForge partition coordinates. Engine
+    adapters should map host assets into `ColliderShapeDefinition` or
+    `ColliderShapeDefinition2D`, then call `CreateCollider()` to obtain the
+    common runtime base type.
 
 Typical integration creates or attaches a context, initializes bodies and
 colliders against agents bound to that context, then advances the simulation

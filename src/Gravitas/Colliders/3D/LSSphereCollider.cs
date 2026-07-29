@@ -12,7 +12,7 @@ using SwiftCollections;
 
 namespace Gravitas.Colliders;
 
-public class LSSphereCollider : LSCollider
+public sealed class LSSphereCollider : LSCollider
 {
     private Fixed64 _scaledRadius = Fixed64.Half;
     private Fixed64 _preparedRadius;

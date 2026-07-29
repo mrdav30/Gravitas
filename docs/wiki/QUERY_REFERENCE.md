@@ -119,8 +119,9 @@ Reducer notes:
 - AABB, convex-polygon, and stable compound reductions report `Exact`.
 - supported 3D primitive slabs, finite cones at any rotation, mesh triangles,
   and compounds report `Exact`.
-- conservative fallback labels are reserved for safe proxy candidates that must
-  not create false negatives.
+- conservative fallback labels are reserved for safe internal proxy candidates
+  that must not create false negatives; they are not a custom-collider
+  extension mechanism.
 - concave/raw mesh-source sweeps are `NotSupported`; author stable convex
   compound source parts.
 

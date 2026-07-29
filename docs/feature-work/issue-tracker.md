@@ -29,18 +29,19 @@ records follow with their original discovery context.
 - Treat local links as unstaged validation scaffolding. Do not publish or
   release with them in place.
 - FixedMathSharp foundation hardening is complete. The current locally linked
-  geometry and arithmetic extensions pass 2,601 Release tests at
-  45,552/45,552 lines, 8,554/8,554 branches, and 3,396/3,396 ReportGenerator
-  methods. ReleaseLean passes 2,580 tests. Retain the local link while the
+  geometry and arithmetic extensions pass 2,638 Release tests at
+  47,462/47,462 lines, 8,732/8,732 branches, and 3,500/3,500 ReportGenerator
+  methods. ReleaseLean passes 2,617 tests. Retain the local link while the
   remaining Gravitas queue is hardened.
 - SwiftCollections has no library-specific active issue at this checkpoint; its
   place in the sequence is a full downstream compatibility and release gate.
 - GridForge's runtime-identity defect is resolved. Keep the lower stack locally
   linked while the remaining Gravitas queue is hardened so another downstream
   discovery does not force a partial release cycle.
-- Gravitas's current Release run passes 3,713 tests at 38,695/38,695 lines,
-  12,069/12,069 branches, and 4,310/4,310 methods. ReleaseLean passes 3,658
-  tests. Canonical-geometry correctness, replay, allocation, coverage, and
+- Gravitas's current Release run passes 3,776 tests at 40,072/40,072 lines,
+  12,365/12,365 branches, and 4,368/4,368 methods. ReleaseLean passes 3,721
+  tests; the focused replay and allocation gates pass 84 and 5 tests.
+  Canonical-geometry correctness, replay, allocation, coverage, and
   documentation gates are closed; the measured exact-OBB throughput signal
   remains in the benchmark backlog.
 - After the Gravitas queue closes, release the lower stack in dependency order,
@@ -50,91 +51,15 @@ records follow with their original discovery context.
 ### Ordered Queue
 
 1. **Gravitas:**
-   [True Unrepresentable Contact Lever Arms Can Drop Physical Response](#true-unrepresentable-contact-lever-arms-can-drop-physical-response).
-2. **Gravitas:**
    [Extreme Friction Accumulation And Cone Clamping Are Not Full-Domain](#extreme-friction-accumulation-and-cone-clamping-are-not-full-domain).
-3. **Gravitas:**
+2. **Gravitas:**
    [SolidBody Point Transforms Can Saturate Before Their Final World Or Local Coordinate](#solidbody-point-transforms-can-saturate-before-their-final-world-or-local-coordinate).
-4. **Gravitas:**
-   [3D Overlap-Circle Classification Depends On A Full-3D Surface Witness](#3d-overlap-circle-classification-depends-on-a-full-3d-surface-witness).
-5. **FixedMathSharp / Gravitas:**
+3. **Gravitas:**
+   [3D Closest-Surface And Overlap-Circle Classification Are Not Full-Domain](#3d-closest-surface-and-overlap-circle-classification-are-not-full-domain).
+4. **FixedMathSharp / Gravitas:**
    [Radial Segment Parameters Can Collapse Spatially Distinct Query Hits](#radial-segment-parameters-can-collapse-spatially-distinct-query-hits).
-6. **FixedMathSharp / Gravitas:**
+5. **FixedMathSharp / Gravitas:**
    [Mesh Triangle-Triangle SAT Can Saturate Before Axis Classification](#mesh-triangle-triangle-sat-can-saturate-before-axis-classification).
-
-### True Unrepresentable Contact Lever Arms Can Drop Physical Response
-
-**Discovered:** 2026-07-22  
-**Source:** canonical contact-anchor and center-of-mass migration  
-**Affected area:** 2D, 3D, and mixed collision response; rotational CCD;
-grounding/support response; compound child mass-property aggregation; solver
-contact admission and diagnostics
-
-Canonical point anchors allow narrow phase to preserve a real contact when an
-intermediate rotated offset or absolute world point lies outside the
-`Fixed64` scalar range. Exact anchor-to-center-of-mass subtraction also
-recovers every final lever arm that cancels back into range. A physically real
-contact can nevertheless have a true final lever arm whose component exceeds
-`Fixed64.MaxValue`. The current solver stores lever arms as `Vector2d` or
-`Vector3d`, so that contact cannot enter angular response without narrowing.
-Silently saturating it would invent torque; treating anchor materialization
-failure as separation would lose collision state.
-
-The same storage boundary appears when an individual compound child's
-body-local center of mass is outside the scalar domain even though a later
-weighted aggregate could cancel back into range. The current exact
-weighted-average hardening covers representable child centers without
-saturating their products or sum; retaining unrepresentable child centers
-requires a semantic mass-point representation carried through parallel-axis
-calculations.
-
-The exact scale-admission pass makes that boundary explicit for collider
-offsets as well. A bodyless collider may retain a representable world center
-when `world origin + rotation * (owner scale * local offset)` cancels only in
-the complete expression, even though the independently requested scaled offset
-is unavailable. Compound parts likewise admit when their complete body-local
-owner/part composition is representable. A body-attached standalone collider
-whose final body-local center of mass or lever arm is genuinely outside the
-scalar domain still rejects at that solver boundary; admitting it requires the
-same semantic mass-point/lever representation described here, not saturation
-or a collider-registration workaround.
-
-Mass-property weights have the same representation boundary before averaging.
-Primitive volume or shell measures and nested compound weight sums can exceed
-`Fixed64.MaxValue`; saturating those values can change their relative ratios.
-An exact final weighted-average or mass-share distributor cannot recover a
-ratio that was already lost at that earlier scalar boundary. The complete
-solution therefore needs semantic wide weights from primitive measurement
-through nested aggregation and inertia distribution, rather than a
-distribution-only patch at the final compound.
-
-The canonical-geometry release audit found the corresponding mixed-query
-failure mode: a far full-domain 2D circle can reach
-`MixedEmbedded2DGeometry` with an unrepresentable boundary distance, where its
-public-point fallback throws before narrow phase can decline the contact or
-query. Resolve that path through the same semantic anchor/lever contract; do
-not hide it with a saturated point or a query-local exception handler.
-
-Define an explicit solver-domain contract for true final lever overflow. The
-solution may be a bounded exact lever/mass-point representation carried into
-cross/dot and parallel-axis products, including semantic wide mass weights, or
-a documented deterministic response mode that preserves contact and linear
-response while reporting unavailable angular response. It must not
-conservatively reject canonical colliders or center-of-mass overrides, because
-most apparent overflows cancel once the complete relative expression is
-evaluated. Cover mirrored scalar faces, primitive and nested-compound weight
-ratios, compound weighted-COM cancellation, 2D/3D/mixed parity, rotational CCD,
-stable replay/diagnostics, and warmed zero-allocation behavior.
-
-**Phase 2 progress (2026-07-28):** FixedMathSharp now owns an allocation-free
-semantic 3D normal-response operation that carries point velocity, effective
-mass, shared impulse, cache completion, and final body deltas through bounded
-wide arithmetic. Gravitas 3D discrete response and rotational CCD consume it
-only when compact levers or intermediate scalar projections are insufficient.
-Unrepresentable diagnostic/cache projections no longer discard physical
-response; a truly unrepresentable final velocity delta still rejects the pair
-atomically. Pure 2D, mixed response, compound semantic mass points/weights, and
-the far-circle mixed-query boundary remain in later phases of the active plan.
 
 ### Extreme Friction Accumulation And Cone Clamping Are Not Full-Domain
 
@@ -188,13 +113,24 @@ zero-allocation behavior. Pure 2D currently has no equivalent public point API,
 so parity means deciding whether a first-class planar surface is useful rather
 than copying the defect.
 
-### 3D Overlap-Circle Classification Depends On A Full-3D Surface Witness
+### 3D Closest-Surface And Overlap-Circle Classification Are Not Full-Domain
 
 **Discovered:** 2026-07-22  
-**Source:** finite-axis closest-surface authority audit  
-**Affected area:** 3D `OverlapCircle`, `OverlapCircleInDirection`,
+**Source:** finite-axis closest-surface authority audit; exact 2D boundary
+closure review  
+**Affected area:** public 3D closest-surface APIs, `LSCompoundCollider`
+part selection, 3D `OverlapCircle`, `OverlapCircleInDirection`,
 `OverlapCircleAll`, batch variants, `Physics3DHit`, and finite-axis/cuboid
 surface witnesses
+
+`LSSphereCollider.ClosestPointOnSurface(...)` still materializes a relative
+vector through ordinary saturating subtraction and magnitude arithmetic.
+`LSCompoundCollider` then materializes every child surface point and ranks
+those points with scalar `Vector3d.DistanceSquared`. Extreme representable
+coordinates can therefore collapse distinct child distances, retain the wrong
+authored part, or reject a surface that has a valid semantic anchor. The 2D
+counterpart now selects and materializes one exact boundary anchor, but the 3D
+surface API does not yet expose equivalent ownership.
 
 The public 3D overlap-circle family is documented as X/Z proximity, but
 `TryBuildOverlapHit` currently obtains a collider's full-3D closest surface
@@ -208,12 +144,14 @@ current `Physics3DHit` contract has no explicit way to preserve that
 classification without returning a false negative or inventing a non-surface
 point.
 
-Define an exact X/Z classification contract independently from hit-witness
-materialization. Decide whether an overlap whose selected planar surface
-witness is not representable needs a richer result state, a deterministic
-representable planar feature policy, or a documented query-domain admission
-rule. Apply the decision consistently to closest, directional, all-hit, and
-batch paths. Cover vertical-offset invariance, scalar-face finite axes and
+First define a reusable 3D semantic closest-surface anchor contract and exact
+compound distance ranking, then define X/Z overlap classification independently
+from final witness materialization. Decide whether an overlap whose selected
+planar witness is not representable needs a richer result state, a
+deterministic representable-feature policy, or a documented query-domain
+admission rule. Apply the decision consistently to public closest-surface,
+closest, directional, all-hit, and batch paths. Cover scalar-face spheres and
+compounds, authored-part ties, vertical-offset invariance, finite axes and
 cuboids, ordinary witness parity, deterministic ordering, and warmed
 zero-allocation behavior. Do not mask the issue with full-3D distance,
 saturating projection, a fake hit point, or a silent miss.
@@ -274,6 +212,31 @@ projection/ranking paths; do not assume a discrete 3D collision fix provides
 query parity.
 
 ## Resolved Issues
+
+### True Unrepresentable Contact Lever Arms Preserve Physical Response
+
+**Discovered:** 2026-07-22  
+**Resolved:** 2026-07-28
+
+FixedMathSharp now retains exact semantic 2D/3D levers, mass points, and
+positive weights through point-velocity, effective-mass, lever-dependent
+contact friction response, warm-start, proportional-share, weighted-center,
+and parallel-axis calculations. Gravitas keeps compact materialized vectors as
+the ordinary fast
+path and enters the allocation-free semantic path only when the complete
+expression cannot be proven representable. A truly unrepresentable final body
+delta still rejects atomically; intermediate scalar overflow no longer drops a
+physical contact or child mass contribution.
+
+Pure 2D, 3D, mixed response, rotational CCD, compound mass properties, replay,
+diagnostics, mirrored scalar faces, and warmed allocation behavior share that
+contract. Embedded 2D mixed volumes now select far-domain circle, capsule,
+polygon, box, and compound boundaries semantically; exact compound distance
+ranking retains the first authored part on ties and no built-in shape falls
+through the public closest-point fallback.
+
+The implementation and release evidence are retained in
+[`Exact Contact Lever And Mass Response`](done/2026-07-27-exact-contact-lever-response-plan.md).
 
 ### Finite-Axis Collider Geometry Uses Canonical Rigid Frames
 

@@ -53,6 +53,20 @@ instead of burying it in notes.
 
 ## Recently Completed
 
+- [`Exact Contact Lever And Mass Response`](done/2026-07-27-exact-contact-lever-response-plan.md)
+  - Completed 2026-07-28. FixedMathSharp retains semantic 2D/3D contact
+    levers, mass points, positive weights, and exact 2D anchor-distance
+    ordering without exposing raw wide arithmetic. Gravitas consumes compact
+    representable paths plus allocation-free exact fallback across 2D, 3D,
+    mixed response, rotational CCD, compound mass properties, and embedded
+    mixed boundaries. Runtime collider hierarchies are closed; host adapters
+    author built-in geometry through `ColliderShapeDefinition*.CreateCollider()`.
+    FixedMathSharp passes 2,638 Release and 2,617 ReleaseLean tests at
+    47,462/47,462 lines, 8,732/8,732 branches, and 3,500/3,500 methods.
+    Gravitas passes 3,776 Release and 3,721 ReleaseLean tests at
+    40,072/40,072 lines, 12,365/12,365 branches, and 4,368/4,368 methods;
+    replay, allocation, package, documentation, and independent-review gates
+    are closed.
 - [`Canonical Collider Geometry And Exact Scale Admission`](issue-tracker.md#finite-axis-collider-geometry-uses-canonical-rigid-frames)
   - Completed 2026-07-27. FixedMathSharp owns strict transform composition,
     fused scaled dimensions, centered finite-axis relations, local convex

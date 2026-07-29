@@ -74,6 +74,13 @@ used for queries, compound cuboid parts, grounding, or CCD.
 `Query2D` and `Query3D` stay dimension-local and never report cross-dimensional
 hits. Mixed queries are always explicit.
 
+Mixed sphere/slab reducers retain the selected embedded-2D boundary as a
+semantic point anchor. A valid far-domain witness is not re-queried through a
+public closest-point API merely because its Euclidean distance cannot fit in
+`Fixed64`; compound parts are ranked by exact squared anchor distance with
+stable authored-order ties. Query families that actually return a scalar
+distance still fail that final conversion honestly rather than saturating it.
+
 ## Hit Witnesses
 
 `Physics3DHit`, `Physics2DHit`, and `PhysicsMixedHit` retain surface witnesses

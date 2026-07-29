@@ -52,8 +52,8 @@ bit combinations are rejected as settings values.
 
 | Domain      | Bodies                    | Colliders                           | Constraints                      | Queries              |
 | ----------- | ------------------------- | ----------------------------------- | -------------------------------- | -------------------- |
-| 3D          | `SolidBody`               | `LSCollider` subclasses             | `Joint3D`, `RagdollRuntime3D`    | `context.Query3D`    |
-| 2D          | `SolidBody2D`             | `LSCollider2D` subclasses           | `Joint2D`, `RagdollRuntime2D`    | `context.Query2D`    |
+| 3D          | `SolidBody`               | built-in `LSCollider` implementations   | `Joint3D`, `RagdollRuntime3D` | `context.Query3D` |
+| 2D          | `SolidBody2D`             | built-in `LSCollider2D` implementations | `Joint2D`, `RagdollRuntime2D` | `context.Query2D` |
 | Mixed 2D/3D | Existing 3D and 2D bodies | 3D colliders plus embedded 2D slabs | Mixed contacts, not mixed joints | `context.QueryMixed` |
 
 Supported 3D collider types:
@@ -209,8 +209,8 @@ and query stamps.
 
 | Domain | Definition types                                      | Runtime materialization                                            | Mass properties                                                                      |
 | ------ | ----------------------------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
-| 3D     | `ColliderShapeDefinition`, `CompoundColliderPart`     | `LSCollider` subclasses and private `LSCompoundCollider` parts     | local center of mass, shape-derived mass distribution, and `Fixed3x3` inertia tensor |
-| 2D     | `ColliderShapeDefinition2D`, `CompoundColliderPart2D` | `LSCollider2D` subclasses and private `LSCompoundCollider2D` parts | local center of mass, area, and scalar moment of inertia                             |
+| 3D     | `ColliderShapeDefinition`, `CompoundColliderPart`     | built-in `LSCollider` implementations and private `LSCompoundCollider` parts     | local center of mass, shape-derived mass distribution, and `Fixed3x3` inertia tensor |
+| 2D     | `ColliderShapeDefinition2D`, `CompoundColliderPart2D` | built-in `LSCollider2D` implementations and private `LSCompoundCollider2D` parts | local center of mass, area, and scalar moment of inertia                             |
 
 3D compound assets should serialize `CompoundColliderPart` values, not private
 runtime part colliders. `LSCompoundCollider` aggregates private parts in stable

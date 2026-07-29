@@ -31,8 +31,8 @@ public sealed partial class GravitasQueryMixedService
             MixedEmbedded2DGeometry.GetClosestAnchorOnEmbeddedVolume(
                 collider,
                 sweepCenter);
-        // Accepted exact and conservative reducers bound each anchor component
-        // by the admitted sphere expansion.
+        // Exact reducers bound each anchor component by the admitted sphere
+        // expansion.
         _ = anchor2D.TryGetOffsetFrom(
             sweepCenter,
             out Vector3d to2D);

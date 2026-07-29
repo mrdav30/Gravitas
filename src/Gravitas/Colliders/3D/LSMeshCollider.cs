@@ -15,7 +15,7 @@ using System.Runtime.CompilerServices;
 
 namespace Gravitas.Colliders;
 
-public class LSMeshCollider : LSCollider
+public sealed class LSMeshCollider : LSCollider
 {
     private readonly SwiftList<int> _triangleQueryBuffer = new();
 

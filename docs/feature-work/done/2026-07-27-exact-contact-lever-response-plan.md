@@ -178,12 +178,12 @@ arithmetic, xUnit v3, BenchmarkDotNet, Gravitas 2D/3D/mixed solvers and CCD.
 - Modify: `docs/feature-work/issue-tracker.md`
 - Modify: this plan
 
-- [ ] Replace the far-circle public-point fallback with an exact semantic
+- [x] Replace the far-circle public-point fallback with an exact semantic
   boundary operation; do not catch exceptions or synthesize saturated points.
-- [ ] Run complete locally linked `Release`, `ReleaseLean`, replay, allocation,
+- [x] Run complete locally linked `Release`, `ReleaseLean`, replay, allocation,
   benchmark, and 100% coverage gates across FixedMathSharp and Gravitas.
-- [ ] Compare like-for-like benchmark medians and record regressions honestly.
-- [ ] Complete final code review, resolve material findings, move the tracker
+- [x] Compare like-for-like benchmark medians and record regressions honestly.
+- [x] Complete final code review, resolve material findings, move the tracker
   issue to resolved history, and move this plan to `done`.
 
 ## Current Status
@@ -201,7 +201,9 @@ arithmetic, xUnit v3, BenchmarkDotNet, Gravitas 2D/3D/mixed solvers and CCD.
   authored compound paths now retain semantic mass points and exact positive
   weights through final center, mass distribution, and parallel-axis
   materialization.
-- [ ] Phase 5 pending.
+- [x] Phase 5 complete: mixed boundary selection, public 2D compound selection,
+  collider authoring boundaries, release gates, documentation, and independent
+  review are closed.
 
 ## Evidence To Date
 
@@ -327,3 +329,37 @@ arithmetic, xUnit v3, BenchmarkDotNet, Gravitas 2D/3D/mixed solvers and CCD.
   zero-area parity, analytic shell-tensor and translation-invariance coverage,
   preservation of scalar total/frontal-area parity, and removal of the
   duplicate triangle-area pass. No material Phase 4 finding remains.
+- FixedMathSharp adds exact squared-distance comparison between 2D point
+  anchors. All anchors share one fixed denominator, so the implementation
+  compares existing signed-576-bit squared coordinate numerators directly
+  without a new public wide type, cross-ratio product, or allocation.
+- Mixed embedded 2D boundary selection now keeps circle, capsule, box, polygon,
+  and compound features semantic until the selected contact anchor is
+  returned. Far-domain compound selection uses exact distance ordering and
+  retains the first authored part on ties. The public 2D compound
+  `GetClosestPoint(...)` follows the same path.
+- The public runtime collider hierarchies are closed. Engine and application
+  adapters construct built-in colliders through
+  `ColliderShapeDefinition*.CreateCollider()`; unknown friend-only shapes fail
+  explicitly instead of entering a conservative public-point fallback.
+  Removing that obsolete extension behavior deleted the mixed prism-bounds
+  query fallback and repurposed or deleted five stale custom-shape tests.
+- The retained exact compound-query benchmark reports short-run medians of
+  `25.160 ms` for 64 targets and `412.322 ms` for 1,024 targets with zero
+  managed allocation. An attempted scalar-distance fast path measured
+  `26.972 ms` and `450.454 ms`, respectively, so it was removed rather than
+  hiding a `7.2-9.2%` regression behind simpler-looking arithmetic.
+- Final FixedMathSharp Release passes `2,638/2,638`; ReleaseLean passes
+  `2,617/2,617`. Coverage is `47,462/47,462` lines, `8,732/8,732` branches,
+  and `3,500/3,500` methods.
+- Final Gravitas Release passes `3,776/3,776`; ReleaseLean passes
+  `3,721/3,721`. Focused replay and allocation gates pass `84/84` and `5/5`.
+  Coverage is `40,072/40,072` lines, `12,365/12,365` branches, and
+  `4,368/4,368` methods.
+- FixedMathSharp and Gravitas `Release` and `ReleaseLean` packages build both
+  target frameworks without warnings or errors.
+- Independent final review found and closed public 2D compound distance
+  saturation, incomplete hierarchy sealing, the obsolete mixed public-point
+  fallback, and one weak symmetric exactness regression. Its separate 3D
+  closest-surface finding is merged into the active 3D overlap/surface issue
+  rather than expanding this phase.

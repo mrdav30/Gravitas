@@ -75,8 +75,7 @@ internal static class MixedEmbedded2DGeometry
             if (TryGetPlanarBoundaryAnchor(
                     embedded,
                     planarPoint,
-                    out ContactAnchor2D closestPlanar,
-                    out _))
+                    out ContactAnchor2D closestPlanar))
             {
                 return EmbedPlanarAnchor(
                     closestPlanar,
@@ -84,16 +83,8 @@ internal static class MixedEmbedded2DGeometry
                     closestYOffset);
             }
 
-            Vector2d fallback = embedded.GetClosestPoint(planarPoint);
-            return new ContactAnchor(
-                new Vector3d(
-                    fallback.X,
-                    embedded.MixedSlabCenterY,
-                    fallback.Y),
-                new Vector3d(
-                    Fixed64.Zero,
-                    closestYOffset,
-                    Fixed64.Zero));
+            throw new InvalidOperationException(
+                "Committed embedded 2D geometry has no semantic boundary anchor.");
         }
 
         bool upperYBoundary = signedCenterOffset > Fixed64.Zero;
@@ -113,12 +104,14 @@ internal static class MixedEmbedded2DGeometry
                 yBoundaryOffset,
                 Fixed64.Zero));
 
-        if (TryGetPlanarBoundaryAnchor(
-                embedded,
-                planarPoint,
-                out ContactAnchor2D planarBoundary,
-                out Fixed64 planarDistance)
-            && planarDistance < bestDistance)
+        // A point inside an admitted built-in shape is no farther from its
+        // nearest boundary than that shape's representable dimensions.
+        _ = TryGetPlanarBoundaryAnchor(
+            embedded,
+            planarPoint,
+            out ContactAnchor2D planarBoundary,
+            out Fixed64 planarDistance);
+        if (planarDistance < bestDistance)
         {
             closest = EmbedPlanarAnchor(
                 planarBoundary,
@@ -154,6 +147,23 @@ internal static class MixedEmbedded2DGeometry
                 out distance)
             && anchor.TryGetWorldPoint(out boundary))
         {
+            return true;
+        }
+
+        boundary = default;
+        return false;
+    }
+
+    public static bool TryGetPlanarBoundaryAnchor(
+        LSCollider2D embedded,
+        Vector2d point,
+        out ContactAnchor2D boundary)
+    {
+        if (embedded.TryGetClosestBoundaryAnchor(
+                point,
+                out FixedPointAnchor2d anchor))
+        {
+            boundary = new ContactAnchor2D(anchor);
             return true;
         }
 

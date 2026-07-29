@@ -117,58 +117,72 @@ public abstract partial class LSCollider2D
 
     internal bool TryGetClosestBoundaryAnchor(
         Vector2d point,
-        out FixedPointAnchor2d boundary,
-        out Fixed64 distance)
+        out FixedPointAnchor2d boundary)
     {
         switch (this)
         {
             case LSCircleCollider2D circle:
-                return TryGetRoundBoundaryAnchor(
+                boundary = GetRoundBoundaryAnchor(
                     circle.Center,
                     circle.Rotation,
                     Vector2d.Forward,
                     Fixed64.Zero,
                     circle.ScaledRadius,
                     point,
-                    Vector2d.Right,
-                    out boundary,
-                    out distance);
+                    Vector2d.Right);
+                return true;
             case LSCapsuleCollider2D capsule:
-                return TryGetRoundBoundaryAnchor(
+                boundary = GetRoundBoundaryAnchor(
                     capsule.Center,
                     capsule.Rotation,
                     Vector2d.Forward,
                     capsule.AxisLength,
                     capsule.ScaledRadius,
                     point,
-                    capsule.GetNormalFromCenteredAxis(point),
-                    out boundary,
-                    out distance);
+                    capsule.GetNormalFromCenteredAxis(point));
+                return true;
             case LSAABBoxCollider2D box:
                 return TryGetAABoxBoundaryAnchor(
                     box,
                     point,
-                    out boundary,
-                    out distance);
+                    out boundary);
             case LSPolygonCollider2D polygon:
                 return TryGetConvexBoundaryAnchor(
                     polygon.Center,
                     polygon.Rotation,
                     polygon.ScaledLocalVertices,
                     point,
-                    out boundary,
-                    out distance);
+                    out boundary);
             case LSCompoundCollider2D compound:
                 return TryGetCompoundBoundaryAnchor(
                     compound,
                     point,
-                    out boundary,
-                    out distance);
+                    out boundary);
             default:
                 boundary = default;
-                distance = default;
                 return false;
         }
+    }
+
+    internal bool TryGetClosestBoundaryAnchor(
+        Vector2d point,
+        out FixedPointAnchor2d boundary,
+        out Fixed64 distance)
+    {
+        if (TryGetClosestBoundaryAnchor(
+                point,
+                out boundary)
+            && TryGetAnchorDistance(
+                point,
+                boundary,
+                out distance))
+        {
+            return true;
+        }
+
+        boundary = default;
+        distance = default;
+        return false;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -179,16 +193,14 @@ public abstract partial class LSCollider2D
             ConvexRotation,
             out vertex);
 
-    private static bool TryGetRoundBoundaryAnchor(
+    private static FixedPointAnchor2d GetRoundBoundaryAnchor(
         Vector2d center,
         Fixed64 rotation,
         Vector2d localAxis,
         Fixed64 axisLength,
         Fixed64 radius,
         Vector2d point,
-        Vector2d fallbackNormal,
-        out FixedPointAnchor2d boundary,
-        out Fixed64 distance)
+        Vector2d fallbackNormal)
     {
         Vector2d normal = FixedSegment2d.GetDirectionFromCenteredAxis(
             point,
@@ -198,41 +210,22 @@ public abstract partial class LSCollider2D
         if (normal == Vector2d.Zero)
             normal = fallbackNormal;
 
-        if (Vector2d.TryRotate(
-                normal,
-                -rotation,
-                out Vector2d localNormal))
-        {
-            localNormal = localNormal.Normalized;
-            FixedPointAnchor2d candidate =
-                FixedSegment2d.GetSurfaceAnchorOnCenteredCapsule(
-                    point,
-                    center,
-                    rotation,
-                    localAxis,
-                    axisLength,
-                    radius,
-                    localNormal);
-            if (TryGetAnchorDistance(
-                    point,
-                    candidate,
-                    out distance))
-            {
-                boundary = candidate;
-                return true;
-            }
-        }
-
-        boundary = default;
-        distance = default;
-        return false;
+        Vector2d localNormal =
+            Vector2d.Rotate(normal, -rotation).Normalized;
+        return FixedSegment2d.GetSurfaceAnchorOnCenteredCapsule(
+            point,
+            center,
+            rotation,
+            localAxis,
+            axisLength,
+            radius,
+            localNormal);
     }
 
     private static bool TryGetAABoxBoundaryAnchor(
         LSAABBoxCollider2D box,
         Vector2d point,
-        out FixedPointAnchor2d boundary,
-        out Fixed64 distance)
+        out FixedPointAnchor2d boundary)
     {
         Vector2d halfExtents = box.ScaledHalfExtents;
         Span<Vector2d> offsets = stackalloc Vector2d[4];
@@ -245,8 +238,7 @@ public abstract partial class LSCollider2D
             Fixed64.Zero,
             offsets,
             point,
-            out boundary,
-            out distance);
+            out boundary);
     }
 
     private static bool TryGetConvexBoundaryAnchor(
@@ -254,41 +246,32 @@ public abstract partial class LSCollider2D
         Fixed64 rotation,
         ReadOnlySpan<Vector2d> offsets,
         Vector2d point,
-        out FixedPointAnchor2d boundary,
-        out Fixed64 distance)
+        out FixedPointAnchor2d boundary)
     {
-        FixedPointAnchor2d candidate =
+        boundary =
             FixedConvex2dRelations.GetClosestPointAnchor(
                 point,
                 center,
                 rotation,
                 offsets);
-        if (TryGetAnchorDistance(
-                point,
-                candidate,
-                out distance))
-        {
-            boundary = candidate;
-            return true;
-        }
-
-        boundary = default;
-        distance = default;
-        return false;
+        return true;
     }
 
     private static bool TryGetCompoundBoundaryAnchor(
         LSCompoundCollider2D compound,
         Vector2d point,
-        out FixedPointAnchor2d boundary,
-        out Fixed64 distance)
+        out FixedPointAnchor2d boundary)
     {
+        var reference = new FixedPointAnchor2d(
+            point,
+            Fixed64.Zero,
+            Vector2d.Zero);
         if (TryGetCompoundBoundaryAnchor(
                 compound,
                 point,
+                reference,
                 containingPartsOnly: true,
-                out boundary,
-                out distance))
+                out boundary))
         {
             return true;
         }
@@ -296,38 +279,39 @@ public abstract partial class LSCollider2D
         return TryGetCompoundBoundaryAnchor(
             compound,
             point,
+            reference,
             containingPartsOnly: false,
-            out boundary,
-            out distance);
+            out boundary);
     }
 
     private static bool TryGetCompoundBoundaryAnchor(
         LSCompoundCollider2D compound,
         Vector2d point,
+        in FixedPointAnchor2d reference,
         bool containingPartsOnly,
-        out FixedPointAnchor2d boundary,
-        out Fixed64 distance)
+        out FixedPointAnchor2d boundary)
     {
         boundary = default;
-        distance = default;
         bool found = false;
-        Fixed64 bestDistance = Fixed64.MaxValue;
         for (int i = 0; i < compound.PartCount; i++)
         {
             LSCollider2D part = compound.GetPartCollider(i);
-            if ((containingPartsOnly && !part.ContainsPoint(point))
-                || !part.TryGetClosestBoundaryAnchor(
-                    point,
-                    out FixedPointAnchor2d candidate,
-                    out Fixed64 candidateDistance)
-                || (found && candidateDistance >= bestDistance))
+            if (containingPartsOnly && !part.ContainsPoint(point))
+                continue;
+
+            // Compound definitions materialize only built-in semantic shapes.
+            _ = part.TryGetClosestBoundaryAnchor(
+                point,
+                out FixedPointAnchor2d candidate);
+            if (found
+                && reference.CompareSquaredDistance(
+                    candidate,
+                    boundary) >= 0)
             {
                 continue;
             }
 
             boundary = candidate;
-            distance = candidateDistance;
-            bestDistance = candidateDistance;
             found = true;
         }
 

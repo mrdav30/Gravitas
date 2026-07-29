@@ -160,6 +160,34 @@ If no voxel exists for a collider's bounds, the collider cannot be distributed
 into partitions and will not participate in partition-backed collision/query
 work for that area.
 
+### Collider Authoring And Adapter Boundary
+
+`LSCollider` and `LSCollider2D` are public polymorphic runtime types, not
+extension points for engine-owned geometry. Gravitas owns their concrete shape
+implementations and keeps their base constructors assembly-only so every
+registered collider has a supported deterministic geometry contract.
+
+Engine adapters should translate host collider assets into the data-only shape
+definitions, then create an unbound runtime collider:
+
+```csharp
+ColliderShapeDefinition shape =
+    ColliderShapeDefinition.Sphere(
+        Fixed64.Half,
+        PhysicsMaterial.Default);
+LSCollider collider = shape.CreateCollider();
+
+ColliderShapeDefinition2D shape2D =
+    ColliderShapeDefinition2D.Circle(Fixed64.Half);
+LSCollider2D collider2D = shape2D.CreateCollider();
+```
+
+The definitions snapshot mesh and polygon inputs and validate dimensions before
+creating the matching Gravitas-owned runtime shape. Direct construction of
+`LSSphereCollider`, `LSCircleCollider2D`, and the other concrete types remains
+available when an adapter already knows the exact shape. No engine reference,
+reflection, or custom collider subclass is required.
+
 ### Dynamic 3D Body
 
 Dynamic 3D matter usually has a host agent, one `LSCollider`, and one

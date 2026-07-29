@@ -260,19 +260,30 @@ public sealed class GravitasDiagnosticSinkTests
             acceptedHits: 0,
             fallbackHits: 0,
             rejectedConservativeCandidates: 0);
+        scenario.Context.Diagnostics.EmitQuerySummary(
+            GravitasColliderDimension.ThreeD,
+            GravitasColliderDimension.TwoD,
+            Vector3d.Zero,
+            Vector3d.Right,
+            exactReducerAttempts: 0,
+            acceptedHits: 1,
+            fallbackHits: 1,
+            rejectedConservativeCandidates: 0);
         scenario.Context.Diagnostics.EmitContact(pair, hit: false);
 
         ReadOnlySpan<GravitasDiagnosticEvent> events = scenario.Context.Diagnostics.Events;
-        events.Length.Should().Be(3);
+        events.Length.Should().Be(4);
         events[0].Kind.Should().Be(GravitasDiagnosticEventKind.CircleQuery);
         events[0].ColliderAId.Should().Be(-1);
         events[0].ColliderAType.Should().Be(ColliderType.None);
         events[0].Hit.Should().BeFalse();
         events[1].Kind.Should().Be(GravitasDiagnosticEventKind.QuerySummary);
         events[1].Hit.Should().BeFalse();
-        events[2].Kind.Should().Be(GravitasDiagnosticEventKind.Contact);
-        events[2].Hit.Should().BeFalse();
-        events[2].DataA.Should().Be(0);
+        events[2].Kind.Should().Be(GravitasDiagnosticEventKind.QuerySummary);
+        events[2].Hit.Should().BeTrue();
+        events[3].Kind.Should().Be(GravitasDiagnosticEventKind.Contact);
+        events[3].Hit.Should().BeFalse();
+        events[3].DataA.Should().Be(0);
     }
 
     [Fact]

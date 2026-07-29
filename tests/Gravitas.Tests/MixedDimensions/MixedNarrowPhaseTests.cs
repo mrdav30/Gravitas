@@ -633,60 +633,77 @@ public sealed partial class MixedNarrowPhaseTests
     }
 
     [Fact]
-    public void SphereCustom2DSlab_WithDegenerateClosestPoint_ShouldUseDeterministicFallbackNormal()
+    public void SphereCircleSlab_WithSubEpsilonCoincidentBoundary_ShouldUseDeterministicFallbackNormal()
     {
         using GravitasWorldContext context = CreateMixedContext();
-        ScenarioBody<LSSphereCollider> sphere = CreateSphere3D(context, Vector3d.Zero);
-        SolidBody2D custom = CreateBody2D(context, new UnsupportedTestCollider2D(), Vector2d.Zero);
+        ScenarioBody<LSSphereCollider> sphere = CreateSphere3D(
+            context,
+            -Vector3d.Up * Fixed64.MinIncrement);
+        var circle = new LSCircleCollider2D(Fixed64.Half)
+        {
+            MixedHalfThicknessOverride = Fixed64.MinIncrement
+        };
+        SolidBody2D embedded = CreateBody2D(
+            context,
+            circle,
+            Vector2d.Zero);
 
-        bool collided = CollisionDetectionMixed.TryCollide(sphere.Collider, custom.Collider, out MixedContact contact);
+        bool collided = CollisionDetectionMixed.TryCollide(
+            sphere.Collider,
+            embedded.Collider,
+            out MixedContact contact);
 
         collided.Should().BeTrue();
         contact.HasContact.Should().BeTrue();
         contact.Normal3DTo2D.Should().Be(Vector3d.Right);
-        contact.Point3D.Should().Be(Vector3d.Right * Fixed64.Half);
-        contact.Point2D.Should().Be(Vector3d.Zero);
+        contact.Point3D.Should().Be(
+            sphere.Body.Position3d + Vector3d.Right * Fixed64.Half);
+        contact.Point2D.Should().Be(sphere.Body.Position3d);
     }
 
     [Fact]
-    public void SphereCustom2DSlab_WithDegenerateClosestPointAndOffsetCenter_ShouldUseCenterFallbackNormal()
+    public void SphereCircleSlab_WithCoincidentLowerFace_ShouldUseCenterFallbackNormal()
     {
         using GravitasWorldContext context = CreateMixedContext();
-        ScenarioBody<LSSphereCollider> sphere = CreateSphere3D(context, Vector3d.Zero);
-        SolidBody2D custom = CreateBody2D(
+        ScenarioBody<LSSphereCollider> sphere = CreateSphere3D(
             context,
-            new UnsupportedTestCollider2D(),
-            new Vector2d(Fixed64.Zero, Fixed64.One));
+            -Vector3d.Up);
+        var circle = new LSCircleCollider2D(Fixed64.Half)
+        {
+            MixedHalfThicknessOverride = Fixed64.One
+        };
+        SolidBody2D embedded = CreateBody2D(
+            context,
+            circle,
+            Vector2d.Zero);
 
-        bool collided = CollisionDetectionMixed.TryCollide(sphere.Collider, custom.Collider, out MixedContact contact);
+        bool collided = CollisionDetectionMixed.TryCollide(
+            sphere.Collider,
+            embedded.Collider,
+            out MixedContact contact);
 
         collided.Should().BeTrue();
         contact.HasContact.Should().BeTrue();
-        contact.Normal3DTo2D.Should().Be(Vector3d.Forward);
-        contact.Point3D.Should().Be(Vector3d.Forward * Fixed64.Half);
-        contact.Point2D.Should().Be(Vector3d.Zero);
+        contact.Normal3DTo2D.Should().Be(Vector3d.Up);
+        contact.Point3D.Should().Be(-Vector3d.Up * Fixed64.Half);
+        contact.Point2D.Should().Be(-Vector3d.Up);
     }
 
     [Fact]
-    public void SphereCustomContaining2DSlab_WithoutPlanarBoundary_ShouldRetainVerticalBoundary()
+    public void SphereCircleContainingSlab_WithNearerVerticalBoundary_ShouldRetainVerticalBoundary()
     {
         using GravitasWorldContext context = CreateMixedContext();
         ScenarioBody<LSSphereCollider> sphere = CreateSphere3D(context, Vector3d.Zero);
-        SolidBody2D custom = CreateBody2D(
+        SolidBody2D embedded = CreateBody2D(
             context,
-            new UnsupportedTestCollider2D(containsPoints: true),
+            new LSCircleCollider2D((Fixed64)2),
             Vector2d.Zero);
 
-        custom.Collider.ContainsPoint(Vector2d.Zero).Should().BeTrue();
-        MixedEmbedded2DGeometry.TryGetPlanarBoundaryPoint(
-            custom.Collider,
-            Vector2d.Zero,
-            out _,
-            out _).Should().BeFalse();
+        embedded.Collider.ContainsPoint(Vector2d.Zero).Should().BeTrue();
 
         CollisionDetectionMixed.TryCollide(
             sphere.Collider,
-            custom.Collider,
+            embedded.Collider,
             out MixedContact contact).Should().BeTrue();
 
         contact.Normal3DTo2D.Should().Be(-Vector3d.Up);

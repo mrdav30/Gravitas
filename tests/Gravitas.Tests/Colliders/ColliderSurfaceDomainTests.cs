@@ -30,7 +30,7 @@ public sealed class ColliderSurfaceDomainTests
     }
 
     [Fact]
-    public void Round2DSurfacesAtScalarFace_ShouldRejectUnrepresentableClosestPoints()
+    public void Round2DSurfacesAtScalarFace_ShouldRejectOnlyUnrepresentableClosestPoints()
     {
         using GravitasWorldContext context = CreatePositiveScalarFaceContext();
         var circle = new LSCircleCollider2D(Fixed64.Half);
@@ -41,10 +41,10 @@ public sealed class ColliderSurfaceDomainTests
         FluentActions.Invoking(() => circle.GetClosestPoint(circle.Center))
             .Should().Throw<InvalidOperationException>()
             .WithMessage("*outside*coordinate*domain*");
-        FluentActions.Invoking(() => circle.GetClosestPoint(
-                new Vector2d(Fixed64.MinValue, Fixed64.Zero)))
-            .Should().Throw<InvalidOperationException>()
-            .WithMessage("*outside*coordinate*domain*");
+        circle.GetClosestPoint(
+                new Vector2d(Fixed64.MinValue, Fixed64.Zero))
+            .Should().Be(
+                circle.Center - Vector2d.Right * Fixed64.Half);
         FluentActions.Invoking(() => capsule.GetClosestPoint(capsule.Center))
             .Should().Throw<InvalidOperationException>()
             .WithMessage("*outside*coordinate*domain*");
@@ -94,6 +94,10 @@ public sealed class ColliderSurfaceDomainTests
                 Vector2d.One));
         Initialize(context, collider);
 
+        FluentActions.Invoking(() =>
+                collider.GetClosestPoint(collider.Center))
+            .Should().Throw<InvalidOperationException>()
+            .WithMessage("*outside*coordinate*domain*");
         collider.TryGetClosestBoundaryAnchor(
                 new Vector2d(Fixed64.MinValue, Fixed64.Zero),
                 out _,
