@@ -458,10 +458,14 @@ BenchmarkDotNet, `Release` and `ReleaseLean` package variants.
 - Create under:
   `F:/gamedevrepos/FixedMathSharp/src/FixedMathSharp/Geometry/Anchors/Wide`
   - `WidePointAnchor3d.cs`
+  - `WidePointAnchor3d.Exact.cs`
+  - `WidePointAnchor3d.Distance.cs`
   - `WidePointAnchor2d.cs`
   - `WideLever3d.cs`
-  - `WideLever2d.cs`
-  - `WideRationalBasis3d.cs` only when required by the extracted 3D operations.
+- Create:
+  `F:/gamedevrepos/FixedMathSharp/src/FixedMathSharp/Geometry/Wide/WideRationalBasis3d.cs`
+  because the exact quaternion basis is shared by anchor and non-anchor
+  geometry.
 - Modify:
   `F:/gamedevrepos/FixedMathSharp/src/FixedMathSharp/Geometry/Anchors/FixedPointAnchor.cs`
 - Modify:
@@ -488,42 +492,83 @@ BenchmarkDotNet, `Release` and `ReleaseLean` package variants.
 
 - `WidePointAnchor3d` and `WidePointAnchor2d` own anchor construction,
   validation, term reduction, distance ordering, and relative-ratio extraction.
-- `WideLever3d` and `WideLever2d` own policy-neutral exact lever algebra.
+- `WideLever3d` owns policy-neutral exact 3D lever algebra. The temporary
+  unreleased `FixedLever2d` value owns its small algebra surface directly;
+  no `WideLever2d` exists only to forward the same operations before Phase 4
+  removes that public type.
 - The few exact ratio primitives required by Gravitas are `internal`; public
   semantic methods continue to delegate to these owners.
 - No solver-response DTO, restitution coefficient, impulse accumulator, or
   friction coefficient enters these FixedMathSharp owners.
 
-- [ ] Add or identify focused tests that exercise every public semantic anchor
+- [x] Add or identify focused tests that exercise every public semantic anchor
   and lever operation through ordinary, full-domain, mirrored, degenerate,
   uninitialized, final-overflow, and deterministic-tie cases.
-- [ ] Move 3D point-anchor term construction, reduction, distance ordering, and
+- [x] Move 3D point-anchor term construction, reduction, distance ordering, and
   relative-ratio operations out of `WideOrientedBox`.
-- [ ] Move 2D point-anchor term and lever operations out of
+- [x] Move 2D point-anchor term and lever operations out of
   `WideVector2dTransform`.
-- [ ] Move policy-neutral 3D lever materialization, relative point-velocity
+- [x] Move policy-neutral 3D lever materialization, relative point-velocity
   ratio, cross-product quadratic-form ratio, and transformed cross-product
   arithmetic into `WideLever3d`.
-- [ ] Promote only the extracted operations Gravitas needs from `private` to
+- [x] Promote only the extracted operations Gravitas needs from `private` to
   `internal`. Keep implementation details private when they do not cross the
   assembly boundary.
-- [ ] Extract `WideRationalBasis3d` from `WideOrientedBox` only if the anchor
+- [x] Extract `WideRationalBasis3d` from `WideOrientedBox` only if the anchor
   and lever code otherwise remains coupled to a private nested basis. Do not
   add a generalized rational-vector framework.
-- [ ] Update all FixedMathSharp callers to use the new owners and confirm no
+- [x] Update all FixedMathSharp callers to use the new owners and confirm no
   anchor/lever method still delegates through `WideOrientedBox` or
   `WideVector2dTransform`.
-- [ ] Keep the existing FixedMathSharp response APIs temporarily operational
+- [x] Keep the existing FixedMathSharp response APIs temporarily operational
   by routing them through the new policy-neutral owners. Their removal belongs
   to Phase 4 after Gravitas parity is proven.
-- [ ] Run all FixedMathSharp `Release`, `ReleaseLean`, coverage, and
+- [x] Run all FixedMathSharp `Release`, `ReleaseLean`, coverage, and
   point-anchor benchmark gates.
-- [ ] Require 100% line, branch, and method coverage and zero managed
+- [x] Require 100% line, branch, and method coverage and zero managed
   allocation.
-- [ ] Request independent review focused on semantic parity, accessibility
+- [x] Request independent review focused on semantic parity, accessibility
   breadth, wide-type leakage, and whether any new owner exists only for naming
   rather than a real responsibility.
-- [ ] Update this plan with results and pause for owner review.
+- [x] Update this plan with results and pause for owner review.
+
+**Phase 2 result (2026-07-29):**
+
+- Exact 3D anchor construction, reduction, reframing, projection, distance
+  ordering, and relative-ratio extraction now belong to
+  `WidePointAnchor3d`. Policy-neutral 3D lever materialization, point-velocity,
+  quadratic-form, and transformed-cross arithmetic now belong to
+  `WideLever3d`.
+- Exact 2D anchor work now belongs to `WidePointAnchor2d`.
+  `WideVector2dTransform` retains only general transform kernels. The small
+  temporary `FixedLever2d` algebra surface stays directly on that unreleased
+  value rather than adding a hollow `WideLever2d` immediately before Phase 4
+  removes the public type.
+- The quaternion-derived rational basis is a shared
+  `Geometry/Wide/WideRationalBasis3d` owner because 29 anchor and non-anchor
+  geometry files consume it. Its duplicate raw `Fixed64` product was replaced
+  by the canonical `Fixed64.GetExactRawProduct`.
+- The extraction exposed repeated two- and three-product sums plus a 3D dot
+  product. `WideArithmetic.Signed320` now owns those operations directly;
+  finite-axis and anchor/oriented-box callers no longer route through local
+  arithmetic copies. The migrated response paths also call the existing
+  magnitude-zero owner directly.
+- No public signature, serialized layout, branch, collection, allocation, or
+  deterministic ordering contract changed. The production source is seven
+  lines smaller overall despite the explicit owner files.
+- Focused anchor, lever, and finite-axis validation passes 354/354.
+  Complete FixedMathSharp `Release` passes 2,651/2,651 and `ReleaseLean`
+  passes 2,630/2,630. Locally linked Gravitas passes 3,776/3,776 in `Release`
+  and 3,721/3,721 in `ReleaseLean`.
+- Authoritative `Release` coverage remains exactly 100%: 47,318/47,318 lines,
+  8,672/8,672 branches, and 3,488/3,488 methods. The CRAP scan reports no
+  coverage-amplified risk; its 11 flags are fully covered complexity floors.
+- All 13 `PointAnchorBenchmarks` ShortRun rows remain allocation-free. The
+  migrated 3D rows are flat or faster than the Phase 0 baseline. The isolated
+  2D squared-cross sample remains within the Phase 0 confidence interval, so
+  no speculative optimization was added.
+- Independent 2D and 3D reviews found no semantic, width, sign, argument-order,
+  accessibility, public-leakage, allocation, or stale-forwarding defect.
 
 ## Phase 3: Move Physics-Specific Exact Semantics Into Gravitas
 
