@@ -225,8 +225,8 @@ internal static class ExactContactLever2D
                 out spatialLinear);
         Vector3d spatialAngular = Vector3d.Zero;
         bool angularResolved = !body.CanRotate
-            || WideLever3d.TryGetTransformedWeightedCrossProduct(
-                lever.Value,
+            || ExactLever3D.TryGetTransformedWeightedCrossProduct(
+                lever,
                 firstAxis,
                 firstScale,
                 secondAxis,

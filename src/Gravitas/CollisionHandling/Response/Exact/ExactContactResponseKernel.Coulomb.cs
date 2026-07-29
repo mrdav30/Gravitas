@@ -433,13 +433,13 @@ internal static partial class ExactContactResponseKernel
         if (!inputsValid)
             return false;
 
-        _ = WideLever3d.TryGetRelativePointVelocityRatio(
+        _ = ExactLever3D.TryGetRelativePointVelocityRatio(
             first.LinearVelocity,
             first.AngularVelocity,
-            first.Lever.Value,
+            first.Lever,
             second.LinearVelocity,
             second.AngularVelocity,
-            second.Lever.Value,
+            second.Lever,
             constraint.Normal,
             out Signed832 velocityNumerator,
             out Signed832 velocityDenominator);
@@ -528,13 +528,13 @@ internal static partial class ExactContactResponseKernel
         numerator.Clear();
         denominator.Clear();
         sign = 0;
-        _ = WideLever3d.TryGetRelativePointVelocityRatio(
+        _ = ExactLever3D.TryGetRelativePointVelocityRatio(
             first.LinearVelocity,
             first.AngularVelocity,
-            first.Lever.Value,
+            first.Lever,
             second.LinearVelocity,
             second.AngularVelocity,
-            second.Lever.Value,
+            second.Lever,
             tangent,
             out Signed832 velocityNumerator,
             out Signed832 velocityDenominator);
@@ -944,15 +944,15 @@ internal static partial class ExactContactResponseKernel
         ReadOnlySpan<ulong> radicand,
         out Vector3d result)
     {
-        WideLever3d.GetTransformedCrossProduct(
-            lever.Value,
+        ExactLever3D.GetTransformedCrossProduct(
+            lever,
             primaryAxis,
             inverseInertia,
             out Signed832 primaryX,
             out Signed832 primaryY,
             out Signed832 primaryZ);
-        WideLever3d.GetTransformedCrossProduct(
-            lever.Value,
+        ExactLever3D.GetTransformedCrossProduct(
+            lever,
             secondaryAxis,
             inverseInertia,
             out Signed832 secondaryX,

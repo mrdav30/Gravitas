@@ -112,14 +112,12 @@ BenchmarkDotNet, `Release` and `ReleaseLean` package variants.
 5. `WideOrientedBox` must not remain the hidden owner of general point-anchor,
    lever, or rigid-body response arithmetic. `WideVector2dTransform` must not
    remain the hidden owner of 2D point-anchor response arithmetic.
-6. FixedMathSharp will introduce only focused internal owners required by
-   current behavior:
+6. FixedMathSharp introduces only focused internal owners required by
+   standard math and geometry behavior:
    - `WidePointAnchor3d`
    - `WidePointAnchor2d`
-   - `WideLever3d`
-   - `WideLever2d`
-   - `WideRationalBasis3d` only if extracting the current shared rational basis
-     is required to remove the unrelated partial dependency.
+   - `WideRationalBasis3d`
+   Rigid-body lever storage and arithmetic belong to Gravitas.
 7. The exact class split may use non-partial types or cohesive partials based on
    file size, but no broad `WidePhysics`, generic expression framework, dynamic
    word collection, or one-interface/one-implementation abstraction is added.
@@ -461,7 +459,8 @@ BenchmarkDotNet, `Release` and `ReleaseLean` package variants.
   - `WidePointAnchor3d.Exact.cs`
   - `WidePointAnchor3d.Distance.cs`
   - `WidePointAnchor2d.cs`
-  - `WideLever3d.cs`
+  - `WideLever3d.cs` as a temporary extraction removed by the Phase 4 fast
+    follow once its only live consumer was Gravitas.
 - Create:
   `F:/gamedevrepos/FixedMathSharp/src/FixedMathSharp/Geometry/Wide/WideRationalBasis3d.cs`
   because the exact quaternion basis is shared by anchor and non-anchor
@@ -492,9 +491,10 @@ BenchmarkDotNet, `Release` and `ReleaseLean` package variants.
 
 - `WidePointAnchor3d` and `WidePointAnchor2d` own anchor construction,
   validation, term reduction, distance ordering, and relative-ratio extraction.
-- `WideLever3d` owns policy-neutral exact 3D lever algebra. The temporary
-  unreleased `FixedLever2d` value owns its small algebra surface directly;
-  no `WideLever2d` exists only to forward the same operations before Phase 4
+- `WideLever3d` temporarily owns exact 3D lever algebra until Phase 4 can move
+  the sole surviving rigid-body consumer into Gravitas. The temporary
+  unreleased `FixedLever2d` value owns its small algebra surface directly; no
+  `WideLever2d` exists only to forward the same operations before Phase 4
   removes that public type.
 - The few exact ratio primitives required by Gravitas are `internal`; public
   semantic methods continue to delegate to these owners.
@@ -536,9 +536,9 @@ BenchmarkDotNet, `Release` and `ReleaseLean` package variants.
 
 - Exact 3D anchor construction, reduction, reframing, projection, distance
   ordering, and relative-ratio extraction now belong to
-  `WidePointAnchor3d`. Policy-neutral 3D lever materialization, point-velocity,
-  quadratic-form, and transformed-cross arithmetic now belong to
-  `WideLever3d`.
+  `WidePointAnchor3d`. Phase 2 temporarily placed 3D lever materialization,
+  point-velocity, quadratic-form, and transformed-cross arithmetic in
+  `WideLever3d`; Phase 4 later moved that single-consumer owner into Gravitas.
 - Exact 2D anchor work now belongs to `WidePointAnchor2d`.
   `WideVector2dTransform` retains only general transform kernels. The small
   temporary `FixedLever2d` algebra surface stays directly on that unreleased
@@ -698,9 +698,9 @@ BenchmarkDotNet, `Release` and `ReleaseLean` package variants.
   single Gravitas implementation.
 - Gravitas now owns exact mass points, weights, weighted centers, parallel-axis
   composition, polygon mass policy, and triangle-shell surface inertia.
-  FixedMathSharp supplies only signed-wide arithmetic and the minimum
-  policy-neutral lever, rational-basis, triangle-normal, and polygon-area
-  mechanics required by those consumers.
+  FixedMathSharp supplies signed-wide arithmetic plus point-anchor,
+  rational-basis, triangle-normal, and polygon-area mechanics. The temporary
+  wide-lever owner was subsequently moved into Gravitas during Phase 4.
 - No Gravitas production, test, or benchmark reference remains to the old
   FixedMathSharp lever-response or mass-property façades. The intermediate v7
   FixedMathSharp surface remains only until its planned Phase 4 deletion.
@@ -773,36 +773,90 @@ BenchmarkDotNet, `Release` and `ReleaseLean` package variants.
 - Gravitas-owned regression coverage for every unique response contract worth
   retaining.
 
-- [ ] Remove the four response methods from `FixedLever`.
-- [ ] Delete the four intermediate v7 public response DTOs.
-- [ ] Delete the intermediate public lever, mass-point, and mass-weight types
+- [x] Remove the four response methods from `FixedLever`.
+- [x] Delete the four intermediate v7 public response DTOs.
+- [x] Delete the intermediate public lever, mass-point, and mass-weight types
   after every Gravitas caller uses its downstream owner.
-- [ ] Remove FixedMathSharp's physics-specific triangle/polygon mass and
+- [x] Remove FixedMathSharp's physics-specific triangle/polygon mass and
   inertia surface without narrating discarded intermediate v7 APIs as a v6
   migration.
-- [ ] Delete FixedMathSharp's normal and Coulomb response implementations after
+- [x] Delete FixedMathSharp's normal and Coulomb response implementations after
   confirming no production caller remains.
-- [ ] Audit the approximately 1,482 lines of FixedMathSharp response tests.
+- [x] Audit the approximately 1,482 lines of FixedMathSharp response tests.
   Move only unique physical or arithmetic regressions into Gravitas; delete
   duplicates already proven by Gravitas response, replay, and allocation
   suites.
-- [ ] Keep focused FixedMathSharp tests for the policy-neutral internal
+- [x] Keep focused FixedMathSharp tests for the policy-neutral internal
   arithmetic that remains. Do not retain solver terminology solely to preserve
   deleted test cases.
-- [ ] Update the v6-to-v7 migration guide to describe the final semantic lever
+- [x] Update the v6-to-v7 migration guide to describe the final semantic lever
   and mass-property surface. Do not add a migration step saying unreleased v7
   response APIs were removed.
-- [ ] Confirm no `FixedLeverResponse*`, `FixedLeverNormalConstraint*`, or
+- [x] Confirm no `FixedLeverResponse*`, `FixedLeverNormalConstraint*`, or
   `FixedLever.TryGet*Coulomb*Response` reference remains anywhere in the
   locally linked stack.
-- [ ] Run complete FixedMathSharp and Gravitas `Release` and `ReleaseLean`
+- [x] Run complete FixedMathSharp and Gravitas `Release` and `ReleaseLean`
   suites.
-- [ ] Generate coverage for both repositories and require 100% line, branch,
+- [x] Generate coverage for both repositories and require 100% line, branch,
   and method coverage.
-- [ ] Re-run response allocation and benchmark gates to prove deleting the old
+- [x] Re-run response allocation and benchmark gates to prove deleting the old
   façade did not alter runtime behavior.
-- [ ] Request independent public-surface and ownership review.
-- [ ] Update this plan with results and pause for owner review.
+- [x] Request independent public-surface and ownership review.
+- [x] Update this plan with results and pause for owner review.
+
+### Phase 4 Evidence
+
+- FixedMathSharp's intermediate public `FixedLever*`, `FixedMassPoint*`, and
+  `FixedMassWeight` types, response DTOs, normal/Coulomb solvers, and
+  mass-property façade implementations are gone. The phase removes 6,838 net
+  lines across production, tests, benchmarks, and documentation without adding
+  a replacement physics abstraction.
+- FixedPoint anchors, contact anchors, and ordinary polygon area/centroid
+  relations remain policy-neutral FixedMathSharp geometry. The Phase 4 fast
+  follow moved `WideLever3d` and `WideLever3dValue` into Gravitas's existing
+  `ExactLever3D` because Gravitas was their only live runtime consumer.
+  Unused lever-vector, cross-projection, and sum-scaled helper branches were
+  deleted instead of preserved for symmetry.
+- The duplicated FixedMathSharp solver and mass-property suites were deleted.
+  FixedMathSharp regressions now cover only retained arithmetic, point-anchor,
+  full-domain narrowing, area, centroid, winding, and allocation contracts.
+  Gravitas directly covers exact lever relative-velocity, transformed-cross,
+  response, and allocation behavior. No API-shape or reflection-only absence
+  test was added.
+- FixedMathSharp's v6-to-v7 migration guide now presents only the final v7
+  geometric anchor surface. Gravitas's collision-pipeline documentation names
+  the downstream exact lever, mass-point, mass-weight, and response owners.
+- A complete source/test/wiki scan of FixedMathSharp, Gravitas,
+  SwiftCollections, GridForge, and TrailBlazer finds no stale intermediate
+  response or mass type reference. A separate signature scan finds no
+  FixedMathSharp `Signed*`, `WideArithmetic`, or `Wide*` type in a Gravitas
+  public or protected declaration.
+- The fast follow removes another 1,073 net FixedMathSharp lines while
+  retaining the shared `Signed832` multiplication oracle in its existing
+  wide-arithmetic suite.
+- FixedMathSharp `Release` passes 2,590 core plus 8 Chronicler tests;
+  `ReleaseLean` passes 2,569 core plus 8 Chronicler tests. Gravitas `Release`
+  passes 3,818 tests; `ReleaseLean` passes 3,763 tests.
+- FixedMathSharp coverage is exactly 44,235/44,235 lines, 8,398/8,398
+  branches, and 3,316/3,316 methods. Gravitas coverage is exactly
+  42,858/42,858 lines, 12,629/12,629 branches, and 4,498/4,498 methods.
+  CRAP analysis reports only fully covered complexity floors: 10 in
+  FixedMathSharp and 27 in Gravitas.
+- Focused exact-response validation passes 82 tests, the direct exact-lever
+  contract passes 4 tests, and all 6 warmed response allocation assertions
+  pass.
+- All 24 prepared 3D response benchmark rows and all 8 mixed response rows
+  report zero managed allocation in separate out-of-process runs. Timing
+  remains a comparison signal rather than an absolute throughput claim because
+  ShortRun produced expected noise, including one 64-pair distinct-face and one
+  64-pair distinct-island outlier.
+- Standard and Lean packages build both `net8.0` and `netstandard2.1`.
+  FixedMathSharp is warning-free; Gravitas Lean reports only the established
+  local-link MemoryPack shim type-conflict warnings.
+- The original independent public-surface and ownership review found no
+  critical, important, or minor issue. The Phase 4 fast-follow review found one
+  missing different-anchor-frame regression; that unique test moved downstream
+  and the reviewer confirmed the final diff is clean.
 
 ## Phase 5: Mechanical Directory And Partial Ownership Cleanup
 
@@ -946,7 +1000,7 @@ Geometry/
 - [x] Phase 1 proven wide-arithmetic duplication consolidated.
 - [x] Phase 2 policy-neutral anchor and lever owners extracted.
 - [x] Phase 3 Gravitas exact response policy migrated and parity-proven.
-- [ ] Phase 4 intermediate v7 FixedMathSharp response surface removed.
+- [x] Phase 4 intermediate v7 FixedMathSharp response surface removed.
 - [ ] Phase 5 directory and partial ownership cleanup complete.
 - [ ] Phase 6 documentation, package, and cross-stack closure complete.
 

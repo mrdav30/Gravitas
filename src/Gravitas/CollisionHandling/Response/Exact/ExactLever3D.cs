@@ -14,29 +14,51 @@ namespace Gravitas.CollisionHandling;
 /// Represents a rigid-body contact lever without narrowing its point-anchor
 /// displacement to the Q32.32 scalar domain.
 /// </summary>
-internal readonly struct ExactLever3D
+internal readonly partial struct ExactLever3D
 {
-    private readonly WideLever3dValue _value;
-
-    private ExactLever3D(in WideLever3dValue value)
+    private ExactLever3D(
+        Signed576 xNumerator,
+        Signed576 yNumerator,
+        Signed576 zNumerator,
+        Signed576 denominator)
     {
-        _value = value;
+        XNumerator = xNumerator;
+        YNumerator = yNumerator;
+        ZNumerator = zNumerator;
+        Denominator = denominator;
     }
 
-    internal WideLever3dValue Value => _value;
+    internal Signed576 XNumerator { get; }
 
-    internal Signed576 XNumerator => _value.XNumerator;
+    internal Signed576 YNumerator { get; }
 
-    internal Signed576 YNumerator => _value.YNumerator;
+    internal Signed576 ZNumerator { get; }
 
-    internal Signed576 ZNumerator => _value.ZNumerator;
-
-    internal Signed576 Denominator => _value.Denominator;
+    internal Signed576 Denominator { get; }
 
     internal static ExactLever3D Create(
         in FixedPointAnchor point,
-        in FixedPointAnchor center) =>
-        new(WideLever3d.GetValue(point, center));
+        in FixedPointAnchor center)
+    {
+        WidePointAnchor3d.GetExactRelativeOffsetRatio(
+            point.Origin,
+            point.Rotation,
+            point.LocalPoint,
+            point.LocalDisplacement,
+            point.LocalTranslation,
+            point.ExactLocalTerm,
+            center.Origin,
+            center.Rotation,
+            center.LocalPoint,
+            center.LocalDisplacement,
+            center.LocalTranslation,
+            center.ExactLocalTerm,
+            out Signed576 x,
+            out Signed576 y,
+            out Signed576 z,
+            out Signed576 denominator);
+        return new ExactLever3D(x, y, z, denominator);
+    }
 
     internal static ExactLever3D CreateXZ(
         in FixedPointAnchor2d point,
@@ -57,10 +79,9 @@ internal readonly struct ExactLever3D
             out Signed320 z,
             out Signed320 denominator);
         return new ExactLever3D(
-            new WideLever3dValue(
-                Signed576.ExtendValue(x),
-                default,
-                Signed576.ExtendValue(z),
-                Signed576.ExtendValue(denominator)));
+            Signed576.ExtendValue(x),
+            default,
+            Signed576.ExtendValue(z),
+            Signed576.ExtendValue(denominator));
     }
 }

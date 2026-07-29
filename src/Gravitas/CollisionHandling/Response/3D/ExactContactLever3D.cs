@@ -115,13 +115,13 @@ internal static class ExactContactLever3D
         in ExactLever3D relativeContactPointB,
         Vector3d normal,
         out Fixed64 normalVelocity) =>
-        WideLever3d.TryGetRelativePointVelocityProjection(
+        ExactLever3D.TryGetRelativePointVelocityProjection(
             linearVelocityA,
             angularVelocityA,
-            relativeContactPointA.Value,
+            relativeContactPointA,
             linearVelocityB,
             angularVelocityB,
-            relativeContactPointB.Value,
+            relativeContactPointB,
             normal,
             out normalVelocity);
 
@@ -186,8 +186,8 @@ internal static class ExactContactLever3D
         if (body?.CanRotate != true)
             return true;
 
-        if (!WideLever3d.TryGetCrossProductQuadraticForm(
-                relativeContactPoint.Value,
+        if (!ExactLever3D.TryGetCrossProductQuadraticForm(
+                relativeContactPoint,
                 axis,
                 body.GetConstrainedInverseInertiaTensor(),
                 out denominator))
@@ -207,8 +207,8 @@ internal static class ExactContactLever3D
     {
         velocityDelta = Vector3d.Zero;
         return body?.CanRotate != true
-            || WideLever3d.TryGetTransformedScaledCrossProduct(
-                relativeContactPoint.Value,
+            || ExactLever3D.TryGetTransformedScaledCrossProduct(
+                relativeContactPoint,
                 impulse,
                 body.GetConstrainedInverseInertiaTensor(),
                 Fixed64.One,
@@ -313,8 +313,8 @@ internal static class ExactContactLever3D
     {
         velocityDelta = Vector3d.Zero;
         return body?.CanRotate != true
-            || WideLever3d.TryGetTransformedWeightedCrossProduct(
-                    relativeContactPoint.Value,
+            || ExactLever3D.TryGetTransformedWeightedCrossProduct(
+                    relativeContactPoint,
                     firstAxis,
                     firstScale,
                     secondAxis,

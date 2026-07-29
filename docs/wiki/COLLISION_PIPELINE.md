@@ -134,13 +134,16 @@ throw when the requested view is not representable; domain-edge callers should
 use `TryGetOffset` and the matching `TryGetPoint*` method.
 
 Response keeps materialized 2D/3D lever vectors as the ordinary fast path and
-reconstructs a semantic `FixedLever2d` or `FixedLever` from the contact anchors
-only when the complete compact expression cannot be proven representable.
-Point velocity, effective mass, warm-start completion, friction, and final
-body deltas then remain exact through one final checked narrowing. Compound
-mass properties use `FixedMassPoint`, `FixedMassPoint2d`, and
-`FixedMassWeight` for the equivalent weighted-center and parallel-axis
+reconstructs a Gravitas-owned `ExactLever3D` from contact anchors only when the
+complete compact expression cannot be proven representable. Point velocity,
+effective mass, warm-start completion, friction, and final body deltas then
+remain exact through one final checked narrowing. Compound mass properties use
+the Gravitas-owned `ExactMassPoint3D`, `ExactMassPoint2D`, and
+`ExactMassWeight` types for the equivalent weighted-center and parallel-axis
 contract; no saturated child center or weight is admitted as physical data.
+These internal physics semantics consume FixedMathSharp's policy-neutral wide
+arithmetic through the intentional friend-assembly boundary and never enter
+Gravitas public signatures.
 
 Embedded 2D mixed volumes also select planar boundary anchors semantically.
 Built-in circles, capsules, boxes, polygons, and compounds therefore do not
