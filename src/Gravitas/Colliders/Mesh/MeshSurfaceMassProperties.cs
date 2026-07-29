@@ -58,11 +58,11 @@ public readonly struct MeshSurfaceMassProperties
         ReadOnlySpan<Vector3d> localVertices,
         ReadOnlySpan<int> triangles,
         Fixed64 totalArea,
-        out FixedMassWeight totalWeight,
+        out ExactMassWeight totalWeight,
         out MeshSurfaceMassProperties properties)
     {
         properties = default;
-        if (!FixedTriangle.TryGetUniformShellMassProperties(
+        if (!TriangleShellMassProperties.TryCreateUniformShell(
                 localVertices,
                 triangles,
                 out totalWeight,

@@ -634,11 +634,11 @@ public sealed class ColliderExactScaleAdmissionTests
         internal static Vector2d ClampForTest(Vector2d value) =>
             ClampNearZero(value);
 
-        internal override FixedMassWeight CalculateAreaForMassProperties() =>
-            FixedMassWeight.Zero;
+        internal override ExactMassWeight CalculateAreaForMassProperties() =>
+            ExactMassWeight.Zero;
 
-        internal override FixedMassWeight CalculatePreparedAreaForMassProperties() =>
-            FixedMassWeight.Zero;
+        internal override ExactMassWeight CalculatePreparedAreaForMassProperties() =>
+            ExactMassWeight.Zero;
 
         private protected override void PrepareShape(
             in ColliderShapeSnapshot2D snapshot) =>

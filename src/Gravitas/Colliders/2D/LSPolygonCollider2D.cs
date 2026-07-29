@@ -136,7 +136,7 @@ public sealed class LSPolygonCollider2D : LSCollider2D, IConvexVertexSource2D
             _scaledLocalVertices,
             direction);
 
-    internal override FixedMassPoint2d CalculateLocalMassPoint()
+    internal override ExactMassPoint2D CalculateLocalMassPoint()
     {
         _ = TryCalculateIntrinsicSignedAreaAndCentroid(
             out _,
@@ -144,9 +144,9 @@ public sealed class LSPolygonCollider2D : LSCollider2D, IConvexVertexSource2D
         return TransformRelativeMassPropertyPointExact(intrinsicCentroid);
     }
 
-    internal override FixedMassPoint2d CalculatePreparedLocalMassPoint()
+    internal override ExactMassPoint2D CalculatePreparedLocalMassPoint()
     {
-        _ = FixedConvex2dRelations.TryGetMassWeightAndCentroid(
+        _ = PolygonMassProperties2D.TryGetWeightAndCentroid(
             _scaledLocalVerticesScratch,
             out _,
             out Vector2d intrinsicCentroid);
@@ -154,21 +154,21 @@ public sealed class LSPolygonCollider2D : LSCollider2D, IConvexVertexSource2D
             intrinsicCentroid);
     }
 
-    internal override FixedMassWeight CalculateAreaForMassProperties()
+    internal override ExactMassWeight CalculateAreaForMassProperties()
     {
         ReadOnlySpan<Vector2d> vertices = GetMassPropertyVertices();
-        _ = FixedConvex2dRelations.TryGetMassWeightAndCentroid(
+        _ = PolygonMassProperties2D.TryGetWeightAndCentroid(
             vertices,
-            out FixedMassWeight weight,
+            out ExactMassWeight weight,
             out _);
         return weight;
     }
 
-    internal override FixedMassWeight CalculatePreparedAreaForMassProperties()
+    internal override ExactMassWeight CalculatePreparedAreaForMassProperties()
     {
-        _ = FixedConvex2dRelations.TryGetMassWeightAndCentroid(
+        _ = PolygonMassProperties2D.TryGetWeightAndCentroid(
             _scaledLocalVerticesScratch,
-            out FixedMassWeight weight,
+            out ExactMassWeight weight,
             out _);
         return weight;
     }

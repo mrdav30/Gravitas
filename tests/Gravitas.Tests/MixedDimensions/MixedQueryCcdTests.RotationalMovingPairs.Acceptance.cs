@@ -219,7 +219,7 @@ public sealed partial class MixedQueryCcdTests
         var sourceCollider = new UnsupportedTestCollider3D
         {
             InertiaTensor = Fixed3x3.Identity,
-            MassPropertyWeight = FixedMassWeight.One
+            MassPropertyWeight = ExactMassWeight.One
         };
         ScenarioBody<UnsupportedTestCollider3D> blade = CreateBody3D(
             context,

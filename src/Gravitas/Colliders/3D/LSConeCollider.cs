@@ -107,7 +107,7 @@ public sealed class LSConeCollider : LSCollider
         Area = _preparedVolume;
     }
 
-    protected internal override FixedMassWeight CalculateMassPropertyWeight()
+    internal override ExactMassWeight CalculateMassPropertyWeight()
     {
         Fixed64 radius = HasCommittedShape
             ? ScaledRadius
@@ -115,28 +115,28 @@ public sealed class LSConeCollider : LSCollider
         Fixed64 height = HasCommittedShape
             ? Height
             : GetCurrentHeight();
-        return FixedMassWeight.FromProduct(
+        return ExactMassWeight.FromProduct(
             Fixed64.Pi / (Fixed64)3,
             radius,
             radius,
             height);
     }
 
-    internal override FixedMassWeight CalculatePreparedMassPropertyWeight() =>
-        FixedMassWeight.FromProduct(
+    internal override ExactMassWeight CalculatePreparedMassPropertyWeight() =>
+        ExactMassWeight.FromProduct(
             Fixed64.Pi / (Fixed64)3,
             _preparedRadius,
             _preparedRadius,
             _preparedHeight);
 
-    internal override FixedMassPoint CalculateLocalMassPoint() =>
+    internal override ExactMassPoint3D CalculateLocalMassPoint() =>
         TransformRelativeMassPropertyPointExact(
             GetLocalCenterOfMass(
                 HasCommittedShape
                     ? Height
                     : GetCurrentHeight()));
 
-    internal override FixedMassPoint CalculatePreparedLocalMassPoint() =>
+    internal override ExactMassPoint3D CalculatePreparedLocalMassPoint() =>
         TransformPreparedRelativeMassPropertyPointExact(
             GetLocalCenterOfMass(_preparedHeight));
 

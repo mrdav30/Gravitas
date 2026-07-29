@@ -22,8 +22,8 @@ public sealed class LSCompoundCollider2D : LSCollider2D
 {
     private readonly CompoundColliderPart2D[] _parts;
     private readonly LSCollider2D[] _partColliders;
-    private readonly FixedMassPoint2d[] _massPointScratch;
-    private readonly FixedMassWeight[] _massWeightScratch;
+    private readonly ExactMassPoint2D[] _massPointScratch;
+    private readonly ExactMassWeight[] _massWeightScratch;
     private readonly ContactManifold2D _partManifoldScratch = new();
 
     public LSCompoundCollider2D(params CompoundColliderPart2D[] parts)
@@ -36,8 +36,8 @@ public sealed class LSCompoundCollider2D : LSCollider2D
 
         _parts = new CompoundColliderPart2D[parts.Length];
         _partColliders = new LSCollider2D[parts.Length];
-        _massPointScratch = new FixedMassPoint2d[parts.Length];
-        _massWeightScratch = new FixedMassWeight[parts.Length];
+        _massPointScratch = new ExactMassPoint2D[parts.Length];
+        _massWeightScratch = new ExactMassWeight[parts.Length];
         for (int i = 0; i < parts.Length; i++)
         {
             _parts[i] = parts[i];
@@ -132,19 +132,19 @@ public sealed class LSCompoundCollider2D : LSCollider2D
         return bestPoint;
     }
 
-    internal override FixedMassPoint2d CalculateLocalMassPoint() =>
+    internal override ExactMassPoint2D CalculateLocalMassPoint() =>
         CalculateAggregateMassPoint(usePrepared: false);
 
-    internal override FixedMassPoint2d CalculatePreparedLocalMassPoint() =>
+    internal override ExactMassPoint2D CalculatePreparedLocalMassPoint() =>
         CalculateAggregateMassPoint(usePrepared: true);
 
-    private FixedMassPoint2d CalculateAggregateMassPoint(bool usePrepared)
+    private ExactMassPoint2D CalculateAggregateMassPoint(bool usePrepared)
     {
         bool hasPositiveWeight = false;
         for (int i = 0; i < _partColliders.Length; i++)
         {
             LSCollider2D partCollider = _partColliders[i];
-            FixedMassWeight weight = usePrepared
+            ExactMassWeight weight = usePrepared
                 ? partCollider.CalculatePreparedAreaForMassProperties()
                 : partCollider.CalculateAreaForMassProperties();
             _massPointScratch[i] = usePrepared
@@ -157,10 +157,10 @@ public sealed class LSCompoundCollider2D : LSCollider2D
         if (!hasPositiveWeight)
         {
             for (int i = 0; i < _massWeightScratch.Length; i++)
-                _massWeightScratch[i] = FixedMassWeight.One;
+                _massWeightScratch[i] = ExactMassWeight.One;
         }
 
-        if (!FixedMassPoint2d.TryGetWeightedAverage(
+        if (!ExactMassPoint2D.TryGetWeightedAverage(
             _massPointScratch,
             _massWeightScratch,
             out Vector2d center))
@@ -170,21 +170,21 @@ public sealed class LSCompoundCollider2D : LSCollider2D
                     ? "Prepared 2D compound mass-property point is outside the Fixed64 coordinate domain."
                     : "The 2D compound collider's center of mass is outside the Fixed64 coordinate domain.");
         }
-        return FixedMassPoint2d.FromPoint(center);
+        return ExactMassPoint2D.FromPoint(center);
     }
 
-    internal override FixedMassWeight CalculateAreaForMassProperties() =>
+    internal override ExactMassWeight CalculateAreaForMassProperties() =>
         CalculateAggregateMassWeight(usePrepared: false);
 
-    internal override FixedMassWeight CalculatePreparedAreaForMassProperties() =>
+    internal override ExactMassWeight CalculatePreparedAreaForMassProperties() =>
         CalculateAggregateMassWeight(usePrepared: true);
 
-    private FixedMassWeight CalculateAggregateMassWeight(bool usePrepared)
+    private ExactMassWeight CalculateAggregateMassWeight(bool usePrepared)
     {
-        FixedMassWeight totalWeight = FixedMassWeight.Zero;
+        ExactMassWeight totalWeight = ExactMassWeight.Zero;
         for (int i = 0; i < _partColliders.Length; i++)
         {
-            FixedMassWeight weight = usePrepared
+            ExactMassWeight weight = usePrepared
                 ? _partColliders[i].CalculatePreparedAreaForMassProperties()
                 : _partColliders[i].CalculateAreaForMassProperties();
             totalWeight = totalWeight.Add(weight);
@@ -196,11 +196,11 @@ public sealed class LSCompoundCollider2D : LSCollider2D
     internal override Fixed64 CalculateCenterOfMassMoment(Fixed64 mass)
     {
         Vector2d center = CalculateLocalCenterOfMassOffset();
-        FixedMassWeight totalWeight = FixedMassWeight.Zero;
+        ExactMassWeight totalWeight = ExactMassWeight.Zero;
         int residualPartIndex = _partColliders.Length - 1;
         for (int i = 0; i < _partColliders.Length; i++)
         {
-            FixedMassWeight weight =
+            ExactMassWeight weight =
                 _partColliders[i].CalculateAreaForMassProperties();
             totalWeight = totalWeight.Add(weight);
             residualPartIndex = i;
@@ -209,19 +209,19 @@ public sealed class LSCompoundCollider2D : LSCollider2D
         bool useEqualWeights = totalWeight.IsZero;
         if (useEqualWeights)
         {
-            totalWeight = FixedMassWeight.Zero;
+            totalWeight = ExactMassWeight.Zero;
             for (int i = 0; i < _partColliders.Length; i++)
-                totalWeight = totalWeight.Add(FixedMassWeight.One);
+                totalWeight = totalWeight.Add(ExactMassWeight.One);
         }
 
-        FixedMassWeight cumulativeWeight = FixedMassWeight.Zero;
+        ExactMassWeight cumulativeWeight = ExactMassWeight.Zero;
         Fixed64 assignedMass = Fixed64.Zero;
         Fixed64 moment = Fixed64.Zero;
         for (int i = 0; i < _partColliders.Length; i++)
         {
             LSCollider2D part = _partColliders[i];
-            FixedMassWeight weight = useEqualWeights
-                ? FixedMassWeight.One
+            ExactMassWeight weight = useEqualWeights
+                ? ExactMassWeight.One
                 : part.CalculateAreaForMassProperties();
             cumulativeWeight = cumulativeWeight.Add(weight);
             Fixed64 partMass;

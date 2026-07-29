@@ -638,53 +638,98 @@ BenchmarkDotNet, `Release` and `ReleaseLean` package variants.
   semantics without appearing in public host signatures. Their arithmetic
   composes FixedMathSharp internals directly instead of duplicating limb math.
 
-- [ ] Add `[assembly: InternalsVisibleTo("Gravitas")]` to FixedMathSharp's
+- [x] Add `[assembly: InternalsVisibleTo("Gravitas")]` to FixedMathSharp's
   existing friend declaration file. Do not add friend entries for Gravitas
   tests or benchmarks.
-- [ ] Add internal Gravitas response value types in separate files. Preserve
+- [x] Add internal Gravitas response value types in separate files. Preserve
   existing projection flags, atomic final-delta semantics, and optional
   diagnostic projections without exposing FixedMathSharp wide types.
-- [ ] Move the semantic 3D lever into Gravitas and remove the unused 2D public
+- [x] Move the semantic 3D lever into Gravitas and remove the unused 2D public
   counterpart unless migration demonstrates a real independent need.
-- [ ] Move mass points, mass weights, weighted centers, parallel-axis
+- [x] Move mass points, mass weights, weighted centers, parallel-axis
   composition, and surface-inertia policy into Gravitas. Retain only general
   weighted arithmetic and signed-wide mechanics in FixedMathSharp.
-- [ ] Port the exact normal-response algorithm into
+- [x] Port the exact normal-response algorithm into
   `ExactContactResponseKernel.Normal.cs`, retaining validation for normalized
   axes, nonnegative restitution/thresholds, accumulated-impulse bounds,
   mobility-projected axes, and all-or-nothing final velocity materialization.
-- [ ] Port line and disk Coulomb response into
+- [x] Port line and disk Coulomb response into
   `ExactContactResponseKernel.Coulomb.cs`, retaining orthogonality,
   participant-consistency, static/dynamic friction, accumulator clamping, and
   atomic final-delta semantics.
-- [ ] Use direct internal FixedMathSharp calls from the kernel. Do not copy limb
+- [x] Use direct internal FixedMathSharp calls from the kernel. Do not copy limb
   arithmetic, add a Gravitas wide façade, or expose internal FixedMathSharp
   values beyond the exact response subsystem.
-- [ ] Migrate pure 3D callers to the Gravitas response values and kernel.
-- [ ] Migrate pure 2D callers through the existing X/Z embedding and signed
+- [x] Migrate pure 3D callers to the Gravitas response values and kernel.
+- [x] Migrate pure 2D callers through the existing X/Z embedding and signed
   angular convention without creating a second 2D solver implementation.
-- [ ] Migrate mixed response, warm starts, friction, replay-visible state, and
+- [x] Migrate mixed response, warm starts, friction, replay-visible state, and
   rotational CCD callers.
-- [ ] While the old FixedMathSharp response entry points still exist, add
+- [x] While the old FixedMathSharp response entry points still exist, add
   temporary parity coverage comparing normal, accumulated-normal, line-
   friction, and disk-friction success/failure and every returned field across:
   ordinary inputs, full-domain levers, different denominators, separating
   contacts, stale accumulators, frozen/bodyless participants, mirrored scalar
   faces, diagnostic projection overflow, and true final overflow.
-- [ ] Convert parity cases to stable Gravitas-owned expected-result assertions
+- [x] Convert parity cases to stable Gravitas-owned expected-result assertions
   before Phase 4 removes the old FixedMathSharp oracle calls. Do not leave tests
   that merely prove a type or method exists.
-- [ ] Run focused 2D, 3D, mixed, warm-start, rotational CCD, replay, and
+- [x] Run focused 2D, 3D, mixed, warm-start, rotational CCD, replay, and
   allocation tests in `Release` and `ReleaseLean`.
-- [ ] Re-run both response benchmark classes against the Phase 0 baseline.
+- [x] Re-run both response benchmark classes against the Phase 0 baseline.
   Require zero allocation and investigate any material regression in inlining,
   bounds checks, or `stackalloc` pressure before proceeding.
-- [ ] Generate Gravitas coverage and require 100% line, branch, and method
+- [x] Generate Gravitas coverage and require 100% line, branch, and method
   coverage.
-- [ ] Request independent physics and code-ownership review. Verify restitution
+- [x] Request independent physics and code-ownership review. Verify restitution
   and friction policy exists only in Gravitas and raw wide mechanics exist only
   in FixedMathSharp.
-- [ ] Update this plan with results and pause for owner review.
+- [x] Update this plan with results and pause for owner review.
+
+### Phase 3 Evidence
+
+- FixedMathSharp now friends exactly `Gravitas` in addition to its existing
+  tests and benchmarks. `Gravitas.Tests` and `Gravitas.Benchmarks` remain
+  non-friends, and no raw wide type appears in a Gravitas public, protected,
+  serialized, or host-facing signature.
+- `ExactContactResponseKernel` and its internal response values now own normal,
+  accumulated-normal, line-friction, and disk-friction policy. Pure 3D, X/Z-
+  embedded 2D, mixed response, warm starts, and rotational CCD all use this
+  single Gravitas implementation.
+- Gravitas now owns exact mass points, weights, weighted centers, parallel-axis
+  composition, polygon mass policy, and triangle-shell surface inertia.
+  FixedMathSharp supplies only signed-wide arithmetic and the minimum
+  policy-neutral lever, rational-basis, triangle-normal, and polygon-area
+  mechanics required by those consumers.
+- No Gravitas production, test, or benchmark reference remains to the old
+  FixedMathSharp lever-response or mass-property façades. The intermediate v7
+  FixedMathSharp surface remains only until its planned Phase 4 deletion.
+- Temporary oracle comparisons were converted to stable Gravitas-owned
+  behavioral expectations. Coverage hardening also deleted unused scalar mass
+  composition methods and the unreachable exact-lever admission branch rather
+  than adding hollow tests.
+- FixedMathSharp passes 2,643 core plus 8 Chronicler tests in `Release` and
+  2,622 plus 8 in `ReleaseLean`. Authoritative merged coverage is exactly
+  47,345/47,345 lines, 8,674/8,674 branches, and 3,492/3,492 methods.
+- Gravitas passes 3,814 tests in `Release` and 3,759 in `ReleaseLean`.
+  Authoritative coverage is exactly 42,472/42,472 lines, 12,617/12,617
+  branches, and 4,487/4,487 methods.
+- CRAP analysis reports no coverage-amplified risk. FixedMathSharp's 11 and
+  Gravitas's 27 flagged methods are fully covered complexity floors.
+- All 24 `CollisionResponseBenchmarks` rows and all 8
+  `MixedCollisionResponseBenchmarks` rows remain allocation-free. The isolated
+  mixed rerun measured 1.366-2.831 ms for prepared pairs and 3.802-6.457 ms for
+  island iterations, consistent with the Phase 0 ranges after ShortRun noise.
+- Standard and Lean packages build both `net8.0` and `netstandard2.1`.
+  FixedMathSharp builds warning-free; Gravitas Lean retains only the known
+  local-link MemoryPack shim type-conflict warnings.
+- Independent physics and ownership review found no critical or important
+  issue. Its three source-hygiene notes were applied: the 2D adapter summary,
+  ASCII copyright headers, and unused geometry imports.
+- `ExactContactResponseKernel.Coulomb.cs` is 1,299 lines, just above the review
+  warning. It remains one cohesive, measured, allocation-free fixed-width
+  solver for this phase; Phase 5 will reassess its navigation after the old
+  FixedMathSharp implementation is removed.
 
 ## Phase 4: Remove The Intermediate v7 FixedMathSharp Physics Surface
 
@@ -899,8 +944,8 @@ Geometry/
 - [x] Phase 0 semantic keep/move recommendations approved and later phase
   ownership revised to match.
 - [x] Phase 1 proven wide-arithmetic duplication consolidated.
-- [ ] Phase 2 policy-neutral anchor and lever owners extracted.
-- [ ] Phase 3 Gravitas exact response policy migrated and parity-proven.
+- [x] Phase 2 policy-neutral anchor and lever owners extracted.
+- [x] Phase 3 Gravitas exact response policy migrated and parity-proven.
 - [ ] Phase 4 intermediate v7 FixedMathSharp response surface removed.
 - [ ] Phase 5 directory and partial ownership cleanup complete.
 - [ ] Phase 6 documentation, package, and cross-stack closure complete.

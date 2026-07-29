@@ -20,29 +20,29 @@ internal static class ExactContactLever3D
         SolidBody? bodyA,
         Vector3d linearVelocityA,
         Vector3d angularVelocityA,
-        in FixedLever relativeContactPointA,
+        in ExactLever3D relativeContactPointA,
         SolidBody? bodyB,
         Vector3d linearVelocityB,
         Vector3d angularVelocityB,
-        in FixedLever relativeContactPointB,
+        in ExactLever3D relativeContactPointB,
         Vector3d normal,
         Fixed64 restitution,
         Fixed64 restitutionVelocityThreshold,
-        out FixedLeverNormalResponse3d response)
+        out ExactNormalResponse3D response)
     {
-        FixedLeverResponseOperand3d first = CreateResponseOperand(
+        ExactContactResponseOperand3D first = CreateResponseOperand(
             bodyA,
             linearVelocityA,
             angularVelocityA,
             relativeContactPointA,
             -normal);
-        FixedLeverResponseOperand3d second = CreateResponseOperand(
+        ExactContactResponseOperand3D second = CreateResponseOperand(
             bodyB,
             linearVelocityB,
             angularVelocityB,
             relativeContactPointB,
             normal);
-        return FixedLever.TryGetNormalResponse(
+        return ExactContactResponseKernel.TryGetNormalResponse(
             first,
             second,
             normal,
@@ -55,32 +55,32 @@ internal static class ExactContactLever3D
         SolidBody? bodyA,
         Vector3d linearVelocityA,
         Vector3d angularVelocityA,
-        in FixedLever relativeContactPointA,
+        in ExactLever3D relativeContactPointA,
         SolidBody? bodyB,
         Vector3d linearVelocityB,
         Vector3d angularVelocityB,
-        in FixedLever relativeContactPointB,
+        in ExactLever3D relativeContactPointB,
         Vector3d normal,
         Fixed64 restitution,
         Fixed64 restitutionVelocityThreshold,
         Fixed64 accumulatedImpulse,
         Fixed64 positiveImpulseScale,
         Fixed64 negativeImpulseScale,
-        out FixedLeverNormalResponse3d response)
+        out ExactNormalResponse3D response)
     {
-        FixedLeverResponseOperand3d first = CreateResponseOperand(
+        ExactContactResponseOperand3D first = CreateResponseOperand(
             bodyA,
             linearVelocityA,
             angularVelocityA,
             relativeContactPointA,
             -normal);
-        FixedLeverResponseOperand3d second = CreateResponseOperand(
+        ExactContactResponseOperand3D second = CreateResponseOperand(
             bodyB,
             linearVelocityB,
             angularVelocityB,
             relativeContactPointB,
             normal);
-        return FixedLever.TryGetAccumulatedNormalResponse(
+        return ExactContactResponseKernel.TryGetAccumulatedNormalResponse(
             first,
             second,
             normal,
@@ -92,11 +92,11 @@ internal static class ExactContactLever3D
             out response);
     }
 
-    internal static FixedLeverResponseOperand3d CreateResponseOperand(
+    internal static ExactContactResponseOperand3D CreateResponseOperand(
         SolidBody? body,
         Vector3d linearVelocity,
         Vector3d angularVelocity,
-        in FixedLever relativeContactPoint,
+        in ExactLever3D relativeContactPoint,
         Vector3d signedNormal) =>
         new(
             relativeContactPoint,
@@ -109,27 +109,27 @@ internal static class ExactContactLever3D
     internal static bool TryComputeNormalVelocity(
         Vector3d linearVelocityA,
         Vector3d angularVelocityA,
-        in FixedLever relativeContactPointA,
+        in ExactLever3D relativeContactPointA,
         Vector3d linearVelocityB,
         Vector3d angularVelocityB,
-        in FixedLever relativeContactPointB,
+        in ExactLever3D relativeContactPointB,
         Vector3d normal,
         out Fixed64 normalVelocity) =>
-        FixedLever.TryGetRelativePointVelocityProjection(
+        WideLever3d.TryGetRelativePointVelocityProjection(
             linearVelocityA,
             angularVelocityA,
-            relativeContactPointA,
+            relativeContactPointA.Value,
             linearVelocityB,
             angularVelocityB,
-            relativeContactPointB,
+            relativeContactPointB.Value,
             normal,
             out normalVelocity);
 
     internal static bool TryComputeDenominator(
         SolidBody? bodyA,
-        in FixedLever relativeContactPointA,
+        in ExactLever3D relativeContactPointA,
         SolidBody? bodyB,
-        in FixedLever relativeContactPointB,
+        in ExactLever3D relativeContactPointB,
         Vector3d axis,
         out Fixed64 denominator)
     {
@@ -146,9 +146,9 @@ internal static class ExactContactLever3D
 
     internal static bool TryComputeDenominatorTerms(
         SolidBody? bodyA,
-        in FixedLever relativeContactPointA,
+        in ExactLever3D relativeContactPointA,
         SolidBody? bodyB,
-        in FixedLever relativeContactPointB,
+        in ExactLever3D relativeContactPointB,
         Vector3d axis,
         out ContactEffectiveMassTerms3D denominator)
     {
@@ -178,7 +178,7 @@ internal static class ExactContactLever3D
 
     internal static bool TryGetAngularDenominator(
         SolidBody? body,
-        in FixedLever relativeContactPoint,
+        in ExactLever3D relativeContactPoint,
         Vector3d axis,
         out Fixed64 denominator)
     {
@@ -186,7 +186,8 @@ internal static class ExactContactLever3D
         if (body?.CanRotate != true)
             return true;
 
-        if (!relativeContactPoint.TryGetCrossProductQuadraticForm(
+        if (!WideLever3d.TryGetCrossProductQuadraticForm(
+                relativeContactPoint.Value,
                 axis,
                 body.GetConstrainedInverseInertiaTensor(),
                 out denominator))
@@ -200,15 +201,17 @@ internal static class ExactContactLever3D
 
     internal static bool TryGetAngularVelocityDelta(
         SolidBody? body,
-        in FixedLever relativeContactPoint,
+        in ExactLever3D relativeContactPoint,
         Vector3d impulse,
         out Vector3d velocityDelta)
     {
         velocityDelta = Vector3d.Zero;
         return body?.CanRotate != true
-            || relativeContactPoint.TryGetTransformedScaledCrossProduct(
+            || WideLever3d.TryGetTransformedScaledCrossProduct(
+                relativeContactPoint.Value,
                 impulse,
                 body.GetConstrainedInverseInertiaTensor(),
+                Fixed64.One,
                 Fixed64.One,
                 Fixed64.One,
                 out velocityDelta);
@@ -216,9 +219,9 @@ internal static class ExactContactLever3D
 
     internal static bool TryGetImpulseCombinationVelocityDeltas(
         SolidBody? bodyA,
-        in FixedLever relativeContactPointA,
+        in ExactLever3D relativeContactPointA,
         SolidBody? bodyB,
-        in FixedLever relativeContactPointB,
+        in ExactLever3D relativeContactPointB,
         Vector3d firstAxis,
         Fixed64 firstScale,
         Vector3d secondAxis,
@@ -299,7 +302,7 @@ internal static class ExactContactLever3D
 
     private static bool TryGetAngularCombinationVelocityDelta(
         SolidBody? body,
-        in FixedLever relativeContactPoint,
+        in ExactLever3D relativeContactPoint,
         Vector3d firstAxis,
         Fixed64 firstScale,
         Vector3d secondAxis,
@@ -310,8 +313,8 @@ internal static class ExactContactLever3D
     {
         velocityDelta = Vector3d.Zero;
         return body?.CanRotate != true
-            || relativeContactPoint
-                .TryGetTransformedWeightedCrossProduct(
+            || WideLever3d.TryGetTransformedWeightedCrossProduct(
+                    relativeContactPoint.Value,
                     firstAxis,
                     firstScale,
                     secondAxis,

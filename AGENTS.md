@@ -335,6 +335,59 @@ The main external packages shape how this project should be changed:
   MemoryPack dependencies or isolate them behind `GRAVITAS_DISABLE_MEMORYPACK`
   compatible files.
 
+### FixedMathSharp Internal Friendship Boundary
+
+FixedMathSharp intentionally grants `InternalsVisibleTo("Gravitas")`. This is a
+one-way, release-coupled internal ABI between the mathematics and physics
+layers, not a general extension mechanism or a precedent for other LSF
+libraries.
+
+Use this ownership test before adding or moving code:
+
+- FixedMathSharp owns reusable deterministic arithmetic, vectors, matrices,
+  quaternions, computational geometry, exact ratios, fixed-width wide
+  operations, rounding, and final materialization whose contract is meaningful
+  without a physics engine.
+- Gravitas owns rigid-body meaning and policy: bodies, colliders, contacts,
+  mass and inertia interpretation, mobility constraints, impulses, restitution,
+  friction, solver accumulation, warm starts, CCD response, and physics-specific
+  failure or threshold decisions.
+- If a type or method would be awkward or misleading in a general fixed-point
+  math library, keep it in Gravitas and compose the existing FixedMathSharp
+  internals directly. Do not move physics policy upstream to make it reusable.
+
+Promoting a FixedMathSharp member from `private` to `internal` is appropriate
+only when all of the following are true:
+
+- Gravitas has a current production use, not a speculative future use.
+- The operation is policy-neutral math or geometry owned by FixedMathSharp.
+- Its width, sign, rounding, overflow, and failure contract can be stated
+  independently of bodies, colliders, contacts, or solver policy.
+- The narrowest required member or focused owner is promoted; unrelated
+  helpers and private state remain private.
+- FixedMathSharp tests continue to verify the internal arithmetic contract, and
+  Gravitas tests verify the physics semantics built on top of it.
+
+Prefer reusing an existing internal owner, then extracting duplicated
+policy-neutral math into a focused FixedMathSharp internal owner, and only then
+promoting a private member. Do not add a Gravitas wide façade, copy
+`Signed*`/`WideArithmetic` limb mechanics downstream, or create one-line
+forwarders that only hide the real owner.
+
+Keep `Signed192`, `Signed320`, `Signed576`, `Signed704`, `Signed832`,
+`WideArithmetic`, and other FixedMathSharp internals out of Gravitas public and
+protected signatures, serializable layouts, public XML documentation, and
+host-facing APIs. `Gravitas.Tests` and `Gravitas.Benchmarks` must exercise them
+through Gravitas-owned internal behavior; do not request additional
+FixedMathSharp friendship for those assemblies.
+
+Any consumed FixedMathSharp internal change is a coordinated compatibility
+event even when neither public API changes. Update both repositories together,
+retain local project links through validation, preserve 100% reachable line,
+branch, and method coverage, and rerun affected allocation and performance
+gates. Release FixedMathSharp first, then validate Gravitas against the released
+package before releasing Gravitas.
+
 Do not casually replace these with standard floating-point, general-purpose
 collections, or non-deterministic alternatives.
 
@@ -470,6 +523,9 @@ Contributor expectations:
 
 - Add or improve XML `<summary>` tags for public and externally meaningful
   internal APIs when touching them.
+- Put the type-level XML `<summary>` on the main declaration file. Secondary
+  partial declaration files use `<content>` to describe that file's
+  responsibility; do not repeat a `<summary>` that the SDK will ignore.
 - Add brief comments only where logic, invariants, or edge conditions are hard
   to infer from the code alone.
 - Preserve ASCII unless the file already requires otherwise.

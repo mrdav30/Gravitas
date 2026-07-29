@@ -1,4 +1,4 @@
-﻿//=======================================================================
+//=======================================================================
 // LSSphereCollider.cs
 //=======================================================================
 // MIT License, Copyright (c) 2026–present David Oravsky (mrdav30)
@@ -66,15 +66,15 @@ public sealed class LSSphereCollider : LSCollider
         Area = _preparedArea;
     }
 
-    protected internal override FixedMassWeight CalculateMassPropertyWeight() =>
-        FixedMassWeight.FromProduct(
+    internal override ExactMassWeight CalculateMassPropertyWeight() =>
+        ExactMassWeight.FromProduct(
             Fixed64.FromFraction(4, 3) * Fixed64.Pi,
             ScaledRadius,
             ScaledRadius,
             ScaledRadius);
 
-    internal override FixedMassWeight CalculatePreparedMassPropertyWeight() =>
-        FixedMassWeight.FromProduct(
+    internal override ExactMassWeight CalculatePreparedMassPropertyWeight() =>
+        ExactMassWeight.FromProduct(
             Fixed64.FromFraction(4, 3) * Fixed64.Pi,
             _preparedRadius,
             _preparedRadius,

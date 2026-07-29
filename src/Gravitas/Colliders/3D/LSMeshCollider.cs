@@ -1,4 +1,4 @@
-﻿//=======================================================================
+//=======================================================================
 // LSMeshCollider.cs
 //=======================================================================
 // MIT License, Copyright (c) 2026–present David Oravsky (mrdav30)
@@ -105,18 +105,18 @@ public sealed class LSMeshCollider : LSCollider
     private protected override void PublishShape() =>
         Mesh.PublishPreparedTransformation();
 
-    protected internal override FixedMassWeight CalculateMassPropertyWeight()
+    internal override ExactMassWeight CalculateMassPropertyWeight()
     {
         if (InertiaPolicy == MeshInertiaPolicy.SurfaceApproximation)
             return Mesh.SurfaceMassWeight;
 
         if (Mesh.TryGetClosedVolumeMassProperties(out MeshMassProperties properties, out _))
-            return FixedMassWeight.FromMeasure(properties.Volume);
+            return ExactMassWeight.FromMeasure(properties.Volume);
 
-        return FixedMassWeight.Zero;
+        return ExactMassWeight.Zero;
     }
 
-    internal override FixedMassWeight CalculatePreparedMassPropertyWeight()
+    internal override ExactMassWeight CalculatePreparedMassPropertyWeight()
     {
         if (InertiaPolicy == MeshInertiaPolicy.SurfaceApproximation)
             return Mesh.PreparedSurfaceMassWeight;
@@ -125,17 +125,17 @@ public sealed class LSMeshCollider : LSCollider
             out MeshMassProperties properties,
             out _))
         {
-            return FixedMassWeight.FromMeasure(properties.Volume);
+            return ExactMassWeight.FromMeasure(properties.Volume);
         }
 
-        return FixedMassWeight.Zero;
+        return ExactMassWeight.Zero;
     }
 
     internal override bool SupportsMassProperties =>
         InertiaPolicy == MeshInertiaPolicy.SurfaceApproximation
         || Mesh.TryGetClosedVolumeMassProperties(out _, out _);
 
-    internal override FixedMassPoint CalculateLocalMassPoint()
+    internal override ExactMassPoint3D CalculateLocalMassPoint()
     {
         Vector3d meshCenterOfMass;
         if (InertiaPolicy == MeshInertiaPolicy.SurfaceApproximation)
@@ -158,7 +158,7 @@ public sealed class LSMeshCollider : LSCollider
             meshCenterOfMass);
     }
 
-    internal override FixedMassPoint CalculatePreparedLocalMassPoint()
+    internal override ExactMassPoint3D CalculatePreparedLocalMassPoint()
     {
         Vector3d meshCenterOfMass;
         if (InertiaPolicy == MeshInertiaPolicy.SurfaceApproximation)

@@ -700,7 +700,7 @@ public sealed partial class MixedResponseTests
         var collider3D = new UnsupportedTestCollider3D
         {
             InertiaTensor = inertiaTensor!.Value,
-            MassPropertyWeight = FixedMassWeight.One
+            MassPropertyWeight = ExactMassWeight.One
         };
         var agent3D = new TestMatterAgent(
             context,

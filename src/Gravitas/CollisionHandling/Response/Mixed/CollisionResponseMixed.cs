@@ -250,8 +250,8 @@ public static class CollisionResponseMixed
             contact,
             body3D,
             body2D,
-            out FixedLever exact3D,
-            out FixedLever exact2D);
+            out ExactLever3D exact3D,
+            out ExactLever3D exact2D);
         return ContactNormalImpulseMixed.TryCalculateAccumulatedDeltaExact(
             body3D,
             linearVelocity3D,
@@ -544,8 +544,8 @@ public static class CollisionResponseMixed
             contact,
             body3D,
             body2D,
-            out FixedLever exact3D,
-            out FixedLever exact2D);
+            out ExactLever3D exact3D,
+            out ExactLever3D exact2D);
         Vector3d tangent = SolverContact.CreateTangent(normal);
         Vector3d secondaryTangent =
             Vector3d.Cross(normal, tangent).Normalized;
@@ -559,7 +559,7 @@ public static class CollisionResponseMixed
             responseBody2D == null
                 ? Fixed64.Zero
                 : normalAngularVelocity2D;
-        var normalConstraint = new FixedLeverNormalConstraint3d(
+        var normalConstraint = new ExactNormalConstraint3D(
             ExactContactLever3D.CreateResponseOperand(
                 body3D,
                 normalLinearVelocity3D,
@@ -594,7 +594,7 @@ public static class CollisionResponseMixed
             responseBody2D == null
                 ? Fixed64.Zero
                 : ResolveAngularVelocity(responseBody2D);
-        if (!FixedLever.TryGetCoulombDiskResponse(
+        if (!ExactContactResponseKernel.TryGetCoulombDiskResponse(
                 normalConstraint,
                 ExactContactLever3D.CreateResponseOperand(
                     body3D,
@@ -624,7 +624,7 @@ public static class CollisionResponseMixed
                 secondaryTangent,
                 staticFriction,
                 dynamicFriction,
-                out FixedLeverCoulombResponse3d response))
+                out ExactCoulombResponse3D response))
         {
             return false;
         }
@@ -845,8 +845,8 @@ public static class CollisionResponseMixed
         MixedContact contact,
         SolidBody? body3D,
         SolidBody2D? body2D,
-        out FixedLever exact3D,
-        out FixedLever exact2D)
+        out ExactLever3D exact3D,
+        out ExactLever3D exact2D)
     {
         ContactAnchor center3D = body3D?.GetCenterOfMassAnchor()
             ?? ContactAnchor.FromWorldPoint(pair.Collider3D.Center);

@@ -176,11 +176,8 @@ public readonly struct ContactAnchor
         _point.TryGetOffsetFrom(other._point, out offset);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal FixedLever GetLeverFrom(in ContactAnchor other)
-    {
-        _ = _point.TryGetLeverFrom(other._point, out FixedLever lever);
-        return lever;
-    }
+    internal ExactLever3D GetLeverFrom(in ContactAnchor other) =>
+        ExactLever3D.Create(_point, other._point);
 
     /// <summary>
     /// Attempts to express the same conceptual point relative to another

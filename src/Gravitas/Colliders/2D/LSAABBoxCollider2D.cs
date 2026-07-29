@@ -158,17 +158,17 @@ public sealed class LSAABBoxCollider2D : LSCollider2D, IConvexVertexSource2D
         offsets[3] = new Vector2d(-halfExtents.X, halfExtents.Y);
     }
 
-    internal override FixedMassWeight CalculateAreaForMassProperties()
+    internal override ExactMassWeight CalculateAreaForMassProperties()
     {
         Vector2d halfExtents = ScaledHalfExtents;
-        return FixedMassWeight.FromProduct(
+        return ExactMassWeight.FromProduct(
             (Fixed64)4,
             halfExtents.X,
             halfExtents.Y);
     }
 
-    internal override FixedMassWeight CalculatePreparedAreaForMassProperties() =>
-        FixedMassWeight.FromProduct(
+    internal override ExactMassWeight CalculatePreparedAreaForMassProperties() =>
+        ExactMassWeight.FromProduct(
             (Fixed64)4,
             _preparedHalfExtents.X,
             _preparedHalfExtents.Y);

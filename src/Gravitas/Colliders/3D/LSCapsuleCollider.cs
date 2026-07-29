@@ -1,4 +1,4 @@
-﻿//=======================================================================
+//=======================================================================
 // LSCapsuleCollider.cs
 //=======================================================================
 // MIT License, Copyright (c) 2026–present David Oravsky (mrdav30)
@@ -136,11 +136,11 @@ public sealed class LSCapsuleCollider : LSCollider
         Area = _preparedArea;
     }
 
-    protected internal override FixedMassWeight CalculateMassPropertyWeight() =>
+    internal override ExactMassWeight CalculateMassPropertyWeight() =>
         GetCylinderWeight(ScaledRadius, AxisLength)
             .Add(GetCapWeight(ScaledRadius));
 
-    internal override FixedMassWeight CalculatePreparedMassPropertyWeight() =>
+    internal override ExactMassWeight CalculatePreparedMassPropertyWeight() =>
         GetCylinderWeight(_preparedRadius, _preparedAxisLength)
             .Add(GetCapWeight(_preparedRadius));
 
@@ -161,10 +161,10 @@ public sealed class LSCapsuleCollider : LSCollider
         }
 
         // Masses of the cylinder and spheres (proportional to their volumes)
-        FixedMassWeight cylinderWeight =
+        ExactMassWeight cylinderWeight =
             GetCylinderWeight(ScaledRadius, AxisLength);
-        FixedMassWeight capWeight = GetCapWeight(ScaledRadius);
-        FixedMassWeight totalWeight = cylinderWeight.Add(capWeight);
+        ExactMassWeight capWeight = GetCapWeight(ScaledRadius);
+        ExactMassWeight totalWeight = cylinderWeight.Add(capWeight);
 
         _ = cylinderWeight.TryGetProportionalShare(
             mass,
@@ -196,17 +196,17 @@ public sealed class LSCapsuleCollider : LSCollider
         return tensor;
     }
 
-    private static FixedMassWeight GetCylinderWeight(
+    private static ExactMassWeight GetCylinderWeight(
         Fixed64 radius,
         Fixed64 axisLength) =>
-        FixedMassWeight.FromProduct(
+        ExactMassWeight.FromProduct(
             Fixed64.Pi,
             radius,
             radius,
             axisLength);
 
-    private static FixedMassWeight GetCapWeight(Fixed64 radius) =>
-        FixedMassWeight.FromProduct(
+    private static ExactMassWeight GetCapWeight(Fixed64 radius) =>
+        ExactMassWeight.FromProduct(
             Fixed64.FromFraction(4, 3) * Fixed64.Pi,
             radius,
             radius,

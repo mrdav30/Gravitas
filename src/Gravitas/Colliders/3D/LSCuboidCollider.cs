@@ -1,4 +1,4 @@
-﻿//=======================================================================
+//=======================================================================
 // LSCuboidCollider.cs
 //=======================================================================
 // MIT License, Copyright (c) 2026–present David Oravsky (mrdav30)
@@ -34,7 +34,7 @@ public sealed class LSCuboidCollider : LSCollider
             : ColliderCanonicalBounds
                 .GetCurrentCenteredProxyRadius(this);
 
-    protected internal override FixedMassWeight CalculateMassPropertyWeight()
+    internal override ExactMassWeight CalculateMassPropertyWeight()
     {
         Vector3d halfExtents;
         if (HasCommittedShape)
@@ -52,17 +52,17 @@ public sealed class LSCuboidCollider : LSCollider
                 partScale,
                 Fixed64.Two);
         }
-        return FixedMassWeight.FromProduct(
+        return ExactMassWeight.FromProduct(
             halfExtents.X,
             halfExtents.Y,
             halfExtents.Z,
             (Fixed64)8);
     }
 
-    internal override FixedMassWeight CalculatePreparedMassPropertyWeight()
+    internal override ExactMassWeight CalculatePreparedMassPropertyWeight()
     {
         Vector3d halfExtents = _preparedOrientedBox.HalfExtents;
-        return FixedMassWeight.FromProduct(
+        return ExactMassWeight.FromProduct(
             halfExtents.X,
             halfExtents.Y,
             halfExtents.Z,

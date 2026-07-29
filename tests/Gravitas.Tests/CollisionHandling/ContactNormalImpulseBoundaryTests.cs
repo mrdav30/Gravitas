@@ -13,10 +13,10 @@ public sealed class ContactNormalImpulseBoundaryTests
     [Fact]
     public void ExactUnaccumulatedKernel_ShouldHandleSeparatingAndImmovablePairs()
     {
-        FixedLever exactParallel = CreateLever(
+        ExactLever3D exactParallel = CreateLever(
             new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero),
             Vector3d.Right * Fixed64.MinIncrement);
-        FixedLever zero = CreateLever(Vector3d.Zero, Vector3d.Zero);
+        ExactLever3D zero = CreateLever(Vector3d.Zero, Vector3d.Zero);
 
         ContactNormalImpulse3D.TryCalculateVelocityDeltasExact(
                 null,
@@ -66,10 +66,10 @@ public sealed class ContactNormalImpulseBoundaryTests
         ScenarioBody<LSSphereCollider> body =
             scenario.CreateSphere(Vector3d.Zero);
         body.Body.FreezeAxes = BodyFreezeAxes3D.Rotation;
-        FixedLever exactParallel = CreateLever(
+        ExactLever3D exactParallel = CreateLever(
             new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero),
             Vector3d.Right * Fixed64.MinIncrement);
-        FixedLever zero = CreateLever(Vector3d.Zero, Vector3d.Zero);
+        ExactLever3D zero = CreateLever(Vector3d.Zero, Vector3d.Zero);
 
         ContactNormalImpulse3D.TryCalculateVelocityDeltasExact(
                 body.Body,
@@ -107,16 +107,16 @@ public sealed class ContactNormalImpulseBoundaryTests
             scenario.CreateSphere(Vector3d.Up);
         ScenarioBody<LSSphereCollider> ordinarySecond =
             scenario.CreateSphere(Vector3d.Forward);
-        FixedLever exactParallel = CreateLever(
+        ExactLever3D exactParallel = CreateLever(
             new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero),
             Vector3d.Right * Fixed64.MinIncrement);
-        FixedLever exactParallelWithUnitOffset = CreateLever(
+        ExactLever3D exactParallelWithUnitOffset = CreateLever(
             new Vector3d(Fixed64.MaxValue, Fixed64.One, Fixed64.Zero),
             Vector3d.Right * Fixed64.MinIncrement);
-        FixedLever hugePerpendicular = CreateLever(
+        ExactLever3D hugePerpendicular = CreateLever(
             new Vector3d(Fixed64.Zero, Fixed64.MaxValue, Fixed64.Zero),
             Vector3d.Up * Fixed64.MinIncrement);
-        FixedLever zero = CreateLever(Vector3d.Zero, Vector3d.Zero);
+        ExactLever3D zero = CreateLever(Vector3d.Zero, Vector3d.Zero);
 
         first.Body.Mass = Fixed64.MinIncrement;
         second.Body.Mass = Fixed64.MinIncrement;
@@ -197,10 +197,10 @@ public sealed class ContactNormalImpulseBoundaryTests
             scenario,
             Fixed3x3.Identity);
         body.FreezeAxes = BodyFreezeAxes3D.Position;
-        FixedLever hugePerpendicular = CreateLever(
+        ExactLever3D hugePerpendicular = CreateLever(
             new Vector3d(Fixed64.Zero, Fixed64.MaxValue, Fixed64.Zero),
             new Vector3d(Fixed64.Zero, Fixed64.MaxValue, Fixed64.Zero));
-        FixedLever zero = CreateLever(Vector3d.Zero, Vector3d.Zero);
+        ExactLever3D zero = CreateLever(Vector3d.Zero, Vector3d.Zero);
 
         ContactNormalImpulse3D.TryCalculateVelocityDeltasExact(
                 body,
@@ -241,7 +241,7 @@ public sealed class ContactNormalImpulseBoundaryTests
         second.Body.FreezeAxes = BodyFreezeAxes3D.Rotation;
         first.Body.InverseMass.Should().Be(Fixed64.MinIncrement * Fixed64.Two);
         second.Body.InverseMass.Should().Be(Fixed64.MinIncrement * Fixed64.Two);
-        FixedLever zero = CreateLever(Vector3d.Zero, Vector3d.Zero);
+        ExactLever3D zero = CreateLever(Vector3d.Zero, Vector3d.Zero);
 
         ContactNormalImpulse3D.TryCalculateAccumulatedDeltaExact(
                 first.Body,
@@ -283,10 +283,10 @@ public sealed class ContactNormalImpulseBoundaryTests
         ScenarioBody<LSSphereCollider> bodyB = scenario.CreateSphere(
             Vector3d.Right,
             mass: Fixed64.MaxValue);
-        FixedLever exactParallel = CreateLever(
+        ExactLever3D exactParallel = CreateLever(
             new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero),
             Vector3d.Right * Fixed64.MinIncrement);
-        FixedLever zero = CreateLever(Vector3d.Zero, Vector3d.Zero);
+        ExactLever3D zero = CreateLever(Vector3d.Zero, Vector3d.Zero);
 
         ContactNormalImpulse3D.TryCalculateVelocityDeltasExact(
                 bodyA.Body,
@@ -327,10 +327,10 @@ public sealed class ContactNormalImpulseBoundaryTests
         ScenarioBody<LSSphereCollider> body =
             scenario.CreateSphere(Vector3d.Zero);
         body.Body.FreezeAxes = BodyFreezeAxes3D.Rotation;
-        FixedLever exactParallel = CreateLever(
+        ExactLever3D exactParallel = CreateLever(
             new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero),
             Vector3d.Right * Fixed64.MinIncrement);
-        FixedLever zero = CreateLever(Vector3d.Zero, Vector3d.Zero);
+        ExactLever3D zero = CreateLever(Vector3d.Zero, Vector3d.Zero);
 
         ContactNormalImpulse3D.TryCalculateAccumulatedDeltaExact(
                 null,
@@ -391,10 +391,10 @@ public sealed class ContactNormalImpulseBoundaryTests
             scenario.CreateSphere(Vector3d.Zero);
         ScenarioBody<LSSphereCollider> bodyB =
             scenario.CreateSphere(Vector3d.Right);
-        FixedLever exactParallelWithUnitOffset = CreateLever(
+        ExactLever3D exactParallelWithUnitOffset = CreateLever(
             new Vector3d(Fixed64.MaxValue, Fixed64.One, Fixed64.Zero),
             Vector3d.Right * Fixed64.MinIncrement);
-        FixedLever zero = CreateLever(Vector3d.Zero, Vector3d.Zero);
+        ExactLever3D zero = CreateLever(Vector3d.Zero, Vector3d.Zero);
 
         AssertAccumulatedUnresolved(
             bodyA.Body,
@@ -429,10 +429,10 @@ public sealed class ContactNormalImpulseBoundaryTests
         body.Body.Mass = Fixed64.MinIncrement;
         body.Body.FreezeAxes = BodyFreezeAxes3D.Rotation;
         body2D.FreezeAxes = BodyFreezeAxes2D.Rotation;
-        FixedLever exactParallel = CreateLever(
+        ExactLever3D exactParallel = CreateLever(
             new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero),
             Vector3d.Right * Fixed64.MinIncrement);
-        FixedLever zero = CreateLever(Vector3d.Zero, Vector3d.Zero);
+        ExactLever3D zero = CreateLever(Vector3d.Zero, Vector3d.Zero);
 
         ContactNormalImpulse3D.TryCalculateAccumulatedDeltaExact(
                 body.Body,
@@ -568,7 +568,7 @@ public sealed class ContactNormalImpulseBoundaryTests
             CreateBody2D(scenario.Context, Fixed64.One);
         body.Body.FreezeAxes = BodyFreezeAxes3D.Rotation;
         body2D.FreezeAxes = BodyFreezeAxes2D.Rotation;
-        FixedLever zero = CreateLever(Vector3d.Zero, Vector3d.Zero);
+        ExactLever3D zero = CreateLever(Vector3d.Zero, Vector3d.Zero);
 
         ContactNormalImpulse3D.TryCalculateAccumulatedDelta(
                 body.Body,
@@ -1707,7 +1707,7 @@ public sealed class ContactNormalImpulseBoundaryTests
             .Should()
             .BeTrue();
 
-        FixedLever zero =
+        ExactLever3D zero =
             CreateLever(Vector3d.Zero, Vector3d.Zero);
         ContactNormalImpulseMixed.TryCalculateAccumulatedDeltaExact(
                 body.Body,
@@ -1803,7 +1803,7 @@ public sealed class ContactNormalImpulseBoundaryTests
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         SolidBody2D body =
             CreateBody2D(scenario.Context, Fixed64.One);
-        FixedLever lever =
+        ExactLever3D lever =
             CreateLever(Vector3d.Zero, Vector3d.Forward);
 
         body.FreezeAxes = BodyFreezeAxes2D.Position;
@@ -1914,11 +1914,11 @@ public sealed class ContactNormalImpulseBoundaryTests
         SolidBody? bodyA,
         Vector3d linearVelocityA,
         Vector3d angularVelocityA,
-        FixedLever leverA,
+        ExactLever3D leverA,
         SolidBody? bodyB,
         Vector3d linearVelocityB,
         Vector3d angularVelocityB,
-        FixedLever leverB,
+        ExactLever3D leverB,
         Fixed64 accumulatedImpulse) =>
         ContactNormalImpulse3D.TryCalculateAccumulatedDeltaExact(
                 bodyA,
@@ -2009,7 +2009,7 @@ public sealed class ContactNormalImpulseBoundaryTests
             FixedQuaternion.Identity).Body;
     }
 
-    private static FixedLever CreateLever(
+    private static ExactLever3D CreateLever(
         Vector3d origin,
         Vector3d localPoint)
     {
@@ -2021,9 +2021,6 @@ public sealed class ContactNormalImpulseBoundaryTests
             Vector3d.Zero,
             FixedQuaternion.Identity,
             Vector3d.Zero);
-        point.TryGetLeverFrom(center, out FixedLever lever)
-            .Should()
-            .BeTrue();
-        return lever;
+        return ExactLever3D.Create(point, center);
     }
 }

@@ -338,8 +338,8 @@ public static class CollisionResponse2D
             contact,
             responsePositionA,
             responsePositionB,
-            out FixedLever exactA,
-            out FixedLever exactB);
+            out ExactLever3D exactA,
+            out ExactLever3D exactB);
         return ContactNormalImpulse2D.TryCalculateAccumulatedDeltaExact(
             contact.A.Body,
             linearVelocityA,
@@ -581,11 +581,11 @@ public static class CollisionResponse2D
             contact,
             responsePositionA,
             responsePositionB,
-            out FixedLever exactA,
-            out FixedLever exactB);
+            out ExactLever3D exactA,
+            out ExactLever3D exactB);
         Vector3d spatialNormal =
             ExactContactLever2D.ToSpatial(contact.Normal);
-        var normalConstraint = new FixedLeverNormalConstraint3d(
+        var normalConstraint = new ExactNormalConstraint3D(
             ExactContactLever2D.CreateResponseOperand(
                 contact.A.Body,
                 normalLinearVelocityA,
@@ -606,7 +606,7 @@ public static class CollisionResponse2D
             contactShare);
         Vector3d spatialTangent =
             ExactContactLever2D.ToSpatial(contact.Tangent);
-        if (!FixedLever.TryGetCoulombLineResponse(
+        if (!ExactContactResponseKernel.TryGetCoulombLineResponse(
                 normalConstraint,
                 ExactContactLever2D.CreateResponseOperand(
                     contact.A.Body,
@@ -624,7 +624,7 @@ public static class CollisionResponse2D
                 contact.CachedTangentImpulse,
                 contact.StaticFriction,
                 contact.DynamicFriction,
-                out FixedLeverCoulombResponse3d response))
+                out ExactCoulombResponse3D response))
         {
             return false;
         }
@@ -703,8 +703,8 @@ public static class CollisionResponse2D
             contact,
             responsePositionA,
             responsePositionB,
-            out FixedLever exactA,
-            out FixedLever exactB);
+            out ExactLever3D exactA,
+            out ExactLever3D exactB);
         return ExactContactLever2D.TryGetImpulseVelocityDeltas(
                 contact.A.Body,
                 exactA,
@@ -896,8 +896,8 @@ public static class CollisionResponse2D
         SolverContact2D contact,
         Vector2d responsePositionA,
         Vector2d responsePositionB,
-        out FixedLever exactA,
-        out FixedLever exactB)
+        out ExactLever3D exactA,
+        out ExactLever3D exactB)
     {
         ManifoldContact2D manifoldContact =
             pair.Manifold[contact.ManifoldIndex];

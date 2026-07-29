@@ -365,11 +365,11 @@ internal static class ContactNormalImpulse2D
         SolidBody2D? bodyA,
         Vector2d linearVelocityA,
         Fixed64 angularVelocityA,
-        in FixedLever relativeContactPointA,
+        in ExactLever3D relativeContactPointA,
         SolidBody2D? bodyB,
         Vector2d linearVelocityB,
         Fixed64 angularVelocityB,
-        in FixedLever relativeContactPointB,
+        in ExactLever3D relativeContactPointB,
         Vector2d normal,
         Fixed64 restitution,
         Fixed64 restitutionVelocityThreshold,
@@ -388,7 +388,7 @@ internal static class ContactNormalImpulse2D
                 normal,
                 restitution,
                 restitutionVelocityThreshold,
-                out FixedLeverNormalResponse3d response))
+                out ExactNormalResponse3D response))
         {
             return false;
         }
@@ -410,11 +410,11 @@ internal static class ContactNormalImpulse2D
         SolidBody2D? bodyA,
         Vector2d linearVelocityA,
         Fixed64 angularVelocityA,
-        in FixedLever relativeContactPointA,
+        in ExactLever3D relativeContactPointA,
         SolidBody2D? bodyB,
         Vector2d linearVelocityB,
         Fixed64 angularVelocityB,
-        in FixedLever relativeContactPointB,
+        in ExactLever3D relativeContactPointB,
         Vector2d normal,
         Fixed64 restitution,
         Fixed64 restitutionVelocityThreshold,
@@ -439,7 +439,7 @@ internal static class ContactNormalImpulse2D
                 accumulatedImpulse,
                 positiveImpulseScale,
                 negativeImpulseScale,
-                out FixedLeverNormalResponse3d response))
+                out ExactNormalResponse3D response))
         {
             return false;
         }

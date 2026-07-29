@@ -277,11 +277,11 @@ internal static class ContactNormalImpulse3D
         SolidBody? bodyA,
         Vector3d linearVelocityA,
         Vector3d angularVelocityA,
-        in FixedLever relativeContactPointA,
+        in ExactLever3D relativeContactPointA,
         SolidBody? bodyB,
         Vector3d linearVelocityB,
         Vector3d angularVelocityB,
-        in FixedLever relativeContactPointB,
+        in ExactLever3D relativeContactPointB,
         Vector3d normal,
         Fixed64 restitution,
         Fixed64 restitutionVelocityThreshold,
@@ -300,7 +300,7 @@ internal static class ContactNormalImpulse3D
                 normal,
                 restitution,
                 restitutionVelocityThreshold,
-                out FixedLeverNormalResponse3d response))
+                out ExactNormalResponse3D response))
         {
             return false;
         }
@@ -458,11 +458,11 @@ internal static class ContactNormalImpulse3D
         SolidBody? bodyA,
         Vector3d linearVelocityA,
         Vector3d angularVelocityA,
-        in FixedLever relativeContactPointA,
+        in ExactLever3D relativeContactPointA,
         SolidBody? bodyB,
         Vector3d linearVelocityB,
         Vector3d angularVelocityB,
-        in FixedLever relativeContactPointB,
+        in ExactLever3D relativeContactPointB,
         Vector3d normal,
         Fixed64 restitution,
         Fixed64 restitutionVelocityThreshold,
@@ -487,7 +487,7 @@ internal static class ContactNormalImpulse3D
                 accumulatedImpulse,
                 positiveImpulseScale,
                 negativeImpulseScale,
-                out FixedLeverNormalResponse3d response))
+                out ExactNormalResponse3D response))
         {
             return false;
         }

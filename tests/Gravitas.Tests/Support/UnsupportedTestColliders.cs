@@ -29,11 +29,11 @@ internal sealed class UnsupportedTestCollider2D : LSCollider2D
     internal override Fixed64 CalculateCenterOfMassMoment(Fixed64 mass) =>
         Fixed64.Zero;
 
-    internal override FixedMassWeight CalculateAreaForMassProperties() =>
-        FixedMassWeight.Zero;
+    internal override ExactMassWeight CalculateAreaForMassProperties() =>
+        ExactMassWeight.Zero;
 
-    internal override FixedMassWeight CalculatePreparedAreaForMassProperties() =>
-        FixedMassWeight.Zero;
+    internal override ExactMassWeight CalculatePreparedAreaForMassProperties() =>
+        ExactMassWeight.Zero;
 
     private protected override void PrepareShape(in ColliderShapeSnapshot2D snapshot) =>
         SetPreparedBounds(FixedBoundArea.FromMinMax(
@@ -47,8 +47,8 @@ internal sealed class UnsupportedTestCollider3D : LSCollider
 {
     internal Fixed3x3 InertiaTensor { get; set; } = Fixed3x3.Zero;
 
-    internal FixedMassWeight MassPropertyWeight { get; set; } =
-        FixedMassWeight.Zero;
+    internal ExactMassWeight MassPropertyWeight { get; set; } =
+        ExactMassWeight.Zero;
 
     internal bool ReportRayOverlapWithoutIntersection { get; set; }
 
@@ -87,10 +87,10 @@ internal sealed class UnsupportedTestCollider3D : LSCollider
         Fixed64 mass) =>
         InertiaTensor;
 
-    protected internal override FixedMassWeight CalculateMassPropertyWeight() =>
+    internal override ExactMassWeight CalculateMassPropertyWeight() =>
         MassPropertyWeight;
 
-    internal override FixedMassWeight CalculatePreparedMassPropertyWeight() =>
+    internal override ExactMassWeight CalculatePreparedMassPropertyWeight() =>
         MassPropertyWeight;
 
     public override Vector3d ClosestPointOnSurface(Vector3d other) =>

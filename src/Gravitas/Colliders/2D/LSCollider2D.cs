@@ -742,21 +742,21 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    protected FixedMassPoint2d TransformRelativeMassPropertyPointExact(
+    internal ExactMassPoint2D TransformRelativeMassPropertyPointExact(
         Vector2d partRelativePoint)
     {
         GetCurrentScaleFactors(
             out Vector2d ownerScale,
             out _);
         return _compoundOwner == null
-            ? FixedMassPoint2d.CreateScaledLocalComposition(
+            ? ExactMassPoint2D.CreateScaledLocalComposition(
                 LocalOffset,
                 ownerScale,
                 Vector2d.Zero,
                 Vector2d.One,
                 partRelativePoint,
                 Fixed64.Zero)
-            : FixedMassPoint2d.CreateScaledLocalComposition(
+            : ExactMassPoint2D.CreateScaledLocalComposition(
                 _compoundOwner.LocalOffset,
                 ownerScale,
                 LocalOffset,

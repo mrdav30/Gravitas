@@ -1245,25 +1245,11 @@ public sealed class PhysicsMeshScaleTests
             FixedQuaternion.Identity,
             MeshColliderMode.Concave);
 
-        var points = new FixedMassPoint[mesh.TriangleCount];
-        var weights = new FixedMassWeight[mesh.TriangleCount];
-        for (int i = 0; i < mesh.TriangleCount; i++)
-        {
-            mesh.GetLocalTriangleVertices(
-                i,
-                out Vector3d first,
-                out Vector3d second,
-                out Vector3d third);
-            var triangle = new FixedTriangle(first, second, third);
-            points[i] = FixedMassPoint.FromPoint(triangle.Centroid);
-            weights[i] = triangle.AreaWeight;
-        }
-        FixedMassPoint.TryGetWeightedAverage(
-            points,
-            weights,
-            out Vector3d expectedCenter)
-            .Should().BeTrue();
-
+        // Exact round-to-even centroid of the three canonical shell faces.
+        var expectedCenter = new Vector3d(
+            Fixed64.FromRaw(1_861_152_495L),
+            Fixed64.FromRaw(-28_633_115_302_085L),
+            Fixed64.FromRaw(-42_949_672_964_581L));
         mesh.SurfaceMassWeight.TryGetMeasure(out _)
             .Should().BeFalse();
         mesh.SurfaceMassProperties.CenterOfMass

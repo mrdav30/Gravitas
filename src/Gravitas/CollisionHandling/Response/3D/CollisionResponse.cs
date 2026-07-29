@@ -328,8 +328,8 @@ public static class CollisionResponse
             contact,
             responsePositionA,
             responsePositionB,
-            out FixedLever exactA,
-            out FixedLever exactB);
+            out ExactLever3D exactA,
+            out ExactLever3D exactB);
         return ContactNormalImpulse3D.TryCalculateAccumulatedDeltaExact(
             contact.A.Body,
             ResolveLinearVelocity(contact.A.Body),
@@ -470,8 +470,8 @@ public static class CollisionResponse
             contact,
             responsePositionA,
             responsePositionB,
-            out FixedLever exactA,
-            out FixedLever exactB);
+            out ExactLever3D exactA,
+            out ExactLever3D exactB);
         return TryApplyExactImpulse(
             contact,
             exactA,
@@ -497,8 +497,8 @@ public static class CollisionResponse
             contact,
             responsePositionA,
             responsePositionB,
-            out FixedLever exactA,
-            out FixedLever exactB);
+            out ExactLever3D exactA,
+            out ExactLever3D exactB);
         if (!ExactContactLever3D
                 .TryGetImpulseCombinationVelocityDeltas(
                     contact.A.Body,
@@ -664,8 +664,8 @@ public static class CollisionResponse
             contact,
             responsePositionA,
             responsePositionB,
-            out FixedLever exactA,
-            out FixedLever exactB);
+            out ExactLever3D exactA,
+            out ExactLever3D exactB);
 
         Fixed64 staticFrictionLimit =
             normalImpulseScalar > Fixed64.Zero
@@ -734,8 +734,8 @@ public static class CollisionResponse
 
     private static bool TryComputeTangentImpulseDeltaExact(
         SolverContact contact,
-        in FixedLever exactA,
-        in FixedLever exactB,
+        in ExactLever3D exactA,
+        in ExactLever3D exactB,
         Vector3d tangent,
         out Fixed64 impulseDelta)
     {
@@ -834,8 +834,8 @@ public static class CollisionResponse
 
     private static bool TryComputeRelativeVelocityProjectionExact(
         SolverContact contact,
-        in FixedLever exactA,
-        in FixedLever exactB,
+        in ExactLever3D exactA,
+        in ExactLever3D exactB,
         Vector3d axis,
         out Fixed64 projection) =>
         ExactContactLever3D.TryComputeNormalVelocity(
@@ -900,8 +900,8 @@ public static class CollisionResponse
 
     private static bool TryComputeImpulseDenominatorExact(
         SolverContact contact,
-        in FixedLever exactA,
-        in FixedLever exactB,
+        in ExactLever3D exactA,
+        in ExactLever3D exactB,
         Vector3d axis,
         out Fixed64 denominator) =>
         ExactContactLever3D.TryComputeDenominator(
@@ -914,8 +914,8 @@ public static class CollisionResponse
 
     private static bool TryApplyExactImpulse(
         SolverContact contact,
-        in FixedLever exactA,
-        in FixedLever exactB,
+        in ExactLever3D exactA,
+        in ExactLever3D exactB,
         Vector3d impulseB)
     {
         Vector3d impulseA = -impulseB;
@@ -1124,8 +1124,8 @@ public static class CollisionResponse
         SolverContact contact,
         Vector3d responsePositionA,
         Vector3d responsePositionB,
-        out FixedLever exactA,
-        out FixedLever exactB)
+        out ExactLever3D exactA,
+        out ExactLever3D exactB)
     {
         ManifoldContact manifoldContact =
             pair.Manifold[contact.ManifoldIndex];

@@ -162,8 +162,8 @@ public readonly struct ContactAnchor2D
         _point.TryGetOffsetFrom(other._point, out offset);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal FixedLever GetXZLeverFrom(in ContactAnchor2D other) =>
-        _point.GetLeverFrom(other._point).ToXZLever();
+    internal ExactLever3D GetXZLeverFrom(in ContactAnchor2D other) =>
+        ExactLever3D.CreateXZ(_point, other._point);
 
     /// <summary>
     /// Attempts to express the same conceptual point relative to another

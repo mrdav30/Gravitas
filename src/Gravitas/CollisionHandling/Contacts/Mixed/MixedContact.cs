@@ -170,7 +170,7 @@ public readonly struct MixedContact
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal FixedLever GetPlanarXZLeverFrom(
+    internal ExactLever3D GetPlanarXZLeverFrom(
         Vector2d origin,
         Fixed64 rotation,
         Vector2d localPoint) =>

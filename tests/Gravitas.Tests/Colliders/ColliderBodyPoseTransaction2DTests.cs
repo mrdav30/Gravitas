@@ -61,11 +61,11 @@ public sealed class ColliderBodyPoseTransaction2DTests
             Fixed64 mass) =>
             Fixed64.Zero;
 
-        internal override FixedMassWeight CalculateAreaForMassProperties() =>
-            FixedMassWeight.Zero;
+        internal override ExactMassWeight CalculateAreaForMassProperties() =>
+            ExactMassWeight.Zero;
 
-        internal override FixedMassWeight CalculatePreparedAreaForMassProperties() =>
-            FixedMassWeight.Zero;
+        internal override ExactMassWeight CalculatePreparedAreaForMassProperties() =>
+            ExactMassWeight.Zero;
 
         private protected override void PrepareShape(
             in ColliderShapeSnapshot2D snapshot)

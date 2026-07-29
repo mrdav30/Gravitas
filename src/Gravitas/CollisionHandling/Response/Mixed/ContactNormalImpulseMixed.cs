@@ -407,38 +407,38 @@ internal static class ContactNormalImpulseMixed
         SolidBody? body3D,
         Vector3d linearVelocity3D,
         Vector3d angularVelocity3D,
-        in FixedLever relativeContactPoint3D,
+        in ExactLever3D relativeContactPoint3D,
         SolidBody2D? body2D,
         Vector2d linearVelocity2D,
         Fixed64 angularVelocity2D,
-        in FixedLever relativeContactPoint2D,
+        in ExactLever3D relativeContactPoint2D,
         Vector3d normal,
         Fixed64 restitution,
         Fixed64 restitutionVelocityThreshold,
         out ContactNormalVelocityDeltaResultMixed result)
     {
         result = default;
-        FixedLeverResponseOperand3d first =
+        ExactContactResponseOperand3D first =
             ExactContactLever3D.CreateResponseOperand(
                 body3D,
                 linearVelocity3D,
                 angularVelocity3D,
                 relativeContactPoint3D,
                 -normal);
-        FixedLeverResponseOperand3d second =
+        ExactContactResponseOperand3D second =
             ExactContactLever2D.CreateResponseOperand(
                 body2D,
                 linearVelocity2D,
                 angularVelocity2D,
                 relativeContactPoint2D,
                 normal);
-        if (!FixedLever.TryGetNormalResponse(
+        if (!ExactContactResponseKernel.TryGetNormalResponse(
                 first,
                 second,
                 normal,
                 restitution,
                 restitutionVelocityThreshold,
-                out FixedLeverNormalResponse3d response))
+                out ExactNormalResponse3D response))
         {
             return false;
         }
@@ -460,11 +460,11 @@ internal static class ContactNormalImpulseMixed
         SolidBody? body3D,
         Vector3d linearVelocity3D,
         Vector3d angularVelocity3D,
-        in FixedLever relativeContactPoint3D,
+        in ExactLever3D relativeContactPoint3D,
         SolidBody2D? body2D,
         Vector2d linearVelocity2D,
         Fixed64 angularVelocity2D,
-        in FixedLever relativeContactPoint2D,
+        in ExactLever3D relativeContactPoint2D,
         Vector3d normal,
         Fixed64 restitution,
         Fixed64 restitutionVelocityThreshold,
@@ -474,21 +474,21 @@ internal static class ContactNormalImpulseMixed
         out ContactNormalImpulseResultMixed result)
     {
         result = default;
-        FixedLeverResponseOperand3d first =
+        ExactContactResponseOperand3D first =
             ExactContactLever3D.CreateResponseOperand(
                 body3D,
                 linearVelocity3D,
                 angularVelocity3D,
                 relativeContactPoint3D,
                 -normal);
-        FixedLeverResponseOperand3d second =
+        ExactContactResponseOperand3D second =
             ExactContactLever2D.CreateResponseOperand(
                 body2D,
                 linearVelocity2D,
                 angularVelocity2D,
                 relativeContactPoint2D,
                 normal);
-        if (!FixedLever.TryGetAccumulatedNormalResponse(
+        if (!ExactContactResponseKernel.TryGetAccumulatedNormalResponse(
                 first,
                 second,
                 normal,
@@ -497,7 +497,7 @@ internal static class ContactNormalImpulseMixed
                 accumulatedImpulse,
                 positiveImpulseScale,
                 negativeImpulseScale,
-                out FixedLeverNormalResponse3d response))
+                out ExactNormalResponse3D response))
         {
             return false;
         }

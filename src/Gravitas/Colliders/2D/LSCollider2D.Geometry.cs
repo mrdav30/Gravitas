@@ -343,7 +343,7 @@ public abstract partial class LSCollider2D
     /// </summary>
     public virtual Vector2d CalculateLocalCenterOfMassOffset()
     {
-        FixedMassPoint2d point = CalculateLocalMassPoint();
+        ExactMassPoint2D point = CalculateLocalMassPoint();
         SwiftThrowHelper.ThrowIfTrue(
             !point.TryGetPoint(out Vector2d center),
             nameof(CalculateLocalCenterOfMassOffset),
@@ -351,10 +351,10 @@ public abstract partial class LSCollider2D
         return center;
     }
 
-    internal virtual FixedMassPoint2d CalculateLocalMassPoint() =>
+    internal virtual ExactMassPoint2D CalculateLocalMassPoint() =>
         TransformRelativeMassPropertyPointExact(Vector2d.Zero);
 
-    internal virtual FixedMassPoint2d CalculatePreparedLocalMassPoint() =>
+    internal virtual ExactMassPoint2D CalculatePreparedLocalMassPoint() =>
         TransformPreparedRelativeMassPropertyPointExact(Vector2d.Zero);
 
     /// <summary>
@@ -369,7 +369,7 @@ public abstract partial class LSCollider2D
 
         Fixed64 centerMoment =
             CalculateCenterOfMassMoment(mass);
-        FixedMassPoint2d massPoint = CalculateLocalMassPoint();
+        ExactMassPoint2D massPoint = CalculateLocalMassPoint();
         if (massPoint.TryAddParallelAxisMoment(
                 centerMoment,
                 mass,
@@ -394,24 +394,24 @@ public abstract partial class LSCollider2D
 
     internal abstract Fixed64 CalculateCenterOfMassMoment(Fixed64 mass);
 
-    internal abstract FixedMassWeight CalculateAreaForMassProperties();
+    internal abstract ExactMassWeight CalculateAreaForMassProperties();
 
-    internal abstract FixedMassWeight CalculatePreparedAreaForMassProperties();
+    internal abstract ExactMassWeight CalculatePreparedAreaForMassProperties();
 
     protected virtual void OnMaterialChanged() { }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    protected FixedMassPoint2d TransformPreparedRelativeMassPropertyPointExact(
+    internal ExactMassPoint2D TransformPreparedRelativeMassPropertyPointExact(
         Vector2d partRelativePoint) =>
         _compoundOwner == null
-            ? FixedMassPoint2d.CreateScaledLocalComposition(
+            ? ExactMassPoint2D.CreateScaledLocalComposition(
                 _preparedSnapshot.LocalOffset,
                 _preparedSnapshot.OwnerScale,
                 Vector2d.Zero,
                 Vector2d.One,
                 partRelativePoint,
                 Fixed64.Zero)
-            : FixedMassPoint2d.CreateScaledLocalComposition(
+            : ExactMassPoint2D.CreateScaledLocalComposition(
                 _compoundOwner._preparedSnapshot.LocalOffset,
                 _preparedSnapshot.OwnerScale,
                 _preparedSnapshot.LocalOffset,

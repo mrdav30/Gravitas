@@ -834,8 +834,8 @@ public sealed class CollisionResponseExactLeverTests
         right.Body.FreezeAxes = BodyFreezeAxes3D.Rotation;
         ContactAnchor leftCenter = left.Body.GetCenterOfMassAnchor();
         ContactAnchor rightCenter = right.Body.GetCenterOfMassAnchor();
-        FixedLever leftLever = leftCenter.GetLeverFrom(leftCenter);
-        FixedLever rightLever = rightCenter.GetLeverFrom(rightCenter);
+        ExactLever3D leftLever = leftCenter.GetLeverFrom(leftCenter);
+        ExactLever3D rightLever = rightCenter.GetLeverFrom(rightCenter);
         ExactContactLever3D.TryGetAngularVelocityDelta(
                 null,
                 leftLever,
@@ -925,7 +925,7 @@ public sealed class CollisionResponseExactLeverTests
         linearB.Should().Be(Vector3d.Zero);
         angularB.Should().Be(Vector3d.Zero);
 
-        FixedLever unitLever = ContactAnchor.FromWorldPoint(
+        ExactLever3D unitLever = ContactAnchor.FromWorldPoint(
                 left.Body.WorldCenterOfMass + Vector3d.Right)
             .GetLeverFrom(leftCenter);
         ExactContactLever3D.TryGetImpulseCombinationVelocityDeltas(
@@ -954,7 +954,7 @@ public sealed class CollisionResponseExactLeverTests
         ScenarioBody<LSSphereCollider> body =
             scenario.CreateSphere(Vector3d.Zero);
         body.Body.FreezeAxes = BodyFreezeAxes3D.Rotation;
-        FixedLever zero = body.Body.GetCenterOfMassAnchor()
+        ExactLever3D zero = body.Body.GetCenterOfMassAnchor()
             .GetLeverFrom(body.Body.GetCenterOfMassAnchor());
 
         ExactContactLever3D.TryComputeDenominatorTerms(

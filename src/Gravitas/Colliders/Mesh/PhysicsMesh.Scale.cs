@@ -26,7 +26,7 @@ public partial class PhysicsMesh
     private Vector3d[] _scaledFaceNormals;
     private Vector3d[] _preparedScaledFaceNormals;
     private Fixed64 _scaledTotalArea;
-    private FixedMassWeight _scaledTotalAreaWeight;
+    private ExactMassWeight _scaledTotalAreaWeight;
     private Fixed64 _scaledLocalRadius;
     private FixedBoundBox _scaledLocalBounds;
     private MeshSurfaceMassProperties _surfaceMassProperties;
@@ -39,7 +39,7 @@ public partial class PhysicsMesh
     private FixedBoundBox _preparedBounds;
     private FixedBoundBox _preparedScaledLocalBounds;
     private Fixed64 _preparedScaledTotalArea;
-    private FixedMassWeight _preparedScaledTotalAreaWeight;
+    private ExactMassWeight _preparedScaledTotalAreaWeight;
     private Fixed64 _preparedScaledLocalRadius;
     private MeshSurfaceMassProperties _preparedSurfaceMassProperties;
     private bool _preparedSurfaceMassPropertiesValid;
@@ -63,10 +63,10 @@ public partial class PhysicsMesh
 
     internal Fixed64 ScaledLocalRadius => _scaledLocalRadius;
 
-    internal FixedMassWeight SurfaceMassWeight =>
+    internal ExactMassWeight SurfaceMassWeight =>
         _scaledTotalAreaWeight;
 
-    internal FixedMassWeight PreparedSurfaceMassWeight =>
+    internal ExactMassWeight PreparedSurfaceMassWeight =>
         _preparedScaledTotalAreaWeight;
 
     internal Fixed64 GetScaledLocalRadius(
@@ -312,7 +312,7 @@ public partial class PhysicsMesh
 
         _preparedScaledLocalBounds = CalculateBounds(_preparedScaledLocalVertices);
         _preparedScaledTotalArea = Fixed64.Zero;
-        _preparedScaledTotalAreaWeight = FixedMassWeight.Zero;
+        _preparedScaledTotalAreaWeight = ExactMassWeight.Zero;
         for (int i = 0; i < _triangleCount; i++)
         {
             int triangleIndex = i * 3;

@@ -210,7 +210,7 @@ public sealed class LSCapsuleCollider2D : LSCollider2D
             worldNormal,
             out surfacePoint);
 
-    internal override FixedMassWeight CalculateAreaForMassProperties()
+    internal override ExactMassWeight CalculateAreaForMassProperties()
     {
         GetMassPropertyGeometry(
             out Fixed64 radius,
@@ -219,7 +219,7 @@ public sealed class LSCapsuleCollider2D : LSCollider2D
             .Add(GetCircleWeight(radius));
     }
 
-    internal override FixedMassWeight CalculatePreparedAreaForMassProperties() =>
+    internal override ExactMassWeight CalculatePreparedAreaForMassProperties() =>
         GetRectangleWeight(_preparedRadius, _preparedAxisLength)
             .Add(GetCircleWeight(_preparedRadius));
 
@@ -366,10 +366,10 @@ public sealed class LSCapsuleCollider2D : LSCollider2D
         if (cylinderLength <= Fixed64.Epsilon)
             return mass * radius * radius * Fixed64.Half;
 
-        FixedMassWeight rectangleWeight =
+        ExactMassWeight rectangleWeight =
             GetRectangleWeight(radius, cylinderLength);
-        FixedMassWeight circleWeight = GetCircleWeight(radius);
-        FixedMassWeight totalWeight =
+        ExactMassWeight circleWeight = GetCircleWeight(radius);
+        ExactMassWeight totalWeight =
             rectangleWeight.Add(circleWeight);
         if (totalWeight.IsZero)
             return mass * cylinderLength * cylinderLength / (Fixed64)12;
@@ -395,16 +395,16 @@ public sealed class LSCapsuleCollider2D : LSCollider2D
         return rectangleMoment + capMomentAboutCapsuleCenter * (Fixed64)2;
     }
 
-    private static FixedMassWeight GetRectangleWeight(
+    private static ExactMassWeight GetRectangleWeight(
         Fixed64 radius,
         Fixed64 cylinderLength) =>
-        FixedMassWeight.FromProduct(
+        ExactMassWeight.FromProduct(
             Fixed64.Two,
             radius,
             cylinderLength);
 
-    private static FixedMassWeight GetCircleWeight(Fixed64 radius) =>
-        FixedMassWeight.FromProduct(
+    private static ExactMassWeight GetCircleWeight(Fixed64 radius) =>
+        ExactMassWeight.FromProduct(
             Fixed64.Pi,
             radius,
             radius);

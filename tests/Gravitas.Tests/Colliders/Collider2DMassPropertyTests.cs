@@ -583,7 +583,7 @@ public sealed class Collider2DMassPropertyTests
         FixedMath.Abs(actual - expected).Should().BeLessThanOrEqualTo(tolerance);
     }
 
-    private static Fixed64 GetMeasure(FixedMassWeight weight)
+    private static Fixed64 GetMeasure(ExactMassWeight weight)
     {
         weight.TryGetMeasure(out Fixed64 measure).Should().BeTrue();
         return measure;

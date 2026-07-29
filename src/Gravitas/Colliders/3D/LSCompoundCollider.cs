@@ -1,4 +1,4 @@
-﻿//=======================================================================
+//=======================================================================
 // LSCompoundCollider.cs
 //=======================================================================
 // MIT License, Copyright (c) 2026–present David Oravsky (mrdav30)
@@ -23,8 +23,8 @@ public sealed class LSCompoundCollider : LSCollider
 {
     private readonly CompoundColliderPart[] _parts;
     private readonly LSCollider[] _partColliders;
-    private readonly FixedMassPoint[] _massPointScratch;
-    private readonly FixedMassWeight[] _massWeightScratch;
+    private readonly ExactMassPoint3D[] _massPointScratch;
+    private readonly ExactMassWeight[] _massWeightScratch;
 
     public LSCompoundCollider(params CompoundColliderPart[] parts)
     {
@@ -36,8 +36,8 @@ public sealed class LSCompoundCollider : LSCollider
 
         _parts = new CompoundColliderPart[parts.Length];
         _partColliders = new LSCollider[parts.Length];
-        _massPointScratch = new FixedMassPoint[parts.Length];
-        _massWeightScratch = new FixedMassWeight[parts.Length];
+        _massPointScratch = new ExactMassPoint3D[parts.Length];
+        _massWeightScratch = new ExactMassWeight[parts.Length];
         for (int i = 0; i < parts.Length; i++)
         {
             _parts[i] = parts[i];
@@ -132,19 +132,19 @@ public sealed class LSCompoundCollider : LSCollider
         Area = area;
     }
 
-    internal override FixedMassPoint CalculateLocalMassPoint() =>
+    internal override ExactMassPoint3D CalculateLocalMassPoint() =>
         CalculateAggregateMassPoint(usePrepared: false);
 
-    internal override FixedMassPoint CalculatePreparedLocalMassPoint() =>
+    internal override ExactMassPoint3D CalculatePreparedLocalMassPoint() =>
         CalculateAggregateMassPoint(usePrepared: true);
 
-    private FixedMassPoint CalculateAggregateMassPoint(bool usePrepared)
+    private ExactMassPoint3D CalculateAggregateMassPoint(bool usePrepared)
     {
         bool hasPositiveWeight = false;
         for (int i = 0; i < _partColliders.Length; i++)
         {
             LSCollider part = _partColliders[i];
-            FixedMassWeight weight = usePrepared
+            ExactMassWeight weight = usePrepared
                 ? part.CalculatePreparedMassPropertyWeight()
                 : part.CalculateMassPropertyWeight();
             _massPointScratch[i] = usePrepared
@@ -161,7 +161,7 @@ public sealed class LSCompoundCollider : LSCollider
             {
                 if (_partColliders[i].SupportsMassProperties)
                 {
-                    _massWeightScratch[i] = FixedMassWeight.One;
+                    _massWeightScratch[i] = ExactMassWeight.One;
                     supportedPartCount++;
                 }
             }
@@ -169,11 +169,11 @@ public sealed class LSCompoundCollider : LSCollider
             if (supportedPartCount == 0)
             {
                 for (int i = 0; i < _massWeightScratch.Length; i++)
-                    _massWeightScratch[i] = FixedMassWeight.One;
+                    _massWeightScratch[i] = ExactMassWeight.One;
             }
         }
 
-        if (!FixedMassPoint.TryGetWeightedAverage(
+        if (!ExactMassPoint3D.TryGetWeightedAverage(
                 _massPointScratch,
                 _massWeightScratch,
                 out Vector3d center))
@@ -183,21 +183,21 @@ public sealed class LSCompoundCollider : LSCollider
                     ? "Prepared compound mass-property point is outside the Fixed64 coordinate domain."
                     : "The compound collider's center of mass is outside the Fixed64 coordinate domain.");
         }
-        return FixedMassPoint.FromPoint(center);
+        return ExactMassPoint3D.FromPoint(center);
     }
 
-    protected internal override FixedMassWeight CalculateMassPropertyWeight() =>
+    internal override ExactMassWeight CalculateMassPropertyWeight() =>
         CalculateAggregateMassWeight(usePrepared: false);
 
-    internal override FixedMassWeight CalculatePreparedMassPropertyWeight() =>
+    internal override ExactMassWeight CalculatePreparedMassPropertyWeight() =>
         CalculateAggregateMassWeight(usePrepared: true);
 
-    private FixedMassWeight CalculateAggregateMassWeight(bool usePrepared)
+    private ExactMassWeight CalculateAggregateMassWeight(bool usePrepared)
     {
-        FixedMassWeight totalWeight = FixedMassWeight.Zero;
+        ExactMassWeight totalWeight = ExactMassWeight.Zero;
         for (int i = 0; i < _parts.Length; i++)
         {
-            FixedMassWeight weight = usePrepared
+            ExactMassWeight weight = usePrepared
                 ? _partColliders[i].CalculatePreparedMassPropertyWeight()
                 : _partColliders[i].CalculateMassPropertyWeight();
             totalWeight = totalWeight.Add(weight);
@@ -209,7 +209,7 @@ public sealed class LSCompoundCollider : LSCollider
         Fixed64 mass)
     {
         Vector3d center = CalculateLocalCenterOfMassOffset();
-        FixedMassWeight totalWeight = FixedMassWeight.Zero;
+        ExactMassWeight totalWeight = ExactMassWeight.Zero;
         int residualPartIndex = _parts.Length - 1;
         int eligiblePartCount = 0;
         for (int i = 0; i < _parts.Length; i++)
@@ -217,12 +217,12 @@ public sealed class LSCompoundCollider : LSCollider
             LSCollider part = _partColliders[i];
             if (!part.SupportsMassProperties)
             {
-                _massWeightScratch[i] = FixedMassWeight.Zero;
+                _massWeightScratch[i] = ExactMassWeight.Zero;
                 continue;
             }
 
             eligiblePartCount++;
-            FixedMassWeight weight = part.CalculateMassPropertyWeight();
+            ExactMassWeight weight = part.CalculateMassPropertyWeight();
             _massWeightScratch[i] = weight;
             totalWeight = totalWeight.Add(weight);
             residualPartIndex = i;
@@ -234,14 +234,14 @@ public sealed class LSCompoundCollider : LSCollider
                 "Compound inertia requires at least one part with valid mass properties.");
         }
 
-        FixedMassWeight cumulativeWeight = FixedMassWeight.Zero;
+        ExactMassWeight cumulativeWeight = ExactMassWeight.Zero;
         Fixed64 assignedMass = Fixed64.Zero;
         Fixed3x3 tensor = Fixed3x3.Zero;
 
         for (int i = 0; i < _parts.Length; i++)
         {
             LSCollider part = _partColliders[i];
-            FixedMassWeight weight = _massWeightScratch[i];
+            ExactMassWeight weight = _massWeightScratch[i];
             cumulativeWeight = cumulativeWeight.Add(weight);
             Fixed64 partMass;
             if (i == residualPartIndex)
@@ -262,7 +262,7 @@ public sealed class LSCompoundCollider : LSCollider
             if (partMass == Fixed64.Zero)
                 continue;
 
-            FixedMassPoint partCenterOfMass =
+            ExactMassPoint3D partCenterOfMass =
                 part.CalculateLocalMassPoint();
             Fixed3x3 partTensor =
                 part.CalculateCenterOfMassInertiaTensor(partMass);

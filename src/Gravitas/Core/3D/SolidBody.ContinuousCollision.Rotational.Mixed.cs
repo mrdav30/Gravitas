@@ -749,9 +749,9 @@ public partial class SolidBody
                 out response);
         if (!responseResolved)
         {
-            FixedLever exactSource =
+            ExactLever3D exactSource =
                 contact.Anchor3D.GetLeverFrom(sourceCenter);
-            FixedLever exactTarget =
+            ExactLever3D exactTarget =
                 contact.GetPlanarXZLeverFrom(
                     targetPosition,
                     targetRotation,

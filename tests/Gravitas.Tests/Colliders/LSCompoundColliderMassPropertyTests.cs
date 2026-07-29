@@ -521,7 +521,7 @@ public sealed class LSCompoundColliderMassPropertyTests
         FixedMath.Abs(actual - expected)
             .Should().BeLessThanOrEqualTo(Fixed64.Epsilon * (Fixed64)512);
 
-    private static Fixed64 GetMeasure(FixedMassWeight weight)
+    private static Fixed64 GetMeasure(ExactMassWeight weight)
     {
         weight.TryGetMeasure(out Fixed64 measure).Should().BeTrue();
         return measure;

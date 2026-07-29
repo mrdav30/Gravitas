@@ -270,9 +270,9 @@ public partial class SolidBody
             positionB,
             rotationB,
             bodyB._localCenterOfMassOffset);
-        FixedMathSharp.Geometry.FixedLever exactA =
+        ExactLever3D exactA =
             contact.AnchorA.GetLeverFrom(centerA);
-        FixedMathSharp.Geometry.FixedLever exactB =
+        ExactLever3D exactB =
             contact.AnchorB.GetLeverFrom(centerB);
         return ContactNormalImpulse3D.TryCalculateVelocityDeltasExact(
                 bodyA,

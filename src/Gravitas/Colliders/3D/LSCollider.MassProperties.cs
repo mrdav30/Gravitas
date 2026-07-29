@@ -21,7 +21,7 @@ public abstract partial class LSCollider
     /// </summary>
     public virtual Vector3d CalculateLocalCenterOfMassOffset()
     {
-        FixedMassPoint point = CalculateLocalMassPoint();
+        ExactMassPoint3D point = CalculateLocalMassPoint();
         SwiftThrowHelper.ThrowIfTrue(
             !point.TryGetPoint(out Vector3d center),
             nameof(CalculateLocalCenterOfMassOffset),
@@ -29,10 +29,10 @@ public abstract partial class LSCollider
         return center;
     }
 
-    internal virtual FixedMassPoint CalculateLocalMassPoint() =>
+    internal virtual ExactMassPoint3D CalculateLocalMassPoint() =>
         TransformRelativeMassPropertyPointExact(Vector3d.Zero);
 
-    internal virtual FixedMassPoint CalculatePreparedLocalMassPoint() =>
+    internal virtual ExactMassPoint3D CalculatePreparedLocalMassPoint() =>
         TransformPreparedRelativeMassPropertyPointExact(Vector3d.Zero);
 
     /// <summary>
@@ -43,9 +43,9 @@ public abstract partial class LSCollider
     /// Solid shapes return volume. Explicit surface-approximation shapes may
     /// return a documented shell measure instead.
     /// </remarks>
-    protected internal abstract FixedMassWeight CalculateMassPropertyWeight();
+    internal abstract ExactMassWeight CalculateMassPropertyWeight();
 
-    internal abstract FixedMassWeight CalculatePreparedMassPropertyWeight();
+    internal abstract ExactMassWeight CalculatePreparedMassPropertyWeight();
 
     internal virtual bool SupportsMassProperties => true;
 
@@ -58,7 +58,7 @@ public abstract partial class LSCollider
 
         Fixed3x3 centerTensor =
             CalculateCenterOfMassInertiaTensor(mass);
-        FixedMassPoint massPoint = CalculateLocalMassPoint();
+        ExactMassPoint3D massPoint = CalculateLocalMassPoint();
         if (massPoint.TryAddParallelAxisTensor(
                 centerTensor,
                 mass,
@@ -89,17 +89,17 @@ public abstract partial class LSCollider
         Fixed64 mass);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    protected FixedMassPoint TransformRelativeMassPropertyPointExact(
+    internal ExactMassPoint3D TransformRelativeMassPropertyPointExact(
         Vector3d partRelativePoint) =>
         _compoundOwner == null
-            ? FixedMassPoint.CreateScaledLocalComposition(
+            ? ExactMassPoint3D.CreateScaledLocalComposition(
                 LocalOffset,
                 GetCurrentOwnerScale(),
                 Vector3d.Zero,
                 Vector3d.One,
                 partRelativePoint,
                 FixedQuaternion.Identity)
-            : FixedMassPoint.CreateScaledLocalComposition(
+            : ExactMassPoint3D.CreateScaledLocalComposition(
                 _compoundOwner.LocalOffset,
                 GetCurrentOwnerScale(),
                 LocalOffset,
@@ -108,17 +108,17 @@ public abstract partial class LSCollider
                 _compoundLocalRotation);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    protected FixedMassPoint TransformPreparedRelativeMassPropertyPointExact(
+    internal ExactMassPoint3D TransformPreparedRelativeMassPropertyPointExact(
         Vector3d partRelativePoint) =>
         _compoundOwner == null
-            ? FixedMassPoint.CreateScaledLocalComposition(
+            ? ExactMassPoint3D.CreateScaledLocalComposition(
                 _preparedSnapshot.LocalOffset,
                 _preparedSnapshot.OwnerScale,
                 Vector3d.Zero,
                 Vector3d.One,
                 partRelativePoint,
                 FixedQuaternion.Identity)
-            : FixedMassPoint.CreateScaledLocalComposition(
+            : ExactMassPoint3D.CreateScaledLocalComposition(
                 _compoundOwner._preparedSnapshot.LocalOffset,
                 _preparedSnapshot.OwnerScale,
                 _preparedSnapshot.LocalOffset,

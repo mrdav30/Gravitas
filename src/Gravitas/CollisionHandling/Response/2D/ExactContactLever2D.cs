@@ -10,6 +10,10 @@ using FixedMathSharp.Geometry;
 
 namespace Gravitas.CollisionHandling;
 
+/// <summary>
+/// Adapts planar body mobility and signed yaw to the shared exact 3D response
+/// kernel.
+/// </summary>
 internal static class ExactContactLever2D
 {
     internal static bool CanUseCompactResponse(
@@ -50,11 +54,11 @@ internal static class ExactContactLever2D
                 CreateInverseInertia(bodyB));
     }
 
-    internal static FixedLeverResponseOperand3d CreateResponseOperand(
+    internal static ExactContactResponseOperand3D CreateResponseOperand(
         SolidBody2D? body,
         Vector2d linearVelocity,
         Fixed64 angularVelocity,
-        in FixedLever lever,
+        in ExactLever3D lever,
         Vector3d signedAxis) =>
         new(
             lever,
@@ -73,30 +77,30 @@ internal static class ExactContactLever2D
         SolidBody2D? bodyA,
         Vector2d linearVelocityA,
         Fixed64 angularVelocityA,
-        in FixedLever relativeContactPointA,
+        in ExactLever3D relativeContactPointA,
         SolidBody2D? bodyB,
         Vector2d linearVelocityB,
         Fixed64 angularVelocityB,
-        in FixedLever relativeContactPointB,
+        in ExactLever3D relativeContactPointB,
         Vector2d normal,
         Fixed64 restitution,
         Fixed64 restitutionVelocityThreshold,
-        out FixedLeverNormalResponse3d response)
+        out ExactNormalResponse3D response)
     {
         Vector3d spatialNormal = ToSpatial(normal);
-        FixedLeverResponseOperand3d first = CreateResponseOperand(
+        ExactContactResponseOperand3D first = CreateResponseOperand(
             bodyA,
             linearVelocityA,
             angularVelocityA,
             relativeContactPointA,
             -spatialNormal);
-        FixedLeverResponseOperand3d second = CreateResponseOperand(
+        ExactContactResponseOperand3D second = CreateResponseOperand(
             bodyB,
             linearVelocityB,
             angularVelocityB,
             relativeContactPointB,
             spatialNormal);
-        return FixedLever.TryGetNormalResponse(
+        return ExactContactResponseKernel.TryGetNormalResponse(
             first,
             second,
             spatialNormal,
@@ -109,33 +113,33 @@ internal static class ExactContactLever2D
         SolidBody2D? bodyA,
         Vector2d linearVelocityA,
         Fixed64 angularVelocityA,
-        in FixedLever relativeContactPointA,
+        in ExactLever3D relativeContactPointA,
         SolidBody2D? bodyB,
         Vector2d linearVelocityB,
         Fixed64 angularVelocityB,
-        in FixedLever relativeContactPointB,
+        in ExactLever3D relativeContactPointB,
         Vector2d normal,
         Fixed64 restitution,
         Fixed64 restitutionVelocityThreshold,
         Fixed64 accumulatedImpulse,
         Fixed64 positiveImpulseScale,
         Fixed64 negativeImpulseScale,
-        out FixedLeverNormalResponse3d response)
+        out ExactNormalResponse3D response)
     {
         Vector3d spatialNormal = ToSpatial(normal);
-        FixedLeverResponseOperand3d first = CreateResponseOperand(
+        ExactContactResponseOperand3D first = CreateResponseOperand(
             bodyA,
             linearVelocityA,
             angularVelocityA,
             relativeContactPointA,
             -spatialNormal);
-        FixedLeverResponseOperand3d second = CreateResponseOperand(
+        ExactContactResponseOperand3D second = CreateResponseOperand(
             bodyB,
             linearVelocityB,
             angularVelocityB,
             relativeContactPointB,
             spatialNormal);
-        return FixedLever.TryGetAccumulatedNormalResponse(
+        return ExactContactResponseKernel.TryGetAccumulatedNormalResponse(
             first,
             second,
             spatialNormal,
@@ -158,9 +162,9 @@ internal static class ExactContactLever2D
 
     internal static bool TryGetImpulseVelocityDeltas(
         SolidBody2D? bodyA,
-        in FixedLever relativeContactPointA,
+        in ExactLever3D relativeContactPointA,
         SolidBody2D? bodyB,
-        in FixedLever relativeContactPointB,
+        in ExactLever3D relativeContactPointB,
         Vector2d firstAxis,
         Fixed64 firstScale,
         Vector2d secondAxis,
@@ -195,7 +199,7 @@ internal static class ExactContactLever2D
 
     internal static bool TryGetParticipantVelocityDeltas(
         SolidBody2D? body,
-        in FixedLever lever,
+        in ExactLever3D lever,
         Vector3d firstAxis,
         Fixed64 firstScale,
         Vector3d secondAxis,
@@ -221,7 +225,8 @@ internal static class ExactContactLever2D
                 out spatialLinear);
         Vector3d spatialAngular = Vector3d.Zero;
         bool angularResolved = !body.CanRotate
-            || lever.TryGetTransformedWeightedCrossProduct(
+            || WideLever3d.TryGetTransformedWeightedCrossProduct(
+                lever.Value,
                 firstAxis,
                 firstScale,
                 secondAxis,
