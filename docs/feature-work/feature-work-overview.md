@@ -36,20 +36,18 @@ instead of burying it in notes.
 - [`Benchmark Signal Hardening`](benchmark-signal-hardening-backlog.md)
   - Reproduce and close confirmed release-relevant signals alongside the owning
     library change. Do not broaden this into speculative optimization work.
-- **Final FixedMathSharp / Gravitas Ownership Boundary Pass**
-  - After the remaining cross-stack work is complete, audit the exact
-    point-anchor and lever-response additions before releasing FixedMathSharp.
-    Keep reusable exact geometry, lever algebra, fused arithmetic, and internal
-    wide representations in FixedMathSharp. Move rigid-body solver policy such
-    as restitution, unilateral impulse accumulation, inverse-mass/inertia
-    response operands, and solver response results into Gravitas.
-  - If Gravitas still requires the internal wide implementation, use a tightly
-    contained `InternalsVisibleTo("Gravitas")` boundary rather than publishing
-    raw wide arithmetic or adding another integration package. Direct wide
-    access must remain isolated behind one Gravitas-owned response component so
-    FixedMathSharp internals do not become an informal API throughout the
-    engine. Re-run both libraries' full coverage, package, Lean, allocation,
-    and downstream validation gates after the split.
+- [`FixedMathSharp / Gravitas Ownership Boundary`](2026-07-28-fixedmathsharp-gravitas-ownership-boundary-plan.md)
+  - Complete this focused detour before the remaining Gravitas issue queue.
+    FixedMathSharp retains reusable exact geometry, lever algebra, fused
+    arithmetic, mass-property semantics, and internal wide representations.
+    Gravitas receives intentional friend access and owns rigid-body restitution,
+    unilateral impulse accumulation, inverse-mass/inertia response, and Coulomb
+    friction behind one internal exact-response component.
+  - The plan also centralizes only proven duplicate wide kernels, removes
+    misleading partial ownership, and mechanically reorganizes crowded geometry
+    directories after behavior is stable. FixedMathSharp v6 remains the public
+    migration baseline; unreleased intermediate v7 response APIs do not receive
+    compatibility shims or misleading migration entries.
 
 ## Recently Completed
 
@@ -299,11 +297,12 @@ host-facing need appears.
 1. Keep the benchmark backlog and issue tracker as intake buckets; promote new
    measured risks into dated plans only when they are broader than a focused
    patch.
-2. Resolve the remaining cross-stack issues, including Gravitas-owned
+2. Complete the FixedMathSharp / Gravitas ownership boundary pass and
+   revalidate the locally linked stack before more response work crosses the
+   package boundary.
+3. Resolve the remaining cross-stack issues, including Gravitas-owned
    lifecycle, admission, geometry, and numeric-range blocks, while retaining
    the temporary local project references.
-3. Complete the final FixedMathSharp / Gravitas ownership boundary pass and
-   revalidate the locally linked stack.
 4. Release FixedMathSharp from the reviewed hardening tree.
 5. Update SwiftCollections to the released FixedMathSharp package, run its full
    validation, and release SwiftCollections before advancing the chain.
