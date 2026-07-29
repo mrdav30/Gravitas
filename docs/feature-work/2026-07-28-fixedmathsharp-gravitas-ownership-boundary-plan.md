@@ -224,7 +224,7 @@ BenchmarkDotNet, `Release` and `ReleaseLean` package variants.
   - whether the contract is recognizable standard math/geometry;
   - whether its terminology or invariants encode rigid-body physics policy;
   - the public API and documentation consequence of keeping or moving it.
-- [ ] Revise later phase file lists and interfaces to follow the approved
+- [x] Revise later phase ownership and interfaces to follow the approved
   keep/move ledger rather than the audit's initial preservation assumption.
 - [x] Pause for owner review before changing source ownership.
 
@@ -365,43 +365,91 @@ BenchmarkDotNet, `Release` and `ReleaseLean` package variants.
 **Interfaces:**
 
 - Produces internal allocation-free magnitude-span kernels for multiplication,
-  zero-safe active length/bit length, word addition, copying, shifting, and
-  equal-length comparison.
+  zero-safe active length/bit length, word addition, equal-width addition and
+  subtraction, and equal-length comparison. Contract-specific copy and shift
+  helpers remain with their current owners.
 - Preserves every existing public result, midpoint decision, saturation rule,
   stable tie order, and failure path.
 
-- [ ] Add focused internal tests for zero, one-word, full-carry, highest-word,
+- [x] Add focused internal tests for zero, one-word, full-carry, highest-word,
   unequal-active-length, and maximum-workspace magnitude operations. Compare
   multiplication and comparison results to `BigInteger` or the existing
   fixed-width oracle used by the current test area.
-- [ ] Move the byte-for-byte equivalent generic `MultiplyMagnitudes` kernel
+- [x] Move the behaviorally equivalent generic `MultiplyMagnitudes` kernel
   from the width-specific `WideArithmetic.Signed704.cs` owner into
-  `WideArithmetic.Magnitude.cs`.
-- [ ] Replace the local magnitude multiplication and word-add copies in
+  `WideArithmetic.Magnitude.cs`. Preserve its bounded destination contract;
+  rational-segment-sweep adoption additionally requires proof that the existing
+  36-word workspace retains every reachable product.
+- [x] Replace the local magnitude multiplication and word-add copies in
   `WideConvexPrismRelations.ProjectionArithmetic.cs` and
   `WideOrientedBox.RationalSegmentSweep.cs` with direct `WideArithmetic`
   calls.
-- [ ] Centralize zero-safe magnitude bit-length and replace the repeated loops
-  in the six audited geometry/arithmetic locations.
-- [ ] Route `WideGeometry` through `WideArithmetic.Difference` and delete its
+- [x] Centralize zero-safe magnitude bit-length and replace only the repeated
+  loops that remain after the recent arithmetic cleanup. Do not churn
+  normalization or finite-axis paths that already use the canonical fixed-width
+  helpers.
+- [x] Route `WideGeometry` through `WideArithmetic.Difference` and delete its
   duplicate private difference implementation.
-- [ ] Route `WideConvexPrismRelations` wide-candidate radical comparison
+- [x] Route `WideConvexPrismRelations` wide-candidate radical comparison
   through its existing equal-length radical-pair implementation and delete the
   duplicate local pair.
-- [ ] Keep fixed-width unrolled add/subtract/multiply methods and
+- [x] Keep fixed-width unrolled add/subtract/multiply methods and
   contract-specific root solvers unchanged unless a focused test proves they
   are exactly the same operation and a benchmark shows no regression.
-- [ ] Run the focused geometry and wide-arithmetic suites in `Release` and
+- [x] Run the focused geometry and wide-arithmetic suites in `Release` and
   `ReleaseLean`.
-- [ ] Re-run FixedMathSharp coverage and require 100% line, branch, and method
+- [x] Re-run FixedMathSharp coverage and require 100% line, branch, and method
   coverage.
-- [ ] Re-run affected point-anchor and finite-geometry benchmarks. Require zero
+- [x] Re-run affected point-anchor and finite-geometry benchmarks. Require zero
   managed allocation and no material regression attributable to generic span
   bounds checks, inlining, or expanded `stackalloc` lifetime.
-- [ ] Request independent review focused on sign extension, carry propagation,
+- [x] Request independent review focused on sign extension, carry propagation,
   zero handling, workspace bounds, stack pressure, and accidental
   genericization.
-- [ ] Update this plan with results and pause for owner review.
+- [x] Update this plan with results and pause for owner review.
+
+**Phase 1 result (2026-07-29):**
+
+- `WideArithmetic.Magnitude.cs` now owns the proven policy-neutral unsigned
+  magnitude kernels. Migrated consumers use explicit equal-width add/subtract
+  contracts, avoiding speculative unequal-width helpers and their per-limb
+  bounds checks.
+- The rational sweep retains its private clear-and-truncate copy helper and
+  distinct shift contract. Its existing `<2252`-bit proof remains within the
+  unchanged 36-word/2304-bit workspace. A public full-domain edge sweep
+  regression preserves the expected `3/2` distance through the migrated path.
+- The wide-candidate radical comparison now reuses the existing equal-width
+  implementation without changing its 160/320/640-word stack-allocation shape.
+  The stale `WideGeometry.GetDifference` wrapper and repeated span bit-length
+  loops were deleted.
+- A review fast follow removed the remaining no-contract forwarding methods in
+  the migrated wide paths. Consumers now call `WideArithmetic`,
+  `WideConvex2dRelations`, and the retained semantic owner directly; invariant,
+  representation-adaptation, and mass-property ownership helpers remain.
+- The source diff removes 341 net production lines while adding 118 focused
+  test lines, for 223 fewer lines overall.
+- Four focused magnitude-kernel tests cover zero, one-word, carry truncation,
+  unequal active lengths at equal physical width, dirty destinations,
+  comparison, and the 640-word maximum workspace against `BigInteger`.
+- Focused `Release` and `ReleaseLean` suites pass 284/284. Complete `Release`
+  passes 2,651/2,651; complete `ReleaseLean` passes 2,630/2,630.
+- Authoritative `Release` source coverage is exactly 100%: 47,254/47,254 lines,
+  8,679/8,679 branches, and 3,490/3,490 methods. The like-for-like Debug source
+  report is also exactly 100%: 53,169/53,169 lines, 8,749/8,749 branches, and
+  3,490/3,490 methods. Generated `*.g.cs` formatter scaffolding remains outside
+  the source-coverage contract. Relative to the Phase 0 Debug baseline, the
+  phase removes 304 coverable lines, 57 branches, and 16 methods.
+- All 17 matched out-of-process benchmark rows remain allocation-free. Sixteen
+  rows were within expected variance or faster. The only slower full-suite
+  sample, `OrdinaryConeSlabProjection`, reran in isolation at 12.063 us versus
+  the 12.323 us baseline, confirming no reproducible material regression.
+- Independent review found no code defect or public API, serialization, sign,
+  tie-order, saturation, stack-pressure, or failure-path change. It verified
+  non-aliasing multiplication destinations, equal physical widths at every
+  migrated add/subtract/compare call, and the rational-workspace proof. A
+  separate fast-follow review confirmed all 16 removed methods were private
+  contract-free forwarders and every direct call retained the same target and
+  overload.
 
 ## Phase 2: Extract Policy-Neutral Anchor And Lever Owners
 
@@ -477,7 +525,7 @@ BenchmarkDotNet, `Release` and `ReleaseLean` package variants.
   rather than a real responsibility.
 - [ ] Update this plan with results and pause for owner review.
 
-## Phase 3: Move Exact Response Policy Into Gravitas
+## Phase 3: Move Physics-Specific Exact Semantics Into Gravitas
 
 **Files:**
 
@@ -491,6 +539,11 @@ BenchmarkDotNet, `Release` and `ReleaseLean` package variants.
   - `ExactCoulombResponse3D.cs`
   - `ExactContactResponseKernel.Normal.cs`
   - `ExactContactResponseKernel.Coulomb.cs`
+- Create focused Gravitas-owned exact lever and mass-property values under the
+  response and collider-mass subsystems. Do not create a general downstream
+  wide-arithmetic façade.
+- Modify the 2D, 3D, compound, mesh, triangle-shell, and polygon mass-property
+  consumers recorded by the Phase 0 ownership ledger.
 - Modify:
   `src/Gravitas/CollisionHandling/Response/3D/ExactContactLever3D.cs`
 - Modify:
@@ -536,6 +589,9 @@ BenchmarkDotNet, `Release` and `ReleaseLean` package variants.
   Gravitas velocity-delta and accumulator results.
 - `ExactContactLever3D` and `ExactContactLever2D` adapt bodies, constrained
   mobility, and dimensional embedding to the shared kernel.
+- Gravitas-owned lever, mass-point, and mass-weight values express rigid-body
+  semantics without appearing in public host signatures. Their arithmetic
+  composes FixedMathSharp internals directly instead of duplicating limb math.
 
 - [ ] Add `[assembly: InternalsVisibleTo("Gravitas")]` to FixedMathSharp's
   existing friend declaration file. Do not add friend entries for Gravitas
@@ -543,6 +599,11 @@ BenchmarkDotNet, `Release` and `ReleaseLean` package variants.
 - [ ] Add internal Gravitas response value types in separate files. Preserve
   existing projection flags, atomic final-delta semantics, and optional
   diagnostic projections without exposing FixedMathSharp wide types.
+- [ ] Move the semantic 3D lever into Gravitas and remove the unused 2D public
+  counterpart unless migration demonstrates a real independent need.
+- [ ] Move mass points, mass weights, weighted centers, parallel-axis
+  composition, and surface-inertia policy into Gravitas. Retain only general
+  weighted arithmetic and signed-wide mechanics in FixedMathSharp.
 - [ ] Port the exact normal-response algorithm into
   `ExactContactResponseKernel.Normal.cs`, retaining validation for normalized
   axes, nonnegative restitution/thresholds, accumulated-impulse bounds,
@@ -580,7 +641,7 @@ BenchmarkDotNet, `Release` and `ReleaseLean` package variants.
   in FixedMathSharp.
 - [ ] Update this plan with results and pause for owner review.
 
-## Phase 4: Remove The Intermediate v7 FixedMathSharp Solver Surface
+## Phase 4: Remove The Intermediate v7 FixedMathSharp Physics Surface
 
 **Files:**
 
@@ -594,6 +655,17 @@ BenchmarkDotNet, `Release` and `ReleaseLean` package variants.
 - Delete:
   - `Geometry/Wide/WideOrientedBox.NormalResponse.cs`
   - `Geometry/Wide/WideOrientedBox.CoulombResponse.cs`
+- Delete after Gravitas parity is proven:
+  - `Geometry/Anchors/FixedLever.cs`
+  - `Geometry/Anchors/FixedLever2d.cs`
+  - `Geometry/MassProperties/FixedMassPoint.cs`
+  - `Geometry/MassProperties/FixedMassPoint2d.cs`
+  - `Geometry/MassProperties/FixedMassWeight.cs`
+- Delete or reduce to policy-neutral arithmetic:
+  - `Geometry/Wide/WideMassProperties.cs`
+  - `Geometry/Wide/WideTriangleMassProperties.cs`
+- Remove the recent triangle/polygon mass-weight and surface-inertia public
+  methods while retaining ordinary area, centroid, and relation geometry.
 - Delete or narrow:
   `F:/gamedevrepos/FixedMathSharp/tests/FixedMathSharp.Tests/Geometry/Primitives/FixedLeverNormalResponse.Tests.cs`
 - Delete or narrow:
@@ -605,13 +677,19 @@ BenchmarkDotNet, `Release` and `ReleaseLean` package variants.
 
 **Produces:**
 
-- A final FixedMathSharp v7 public surface containing semantic lever algebra but
-  no rigid-body response policy.
+- A final FixedMathSharp v7 public surface containing standard math and
+  computational geometry, but no rigid-body lever, mass-property, or response
+  policy.
 - Gravitas-owned regression coverage for every unique response contract worth
   retaining.
 
 - [ ] Remove the four response methods from `FixedLever`.
 - [ ] Delete the four intermediate v7 public response DTOs.
+- [ ] Delete the intermediate public lever, mass-point, and mass-weight types
+  after every Gravitas caller uses its downstream owner.
+- [ ] Remove FixedMathSharp's physics-specific triangle/polygon mass and
+  inertia surface without narrating discarded intermediate v7 APIs as a v6
+  migration.
 - [ ] Delete FixedMathSharp's normal and Coulomb response implementations after
   confirming no production caller remains.
 - [ ] Audit the approximately 1,482 lines of FixedMathSharp response tests.
@@ -734,8 +812,9 @@ Geometry/
 - Modify: `docs/feature-work/feature-work-overview.md`
 - Modify: this plan
 
-- [ ] Document FixedMathSharp as the owner of semantic exact geometry, lever
-  algebra, mass-property arithmetic, and internal wide mechanics.
+- [ ] Document FixedMathSharp as the owner of semantic exact geometry and
+  internal wide mechanics, with rigid-body lever and mass-property semantics
+  owned by Gravitas.
 - [ ] Document Gravitas as the owner of exact rigid-body normal/friction
   response and the sole intentional non-test friend consumer of FixedMathSharp
   internals.
@@ -772,9 +851,9 @@ Geometry/
   current develop worktree is the unreleased v7 target.
 - [x] Phase 0 runtime, coverage, CRAP, allocation, benchmark, caller, and
   semantic-ownership evidence captured.
-- [ ] Phase 0 semantic keep/move recommendations approved and later phase file
-  lists revised to match.
-- [ ] Phase 1 proven wide-arithmetic duplication consolidated.
+- [x] Phase 0 semantic keep/move recommendations approved and later phase
+  ownership revised to match.
+- [x] Phase 1 proven wide-arithmetic duplication consolidated.
 - [ ] Phase 2 policy-neutral anchor and lever owners extracted.
 - [ ] Phase 3 Gravitas exact response policy migrated and parity-proven.
 - [ ] Phase 4 intermediate v7 FixedMathSharp response surface removed.
