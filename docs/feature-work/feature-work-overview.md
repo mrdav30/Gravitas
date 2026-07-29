@@ -38,11 +38,13 @@ instead of burying it in notes.
     library change. Do not broaden this into speculative optimization work.
 - [`FixedMathSharp / Gravitas Ownership Boundary`](2026-07-28-fixedmathsharp-gravitas-ownership-boundary-plan.md)
   - Complete this focused detour before the remaining Gravitas issue queue.
-    FixedMathSharp retains reusable exact geometry, lever algebra, fused
-    arithmetic, mass-property semantics, and internal wide representations.
-    Gravitas receives intentional friend access and owns rigid-body restitution,
-    unilateral impulse accumulation, inverse-mass/inertia response, and Coulomb
-    friction behind one internal exact-response component.
+    FixedMathSharp retains standard-library-quality exact math, geometry, fused
+    arithmetic, and internal wide representations. Recent semantic geometry,
+    lever, and mass-property types remain foundational only when they have value
+    independent of Gravitas; physics-specific types and algorithms move
+    downstream. Gravitas receives intentional friend access and owns rigid-body
+    restitution, unilateral impulse accumulation, inverse-mass/inertia response,
+    and Coulomb friction behind one internal exact-response subsystem.
   - The plan also centralizes only proven duplicate wide kernels, removes
     misleading partial ownership, and mechanically reorganizes crowded geometry
     directories after behavior is stable. FixedMathSharp v6 remains the public
