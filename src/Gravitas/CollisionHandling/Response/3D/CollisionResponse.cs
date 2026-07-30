@@ -583,68 +583,158 @@ public static class CollisionResponse
         out Fixed64 tangentImpulse,
         out Fixed64 secondaryTangentImpulse)
     {
-        if (contact.RelativeA.IsExact || contact.RelativeB.IsExact)
-        {
-            return TrySolveFrictionImpulseExact(
-                pair,
+        if (!contact.RelativeA.IsExact
+            && !contact.RelativeB.IsExact
+            && TryGetCompactFrictionResponse(
                 contact,
-                responsePositionA,
-                responsePositionB,
                 normalImpulseScalar,
                 out tangentImpulse,
-                out secondaryTangentImpulse);
-        }
-
-        tangentImpulse = Fixed64.Zero;
-        secondaryTangentImpulse = Fixed64.Zero;
-
-        Fixed64 staticFrictionLimit = normalImpulseScalar > Fixed64.Zero && contact.StaticFriction > Fixed64.Zero
-            ? normalImpulseScalar * contact.StaticFriction
-            : Fixed64.Zero;
-        Fixed64 dynamicFrictionLimit = normalImpulseScalar > Fixed64.Zero && contact.DynamicFriction > Fixed64.Zero
-            ? normalImpulseScalar * contact.DynamicFriction
-            : Fixed64.Zero;
-        if (staticFrictionLimit <= Fixed64.Zero && dynamicFrictionLimit <= Fixed64.Zero)
+                out secondaryTangentImpulse,
+                out Fixed64 tangentDelta,
+                out Fixed64 secondaryTangentDelta)
+            && ((tangentDelta == Fixed64.Zero
+                    && secondaryTangentDelta == Fixed64.Zero)
+                || TryApplyContactImpulseCombination(
+                    pair,
+                    contact,
+                    responsePositionA,
+                    responsePositionB,
+                    contact.Normal,
+                    Fixed64.Zero,
+                    contact.Tangent,
+                    tangentDelta,
+                    contact.SecondaryTangent,
+                    secondaryTangentDelta)))
         {
-            return TryApplyFrictionDelta(
-                pair,
-                contact,
-                responsePositionA,
-                responsePositionB,
-                -contact.CachedTangentImpulse,
-                -contact.CachedSecondaryTangentImpulse);
+            return true;
         }
 
-        Vector3d relativeVelocity = ComputeRelativeVelocity(contact);
-        Fixed64 tangentDelta = ComputeTangentImpulseDelta(
-            contact,
-            relativeVelocity,
-            contact.Tangent);
-        Fixed64 secondaryTangentDelta = ComputeTangentImpulseDelta(
-            contact,
-            relativeVelocity,
-            contact.SecondaryTangent);
-
-        tangentImpulse = contact.CachedTangentImpulse + tangentDelta;
-        secondaryTangentImpulse = contact.CachedSecondaryTangentImpulse + secondaryTangentDelta;
-        Fixed64 desiredMagnitudeSquared = tangentImpulse * tangentImpulse
-            + secondaryTangentImpulse * secondaryTangentImpulse;
-        Fixed64 staticLimitSquared = staticFrictionLimit * staticFrictionLimit;
-        if (desiredMagnitudeSquared > staticLimitSquared)
-        {
-            ClampTangentImpulsePair(
-                ref tangentImpulse,
-                ref secondaryTangentImpulse,
-                dynamicFrictionLimit);
-        }
-
-        return TryApplyFrictionDelta(
+        return TrySolveFrictionImpulseExact(
             pair,
             contact,
             responsePositionA,
             responsePositionB,
-            tangentImpulse - contact.CachedTangentImpulse,
-            secondaryTangentImpulse - contact.CachedSecondaryTangentImpulse);
+            normalImpulseScalar,
+            out tangentImpulse,
+            out secondaryTangentImpulse);
+    }
+
+    private static bool TryGetCompactFrictionResponse(
+        SolverContact contact,
+        Fixed64 normalImpulseScalar,
+        out Fixed64 tangentImpulse,
+        out Fixed64 secondaryTangentImpulse,
+        out Fixed64 tangentDelta,
+        out Fixed64 secondaryTangentDelta)
+    {
+        tangentImpulse = default;
+        secondaryTangentImpulse = default;
+        tangentDelta = default;
+        secondaryTangentDelta = default;
+        bool limitsResolved = TryGetFrictionLimit(
+            normalImpulseScalar,
+            contact.StaticFriction,
+            out Fixed64 staticFrictionLimit);
+        limitsResolved &= TryGetFrictionLimit(
+            normalImpulseScalar,
+            contact.DynamicFriction,
+            out Fixed64 dynamicFrictionLimit);
+        if (!limitsResolved)
+            return false;
+
+        if (staticFrictionLimit == Fixed64.Zero
+            && dynamicFrictionLimit == Fixed64.Zero)
+        {
+            return Fixed64.TrySubtract(
+                    Fixed64.Zero,
+                    contact.CachedTangentImpulse,
+                    out tangentDelta)
+                & Fixed64.TrySubtract(
+                    Fixed64.Zero,
+                    contact.CachedSecondaryTangentImpulse,
+                    out secondaryTangentDelta);
+        }
+
+        Vector3d linearA = ResolveLinearVelocity(contact.A.Body);
+        Vector3d angularA = ResolveAngularVelocity(contact.A.Body);
+        Vector3d linearB = ResolveLinearVelocity(contact.B.Body);
+        Vector3d angularB = ResolveAngularVelocity(contact.B.Body);
+        if (!TryGetCompactRelativeVelocity(
+                linearA,
+                angularA,
+                contact.RelativeA.Vector,
+                linearB,
+                angularB,
+                contact.RelativeB.Vector,
+                contact.Tangent,
+                out Vector3d relativeVelocity))
+        {
+            return false;
+        }
+
+        bool deltasResolved = TryGetCompactTangentImpulseDelta(
+            contact,
+            relativeVelocity,
+            contact.Tangent,
+            out Fixed64 desiredTangentDelta);
+        deltasResolved &= TryGetCompactTangentImpulseDelta(
+            contact,
+            relativeVelocity,
+            contact.SecondaryTangent,
+            out Fixed64 desiredSecondaryTangentDelta);
+        bool diskResolved = Fixed64.TryAdd(
+                contact.CachedTangentImpulse,
+                desiredTangentDelta,
+                out tangentImpulse)
+            & Fixed64.TryAdd(
+                contact.CachedSecondaryTangentImpulse,
+                desiredSecondaryTangentDelta,
+                out secondaryTangentImpulse)
+            & TryGetMagnitudeSquared(
+                tangentImpulse,
+                secondaryTangentImpulse,
+                out Fixed64 desiredMagnitudeSquared)
+            & TryGetSquare(
+                staticFrictionLimit,
+                out Fixed64 staticLimitSquared);
+        if (!(deltasResolved & diskResolved))
+        {
+            return false;
+        }
+
+        if (desiredMagnitudeSquared > staticLimitSquared)
+        {
+            Fixed64 magnitude = FixedMath.Sqrt(desiredMagnitudeSquared);
+            Fixed64 scale = dynamicFrictionLimit / magnitude;
+            if (dynamicFrictionLimit != Fixed64.Zero
+                && scale == Fixed64.Zero)
+            {
+                return false;
+            }
+
+            Fixed64 desiredTangentImpulse = tangentImpulse;
+            Fixed64 desiredSecondaryTangentImpulse =
+                secondaryTangentImpulse;
+            tangentImpulse *= scale;
+            secondaryTangentImpulse *= scale;
+            if (dynamicFrictionLimit != Fixed64.Zero
+                && ((desiredTangentImpulse != Fixed64.Zero
+                        && tangentImpulse == Fixed64.Zero)
+                    || (desiredSecondaryTangentImpulse != Fixed64.Zero
+                        && secondaryTangentImpulse == Fixed64.Zero)))
+            {
+                return false;
+            }
+        }
+
+        return Fixed64.TrySubtract(
+                tangentImpulse,
+                contact.CachedTangentImpulse,
+                out tangentDelta)
+            & Fixed64.TrySubtract(
+                secondaryTangentImpulse,
+                contact.CachedSecondaryTangentImpulse,
+                out secondaryTangentDelta);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
@@ -657,8 +747,6 @@ public static class CollisionResponse
         out Fixed64 tangentImpulse,
         out Fixed64 secondaryTangentImpulse)
     {
-        tangentImpulse = Fixed64.Zero;
-        secondaryTangentImpulse = Fixed64.Zero;
         GetExactLevers(
             pair,
             contact,
@@ -666,187 +754,245 @@ public static class CollisionResponse
             responsePositionB,
             out ExactLever3D exactA,
             out ExactLever3D exactB);
-
-        Fixed64 staticFrictionLimit =
-            normalImpulseScalar > Fixed64.Zero
-                && contact.StaticFriction > Fixed64.Zero
-                ? normalImpulseScalar * contact.StaticFriction
-                : Fixed64.Zero;
-        Fixed64 dynamicFrictionLimit =
-            normalImpulseScalar > Fixed64.Zero
-                && contact.DynamicFriction > Fixed64.Zero
-                ? normalImpulseScalar * contact.DynamicFriction
-                : Fixed64.Zero;
-        if (staticFrictionLimit <= Fixed64.Zero
-            && dynamicFrictionLimit <= Fixed64.Zero)
-        {
-            return TryApplyFrictionDelta(
-                pair,
-                contact,
-                responsePositionA,
-                responsePositionB,
-                -contact.CachedTangentImpulse,
-                -contact.CachedSecondaryTangentImpulse);
-        }
-
-        if (!TryComputeTangentImpulseDeltaExact(
-                contact,
+        Vector3d linearA = ResolveLinearVelocity(contact.A.Body);
+        Vector3d angularA = ResolveAngularVelocity(contact.A.Body);
+        Vector3d linearB = ResolveLinearVelocity(contact.B.Body);
+        Vector3d angularB = ResolveAngularVelocity(contact.B.Body);
+        ExactContactResponseOperand3D primaryFirst =
+            ExactContactLever3D.CreateResponseOperand(
+                contact.A.Body,
+                linearA,
+                angularA,
                 exactA,
+                -contact.Tangent);
+        ExactContactResponseOperand3D primarySecond =
+            ExactContactLever3D.CreateResponseOperand(
+                contact.B.Body,
+                linearB,
+                angularB,
                 exactB,
+                contact.Tangent);
+        ExactContactResponseOperand3D secondaryFirst =
+            ExactContactLever3D.CreateResponseOperand(
+                contact.A.Body,
+                linearA,
+                angularA,
+                exactA,
+                -contact.SecondaryTangent);
+        ExactContactResponseOperand3D secondarySecond =
+            ExactContactLever3D.CreateResponseOperand(
+                contact.B.Body,
+                linearB,
+                angularB,
+                exactB,
+                contact.SecondaryTangent);
+        if (!ExactContactResponseKernel.TryGetCoulombDiskResponse(
+                contact.Normal,
+                normalImpulseScalar,
+                primaryFirst,
+                primarySecond,
                 contact.Tangent,
-                out Fixed64 tangentDelta)
-            || !TryComputeTangentImpulseDeltaExact(
-                contact,
-                exactA,
-                exactB,
+                contact.CachedTangentImpulse,
+                secondaryFirst,
+                secondarySecond,
                 contact.SecondaryTangent,
-                out Fixed64 secondaryTangentDelta))
+                contact.CachedSecondaryTangentImpulse,
+                contact.StaticFriction,
+                contact.DynamicFriction,
+                out ExactCoulombResponse3D response))
         {
+            tangentImpulse = default;
+            secondaryTangentImpulse = default;
             return false;
         }
 
-        tangentImpulse = contact.CachedTangentImpulse + tangentDelta;
-        secondaryTangentImpulse =
-            contact.CachedSecondaryTangentImpulse
-            + secondaryTangentDelta;
-        Fixed64 desiredMagnitudeSquared =
-            tangentImpulse * tangentImpulse
-            + secondaryTangentImpulse * secondaryTangentImpulse;
-        Fixed64 staticLimitSquared =
-            staticFrictionLimit * staticFrictionLimit;
-        if (desiredMagnitudeSquared > staticLimitSquared)
-        {
-            ClampTangentImpulsePair(
-                ref tangentImpulse,
-                ref secondaryTangentImpulse,
-                dynamicFrictionLimit);
-        }
-
-        return TryApplyFrictionDelta(
-            pair,
-            contact,
-            responsePositionA,
-            responsePositionB,
-            tangentImpulse - contact.CachedTangentImpulse,
-            secondaryTangentImpulse
-                - contact.CachedSecondaryTangentImpulse);
+        _ = response.TryGetPrimaryAccumulatedImpulse(out tangentImpulse);
+        _ = response.TryGetSecondaryAccumulatedImpulse(
+            out secondaryTangentImpulse);
+        return !response.HasAppliedImpulse
+            || TryApplyVelocityDeltas(
+                contact,
+                response.FirstLinearVelocityDelta,
+                response.FirstAngularVelocityDelta,
+                response.SecondLinearVelocityDelta,
+                response.SecondAngularVelocityDelta);
     }
 
-    private static bool TryComputeTangentImpulseDeltaExact(
+    private static bool TryGetCompactTangentImpulseDelta(
         SolverContact contact,
-        in ExactLever3D exactA,
-        in ExactLever3D exactB,
+        Vector3d relativeVelocity,
         Vector3d tangent,
         out Fixed64 impulseDelta)
     {
         impulseDelta = Fixed64.Zero;
-        if (!TryComputeRelativeVelocityProjectionExact(
-                contact,
-                exactA,
-                exactB,
+        if (!ContactResponseArithmetic3D.TryDot(
+                relativeVelocity,
                 tangent,
                 out Fixed64 tangentVelocity))
         {
             return false;
         }
 
-        if (tangentVelocity.Abs() <= Fixed64.Epsilon)
+        if (tangentVelocity >= -Fixed64.Epsilon
+            && tangentVelocity <= Fixed64.Epsilon)
+        {
             return true;
+        }
 
-        if (!TryComputeImpulseDenominatorExact(
-                contact,
-                exactA,
-                exactB,
+        bool denominatorsResolved =
+            ContactNormalImpulse3D.TryComputeAngularDenominator(
+                contact.A.Body,
+                contact.RelativeA.Vector,
                 tangent,
-                out Fixed64 denominator))
+                out Fixed64 angularA);
+        denominatorsResolved &=
+            ContactNormalImpulse3D.TryComputeAngularDenominator(
+                contact.B.Body,
+                contact.RelativeB.Vector,
+                tangent,
+                out Fixed64 angularB);
+        denominatorsResolved &= TryGetCompactConstrainedInverseMass(
+            contact.A,
+            tangent,
+            out Fixed64 linearA);
+        denominatorsResolved &= TryGetCompactConstrainedInverseMass(
+            contact.B,
+            tangent,
+            out Fixed64 linearB);
+        var denominatorTerms = new ContactEffectiveMassTerms3D(
+            linearA,
+            linearB,
+            angularA,
+            angularB);
+        bool denominatorResolved = denominatorsResolved
+            & denominatorTerms.TryGetValue(out Fixed64 denominator);
+        if (!denominatorResolved)
         {
             return false;
         }
 
-        if (denominator > Fixed64.Epsilon)
-            impulseDelta = -tangentVelocity / denominator;
-        return true;
+        if (denominator <= Fixed64.Epsilon)
+            return true;
+
+        return Fixed64.TryMultiplyDivide(
+                tangentVelocity,
+                -Fixed64.One,
+                denominator,
+                out impulseDelta)
+            && impulseDelta != Fixed64.Zero;
     }
 
-    private static Fixed64 ComputeTangentImpulseDelta(
-        SolverContact contact,
-        Vector3d relativeVelocity,
-        Vector3d tangent)
-    {
-        Fixed64 tangentVelocity = Vector3d.Dot(relativeVelocity, tangent);
-        if (tangentVelocity.Abs() <= Fixed64.Epsilon)
-            return Fixed64.Zero;
-
-        Fixed64 denominator =
-            ComputeImpulseDenominator(contact, tangent);
-        return denominator > Fixed64.Epsilon
-            ? -tangentVelocity / denominator
-            : Fixed64.Zero;
-    }
-
-    private static bool TryApplyFrictionDelta(
-        CollisionPair pair,
-        SolverContact contact,
-        Vector3d responsePositionA,
-        Vector3d responsePositionB,
-        Fixed64 tangentDelta,
-        Fixed64 secondaryTangentDelta)
-    {
-        return TryApplyContactImpulseCombination(
-            pair,
-            contact,
-            responsePositionA,
-            responsePositionB,
-            contact.Normal,
-            Fixed64.Zero,
-            contact.Tangent,
-            tangentDelta,
-            contact.SecondaryTangent,
-            secondaryTangentDelta);
-    }
-
-    private static void ClampTangentImpulsePair(
-        ref Fixed64 tangentImpulse,
-        ref Fixed64 secondaryTangentImpulse,
-        Fixed64 maxMagnitude)
-    {
-        Fixed64 magnitudeSquared = tangentImpulse * tangentImpulse
-            + secondaryTangentImpulse * secondaryTangentImpulse;
-        Fixed64 magnitude = FixedMath.Sqrt(magnitudeSquared);
-        Fixed64 scale = maxMagnitude / magnitude;
-        tangentImpulse *= scale;
-        secondaryTangentImpulse *= scale;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Vector3d ComputeRelativeVelocity(SolverContact contact)
-    {
-        Vector3d velocityA = ResolveLinearVelocity(contact.A.Body)
-            + Vector3d.Cross(
-                ResolveAngularVelocity(contact.A.Body),
-                contact.RelativeA.Vector);
-        Vector3d velocityB = ResolveLinearVelocity(contact.B.Body)
-            + Vector3d.Cross(
-                ResolveAngularVelocity(contact.B.Body),
-                contact.RelativeB.Vector);
-        return velocityB - velocityA;
-    }
-
-    private static bool TryComputeRelativeVelocityProjectionExact(
-        SolverContact contact,
-        in ExactLever3D exactA,
-        in ExactLever3D exactB,
+    private static bool TryGetCompactConstrainedInverseMass(
+        ResponseBody body,
         Vector3d axis,
-        out Fixed64 projection) =>
-        ExactContactLever3D.TryComputeNormalVelocity(
-            ResolveLinearVelocity(contact.A.Body),
-            ResolveAngularVelocity(contact.A.Body),
-            exactA,
-            ResolveLinearVelocity(contact.B.Body),
-            ResolveAngularVelocity(contact.B.Body),
-            exactB,
-            axis,
-            out projection);
+        out Fixed64 inverseMass)
+    {
+        inverseMass = body.GetConstrainedInverseMass(axis);
+        return inverseMass != Fixed64.Zero
+            || body.InverseMass == Fixed64.Zero
+            || body.Body.ProjectLinearMotion(axis) == Vector3d.Zero;
+    }
+
+    private static bool TryGetCompactRelativeVelocity(
+        Vector3d linearA,
+        Vector3d angularA,
+        Vector3d leverA,
+        Vector3d linearB,
+        Vector3d angularB,
+        Vector3d leverB,
+        Vector3d tangent,
+        out Vector3d relativeVelocity)
+    {
+        if (ContactResponseArithmetic3D.CanUseFastPointVelocity(
+                linearA,
+                angularA,
+                leverA,
+                linearB,
+                angularB,
+                leverB,
+                tangent))
+        {
+            Vector3d fastPointVelocityA =
+                linearA + Vector3d.Cross(angularA, leverA);
+            Vector3d fastPointVelocityB =
+                linearB + Vector3d.Cross(angularB, leverB);
+            relativeVelocity = fastPointVelocityB - fastPointVelocityA;
+            return true;
+        }
+
+        bool pointVelocitiesResolved = ContactResponseArithmetic3D.TryCross(
+                angularA,
+                leverA,
+                out Vector3d angularVelocityA)
+            & ContactResponseArithmetic3D.TryCross(
+                angularB,
+                leverB,
+                out Vector3d angularVelocityB)
+            & Vector3d.TryAdd(
+                linearA,
+                angularVelocityA,
+                out Vector3d pointVelocityA)
+            & Vector3d.TryAdd(
+                linearB,
+                angularVelocityB,
+                out Vector3d pointVelocityB);
+        if (!pointVelocitiesResolved)
+        {
+            relativeVelocity = default;
+            return false;
+        }
+
+        return Vector3d.TrySubtract(
+            pointVelocityB,
+            pointVelocityA,
+            out relativeVelocity);
+    }
+
+    private static bool TryGetFrictionLimit(
+        Fixed64 normalImpulse,
+        Fixed64 friction,
+        out Fixed64 limit)
+    {
+        if (normalImpulse <= Fixed64.Zero || friction <= Fixed64.Zero)
+        {
+            limit = Fixed64.Zero;
+            return true;
+        }
+
+        return Fixed64.TryMultiplyDivide(
+                normalImpulse,
+                friction,
+                Fixed64.One,
+                out limit)
+            && limit != Fixed64.Zero;
+    }
+
+    private static bool TryGetMagnitudeSquared(
+        Fixed64 first,
+        Fixed64 second,
+        out Fixed64 result)
+    {
+        bool resolved = TryGetSquare(first, out Fixed64 firstSquared)
+            & TryGetSquare(second, out Fixed64 secondSquared);
+        if (!resolved)
+        {
+            result = default;
+            return false;
+        }
+
+        return Fixed64.TryAdd(
+            firstSquared,
+            secondSquared,
+            out result);
+    }
+
+    private static bool TryGetSquare(Fixed64 value, out Fixed64 square) =>
+        Fixed64.TryMultiplyDivide(
+            value,
+            value,
+            Fixed64.One,
+            out square)
+        && (value == Fixed64.Zero || square != Fixed64.Zero);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Vector3d ResolveLinearVelocity(SolidBody body) =>
@@ -861,56 +1007,6 @@ public static class CollisionResponse
             body.IsKinematic
                 ? body.SampleContinuousCollisionAngularVelocity(Fixed64.One)
                 : body.AngularVelocity);
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Fixed64 ComputeImpulseDenominator(
-        SolverContact contact,
-        Vector3d axis)
-    {
-        return contact.GetTotalInverseMass(axis)
-            + ComputeAngularDenominator(
-                contact.A,
-                contact.RelativeA.Vector,
-                axis)
-            + ComputeAngularDenominator(
-                contact.B,
-                contact.RelativeB.Vector,
-                axis);
-    }
-
-    private static Fixed64 ComputeAngularDenominator(
-        ResponseBody body,
-        Vector3d relativeContactPoint,
-        Vector3d axis)
-    {
-        if (!body.CanRotate)
-            return Fixed64.Zero;
-
-        Vector3d angularVelocityDelta =
-            body.ApplyConstrainedInverseInertia(
-                Vector3d.Cross(relativeContactPoint, axis));
-        Vector3d angular = Vector3d.Cross(
-            angularVelocityDelta,
-            relativeContactPoint);
-        Fixed64 denominator = Vector3d.Dot(angular, axis);
-        return denominator > Fixed64.Zero
-            ? denominator
-            : Fixed64.Zero;
-    }
-
-    private static bool TryComputeImpulseDenominatorExact(
-        SolverContact contact,
-        in ExactLever3D exactA,
-        in ExactLever3D exactB,
-        Vector3d axis,
-        out Fixed64 denominator) =>
-        ExactContactLever3D.TryComputeDenominator(
-            contact.A.Body,
-            exactA,
-            contact.B.Body,
-            exactB,
-            axis,
-            out denominator);
 
     private static bool TryApplyExactImpulse(
         SolverContact contact,
@@ -1036,20 +1132,39 @@ public static class CollisionResponse
                 impulse,
                 inverseInertia))
         {
+            Vector3d fastTorqueAxis =
+                Vector3d.Cross(relativeContactPoint, impulse);
             velocityDelta = Fixed3x3.TransformDirection(
                 inverseInertia,
-                Vector3d.Cross(relativeContactPoint, impulse));
-            return true;
+                fastTorqueAxis);
+            return ContactResponseArithmetic3D
+                    .PreservesNonzeroCrossProduct(
+                        relativeContactPoint,
+                        impulse,
+                        fastTorqueAxis)
+                && ContactResponseArithmetic3D
+                    .PreservesNonzeroTransformDirection(
+                        inverseInertia,
+                        fastTorqueAxis,
+                        velocityDelta);
         }
 
-        return ContactResponseArithmetic3D.TryCross(
+        if (!ContactResponseArithmetic3D.TryCross(
                 relativeContactPoint,
                 impulse,
                 out Vector3d torqueAxis)
-            && ContactResponseArithmetic3D.TryTransformDirection(
-                inverseInertia,
-                torqueAxis,
-                out velocityDelta);
+            || !ContactResponseArithmetic3D.PreservesNonzeroCrossProduct(
+                relativeContactPoint,
+                impulse,
+                torqueAxis))
+        {
+            return false;
+        }
+
+        return ContactResponseArithmetic3D.TryTransformDirection(
+            inverseInertia,
+            torqueAxis,
+            out velocityDelta);
     }
 
     private static bool TryPrepareVelocityStates(

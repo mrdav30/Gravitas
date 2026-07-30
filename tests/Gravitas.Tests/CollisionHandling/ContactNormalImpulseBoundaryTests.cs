@@ -11,6 +11,38 @@ namespace Gravitas.Tests.Response;
 public sealed class ContactNormalImpulseBoundaryTests
 {
     [Fact]
+    public void ResponseTransform_WithSubPrecisionNonzeroSum_ShouldRejectCompactResult()
+    {
+        Fixed64 coefficient = Fixed64.FromFraction(2, 5);
+        var matrix = new Fixed3x3(
+            coefficient, Fixed64.Zero, Fixed64.Zero,
+            coefficient, Fixed64.Zero, Fixed64.Zero,
+            coefficient, Fixed64.Zero, Fixed64.Zero);
+        Vector3d direction = new(
+            Fixed64.MinIncrement,
+            Fixed64.MinIncrement,
+            Fixed64.MinIncrement);
+
+        Fixed3x3.TransformDirection(matrix, direction)
+            .Should()
+            .Be(Vector3d.Zero);
+        Fixed3x3.TryTransformDirection(
+                matrix,
+                direction,
+                out Vector3d exact)
+            .Should()
+            .BeTrue();
+        exact.X.Should().Be(Fixed64.MinIncrement);
+
+        ContactResponseArithmetic3D.TryTransformDirection(
+                matrix,
+                direction,
+                out _)
+            .Should()
+            .BeFalse();
+    }
+
+    [Fact]
     public void ExactUnaccumulatedKernel_ShouldHandleSeparatingAndImmovablePairs()
     {
         ExactLever3D exactParallel = CreateLever(

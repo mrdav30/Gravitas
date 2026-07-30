@@ -1,6 +1,6 @@
 # Full-Domain Friction Response Implementation Plan
 
-**Status:** Active. Phases 0-1 are complete; Phase 1 is awaiting owner review.
+**Status:** Active. Phases 0-2 are complete; Phase 2 is awaiting owner review.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use
 > `superpowers:test-driven-development` while changing behavior,
@@ -205,43 +205,78 @@ coverage pass. Do not change pure 2D or mixed response in this phase.
 - Modify:
   `src/Gravitas/CollisionHandling/Response/3D/CollisionResponse.cs`
 - Modify:
+  `src/Gravitas/CollisionHandling/Response/3D/ContactNormalImpulse3D.cs`
+- Modify:
+  `src/Gravitas/CollisionHandling/Response/3D/ContactResponseArithmetic3D.cs`
+- Modify:
   `src/Gravitas/CollisionHandling/Response/Exact/ExactContactResponseKernel.Coulomb.cs`
+- Modify:
+  `src/Gravitas/CollisionHandling/Response/Exact/ExactContactResponseKernel.Normal.cs`
+- Simplify:
+  `src/Gravitas/CollisionHandling/Response/3D/ExactContactLever3D.cs`,
+  `src/Gravitas/CollisionHandling/Response/3D/ResponseBody.cs`,
+  `src/Gravitas/CollisionHandling/Response/3D/SolverContact.cs`, and
+  `src/Gravitas/CollisionHandling/Response/Exact/ExactLever3D.Arithmetic.cs`
 - Modify:
   `tests/Gravitas.Tests/CollisionHandling/CollisionResponseExactLeverTests.cs`
 - Modify:
   `tests/Gravitas.Tests/CollisionHandling/CollisionWarmStartTests.cs`
 - Modify:
-  `tests/Gravitas.Tests/Determinism/GravitasReplayConformanceTests.cs`
+  `tests/Gravitas.Tests/CollisionHandling/ContactNormalImpulseBoundaryTests.cs`
+- Modify:
+  `tests/Gravitas.Tests/CollisionHandling/ExactContactResponseKernel.Coulomb.Tests.cs`
+- Delete when its production owner is removed:
+  `tests/Gravitas.Tests/CollisionHandling/ExactLever3D.Tests.cs`
 - Update:
   `docs/wiki/COLLISION_RESPONSE.md`
 - Update:
   `docs/feature-work/2026-07-29-full-domain-friction-response-plan.md`
 
-- [ ] Add failing 3D regressions for compact point-velocity overflow, angular
+- [x] Add failing 3D regressions for compact point-velocity overflow, angular
   effective-mass overflow, cache-plus-delta cancellation, exact cache removal,
   static disk retention, dynamic disk projection, mirrored extremes, and true
   final overflow.
-- [ ] Prove atomic rejection by asserting both bodies and all three warm-start
-  scalars remain unchanged when a final delta cannot be represented.
-- [ ] Add a deterministic repeated-run regression with nonzero cached primary
+- [x] Prove friction-delta atomicity by asserting that a failed final friction
+  delta cannot partially mutate either body or publish partially updated
+  tangent caches. The already-applied normal response remains authoritative;
+  atomically preflighting normal and friction together would be a separate
+  solver-phase redesign.
+- [x] Add a deterministic repeated-run regression with nonzero cached primary
   and secondary tangent impulses.
-- [ ] Add or extend a warmed allocation assertion for the exact cached-disk
+- [x] Add or extend a warmed allocation assertion for the exact cached-disk
   fallback.
-- [ ] Add the exact-kernel entry path for an already-completed non-negative
+- [x] Add the exact-kernel entry path for an already-completed non-negative
   normal accumulator and converge it on the Phase 1 disk core.
-- [ ] Give the compact 3D path one conservative admission gate using existing
+- [x] Give the compact 3D path one conservative admission gate using existing
   `ContactResponseArithmetic3D` and checked `Fixed64` operations.
-- [ ] Route every failed compact proof to the exact disk owner.
-- [ ] Replace `TrySolveFrictionImpulseExact`,
+- [x] Route every failed compact proof to the exact disk owner.
+- [x] Replace `TrySolveFrictionImpulseExact`,
   `TryComputeTangentImpulseDeltaExact`, and `ClampTangentImpulsePair` where
   their behavior is fully subsumed; delete rather than retain forwarding hops.
-- [ ] Preserve the existing tangent basis, contact order, warm-start storage,
+- [x] Preserve the existing tangent basis, contact order, warm-start storage,
   diagnostics, and compact ordinary-domain results.
-- [ ] Run focused 3D response, replay, and allocation tests.
-- [ ] Run focused coverage and remove unreachable branches rather than writing
+- [x] Run focused 3D response, replay, and allocation tests.
+- [x] Run focused coverage and remove unreachable branches rather than writing
   hollow tests.
-- [ ] Request independent review, resolve findings, record results, and stop
+- [x] Request independent review, resolve findings, record results, and stop
   for owner review.
+
+**Phase 2 result:** 3D friction now keeps proven-safe contacts on the compact
+solver while routing any unsafe point velocity, effective mass, cache
+accumulation, disk clamp, or final velocity materialization once through the
+exact cached Coulomb-disk owner. Friction deltas are preflighted across both
+bodies before application; an unrepresentable friction result leaves the
+already-applied normal response authoritative and publishes no partial tangent
+cache. Duplicate exact-friction arithmetic and its forwarding-only helpers
+were removed. Focused 3D response, exact-kernel, warm-start, allocation, and
+boundary coverage passes `106/106`; the warmed exact cached-disk path allocates
+zero bytes. The authoritative Release gate passes `3,843/3,843` tests with
+`43,534/43,534` lines, `12,745/12,745` branches, and `4,507/4,507` methods
+covered. ReleaseLean passes `3,788/3,788`; normal and Lean multi-target package
+builds pass serially with zero warnings or errors so lower-stack local-link
+restores cannot race across configurations. Independent review found no
+remaining correctness, scope, or allocation issue. Pure 2D and mixed response
+remain unchanged for Phase 3.
 
 ---
 

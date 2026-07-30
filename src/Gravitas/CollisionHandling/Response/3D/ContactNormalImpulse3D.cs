@@ -704,9 +704,36 @@ internal static class ContactNormalImpulse3D
             Vector3d fastAngular = Vector3d.Cross(
                 fastAngularVelocityDelta,
                 relativeContactPoint);
-            denominator = FixedMath.Max(
-                Vector3d.Dot(fastAngular, axis),
-                Fixed64.Zero);
+            denominator = Vector3d.Dot(fastAngular, axis);
+            bool responsePreserved =
+                ContactResponseArithmetic3D.PreservesNonzeroCrossProduct(
+                    relativeContactPoint,
+                    axis,
+                    fastTorqueAxis);
+            responsePreserved &=
+                ContactResponseArithmetic3D
+                .PreservesNonzeroTransformDirection(
+                    inverseInertia,
+                    fastTorqueAxis,
+                    fastAngularVelocityDelta);
+            responsePreserved &=
+                ContactResponseArithmetic3D
+                .PreservesNonzeroCrossProduct(
+                    fastAngularVelocityDelta,
+                    relativeContactPoint,
+                    fastAngular);
+            responsePreserved &=
+                ContactResponseArithmetic3D.PreservesNonzeroDotProduct(
+                    fastAngular,
+                    axis,
+                    denominator);
+            if (!responsePreserved)
+            {
+                denominator = default;
+                return false;
+            }
+
+            denominator = FixedMath.Max(denominator, Fixed64.Zero);
             return true;
         }
 
@@ -714,6 +741,10 @@ internal static class ContactNormalImpulse3D
                 relativeContactPoint,
                 axis,
                 out Vector3d torqueAxis)
+            || !ContactResponseArithmetic3D.PreservesNonzeroCrossProduct(
+                relativeContactPoint,
+                axis,
+                torqueAxis)
             || !ContactResponseArithmetic3D.TryTransformDirection(
                 inverseInertia,
                 torqueAxis,
@@ -722,10 +753,18 @@ internal static class ContactNormalImpulse3D
                 angularVelocityDelta,
                 relativeContactPoint,
                 out Vector3d angular)
+            || !ContactResponseArithmetic3D.PreservesNonzeroCrossProduct(
+                angularVelocityDelta,
+                relativeContactPoint,
+                angular)
             || !ContactResponseArithmetic3D.TryDot(
                 angular,
                 axis,
-                out denominator))
+                out denominator)
+            || !ContactResponseArithmetic3D.PreservesNonzeroDotProduct(
+                angular,
+                axis,
+                denominator))
         {
             denominator = default;
             return false;

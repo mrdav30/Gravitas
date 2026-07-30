@@ -766,6 +766,20 @@ public sealed partial class ExactContactResponseKernelCoulombTests
             Vector3d.Forward,
             Fixed64.One,
             Fixed3x3.Zero);
+        var secondaryFirst = new ExactContactResponseOperand3D(
+            lever,
+            constraint.First.LinearVelocity,
+            Vector3d.Zero,
+            -Vector3d.Up,
+            Fixed64.One,
+            Fixed3x3.Zero);
+        var secondarySecond = new ExactContactResponseOperand3D(
+            lever,
+            Vector3d.Zero,
+            Vector3d.Zero,
+            Vector3d.Up,
+            Fixed64.One,
+            Fixed3x3.Zero);
 
         Assert.False(ExactContactResponseKernel.TryGetCoulombLineResponse(
             constraint,
@@ -857,6 +871,57 @@ public sealed partial class ExactContactResponseKernelCoulombTests
             first,
             second,
             Vector3d.Right,
+            Fixed64.Zero,
+            Fixed64.One,
+            Fixed64.One,
+            out _));
+        Assert.False(ExactContactResponseKernel.TryGetCoulombDiskResponse(
+            constraint.Normal,
+            -Fixed64.MinIncrement,
+            first,
+            second,
+            Vector3d.Forward,
+            Fixed64.Zero,
+            secondaryFirst,
+            secondarySecond,
+            Vector3d.Up,
+            Fixed64.Zero,
+            Fixed64.One,
+            Fixed64.One,
+            out _));
+        Assert.False(ExactContactResponseKernel.TryGetCoulombDiskResponse(
+            constraint.Normal,
+            Fixed64.One,
+            first,
+            second,
+            Vector3d.Forward,
+            Fixed64.Zero,
+            secondaryFirst,
+            secondarySecond,
+            Vector3d.Forward,
+            Fixed64.Zero,
+            Fixed64.One,
+            Fixed64.One,
+            out _));
+
+        var invalidNormalAccumulator = new ExactNormalConstraint3D(
+            constraint.First,
+            constraint.Second,
+            constraint.Normal,
+            -Fixed64.MinIncrement,
+            Fixed64.Zero,
+            Fixed64.Zero,
+            Fixed64.One,
+            Fixed64.One);
+        Assert.False(ExactContactResponseKernel.TryGetCoulombDiskResponse(
+            invalidNormalAccumulator,
+            first,
+            second,
+            Vector3d.Forward,
+            Fixed64.Zero,
+            secondaryFirst,
+            secondarySecond,
+            Vector3d.Up,
             Fixed64.Zero,
             Fixed64.One,
             Fixed64.One,

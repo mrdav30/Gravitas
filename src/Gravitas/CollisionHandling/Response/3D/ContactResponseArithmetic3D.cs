@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using FixedMathSharp.Geometry;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas.CollisionHandling;
@@ -94,13 +95,17 @@ internal static class ContactResponseArithmetic3D
         if (HasSafeProductInputs(matrix, direction))
         {
             result = Fixed3x3.TransformDirection(matrix, direction);
-            return true;
+            return PreservesNonzeroTransformDirection(
+                matrix,
+                direction,
+                result);
         }
 
         return Fixed3x3.TryTransformDirection(
             matrix,
             direction,
-            out result);
+            out result)
+            && PreservesNonzeroTransformDirection(matrix, direction, result);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -124,7 +129,14 @@ internal static class ContactResponseArithmetic3D
             result = first * firstScale
                 + second * secondScale
                 + third * thirdScale;
-            return true;
+            return PreservesNonzeroLinearCombination(
+                first,
+                firstScale,
+                second,
+                secondScale,
+                third,
+                thirdScale,
+                result);
         }
 
         return Vector3d.TryLinearCombination(
@@ -134,7 +146,15 @@ internal static class ContactResponseArithmetic3D
             secondScale,
             third,
             thirdScale,
-            out result);
+            out result)
+            && PreservesNonzeroLinearCombination(
+                first,
+                firstScale,
+                second,
+                secondScale,
+                third,
+                thirdScale,
+                result);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -167,6 +187,199 @@ internal static class ContactResponseArithmetic3D
         result = resolved ? new Vector3d(x, y, z) : default;
         return resolved;
     }
+
+    internal static bool PreservesNonzeroCrossProduct(
+        Vector3d left,
+        Vector3d right,
+        Vector3d result)
+    {
+        bool inspectX = result.X == Fixed64.Zero
+            && HasNonzeroDifferenceTerm(
+                left.Y,
+                right.Z,
+                left.Z,
+                right.Y);
+        bool inspectY = result.Y == Fixed64.Zero
+            && HasNonzeroDifferenceTerm(
+                left.Z,
+                right.X,
+                left.X,
+                right.Z);
+        bool inspectZ = result.Z == Fixed64.Zero
+            && HasNonzeroDifferenceTerm(
+                left.X,
+                right.Y,
+                left.Y,
+                right.X);
+        if (!(inspectX | inspectY | inspectZ))
+            return true;
+
+        WideGeometry.GetDifferenceCrossProduct3D(
+            left.X, Fixed64.Zero,
+            left.Y, Fixed64.Zero,
+            left.Z, Fixed64.Zero,
+            right.X, Fixed64.Zero,
+            right.Y, Fixed64.Zero,
+            right.Z, Fixed64.Zero,
+            out Signed192 exactX,
+            out Signed192 exactY,
+            out Signed192 exactZ);
+        return PreservesExactValue(inspectX, exactX)
+            & PreservesExactValue(inspectY, exactY)
+            & PreservesExactValue(inspectZ, exactZ);
+    }
+
+    internal static bool PreservesNonzeroDotProduct(
+        Vector3d left,
+        Vector3d right,
+        Fixed64 result)
+    {
+        if (result != Fixed64.Zero
+            || !HasNonzeroTerm(
+                left.X,
+                right.X,
+                left.Y,
+                right.Y,
+                left.Z,
+                right.Z))
+        {
+            return true;
+        }
+
+        return GetLinearCombinationComponent(
+            left.X,
+            right.X,
+            left.Y,
+            right.Y,
+            left.Z,
+            right.Z).IsZero;
+    }
+
+    internal static bool PreservesNonzeroTransformDirection(
+        Fixed3x3 matrix,
+        Vector3d direction,
+        Vector3d result)
+    {
+        bool inspectX = result.X == Fixed64.Zero
+            && HasNonzeroTerm(
+                direction.X,
+                matrix.M11,
+                direction.Y,
+                matrix.M21,
+                direction.Z,
+                matrix.M31);
+        bool inspectY = result.Y == Fixed64.Zero
+            && HasNonzeroTerm(
+                direction.X,
+                matrix.M12,
+                direction.Y,
+                matrix.M22,
+                direction.Z,
+                matrix.M32);
+        bool inspectZ = result.Z == Fixed64.Zero
+            && HasNonzeroTerm(
+                direction.X,
+                matrix.M13,
+                direction.Y,
+                matrix.M23,
+                direction.Z,
+                matrix.M33);
+        if (!(inspectX | inspectY | inspectZ))
+            return true;
+
+        Signed192 exactX = GetLinearCombinationComponent(
+            direction.X,
+            matrix.M11,
+            direction.Y,
+            matrix.M21,
+            direction.Z,
+            matrix.M31);
+        Signed192 exactY = GetLinearCombinationComponent(
+            direction.X,
+            matrix.M12,
+            direction.Y,
+            matrix.M22,
+            direction.Z,
+            matrix.M32);
+        Signed192 exactZ = GetLinearCombinationComponent(
+            direction.X,
+            matrix.M13,
+            direction.Y,
+            matrix.M23,
+            direction.Z,
+            matrix.M33);
+        return PreservesExactValue(inspectX, exactX)
+            & PreservesExactValue(inspectY, exactY)
+            & PreservesExactValue(inspectZ, exactZ);
+    }
+
+    private static bool PreservesNonzeroLinearCombination(
+        Vector3d first,
+        Fixed64 firstScale,
+        Vector3d second,
+        Fixed64 secondScale,
+        Vector3d third,
+        Fixed64 thirdScale,
+        Vector3d result)
+    {
+        bool inspectX = result.X == Fixed64.Zero
+            && HasNonzeroTerm(
+                first.X,
+                firstScale,
+                second.X,
+                secondScale,
+                third.X,
+                thirdScale);
+        bool inspectY = result.Y == Fixed64.Zero
+            && HasNonzeroTerm(
+                first.Y,
+                firstScale,
+                second.Y,
+                secondScale,
+                third.Y,
+                thirdScale);
+        bool inspectZ = result.Z == Fixed64.Zero
+            && HasNonzeroTerm(
+                first.Z,
+                firstScale,
+                second.Z,
+                secondScale,
+                third.Z,
+                thirdScale);
+        if (!(inspectX | inspectY | inspectZ))
+            return true;
+
+        Signed192 exactX = GetLinearCombinationComponent(
+            first.X,
+            firstScale,
+            second.X,
+            secondScale,
+            third.X,
+            thirdScale);
+        Signed192 exactY = GetLinearCombinationComponent(
+            first.Y,
+            firstScale,
+            second.Y,
+            secondScale,
+            third.Y,
+            thirdScale);
+        Signed192 exactZ = GetLinearCombinationComponent(
+            first.Z,
+            firstScale,
+            second.Z,
+            secondScale,
+            third.Z,
+            thirdScale);
+        return PreservesExactValue(inspectX, exactX)
+            & PreservesExactValue(inspectY, exactY)
+            & PreservesExactValue(inspectZ, exactZ);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool PreservesExactValue(
+        bool inspect,
+        Signed192 exact) =>
+        !inspect || exact.IsZero;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool HasSafeProductInputs(
@@ -211,6 +424,42 @@ internal static class ContactResponseArithmetic3D
             GetAggregateMagnitude(value)
             | GetRawMagnitude(scale),
             SafeProductMagnitudeShift);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool HasNonzeroTerm(
+        Fixed64 first,
+        Fixed64 firstScale,
+        Fixed64 second,
+        Fixed64 secondScale,
+        Fixed64 third,
+        Fixed64 thirdScale) =>
+        (first != Fixed64.Zero && firstScale != Fixed64.Zero)
+        || (second != Fixed64.Zero && secondScale != Fixed64.Zero)
+        || (third != Fixed64.Zero && thirdScale != Fixed64.Zero);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static bool HasNonzeroDifferenceTerm(
+        Fixed64 first,
+        Fixed64 firstScale,
+        Fixed64 second,
+        Fixed64 secondScale) =>
+        (first != Fixed64.Zero && firstScale != Fixed64.Zero)
+        || (second != Fixed64.Zero && secondScale != Fixed64.Zero);
+
+    private static Signed192 GetLinearCombinationComponent(
+        Fixed64 first,
+        Fixed64 firstScale,
+        Fixed64 second,
+        Fixed64 secondScale,
+        Fixed64 third,
+        Fixed64 thirdScale) =>
+        WideGeometry.GetDifferenceDotProduct3D(
+            first, Fixed64.Zero,
+            second, Fixed64.Zero,
+            third, Fixed64.Zero,
+            firstScale, Fixed64.Zero,
+            secondScale, Fixed64.Zero,
+            thirdScale, Fixed64.Zero);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool IsSafeMagnitude(

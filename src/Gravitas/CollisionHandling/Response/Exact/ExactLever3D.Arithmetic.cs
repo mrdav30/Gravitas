@@ -16,39 +16,7 @@ namespace Gravitas.CollisionHandling;
 /// </content>
 internal readonly partial struct ExactLever3D
 {
-    internal static bool TryGetRelativePointVelocityProjection(
-        Vector3d firstLinearVelocity,
-        Vector3d firstAngularVelocity,
-        in ExactLever3D firstLever,
-        Vector3d secondLinearVelocity,
-        Vector3d secondAngularVelocity,
-        in ExactLever3D secondLever,
-        Vector3d projectionAxis,
-        out Fixed64 projection)
-    {
-        if (!TryGetRelativePointVelocityRatio(
-                firstLinearVelocity,
-                firstAngularVelocity,
-                firstLever,
-                secondLinearVelocity,
-                secondAngularVelocity,
-                secondLever,
-                projectionAxis,
-                out Signed832 numerator,
-                out Signed832 denominator))
-        {
-            projection = default;
-            return false;
-        }
-
-        return Fixed64.TryGetSignedRawRatio(
-            numerator,
-            denominator,
-            0,
-            out projection);
-    }
-
-    internal static bool TryGetRelativePointVelocityRatio(
+    internal static void GetRelativePointVelocityRatio(
         Vector3d firstLinearVelocity,
         Vector3d firstAngularVelocity,
         in ExactLever3D firstLever,
@@ -59,14 +27,6 @@ internal readonly partial struct ExactLever3D
         out Signed832 numerator,
         out Signed832 denominator)
     {
-        if (firstLever.Denominator.Sign == 0
-            || secondLever.Denominator.Sign == 0)
-        {
-            numerator = default;
-            denominator = default;
-            return false;
-        }
-
         // Normalized anchors bound each lever denominator below the Signed320 width.
         Signed320 firstDenominator =
             Signed320.NarrowValue(firstLever.Denominator);
@@ -119,26 +79,6 @@ internal readonly partial struct ExactLever3D
             Signed192.One,
             Signed192.One);
         denominator = Signed832.ExtendValue(narrowDenominator);
-        return true;
-    }
-
-    internal static bool TryGetCrossProductQuadraticForm(
-        in ExactLever3D lever,
-        Vector3d crossVector,
-        Fixed3x3 transform,
-        out Fixed64 result)
-    {
-        GetCrossProductQuadraticFormRatio(
-            lever,
-            crossVector,
-            transform,
-            out Signed832 numerator,
-            out Signed832 denominator);
-        return Fixed64.TryGetSignedRawRatio(
-            numerator,
-            denominator,
-            0,
-            out result);
     }
 
     internal static void GetCrossProductQuadraticFormRatio(

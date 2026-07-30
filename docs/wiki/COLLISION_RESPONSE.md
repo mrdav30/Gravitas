@@ -89,6 +89,16 @@ Non-trigger 3D response:
 Collider centers remain collision-geometry references for narrow phase, culling,
 and normal fallback; they are not implicit body COM.
 
+Ordinary-domain 3D friction stays on a checked compact path. If point velocity,
+effective mass, cache accumulation, disk clamping, or final velocity
+materialization cannot be proven representable there, response falls through
+once to the exact two-axis Coulomb-disk kernel. The exact path keeps both
+tangent accumulators rational through static retention, dynamic radial
+projection, and cache removal, then rounds only the final body deltas and
+representable cache projections. Friction application is atomic across both
+bodies; a true final friction overflow does not undo the normal response that
+was already applied earlier in the solver phase.
+
 ## 2D Response
 
 2D response uses 2D-specific solver data:

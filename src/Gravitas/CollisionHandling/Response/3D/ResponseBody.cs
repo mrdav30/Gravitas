@@ -32,9 +32,6 @@ internal readonly struct ResponseBody
     public Fixed64 GetConstrainedInverseMass(Vector3d axis) =>
         Body.GetConstrainedInverseMass(axis);
 
-    public Vector3d ApplyConstrainedInverseInertia(Vector3d torqueAxis) =>
-        Body.ApplyConstrainedInverseInertia(torqueAxis);
-
     public static ResponseBody Create(LSCollider collider)
     {
         SolidBody body = collider.Body!;

@@ -126,6 +126,8 @@ public sealed class CollisionWarmStartTests
         WarmStartedState second = RunWarmStartedRestingFrictionSequence();
 
         second.Should().Be(first);
+        first.TangentImpulse.Should().NotBe(Fixed64.Zero);
+        first.SecondaryTangentImpulse.Should().NotBe(Fixed64.Zero);
     }
 
     [Fact]
@@ -178,16 +180,28 @@ public sealed class CollisionWarmStartTests
             PhysicsScenarioBuilder.Vector(0, 1, 0),
             preventAngularForces: true);
         CollisionPair pair = scenario.CreatePair(floor.Collider, box.Collider);
-        CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
-        StoreWarmStartNormalLoad(pair, Fixed64.One);
+        pair.Manifold.SetContact(
+            floor.Body.WorldCenterOfMass,
+            box.Body.WorldCenterOfMass,
+            Fixed64.Zero,
+            Vector3d.Up);
+        ManifoldContact contact = pair.Manifold.PrimaryContact;
+        pair.StoreWarmStartImpulse(
+            contact.ContactId,
+            contact.Normal,
+            (Fixed64)4,
+            Fixed64.One,
+            Fixed64.Half);
+        CollisionResponse.CalculateImpulse(
+            pair,
+            applyCachedImpulse: false,
+            applyPositionCorrection: false);
 
-        for (int i = 0; i < 4; i++)
-        {
-            box.Body.AddLinearImpulse(new Vector3d(Fixed64.FromFraction(1, 4), Fixed64.Zero, Fixed64.FromFraction(1, 8)));
-            CollisionResponse.CalculateImpulse(pair);
-        }
-
-        pair.TryGetWarmStartImpulse(pair.Manifold[0].ContactId, out ContactWarmStartImpulse impulse).Should().BeTrue();
+        pair.TryGetWarmStartImpulse(
+                contact.ContactId,
+                out ContactWarmStartImpulse impulse)
+            .Should()
+            .BeTrue();
         return new WarmStartedState(
             box.Body.LinearVelocity,
             box.Body.AngularVelocity,

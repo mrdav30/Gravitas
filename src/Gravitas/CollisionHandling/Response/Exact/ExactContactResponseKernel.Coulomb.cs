@@ -71,6 +71,7 @@ internal static partial class ExactContactResponseKernel
             firstTangent,
             secondTangent,
             tangent,
+            Fixed64.Zero,
             tangentNumerator,
             tangentDenominator,
             out int tangentSign);
@@ -195,6 +196,60 @@ internal static partial class ExactContactResponseKernel
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     internal static bool TryGetCoulombDiskResponse(
+        Vector3d normal,
+        Fixed64 completedNormalImpulse,
+        in ExactContactResponseOperand3D primaryFirst,
+        in ExactContactResponseOperand3D primarySecond,
+        Vector3d primaryTangent,
+        Fixed64 accumulatedPrimaryTangentImpulse,
+        in ExactContactResponseOperand3D secondaryFirst,
+        in ExactContactResponseOperand3D secondarySecond,
+        Vector3d secondaryTangent,
+        Fixed64 accumulatedSecondaryTangentImpulse,
+        Fixed64 staticFriction,
+        Fixed64 dynamicFriction,
+        out ExactCoulombResponse3D response)
+    {
+        response = default;
+        if (completedNormalImpulse < Fixed64.Zero
+            || !AreCoulombDiskInputsValid(
+                normal,
+                primaryFirst,
+                primarySecond,
+                primaryTangent,
+                secondaryFirst,
+                secondarySecond,
+                secondaryTangent,
+                staticFriction,
+                dynamicFriction))
+        {
+            return false;
+        }
+
+        Span<ulong> normalNumerator = stackalloc ulong[MaxResponseWords];
+        Span<ulong> normalDenominator = stackalloc ulong[MaxResponseWords];
+        SetMagnitude(completedNormalImpulse, normalNumerator);
+        normalDenominator.Clear();
+        normalDenominator[0] = 1UL;
+        return TryGetCoulombDiskResponseCore(
+            normalNumerator,
+            normalDenominator,
+            primaryFirst,
+            primarySecond,
+            primaryTangent,
+            accumulatedPrimaryTangentImpulse,
+            secondaryFirst,
+            secondarySecond,
+            secondaryTangent,
+            accumulatedSecondaryTangentImpulse,
+            staticFriction,
+            dynamicFriction,
+            Fixed64.Epsilon,
+            out response);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    internal static bool TryGetCoulombDiskResponse(
         in ExactNormalConstraint3D normalConstraint,
         in ExactContactResponseOperand3D primaryFirst,
         in ExactContactResponseOperand3D primarySecond,
@@ -209,20 +264,16 @@ internal static partial class ExactContactResponseKernel
         out ExactCoulombResponse3D response)
     {
         response = default;
-        bool inputsValid =
-            staticFriction >= Fixed64.Zero
-            & dynamicFriction >= Fixed64.Zero
-            & primaryTangent.IsNormalized()
-            & secondaryTangent.IsNormalized()
-            & FixedMath.Abs(Vector3d.Dot(
+        bool inputsValid = AreCoulombDiskInputsValid(
+                normalConstraint.Normal,
+                primaryFirst,
+                primarySecond,
                 primaryTangent,
-                secondaryTangent)) <= Fixed64.Epsilon
-            & FixedMath.Abs(Vector3d.Dot(
-                normalConstraint.Normal,
-                primaryTangent)) <= Fixed64.Epsilon
-            & FixedMath.Abs(Vector3d.Dot(
-                normalConstraint.Normal,
-                secondaryTangent)) <= Fixed64.Epsilon
+                secondaryFirst,
+                secondarySecond,
+                secondaryTangent,
+                staticFriction,
+                dynamicFriction)
             & HaveMatchingParticipants(
                 normalConstraint.First,
                 primaryFirst)
@@ -236,19 +287,55 @@ internal static partial class ExactContactResponseKernel
 
         Span<ulong> normalNumerator = stackalloc ulong[MaxResponseWords];
         Span<ulong> normalDenominator = stackalloc ulong[MaxResponseWords];
-        Span<ulong> primaryNumerator = stackalloc ulong[MaxResponseWords];
-        Span<ulong> primaryDenominator = stackalloc ulong[MaxResponseWords];
-        Span<ulong> secondaryNumerator = stackalloc ulong[MaxResponseWords];
-        Span<ulong> secondaryDenominator = stackalloc ulong[MaxResponseWords];
         if (!TryGetCompletedNormalAccumulatorRatio(
                 normalConstraint,
                 normalNumerator,
                 normalDenominator))
             return false;
+
+        return TryGetCoulombDiskResponseCore(
+            normalNumerator,
+            normalDenominator,
+            primaryFirst,
+            primarySecond,
+            primaryTangent,
+            accumulatedPrimaryTangentImpulse,
+            secondaryFirst,
+            secondarySecond,
+            secondaryTangent,
+            accumulatedSecondaryTangentImpulse,
+            staticFriction,
+            dynamicFriction,
+            Fixed64.Zero,
+            out response);
+    }
+
+    private static bool TryGetCoulombDiskResponseCore(
+        ReadOnlySpan<ulong> normalNumerator,
+        ReadOnlySpan<ulong> normalDenominator,
+        in ExactContactResponseOperand3D primaryFirst,
+        in ExactContactResponseOperand3D primarySecond,
+        Vector3d primaryTangent,
+        Fixed64 accumulatedPrimaryTangentImpulse,
+        in ExactContactResponseOperand3D secondaryFirst,
+        in ExactContactResponseOperand3D secondarySecond,
+        Vector3d secondaryTangent,
+        Fixed64 accumulatedSecondaryTangentImpulse,
+        Fixed64 staticFriction,
+        Fixed64 dynamicFriction,
+        Fixed64 velocityDeadzone,
+        out ExactCoulombResponse3D response)
+    {
+        response = default;
+        Span<ulong> primaryNumerator = stackalloc ulong[MaxResponseWords];
+        Span<ulong> primaryDenominator = stackalloc ulong[MaxResponseWords];
+        Span<ulong> secondaryNumerator = stackalloc ulong[MaxResponseWords];
+        Span<ulong> secondaryDenominator = stackalloc ulong[MaxResponseWords];
         GetBilateralImpulseRatio(
             primaryFirst,
             primarySecond,
             primaryTangent,
+            velocityDeadzone,
             primaryNumerator,
             primaryDenominator,
             out int primarySign);
@@ -256,6 +343,7 @@ internal static partial class ExactContactResponseKernel
             secondaryFirst,
             secondarySecond,
             secondaryTangent,
+            velocityDeadzone,
             secondaryNumerator,
             secondaryDenominator,
             out int secondarySign);
@@ -501,6 +589,37 @@ internal static partial class ExactContactResponseKernel
         return true;
     }
 
+    private static bool AreCoulombDiskInputsValid(
+        Vector3d normal,
+        in ExactContactResponseOperand3D primaryFirst,
+        in ExactContactResponseOperand3D primarySecond,
+        Vector3d primaryTangent,
+        in ExactContactResponseOperand3D secondaryFirst,
+        in ExactContactResponseOperand3D secondarySecond,
+        Vector3d secondaryTangent,
+        Fixed64 staticFriction,
+        Fixed64 dynamicFriction) =>
+        staticFriction >= Fixed64.Zero
+        & dynamicFriction >= Fixed64.Zero
+        & primaryFirst.Lever.Denominator.Sign != 0
+        & primarySecond.Lever.Denominator.Sign != 0
+        & primaryFirst.InverseMass >= Fixed64.Zero
+        & primarySecond.InverseMass >= Fixed64.Zero
+        & normal.IsNormalized()
+        & primaryTangent.IsNormalized()
+        & secondaryTangent.IsNormalized()
+        & FixedMath.Abs(Vector3d.Dot(
+            primaryTangent,
+            secondaryTangent)) <= Fixed64.Epsilon
+        & FixedMath.Abs(Vector3d.Dot(
+            normal,
+            primaryTangent)) <= Fixed64.Epsilon
+        & FixedMath.Abs(Vector3d.Dot(
+            normal,
+            secondaryTangent)) <= Fixed64.Epsilon
+        & HaveMatchingParticipants(primaryFirst, secondaryFirst)
+        & HaveMatchingParticipants(primarySecond, secondarySecond);
+
     private static bool TryGetCompletedNormalAccumulatorRatio(
         in ExactNormalConstraint3D constraint,
         Span<ulong> numerator,
@@ -524,7 +643,7 @@ internal static partial class ExactContactResponseKernel
         if (!inputsValid)
             return false;
 
-        _ = ExactLever3D.TryGetRelativePointVelocityRatio(
+        ExactLever3D.GetRelativePointVelocityRatio(
             first.LinearVelocity,
             first.AngularVelocity,
             first.Lever,
@@ -612,6 +731,7 @@ internal static partial class ExactContactResponseKernel
         in ExactContactResponseOperand3D first,
         in ExactContactResponseOperand3D second,
         Vector3d tangent,
+        Fixed64 velocityDeadzone,
         Span<ulong> numerator,
         Span<ulong> denominator,
         out int sign)
@@ -619,7 +739,7 @@ internal static partial class ExactContactResponseKernel
         numerator.Clear();
         denominator.Clear();
         sign = 0;
-        _ = ExactLever3D.TryGetRelativePointVelocityRatio(
+        ExactLever3D.GetRelativePointVelocityRatio(
             first.LinearVelocity,
             first.AngularVelocity,
             first.Lever,
@@ -640,7 +760,16 @@ internal static partial class ExactContactResponseKernel
             effectiveDenominator);
         int velocitySign =
             velocityNumerator.Sign * velocityDenominator.Sign;
+        bool suppressVelocity = velocityDeadzone != Fixed64.Zero
+            && Fixed64.TryGetSignedRawRatio(
+                velocityNumerator,
+                velocityDenominator,
+                0,
+                out Fixed64 velocityProjection)
+            && velocityProjection >= -velocityDeadzone
+            && velocityProjection <= velocityDeadzone;
         if (velocitySign == 0
+            || suppressVelocity
             || WideArithmetic.IsZeroMagnitude(effectiveNumerator))
         {
             denominator[0] = 1UL;

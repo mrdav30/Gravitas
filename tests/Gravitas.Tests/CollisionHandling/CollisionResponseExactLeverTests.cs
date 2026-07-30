@@ -311,10 +311,6 @@ public sealed class CollisionResponseExactLeverTests
             scenario.CreateSphere(Vector3d.Right);
         left.Body.FreezeAxes = BodyFreezeAxes3D.Rotation;
         right.Body.FreezeAxes = BodyFreezeAxes3D.Rotation;
-        left.Body.ApplyCollisionLinearVelocityDelta(
-            Vector3d.Right * StandardSpeed + Vector3d.Forward);
-        right.Body.ApplyCollisionLinearVelocityDelta(
-            Vector3d.Left * StandardSpeed);
         CollisionPair pair =
             scenario.CreatePair(left.Collider, right.Collider);
         pair.Manifold.SetContact(
@@ -323,11 +319,18 @@ public sealed class CollisionResponseExactLeverTests
                 right.Body.WorldCenterOfMass + Vector3d.Up),
             Fixed64.Half,
             Vector3d.Right);
+        ManifoldContact contact = pair.Manifold.PrimaryContact;
+        pair.StoreWarmStartImpulse(
+            contact.ContactId,
+            contact.Normal,
+            (Fixed64)4,
+            Fixed64.One,
+            Fixed64.Half);
 
         void Resolve() =>
             CollisionResponse.CalculateImpulse(
                 pair,
-                applyCachedImpulse: true,
+                applyCachedImpulse: false,
                 applyPositionCorrection: false);
 
         long allocatedBytes = AllocationTestHelper.MeasureSteadyState(
@@ -339,20 +342,24 @@ public sealed class CollisionResponseExactLeverTests
         allocatedBytes.Should().Be(0);
         pair.TryGetWarmStartImpulse(
                 pair.Manifold.PrimaryContact.ContactId,
-                out _)
+                out ContactWarmStartImpulse impulse)
             .Should()
             .BeTrue();
+        impulse.TangentImpulse.Should().Be(Fixed64.One);
+        impulse.SecondaryTangentImpulse.Should().Be(Fixed64.Half);
     }
 
     [Fact]
     public void CalculateImpulse_WithExactLeverSlidingContact_ShouldUseDynamicFriction()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        scenario.Context.Environment.MinSpeed = Fixed64.Zero;
         ScenarioBody<LSCuboidCollider> wall = scenario.CreateCuboid(
             Vector3d.Zero,
             immovable: true);
-        ScenarioBody<LSSphereCollider> mover =
-            scenario.CreateSphere(Vector3d.Right);
+        ScenarioBody<LSSphereCollider> mover = scenario.CreateSphere(
+            Vector3d.Right,
+            mass: Fixed64.Half);
         PhysicsMaterial sliding = new(
             Fixed64.Half,
             Fixed64.Half,
@@ -379,6 +386,623 @@ public sealed class CollisionResponseExactLeverTests
         mover.Body.LinearVelocity.X.Should().Be(Fixed64.Zero);
         mover.Body.LinearVelocity.Z.Should().BeGreaterThan(Fixed64.Zero);
         mover.Body.LinearVelocity.Z.Should().BeLessThan((Fixed64)3);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void CalculateImpulse_WithOpposingExtremePointVelocitiesAndCache_ShouldResolveExactly(
+        bool exactLever,
+        bool mirrored)
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        scenario.Context.Environment.MaxSpeed = Fixed64.MaxValue;
+        scenario.Context.Environment.MaxFallSpeed = Fixed64.MaxValue;
+        ScenarioBody<LSSphereCollider> left =
+            scenario.CreateSphere(Vector3d.Zero, mass: Fixed64.Two);
+        ScenarioBody<LSSphereCollider> right =
+            scenario.CreateSphere(Vector3d.Right, mass: Fixed64.Two);
+        left.Body.FreezeAxes = BodyFreezeAxes3D.Rotation;
+        right.Body.FreezeAxes = BodyFreezeAxes3D.Rotation;
+        var rough = new PhysicsMaterial(
+            Fixed64.One,
+            Fixed64.One,
+            Fixed64.Zero);
+        left.Collider.Material = rough;
+        right.Collider.Material = rough;
+        Fixed64 direction = mirrored
+            ? -Fixed64.One
+            : Fixed64.One;
+        left.Body.ApplyCollisionLinearVelocityDelta(
+            Vector3d.Forward * Fixed64.MaxValue * direction);
+        right.Body.ApplyCollisionLinearVelocityDelta(
+            -Vector3d.Forward * Fixed64.MaxValue * direction);
+        CollisionPair pair =
+            scenario.CreatePair(left.Collider, right.Collider);
+        if (exactLever)
+        {
+            SetExactContact(
+                pair,
+                left.Collider,
+                CreateExactParallelAnchor(Vector3d.Zero));
+        }
+        else
+        {
+            pair.Manifold.SetContact(
+                left.Body.WorldCenterOfMass,
+                right.Body.WorldCenterOfMass,
+                Fixed64.Zero,
+                Vector3d.Right);
+        }
+
+        ManifoldContact contact = pair.Manifold.PrimaryContact;
+        pair.StoreWarmStartImpulse(
+            contact.ContactId,
+            contact.Normal,
+            Fixed64.MaxValue,
+            Fixed64.MaxValue * direction,
+            Fixed64.Zero);
+
+        CollisionResponse.CalculateImpulse(
+            pair,
+            applyCachedImpulse: false,
+            applyPositionCorrection: false);
+
+        left.Body.LinearVelocity.Should().Be(Vector3d.Zero);
+        right.Body.LinearVelocity.Should().Be(Vector3d.Zero);
+        pair.TryGetWarmStartImpulse(
+                contact.ContactId,
+                out ContactWarmStartImpulse impulse)
+            .Should()
+            .BeTrue();
+        impulse.NormalImpulse.Should().Be(Fixed64.MaxValue);
+        impulse.TangentImpulse.Should().Be(
+            -Fixed64.MaxValue * direction);
+        impulse.SecondaryTangentImpulse.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void CalculateImpulse_WithExactExtremeCachedDisk_ShouldProjectToDynamicLimit()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        scenario.Context.Environment.MaxSpeed = Fixed64.MaxValue;
+        scenario.Context.Environment.MaxFallSpeed = Fixed64.MaxValue;
+        ScenarioBody<LSCuboidCollider> wall = scenario.CreateCuboid(
+            Vector3d.Zero,
+            immovable: true);
+        ScenarioBody<LSSphereCollider> mover =
+            scenario.CreateSphere(Vector3d.Right);
+        mover.Body.FreezeAxes = BodyFreezeAxes3D.Rotation;
+        var rough = new PhysicsMaterial(
+            Fixed64.One,
+            Fixed64.One,
+            Fixed64.Zero);
+        wall.Collider.Material = rough;
+        mover.Collider.Material = rough;
+        CollisionPair pair =
+            scenario.CreatePair(wall.Collider, mover.Collider);
+        SetExactContact(
+            pair,
+            mover.Collider,
+            CreateExactParallelAnchor(Vector3d.Zero));
+        ManifoldContact contact = pair.Manifold.PrimaryContact;
+        pair.StoreWarmStartImpulse(
+            contact.ContactId,
+            contact.Normal,
+            Fixed64.MaxValue,
+            Fixed64.MaxValue,
+            Fixed64.MaxValue);
+
+        CollisionResponse.CalculateImpulse(
+            pair,
+            applyCachedImpulse: false,
+            applyPositionCorrection: false);
+
+        pair.TryGetWarmStartImpulse(
+                contact.ContactId,
+                out ContactWarmStartImpulse impulse)
+            .Should()
+            .BeTrue();
+        impulse.TangentImpulse.Should().BeGreaterThan(Fixed64.Zero);
+        impulse.SecondaryTangentImpulse.Should().Be(
+            impulse.TangentImpulse);
+        impulse.TangentImpulse.Should().BeLessThan(Fixed64.MaxValue);
+        new Vector2d(
+                impulse.TangentImpulse,
+                impulse.SecondaryTangentImpulse)
+            .Magnitude
+            .Should()
+            .BeLessThanOrEqualTo(Fixed64.MaxValue);
+        mover.Body.LinearVelocity.Should().NotBe(Vector3d.Zero);
+    }
+
+    [Fact]
+    public void CalculateImpulse_WithExactFrictionlessCache_ShouldRemoveBothTangentAxes()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        ScenarioBody<LSSphereCollider> left =
+            scenario.CreateSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> right =
+            scenario.CreateSphere(Vector3d.Right);
+        left.Body.FreezeAxes = BodyFreezeAxes3D.Rotation;
+        right.Body.FreezeAxes = BodyFreezeAxes3D.Rotation;
+        left.Collider.Material = PhysicsMaterial.Frictionless;
+        right.Collider.Material = PhysicsMaterial.Frictionless;
+        CollisionPair pair =
+            scenario.CreatePair(left.Collider, right.Collider);
+        SetExactContact(
+            pair,
+            left.Collider,
+            CreateExactParallelAnchor(Vector3d.Zero));
+        ManifoldContact contact = pair.Manifold.PrimaryContact;
+        pair.StoreWarmStartImpulse(
+            contact.ContactId,
+            contact.Normal,
+            Fixed64.Zero,
+            Fixed64.One,
+            Fixed64.Half);
+
+        CollisionResponse.CalculateImpulse(
+            pair,
+            applyCachedImpulse: false,
+            applyPositionCorrection: false);
+
+        left.Body.LinearVelocity.Should().NotBe(Vector3d.Zero);
+        right.Body.LinearVelocity.Should().Be(-left.Body.LinearVelocity);
+        pair.TryGetWarmStartImpulse(
+                contact.ContactId,
+                out ContactWarmStartImpulse impulse)
+            .Should()
+            .BeTrue();
+        impulse.TangentImpulse.Should().Be(Fixed64.Zero);
+        impulse.SecondaryTangentImpulse.Should().Be(Fixed64.Zero);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CalculateImpulse_WithSubPrecisionCoulombDiskProducts_ShouldUseExactProjection(
+        bool scaleUnderflows)
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        scenario.Context.Environment.MinSpeed = Fixed64.Zero;
+        ScenarioBody<LSCuboidCollider> wall = scenario.CreateCuboid(
+            Vector3d.Zero,
+            immovable: true);
+        ScenarioBody<LSSphereCollider> mover =
+            scenario.CreateSphere(Vector3d.Right);
+        mover.Body.FreezeAxes = BodyFreezeAxes3D.Rotation;
+        Fixed64 staticFriction = scaleUnderflows
+            ? Fixed64.One
+            : Fixed64.MinIncrement;
+        var material = new PhysicsMaterial(
+            staticFriction,
+            Fixed64.MinIncrement,
+            Fixed64.Zero);
+        wall.Collider.Material = material;
+        mover.Collider.Material = material;
+        CollisionPair pair =
+            scenario.CreatePair(wall.Collider, mover.Collider);
+        pair.Manifold.SetContact(
+            wall.Body.WorldCenterOfMass,
+            mover.Body.WorldCenterOfMass,
+            Fixed64.Zero,
+            Vector3d.Right);
+        ManifoldContact contact = pair.Manifold.PrimaryContact;
+        pair.StoreWarmStartImpulse(
+            contact.ContactId,
+            contact.Normal,
+            Fixed64.One,
+            scaleUnderflows
+                ? Fixed64.Two
+                : Fixed64.MinIncrement * Fixed64.Two,
+            Fixed64.Zero);
+
+        CollisionResponse.CalculateImpulse(
+            pair,
+            applyCachedImpulse: false,
+            applyPositionCorrection: false);
+
+        pair.TryGetWarmStartImpulse(
+                contact.ContactId,
+                out ContactWarmStartImpulse impulse)
+            .Should()
+            .BeTrue();
+        impulse.TangentImpulse.Should().Be(Fixed64.MinIncrement);
+        mover.Body.LinearVelocity.Should().NotBe(Vector3d.Zero);
+    }
+
+    [Fact]
+    public void CalculateImpulse_WithExactLeverAndDeadzoneTangentVelocity_ShouldRetainVelocity()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        scenario.Context.Environment.MinSpeed = Fixed64.Zero;
+        ScenarioBody<LSCuboidCollider> wall = scenario.CreateCuboid(
+            Vector3d.Zero,
+            immovable: true);
+        ScenarioBody<LSSphereCollider> mover =
+            scenario.CreateSphere(Vector3d.Right);
+        mover.Body.FreezeAxes = BodyFreezeAxes3D.Rotation;
+        wall.Collider.Material = PhysicsMaterial.Default;
+        mover.Collider.Material = PhysicsMaterial.Default;
+        Vector3d velocity = Vector3d.Forward * Fixed64.Epsilon;
+        mover.Body.ApplyCollisionLinearVelocityDelta(velocity);
+        CollisionPair pair =
+            scenario.CreatePair(wall.Collider, mover.Collider);
+        SetExactContact(
+            pair,
+            wall.Collider,
+            CreateExactParallelAnchor(Vector3d.Zero));
+        ManifoldContact contact = pair.Manifold.PrimaryContact;
+        pair.StoreWarmStartImpulse(
+            contact.ContactId,
+            contact.Normal,
+            Fixed64.One,
+            Fixed64.Zero,
+            Fixed64.Zero);
+
+        CollisionResponse.CalculateImpulse(
+            pair,
+            applyCachedImpulse: false,
+            applyPositionCorrection: false);
+
+        mover.Body.LinearVelocity.Should().Be(velocity);
+        pair.TryGetWarmStartImpulse(
+                contact.ContactId,
+                out ContactWarmStartImpulse impulse)
+            .Should()
+            .BeTrue();
+        impulse.TangentImpulse.Should().Be(Fixed64.Zero);
+        impulse.SecondaryTangentImpulse.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void CalculateImpulse_WithSubPrecisionFrictionLimit_ShouldPreserveAmplifiedResponse()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        scenario.Context.Environment.MinSpeed = Fixed64.Zero;
+        ScenarioBody<LSCuboidCollider> wall = scenario.CreateCuboid(
+            Vector3d.Zero,
+            immovable: true);
+        ScenarioBody<LSSphereCollider> mover = scenario.CreateSphere(
+            Vector3d.Right,
+            mass: Fixed64.FromFraction(1, 4));
+        mover.Body.FreezeAxes = BodyFreezeAxes3D.Rotation;
+        var material = new PhysicsMaterial(
+            Fixed64.Half,
+            Fixed64.Half,
+            Fixed64.Zero);
+        wall.Collider.Material = material;
+        mover.Collider.Material = material;
+        CollisionPair pair =
+            scenario.CreatePair(wall.Collider, mover.Collider);
+        pair.Manifold.SetContact(
+            wall.Body.WorldCenterOfMass,
+            mover.Body.WorldCenterOfMass,
+            Fixed64.Zero,
+            Vector3d.Right);
+        ManifoldContact contact = pair.Manifold.PrimaryContact;
+        pair.StoreWarmStartImpulse(
+            contact.ContactId,
+            contact.Normal,
+            Fixed64.MinIncrement,
+            Fixed64.MinIncrement,
+            Fixed64.Zero);
+
+        CollisionResponse.CalculateImpulse(
+            pair,
+            applyCachedImpulse: false,
+            applyPositionCorrection: false);
+
+        mover.Body.LinearVelocity.Should().NotBe(Vector3d.Zero);
+        pair.TryGetWarmStartImpulse(
+                contact.ContactId,
+                out ContactWarmStartImpulse impulse)
+            .Should()
+            .BeTrue();
+        impulse.TangentImpulse.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void CalculateImpulse_WithSubPrecisionTangentImpulse_ShouldPreserveAmplifiedResponse()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        scenario.Context.Environment.MinSpeed = Fixed64.Zero;
+        ScenarioBody<LSCuboidCollider> wall = scenario.CreateCuboid(
+            Vector3d.Zero,
+            immovable: true);
+        ScenarioBody<LSSphereCollider> mover = scenario.CreateSphere(
+            Vector3d.Right,
+            mass: Fixed64.MinIncrement);
+        mover.Body.FreezeAxes = BodyFreezeAxes3D.Rotation;
+        wall.Collider.Material = PhysicsMaterial.Default;
+        mover.Collider.Material = PhysicsMaterial.Default;
+        mover.Body.ApplyCollisionLinearVelocityDelta(
+            Vector3d.Forward
+            * (Fixed64.Epsilon + Fixed64.MinIncrement));
+        CollisionPair pair =
+            scenario.CreatePair(wall.Collider, mover.Collider);
+        pair.Manifold.SetContact(
+            wall.Body.WorldCenterOfMass,
+            mover.Body.WorldCenterOfMass,
+            Fixed64.Zero,
+            Vector3d.Right);
+        ManifoldContact contact = pair.Manifold.PrimaryContact;
+        pair.StoreWarmStartImpulse(
+            contact.ContactId,
+            contact.Normal,
+            Fixed64.One,
+            Fixed64.Zero,
+            Fixed64.Zero);
+
+        CollisionResponse.CalculateImpulse(
+            pair,
+            applyCachedImpulse: false,
+            applyPositionCorrection: false);
+
+        mover.Body.LinearVelocity.Should().Be(Vector3d.Zero);
+        pair.TryGetWarmStartImpulse(contact.ContactId, out _)
+            .Should()
+            .BeTrue();
+    }
+
+    [Fact]
+    public void CalculateImpulse_WithSubPrecisionConstrainedMass_ShouldUseExactResponse()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        scenario.Context.Environment.MinSpeed = Fixed64.Zero;
+        ScenarioBody<LSSphereCollider> driver = scenario.CreateSphere(
+            Vector3d.Zero,
+            isKinematic: true);
+        ScenarioBody<LSSphereCollider> target = scenario.CreateSphere(
+            Vector3d.Right,
+            mass: Fixed64.MinIncrement);
+        target.Body.FreezeAxes =
+            BodyFreezeAxes3D.PositionY
+            | BodyFreezeAxes3D.PositionZ
+            | BodyFreezeAxes3D.Rotation;
+        driver.Collider.Material = PhysicsMaterial.Default;
+        target.Collider.Material = PhysicsMaterial.Default;
+        Vector3d normal = new Vector3d(
+            Fixed64.One,
+            Fixed64.FromRaw(23),
+            Fixed64.Zero).Normalized;
+        Vector3d tangent = SolverContact.CreateTangent(normal);
+        driver.Body.Agent.Transform.LocalPosition =
+            tangent * scenario.Context.DeltaTime;
+        scenario.Context.AdvanceLateSimulateToken();
+        driver.Body.EnsureContinuousCollisionFramePrepared(
+            scenario.Context.LateSimulateToken);
+        CollisionPair pair =
+            scenario.CreatePair(driver.Collider, target.Collider);
+        pair.Manifold.SetContact(
+            driver.Body.WorldCenterOfMass,
+            target.Body.WorldCenterOfMass,
+            Fixed64.Zero,
+            normal);
+        ManifoldContact contact = pair.Manifold.PrimaryContact;
+        pair.StoreWarmStartImpulse(
+            contact.ContactId,
+            contact.Normal,
+            Fixed64.MaxValue,
+            Fixed64.Zero,
+            Fixed64.Zero);
+
+        CollisionResponse.CalculateImpulse(
+            pair,
+            applyCachedImpulse: false,
+            applyPositionCorrection: false);
+
+        pair.TryGetWarmStartImpulse(
+                contact.ContactId,
+                out ContactWarmStartImpulse cached)
+            .Should()
+            .BeTrue();
+        target.Body.LinearVelocity.X.Should().NotBe(
+            Fixed64.Zero,
+            "the exact response should preserve constrained mass; driver {0}, cache {1}/{2}/{3}",
+            driver.Body.SampleContinuousCollisionLinearVelocity(Fixed64.One),
+            cached.NormalImpulse,
+            cached.TangentImpulse,
+            cached.SecondaryTangentImpulse);
+    }
+
+    [Fact]
+    public void CalculateImpulse_WithSubPrecisionImpulseComponent_ShouldUseExactApplication()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        scenario.Context.Environment.MinSpeed = Fixed64.Zero;
+        ScenarioBody<LSCuboidCollider> wall = scenario.CreateCuboid(
+            Vector3d.Zero,
+            immovable: true);
+        ScenarioBody<LSSphereCollider> mover = scenario.CreateSphere(
+            Vector3d.Right,
+            mass: Fixed64.MinIncrement);
+        mover.Body.FreezeAxes =
+            BodyFreezeAxes3D.PositionY
+            | BodyFreezeAxes3D.PositionZ
+            | BodyFreezeAxes3D.Rotation;
+        wall.Collider.Material = PhysicsMaterial.Frictionless;
+        mover.Collider.Material = PhysicsMaterial.Frictionless;
+        CollisionPair pair =
+            scenario.CreatePair(wall.Collider, mover.Collider);
+        Vector3d normal = new Vector3d(
+            Fixed64.One,
+            Fixed64.FromRaw(23),
+            Fixed64.Zero).Normalized;
+        pair.Manifold.SetContact(
+            wall.Body.WorldCenterOfMass,
+            mover.Body.WorldCenterOfMass,
+            Fixed64.Zero,
+            normal);
+        ManifoldContact contact = pair.Manifold.PrimaryContact;
+        pair.StoreWarmStartImpulse(
+            contact.ContactId,
+            contact.Normal,
+            Fixed64.Zero,
+            Fixed64.MinIncrement,
+            Fixed64.Zero);
+
+        CollisionResponse.CalculateImpulse(
+            pair,
+            applyCachedImpulse: false,
+            applyPositionCorrection: false);
+
+        mover.Body.LinearVelocity.X.Should().NotBe(Fixed64.Zero);
+        pair.TryGetWarmStartImpulse(
+                contact.ContactId,
+                out ContactWarmStartImpulse impulse)
+            .Should()
+            .BeTrue();
+        impulse.TangentImpulse.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void CalculateImpulse_WithSubPrecisionTorque_ShouldUseExactApplication()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        scenario.Context.Environment.MinSpeed = Fixed64.Zero;
+        var collider = new UnsupportedTestCollider3D
+        {
+            InertiaTensor = new Fixed3x3(
+                Fixed64.MinIncrement, Fixed64.Zero, Fixed64.Zero,
+                Fixed64.Zero, Fixed64.MinIncrement, Fixed64.Zero,
+                Fixed64.Zero, Fixed64.Zero, Fixed64.MinIncrement)
+        };
+        ScenarioBody<UnsupportedTestCollider3D> mover =
+            scenario.CreateBody(
+                collider,
+                Vector3d.Zero,
+                FixedQuaternion.Identity);
+        ScenarioBody<LSCuboidCollider> wall = scenario.CreateCuboid(
+            Vector3d.Right,
+            immovable: true);
+        mover.Body.FreezeAxes = BodyFreezeAxes3D.Position;
+        mover.Body.EffectiveInverseInertiaTensor.M11.Should()
+            .Be(Fixed64.MaxValue);
+        mover.Collider.Material = PhysicsMaterial.Frictionless;
+        wall.Collider.Material = PhysicsMaterial.Frictionless;
+        CollisionPair pair =
+            scenario.CreatePair(mover.Collider, wall.Collider);
+        bool moverIsA = ReferenceEquals(pair.ColliderA, mover.Collider);
+        ContactAnchor moverAnchor = ContactAnchor.FromWorldPoint(
+            mover.Body.WorldCenterOfMass
+            + Vector3d.Up
+                * (Fixed64.MinIncrement * Fixed64.Two));
+        ContactAnchor wallAnchor =
+            ContactAnchor.FromWorldPoint(wall.Body.WorldCenterOfMass);
+        Vector3d normal =
+            (pair.ColliderB.Center - pair.ColliderA.Center).Normalized;
+        pair.Manifold.SetContact(
+            moverIsA ? moverAnchor : wallAnchor,
+            moverIsA ? wallAnchor : moverAnchor,
+            Fixed64.Zero,
+            normal);
+        ManifoldContact contact = pair.Manifold.PrimaryContact;
+        ExactLever3D moverLever =
+            (moverIsA ? contact.AnchorA : contact.AnchorB).GetLeverFrom(
+                mover.Body.GetCenterOfMassAnchor());
+        Vector3d moverImpulse =
+            SolverContact.CreateTangent(contact.Normal)
+            * -Fixed64.MinIncrement;
+        if (moverIsA)
+            moverImpulse = -moverImpulse;
+        Assert.True(ExactContactLever3D.TryGetAngularVelocityDelta(
+                mover.Body,
+                moverLever,
+                moverImpulse,
+                out Vector3d expectedAngularVelocity));
+        Assert.NotEqual(Vector3d.Zero, expectedAngularVelocity);
+        Assert.True((moverIsA ? contact.AnchorA : contact.AnchorB)
+            .TryGetOffsetFrom(
+                mover.Body.GetCenterOfMassAnchor(),
+                out Vector3d compactLever));
+        Assert.True(ContactResponseArithmetic3D.TryCross(
+                compactLever,
+                moverImpulse,
+                out Vector3d compactTorque));
+        Assert.Equal(Vector3d.Zero, compactTorque);
+        Assert.False(ContactResponseArithmetic3D.PreservesNonzeroCrossProduct(
+                compactLever,
+                moverImpulse,
+                compactTorque));
+        Vector3d initialAngularVelocity = compactLever.Normalized;
+        mover.Body.ApplyCollisionAngularVelocityDelta(initialAngularVelocity);
+        pair.StoreWarmStartImpulse(
+            contact.ContactId,
+            contact.Normal,
+            Fixed64.Zero,
+            Fixed64.MinIncrement,
+            Fixed64.Zero);
+
+        CollisionResponse.CalculateImpulse(
+            pair,
+            applyCachedImpulse: false,
+            applyPositionCorrection: false);
+
+        pair.TryGetWarmStartImpulse(
+                contact.ContactId,
+                out ContactWarmStartImpulse impulse)
+            .Should()
+            .BeTrue();
+        impulse.TangentImpulse.Should().Be(Fixed64.Zero);
+        mover.Body.AngularVelocity.Should().Be(
+            initialAngularVelocity + expectedAngularVelocity);
+    }
+
+    [Fact]
+    public void CalculateImpulse_WithAngularEffectiveMassOverflow_ShouldResolveThroughExactFallback()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        var collider = new UnsupportedTestCollider3D
+        {
+            InertiaTensor = new Fixed3x3(
+                Fixed64.MinIncrement, Fixed64.Zero, Fixed64.Zero,
+                Fixed64.Zero, Fixed64.MinIncrement, Fixed64.Zero,
+                Fixed64.Zero, Fixed64.Zero, Fixed64.MinIncrement)
+        };
+        ScenarioBody<UnsupportedTestCollider3D> mover =
+            scenario.CreateBody(
+                collider,
+                Vector3d.Zero,
+                FixedQuaternion.Identity);
+        ScenarioBody<LSCuboidCollider> wall = scenario.CreateCuboid(
+            Vector3d.Right,
+            immovable: true);
+        mover.Collider.Material = PhysicsMaterial.Default;
+        wall.Collider.Material = PhysicsMaterial.Default;
+        mover.Body.ApplyCollisionLinearVelocityDelta(Vector3d.Forward);
+        CollisionPair pair =
+            scenario.CreatePair(mover.Collider, wall.Collider);
+        pair.Manifold.SetContact(
+            ContactAnchor.FromWorldPoint(
+                mover.Body.WorldCenterOfMass
+                + Vector3d.Up * Fixed64.FromFraction(3, 2)),
+            ContactAnchor.FromWorldPoint(wall.Body.WorldCenterOfMass),
+            Fixed64.Zero,
+            Vector3d.Right);
+        ManifoldContact contact = pair.Manifold.PrimaryContact;
+        pair.StoreWarmStartImpulse(
+            contact.ContactId,
+            contact.Normal,
+            (Fixed64)4,
+            Fixed64.Zero,
+            Fixed64.Zero);
+
+        CollisionResponse.CalculateImpulse(
+            pair,
+            applyCachedImpulse: false,
+            applyPositionCorrection: false);
+
+        pair.TryGetWarmStartImpulse(
+                contact.ContactId,
+                out ContactWarmStartImpulse impulse)
+            .Should()
+            .BeTrue();
+        mover.Body.LinearVelocity.Should().Be(Vector3d.Forward);
+        impulse.TangentImpulse.Should().Be(Fixed64.Zero);
     }
 
     [Fact]
@@ -421,7 +1045,7 @@ public sealed class CollisionResponseExactLeverTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void CalculateImpulse_WithUnrepresentableExactFrictionProduct_ShouldKeepNormalResponseAtomic(
+    public void CalculateImpulse_WithUnrepresentableExactFrictionProduct_ShouldPreservePhysicalResponse(
         bool pointVelocityOverflows)
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
@@ -450,22 +1074,26 @@ public sealed class CollisionResponseExactLeverTests
             pair,
             mover.Collider,
             CreateExactParallelAnchor(Vector3d.Zero));
-        Vector3d tangentialVelocity = mover.Body.LinearVelocity;
-        Vector3d angularVelocity = mover.Body.AngularVelocity;
 
         CollisionResponse.CalculateImpulse(
             pair,
             applyCachedImpulse: false,
             applyPositionCorrection: false);
 
-        mover.Body.LinearVelocity.X.Should().Be(Fixed64.Zero);
-        mover.Body.LinearVelocity.Z.Should().Be(tangentialVelocity.Z);
-        mover.Body.AngularVelocity.Should().Be(angularVelocity);
+        mover.Body.LinearVelocity.X.Abs().Should()
+            .BeLessThanOrEqualTo(Fixed64.MinIncrement);
         pair.TryGetWarmStartImpulse(
                 pair.Manifold.PrimaryContact.ContactId,
-                out _)
+                out ContactWarmStartImpulse impulse)
             .Should()
-            .BeFalse();
+            .BeTrue();
+        if (pointVelocityOverflows)
+        {
+            (impulse.TangentImpulse != Fixed64.Zero
+                || impulse.SecondaryTangentImpulse != Fixed64.Zero)
+                .Should()
+                .BeTrue();
+        }
     }
 
     [Fact]
@@ -714,7 +1342,7 @@ public sealed class CollisionResponseExactLeverTests
             .Should()
             .BeTrue();
         retained.NormalImpulse.Should().Be(Fixed64.MaxValue);
-        retained.TangentImpulse.Should().Be(Fixed64.MinValue);
+        retained.TangentImpulse.Should().Be(-Fixed64.MaxValue);
         retained.SecondaryTangentImpulse.Should().Be(Fixed64.Zero);
     }
 
@@ -948,57 +1576,29 @@ public sealed class CollisionResponseExactLeverTests
     }
 
     [Fact]
-    public void ExactEffectiveMassTerms_ShouldRetainStaticParticipantsAndRejectWideSum()
-    {
-        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
-        ScenarioBody<LSSphereCollider> body =
-            scenario.CreateSphere(Vector3d.Zero);
-        body.Body.FreezeAxes = BodyFreezeAxes3D.Rotation;
-        ExactLever3D zero = body.Body.GetCenterOfMassAnchor()
-            .GetLeverFrom(body.Body.GetCenterOfMassAnchor());
-
-        ExactContactLever3D.TryComputeDenominatorTerms(
-                null,
-                zero,
-                body.Body,
-                zero,
-                Vector3d.Right,
-                out ContactEffectiveMassTerms3D staticFirst)
-            .Should()
-            .BeTrue();
-        staticFirst.LinearA.Should().Be(Fixed64.Zero);
-        staticFirst.LinearB.Should().Be(body.Body.InverseMass);
-
-        ExactContactLever3D.TryComputeDenominatorTerms(
-                body.Body,
-                zero,
-                null,
-                zero,
-                Vector3d.Right,
-                out ContactEffectiveMassTerms3D staticSecond)
-            .Should()
-            .BeTrue();
-        staticSecond.LinearA.Should().Be(body.Body.InverseMass);
-        staticSecond.LinearB.Should().Be(Fixed64.Zero);
-
-        var wide = new ContactEffectiveMassTerms3D(
-            Fixed64.MaxValue,
-            Fixed64.One,
-            Fixed64.Zero,
-            Fixed64.Zero);
-        wide.TryGetValue(out _).Should().BeFalse();
-    }
-
-    [Fact]
     public void CalculateImpulse_WithCompactPointVelocityOverflow_ShouldUseExactFallback()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
-        ScenarioBody<LSSphereCollider> left =
-            scenario.CreateSphere(Vector3d.Zero);
+        var collider = new UnsupportedTestCollider3D
+        {
+            InertiaTensor = new Fixed3x3(
+                Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero,
+                Fixed64.Zero, Fixed64.MaxValue, Fixed64.Zero,
+                Fixed64.Zero, Fixed64.Zero, Fixed64.MaxValue)
+        };
+        ScenarioBody<UnsupportedTestCollider3D> left =
+            scenario.CreateBody(
+                collider,
+                Vector3d.Zero,
+                FixedQuaternion.Identity);
         ScenarioBody<LSSphereCollider> right =
             scenario.CreateSphere(Vector3d.Up);
-        left.Collider.Material = PhysicsMaterial.Frictionless;
-        right.Collider.Material = PhysicsMaterial.Frictionless;
+        var rough = new PhysicsMaterial(
+            Fixed64.One,
+            Fixed64.One,
+            Fixed64.Zero);
+        left.Collider.Material = rough;
+        right.Collider.Material = rough;
         left.Body.ApplyCollisionAngularVelocityDelta(
             Vector3d.Forward * Fixed64.MaxValue);
         CollisionPair pair =
@@ -1010,6 +1610,13 @@ public sealed class CollisionResponseExactLeverTests
             ContactAnchor.FromWorldPoint(right.Body.WorldCenterOfMass),
             Fixed64.Zero,
             Vector3d.Up);
+        ManifoldContact contact = pair.Manifold.PrimaryContact;
+        pair.StoreWarmStartImpulse(
+            contact.ContactId,
+            contact.Normal,
+            Fixed64.One,
+            Fixed64.Zero,
+            Fixed64.Zero);
         Vector3d leftAngularVelocity = left.Body.AngularVelocity;
 
         CollisionResponse.CalculateImpulse(
@@ -1017,16 +1624,273 @@ public sealed class CollisionResponseExactLeverTests
             applyCachedImpulse: false,
             applyPositionCorrection: false);
 
-        left.Body.LinearVelocity.Should().Be(Vector3d.Zero);
-        left.Body.AngularVelocity.Should().Be(leftAngularVelocity);
-        right.Body.LinearVelocity.Should().Be(Vector3d.Zero);
+        Assert.NotEqual(Vector3d.Zero, left.Body.LinearVelocity);
+        Assert.NotEqual(leftAngularVelocity, left.Body.AngularVelocity);
+        right.Body.LinearVelocity.Should().Be(-left.Body.LinearVelocity);
         right.Body.AngularVelocity.Should().Be(Vector3d.Zero);
         pair.TryGetWarmStartImpulse(
-                pair.Manifold.PrimaryContact.ContactId,
+                contact.ContactId,
                 out ContactWarmStartImpulse cached)
             .Should()
             .BeTrue();
-        cached.NormalImpulse.Should().Be(Fixed64.Zero);
+        cached.NormalImpulse.Should().Be(Fixed64.One);
+        (cached.TangentImpulse != Fixed64.Zero
+            || cached.SecondaryTangentImpulse != Fixed64.Zero)
+            .Should()
+            .BeTrue();
+    }
+
+    [Fact]
+    public void CalculateImpulse_WithOverflowingCompactEffectiveMass_ShouldUseExactFriction()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        scenario.Context.Environment.MinSpeed = Fixed64.Zero;
+        scenario.Context.Environment.MaxSpeed = Fixed64.MaxValue;
+        ScenarioBody<LSSphereCollider> left = scenario.CreateSphere(
+            Vector3d.Zero,
+            mass: Fixed64.MinIncrement);
+        ScenarioBody<LSSphereCollider> right = scenario.CreateSphere(
+            Vector3d.Right,
+            mass: Fixed64.MinIncrement);
+        left.Body.FreezeAxes = BodyFreezeAxes3D.Rotation;
+        right.Body.FreezeAxes = BodyFreezeAxes3D.Rotation;
+        left.Collider.Material = PhysicsMaterial.Default;
+        right.Collider.Material = PhysicsMaterial.Default;
+        CollisionPair pair =
+            scenario.CreatePair(left.Collider, right.Collider);
+        Vector3d normal =
+            (pair.ColliderB.Center - pair.ColliderA.Center).Normalized;
+        Vector3d tangent = SolverContact.CreateTangent(normal);
+        pair.ColliderA.Body!.ApplyCollisionLinearVelocityDelta(tangent);
+        pair.Manifold.SetContact(
+            pair.ColliderA.Body.WorldCenterOfMass,
+            pair.ColliderB.Body!.WorldCenterOfMass,
+            Fixed64.Zero,
+            normal);
+        ManifoldContact contact = pair.Manifold.PrimaryContact;
+        pair.StoreWarmStartImpulse(
+            contact.ContactId,
+            normal,
+            Fixed64.One,
+            Fixed64.Zero,
+            Fixed64.Zero);
+
+        CollisionResponse.CalculateImpulse(
+            pair,
+            applyCachedImpulse: false,
+            applyPositionCorrection: false);
+
+        Vector3d.Dot(pair.ColliderA.Body.LinearVelocity, tangent)
+            .Should()
+            .Be(Fixed64.Half);
+        Vector3d.Dot(pair.ColliderB.Body.LinearVelocity, tangent)
+            .Should()
+            .Be(Fixed64.Half);
+        pair.TryGetWarmStartImpulse(
+                contact.ContactId,
+                out ContactWarmStartImpulse cached)
+            .Should()
+            .BeTrue();
+        cached.TangentImpulse.Abs().Should().BeGreaterThan(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void CalculateImpulse_WithOverflowingCompactTangentDot_ShouldUseExactFriction()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        scenario.Context.Environment.MinSpeed = Fixed64.Zero;
+        scenario.Context.Environment.MaxSpeed = Fixed64.MaxValue;
+        ScenarioBody<LSCuboidCollider> wall = scenario.CreateCuboid(
+            Vector3d.Zero,
+            immovable: true);
+        ScenarioBody<LSSphereCollider> mover =
+            scenario.CreateSphere(Vector3d.Right);
+        mover.Body.FreezeAxes = BodyFreezeAxes3D.Rotation;
+        wall.Collider.Material = PhysicsMaterial.Default;
+        mover.Collider.Material = PhysicsMaterial.Default;
+        Vector3d velocity = new(
+            Fixed64.Zero,
+            -Fixed64.MaxValue,
+            Fixed64.MaxValue);
+        mover.Body.ApplyCollisionLinearVelocityDelta(velocity);
+        CollisionPair pair =
+            scenario.CreatePair(wall.Collider, mover.Collider);
+        Vector3d normal = Vector3d.One.Normalized;
+        pair.Manifold.SetContact(
+            wall.Body.WorldCenterOfMass,
+            mover.Body.WorldCenterOfMass,
+            Fixed64.Zero,
+            normal);
+        ManifoldContact contact = pair.Manifold.PrimaryContact;
+        pair.StoreWarmStartImpulse(
+            contact.ContactId,
+            normal,
+            Fixed64.MaxValue,
+            Fixed64.Zero,
+            Fixed64.Zero);
+
+        CollisionResponse.CalculateImpulse(
+            pair,
+            applyCachedImpulse: false,
+            applyPositionCorrection: false);
+
+        mover.Body.LinearVelocity.Should().NotBe(velocity);
+        pair.TryGetWarmStartImpulse(
+                contact.ContactId,
+                out ContactWarmStartImpulse cached)
+            .Should()
+            .BeTrue();
+        cached.TangentImpulse.Should().NotBe(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void CalculateImpulse_WithOverflowingCompactTangentQuotient_ShouldUseExactFriction()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        scenario.Context.Environment.MinSpeed = Fixed64.Zero;
+        scenario.Context.Environment.MaxSpeed = Fixed64.MaxValue;
+        ScenarioBody<LSCuboidCollider> wall = scenario.CreateCuboid(
+            Vector3d.Zero,
+            immovable: true);
+        ScenarioBody<LSSphereCollider> mover = scenario.CreateSphere(
+            Vector3d.Right,
+            mass: (Fixed64)16_000_000);
+        mover.Body.FreezeAxes = BodyFreezeAxes3D.Rotation;
+        wall.Collider.Material = PhysicsMaterial.Default;
+        mover.Collider.Material = PhysicsMaterial.Default;
+        CollisionPair pair =
+            scenario.CreatePair(wall.Collider, mover.Collider);
+        Vector3d normal =
+            (pair.ColliderB.Center - pair.ColliderA.Center).Normalized;
+        Vector3d tangent = SolverContact.CreateTangent(normal);
+        mover.Body.ApplyCollisionLinearVelocityDelta(
+            tangent * Fixed64.MaxValue);
+        Vector3d velocity = mover.Body.LinearVelocity;
+        pair.Manifold.SetContact(
+            wall.Body.WorldCenterOfMass,
+            mover.Body.WorldCenterOfMass,
+            Fixed64.Zero,
+            normal);
+        ManifoldContact contact = pair.Manifold.PrimaryContact;
+        pair.StoreWarmStartImpulse(
+            contact.ContactId,
+            normal,
+            Fixed64.MaxValue,
+            Fixed64.Zero,
+            Fixed64.Zero);
+
+        CollisionResponse.CalculateImpulse(
+            pair,
+            applyCachedImpulse: false,
+            applyPositionCorrection: false);
+
+        mover.Body.LinearVelocity.Should().NotBe(velocity);
+        pair.TryGetWarmStartImpulse(
+                contact.ContactId,
+                out ContactWarmStartImpulse cached)
+            .Should()
+            .BeTrue();
+        cached.TangentImpulse.Abs().Should().Be(Fixed64.MaxValue);
+    }
+
+    [Fact]
+    public void CalculateImpulse_WithOverflowingCompactFrictionLimit_ShouldUseExactFriction()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        scenario.Context.Environment.MinSpeed = Fixed64.Zero;
+        ScenarioBody<LSCuboidCollider> wall = scenario.CreateCuboid(
+            Vector3d.Zero,
+            immovable: true);
+        ScenarioBody<LSSphereCollider> mover =
+            scenario.CreateSphere(Vector3d.Right);
+        mover.Body.FreezeAxes = BodyFreezeAxes3D.Rotation;
+        var material = new PhysicsMaterial(
+            Fixed64.Two,
+            Fixed64.Two,
+            Fixed64.Zero);
+        wall.Collider.Material = material;
+        mover.Collider.Material = material;
+        CollisionPair pair =
+            scenario.CreatePair(wall.Collider, mover.Collider);
+        Vector3d normal =
+            (pair.ColliderB.Center - pair.ColliderA.Center).Normalized;
+        Vector3d tangent = SolverContact.CreateTangent(normal);
+        mover.Body.ApplyCollisionLinearVelocityDelta(tangent);
+        pair.Manifold.SetContact(
+            wall.Body.WorldCenterOfMass,
+            mover.Body.WorldCenterOfMass,
+            Fixed64.Zero,
+            normal);
+        ManifoldContact contact = pair.Manifold.PrimaryContact;
+        pair.StoreWarmStartImpulse(
+            contact.ContactId,
+            normal,
+            Fixed64.MaxValue,
+            Fixed64.Zero,
+            Fixed64.Zero);
+
+        CollisionResponse.CalculateImpulse(
+            pair,
+            applyCachedImpulse: false,
+            applyPositionCorrection: false);
+
+        mover.Body.LinearVelocity.Should().Be(Vector3d.Zero);
+        pair.TryGetWarmStartImpulse(
+                contact.ContactId,
+                out ContactWarmStartImpulse cached)
+            .Should()
+            .BeTrue();
+        cached.TangentImpulse.Abs().Should().Be(Fixed64.One);
+    }
+
+    [Fact]
+    public void CalculateImpulse_WithSubPrecisionDynamicDiskComponent_ShouldUseExactFriction()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        scenario.Context.Environment.MinSpeed = Fixed64.Zero;
+        ScenarioBody<LSCuboidCollider> wall = scenario.CreateCuboid(
+            Vector3d.Zero,
+            immovable: true);
+        ScenarioBody<LSSphereCollider> mover =
+            scenario.CreateSphere(Vector3d.Right);
+        mover.Body.FreezeAxes = BodyFreezeAxes3D.Rotation;
+        var material = new PhysicsMaterial(
+            Fixed64.One,
+            Fixed64.MinIncrement,
+            Fixed64.Zero);
+        wall.Collider.Material = material;
+        mover.Collider.Material = material;
+        CollisionPair pair =
+            scenario.CreatePair(wall.Collider, mover.Collider);
+        Vector3d normal =
+            (pair.ColliderB.Center - pair.ColliderA.Center).Normalized;
+        pair.Manifold.SetContact(
+            wall.Body.WorldCenterOfMass,
+            mover.Body.WorldCenterOfMass,
+            Fixed64.Zero,
+            normal);
+        ManifoldContact contact = pair.Manifold.PrimaryContact;
+        pair.StoreWarmStartImpulse(
+            contact.ContactId,
+            normal,
+            Fixed64.One,
+            Fixed64.Half,
+            Fixed64.One);
+
+        CollisionResponse.CalculateImpulse(
+            pair,
+            applyCachedImpulse: false,
+            applyPositionCorrection: false);
+
+        mover.Body.LinearVelocity.Should().NotBe(Vector3d.Zero);
+        pair.TryGetWarmStartImpulse(
+                contact.ContactId,
+                out ContactWarmStartImpulse cached)
+            .Should()
+            .BeTrue();
+        cached.TangentImpulse.Should().Be(Fixed64.Zero);
+        cached.SecondaryTangentImpulse.Should()
+            .Be(Fixed64.MinIncrement);
     }
 
     [Fact]

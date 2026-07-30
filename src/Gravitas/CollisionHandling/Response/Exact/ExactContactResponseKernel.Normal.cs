@@ -84,21 +84,21 @@ internal static partial class ExactContactResponseKernel
             || negativeImpulseScale < Fixed64.Zero
             || first.InverseMass < Fixed64.Zero
             || second.InverseMass < Fixed64.Zero
-            || !normal.IsNormalized()
-            || !ExactLever3D.TryGetRelativePointVelocityRatio(
-                first.LinearVelocity,
-                first.AngularVelocity,
-                first.Lever,
-                second.LinearVelocity,
-                second.AngularVelocity,
-                second.Lever,
-                normal,
-                out Signed832 velocityNumerator,
-                out Signed832 velocityDenominator))
+            || !normal.IsNormalized())
         {
             return false;
         }
 
+        ExactLever3D.GetRelativePointVelocityRatio(
+            first.LinearVelocity,
+            first.AngularVelocity,
+            first.Lever,
+            second.LinearVelocity,
+            second.AngularVelocity,
+            second.Lever,
+            normal,
+            out Signed832 velocityNumerator,
+            out Signed832 velocityDenominator);
         int velocitySign =
             velocityNumerator.Sign * velocityDenominator.Sign;
         bool hasNormalVelocity = Fixed64.TryGetSignedRawRatio(
