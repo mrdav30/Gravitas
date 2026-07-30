@@ -850,6 +850,24 @@ public sealed class ContactNormalImpulseBoundaryTests
     }
 
     [Fact]
+    public void CompactPointVelocity_ShouldRejectSubprecisionAngularContribution()
+    {
+        ContactResponseArithmetic3D.TryGetRelativePointVelocity(
+                Vector3d.Zero,
+                Vector3d.Right * Fixed64.MinIncrement,
+                Vector3d.Up * Fixed64.Half,
+                Vector3d.Zero,
+                Vector3d.Zero,
+                Vector3d.Zero,
+                Vector3d.Right,
+                out Vector3d relativeVelocity)
+            .Should()
+            .BeFalse();
+
+        relativeVelocity.Should().Be(Vector3d.Zero);
+    }
+
+    [Fact]
     public void CompactKernels_ShouldNarrowOnlyFinalEffectiveMassResponse()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
@@ -1649,6 +1667,32 @@ public sealed class ContactNormalImpulseBoundaryTests
     }
 
     [Fact]
+    public void CompactPlanarKernel_ShouldRejectSubprecisionAngularEffectiveMass()
+    {
+        using PhysicsScenarioBuilder scenario =
+            PhysicsScenarioBuilder.Create();
+        SolidBody2D body = CreateBody2D(
+            scenario.Context,
+            Fixed64.MinIncrement,
+            Fixed64.Two);
+        body.FreezeAxes =
+            BodyFreezeAxes2D.PositionX
+            | BodyFreezeAxes2D.PositionY;
+
+        ContactNormalImpulse2D.TryComputeAngularDenominator(
+                body,
+                new Vector2d(
+                    Fixed64.MinIncrement,
+                    Fixed64.Zero),
+                Vector2d.Forward,
+                out Fixed64 denominator)
+            .Should()
+            .BeFalse();
+
+        denominator.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
     public void CompactPlanarKernel_ShouldRejectUnrepresentableLeverCross()
     {
         using PhysicsScenarioBuilder scenario =
@@ -1677,6 +1721,28 @@ public sealed class ContactNormalImpulseBoundaryTests
             .BeFalse();
 
         result.Should().Be(default(ContactNormalVelocityDeltaResult2D));
+    }
+
+    [Fact]
+    public void CompactPlanarKernel_ShouldRejectSubprecisionLeverCross()
+    {
+        using PhysicsScenarioBuilder scenario =
+            PhysicsScenarioBuilder.Create();
+        SolidBody2D body =
+            CreateBody2D(scenario.Context, Fixed64.One);
+        Vector2d axis =
+            new Vector2d(Fixed64.One, (Fixed64)3).Normalized;
+
+        ContactNormalImpulse2D.TryComputeAngularVelocityDelta(
+                body,
+                Vector2d.Forward * Fixed64.MinIncrement,
+                axis,
+                Fixed64.MaxValue,
+                out Fixed64 delta)
+            .Should()
+            .BeFalse();
+
+        delta.Should().Be(Fixed64.Zero);
     }
 
     [Theory]
@@ -1925,7 +1991,8 @@ public sealed class ContactNormalImpulseBoundaryTests
 
     private static SolidBody2D CreateBody2D(
         GravitasWorldContext context,
-        Fixed64 mass)
+        Fixed64 mass,
+        Fixed64? radius = null)
     {
         var body = new SolidBody2D(
             new TestMatterAgent(
@@ -1934,7 +2001,7 @@ public sealed class ContactNormalImpulseBoundaryTests
                     Vector3d.Zero,
                     FixedQuaternion.Identity,
                     Vector3d.One)),
-            new LSCircleCollider2D(Fixed64.Half))
+            new LSCircleCollider2D(radius ?? Fixed64.Half))
         {
             Mass = mass
         };

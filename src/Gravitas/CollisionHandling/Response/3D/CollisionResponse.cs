@@ -659,7 +659,7 @@ public static class CollisionResponse
         Vector3d angularA = ResolveAngularVelocity(contact.A.Body);
         Vector3d linearB = ResolveLinearVelocity(contact.B.Body);
         Vector3d angularB = ResolveAngularVelocity(contact.B.Body);
-        if (!TryGetCompactRelativeVelocity(
+        if (!ContactResponseArithmetic3D.TryGetRelativePointVelocity(
                 linearA,
                 angularA,
                 contact.RelativeA.Vector,
@@ -893,61 +893,6 @@ public static class CollisionResponse
             || body.Body.ProjectLinearMotion(axis) == Vector3d.Zero;
     }
 
-    private static bool TryGetCompactRelativeVelocity(
-        Vector3d linearA,
-        Vector3d angularA,
-        Vector3d leverA,
-        Vector3d linearB,
-        Vector3d angularB,
-        Vector3d leverB,
-        Vector3d tangent,
-        out Vector3d relativeVelocity)
-    {
-        if (ContactResponseArithmetic3D.CanUseFastPointVelocity(
-                linearA,
-                angularA,
-                leverA,
-                linearB,
-                angularB,
-                leverB,
-                tangent))
-        {
-            Vector3d fastPointVelocityA =
-                linearA + Vector3d.Cross(angularA, leverA);
-            Vector3d fastPointVelocityB =
-                linearB + Vector3d.Cross(angularB, leverB);
-            relativeVelocity = fastPointVelocityB - fastPointVelocityA;
-            return true;
-        }
-
-        bool pointVelocitiesResolved = ContactResponseArithmetic3D.TryCross(
-                angularA,
-                leverA,
-                out Vector3d angularVelocityA)
-            & ContactResponseArithmetic3D.TryCross(
-                angularB,
-                leverB,
-                out Vector3d angularVelocityB)
-            & Vector3d.TryAdd(
-                linearA,
-                angularVelocityA,
-                out Vector3d pointVelocityA)
-            & Vector3d.TryAdd(
-                linearB,
-                angularVelocityB,
-                out Vector3d pointVelocityB);
-        if (!pointVelocitiesResolved)
-        {
-            relativeVelocity = default;
-            return false;
-        }
-
-        return Vector3d.TrySubtract(
-            pointVelocityB,
-            pointVelocityA,
-            out relativeVelocity);
-    }
-
     private static bool TryGetFrictionLimit(
         Fixed64 normalImpulse,
         Fixed64 friction,
@@ -1152,11 +1097,7 @@ public static class CollisionResponse
         if (!ContactResponseArithmetic3D.TryCross(
                 relativeContactPoint,
                 impulse,
-                out Vector3d torqueAxis)
-            || !ContactResponseArithmetic3D.PreservesNonzeroCrossProduct(
-                relativeContactPoint,
-                impulse,
-                torqueAxis))
+                out Vector3d torqueAxis))
         {
             return false;
         }

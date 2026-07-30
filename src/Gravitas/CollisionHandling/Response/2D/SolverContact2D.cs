@@ -106,6 +106,4 @@ internal readonly struct SolverContact2D
 
     public Fixed64 CachedTangentImpulse { get; }
 
-    public Fixed64 GetTotalInverseMass(Vector2d axis) =>
-        A.GetConstrainedInverseMass(axis) + B.GetConstrainedInverseMass(axis);
 }

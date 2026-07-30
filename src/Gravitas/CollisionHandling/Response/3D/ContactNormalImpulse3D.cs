@@ -741,10 +741,6 @@ internal static class ContactNormalImpulse3D
                 relativeContactPoint,
                 axis,
                 out Vector3d torqueAxis)
-            || !ContactResponseArithmetic3D.PreservesNonzeroCrossProduct(
-                relativeContactPoint,
-                axis,
-                torqueAxis)
             || !ContactResponseArithmetic3D.TryTransformDirection(
                 inverseInertia,
                 torqueAxis,
@@ -753,18 +749,10 @@ internal static class ContactNormalImpulse3D
                 angularVelocityDelta,
                 relativeContactPoint,
                 out Vector3d angular)
-            || !ContactResponseArithmetic3D.PreservesNonzeroCrossProduct(
-                angularVelocityDelta,
-                relativeContactPoint,
-                angular)
             || !ContactResponseArithmetic3D.TryDot(
                 angular,
                 axis,
-                out denominator)
-            || !ContactResponseArithmetic3D.PreservesNonzeroDotProduct(
-                angular,
-                axis,
-                denominator))
+                out denominator))
         {
             denominator = default;
             return false;
@@ -810,20 +798,30 @@ internal static class ContactNormalImpulse3D
                 impulse,
                 inverseInertia))
         {
+            if (!ContactResponseArithmetic3D.TryCross(
+                    relativeContactPoint,
+                    impulse,
+                    out Vector3d torqueAxis))
+                return false;
+
             velocityDelta = Fixed3x3.TransformDirection(
                 inverseInertia,
-                Vector3d.Cross(relativeContactPoint, impulse));
-            return true;
+                torqueAxis);
+            return ContactResponseArithmetic3D
+                .PreservesNonzeroTransformDirection(
+                    inverseInertia,
+                    torqueAxis,
+                    velocityDelta);
         }
 
         bool torqueResolved = ContactResponseArithmetic3D.TryCross(
                 relativeContactPoint,
                 impulse,
-                out Vector3d torqueAxis);
+                out Vector3d checkedTorqueAxis);
         bool transformResolved =
             ContactResponseArithmetic3D.TryTransformDirection(
                 inverseInertia,
-                torqueAxis,
+                checkedTorqueAxis,
                 out velocityDelta);
         return torqueResolved & transformResolved;
     }

@@ -501,6 +501,416 @@ public sealed partial class MixedResponseTests
     }
 
     [Fact]
+    public void Resolve_WithMinValueTangentImpulse_ShouldUseExactDiskAndReplaySymmetrically()
+    {
+        var positive = RunMinValueTangentImpulse(positive: true);
+        var repeatedPositive = RunMinValueTangentImpulse(positive: true);
+        var negative = RunMinValueTangentImpulse(positive: false);
+
+        positive.Should().Be(repeatedPositive);
+        positive.LinearVelocity3D.Z.Should().Be(
+            Fixed64.One - Fixed64.MinIncrement * Fixed64.Two);
+        negative.LinearVelocity3D.Z.Should().Be(
+            -Fixed64.One + Fixed64.MinIncrement * Fixed64.Two);
+        positive.LinearVelocity3D.Z.Should().Be(
+            -negative.LinearVelocity3D.Z);
+        positive.LinearVelocity2D.Should().Be(Vector2d.Zero);
+        negative.LinearVelocity2D.Should().Be(Vector2d.Zero);
+    }
+
+    [Fact]
+    public void Resolve_WhenMixedTangentEffectiveMassSumOverflows_ShouldUseExactDisk()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        var collider3D = new UnsupportedTestCollider3D
+        {
+            InertiaTensor = new Fixed3x3(
+                Fixed64.One, Fixed64.Zero, Fixed64.Zero,
+                Fixed64.Zero, Fixed64.One, Fixed64.Zero,
+                Fixed64.Zero, Fixed64.Zero, Fixed64.One),
+            MassPropertyWeight = ExactMassWeight.One
+        };
+        var body3D = new SolidBody(
+            new TestMatterAgent(
+                context,
+                new FixedTransform(
+                    Vector3d.Zero,
+                    FixedQuaternion.Identity,
+                    Vector3d.One)),
+            collider3D)
+        {
+            Mass = Fixed64.MinIncrement,
+            FreezeAxes =
+                BodyFreezeAxes3D.PositionX
+                | BodyFreezeAxes3D.PositionY
+        };
+        body3D.Initialize(
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            BodyMotionType.Dynamic);
+        SolidBody2D body2D = CreateCircle2D(context, Vector2d.Zero);
+        body2D.Mass = Fixed64.MinIncrement;
+        body2D.FreezeAxes =
+            BodyFreezeAxes2D.PositionX
+            | BodyFreezeAxes2D.Rotation;
+        var material = new PhysicsMaterial(
+            Fixed64.One,
+            Fixed64.One,
+            Fixed64.Zero);
+        collider3D.Material = material;
+        body2D.Collider.Material = material;
+        body3D.ApplyCollisionLinearVelocityDelta(Vector3d.Forward);
+        body3D.ApplyCollisionAngularVelocityDelta(
+            -Vector3d.Forward * Fixed64.Two);
+        body2D.ApplyCollisionLinearVelocityDelta(Vector2d.Backward);
+        var pair = new CollisionPairMixed(collider3D, body2D.Collider);
+        var contact = new MixedContact(
+            ContactAnchor.FromWorldPoint(Vector3d.Up),
+            ContactAnchor.FromWorldPoint(Vector3d.Zero),
+            Vector3d.Right,
+            Fixed64.Zero);
+        Fixed64 initialRelativeSpeed =
+            (body2D.LinearVelocity.Y - body3D.LinearVelocity.Z).Abs();
+
+        CollisionResponseMixed.Resolve(
+                pair,
+                contact,
+                iteration: 0,
+                iterationLimit: 1,
+                applyPositionCorrection: false)
+            .Should()
+            .BeTrue();
+
+        (body2D.LinearVelocity.Y - body3D.LinearVelocity.Z).Abs()
+            .Should()
+            .BeLessThan(initialRelativeSpeed);
+        body3D.LinearVelocity.Z.Should().BeGreaterThanOrEqualTo(
+            Fixed64.Zero);
+        body2D.LinearVelocity.Y.Should().BeLessThanOrEqualTo(
+            Fixed64.Zero);
+    }
+
+    [Fact]
+    public void Resolve_WithSubprecisionPlanarAngularMass_ShouldUseExactDisk()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        context.Environment.MinSpeed = Fixed64.Zero;
+        ScenarioBody<LSSphereCollider> body3D =
+            CreateSphere3D(context, Vector3d.Zero);
+        body3D.Body.Mass = Fixed64.MaxValue;
+        body3D.Body.FreezeAxes = BodyFreezeAxes3D.Rotation;
+        SolidBody2D body2D = CreateCircle2D(
+            context,
+            Vector2d.Zero,
+            radius: Fixed64.Two);
+        body2D.Mass = Fixed64.MinIncrement;
+        body2D.FreezeAxes =
+            BodyFreezeAxes2D.PositionX
+            | BodyFreezeAxes2D.PositionY;
+        var material = new PhysicsMaterial(
+            (Fixed64)4,
+            (Fixed64)4,
+            Fixed64.Zero);
+        body3D.Collider.Material = material;
+        body2D.Collider.Material = material;
+        body3D.Body.ApplyCollisionLinearVelocityDelta(
+            Vector3d.Right
+            + Vector3d.Forward * (Fixed64.MinIncrement * (Fixed64)3));
+        var pair = new CollisionPairMixed(
+            body3D.Collider,
+            body2D.Collider);
+        var contact = new MixedContact(
+            ContactAnchor.FromWorldPoint(Vector3d.Zero),
+            ContactAnchor.FromWorldPoint(
+                Vector3d.Right * Fixed64.MinIncrement),
+            Vector3d.Right,
+            Fixed64.Zero);
+
+        CollisionResponseMixed.Resolve(
+                pair,
+                contact,
+                iteration: 0,
+                iterationLimit: 1,
+                applyPositionCorrection: false)
+            .Should()
+            .BeTrue();
+
+        body3D.Body.LinearVelocity.Z.Should().Be(
+            Fixed64.MinIncrement);
+        body2D.AngularVelocity.Should().Be(
+            Fixed64.FromFraction(3, 5));
+    }
+
+    [Fact]
+    public void Resolve_WithSubprecisionCompactImpulseComponent_ShouldUseExactDisk()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        context.Environment.MinSpeed = Fixed64.Zero;
+        ScenarioBody<LSSphereCollider> body3D =
+            CreateSphere3D(context, Vector3d.Zero);
+        body3D.Body.Mass = Fixed64.MinIncrement;
+        body3D.Body.FreezeAxes = BodyFreezeAxes3D.Rotation;
+        SolidBody2D body2D = CreateCircle2D(context, Vector2d.Zero);
+        body2D.FreezeAxes = BodyFreezeAxes2D.All;
+        var material = new PhysicsMaterial(
+            Fixed64.MaxValue,
+            Fixed64.MaxValue,
+            Fixed64.Zero);
+        body3D.Collider.Material = material;
+        body2D.Collider.Material = material;
+        body3D.Body.ApplyCollisionLinearVelocityDelta(
+            Vector3d.Up
+            + Vector3d.Forward
+            + Vector3d.Right * Fixed64.MinIncrement);
+        var pair = new CollisionPairMixed(
+            body3D.Collider,
+            body2D.Collider);
+        var contact = new MixedContact(
+            ContactAnchor.FromWorldPoint(Vector3d.Zero),
+            ContactAnchor.FromWorldPoint(Vector3d.Zero),
+            Vector3d.Up,
+            Fixed64.Zero);
+
+        CollisionResponseMixed.Resolve(
+                pair,
+                contact,
+                iteration: 0,
+                iterationLimit: 1,
+                applyPositionCorrection: false)
+            .Should()
+            .BeTrue();
+
+        body3D.Body.LinearVelocity.Should().Be(Vector3d.Zero);
+    }
+
+    [Fact]
+    public void Resolve_WithNearVerticalTangent_ShouldRetainPlanarMassInExactFriction()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSSphereCollider> body3D =
+            CreateSphere3D(context, Vector3d.Zero);
+        SolidBody2D body2D = CreateCircle2D(
+            context,
+            Vector2d.Zero);
+        body3D.Body.FreezeAxes = BodyFreezeAxes3D.Rotation;
+        body2D.FreezeAxes = BodyFreezeAxes2D.Rotation;
+        var material = new PhysicsMaterial(
+            Fixed64.One,
+            Fixed64.One,
+            Fixed64.Zero);
+        body3D.Collider.Material = material;
+        body2D.Collider.Material = material;
+        Fixed64 verticalSpeed = (Fixed64)128;
+        body3D.Body.ApplyCollisionLinearVelocityDelta(
+            Vector3d.Right
+            + Vector3d.Up * verticalSpeed
+            + Vector3d.Forward * Fixed64.FromFraction(1, 64));
+        var pair = new CollisionPairMixed(
+            body3D.Collider,
+            body2D.Collider);
+        var contact = new MixedContact(
+            ContactAnchor.FromWorldPoint(Vector3d.Zero),
+            ContactAnchor.FromWorldPoint(Vector3d.Zero),
+            Vector3d.Right,
+            Fixed64.Zero);
+
+        CollisionResponseMixed.Resolve(
+                pair,
+                contact,
+                iteration: 0,
+                iterationLimit: 1,
+                applyPositionCorrection: false)
+            .Should()
+            .BeTrue();
+
+        body3D.Body.LinearVelocity.Y.Should().BeLessThan(
+            verticalSpeed);
+        body2D.LinearVelocity.Y.Should().NotBe(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void Resolve_WhenPlanarTangentMassProductOverflows_ShouldUseExactDisk()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSSphereCollider> body3D =
+            CreateSphere3D(context, Vector3d.Zero);
+        SolidBody2D body2D = CreateCircle2D(
+            context,
+            Vector2d.Zero);
+        body3D.Body.FreezeAxes = BodyFreezeAxes3D.Rotation;
+        body2D.Mass = Fixed64.MinIncrement;
+        body2D.FreezeAxes =
+            BodyFreezeAxes2D.PositionX
+            | BodyFreezeAxes2D.Rotation;
+        var material = new PhysicsMaterial(
+            Fixed64.One,
+            Fixed64.One,
+            Fixed64.Zero);
+        body3D.Collider.Material = material;
+        body2D.Collider.Material = material;
+        Fixed64 tangentialSpeed = Fixed64.FromRaw(
+            Fixed64.One.m_rawValue + 1L);
+        body3D.Body.ApplyCollisionLinearVelocityDelta(
+            Vector3d.Right
+            + Vector3d.Forward * tangentialSpeed);
+        var pair = new CollisionPairMixed(
+            body3D.Collider,
+            body2D.Collider);
+        var contact = new MixedContact(
+            ContactAnchor.FromWorldPoint(Vector3d.Zero),
+            ContactAnchor.FromWorldPoint(Vector3d.Zero),
+            Vector3d.Right,
+            Fixed64.Zero);
+
+        CollisionResponseMixed.Resolve(
+                pair,
+                contact,
+                iteration: 0,
+                iterationLimit: 1,
+                applyPositionCorrection: false)
+            .Should()
+            .BeTrue();
+
+        body3D.Body.LinearVelocity.Z.Should().BeLessThan(
+            tangentialSpeed);
+        body2D.LinearVelocity.Y.Should().NotBe(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void Resolve_WithVerticalAndPlanarTangent_ShouldApplyCompactFriction()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSSphereCollider> body3D =
+            CreateSphere3D(context, Vector3d.Zero);
+        SolidBody2D body2D = CreateCircle2D(
+            context,
+            Vector2d.Zero);
+        body3D.Body.FreezeAxes = BodyFreezeAxes3D.Rotation;
+        body2D.FreezeAxes = BodyFreezeAxes2D.Rotation;
+        var material = new PhysicsMaterial(
+            Fixed64.One,
+            Fixed64.One,
+            Fixed64.Zero);
+        body3D.Collider.Material = material;
+        body2D.Collider.Material = material;
+        body3D.Body.ApplyCollisionLinearVelocityDelta(
+            Vector3d.Right + Vector3d.Up + Vector3d.Forward);
+        var pair = new CollisionPairMixed(
+            body3D.Collider,
+            body2D.Collider);
+        var contact = new MixedContact(
+            ContactAnchor.FromWorldPoint(Vector3d.Zero),
+            ContactAnchor.FromWorldPoint(Vector3d.Zero),
+            Vector3d.Right,
+            Fixed64.Zero);
+
+        CollisionResponseMixed.Resolve(
+                pair,
+                contact,
+                iteration: 0,
+                iterationLimit: 1,
+                applyPositionCorrection: false)
+            .Should()
+            .BeTrue();
+
+        body3D.Body.LinearVelocity.Y.Should().BeLessThan(
+            Fixed64.One);
+        body3D.Body.LinearVelocity.Z.Should().BeLessThan(
+            Fixed64.One);
+        body2D.LinearVelocity.Y.Should().NotBe(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void Resolve_WithMultiAxisTangentBeyondScalarDomain_ShouldUseExactDisk()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        context.Environment.MinSpeed = Fixed64.Zero;
+        context.Environment.MaxSpeed = Fixed64.MaxValue;
+        ScenarioBody<LSSphereCollider> body3D =
+            CreateSphere3D(context, Vector3d.Zero);
+        SolidBody2D body2D = CreateCircle2D(
+            context,
+            Vector2d.Zero);
+        body3D.Body.Mass = Fixed64.MinIncrement;
+        body3D.Body.FreezeAxes = BodyFreezeAxes3D.Rotation;
+        body2D.FreezeAxes = BodyFreezeAxes2D.All;
+        var material = new PhysicsMaterial(
+            Fixed64.MaxValue,
+            Fixed64.MaxValue,
+            Fixed64.Zero);
+        body3D.Collider.Material = material;
+        body2D.Collider.Material = material;
+        body3D.Body.ApplyCollisionLinearVelocityDelta(
+            Vector3d.Right * Fixed64.Two
+            + Vector3d.Up * Fixed64.MaxValue
+            + Vector3d.Forward * Fixed64.MaxValue);
+        var pair = new CollisionPairMixed(
+            body3D.Collider,
+            body2D.Collider);
+        var contact = new MixedContact(
+            ContactAnchor.FromWorldPoint(Vector3d.Zero),
+            ContactAnchor.FromWorldPoint(Vector3d.Zero),
+            Vector3d.Right,
+            Fixed64.Zero);
+
+        CollisionResponseMixed.Resolve(
+                pair,
+                contact,
+                iteration: 0,
+                iterationLimit: 1,
+                applyPositionCorrection: false)
+            .Should()
+            .BeTrue();
+        body3D.Body.LinearVelocity.Should().Be(Vector3d.Zero);
+        body2D.LinearVelocity.Should().Be(Vector2d.Zero);
+    }
+
+    [Fact]
+    public void Resolve_WithTangentialMotionBelowDeadzone_ShouldSkipFriction()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSSphereCollider> body3D =
+            CreateSphere3D(context, Vector3d.Zero);
+        SolidBody2D body2D = CreateCircle2D(
+            context,
+            Vector2d.Zero);
+        body3D.Body.FreezeAxes = BodyFreezeAxes3D.Rotation;
+        body2D.FreezeAxes = BodyFreezeAxes2D.All;
+        var material = new PhysicsMaterial(
+            Fixed64.One,
+            Fixed64.One,
+            Fixed64.Zero);
+        body3D.Collider.Material = material;
+        body2D.Collider.Material = material;
+        Fixed64 tangentialSpeed =
+            Fixed64.FromFraction(1, 8192);
+        body3D.Body.ApplyCollisionLinearVelocityDelta(
+            Vector3d.Right
+            + Vector3d.Forward * tangentialSpeed);
+        var pair = new CollisionPairMixed(
+            body3D.Collider,
+            body2D.Collider);
+        var contact = new MixedContact(
+            ContactAnchor.FromWorldPoint(Vector3d.Zero),
+            ContactAnchor.FromWorldPoint(Vector3d.Zero),
+            Vector3d.Right,
+            Fixed64.Zero);
+
+        CollisionResponseMixed.Resolve(
+                pair,
+                contact,
+                iteration: 0,
+                iterationLimit: 1,
+                applyPositionCorrection: false)
+            .Should()
+            .BeTrue();
+
+        body3D.Body.LinearVelocity.Should().Be(
+            Vector3d.Forward * tangentialSpeed);
+        body2D.LinearVelocity.Should().Be(Vector2d.Zero);
+    }
+
+    [Fact]
     public void Resolve_WhenExactMixedFrictionWouldOverflowCurrentVelocity_ShouldSkipFriction()
     {
         using GravitasWorldContext context = CreateMixedContext();
@@ -1075,6 +1485,62 @@ public sealed partial class MixedResponseTests
 
         return (
             applied,
+            body3D.Body.LinearVelocity,
+            body3D.Body.AngularVelocity,
+            body2D.LinearVelocity,
+            body2D.AngularVelocity,
+            context.ComputeReplayHash(
+                GravitasReplayHashMode.AuthoritativeWithSolverCaches));
+    }
+
+    private static (
+        Vector3d LinearVelocity3D,
+        Vector3d AngularVelocity3D,
+        Vector2d LinearVelocity2D,
+        Fixed64 AngularVelocity2D,
+        ChronicleHash ReplayHash) RunMinValueTangentImpulse(bool positive)
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSSphereCollider> body3D =
+            CreateSphere3D(context, Vector3d.Zero);
+        SolidBody2D body2D = CreateCircle2D(context, Vector2d.Zero);
+        body3D.Body.Mass = Fixed64.MaxValue;
+        body3D.Body.FreezeAxes =
+            BodyFreezeAxes3D.PositionX
+            | BodyFreezeAxes3D.PositionY
+            | BodyFreezeAxes3D.Rotation;
+        body2D.FreezeAxes =
+            BodyFreezeAxes2D.PositionY
+            | BodyFreezeAxes2D.Rotation;
+        var material = new PhysicsMaterial(
+            Fixed64.MaxValue,
+            Fixed64.One,
+            Fixed64.Zero);
+        body3D.Collider.Material = material;
+        body2D.Collider.Material = material;
+        body3D.Body.ApplyCollisionLinearVelocityDelta(
+            (positive ? Vector3d.Forward : -Vector3d.Forward)
+                * Fixed64.One);
+        body2D.ApplyCollisionLinearVelocityDelta(Vector2d.Left);
+        var pair = new CollisionPairMixed(
+            body3D.Collider,
+            body2D.Collider);
+        var contact = new MixedContact(
+            ContactAnchor.FromWorldPoint(Vector3d.Zero),
+            ContactAnchor.FromWorldPoint(Vector3d.Zero),
+            Vector3d.Right,
+            Fixed64.Zero);
+
+        CollisionResponseMixed.Resolve(
+                pair,
+                contact,
+                iteration: 0,
+                iterationLimit: 1,
+                applyPositionCorrection: false)
+            .Should()
+            .BeTrue();
+
+        return (
             body3D.Body.LinearVelocity,
             body3D.Body.AngularVelocity,
             body2D.LinearVelocity,

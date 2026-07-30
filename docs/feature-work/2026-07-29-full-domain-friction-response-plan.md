@@ -1,6 +1,6 @@
 # Full-Domain Friction Response Implementation Plan
 
-**Status:** Active. Phases 0-2 are complete; Phase 2 is awaiting owner review.
+**Status:** Active. Phases 0-3 are complete; Phase 3 is awaiting owner review.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use
 > `superpowers:test-driven-development` while changing behavior,
@@ -300,22 +300,41 @@ pass. Do not start release-wide closure in this phase.
 - Update:
   `docs/feature-work/2026-07-29-full-domain-friction-response-plan.md`
 
-- [ ] Add a failing pure-2D `Fixed64.MinValue` cached-impulse regression that
+- [x] Add a failing pure-2D `Fixed64.MinValue` cached-impulse regression that
   distinguishes the mathematical magnitude from saturating `Abs()`.
-- [ ] Add pure-2D mirrored cancellation/removal and true final-overflow
+- [x] Add pure-2D mirrored cancellation/removal and true final-overflow
   regressions around the existing exact line owner.
-- [ ] Add mixed regressions for unsafe point-velocity construction, tangent
+- [x] Add mixed regressions for unsafe point-velocity construction, tangent
   rejection/normalization, angular denominator accumulation, friction-limit
   multiplication, mirrored extremes, and final atomic overflow.
-- [ ] Tighten pure-2D compact admission only where the current exact line
+- [x] Tighten pure-2D compact admission only where the current exact line
   fallback already supplies the complete contract.
-- [ ] Prove every mixed compact tangent operation or route once to the exact
+- [x] Prove every mixed compact tangent operation or route once to the exact
   disk path; do not add another mixed wide solver.
-- [ ] Preserve mixed planar constraints and the current uncached disk contract.
-- [ ] Extend warmed exact 2D and mixed allocation assertions.
-- [ ] Run focused 2D/mixed response, replay, allocation, and coverage tests.
-- [ ] Request independent review, resolve findings, record results, and stop
+- [x] Preserve mixed planar constraints and the current uncached disk contract.
+- [x] Extend warmed exact 2D and mixed allocation assertions.
+- [x] Run focused 2D/mixed response, replay, allocation, and coverage tests.
+- [x] Request independent review, resolve findings, record results, and stop
   for owner review.
+
+**Phase 3 result:** Pure 2D now classifies the complete signed static-friction
+interval without saturating `Abs()`, checks the complete linear/angular
+effective-mass denominator, and routes unsafe cache or final-delta work to its
+existing exact Coulomb line. Mixed response now uses canonical X/Z embedding
+and proves point velocity, tangent projection/normalization, every effective-
+mass term, friction limits, and final impulse components before retaining the
+compact path; any failed proof routes once to the existing uncached exact disk.
+Subprecision cross, dot, scale, and angular-response loss is rejected by the
+shared response arithmetic owners rather than patched per caller. Focused 2D,
+mixed, replay, boundary, and allocation coverage passes `278/278`; warmed exact
+2D and mixed friction allocate zero bytes. The complete Release suite passes
+`3,861/3,861` with `43,654/43,654` lines, `12,775/12,775` branches, and
+`4,502/4,502` methods covered. Independent review identified and closed
+pure-2D subprecision point-velocity and mixed multi-axis tangent-projection
+admission gaps. The final coverage pass removed an impossible zero-impulse
+helper branch at its sole nonzero-impulse caller, and independent re-review
+found no remaining Phase 3 correctness, allocation, dimensional-parity, API,
+or test-quality issue.
 
 ---
 

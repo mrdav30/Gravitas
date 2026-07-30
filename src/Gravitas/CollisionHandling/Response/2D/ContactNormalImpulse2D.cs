@@ -469,10 +469,6 @@ internal static class ContactNormalImpulse2D
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Fixed64 GetConstrainedInverseMass(SolidBody2D? body, Vector2d axis) =>
-        body?.GetConstrainedInverseMass(axis) ?? Fixed64.Zero;
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool TryComputeNormalVelocity(
         Vector2d linearVelocityA,
         Fixed64 angularVelocityA,
@@ -519,7 +515,7 @@ internal static class ContactNormalImpulse2D
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool TryComputeDenominator(
+    internal static bool TryComputeDenominator(
         SolidBody2D? bodyA,
         Vector2d relativeContactPointA,
         SolidBody2D? bodyB,
@@ -537,9 +533,17 @@ internal static class ContactNormalImpulse2D
             relativeContactPointB,
             normal,
             out Fixed64 angularB);
+        bool linearAResolved = TryGetConstrainedInverseMass(
+            bodyA,
+            normal,
+            out Fixed64 linearA);
+        bool linearBResolved = TryGetConstrainedInverseMass(
+            bodyB,
+            normal,
+            out Fixed64 linearB);
         bool sumResolved = Fixed64.TryAdd(
-                GetConstrainedInverseMass(bodyA, normal),
-                GetConstrainedInverseMass(bodyB, normal),
+                linearA,
+                linearB,
                 out Fixed64 linear)
             & Fixed64.TryAdd(
                 linear,
@@ -549,7 +553,11 @@ internal static class ContactNormalImpulse2D
                 first,
                 angularB,
                 out denominator);
-        if (!(angularAResolved & angularBResolved & sumResolved))
+        if (!(linearAResolved
+            & linearBResolved
+            & angularAResolved
+            & angularBResolved
+            & sumResolved))
         {
             denominator = default;
             return false;
@@ -571,16 +579,46 @@ internal static class ContactNormalImpulse2D
         }
 
         denominator = default;
-        return ContactResponseArithmetic3D.TryCross(
+        bool crossResolved = ContactResponseArithmetic3D.TryCross(
                 ExactContactLever2D.ToSpatial(relativeContactPoint),
                 ExactContactLever2D.ToSpatial(axis),
-                out Vector3d cross)
+                out Vector3d cross);
+        bool denominatorResolved = crossResolved
             && Fixed64.TryMultiplyDivide(
                 cross.Y,
                 cross.Y,
                 body.EffectiveInverseMomentOfInertia,
                 Fixed64.One,
                 out denominator);
+        if (!denominatorResolved
+            || (denominator == Fixed64.Zero
+                && cross.Y != Fixed64.Zero
+                && body.EffectiveInverseMomentOfInertia
+                    != Fixed64.Zero))
+        {
+            denominator = default;
+            return false;
+        }
+
+        return true;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static bool TryGetConstrainedInverseMass(
+        SolidBody2D? body,
+        Vector2d axis,
+        out Fixed64 inverseMass)
+    {
+        if (body == null)
+        {
+            inverseMass = Fixed64.Zero;
+            return true;
+        }
+
+        inverseMass = body.GetConstrainedInverseMass(axis);
+        return inverseMass != Fixed64.Zero
+            || body.EffectiveInverseMass == Fixed64.Zero
+            || body.ProjectLinearMotion(axis) == Vector2d.Zero;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -605,17 +643,23 @@ internal static class ContactNormalImpulse2D
         out Fixed64 velocityDelta)
     {
         velocityDelta = Fixed64.Zero;
-        return body?.CanRotate != true
-            || (ContactResponseArithmetic3D.TryCross(
-                    ExactContactLever2D.ToSpatial(relativeContactPoint),
-                    ExactContactLever2D.ToSpatial(signedNormal),
-                    out Vector3d cross)
-                && Fixed64.TryMultiplyDivide(
-                    -cross.Y,
-                    impulseScalar,
-                    body.EffectiveInverseMomentOfInertia,
-                    Fixed64.One,
-                    out velocityDelta));
+        if (body?.CanRotate != true)
+            return true;
+
+        Vector3d spatialPoint =
+            ExactContactLever2D.ToSpatial(relativeContactPoint);
+        Vector3d spatialNormal =
+            ExactContactLever2D.ToSpatial(signedNormal);
+        return ContactResponseArithmetic3D.TryCross(
+                spatialPoint,
+                spatialNormal,
+                out Vector3d cross)
+            && Fixed64.TryMultiplyDivide(
+                -cross.Y,
+                impulseScalar,
+                body.EffectiveInverseMomentOfInertia,
+                Fixed64.One,
+                out velocityDelta);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

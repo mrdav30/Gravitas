@@ -118,6 +118,14 @@ mass and scalar moment stay inspectable. 2D contact response applies planar
 linear velocity deltas and scalar angular velocity deltas from COM-relative
 normal and tangent friction impulses.
 
+Ordinary 2D friction uses the compact scalar tangent solve only while point
+velocity, effective mass, friction limits, cache accumulation/removal, and
+final body deltas remain representable without losing nonzero terms. Failed
+proofs route once to the exact Coulomb-line owner, which keeps the cached
+tangent impulse and solved delta exact until final round-to-even
+materialization. Static-limit classification uses the signed interval directly,
+so `Fixed64.MinValue` is not mistaken for a smaller saturated magnitude.
+
 ## Mixed Response
 
 Mixed contacts are solved inside `GravitasMixedCollisionService` after both
@@ -132,6 +140,15 @@ Mixed response applies:
 
 The 2D body is treated as having infinite constrained mass along world Y.
 `PhysicsRuntimeMode.Both` never creates mixed contacts.
+
+Mixed friction maps 2D linear velocity and contact arms explicitly into world
+X/Z before constructing point velocity. The compact path proves tangent
+projection and normalization, every linear/angular effective-mass term,
+friction-limit multiplication, and final impulse materialization. Any failed
+proof routes once to the existing uncached exact Coulomb disk; no parallel
+mixed wide solver or warm-start cache is introduced. Exact fallback preserves
+the same planar constraint: world Y response remains exclusive to the 3D
+participant.
 
 ## Materials
 

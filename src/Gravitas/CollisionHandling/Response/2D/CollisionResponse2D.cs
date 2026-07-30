@@ -478,12 +478,54 @@ public static class CollisionResponse2D
         Fixed64 impulseScalar = Fixed64.Zero;
         if (staticFrictionLimit > Fixed64.Zero || dynamicFrictionLimit > Fixed64.Zero)
         {
-            Fixed64 tangentVelocity = Vector2d.Dot(
-                ComputeRelativeVelocity(contact),
-                contact.Tangent);
-            Fixed64 denominator = ComputeImpulseDenominator(
-                contact,
-                contact.Tangent);
+            Vector3d spatialTangent =
+                ExactContactLever2D.ToSpatial(contact.Tangent);
+            Fixed64 tangentVelocity = default;
+            bool tangentVelocityResolved =
+                ContactResponseArithmetic3D.TryGetRelativePointVelocity(
+                    ExactContactLever2D.ToSpatial(
+                        ResolveLinearVelocity(contact.A.Body)),
+                    new Vector3d(
+                        Fixed64.Zero,
+                        -ResolveAngularVelocity(contact.A.Body),
+                        Fixed64.Zero),
+                    ExactContactLever2D.ToSpatial(contact.RelativeA.Vector),
+                    ExactContactLever2D.ToSpatial(
+                        ResolveLinearVelocity(contact.B.Body)),
+                    new Vector3d(
+                        Fixed64.Zero,
+                        -ResolveAngularVelocity(contact.B.Body),
+                        Fixed64.Zero),
+                    ExactContactLever2D.ToSpatial(contact.RelativeB.Vector),
+                    spatialTangent,
+                    out Vector3d relativeVelocity)
+                && ContactResponseArithmetic3D.TryDot(
+                    relativeVelocity,
+                    spatialTangent,
+                    out tangentVelocity);
+            bool denominatorResolved =
+                ContactNormalImpulse2D.TryComputeDenominator(
+                    contact.A.Body,
+                    contact.RelativeA.Vector,
+                    contact.B.Body,
+                    contact.RelativeB.Vector,
+                    contact.Tangent,
+                    out Fixed64 denominator);
+            if (!(tangentVelocityResolved & denominatorResolved))
+            {
+                return TrySolveFrictionImpulseExact(
+                    pair,
+                    contact,
+                    responsePositionA,
+                    responsePositionB,
+                    normalLinearVelocityA,
+                    normalAngularVelocityA,
+                    normalLinearVelocityB,
+                    normalAngularVelocityB,
+                    restitutionVelocityThreshold,
+                    contactShare,
+                    out accumulated);
+            }
             if (tangentVelocity.Abs() > Fixed64.Epsilon
                 && denominator > Fixed64.Zero
                 && !Fixed64.TryMultiplyDivide(
@@ -525,7 +567,8 @@ public static class CollisionResponse2D
                 contactShare,
                 out accumulated);
         }
-        accumulated = desiredAccumulated.Abs() <= staticFrictionLimit
+        accumulated = desiredAccumulated >= -staticFrictionLimit
+            && desiredAccumulated <= staticFrictionLimit
             ? desiredAccumulated
             : FixedMath.Clamp(
                 desiredAccumulated,
@@ -824,15 +867,6 @@ public static class CollisionResponse2D
         return true;
     }
 
-    private static Vector2d ComputeRelativeVelocity(SolverContact2D contact)
-    {
-        Vector2d velocityA = ResolveLinearVelocity(contact.A.Body)
-            + AngularVelocityAtPoint(contact.RelativeA.Vector, ResolveAngularVelocity(contact.A.Body));
-        Vector2d velocityB = ResolveLinearVelocity(contact.B.Body)
-            + AngularVelocityAtPoint(contact.RelativeB.Vector, ResolveAngularVelocity(contact.B.Body));
-        return velocityB - velocityA;
-    }
-
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Vector2d ResolveLinearVelocity(SolidBody2D? body) =>
         body == null
@@ -849,30 +883,6 @@ public static class CollisionResponse2D
             : body.IsKinematic
                 ? body.SampleContinuousCollisionAngularVelocity(Fixed64.One)
                 : body.AngularVelocity;
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Vector2d AngularVelocityAtPoint(Vector2d relativePoint, Fixed64 angularVelocity) =>
-        new(-angularVelocity * relativePoint.Y, angularVelocity * relativePoint.X);
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Fixed64 ComputeImpulseDenominator(SolverContact2D contact, Vector2d axis)
-    {
-        return contact.GetTotalInverseMass(axis)
-            + ComputeAngularDenominator(contact.A, contact.RelativeA.Vector, axis)
-            + ComputeAngularDenominator(contact.B, contact.RelativeB.Vector, axis);
-    }
-
-    private static Fixed64 ComputeAngularDenominator(
-        ResponseBody2D body,
-        Vector2d relativeContactPoint,
-        Vector2d axis)
-    {
-        if (!body.CanRotate)
-            return Fixed64.Zero;
-
-        Fixed64 cross = Vector2d.CrossProduct(relativeContactPoint, axis);
-        return cross * cross * body.InverseMoment;
-    }
 
     private static Vector2d ResolveContactNormal(Vector2d normal, Vector2d fallbackDirection)
     {

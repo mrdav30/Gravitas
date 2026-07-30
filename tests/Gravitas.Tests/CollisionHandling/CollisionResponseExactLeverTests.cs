@@ -864,12 +864,14 @@ public sealed class CollisionResponseExactLeverTests
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         scenario.Context.Environment.MinSpeed = Fixed64.Zero;
+        Fixed64 inverseInertia = (Fixed64)8;
+        Fixed64 inertia = Fixed64.One / inverseInertia;
         var collider = new UnsupportedTestCollider3D
         {
             InertiaTensor = new Fixed3x3(
-                Fixed64.MinIncrement, Fixed64.Zero, Fixed64.Zero,
-                Fixed64.Zero, Fixed64.MinIncrement, Fixed64.Zero,
-                Fixed64.Zero, Fixed64.Zero, Fixed64.MinIncrement)
+                inertia, Fixed64.Zero, Fixed64.Zero,
+                Fixed64.Zero, inertia, Fixed64.Zero,
+                Fixed64.Zero, Fixed64.Zero, inertia)
         };
         ScenarioBody<UnsupportedTestCollider3D> mover =
             scenario.CreateBody(
@@ -881,7 +883,7 @@ public sealed class CollisionResponseExactLeverTests
             immovable: true);
         mover.Body.FreezeAxes = BodyFreezeAxes3D.Position;
         mover.Body.EffectiveInverseInertiaTensor.M11.Should()
-            .Be(Fixed64.MaxValue);
+            .Be(inverseInertia);
         mover.Collider.Material = PhysicsMaterial.Frictionless;
         wall.Collider.Material = PhysicsMaterial.Frictionless;
         CollisionPair pair =
@@ -889,8 +891,7 @@ public sealed class CollisionResponseExactLeverTests
         bool moverIsA = ReferenceEquals(pair.ColliderA, mover.Collider);
         ContactAnchor moverAnchor = ContactAnchor.FromWorldPoint(
             mover.Body.WorldCenterOfMass
-            + Vector3d.Up
-                * (Fixed64.MinIncrement * Fixed64.Two));
+            + Vector3d.Up * Fixed64.MinIncrement);
         ContactAnchor wallAnchor =
             ContactAnchor.FromWorldPoint(wall.Body.WorldCenterOfMass);
         Vector3d normal =
@@ -906,7 +907,7 @@ public sealed class CollisionResponseExactLeverTests
                 mover.Body.GetCenterOfMassAnchor());
         Vector3d moverImpulse =
             SolverContact.CreateTangent(contact.Normal)
-            * -Fixed64.MinIncrement;
+            * -Fixed64.FromFraction(1, 4);
         if (moverIsA)
             moverImpulse = -moverImpulse;
         Assert.True(ExactContactLever3D.TryGetAngularVelocityDelta(
@@ -919,22 +920,29 @@ public sealed class CollisionResponseExactLeverTests
             .TryGetOffsetFrom(
                 mover.Body.GetCenterOfMassAnchor(),
                 out Vector3d compactLever));
-        Assert.True(ContactResponseArithmetic3D.TryCross(
+        Assert.True(Vector3d.TryCross(
                 compactLever,
                 moverImpulse,
                 out Vector3d compactTorque));
         Assert.Equal(Vector3d.Zero, compactTorque);
-        Assert.False(ContactResponseArithmetic3D.PreservesNonzeroCrossProduct(
+        Assert.False(ContactResponseArithmetic3D.TryCross(
                 compactLever,
                 moverImpulse,
-                compactTorque));
+                out compactTorque));
+        Assert.False(
+            ContactNormalImpulse3D.TryComputeAngularVelocityDelta(
+                mover.Body,
+                compactLever,
+                moverImpulse,
+                out Vector3d compactAngularVelocity));
+        Assert.Equal(Vector3d.Zero, compactAngularVelocity);
         Vector3d initialAngularVelocity = compactLever.Normalized;
         mover.Body.ApplyCollisionAngularVelocityDelta(initialAngularVelocity);
         pair.StoreWarmStartImpulse(
             contact.ContactId,
             contact.Normal,
             Fixed64.Zero,
-            Fixed64.MinIncrement,
+            Fixed64.FromFraction(1, 4),
             Fixed64.Zero);
 
         CollisionResponse.CalculateImpulse(

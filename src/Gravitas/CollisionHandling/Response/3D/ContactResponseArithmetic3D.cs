@@ -56,6 +56,81 @@ internal static class ContactResponseArithmetic3D
             | GetAggregateMagnitude(inverseInertia),
             SafeAngularResponseMagnitudeShift);
 
+    internal static bool TryGetRelativePointVelocity(
+        Vector3d linearA,
+        Vector3d angularA,
+        Vector3d leverA,
+        Vector3d linearB,
+        Vector3d angularB,
+        Vector3d leverB,
+        Vector3d axis,
+        out Vector3d relativeVelocity)
+    {
+        if (CanUseFastPointVelocity(
+                linearA,
+                angularA,
+                leverA,
+                linearB,
+                angularB,
+                leverB,
+                axis))
+        {
+            Vector3d fastAngularVelocityA =
+                Vector3d.Cross(angularA, leverA);
+            Vector3d fastAngularVelocityB =
+                Vector3d.Cross(angularB, leverB);
+            if (!PreservesNonzeroCrossProduct(
+                    angularA,
+                    leverA,
+                    fastAngularVelocityA)
+                || !PreservesNonzeroCrossProduct(
+                    angularB,
+                    leverB,
+                    fastAngularVelocityB))
+            {
+                relativeVelocity = default;
+                return false;
+            }
+
+            Vector3d fastPointVelocityA =
+                linearA + fastAngularVelocityA;
+            Vector3d fastPointVelocityB =
+                linearB + fastAngularVelocityB;
+            relativeVelocity =
+                fastPointVelocityB - fastPointVelocityA;
+            return true;
+        }
+
+        bool firstCrossResolved = TryCross(
+                angularA,
+                leverA,
+                out Vector3d angularVelocityA);
+        bool secondCrossResolved = TryCross(
+                angularB,
+                leverB,
+                out Vector3d angularVelocityB);
+        bool pointVelocitiesResolved = firstCrossResolved
+            & secondCrossResolved
+            & Vector3d.TryAdd(
+                linearA,
+                angularVelocityA,
+                out Vector3d pointVelocityA)
+            & Vector3d.TryAdd(
+                linearB,
+                angularVelocityB,
+                out Vector3d pointVelocityB);
+        if (!pointVelocitiesResolved)
+        {
+            relativeVelocity = default;
+            return false;
+        }
+
+        return Vector3d.TrySubtract(
+            pointVelocityB,
+            pointVelocityA,
+            out relativeVelocity);
+    }
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static bool TryCross(
         Vector3d left,
@@ -65,10 +140,14 @@ internal static class ContactResponseArithmetic3D
         if (HasSafeProductInputs(left, right))
         {
             result = Vector3d.Cross(left, right);
-            return true;
+            return PreservesNonzeroCrossProduct(
+                left,
+                right,
+                result);
         }
 
-        return Vector3d.TryCross(left, right, out result);
+        return Vector3d.TryCross(left, right, out result)
+            && PreservesNonzeroCrossProduct(left, right, result);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -80,10 +159,14 @@ internal static class ContactResponseArithmetic3D
         if (HasSafeProductInputs(left, right))
         {
             result = Vector3d.Dot(left, right);
-            return true;
+            return PreservesNonzeroDotProduct(
+                left,
+                right,
+                result);
         }
 
-        return Vector3d.TryDot(left, right, out result);
+        return Vector3d.TryDot(left, right, out result)
+            && PreservesNonzeroDotProduct(left, right, result);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

@@ -307,7 +307,7 @@ public sealed partial class MixedResponseTests
     }
 
     [Fact]
-    public void Resolve_WithPlanarVerticalMixedImpulse_ShouldConstrain2DVerticalAndMove3D()
+    public void Resolve_WithVerticalNormalComponent_ShouldKeep2DOnPlaneAndResolvePlanarFriction()
     {
         using GravitasWorldContext context = CreateMixedContext();
         ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(
@@ -327,7 +327,7 @@ public sealed partial class MixedResponseTests
         body3D.Body.Position3d.Y.Should().BeLessThan(-Fixed64.FromFraction(1, 4));
         body2D.Agent.Transform.LocalPosition.Y.Should().Be(Fixed64.Zero);
         body2D.LinearVelocity.X.Should().BeGreaterThan(Fixed64.Zero);
-        body2D.LinearVelocity.Y.Should().Be(Fixed64.Zero);
+        body2D.LinearVelocity.Y.Should().BeLessThan(Fixed64.Zero);
         body2D.AngularVelocity.Should().BeLessThan(Fixed64.Zero);
     }
 
@@ -1381,9 +1381,11 @@ public sealed partial class MixedResponseTests
         GravitasWorldContext context,
         Vector2d position,
         bool immovable = false,
-        PhysicsLayer? layer = null)
+        PhysicsLayer? layer = null,
+        Fixed64? radius = null)
     {
-        var collider = new LSCircleCollider2D(Fixed64.Half);
+        var collider = new LSCircleCollider2D(
+            radius ?? Fixed64.Half);
         if (layer.HasValue)
             collider.Layer = layer.Value;
 
