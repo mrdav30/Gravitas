@@ -145,6 +145,12 @@ These internal physics semantics consume FixedMathSharp's policy-neutral wide
 arithmetic through the intentional friend-assembly boundary and never enter
 Gravitas public signatures.
 
+`ExactContactResponseKernel` is the sole owner of the exact normal,
+accumulated-normal, Coulomb-line, and Coulomb-disk response policy.
+`ExactContactLever3D` and `ExactContactLever2D` adapt body mobility and
+dimension-specific state into that kernel; they do not duplicate its arithmetic
+or expose the FixedMathSharp internal representation.
+
 Embedded 2D mixed volumes also select planar boundary anchors semantically.
 Built-in circles, capsules, boxes, polygons, and compounds therefore do not
 require a public closest point or representable query-to-boundary distance to

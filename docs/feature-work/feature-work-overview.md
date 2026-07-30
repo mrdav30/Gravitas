@@ -36,31 +36,33 @@ instead of burying it in notes.
 - [`Benchmark Signal Hardening`](benchmark-signal-hardening-backlog.md)
   - Reproduce and close confirmed release-relevant signals alongside the owning
     library change. Do not broaden this into speculative optimization work.
-- [`FixedMathSharp / Gravitas Ownership Boundary`](2026-07-28-fixedmathsharp-gravitas-ownership-boundary-plan.md)
-  - Complete this focused detour before the remaining Gravitas issue queue.
-    FixedMathSharp retains standard-library-quality exact math, geometry, fused
-    arithmetic, and internal wide representations. Recent semantic geometry,
-    lever, and mass-property types remain foundational only when they have value
-    independent of Gravitas; physics-specific types and algorithms move
-    downstream. Gravitas receives intentional friend access and owns rigid-body
-    restitution, unilateral impulse accumulation, inverse-mass/inertia response,
-    and Coulomb friction behind one internal exact-response subsystem.
-  - The plan also centralizes only proven duplicate wide kernels, removes
-    misleading partial ownership, and mechanically reorganizes crowded geometry
-    directories after behavior is stable. FixedMathSharp v6 remains the public
-    migration baseline; unreleased intermediate v7 response APIs do not receive
-    compatibility shims or misleading migration entries.
-
 ## Recently Completed
 
+- [`FixedMathSharp / Gravitas Ownership Boundary`](done/2026-07-28-fixedmathsharp-gravitas-ownership-boundary-plan.md)
+  - Completed 2026-07-29. FixedMathSharp now owns reusable exact math,
+    semantic geometry, and internal wide mechanics; Gravitas is its sole
+    intentional non-test friend and owns rigid-body levers, mass semantics,
+    normal/friction policy, and exact response. The pass removed intermediate
+    v7 physics APIs, centralized proven wide duplication, and reorganized
+    geometry by coherent owners without exposing raw wide types.
+  - FixedMathSharp passes 2,590 Release and 2,569 ReleaseLean tests plus eight
+    Chronicler tests in each mode at 49,416/49,416 authored lines,
+    8,340/8,340 branches, and 3,238/3,238 methods. Gravitas passes 3,818
+    Release and 3,763 ReleaseLean tests at 42,180/42,180 lines,
+    12,627/12,627 branches, and 4,474/4,474 methods. Standard and Lean
+    package-only validation is warning-free across both target frameworks;
+    38 focused anchor/response benchmark rows report zero managed allocation.
+    The published-package relink and revalidation remain in the sequential
+    release gates below.
 - [`Exact Contact Lever And Mass Response`](done/2026-07-27-exact-contact-lever-response-plan.md)
-  - Completed 2026-07-28. FixedMathSharp retains semantic 2D/3D contact
-    levers, mass points, positive weights, and exact 2D anchor-distance
-    ordering without exposing raw wide arithmetic. Gravitas consumes compact
-    representable paths plus allocation-free exact fallback across 2D, 3D,
-    mixed response, rotational CCD, compound mass properties, and embedded
-    mixed boundaries. Runtime collider hierarchies are closed; host adapters
-    author built-in geometry through `ColliderShapeDefinition*.CreateCollider()`.
+  - Completed 2026-07-28. FixedMathSharp retains semantic 2D/3D point anchors,
+    contact relations, and exact anchor-distance ordering without exposing raw
+    wide arithmetic. Gravitas owns contact levers, mass points, positive
+    weights, compact representable paths, and allocation-free exact fallback
+    across 2D, 3D, mixed response, rotational CCD, compound mass properties,
+    and embedded mixed boundaries. Runtime collider hierarchies are closed;
+    host adapters author built-in geometry through
+    `ColliderShapeDefinition*.CreateCollider()`.
     FixedMathSharp passes 2,638 Release and 2,617 ReleaseLean tests at
     47,462/47,462 lines, 8,732/8,732 branches, and 3,500/3,500 methods.
     Gravitas passes 3,776 Release and 3,721 ReleaseLean tests at
@@ -299,18 +301,15 @@ host-facing need appears.
 1. Keep the benchmark backlog and issue tracker as intake buckets; promote new
    measured risks into dated plans only when they are broader than a focused
    patch.
-2. Complete the FixedMathSharp / Gravitas ownership boundary pass and
-   revalidate the locally linked stack before more response work crosses the
-   package boundary.
-3. Resolve the remaining cross-stack issues, including Gravitas-owned
+2. Resolve the remaining cross-stack issues, including Gravitas-owned
    lifecycle, admission, geometry, and numeric-range blocks, while retaining
    the temporary local project references.
-4. Release FixedMathSharp from the reviewed hardening tree.
-5. Update SwiftCollections to the released FixedMathSharp package, run its full
+3. Release FixedMathSharp from the reviewed hardening tree.
+4. Update SwiftCollections to the released FixedMathSharp package, run its full
    validation, and release SwiftCollections before advancing the chain.
-6. Update GridForge to the released lower-stack packages, validate its resolved
+5. Update GridForge to the released lower-stack packages, validate its resolved
    runtime-identity hardening and downstream consumers, and release GridForge.
-7. Update Gravitas to the released package versions, remove every temporary
+6. Update Gravitas to the released package versions, remove every temporary
    local link, and rerun `Release`, `ReleaseLean`, coverage, replay, allocation,
    and relevant benchmark gates against package-only dependencies before its
    first public release.

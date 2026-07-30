@@ -75,6 +75,22 @@ Both variants are intended to expose the same core physics API. The difference
 is whether built-in MemoryPack support and the standard dependency chain are
 present.
 
+### FixedMathSharp Ownership Boundary
+
+FixedMathSharp owns reusable deterministic arithmetic, exact geometry, and its
+internal fixed-width wide mechanics. Gravitas is its sole intentional non-test
+friend and owns the rigid-body meaning built from those mechanics: mass and
+inertia interpretation, contact levers, impulses, restitution, friction,
+warm-start accumulation, and CCD response. FixedMathSharp internal types never
+appear in Gravitas public or serialized APIs.
+
+This is a one-way, release-coupled implementation boundary, not a public
+FixedMathSharp extension mechanism or a precedent for SwiftCollections,
+GridForge, Trailblazer, or host adapters. FixedMathSharp is released first;
+SwiftCollections and GridForge are then validated and released in dependency
+order before Gravitas is rebuilt against the exact released FixedMathSharp
+version and the complete package-only lower stack.
+
 Install via NuGet:
 
 ```bash

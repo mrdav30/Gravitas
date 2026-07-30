@@ -1,5 +1,7 @@
 # FixedMathSharp / Gravitas Ownership Boundary Implementation Plan
 
+**Status:** Completed 2026-07-29.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use
 > `superpowers:test-driven-development` while changing behavior,
 > `superpowers:requesting-code-review` at each review checkpoint, and
@@ -721,8 +723,9 @@ BenchmarkDotNet, `Release` and `ReleaseLean` package variants.
   mixed rerun measured 1.366-2.831 ms for prepared pairs and 3.802-6.457 ms for
   island iterations, consistent with the Phase 0 ranges after ShortRun noise.
 - Standard and Lean packages build both `net8.0` and `netstandard2.1`.
-  FixedMathSharp builds warning-free; Gravitas Lean retains only the known
-  local-link MemoryPack shim type-conflict warnings.
+  FixedMathSharp builds warning-free; Gravitas Lean retained only a local-link
+  MemoryPack shim type-conflict warning that Phase 6 later eliminated at its
+  friend-assembly root cause.
 - Independent physics and ownership review found no critical or important
   issue. Its three source-hygiene notes were applied: the 2D adapter summary,
   ASCII copyright headers, and unused geometry imports.
@@ -851,8 +854,8 @@ BenchmarkDotNet, `Release` and `ReleaseLean` package variants.
   ShortRun produced expected noise, including one 64-pair distinct-face and one
   64-pair distinct-island outlier.
 - Standard and Lean packages build both `net8.0` and `netstandard2.1`.
-  FixedMathSharp is warning-free; Gravitas Lean reports only the established
-  local-link MemoryPack shim type-conflict warnings.
+  FixedMathSharp is warning-free; Gravitas Lean reported only the local-link
+  MemoryPack shim warning later eliminated in Phase 6.
 - The original independent public-surface and ownership review found no
   critical, important, or minor issue. The Phase 4 fast-follow review found one
   missing different-anchor-frame regression; that unique test moved downstream
@@ -987,8 +990,8 @@ Geometry/
   complexity floors already registered in `docs/complexity-exceptions.md`.
 - With all local stack links retained, Gravitas `Release` passes all 3,818
   tests and `ReleaseLean` passes all 3,763 tests; both benchmark projects build.
-  The Lean test compilation reports only the established local-link MemoryPack
-  shim type-conflict warnings already recorded in Phase 4.
+  The Lean test compilation reported only the local-link MemoryPack shim
+  warning recorded in Phase 4 and later eliminated in Phase 6.
 - Independent review matched all 450 members across the 15 merged partial groups
   without loss, duplication, attribute change, or body change and found no
   correctness, ownership, API, serialization, ordering, test-quality, or
@@ -1001,44 +1004,111 @@ Geometry/
 **Files:**
 
 - Modify:
+  `F:/gamedevrepos/FixedMathSharp/AGENTS.md`
+- Modify:
   `F:/gamedevrepos/FixedMathSharp/README.md`
 - Modify:
   `F:/gamedevrepos/FixedMathSharp/docs/wiki/bounds-and-geometry.md`
 - Modify:
   `F:/gamedevrepos/FixedMathSharp/docs/MIGRATION.md`
+- Modify:
+  `F:/gamedevrepos/FixedMathSharp/src/FixedMathSharp/FixedMathSharp.csproj`
+- Modify:
+  `F:/gamedevrepos/FixedMathSharp/tests/FixedMathSharp.Tests/FixedMathSharp.Tests.csproj`
 - Modify: `README.md`
 - Modify: `docs/wiki/COLLISION_PIPELINE.md`
 - Modify: `docs/feature-work/feature-work-overview.md`
+- Modify: `src/Gravitas/Gravitas.csproj`
 - Modify: this plan
 
-- [ ] Document FixedMathSharp as the owner of semantic exact geometry and
+- [x] Document FixedMathSharp as the owner of semantic exact geometry and
   internal wide mechanics, with rigid-body lever and mass-property semantics
   owned by Gravitas.
-- [ ] Document Gravitas as the owner of exact rigid-body normal/friction
+- [x] Document Gravitas as the owner of exact rigid-body normal/friction
   response and the sole intentional non-test friend consumer of FixedMathSharp
   internals.
-- [ ] State that the friendship is deliberate release coupling, not a public
+- [x] State that the friendship is deliberate release coupling, not a public
   FixedMathSharp extension mechanism or a precedent for GridForge,
   SwiftCollections, Trailblazer, or host adapters.
-- [ ] Document the release rule: release FixedMathSharp first, replace the local
+- [x] Document the release rule: release FixedMathSharp first, replace the local
   link with its package in Gravitas, then rebuild and validate Gravitas before
   release. Treat an internal FixedMathSharp change consumed by Gravitas as a
   coordinated compatibility event even when FixedMathSharp's public SemVer
   surface is unchanged.
-- [ ] Confirm no FixedMathSharp internal type appears in Gravitas public XML
+- [x] Confirm no FixedMathSharp internal type appears in Gravitas public XML
   documentation, protected/public signatures, serialization metadata, or host
   examples.
-- [ ] Run final complete locally linked `Release`, `ReleaseLean`, replay,
+- [x] Run final complete locally linked `Release`, `ReleaseLean`, replay,
   allocation, benchmark, and 100% coverage gates for both repositories.
-- [ ] Build and test both standard and Lean packages for `net8.0` and
+- [x] Build and test both standard and Lean packages for `net8.0` and
   `netstandard2.1`.
-- [ ] After the owner releases FixedMathSharp, replace the Gravitas local link
-  with the released v7 package and repeat Gravitas `Release`, `ReleaseLean`,
-  coverage, replay, allocation, and response benchmark gates.
-- [ ] Request independent final review of the source boundary, API surface,
+- [x] Validate Gravitas standard and Lean package-only consumption against the
+  complete local release-candidate chain. Hand off the final published-package
+  sequence—FixedMathSharp, SwiftCollections, GridForge, then Gravitas—to the
+  evergreen release tracker, where the owner will replace each local link and
+  repeat the downstream gates after publishing.
+- [x] Request independent final review of the source boundary, API surface,
   package matrix, documentation, and plan evidence.
-- [ ] Move this plan to `docs/feature-work/done` and update the overview only
+- [x] Move this plan to `docs/feature-work/done` and update the overview only
   after every exit criterion is proven.
+
+### Phase 6 Evidence
+
+- The whole-plan audit found no missed semantic owner or public raw-wide leak.
+  It removed duplicate equal-length magnitude compare/subtract loops from
+  `Fixed64`, normalized-component rounding, width-specific square-root code,
+  and rounded-cylinder arithmetic, routing every caller directly through
+  `WideArithmetic` without a forwarding layer.
+- FixedMathSharp README, wiki, and contributor guidance now define the
+  standard-math ownership boundary, sole Gravitas friendship, deliberate
+  release coupling, and prohibition on treating friendship as a general
+  extension mechanism. Gravitas README and collision-pipeline guidance define
+  the reciprocal response-policy ownership and one exact-response kernel.
+- FixedMathSharp's final v7 migration guide was audited against released v6 and
+  required no change: it describes the final public surface without exposing
+  discarded intermediate v7 response APIs.
+- FixedMathSharp standard and Lean assemblies retain exactly three friends:
+  `Gravitas`, `FixedMathSharp.Tests`, and `FixedMathSharp.Benchmarks`.
+  Searches of all four Gravitas XML artifacts, public/protected source
+  declarations, serialization-facing docs, examples, tests, and benchmarks
+  found no raw wide type.
+- The friendship initially exposed a Lean-only package defect: the transitive
+  source shim placed fake internal `MemoryPack.*` attributes inside
+  FixedMathSharp, making them visible to Gravitas. FixedMathSharp now owns
+  private compatibility attributes under its own namespace, while only the
+  Lean test project consumes the source shim. Standard, Lean, linked, and
+  package-only builds are warning-free.
+- FixedMathSharp `Release` passes 2,590 core plus 8 Chronicler tests;
+  `ReleaseLean` passes 2,569 core plus 8 Chronicler tests. Gravitas linked and
+  package-only `Release` each pass 3,818 tests; linked and package-only
+  `ReleaseLean` each pass 3,763 tests.
+- Generated MemoryPack formatters excluded by the established authored-source
+  filter, the final reviewed FixedMathSharp coverage run is exactly
+  49,416/49,416 lines, 8,340/8,340 branches, and 3,238/3,238 ReportGenerator
+  methods. Gravitas is
+  exactly 42,180/42,180 lines, 12,627/12,627 branches, and 4,474/4,474 methods.
+  Method-level analysis reports no gap; its 9 and 27 CRAP flags are fully
+  covered complexity floors.
+- FixedMathSharp and Gravitas standard/Lean release-candidate packages contain
+  both `net8.0` and `netstandard2.1` assemblies and XML docs. Gravitas metadata
+  contains its real description, repository, readme, license, and icon; its
+  FixedMathSharp dependency is exactly `[7.0.0]` in both variants because the
+  friendship is a private ABI contract.
+- All six point-anchor benchmark rows, 24 prepared 3D response rows, and eight
+  prepared mixed-response rows report zero managed allocation. ShortRun timing
+  remains a smoke/comparison signal; no runtime behavior changed in this phase.
+- Publishing was intentionally not performed by this plan. The validated local
+  candidate chain and package-only switch prove the boundary; the overview
+  retains the owner-managed publish/relink/revalidate sequence as a release
+  gate.
+- `Directory.Build.props`, `Gravitas.slnx`, and the conditional local
+  project-reference hunks remain owner-authorized, unstaged validation
+  scaffolding. They are excluded from the release change and must be removed as
+  each downstream package replaces its local link.
+- Independent final review found no critical defect. Its two closure findings
+  were resolved before handoff: the remaining equal-width arithmetic loops now
+  use the canonical helpers, and the temporary local-link toggle is no longer
+  advertised as a supported package feature.
 
 ## Current Status
 
@@ -1057,7 +1127,7 @@ Geometry/
 - [x] Phase 3 Gravitas exact response policy migrated and parity-proven.
 - [x] Phase 4 intermediate v7 FixedMathSharp response surface removed.
 - [x] Phase 5 directory and partial ownership cleanup complete.
-- [ ] Phase 6 documentation, package, and cross-stack closure complete.
+- [x] Phase 6 documentation, package, and cross-stack closure complete.
 
 ## Exit Criteria
 
@@ -1073,8 +1143,9 @@ Geometry/
   runtime assembly.
 - Gravitas tests and benchmarks have no direct friendship with FixedMathSharp
   and no direct raw-wide public surface.
-- General anchor/lever arithmetic no longer delegates through
-  `WideOrientedBox` or `WideVector2dTransform`.
+- Anchor-specific ownership is no longer hidden inside `WideOrientedBox` or
+  `WideVector2dTransform`; focused anchor owners may still reuse their
+  policy-neutral transform kernels directly.
 - No duplicated generic magnitude multiplication, bit-length, difference, or
   equal-length radical-pair implementation remains in the audited locations.
 - Fixed-width unrolled arithmetic and contract-specific solvers remain direct
@@ -1088,5 +1159,6 @@ Geometry/
 - Common compact response and exact fallback benchmarks remain allocation-free,
   with any material throughput change explained and approved.
 - Standard and Lean packages build and test for both target frameworks.
-- Package-only Gravitas validation passes against the released FixedMathSharp
-  v7 dependency before Gravitas release.
+- Package-only Gravitas validation passes against the complete local release-
+  candidate chain. The evergreen release tracker requires the same validation
+  against each published package before Gravitas release.
