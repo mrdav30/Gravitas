@@ -449,7 +449,7 @@ public static class CollisionResponse2D
         if (contact.RelativeA.IsExact
             || contact.RelativeB.IsExact
             || !normalResult.HasRepresentableAccumulatedImpulse
-            || !CanUseCompactFriction(contact)
+            || !CanUseCompactAxisResponse(contact, contact.Tangent)
             || !Fixed64.TryMultiplyDivide(
                 normalImpulseScalar,
                 contact.StaticFriction,
@@ -688,9 +688,6 @@ public static class CollisionResponse2D
                 ExactContactLever2D.ToPlanarAngular(
                     response.SecondAngularVelocityDelta));
     }
-
-    private static bool CanUseCompactFriction(SolverContact2D contact) =>
-        CanUseCompactAxisResponse(contact, contact.Tangent);
 
     private static bool CanUseCompactAxisResponse(
         SolverContact2D contact,

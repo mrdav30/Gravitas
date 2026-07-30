@@ -29,21 +29,22 @@ records follow with their original discovery context.
 - Treat local links as unstaged validation scaffolding. Do not publish or
   release with them in place.
 - FixedMathSharp foundation hardening is complete. The current locally linked
-  geometry and arithmetic extensions pass 2,638 Release tests at
-  47,462/47,462 lines, 8,732/8,732 branches, and 3,500/3,500 ReportGenerator
-  methods. ReleaseLean passes 2,617 tests. Retain the local link while the
-  remaining Gravitas queue is hardened.
+  geometry and arithmetic extensions pass 2,590 Release and 2,569 ReleaseLean
+  tests plus eight Chronicler tests in each mode at 49,416/49,416 authored
+  lines, 8,340/8,340 branches, and 3,238/3,238 methods. Retain the local link
+  while the remaining Gravitas queue is hardened.
 - SwiftCollections has no library-specific active issue at this checkpoint; its
   place in the sequence is a full downstream compatibility and release gate.
 - GridForge's runtime-identity defect is resolved. Keep the lower stack locally
   linked while the remaining Gravitas queue is hardened so another downstream
   discovery does not force a partial release cycle.
-- Gravitas's current Release run passes 3,776 tests at 40,072/40,072 lines,
-  12,365/12,365 branches, and 4,368/4,368 methods. ReleaseLean passes 3,721
-  tests; the focused replay and allocation gates pass 84 and 5 tests.
-  Canonical-geometry correctness, replay, allocation, coverage, and
-  documentation gates are closed; the measured exact-OBB throughput signal
-  remains in the benchmark backlog.
+- Gravitas's current Release run passes 3,861 tests at 43,653/43,653 lines,
+  12,775/12,775 branches, and 4,501/4,501 methods. ReleaseLean passes 3,806
+  tests; focused replay passes 85/85, and warmed exact 3D, 2D, and mixed
+  friction allocation gates pass 3/3 with zero managed bytes. Full-domain
+  friction correctness, replay, allocation, coverage, and documentation gates
+  are closed; measured exact response timing signals remain in the benchmark
+  backlog.
 - After the Gravitas queue closes, release the lower stack in dependency order,
   replace local links with released packages at each layer, and rerun Gravitas
   `Release`, `ReleaseLean`, coverage, replay, and relevant benchmark gates.
@@ -51,38 +52,13 @@ records follow with their original discovery context.
 ### Ordered Queue
 
 1. **Gravitas:**
-   [Extreme Friction Accumulation And Cone Clamping Are Not Full-Domain](#extreme-friction-accumulation-and-cone-clamping-are-not-full-domain).
-2. **Gravitas:**
    [SolidBody Point Transforms Can Saturate Before Their Final World Or Local Coordinate](#solidbody-point-transforms-can-saturate-before-their-final-world-or-local-coordinate).
-3. **Gravitas:**
+2. **Gravitas:**
    [3D Closest-Surface And Overlap-Circle Classification Are Not Full-Domain](#3d-closest-surface-and-overlap-circle-classification-are-not-full-domain).
-4. **FixedMathSharp / Gravitas:**
+3. **FixedMathSharp / Gravitas:**
    [Radial Segment Parameters Can Collapse Spatially Distinct Query Hits](#radial-segment-parameters-can-collapse-spatially-distinct-query-hits).
-5. **FixedMathSharp / Gravitas:**
+4. **FixedMathSharp / Gravitas:**
    [Mesh Triangle-Triangle SAT Can Saturate Before Axis Classification](#mesh-triangle-triangle-sat-can-saturate-before-axis-classification).
-
-### Extreme Friction Accumulation And Cone Clamping Are Not Full-Domain
-
-**Discovered:** 2026-07-28  
-**Source:** exact 3D contact-lever response review  
-**Affected area:** 3D contact friction; 2D and mixed response parity
-
-The 3D response solver now carries cached and newly solved tangent directions
-through each body's final linear and angular delta before atomically mutating
-either body. The scalar friction solve still uses ordinary saturating
-`Fixed64` arithmetic for point-velocity construction, tangent projection,
-angular effective mass, cached-plus-delta accumulation, cache removal,
-friction-limit multiplication, squared two-axis magnitude, delta subtraction,
-and final cone scaling. Extreme representable inputs can therefore clamp,
-negate, or saturate before the final friction result is known, changing the
-direction or magnitude of an otherwise representable tangential response.
-
-Define the minimum fused scalar/vector operations needed to evaluate and clamp
-the complete tangent solve and two-axis Coulomb friction disk before narrowing.
-Apply the same contract to pure 2D and mixed response where equivalent
-arithmetic exists. Cover static and dynamic limits, cached impulse
-cancellation and removal, `Fixed64.MinValue`, mirrored extremes, true final
-overflow, atomic rejection, deterministic replay, and warmed zero allocation.
 
 ### SolidBody Point Transforms Can Saturate Before Their Final World Or Local Coordinate
 
@@ -212,6 +188,28 @@ projection/ranking paths; do not assume a discrete 3D collision fix provides
 query parity.
 
 ## Resolved Issues
+
+### Extreme Friction Accumulation And Cone Clamping Are Not Full-Domain
+
+**Discovered:** 2026-07-28  
+**Resolved:** 2026-07-30
+
+Gravitas now preserves point velocity, effective mass, cached impulse
+accumulation and removal, friction-limit construction, Coulomb line/disk
+classification, and final body deltas until one deterministic round-to-even
+materialization. Proven-safe ordinary contacts retain compact 3D, 2D, and
+mixed paths; unsafe intermediates route once to the existing allocation-free
+exact response owners. True final overflow rejects the friction delta
+atomically without partially mutating either body or publishing partial
+tangent caches.
+
+The complete Release suite passes 3,861 tests at 43,653/43,653 lines,
+12,775/12,775 branches, and 4,501/4,501 methods. ReleaseLean passes 3,806
+tests, focused replay passes 85/85, warmed exact 3D/2D/mixed allocation gates
+remain at zero managed bytes, and 42 representative response benchmark rows
+report zero allocation without a gross compact-path regression. The
+implementation and evidence are retained in
+[`Full-Domain Friction Response`](done/2026-07-29-full-domain-friction-response-plan.md).
 
 ### True Unrepresentable Contact Lever Arms Preserve Physical Response
 

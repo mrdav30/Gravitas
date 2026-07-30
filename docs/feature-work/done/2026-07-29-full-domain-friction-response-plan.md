@@ -1,6 +1,6 @@
 # Full-Domain Friction Response Implementation Plan
 
-**Status:** Active. Phases 0-3 are complete; Phase 3 is awaiting owner review.
+**Status:** Complete. Phases 0-4 completed 2026-07-30.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use
 > `superpowers:test-driven-development` while changing behavior,
@@ -352,26 +352,52 @@ or test-quality issue.
   `docs/feature-work/2026-07-29-full-domain-friction-response-plan.md`
   to `docs/feature-work/done/`
 
-- [ ] Run the complete Gravitas `Release` suite from the test project so local
+- [x] Run the complete Gravitas `Release` suite from the test project so local
   project references inherit the correct configuration.
-- [ ] Run `ReleaseLean` and package-reference validation.
-- [ ] Collect coverage and confirm 100% reachable line, branch, and method
+- [x] Run `ReleaseLean` and validate standard/Lean package output across both
+  target frameworks. Retain published-package relinking as the existing
+  sequential release gate after the lower stack is released.
+- [x] Collect coverage and confirm 100% reachable line, branch, and method
   coverage.
-- [ ] Run deterministic replay and every exact-response allocation gate.
-- [ ] Compare the existing representative compact/exact response benchmarks.
+- [x] Run deterministic replay and every exact-response allocation gate.
+- [x] Compare the existing representative compact/exact response benchmarks.
   Preserve ordinary compact throughput and zero allocation; record any
   meaningful exact-fallback change in the benchmark backlog.
-- [ ] Confirm FixedMathSharp and GridForge remain at their existing 100%
+- [x] Confirm FixedMathSharp and GridForge remain at their existing 100%
   coverage baselines when their source is unchanged.
-- [ ] Review the complete diff for duplicate helpers, forwarding-only methods,
+- [x] Review the complete diff for duplicate helpers, forwarding-only methods,
   stale branches, avoidable partials, and physics policy misplaced in
   FixedMathSharp.
-- [ ] Update `COLLISION_RESPONSE.md` with the compact-proof/exact-fallback
+- [x] Update `COLLISION_RESPONSE.md` with the compact-proof/exact-fallback
   contract without exposing internal wide representations.
-- [ ] Move the issue-tracker entry into resolved history and renumber the
+- [x] Move the issue-tracker entry into resolved history and renumber the
   ordered queue.
-- [ ] Mark this plan complete, move it to `docs/feature-work/done`, request one
+- [x] Mark this plan complete, move it to `docs/feature-work/done`, request one
   final independent review, and resolve all findings.
+
+**Phase 4 result:** The complete Release suite passes `3,861/3,861` tests at
+`43,653/43,653` lines, `12,775/12,775` branches, and `4,501/4,501` methods.
+ReleaseLean passes `3,806/3,806`; standard and Lean library builds produce
+both target frameworks and their packages with zero warnings or errors.
+Focused deterministic replay passes `85/85`, and the warmed exact 3D, 2D, and
+mixed friction allocation gates pass `3/3` at zero managed bytes.
+
+Thirty-two prepared 3D/mixed and ten pure-2D ShortRun response cells remain at
+`0 B/op` without a gross compact-path regression. The short timing windows are
+not precise enough to close the existing exact-response profiling signal, so
+the measured follow-up remains in the benchmark backlog rather than spawning a
+duplicate issue. FixedMathSharp and GridForge source were unchanged, preserving
+their verified 100% coverage baselines. The complete implementation and
+documentation audit found no duplicate wide owner, forwarding-only production
+hop, stale branch, avoidable partial, public API addition, or physics policy
+misplaced in FixedMathSharp. `COLLISION_RESPONSE.md` now states the exact
+rational/radical projection contract without exposing internal wide
+representations. The issue moved to resolved history and the active queue now
+contains four items. Published-package relinking remains the evergreen
+sequential release gate after lower-stack releases. Final independent review
+removed one forwarding-only 2D admission helper, corrected the wiki's
+rational/radical wording, preserved the historical issue anchor, and found no
+remaining actionable issue after the fresh coverage and Lean reruns.
 
 ## Completion Criteria
 

@@ -36,8 +36,19 @@ instead of burying it in notes.
 - [`Benchmark Signal Hardening`](benchmark-signal-hardening-backlog.md)
   - Reproduce and close confirmed release-relevant signals alongside the owning
     library change. Do not broaden this into speculative optimization work.
+
 ## Recently Completed
 
+- [`Full-Domain Friction Response`](done/2026-07-29-full-domain-friction-response-plan.md)
+  - Completed 2026-07-30. Gravitas now retains exact 3D cached Coulomb-disk
+    accumulation, pure-2D Coulomb-line response, and mixed two-axis response
+    whenever compact arithmetic cannot prove the complete operation safe.
+    True final overflow rejects atomically; ordinary contacts keep the compact
+    path, and warmed exact fallbacks allocate zero managed bytes.
+  - Gravitas passes 3,861 Release and 3,806 ReleaseLean tests at
+    43,653/43,653 lines, 12,775/12,775 branches, and 4,501/4,501 methods.
+    Forty-two representative 3D, 2D, and mixed response benchmark rows report
+    zero managed allocation without a gross compact-path regression.
 - [`FixedMathSharp / Gravitas Ownership Boundary`](done/2026-07-28-fixedmathsharp-gravitas-ownership-boundary-plan.md)
   - Completed 2026-07-29. FixedMathSharp now owns reusable exact math,
     semantic geometry, and internal wide mechanics; Gravitas is its sole

@@ -147,6 +147,21 @@ the benchmarked compact proof path and the medians above are unchanged. Focused
 wide-response and rotational-CCD allocation guards remain at zero managed bytes
 after warmup.
 
+Phase 4 friction closure on 2026-07-30 reran 32 prepared 3D/mixed and 10 pure
+2D response ShortRun cells. Every cell remained at `0 B/op`; the mixed
+16-pair medians (`1.380 ms` default, `1.370 ms` distinct) remained comparable
+to the preserved `1.417 ms` and `1.355 ms` baseline, and the pure-2D rows
+retained stable 64-to-1,024-pair scaling. The 3D cells showed no broad
+regression pattern, although the single-contact medians (`1.090 ms` and
+`1.076 ms`) were above the Phase 2 post-change sample while several manifold
+rows improved. Because these ShortRun iterations remain below a reliable
+timing duration, this is a zero-allocation and no-gross-regression closure
+gate, not evidence to close the active profiling signal. The exact 3D, 2D, and
+mixed fallback allocation tests also pass `3/3` at zero managed bytes.
+Artifacts are retained under
+`artifacts/benchmarks/2026-07-30-friction-phase4-closure` and
+`artifacts/benchmarks/2026-07-30-friction-phase4-closure-2d`.
+
 ### Signal: Mesh Scale Rebuild Allocates With Subdivision Count
 
 **Discovered:** 2026-07-28  
