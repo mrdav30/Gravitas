@@ -609,6 +609,7 @@ public static class CollisionResponseMixed
                     exact2D,
                     tangent),
                 tangent,
+                Fixed64.Zero,
                 ExactContactLever3D.CreateResponseOperand(
                     body3D,
                     linearVelocity3D,
@@ -622,6 +623,7 @@ public static class CollisionResponseMixed
                     exact2D,
                     secondaryTangent),
                 secondaryTangent,
+                Fixed64.Zero,
                 staticFriction,
                 dynamicFriction,
                 out ExactCoulombResponse3D response))

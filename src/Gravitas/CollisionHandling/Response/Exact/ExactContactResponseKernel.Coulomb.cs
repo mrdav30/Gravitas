@@ -199,9 +199,11 @@ internal static partial class ExactContactResponseKernel
         in ExactContactResponseOperand3D primaryFirst,
         in ExactContactResponseOperand3D primarySecond,
         Vector3d primaryTangent,
+        Fixed64 accumulatedPrimaryTangentImpulse,
         in ExactContactResponseOperand3D secondaryFirst,
         in ExactContactResponseOperand3D secondarySecond,
         Vector3d secondaryTangent,
+        Fixed64 accumulatedSecondaryTangentImpulse,
         Fixed64 staticFriction,
         Fixed64 dynamicFriction,
         out ExactCoulombResponse3D response)
@@ -258,6 +260,25 @@ internal static partial class ExactContactResponseKernel
             secondaryDenominator,
             out int secondarySign);
 
+        Span<ulong> desiredPrimaryNumerator =
+            stackalloc ulong[MaxResponseWords];
+        Span<ulong> desiredSecondaryNumerator =
+            stackalloc ulong[MaxResponseWords];
+        AddFixedToRatio(
+            primaryNumerator,
+            primaryDenominator,
+            primarySign,
+            accumulatedPrimaryTangentImpulse,
+            desiredPrimaryNumerator,
+            out int desiredPrimarySign);
+        AddFixedToRatio(
+            secondaryNumerator,
+            secondaryDenominator,
+            secondarySign,
+            accumulatedSecondaryTangentImpulse,
+            desiredSecondaryNumerator,
+            out int desiredSecondarySign);
+
         Span<ulong> commonDenominator = stackalloc ulong[MaxCoulombWords];
         Span<ulong> primaryAtCommon = stackalloc ulong[MaxCoulombWords];
         Span<ulong> secondaryAtCommon = stackalloc ulong[MaxCoulombWords];
@@ -266,11 +287,11 @@ internal static partial class ExactContactResponseKernel
             secondaryDenominator,
             commonDenominator);
         WideArithmetic.MultiplyMagnitudes(
-            primaryNumerator,
+            desiredPrimaryNumerator,
             secondaryDenominator,
             primaryAtCommon);
         WideArithmetic.MultiplyMagnitudes(
-            secondaryNumerator,
+            desiredSecondaryNumerator,
             primaryDenominator,
             secondaryAtCommon);
 
@@ -312,45 +333,108 @@ internal static partial class ExactContactResponseKernel
                 dynamicDenominator);
         }
 
-        bool hasImpulse =
-            !WideArithmetic.IsZeroMagnitude(magnitudeSquared)
-            && (withinStaticLimit
-                || !WideArithmetic.IsZeroMagnitude(dynamicNumerator));
-        if (!hasImpulse)
+        bool useDynamicProjection =
+            !withinStaticLimit
+            && !WideArithmetic.IsZeroMagnitude(magnitudeSquared)
+            && !WideArithmetic.IsZeroMagnitude(dynamicNumerator);
+        bool hasAppliedImpulse;
+        bool resolved;
+        Vector3d firstLinear;
+        Vector3d firstAngular;
+        Vector3d secondLinear;
+        Vector3d secondAngular;
+        if (useDynamicProjection)
         {
-            response = new ExactCoulombResponse3D(
-                hasAppliedImpulse: false,
-                Vector3d.Zero,
-                Vector3d.Zero,
-                Vector3d.Zero,
-                Vector3d.Zero,
-                hasPrimaryAccumulatedImpulse: true,
-                Fixed64.Zero,
-                hasSecondaryAccumulatedImpulse: true,
-                Fixed64.Zero);
-            return true;
+            hasAppliedImpulse =
+                !IsRadialProjectionEqualToFixed(
+                    primaryAtCommon,
+                    desiredPrimarySign,
+                    dynamicNumerator,
+                    dynamicDenominator,
+                    magnitudeSquared,
+                    accumulatedPrimaryTangentImpulse)
+                || !IsRadialProjectionEqualToFixed(
+                    secondaryAtCommon,
+                    desiredSecondarySign,
+                    dynamicNumerator,
+                    dynamicDenominator,
+                    magnitudeSquared,
+                    accumulatedSecondaryTangentImpulse);
+            resolved = TryGetDiskVelocityDeltas(
+                primaryFirst,
+                primarySecond,
+                secondaryFirst,
+                secondarySecond,
+                primaryTangent,
+                secondaryTangent,
+                primaryAtCommon,
+                desiredPrimarySign,
+                secondaryAtCommon,
+                desiredSecondarySign,
+                commonDenominator,
+                rational: false,
+                dynamicNumerator,
+                dynamicDenominator,
+                magnitudeSquared,
+                accumulatedPrimaryTangentImpulse,
+                accumulatedSecondaryTangentImpulse,
+                out firstLinear,
+                out firstAngular,
+                out secondLinear,
+                out secondAngular);
         }
-
-        bool resolved = TryGetDiskVelocityDeltas(
-            primaryFirst,
-            primarySecond,
-            secondaryFirst,
-            secondarySecond,
-            primaryTangent,
-            secondaryTangent,
-            primaryAtCommon,
-            primarySign,
-            secondaryAtCommon,
-            secondarySign,
-            commonDenominator,
-            withinStaticLimit,
-            dynamicNumerator,
-            dynamicDenominator,
-            magnitudeSquared,
-            out Vector3d firstLinear,
-            out Vector3d firstAngular,
-            out Vector3d secondLinear,
-            out Vector3d secondAngular);
+        else
+        {
+            Span<ulong> zero = stackalloc ulong[MaxCoulombWords];
+            Span<ulong> appliedPrimaryNumerator =
+                stackalloc ulong[MaxCoulombWords];
+            Span<ulong> appliedDenominator =
+                stackalloc ulong[MaxCoulombWords];
+            Span<ulong> appliedSecondaryNumerator =
+                stackalloc ulong[MaxCoulombWords];
+            zero.Clear();
+            SubtractFixedFromRatio(
+                withinStaticLimit ? primaryAtCommon : zero,
+                commonDenominator,
+                withinStaticLimit ? desiredPrimarySign : 0,
+                accumulatedPrimaryTangentImpulse,
+                appliedPrimaryNumerator,
+                appliedDenominator,
+                out int appliedPrimarySign);
+            SubtractFixedFromRatio(
+                withinStaticLimit ? secondaryAtCommon : zero,
+                commonDenominator,
+                withinStaticLimit ? desiredSecondarySign : 0,
+                accumulatedSecondaryTangentImpulse,
+                appliedSecondaryNumerator,
+                appliedDenominator,
+                out int appliedSecondarySign);
+            hasAppliedImpulse =
+                appliedPrimarySign != 0
+                || appliedSecondarySign != 0;
+            resolved = TryGetDiskVelocityDeltas(
+                primaryFirst,
+                primarySecond,
+                secondaryFirst,
+                secondarySecond,
+                primaryTangent,
+                secondaryTangent,
+                appliedPrimaryNumerator,
+                appliedPrimarySign,
+                appliedSecondaryNumerator,
+                appliedSecondarySign,
+                appliedDenominator,
+                rational: true,
+                dynamicNumerator,
+                dynamicDenominator,
+                magnitudeSquared,
+                Fixed64.Zero,
+                Fixed64.Zero,
+                out firstLinear,
+                out firstAngular,
+                out secondLinear,
+                out secondAngular);
+        }
         if (!resolved)
             return false;
 
@@ -363,15 +447,15 @@ internal static partial class ExactContactResponseKernel
             hasPrimaryProjection = Fixed64.TryGetSignedRawRatio(
                 primaryAtCommon,
                 commonDenominator,
-                primarySign < 0,
+                desiredPrimarySign < 0,
                 out primaryProjection);
             hasSecondaryProjection = Fixed64.TryGetSignedRawRatio(
                 secondaryAtCommon,
                 commonDenominator,
-                secondarySign < 0,
+                desiredSecondarySign < 0,
                 out secondaryProjection);
         }
-        else
+        else if (useDynamicProjection)
         {
             Span<ulong> projectedNumerator =
                 stackalloc ulong[MaxCoulombWords + MaxResponseWords];
@@ -383,7 +467,7 @@ internal static partial class ExactContactResponseKernel
                 projectedNumerator,
                 dynamicDenominator,
                 magnitudeSquared,
-                primarySign < 0,
+                desiredPrimarySign < 0,
                 out primaryProjection);
             WideArithmetic.MultiplyMagnitudes(
                 secondaryAtCommon,
@@ -393,12 +477,19 @@ internal static partial class ExactContactResponseKernel
                 projectedNumerator,
                 dynamicDenominator,
                 magnitudeSquared,
-                secondarySign < 0,
+                desiredSecondarySign < 0,
                 out secondaryProjection);
+        }
+        else
+        {
+            hasPrimaryProjection = true;
+            hasSecondaryProjection = true;
+            primaryProjection = Fixed64.Zero;
+            secondaryProjection = Fixed64.Zero;
         }
 
         response = new ExactCoulombResponse3D(
-            hasAppliedImpulse: true,
+            hasAppliedImpulse,
             firstLinear,
             firstAngular,
             secondLinear,
@@ -699,447 +790,6 @@ internal static partial class ExactContactResponseKernel
             denominatorSquared,
             right);
         return WideArithmetic.CompareMagnitudeEqualLength(left, right) <= 0;
-    }
-
-    private static bool TryGetDiskVelocityDeltas(
-        in ExactContactResponseOperand3D primaryFirst,
-        in ExactContactResponseOperand3D primarySecond,
-        in ExactContactResponseOperand3D secondaryFirst,
-        in ExactContactResponseOperand3D secondarySecond,
-        Vector3d primaryTangent,
-        Vector3d secondaryTangent,
-        ReadOnlySpan<ulong> primaryNumerator,
-        int primarySign,
-        ReadOnlySpan<ulong> secondaryNumerator,
-        int secondarySign,
-        ReadOnlySpan<ulong> commonDenominator,
-        bool rational,
-        ReadOnlySpan<ulong> radialNumerator,
-        ReadOnlySpan<ulong> radialDenominator,
-        ReadOnlySpan<ulong> radicand,
-        out Vector3d firstLinear,
-        out Vector3d firstAngular,
-        out Vector3d secondLinear,
-        out Vector3d secondAngular)
-    {
-        bool resolved = TryGetDiskLinearVelocityDelta(
-            primaryFirst.LinearImpulseAxis,
-            secondaryFirst.LinearImpulseAxis,
-            primaryFirst.InverseMass,
-            primaryNumerator,
-            primarySign,
-            secondaryNumerator,
-            secondarySign,
-            commonDenominator,
-            rational,
-            radialNumerator,
-            radialDenominator,
-            radicand,
-            out firstLinear);
-        resolved &= TryGetDiskAngularVelocityDelta(
-            primaryFirst.Lever,
-            -primaryTangent,
-            -secondaryTangent,
-            primaryFirst.InverseInertia,
-            primaryNumerator,
-            primarySign,
-            secondaryNumerator,
-            secondarySign,
-            commonDenominator,
-            rational,
-            radialNumerator,
-            radialDenominator,
-            radicand,
-            out firstAngular);
-        resolved &= TryGetDiskLinearVelocityDelta(
-            primarySecond.LinearImpulseAxis,
-            secondarySecond.LinearImpulseAxis,
-            primarySecond.InverseMass,
-            primaryNumerator,
-            primarySign,
-            secondaryNumerator,
-            secondarySign,
-            commonDenominator,
-            rational,
-            radialNumerator,
-            radialDenominator,
-            radicand,
-            out secondLinear);
-        resolved &= TryGetDiskAngularVelocityDelta(
-            primarySecond.Lever,
-            primaryTangent,
-            secondaryTangent,
-            primarySecond.InverseInertia,
-            primaryNumerator,
-            primarySign,
-            secondaryNumerator,
-            secondarySign,
-            commonDenominator,
-            rational,
-            radialNumerator,
-            radialDenominator,
-            radicand,
-            out secondAngular);
-        return resolved;
-    }
-
-    private static bool TryGetDiskLinearVelocityDelta(
-        Vector3d primaryAxis,
-        Vector3d secondaryAxis,
-        Fixed64 inverseMass,
-        ReadOnlySpan<ulong> primaryNumerator,
-        int primarySign,
-        ReadOnlySpan<ulong> secondaryNumerator,
-        int secondarySign,
-        ReadOnlySpan<ulong> commonDenominator,
-        bool rational,
-        ReadOnlySpan<ulong> radialNumerator,
-        ReadOnlySpan<ulong> radialDenominator,
-        ReadOnlySpan<ulong> radicand,
-        out Vector3d result)
-    {
-        bool xResolved = TryGetDiskLinearComponent(
-            primaryAxis.X,
-            secondaryAxis.X,
-            inverseMass,
-            primaryNumerator,
-            primarySign,
-            secondaryNumerator,
-            secondarySign,
-            commonDenominator,
-            rational,
-            radialNumerator,
-            radialDenominator,
-            radicand,
-            out Fixed64 x);
-        bool yResolved = TryGetDiskLinearComponent(
-            primaryAxis.Y,
-            secondaryAxis.Y,
-            inverseMass,
-            primaryNumerator,
-            primarySign,
-            secondaryNumerator,
-            secondarySign,
-            commonDenominator,
-            rational,
-            radialNumerator,
-            radialDenominator,
-            radicand,
-            out Fixed64 y);
-        bool zResolved = TryGetDiskLinearComponent(
-            primaryAxis.Z,
-            secondaryAxis.Z,
-            inverseMass,
-            primaryNumerator,
-            primarySign,
-            secondaryNumerator,
-            secondarySign,
-            commonDenominator,
-            rational,
-            radialNumerator,
-            radialDenominator,
-            radicand,
-            out Fixed64 z);
-        result = xResolved & yResolved & zResolved
-            ? new Vector3d(x, y, z)
-            : default;
-        return xResolved & yResolved & zResolved;
-    }
-
-    private static bool TryGetDiskLinearComponent(
-        Fixed64 primaryAxis,
-        Fixed64 secondaryAxis,
-        Fixed64 inverseMass,
-        ReadOnlySpan<ulong> primaryNumerator,
-        int primarySign,
-        ReadOnlySpan<ulong> secondaryNumerator,
-        int secondarySign,
-        ReadOnlySpan<ulong> commonDenominator,
-        bool rational,
-        ReadOnlySpan<ulong> radialNumerator,
-        ReadOnlySpan<ulong> radialDenominator,
-        ReadOnlySpan<ulong> radicand,
-        out Fixed64 result)
-    {
-        Span<ulong> combined = stackalloc ulong[MaxCoulombWords + 2];
-        GetWeightedSignedSum(
-            primaryAxis,
-            primaryNumerator,
-            primarySign,
-            secondaryAxis,
-            secondaryNumerator,
-            secondarySign,
-            combined,
-            out int combinedSign);
-        if (combinedSign == 0 || inverseMass == Fixed64.Zero)
-        {
-            result = Fixed64.Zero;
-            return true;
-        }
-
-        Span<ulong> inverseMassMagnitude =
-            stackalloc ulong[3];
-        Span<ulong> fixedScale = stackalloc ulong[1];
-        Span<ulong> numerator = stackalloc ulong[MaxCoulombComparisonWords / 2];
-        Span<ulong> denominator =
-            stackalloc ulong[MaxCoulombComparisonWords / 2];
-        SetMagnitude(inverseMass, inverseMassMagnitude);
-        fixedScale.Clear();
-        fixedScale[0] = (ulong)FixedMath.ONE_L;
-        WideArithmetic.MultiplyMagnitudes(
-            combined,
-            inverseMassMagnitude,
-            numerator);
-        Multiply3(
-            commonDenominator,
-            fixedScale,
-            fixedScale,
-            denominator);
-        if (rational)
-        {
-            return Fixed64.TryGetSignedRawRatio(
-                numerator,
-                denominator,
-                combinedSign < 0,
-                out result);
-        }
-
-        Span<ulong> scaledNumerator =
-            stackalloc ulong[MaxCoulombComparisonWords / 2];
-        Span<ulong> scaledDenominator =
-            stackalloc ulong[MaxCoulombComparisonWords / 2];
-        WideArithmetic.MultiplyMagnitudes(
-            numerator,
-            radialNumerator,
-            scaledNumerator);
-        WideArithmetic.MultiplyMagnitudes(
-            radialDenominator,
-            fixedScale,
-            scaledDenominator);
-        WideArithmetic.MultiplyMagnitudes(
-            scaledDenominator,
-            fixedScale,
-            denominator);
-        return TryGetSignedRatioOverSquareRoot(
-            scaledNumerator,
-            denominator,
-            radicand,
-            combinedSign < 0,
-            out result);
-    }
-
-    private static bool TryGetDiskAngularVelocityDelta(
-        in ExactLever3D lever,
-        Vector3d primaryAxis,
-        Vector3d secondaryAxis,
-        Fixed3x3 inverseInertia,
-        ReadOnlySpan<ulong> primaryNumerator,
-        int primarySign,
-        ReadOnlySpan<ulong> secondaryNumerator,
-        int secondarySign,
-        ReadOnlySpan<ulong> commonDenominator,
-        bool rational,
-        ReadOnlySpan<ulong> radialNumerator,
-        ReadOnlySpan<ulong> radialDenominator,
-        ReadOnlySpan<ulong> radicand,
-        out Vector3d result)
-    {
-        ExactLever3D.GetTransformedCrossProduct(
-            lever,
-            primaryAxis,
-            inverseInertia,
-            out Signed832 primaryX,
-            out Signed832 primaryY,
-            out Signed832 primaryZ);
-        ExactLever3D.GetTransformedCrossProduct(
-            lever,
-            secondaryAxis,
-            inverseInertia,
-            out Signed832 secondaryX,
-            out Signed832 secondaryY,
-            out Signed832 secondaryZ);
-        Signed320 fixedScaleSquared = WideArithmetic.MultiplySigned192(
-            Signed192.One,
-            Signed192.One);
-        Signed704 transformedDenominator =
-            WideArithmetic.MultiplySigned576ToSigned704(
-                lever.Denominator,
-                fixedScaleSquared);
-
-        bool xResolved = TryGetDiskAngularComponent(
-            primaryX,
-            secondaryX,
-            transformedDenominator,
-            primaryNumerator,
-            primarySign,
-            secondaryNumerator,
-            secondarySign,
-            commonDenominator,
-            rational,
-            radialNumerator,
-            radialDenominator,
-            radicand,
-            out Fixed64 x);
-        bool yResolved = TryGetDiskAngularComponent(
-            primaryY,
-            secondaryY,
-            transformedDenominator,
-            primaryNumerator,
-            primarySign,
-            secondaryNumerator,
-            secondarySign,
-            commonDenominator,
-            rational,
-            radialNumerator,
-            radialDenominator,
-            radicand,
-            out Fixed64 y);
-        bool zResolved = TryGetDiskAngularComponent(
-            primaryZ,
-            secondaryZ,
-            transformedDenominator,
-            primaryNumerator,
-            primarySign,
-            secondaryNumerator,
-            secondarySign,
-            commonDenominator,
-            rational,
-            radialNumerator,
-            radialDenominator,
-            radicand,
-            out Fixed64 z);
-        result = xResolved & yResolved & zResolved
-            ? new Vector3d(x, y, z)
-            : default;
-        return xResolved & yResolved & zResolved;
-    }
-
-    private static bool TryGetDiskAngularComponent(
-        Signed832 primary,
-        Signed832 secondary,
-        Signed704 transformedDenominator,
-        ReadOnlySpan<ulong> primaryNumerator,
-        int primarySign,
-        ReadOnlySpan<ulong> secondaryNumerator,
-        int secondarySign,
-        ReadOnlySpan<ulong> commonDenominator,
-        bool rational,
-        ReadOnlySpan<ulong> radialNumerator,
-        ReadOnlySpan<ulong> radialDenominator,
-        ReadOnlySpan<ulong> radicand,
-        out Fixed64 result)
-    {
-        Span<ulong> primaryMagnitude = stackalloc ulong[13];
-        Span<ulong> secondaryMagnitude = stackalloc ulong[13];
-        SetMagnitude(primary, primaryMagnitude);
-        SetMagnitude(secondary, secondaryMagnitude);
-        Span<ulong> primaryProduct =
-            stackalloc ulong[MaxCoulombComparisonWords / 2];
-        Span<ulong> secondaryProduct =
-            stackalloc ulong[MaxCoulombComparisonWords / 2];
-        WideArithmetic.MultiplyMagnitudes(
-            primaryMagnitude,
-            primaryNumerator,
-            primaryProduct);
-        WideArithmetic.MultiplyMagnitudes(
-            secondaryMagnitude,
-            secondaryNumerator,
-            secondaryProduct);
-        Span<ulong> combined =
-            stackalloc ulong[MaxCoulombComparisonWords / 2];
-        AddSignedMagnitudes(
-            primaryProduct,
-            primary.Sign * primarySign,
-            secondaryProduct,
-            secondary.Sign * secondarySign,
-            combined,
-            out int combinedSign);
-        if (combinedSign == 0)
-        {
-            result = Fixed64.Zero;
-            return true;
-        }
-
-        Span<ulong> transformedDenominatorMagnitude =
-            stackalloc ulong[11];
-        Span<ulong> fixedScale = stackalloc ulong[1];
-        Span<ulong> denominator =
-            stackalloc ulong[MaxCoulombComparisonWords / 2];
-        SetMagnitude(transformedDenominator, transformedDenominatorMagnitude);
-        fixedScale.Clear();
-        fixedScale[0] = (ulong)FixedMath.ONE_L;
-        Multiply3(
-            transformedDenominatorMagnitude,
-            commonDenominator,
-            fixedScale,
-            denominator);
-        if (rational)
-        {
-            return Fixed64.TryGetSignedRawRatio(
-                combined,
-                denominator,
-                combinedSign < 0,
-                out result);
-        }
-
-        Span<ulong> scaledNumerator =
-            stackalloc ulong[MaxCoulombComparisonWords / 2];
-        Span<ulong> scaledDenominator =
-            stackalloc ulong[MaxCoulombComparisonWords / 2];
-        WideArithmetic.MultiplyMagnitudes(
-            combined,
-            radialNumerator,
-            scaledNumerator);
-        WideArithmetic.MultiplyMagnitudes(
-            transformedDenominatorMagnitude,
-            radialDenominator,
-            scaledDenominator);
-        WideArithmetic.MultiplyMagnitudes(
-            scaledDenominator,
-            fixedScale,
-            denominator);
-        return TryGetSignedRatioOverSquareRoot(
-            scaledNumerator,
-            denominator,
-            radicand,
-            combinedSign < 0,
-            out result);
-    }
-
-    private static void GetWeightedSignedSum(
-        Fixed64 firstFactor,
-        ReadOnlySpan<ulong> firstMagnitude,
-        int firstSign,
-        Fixed64 secondFactor,
-        ReadOnlySpan<ulong> secondMagnitude,
-        int secondSign,
-        Span<ulong> result,
-        out int resultSign)
-    {
-        Span<ulong> factorMagnitude = stackalloc ulong[3];
-        Span<ulong> first = stackalloc ulong[MaxCoulombWords + 2];
-        Span<ulong> second = stackalloc ulong[MaxCoulombWords + 2];
-        SetMagnitude(firstFactor, factorMagnitude);
-        WideArithmetic.MultiplyMagnitudes(
-            factorMagnitude,
-            firstMagnitude,
-            first);
-        SetMagnitude(secondFactor, factorMagnitude);
-        WideArithmetic.MultiplyMagnitudes(
-            factorMagnitude,
-            secondMagnitude,
-            second);
-        AddSignedMagnitudes(
-            first,
-            firstFactor == Fixed64.Zero
-                ? 0
-                : firstFactor < Fixed64.Zero ? -firstSign : firstSign,
-            second,
-            secondFactor == Fixed64.Zero
-                ? 0
-                : secondFactor < Fixed64.Zero ? -secondSign : secondSign,
-            result,
-            out resultSign);
     }
 
     private static void AddSignedMagnitudes(

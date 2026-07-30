@@ -5,7 +5,10 @@ using Xunit;
 
 namespace Gravitas.Tests.CollisionHandlingTests;
 
-public sealed class ExactContactResponseKernelCoulombTests
+/// <summary>
+/// Verifies exact line and uncached disk Coulomb response.
+/// </summary>
+public sealed partial class ExactContactResponseKernelCoulombTests
 {
     [Fact]
     public void CoulombLineResponse_ShouldRetainUnrepresentableNormalAndTangentImpulses()
@@ -370,9 +373,11 @@ public sealed class ExactContactResponseKernelCoulombTests
             primaryFirst,
             primarySecond,
             Vector3d.Right,
+            Fixed64.Zero,
             secondaryFirst,
             secondarySecond,
             Vector3d.Forward,
+            Fixed64.Zero,
             Fixed64.Half,
             Fixed64.One / (Fixed64)4,
             out ExactCoulombResponse3D response));
@@ -430,9 +435,11 @@ public sealed class ExactContactResponseKernelCoulombTests
             primaryFirst,
             primarySecond,
             Vector3d.Right,
+            Fixed64.Zero,
             secondaryFirst,
             secondarySecond,
             Vector3d.Forward,
+            Fixed64.Zero,
             Fixed64.One,
             Fixed64.One,
             out ExactCoulombResponse3D staticResponse));
@@ -463,9 +470,11 @@ public sealed class ExactContactResponseKernelCoulombTests
             restingFirst,
             primarySecond,
             Vector3d.Right,
+            Fixed64.Zero,
             restingFirst,
             secondarySecond,
             Vector3d.Forward,
+            Fixed64.Zero,
             Fixed64.Zero,
             Fixed64.Zero,
             out ExactCoulombResponse3D restingResponse));
@@ -477,9 +486,11 @@ public sealed class ExactContactResponseKernelCoulombTests
             primaryFirst,
             primarySecond,
             Vector3d.Right,
+            Fixed64.Zero,
             secondaryFirst,
             secondarySecond,
             Vector3d.Forward,
+            Fixed64.Zero,
             Fixed64.Zero,
             Fixed64.Zero,
             out ExactCoulombResponse3D zeroDynamicResponse));
@@ -532,9 +543,11 @@ public sealed class ExactContactResponseKernelCoulombTests
             primaryFirst,
             primarySecond,
             Vector3d.Right,
+            Fixed64.Zero,
             secondaryFirst,
             secondarySecond,
             Vector3d.Forward,
+            Fixed64.Zero,
             Fixed64.One,
             Fixed64.One,
             out ExactCoulombResponse3D staticResponse));
@@ -570,9 +583,11 @@ public sealed class ExactContactResponseKernelCoulombTests
             primaryFirst,
             primarySecond,
             Vector3d.Right,
+            Fixed64.Zero,
             secondaryFirst,
             secondarySecond,
             Vector3d.Forward,
+            Fixed64.Zero,
             Fixed64.Zero,
             Fixed64.One / (Fixed64)4,
             out ExactCoulombResponse3D dynamicResponse));
@@ -620,9 +635,11 @@ public sealed class ExactContactResponseKernelCoulombTests
             primaryFirst,
             primarySecond,
             Vector3d.Right,
+            Fixed64.Zero,
             secondaryFirst,
             secondarySecond,
             Vector3d.Forward,
+            Fixed64.Zero,
             Fixed64.Zero,
             Fixed64.One / (Fixed64)4,
             out ExactCoulombResponse3D response));
@@ -663,9 +680,11 @@ public sealed class ExactContactResponseKernelCoulombTests
             primaryFirst,
             primarySecond,
             Vector3d.Right,
+            Fixed64.Zero,
             secondaryFirst,
             secondarySecond,
             Vector3d.Forward,
+            Fixed64.Zero,
             Fixed64.Zero,
             Fixed64.MaxValue,
             out _));
@@ -717,9 +736,11 @@ public sealed class ExactContactResponseKernelCoulombTests
             angularPrimaryFirst,
             angularPrimarySecond,
             Vector3d.Right,
+            Fixed64.Zero,
             angularPrimaryFirst,
             angularPrimarySecond,
             Vector3d.Forward,
+            Fixed64.Zero,
             Fixed64.Zero,
             Fixed64.One,
             out _));
@@ -806,9 +827,11 @@ public sealed class ExactContactResponseKernelCoulombTests
             first,
             second,
             Vector3d.Forward,
+            Fixed64.Zero,
             first,
             second,
             Vector3d.Forward,
+            Fixed64.Zero,
             Fixed64.One,
             Fixed64.One,
             out _));
@@ -817,9 +840,11 @@ public sealed class ExactContactResponseKernelCoulombTests
             mismatched,
             second,
             Vector3d.Forward,
+            Fixed64.Zero,
             first,
             second,
             Vector3d.Right,
+            Fixed64.Zero,
             Fixed64.One,
             Fixed64.One,
             out _));
@@ -828,9 +853,11 @@ public sealed class ExactContactResponseKernelCoulombTests
             first,
             second,
             Vector3d.Forward,
+            Fixed64.Zero,
             first,
             second,
             Vector3d.Right,
+            Fixed64.Zero,
             Fixed64.One,
             Fixed64.One,
             out _));
