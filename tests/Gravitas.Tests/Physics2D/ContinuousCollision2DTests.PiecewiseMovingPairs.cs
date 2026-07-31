@@ -3,13 +3,123 @@ using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
+using Gravitas.Queries;
 using Gravitas.Tests.Support;
+using GridForge.Configuration;
 using Xunit;
 
 namespace Gravitas.Tests.Physics2D;
 
 public sealed partial class ContinuousCollision2DTests
 {
+    [Fact]
+    public void DynamicRelativeCircleHit_ShouldNotConstructSyntheticEndpoint()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        context.Settings.RuntimeMode = PhysicsRuntimeMode.TwoD;
+        context.SetFrameRate(1);
+        context.Environment.Gravity = Fixed64.Zero;
+        Fixed64 targetX = Fixed64.MaxValue - Fixed64.FromFraction(3, 2);
+        Fixed64 sourceX = targetX - Fixed64.Two;
+        context.World.TryAddGrid(
+                new GridConfiguration(
+                    new Vector3d(targetX - (Fixed64)16, Fixed64.Zero, (Fixed64)(-4)),
+                    new Vector3d(Fixed64.MaxValue, Fixed64.Zero, (Fixed64)4)),
+                out _)
+            .Should()
+            .BeTrue();
+        SolidBody2D source = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            new Vector2d(sourceX, Fixed64.Zero),
+            immovable: false);
+        SolidBody2D target = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            new Vector2d(targetX, Fixed64.Zero),
+            immovable: false);
+        target.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        target.ApplyCollisionLinearVelocityDelta(Vector2d.Left * (Fixed64)3);
+        context.AdvanceLateSimulateToken();
+        context.Physics2D.PrepareContinuousCollisionFrame();
+
+        source.TryGetDynamicRelativeContinuousCollisionHit(
+                target,
+                source.Position,
+                Vector2d.Right,
+                Fixed64.Half,
+                Fixed64.One,
+                Fixed64.Zero,
+                out Physics2DHit hit,
+                out _)
+            .Should()
+            .BeTrue();
+        hit.Distance.Should().Be(Fixed64.One / (Fixed64)4);
+        hit.Normal.Should().Be(Vector2d.Left);
+    }
+
+    [Fact]
+    public void DynamicRelativeHits_ShouldPreserveOneRawPhysicalDistanceOrdering()
+    {
+        using GravitasWorldContext context = CreateContext(frameRate: 1, extent: 64);
+        context.Environment.Gravity = Fixed64.Zero;
+        SolidBody2D source = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            Vector2d.Zero,
+            immovable: false);
+        SolidBody2D farther = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            new Vector2d((Fixed64)11 + Fixed64.MinIncrement, Fixed64.Zero),
+            immovable: false);
+        SolidBody2D nearer = CreateBody(
+            context,
+            new LSCircleCollider2D(Fixed64.Half),
+            new Vector2d((Fixed64)11, Fixed64.Zero),
+            immovable: false);
+        Vector2d displacement = Vector2d.Right * (Fixed64)100_000;
+        context.AdvanceLateSimulateToken();
+        context.Physics2D.PrepareContinuousCollisionFrame();
+
+        source.TryGetDynamicRelativeContinuousCollisionHit(
+                farther,
+                source.Position,
+                displacement,
+                Fixed64.Half,
+                (Fixed64)100_000,
+                Fixed64.Zero,
+                out Physics2DHit fartherHit,
+                out Fixed64 fartherClosingSpeed)
+            .Should()
+            .BeTrue();
+        source.TryGetDynamicRelativeContinuousCollisionHit(
+                nearer,
+                source.Position,
+                displacement,
+                Fixed64.Half,
+                (Fixed64)100_000,
+                Fixed64.Zero,
+                out Physics2DHit nearerHit,
+                out Fixed64 nearerClosingSpeed)
+            .Should()
+            .BeTrue();
+
+        (fartherHit.Distance - nearerHit.Distance)
+            .Should()
+            .Be(Fixed64.MinIncrement);
+        farther.Collider.Id.Should().BeLessThan(nearer.Collider.Id);
+        ContinuousCollisionCandidateOrdering.ShouldReplaceHit(
+                nearerHit,
+                nearerClosingSpeed,
+                true,
+                true,
+                fartherHit,
+                fartherClosingSpeed)
+            .Should()
+            .BeTrue();
+    }
+
     [Fact]
     public void ContinuousMode_PiecewiseOutAndReturn2DTarget_ShouldBlockTranslationalSource()
     {

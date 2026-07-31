@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Queries;
@@ -305,7 +306,7 @@ public sealed partial class SolidBody2D
                     ContinuousCollisionSweepRange.ValidateEndpoint(
                         sourceSegmentStart,
                         sourceSegmentEnd,
-                        out _);
+                        out Fixed64 sourceSegmentLength);
                 Vector2d targetStart = segment.SamplePosition(overlapStart);
                 Vector2d targetEnd = segment.SamplePosition(overlapEnd);
                 Vector2d targetDisplacement =
@@ -313,25 +314,28 @@ public sealed partial class SolidBody2D
                         targetStart,
                         targetEnd,
                         out _);
-                if (!ContinuousCollisionMath.TrySweepRelativeCircles(
-                        sourceSegmentStart,
-                        sourceSegmentDisplacement,
-                        sourceRadius,
-                        targetStart,
-                        targetDisplacement,
-                        targetRadius,
-                        out _,
-                        out _,
-                        out _))
+                LSCircleCollider2D? sourceCircle = Collider as LSCircleCollider2D;
+                LSCircleCollider2D? targetCircle = target.Collider as LSCircleCollider2D;
+                bool radialPair = sourceCircle is not null && targetCircle is not null;
+                Vector2d relativeDisplacement = default;
+                Fixed64 relativeLength = default;
+                if (!radialPair
+                    && !ContinuousCollisionMath.TryGetRelativeCircleOverlapDistanceInterval(
+                            sourceSegmentStart,
+                            sourceSegmentDisplacement,
+                            sourceRadius,
+                            targetStart,
+                            targetDisplacement,
+                            targetRadius,
+                            out _,
+                            out _,
+                            out relativeDisplacement,
+                            out relativeLength,
+                            out _,
+                            out _))
                 {
                     continue;
                 }
-
-                Vector2d relativeDisplacement =
-                    ContinuousCollisionSweepRange.ValidateRelativeDisplacement(
-                        sourceSegmentDisplacement,
-                        targetDisplacement,
-                        out Fixed64 relativeLength);
                 _position = sourceSegmentStart;
                 target._position = targetStart;
                 target._rotation = target.SampleContinuousCollisionRotation(
@@ -339,24 +343,50 @@ public sealed partial class SolidBody2D
                 Collider.RebuildRuntimeShapeOnly();
                 target.Collider.RebuildRuntimeShapeOnly();
 
-                if (!QueryDetection2D.TrySweepMoverShape(
-                        Collider,
-                        relativeDisplacement,
-                        target.Collider,
-                        out Physics2DHit relativeHit))
+                Physics2DHit relativeHit;
+                if (radialPair)
+                {
+                    if (!ContinuousCollisionMath.TryGetRelativeCircleOverlapDistanceInterval(
+                            sourceCircle!.Center,
+                            sourceSegmentDisplacement,
+                            sourceCircle.ScaledRadius,
+                            targetCircle!.Center,
+                            targetDisplacement,
+                            targetCircle.ScaledRadius,
+                            out Fixed64 circleDistance,
+                            out _,
+                            out relativeDisplacement,
+                            out relativeLength,
+                            out Vector2d circleNormal,
+                            out _))
+                    {
+                        continue;
+                    }
+
+                    relativeHit = new Physics2DHit(
+                        targetCircle,
+                        new ContactAnchor2D(
+                            targetCircle.Center,
+                            circleNormal * targetCircle.ScaledRadius),
+                        circleNormal,
+                        circleDistance);
+                }
+                else if (!QueryDetection2D.TrySweepMoverShape(
+                            Collider,
+                            relativeDisplacement,
+                            target.Collider,
+                            out relativeHit))
                 {
                     continue;
                 }
 
-                Fixed64 segmentTime = FixedMath.Clamp01(
-                    relativeHit.Distance / relativeLength);
                 Fixed64 successorStart = segmentIndex + 1
                     < target.ContinuousCollisionTrajectoryCount
                     ? target.GetContinuousCollisionTrajectorySegment(segmentIndex + 1)
                         .StartFraction
                     : Fixed64.Zero;
                 if (ContinuousCollisionMath.IsSupersededTranslationalBoundaryHit(
-                        segmentTime,
+                        relativeHit.Distance >= relativeLength,
                         overlapEnd,
                         segmentIndex,
                         target.ContinuousCollisionTrajectoryCount,
@@ -373,20 +403,30 @@ public sealed partial class SolidBody2D
                         out Fixed64 candidateClosingSpeed))
                     continue;
 
-                Fixed64 sourceTime = FixedMath.Lerp(
-                    sourceStartTime,
-                    sourceEndTime,
-                    segmentTime);
                 ContactAnchor2D candidateAnchor = TranslateContactAnchor(
                     relativeHit.Anchor,
-                    targetDisplacement,
-                    segmentTime);
+                    new FixedSegment2d(targetStart, targetEnd),
+                    relativeHit.Distance,
+                    relativeLength);
+                if (!Fixed64.TryMultiplyDivide(
+                        sourceSegmentLength,
+                        relativeHit.Distance,
+                        relativeLength,
+                        out Fixed64 localSourceDistance)
+                    || !Fixed64.TryMultiplyAdd(
+                        sourceLength,
+                        sourceStartTime,
+                        localSourceDistance,
+                        out Fixed64 sourceDistance))
+                {
+                    continue;
+                }
 
                 var candidate = new Physics2DHit(
                     target.Collider,
                     candidateAnchor,
                     relativeHit.Normal,
-                    sourceLength * sourceTime);
+                    sourceDistance);
                 best = candidate;
                 bestClosingSpeed = candidateClosingSpeed;
                 found = true;
@@ -410,23 +450,20 @@ public sealed partial class SolidBody2D
 
     private static ContactAnchor2D TranslateContactAnchor(
         ContactAnchor2D anchor,
-        Vector2d displacement,
-        Fixed64 fraction)
+        FixedSegment2d targetTrajectory,
+        Fixed64 distance,
+        Fixed64 totalDistance)
     {
-        // The validated target trajectory keeps every interpolation between
-        // its admitted endpoints in the coordinate domain.
-        _ = Fixed64.TryMultiplyAdd(
-            displacement.X,
-            fraction,
-            anchor.Origin.X,
-            out Fixed64 x);
-        _ = Fixed64.TryMultiplyAdd(
-            displacement.Y,
-            fraction,
-            anchor.Origin.Y,
-            out Fixed64 y);
+        Vector2d targetAtImpact = targetTrajectory.GetPointAtDistance(
+            distance,
+            totalDistance);
+        _ = Vector2d.TrySubtract(
+            targetAtImpact,
+            targetTrajectory.Start,
+            out Vector2d translation);
+        _ = Vector2d.TryAdd(anchor.Origin, translation, out Vector2d origin);
         return new ContactAnchor2D(
-            new Vector2d(x, y),
+            origin,
             anchor.Rotation,
             anchor.LocalPoint,
             anchor.LocalDisplacement);
@@ -543,15 +580,17 @@ public sealed partial class SolidBody2D
                     targetStart,
                     targetEnd,
                     out _);
-            if (!ContinuousCollisionMath.TryGetRelativeSphereOverlapInterval(
+            if (!ContinuousCollisionMath.TryGetRelativeSphereOverlapDistanceInterval(
                     sourceSegmentStart,
                     sourceSegmentDisplacement,
                     sourceRadius,
                     targetStart,
                     targetDisplacement,
                     targetRadius,
-                    out Fixed64 entryTime,
-                    out Fixed64 exitTime,
+                    out Fixed64 entryDistance,
+                    out Fixed64 exitDistance,
+                    out _,
+                    out Fixed64 relativeLength,
                     out _,
                     out Fixed64 localClosingSpeed))
             {
@@ -564,7 +603,7 @@ public sealed partial class SolidBody2D
                     .StartFraction
                 : Fixed64.Zero;
             if (ContinuousCollisionMath.IsSupersededTranslationalBoundaryHit(
-                    entryTime,
+                    entryDistance >= relativeLength,
                     overlapEnd,
                     segmentIndex,
                     target.ContinuousCollisionTrajectoryCount,
@@ -592,6 +631,7 @@ public sealed partial class SolidBody2D
             if (TryGetExactSphereCircleTranslationalContact(
                     target,
                     segment,
+                    targetDisplacement,
                     sourceSegmentStart.ToVector2d(),
                     sourceSegmentDisplacement.ToVector2d(),
                     sourceStartRotation,
@@ -627,6 +667,9 @@ public sealed partial class SolidBody2D
                     target.Collider.Id);
                 return ContinuousCollisionMath.IntervalSearchStatus.ExactHit;
             }
+
+            Fixed64 entryTime = entryDistance / relativeLength;
+            Fixed64 exitTime = exitDistance / relativeLength;
 
             bool searchFound =
                 TryFindEarliestMixedRotationalContinuousCollisionAgainstTarget(

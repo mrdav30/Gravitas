@@ -10,6 +10,31 @@ namespace Gravitas.Tests.CollisionHandlingTests;
 public sealed class ContinuousCollisionMathTests
 {
     [Fact]
+    public void TranslationalBoundarySuppression_ShouldUsePhysicalDistanceBeforeRoundedTime()
+    {
+        Fixed64 relativeLength = (Fixed64)1_000_000;
+        Fixed64 entryDistance = relativeLength - Fixed64.MinIncrement;
+
+        (entryDistance / relativeLength).Should().Be(Fixed64.One);
+        ContinuousCollisionMath.IsSupersededTranslationalBoundaryHit(
+                entryDistance >= relativeLength,
+                Fixed64.Half,
+                0,
+                2,
+                Fixed64.Half)
+            .Should()
+            .BeFalse();
+        ContinuousCollisionMath.IsSupersededTranslationalBoundaryHit(
+                true,
+                Fixed64.Half,
+                0,
+                2,
+                Fixed64.Half)
+            .Should()
+            .BeTrue();
+    }
+
+    [Fact]
     public void BoundsSeparation_ShouldRecognizeFullDomainAxisGaps()
     {
         FixedBoundBox negativeExtreme = FixedBoundBox.FromMinMax(
@@ -687,6 +712,58 @@ public sealed class ContinuousCollisionMathTests
         overlapTime.Should().Be(Fixed64.Zero);
         overlapNormal.Should().Be(Vector3d.Right);
         overlapSpeed.Should().Be(Fixed64.One);
+    }
+
+    [Fact]
+    public void RelativeRadialDistanceIntervals_ShouldNotConstructSyntheticEndpoints()
+    {
+        Fixed64 startX = Fixed64.MaxValue - Fixed64.Two;
+        var sourceStart2d = new Vector2d(startX, Fixed64.Zero);
+        var targetStart2d = new Vector2d(Fixed64.MaxValue, Fixed64.Zero);
+        var sourceStart3d = new Vector3d(startX, Fixed64.Zero, Fixed64.Zero);
+        var targetStart3d = new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero);
+
+        ContinuousCollisionMath.TryGetRelativeCircleOverlapDistanceInterval(
+                sourceStart2d,
+                Vector2d.Right,
+                Fixed64.Half,
+                targetStart2d,
+                Vector2d.Left * (Fixed64)3,
+                Fixed64.Half,
+                out Fixed64 entry2d,
+                out Fixed64 exit2d,
+                out _,
+                out Fixed64 length2d,
+                out Vector2d normal2d,
+                out Fixed64 closing2d)
+            .Should()
+            .BeTrue();
+        ContinuousCollisionMath.TryGetRelativeSphereOverlapDistanceInterval(
+                sourceStart3d,
+                Vector3d.Right,
+                Fixed64.Half,
+                targetStart3d,
+                Vector3d.Left * (Fixed64)3,
+                Fixed64.Half,
+                out Fixed64 entry3d,
+                out Fixed64 exit3d,
+                out _,
+                out Fixed64 length3d,
+                out Vector3d normal3d,
+                out Fixed64 closing3d)
+            .Should()
+            .BeTrue();
+
+        entry2d.Should().Be(Fixed64.One);
+        exit2d.Should().Be((Fixed64)3);
+        length2d.Should().Be((Fixed64)4);
+        normal2d.Should().Be(Vector2d.Left);
+        closing2d.Should().Be((Fixed64)4);
+        entry3d.Should().Be(entry2d);
+        exit3d.Should().Be(exit2d);
+        length3d.Should().Be(length2d);
+        normal3d.Should().Be(Vector3d.Left);
+        closing3d.Should().Be(closing2d);
     }
 
     [Fact]

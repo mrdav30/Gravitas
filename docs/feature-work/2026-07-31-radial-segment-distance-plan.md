@@ -144,21 +144,47 @@ now-dead 3D overload and copied tests were deleted.
 
 ### Phase 3: Relative CCD Adoption
 
-- [ ] Add the narrow internal direction-and-distance radial contract required
+- [x] Add the narrow internal direction-and-distance radial contract required
   by Gravitas without exposing wide mechanics publicly.
-- [ ] Migrate pure-2D, pure-3D, and mixed relative radial CCD.
-- [ ] Reconstruct source and target impact positions from their authored
+- [x] Migrate pure-2D, pure-3D, and mixed relative radial CCD.
+- [x] Reconstruct source and target impact positions from their authored
   trajectories before normalized-time materialization.
-- [ ] Compare exact distance against the relative sweep boundary before any
+- [x] Compare exact distance against the relative sweep boundary before any
   Q32.32 time conversion.
-- [ ] Delete `RadialSweepAdmission` after its final relative-CCD caller is
+- [x] Delete `RadialSweepAdmission` after its final relative-CCD caller is
   migrated.
-- [ ] Cover reversed body order, opposite scalar faces, start overlap, strict
+- [x] Cover reversed body order, opposite scalar faces, start overlap, strict
   end exclusion, one-raw root ordering, tiny transverse motion, and
   deterministic same-time arbitration.
 
 **Review checkpoint:** Stop after all dimensional CCD paths are green and
 independently reviewed.
+
+**Outcome:** FixedMathSharp now exposes only the narrow internal endpoint-free
+direction-and-distance radial kernels required by Gravitas, including the
+finite rounded-cylinder path. Pure-2D, pure-3D, and mixed relative CCD solve in
+physical distance, compare that exact distance against the active sweep
+boundary, and reconstruct impact state from the authored source and target
+segments before normalized-time materialization. `RadialSweepAdmission` and
+its copied endpoint arithmetic were deleted. Independent review also found and
+corrected a mixed-path defect where a clipped overlap interval still used the
+target's full-frame displacement; the regression covers both source/target
+orientations and distinguishes the prior rounded result from the exact contact.
+
+**Verification:**
+
+- FixedMathSharp `Release`: 2,628 passed; `ReleaseLean`: 2,607 passed.
+- FixedMathSharp coverage remains 100% line (46,756/46,756), branch
+  (8,648/8,648), and method (3,413/3,413).
+- Gravitas `Release`: 3,903 passed; `ReleaseLean`: 3,848 passed.
+- Gravitas coverage remains 100% line (43,969/43,969), branch
+  (12,835/12,835), and method (4,526/4,526).
+- All 56 warmed steady-state allocation guards pass.
+- The focused radial/CCD suite passes all 740 cases, including the red/green
+  mixed clipped-segment regression in both body orientations.
+- Independent review found no Critical, Important, or Minor issue in the
+  arithmetic contract, dimensional adoption, authored-segment reconstruction,
+  deterministic ordering, test quality, or plan accuracy.
 
 ### Phase 4: Coverage, Performance, Documentation, And Queue Closure
 

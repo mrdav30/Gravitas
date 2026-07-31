@@ -3,12 +3,101 @@ using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Tests.Support;
+using System.Reflection;
 using Xunit;
 
 namespace Gravitas.Tests.MixedDimensions;
 
 public sealed partial class MixedQueryCcdTests
 {
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void MixedContinuousMode_AnalyticSphereCircle_WhenSourceStartsMidTargetSegment_ShouldClipTargetDisplacement(
+        bool sphereIsSource)
+    {
+        using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
+        context.Environment.Gravity = Fixed64.Zero;
+        context.Environment.AirDensity = Fixed64.Zero;
+
+        // The target moves six units over the frame, but the source query only
+        // covers the final half. The exact solve must use the clipped
+        // three-unit target displacement and stop at the shared x=1.75 contact.
+        if (sphereIsSource)
+        {
+            ScenarioBody<LSSphereCollider> source = CreateSphere3D(
+                context,
+                Vector3d.Zero);
+            SolidBody2D target = CreateCircle2D(
+                context,
+                new Vector2d(Fixed64.FromFraction(-7, 4), Fixed64.Zero));
+            source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+            target.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+            target.AddLinearImpulse(Vector2d.Right * (Fixed64)6);
+
+            context.AdvanceLateSimulateToken();
+            context.Physics.PrepareContinuousCollisionFrame();
+            context.Physics2D.PrepareContinuousCollisionFrame();
+            object?[] arguments =
+            {
+                target,
+                Vector3d.Zero,
+                Vector3d.Right * Fixed64.FromFraction(7, 2),
+                Fixed64.Half,
+                Fixed64.Half,
+                Fixed64.FromFraction(7, 2),
+                Fixed64.Half,
+                null
+            };
+            ContinuousCollisionMath.IntervalSearchStatus status =
+                (ContinuousCollisionMath.IntervalSearchStatus)typeof(SolidBody)
+                    .GetMethod(
+                        "TryGetDynamicMixed2DContinuousCollisionHit",
+                        BindingFlags.Instance | BindingFlags.NonPublic)!
+                    .Invoke(source.Body, arguments)!;
+            var hit = (DynamicMixedIntervalHit)arguments[7]!;
+
+            status.Should().Be(ContinuousCollisionMath.IntervalSearchStatus.ExactHit);
+            hit.ExactHit.Distance.Should().Be(Fixed64.FromFraction(7, 4));
+            return;
+        }
+
+        SolidBody2D source2D = CreateCircle2D(context, Vector2d.Zero);
+        ScenarioBody<LSSphereCollider> target3D = CreateSphere3D(
+            context,
+            new Vector3d(
+                Fixed64.FromFraction(-7, 4),
+                Fixed64.Zero,
+                Fixed64.Zero));
+        source2D.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        target3D.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        target3D.Body.AddLinearImpulse(Vector3d.Right * (Fixed64)6);
+
+        context.AdvanceLateSimulateToken();
+        context.Physics.PrepareContinuousCollisionFrame();
+        context.Physics2D.PrepareContinuousCollisionFrame();
+        object?[] arguments2D =
+        {
+            target3D.Body,
+            Vector3d.Zero,
+            Vector3d.Right * Fixed64.FromFraction(7, 2),
+            Fixed64.Half,
+            Fixed64.FromFraction(7, 2),
+            Fixed64.Half,
+            null
+        };
+        ContinuousCollisionMath.IntervalSearchStatus status2D =
+            (ContinuousCollisionMath.IntervalSearchStatus)typeof(SolidBody2D)
+                .GetMethod(
+                    "TryGetDynamicMixed3DContinuousCollisionHit",
+                    BindingFlags.Instance | BindingFlags.NonPublic)!
+                .Invoke(source2D, arguments2D)!;
+        var hit2D = (DynamicMixedIntervalHit)arguments2D[6]!;
+
+        status2D.Should().Be(ContinuousCollisionMath.IntervalSearchStatus.ExactHit);
+        hit2D.ExactHit.Distance.Should().Be(Fixed64.FromFraction(7, 4));
+    }
+
     [Fact]
     public void MixedContinuousMode_PiecewiseOutAndReturn3DTarget_ShouldBlock2DSource()
     {

@@ -5147,10 +5147,10 @@ public sealed partial class MixedQueryCcdTests
         driver2D.AddForce(Vector2d.Right * (Fixed64)10);
         context.LateSimulate();
 
-        // The 3D queue owns the single shared iteration. Its already-mutated
-        // middle body clamps at the trajectory limit, while the untouched 2D
-        // queue is discarded with its inbound handoff velocity intact.
-        middle3D.Body.LinearVelocity.Should().Be(Vector3d.Zero);
+        // The 3D queue owns the single shared iteration. Exact impact distance
+        // retains the middle body's inbound velocity while preventing mutation
+        // of either receiver; the untouched 2D queue is then discarded.
+        middle3D.Body.LinearVelocity.X.Should().BeGreaterThan(Fixed64.Zero);
         receiver3D.Body.LinearVelocity.Should().Be(Vector3d.Zero);
         middle2D.LinearVelocity.X.Should().BeGreaterThan(Fixed64.Zero);
         receiver2D.LinearVelocity.Should().Be(Vector2d.Zero);

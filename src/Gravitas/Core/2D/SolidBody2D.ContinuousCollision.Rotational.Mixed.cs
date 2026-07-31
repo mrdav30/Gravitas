@@ -488,6 +488,7 @@ public sealed partial class SolidBody2D
     private bool TryGetExactSphereCircleTranslationalContact(
         SolidBody target,
         ContinuousCollisionMotionSegment3D targetSegment,
+        Vector3d targetDisplacement,
         Vector2d sourceStart,
         Vector2d sourceDisplacement,
         Fixed64 sourceStartRotation,
@@ -528,43 +529,16 @@ public sealed partial class SolidBody2D
                 circle.MixedSlabCenterY,
                 circle.Center.Y);
             Vector3d sphereStart = sphere.Center;
-
-            SampleMixedRotationalContinuousPairPose(
-                sourceStart,
-                sourceDisplacement,
-                sourceStartRotation,
-                Fixed64.Zero,
-                Fixed64.One,
-                elapsedTime,
-                remainingTime,
-                target,
-                samplesTargetMotion: true);
-            Vector3d cylinderEnd = new(
-                circle.Center.X,
-                circle.MixedSlabCenterY,
-                circle.Center.Y);
-            Vector3d sphereEnd = sphere.Center;
-            if (!Vector3d.TrySubtract(
-                    cylinderEnd,
-                    cylinderStart,
-                    out Vector3d cylinderDisplacement)
-                || !Vector3d.TrySubtract(
-                    sphereEnd,
+            Vector3d cylinderDisplacement = sourceDisplacement.ToVector3d(Fixed64.Zero);
+            Vector3d relativeDisplacement =
+                ContinuousCollisionSweepRange.ValidateRelativeDisplacement(
+                    targetDisplacement,
                     cylinderDisplacement,
-                    out Vector3d relativeSphereEnd)
-                || !Vector3d.TryGetDistance(
-                    sphereStart,
-                    relativeSphereEnd,
-                    out Fixed64 totalDistance))
-            {
-                return false;
-            }
-
-            var relativeSpherePath = new FixedSegment(
-                sphereStart,
-                relativeSphereEnd);
-            if (!relativeSpherePath
-                    .TryGetSweptSphereCenteredFiniteCylinderIntersectionDistanceFromHalfAxisLength(
+                    out Fixed64 totalDistance);
+            if (!WideFiniteAxisIntersection
+                    .TryGetSphericallyExpandedFiniteCylinderDirectionFirstDistanceFromHalfAxisLength(
+                        sphereStart,
+                        relativeDisplacement,
                         cylinderStart,
                         Vector3d.Up,
                         circle.MixedHalfThickness,
@@ -576,8 +550,8 @@ public sealed partial class SolidBody2D
                 return false;
             }
 
-            // Caller admission proves the source segment and proportional
-            // contact distance are representable.
+            // Caller admission proves the proportional source distance is
+            // representable.
             _ = Vector2d.TryGetMagnitude(
                 sourceDisplacement,
                 out Fixed64 sourceTravelDistance);

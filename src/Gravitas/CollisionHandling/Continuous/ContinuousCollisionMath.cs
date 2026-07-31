@@ -297,12 +297,12 @@ internal static class ContinuousCollisionMath
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool IsSupersededTranslationalBoundaryHit(
-        Fixed64 segmentTime,
+        bool hitAtSegmentEnd,
         Fixed64 overlapEnd,
         int segmentIndex,
         int segmentCount,
         Fixed64 successorStart) =>
-        segmentTime >= Fixed64.One
+        hitAtSegmentEnd
         && overlapEnd < Fixed64.One
         && segmentIndex + 1 < segmentCount
         && successorStart == overlapEnd;
@@ -336,40 +336,52 @@ internal static class ContinuousCollisionMath
         out Vector3d normalForSource,
         out Fixed64 closingSpeed)
     {
-        return TryGetRelativeSphereOverlapInterval(
-            sourceStart,
-            sourceDisplacement,
-            sourceRadius,
-            targetStart,
-            targetDisplacement,
-            targetRadius,
-            out normalizedTime,
-            out _,
-            out normalForSource,
-            out closingSpeed);
+        normalizedTime = Fixed64.Zero;
+        if (!TryGetRelativeSphereOverlapDistanceInterval(
+                sourceStart,
+                sourceDisplacement,
+                sourceRadius,
+                targetStart,
+                targetDisplacement,
+                targetRadius,
+                out Fixed64 entryDistance,
+                out _,
+                out _,
+                out Fixed64 relativeLength,
+                out normalForSource,
+                out closingSpeed))
+        {
+            return false;
+        }
+
+        normalizedTime = entryDistance / relativeLength;
+        return true;
     }
 
-    public static bool TryGetRelativeSphereOverlapInterval(
+    public static bool TryGetRelativeSphereOverlapDistanceInterval(
         Vector3d sourceStart,
         Vector3d sourceDisplacement,
         Fixed64 sourceRadius,
         Vector3d targetStart,
         Vector3d targetDisplacement,
         Fixed64 targetRadius,
-        out Fixed64 entryTime,
-        out Fixed64 exitTime,
+        out Fixed64 entryDistance,
+        out Fixed64 exitDistance,
+        out Vector3d relativeDisplacement,
+        out Fixed64 relativeLength,
         out Vector3d normalForSource,
         out Fixed64 closingSpeed)
     {
-        entryTime = Fixed64.Zero;
-        exitTime = Fixed64.Zero;
+        entryDistance = Fixed64.Zero;
+        exitDistance = Fixed64.Zero;
+        relativeDisplacement = Vector3d.Zero;
         normalForSource = Vector3d.Zero;
         closingSpeed = Fixed64.Zero;
 
-        Vector3d relativeDisplacement = ContinuousCollisionSweepRange.ValidateRelativeDisplacement(
+        relativeDisplacement = ContinuousCollisionSweepRange.ValidateRelativeDisplacement(
             sourceDisplacement,
             targetDisplacement,
-            out _);
+            out relativeLength);
         Vector3d sourceEnd = GetSweepEnd(sourceStart, sourceDisplacement);
         Vector3d targetEnd = GetSweepEnd(targetStart, targetDisplacement);
         if (relativeDisplacement.MagnitudeSquared <= Fixed64.Epsilon
@@ -378,26 +390,27 @@ internal static class ContinuousCollisionMath
             return false;
         }
 
-        if (!new FixedRay(sourceStart, relativeDisplacement)
-                .TryGetIntersectionInterval(
-                    new FixedBoundSphere(targetStart, targetRadius),
-                    sourceRadius,
-                    Fixed64.One,
-                    out Fixed64 entry,
-                    out Fixed64 exit))
+        if (!WideFiniteAxisIntersection.TryGetSphereDirectionDistanceInterval(
+                sourceStart,
+                relativeDisplacement,
+                new FixedBoundSphere(targetStart, targetRadius),
+                sourceRadius,
+                relativeLength,
+                out entryDistance,
+                out exitDistance))
         {
             return false;
         }
 
-        Vector3d sourceImpact = Vector3d.Lerp(sourceStart, sourceEnd, entry);
-        Vector3d targetImpact = Vector3d.Lerp(targetStart, targetEnd, entry);
+        Vector3d sourceImpact = new FixedSegment(sourceStart, sourceEnd)
+            .GetPointAtDistance(entryDistance, relativeLength);
+        Vector3d targetImpact = new FixedSegment(targetStart, targetEnd)
+            .GetPointAtDistance(entryDistance, relativeLength);
         normalForSource = ResolveNormal(targetImpact, sourceImpact, relativeDisplacement);
         closingSpeed = -Vector3d.Dot(relativeDisplacement, normalForSource);
         if (closingSpeed <= Fixed64.Epsilon)
             return false;
 
-        entryTime = entry;
-        exitTime = exit;
         return true;
     }
 
@@ -414,13 +427,51 @@ internal static class ContinuousCollisionMath
         out Fixed64 closingSpeed)
     {
         normalizedTime = Fixed64.Zero;
+        if (!TryGetRelativeCircleOverlapDistanceInterval(
+                sourceStart,
+                sourceDisplacement,
+                sourceRadius,
+                targetStart,
+                targetDisplacement,
+                targetRadius,
+                out Fixed64 entryDistance,
+                out _,
+                out _,
+                out Fixed64 relativeLength,
+                out normalForSource,
+                out closingSpeed))
+        {
+            return false;
+        }
+
+        normalizedTime = entryDistance / relativeLength;
+        return true;
+    }
+
+    public static bool TryGetRelativeCircleOverlapDistanceInterval(
+        Vector2d sourceStart,
+        Vector2d sourceDisplacement,
+        Fixed64 sourceRadius,
+        Vector2d targetStart,
+        Vector2d targetDisplacement,
+        Fixed64 targetRadius,
+        out Fixed64 entryDistance,
+        out Fixed64 exitDistance,
+        out Vector2d relativeDisplacement,
+        out Fixed64 relativeLength,
+        out Vector2d normalForSource,
+        out Fixed64 closingSpeed)
+    {
+        entryDistance = Fixed64.Zero;
+        exitDistance = Fixed64.Zero;
+        relativeDisplacement = Vector2d.Zero;
         normalForSource = Vector2d.Zero;
         closingSpeed = Fixed64.Zero;
 
-        Vector2d relativeDisplacement = ContinuousCollisionSweepRange.ValidateRelativeDisplacement(
+        relativeDisplacement = ContinuousCollisionSweepRange.ValidateRelativeDisplacement(
             sourceDisplacement,
             targetDisplacement,
-            out _);
+            out relativeLength);
         Vector2d sourceEnd = GetSweepEnd(sourceStart, sourceDisplacement);
         Vector2d targetEnd = GetSweepEnd(targetStart, targetDisplacement);
         if (relativeDisplacement.MagnitudeSquared <= Fixed64.Epsilon
@@ -429,26 +480,27 @@ internal static class ContinuousCollisionMath
             return false;
         }
 
-        if (!RadialSweepAdmission.TryIntersect(
+        if (!WideFiniteAxisIntersection.TryGetCircleDirectionDistanceInterval(
                 sourceStart,
                 relativeDisplacement,
-                Fixed64.One,
-                targetStart,
-                targetRadius,
+                new FixedBoundCircle(targetStart, targetRadius),
                 sourceRadius,
-                sourceEnd,
-                targetEnd,
-                out Fixed64 time))
+                relativeLength,
+                out entryDistance,
+                out exitDistance))
+        {
             return false;
+        }
 
-        Vector2d sourceImpact = Vector2d.Lerp(sourceStart, sourceEnd, time);
-        Vector2d targetImpact = Vector2d.Lerp(targetStart, targetEnd, time);
+        Vector2d sourceImpact = new FixedSegment2d(sourceStart, sourceEnd)
+            .GetPointAtDistance(entryDistance, relativeLength);
+        Vector2d targetImpact = new FixedSegment2d(targetStart, targetEnd)
+            .GetPointAtDistance(entryDistance, relativeLength);
         normalForSource = ResolveNormal(targetImpact, sourceImpact, relativeDisplacement);
         closingSpeed = -Vector2d.Dot(relativeDisplacement, normalForSource);
         if (closingSpeed <= Fixed64.Epsilon)
             return false;
 
-        normalizedTime = time;
         return true;
     }
 
