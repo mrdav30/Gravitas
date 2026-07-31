@@ -101,19 +101,45 @@ rank child anchors exactly with authored-order ties.
 
 ### Phase 2: Exact X/Z Projection Reducers
 
-- [ ] Reuse existing exact anchors, convex support, finite-slab projection,
+- [x] Reuse existing exact anchors, convex support, finite-slab projection,
   triangle projection, and oriented-box owners where their contracts fit.
-- [ ] Add only the missing policy-neutral projection math to FixedMathSharp.
-- [ ] Classify sphere, capsule, cylinder, cone, cuboid, mesh triangle, and
+- [x] Add only the missing policy-neutral projection math to FixedMathSharp.
+- [x] Classify sphere, capsule, cylinder, cone, cuboid, mesh triangle, and
   compound projections without materializing conceptual world coordinates.
-- [ ] Return zero distance for containment and exact planar separation
+- [x] Return zero distance for containment and exact planar separation
   otherwise.
-- [ ] Retain a deterministic real surface anchor and outward normal independently
+- [x] Retain a deterministic real surface anchor and outward normal independently
   from classification materialization.
-- [ ] Keep all reducers stack-only and allocation-free.
+- [x] Keep all reducers stack-only and allocation-free.
 
 **Review checkpoint:** Stop after primitive and mesh/compound projection
 reducers are green in isolation.
+
+**Outcome:** FixedMathSharp now owns one exact planar-relation surface for
+spheres, centered capsules, finite cylinders, finite cones, oriented boxes, and
+triangles. Rational polygon reduction avoids conceptual world-corner
+materialization; tilted disks and cone hulls use exact admission and
+round-half-to-even distance certification while deriving offsets from the same
+closest projected feature. Gravitas adds one collider dispatcher that composes
+those reducers with the existing semantic closest-surface anchor owner for all
+built-in primitives, compounds, and mesh triangles. Equal representable
+compound-part and mesh-triangle distances retain earlier authored order.
+
+The full-domain regressions include containment, exact elliptical-cap
+tangency, mirrored stereographic fallback, subraw gaps, huge off-principal
+gaps that force the exact fallback, feature-direction ownership, authored-order
+ties, all-miss collections, and allocation-free warmed dispatch.
+
+**Verification:**
+
+- FixedMathSharp `Release`: 2,625 passed; 100% line (46,525/46,525), branch
+  (8,638/8,638), and method (3,399/3,399) coverage.
+- FixedMathSharp `ReleaseLean`: 2,604 passed.
+- Gravitas `Release`: 3,881 passed; 100% line (43,857/43,857), branch
+  (12,811/12,811), and method (4,520/4,520) coverage.
+- Gravitas `ReleaseLean`: 3,826 passed after a configuration-aware restore.
+- The warmed reducer allocation assertion reports zero bytes across every
+  primitive plus mesh and compound dispatch.
 
 ### Phase 3: Query-Family Adoption
 
