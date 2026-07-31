@@ -95,6 +95,64 @@ public sealed class GravitasQuery3DServiceCircleTests
     }
 
     [Fact]
+    public void OverlapCircleAll_ShouldAdoptEverySupportedProjectionAndOrderPlanarTiesByColliderId()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        EnsureGrid(context);
+        LSCollider[] colliders =
+        {
+            new LSSphereCollider { Radius = Fixed64.One },
+            new LSCapsuleCollider
+            {
+                Radius = Fixed64.One,
+                Size = new Vector3d(Fixed64.Two, (Fixed64)4, Fixed64.Two)
+            },
+            new LSCylinderCollider
+            {
+                Radius = Fixed64.One,
+                Size = new Vector3d(Fixed64.Two, (Fixed64)4, Fixed64.Two)
+            },
+            new LSConeCollider
+            {
+                Radius = Fixed64.One,
+                Size = new Vector3d(Fixed64.Two, (Fixed64)4, Fixed64.Two)
+            },
+            new LSCuboidCollider
+            {
+                Size = new Vector3d(Fixed64.Two, (Fixed64)4, Fixed64.Two)
+            },
+            MeshTestFixtures.CreateConvexQuadFloor(),
+            new LSCompoundCollider(
+                CompoundColliderPart.Sphere(Fixed64.One, Vector3d.Zero))
+        };
+        var colliderPosition = new Vector3d(Fixed64.Zero, (Fixed64)4, Fixed64.Zero);
+        foreach (LSCollider collider in colliders)
+        {
+            collider.InitializeWithNoBody(new TestMatterAgent(
+                context,
+                new FixedTransform(
+                    colliderPosition,
+                    FixedQuaternion.Identity,
+                    Vector3d.One)));
+        }
+        var hits = new SwiftList<Physics3DHit>();
+
+        int count = context.Query3D.OverlapCircleAll(
+            new Vector3d(Fixed64.Zero, (Fixed64)(-3), Fixed64.Zero),
+            Fixed64.Zero,
+            IncludeLayerZero,
+            hits);
+
+        count.Should().Be(colliders.Length);
+        for (int index = 0; index < colliders.Length; index++)
+        {
+            hits[index].Collider.Should().BeSameAs(colliders[index]);
+            hits[index].Distance.Should().Be(Fixed64.Zero);
+            hits[index].Direction.Should().Be(Vector3d.Zero);
+        }
+    }
+
+    [Fact]
     public void OverlapCircle_ShouldReturnClosestLayerFilteredHit()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
@@ -114,7 +172,7 @@ public sealed class GravitasQuery3DServiceCircleTests
     }
 
     [Fact]
-    public void OverlapCircle_AtCuboidCenter_ShouldUseNearestFaceDistance()
+    public void OverlapCircle_AtCuboidCenter_ShouldReportProjectedContainmentWithSurfaceAnchor()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         LSCuboidCollider cuboid =
@@ -128,7 +186,8 @@ public sealed class GravitasQuery3DServiceCircleTests
             .Should().BeTrue();
 
         hit.Collider.Should().BeSameAs(cuboid);
-        hit.Distance.Should().Be(Fixed64.Half);
+        hit.Distance.Should().Be(Fixed64.Zero);
+        hit.Direction.Should().Be(Vector3d.Zero);
         hit.Anchor.TryGetOffsetFrom(
                 Vector3d.Zero,
                 out Vector3d surfaceOffset)
@@ -169,9 +228,16 @@ public sealed class GravitasQuery3DServiceCircleTests
             Fixed64.MaxValue,
             out Physics3DHit result,
             IncludeLayerZero);
+        bool surfaceHit = GravitasQuery3DService.TryBuildSurfaceOverlapHit(
+            cuboid,
+            Vector3d.Zero,
+            Fixed64.MaxValue,
+            out Physics3DHit surfaceResult);
 
         hit.Should().BeFalse();
         result.Should().Be(default(Physics3DHit));
+        surfaceHit.Should().BeFalse();
+        surfaceResult.Should().Be(default(Physics3DHit));
         context.Query3D.LastQueryCandidateCount.Should().Be(1);
     }
 
@@ -326,6 +392,46 @@ public sealed class GravitasQuery3DServiceCircleTests
 
         hit.Should().BeTrue();
         hitInfo.Collider.Should().BeSameAs(target);
+    }
+
+    [Fact]
+    public void OverlapCircleFamily_ShouldIgnoreQueryYAndDirectionY()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSSphereCollider target = CreateDynamicSphere(
+            context,
+            new Vector3d((Fixed64)2, (Fixed64)5, Fixed64.Zero));
+        var query = new Vector3d(Fixed64.Zero, (Fixed64)(-3), Fixed64.Zero);
+        var hits = new SwiftList<Physics3DHit>();
+
+        context.Query3D.OverlapCircle(
+                query,
+                (Fixed64)3,
+                out Physics3DHit closest,
+                IncludeLayerZero)
+            .Should().BeTrue();
+        context.Query3D.OverlapCircleInDirection(
+                query,
+                (Fixed64)3,
+                new Vector3d(Fixed64.MinIncrement, Fixed64.MaxValue, Fixed64.Zero),
+                out Physics3DHit directional,
+                (Fixed64)2,
+                IncludeLayerZero)
+            .Should().BeTrue();
+        context.Query3D.OverlapCircleAll(
+                query,
+                (Fixed64)3,
+                IncludeLayerZero,
+                hits)
+            .Should().Be(1);
+
+        closest.Collider.Should().BeSameAs(target);
+        directional.Collider.Should().BeSameAs(target);
+        hits[0].Collider.Should().BeSameAs(target);
+        closest.Distance.Should().Be((Fixed64)1.5m);
+        directional.Distance.Should().Be(closest.Distance);
+        hits[0].Distance.Should().Be(closest.Distance);
+        closest.Direction.Should().Be(new Vector3d((Fixed64)1.5m, Fixed64.Zero, Fixed64.Zero));
     }
 
     [Fact]

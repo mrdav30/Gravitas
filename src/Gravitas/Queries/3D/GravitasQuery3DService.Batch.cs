@@ -775,13 +775,11 @@ public sealed partial class GravitasQuery3DService
 
         bool found = false;
         Physics3DHit closest = default;
-        Fixed64 closestDistance = Fixed64.MaxValue;
         TraceCircleForClosestHit(
             request.Position,
             request.Radius,
             ref found,
-            ref closest,
-            ref closestDistance);
+            ref closest);
 
         hit = closest;
         return found;
@@ -811,21 +809,18 @@ public sealed partial class GravitasQuery3DService
         _redundantColliderCheck.Clear();
         _redundantVoxelCheck.Clear();
 
-        Vector3d direction = request.Direction == Vector3d.Zero
-            ? Vector3d.Zero
-            : request.Direction.Normalized;
-        Fixed64 maxDistanceSqr = request.MaxDistance * request.MaxDistance;
+        var direction = new Vector2d(
+            request.Direction.X,
+            request.Direction.Z);
         bool found = false;
         Physics3DHit closest = default;
-        Fixed64 closestDistance = Fixed64.MaxValue;
         TraceCircleForDirectionalHit(
             request.Position,
             request.Radius,
             direction,
-            maxDistanceSqr,
+            request.MaxDistance,
             ref found,
-            ref closest,
-            ref closestDistance);
+            ref closest);
 
         hit = found ? closest : default;
         return found;

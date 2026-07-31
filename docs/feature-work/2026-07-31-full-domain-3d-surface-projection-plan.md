@@ -143,21 +143,51 @@ ties, all-miss collections, and allocation-free warmed dispatch.
 
 ### Phase 3: Query-Family Adoption
 
-- [ ] Replace the full-3D broad rejection with an exact or conservative X/Z
+- [x] Replace the full-3D broad rejection with an exact or conservative X/Z
   rejection that cannot discard a valid projected hit.
-- [ ] Adopt the projection reducer in closest, directional, all-hit, and batch
+- [x] Adopt the projection reducer in closest, directional, all-hit, and batch
   APIs through one shared worker.
-- [ ] Make directional filtering explicitly planar and robust for tiny
+- [x] Make directional filtering explicitly planar and robust for tiny
   representable directions.
-- [ ] Preserve distance-plus-collider-ID ordering and duplicate suppression.
-- [ ] Cover vertical invariance, containment, scalar faces, all supported
+- [x] Preserve distance-plus-collider-ID ordering and duplicate suppression.
+- [x] Cover vertical invariance, containment, scalar faces, all supported
   shapes, ties, and single/batch parity.
+
+**Review checkpoint:** Stop after the complete public query family is green
+before benchmark and documentation closure.
+
+**Outcome:** The closest, directional, all-hit, and batch X/Z circle APIs now
+scan the covered X/Z columns across the active world's complete vertical
+domain, retain GridForge partition traversal and duplicate suppression, and
+delegate final admission to the Phase 2 planar reducer. Query Y no longer
+changes candidate discovery or classification. Hits report planar distance and
+direction while retaining an independent real 3D surface anchor and normal;
+containment therefore reports zero distance without inventing a surface point.
+
+Directional filtering ignores Y, compares the exact planar dot-product sign,
+and compares the already-certified distance directly instead of squaring either
+operand. The public integration coverage exercises every supported primitive,
+mesh, and compound collider, deterministic collider-ID ties, vertical
+invariance, tiny representable directions, and existing single/batch parity.
+True 3D overlap-sphere admission remains on its separate surface-distance
+worker so rotational CCD does not inherit planar semantics.
+
+**Verification:**
+
+- Gravitas focused circle, batch, and rotational-CCD regressions: 39 passed.
+- Gravitas `Release`: 3,883 passed.
+- Gravitas coverage: 100% line (43,879/43,879), branch
+  (12,807/12,807), and method (4,522/4,522) coverage.
+- Gravitas `ReleaseLean`: 3,828 passed after a configuration-aware restore.
+- Independent review found no correctness issues and identified configured-Y
+  traversal scaling as a Phase 4 benchmark gate.
 
 ### Phase 4: Closure
 
 - [ ] Run focused and full Release/ReleaseLean tests in both repositories.
 - [ ] Re-establish 100% reachable line, branch, and method coverage.
-- [ ] Run warmed allocation assertions and relevant query benchmarks.
+- [ ] Run warmed allocation assertions and X/Z query benchmarks, including
+  vertical scaling across tall dense and sparse grids.
 - [ ] Update query documentation and remove stale tracker language.
 - [ ] Move this plan to `docs/feature-work/done`.
 
