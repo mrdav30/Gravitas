@@ -187,7 +187,6 @@ internal static partial class QueryDetection2D
         if (collider is LSCompoundCollider2D compound)
             return TryRaycastCompound(start, end, compound, out hit);
 
-        Vector2d direction = segment.Normalized;
         if (ContainsPointExact(collider, start))
         {
             hit = new Physics2DHit(
@@ -199,7 +198,7 @@ internal static partial class QueryDetection2D
         }
 
         if (collider is LSCircleCollider2D circle)
-            return TryRaycastCircle(start, end, direction, segmentLength, circle, out hit);
+            return TryRaycastCircle(start, end, segmentLength, circle, out hit);
         if (collider is LSCapsuleCollider2D capsule)
             return TryRaycastCapsule(start, end, segmentLength, capsule, out hit);
         if (collider is not LSAABBoxCollider2D
@@ -209,6 +208,7 @@ internal static partial class QueryDetection2D
             return false;
         }
 
+        Vector2d direction = segment.Normalized;
         return TryRaycastConvex(start, direction, segmentLength, collider, out hit);
     }
 
@@ -247,9 +247,8 @@ internal static partial class QueryDetection2D
             return true;
         }
 
-        Vector2d direction = segment.Normalized;
         if (collider is LSCircleCollider2D circle)
-            return TrySweepCircleCircle(start, end, direction, segmentLength, radius, circle, out hit);
+            return TrySweepCircleCircle(start, end, segmentLength, radius, circle, out hit);
         if (collider is LSCapsuleCollider2D capsule)
             return TrySweepCircleCapsule(start, end, segmentLength, radius, capsule, out hit);
         if (collider is not LSAABBoxCollider2D
@@ -259,6 +258,7 @@ internal static partial class QueryDetection2D
             return false;
         }
 
+        Vector2d direction = segment.Normalized;
         return TrySweepCircleConvex(start, direction, segmentLength, radius, collider, out hit);
     }
 
@@ -331,31 +331,23 @@ internal static partial class QueryDetection2D
     private static bool TryRaycastCircle(
         Vector2d start,
         Vector2d end,
-        Vector2d direction,
         Fixed64 segmentLength,
         LSCircleCollider2D circle,
         out Physics2DHit hit)
     {
-        if (!RadialSweepAdmission.TryIntersect(
-                start,
-                direction,
+        var query = new FixedSegment2d(start, end);
+        if (!query.TryGetCircleIntersectionDistanceInterval(
+                new FixedBoundCircle(circle.Center, circle.ScaledRadius),
                 segmentLength,
-                circle.Center,
-                circle.ScaledRadius,
-                Fixed64.Zero,
-                end,
-                circle.Center,
-                out Fixed64 parameter))
+                out Fixed64 distance,
+                out _))
         {
             hit = default;
             return false;
         }
 
-        Fixed64 distance = parameter;
-        Vector2d point = distance == segmentLength
-            ? end
-            : start + direction * distance;
-        Vector2d normal = (point - circle.Center).Normalized;
+        Vector2d point = query.GetPointAtDistance(distance, segmentLength);
+        Vector2d normal = Vector2d.GetDirection(circle.Center, point);
         hit = new Physics2DHit(
             circle,
             new ContactAnchor2D(
@@ -369,32 +361,27 @@ internal static partial class QueryDetection2D
     private static bool TrySweepCircleCircle(
         Vector2d start,
         Vector2d end,
-        Vector2d direction,
         Fixed64 segmentLength,
         Fixed64 radius,
         LSCircleCollider2D circle,
         out Physics2DHit hit)
     {
-        if (!RadialSweepAdmission.TryIntersect(
-                start,
-                direction,
-                segmentLength,
-                circle.Center,
-                circle.ScaledRadius,
+        var query = new FixedSegment2d(start, end);
+        if (!query.TryGetCircleIntersectionDistanceInterval(
+                new FixedBoundCircle(circle.Center, circle.ScaledRadius),
                 radius,
-                end,
-                circle.Center,
-                out Fixed64 parameter))
+                segmentLength,
+                out Fixed64 distance,
+                out _,
+                out _,
+                out _))
         {
             hit = default;
             return false;
         }
 
-        Fixed64 distance = parameter;
-        Vector2d sweptCenter = distance == segmentLength
-            ? end
-            : start + direction * distance;
-        Vector2d normal = (sweptCenter - circle.Center).Normalized;
+        Vector2d sweptCenter = query.GetPointAtDistance(distance, segmentLength);
+        Vector2d normal = Vector2d.GetDirection(circle.Center, sweptCenter);
         hit = new Physics2DHit(
             circle,
             new ContactAnchor2D(

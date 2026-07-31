@@ -27,6 +27,7 @@ internal static partial class FiniteSlabProjectionSweep
 
     public static bool TrySweepCircleAgainstCapsule(
         Vector2d start,
+        Vector2d end,
         Vector2d direction,
         Fixed64 length,
         Fixed64 radius,
@@ -39,6 +40,7 @@ internal static partial class FiniteSlabProjectionSweep
         var target = ProjectionTarget.CreateCapsule(capsule, slabMinY, slabMaxY);
         return TrySweepCircle(
             start,
+            end,
             direction,
             length,
             radius,
@@ -49,6 +51,7 @@ internal static partial class FiniteSlabProjectionSweep
 
     public static bool TrySweepCircleAgainstCylinder(
         Vector2d start,
+        Vector2d end,
         Vector2d direction,
         Fixed64 length,
         Fixed64 radius,
@@ -61,6 +64,7 @@ internal static partial class FiniteSlabProjectionSweep
         var target = ProjectionTarget.CreateCylinder(cylinder, slabMinY, slabMaxY);
         return TrySweepCircle(
             start,
+            end,
             direction,
             length,
             radius,
@@ -71,6 +75,7 @@ internal static partial class FiniteSlabProjectionSweep
 
     public static bool TrySweepCircleAgainstCone(
         Vector2d start,
+        Vector2d end,
         Vector2d direction,
         Fixed64 length,
         Fixed64 radius,
@@ -83,6 +88,7 @@ internal static partial class FiniteSlabProjectionSweep
         var target = ProjectionTarget.CreateCone(cone, slabMinY, slabMaxY);
         return TrySweepCircle(
             start,
+            end,
             direction,
             length,
             radius,
@@ -93,6 +99,7 @@ internal static partial class FiniteSlabProjectionSweep
 
     private static bool TrySweepCircle(
         Vector2d start,
+        Vector2d end,
         Vector2d direction,
         Fixed64 length,
         Fixed64 radius,
@@ -105,35 +112,20 @@ internal static partial class FiniteSlabProjectionSweep
             || (directionMagnitude != Fixed64.Zero
                 && FixedMath.Abs(directionMagnitude - Fixed64.One) > Fixed64.Epsilon)
             || maxConservativeAdvancementIterations <= 0
-            || !target.TrySupport(Vector2d.Right, out Vector2d rightSupport)
-            || !TryGetSweepEndpoint(start, direction, length, out Vector2d end))
+            || !target.TrySupport(Vector2d.Right, out Vector2d rightSupport))
             return false;
 
         if (target.TryGetPlanarCircle(rightSupport, out Vector2d targetCenter, out Fixed64 targetRadius))
         {
-            if (RadialSweepAdmission.TryIntersect(
-                start,
-                direction,
-                length,
-                targetCenter,
-                targetRadius,
-                radius,
-                end,
-                targetCenter,
-                out distance))
-            {
-                return true;
-            }
-
-            if (Fixed64.TryAdd(targetRadius, radius, out Fixed64 combinedRadius)
-                && Fixed64.TryAdd(combinedRadius, SweepContactTolerance, out Fixed64 tolerantRadius))
-            {
-                if (!end.CheckDistance(targetCenter, tolerantRadius))
-                    return false;
-
-                distance = length;
-                return true;
-            }
+            return new FixedSegment2d(start, end)
+                .TryGetCircleIntersectionDistanceInterval(
+                    new FixedBoundCircle(targetCenter, targetRadius),
+                    radius,
+                    length,
+                    out distance,
+                    out _,
+                    out _,
+                    out _);
         }
 
         Fixed64 travelDistance = Fixed64.Zero;
@@ -286,7 +278,7 @@ internal static partial class FiniteSlabProjectionSweep
         return true;
     }
 
-    // Endpoint admission proves every monotonic intermediate component is representable.
+    // The authored endpoint bounds every monotonic intermediate component.
     private static Vector2d GetSweepPoint(
         Vector2d start,
         Vector2d direction,
@@ -294,18 +286,6 @@ internal static partial class FiniteSlabProjectionSweep
         new(
             Fixed64.MultiplyAdd(direction.X, distance, start.X),
             Fixed64.MultiplyAdd(direction.Y, distance, start.Y));
-
-    private static bool TryGetSweepEndpoint(
-        Vector2d start,
-        Vector2d direction,
-        Fixed64 length,
-        out Vector2d endpoint)
-    {
-        bool hasX = Fixed64.TryMultiplyAdd(direction.X, length, start.X, out Fixed64 x);
-        bool hasY = Fixed64.TryMultiplyAdd(direction.Y, length, start.Y, out Fixed64 y);
-        endpoint = new Vector2d(x, y);
-        return hasX & hasY;
-    }
 
     private static ClosestPlanarSimplexResult SolveClosestSimplex(
         Span<PlanarSupportPoint> simplex,

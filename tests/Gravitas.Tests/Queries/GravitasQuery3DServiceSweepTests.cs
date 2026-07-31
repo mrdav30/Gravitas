@@ -353,6 +353,34 @@ public sealed class GravitasQuery3DServiceSweepTests
     }
 
     [Fact]
+    public void SweptSphereWorker_WithTwoRawTransverseMotion_ShouldPreserveSphereTangency()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        Fixed64 raw = Fixed64.FromRaw(1);
+        var target = new LSSphereCollider { Radius = raw };
+        target.InitializeWithNoBody(new TestMatterAgent(
+            context,
+            new FixedTransform(
+                new Vector3d(Fixed64.Zero, raw * 3, Fixed64.Zero),
+                FixedQuaternion.Identity,
+                Vector3d.One)));
+        var worker = new SweptSphereQueryWorker();
+        worker.Prepare(
+            new Vector3d((Fixed64)(-100_000), Fixed64.Zero, Fixed64.Zero),
+            new Vector3d((Fixed64)100_000, raw * 2, Fixed64.Zero),
+            raw);
+
+        bool found = worker.TrySweep(
+            target,
+            out Vector3d centerAtImpact,
+            out Fixed64 distance);
+
+        found.Should().BeTrue();
+        distance.Should().Be((Fixed64)100_000);
+        centerAtImpact.Should().Be(new Vector3d(Fixed64.Zero, raw, Fixed64.Zero));
+    }
+
+    [Fact]
     public void SweepSphere_ShouldReturnStartingOverlapAtZeroDistance()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();

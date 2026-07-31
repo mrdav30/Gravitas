@@ -64,7 +64,7 @@ public sealed class RaycastSegmentWorker
     /// </summary>
     /// <param name="sphere">The sphere bound.</param>
     /// <param name="outputIntersectionPoints">
-    /// Receives segment points reconstructed from the nearest representable bounded intersection parameters.
+    /// Receives segment points reconstructed from exact physical intersection distances.
     /// </param>
     /// <returns><see langword="true"/> when the prepared segment overlaps the sphere.</returns>
     public bool CheckSphereOverlaps(
@@ -77,13 +77,15 @@ public sealed class RaycastSegmentWorker
         if (_cachedSegment.IsZero)
             return CheckPointInsideSphere(sphere, ref outputIntersectionPoints);
 
-        bool startsInside = sphere.Contains(_cachedOrigin);
-        var ray = new FixedRay(_cachedOrigin, _cachedSegment);
-        if (!ray.TryGetIntersectionInterval(
+        var query = new FixedSegment(_cachedOrigin, _cachedEnd);
+        if (!query.TryGetSphereIntersectionDistanceInterval(
                 sphere,
-                Fixed64.One,
+                Fixed64.Zero,
+                _segmentLength,
                 out Fixed64 entry,
-                out Fixed64 exit))
+                out Fixed64 exit,
+                out bool startContained,
+                out bool endContainedStrict))
         {
             return false;
         }
@@ -91,19 +93,12 @@ public sealed class RaycastSegmentWorker
         if (!_calculateIntersections)
             return true;
 
-        if (startsInside)
-        {
-            outputIntersectionPoints.Add(_cachedOrigin);
-            return true;
-        }
-
-        AddSegmentParameterIntersectionPoint(entry, ref outputIntersectionPoints);
-        if (exit != entry
-            && (exit < Fixed64.One || !sphere.ContainsStrict(_cachedEnd)))
-        {
-            AddSegmentParameterIntersectionPoint(exit, ref outputIntersectionPoints);
-        }
-
+        AddFiniteAxisIntersectionInterval(
+            entry,
+            exit,
+            startContained,
+            endContainedStrict,
+            ref outputIntersectionPoints);
         return true;
     }
 
@@ -461,14 +456,6 @@ public sealed class RaycastSegmentWorker
         ref SwiftList<Vector3d> outputIntersectionPoints) =>
         outputIntersectionPoints.Add(new FixedSegment(_cachedOrigin, _cachedEnd)
             .GetPointAtDistance(distance, _segmentLength));
-
-    private void AddSegmentParameterIntersectionPoint(
-        Fixed64 parameter,
-        ref SwiftList<Vector3d> outputIntersectionPoints) =>
-        outputIntersectionPoints.Add(
-            parameter == Fixed64.One
-                ? _cachedEnd
-                : Vector3d.Lerp(_cachedOrigin, _cachedEnd, parameter));
 
     private bool CheckPointInsideBox(
         Vector3d min,

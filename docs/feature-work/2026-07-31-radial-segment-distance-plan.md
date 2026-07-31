@@ -106,18 +106,41 @@ axis limit contract.
 
 ### Phase 2: Gravitas Query Adoption
 
-- [ ] Migrate pure-2D circle raycasts and circle sweeps.
-- [ ] Migrate 3D sphere raycasts, swept-sphere/sphere tests, and mesh-vertex
+- [x] Migrate pure-2D circle raycasts and circle sweeps.
+- [x] Migrate 3D sphere raycasts, swept-sphere/sphere tests, and mesh-vertex
   radial tests.
-- [ ] Migrate mixed circle/sphere and circular finite-slab reducers.
-- [ ] Reconstruct hit points with exact distance along the authored segment.
-- [ ] Delete `RadialSweepAdmission` and move its meaningful regressions to the
-  public query families.
-- [ ] Preserve distance-plus-collider-ID ordering, batch parity, and warmed
+- [x] Migrate mixed circle/sphere and circular finite-slab reducers.
+- [x] Reconstruct hit points with exact distance along the authored segment.
+- [x] Remove every query dependency on `RadialSweepAdmission` and move its
+  meaningful query regressions to the public query families.
+- [x] Preserve distance-plus-collider-ID ordering, batch parity, and warmed
   zero allocation.
 
 **Review checkpoint:** Stop after the complete public query family is green and
 independently reviewed.
+
+**Outcome:** Pure-2D circle raycasts and sweeps, 3D sphere raycasts and sphere
+sweeps, mesh-vertex radial tests, mixed circle/sphere queries, and circular
+finite-slab reducers now solve and reconstruct directly from physical distance
+along the authored segment. Mixed finite-slab callers pass their authored end
+point through the reducer, and the endpoint-only tolerance fallback was
+removed. No query path depends on `RadialSweepAdmission`; its remaining 2D
+overload serves only the relative-CCD caller scheduled for Phase 3, while its
+now-dead 3D overload and copied tests were deleted.
+
+**Verification:**
+
+- Gravitas `Release`: 3,898 passed; `ReleaseLean`: 3,843 passed.
+- Coverage remains 100% line (55,969/55,969), branch (15,851/15,851), and
+  method (5,353/5,353) in the generated report.
+- The focused warmed allocation gate passes all five pure-2D, 3D, and mixed
+  query cases with zero managed allocation.
+- The existing radial-raycast benchmark executes all 18 normal and
+  100,000-scale cases successfully under its Dry validation job with zero
+  managed allocation.
+- Independent review found no Critical or Important issue in distance and
+  containment semantics, reconstruction, ordering, allocation behavior, test
+  quality, or plan accuracy.
 
 ### Phase 3: Relative CCD Adoption
 
@@ -128,6 +151,8 @@ independently reviewed.
   trajectories before normalized-time materialization.
 - [ ] Compare exact distance against the relative sweep boundary before any
   Q32.32 time conversion.
+- [ ] Delete `RadialSweepAdmission` after its final relative-CCD caller is
+  migrated.
 - [ ] Cover reversed body order, opposite scalar faces, start overlap, strict
   end exclusion, one-raw root ordering, tiny transverse motion, and
   deterministic same-time arbitration.

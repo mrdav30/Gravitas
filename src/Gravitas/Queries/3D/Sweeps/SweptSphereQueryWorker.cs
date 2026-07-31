@@ -127,7 +127,6 @@ public sealed class SweptSphereQueryWorker
         TrySweepSphere(
             _start,
             _end,
-            _direction,
             _length,
             center,
             radius,
@@ -138,7 +137,6 @@ public sealed class SweptSphereQueryWorker
     private static bool TrySweepSphere(
         Vector3d start,
         Vector3d end,
-        Vector3d direction,
         Fixed64 length,
         Vector3d center,
         Fixed64 radius,
@@ -149,22 +147,19 @@ public sealed class SweptSphereQueryWorker
         sphereCenterAtImpact = Vector3d.Zero;
         impactDistance = Fixed64.Zero;
 
-        if (!RadialSweepAdmission.TryIntersect(
-                start,
-                direction,
-                length,
-                center,
-                radius,
+        var query = new FixedSegment(start, end);
+        if (!query.TryGetSphereIntersectionDistanceInterval(
+                new FixedBoundSphere(center, radius),
                 radiusExpansion,
-                end,
-                center,
-                out Fixed64 parameter))
+                length,
+                out Fixed64 distance,
+                out _,
+                out _,
+                out _))
             return false;
 
-        impactDistance = parameter;
-        sphereCenterAtImpact = parameter == length
-            ? end
-            : start + direction * parameter;
+        impactDistance = distance;
+        sphereCenterAtImpact = query.GetPointAtDistance(distance, length);
         return true;
     }
 
@@ -409,19 +404,19 @@ public sealed class SweptSphereQueryWorker
             ref sphereCenterAtImpact,
             ref impactDistance);
         found |= TryKeepEarlierSweep(
-            TrySweepSphere(start, end, direction, _length, first, Fixed64.Zero, _radius, out Vector3d firstVertexHit, out Fixed64 firstVertexDistance),
+            TrySweepSphere(start, end, _length, first, Fixed64.Zero, _radius, out Vector3d firstVertexHit, out Fixed64 firstVertexDistance),
             firstVertexHit,
             firstVertexDistance,
             ref sphereCenterAtImpact,
             ref impactDistance);
         found |= TryKeepEarlierSweep(
-            TrySweepSphere(start, end, direction, _length, second, Fixed64.Zero, _radius, out Vector3d secondVertexHit, out Fixed64 secondVertexDistance),
+            TrySweepSphere(start, end, _length, second, Fixed64.Zero, _radius, out Vector3d secondVertexHit, out Fixed64 secondVertexDistance),
             secondVertexHit,
             secondVertexDistance,
             ref sphereCenterAtImpact,
             ref impactDistance);
         found |= TryKeepEarlierSweep(
-            TrySweepSphere(start, end, direction, _length, third, Fixed64.Zero, _radius, out Vector3d thirdVertexHit, out Fixed64 thirdVertexDistance),
+            TrySweepSphere(start, end, _length, third, Fixed64.Zero, _radius, out Vector3d thirdVertexHit, out Fixed64 thirdVertexDistance),
             thirdVertexHit,
             thirdVertexDistance,
             ref sphereCenterAtImpact,

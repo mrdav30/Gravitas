@@ -477,6 +477,7 @@ public sealed class FiniteAxisProjectionWorkerTests
 
         bool found = FiniteSlabProjectionSweep.TrySweepCircleAgainstCapsule(
             new Vector2d(Fixed64.Zero, (Fixed64)(-3)),
+            new Vector2d(Fixed64.Zero, (Fixed64)3),
             Vector2d.Forward,
             (Fixed64)6,
             Fixed64.Zero,
@@ -507,6 +508,7 @@ public sealed class FiniteAxisProjectionWorkerTests
 
         bool found = FiniteSlabProjectionSweep.TrySweepCircleAgainstCapsule(
             new Vector2d(Fixed64.Zero, (Fixed64)(-100_000)),
+            new Vector2d(Fixed64.Zero, (Fixed64)100_000),
             Vector2d.Forward,
             (Fixed64)200_000,
             Fixed64.Zero,
@@ -538,6 +540,7 @@ public sealed class FiniteAxisProjectionWorkerTests
 
         bool found = FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
             new Vector2d(Fixed64.Zero, (Fixed64)(-100_000)),
+            new Vector2d(Fixed64.Zero, (Fixed64)100_000),
             Vector2d.Forward,
             (Fixed64)200_000,
             Fixed64.Zero,
@@ -575,6 +578,7 @@ public sealed class FiniteAxisProjectionWorkerTests
             out Vector3d baseCenter).Should().BeTrue();
         bool found = FiniteSlabProjectionSweep.TrySweepCircleAgainstCone(
             new Vector2d(baseCenter.X, (Fixed64)(-100_000)),
+            new Vector2d(baseCenter.X, (Fixed64)100_000),
             Vector2d.Forward,
             (Fixed64)200_000,
             Fixed64.Zero,

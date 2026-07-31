@@ -129,10 +129,62 @@ public sealed partial class MixedQueryCcdTests
     }
 
     [Fact]
-    public void RadialMixedSweeps_WithRoundedEndpointSlightlyOutsideCapsule_ShouldRejectExactSphereMiss()
+    public void SweepCircleAgainstSphere_WithTwoRawTransverseMotion_ShouldPreserveInteriorTangency()
     {
         using GravitasWorldContext context = CreateMixedContext();
-        LSCollider target3D = CreateBodyless3D(context, new LSSphereCollider(), Vector3d.Zero);
+        Fixed64 raw = Fixed64.FromRaw(1);
+        LSSphereCollider target = CreateBodyless3D(
+            context,
+            new LSSphereCollider { Radius = raw },
+            new Vector3d(Fixed64.Zero, Fixed64.Zero, raw * 3));
+
+        bool found = context.QueryMixed.SweepCircleAgainst3D(
+            new Vector2d((Fixed64)(-100_000), Fixed64.Zero),
+            new Vector2d((Fixed64)100_000, raw * 2),
+            raw,
+            Fixed64.Zero,
+            raw,
+            IncludeLayerZero,
+            out PhysicsMixedHit hit);
+
+        found.Should().BeTrue();
+        hit.Collider3D.Should().BeSameAs(target);
+        hit.Distance.Should().Be((Fixed64)100_000);
+    }
+
+    [Fact]
+    public void SweepCircleAgainstVerticalCylinder_WithTwoRawTransverseMotion_ShouldPreserveInteriorTangency()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        Fixed64 raw = Fixed64.FromRaw(1);
+        ScenarioBody<LSCylinderCollider> target = CreateBody3D(
+            context,
+            new LSCylinderCollider
+            {
+                Size = new Vector3d(Fixed64.One, (Fixed64)3, Fixed64.One)
+            },
+            new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.One + raw),
+            immovable: true);
+
+        bool found = context.QueryMixed.SweepCircleAgainst3D(
+            new Vector2d((Fixed64)(-100_000), Fixed64.Zero),
+            new Vector2d((Fixed64)100_000, raw * 2),
+            Fixed64.Half,
+            Fixed64.Zero,
+            Fixed64.Half,
+            IncludeLayerZero,
+            out PhysicsMixedHit hit);
+
+        found.Should().BeTrue();
+        hit.Collider3D.Should().BeSameAs(target.Collider);
+        hit.Distance.Should().Be((Fixed64)100_000);
+    }
+
+    [Fact]
+    public void RadialMixedSweeps_WithRoundedEndpointOutsideExactBoundary_ShouldReject()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        _ = CreateBodyless3D(context, new LSSphereCollider(), Vector3d.Zero);
         LSCollider2D target2D = CreateBodylessCapsule2D(context, Vector2d.Zero);
         Vector2d direction2D = new Vector2d(
             Fixed64.One,
@@ -166,10 +218,8 @@ public sealed partial class MixedQueryCcdTests
             IncludeLayerZero,
             out PhysicsMixedHit sphereResult);
 
-        circleHit.Should().BeTrue();
-        circleResult.Collider3D.Should().BeSameAs(target3D);
-        circleResult.Distance.Should().Be(Fixed64.One);
-        circleResult.ReducerKind.Should().Be(PhysicsQueryReducerKind.Exact);
+        circleHit.Should().BeFalse();
+        circleResult.Should().Be(default(PhysicsMixedHit));
         sphereHit.Should().BeFalse();
         sphereResult.Should().Be(default(PhysicsMixedHit));
     }
@@ -926,6 +976,7 @@ public sealed partial class MixedQueryCcdTests
 
         bool found = FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
             new Vector2d((Fixed64)(-4), Fixed64.Zero),
+            CreateFiniteSlabSweepEnd(new Vector2d((Fixed64)(-4), Fixed64.Zero), Vector2d.Right, (Fixed64)8),
             Vector2d.Right,
             (Fixed64)8,
             Fixed64.Half,
@@ -950,6 +1001,7 @@ public sealed partial class MixedQueryCcdTests
 
         bool found = FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
             new Vector2d((Fixed64)3, Fixed64.Zero),
+            CreateFiniteSlabSweepEnd(new Vector2d((Fixed64)3, Fixed64.Zero), Vector2d.Right, (Fixed64)8),
             Vector2d.Right,
             (Fixed64)8,
             Fixed64.Half,
@@ -974,6 +1026,7 @@ public sealed partial class MixedQueryCcdTests
 
         bool found = FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
             new Vector2d((Fixed64)(-4), Fixed64.Zero),
+            CreateFiniteSlabSweepEnd(new Vector2d((Fixed64)(-4), Fixed64.Zero), Vector2d.Right, Fixed64.One),
             Vector2d.Right,
             Fixed64.One,
             Fixed64.Half,
@@ -987,7 +1040,7 @@ public sealed partial class MixedQueryCcdTests
     }
 
     [Fact]
-    public void FiniteSlabProjectionSweep_WithEndpointInsideContactTolerance_ShouldReturnEndpointHit()
+    public void FiniteSlabProjectionSweep_WithEndpointOutsideExactBoundary_ShouldReject()
     {
         using GravitasWorldContext context = CreateMixedContext();
         ScenarioBody<LSCylinderCollider> target = CreateBody3D(
@@ -999,6 +1052,7 @@ public sealed partial class MixedQueryCcdTests
 
         bool found = FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
             new Vector2d((Fixed64)(-2) - halfContactTolerance, Fixed64.Zero),
+            CreateFiniteSlabSweepEnd(new Vector2d((Fixed64)(-2) - halfContactTolerance, Fixed64.Zero), Vector2d.Right, Fixed64.One),
             Vector2d.Right,
             Fixed64.One,
             Fixed64.Half,
@@ -1007,8 +1061,8 @@ public sealed partial class MixedQueryCcdTests
             target.Collider,
             out Fixed64 distance);
 
-        found.Should().BeTrue();
-        distance.Should().Be(Fixed64.One);
+        found.Should().BeFalse();
+        distance.Should().Be(Fixed64.Zero);
     }
 
     [Fact]
@@ -1023,6 +1077,7 @@ public sealed partial class MixedQueryCcdTests
 
         bool found = FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
             new Vector2d(Fixed64.MinValue, Fixed64.Zero),
+            CreateFiniteSlabSweepEnd(new Vector2d(Fixed64.MinValue, Fixed64.Zero), Vector2d.Right, Fixed64.MaxValue),
             Vector2d.Right,
             Fixed64.MaxValue,
             Fixed64.Half,
@@ -1047,6 +1102,7 @@ public sealed partial class MixedQueryCcdTests
 
         bool found = FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
             Vector2d.Zero,
+            CreateFiniteSlabSweepEnd(Vector2d.Zero, Vector2d.Right, new Fixed64(100_000_010)),
             Vector2d.Right,
             new Fixed64(100_000_010),
             Fixed64.Half,
@@ -1071,6 +1127,7 @@ public sealed partial class MixedQueryCcdTests
 
         bool found = FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
             Vector2d.Zero,
+            CreateFiniteSlabSweepEnd(Vector2d.Zero, Vector2d.One, Fixed64.MaxValue),
             Vector2d.One,
             Fixed64.MaxValue,
             Fixed64.Half,
@@ -1100,6 +1157,7 @@ public sealed partial class MixedQueryCcdTests
 
         bool found = FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
             Vector2d.Zero,
+            CreateFiniteSlabSweepEnd(Vector2d.Zero, direction, (Fixed64)3),
             direction,
             (Fixed64)3,
             Fixed64.Half,
@@ -1126,6 +1184,7 @@ public sealed partial class MixedQueryCcdTests
 
         bool found = FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
             new Vector2d(-offset, -offset),
+            CreateFiniteSlabSweepEnd(new Vector2d(-offset, -offset), Vector2d.Right, Fixed64.One),
             Vector2d.Right,
             Fixed64.One,
             Fixed64.Half,
@@ -1150,6 +1209,7 @@ public sealed partial class MixedQueryCcdTests
 
         bool found = FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
             Vector2d.Zero,
+            CreateFiniteSlabSweepEnd(Vector2d.Zero, new Vector2d(Fixed64.MaxValue, Fixed64.MaxValue), Fixed64.One),
             new Vector2d(Fixed64.MaxValue, Fixed64.MaxValue),
             Fixed64.One,
             Fixed64.Half,
@@ -1174,6 +1234,7 @@ public sealed partial class MixedQueryCcdTests
 
         bool exhaustedHit = FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
             new Vector2d((Fixed64)(-4), Fixed64.Zero),
+            CreateFiniteSlabSweepEnd(new Vector2d((Fixed64)(-4), Fixed64.Zero), Vector2d.Right, (Fixed64)8),
             Vector2d.Right,
             (Fixed64)8,
             Fixed64.Half,
@@ -1184,6 +1245,7 @@ public sealed partial class MixedQueryCcdTests
             maxConservativeAdvancementIterations: 0);
         bool defaultHit = FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
             new Vector2d((Fixed64)(-4), Fixed64.Zero),
+            CreateFiniteSlabSweepEnd(new Vector2d((Fixed64)(-4), Fixed64.Zero), Vector2d.Right, (Fixed64)8),
             Vector2d.Right,
             (Fixed64)8,
             Fixed64.Half,
@@ -1196,30 +1258,6 @@ public sealed partial class MixedQueryCcdTests
         exhaustedDistance.Should().Be(Fixed64.Zero);
         defaultHit.Should().BeTrue();
         defaultDistance.Should().BeGreaterThan(Fixed64.Zero);
-    }
-
-    [Fact]
-    public void FiniteSlabProjectionSweep_WithUnrepresentableEndpoint_ShouldReject()
-    {
-        using GravitasWorldContext context = CreateMixedContext();
-        ScenarioBody<LSCylinderCollider> target = CreateBody3D(
-            context,
-            new LSCylinderCollider { Size = new Vector3d(Fixed64.One, (Fixed64)3, Fixed64.One) },
-            Vector3d.Zero,
-            immovable: true);
-
-        bool found = FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
-            new Vector2d(Fixed64.MaxValue, Fixed64.Zero),
-            Vector2d.Right,
-            Fixed64.One,
-            Fixed64.Half,
-            -Fixed64.Half,
-            Fixed64.Half,
-            target.Collider,
-            out Fixed64 distance);
-
-        found.Should().BeFalse();
-        distance.Should().Be(Fixed64.Zero);
     }
 
     [Fact]
@@ -1242,6 +1280,7 @@ public sealed partial class MixedQueryCcdTests
 
         bool startSupportFound = FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
             new Vector2d((Fixed64)10, Fixed64.MaxValue),
+            CreateFiniteSlabSweepEnd(new Vector2d((Fixed64)10, Fixed64.MaxValue), Vector2d.Zero, Fixed64.Zero),
             Vector2d.Zero,
             Fixed64.Zero,
             Fixed64.Zero,
@@ -1251,6 +1290,7 @@ public sealed partial class MixedQueryCcdTests
             out Fixed64 startSupportDistance);
         bool endpointSupportFound = FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
             new Vector2d((Fixed64)10, Fixed64.MaxValue - (Fixed64)5),
+            CreateFiniteSlabSweepEnd(new Vector2d((Fixed64)10, Fixed64.MaxValue - (Fixed64)5), Vector2d.Forward, (Fixed64)5),
             Vector2d.Forward,
             (Fixed64)5,
             Fixed64.Zero,
@@ -1279,6 +1319,7 @@ public sealed partial class MixedQueryCcdTests
 
         bool found = FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
             new Vector2d((Fixed64)(-1_000_000), Fixed64.Zero),
+            CreateFiniteSlabSweepEnd(new Vector2d((Fixed64)(-1_000_000), Fixed64.Zero), direction, Fixed64.One),
             direction,
             Fixed64.One,
             Fixed64.Zero,
@@ -1305,6 +1346,7 @@ public sealed partial class MixedQueryCcdTests
 
         bool boundedFound = FiniteSlabProjectionSweep.TrySweepCircleAgainstCapsule(
             new Vector2d((Fixed64)(-4), Fixed64.Zero),
+            CreateFiniteSlabSweepEnd(new Vector2d((Fixed64)(-4), Fixed64.Zero), Vector2d.Right, (Fixed64)8),
             Vector2d.Right,
             (Fixed64)8,
             Fixed64.Half,
@@ -1315,6 +1357,7 @@ public sealed partial class MixedQueryCcdTests
             maxConservativeAdvancementIterations: 1);
         bool defaultFound = FiniteSlabProjectionSweep.TrySweepCircleAgainstCapsule(
             new Vector2d((Fixed64)(-4), Fixed64.Zero),
+            CreateFiniteSlabSweepEnd(new Vector2d((Fixed64)(-4), Fixed64.Zero), Vector2d.Right, (Fixed64)8),
             Vector2d.Right,
             (Fixed64)8,
             Fixed64.Half,
@@ -1343,6 +1386,7 @@ public sealed partial class MixedQueryCcdTests
 
         FiniteSlabProjectionSweep.TrySweepCircleAgainstCapsule(
             start,
+            CreateFiniteSlabSweepEnd(start, Vector2d.Right, (Fixed64)8),
             Vector2d.Right,
             (Fixed64)8,
             Fixed64.Half,
@@ -1354,6 +1398,7 @@ public sealed partial class MixedQueryCcdTests
 
         bool found = FiniteSlabProjectionSweep.TrySweepCircleAgainstCapsule(
             start,
+            CreateFiniteSlabSweepEnd(start, Vector2d.Right, shortenedLength),
             Vector2d.Right,
             shortenedLength,
             Fixed64.Half,
@@ -1398,6 +1443,7 @@ public sealed partial class MixedQueryCcdTests
 
         bool found = FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
             Vector2d.Zero,
+            CreateFiniteSlabSweepEnd(Vector2d.Zero, Vector2d.Right, (Fixed64)4),
             Vector2d.Right,
             (Fixed64)4,
             Fixed64.Half,
@@ -1422,6 +1468,7 @@ public sealed partial class MixedQueryCcdTests
 
         bool found = FiniteSlabProjectionSweep.TrySweepCircleAgainstCapsule(
             new Vector2d((Fixed64)(-4), Fixed64.Zero),
+            CreateFiniteSlabSweepEnd(new Vector2d((Fixed64)(-4), Fixed64.Zero), Vector2d.Right, (Fixed64)8),
             Vector2d.Right,
             (Fixed64)8,
             Fixed64.Half,
@@ -1446,6 +1493,7 @@ public sealed partial class MixedQueryCcdTests
 
         bool found = FiniteSlabProjectionSweep.TrySweepCircleAgainstCone(
             new Vector2d((Fixed64)(-4), Fixed64.Zero),
+            CreateFiniteSlabSweepEnd(new Vector2d((Fixed64)(-4), Fixed64.Zero), Vector2d.Right, (Fixed64)8),
             Vector2d.Right,
             (Fixed64)8,
             Fixed64.Half,
@@ -1489,6 +1537,7 @@ public sealed partial class MixedQueryCcdTests
 
         bool baseFound = FiniteSlabProjectionSweep.TrySweepCircleAgainstCone(
             new Vector2d((Fixed64)(-4), Fixed64.Zero),
+            CreateFiniteSlabSweepEnd(new Vector2d((Fixed64)(-4), Fixed64.Zero), Vector2d.Right, (Fixed64)8),
             Vector2d.Right,
             (Fixed64)8,
             Fixed64.Half,
@@ -1498,6 +1547,7 @@ public sealed partial class MixedQueryCcdTests
             out Fixed64 baseDistance);
         bool apexFound = FiniteSlabProjectionSweep.TrySweepCircleAgainstCone(
             new Vector2d((Fixed64)(-4), Fixed64.Zero),
+            CreateFiniteSlabSweepEnd(new Vector2d((Fixed64)(-4), Fixed64.Zero), Vector2d.Right, (Fixed64)8),
             Vector2d.Right,
             (Fixed64)8,
             Fixed64.Half,
@@ -1529,6 +1579,7 @@ public sealed partial class MixedQueryCcdTests
 
         bool capsuleFound = FiniteSlabProjectionSweep.TrySweepCircleAgainstCapsule(
             new Vector2d((Fixed64)(-4), Fixed64.Zero),
+            CreateFiniteSlabSweepEnd(new Vector2d((Fixed64)(-4), Fixed64.Zero), Vector2d.Right, (Fixed64)8),
             Vector2d.Right,
             (Fixed64)8,
             Fixed64.Half,
@@ -1538,6 +1589,7 @@ public sealed partial class MixedQueryCcdTests
             out Fixed64 capsuleDistance);
         bool coneFound = FiniteSlabProjectionSweep.TrySweepCircleAgainstCone(
             new Vector2d((Fixed64)(-4), Fixed64.Zero),
+            CreateFiniteSlabSweepEnd(new Vector2d((Fixed64)(-4), Fixed64.Zero), Vector2d.Right, (Fixed64)8),
             Vector2d.Right,
             (Fixed64)8,
             Fixed64.Half,
@@ -1565,6 +1617,7 @@ public sealed partial class MixedQueryCcdTests
 
         bool firstFound = FiniteSlabProjectionSweep.TrySweepCircleAgainstCone(
             new Vector2d((Fixed64)(-4), Fixed64.Zero),
+            CreateFiniteSlabSweepEnd(new Vector2d((Fixed64)(-4), Fixed64.Zero), Vector2d.Right, (Fixed64)8),
             Vector2d.Right,
             (Fixed64)8,
             Fixed64.Half,
@@ -1574,6 +1627,7 @@ public sealed partial class MixedQueryCcdTests
             out Fixed64 firstDistance);
         bool secondFound = FiniteSlabProjectionSweep.TrySweepCircleAgainstCone(
             new Vector2d((Fixed64)(-4), Fixed64.Zero),
+            CreateFiniteSlabSweepEnd(new Vector2d((Fixed64)(-4), Fixed64.Zero), Vector2d.Right, (Fixed64)8),
             Vector2d.Right,
             (Fixed64)8,
             Fixed64.Half,
@@ -1605,6 +1659,7 @@ public sealed partial class MixedQueryCcdTests
 
         bool found = FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
             Vector2d.Zero,
+            CreateFiniteSlabSweepEnd(Vector2d.Zero, Vector2d.Right, (Fixed64)4),
             Vector2d.Right,
             (Fixed64)4,
             Fixed64.Half,
@@ -1632,6 +1687,7 @@ public sealed partial class MixedQueryCcdTests
 
         bool found = FiniteSlabProjectionSweep.TrySweepCircleAgainstCapsule(
             new Vector2d((Fixed64)(-4), Fixed64.Zero),
+            CreateFiniteSlabSweepEnd(new Vector2d((Fixed64)(-4), Fixed64.Zero), Vector2d.Right, (Fixed64)8),
             Vector2d.Right,
             (Fixed64)8,
             Fixed64.Half,
@@ -1658,6 +1714,7 @@ public sealed partial class MixedQueryCcdTests
 
         bool found = FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
             new Vector2d((Fixed64)(-4), Fixed64.Zero),
+            CreateFiniteSlabSweepEnd(new Vector2d((Fixed64)(-4), Fixed64.Zero), Vector2d.Right, (Fixed64)8),
             Vector2d.Right,
             (Fixed64)8,
             Fixed64.Half,
@@ -1683,6 +1740,7 @@ public sealed partial class MixedQueryCcdTests
 
         bool found = FiniteSlabProjectionSweep.TrySweepCircleAgainstCone(
             new Vector2d((Fixed64)(-4), Fixed64.Zero),
+            CreateFiniteSlabSweepEnd(new Vector2d((Fixed64)(-4), Fixed64.Zero), Vector2d.Right, (Fixed64)8),
             Vector2d.Right,
             (Fixed64)8,
             Fixed64.Half,
@@ -1720,6 +1778,7 @@ public sealed partial class MixedQueryCcdTests
 
         bool capsuleHit = FiniteSlabProjectionSweep.TrySweepCircleAgainstCapsule(
             new Vector2d((Fixed64)(-7), Fixed64.Zero),
+            CreateFiniteSlabSweepEnd(new Vector2d((Fixed64)(-7), Fixed64.Zero), Vector2d.Right, (Fixed64)8),
             Vector2d.Right,
             (Fixed64)8,
             Fixed64.Half,
@@ -1729,6 +1788,7 @@ public sealed partial class MixedQueryCcdTests
             out Fixed64 capsuleDistance);
         bool cylinderHitFromLeft = FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
             new Vector2d((Fixed64)(-4), Fixed64.Zero),
+            CreateFiniteSlabSweepEnd(new Vector2d((Fixed64)(-4), Fixed64.Zero), Vector2d.Right, (Fixed64)8),
             Vector2d.Right,
             (Fixed64)8,
             Fixed64.Half,
@@ -1738,6 +1798,7 @@ public sealed partial class MixedQueryCcdTests
             out Fixed64 cylinderLeftDistance);
         bool cylinderHitFromRight = FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
             new Vector2d((Fixed64)4, Fixed64.Zero),
+            CreateFiniteSlabSweepEnd(new Vector2d((Fixed64)4, Fixed64.Zero), -Vector2d.Right, (Fixed64)8),
             -Vector2d.Right,
             (Fixed64)8,
             Fixed64.Half,
@@ -1747,6 +1808,7 @@ public sealed partial class MixedQueryCcdTests
             out Fixed64 cylinderRightDistance);
         bool coneHit = FiniteSlabProjectionSweep.TrySweepCircleAgainstCone(
             new Vector2d((Fixed64)(-4), Fixed64.Zero),
+            CreateFiniteSlabSweepEnd(new Vector2d((Fixed64)(-4), Fixed64.Zero), Vector2d.Right, (Fixed64)8),
             Vector2d.Right,
             (Fixed64)8,
             Fixed64.Half,
@@ -1756,6 +1818,7 @@ public sealed partial class MixedQueryCcdTests
             out Fixed64 coneDistance);
         bool coneMiss = FiniteSlabProjectionSweep.TrySweepCircleAgainstCone(
             new Vector2d((Fixed64)(-4), (Fixed64)4),
+            CreateFiniteSlabSweepEnd(new Vector2d((Fixed64)(-4), (Fixed64)4), Vector2d.Right, (Fixed64)8),
             Vector2d.Right,
             (Fixed64)8,
             Fixed64.Half,
@@ -1805,6 +1868,7 @@ public sealed partial class MixedQueryCcdTests
 
         bool cylinderInsideZeroDirection = FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
             Vector2d.Zero,
+            CreateFiniteSlabSweepEnd(Vector2d.Zero, Vector2d.Zero, (Fixed64)4),
             Vector2d.Zero,
             (Fixed64)4,
             Fixed64.Half,
@@ -1814,6 +1878,7 @@ public sealed partial class MixedQueryCcdTests
             out Fixed64 cylinderInsideDistance);
         bool cylinderOutsideZeroDirection = FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
             new Vector2d((Fixed64)4, Fixed64.Zero),
+            CreateFiniteSlabSweepEnd(new Vector2d((Fixed64)4, Fixed64.Zero), Vector2d.Zero, (Fixed64)4),
             Vector2d.Zero,
             (Fixed64)4,
             Fixed64.Half,
@@ -1823,6 +1888,7 @@ public sealed partial class MixedQueryCcdTests
             out Fixed64 cylinderOutsideDistance);
         bool cylinderOutsideSlab = FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
             new Vector2d((Fixed64)(-4), Fixed64.Zero),
+            CreateFiniteSlabSweepEnd(new Vector2d((Fixed64)(-4), Fixed64.Zero), Vector2d.Right, (Fixed64)8),
             Vector2d.Right,
             (Fixed64)8,
             Fixed64.Half,
@@ -1832,6 +1898,7 @@ public sealed partial class MixedQueryCcdTests
             out Fixed64 cylinderOutsideSlabDistance);
         bool cylinderTopBand = FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
             new Vector2d((Fixed64)(-4), Fixed64.Zero),
+            CreateFiniteSlabSweepEnd(new Vector2d((Fixed64)(-4), Fixed64.Zero), Vector2d.Right, (Fixed64)8),
             Vector2d.Right,
             (Fixed64)8,
             Fixed64.Half,
@@ -1841,6 +1908,7 @@ public sealed partial class MixedQueryCcdTests
             out Fixed64 cylinderTopBandDistance);
         bool tiltedCylinderForward = FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
             new Vector2d((Fixed64)(-4), Fixed64.Zero),
+            CreateFiniteSlabSweepEnd(new Vector2d((Fixed64)(-4), Fixed64.Zero), Vector2d.Right, (Fixed64)8),
             Vector2d.Right,
             (Fixed64)8,
             Fixed64.Half,
@@ -1850,6 +1918,7 @@ public sealed partial class MixedQueryCcdTests
             out Fixed64 tiltedCylinderForwardDistance);
         bool tiltedCylinderReverse = FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
             new Vector2d((Fixed64)4, Fixed64.Zero),
+            CreateFiniteSlabSweepEnd(new Vector2d((Fixed64)4, Fixed64.Zero), -Vector2d.Right, (Fixed64)8),
             -Vector2d.Right,
             (Fixed64)8,
             Fixed64.Half,
@@ -1859,6 +1928,7 @@ public sealed partial class MixedQueryCcdTests
             out Fixed64 tiltedCylinderReverseDistance);
         bool horizontalCapsuleHit = FiniteSlabProjectionSweep.TrySweepCircleAgainstCapsule(
             new Vector2d((Fixed64)(-4), Fixed64.Zero),
+            CreateFiniteSlabSweepEnd(new Vector2d((Fixed64)(-4), Fixed64.Zero), Vector2d.Right, (Fixed64)8),
             Vector2d.Right,
             (Fixed64)8,
             Fixed64.Half,
@@ -1868,6 +1938,7 @@ public sealed partial class MixedQueryCcdTests
             out Fixed64 horizontalCapsuleDistance);
         bool coneInsideZeroDirection = FiniteSlabProjectionSweep.TrySweepCircleAgainstCone(
             Vector2d.Zero,
+            CreateFiniteSlabSweepEnd(Vector2d.Zero, Vector2d.Zero, (Fixed64)4),
             Vector2d.Zero,
             (Fixed64)4,
             Fixed64.Half,
@@ -1877,6 +1948,7 @@ public sealed partial class MixedQueryCcdTests
             out Fixed64 coneInsideDistance);
         bool coneOutsideZeroDirection = FiniteSlabProjectionSweep.TrySweepCircleAgainstCone(
             new Vector2d((Fixed64)4, Fixed64.Zero),
+            CreateFiniteSlabSweepEnd(new Vector2d((Fixed64)4, Fixed64.Zero), Vector2d.Zero, (Fixed64)4),
             Vector2d.Zero,
             (Fixed64)4,
             Fixed64.Half,
@@ -1936,6 +2008,7 @@ public sealed partial class MixedQueryCcdTests
 
         bool horizontalHit = FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
             new Vector2d(Fixed64.Zero, (Fixed64)(-4)),
+            CreateFiniteSlabSweepEnd(new Vector2d(Fixed64.Zero, (Fixed64)(-4)), Vector2d.Forward, (Fixed64)8),
             Vector2d.Forward,
             (Fixed64)8,
             Fixed64.Half,
@@ -1945,6 +2018,7 @@ public sealed partial class MixedQueryCcdTests
             out Fixed64 horizontalDistance);
         bool tiltedLeftHit = FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
             new Vector2d((Fixed64)(-4), Fixed64.Zero),
+            CreateFiniteSlabSweepEnd(new Vector2d((Fixed64)(-4), Fixed64.Zero), Vector2d.Right, (Fixed64)8),
             Vector2d.Right,
             (Fixed64)8,
             Fixed64.Half,
@@ -1954,6 +2028,7 @@ public sealed partial class MixedQueryCcdTests
             out Fixed64 tiltedLeftDistance);
         bool tiltedRightHit = FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
             new Vector2d((Fixed64)4, Fixed64.Zero),
+            CreateFiniteSlabSweepEnd(new Vector2d((Fixed64)4, Fixed64.Zero), -Vector2d.Right, (Fixed64)8),
             -Vector2d.Right,
             (Fixed64)8,
             Fixed64.Half,
@@ -1963,6 +2038,7 @@ public sealed partial class MixedQueryCcdTests
             out Fixed64 tiltedRightDistance);
         bool capsuleBoundaryHit = FiniteSlabProjectionSweep.TrySweepCircleAgainstCapsule(
             new Vector2d((Fixed64)(-4), Fixed64.Zero),
+            CreateFiniteSlabSweepEnd(new Vector2d((Fixed64)(-4), Fixed64.Zero), Vector2d.Right, (Fixed64)8),
             Vector2d.Right,
             (Fixed64)8,
             Fixed64.Half,
@@ -1972,6 +2048,7 @@ public sealed partial class MixedQueryCcdTests
             out Fixed64 capsuleBoundaryDistance);
         bool coneTiltedHit = FiniteSlabProjectionSweep.TrySweepCircleAgainstCone(
             new Vector2d((Fixed64)(-4), Fixed64.Zero),
+            CreateFiniteSlabSweepEnd(new Vector2d((Fixed64)(-4), Fixed64.Zero), Vector2d.Right, (Fixed64)8),
             Vector2d.Right,
             (Fixed64)8,
             Fixed64.Half,
@@ -2362,7 +2439,6 @@ public sealed partial class MixedQueryCcdTests
         bool found = GravitasQueryMixedService.TrySweepCircleAgainstSphere(
             -Vector2d.One,
             Vector2d.One,
-            Vector2d.One.Normalized,
             Vector2d.One.Magnitude * 2,
             Fixed64.Half,
             Fixed64.MinValue,
@@ -5614,6 +5690,12 @@ public sealed partial class MixedQueryCcdTests
             MeshColliderMode.Convex,
             MeshInertiaPolicy.SurfaceApproximation);
     }
+
+    private static Vector2d CreateFiniteSlabSweepEnd(
+        Vector2d start,
+        Vector2d direction,
+        Fixed64 length) =>
+        start + direction * length;
 
     private static LSCompoundCollider CreateEqualDistanceMeshPartCompound()
     {

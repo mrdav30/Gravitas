@@ -47,38 +47,6 @@ internal static class RadialSweepAdmission
         return true;
     }
 
-    internal static bool TryIntersect(
-        Vector3d rayStart,
-        Vector3d rayDirection,
-        Fixed64 maxParameter,
-        Vector3d targetCenter,
-        Fixed64 targetRadius,
-        Fixed64 radiusExpansion,
-        Vector3d sourceEndpoint,
-        Vector3d targetEndpoint,
-        out Fixed64 parameter)
-    {
-        Fixed64? exact = new FixedRay(rayStart, rayDirection).Intersects(
-            new FixedBoundSphere(targetCenter, targetRadius),
-            radiusExpansion,
-            maxParameter);
-        if (exact.HasValue)
-        {
-            parameter = exact.Value;
-            return true;
-        }
-
-        if (maxParameter < Fixed64.Zero
-            || !IsRepresentableEndpointContact(sourceEndpoint, targetEndpoint, targetRadius, radiusExpansion))
-        {
-            parameter = default;
-            return false;
-        }
-
-        parameter = maxParameter;
-        return true;
-    }
-
     private static bool IsRepresentableEndpointContact(
         Vector2d sourceEndpoint,
         Vector2d targetEndpoint,
@@ -93,17 +61,4 @@ internal static class RadialSweepAdmission
             || endpointDistance <= combinedRadius;
     }
 
-    private static bool IsRepresentableEndpointContact(
-        Vector3d sourceEndpoint,
-        Vector3d targetEndpoint,
-        Fixed64 targetRadius,
-        Fixed64 radiusExpansion)
-    {
-        if (!Vector3d.TryGetDistance(sourceEndpoint, targetEndpoint, out Fixed64 endpointDistance))
-            return false;
-
-        targetRadius = targetRadius.Abs();
-        return !Fixed64.TryAdd(targetRadius, radiusExpansion, out Fixed64 combinedRadius)
-            || endpointDistance <= combinedRadius;
-    }
 }

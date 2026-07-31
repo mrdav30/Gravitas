@@ -706,6 +706,61 @@ public sealed class Physics2DQueryTests
     }
 
     [Fact]
+    public void RaycastCircle_WithTwoRawTransverseMotion_ShouldPreserveInteriorTangency()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        Fixed64 raw = Fixed64.FromRaw(1);
+        var target = new LSCircleCollider2D(raw);
+        target.InitializeWithNoBody(new TestMatterAgent(
+            context,
+            new FixedTransform(
+                new Vector3d(Fixed64.Zero, Fixed64.Zero, raw * 2),
+                FixedQuaternion.Identity,
+                Vector3d.One)));
+        Vector2d start = new((Fixed64)(-100_000), Fixed64.Zero);
+        Vector2d end = new((Fixed64)100_000, raw * 2);
+
+        bool found = QueryDetection2D.TryRaycast(
+            start,
+            end,
+            target,
+            out Physics2DHit hit);
+
+        found.Should().BeTrue();
+        hit.Distance.Should().Be((Fixed64)100_000);
+        hit.Point.Should().Be(new Vector2d(Fixed64.Zero, raw));
+        hit.Normal.Should().Be(new Vector2d(Fixed64.Zero, -Fixed64.One));
+    }
+
+    [Fact]
+    public void SweepCircleCircle_WithTwoRawTransverseMotion_ShouldPreserveInteriorTangency()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        Fixed64 raw = Fixed64.FromRaw(1);
+        var target = new LSCircleCollider2D(raw);
+        target.InitializeWithNoBody(new TestMatterAgent(
+            context,
+            new FixedTransform(
+                new Vector3d(Fixed64.Zero, Fixed64.Zero, raw * 3),
+                FixedQuaternion.Identity,
+                Vector3d.One)));
+        Vector2d start = new((Fixed64)(-100_000), Fixed64.Zero);
+        Vector2d end = new((Fixed64)100_000, raw * 2);
+
+        bool found = QueryDetection2D.TrySweepCircle(
+            start,
+            end,
+            raw,
+            target,
+            out Physics2DHit hit);
+
+        found.Should().BeTrue();
+        hit.Distance.Should().Be((Fixed64)100_000);
+        hit.Point.Should().Be(new Vector2d(Fixed64.Zero, raw * 2));
+        hit.Normal.Should().Be(new Vector2d(Fixed64.Zero, -Fixed64.One));
+    }
+
+    [Fact]
     public void RaycastCircle_WithContactExactlyAtSegmentEnd_ShouldPreserveAuthoredEndpoint()
     {
         using GravitasWorldContext context = Create2DContext();

@@ -6,8 +6,8 @@
 //=======================================================================
 
 using FixedMathSharp;
+using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
-using Gravitas.CollisionHandling;
 
 namespace Gravitas.Queries;
 
@@ -19,7 +19,6 @@ public sealed partial class GravitasQueryMixedService
     internal static bool TrySweepCircleAgainstSphere(
         Vector2d start,
         Vector2d end,
-        Vector2d direction,
         Fixed64 length,
         Fixed64 radius,
         Fixed64 slabCenterY,
@@ -45,7 +44,6 @@ public sealed partial class GravitasQueryMixedService
         if (!TrySweepPointInPlane(
             start,
             end,
-            direction,
             length,
             sphereCenter,
             planarSphereRadius,
@@ -56,10 +54,8 @@ public sealed partial class GravitasQueryMixedService
             return false;
         }
 
-        Vector2d center2D =
-            distance == length
-                ? end
-                : start + direction * distance;
+        Vector2d center2D = new FixedSegment2d(start, end)
+            .GetPointAtDistance(distance, length);
         Vector3d sweepCenter = new(
             center2D.X,
             slabCenterY,
@@ -80,20 +76,18 @@ public sealed partial class GravitasQueryMixedService
     private static bool TrySweepPointInPlane(
         Vector2d start,
         Vector2d end,
-        Vector2d direction,
         Fixed64 length,
         Vector2d point,
         Fixed64 radius,
         Fixed64 radiusExpansion,
         out Fixed64 distance) =>
-        RadialSweepAdmission.TryIntersect(
-            start,
-            direction,
-            length,
-            point,
-            radius,
-            radiusExpansion,
-            end,
-            point,
-            out distance);
+        new FixedSegment2d(start, end)
+            .TryGetCircleIntersectionDistanceInterval(
+                new FixedBoundCircle(point, radius),
+                radiusExpansion,
+                length,
+                out distance,
+                out _,
+                out _,
+                out _);
 }

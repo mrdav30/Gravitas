@@ -219,7 +219,7 @@ public sealed class RaycastSegmentWorkerTests
 
         hit.Should().BeTrue();
         hits.Count.Should().Be(1);
-        hits[0].Should().Be(new Vector3d(Fixed64.FromRaw(-4_294_967_297L), Fixed64.Zero, Fixed64.Zero));
+        hits[0].Should().Be(-Vector3d.Right);
     }
 
     [Fact]
@@ -237,11 +237,8 @@ public sealed class RaycastSegmentWorkerTests
 
         hit.Should().BeTrue();
         hits.Count.Should().Be(2);
-        // The exact roots are +/-80,000. The worker publishes points from the
-        // independently nearest-even segment parameters, so a 400,000-unit
-        // segment deterministically amplifies that sub-raw parameter rounding.
-        hits[0].Should().Be(new Vector3d(Fixed64.FromRaw(-343_597_383_600_000L), Fixed64.Zero, Fixed64.Zero));
-        hits[1].Should().Be(new Vector3d(Fixed64.FromRaw(343_597_383_600_000L), Fixed64.Zero, Fixed64.Zero));
+        hits[0].Should().Be(new Vector3d((Fixed64)(-80_000), Fixed64.Zero, Fixed64.Zero));
+        hits[1].Should().Be(new Vector3d((Fixed64)80_000, Fixed64.Zero, Fixed64.Zero));
     }
 
     [Fact]
