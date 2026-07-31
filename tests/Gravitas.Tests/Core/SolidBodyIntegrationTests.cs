@@ -221,7 +221,7 @@ public sealed class SolidBodyIntegrationTests
     }
 
     [Fact]
-    public void TransformPoint_WithPrimitiveDimensions_ShouldUseOnlyHostTransformScale()
+    public void PointConversion_WithPrimitiveDimensions_ShouldUseCommittedOwnerScale()
     {
         using PhysicsScenarioBuilder scenario = CreateIntegrationScenario(frameRate: 4);
         var collider = new LSCuboidCollider
@@ -240,10 +240,10 @@ public sealed class SolidBodyIntegrationTests
         Vector3d localPoint = new(Fixed64.Half, Fixed64.One, -Fixed64.Half);
         Vector3d expectedWorldPoint = position + rotation * Vector3d.Multiply(hostScale, localPoint);
 
-        body.Body.TryTransformPoint(localPoint, out Vector3d attemptedWorldPoint).Should().BeTrue();
-        Vector3d worldPoint = body.Body.TransformPoint(localPoint);
-        body.Body.TryInverseTransformPoint(worldPoint, out Vector3d attemptedLocalPoint).Should().BeTrue();
-        Vector3d roundTripped = body.Body.InverseTransformPoint(worldPoint);
+        body.Body.TryGetWorldPoint(localPoint, out Vector3d attemptedWorldPoint).Should().BeTrue();
+        Vector3d worldPoint = body.Body.GetWorldPoint(localPoint);
+        body.Body.TryGetLocalPoint(worldPoint, out Vector3d attemptedLocalPoint).Should().BeTrue();
+        Vector3d roundTripped = body.Body.GetLocalPoint(worldPoint);
 
         attemptedWorldPoint.Should().Be(expectedWorldPoint);
         worldPoint.Should().Be(expectedWorldPoint);
@@ -258,33 +258,35 @@ public sealed class SolidBodyIntegrationTests
         Vector3d position = new((Fixed64)(-2_000_000_000), Fixed64.Zero, Fixed64.Zero);
         ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(position);
         body.Body.Agent.Transform.LocalScale = new Vector3d((Fixed64)3, Fixed64.One, Fixed64.One);
+        body.Collider.Simulate();
         Vector3d localPoint = new((Fixed64)1_000_000_000, Fixed64.Zero, Fixed64.Zero);
         Vector3d expectedWorldPoint = new((Fixed64)1_000_000_000, Fixed64.Zero, Fixed64.Zero);
 
-        body.Body.TryTransformPoint(localPoint, out Vector3d worldPoint).Should().BeTrue();
-        body.Body.TryInverseTransformPoint(expectedWorldPoint, out Vector3d roundTripped).Should().BeTrue();
+        body.Body.TryGetWorldPoint(localPoint, out Vector3d worldPoint).Should().BeTrue();
+        body.Body.TryGetLocalPoint(expectedWorldPoint, out Vector3d roundTripped).Should().BeTrue();
 
         worldPoint.Should().Be(expectedWorldPoint);
         roundTripped.Should().Be(localPoint);
-        body.Body.TransformPoint(localPoint).Should().Be(expectedWorldPoint);
-        body.Body.InverseTransformPoint(expectedWorldPoint).Should().Be(localPoint);
+        body.Body.GetWorldPoint(localPoint).Should().Be(expectedWorldPoint);
+        body.Body.GetLocalPoint(expectedWorldPoint).Should().Be(localPoint);
     }
 
     [Fact]
-    public void PointTransforms_WithMirroredAnisotropicScale_ShouldRoundTrip()
+    public void PointConversion_WithAnisotropicScale_ShouldRoundTrip()
     {
         using PhysicsScenarioBuilder scenario = CreateIntegrationScenario(frameRate: 4);
         FixedQuaternion rotation = PhysicsScenarioBuilder.Yaw(90);
         ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(
             new Vector3d((Fixed64)7, (Fixed64)(-3), (Fixed64)11),
             rotation);
-        body.Body.Agent.Transform.LocalScale = new Vector3d((Fixed64)(-3), Fixed64.Half, (Fixed64)4);
+        body.Body.Agent.Transform.LocalScale = new Vector3d((Fixed64)3, Fixed64.Half, (Fixed64)4);
+        body.Collider.Simulate();
         Vector3d localPoint = new(Fixed64.Half, (Fixed64)(-2), (Fixed64)3);
 
-        body.Body.TryTransformPoint(localPoint, out Vector3d worldPoint).Should().BeTrue();
-        body.Body.TryInverseTransformPoint(worldPoint, out Vector3d roundTripped).Should().BeTrue();
+        body.Body.TryGetWorldPoint(localPoint, out Vector3d worldPoint).Should().BeTrue();
+        body.Body.TryGetLocalPoint(worldPoint, out Vector3d roundTripped).Should().BeTrue();
 
-        worldPoint.Should().Be(body.Body.TransformPoint(localPoint));
+        worldPoint.Should().Be(body.Body.GetWorldPoint(localPoint));
         AssertNear(roundTripped, localPoint);
     }
 
@@ -296,24 +298,25 @@ public sealed class SolidBodyIntegrationTests
             new Vector3d((Fixed64)2_000_000_000, Fixed64.Zero, Fixed64.Zero));
         Vector3d localPoint = new((Fixed64)1_000_000_000, Fixed64.Zero, Fixed64.Zero);
 
-        body.Body.TryTransformPoint(localPoint, out Vector3d worldPoint).Should().BeFalse();
-        body.Body.TryInverseTransformPoint(
+        body.Body.TryGetWorldPoint(localPoint, out Vector3d worldPoint).Should().BeFalse();
+        body.Body.TryGetLocalPoint(
             new Vector3d(Fixed64.MinValue, Fixed64.Zero, Fixed64.Zero),
             out Vector3d inversePoint).Should().BeFalse();
 
         worldPoint.Should().Be(Vector3d.Zero);
         inversePoint.Should().Be(Vector3d.Zero);
-        ((Action)(() => body.Body.TransformPoint(localPoint))).Should().Throw<InvalidOperationException>();
-        ((Action)(() => body.Body.InverseTransformPoint(
+        ((Action)(() => body.Body.GetWorldPoint(localPoint))).Should().Throw<InvalidOperationException>();
+        ((Action)(() => body.Body.GetLocalPoint(
             new Vector3d(Fixed64.MinValue, Fixed64.Zero, Fixed64.Zero))))
             .Should().Throw<InvalidOperationException>();
     }
 
     [Fact]
-    public void PointTransforms_WhenHierarchyScaleCannotBeRepresented_ShouldFailAtomically()
+    public void PointConversion_WhenHostSnapshotChanges_ShouldRetainCommittedSimulationScale()
     {
         using PhysicsScenarioBuilder scenario = CreateIntegrationScenario(frameRate: 4);
         ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
+        Vector3d localPoint = new(Fixed64.One, Fixed64.Two, (Fixed64)3);
         var parent = new FixedTransform(
             Vector3d.Zero,
             FixedQuaternion.Identity,
@@ -321,15 +324,16 @@ public sealed class SolidBodyIntegrationTests
         body.Body.Agent.Transform.LocalScale = new Vector3d(Fixed64.Two, Fixed64.One, Fixed64.One);
         body.Body.Agent.Transform.SetParentKeepingLocal(parent);
 
-        body.Body.TryTransformPoint(Vector3d.One, out Vector3d worldPoint).Should().BeFalse();
-        body.Body.TryInverseTransformPoint(Vector3d.One, out Vector3d localPoint).Should().BeFalse();
+        body.Body.TryGetWorldPoint(localPoint, out Vector3d worldPoint).Should().BeTrue();
+        body.Body.TryGetLocalPoint(worldPoint, out Vector3d roundTrip).Should().BeTrue();
+        body.Body.Agent.Transform.TryTransformPoint(localPoint, out _).Should().BeFalse();
 
-        worldPoint.Should().Be(Vector3d.Zero);
-        localPoint.Should().Be(Vector3d.Zero);
+        worldPoint.Should().Be(localPoint);
+        roundTrip.Should().Be(localPoint);
     }
 
     [Fact]
-    public void TransformPoint_WithCompoundBounds_ShouldUseOnlyHostTransformScale()
+    public void PointConversion_WithCompoundBounds_ShouldUseCommittedOwnerScale()
     {
         using PhysicsScenarioBuilder scenario = CreateIntegrationScenario(frameRate: 4);
         var collider = new LSCompoundCollider(
@@ -348,26 +352,29 @@ public sealed class SolidBodyIntegrationTests
         Vector3d localPoint = new((Fixed64)2, -Fixed64.Half, Fixed64.One);
         Vector3d expectedWorldPoint = position + rotation * Vector3d.Multiply(hostScale, localPoint);
 
-        Vector3d worldPoint = body.Body.TransformPoint(localPoint);
+        Vector3d worldPoint = body.Body.GetWorldPoint(localPoint);
 
         worldPoint.Should().Be(expectedWorldPoint);
-        AssertNear(body.Body.InverseTransformPoint(worldPoint), localPoint);
+        AssertNear(body.Body.GetLocalPoint(worldPoint), localPoint);
     }
 
     [Fact]
-    public void InverseTransformPoint_WithZeroHostScale_ShouldRejectSingularTransform()
+    public void PointConversion_BeforeShapeCommit_ShouldFailAtomically()
     {
         using PhysicsScenarioBuilder scenario = CreateIntegrationScenario(frameRate: 4);
-        ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
-        body.Body.Agent.Transform.LocalScale = new Vector3d(Fixed64.One, Fixed64.Zero, Fixed64.One);
+        var body = new SolidBody(
+            new TestMatterAgent(scenario.Context),
+            new LSSphereCollider());
 
-        body.Body.TryTransformPoint(Vector3d.One, out Vector3d worldPoint).Should().BeTrue();
-        body.Body.TryInverseTransformPoint(Vector3d.One, out Vector3d localPoint).Should().BeFalse();
-        Action inverseTransform = () => body.Body.InverseTransformPoint(Vector3d.One);
+        body.TryGetWorldPoint(Vector3d.One, out Vector3d worldPoint).Should().BeFalse();
+        body.TryGetLocalPoint(Vector3d.One, out Vector3d localPoint).Should().BeFalse();
+        Action getWorldPoint = () => body.GetWorldPoint(Vector3d.One);
+        Action getLocalPoint = () => body.GetLocalPoint(Vector3d.One);
 
-        worldPoint.Should().Be(new Vector3d(Fixed64.One, Fixed64.Zero, Fixed64.One));
+        worldPoint.Should().Be(Vector3d.Zero);
         localPoint.Should().Be(Vector3d.Zero);
-        inverseTransform.Should().Throw<InvalidOperationException>();
+        getWorldPoint.Should().Throw<InvalidOperationException>();
+        getLocalPoint.Should().Throw<InvalidOperationException>();
     }
 
     [Fact]
@@ -377,14 +384,15 @@ public sealed class SolidBodyIntegrationTests
         ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(
             new Vector3d((Fixed64)5, (Fixed64)(-2), (Fixed64)9),
             PhysicsScenarioBuilder.Yaw(30));
-        body.Body.Agent.Transform.LocalScale = new Vector3d((Fixed64)3, Fixed64.Half, (Fixed64)(-2));
+        body.Body.Agent.Transform.LocalScale = new Vector3d((Fixed64)3, Fixed64.Half, Fixed64.Two);
+        body.Collider.Simulate();
         Vector3d localPoint = new(Fixed64.Half, -Fixed64.One, Fixed64.Two);
-        Vector3d worldPoint = body.Body.TransformPoint(localPoint);
+        Vector3d worldPoint = body.Body.GetWorldPoint(localPoint);
 
         void TransformRoundTrip()
         {
-            body.Body.TryTransformPoint(localPoint, out _);
-            body.Body.TryInverseTransformPoint(worldPoint, out _);
+            body.Body.TryGetWorldPoint(localPoint, out _);
+            body.Body.TryGetLocalPoint(worldPoint, out _);
         }
 
         AllocationTestHelper.MeasureSteadyState(TransformRoundTrip).Should().Be(0);

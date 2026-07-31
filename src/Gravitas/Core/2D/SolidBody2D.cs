@@ -514,6 +514,70 @@ public sealed partial class SolidBody2D : IRecordable
     }
 
     /// <summary>
+    /// Gets a world-space point from the authoritative 2D body pose and committed collider scale.
+    /// </summary>
+    public Vector2d GetWorldPoint(Vector2d point)
+    {
+        bool transformed = TryGetWorldPoint(point, out Vector2d result);
+        SwiftThrowHelper.ThrowIfTrue(
+            !transformed,
+            nameof(Collider),
+            "Cannot get the world point because the 2D collider has no committed scale or the final coordinate is not representable.");
+        return result;
+    }
+
+    /// <summary>
+    /// Attempts to get a world-space point from the authoritative 2D body pose and committed collider scale.
+    /// </summary>
+    public bool TryGetWorldPoint(Vector2d point, out Vector2d result)
+    {
+        if (!Collider.TryGetCommittedOwnerScale(out Vector2d scale))
+        {
+            result = Vector2d.Zero;
+            return false;
+        }
+
+        return Vector2d.TryTransformScaledPoint(
+            Position,
+            point,
+            scale,
+            Rotation,
+            out result);
+    }
+
+    /// <summary>
+    /// Gets a body-local point from the authoritative 2D body pose and committed collider scale.
+    /// </summary>
+    public Vector2d GetLocalPoint(Vector2d point)
+    {
+        bool transformed = TryGetLocalPoint(point, out Vector2d result);
+        SwiftThrowHelper.ThrowIfTrue(
+            !transformed,
+            nameof(Collider),
+            "Cannot get the local point because the 2D collider has no committed scale, its scale is singular, or the final coordinate is not representable.");
+        return result;
+    }
+
+    /// <summary>
+    /// Attempts to get a body-local point from the authoritative 2D body pose and committed collider scale.
+    /// </summary>
+    public bool TryGetLocalPoint(Vector2d point, out Vector2d result)
+    {
+        if (!Collider.TryGetCommittedOwnerScale(out Vector2d scale))
+        {
+            result = Vector2d.Zero;
+            return false;
+        }
+
+        return Vector2d.TryInverseTransformScaledPoint(
+            Position,
+            point,
+            scale,
+            Rotation,
+            out result);
+    }
+
+    /// <summary>
     /// Resets authoritative 2D pose and clears accumulated linear/angular motion for deterministic fixture reuse.
     /// </summary>
     /// <param name="position">The new X/Z-plane position.</param>

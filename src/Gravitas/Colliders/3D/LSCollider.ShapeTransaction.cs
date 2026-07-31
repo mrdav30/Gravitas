@@ -41,6 +41,18 @@ public abstract partial class LSCollider
 
     internal FixedQuaternion CanonicalRotation => _committedRotation;
 
+    internal bool TryGetCommittedOwnerScale(out Vector3d scale)
+    {
+        if (_hasCommittedShape)
+        {
+            scale = _committedOwnerScale;
+            return true;
+        }
+
+        scale = default;
+        return false;
+    }
+
     private Vector3d GetCurrentOwnerScale()
     {
         if (_hasCommittedShape)

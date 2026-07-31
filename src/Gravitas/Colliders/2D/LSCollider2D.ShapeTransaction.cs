@@ -40,6 +40,18 @@ public abstract partial class LSCollider2D
 
     internal Vector2d CanonicalCenter => _committedCenter;
 
+    internal bool TryGetCommittedOwnerScale(out Vector2d scale)
+    {
+        if (_hasCommittedShape)
+        {
+            scale = _committedOwnerScale;
+            return true;
+        }
+
+        scale = default;
+        return false;
+    }
+
     private Vector2d GetCurrentOwnerScale()
     {
         if (_hasCommittedShape)

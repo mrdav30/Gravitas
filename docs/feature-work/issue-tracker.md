@@ -161,9 +161,8 @@ query parity.
 **Discovered:** 2026-07-22  
 **Resolved:** 2026-07-30  
 **Source:** canonical scale-admission final public-API audit  
-**Affected area:** 3D `SolidBody.TransformPoint(...)`,
-`SolidBody.InverseTransformPoint(...)`, host hierarchy scale, and adapter-facing
-point conversion
+**Affected area:** `FixedTransform` current-snapshot conversion, authoritative
+3D/2D body point conversion, committed collider scale, and host adapters
 
 The prior helpers chained Q32.32 scale, rotation, translation, subtraction, and
 division, allowing a saturated intermediate to hide a representable final
@@ -174,24 +173,28 @@ operation in wide arithmetic until one final round-half-to-even materialization
 per coordinate. The generic mechanics moved out of the oriented-box owner
 without leaving a forwarding-only façade.
 
-`SolidBody` now exposes `TryTransformPoint(...)` and
-`TryInverseTransformPoint(...)`. Failure is atomic with a zero result for
-unavailable hierarchy scale, singular inverse scale, or true final overflow.
-The existing convenience methods delegate to those operations and throw
-`InvalidOperationException`; neither path uses collider dimensions. Root
-transforms reuse their exact nonnegative local scale directly, while hierarchy
-scale remains strictly composed. Pure 2D gained no speculative public API
-because it has no current body-level counterpart or consumer.
+`FixedTransform` now owns generic current-snapshot `TransformPoint` /
+`InverseTransformPoint` conversion over the strict composed affine hierarchy,
+plus explicit X/Z variants that retain in-plane shear and reject Y coupling.
+`SolidBody` and `SolidBody2D` expose matching authoritative `GetWorldPoint` /
+`GetLocalPoint` and `Try*` pairs. Body conversion consumes committed collider
+owner scale rather than mutable host or presentation scale, so interpolation
+cannot enter deterministic queries. Failures are atomic with a zero result;
+throwing wrappers use `InvalidOperationException`. No path uses collider
+dimensions or retains the superseded transform-like body names.
 
 Regression coverage includes forward and inverse scalar-face cancellation,
-mirrored anisotropic scale, singular and unavailable hierarchy scale, final
+mirrored anisotropic scale, affine hierarchy shear, X/Z plane admission,
+singular and unavailable committed scale, host/presentation divergence, final
 overflow, ordinary parity, round trips, and warmed zero-allocation behavior.
-FixedMathSharp passes 2,595 `Release` and 2,574 `ReleaseLean` tests at exact
-100% coverage across 49,865 lines, 8,426 branches, and 3,304 methods. Gravitas
-passes 3,866 `Release` and 3,811 `ReleaseLean` tests at exact 100% coverage
-across 43,664 lines, 12,775 branches, and 4,503 methods. ShortRun ordinary and
-full-domain body round trips measure 3.520 us and 2.484 us respectively with
-zero managed allocation.
+FixedMathSharp passes 2,603 `Release` and 2,582 `ReleaseLean` tests at exact
+100% coverage across 44,334 lines, 8,393 branches, and 3,320 methods. Gravitas
+passes 3,870 `Release` and 3,815 `ReleaseLean` tests at exact 100% coverage
+across 43,028 lines, 12,779 branches, and 4,486 methods. ShortRun 3D ordinary,
+3D full-domain, and 2D ordinary body round trips measure 3.714 us, 2.467 us,
+and 2.512 us respectively with zero managed allocation. The implementation and
+evidence are retained in
+[`Full-Domain SolidBody Point Transform`](done/2026-07-30-full-domain-solid-body-point-transform-plan.md).
 
 ### Extreme Friction Accumulation And Cone Clamping Are Not Full-Domain
 

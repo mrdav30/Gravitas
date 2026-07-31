@@ -39,20 +39,19 @@ instead of burying it in notes.
 
 ## Recently Completed
 
-- [`Full-Domain SolidBody Point Transforms`](done/2026-07-30-full-domain-solid-body-point-transform-plan.md)
-  - Completed 2026-07-30. FixedMathSharp now owns one exact component-scaled
-    3D transform kernel and the missing inverse operation; Gravitas exposes
-    allocation-free throwing/`Try*` point conversion pairs over authoritative
-    body pose and strict host hierarchy scale. Representable cancellation is
-    retained until one final round-half-to-even coordinate conversion, while
-    singular scale, unavailable hierarchy scale, and true final overflow fail
-    explicitly and atomically.
-  - FixedMathSharp passes 2,595 `Release` and 2,574 `ReleaseLean` tests at
-    49,865/49,865 lines, 8,426/8,426 branches, and 3,304/3,304 methods.
-    Gravitas passes 3,866 `Release` and 3,811 `ReleaseLean` tests at
-    43,664/43,664 lines, 12,775/12,775 branches, and 4,503/4,503 methods.
-    Standard and Lean multi-target package builds are warning-free. Ordinary
-    and full-domain body round trips remain allocation-free in ShortRun.
+- [`Full-Domain SolidBody Point Transform`](done/2026-07-30-full-domain-solid-body-point-transform-plan.md)
+  - Completed 2026-07-30. `FixedTransform` now owns strict current-snapshot 3D
+    and explicit X/Z point conversion. `SolidBody` and `SolidBody2D` expose
+    dimensionally symmetric authoritative `GetWorldPoint` / `GetLocalPoint`
+    APIs over committed collider owner scale, so mutable presentation state
+    cannot enter deterministic simulation queries.
+  - FixedMathSharp passes 2,603 Release and 2,582 ReleaseLean tests at
+    44,334/44,334 lines, 8,393/8,393 branches, and 3,320/3,320 methods.
+    Gravitas passes 3,870 Release and 3,815 ReleaseLean tests at
+    43,028/43,028 lines, 12,779/12,779 branches, and 4,486/4,486 methods.
+    Standard and Lean package builds are warning-free, all five focused
+    ShortRun rows allocate zero managed bytes, and independent review reported
+    no findings.
 - [`Full-Domain Friction Response`](done/2026-07-29-full-domain-friction-response-plan.md)
   - Completed 2026-07-30. Gravitas now retains exact 3D cached Coulomb-disk
     accumulation, pure-2D Coulomb-line response, and mixed two-axis response

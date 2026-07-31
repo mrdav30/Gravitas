@@ -936,32 +936,32 @@ public partial class SolidBody : IRecordable
     }
 
     /// <summary>
-    /// Transforms a point from body-local space to world space using the host transform's world scale.
+    /// Gets a world-space point from the authoritative body pose and committed collider scale.
     /// </summary>
     /// <param name="point">The body-local point.</param>
     /// <returns>The corresponding world-space point.</returns>
     /// <exception cref="InvalidOperationException">
-    /// The host transform's world scale or the final world-space point is not representable.
+    /// The collider has no committed scale or the final world-space point is not representable.
     /// </exception>
-    public Vector3d TransformPoint(Vector3d point)
+    public Vector3d GetWorldPoint(Vector3d point)
     {
-        bool transformed = TryTransformPoint(point, out Vector3d result);
+        bool transformed = TryGetWorldPoint(point, out Vector3d result);
         SwiftThrowHelper.ThrowIfTrue(
             !transformed,
-            nameof(Agent.Transform),
-            "Cannot transform the point because the host world scale or final world-space point is not representable.");
+            nameof(Collider),
+            "Cannot get the world point because the collider has no committed scale or the final coordinate is not representable.");
         return result;
     }
 
     /// <summary>
-    /// Attempts to transform a point from body-local space to world space using the host transform's world scale.
+    /// Attempts to get a world-space point from the authoritative body pose and committed collider scale.
     /// </summary>
     /// <param name="point">The body-local point.</param>
     /// <param name="result">The world-space point on success; otherwise zero.</param>
-    /// <returns><see langword="true"/> when the host world scale and final point are representable.</returns>
-    public bool TryTransformPoint(Vector3d point, out Vector3d result)
+    /// <returns><see langword="true"/> when a committed scale exists and the final point is representable.</returns>
+    public bool TryGetWorldPoint(Vector3d point, out Vector3d result)
     {
-        if (!Agent.Transform.TryGetLossyScale(out Vector3d scale))
+        if (!Collider.TryGetCommittedOwnerScale(out Vector3d scale))
         {
             result = Vector3d.Zero;
             return false;
@@ -971,34 +971,34 @@ public partial class SolidBody : IRecordable
     }
 
     /// <summary>
-    /// Transforms a point from world space to body-local space using the host transform's world scale.
+    /// Gets a body-local point from the authoritative body pose and committed collider scale.
     /// </summary>
     /// <param name="point">The world-space point.</param>
     /// <returns>The corresponding body-local point.</returns>
     /// <exception cref="InvalidOperationException">
-    /// The host transform's world scale is unavailable or singular, or the final body-local point is not representable.
+    /// The collider has no committed scale, its scale is singular, or the final body-local point is not representable.
     /// </exception>
-    public Vector3d InverseTransformPoint(Vector3d point)
+    public Vector3d GetLocalPoint(Vector3d point)
     {
-        bool transformed = TryInverseTransformPoint(point, out Vector3d result);
+        bool transformed = TryGetLocalPoint(point, out Vector3d result);
         SwiftThrowHelper.ThrowIfTrue(
             !transformed,
-            nameof(Agent.Transform),
-            "Cannot inverse-transform the point because the host world scale is unavailable or singular, or the final body-local point is not representable.");
+            nameof(Collider),
+            "Cannot get the local point because the collider has no committed scale, its scale is singular, or the final coordinate is not representable.");
         return result;
     }
 
     /// <summary>
-    /// Attempts to transform a point from world space to body-local space using the host transform's world scale.
+    /// Attempts to get a body-local point from the authoritative body pose and committed collider scale.
     /// </summary>
     /// <param name="point">The world-space point.</param>
     /// <param name="result">The body-local point on success; otherwise zero.</param>
     /// <returns>
-    /// <see langword="true"/> when the host world scale is available and nonsingular and the final point is representable.
+    /// <see langword="true"/> when a committed nonsingular scale exists and the final point is representable.
     /// </returns>
-    public bool TryInverseTransformPoint(Vector3d point, out Vector3d result)
+    public bool TryGetLocalPoint(Vector3d point, out Vector3d result)
     {
-        if (!Agent.Transform.TryGetLossyScale(out Vector3d scale))
+        if (!Collider.TryGetCommittedOwnerScale(out Vector3d scale))
         {
             result = Vector3d.Zero;
             return false;

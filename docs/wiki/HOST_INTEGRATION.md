@@ -337,17 +337,22 @@ property is formed with an exact fused operation and rejected only when that
 final canonical value is not representable or physically valid. Intermediate
 Q32.32 saturation is never accepted as a plausible runtime dimension.
 
-`SolidBody.TransformPoint(...)` and `InverseTransformPoint(...)` combine the
-body's authoritative position and rotation with the host transform's strict
-hierarchy-derived `LossyScale`. Collider radius, size, compound bounds, and
-other authored shape dimensions are not transform scale. These convenience
-methods evaluate the complete scale/rotation/translation expression before one
-final round-to-even conversion per coordinate, so representable cancellation is
-not lost to intermediate saturation. They throw `InvalidOperationException`
-when hierarchy scale is unavailable, inverse scale is singular, or the final
-coordinate is outside the Q32.32 domain. Use `TryTransformPoint(...)` and
-`TryInverseTransformPoint(...)` when those expected domain failures should
-return `false`; failed calls set the output to zero atomically.
+Use `FixedTransform.TransformPoint(...)`, `InverseTransformPoint(...)`, and
+their explicit X/Z counterparts when converting through the current authored
+or presentation snapshot.
+
+Use `SolidBody.GetWorldPoint(...)` / `GetLocalPoint(...)`, or the matching
+`SolidBody2D` methods, for gameplay conversion through the authoritative
+physics pose. These body methods use the collider's last committed owner-scale
+snapshot, not a newly read host scale, so render interpolation or a pending
+adapter mutation cannot change simulation queries. Their `Try*` counterparts
+return `false` with a zero output before the first shape commit or when the
+final coordinate is outside the Q32.32 domain.
+
+Engine adapters should treat Gravitas as the sole simulation authority. Publish
+the visual pose to the engine transform, and disable native rigid-body
+simulation or interpolation that would apply a second motion source or
+double-interpolate the Gravitas result.
 
 ## Common Configuration
 
