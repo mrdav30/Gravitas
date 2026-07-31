@@ -940,26 +940,71 @@ public partial class SolidBody : IRecordable
     /// </summary>
     /// <param name="point">The body-local point.</param>
     /// <returns>The corresponding world-space point.</returns>
-    public Vector3d TransformPoint(Vector3d point) =>
-        Position3d + Rotation * Vector3d.Multiply(Agent.Transform.LossyScale, point);
+    /// <exception cref="InvalidOperationException">
+    /// The host transform's world scale or the final world-space point is not representable.
+    /// </exception>
+    public Vector3d TransformPoint(Vector3d point)
+    {
+        bool transformed = TryTransformPoint(point, out Vector3d result);
+        SwiftThrowHelper.ThrowIfTrue(
+            !transformed,
+            nameof(Agent.Transform),
+            "Cannot transform the point because the host world scale or final world-space point is not representable.");
+        return result;
+    }
+
+    /// <summary>
+    /// Attempts to transform a point from body-local space to world space using the host transform's world scale.
+    /// </summary>
+    /// <param name="point">The body-local point.</param>
+    /// <param name="result">The world-space point on success; otherwise zero.</param>
+    /// <returns><see langword="true"/> when the host world scale and final point are representable.</returns>
+    public bool TryTransformPoint(Vector3d point, out Vector3d result)
+    {
+        if (!Agent.Transform.TryGetLossyScale(out Vector3d scale))
+        {
+            result = Vector3d.Zero;
+            return false;
+        }
+
+        return Rotation.TryTransformScaledPoint(Position3d, point, scale, out result);
+    }
 
     /// <summary>
     /// Transforms a point from world space to body-local space using the host transform's world scale.
     /// </summary>
     /// <param name="point">The world-space point.</param>
     /// <returns>The corresponding body-local point.</returns>
-    /// <exception cref="InvalidOperationException">The host transform has a zero world-scale component.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// The host transform's world scale is unavailable or singular, or the final body-local point is not representable.
+    /// </exception>
     public Vector3d InverseTransformPoint(Vector3d point)
     {
-        Vector3d scale = Agent.Transform.LossyScale;
+        bool transformed = TryInverseTransformPoint(point, out Vector3d result);
         SwiftThrowHelper.ThrowIfTrue(
-            scale.X == Fixed64.Zero || scale.Y == Fixed64.Zero || scale.Z == Fixed64.Zero,
+            !transformed,
             nameof(Agent.Transform),
-            "Cannot inverse-transform a point when the host transform has a zero world-scale component.");
+            "Cannot inverse-transform the point because the host world scale is unavailable or singular, or the final body-local point is not representable.");
+        return result;
+    }
 
-        Vector3d translated = point - Position3d;
-        Vector3d rotated = Rotation.Inverse() * translated;
-        return Vector3d.Divide(rotated, scale);
+    /// <summary>
+    /// Attempts to transform a point from world space to body-local space using the host transform's world scale.
+    /// </summary>
+    /// <param name="point">The world-space point.</param>
+    /// <param name="result">The body-local point on success; otherwise zero.</param>
+    /// <returns>
+    /// <see langword="true"/> when the host world scale is available and nonsingular and the final point is representable.
+    /// </returns>
+    public bool TryInverseTransformPoint(Vector3d point, out Vector3d result)
+    {
+        if (!Agent.Transform.TryGetLossyScale(out Vector3d scale))
+        {
+            result = Vector3d.Zero;
+            return false;
+        }
+
+        return Rotation.TryInverseTransformScaledPoint(Position3d, point, scale, out result);
     }
 
     public void ResetPosition(Vector3d position = default, FixedQuaternion rotation = default)

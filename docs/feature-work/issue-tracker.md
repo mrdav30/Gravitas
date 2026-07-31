@@ -29,22 +29,20 @@ records follow with their original discovery context.
 - Treat local links as unstaged validation scaffolding. Do not publish or
   release with them in place.
 - FixedMathSharp foundation hardening is complete. The current locally linked
-  geometry and arithmetic extensions pass 2,590 Release and 2,569 ReleaseLean
-  tests plus eight Chronicler tests in each mode at 49,416/49,416 authored
-  lines, 8,340/8,340 branches, and 3,238/3,238 methods. Retain the local link
+  geometry and arithmetic extensions pass 2,595 Release and 2,574 ReleaseLean
+  tests plus eight Chronicler tests in each mode at 49,865/49,865 authored
+  lines, 8,426/8,426 branches, and 3,304/3,304 methods. Retain the local link
   while the remaining Gravitas queue is hardened.
 - SwiftCollections has no library-specific active issue at this checkpoint; its
   place in the sequence is a full downstream compatibility and release gate.
 - GridForge's runtime-identity defect is resolved. Keep the lower stack locally
   linked while the remaining Gravitas queue is hardened so another downstream
   discovery does not force a partial release cycle.
-- Gravitas's current Release run passes 3,861 tests at 43,653/43,653 lines,
-  12,775/12,775 branches, and 4,501/4,501 methods. ReleaseLean passes 3,806
-  tests; focused replay passes 85/85, and warmed exact 3D, 2D, and mixed
-  friction allocation gates pass 3/3 with zero managed bytes. Full-domain
-  friction correctness, replay, allocation, coverage, and documentation gates
-  are closed; measured exact response timing signals remain in the benchmark
-  backlog.
+- Gravitas's current Release run passes 3,866 tests at 43,664/43,664 lines,
+  12,775/12,775 branches, and 4,503/4,503 methods. ReleaseLean passes 3,811
+  tests. Exact body point transforms and the existing 3D, 2D, and mixed
+  response allocation gates remain at zero managed bytes; measured timing
+  signals remain in the benchmark backlog.
 - After the Gravitas queue closes, release the lower stack in dependency order,
   replace local links with released packages at each layer, and rerun Gravitas
   `Release`, `ReleaseLean`, coverage, replay, and relevant benchmark gates.
@@ -52,42 +50,11 @@ records follow with their original discovery context.
 ### Ordered Queue
 
 1. **Gravitas:**
-   [SolidBody Point Transforms Can Saturate Before Their Final World Or Local Coordinate](#solidbody-point-transforms-can-saturate-before-their-final-world-or-local-coordinate).
-2. **Gravitas:**
    [3D Closest-Surface And Overlap-Circle Classification Are Not Full-Domain](#3d-closest-surface-and-overlap-circle-classification-are-not-full-domain).
-3. **FixedMathSharp / Gravitas:**
+2. **FixedMathSharp / Gravitas:**
    [Radial Segment Parameters Can Collapse Spatially Distinct Query Hits](#radial-segment-parameters-can-collapse-spatially-distinct-query-hits).
-4. **FixedMathSharp / Gravitas:**
+3. **FixedMathSharp / Gravitas:**
    [Mesh Triangle-Triangle SAT Can Saturate Before Axis Classification](#mesh-triangle-triangle-sat-can-saturate-before-axis-classification).
-
-### SolidBody Point Transforms Can Saturate Before Their Final World Or Local Coordinate
-
-**Discovered:** 2026-07-22  
-**Source:** canonical scale-admission final public-API audit  
-**Affected area:** 3D `SolidBody.TransformPoint(...)`,
-`SolidBody.InverseTransformPoint(...)`, host hierarchy scale, and adapter-facing
-point conversion
-
-The earlier point-transform correction removed collider dimensions from the
-body transform contract, but the public methods still evaluate scale, rotation,
-translation, and inverse operations as ordinary chained Q32.32 expressions.
-`TransformPoint` can saturate the scale product or rotated coordinate before a
-later component cancels back into the representable world range.
-`InverseTransformPoint` can likewise saturate the world-position subtraction
-before inverse rotation and division recover a representable local point.
-Parenthesizing those expressions does not fuse them.
-
-Add explicit exact-or-false forward and inverse scaled-point primitives to
-FixedMathSharp if the complete operations are reusable there, then give
-`SolidBody` friendly `TryTransformPoint`/`TryInverseTransformPoint` APIs and
-defined throwing convenience behavior. Preserve the body's authoritative
-position/rotation plus the host hierarchy-scale contract; do not silently clamp
-or route through collider shape dimensions. Cover cancellation after an
-otherwise overflowing intermediate, mirrored scalar faces, anisotropic scale,
-singular inverse rejection, ordinary parity, round trips, and warmed
-zero-allocation behavior. Pure 2D currently has no equivalent public point API,
-so parity means deciding whether a first-class planar surface is useful rather
-than copying the defect.
 
 ### 3D Closest-Surface And Overlap-Circle Classification Are Not Full-Domain
 
@@ -188,6 +155,43 @@ projection/ranking paths; do not assume a discrete 3D collision fix provides
 query parity.
 
 ## Resolved Issues
+
+### SolidBody Point Transforms Can Saturate Before Their Final World Or Local Coordinate
+
+**Discovered:** 2026-07-22  
+**Resolved:** 2026-07-30  
+**Source:** canonical scale-admission final public-API audit  
+**Affected area:** 3D `SolidBody.TransformPoint(...)`,
+`SolidBody.InverseTransformPoint(...)`, host hierarchy scale, and adapter-facing
+point conversion
+
+The prior helpers chained Q32.32 scale, rotation, translation, subtraction, and
+division, allowing a saturated intermediate to hide a representable final
+coordinate. FixedMathSharp now owns one internal scaled-3D transform kernel.
+The existing forward API and new
+`FixedQuaternion.TryInverseTransformScaledPoint(...)` retain the complete
+operation in wide arithmetic until one final round-half-to-even materialization
+per coordinate. The generic mechanics moved out of the oriented-box owner
+without leaving a forwarding-only façade.
+
+`SolidBody` now exposes `TryTransformPoint(...)` and
+`TryInverseTransformPoint(...)`. Failure is atomic with a zero result for
+unavailable hierarchy scale, singular inverse scale, or true final overflow.
+The existing convenience methods delegate to those operations and throw
+`InvalidOperationException`; neither path uses collider dimensions. Root
+transforms reuse their exact nonnegative local scale directly, while hierarchy
+scale remains strictly composed. Pure 2D gained no speculative public API
+because it has no current body-level counterpart or consumer.
+
+Regression coverage includes forward and inverse scalar-face cancellation,
+mirrored anisotropic scale, singular and unavailable hierarchy scale, final
+overflow, ordinary parity, round trips, and warmed zero-allocation behavior.
+FixedMathSharp passes 2,595 `Release` and 2,574 `ReleaseLean` tests at exact
+100% coverage across 49,865 lines, 8,426 branches, and 3,304 methods. Gravitas
+passes 3,866 `Release` and 3,811 `ReleaseLean` tests at exact 100% coverage
+across 43,664 lines, 12,775 branches, and 4,503 methods. ShortRun ordinary and
+full-domain body round trips measure 3.520 us and 2.484 us respectively with
+zero managed allocation.
 
 ### Extreme Friction Accumulation And Cone Clamping Are Not Full-Domain
 

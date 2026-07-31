@@ -338,11 +338,16 @@ final canonical value is not representable or physically valid. Intermediate
 Q32.32 saturation is never accepted as a plausible runtime dimension.
 
 `SolidBody.TransformPoint(...)` and `InverseTransformPoint(...)` combine the
-body's authoritative position and rotation with the host transform's
+body's authoritative position and rotation with the host transform's strict
 hierarchy-derived `LossyScale`. Collider radius, size, compound bounds, and
-other authored shape dimensions are not transform scale. Inverse point
-conversion throws `InvalidOperationException` when any world-scale component is
-zero because the corresponding transform is singular.
+other authored shape dimensions are not transform scale. These convenience
+methods evaluate the complete scale/rotation/translation expression before one
+final round-to-even conversion per coordinate, so representable cancellation is
+not lost to intermediate saturation. They throw `InvalidOperationException`
+when hierarchy scale is unavailable, inverse scale is singular, or the final
+coordinate is outside the Q32.32 domain. Use `TryTransformPoint(...)` and
+`TryInverseTransformPoint(...)` when those expected domain failures should
+return `false`; failed calls set the output to zero atomically.
 
 ## Common Configuration
 
