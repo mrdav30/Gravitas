@@ -118,6 +118,39 @@ public sealed class ColliderPlanarProjectionTests
     }
 
     [Fact]
+    public void CylinderReducer_DistinguishesPositiveSubrawSeparationFromContainment()
+    {
+        static Fixed64 Raw(long value) => Fixed64.FromRaw(value);
+
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        var cylinder = new LSCylinderCollider
+        {
+            Radius = Raw(2),
+            Size = new Vector3d(Raw(4), Raw(1), Raw(4))
+        };
+        Initialize(
+            context,
+            cylinder,
+            new FixedQuaternion(
+                Fixed64.Zero,
+                Fixed64.Zero,
+                Raw(1),
+                Raw(2)));
+
+        ColliderPlanarProjection.TryGetRelation(
+                cylinder,
+                new Vector2d(Raw(2), Fixed64.Zero),
+                Raw(4),
+                out ProjectedSurfaceRelation relation)
+            .Should().BeTrue();
+
+        relation.Distance.Should().Be(Fixed64.Zero);
+        relation.Offset.Should().Be(Vector2d.Zero);
+        relation.IsContained.Should().BeFalse();
+        relation.Direction.X.Should().BeLessThan(Fixed64.Zero);
+    }
+
+    [Fact]
     public void MeshReducer_RetainsTheEarlierTriangleOnAPlanarTie()
     {
         using GravitasWorldContext context =
@@ -180,6 +213,92 @@ public sealed class ColliderPlanarProjectionTests
     }
 
     [Fact]
+    public void CompoundReducer_ShouldPreferContainmentOverEarlierZeroRoundedGap()
+    {
+        static Fixed64 Raw(long value) => Fixed64.FromRaw(value);
+
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        var compound = new LSCompoundCollider(
+            CompoundColliderPart.Sphere(
+                Raw(1),
+                new Vector3d(Raw(1), Fixed64.Zero, Raw(1))),
+            CompoundColliderPart.Sphere(
+                Raw(1),
+                Vector3d.Zero),
+            CompoundColliderPart.Sphere(
+                Raw(1),
+                new Vector3d(Fixed64.Half, Fixed64.Zero, Fixed64.Zero)));
+        Initialize(context, compound, FixedQuaternion.Identity);
+
+        ColliderPlanarProjection.TryGetRelation(
+                compound,
+                Vector2d.Zero,
+                Fixed64.One,
+                out ProjectedSurfaceRelation relation)
+            .Should().BeTrue();
+
+        relation.Distance.Should().Be(Fixed64.Zero);
+        relation.IsContained.Should().BeTrue();
+    }
+
+    [Fact]
+    public void MeshReducer_ShouldPreferContainmentOverEarlierZeroRoundedGap()
+    {
+        static Fixed64 Raw(long value) => Fixed64.FromRaw(value);
+
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        Vector3d[] firstTriangle =
+        {
+            Vector3d.Zero,
+            new(Fixed64.One, Fixed64.Zero, Fixed64.Two),
+            new(Fixed64.Zero, Fixed64.Zero, Fixed64.One)
+        };
+        var separatedMesh = new LSMeshCollider(
+            firstTriangle,
+            new[] { 0, 1, 2 },
+            MeshColliderMode.Concave,
+            MeshInertiaPolicy.SurfaceApproximation);
+        Initialize(context, separatedMesh, FixedQuaternion.Identity);
+        var queryCenter = new Vector2d(Raw(1), Raw(1));
+
+        ColliderPlanarProjection.TryGetRelation(
+                separatedMesh,
+                queryCenter,
+                Raw(1),
+                out ProjectedSurfaceRelation separated)
+            .Should().BeTrue();
+        separated.Distance.Should().Be(Fixed64.Zero);
+        separated.IsContained.Should().BeFalse();
+
+        var mesh = new LSMeshCollider(
+            new[]
+            {
+                firstTriangle[0],
+                firstTriangle[1],
+                firstTriangle[2],
+                new Vector3d(-Fixed64.One, Fixed64.Zero, -Fixed64.One),
+                new Vector3d(Fixed64.One, Fixed64.Zero, -Fixed64.One),
+                new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.One),
+                new Vector3d(Fixed64.Half, Fixed64.Zero, -Fixed64.Half),
+                new Vector3d(Fixed64.Half, Fixed64.Zero, Fixed64.Half),
+                new Vector3d(Fixed64.One, Fixed64.Zero, Fixed64.Zero)
+            },
+            new[] { 0, 1, 2, 3, 4, 5, 6, 7, 8 },
+            MeshColliderMode.Concave,
+            MeshInertiaPolicy.SurfaceApproximation);
+        Initialize(context, mesh, FixedQuaternion.Identity);
+
+        ColliderPlanarProjection.TryGetRelation(
+                mesh,
+                queryCenter,
+                Fixed64.One,
+                out ProjectedSurfaceRelation relation)
+            .Should().BeTrue();
+        relation.Distance.Should().Be(Fixed64.Zero);
+        relation.IsContained.Should().BeTrue();
+    }
+
+    [Fact]
     public void Reducers_AreAllocationFreeAfterWarmup()
     {
         using GravitasWorldContext context =
@@ -238,7 +357,7 @@ public sealed class ColliderPlanarProjectionTests
         foreach (LSCollider collider in colliders)
             Initialize(context, collider, FixedQuaternion.Identity);
 
-        for (int index = 0; index < 32; index++)
+        void ReduceAll()
         {
             foreach (LSCollider collider in colliders)
             {
@@ -250,22 +369,7 @@ public sealed class ColliderPlanarProjectionTests
             }
         }
 
-        long before = GC.GetAllocatedBytesForCurrentThread();
-        for (int index = 0; index < 256; index++)
-        {
-            foreach (LSCollider collider in colliders)
-            {
-                _ = ColliderPlanarProjection.TryGetRelation(
-                    collider,
-                    Vector2d.Zero,
-                    Fixed64.Zero,
-                    out _);
-            }
-        }
-        long allocated =
-            GC.GetAllocatedBytesForCurrentThread() - before;
-
-        allocated.Should().Be(0L);
+        AllocationTestHelper.MeasureSteadyState(ReduceAll).Should().Be(0L);
     }
 
     [Fact]

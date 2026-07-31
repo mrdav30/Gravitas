@@ -17,6 +17,8 @@ internal sealed class DynamicCcdCandidateIndex
     private readonly SwiftList<Entry> _entries;
     private readonly SwiftDictionary<int, int>? _entryIndices;
     private Fixed64 _maxExtentX;
+    private int _maxExtentXCount;
+    private int _unrepresentableExtentXCount;
     private bool _isSorted = true;
 
     public DynamicCcdCandidateIndex(int capacity = 0, bool supportsUpdates = false)
@@ -36,6 +38,8 @@ internal sealed class DynamicCcdCandidateIndex
         _entries.FastClear();
         _entryIndices?.Clear();
         _maxExtentX = Fixed64.Zero;
+        _maxExtentXCount = 0;
+        _unrepresentableExtentXCount = 0;
         _isSorted = true;
     }
 
@@ -43,9 +47,7 @@ internal sealed class DynamicCcdCandidateIndex
     {
         _entryIndices?.Add(dynamicId, _entries.Count);
         _entries.Add(new Entry(dynamicId, bounds));
-        Fixed64 extentX = bounds.Max.X - bounds.Min.X;
-        if (extentX > _maxExtentX)
-            _maxExtentX = extentX;
+        IncludeExtent(bounds.Min.X, bounds.Max.X);
 
         _isSorted = false;
     }
@@ -59,11 +61,22 @@ internal sealed class DynamicCcdCandidateIndex
             "Candidate index was not configured for updates.");
         if (entryIndices.TryGetValue(dynamicId, out int index))
         {
+            Entry previous = _entries[index];
             _entries[index] = new Entry(dynamicId, bounds);
-            Fixed64 updatedExtentX = bounds.Max.X - bounds.Min.X;
-            if (updatedExtentX > _maxExtentX)
-                _maxExtentX = updatedExtentX;
-            _isSorted = false;
+            bool remainsSorted = _isSorted && IsOrderedAt(index);
+            if (!DynamicCcdExtentMetadata.IsEquivalent(
+                    previous.MinX,
+                    previous.MaxX,
+                    bounds.Min.X,
+                    bounds.Max.X))
+            {
+                if (RemoveExtent(previous.MinX, previous.MaxX))
+                    RebuildExtents();
+                else
+                    IncludeExtent(bounds.Min.X, bounds.Max.X);
+            }
+
+            _isSorted = remainsSorted;
             return;
         }
 
@@ -76,6 +89,7 @@ internal sealed class DynamicCcdCandidateIndex
         if (entryIndices == null || !entryIndices.TryGetValue(dynamicId, out int index))
             return false;
 
+        Entry removed = _entries[index];
         int lastIndex = _entries.Count - 1;
         if (index != lastIndex)
         {
@@ -86,6 +100,8 @@ internal sealed class DynamicCcdCandidateIndex
 
         _entries.RemoveAt(lastIndex);
         entryIndices.Remove(dynamicId);
+        if (RemoveExtent(removed.MinX, removed.MaxX))
+            RebuildExtents();
         _isSorted = false;
         return true;
     }
@@ -105,7 +121,10 @@ internal sealed class DynamicCcdCandidateIndex
             return;
 
         Sort();
-        Fixed64 scanMinX = queryBounds.Min.X - _maxExtentX;
+        Fixed64 scanMinX = _unrepresentableExtentXCount > 0
+            || !Fixed64.TrySubtract(queryBounds.Min.X, _maxExtentX, out Fixed64 representableScanMinX)
+                ? Fixed64.MinValue
+                : representableScanMinX;
         int index = FindFirstCandidateIndex(scanMinX);
         for (; index < _entries.Count; index++)
         {
@@ -135,6 +154,45 @@ internal sealed class DynamicCcdCandidateIndex
         return new FixedBoundVolume(Vector3d.Min(start, end) - extents, Vector3d.Max(start, end) + extents);
     }
 
+    private void IncludeExtent(Fixed64 minX, Fixed64 maxX)
+    {
+        if (!Fixed64.TrySubtract(maxX, minX, out Fixed64 extentX))
+        {
+            _unrepresentableExtentXCount++;
+            return;
+        }
+
+        if (extentX > _maxExtentX)
+        {
+            _maxExtentX = extentX;
+            _maxExtentXCount = 1;
+        }
+        else if (extentX == _maxExtentX)
+        {
+            _maxExtentXCount++;
+        }
+    }
+
+    private bool RemoveExtent(Fixed64 minX, Fixed64 maxX)
+    {
+        if (!Fixed64.TrySubtract(maxX, minX, out Fixed64 extentX))
+        {
+            _unrepresentableExtentXCount--;
+            return false;
+        }
+
+        return extentX == _maxExtentX && --_maxExtentXCount == 0;
+    }
+
+    private void RebuildExtents()
+    {
+        _maxExtentX = Fixed64.Zero;
+        _maxExtentXCount = 0;
+        _unrepresentableExtentXCount = 0;
+        for (int i = 0; i < _entries.Count; i++)
+            IncludeExtent(_entries[i].MinX, _entries[i].MaxX);
+    }
+
     private int FindFirstCandidateIndex(Fixed64 minX)
     {
         int low = 0;
@@ -149,6 +207,14 @@ internal sealed class DynamicCcdCandidateIndex
         }
 
         return low;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private bool IsOrderedAt(int index)
+    {
+        Entry entry = _entries[index];
+        return (index == 0 || Compare(_entries[index - 1], entry) <= 0)
+            && (index == _entries.Count - 1 || Compare(entry, _entries[index + 1]) <= 0);
     }
 
     private void HeapSort()
@@ -282,6 +348,8 @@ internal sealed class DynamicCcdCandidateIndex2D
     private readonly SwiftList<Entry> _entries;
     private readonly SwiftDictionary<int, int>? _entryIndices;
     private Fixed64 _maxExtentX;
+    private int _maxExtentXCount;
+    private int _unrepresentableExtentXCount;
     private bool _isSorted = true;
 
     public DynamicCcdCandidateIndex2D(int capacity = 0, bool supportsUpdates = false)
@@ -301,6 +369,8 @@ internal sealed class DynamicCcdCandidateIndex2D
         _entries.FastClear();
         _entryIndices?.Clear();
         _maxExtentX = Fixed64.Zero;
+        _maxExtentXCount = 0;
+        _unrepresentableExtentXCount = 0;
         _isSorted = true;
     }
 
@@ -308,9 +378,7 @@ internal sealed class DynamicCcdCandidateIndex2D
     {
         _entryIndices?.Add(dynamicId, _entries.Count);
         _entries.Add(new Entry(dynamicId, bounds));
-        Fixed64 extentX = bounds.MaxX - bounds.MinX;
-        if (extentX > _maxExtentX)
-            _maxExtentX = extentX;
+        IncludeExtent(bounds.MinX, bounds.MaxX);
 
         _isSorted = false;
     }
@@ -324,11 +392,22 @@ internal sealed class DynamicCcdCandidateIndex2D
             "Candidate index was not configured for updates.");
         if (entryIndices.TryGetValue(dynamicId, out int index))
         {
+            Entry previous = _entries[index];
             _entries[index] = new Entry(dynamicId, bounds);
-            Fixed64 updatedExtentX = bounds.MaxX - bounds.MinX;
-            if (updatedExtentX > _maxExtentX)
-                _maxExtentX = updatedExtentX;
-            _isSorted = false;
+            bool remainsSorted = _isSorted && IsOrderedAt(index);
+            if (!DynamicCcdExtentMetadata.IsEquivalent(
+                    previous.MinX,
+                    previous.MaxX,
+                    bounds.MinX,
+                    bounds.MaxX))
+            {
+                if (RemoveExtent(previous.MinX, previous.MaxX))
+                    RebuildExtents();
+                else
+                    IncludeExtent(bounds.MinX, bounds.MaxX);
+            }
+
+            _isSorted = remainsSorted;
             return;
         }
 
@@ -341,6 +420,7 @@ internal sealed class DynamicCcdCandidateIndex2D
         if (entryIndices == null || !entryIndices.TryGetValue(dynamicId, out int index))
             return false;
 
+        Entry removed = _entries[index];
         int lastIndex = _entries.Count - 1;
         if (index != lastIndex)
         {
@@ -351,6 +431,8 @@ internal sealed class DynamicCcdCandidateIndex2D
 
         _entries.RemoveAt(lastIndex);
         entryIndices.Remove(dynamicId);
+        if (RemoveExtent(removed.MinX, removed.MaxX))
+            RebuildExtents();
         _isSorted = false;
         return true;
     }
@@ -370,7 +452,10 @@ internal sealed class DynamicCcdCandidateIndex2D
             return;
 
         Sort();
-        Fixed64 scanMinX = queryBounds.MinX - _maxExtentX;
+        Fixed64 scanMinX = _unrepresentableExtentXCount > 0
+            || !Fixed64.TrySubtract(queryBounds.MinX, _maxExtentX, out Fixed64 representableScanMinX)
+                ? Fixed64.MinValue
+                : representableScanMinX;
         int index = FindFirstCandidateIndex(scanMinX);
         for (; index < _entries.Count; index++)
         {
@@ -398,6 +483,45 @@ internal sealed class DynamicCcdCandidateIndex2D
         return new DynamicCcdPlanarBounds(minX, minZ, maxX, maxZ);
     }
 
+    private void IncludeExtent(Fixed64 minX, Fixed64 maxX)
+    {
+        if (!Fixed64.TrySubtract(maxX, minX, out Fixed64 extentX))
+        {
+            _unrepresentableExtentXCount++;
+            return;
+        }
+
+        if (extentX > _maxExtentX)
+        {
+            _maxExtentX = extentX;
+            _maxExtentXCount = 1;
+        }
+        else if (extentX == _maxExtentX)
+        {
+            _maxExtentXCount++;
+        }
+    }
+
+    private bool RemoveExtent(Fixed64 minX, Fixed64 maxX)
+    {
+        if (!Fixed64.TrySubtract(maxX, minX, out Fixed64 extentX))
+        {
+            _unrepresentableExtentXCount--;
+            return false;
+        }
+
+        return extentX == _maxExtentX && --_maxExtentXCount == 0;
+    }
+
+    private void RebuildExtents()
+    {
+        _maxExtentX = Fixed64.Zero;
+        _maxExtentXCount = 0;
+        _unrepresentableExtentXCount = 0;
+        for (int i = 0; i < _entries.Count; i++)
+            IncludeExtent(_entries[i].MinX, _entries[i].MaxX);
+    }
+
     private int FindFirstCandidateIndex(Fixed64 minX)
     {
         int low = 0;
@@ -412,6 +536,14 @@ internal sealed class DynamicCcdCandidateIndex2D
         }
 
         return low;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private bool IsOrderedAt(int index)
+    {
+        Entry entry = _entries[index];
+        return (index == 0 || Compare(_entries[index - 1], entry) <= 0)
+            && (index == _entries.Count - 1 || Compare(entry, _entries[index + 1]) <= 0);
     }
 
     private void HeapSort()
@@ -508,5 +640,21 @@ internal sealed class DynamicCcdCandidateIndex2D
             return !(MinX > queryBounds.MaxX || MaxX < queryBounds.MinX ||
                      MinZ > queryBounds.MaxZ || MaxZ < queryBounds.MinZ);
         }
+    }
+}
+
+file static class DynamicCcdExtentMetadata
+{
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool IsEquivalent(
+        Fixed64 previousMinX,
+        Fixed64 previousMaxX,
+        Fixed64 currentMinX,
+        Fixed64 currentMaxX)
+    {
+        bool previousRepresentable = Fixed64.TrySubtract(previousMaxX, previousMinX, out Fixed64 previousExtentX);
+        bool currentRepresentable = Fixed64.TrySubtract(currentMaxX, currentMinX, out Fixed64 currentExtentX);
+        return previousRepresentable == currentRepresentable
+            && (!previousRepresentable || previousExtentX == currentExtentX);
     }
 }

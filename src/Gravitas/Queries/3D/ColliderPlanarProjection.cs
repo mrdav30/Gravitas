@@ -114,8 +114,10 @@ internal static class ColliderPlanarProjection
         relation = new ProjectedSurfaceRelation(
             planar.Distance,
             planar.Offset,
+            planar.Direction,
             anchor,
-            normal);
+            normal,
+            planar.IsContained);
         return true;
     }
 
@@ -135,7 +137,7 @@ internal static class ColliderPlanarProjection
                     circleRadius,
                     out ProjectedSurfaceRelation candidate)
                 || (found
-                    && candidate.Distance >= relation.Distance))
+                    && ShouldKeepCurrent(candidate, relation)))
             {
                 continue;
             }
@@ -173,7 +175,7 @@ internal static class ColliderPlanarProjection
                     mesh.Origin,
                     mesh.Rotation,
                     out PlanarProjectionRelation candidate)
-                || (found && candidate.Distance >= best.Distance))
+                || (found && ShouldKeepCurrent(candidate, best)))
             {
                 continue;
             }
@@ -203,10 +205,26 @@ internal static class ColliderPlanarProjection
         relation = new ProjectedSurfaceRelation(
             best.Distance,
             best.Offset,
+            best.Direction,
             contact,
-            mesh.GetFaceNormalWorld(bestTriangle));
+            mesh.GetFaceNormalWorld(bestTriangle),
+            best.IsContained);
         return true;
     }
+
+    private static bool ShouldKeepCurrent(
+        ProjectedSurfaceRelation candidate,
+        ProjectedSurfaceRelation current) =>
+        candidate.Distance > current.Distance
+        || (candidate.Distance == current.Distance
+            && candidate.IsContained.CompareTo(current.IsContained) <= 0);
+
+    private static bool ShouldKeepCurrent(
+        PlanarProjectionRelation candidate,
+        PlanarProjectionRelation current) =>
+        candidate.Distance > current.Distance
+        || (candidate.Distance == current.Distance
+            && candidate.IsContained.CompareTo(current.IsContained) <= 0);
 
     private static Vector3d GetCanonicalQueryPoint(
         LSCollider collider,

@@ -153,7 +153,7 @@ The current runtime uses explicit world-context ownership:
   deterministic broad-phase identity rather than physical thickness. It follows
   the same static/kinematic/dynamic partition policy as the 3D service.
 - `GravitasQuery3DService` owns 3D raycast, swept-sphere, and X/Z
-  overlap/proximity query workers, intersection state, candidate gathering,
+  projected-circle overlap workers, intersection state, candidate gathering,
   filtering, and result ordering for one context. X/Z circle queries are not
   swept casts.
 - `GravitasQuery2DService` owns pure 2D overlap-circle and segment raycast query

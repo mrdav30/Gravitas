@@ -251,7 +251,7 @@ public readonly struct PhysicsOverlapCircle3DRequest
 }
 
 /// <summary>
-/// Describes one directional 3D X/Z circle proximity query in a batched query call.
+/// Describes one directional 3D X/Z projected-circle overlap in a batched query call.
 /// </summary>
 public readonly struct PhysicsOverlapCircleInDirection3DRequest
 {

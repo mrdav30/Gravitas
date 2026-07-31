@@ -1,7 +1,8 @@
 # Full-Domain 3D Surface Projection Implementation
 
-**Status:** Active  
+**Status:** Completed  
 **Started:** 2026-07-31  
+**Completed:** 2026-07-31  
 **Repositories:** FixedMathSharp, Gravitas  
 **Queue item:** `3D Closest-Surface And Overlap-Circle Classification Are Not Full-Domain`
 
@@ -39,16 +40,16 @@ The work must preserve:
 
 ## Historical Root Cause
 
-The existing path couples three different concerns:
+The prior path coupled three different concerns:
 
 1. closest-surface feature selection;
 2. representable full-3D distance calculation;
 3. final point materialization.
 
-Finite-axis helpers can construct a valid `FixedPointAnchor` before failing
+Finite-axis helpers could construct a valid `FixedPointAnchor` before failing
 only because the full 3D distance cannot fit in `Fixed64`. Sphere and compound
-paths additionally use saturating vector arithmetic. The 3D overlap-circle
-worker then reuses that full-3D result even though its documented domain is
+paths additionally used saturating vector arithmetic. The 3D overlap-circle
+worker then reused that full-3D result even though its documented domain was
 X/Z.
 
 `Physics3DHit` has since gained semantic `ContactAnchor` ownership, so the old
@@ -156,19 +157,20 @@ ties, all-miss collections, and allocation-free warmed dispatch.
 **Review checkpoint:** Stop after the complete public query family is green
 before benchmark and documentation closure.
 
-**Outcome:** The closest, directional, all-hit, and batch X/Z circle APIs now
-scan the covered X/Z columns across the active world's complete vertical
-domain, retain GridForge partition traversal and duplicate suppression, and
-delegate final admission to the Phase 2 planar reducer. Query Y no longer
-changes candidate discovery or classification. Hits report planar distance and
-direction while retaining an independent real 3D surface anchor and normal;
-containment therefore reports zero distance without inventing a surface point.
+**Outcome:** The closest, directional, all-hit, and batch X/Z circle APIs share
+one exact reducer after the existing GridForge candidate traversal. At this
+checkpoint, candidate discovery still multiplied traversal across the configured
+Y range; Phase 4 later replaced it with the collision-service planar index.
+Hits report planar distance and direction while retaining an independent real
+3D surface anchor and normal; containment therefore reports zero distance
+without inventing a surface point.
 
-Directional filtering ignores Y, compares the exact planar dot-product sign,
-and compares the already-certified distance directly instead of squaring either
-operand. The public integration coverage exercises every supported primitive,
-mesh, and compound collider, deterministic collider-ID ties, vertical
-invariance, tiny representable directions, and existing single/batch parity.
+Containment is admitted independently of direction. Separated hits ignore Y,
+require a positive exact planar dot-product sign, and compare the
+already-certified distance directly instead of squaring either operand. The
+public integration coverage exercises every supported primitive, mesh, and
+compound collider, deterministic collider-ID ties, vertical invariance, tiny
+representable directions, and existing single/batch parity.
 True 3D overlap-sphere admission remains on its separate surface-distance
 worker so rotational CCD does not inherit planar semantics.
 
@@ -184,12 +186,55 @@ worker so rotational CCD does not inherit planar semantics.
 
 ### Phase 4: Closure
 
-- [ ] Run focused and full Release/ReleaseLean tests in both repositories.
-- [ ] Re-establish 100% reachable line, branch, and method coverage.
-- [ ] Run warmed allocation assertions and X/Z query benchmarks, including
-  vertical scaling across tall dense and sparse grids.
-- [ ] Update query documentation and remove stale tracker language.
-- [ ] Move this plan to `docs/feature-work/done`.
+- [x] Run focused and full Release/ReleaseLean tests in both repositories.
+- [x] Re-establish 100% reachable line, branch, and method coverage.
+- [x] Run warmed allocation assertions and X/Z query benchmarks, including
+  vertical scaling across tall dense and sparse grids plus candidate-index
+  translation scaling.
+- [x] Update query documentation and remove stale tracker language.
+- [x] Move this plan to `docs/feature-work/done`.
+
+**Outcome:** Closure replaced the vertically multiplied GridForge traversal
+with the synchronized planar index, removed obsolete per-candidate duplicate
+hash/version work from indexed circle paths, and kept partition-traversed
+sphere/cone deduplication unchanged. Coverage review also hardened
+unrepresentable index-span removal, whole-batch radius validation, exact
+containment versus positive subraw separation, aggregate semantic ties, and
+grid-removal lifecycle behavior. Public XML and wiki references now describe
+complete projected overlap, real anchor ownership, Y independence, and the
+active-grid discoverability boundary. Final review also removed an O(N)
+extent-metadata rebuild from translation-only updates of the uniquely widest
+candidate and preserved sorted state when an update remains between its prior
+neighbors. Actual ordering crossings still use the deterministic full sort. The
+issue moved to resolved history.
+
+**Verification:**
+
+- FixedMathSharp `Release`: 2,625 passed; `ReleaseLean`: 2,604 passed; 100%
+  line (46,549/46,549), branch (8,640/8,640), and method (3,400/3,400)
+  coverage.
+- Gravitas `Release`: 3,894 passed; `ReleaseLean`: 3,839 passed; 100% line
+  (43,971/43,971), branch (12,865/12,865), and method (4,531/4,531) coverage.
+- The warmed reducer allocation assertion and all six projection-scaling rows
+  report zero managed allocation.
+- Before the index change, dense height scaling grew from 18.754 us at 8 cells
+  to 204.667 us at 128 and 2.900 ms at 1,024. The final configuration-aware
+  ShortRun is height-independent: dense rows are 5.445/5.402/5.418 us and
+  sparse rows are 5.404/5.437/5.456 us at 8/128/1,024 cells.
+- Before the final extent-metadata fix, translating the uniquely widest
+  candidate grew from 243.8 ns to 36.350 us in 3D and from 189.0 ns to
+  35.719 us in 2D as the index grew from 64 to 16,384 entries. The corrected
+  rows remain flat at approximately 111 ns in 3D and 54 ns in 2D, with zero
+  managed allocation.
+- Before sorted-state retention, the matching update-plus-query rows grew from
+  10.693 us to 7.055 ms in 3D and from 6.954 us to 4.753 ms in 2D. Ordered
+  translations now remain approximately 137-144 ns in 3D and 79-84 ns in 2D
+  from 64 through 16,384 entries, with zero managed allocation.
+- Independent performance, documentation, and final code reviews found no
+  remaining critical or important defect after the metadata, sorted-state,
+  chronology, directional-semantics, and minor duplicate-work findings were
+  resolved. Existing query-service benchmarks retain the separate
+  collider-count signal.
 
 ## Non-Goals
 

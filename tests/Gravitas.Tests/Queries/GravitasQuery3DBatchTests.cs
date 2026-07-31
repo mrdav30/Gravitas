@@ -213,6 +213,46 @@ public sealed class GravitasQuery3DBatchTests
     }
 
     [Fact]
+    public void OverlapCircleBatches_WithNegativeRadius_ShouldRejectWholeBatchBeforeMutation()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSSphereCollider collider = scenario.CreateSphere(Vector3d.Zero).Collider;
+        scenario.Context.Query3D.OverlapCircle(
+            Vector3d.Zero,
+            Fixed64.One,
+            out Physics3DHit sentinel,
+            IncludeLayerZero).Should().BeTrue();
+        PhysicsOverlapCircle3DRequest[] overlapRequests =
+        {
+            new(Vector3d.Zero, Fixed64.One, IncludeLayerZero),
+            new(Vector3d.Zero, -Fixed64.MinIncrement, IncludeLayerZero)
+        };
+        PhysicsOverlapCircleInDirection3DRequest[] directionalRequests =
+        {
+            new(Vector3d.Zero, Fixed64.One, Vector3d.Right, Fixed64.One, IncludeLayerZero),
+            new(Vector3d.Zero, -Fixed64.MinIncrement, Vector3d.Right, Fixed64.One, IncludeLayerZero)
+        };
+        Physics3DHit[] closest = { sentinel, sentinel };
+        var hits = new SwiftList<Physics3DHit> { sentinel };
+        PhysicsQueryHitRange[] ranges =
+        {
+            new(7, 8),
+            new(9, 10)
+        };
+
+        Action closestBatch = () => scenario.Context.Query3D.OverlapCircleBatch(overlapRequests, closest);
+        Action allBatch = () => scenario.Context.Query3D.OverlapCircleAllBatch(overlapRequests, hits, ranges);
+        Action directionalBatch = () => scenario.Context.Query3D.OverlapCircleInDirectionBatch(directionalRequests, closest);
+
+        closestBatch.Should().Throw<ArgumentException>().WithParameterName("requests");
+        allBatch.Should().Throw<ArgumentException>().WithParameterName("requests");
+        directionalBatch.Should().Throw<ArgumentException>().WithParameterName("requests");
+        closest.Should().OnlyContain(hit => ReferenceEquals(hit.Collider, collider));
+        hits.Should().ContainSingle().Which.Collider.Should().BeSameAs(collider);
+        ranges.Should().Equal(new PhysicsQueryHitRange(7, 8), new PhysicsQueryHitRange(9, 10));
+    }
+
+    [Fact]
     public void SweepBatches_WithUnrepresentableSegmentLength_ShouldRejectAndClearOutputs()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();

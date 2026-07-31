@@ -22,7 +22,8 @@ namespace Gravitas.Queries;
 public sealed partial class GravitasQuery3DService
 {
     /// <summary>
-    /// Finds the closest collider whose surface is inside the supplied X/Z circle radius.
+    /// Finds the closest collider whose complete X/Z projection overlaps the supplied circle.
+    /// The query position's Y component does not affect classification.
     /// </summary>
     public bool OverlapCircle(
         Vector3d position,
@@ -30,11 +31,13 @@ public sealed partial class GravitasQuery3DService
         out Physics3DHit raycastHit,
         PhysicsLayerMask layerMask)
     {
+        SwiftThrowHelper.ThrowIfArgument(
+            radius < Fixed64.Zero,
+            nameof(radius),
+            "3D query radius cannot be negative.");
+
         _currentLayerMask = layerMask;
-        NextCircleVersion();
         ResetLastQueryCounters();
-        _redundantColliderCheck.Clear();
-        _redundantVoxelCheck.Clear();
 
         Physics3DHit closestHit = default;
         bool found = false;
@@ -56,8 +59,9 @@ public sealed partial class GravitasQuery3DService
     }
 
     /// <summary>
-    /// Finds the closest circle-overlap hit whose projected surface offset lies in the supplied X/Z
-    /// direction and within the supplied distance.
+    /// Finds the closest projected-circle overlap whose exact separation lies in the supplied X/Z
+    /// direction and whose rounded distance is within the supplied limit. Containment is admitted in
+    /// every direction, and the query position's Y component is ignored.
     /// </summary>
     public bool OverlapCircleInDirection(
         Vector3d position,
@@ -67,11 +71,13 @@ public sealed partial class GravitasQuery3DService
         Fixed64 maxDistance,
         PhysicsLayerMask layerMask)
     {
+        SwiftThrowHelper.ThrowIfArgument(
+            radius < Fixed64.Zero,
+            nameof(radius),
+            "3D query radius cannot be negative.");
+
         _currentLayerMask = layerMask;
-        NextCircleVersion();
         ResetLastQueryCounters();
-        _redundantColliderCheck.Clear();
-        _redundantVoxelCheck.Clear();
 
         var planarDirection = new Vector2d(direction.X, direction.Z);
         Vector2d normalizedPlanarDirection = Vector2d.GetNormalized(planarDirection);
@@ -105,7 +111,8 @@ public sealed partial class GravitasQuery3DService
     }
 
     /// <summary>
-    /// Finds all colliders whose surfaces are inside the supplied X/Z circle radius.
+    /// Finds all colliders whose complete X/Z projections overlap the supplied circle. The query
+    /// position's Y component does not affect classification.
     /// </summary>
     public int OverlapCircleAll(
         Vector3d position,
@@ -114,14 +121,15 @@ public sealed partial class GravitasQuery3DService
         SwiftList<Physics3DHit> results)
     {
         SwiftThrowHelper.ThrowIfNull(results, nameof(results));
+        SwiftThrowHelper.ThrowIfArgument(
+            radius < Fixed64.Zero,
+            nameof(radius),
+            "3D query radius cannot be negative.");
 
         _currentLayerMask = layerMask;
-        NextCircleVersion();
         ResetLastQueryCounters();
 
         results.FastClear();
-        _redundantColliderCheck.Clear();
-        _redundantVoxelCheck.Clear();
 
         TraceCircleForAllHits(position, radius, results);
 
@@ -244,16 +252,20 @@ public sealed partial class GravitasQuery3DService
         ref bool found,
         ref Physics3DHit closestHit)
     {
-        GetCoveredCircleVoxels(position, radius);
-        for (int i = 0; i < _coveredVoxels.Count; i++)
+        GetPlanarCircleCandidates(position, radius);
+        for (int i = 0; i < _planarCircleCandidates.Count; i++)
         {
-            Voxel voxel = _coveredVoxels[i];
-            if (!GridTraversal.TryGetUniquePartition(voxel, _redundantVoxelCheck, out PhysicsPartition? partition))
-            {
+            if (!TryBuildOverlapHit(
+                    _planarCircleCandidates[i],
+                    position,
+                    radius,
+                    out Physics3DHit hitInfo,
+                    out _)
+                || !PhysicsHitSelectionPolicy.ShouldReplace(hitInfo, found, closestHit))
                 continue;
-            }
 
-            ProcessPartitionForClosestHit(partition!, position, radius, ref found, ref closestHit);
+            found = true;
+            closestHit = hitInfo;
         }
     }
 
@@ -268,224 +280,99 @@ public sealed partial class GravitasQuery3DService
         if (direction == Vector2d.Zero)
             return;
 
-        GetCoveredCircleVoxels(position, radius);
-        for (int i = 0; i < _coveredVoxels.Count; i++)
+        GetPlanarCircleCandidates(position, radius);
+        for (int i = 0; i < _planarCircleCandidates.Count; i++)
         {
-            Voxel voxel = _coveredVoxels[i];
-            if (!GridTraversal.TryGetUniquePartition(voxel, _redundantVoxelCheck, out PhysicsPartition? partition))
+            if (!TryBuildOverlapHit(
+                    _planarCircleCandidates[i],
+                    position,
+                    radius,
+                    out Physics3DHit hitInfo,
+                    out ProjectedSurfaceRelation relation)
+                || hitInfo.Distance > maxDistance
+                || (!relation.IsContained
+                    && WideGeometry.GetDifferenceDotProduct2D(
+                        relation.Direction.X,
+                        Fixed64.Zero,
+                        relation.Direction.Y,
+                        Fixed64.Zero,
+                        direction.X,
+                        Fixed64.Zero,
+                        direction.Y,
+                        Fixed64.Zero).Sign <= 0)
+                || !PhysicsHitSelectionPolicy.ShouldReplace(hitInfo, found, closestHit))
             {
                 continue;
             }
 
-            ProcessPartitionForDirectionalHit(
-                partition!,
-                position,
-                radius,
-                direction,
-                maxDistance,
-                ref found,
-                ref closestHit);
+            found = true;
+            closestHit = hitInfo;
         }
     }
 
     private void TraceCircleForAllHits(Vector3d position, Fixed64 radius, SwiftList<Physics3DHit> results)
     {
-        GetCoveredCircleVoxels(position, radius);
-        for (int i = 0; i < _coveredVoxels.Count; i++)
-        {
-            Voxel voxel = _coveredVoxels[i];
-            if (!GridTraversal.TryGetUniquePartition(voxel, _redundantVoxelCheck, out PhysicsPartition? partition))
-            {
-                continue;
-            }
-
-            ProcessPartitionForAllHits(partition!, position, radius, results);
-        }
-    }
-
-    private void GetCoveredCircleVoxels(Vector3d position, Fixed64 radius)
-    {
-        var min = new Vector3d(
-            position.X - radius,
-            Fixed64.MinValue,
-            position.Z - radius);
-        var max = new Vector3d(
-            position.X + radius,
-            Fixed64.MaxValue,
-            position.Z + radius);
-        GridTracer.GetCoveredVoxelsInto(
-            _context.World,
-            min,
-            max,
-            _coveredVoxels,
-            _traceScratch);
-    }
-
-    private void ProcessPartitionForClosestHit(
-        PhysicsPartition partition,
-        Vector3d position,
-        Fixed64 radius,
-        ref bool found,
-        ref Physics3DHit closestHit)
-    {
-        ProcessColliderListForClosestHit(
-            partition.ContainedDynamicObjects,
-            position,
-            radius,
-            ref found,
-            ref closestHit);
-
-        ProcessColliderListForClosestHit(
-            partition.ContainedKinematicObjects,
-            position,
-            radius,
-            ref found,
-            ref closestHit);
-
-        ProcessColliderListForClosestHit(
-            partition.ContainedStaticObjects,
-            position,
-            radius,
-            ref found,
-            ref closestHit);
-    }
-
-    private void ProcessColliderListForClosestHit(
-        SwiftSparseSet? colliderIds,
-        Vector3d position,
-        Fixed64 radius,
-        ref bool found,
-        ref Physics3DHit closestHit)
-    {
-        if (colliderIds == null)
-            return;
-
-        for (int i = colliderIds.Count - 1; i >= 0; i--)
-        {
-            if (!TryBuildOverlapHit(colliderIds.DenseKeys[i], position, radius, out Physics3DHit hitInfo)
-                || !PhysicsHitSelectionPolicy.ShouldReplace(hitInfo, found, closestHit))
-            {
-                continue;
-            }
-
-            found = true;
-            closestHit = hitInfo;
-        }
-    }
-
-    private void ProcessPartitionForDirectionalHit(
-        PhysicsPartition partition,
-        Vector3d position,
-        Fixed64 radius,
-        Vector2d direction,
-        Fixed64 maxDistance,
-        ref bool found,
-        ref Physics3DHit closestHit)
-    {
-        ProcessColliderListForDirectionalHit(partition.ContainedDynamicObjects, position, radius, direction, maxDistance, ref found, ref closestHit);
-        ProcessColliderListForDirectionalHit(partition.ContainedKinematicObjects, position, radius, direction, maxDistance, ref found, ref closestHit);
-        ProcessColliderListForDirectionalHit(partition.ContainedStaticObjects, position, radius, direction, maxDistance, ref found, ref closestHit);
-    }
-
-    private void ProcessColliderListForDirectionalHit(
-        SwiftSparseSet? colliderIds,
-        Vector3d position,
-        Fixed64 radius,
-        Vector2d direction,
-        Fixed64 maxDistance,
-        ref bool found,
-        ref Physics3DHit closestHit)
-    {
-        if (colliderIds == null)
-            return;
-
-        for (int i = colliderIds.Count - 1; i >= 0; i--)
-        {
-            if (!TryBuildOverlapHit(colliderIds.DenseKeys[i], position, radius, out Physics3DHit hitInfo))
-                continue;
-
-            if (hitInfo.Distance > maxDistance
-                || WideGeometry.GetDifferenceDotProduct2D(
-                    hitInfo.Direction.X,
-                    Fixed64.Zero,
-                    hitInfo.Direction.Z,
-                    Fixed64.Zero,
-                    direction.X,
-                    Fixed64.Zero,
-                    direction.Y,
-                    Fixed64.Zero).Sign <= 0
-                || !PhysicsHitSelectionPolicy.ShouldReplace(hitInfo, found, closestHit))
-            {
-                continue;
-            }
-
-            found = true;
-            closestHit = hitInfo;
-        }
-    }
-
-    private void ProcessPartitionForAllHits(
-        PhysicsPartition partition,
-        Vector3d position,
-        Fixed64 radius,
-        SwiftList<Physics3DHit> results)
-    {
-        ProcessColliderListForAllHits(partition.ContainedDynamicObjects, position, radius, results);
-        ProcessColliderListForAllHits(partition.ContainedKinematicObjects, position, radius, results);
-        ProcessColliderListForAllHits(partition.ContainedStaticObjects, position, radius, results);
-    }
-
-    private void ProcessColliderListForAllHits(
-        SwiftSparseSet? colliderIds,
-        Vector3d position,
-        Fixed64 radius,
-        SwiftList<Physics3DHit> results)
-    {
-        if (colliderIds == null)
-            return;
-
-        for (int i = colliderIds.Count - 1; i >= 0; i--)
-        {
-            if (TryBuildOverlapHit(colliderIds.DenseKeys[i], position, radius, out Physics3DHit hitInfo))
+        GetPlanarCircleCandidates(position, radius);
+        for (int i = 0; i < _planarCircleCandidates.Count; i++)
+            if (TryBuildOverlapHit(
+                    _planarCircleCandidates[i],
+                    position,
+                    radius,
+                    out Physics3DHit hitInfo,
+                    out _))
                 results.Add(hitInfo);
-        }
     }
 
-    private bool TryBuildOverlapHit(int colliderId, Vector3d position, Fixed64 radius, out Physics3DHit raycastHit)
+    private void GetPlanarCircleCandidates(Vector3d position, Fixed64 radius)
+    {
+        var center = new Vector2d(position.X, position.Z);
+        _context.Collisions.QueryPlanarColliderCandidates(
+            DynamicCcdCandidateIndex2D.CreateBoundsBetween(
+                center,
+                center,
+                radius),
+            _planarCircleCandidates);
+    }
+
+    private bool TryBuildOverlapHit(
+        int colliderId,
+        Vector3d position,
+        Fixed64 radius,
+        out Physics3DHit raycastHit,
+        out ProjectedSurfaceRelation relation)
     {
         raycastHit = default;
-        if (!_context.Physics.TryGetColliderById(colliderId, out LSCollider? current))
-            return false;
-
+        relation = default;
+        SwiftThrowHelper.ThrowIfTrue(
+            !_context.Physics.TryGetColliderById(colliderId, out LSCollider? current),
+            nameof(GravitasQuery3DService),
+            "Planar query index contained an unregistered collider.");
         LSCollider collider = current!;
-        if (!_currentLayerMask.Includes(collider.Layer)
-            || collider.CircleQueryVersion == CircleVersion
-            || !_redundantColliderCheck.Add(collider.Id))
-        {
+        if (!_currentLayerMask.Includes(collider.Layer))
             return false;
-        }
 
-        collider.CircleQueryVersion = CircleVersion;
         LastQueryCandidateCount++;
 
         return TryBuildPlanarOverlapHit(
             collider,
             position,
             radius,
-            out raycastHit);
+            out raycastHit,
+            out relation);
     }
 
     private static bool TryBuildPlanarOverlapHit(
         LSCollider collider,
         Vector3d position,
         Fixed64 radius,
-        out Physics3DHit hit)
+        out Physics3DHit hit,
+        out ProjectedSurfaceRelation relation)
     {
         if (!ColliderPlanarProjection.TryGetRelation(
                 collider,
                 new Vector2d(position.X, position.Z),
                 radius,
-                out ProjectedSurfaceRelation relation))
+                out relation))
         {
             hit = default;
             return false;

@@ -109,7 +109,7 @@ Gravitas owns, per context:
 | `GravitasMixedCollisionService` | Mixed broad phase, pair lifecycle, constrained response, CCD handoff, retained partition cleanup, and diagnostics.                                     |
 | `GravitasConstraint3DService`   | 3D joints, ragdolls, linked-collider filtering, motor handoff, replay hashing, and metrics.                                                            |
 | `GravitasConstraint2DService`   | 2D joints, ragdolls, linked-collider filtering, motor handoff, replay hashing, and metrics.                                                            |
-| `GravitasQuery3DService`        | 3D raycasts, swept-sphere and convex-source sweeps, cone volumes, and X/Z circle proximity.                                                            |
+| `GravitasQuery3DService`        | 3D raycasts, swept-sphere and convex-source sweeps, cone volumes, and X/Z projected-circle overlaps.                                                   |
 | `GravitasQuery2DService`        | 2D overlaps, segment raycasts, swept-circle queries, batching, and hit ordering.                                                                       |
 | `GravitasQueryMixedService`     | Explicit mixed sphere-against-2D and circle-against-3D sweeps.                                                                                         |
 | `GravitasDiagnosticSink`        | Disabled-by-default context diagnostics for events and renderer-neutral debug draw commands.                                                           |

@@ -68,7 +68,7 @@ implementation details stay inside services.
 | `GravitasMixedCollisionService` | Dedicated mixed 2D/3D broad phase, pair lifecycle, constrained response, partition cleanup.  |
 | `GravitasCollisionService`      | GridForge-backed 3D partitions, duplicate suppression, culling, retained partition cleanup.  |
 | `GravitasCollision2DService`    | GridForge-backed 2D partitions, awake dynamic membership, retained partition cleanup.        |
-| `GravitasQuery3DService`        | 3D raycasts, swept-sphere and convex-source sweeps, cone volumes, X/Z circle proximity.      |
+| `GravitasQuery3DService`        | 3D raycasts, swept-sphere and convex-source sweeps, cone volumes, X/Z projected-circle overlap. |
 | `GravitasQuery2DService`        | 2D overlaps, segment raycasts, swept-circle queries, hit ordering.                           |
 | `GravitasQueryMixedService`     | Explicit mixed sphere-against-2D and circle-against-3D sweeps.                               |
 | `GravitasCoroutineService`      | Lockstep coroutines and context-bound waits.                                                 |

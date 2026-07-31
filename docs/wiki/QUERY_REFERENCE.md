@@ -44,7 +44,7 @@ ordering, except cone volumes sort by axial distance before collider ID.
 | `SweepConvexMesh`                                               | convex `LSMeshCollider` at current pose plus displacement       | supported 3D targets and concave mesh target triangles                |
 | `SweepCompound`                                                 | authored `LSCompoundCollider` from supported convex parts       | supported 3D targets                                                  |
 | `OverlapCone`, `OverlapConeAll`                                 | apex-origin finite cone volume                                  | 3D colliders                                                          |
-| `OverlapCircle`, `OverlapCircleInDirection`, `OverlapCircleAll` | X/Z circle proximity query                                      | 3D colliders through closest-surface projection                       |
+| `OverlapCircle`, `OverlapCircleInDirection`, `OverlapCircleAll` | X/Z projected-circle overlap                                    | complete X/Z projections of supported 3D colliders                    |
 
 Reducer notes:
 
@@ -70,7 +70,7 @@ Reducer notes:
 - concave source meshes throw; author stable convex compound source parts.
 - cone volumes use exact supported convex target checks and stable compound
   reduction.
-- `OverlapCircle` is an X/Z proximity query, not swept movement.
+- `OverlapCircle` is an X/Z projected overlap, not swept movement.
 
 ### 2D
 
@@ -135,7 +135,7 @@ through one tagged request type.
 
 | Service      | Batch families                                                                     |
 | ------------ | ---------------------------------------------------------------------------------- |
-| `Query3D`    | raycast, swept sphere, registered source sweeps, cone volume, X/Z circle proximity |
+| `Query3D`    | raycast, swept sphere, registered source sweeps, cone volume, X/Z projected-circle overlap |
 | `Query2D`    | raycast, overlap, swept circle                                                     |
 | `QueryMixed` | sphere-against-2D and circle-against-3D                                            |
 
@@ -229,8 +229,26 @@ maximum-scale lattice witness, so a cone section wholly contained by a triangle
 does not require an edge crossing or an axis/face intersection. Exact ties keep
 edge order, and equal-distance mesh hits keep triangle index order.
 
-The 3D `OverlapCircle` family is an X/Z proximity query for 3D colliders. It is
-not a `Query2D` call, not a swept circle, and not a swept sphere.
+The 3D `OverlapCircle` family classifies the complete X/Z projection of each
+supported 3D collider. It is not a `Query2D` call, not a swept circle, and not
+a swept sphere. Query Y does not affect candidate discovery, classification,
+distance, direction, or ordering. Exact containment is a zero-distance overlap;
+an exact positive separation retains its direction for directional filtering
+even when the public Q32.32 distance and offset round to zero. Equal compound
+parts and mesh triangles retain earlier authored order. Every hit owns a real
+3D surface `ContactAnchor`; callers use `Physics3DHit.TryGetPoint(...)` when a
+materialized coordinate is required.
+
+Directional projected-circle queries ignore direction Y and reject a zero X/Z
+direction. Containment is admitted independently of direction because it has no
+separation side; every separated hit requires a positive exact X/Z dot product
+and a reported distance no greater than `maxDistance`.
+
+Candidate discovery uses a partition-synchronized planar index rather than
+scanning configured Y columns, so dense and sparse world height do not multiply
+the query cost. The index contains each registered collider that currently owns
+at least one active-grid 3D partition; colliders wholly outside configured grids
+remain undiscoverable, matching the other partition-backed 3D query families.
 
 ## 2D Queries
 

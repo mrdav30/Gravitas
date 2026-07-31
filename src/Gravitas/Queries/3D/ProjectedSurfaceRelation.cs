@@ -19,20 +19,28 @@ internal readonly struct ProjectedSurfaceRelation
     internal ProjectedSurfaceRelation(
         Fixed64 distance,
         Vector2d offset,
+        Vector2d direction,
         FixedPointAnchor contactAnchor,
-        Vector3d outwardNormal)
+        Vector3d outwardNormal,
+        bool isContained)
     {
         Distance = distance;
         Offset = offset;
+        Direction = direction;
         ContactAnchor = contactAnchor;
         OutwardNormal = outwardNormal;
+        IsContained = isContained;
     }
 
     internal Fixed64 Distance { get; }
 
     internal Vector2d Offset { get; }
 
+    internal Vector2d Direction { get; }
+
     internal FixedPointAnchor ContactAnchor { get; }
 
     internal Vector3d OutwardNormal { get; }
+
+    internal bool IsContained { get; }
 }

@@ -55,12 +55,12 @@ public sealed class QueryContextServiceTests
     }
 
     [Fact]
-    public void Query3DReset_WithLiveCollider_ShouldInvalidateRayAndCircleDeduplicationCaches()
+    public void Query3DReset_WithLiveCollider_ShouldInvalidateRayAndVolumeDeduplicationCaches()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         EnsureGrid(context);
         LSSphereCollider sphere = CreateDynamicSphere(context, Vector3d.Zero);
-        var circleHits = new SwiftList<Physics3DHit>();
+        var volumeHits = new SwiftList<Physics3DHit>();
 
         context.Query3D.Raycast(
             new Vector3d((Fixed64)(-2), Fixed64.Zero, Fixed64.Zero),
@@ -68,11 +68,13 @@ public sealed class QueryContextServiceTests
             (Fixed64)4,
             out _,
             PhysicsLayerMask.All).Should().BeTrue();
-        context.Query3D.OverlapCircleAll(
-            Vector3d.Zero,
-            (Fixed64)2,
+        context.Query3D.OverlapConeAll(
+            new Vector3d((Fixed64)(-2), Fixed64.Zero, Fixed64.Zero),
+            Vector3d.Right,
+            (Fixed64)4,
+            Fixed64.One,
             PhysicsLayerMask.All,
-            circleHits).Should().Be(1);
+            volumeHits).Should().Be(1);
         sphere.RaycastVersion.Should().Be(context.Query3D.RaycastVersion);
         sphere.CircleQueryVersion.Should().Be(context.Query3D.CircleVersion);
         sphere.RaycastVersion.Should().NotBe(0);
@@ -92,13 +94,15 @@ public sealed class QueryContextServiceTests
             (Fixed64)4,
             out Physics3DHit rayHit,
             PhysicsLayerMask.All).Should().BeTrue();
-        context.Query3D.OverlapCircleAll(
-            Vector3d.Zero,
-            (Fixed64)2,
+        context.Query3D.OverlapConeAll(
+            new Vector3d((Fixed64)(-2), Fixed64.Zero, Fixed64.Zero),
+            Vector3d.Right,
+            (Fixed64)4,
+            Fixed64.One,
             PhysicsLayerMask.All,
-            circleHits).Should().Be(1);
+            volumeHits).Should().Be(1);
         rayHit.Collider.Should().BeSameAs(sphere);
-        circleHits[0].Collider.Should().BeSameAs(sphere);
+        volumeHits[0].Collider.Should().BeSameAs(sphere);
     }
 
     private static LSSphereCollider CreateDynamicSphere(GravitasWorldContext context, Vector3d position)

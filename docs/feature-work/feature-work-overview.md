@@ -39,6 +39,23 @@ instead of burying it in notes.
 
 ## Recently Completed
 
+- [`Full-Domain 3D Surface Projection`](done/2026-07-31-full-domain-3d-surface-projection-plan.md)
+  - Completed 2026-07-31. FixedMathSharp now owns reusable exact planar
+    relations and semantic surface anchors; Gravitas classifies complete X/Z
+    collider projections independently from optional point materialization.
+    Closest, directional, all-hit, and batch queries share one exact reducer and
+    one partition-synchronized planar index with deterministic authored-order
+    ties, grid-removal repair, Y-independent discovery, and zero warmed
+    allocation.
+  - FixedMathSharp passes 2,625 Release and 2,604 ReleaseLean tests at
+    46,549/46,549 lines, 8,640/8,640 branches, and 3,400/3,400 methods. Gravitas
+    passes 3,894 Release and 3,839 ReleaseLean tests at 43,971/43,971 lines,
+    12,865/12,865 branches, and 4,531/4,531 methods. Dense and sparse
+    projected-circle rows remain approximately 5.4 us from 8 through 1,024
+    vertical cells with zero allocation. Translation-only updates of the unique
+    widest candidate and the following query remain flat from 64 through
+    16,384 entries when ordering is retained; independent closure review found
+    no remaining critical or important issue.
 - [`Full-Domain SolidBody Point Transform`](done/2026-07-30-full-domain-solid-body-point-transform-plan.md)
   - Completed 2026-07-30. `FixedTransform` now owns strict current-snapshot 3D
     and explicit X/Z point conversion. `SolidBody` and `SolidBody2D` expose

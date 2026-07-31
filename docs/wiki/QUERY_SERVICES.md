@@ -39,7 +39,7 @@ flowchart LR
 | Swept sphere                    | `Query3D.SweepSphere(...)`                                                                      | `Query3D.SweepSphereAll(...)` |
 | Registered convex source sweeps | `SweepCapsule`, `SweepCuboid`, `SweepCylinder`, `SweepCone`, `SweepConvexMesh`, `SweepCompound` | matching `*All` overloads     |
 | Cone volume                     | `Query3D.OverlapCone(...)`                                                                      | `Query3D.OverlapConeAll(...)` |
-| X/Z circle proximity            | `OverlapCircle`, `OverlapCircleInDirection`                                                     | `OverlapCircleAll`            |
+| X/Z projected-circle overlap    | `OverlapCircle`, `OverlapCircleInDirection`                                                     | `OverlapCircleAll`            |
 
 Concave-mesh cone overlap reduces every candidate through FixedMathSharp's
 full-domain `FixedTriangle` contract. Stable AB, BC, CA boundary candidates and
@@ -47,6 +47,16 @@ the exact face-interior candidate are compared before final hit narrowing, so a
 cone section wholly contained by a large triangle is not dependent on an edge
 crossing or an axis/face intersection. Equal-distance mesh hits retain triangle
 index order, and the warmed query path remains allocation-free.
+
+The 3D projected-circle family classifies the complete X/Z projection of each
+supported collider. Query Y is ignored. Exact containment is a zero-distance
+overlap; positive separations retain an exact direction witness even when the
+public Q32.32 distance and offset round to zero. Hits keep a real 3D
+`ContactAnchor`, and point materialization remains explicit through
+`Physics3DHit.TryGetPoint(...)`. Candidate discovery uses the collision
+service's partition-synchronized planar index, so configured world height does
+not multiply query cost. As with other partition-backed 3D queries, a collider
+must own at least one active-grid partition to be discoverable.
 
 Sphere sweeps against cuboids transform the authored center chord into cuboid
 local space and delegate to FixedMathSharp's exact spherical-box dilation.

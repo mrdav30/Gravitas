@@ -29,17 +29,17 @@ records follow with their original discovery context.
 - Treat local links as unstaged validation scaffolding. Do not publish or
   release with them in place.
 - FixedMathSharp foundation hardening is complete. The current locally linked
-  geometry and arithmetic extensions pass 2,595 Release and 2,574 ReleaseLean
-  tests plus eight Chronicler tests in each mode at 49,865/49,865 authored
-  lines, 8,426/8,426 branches, and 3,304/3,304 methods. Retain the local link
-  while the remaining Gravitas queue is hardened.
+  geometry and arithmetic extensions pass 2,625 Release and 2,604 ReleaseLean
+  tests at 46,549/46,549 reachable lines, 8,640/8,640 branches, and
+  3,400/3,400 methods. Retain the local link while the remaining Gravitas queue
+  is hardened.
 - SwiftCollections has no library-specific active issue at this checkpoint; its
   place in the sequence is a full downstream compatibility and release gate.
 - GridForge's runtime-identity defect is resolved. Keep the lower stack locally
   linked while the remaining Gravitas queue is hardened so another downstream
   discovery does not force a partial release cycle.
-- Gravitas's current Release run passes 3,866 tests at 43,664/43,664 lines,
-  12,775/12,775 branches, and 4,503/4,503 methods. ReleaseLean passes 3,811
+- Gravitas's current Release run passes 3,894 tests at 43,971/43,971 lines,
+  12,865/12,865 branches, and 4,531/4,531 methods. ReleaseLean passes 3,839
   tests. Exact body point transforms and the existing 3D, 2D, and mixed
   response allocation gates remain at zero managed bytes; measured timing
   signals remain in the benchmark backlog.
@@ -49,54 +49,10 @@ records follow with their original discovery context.
 
 ### Ordered Queue
 
-1. **Gravitas:**
-   [3D Closest-Surface And Overlap-Circle Classification Are Not Full-Domain](#3d-closest-surface-and-overlap-circle-classification-are-not-full-domain).
-2. **FixedMathSharp / Gravitas:**
+1. **FixedMathSharp / Gravitas:**
    [Radial Segment Parameters Can Collapse Spatially Distinct Query Hits](#radial-segment-parameters-can-collapse-spatially-distinct-query-hits).
-3. **FixedMathSharp / Gravitas:**
+2. **FixedMathSharp / Gravitas:**
    [Mesh Triangle-Triangle SAT Can Saturate Before Axis Classification](#mesh-triangle-triangle-sat-can-saturate-before-axis-classification).
-
-### 3D Closest-Surface And Overlap-Circle Classification Are Not Full-Domain
-
-**Discovered:** 2026-07-22  
-**Source:** finite-axis closest-surface authority audit; exact 2D boundary
-closure review  
-**Affected area:** public 3D closest-surface APIs, `LSCompoundCollider`
-part selection, 3D `OverlapCircle`, `OverlapCircleInDirection`,
-`OverlapCircleAll`, batch variants, `Physics3DHit`, and finite-axis/cuboid
-surface witnesses
-
-**Progress (2026-07-31):** Phase 1 of the
-[full-domain 3D surface projection plan](2026-07-31-full-domain-3d-surface-projection-plan.md)
-replaced sphere saturation, separated finite-axis semantic anchors from optional
-scalar distance materialization, and moved compound selection to exact anchor
-ranking. `Physics3DHit` already owns a semantic `ContactAnchor`; the remaining
-work is exact X/Z projected-volume classification and query-family adoption.
-
-Before Phase 1, `LSSphereCollider.ClosestPointOnSurface(...)` materialized a
-relative vector through saturating subtraction and magnitude arithmetic, while
-`LSCompoundCollider` materialized and scalar-ranked every child point. The
-shared internal semantic-anchor path now removes both failure modes without
-adding a second public collider API.
-
-The remaining public 3D overlap-circle family is documented as X/Z proximity,
-but `TryBuildOverlapHit` currently obtains a collider's full-3D closest surface
-point and compares the resulting 3D distance with the circle radius. A vertical
-offset can therefore reject a collider whose X/Z projection overlaps the query.
-The same path treats the surface witness as both classification evidence and
-the required hit payload. Near a `Fixed64` scalar face, canonical finite-axis
-or oriented-box geometry can overlap the circle even when its conceptual
-nearest surface point is outside the representable coordinate domain. The
-existing `Physics3DHit.ContactAnchor` can preserve the semantic witness; the
-query path must now classify projection independently and materialize only when
-the caller requests the point.
-
-Define X/Z overlap classification independently from final witness
-materialization and adopt it consistently across closest, directional, all-hit,
-and batch paths. Cover vertical-offset invariance, containment, scalar faces,
-finite axes, cuboids, meshes, compounds, deterministic ordering, and warmed
-zero-allocation behavior. Do not mask the issue with full-3D distance,
-saturating projection, a fake hit point, or a silent miss.
 
 ### Radial Segment Parameters Can Collapse Spatially Distinct Query Hits
 
@@ -154,6 +110,40 @@ projection/ranking paths; do not assume a discrete 3D collision fix provides
 query parity.
 
 ## Resolved Issues
+
+### 3D Closest-Surface And Overlap-Circle Classification Are Not Full-Domain
+
+**Discovered:** 2026-07-22  
+**Resolved:** 2026-07-31  
+**Source:** finite-axis closest-surface authority audit; exact 2D boundary
+closure review  
+**Affected area:** public 3D closest-surface APIs, compound and mesh feature
+selection, the complete 3D projected-circle query family, and
+`Physics3DHit.ContactAnchor`
+
+RCA: closest-feature selection, representable 3D distance, and final point
+materialization were coupled. Saturating subtraction or an unrepresentable
+conceptual coordinate could therefore hide a valid semantic surface witness,
+while the X/Z circle family incorrectly used full-3D distance and vertically
+scanned configured GridForge columns.
+
+Fix: FixedMathSharp now owns policy-neutral exact planar relations and semantic
+surface anchors. Gravitas dispatches every built-in primitive, mesh triangle,
+and compound part through those contracts, preserves exact containment and
+subraw separation direction, retains authored-order ties, and materializes a
+point only through the existing explicit hit boundary. Public closest,
+directional, all-hit, and batch queries share one reducer and a
+partition-synchronized planar candidate index. The index remains conservative
+over the full scalar domain, repairs its extent metadata after updates and
+removals, skips equivalent-width metadata churn, and rebuilds deterministically
+when GridForge world ownership changes. Translation updates that remain between
+their sorted neighbors preserve query-ready order; actual crossings retain the
+deterministic full-sort fallback.
+
+Verification: the completed
+[full-domain 3D surface projection plan](done/2026-07-31-full-domain-3d-surface-projection-plan.md)
+records full standard/Lean test, exact coverage, zero-allocation, dense/sparse
+vertical-scaling benchmark, documentation, and independent-review evidence.
 
 ### SolidBody Point Transforms Can Saturate Before Their Final World Or Local Coordinate
 

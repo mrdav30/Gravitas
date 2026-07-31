@@ -148,23 +148,47 @@ public sealed class DynamicCcdCandidateIndexTests
     }
 
     [Fact]
-    public void AddOrUpdate_ShouldReplaceSortedBoundsWithoutDuplicatingIdentity()
+    public void AddOrUpdate_ShouldPreserveIdentityAcrossOrderedAndCrossingUpdates()
     {
         var index3D = new DynamicCcdCandidateIndex(2, supportsUpdates: true);
         index3D.Add(7, CreateBounds(Fixed64.Zero, Fixed64.Zero));
         index3D.Add(9, CreateBounds((Fixed64)4, Fixed64.Zero));
         index3D.Sort();
-        index3D.AddOrUpdate(7, CreateBounds((Fixed64)8, Fixed64.Zero));
         var results3D = new SwiftList<int>(2);
+        index3D.AddOrUpdate(7, CreateBounds(Fixed64.One, Fixed64.Zero));
+        index3D.Query(CreateBounds(Fixed64.One, Fixed64.Zero), results3D);
+        results3D.Should().Equal(7);
+        index3D.AddOrUpdate(7, CreateBounds((Fixed64)8, Fixed64.Zero));
         index3D.Query(CreateBounds((Fixed64)8, Fixed64.Zero), results3D);
+        results3D.Should().Equal(7);
+        index3D.AddOrUpdate(
+            7,
+            new FixedBoundVolume(
+                new Vector3d((Fixed64)6, -Fixed64.Half, -Fixed64.Half),
+                new Vector3d((Fixed64)10, Fixed64.Half, Fixed64.Half)));
+        index3D.Query(CreateBounds((Fixed64)8, Fixed64.Zero), results3D);
+        results3D.Should().Equal(7);
+        index3D.AddOrUpdate(7, CreateBounds(Fixed64.One, Fixed64.Zero));
+        index3D.Query(CreateBounds(Fixed64.One, Fixed64.Zero), results3D);
 
         var index2D = new DynamicCcdCandidateIndex2D(2, supportsUpdates: true);
         index2D.Add(11, CreatePlanarBounds(Fixed64.Zero, Fixed64.Zero));
         index2D.Add(13, CreatePlanarBounds((Fixed64)4, Fixed64.Zero));
         index2D.Sort();
-        index2D.AddOrUpdate(11, CreatePlanarBounds((Fixed64)8, Fixed64.Zero));
         var results2D = new SwiftList<int>(2);
+        index2D.AddOrUpdate(11, CreatePlanarBounds(Fixed64.One, Fixed64.Zero));
+        index2D.Query(CreatePlanarBounds(Fixed64.One, Fixed64.Zero), results2D);
+        results2D.Should().Equal(11);
+        index2D.AddOrUpdate(11, CreatePlanarBounds((Fixed64)8, Fixed64.Zero));
         index2D.Query(CreatePlanarBounds((Fixed64)8, Fixed64.Zero), results2D);
+        results2D.Should().Equal(11);
+        index2D.AddOrUpdate(
+            11,
+            new DynamicCcdPlanarBounds((Fixed64)6, -Fixed64.Half, (Fixed64)10, Fixed64.Half));
+        index2D.Query(CreatePlanarBounds((Fixed64)8, Fixed64.Zero), results2D);
+        results2D.Should().Equal(11);
+        index2D.AddOrUpdate(11, CreatePlanarBounds(Fixed64.One, Fixed64.Zero));
+        index2D.Query(CreatePlanarBounds(Fixed64.One, Fixed64.Zero), results2D);
 
         index3D.Count.Should().Be(2);
         results3D.Should().Equal(7);
@@ -220,6 +244,77 @@ public sealed class DynamicCcdCandidateIndexTests
 
         results3D.Should().Equal(7);
         results2D.Should().Equal(11);
+    }
+
+    [Fact]
+    public void Query_ShouldAdmitFullDomainSpansFromEitherEndpoint()
+    {
+        var updatedFullDomainBounds3D = new FixedBoundVolume(
+            new Vector3d(Fixed64.MinValue + Fixed64.One, Fixed64.Zero, Fixed64.Zero),
+            new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero));
+        var endpointQuery3D = new FixedBoundVolume(
+            new Vector3d(Fixed64.MaxValue - Fixed64.One, Fixed64.Zero, Fixed64.Zero),
+            new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero));
+        var updatedFullDomainBounds2D = new DynamicCcdPlanarBounds(
+            Fixed64.MinValue + Fixed64.One,
+            Fixed64.Zero,
+            Fixed64.MaxValue,
+            Fixed64.Zero);
+        var endpointQuery2D = new DynamicCcdPlanarBounds(
+            Fixed64.MaxValue - Fixed64.One,
+            Fixed64.Zero,
+            Fixed64.MaxValue,
+            Fixed64.Zero);
+
+        var index3D = new DynamicCcdCandidateIndex(2, supportsUpdates: true);
+        index3D.Add(5, CreateBounds(Fixed64.Zero, Fixed64.Zero));
+        index3D.Add(
+            7,
+            new FixedBoundVolume(
+                new Vector3d(Fixed64.MinValue, Fixed64.Zero, Fixed64.Zero),
+                new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero)));
+        index3D.AddOrUpdate(7, updatedFullDomainBounds3D);
+        var results3D = new SwiftList<int>(1);
+
+        var index2D = new DynamicCcdCandidateIndex2D(2, supportsUpdates: true);
+        index2D.Add(9, CreatePlanarBounds(Fixed64.Zero, Fixed64.Zero));
+        index2D.Add(
+            11,
+            new DynamicCcdPlanarBounds(
+                Fixed64.MinValue,
+                Fixed64.Zero,
+                Fixed64.MaxValue,
+                Fixed64.Zero));
+        index2D.AddOrUpdate(11, updatedFullDomainBounds2D);
+        var results2D = new SwiftList<int>(1);
+
+        index3D.Query(endpointQuery3D, results3D);
+        index2D.Query(endpointQuery2D, results2D);
+
+        results3D.Should().Equal(7);
+        results2D.Should().Equal(11);
+
+        index3D.AddOrUpdate(7, CreateBounds(Fixed64.Zero, Fixed64.Zero));
+        index2D.AddOrUpdate(11, CreatePlanarBounds(Fixed64.Zero, Fixed64.Zero));
+        index3D.Query(endpointQuery3D, results3D);
+        index2D.Query(endpointQuery2D, results2D);
+        results3D.Should().BeEmpty();
+        results2D.Should().BeEmpty();
+
+        index3D.AddOrUpdate(7, updatedFullDomainBounds3D);
+        index2D.AddOrUpdate(11, updatedFullDomainBounds2D);
+        index3D.Query(endpointQuery3D, results3D);
+        index2D.Query(endpointQuery2D, results2D);
+        results3D.Should().Equal(7);
+        results2D.Should().Equal(11);
+
+        index3D.Remove(7).Should().BeTrue();
+        index2D.Remove(11).Should().BeTrue();
+        index3D.Query(CreateBounds(Fixed64.Zero, Fixed64.Zero), results3D);
+        index2D.Query(CreatePlanarBounds(Fixed64.Zero, Fixed64.Zero), results2D);
+
+        results3D.Should().Equal(5);
+        results2D.Should().Equal(9);
     }
 
     [Fact]

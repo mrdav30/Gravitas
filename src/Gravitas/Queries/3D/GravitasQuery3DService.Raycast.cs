@@ -28,6 +28,7 @@ public sealed partial class GravitasQuery3DService
     private readonly ConvexSweepQueryWorker _convexSweepWorker = new();
     private SwiftList<Vector3d> _bufferIntersectionPoints = new();
     private readonly SwiftList<int> _meshTriangleCandidates = new(16);
+    private readonly SwiftList<int> _planarCircleCandidates = new();
     private readonly SwiftHashSet<int> _redundantColliderCheck = new();
     private readonly SwiftHashSet<WorldVoxelIndex> _redundantVoxelCheck = new();
     private readonly SwiftList<Voxel> _coveredVoxels = new();
@@ -60,7 +61,7 @@ public sealed partial class GravitasQuery3DService
     public uint RaycastVersion { get; internal set; }
 
     /// <summary>
-    /// Gets the context-local 3D X/Z circle query version.
+    /// Gets the context-local partition-traversed sphere/cone deduplication version.
     /// </summary>
     public uint CircleVersion { get; internal set; }
 
@@ -81,6 +82,7 @@ public sealed partial class GravitasQuery3DService
         ResetBatchCounters(0);
         _bufferIntersectionPoints.FastClear();
         _meshTriangleCandidates.FastClear();
+        _planarCircleCandidates.FastClear();
         _batch3DHits.FastClear();
         _redundantColliderCheck.Clear();
         _redundantVoxelCheck.Clear();

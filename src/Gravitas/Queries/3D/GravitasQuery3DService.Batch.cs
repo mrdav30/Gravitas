@@ -536,6 +536,7 @@ public sealed partial class GravitasQuery3DService
     public int OverlapCircleBatch(ReadOnlySpan<PhysicsOverlapCircle3DRequest> requests, Span<Physics3DHit> closestHits)
     {
         ValidateClosestBatchOutput(requests.Length, closestHits);
+        ValidateOverlapCircleRequests(requests);
         ResetBatchCounters(requests.Length);
 
         int hitCount = 0;
@@ -560,6 +561,7 @@ public sealed partial class GravitasQuery3DService
     {
         SwiftThrowHelper.ThrowIfNull(hits, nameof(hits));
         ValidateRangeBatchOutput(requests.Length, ranges);
+        ValidateOverlapCircleRequests(requests);
         ResetBatchCounters(requests.Length);
         hits.FastClear();
 
@@ -619,13 +621,14 @@ public sealed partial class GravitasQuery3DService
     }
 
     /// <summary>
-    /// Executes multiple directional 3D X/Z circle proximity queries and writes one closest-hit slot per request.
+    /// Executes multiple directional 3D X/Z projected-circle overlaps and writes one closest-hit slot per request.
     /// </summary>
     public int OverlapCircleInDirectionBatch(
         ReadOnlySpan<PhysicsOverlapCircleInDirection3DRequest> requests,
         Span<Physics3DHit> closestHits)
     {
         ValidateClosestBatchOutput(requests.Length, closestHits);
+        ValidateOverlapCircleRequests(requests);
         ResetBatchCounters(requests.Length);
 
         int hitCount = 0;
@@ -768,10 +771,7 @@ public sealed partial class GravitasQuery3DService
     private bool TryOverlapCircleBatchRequest(PhysicsOverlapCircle3DRequest request, out Physics3DHit hit)
     {
         _currentLayerMask = request.LayerMask;
-        NextCircleVersion();
         ResetLastQueryCounters();
-        _redundantColliderCheck.Clear();
-        _redundantVoxelCheck.Clear();
 
         bool found = false;
         Physics3DHit closest = default;
@@ -788,11 +788,8 @@ public sealed partial class GravitasQuery3DService
     private int OverlapCircleAllBatchRequest(PhysicsOverlapCircle3DRequest request, SwiftList<Physics3DHit> results)
     {
         _currentLayerMask = request.LayerMask;
-        NextCircleVersion();
         ResetLastQueryCounters();
         results.FastClear();
-        _redundantColliderCheck.Clear();
-        _redundantVoxelCheck.Clear();
 
         TraceCircleForAllHits(request.Position, request.Radius, results);
         Physics3DHitSorter.SortByDistance(results);
@@ -804,10 +801,7 @@ public sealed partial class GravitasQuery3DService
         out Physics3DHit hit)
     {
         _currentLayerMask = request.LayerMask;
-        NextCircleVersion();
         ResetLastQueryCounters();
-        _redundantColliderCheck.Clear();
-        _redundantVoxelCheck.Clear();
 
         var direction = new Vector2d(
             request.Direction.X,
@@ -834,6 +828,29 @@ public sealed partial class GravitasQuery3DService
             request.EndRadius,
             out hit,
             request.LayerMask);
+
+    private static void ValidateOverlapCircleRequests(ReadOnlySpan<PhysicsOverlapCircle3DRequest> requests)
+    {
+        for (int i = 0; i < requests.Length; i++)
+        {
+            SwiftThrowHelper.ThrowIfArgument(
+                requests[i].Radius < Fixed64.Zero,
+                nameof(requests),
+                "3D query radius cannot be negative.");
+        }
+    }
+
+    private static void ValidateOverlapCircleRequests(
+        ReadOnlySpan<PhysicsOverlapCircleInDirection3DRequest> requests)
+    {
+        for (int i = 0; i < requests.Length; i++)
+        {
+            SwiftThrowHelper.ThrowIfArgument(
+                requests[i].Radius < Fixed64.Zero,
+                nameof(requests),
+                "3D query radius cannot be negative.");
+        }
+    }
 
     private int OverlapConeAllBatchRequest(PhysicsOverlapCone3DRequest request, SwiftList<Physics3DHit> results) =>
         OverlapConeAll(

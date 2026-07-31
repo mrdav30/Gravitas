@@ -7,6 +7,7 @@
 
 using FixedMathSharp;
 using Gravitas.Colliders;
+using Gravitas.CollisionHandling;
 using GridForge.Grids;
 using GridForge.Spatial;
 using GridForge.Utility;
@@ -34,11 +35,16 @@ public sealed class GravitasCollisionService
     private readonly SwiftList<PhysicsPartition> _distributionPartitions = new();
     private readonly SwiftList<int> _distributionDynamicIds = new();
     private readonly SwiftList<int> _distributionStaticIds = new();
+    private readonly SwiftList<int> _planarQueryPartitionColliderIds = new();
+    private readonly SwiftHashSet<int> _planarQueryUniqueColliderIds = new();
+    private readonly DynamicCcdCandidateIndex2D _planarQueryCandidates =
+        new(capacity: 0, supportsUpdates: true);
     private readonly Action<PhysicsPartition> _releaseRetainedPartition;
     private readonly object _cullDistributorLock = new();
 
     private int _cullDistributor;
     private int _retainedPartitionRetirementCursor;
+    private uint _planarQueryWorldVersion;
 
     /// <summary>
     /// Initializes a new collision service for the supplied context.
@@ -99,10 +105,14 @@ public sealed class GravitasCollisionService
         _distributionPartitions.FastClear();
         _distributionDynamicIds.FastClear();
         _distributionStaticIds.FastClear();
+        _planarQueryPartitionColliderIds.FastClear();
+        _planarQueryUniqueColliderIds.Clear();
+        _planarQueryCandidates.Clear();
         _inactivePartitionPool.Clear();
         Version = 1;
         _cullDistributor = 0;
         _retainedPartitionRetirementCursor = 0;
+        _planarQueryWorldVersion = 0;
     }
 
     private void DetachRetainedPartitions() => RetainedPartitionLifecycle.DetachAll(
@@ -143,7 +153,20 @@ public sealed class GravitasCollisionService
         partitionedCoordinates.FastClear();
 
         PartitionCoveredVoxels(collider, partitionedCoordinates, GetMobilityKind(collider));
-        return partitionedCoordinates.Count > 0;
+        if (partitionedCoordinates.Count == 0)
+        {
+            _planarQueryCandidates.Remove(collider.Id);
+            return false;
+        }
+
+        _planarQueryCandidates.AddOrUpdate(
+            collider.Id,
+            new DynamicCcdPlanarBounds(
+                collider.BoundsMin.X,
+                collider.BoundsMin.Z,
+                collider.BoundsMax.X,
+                collider.BoundsMax.Z));
+        return true;
     }
 
     private void PartitionCoveredVoxels(
@@ -208,6 +231,7 @@ public sealed class GravitasCollisionService
             return false;
 
         PhysicsPartitionMobilityKind partitionKind = GetStoredMobilityKind(collider.PartitionKind);
+        _planarQueryCandidates.Remove(collider.Id);
 
         for (int i = 0; i < collider.PartitionCoordinates!.Count; i++)
         {
@@ -230,6 +254,45 @@ public sealed class GravitasCollisionService
         collider.ClearPartitionCoordinates();
 
         return true;
+    }
+
+    internal void QueryPlanarColliderCandidates(
+        DynamicCcdPlanarBounds bounds,
+        SwiftList<int> results)
+    {
+        if (_planarQueryWorldVersion != _context.World.Version)
+            RebuildPlanarQueryCandidates();
+
+        _planarQueryCandidates.Query(bounds, results);
+    }
+
+    private void RebuildPlanarQueryCandidates()
+    {
+        _planarQueryCandidates.Clear();
+        _planarQueryUniqueColliderIds.Clear();
+        for (int partitionIndex = 0; partitionIndex < _retainedPartitions.Count; partitionIndex++)
+        {
+            _retainedPartitions[partitionIndex].CopyAllColliderIds(_planarQueryPartitionColliderIds);
+            for (int colliderIndex = 0; colliderIndex < _planarQueryPartitionColliderIds.Count; colliderIndex++)
+            {
+                int colliderId = _planarQueryPartitionColliderIds[colliderIndex];
+                if (!_planarQueryUniqueColliderIds.Add(colliderId)
+                    || !_context.Physics.TryGetColliderById(colliderId, out LSCollider? collider))
+                {
+                    continue;
+                }
+
+                _planarQueryCandidates.AddOrUpdate(
+                    colliderId,
+                    new DynamicCcdPlanarBounds(
+                        collider!.BoundsMin.X,
+                        collider.BoundsMin.Z,
+                        collider.BoundsMax.X,
+                        collider.BoundsMax.Z));
+            }
+        }
+
+        _planarQueryWorldVersion = _context.World.Version;
     }
 
     internal void RefreshPartitionAwakeState(LSCollider collider)

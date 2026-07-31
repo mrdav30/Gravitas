@@ -252,6 +252,11 @@ be represented. Broad-phase bounds are never substituted for mesh geometry,
 including mesh/sphere contacts and circle overlap queries. Full-domain
 FixedMathSharp triangle and squared-distance predicates preserve the closest
 authored candidate even when public Q32.32 distance values would saturate.
+Primitive, mesh, and compound closest-surface selection likewise owns a
+semantic surface anchor before optional point or scalar-distance
+materialization. Projected overlap queries classify exact X/Z geometry and
+retain that real 3D anchor; clipped broad-phase boxes and invented coordinates
+are never narrow-phase substitutes.
 
 This validation is intentionally breaking for assets that previously selected
 `Convex` despite violating its geometry contract. Author raw terrain, triangle
