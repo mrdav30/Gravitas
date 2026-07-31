@@ -92,18 +92,9 @@ public sealed class LSCylinderCollider : LSCollider
 
     public override Vector3d ClosestPointOnSurface(Vector3d other)
     {
-        if (!FixedSegment.TryGetClosestCenteredFiniteCylinderSurfaceAnchor(
-                other,
-                Center,
-                Rotation,
-                Vector3d.Up,
-                Height,
-                ScaledRadius,
-                Vector3d.Right,
-                out FixedPointAnchor surfaceAnchor,
-                out _,
-                out _)
-            || !surfaceAnchor.TryGetPoint(out Vector3d surfacePoint))
+        FixedPointAnchor surfaceAnchor =
+            GetClosestSurfaceAnchor(other, out _);
+        if (!surfaceAnchor.TryGetPoint(out Vector3d surfacePoint))
         {
             throw new InvalidOperationException(
                 "The closest cylinder surface point is outside the representable coordinate domain.");
@@ -114,7 +105,17 @@ public sealed class LSCylinderCollider : LSCollider
 
     public override Vector3d GetNormalAtPoint(Vector3d point)
     {
-        if (!FixedSegment.TryGetClosestCenteredFiniteCylinderSurfaceAnchor(
+        _ = GetClosestSurfaceAnchor(
+            point,
+            out Vector3d outwardNormal);
+        return outwardNormal;
+    }
+
+    internal override FixedPointAnchor GetClosestSurfaceAnchor(
+        Vector3d point,
+        out Vector3d normal) =>
+        WideFiniteAxisIntersection
+            .GetClosestCenteredFiniteCylinderSurfaceAnchor(
                 point,
                 Center,
                 Rotation,
@@ -122,16 +123,8 @@ public sealed class LSCylinderCollider : LSCollider
                 Height,
                 ScaledRadius,
                 Vector3d.Right,
-                out _,
-                out Vector3d outwardNormal,
-                out _))
-        {
-            throw new InvalidOperationException(
-                "The closest cylinder surface normal is outside the representable coordinate domain.");
-        }
-
-        return outwardNormal;
-    }
+                out normal,
+                out _);
 
     private protected override void PrepareShape(in ColliderShapeSnapshot snapshot)
     {

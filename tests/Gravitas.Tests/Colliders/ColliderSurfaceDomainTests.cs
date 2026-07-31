@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using FixedMathSharp.Geometry;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Tests.Support;
@@ -106,9 +107,13 @@ public sealed class ColliderSurfaceDomainTests
     }
 
     [Fact]
-    public void FiniteRound3DSurfacesAtScalarFace_ShouldRejectUnrepresentableResults()
+    public void FiniteRound3DSurfacesAtScalarFace_ShouldRejectOnlyUnrepresentablePoints()
     {
         using GravitasWorldContext context = CreatePositiveScalarFaceContext();
+        var sphere = new LSSphereCollider
+        {
+            Radius = Fixed64.Half
+        };
         var capsule = new LSCapsuleCollider
         {
             Radius = Fixed64.Half,
@@ -124,19 +129,125 @@ public sealed class ColliderSurfaceDomainTests
             Radius = Fixed64.Half,
             Size = Vector3d.One
         };
+        Initialize(context, sphere);
         Initialize(context, capsule);
         Initialize(context, cylinder);
         Initialize(context, cone);
 
+        AssertSurfacePointOutsideDomain(sphere);
         AssertSurfacePointOutsideDomain(capsule);
         AssertSurfacePointOutsideDomain(cylinder);
         AssertSurfacePointOutsideDomain(cone);
-        AssertSurfaceDistanceOutsideDomain(capsule);
-        AssertSurfaceDistanceOutsideDomain(cylinder);
-        AssertSurfaceDistanceOutsideDomain(cone);
-        AssertSurfaceNormalOutsideDomain(capsule);
-        AssertSurfaceNormalOutsideDomain(cylinder);
-        AssertSurfaceNormalOutsideDomain(cone);
+        AssertRepresentableInwardSurface(sphere);
+        AssertRepresentableInwardSurface(capsule);
+        AssertRepresentableInwardSurface(cylinder);
+        AssertRepresentableInwardSurface(cone);
+    }
+
+    [Fact]
+    public void CompoundAtScalarFace_ShouldRankSemanticPartAnchorsExactly()
+    {
+        using GravitasWorldContext context = CreatePositiveScalarFaceContext();
+        var collider = new LSCompoundCollider(
+            CompoundColliderPart.Sphere(
+                Fixed64.Half,
+                Vector3d.Zero),
+            CompoundColliderPart.Sphere(
+                Fixed64.Half,
+                -Vector3d.Right * Fixed64.Two));
+        Initialize(context, collider);
+
+        Vector3d closest = collider.ClosestPointOnSurface(
+            new Vector3d(
+                Fixed64.MinValue,
+                Fixed64.Zero,
+                Fixed64.Zero));
+
+        closest.Should().Be(new Vector3d(
+            ScalarFaceCenter.X - Fixed64.FromFraction(5, 2),
+            Fixed64.Zero,
+            Fixed64.Zero));
+        collider.GetNormalAtPoint(
+                new Vector3d(
+                    Fixed64.MinValue,
+                    Fixed64.Zero,
+                    Fixed64.Zero))
+            .Should()
+            .Be(Vector3d.Left);
+    }
+
+    [Fact]
+    public void CompoundAtScalarScale_ShouldPreserveFirstAuthoredExactTie()
+    {
+        using GravitasWorldContext context =
+            CreatePositiveScalarFaceContext();
+        var collider = new LSCompoundCollider(
+            CompoundColliderPart.Sphere(
+                Fixed64.Half,
+                Vector3d.Up),
+            CompoundColliderPart.Sphere(
+                Fixed64.Half,
+                Vector3d.Down));
+        Initialize(context, collider);
+
+        Vector3d closest = collider.ClosestPointOnSurface(
+            new Vector3d(
+                Fixed64.MinValue,
+                Fixed64.Zero,
+                Fixed64.Zero));
+
+        closest.Y.Should().Be(Fixed64.One);
+    }
+
+    [Fact]
+    public void CompoundAtScalarFace_ShouldRejectUnrepresentableSelectedSurface()
+    {
+        using GravitasWorldContext context =
+            CreatePositiveScalarFaceContext();
+        var collider = new LSCompoundCollider(
+            CompoundColliderPart.Sphere(
+                Fixed64.Half,
+                Vector3d.Zero));
+        Initialize(context, collider);
+
+        FluentActions.Invoking(() =>
+                collider.ClosestPointOnSurface(collider.Center))
+            .Should()
+            .Throw<InvalidOperationException>()
+            .WithMessage("*outside*representable*domain*");
+    }
+
+    [Fact]
+    public void SphereCenter_ShouldSeparateSurfaceFallbackFromUndefinedPointNormal()
+    {
+        using GravitasWorldContext context =
+            GravitasWorldContext.CreateOwned();
+        var collider = new LSSphereCollider
+        {
+            Radius = Fixed64.Half
+        };
+        collider.InitializeWithNoBody(new TestMatterAgent(
+            context,
+            new FixedTransform(
+                Vector3d.Zero,
+                FixedQuaternion.Identity,
+                Vector3d.One)));
+
+        collider.ClosestPointOnSurface(collider.Center)
+            .Should()
+            .Be(Vector3d.Right * Fixed64.Half);
+        collider.GetNormalAtPoint(collider.Center)
+            .Should()
+            .Be(Vector3d.Zero);
+        FixedPointAnchor anchor =
+            collider.GetClosestSurfaceAnchor(
+                collider.Center,
+                out Vector3d anchorNormal);
+        anchor.TryGetPoint(out Vector3d anchorPoint)
+            .Should()
+            .BeTrue();
+        anchorPoint.Should().Be(Vector3d.Right * Fixed64.Half);
+        anchorNormal.Should().Be(Vector3d.Right);
     }
 
     [Fact]
@@ -156,17 +267,18 @@ public sealed class ColliderSurfaceDomainTests
             .Should().Throw<InvalidOperationException>()
             .WithMessage("*outside*representable*domain*");
 
-    private static void AssertSurfaceDistanceOutsideDomain(LSCollider collider) =>
-        FluentActions.Invoking(() => collider.ClosestPointOnSurface(
-                new Vector3d(Fixed64.MinValue, Fixed64.Zero, Fixed64.Zero)))
-            .Should().Throw<InvalidOperationException>()
-            .WithMessage("*outside*representable*domain*");
+    private static void AssertRepresentableInwardSurface(LSCollider collider)
+    {
+        Vector3d query = new(
+            Fixed64.MinValue,
+            Fixed64.Zero,
+            Fixed64.Zero);
 
-    private static void AssertSurfaceNormalOutsideDomain(LSCollider collider) =>
-        FluentActions.Invoking(() => collider.GetNormalAtPoint(
-                new Vector3d(Fixed64.MinValue, Fixed64.Zero, Fixed64.Zero)))
-            .Should().Throw<InvalidOperationException>()
-            .WithMessage("*outside*representable*domain*");
+        Vector3d closest = collider.ClosestPointOnSurface(query);
+        closest.X.Should().BeLessThan(collider.Center.X);
+        collider.GetNormalAtPoint(query).IsNormalized().Should().BeTrue();
+        collider.GetNormalAtPoint(query).X.Should().BeLessThan(Fixed64.Zero);
+    }
 
     private static void Initialize(
         GravitasWorldContext context,

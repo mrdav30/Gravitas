@@ -66,36 +66,35 @@ part selection, 3D `OverlapCircle`, `OverlapCircleInDirection`,
 `OverlapCircleAll`, batch variants, `Physics3DHit`, and finite-axis/cuboid
 surface witnesses
 
-`LSSphereCollider.ClosestPointOnSurface(...)` still materializes a relative
-vector through ordinary saturating subtraction and magnitude arithmetic.
-`LSCompoundCollider` then materializes every child surface point and ranks
-those points with scalar `Vector3d.DistanceSquared`. Extreme representable
-coordinates can therefore collapse distinct child distances, retain the wrong
-authored part, or reject a surface that has a valid semantic anchor. The 2D
-counterpart now selects and materializes one exact boundary anchor, but the 3D
-surface API does not yet expose equivalent ownership.
+**Progress (2026-07-31):** Phase 1 of the
+[full-domain 3D surface projection plan](2026-07-31-full-domain-3d-surface-projection-plan.md)
+replaced sphere saturation, separated finite-axis semantic anchors from optional
+scalar distance materialization, and moved compound selection to exact anchor
+ranking. `Physics3DHit` already owns a semantic `ContactAnchor`; the remaining
+work is exact X/Z projected-volume classification and query-family adoption.
 
-The public 3D overlap-circle family is documented as X/Z proximity, but
-`TryBuildOverlapHit` currently obtains a collider's full-3D closest surface
+Before Phase 1, `LSSphereCollider.ClosestPointOnSurface(...)` materialized a
+relative vector through saturating subtraction and magnitude arithmetic, while
+`LSCompoundCollider` materialized and scalar-ranked every child point. The
+shared internal semantic-anchor path now removes both failure modes without
+adding a second public collider API.
+
+The remaining public 3D overlap-circle family is documented as X/Z proximity,
+but `TryBuildOverlapHit` currently obtains a collider's full-3D closest surface
 point and compares the resulting 3D distance with the circle radius. A vertical
 offset can therefore reject a collider whose X/Z projection overlaps the query.
 The same path treats the surface witness as both classification evidence and
 the required hit payload. Near a `Fixed64` scalar face, canonical finite-axis
 or oriented-box geometry can overlap the circle even when its conceptual
 nearest surface point is outside the representable coordinate domain. The
-current `Physics3DHit` contract has no explicit way to preserve that
-classification without returning a false negative or inventing a non-surface
-point.
+existing `Physics3DHit.ContactAnchor` can preserve the semantic witness; the
+query path must now classify projection independently and materialize only when
+the caller requests the point.
 
-First define a reusable 3D semantic closest-surface anchor contract and exact
-compound distance ranking, then define X/Z overlap classification independently
-from final witness materialization. Decide whether an overlap whose selected
-planar witness is not representable needs a richer result state, a
-deterministic representable-feature policy, or a documented query-domain
-admission rule. Apply the decision consistently to public closest-surface,
-closest, directional, all-hit, and batch paths. Cover scalar-face spheres and
-compounds, authored-part ties, vertical-offset invariance, finite axes and
-cuboids, ordinary witness parity, deterministic ordering, and warmed
+Define X/Z overlap classification independently from final witness
+materialization and adopt it consistently across closest, directional, all-hit,
+and batch paths. Cover vertical-offset invariance, containment, scalar faces,
+finite axes, cuboids, meshes, compounds, deterministic ordering, and warmed
 zero-allocation behavior. Do not mask the issue with full-3D distance,
 saturating projection, a fake hit point, or a silent miss.
 

@@ -99,6 +99,18 @@ internal sealed class UnsupportedTestCollider3D : LSCollider
     public override Vector3d GetNormalAtPoint(Vector3d point) =>
         NormalOverride ?? Vector3d.Up;
 
+    internal override FixedPointAnchor GetClosestSurfaceAnchor(
+        Vector3d point,
+        out Vector3d normal)
+    {
+        Vector3d closest = ClosestPointOnSurface(point);
+        normal = GetNormalAtPoint(closest);
+        return new FixedPointAnchor(
+            closest,
+            FixedQuaternion.Identity,
+            Vector3d.Zero);
+    }
+
     public override bool ColliderOverlapsRay(RaycastSegmentWorker worker, ref SwiftList<Vector3d> outputIntersectionPoints) =>
         ReportRayOverlapWithoutIntersection;
 }

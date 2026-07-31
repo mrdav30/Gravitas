@@ -318,14 +318,53 @@ public sealed class LSCompoundCollider : LSCollider
 
     public override Vector3d ClosestPointOnSurface(Vector3d other)
     {
-        int bestIndex = FindClosestPartIndex(other);
-        return _partColliders[bestIndex].ClosestPointOnSurface(other);
+        FixedPointAnchor anchor =
+            GetClosestSurfaceAnchor(other, out _);
+        if (anchor.TryGetPoint(out Vector3d point))
+            return point;
+
+        throw new InvalidOperationException(
+            "The closest compound surface point is outside the representable coordinate domain.");
     }
 
     public override Vector3d GetNormalAtPoint(Vector3d point)
     {
-        int bestIndex = FindClosestPartIndex(point);
-        return _partColliders[bestIndex].GetNormalAtPoint(point);
+        _ = GetClosestSurfaceAnchor(
+            point,
+            out Vector3d normal);
+        return normal;
+    }
+
+    internal override FixedPointAnchor GetClosestSurfaceAnchor(
+        Vector3d point,
+        out Vector3d normal)
+    {
+        var reference = new FixedPointAnchor(
+            point,
+            FixedQuaternion.Identity,
+            Vector3d.Zero);
+        FixedPointAnchor closest =
+            _partColliders[0].GetClosestSurfaceAnchor(
+                point,
+                out normal);
+        for (int i = 1; i < _partColliders.Length; i++)
+        {
+            FixedPointAnchor candidate =
+                _partColliders[i].GetClosestSurfaceAnchor(
+                    point,
+                    out Vector3d candidateNormal);
+            if (reference.CompareSquaredDistance(
+                    candidate,
+                    closest) >= 0)
+            {
+                continue;
+            }
+
+            closest = candidate;
+            normal = candidateNormal;
+        }
+
+        return closest;
     }
 
     public override bool ColliderOverlapsRay(RaycastSegmentWorker worker, ref SwiftList<Vector3d> outputIntersectionPoints)
@@ -339,26 +378,6 @@ public sealed class LSCompoundCollider : LSCollider
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal bool ContainsPartCollider(LSCollider collider) =>
         ReferenceEquals(collider.CompoundOwner, this);
-
-    private int FindClosestPartIndex(Vector3d point)
-    {
-        int bestIndex = 0;
-        Vector3d closest = _partColliders[0].ClosestPointOnSurface(point);
-        Fixed64 bestDistance = Vector3d.DistanceSquared(point, closest);
-
-        for (int i = 1; i < _parts.Length; i++)
-        {
-            Vector3d candidate = _partColliders[i].ClosestPointOnSurface(point);
-            Fixed64 distance = Vector3d.DistanceSquared(point, candidate);
-            if (distance >= bestDistance)
-                continue;
-
-            bestDistance = distance;
-            bestIndex = i;
-        }
-
-        return bestIndex;
-    }
 
     private static LSCollider MaterializePartCollider(CompoundColliderPart part)
     {

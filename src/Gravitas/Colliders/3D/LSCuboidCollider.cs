@@ -139,7 +139,9 @@ public sealed class LSCuboidCollider : LSCollider
 
     public override Vector3d ClosestPointOnSurface(Vector3d other)
     {
-        if (_orientedBox.TryGetClosestPointOnSurface(other, out Vector3d closestPoint))
+        FixedPointAnchor anchor =
+            GetClosestSurfaceAnchor(other, out _);
+        if (anchor.TryGetPoint(out Vector3d closestPoint))
             return closestPoint;
 
         throw new InvalidOperationException(
@@ -148,6 +150,14 @@ public sealed class LSCuboidCollider : LSCollider
 
     public override Vector3d GetNormalAtPoint(Vector3d point) =>
         _orientedBox.GetNearestFaceNormal(point);
+
+    internal override FixedPointAnchor GetClosestSurfaceAnchor(
+        Vector3d point,
+        out Vector3d normal)
+    {
+        normal = _orientedBox.GetNearestFaceNormal(point);
+        return _orientedBox.GetClosestPointAnchor(point);
+    }
 
     internal override bool TryGetPlanarSurfaceNormal(Vector3d point, out Vector3d normal)
     {

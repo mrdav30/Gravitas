@@ -9,6 +9,7 @@ using FixedMathSharp;
 using FixedMathSharp.Geometry;
 using Gravitas.Queries;
 using SwiftCollections;
+using System;
 
 namespace Gravitas.Colliders;
 
@@ -95,14 +96,40 @@ public sealed class LSSphereCollider : LSCollider
 
     public override Vector3d ClosestPointOnSurface(Vector3d other)
     {
-        Vector3d direction = other - Center;
-        Fixed64 distance = direction.Magnitude;
-        direction /= distance; // normalize
-        direction *= ScaledRadius;
-        return Center + direction;
+        FixedPointAnchor anchor =
+            GetClosestSurfaceAnchor(other, out _);
+        if (anchor.TryGetPoint(out Vector3d point))
+            return point;
+
+        throw new InvalidOperationException(
+            "The closest sphere surface point is outside the representable coordinate domain.");
     }
 
-    public override Vector3d GetNormalAtPoint(Vector3d point) => (point - Center).Normalized;
+    public override Vector3d GetNormalAtPoint(Vector3d point)
+    {
+        if (point == Center)
+            return Vector3d.Zero;
+
+        _ = GetClosestSurfaceAnchor(
+            point,
+            out Vector3d normal);
+        return normal;
+    }
+
+    internal override FixedPointAnchor GetClosestSurfaceAnchor(
+        Vector3d point,
+        out Vector3d normal) =>
+        WideFiniteAxisIntersection
+            .GetClosestCenteredCapsuleSurfaceAnchor(
+                point,
+                Center,
+                FixedQuaternion.Identity,
+                Vector3d.Up,
+                Fixed64.Zero,
+                ScaledRadius,
+                Vector3d.Right,
+                out normal,
+                out _);
 
     public override bool ColliderOverlapsRay(RaycastSegmentWorker worker, ref SwiftList<Vector3d> outputIntersectionPoints) =>
         worker.CheckSphereOverlaps(this, ref outputIntersectionPoints);

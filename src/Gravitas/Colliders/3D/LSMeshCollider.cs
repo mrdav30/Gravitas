@@ -222,16 +222,25 @@ public sealed class LSMeshCollider : LSCollider
 
     public override Vector3d ClosestPointOnSurface(Vector3d queryPoint)
     {
-        FindClosestPointAnchor(
-            queryPoint,
-            _triangleQueryBuffer,
-            out FixedPointAnchor closest,
-            out _);
+        FixedPointAnchor closest =
+            GetClosestSurfaceAnchor(queryPoint, out _);
         if (closest.TryGetPoint(out Vector3d point))
             return point;
 
         throw new InvalidOperationException(
             "The closest mesh point is outside the representable coordinate range.");
+    }
+
+    internal override FixedPointAnchor GetClosestSurfaceAnchor(
+        Vector3d queryPoint,
+        out Vector3d normal)
+    {
+        FindClosestPointAnchor(
+            queryPoint,
+            _triangleQueryBuffer,
+            out FixedPointAnchor closest,
+            out normal);
+        return closest;
     }
 
     internal void FindClosestPointAnchor(
@@ -487,10 +496,8 @@ public sealed class LSMeshCollider : LSCollider
 
     public override Vector3d GetNormalAtPoint(Vector3d point)
     {
-        FindClosestPointAnchor(
+        _ = GetClosestSurfaceAnchor(
             point,
-            _triangleQueryBuffer,
-            out _,
             out Vector3d normal);
         return normal;
     }

@@ -192,18 +192,9 @@ public sealed class LSConeCollider : LSCollider
 
     public override Vector3d ClosestPointOnSurface(Vector3d other)
     {
-        if (!FixedSegment.TryGetClosestCenteredFiniteConeSurfaceAnchor(
-                other,
-                Center,
-                Rotation,
-                Vector3d.Up,
-                Height,
-                ScaledRadius,
-                Vector3d.Right,
-                out FixedPointAnchor surfaceAnchor,
-                out _,
-                out _)
-            || !surfaceAnchor.TryGetPoint(out Vector3d surfacePoint))
+        FixedPointAnchor surfaceAnchor =
+            GetClosestSurfaceAnchor(other, out _);
+        if (!surfaceAnchor.TryGetPoint(out Vector3d surfacePoint))
         {
             throw new InvalidOperationException(
                 "The closest cone surface point is outside the representable coordinate domain.");
@@ -214,7 +205,17 @@ public sealed class LSConeCollider : LSCollider
 
     public override Vector3d GetNormalAtPoint(Vector3d point)
     {
-        if (!FixedSegment.TryGetClosestCenteredFiniteConeSurfaceAnchor(
+        _ = GetClosestSurfaceAnchor(
+            point,
+            out Vector3d outwardNormal);
+        return outwardNormal;
+    }
+
+    internal override FixedPointAnchor GetClosestSurfaceAnchor(
+        Vector3d point,
+        out Vector3d normal) =>
+        WideFiniteAxisIntersection
+            .GetClosestCenteredFiniteConeSurfaceAnchor(
                 point,
                 Center,
                 Rotation,
@@ -222,16 +223,8 @@ public sealed class LSConeCollider : LSCollider
                 Height,
                 ScaledRadius,
                 Vector3d.Right,
-                out _,
-                out Vector3d outwardNormal,
-                out _))
-        {
-            throw new InvalidOperationException(
-                "The closest cone surface normal is outside the representable coordinate domain.");
-        }
-
-        return outwardNormal;
-    }
+                out normal,
+                out _);
 
     public override bool ColliderOverlapsRay(RaycastSegmentWorker worker, ref SwiftList<Vector3d> outputIntersectionPoints) =>
         worker.CheckConeOverlaps(this, ref outputIntersectionPoints);

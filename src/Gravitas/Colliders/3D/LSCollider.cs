@@ -755,6 +755,14 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
     public abstract Vector3d GetNormalAtPoint(Vector3d point);
 
     /// <summary>
+    /// Returns the semantic closest surface feature without requiring its
+    /// world point or distance to fit in one <see cref="Fixed64"/> vector.
+    /// </summary>
+    internal abstract FixedPointAnchor GetClosestSurfaceAnchor(
+        Vector3d point,
+        out Vector3d normal);
+
+    /// <summary>
     /// Tries to resolve a normal that is invariant across the planar surface
     /// feature containing <paramref name="point"/>. A successful result must
     /// be a nonzero outward normal.

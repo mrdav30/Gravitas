@@ -1,0 +1,144 @@
+# Full-Domain 3D Surface Projection Implementation
+
+**Status:** Active  
+**Started:** 2026-07-31  
+**Repositories:** FixedMathSharp, Gravitas  
+**Queue item:** `3D Closest-Surface And Overlap-Circle Classification Are Not Full-Domain`
+
+## Goal
+
+Make 3D closest-surface ownership and the public X/Z overlap-circle family
+correct across the complete authored fixed-point geometry domain without
+saturating intermediate coordinates, inventing points, or silently dropping
+valid hits.
+
+The work must preserve:
+
+- deterministic authored-order ties;
+- allocation-free warmed query paths;
+- 100% reachable line, branch, and method coverage in both repositories;
+- FixedMathSharp ownership of policy-neutral exact geometry;
+- Gravitas ownership of collider dispatch, query semantics, and hit policy.
+
+## Locked Contract
+
+- `OverlapCircle`, `OverlapCircleInDirection`, `OverlapCircleAll`, and their
+  batch variants classify the complete X/Z projection of supported 3D collider
+  geometry.
+- Circle containment is overlap at distance zero, matching normal overlap-query
+  semantics and the pure-2D contract.
+- Query Y does not affect X/Z classification, distance, direction, ordering, or
+  admission.
+- A hit retains a deterministic real collider-surface `ContactAnchor`.
+  `Physics3DHit.TryGetPoint(...)` remains the explicit materialization boundary;
+  no additional public result state is required.
+- Exact classification and semantic anchor ownership precede optional
+  `Vector3d` materialization.
+- Equal compound-part and mesh-triangle candidates retain earlier authored
+  order.
+
+## Historical Root Cause
+
+The existing path couples three different concerns:
+
+1. closest-surface feature selection;
+2. representable full-3D distance calculation;
+3. final point materialization.
+
+Finite-axis helpers can construct a valid `FixedPointAnchor` before failing
+only because the full 3D distance cannot fit in `Fixed64`. Sphere and compound
+paths additionally use saturating vector arithmetic. The 3D overlap-circle
+worker then reuses that full-3D result even though its documented domain is
+X/Z.
+
+`Physics3DHit` has since gained semantic `ContactAnchor` ownership, so the old
+tracker concern about needing a richer public result is obsolete.
+
+## Battle Plan
+
+### Phase 0: Contract And Baseline
+
+- [x] Trace closest-surface and overlap-circle callers.
+- [x] Confirm `Physics3DHit` already owns semantic anchors.
+- [x] Resolve containment semantics as zero-distance projected overlap.
+- [x] Confirm the existing cuboid-center regression encodes obsolete
+  surface-proximity behavior and must change.
+
+### Phase 1: Semantic 3D Surface Ownership
+
+- [x] Separate finite-axis anchor/normal selection from optional scalar signed
+  distance materialization in FixedMathSharp.
+- [x] Give every built-in 3D collider one internal semantic closest-surface
+  anchor path without adding a second public collider API.
+- [x] Replace sphere saturation and compound materialized-point ranking.
+- [x] Rank compound parts with exact `FixedPointAnchor` distance comparison and
+  retain earlier authored order on ties.
+- [x] Route public `ClosestPointOnSurface(...)` and normal selection through the
+  shared semantic owner, materializing only the requested final result.
+- [x] Add focused scalar-face, representable-result, unrepresentable-result,
+  and compound-tie regressions.
+- [x] Preserve FixedMathSharp and Gravitas 100% coverage.
+
+**Review checkpoint:** Stop after the closest-surface contract is independently
+green before changing overlap classification.
+
+**Outcome:** Every built-in 3D collider now selects one semantic surface anchor
+before optional point or signed-distance materialization. Finite-axis helpers
+retain valid anchors when an unused scalar distance is unrepresentable, sphere
+selection no longer depends on saturating subtraction, and compound colliders
+rank child anchors exactly with authored-order ties.
+
+**Verification:**
+
+- FixedMathSharp `Release`: 2,604 passed; 100% line (44,443/44,443), branch
+  (8,396/8,396), and method (3,329/3,329) coverage.
+- FixedMathSharp `ReleaseLean`: 2,583 passed.
+- Gravitas `Release`: 3,874 passed; 100% line (43,717/43,717), branch
+  (12,777/12,777), and method (4,515/4,515) coverage.
+- Gravitas `ReleaseLean`: 3,819 passed after a configuration-aware restore.
+  Reusing normal-build NuGet assets with `--no-restore` is not a valid Lean
+  gate because it retains the real MemoryPack package beside the Lean shim.
+
+### Phase 2: Exact X/Z Projection Reducers
+
+- [ ] Reuse existing exact anchors, convex support, finite-slab projection,
+  triangle projection, and oriented-box owners where their contracts fit.
+- [ ] Add only the missing policy-neutral projection math to FixedMathSharp.
+- [ ] Classify sphere, capsule, cylinder, cone, cuboid, mesh triangle, and
+  compound projections without materializing conceptual world coordinates.
+- [ ] Return zero distance for containment and exact planar separation
+  otherwise.
+- [ ] Retain a deterministic real surface anchor and outward normal independently
+  from classification materialization.
+- [ ] Keep all reducers stack-only and allocation-free.
+
+**Review checkpoint:** Stop after primitive and mesh/compound projection
+reducers are green in isolation.
+
+### Phase 3: Query-Family Adoption
+
+- [ ] Replace the full-3D broad rejection with an exact or conservative X/Z
+  rejection that cannot discard a valid projected hit.
+- [ ] Adopt the projection reducer in closest, directional, all-hit, and batch
+  APIs through one shared worker.
+- [ ] Make directional filtering explicitly planar and robust for tiny
+  representable directions.
+- [ ] Preserve distance-plus-collider-ID ordering and duplicate suppression.
+- [ ] Cover vertical invariance, containment, scalar faces, all supported
+  shapes, ties, and single/batch parity.
+
+### Phase 4: Closure
+
+- [ ] Run focused and full Release/ReleaseLean tests in both repositories.
+- [ ] Re-establish 100% reachable line, branch, and method coverage.
+- [ ] Run warmed allocation assertions and relevant query benchmarks.
+- [ ] Update query documentation and remove stale tracker language.
+- [ ] Move this plan to `docs/feature-work/done`.
+
+## Non-Goals
+
+- No new public wide-arithmetic surface.
+- No fake or clamped hit points.
+- No general scene-geometry abstraction or speculative custom-collider API.
+- No use of full-3D distance as a proxy for X/Z classification.
+- No duplicate Gravitas implementation of FixedMathSharp wide arithmetic.
