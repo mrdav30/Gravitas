@@ -23,6 +23,10 @@ instead of burying it in notes.
 
 ## Active Release-Scope
 
+- [`Exact Radial Segment Distance`](2026-07-31-radial-segment-distance-plan.md)
+  - Replace parameter-first and normalized-direction radial admission with
+    exact authored-segment physical-distance intervals across FixedMathSharp
+    and Gravitas 2D, 3D, mixed, and relative-CCD consumers.
 - [`Cross-Stack Issue Resolution`](issue-tracker.md)
   - Resolve release-blocking issues in dependency order: `FixedMathSharp`,
     `SwiftCollections`, `GridForge`, then Gravitas. Use the `develop` worktrees
