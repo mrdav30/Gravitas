@@ -474,24 +474,31 @@ public partial class SolidBody
     private bool TryGetExactSphereCircleTranslationalContact(
         SolidBody2D target,
         ContinuousCollisionMotionSegment2D targetSegment,
+        FixedSegment2d targetPath,
         Vector2d targetDisplacement,
-        Vector3d sourceStart,
+        Fixed64 targetTravelDistance,
+        FixedSegment sourcePath,
         Vector3d sourceDisplacement,
+        Fixed64 sourceTravelDistance,
         FixedQuaternion sourceStartRotation,
-        FixedQuaternion sourceEndRotation,
-        Fixed64 elapsedTime,
-        Fixed64 remainingTime,
-        bool sourceIsKinematic,
-        out Fixed64 contactTime,
+        Fixed64 sourceAngularDistance,
+        out bool requiresRotationalFallback,
+        out Fixed64 relativeContactDistance,
         out Fixed64 sourceContactDistance,
+        out Fixed64 localClosingSpeed,
         out MixedContact contact)
     {
-        contactTime = default;
+        requiresRotationalFallback = true;
+        relativeContactDistance = default;
         sourceContactDistance = default;
+        localClosingSpeed = default;
         contact = default;
         if (Collider is not LSSphereCollider sphere
             || target.Collider is not LSCircleCollider2D circle
-            || targetSegment.AngularDistance != Fixed64.Zero)
+            || (targetSegment.AngularDistance != Fixed64.Zero
+                && circle.ScaledLocalOffset != Vector2d.Zero)
+            || (sourceAngularDistance != Fixed64.Zero
+                && sphere.ScaledOffset != Vector3d.Zero))
         {
             return false;
         }
@@ -502,17 +509,12 @@ public partial class SolidBody
         Fixed64 originalTargetRotation = target.Rotation;
         try
         {
-            SampleMixedRotationalContinuousPairPose(
-                sourceStart,
-                sourceDisplacement,
-                sourceStartRotation,
-                sourceEndRotation,
-                Fixed64.Zero,
-                elapsedTime,
-                remainingTime,
-                sourceIsKinematic,
-                target,
-                samplesTargetMotion: true);
+            SetMixedContinuousCollisionSamplePose(
+                sourcePath.Start,
+                sourceStartRotation);
+            target.SetMixedContinuousCollisionSamplePose(
+                targetPath.Start,
+                targetSegment.StartRotation);
             Vector3d sphereStart = sphere.Center;
             Vector3d cylinderStart = new(
                 circle.Center.X,
@@ -537,63 +539,73 @@ public partial class SolidBody
                         totalDistance,
                         out Fixed64 contactDistance))
             {
+                requiresRotationalFallback = false;
                 return false;
             }
 
-            // Caller admission proves the proportional source distance is
-            // representable.
-            _ = Vector3d.TryGetMagnitude(
-                sourceDisplacement,
-                out Fixed64 sourceTravelDistance);
+            relativeContactDistance = contactDistance;
             _ = Fixed64.TryMultiplyDivide(
                 sourceTravelDistance,
                 contactDistance,
                 totalDistance,
                 out sourceContactDistance);
-
-            contactTime = FixedMath.Clamp01(
-                contactDistance / totalDistance);
-            SampleMixedRotationalContinuousPairPose(
-                sourceStart,
-                sourceDisplacement,
-                sourceStartRotation,
-                sourceEndRotation,
-                contactTime,
-                elapsedTime,
-                remainingTime,
-                sourceIsKinematic,
-                target,
-                samplesTargetMotion: true);
-            if (CollisionDetectionMixed.TryCollide(
-                Collider,
-                target.Collider,
-                out contact))
+            Fixed64 candidateDistance = contactDistance;
+            for (int attempt = 0; attempt < 2; attempt++)
             {
-                sourceContactDistance =
-                    sourceTravelDistance * contactTime;
-                return true;
+                _ = Fixed64.TryMultiplyDivide(
+                    sourceTravelDistance,
+                    candidateDistance,
+                    totalDistance,
+                    out Fixed64 sampleSourceDistance);
+                _ = Fixed64.TryMultiplyDivide(
+                    targetTravelDistance,
+                    candidateDistance,
+                    totalDistance,
+                    out Fixed64 targetContactDistance);
+                SetMixedContinuousCollisionSamplePose(
+                    sourcePath.GetPointAtDistance(
+                        sampleSourceDistance,
+                        sourceTravelDistance),
+                    sourceStartRotation);
+                target.SetMixedContinuousCollisionSamplePose(
+                    targetPath.GetPointAtDistance(
+                        targetContactDistance,
+                        targetTravelDistance),
+                    targetSegment.StartRotation);
+                if (CollisionDetectionMixed.TryCollide(
+                    Collider,
+                    target.Collider,
+                    out contact))
+                {
+                    bool closingResolved = Vector3d.TryDot(
+                            relativeDisplacement,
+                            contact.Normal3DTo2D,
+                            out localClosingSpeed);
+                    if (closingResolved
+                        && localClosingSpeed > Fixed64.Epsilon)
+                    {
+                        return true;
+                    }
+
+                    if (closingResolved)
+                        requiresRotationalFallback = false;
+
+                    break;
+                }
+
+                if (candidateDistance >= totalDistance)
+                    break;
+
+                candidateDistance = FixedMath.Min(
+                    totalDistance,
+                    candidateDistance + Fixed64.MinIncrement);
             }
 
-            contactTime = FixedMath.Min(
-                Fixed64.One,
-                contactTime + Fixed64.MinIncrement);
-            SampleMixedRotationalContinuousPairPose(
-                sourceStart,
-                sourceDisplacement,
-                sourceStartRotation,
-                sourceEndRotation,
-                contactTime,
-                elapsedTime,
-                remainingTime,
-                sourceIsKinematic,
-                target,
-                samplesTargetMotion: true);
-            sourceContactDistance =
-                sourceTravelDistance * contactTime;
-            return CollisionDetectionMixed.TryCollide(
-                Collider,
-                target.Collider,
-                out contact);
+            relativeContactDistance = default;
+            sourceContactDistance = default;
+            localClosingSpeed = default;
+            contact = default;
+            return false;
         }
         finally
         {

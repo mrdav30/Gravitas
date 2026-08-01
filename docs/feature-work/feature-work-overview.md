@@ -23,10 +23,6 @@ instead of burying it in notes.
 
 ## Active Release-Scope
 
-- [`Exact Radial Segment Distance`](2026-07-31-radial-segment-distance-plan.md)
-  - Replace parameter-first and normalized-direction radial admission with
-    exact authored-segment physical-distance intervals across FixedMathSharp
-    and Gravitas 2D, 3D, mixed, and relative-CCD consumers.
 - [`Cross-Stack Issue Resolution`](issue-tracker.md)
   - Resolve release-blocking issues in dependency order: `FixedMathSharp`,
     `SwiftCollections`, `GridForge`, then Gravitas. Use the `develop` worktrees
@@ -42,6 +38,21 @@ instead of burying it in notes.
     library change. Do not broaden this into speculative optimization work.
 
 ## Recently Completed
+
+- [`Exact Radial Segment Distance`](done/2026-07-31-radial-segment-distance-plan.md)
+  - Completed 2026-07-31. FixedMathSharp segment APIs now solve circle and
+    sphere intersections directly in authored physical distance while retaining
+    the separate ray-parameter contract. Gravitas query and CCD families keep
+    exact source/target trajectories through ordering and only then materialize
+    normalized time; mixed proxy admission is geometric, ceiling-safe, and
+    separate from contact-normal closing policy. Dead normalized-time wrappers
+    and `RadialSweepAdmission` were removed.
+  - FixedMathSharp passes 2,628 Release and 2,607 ReleaseLean tests at
+    46,756/46,756 lines, 8,648/8,648 branches, and 3,413/3,413 methods. Gravitas
+    passes 3,919 Release and 3,864 ReleaseLean tests at 56,012/56,012 lines,
+    15,889/15,889 branches, and 5,348/5,348 methods. All 56 warmed allocation
+    guards pass, radial and relative-CCD benchmark rows retain zero managed
+    allocation, and independent closure review reported no findings.
 
 - [`Full-Domain 3D Surface Projection`](done/2026-07-31-full-domain-3d-surface-projection-plan.md)
   - Completed 2026-07-31. FixedMathSharp now owns reusable exact planar

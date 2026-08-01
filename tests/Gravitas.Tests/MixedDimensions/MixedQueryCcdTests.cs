@@ -4014,7 +4014,7 @@ public sealed partial class MixedQueryCcdTests
     }
 
     [Fact]
-    public void LateSimulate_WithMixedDynamicContinuousCollision_ShouldClampBothAtSharedTimeOfImpact()
+    public void LateSimulate_WithMixedDynamicContinuousCollision_ShouldClampBothAtSharedImpact()
     {
         using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
         context.Environment.Gravity = Fixed64.Zero;
@@ -4029,17 +4029,11 @@ public sealed partial class MixedQueryCcdTests
         body2D.AddForce(-Vector2d.Right * (Fixed64)5);
         context.LateSimulate();
 
-        Fixed64 retryAdvance3D =
-            body3D.Body.Position3d.X + Fixed64.Half;
-        Fixed64 retryAdvance2D =
-            Fixed64.Half - body2D.Position.X;
-        Fixed64 maximumSingleBodyRetryAdvance =
-            (Fixed64)5 * Fixed64.MinIncrement;
-        retryAdvance3D.Should().Be(retryAdvance2D);
-        retryAdvance3D.Should().BeGreaterThan(Fixed64.Zero);
-        retryAdvance3D.Should().BeLessThanOrEqualTo(
-            maximumSingleBodyRetryAdvance);
-        body3D.Body.Position3d.X.Should().Be(-body2D.Position.X);
+        body3D.Body.Position3d.X.Should().Be(-Fixed64.Half);
+        Fixed64 targetAdvance = body2D.Position.X - Fixed64.Half;
+        targetAdvance.Should().BeGreaterThanOrEqualTo(Fixed64.Zero);
+        targetAdvance.Should().BeLessThanOrEqualTo(
+            (Fixed64)5 * Fixed64.MinIncrement);
         body3D.Body.LinearVelocity.X.Should().Be(Fixed64.Zero);
         body2D.LinearVelocity.X.Should().Be(Fixed64.Zero);
     }
@@ -4266,7 +4260,7 @@ public sealed partial class MixedQueryCcdTests
         source.Body.LastContinuousCollisionToiIterationCount.Should().Be(1);
         source.Body.LastContinuousCollisionToiIterationLimitReached.Should().BeFalse();
         source.Body.Position3d.Should().Be(new Vector3d(
-            Fixed64.FromRaw(-4_294_965_629),
+            Fixed64.FromRaw(-4_294_965_632),
             Fixed64.Zero,
             -smallOffset * (Fixed64)3));
         source.Body.LinearVelocity.Should().Be(new Vector3d(

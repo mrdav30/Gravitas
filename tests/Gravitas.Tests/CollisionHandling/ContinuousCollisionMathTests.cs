@@ -349,110 +349,100 @@ public sealed class ContinuousCollisionMathTests
     }
 
     [Fact]
-    public void TrySweepRelativeSpheres_ShouldCoverClosingSeparatingAndOutOfRangeCases()
+    public void TryGetRelativeSphereOverlapDistanceInterval_ShouldReportGeometryAndClosingSpeedSeparately()
     {
-        ContinuousCollisionMath.TrySweepRelativeSpheres(
+        ContinuousCollisionMath.TryGetRelativeSphereOverlapDistanceInterval(
             Vector3d.Zero,
             Vector3d.Zero,
             Fixed64.Half,
             Vector3d.Right,
             Vector3d.Zero,
             Fixed64.Half,
-            out _,
-            out _,
-            out _).Should().BeFalse();
+            out _, out _, out _, out _, out _, out _).Should().BeFalse();
 
-        ContinuousCollisionMath.TrySweepRelativeSpheres(
+        ContinuousCollisionMath.TryGetRelativeSphereOverlapDistanceInterval(
             Vector3d.Zero,
             Vector3d.Right,
             Fixed64.Zero,
             Vector3d.Right,
             Vector3d.Zero,
             Fixed64.Zero,
-            out _,
-            out _,
-            out _).Should().BeFalse();
+            out _, out _, out _, out _, out _, out _).Should().BeFalse();
 
-        ContinuousCollisionMath.TrySweepRelativeSpheres(
+        ContinuousCollisionMath.TryGetRelativeSphereOverlapDistanceInterval(
             Vector3d.Zero,
             Vector3d.Right,
             Fixed64.Half,
             Vector3d.Right * Fixed64.Half,
             Vector3d.Zero,
             Fixed64.Half,
-            out Fixed64 overlapTime,
-            out Vector3d overlapNormal,
-            out Fixed64 overlapClosingSpeed).Should().BeTrue();
-        overlapTime.Should().Be(Fixed64.Zero);
+            out Fixed64 overlapDistance, out _, out _, out _,
+            out Vector3d overlapNormal, out Fixed64 overlapClosingSpeed).Should().BeTrue();
+        overlapDistance.Should().Be(Fixed64.Zero);
         overlapNormal.Should().Be(-Vector3d.Right);
         overlapClosingSpeed.Should().Be(Fixed64.One);
 
-        ContinuousCollisionMath.TrySweepRelativeSpheres(
+        ContinuousCollisionMath.TryGetRelativeSphereOverlapDistanceInterval(
             Vector3d.Zero,
             -Vector3d.Right,
             Fixed64.Half,
             Vector3d.Right * Fixed64.Half,
             Vector3d.Zero,
             Fixed64.Half,
-            out _,
-            out _,
-            out _).Should().BeFalse();
+            out Fixed64 separatingEntry, out _, out _, out _,
+            out Vector3d separatingNormal, out Fixed64 separatingSpeed).Should().BeTrue();
+        separatingEntry.Should().Be(Fixed64.Zero);
+        separatingNormal.Should().Be(-Vector3d.Right);
+        separatingSpeed.Should().Be(-Fixed64.One);
 
-        ContinuousCollisionMath.TrySweepRelativeSpheres(
+        ContinuousCollisionMath.TryGetRelativeSphereOverlapDistanceInterval(
             -Vector3d.Right * (Fixed64)4,
             Vector3d.Right * (Fixed64)4,
             Fixed64.Half,
             Vector3d.Zero,
             Vector3d.Zero,
             Fixed64.Half,
-            out Fixed64 hitTime,
-            out Vector3d hitNormal,
-            out Fixed64 closingSpeed).Should().BeTrue();
-        hitTime.Should().BeInRange(Fixed64.Zero, Fixed64.One);
+            out Fixed64 entryDistance, out _, out _, out _,
+            out Vector3d hitNormal, out Fixed64 closingSpeed).Should().BeTrue();
+        entryDistance.Should().Be((Fixed64)3);
         hitNormal.Should().Be(-Vector3d.Right);
         closingSpeed.Should().Be((Fixed64)4);
 
-        ContinuousCollisionMath.TrySweepRelativeSpheres(
+        ContinuousCollisionMath.TryGetRelativeSphereOverlapDistanceInterval(
             -Vector3d.Right * (Fixed64)4,
             -Vector3d.Right,
             Fixed64.Half,
             Vector3d.Zero,
             Vector3d.Zero,
             Fixed64.Half,
-            out _,
-            out _,
-            out _).Should().BeFalse();
+            out _, out _, out _, out _, out _, out _).Should().BeFalse();
 
-        ContinuousCollisionMath.TrySweepRelativeSpheres(
+        ContinuousCollisionMath.TryGetRelativeSphereOverlapDistanceInterval(
             new Vector3d((Fixed64)(-4), (Fixed64)4, Fixed64.Zero),
             Vector3d.Right,
             Fixed64.Half,
             Vector3d.Zero,
             Vector3d.Zero,
             Fixed64.Half,
-            out _,
-            out _,
-            out _).Should().BeFalse();
+            out _, out _, out _, out _, out _, out _).Should().BeFalse();
 
-        ContinuousCollisionMath.TrySweepRelativeSpheres(
+        ContinuousCollisionMath.TryGetRelativeSphereOverlapDistanceInterval(
             -Vector3d.Right * (Fixed64)4,
             Vector3d.Right,
             Fixed64.Half,
             Vector3d.Zero,
             Vector3d.Zero,
             Fixed64.Half,
-            out _,
-            out _,
-            out _).Should().BeFalse();
+            out _, out _, out _, out _, out _, out _).Should().BeFalse();
     }
 
     [Fact]
-    public void TrySweepRelativeSpheres_AtClosingSpeedEpsilon_ShouldRejectNearTangency()
+    public void TryGetRelativeSphereOverlapDistanceInterval_AtClosingSpeedEpsilon_ShouldRetainGeometricInterval()
     {
         Fixed64 relativeClosingSpeed = Fixed64.Epsilon;
         Fixed64 combinedRadius = (Fixed64)128;
         Fixed64 radius = combinedRadius * Fixed64.Half;
-        bool hit = ContinuousCollisionMath.TrySweepRelativeSpheres(
+        bool hit = ContinuousCollisionMath.TryGetRelativeSphereOverlapDistanceInterval(
             new Vector3d(
                 combinedRadius + relativeClosingSpeed * Fixed64.Half,
                 -Fixed64.Half,
@@ -462,17 +452,15 @@ public sealed class ContinuousCollisionMathTests
             Vector3d.Zero,
             Vector3d.Zero,
             radius,
-            out Fixed64 normalizedTime,
-            out _,
-            out Fixed64 closingSpeed);
+            out Fixed64 entryDistance, out _, out _, out _, out _, out Fixed64 closingSpeed);
 
-        hit.Should().BeFalse();
-        normalizedTime.Should().Be(Fixed64.Zero);
+        hit.Should().BeTrue();
+        entryDistance.Should().Be(Fixed64.Half);
         closingSpeed.Should().Be(Fixed64.Epsilon);
     }
 
     [Fact]
-    public void TrySweepRelative_WithUnderflowingNonzeroTangentRadius_ShouldUseScaledImpactNormal()
+    public void RelativeRadialDistanceIntervals_WithUnderflowingNonzeroTangentRadius_ShouldReportTangency()
     {
         Fixed64 radius = Fixed64.Epsilon + Fixed64.MinIncrement;
         Fixed64 combinedRadius = radius + radius;
@@ -480,236 +468,229 @@ public sealed class ContinuousCollisionMathTests
         radius.Should().BeGreaterThan(Fixed64.Epsilon);
         (combinedRadius * combinedRadius).Should().Be(Fixed64.Zero);
 
-        bool sphereHit = ContinuousCollisionMath.TrySweepRelativeSpheres(
+        bool sphereHit = ContinuousCollisionMath.TryGetRelativeSphereOverlapDistanceInterval(
             new Vector3d(-Fixed64.One, combinedRadius, Fixed64.Zero),
             Vector3d.Right * (Fixed64)2,
             radius,
             Vector3d.Zero,
             Vector3d.Zero,
             radius,
-            out _,
-            out _,
-            out _);
-        bool circleHit = ContinuousCollisionMath.TrySweepRelativeCircles(
+            out Fixed64 sphereDistance, out _, out _, out _,
+            out Vector3d sphereNormal, out Fixed64 sphereClosingSpeed);
+        bool circleHit = ContinuousCollisionMath.TryGetRelativeCircleOverlapDistanceInterval(
             new Vector2d(-Fixed64.One, combinedRadius),
             Vector2d.Right * (Fixed64)2,
             radius,
             Vector2d.Zero,
             Vector2d.Zero,
             radius,
-            out _,
-            out _,
-            out _);
+            out Fixed64 circleDistance, out _, out _, out _,
+            out Vector2d circleNormal, out Fixed64 circleClosingSpeed);
 
-        sphereHit.Should().BeFalse();
-        circleHit.Should().BeFalse();
+        sphereHit.Should().BeTrue();
+        sphereDistance.Should().Be(Fixed64.One);
+        sphereNormal.Should().Be(Vector3d.Up);
+        sphereClosingSpeed.Should().Be(Fixed64.Zero);
+        circleHit.Should().BeTrue();
+        circleDistance.Should().Be(Fixed64.One);
+        circleNormal.Should().Be(Vector2d.Forward);
+        circleClosingSpeed.Should().Be(Fixed64.Zero);
     }
 
     [Fact]
-    public void TrySweepRelativeCircles_ShouldMirrorSphereRelativeSweepSemantics()
+    public void TryGetRelativeCircleOverlapDistanceInterval_ShouldMirrorSphereRelativeSweepSemantics()
     {
-        ContinuousCollisionMath.TrySweepRelativeCircles(
+        ContinuousCollisionMath.TryGetRelativeCircleOverlapDistanceInterval(
             -Vector2d.Right * (Fixed64)4,
             Vector2d.Right * (Fixed64)4,
             Fixed64.Half,
             Vector2d.Zero,
             Vector2d.Zero,
             Fixed64.Half,
-            out Fixed64 hitTime,
-            out Vector2d hitNormal,
-            out Fixed64 closingSpeed).Should().BeTrue();
-        hitTime.Should().BeInRange(Fixed64.Zero, Fixed64.One);
+            out Fixed64 entryDistance, out _, out _, out _,
+            out Vector2d hitNormal, out Fixed64 closingSpeed).Should().BeTrue();
+        entryDistance.Should().Be((Fixed64)3);
         hitNormal.Should().Be(-Vector2d.Right);
         closingSpeed.Should().Be((Fixed64)4);
 
-        ContinuousCollisionMath.TrySweepRelativeCircles(
+        ContinuousCollisionMath.TryGetRelativeCircleOverlapDistanceInterval(
             Vector2d.Zero,
             Vector2d.Right,
             Fixed64.Half,
             Vector2d.Right * Fixed64.Half,
             Vector2d.Zero,
             Fixed64.Half,
-            out Fixed64 overlapTime,
-            out Vector2d overlapNormal,
-            out Fixed64 overlapClosingSpeed).Should().BeTrue();
-        overlapTime.Should().Be(Fixed64.Zero);
+            out Fixed64 overlapDistance, out _, out _, out _,
+            out Vector2d overlapNormal, out Fixed64 overlapClosingSpeed).Should().BeTrue();
+        overlapDistance.Should().Be(Fixed64.Zero);
         overlapNormal.Should().Be(-Vector2d.Right);
         overlapClosingSpeed.Should().Be(Fixed64.One);
 
-        ContinuousCollisionMath.TrySweepRelativeCircles(
+        ContinuousCollisionMath.TryGetRelativeCircleOverlapDistanceInterval(
             Vector2d.Zero,
             -Vector2d.Right,
             Fixed64.Half,
             Vector2d.Right * Fixed64.Half,
             Vector2d.Zero,
             Fixed64.Half,
-            out _,
-            out _,
-            out _).Should().BeFalse();
+            out Fixed64 separatingEntry, out _, out _, out _,
+            out Vector2d separatingNormal, out Fixed64 separatingSpeed).Should().BeTrue();
+        separatingEntry.Should().Be(Fixed64.Zero);
+        separatingNormal.Should().Be(-Vector2d.Right);
+        separatingSpeed.Should().Be(-Fixed64.One);
 
-        ContinuousCollisionMath.TrySweepRelativeCircles(
+        ContinuousCollisionMath.TryGetRelativeCircleOverlapDistanceInterval(
             new Vector2d((Fixed64)(-3), (Fixed64)2),
             Vector2d.Right * (Fixed64)4,
             Fixed64.Half,
             Vector2d.Zero,
             Vector2d.Zero,
             Fixed64.Half,
-            out _,
-            out _,
-            out _).Should().BeFalse();
+            out _, out _, out _, out _, out _, out _).Should().BeFalse();
 
-        ContinuousCollisionMath.TrySweepRelativeCircles(
+        ContinuousCollisionMath.TryGetRelativeCircleOverlapDistanceInterval(
             -Vector2d.Right * (Fixed64)5,
             Vector2d.Right * (Fixed64)2,
             Fixed64.Half,
             Vector2d.Zero,
             Vector2d.Zero,
             Fixed64.Half,
-            out _,
-            out _,
-            out _).Should().BeFalse();
+            out _, out _, out _, out _, out _, out _).Should().BeFalse();
 
-        ContinuousCollisionMath.TrySweepRelativeCircles(
+        ContinuousCollisionMath.TryGetRelativeCircleOverlapDistanceInterval(
             new Vector2d((Fixed64)(-1), Fixed64.One),
             Vector2d.Right * (Fixed64)2,
             Fixed64.Half,
             Vector2d.Zero,
             Vector2d.Zero,
             Fixed64.Half,
-            out _,
-            out _,
-            out _).Should().BeFalse();
+            out Fixed64 tangentDistance, out _, out _, out _,
+            out Vector2d tangentNormal, out Fixed64 tangentClosingSpeed).Should().BeTrue();
+        tangentDistance.Should().Be(Fixed64.One);
+        tangentNormal.Should().Be(Vector2d.Forward);
+        tangentClosingSpeed.Should().Be(Fixed64.Zero);
 
-        ContinuousCollisionMath.TrySweepRelativeCircles(
+        ContinuousCollisionMath.TryGetRelativeCircleOverlapDistanceInterval(
             new Vector2d((Fixed64)(-4), Fixed64.One),
             Vector2d.Right * (Fixed64)4,
             Fixed64.Half,
             Vector2d.Zero,
             Vector2d.Zero,
             Fixed64.Half,
-            out _,
-            out _,
-            out _).Should().BeFalse();
+            out Fixed64 endpointTangentDistance, out _, out _, out _,
+            out Vector2d endpointTangentNormal, out Fixed64 endpointTangentSpeed).Should().BeTrue();
+        endpointTangentDistance.Should().Be((Fixed64)4);
+        endpointTangentNormal.Should().Be(Vector2d.Forward);
+        endpointTangentSpeed.Should().Be(Fixed64.Zero);
 
-        ContinuousCollisionMath.TrySweepRelativeCircles(
+        ContinuousCollisionMath.TryGetRelativeCircleOverlapDistanceInterval(
             Vector2d.Zero,
             Vector2d.Right,
             Fixed64.Half,
             Vector2d.Zero,
             Vector2d.Zero,
             Fixed64.Half,
-            out Fixed64 centeredOverlapTime,
-            out Vector2d centeredOverlapNormal,
-            out Fixed64 centeredOverlapClosingSpeed).Should().BeTrue();
-        centeredOverlapTime.Should().Be(Fixed64.Zero);
+            out Fixed64 centeredOverlapDistance, out _, out _, out _,
+            out Vector2d centeredOverlapNormal, out Fixed64 centeredOverlapClosingSpeed).Should().BeTrue();
+        centeredOverlapDistance.Should().Be(Fixed64.Zero);
         centeredOverlapNormal.Should().Be(-Vector2d.Right);
         centeredOverlapClosingSpeed.Should().Be(Fixed64.One);
     }
 
     [Fact]
-    public void TrySweepRelativeRadialBounds_ShouldAdmitExactFrameEndpointContactInBothDimensions()
+    public void RelativeRadialDistanceIntervals_ShouldAdmitExactFrameEndpointContactInBothDimensions()
     {
-        bool sphereHit = ContinuousCollisionMath.TrySweepRelativeSpheres(
+        bool sphereHit = ContinuousCollisionMath.TryGetRelativeSphereOverlapDistanceInterval(
             Vector3d.Zero,
             new Vector3d(Fixed64.One, Fixed64.Half, Fixed64.Zero),
             Fixed64.Half,
             new Vector3d((Fixed64)2, Fixed64.Half, Fixed64.Zero),
             Vector3d.Zero,
             Fixed64.Half,
-            out Fixed64 sphereTime,
-            out Vector3d sphereNormal,
-            out Fixed64 sphereClosingSpeed);
-        bool circleHit = ContinuousCollisionMath.TrySweepRelativeCircles(
+            out Fixed64 sphereEntryDistance, out _, out _, out Fixed64 sphereRelativeLength,
+            out Vector3d sphereNormal, out Fixed64 sphereClosingSpeed);
+        bool circleHit = ContinuousCollisionMath.TryGetRelativeCircleOverlapDistanceInterval(
             Vector2d.Zero,
             new Vector2d(Fixed64.One, Fixed64.Half),
             Fixed64.Half,
             new Vector2d((Fixed64)2, Fixed64.Half),
             Vector2d.Zero,
             Fixed64.Half,
-            out Fixed64 circleTime,
-            out Vector2d circleNormal,
-            out Fixed64 circleClosingSpeed);
+            out Fixed64 circleEntryDistance, out _, out _, out Fixed64 circleRelativeLength,
+            out Vector2d circleNormal, out Fixed64 circleClosingSpeed);
 
         sphereHit.Should().BeTrue();
-        sphereTime.Should().Be(Fixed64.One);
+        sphereEntryDistance.Should().Be(sphereRelativeLength);
         sphereNormal.Should().Be(Vector3d.Left);
         sphereClosingSpeed.Should().Be(Fixed64.One);
         circleHit.Should().BeTrue();
-        circleTime.Should().Be(Fixed64.One);
+        circleEntryDistance.Should().Be(circleRelativeLength);
         circleNormal.Should().Be(Vector2d.Left);
         circleClosingSpeed.Should().Be(Fixed64.One);
     }
 
     [Fact]
-    public void TrySweepRelativeSpheres_ShouldOrderExtremeRangeCrossingWithoutQuadraticSaturation()
+    public void TryGetRelativeSphereOverlapDistanceInterval_ShouldOrderExtremeRangeCrossingWithoutQuadraticSaturation()
     {
-        bool hit = ContinuousCollisionMath.TrySweepRelativeSpheres(
+        bool hit = ContinuousCollisionMath.TryGetRelativeSphereOverlapDistanceInterval(
             new Vector3d((Fixed64)(-100_000), Fixed64.Zero, Fixed64.Zero),
             new Vector3d((Fixed64)100_000, Fixed64.Zero, Fixed64.Zero),
             Fixed64.Half,
             Vector3d.Zero,
             new Vector3d((Fixed64)(-100_000), Fixed64.Zero, Fixed64.Zero),
             Fixed64.Half,
-            out Fixed64 normalizedTime,
-            out Vector3d normal,
-            out Fixed64 closingSpeed);
+            out Fixed64 entryDistance, out _, out _, out _, out Vector3d normal, out Fixed64 closingSpeed);
 
         hit.Should().BeTrue();
-        normalizedTime.Should().Be(Fixed64.FromFraction(99_999, 200_000));
+        entryDistance.Should().Be((Fixed64)99_999);
         normal.Should().Be(Vector3d.Left);
         closingSpeed.Should().Be((Fixed64)200_000);
     }
 
     [Fact]
-    public void TrySweepRelativeCircles_ShouldOrderExtremeRangeCrossingWithoutQuadraticSaturation()
+    public void TryGetRelativeCircleOverlapDistanceInterval_ShouldOrderExtremeRangeCrossingWithoutQuadraticSaturation()
     {
-        bool hit = ContinuousCollisionMath.TrySweepRelativeCircles(
+        bool hit = ContinuousCollisionMath.TryGetRelativeCircleOverlapDistanceInterval(
             new Vector2d((Fixed64)(-100_000), Fixed64.Zero),
             new Vector2d((Fixed64)100_000, Fixed64.Zero),
             Fixed64.Half,
             Vector2d.Zero,
             new Vector2d((Fixed64)(-100_000), Fixed64.Zero),
             Fixed64.Half,
-            out Fixed64 normalizedTime,
-            out Vector2d normal,
-            out Fixed64 closingSpeed);
+            out Fixed64 entryDistance, out _, out _, out _, out Vector2d normal, out Fixed64 closingSpeed);
 
         hit.Should().BeTrue();
-        normalizedTime.Should().Be(Fixed64.FromFraction(99_999, 200_000));
+        entryDistance.Should().Be((Fixed64)99_999);
         normal.Should().Be(Vector2d.Left);
         closingSpeed.Should().Be((Fixed64)200_000);
     }
 
     [Fact]
-    public void TrySweepRelativeSpheres_ShouldPreserveUnrepresentableCenterDifferenceAndRadiusSum()
+    public void TryGetRelativeSphereOverlapDistanceInterval_ShouldPreserveUnrepresentableCenterDifferenceAndRadiusSum()
     {
-        bool crossing = ContinuousCollisionMath.TrySweepRelativeSpheres(
+        bool crossing = ContinuousCollisionMath.TryGetRelativeSphereOverlapDistanceInterval(
             new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero),
             new Vector3d(-Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero),
             Fixed64.Half,
             new Vector3d(-Fixed64.One, Fixed64.Zero, Fixed64.Zero),
             Vector3d.Zero,
             Fixed64.Half,
-            out Fixed64 crossingTime,
-            out Vector3d crossingNormal,
-            out Fixed64 crossingSpeed);
-        bool overlapping = ContinuousCollisionMath.TrySweepRelativeSpheres(
+            out Fixed64 crossingDistance, out _, out _, out _, out Vector3d crossingNormal, out Fixed64 crossingSpeed);
+        bool overlapping = ContinuousCollisionMath.TryGetRelativeSphereOverlapDistanceInterval(
             new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero),
             Vector3d.Left,
             Fixed64.One,
             new Vector3d(-Fixed64.One, Fixed64.Zero, Fixed64.Zero),
             Vector3d.Zero,
             Fixed64.MaxValue,
-            out Fixed64 overlapTime,
-            out Vector3d overlapNormal,
-            out Fixed64 overlapSpeed);
+            out Fixed64 overlapDistance, out _, out _, out _, out Vector3d overlapNormal, out Fixed64 overlapSpeed);
 
         crossing.Should().BeTrue();
-        crossingTime.Should().Be(Fixed64.One);
+        crossingDistance.Should().Be(Fixed64.MaxValue);
         crossingNormal.Should().Be(Vector3d.Right);
         crossingSpeed.Should().Be(Fixed64.MaxValue);
         overlapping.Should().BeTrue();
-        overlapTime.Should().Be(Fixed64.Zero);
+        overlapDistance.Should().Be(Fixed64.Zero);
         overlapNormal.Should().Be(Vector3d.Right);
         overlapSpeed.Should().Be(Fixed64.One);
     }
@@ -767,74 +748,68 @@ public sealed class ContinuousCollisionMathTests
     }
 
     [Fact]
-    public void TrySweepRelativeCircles_ShouldPreserveUnrepresentableCenterDifferenceAndRadiusSum()
+    public void TryGetRelativeCircleOverlapDistanceInterval_ShouldPreserveUnrepresentableCenterDifferenceAndRadiusSum()
     {
-        bool crossing = ContinuousCollisionMath.TrySweepRelativeCircles(
+        bool crossing = ContinuousCollisionMath.TryGetRelativeCircleOverlapDistanceInterval(
             new Vector2d(Fixed64.MaxValue, Fixed64.Zero),
             new Vector2d(-Fixed64.MaxValue, Fixed64.Zero),
             Fixed64.Half,
             new Vector2d(-Fixed64.One, Fixed64.Zero),
             Vector2d.Zero,
             Fixed64.Half,
-            out Fixed64 crossingTime,
-            out Vector2d crossingNormal,
-            out Fixed64 crossingSpeed);
-        bool overlapping = ContinuousCollisionMath.TrySweepRelativeCircles(
+            out Fixed64 crossingDistance, out _, out _, out _, out Vector2d crossingNormal, out Fixed64 crossingSpeed);
+        bool overlapping = ContinuousCollisionMath.TryGetRelativeCircleOverlapDistanceInterval(
             new Vector2d(Fixed64.MaxValue, Fixed64.Zero),
             Vector2d.Left,
             Fixed64.One,
             new Vector2d(-Fixed64.One, Fixed64.Zero),
             Vector2d.Zero,
             Fixed64.MaxValue,
-            out Fixed64 overlapTime,
-            out Vector2d overlapNormal,
-            out Fixed64 overlapSpeed);
+            out Fixed64 overlapDistance, out _, out _, out _, out Vector2d overlapNormal, out Fixed64 overlapSpeed);
 
         crossing.Should().BeTrue();
-        crossingTime.Should().Be(Fixed64.One);
+        crossingDistance.Should().Be(Fixed64.MaxValue);
         crossingNormal.Should().Be(Vector2d.Right);
         crossingSpeed.Should().Be(Fixed64.MaxValue);
         overlapping.Should().BeTrue();
-        overlapTime.Should().Be(Fixed64.Zero);
+        overlapDistance.Should().Be(Fixed64.Zero);
         overlapNormal.Should().Be(Vector2d.Right);
         overlapSpeed.Should().Be(Fixed64.One);
     }
 
     [Fact]
-    public void TrySweepRelativeRadialBounds_ShouldRejectUnrepresentableEndpointSeparationInBothDimensions()
+    public void RelativeRadialDistanceIntervals_ShouldRejectUnrepresentableEndpointSeparationInBothDimensions()
     {
         Vector2d far2D = new(Fixed64.MaxValue, Fixed64.MaxValue);
         Vector2d target2D = new(Fixed64.MinValue, Fixed64.MinValue);
         Vector3d far3D = new(Fixed64.MaxValue, Fixed64.MaxValue, Fixed64.MaxValue);
         Vector3d target3D = new(Fixed64.MinValue, Fixed64.MinValue, Fixed64.MinValue);
 
-        bool sphereHit = ContinuousCollisionMath.TrySweepRelativeSpheres(
+        bool sphereHit = ContinuousCollisionMath.TryGetRelativeSphereOverlapDistanceInterval(
             far3D,
             Vector3d.Left,
             Fixed64.Half,
             target3D,
             Vector3d.Zero,
             Fixed64.Half,
-            out Fixed64 sphereTime,
-            out Vector3d sphereNormal,
-            out Fixed64 sphereClosingSpeed);
-        bool circleHit = ContinuousCollisionMath.TrySweepRelativeCircles(
+            out Fixed64 sphereEntryDistance, out _, out _, out _,
+            out Vector3d sphereNormal, out Fixed64 sphereClosingSpeed);
+        bool circleHit = ContinuousCollisionMath.TryGetRelativeCircleOverlapDistanceInterval(
             far2D,
             Vector2d.Left,
             Fixed64.Half,
             target2D,
             Vector2d.Zero,
             Fixed64.Half,
-            out Fixed64 circleTime,
-            out Vector2d circleNormal,
-            out Fixed64 circleClosingSpeed);
+            out Fixed64 circleEntryDistance, out _, out _, out _,
+            out Vector2d circleNormal, out Fixed64 circleClosingSpeed);
 
         sphereHit.Should().BeFalse();
-        sphereTime.Should().Be(Fixed64.Zero);
+        sphereEntryDistance.Should().Be(Fixed64.Zero);
         sphereNormal.Should().Be(Vector3d.Zero);
         sphereClosingSpeed.Should().Be(Fixed64.Zero);
         circleHit.Should().BeFalse();
-        circleTime.Should().Be(Fixed64.Zero);
+        circleEntryDistance.Should().Be(Fixed64.Zero);
         circleNormal.Should().Be(Vector2d.Zero);
         circleClosingSpeed.Should().Be(Fixed64.Zero);
     }
@@ -1041,82 +1016,70 @@ public sealed class ContinuousCollisionMathTests
     }
 
     [Fact]
-    public void RelativeSweepEntryPoints_ShouldRejectUnrepresentableRelativeMotionBeforeProxyMath()
+    public void RelativeRadialDistanceIntervals_ShouldRejectUnrepresentableRelativeMotionBeforeProxyMath()
     {
-        Action sweepSpheres = () => ContinuousCollisionMath.TrySweepRelativeSpheres(
+        Action sphereQuery = () => ContinuousCollisionMath.TryGetRelativeSphereOverlapDistanceInterval(
             Vector3d.Zero,
             new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero),
             Fixed64.Half,
             Vector3d.Right,
             -Vector3d.Right,
             Fixed64.Half,
-            out _,
-            out _,
-            out _);
-        Action sweepCircles = () => ContinuousCollisionMath.TrySweepRelativeCircles(
+            out _, out _, out _, out _, out _, out _);
+        Action circleQuery = () => ContinuousCollisionMath.TryGetRelativeCircleOverlapDistanceInterval(
             Vector2d.Zero,
             new Vector2d(Fixed64.MaxValue, Fixed64.MaxValue),
             Fixed64.Half,
             Vector2d.Right,
             Vector2d.Zero,
             Fixed64.Half,
-            out _,
-            out _,
-            out _);
+            out _, out _, out _, out _, out _, out _);
 
-        sweepSpheres.Should().Throw<ArgumentOutOfRangeException>();
-        sweepCircles.Should().Throw<ArgumentOutOfRangeException>();
+        sphereQuery.Should().Throw<ArgumentOutOfRangeException>();
+        circleQuery.Should().Throw<ArgumentOutOfRangeException>();
     }
 
     [Fact]
-    public void RelativeSweepEntryPoints_ShouldRejectUnrepresentableWorldEndpoints()
+    public void RelativeRadialDistanceIntervals_ShouldRejectUnrepresentableWorldEndpoints()
     {
         Fixed64 sourceStart = Fixed64.MaxValue - Fixed64.Half;
         Fixed64 quarter = Fixed64.One / (Fixed64)4;
-        Action sweepSpheres = () => ContinuousCollisionMath.TrySweepRelativeSpheres(
+        Action sphereHit = () => ContinuousCollisionMath.TryGetRelativeSphereOverlapDistanceInterval(
             new Vector3d(sourceStart, Fixed64.Zero, Fixed64.Zero),
             Vector3d.Right,
             quarter,
             new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero),
             Vector3d.Zero,
             quarter,
-            out _,
-            out _,
-            out _);
-        Action sweepCircles = () => ContinuousCollisionMath.TrySweepRelativeCircles(
+            out _, out _, out _, out _, out _, out _);
+        Action circleHit = () => ContinuousCollisionMath.TryGetRelativeCircleOverlapDistanceInterval(
             new Vector2d(sourceStart, Fixed64.Zero),
             Vector2d.Right,
             quarter,
             new Vector2d(Fixed64.MaxValue, Fixed64.Zero),
             Vector2d.Zero,
             quarter,
-            out _,
-            out _,
-            out _);
-        Action missSpheres = () => ContinuousCollisionMath.TrySweepRelativeSpheres(
+            out _, out _, out _, out _, out _, out _);
+        Action sphereMiss = () => ContinuousCollisionMath.TryGetRelativeSphereOverlapDistanceInterval(
             new Vector3d(sourceStart, Fixed64.Zero, Fixed64.Zero),
             Vector3d.Right,
             quarter,
             new Vector3d(sourceStart, (Fixed64)10, Fixed64.Zero),
             Vector3d.Zero,
             quarter,
-            out _,
-            out _,
-            out _);
-        Action missCircles = () => ContinuousCollisionMath.TrySweepRelativeCircles(
+            out _, out _, out _, out _, out _, out _);
+        Action circleMiss = () => ContinuousCollisionMath.TryGetRelativeCircleOverlapDistanceInterval(
             new Vector2d(sourceStart, Fixed64.Zero),
             Vector2d.Right,
             quarter,
             new Vector2d(sourceStart, (Fixed64)10),
             Vector2d.Zero,
             quarter,
-            out _,
-            out _,
-            out _);
+            out _, out _, out _, out _, out _, out _);
 
-        sweepSpheres.Should().Throw<ArgumentOutOfRangeException>();
-        sweepCircles.Should().Throw<ArgumentOutOfRangeException>();
-        missSpheres.Should().Throw<ArgumentOutOfRangeException>();
-        missCircles.Should().Throw<ArgumentOutOfRangeException>();
+        sphereHit.Should().Throw<ArgumentOutOfRangeException>();
+        circleHit.Should().Throw<ArgumentOutOfRangeException>();
+        sphereMiss.Should().Throw<ArgumentOutOfRangeException>();
+        circleMiss.Should().Throw<ArgumentOutOfRangeException>();
     }
 }

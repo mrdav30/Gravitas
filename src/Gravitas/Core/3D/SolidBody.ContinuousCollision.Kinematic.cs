@@ -259,9 +259,8 @@ public partial class SolidBody
             }
 
             target.EnsureContinuousCollisionFramePrepared(token);
-            Fixed64 targetRadius = FixedMath.Max(
-                target.ResolveContinuousCollisionProxyRadius(),
-                target.Collider.MixedHalfThickness);
+            Fixed64 targetRadius =
+                target.ResolveMixedContinuousCollisionProxyRadius();
             ContinuousCollisionMath.IntervalSearchStatus status =
                 TryGetDynamicMixed2DContinuousCollisionHit(
                     target,

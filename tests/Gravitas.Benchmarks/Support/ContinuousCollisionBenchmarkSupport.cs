@@ -445,16 +445,14 @@ internal static class ContinuousCollisionBenchmarkSupport
                 }
 
                 Fixed64 targetRadius = target.ResolveContinuousCollisionProxyRadius();
-                if (ContinuousCollisionMath.TrySweepRelativeSpheres(
+                if (ContinuousCollisionMath.TryGetRelativeSphereOverlapDistanceInterval(
                         source.ContinuousCollisionFrameStart,
                         source.ContinuousCollisionFrameDisplacement,
                         sourceRadius,
                         target.ContinuousCollisionFrameStart,
                         target.ContinuousCollisionFrameDisplacement,
                         targetRadius,
-                        out _,
-                        out _,
-                        out _))
+                        out _, out _, out _, out _, out _, out _))
                 {
                     total++;
                 }
@@ -488,16 +486,14 @@ internal static class ContinuousCollisionBenchmarkSupport
                 }
 
                 Fixed64 targetRadius = target.ResolveContinuousCollisionProxyRadius();
-                if (ContinuousCollisionMath.TrySweepRelativeCircles(
+                if (ContinuousCollisionMath.TryGetRelativeCircleOverlapDistanceInterval(
                         source.ContinuousCollisionFrameStart,
                         source.ContinuousCollisionFrameDisplacement,
                         sourceRadius,
                         target.ContinuousCollisionFrameStart,
                         target.ContinuousCollisionFrameDisplacement,
                         targetRadius,
-                        out _,
-                        out _,
-                        out _))
+                        out _, out _, out _, out _, out _, out _))
                 {
                     total++;
                 }

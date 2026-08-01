@@ -176,7 +176,7 @@ public sealed partial class MixedQueryCcdTests
     }
 
     [Fact]
-    public void MixedKinematic3DSphere_OutsideTallSlabRadius_ShouldFallbackConservatively()
+    public void MixedKinematic3DSphere_OutsideTallSlabRadius_ShouldRejectEnclosingProxyOnlyHit()
     {
         using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
         context.Environment.Gravity = Fixed64.Zero;
@@ -203,7 +203,8 @@ public sealed partial class MixedQueryCcdTests
 
         context.LateSimulate();
 
-        source.Body.Position3d.Should().Be(start);
+        source.Body.Position3d.Should().Be(requested);
+        source.Body.LastContinuousCollisionToiIterationCount.Should().Be(0);
         target.IsSleeping.Should().BeTrue();
         target.LinearVelocity.Should().Be(Vector2d.Zero);
     }

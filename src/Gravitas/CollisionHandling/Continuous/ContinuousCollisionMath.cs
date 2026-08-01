@@ -324,40 +324,6 @@ internal static class ContinuousCollisionMath
         return true;
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static bool TrySweepRelativeSpheres(
-        Vector3d sourceStart,
-        Vector3d sourceDisplacement,
-        Fixed64 sourceRadius,
-        Vector3d targetStart,
-        Vector3d targetDisplacement,
-        Fixed64 targetRadius,
-        out Fixed64 normalizedTime,
-        out Vector3d normalForSource,
-        out Fixed64 closingSpeed)
-    {
-        normalizedTime = Fixed64.Zero;
-        if (!TryGetRelativeSphereOverlapDistanceInterval(
-                sourceStart,
-                sourceDisplacement,
-                sourceRadius,
-                targetStart,
-                targetDisplacement,
-                targetRadius,
-                out Fixed64 entryDistance,
-                out _,
-                out _,
-                out Fixed64 relativeLength,
-                out normalForSource,
-                out closingSpeed))
-        {
-            return false;
-        }
-
-        normalizedTime = entryDistance / relativeLength;
-        return true;
-    }
-
     public static bool TryGetRelativeSphereOverlapDistanceInterval(
         Vector3d sourceStart,
         Vector3d sourceDisplacement,
@@ -408,43 +374,6 @@ internal static class ContinuousCollisionMath
             .GetPointAtDistance(entryDistance, relativeLength);
         normalForSource = ResolveNormal(targetImpact, sourceImpact, relativeDisplacement);
         closingSpeed = -Vector3d.Dot(relativeDisplacement, normalForSource);
-        if (closingSpeed <= Fixed64.Epsilon)
-            return false;
-
-        return true;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static bool TrySweepRelativeCircles(
-        Vector2d sourceStart,
-        Vector2d sourceDisplacement,
-        Fixed64 sourceRadius,
-        Vector2d targetStart,
-        Vector2d targetDisplacement,
-        Fixed64 targetRadius,
-        out Fixed64 normalizedTime,
-        out Vector2d normalForSource,
-        out Fixed64 closingSpeed)
-    {
-        normalizedTime = Fixed64.Zero;
-        if (!TryGetRelativeCircleOverlapDistanceInterval(
-                sourceStart,
-                sourceDisplacement,
-                sourceRadius,
-                targetStart,
-                targetDisplacement,
-                targetRadius,
-                out Fixed64 entryDistance,
-                out _,
-                out _,
-                out Fixed64 relativeLength,
-                out normalForSource,
-                out closingSpeed))
-        {
-            return false;
-        }
-
-        normalizedTime = entryDistance / relativeLength;
         return true;
     }
 
@@ -498,9 +427,6 @@ internal static class ContinuousCollisionMath
             .GetPointAtDistance(entryDistance, relativeLength);
         normalForSource = ResolveNormal(targetImpact, sourceImpact, relativeDisplacement);
         closingSpeed = -Vector2d.Dot(relativeDisplacement, normalForSource);
-        if (closingSpeed <= Fixed64.Epsilon)
-            return false;
-
         return true;
     }
 

@@ -91,6 +91,14 @@ public closest-point API merely because its Euclidean distance cannot fit in
 stable authored-order ties. Query families that actually return a scalar
 distance still fail that final conversion honestly rather than saturating it.
 
+Segment-based circle and sphere raycasts and sweeps solve and rank physical
+distance along the authored segment directly. They retain the original chord
+through root ordering and hit reconstruction, so a long segment cannot collapse
+spatially distinct hits through an intermediate normalized parameter. This does
+not change FixedMathSharp's separate `FixedRay` and `FixedRay2d` contracts:
+those primitives continue to return ordinary ray parameters, which are physical
+distances only when their direction is normalized.
+
 ## Hit Witnesses
 
 `Physics3DHit`, `Physics2DHit`, and `PhysicsMixedHit` retain surface witnesses

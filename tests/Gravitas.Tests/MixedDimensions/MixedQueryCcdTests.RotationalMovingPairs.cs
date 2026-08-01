@@ -450,6 +450,7 @@ public sealed partial class MixedQueryCcdTests
         target.Body.ResetPosition(Vector3d.Zero, FixedQuaternion.Identity);
         target.Body.Sleep();
         blade.ResolveContinuousCollisionProxyRadius().Should().Be(Fixed64.MaxValue);
+        blade.ResolveMixedContinuousCollisionProxyRadius().Should().Be(Fixed64.MaxValue);
 
         blade.Agent.Transform.LocalRotationXZRadians = RotationalMixedQuarterTurn;
         context.AdvanceLateSimulateToken();

@@ -29,17 +29,17 @@ records follow with their original discovery context.
 - Treat local links as unstaged validation scaffolding. Do not publish or
   release with them in place.
 - FixedMathSharp foundation hardening is complete. The current locally linked
-  geometry and arithmetic extensions pass 2,625 Release and 2,604 ReleaseLean
-  tests at 46,549/46,549 reachable lines, 8,640/8,640 branches, and
-  3,400/3,400 methods. Retain the local link while the remaining Gravitas queue
+  geometry and arithmetic extensions pass 2,628 Release and 2,607 ReleaseLean
+  tests at 46,756/46,756 reachable lines, 8,648/8,648 branches, and
+  3,413/3,413 methods. Retain the local link while the remaining Gravitas queue
   is hardened.
 - SwiftCollections has no library-specific active issue at this checkpoint; its
   place in the sequence is a full downstream compatibility and release gate.
 - GridForge's runtime-identity defect is resolved. Keep the lower stack locally
   linked while the remaining Gravitas queue is hardened so another downstream
   discovery does not force a partial release cycle.
-- Gravitas's current Release run passes 3,894 tests at 43,971/43,971 lines,
-  12,865/12,865 branches, and 4,531/4,531 methods. ReleaseLean passes 3,839
+- Gravitas's current Release run passes 3,919 tests at 56,012/56,012 lines,
+  15,889/15,889 branches, and 5,348/5,348 methods. ReleaseLean passes 3,864
   tests. Exact body point transforms and the existing 3D, 2D, and mixed
   response allocation gates remain at zero managed bytes; measured timing
   signals remain in the benchmark backlog.
@@ -50,36 +50,7 @@ records follow with their original discovery context.
 ### Ordered Queue
 
 1. **FixedMathSharp / Gravitas:**
-   [Radial Segment Parameters Can Collapse Spatially Distinct Query Hits](#radial-segment-parameters-can-collapse-spatially-distinct-query-hits).
-2. **FixedMathSharp / Gravitas:**
    [Mesh Triangle-Triangle SAT Can Saturate Before Axis Classification](#mesh-triangle-triangle-sat-can-saturate-before-axis-classification).
-
-### Radial Segment Parameters Can Collapse Spatially Distinct Query Hits
-
-**Discovered:** 2026-07-20  
-**Source:** authored-segment finite-axis distance closure  
-**Affected area:** FixedMathSharp radial segment output; Gravitas 2D circle
-raycasts/sweeps, 3D sphere raycasts/sweeps, relative radial CCD, and mixed
-radial reducers
-
-The prior radial hardening correctly keeps authored segment coefficients wide
-through its circle/sphere solve, but its public segment result still narrows to
-a Q32.32 parameter. Reconstructing spatial distance or a contact point from that
-parameter can collapse hits one spatial raw unit apart on a long chord. Several
-Gravitas distance-form consumers instead normalize an authored displacement
-before the solve; a representable transverse component can then round to zero,
-changing admission rather than only the reported result. An endpoint fallback
-does not repair an interior crossing or preserve the ordering of two valid
-roots.
-
-Add exact authored-segment distance intervals for radial circle/sphere queries
-in FixedMathSharp, using the same one-final-rounding contract as the finite-axis
-distance APIs. Migrate every 2D, 3D, mixed, and relative-CCD distance consumer
-without changing the deliberate normalized-ray API. Cover million-unit hits
-one raw apart, two-raw transverse interior tangency, starts inside, strict end
-containment, opposite scalar faces, deterministic ordering, and warmed
-zero-allocation behavior. Keep this separate from sphere construction/merge
-and conic-quadratic ownership.
 
 ### Mesh Triangle-Triangle SAT Can Saturate Before Axis Classification
 
@@ -110,6 +81,51 @@ projection/ranking paths; do not assume a discrete 3D collision fix provides
 query parity.
 
 ## Resolved Issues
+
+### Radial Segment Parameters Could Collapse Spatially Distinct Query Hits
+
+**Discovered:** 2026-07-20  
+**Resolved:** 2026-07-31  
+**Source:** authored-segment finite-axis distance closure  
+**Affected area:** FixedMathSharp radial segment output; Gravitas 2D circle
+raycasts/sweeps, 3D sphere raycasts/sweeps, relative radial CCD, and mixed
+radial reducers
+
+RCA: the prior wide radial solver narrowed each root to a Q32.32 ray parameter
+before segment consumers reconstructed physical distance. Long authored chords
+could therefore map spatially distinct roots to the same parameter, while
+callers that normalized a long displacement could erase a small representable
+transverse component before admission. Endpoint fallback could not recover an
+interior crossing or its root order. Mixed moving-pair review also found that a
+proxy-only closing test, an underestimated 2D slab proxy radius, rounded
+trajectory reconstruction, and predecessor-owned shared boundaries could
+override otherwise exact geometry.
+
+FixedMathSharp now exposes direct circle and sphere physical-distance intervals
+on `FixedSegment2d` and `FixedSegment`, backed by the existing one-final-rounding
+wide radial kernel. Its narrow internal direction-and-distance contracts let
+Gravitas avoid manufacturing an unrepresentable relative endpoint without
+exposing wide arithmetic publicly. Gravitas query and CCD consumers preserve
+authored source and target trajectories through exact-distance ordering, then
+materialize normalized time only for final arbitration. Mixed CCD uses a
+ceiling-safe Euclidean slab proxy, treats proxy intervals as geometry-only,
+uses exact or sampled contact normals for closing policy, and gives a
+right-continuous successor segment ownership of shared boundaries.
+`RadialSweepAdmission`, dead relative-sweep wrappers, and their wrapper-only
+tests were deleted.
+
+Verification:
+
+- FixedMathSharp passes 2,628 Release and 2,607 ReleaseLean tests at 100% line
+  (46,756/46,756), branch (8,648/8,648), and method (3,413/3,413) coverage.
+- Gravitas passes 3,919 Release and 3,864 ReleaseLean tests at 100% line
+  (56,012/56,012), branch (15,889/15,889), and method (5,348/5,348) coverage.
+- All 56 warmed Gravitas allocation guards pass. Existing radial and relative
+  CCD Dry benchmark rows retain zero managed allocation, including ordinary
+  and 100,000-scale radial segments and 256/1,024-body relative sweeps.
+- Standard and Lean package builds pass for `net8.0` and `netstandard2.1` with
+  zero warnings. Independent whole-change review found no Critical, Important,
+  or Minor issue.
 
 ### 3D Closest-Surface And Overlap-Circle Classification Are Not Full-Domain
 
@@ -875,15 +891,14 @@ intersection overloads with exact nonnegative radius expansion. Full-domain
 vector direction and endpoint-distance helpers support downstream
 reconstruction without saturated subtraction or squared magnitude.
 
-Gravitas now centralizes radial admission in `RadialSweepAdmission`. Relative
-CCD uses exact normalized-frame roots, validates both world endpoints, resolves
-impact normals from full-domain interpolation, and admits the closed frame end
-only when the separately authored endpoints round to contact. Public query
-workers retain normalized directions and spatial-distance parameters, avoiding
-amplification of one-raw-unit direction rounding. Safe first-root circle/sphere
-reducers in pure and mixed 2D/3D paths share the same contract. Consumers that
-require both roots remain explicitly queued under the separate full-domain
-radial-interval issue.
+At that checkpoint Gravitas centralized radial admission in
+`RadialSweepAdmission`, used exact normalized-frame roots, and retained
+normalized public-query directions. The later exact radial segment-distance
+closure replaced that intermediate contract: segment consumers now solve and
+rank physical distance along the authored chord, relative CCD reconstructs both
+authored trajectories before time materialization, and `RadialSweepAdmission`
+has been deleted. The separate resolved radial-interval record captures that
+final state.
 
 Verification:
 

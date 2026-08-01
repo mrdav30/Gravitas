@@ -55,6 +55,16 @@ public sealed partial class SolidBody2D
             : Fixed64.MaxValue;
     }
 
+    internal Fixed64 ResolveMixedContinuousCollisionProxyRadius()
+    {
+        Vector2d mixedExtents = new(
+            ResolveContinuousCollisionProxyRadius(),
+            Collider.MixedHalfThickness);
+        return mixedExtents.TryGetMagnitudeCeiling(out Fixed64 radius)
+            ? radius
+            : Fixed64.MaxValue;
+    }
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private bool IsValidContinuousCollisionHit(Physics2DHit hit) =>
         IsValidContinuousCollisionTarget(hit.Collider);

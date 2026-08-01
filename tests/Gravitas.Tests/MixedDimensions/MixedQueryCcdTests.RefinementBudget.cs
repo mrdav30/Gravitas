@@ -11,12 +11,186 @@ using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Tests.Support;
 using SwiftCollections.Query;
+using System.Reflection;
 using Xunit;
 
 namespace Gravitas.Tests.MixedDimensions;
 
 public sealed partial class MixedQueryCcdTests
 {
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void MixedContinuousMode_RefinementWithoutContactWitness_ShouldReturnUnresolvedFrontier(
+        bool threeDSource)
+    {
+        using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
+        Fixed64 sourceLength = Fixed64.FromFraction(1, 5);
+        Fixed64 sourceX = (Fixed64)3 + Fixed64.FromFraction(11, 40);
+        Fixed64 startRotation = FixedMath.DegToRad((Fixed64)(-45));
+        Fixed64 endRotation = FixedMath.DegToRad((Fixed64)45);
+
+        object source;
+        object?[] arguments;
+        string methodName;
+        if (threeDSource)
+        {
+            SolidBody2D target = CreateRotationalMixedBlade2D(context);
+            ScenarioBody<LSCuboidCollider> source3D = CreateRefinementSource3D(
+                context,
+                new Vector3d(
+                    sourceX,
+                    Fixed64.Zero,
+                    Fixed64.FromFraction(-1, 10)));
+            target.ResetPosition(Vector2d.Zero, startRotation);
+            target.ContinuousCollisionMode = ContinuousCollisionMode.Discrete;
+            target.Agent.Transform.LocalRotationXZRadians = endRotation;
+            source3D.Body.ContinuousCollisionMode =
+                ContinuousCollisionMode.Continuous;
+            source = source3D.Body;
+            methodName = "TryGetDynamicMixed2DContinuousCollisionHit";
+            arguments = new object?[]
+            {
+                target,
+                source3D.Body.Position3d,
+                Vector3d.Forward * sourceLength,
+                source3D.Body.ResolveContinuousCollisionProxyRadius(),
+                target.ResolveMixedContinuousCollisionProxyRadius(),
+                sourceLength,
+                Fixed64.Zero,
+                null
+            };
+        }
+        else
+        {
+            ScenarioBody<LSCuboidCollider> target =
+                CreateRotationalMixedBlade3D(context);
+            Vector2d sourcePosition = new(
+                sourceX,
+                Fixed64.FromFraction(-1, 10));
+            SolidBody2D source2D = CreateRefinementSource2D(
+                context,
+                sourcePosition);
+            target.Body.ResetPosition(
+                Vector3d.Zero,
+                FixedQuaternion.FromAxisAngle(Vector3d.Up, startRotation));
+            target.Body.ContinuousCollisionMode =
+                ContinuousCollisionMode.Discrete;
+            target.Body.Agent.Transform.LocalRotation =
+                FixedQuaternion.FromAxisAngle(Vector3d.Up, endRotation);
+            source2D.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+            source = source2D;
+            methodName = "TryGetDynamicMixed3DContinuousCollisionHit";
+            arguments = new object?[]
+            {
+                target.Body,
+                sourcePosition.ToVector3d(Fixed64.Zero),
+                Vector3d.Forward * sourceLength,
+                source2D.ResolveMixedContinuousCollisionProxyRadius(),
+                sourceLength,
+                Fixed64.Zero,
+                null
+            };
+        }
+
+        context.AdvanceLateSimulateToken();
+        context.Physics.PrepareContinuousCollisionFrame();
+        context.Physics2D.PrepareContinuousCollisionFrame();
+        MethodInfo method = source.GetType().GetMethod(
+            methodName,
+            BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var status = (ContinuousCollisionMath.IntervalSearchStatus)
+            method.Invoke(source, arguments)!;
+        var hit = (DynamicMixedIntervalHit)arguments[^1]!;
+
+        status.Should().Be(ContinuousCollisionMath.IntervalSearchStatus.Unresolved);
+        hit.Status.Should().Be(ContinuousCollisionMath.IntervalSearchStatus.Unresolved);
+        hit.SafeDistance.Should().BeGreaterThan(Fixed64.Zero);
+        hit.SafeDistance.Should().BeLessThan(sourceLength);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void MixedContinuousMode_TranslationalFallback_ShouldRankByContactNormalClosingSpeed(
+        bool threeDSource)
+    {
+        using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
+        Vector3d sourceStart = new(
+            (Fixed64)4,
+            Fixed64.Zero,
+            Fixed64.FromFraction(1, 5));
+        Vector3d sourceDisplacement = new(
+            (Fixed64)(-2),
+            Fixed64.Zero,
+            Fixed64.FromFraction(-1, 10));
+        Fixed64 sourceLength = sourceDisplacement.Magnitude;
+
+        object source;
+        object?[] arguments;
+        string methodName;
+        if (threeDSource)
+        {
+            SolidBody2D target = CreateRotationalMixedBlade2D(context);
+            ScenarioBody<LSCuboidCollider> source3D =
+                CreateRefinementSource3D(context, sourceStart);
+            target.ContinuousCollisionMode = ContinuousCollisionMode.Discrete;
+            source3D.Body.ContinuousCollisionMode =
+                ContinuousCollisionMode.Continuous;
+            source = source3D.Body;
+            methodName = "TryGetDynamicMixed2DContinuousCollisionHit";
+            arguments = new object?[]
+            {
+                target,
+                sourceStart,
+                sourceDisplacement,
+                source3D.Body.ResolveContinuousCollisionProxyRadius(),
+                target.ResolveMixedContinuousCollisionProxyRadius(),
+                sourceLength,
+                Fixed64.Zero,
+                null
+            };
+        }
+        else
+        {
+            ScenarioBody<LSCuboidCollider> target =
+                CreateRotationalMixedBlade3D(context);
+            SolidBody2D source2D = CreateRefinementSource2D(
+                context,
+                sourceStart.ToVector2d());
+            target.Body.ContinuousCollisionMode =
+                ContinuousCollisionMode.Discrete;
+            source2D.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+            source = source2D;
+            methodName = "TryGetDynamicMixed3DContinuousCollisionHit";
+            arguments = new object?[]
+            {
+                target.Body,
+                sourceStart,
+                sourceDisplacement,
+                source2D.ResolveMixedContinuousCollisionProxyRadius(),
+                sourceLength,
+                Fixed64.Zero,
+                null
+            };
+        }
+
+        context.AdvanceLateSimulateToken();
+        context.Physics.PrepareContinuousCollisionFrame();
+        context.Physics2D.PrepareContinuousCollisionFrame();
+        MethodInfo method = source.GetType().GetMethod(
+            methodName,
+            BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var status = (ContinuousCollisionMath.IntervalSearchStatus)
+            method.Invoke(source, arguments)!;
+        var hit = (DynamicMixedIntervalHit)arguments[^1]!;
+
+        status.Should().NotBe(
+            ContinuousCollisionMath.IntervalSearchStatus.CertifiedNoHit);
+        hit.ClosingSpeed.Should().Be((Fixed64)2);
+        hit.ClosingSpeed.Should().BeLessThan(sourceLength);
+    }
+
     [Fact]
     public void MixedContinuous2D_RefinementExhaustion_ShouldClampReportAndRefreshOutsideResponseBudget()
     {

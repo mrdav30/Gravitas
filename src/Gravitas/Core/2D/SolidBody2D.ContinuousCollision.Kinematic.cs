@@ -148,7 +148,6 @@ public sealed partial class SolidBody2D
         GatherKinematicDynamicMixed3DContinuousCollisionHits(
             startPosition,
             proposedPosition,
-            proxyRadius,
             maxDistance,
             sourceLength,
             ref hasUnresolvedMixedLimit,
@@ -236,7 +235,6 @@ public sealed partial class SolidBody2D
     private void GatherKinematicDynamicMixed3DContinuousCollisionHits(
         Vector2d startPosition,
         Vector2d proposedPosition,
-        Fixed64 proxyRadius,
         Fixed64 maxDistance,
         Fixed64 sourceLength,
         ref bool hasUnresolvedMixedLimit,
@@ -248,7 +246,7 @@ public sealed partial class SolidBody2D
         Vector2d sourceDisplacement2D = proposedPosition - startPosition;
         Vector3d sourceStart = new(startPosition.X, Collider.MixedSlabCenterY, startPosition.Y);
         Vector3d sourceDisplacement = new(sourceDisplacement2D.X, Fixed64.Zero, sourceDisplacement2D.Y);
-        Fixed64 sourceRadius = FixedMath.Max(proxyRadius, Collider.MixedHalfThickness);
+        Fixed64 sourceRadius = ResolveMixedContinuousCollisionProxyRadius();
         int token = Context.LateSimulateToken;
         SwiftList<int> candidateIds = Context.Physics.QueryContinuousCollisionCandidates(
             DynamicCcdCandidateIndex.CreateSweptSphereBounds(sourceStart, sourceDisplacement, sourceRadius));

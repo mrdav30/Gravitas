@@ -107,6 +107,21 @@ canonical segments are chronological and non-overlapping, the first admitted
 non-boundary hit is the global earliest hit. This contract is shared by dynamic
 and kinematic 2D, 3D, and mixed CCD.
 
+Relative circle and sphere reducers keep motion as an endpoint-free direction
+plus physical distance. They compare the exact hit distance with the active
+overlap boundary, reconstruct both bodies from their authored trajectory
+segments, and only then materialize normalized time for arbitration. This
+avoids constructing an unrepresentable relative endpoint or collapsing
+distinct spatial contacts during early Q32.32 time conversion.
+
+Mixed moving-pair admission encloses an embedded 2D shape with the ceiling-safe
+Euclidean combination of its planar pivot radius and slab half-thickness. That
+radial interval is geometry-only: exact reducers or sampled contact normals own
+closing-direction admission and candidate-speed ranking. A conservative proxy
+therefore cannot reject a real slab-closing contact merely because the proxy
+normal is separating, and it cannot promote an enclosing-proxy-only hit after
+an exact reducer certifies a miss.
+
 Candidate results use stable ordering:
 
 - time of impact.

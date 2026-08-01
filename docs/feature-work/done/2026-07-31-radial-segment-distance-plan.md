@@ -1,7 +1,8 @@
 # Exact Radial Segment Distance Implementation
 
-**Status:** Active  
+**Status:** Completed  
 **Started:** 2026-07-31  
+**Completed:** 2026-07-31  
 **Repositories:** FixedMathSharp, Gravitas  
 **Queue item:** `Radial Segment Parameters Can Collapse Spatially Distinct Query Hits`
 
@@ -188,17 +189,48 @@ orientations and distinguishes the prior rounded result from the exact contact.
 
 ### Phase 4: Coverage, Performance, Documentation, And Queue Closure
 
-- [ ] Run focused and full Release/ReleaseLean tests in both repositories.
-- [ ] Re-establish 100% reachable line, branch, and method coverage without
+- [x] Run focused and full Release/ReleaseLean tests in both repositories.
+- [x] Re-establish 100% reachable line, branch, and method coverage without
   hollow API-shape tests or zombie branches.
-- [ ] Run the existing radial query and CCD benchmark/allocation gates and add
+- [x] Run the existing radial query and CCD benchmark/allocation gates and add
   only regressions needed to measure the changed hot paths.
-- [ ] Update public XML and wiki guidance for physical-distance radial
+- [x] Update public XML and wiki guidance for physical-distance radial
   intervals and the retained parameter-ray contract.
-- [ ] Move the issue to resolved history and this plan to `done` with final
+- [x] Move the issue to resolved history and this plan to `done` with final
   evidence.
-- [ ] Obtain an independent whole-change review and resolve every important
+- [x] Obtain an independent whole-change review and resolve every important
   finding before closure.
+
+**Outcome:** Whole-plan review corrected the remaining mixed moving-pair edges:
+the 2D slab proxy is now a ceiling-safe Euclidean enclosure, proxy intervals no
+longer apply shape-contact closing policy, exact radial witnesses retain their
+authored distance across one-raw retry, clipped target trajectories reconstruct
+from the active segment, and shared piecewise boundaries belong to the
+right-continuous successor. Translation-only generic fallback ranks by the
+actual contact-normal closing speed; rotational or witness-free refinement uses
+relative travel only as conservative ranking evidence. The pass also deleted
+dead relative-sweep wrappers and their wrapper-only tests.
+
+**Verification:**
+
+- FixedMathSharp `Release`: 2,628 passed; `ReleaseLean`: 2,607 passed. Coverage
+  is 100% line (46,756/46,756), branch (8,648/8,648), and method
+  (3,413/3,413).
+- Gravitas `Release`: 3,919 passed; `ReleaseLean`: 3,864 passed. Coverage is
+  100% line (56,012/56,012), branch (15,889/15,889), and method
+  (5,348/5,348).
+- Standard and Lean builds pass for `net8.0` and `netstandard2.1` with zero
+  warnings. All 56 warmed Gravitas allocation guards pass.
+- The radial-raycast Dry gate passes at ordinary and 100,000 scale with zero
+  managed collections. Existing 256/1,024-body pure-2D and pure-3D relative
+  sweep attribution rows remain zero-allocation; the focused 256-body rerun
+  completed without managed collections.
+- Public XML, migration guidance, and Gravitas query/CCD wiki guidance describe
+  the physical-distance segment contract, retained ray-parameter contract,
+  and mixed proxy/contact-policy boundary.
+- Independent whole-change review found no Critical, Important, or Minor
+  issue after its closing-speed finding was corrected and regression-covered
+  in both mixed orientations.
 
 ## Non-Goals
 
