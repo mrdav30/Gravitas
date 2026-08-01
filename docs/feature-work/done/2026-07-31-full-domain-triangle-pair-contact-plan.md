@@ -36,7 +36,7 @@ BenchmarkDotNet, Coverlet, ReportGenerator, local FixedMathSharp project links.
 
 ---
 
-**Status:** Phase 3 complete; stopped because Phase 3 added a new release-blocking queue item  
+**Status:** Completed 2026-08-01  
 **Started:** 2026-07-31  
 **Repositories:** FixedMathSharp, Gravitas  
 **Queue item:** `Mesh Triangle-Triangle SAT Can Saturate Before Axis Classification`
@@ -783,7 +783,7 @@ the unchanged 64-pair Gravitas rows, final means were `4.839 ms` ordinary,
 `2,532.822 ms` closed dense. The exact dense rows recovered roughly `28-30%`
 from the initial exact implementation but remain about `3.4-4.4x` above the
 deleted scalar baseline. That measured optimization signal is retained in
-[`benchmark-signal-hardening-backlog.md`](benchmark-signal-hardening-backlog.md);
+[`benchmark-signal-hardening-backlog.md`](../benchmark-signal-hardening-backlog.md);
 no narrowed prefilter or second collision authority was added.
 
 Fresh FixedMathSharp validation passed `2,648/2,648` Release tests and
@@ -851,30 +851,68 @@ Phase 4 closure.
 
 ### Phase 4: Coverage, Performance, Documentation, And Queue Closure
 
-- [ ] Review the complete plan against the locked design and remove any stale
+- [x] Review the complete plan against the locked design and remove any stale
   helper, wrapper-only test, duplicated projection logic, or uncovered branch
   introduced by the work.
-- [ ] Run full Release and ReleaseLean tests in both repositories.
-- [ ] Run standard and Lean package builds for `net8.0` and
+- [x] Run full Release and ReleaseLean tests in both repositories.
+- [x] Run standard and Lean package builds for `net8.0` and
   `netstandard2.1` with zero warnings.
-- [ ] Collect authoritative Cobertura artifacts independently in each repo and
+- [x] Collect authoritative Cobertura artifacts independently in each repo and
   generate ReportGenerator summaries from only those artifacts. Require 100%
   reachable line, branch, and method coverage.
-- [ ] Run all warmed Gravitas allocation guards plus the FixedMathSharp
+- [x] Run all warmed Gravitas allocation guards plus the FixedMathSharp
   triangle-pair allocation assertion.
-- [ ] Rerun focused FixedMathSharp and Gravitas benchmark rows; preserve zero
+- [x] Rerun focused FixedMathSharp and Gravitas benchmark rows; preserve zero
   allocation and document before/after medians plus any intentional complexity
   tradeoff.
-- [ ] Update FixedMathSharp and Gravitas XML/wiki/package guidance, resolve the
+- [x] Update FixedMathSharp and Gravitas XML/wiki/package guidance, resolve the
   issue into historical context, remove it from the ordered queue, and move
   this plan to `docs/feature-work/done`.
-- [ ] Dispatch independent reviewers for arithmetic widths and rounding,
+- [x] Dispatch independent reviewers for arithmetic widths and rounding,
   geometry/contact semantics, deterministic order, performance/allocations,
   test quality/coverage, documentation accuracy, and whole-change code quality.
   Resolve every Critical, Important, or Minor finding.
-- [ ] Record exact test counts, coverage numerators, package results, benchmark
-  results, allocation counts, and reviewer outcomes before declaring the final
-  ordered queue closed.
+- [x] Record exact test counts, coverage numerators, package results, benchmark
+  results, allocation counts, and reviewer outcomes before declaring this queue
+  item closed.
+
+**Phase 4 validation evidence:** the final FixedMathSharp matrix passed
+2,649/2,649 Release and 2,628/2,628 ReleaseLean tests. Gravitas passed
+3,923/3,923 Release and 3,868/3,868 ReleaseLean tests. Standard and Lean
+package builds produced `.nupkg` and `.snupkg` artifacts after warning-free
+`net8.0` and `netstandard2.1` builds in both repositories. Release and
+ReleaseLean were run sequentially because concurrent configuration restores
+can overwrite conditional local-link assets; the sequential project-level
+commands are authoritative.
+
+Fresh independent Cobertura artifacts and ReportGenerator summaries reported
+47,095/47,095 lines, 8,698/8,698 branches, and 3,419/3,419 methods/full methods
+for FixedMathSharp, plus 55,850/55,850 lines, 15,833/15,833 branches, and
+5,322/5,322 methods/full methods for Gravitas. CRAP analysis retained ten and
+twenty-seven fully covered complexity floors respectively; neither repository
+has a coverage gap. All 72 named Gravitas allocation guards passed, including
+the concave/dense mesh paths, and the direct FixedMathSharp triangle-pair guard
+passed at exactly 0 B.
+
+The closure benchmarks measured `TrianglePairPrimary` at 64.221 us and the
+rare tiny-axis fallback at 9.711 us with no reported managed allocation. The
+five 64-pair Gravitas rows measured 4.900 ms, 70.005 ms, 397.087 ms,
+556.138 ms, and 2,519.288 ms. Those point estimates remain within `-1.42%` to
+`+1.26%` of the final Phase 2 exact-path run and support no new speedup claim.
+The dense exact relation cost remains a High benchmark signal; it is not hidden
+behind a narrowed prefilter or competing answer path.
+
+Independent maintainability/test review found no stale helper, forwarding-only
+wrapper, duplicate projection path, hollow test, or actionable branch. The
+semantic review found one Important evidence gap: distinct triangle-frame
+rotations returned only a discarded boolean through Gravitas. A focused public
+FixedMathSharp regression now proves known normal, depth, clamp state,
+frame-owned anchors, reversed order, and separation with independent rotations;
+the focused Release and ReleaseLean reruns passed and re-review approved the
+resolution with no residual finding. Independent final closure review found no
+remaining Critical, Important, or Minor issue after neutralizing one unsupported
+causal description of the in-process MemoryDiagnoser readings. The separate
+scaled-mesh query-normal defect remains ordered queue item 1.
 
 **Recommended commit messages:**
 

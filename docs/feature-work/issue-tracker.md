@@ -29,7 +29,7 @@ records follow with their original discovery context.
 - Treat local links as unstaged validation scaffolding. Do not publish or
   release with them in place.
 - FixedMathSharp foundation hardening is complete. The current locally linked
-  geometry and arithmetic extensions pass 2,648 Release and 2,627 ReleaseLean
+  geometry and arithmetic extensions pass 2,649 Release and 2,628 ReleaseLean
   tests at 47,095/47,095 reachable lines, 8,698/8,698 branches, and
   3,419/3,419 methods. Retain the local link while the remaining Gravitas queue
   is hardened.
@@ -38,8 +38,8 @@ records follow with their original discovery context.
 - GridForge's runtime-identity defect is resolved. Keep the lower stack locally
   linked while the remaining Gravitas queue is hardened so another downstream
   discovery does not force a partial release cycle.
-- Gravitas's current Release run passes 3,923 tests at 55,848/55,848 lines,
-  15,833/15,833 branches, and 5,321/5,321 methods. ReleaseLean passes 3,868
+- Gravitas's current Release run passes 3,923 tests at 55,850/55,850 lines,
+  15,833/15,833 branches, and 5,322/5,322 methods. ReleaseLean passes 3,868
   tests. Exact body point transforms, mesh-pair contact, and the existing 3D,
   2D, and mixed response allocation gates remain at zero managed bytes;
   measured timing signals remain in the benchmark backlog.
@@ -49,45 +49,8 @@ records follow with their original discovery context.
 
 ### Ordered Queue
 
-1. **FixedMathSharp / Gravitas:**
-   [Mesh Triangle-Triangle SAT Can Saturate Before Axis Classification](#mesh-triangle-triangle-sat-can-saturate-before-axis-classification).
-2. **Gravitas:**
+1. **Gravitas:**
    [Scaled Mesh Query Faces Use Authored Unscaled Normals](#scaled-mesh-query-faces-use-authored-unscaled-normals).
-
-### Mesh Triangle-Triangle SAT Can Saturate Before Axis Classification
-
-**Discovered:** 2026-07-24  
-**Source:** canonical-collider coverage closure and collision math review  
-**Affected area:** convex mesh/mesh triangle contact fallback, exact SAT axis
-projection and penetration ranking; related mesh query reducers
-
-RCA: the former `MeshTriangleContactGenerator.TryTestTriangles(...)` expressed
-both triangles in one rigid frame, but then projected vertices with ordinary
-`Vector3d.Dot`, subtracted narrowed scalar interval endpoints, and ranked axes
-through saturated squared products. Large representable relative geometry or
-unnormalized edge-cross axes could therefore change separation, minimum-depth
-selection, or normal orientation before the final public result was known.
-
-Phases 1 and 2 of the
-[`Full-Domain Triangle-Pair Contact`](2026-07-31-full-domain-triangle-pair-contact-plan.md)
-plan are complete. FixedMathSharp now owns the reusable exact rigid-triangle
-contact relation, and Gravitas preserves its BVH candidate traversal while
-delegating each admitted pair to that sole authority. The scalar SAT,
-projection/depth helpers, cached `CollisionTriangle`, synthetic witness
-fallback, and wrapper-only tests were deleted. Reversed dispatch preserves
-stable collider-ID ownership, exact local anchors, inverse normals, depth, and
-clamp state; the warmed path remains allocation-free.
-
-Phases 1 through 3 are complete. Phase 3 found no other consumer of the
-triangle-pair scalar SAT: convex sweeps use GJK, sphere sweeps use finite
-surface relations, mixed circle mesh sweeps use the exact finite-slab projected
-circle relation, and mixed mesh prisms use the wide triangle/prism relation.
-The focused Phase 3 parity slice passed 711/711 under both Release and
-ReleaseLean. This item remains queue item 1 until Phase 4 completes
-documentation, coverage, performance, and release closure. The remaining exact
-concave-mesh throughput signal is tracked
-separately in
-[`benchmark-signal-hardening-backlog.md`](benchmark-signal-hardening-backlog.md).
 
 ### Scaled Mesh Query Faces Use Authored Unscaled Normals
 
@@ -131,6 +94,35 @@ scaled-mesh raycast regression before implementation. Validate deterministic
 candidate ordering and warmed zero-allocation query paths.
 
 ## Resolved Issues
+
+### Mesh Triangle-Triangle SAT Could Saturate Before Axis Classification
+
+**Discovered:** 2026-07-24  
+**Resolved:** 2026-08-01  
+**Source:** canonical-collider coverage closure and collision math review
+
+The former Gravitas mesh-pair fallback projected and ranked triangle axes
+through narrowed scalar arithmetic. FixedMathSharp now owns the reusable
+full-domain rigid-triangle contact relation, while Gravitas retains stable BVH
+candidate traversal and canonical collider-ID direction. The duplicate scalar
+SAT, cached collision-triangle wrapper, synthetic witness fallback, and hollow
+wrapper tests were deleted.
+
+Closure verified that convex sweeps, sphere sweeps, mixed circle/mesh sweeps,
+and mixed mesh prisms already use separate appropriate exact authorities. The
+final matrix passes 2,649 FixedMathSharp Release and 2,628 ReleaseLean tests,
+plus 3,923 Gravitas Release and 3,868 ReleaseLean tests. Fresh independent
+coverage is 47,095/47,095 lines, 8,698/8,698 branches, and 3,419/3,419 methods
+in FixedMathSharp, and 55,850/55,850 lines, 15,833/15,833 branches, and
+5,322/5,322 methods in Gravitas. Package builds are warning-free across both
+target frameworks; 72 Gravitas allocation guards and the direct FixedMathSharp
+triangle-pair guard pass at `0 B`. Independent closure review found and closed
+one missing distinct-rotation result regression. The remaining measured dense
+concave throughput cost stays in
+[`benchmark-signal-hardening-backlog.md`](benchmark-signal-hardening-backlog.md)
+rather than reopening the correctness issue. The completed implementation plan
+is retained at
+[`Full-Domain Triangle-Pair Contact`](done/2026-07-31-full-domain-triangle-pair-contact-plan.md).
 
 ### Radial Segment Parameters Could Collapse Spatially Distinct Query Hits
 

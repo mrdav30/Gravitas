@@ -33,16 +33,27 @@ instead of burying it in notes.
     as releases become available, and revalidate every downstream consumer.
     Treat local links as temporary validation scaffolding, not release
     dependency changes.
-- [`Full-Domain Triangle-Pair Contact`](2026-07-31-full-domain-triangle-pair-contact-plan.md)
-  - Phases 1 and 2 are complete. FixedMathSharp owns the exact rigid-triangle
-    contact relation, and Gravitas has adopted it as the sole concave mesh-pair
-    authority while deleting the narrowed scalar SAT. Phase 3 parity audit and
-    Phase 4 release closure remain.
 - [`Benchmark Signal Hardening`](benchmark-signal-hardening-backlog.md)
   - Reproduce and close confirmed release-relevant signals alongside the owning
     library change. Do not broaden this into speculative optimization work.
 
 ## Recently Completed
+
+- [`Full-Domain Triangle-Pair Contact`](done/2026-07-31-full-domain-triangle-pair-contact-plan.md)
+  - Completed 2026-08-01. FixedMathSharp owns one full-domain rigid-triangle
+    contact relation; Gravitas retains deterministic BVH traversal and uses it
+    as the sole concave mesh-pair authority. The narrowed scalar SAT, duplicate
+    projection/ranking helpers, cached collision-triangle wrapper, synthetic
+    witness fallback, and hollow wrapper tests were removed.
+  - FixedMathSharp passes 2,649 Release and 2,628 ReleaseLean tests at
+    47,095/47,095 lines, 8,698/8,698 branches, and 3,419/3,419 methods. Gravitas
+    passes 3,923 Release and 3,868 ReleaseLean tests at 55,850/55,850 lines,
+    15,833/15,833 branches, and 5,322/5,322 methods. Standard and Lean packages
+    build warning-free for both target frameworks; all 72 named Gravitas
+    allocation guards plus the direct FixedMathSharp relation guard pass. The
+    dense concave throughput gap remains an explicit benchmark signal, and the
+    parity audit captured the separate scaled-mesh query-normal issue as the
+    next ordered queue item.
 
 - [`Exact Radial Segment Distance`](done/2026-07-31-radial-segment-distance-plan.md)
   - Completed 2026-07-31. FixedMathSharp segment APIs now solve circle and

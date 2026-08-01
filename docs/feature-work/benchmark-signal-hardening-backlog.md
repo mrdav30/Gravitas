@@ -76,13 +76,13 @@ relation cost is still release-relevant.
 
 The unchanged 64-pair Short in-process rows reported:
 
-| Row | Scalar baseline | Initial exact | Final optimized exact |
-| --- | ---: | ---: | ---: |
-| Ordinary convex mesh/mesh | `5.168 ms` | `4.921 ms` | `4.839 ms` |
-| Concave mesh/mesh | `16.120 ms` | `98.489 ms` | `70.553 ms` |
-| Dense concave mesh/mesh | `105.139 ms` | `570.378 ms` | `400.501 ms` |
-| Contact-heavy concave mesh/mesh | `163.956 ms` | `804.559 ms` | `564.147 ms` |
-| Closed dense mesh/mesh | `747.173 ms` | `3,641.633 ms` | `2,532.822 ms` |
+| Row | Scalar baseline | Initial exact | Final optimized exact | Closure confirmation |
+| --- | ---: | ---: | ---: | ---: |
+| Ordinary convex mesh/mesh | `5.168 ms` | `4.921 ms` | `4.839 ms` | `4.900 ms` |
+| Concave mesh/mesh | `16.120 ms` | `98.489 ms` | `70.553 ms` | `70.005 ms` |
+| Dense concave mesh/mesh | `105.139 ms` | `570.378 ms` | `400.501 ms` | `397.087 ms` |
+| Contact-heavy concave mesh/mesh | `163.956 ms` | `804.559 ms` | `564.147 ms` | `556.138 ms` |
+| Closed dense mesh/mesh | `747.173 ms` | `3,641.633 ms` | `2,532.822 ms` | `2,519.288 ms` |
 
 FixedMathSharp now computes each triangle's basis-axis projections once per
 axis and cancels identical positive common denominators during normalized-depth
@@ -104,6 +104,17 @@ Preserved artifacts are under
 `artifacts/benchmarks/2026-07-31-triangle-pair-baseline`,
 `artifacts/benchmarks/2026-07-31-triangle-pair-gravitas-after`, and
 `artifacts/benchmarks/2026-07-31-triangle-pair-after-denominator-cancellation`.
+
+The 2026-08-01 closure rerun used the same 64-pair Short in-process job. Its
+point estimates stayed within `-1.42%` to `+1.26%` of the final optimized run,
+so it confirms the retained signal without supporting another performance
+claim. MemoryDiagnoser reported fixed `78 B` / `624 B` readings on the longer
+in-process rows; all 72 direct warmed Gravitas allocation guards, including the
+concave and dense mesh paths, measured exactly `0 B`, so the direct guards
+remain the runtime allocation authority; this document does not assign a cause
+to the differing in-process MemoryDiagnoser readings. The closure artifacts
+are under
+`artifacts/benchmarks/2026-08-01-triangle-pair-closure`.
 
 ### Signal: Exact Canonical OBB Contacts Regress Ordinary Narrow-Phase Throughput
 

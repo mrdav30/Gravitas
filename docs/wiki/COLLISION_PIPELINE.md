@@ -116,8 +116,10 @@ orients face planes from the scaled world-space center of mass and reduces the
 whole capsule over face and edge-cross axes to a matched support-feature exit
 manifold. Other mesh paths use the same deterministic BVH candidate ownership;
 candidate order follows the stable built tree rather than authored triangle
-indices. Compound paths scan parts in stable declaration order and return the
-owner collider as the public identity.
+indices. Concave mesh/mesh pairs canonicalize relation direction by stable
+collider ID and delegate each BVH-admitted triangle pair to FixedMathSharp's
+full-domain rigid-frame contact relation. Compound paths scan parts in stable
+declaration order and return the owner collider as the public identity.
 
 Finite axes, oriented cuboids, and planar convex shapes retain center-relative
 canonical geometry through narrow phase. Contact witnesses use
