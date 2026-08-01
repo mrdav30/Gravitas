@@ -55,6 +55,54 @@ public sealed class LSMeshColliderQueryTests
     }
 
     [Fact]
+    public void ColliderOverlapsRay_WithNonUniformlyScaledSlantedTriangle_ShouldUseCommittedTrianglePlane()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        var mesh = new LSMeshCollider(
+            new[]
+            {
+                Vector3d.Zero,
+                Vector3d.Right,
+                new Vector3d(Fixed64.Zero, Fixed64.One, Fixed64.One)
+            },
+            new[] { 0, 1, 2 },
+            MeshColliderMode.Concave,
+            MeshInertiaPolicy.SurfaceApproximation);
+        mesh.InitializeWithNoBody(new TestMatterAgent(
+            context,
+            new FixedTransform(
+                Vector3d.Zero,
+                FixedQuaternion.Identity,
+                new Vector3d(Fixed64.One, Fixed64.One, (Fixed64)2))));
+        Vector3d expected = new(
+            Fixed64.FromFraction(1, 3),
+            Fixed64.FromFraction(1, 3),
+            Fixed64.FromFraction(2, 3));
+        Vector3d authoredNormal = new(
+            Fixed64.Zero,
+            -Fixed64.One,
+            Fixed64.One);
+        authoredNormal = authoredNormal.Normalized;
+        Vector3d start = expected - authoredNormal;
+        Vector3d end = expected + authoredNormal;
+        var worker = new RaycastSegmentWorker();
+        var hits = new SwiftList<Vector3d>();
+        worker.PrepareSegmentCheck(start, end);
+
+        bool hit = mesh.ColliderOverlapsRay(worker, ref hits);
+
+        hit.Should().BeTrue();
+        hits.Should().ContainSingle().Which.Should().Be(expected);
+
+        AllocationTestHelper.MeasureSteadyState(() =>
+        {
+            hits.FastClear();
+            worker.PrepareSegmentCheck(start, end);
+            _ = mesh.ColliderOverlapsRay(worker, ref hits);
+        }).Should().Be(0);
+    }
+
+    [Fact]
     public void ColliderOverlapsRay_ShouldRejectBoundingBoxHitOutsideTriangle()
     {
         LSMeshCollider mesh = CreateTriangleMesh();

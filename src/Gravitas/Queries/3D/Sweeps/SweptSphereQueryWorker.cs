@@ -298,7 +298,7 @@ public sealed class SweptSphereQueryWorker
                 out Vector3d first,
                 out Vector3d second,
                 out Vector3d third);
-            Vector3d normal = mesh.Mesh.FaceNormals[triangleIndex];
+            Vector3d normal = mesh.Mesh.GetScaledLocalFaceNormal(triangleIndex);
             found |= TryKeepEarlierSweep(
                 TrySweepTriangle(
                     first,

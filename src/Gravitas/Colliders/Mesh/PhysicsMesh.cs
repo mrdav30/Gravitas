@@ -86,21 +86,6 @@ namespace Gravitas.Colliders
         /// </summary>
         public bool IsClosedSurface { get; private set; }
 
-        private bool _faceNormalsValid;
-        private readonly Vector3d[] _faceNormals;
-        /// <summary>
-        /// Holds triangle normals in local mesh space.
-        /// </summary>
-        public ReadOnlySpan<Vector3d> FaceNormals
-        {
-            get
-            {
-                if (!_faceNormalsValid)
-                    CalculateFaceNormals();
-                return _faceNormals;
-            }
-        }
-
         /// <summary>
         /// Gets the current triangle surface area after local scale.
         /// </summary>
@@ -166,7 +151,6 @@ namespace Gravitas.Colliders
             _triangleCount = triangles.Length / 3; // 3 vertices per triangle
             _triangleBVH = new SwiftFixedBVH<int>(2 * TriangleCount - 1);
             _preparedTriangleBVH = new SwiftFixedBVH<int>(2 * TriangleCount - 1);
-            _faceNormals = new Vector3d[TriangleCount];
             _scaledFaceAreas = new Fixed64[TriangleCount];
             _preparedScaledFaceAreas = new Fixed64[TriangleCount];
             _scaledFaceNormals = new Vector3d[TriangleCount];
@@ -253,27 +237,6 @@ namespace Gravitas.Colliders
 
             for (int i = 0; i < referencedVertices.Length; i++)
                 SwiftThrowHelper.ThrowIfArgument(!referencedVertices[i], nameof(vertices), "Every mesh vertex must be referenced by at least one triangle.");
-        }
-
-        private static Vector3d CalculateLocalTriangleNormal(
-            Vector3d[] vertices,
-            int[] triangles,
-            int triangleIndex)
-        {
-            int index = triangleIndex * 3;
-            Vector3d first = vertices[triangles[index]];
-            Vector3d second = vertices[triangles[index + 1]];
-            Vector3d third = vertices[triangles[index + 2]];
-            return Vector3d.Cross(second - first, third - first).Normalized;
-        }
-
-        private Vector3d[] CalculateFaceNormals()
-        {
-            for (int i = 0; i < _triangleCount; i++)
-                _faceNormals[i] = CalculateLocalTriangleNormal(_localVertices, _triangles, i);
-
-            _faceNormalsValid = true;
-            return _faceNormals;
         }
 
         private void BuildTriangleBVH(
@@ -388,6 +351,9 @@ namespace Gravitas.Colliders
             return false;
         }
 
+        /// <summary>
+        /// Gets one triangle's committed scaled vertices in local mesh space.
+        /// </summary>
         public void GetLocalTriangleVertices(int index, out Vector3d first, out Vector3d second, out Vector3d third)
         {
             SwiftThrowHelper.ThrowIfArrayIndexInvalid(index, _triangleCount, nameof(index));
@@ -396,6 +362,15 @@ namespace Gravitas.Colliders
             first = _scaledLocalVertices[_triangles[triangleIndex]];
             second = _scaledLocalVertices[_triangles[triangleIndex + 1]];
             third = _scaledLocalVertices[_triangles[triangleIndex + 2]];
+        }
+
+        /// <summary>
+        /// Gets one triangle's committed scaled normal in local mesh space.
+        /// </summary>
+        internal Vector3d GetScaledLocalFaceNormal(int index)
+        {
+            SwiftThrowHelper.ThrowIfArrayIndexInvalid(index, _triangleCount, nameof(index));
+            return _scaledFaceNormals[index];
         }
 
         /// <summary>

@@ -64,6 +64,12 @@ Planar faces, rounded edges, and spherical corners therefore share one
 full-domain first-distance contract; the older sharp expanded-box proxy is not
 used for queries, compound cuboid parts, grounding, or CCD.
 
+Mesh raycasts and swept-sphere queries solve against one committed local
+geometry snapshot. Non-uniform scale publishes scaled vertices and their
+matching face normals together; query workers consume those cached values
+without recomputing normals or allocating per triangle. Authored vertices
+remain the source for later scale transactions, not query-plane authority.
+
 ### 2D Queries
 
 | Family                 | Closest hit                   | All hits                         |

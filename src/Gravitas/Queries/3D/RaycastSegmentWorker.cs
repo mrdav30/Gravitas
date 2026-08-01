@@ -233,7 +233,7 @@ public sealed class RaycastSegmentWorker
                     first,
                     second,
                     third,
-                    meshCollider.Mesh.FaceNormals[triangleIndex],
+                    meshCollider.Mesh.GetScaledLocalFaceNormal(triangleIndex),
                     localOrigin,
                     localEnd,
                     localSegmentDirection,

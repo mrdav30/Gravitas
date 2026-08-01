@@ -39,6 +39,18 @@ instead of burying it in notes.
 
 ## Recently Completed
 
+- [`Scaled Mesh Query Normal`](done/2026-08-01-scaled-mesh-query-normal-plan.md)
+  - Completed 2026-08-01. Mesh raycasts and swept-sphere queries now consume
+    the face normal committed with their non-uniformly scaled triangle vertices.
+    The unreferenced authored-normal cache and its per-mesh array allocation
+    were deleted after a cross-stack caller audit.
+  - Gravitas passes 3,925 Release and 3,870 ReleaseLean tests at 55,839/55,839
+    lines, 15,829/15,829 branches, and 5,320/5,320 methods. Both corrected
+    query paths remain at zero managed bytes after warmup, standard and Lean
+    packages build warning-free for both targets, and the existing dense-mesh
+    sweep benchmark remains comparable to baseline. The correctness queue is
+    empty.
+
 - [`Full-Domain Triangle-Pair Contact`](done/2026-07-31-full-domain-triangle-pair-contact-plan.md)
   - Completed 2026-08-01. FixedMathSharp owns one full-domain rigid-triangle
     contact relation; Gravitas retains deterministic BVH traversal and uses it

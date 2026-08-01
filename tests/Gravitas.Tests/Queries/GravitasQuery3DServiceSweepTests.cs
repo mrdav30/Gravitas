@@ -905,6 +905,56 @@ public sealed class GravitasQuery3DServiceSweepTests
     }
 
     [Fact]
+    public void SweptSphereWorker_WithNonUniformlyScaledMesh_ShouldUseCommittedTrianglePlane()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        var mesh = new LSMeshCollider(
+            new[]
+            {
+                Vector3d.Zero,
+                Vector3d.Right,
+                new Vector3d(Fixed64.Zero, Fixed64.One, Fixed64.One)
+            },
+            new[] { 0, 1, 2 },
+            MeshColliderMode.Concave,
+            MeshInertiaPolicy.SurfaceApproximation);
+        mesh.InitializeWithNoBody(new TestMatterAgent(
+            context,
+            new FixedTransform(
+                Vector3d.Zero,
+                FixedQuaternion.Identity,
+                new Vector3d(Fixed64.One, Fixed64.One, (Fixed64)2))));
+        Vector3d point = new(
+            Fixed64.FromFraction(1, 3),
+            Fixed64.FromFraction(1, 3),
+            Fixed64.FromFraction(2, 3));
+        Vector3d authoredNormal = new(
+            Fixed64.Zero,
+            -Fixed64.One,
+            Fixed64.One);
+        authoredNormal = authoredNormal.Normalized;
+        Vector3d start = point - authoredNormal;
+        var worker = new SweptSphereQueryWorker();
+        worker.Prepare(start, point + authoredNormal, Fixed64.FromFraction(1, 10));
+
+        bool hit = worker.TrySweep(mesh, out Vector3d centerAtImpact, out Fixed64 distance);
+
+        Fixed64 expectedDistance = Fixed64.FromRaw(3_842_237_992); // 1 - sqrt(10) / 30
+        Vector3d expectedCenter = new FixedSegment(start, point + authoredNormal)
+            .GetPointAtDistance(expectedDistance, (Fixed64)2);
+        hit.Should().BeTrue();
+        (distance - expectedDistance).Abs().Should().BeLessThanOrEqualTo(Fixed64.FromRaw(1));
+        (centerAtImpact.X - expectedCenter.X).Abs().Should().BeLessThanOrEqualTo(Fixed64.FromRaw(1));
+        (centerAtImpact.Y - expectedCenter.Y).Abs().Should().BeLessThanOrEqualTo(Fixed64.FromRaw(1));
+        (centerAtImpact.Z - expectedCenter.Z).Abs().Should().BeLessThanOrEqualTo(Fixed64.FromRaw(1));
+
+        AllocationTestHelper.MeasureSteadyState(
+                () => worker.TrySweep(mesh, out _, out _))
+            .Should()
+            .Be(0);
+    }
+
+    [Fact]
     public void SweepSphereAll_ShouldCollapseMeshTrianglesToOwnerAndOrderMeshTargets()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();

@@ -17,8 +17,8 @@
 
 ## Active Issues
 
-The numbered queue below is the authoritative execution order. Detailed issue
-records follow with their original discovery context.
+No active correctness issues remain. New release-blocking discoveries should
+be added here in explicit execution order.
 
 ### Release Workflow
 
@@ -31,69 +31,66 @@ records follow with their original discovery context.
 - FixedMathSharp foundation hardening is complete. The current locally linked
   geometry and arithmetic extensions pass 2,649 Release and 2,628 ReleaseLean
   tests at 47,095/47,095 reachable lines, 8,698/8,698 branches, and
-  3,419/3,419 methods. Retain the local link while the remaining Gravitas queue
-  is hardened.
+  3,419/3,419 methods. Retain the local link through the final benchmark and
+  cross-stack release gates.
 - SwiftCollections has no library-specific active issue at this checkpoint; its
   place in the sequence is a full downstream compatibility and release gate.
 - GridForge's runtime-identity defect is resolved. Keep the lower stack locally
-  linked while the remaining Gravitas queue is hardened so another downstream
+  linked through the final Gravitas release gates so another downstream
   discovery does not force a partial release cycle.
-- Gravitas's current Release run passes 3,923 tests at 55,850/55,850 lines,
-  15,833/15,833 branches, and 5,322/5,322 methods. ReleaseLean passes 3,868
+- Gravitas's current Release run passes 3,925 tests at 55,839/55,839 lines,
+  15,829/15,829 branches, and 5,320/5,320 methods. ReleaseLean passes 3,870
   tests. Exact body point transforms, mesh-pair contact, and the existing 3D,
   2D, and mixed response allocation gates remain at zero managed bytes;
   measured timing signals remain in the benchmark backlog.
-- After the Gravitas queue closes, release the lower stack in dependency order,
-  replace local links with released packages at each layer, and rerun Gravitas
-  `Release`, `ReleaseLean`, coverage, replay, and relevant benchmark gates.
+- With the Gravitas correctness queue empty, close the release-relevant
+  benchmark backlog, then release the lower stack in dependency order. Replace
+  local links with released packages at each layer and rerun Gravitas `Release`,
+  `ReleaseLean`, coverage, replay, and relevant benchmark gates.
 
 ### Ordered Queue
 
-1. **Gravitas:**
-   [Scaled Mesh Query Faces Use Authored Unscaled Normals](#scaled-mesh-query-faces-use-authored-unscaled-normals).
+No active items.
 
-### Scaled Mesh Query Faces Use Authored Unscaled Normals
+## Resolved Issues
+
+### Scaled Mesh Query Faces Used Authored Unscaled Normals
 
 **Discovered:** 2026-08-01  
+**Resolved:** 2026-08-01  
 **Source:** Full-Domain Triangle-Pair Contact Phase 3 swept-sphere audit  
 **Affected area:** non-uniformly scaled mesh face queries in
 `SweptSphereQueryWorker` and `RaycastSegmentWorker`
 
-RCA: `PhysicsMesh.GetLocalTriangleVertices(...)` returns committed
-`_scaledLocalVertices`, but both consumers pair those vertices with
-`PhysicsMesh.FaceNormals[triangleIndex]`, which is calculated from authored
-`_localVertices`. `PhysicsMesh` already computes the matching
-`_scaledFaceNormals` during scale preparation and uses it for
-`GetFaceNormalWorld(...)`. Under non-uniform scale, the workers therefore solve
-and classify against a different plane from the triangle passed to
-`FixedTriangle.ContainsProjection(...)`. Projection containment cannot repair
-the mismatch because it intentionally projects an off-plane point onto the
-triangle.
+RCA: both workers paired committed scaled triangle vertices with an authored
+unscaled face normal. Under non-uniform scale, the resulting plane differed
+from the triangle used for projection containment and could publish the wrong
+ray intersection or swept-sphere distance.
 
-Evidence: for authored triangle `A=(0,0,0)`, `B=(1,0,0)`, `C=(0,1,1)` with
-scale `(1,1,2)`, the committed triangle is `(0,0,0)`, `(1,0,0)`, `(0,1,2)`.
-Its true normal is `(0,-2/sqrt(5),1/sqrt(5))`, while the authored cached normal
-is `(0,-1/sqrt(2),1/sqrt(2))`; their dot product is `3/sqrt(10)`, not one. For
-interior `P=(1/3,1/3,2/3)`, radius `1/10`, and a sweep from `P-n0` to `P+n0`,
-the real first face contact is `1 - sqrt(10)/30 ~= 0.8945907447`, while the
-worker's authored-normal plane reports `1 - 1/10 - 1/(3*sqrt(2)) ~=
-0.6642977396`; the gap is `~= 0.2302930051`, far beyond Q32.32 rounding.
-`PhysicsMeshScaleTests.SlantedTriangle_WithNonUniformScale_ShouldUseScaledNormalAreaAndProjection`
-already proves the authored and scaled normals can differ. The same
-scaled-vertices/unscaled-normal pair is present in
-`RaycastSegmentWorker.CheckMeshOverlaps(...)` before its local plane solve, so
-that sibling is structurally proven by the same source pairing. Its separate
-literal regression belongs to this issue's implementation work.
+Fix: `PhysicsMesh` now exposes its transactionally committed scaled local face
+normal through one bounds-checked internal accessor. Both workers consume it
+beside the matching scaled vertices without recomputation or allocation. The
+now-unreferenced public authored-normal cache, its lazy state, and its per-mesh
+array allocation were deleted after a full cross-stack caller audit found no
+remaining owner.
 
-Direction: keep scaled normal ownership in `PhysicsMesh`. Expose the committed
-scaled local face normal through one focused mesh accessor, then make both
-workers consume it beside `GetLocalTriangleVertices(...)`; do not recompute
-normals independently in query workers or substitute a triangle-pair contact
-relation. Add the explicit swept-sphere reproducer above and a matching
-scaled-mesh raycast regression before implementation. Validate deterministic
-candidate ordering and warmed zero-allocation query paths.
+Verification:
 
-## Resolved Issues
+- Literal non-uniform-scale raycast and swept-sphere regressions fail on the
+  former authored plane, pass on the committed plane, and remain at `0 B`
+  managed allocation after warmup.
+- The two containing query suites and three stable all-hit/raw-distance
+  ordering regressions pass.
+- Full `Release` passes 3,925 tests and `ReleaseLean` passes 3,870 tests.
+  Independent coverage reports 55,839/55,839 lines, 15,829/15,829 branches,
+  and 5,320/5,320 methods.
+- Standard and Lean package builds pass for `net8.0` and `netstandard2.1` with
+  zero warnings. The existing dense-mesh swept-sphere Dry signal remains
+  comparable at subdivisions 8/16/32: `26.71 ms`, `49.70 ms`, and `179.33 ms`
+  after the fix versus `27.30 ms`, `49.29 ms`, and `181.36 ms` before it.
+- Focused implementation, dead-surface, and final whole-change reviews reported
+  no findings. The completed plan is retained at
+  [`Scaled Mesh Query Normal`](done/2026-08-01-scaled-mesh-query-normal-plan.md).
 
 ### Mesh Triangle-Triangle SAT Could Saturate Before Axis Classification
 
