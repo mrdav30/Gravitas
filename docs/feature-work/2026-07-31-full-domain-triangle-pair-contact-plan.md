@@ -36,7 +36,7 @@ BenchmarkDotNet, Coverlet, ReportGenerator, local FixedMathSharp project links.
 
 ---
 
-**Status:** Phase 1 complete; paused at FixedMathSharp review checkpoint  
+**Status:** Phase 2 complete; stopped for user review  
 **Started:** 2026-07-31  
 **Repositories:** FixedMathSharp, Gravitas  
 **Queue item:** `Mesh Triangle-Triangle SAT Can Saturate Before Axis Classification`
@@ -708,18 +708,21 @@ contact authority while retaining current BVH complexity and stable ordering.
 - Produces: unchanged public Gravitas APIs and a smaller internal mesh contact
   path carrying exact anchors, normal, depth, and clamp state.
 
-- [ ] Add red Gravitas regressions for scalar-face meshes, long local triangles,
-  coplanar separation, tiny-axis separation, reversed dispatch, exact tie
-  ordering, and clamped-depth propagation through `ManifoldContact`.
-- [ ] Replace the redundant existing
+- [x] Reuse the exhaustive Phase 1 scalar-face, long-triangle, coplanar,
+  tiny-axis, and tie-order relation matrix, then add Gravitas boundary
+  regressions for full-domain separation, reversed dispatch, exact anchors,
+  conservative extreme-frame BVH admission, clamped-depth propagation, and
+  warmed allocation. Do not duplicate FixedMathSharp's relation suite.
+- [x] Replace the redundant existing
   `MeshMesh_ShouldPreserveTriangleContact` wrapper assertion with a meaningful
   exact-relation/local-anchor regression; do not retain both tests.
-- [ ] Add one regression proving returned `ContactAnchor` values remain in the
+- [x] Add one regression proving returned `ContactAnchor` values remain in the
   two canonical mesh frames even when neither conceptual world point can be
   represented.
-- [ ] In `TryBuildMeshMeshManifold(...)`, keep the first-triangle transform used
-  solely to query the second mesh's local triangle BVH. Load each candidate's
-  canonical local `FixedTriangle` and call:
+- [x] In `TryBuildMeshMeshManifold(...)`, canonicalize relation direction by
+  stable collider ID, use exact conservative relative triangle bounds solely
+  to query the second mesh's local BVH, and load each candidate's canonical
+  local `FixedTriangle` before calling:
 
   ```csharp
   if (!firstTriangle.TryGetContact(
@@ -734,14 +737,15 @@ contact authority while retaining current BVH complexity and stable ordering.
   }
   ```
 
-- [ ] Add the returned anchors, depth, normal, and `DepthIsClamped` directly to
+- [x] Add the returned anchors, depth, normal, and `DepthIsClamped` directly to
   the manifold. Delete the scalar SAT, projection, magnitude, centroid
   orientation, closest-point reconstruction, and synthetic
   `pointA - normal * depth` fallback.
-- [ ] Reduce `GetTriangleInFrame(...)` to a triangle-bounds helper. Once no
+- [x] Replace `GetTriangleInFrame(...)` with a conservative relative-bounds
+  helper. Once no
   production caller needs cached triangle normals, centers, edges, or vertices,
   delete `CollisionTriangle` and its wrapper-only tests.
-- [ ] Run focused mesh collision and allocation tests:
+- [x] Run focused mesh collision and allocation tests:
 
   ```powershell
   dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj `
@@ -749,14 +753,51 @@ contact authority while retaining current BVH complexity and stable ordering.
       --filter "FullyQualifiedName~MeshTrianglePairContactTests|FullyQualifiedName~CollisionDetectionShapePairTests|FullyQualifiedName~ConcaveMeshCollisionTests"
   ```
 
-- [ ] Rerun the unchanged `*MeshMesh*` benchmark rows into
+- [x] Rerun the unchanged `*MeshMesh*` benchmark rows into
   `artifacts/benchmarks/2026-07-31-triangle-pair-gravitas-after`. Compare each
   median and allocation column against Phase 0; investigate a material
   regression rather than accepting wide arithmetic cost without evidence.
-- [ ] Restore Gravitas 100% reachable coverage for the adopted/deleted path and
+- [x] Restore Gravitas 100% reachable coverage for the adopted/deleted path and
   obtain independent correctness, determinism, performance, and zombie-code
   reviews.
-- [ ] Update this phase with exact evidence and stop for user review.
+- [x] Update this phase with exact evidence and stop for user review.
+
+**Phase 2 evidence:** Gravitas now retains its two-level BVH traversal but uses
+`FixedTriangle.TryGetContact(...)` as the sole concave triangle-pair contact
+authority. Stable collider-ID canonicalization makes reversed dispatch retain
+the same contact identities while swapping anchors and negating normals.
+`FixedBoundBox.FromRelativeRotatedBoundsClippedToDomain(...)` replaced ignored
+per-vertex reframe failures, so unrepresentable relative frames cannot shrink a
+candidate query before the exact relation runs. The scalar SAT/witness helpers,
+`CollisionTriangle`, and wrapper-only tests were deleted. One meaningful
+convex-cube regression retains coverage of the separate positive convex-hull
+forwarding path without restoring the hollow assertion.
+
+The first exact benchmark pass exposed a material per-candidate regression.
+FixedMathSharp now reuses each triangle's three basis-axis projections per axis
+and cancels identical positive denominators during exact depth ranking. Those
+policy-neutral deletions preserved bit results and warmed `0 B` behavior while
+improving the direct triangle-pair mean from `90.907 us` to `65.974 us`. Across
+the unchanged 64-pair Gravitas rows, final means were `4.839 ms` ordinary,
+`70.553 ms` concave, `400.501 ms` dense, `564.147 ms` contact-heavy, and
+`2,532.822 ms` closed dense. The exact dense rows recovered roughly `28-30%`
+from the initial exact implementation but remain about `3.4-4.4x` above the
+deleted scalar baseline. That measured optimization signal is retained in
+[`benchmark-signal-hardening-backlog.md`](benchmark-signal-hardening-backlog.md);
+no narrowed prefilter or second collision authority was added.
+
+Fresh FixedMathSharp validation passed `2,648/2,648` Release tests and
+`2,627/2,627` ReleaseLean tests. Its single Cobertura artifact reports
+`47,095/47,095` lines, `8,698/8,698` branches, and `3,419/3,419` methods/full
+methods. Fresh Gravitas validation passed `3,923/3,923` Release tests and
+`3,868/3,868` ReleaseLean tests. Its single final Cobertura artifact reports
+`55,848/55,848` lines, `15,833/15,833` branches, and `5,321/5,321`
+methods/full methods. Both libraries built Release and ReleaseLean for
+`netstandard2.1` and `net8.0` with zero warnings. Independent correctness,
+determinism, performance, allocation, test-quality, and zombie-code reviews
+approved the final phase with no actionable finding; one benchmark wording
+correction was applied. All production changes remain unstaged and
+uncommitted, and local project links remain preserved.
 
 **Review checkpoint:** Leave all Gravitas changes unstaged/uncommitted after
 Phase 2.

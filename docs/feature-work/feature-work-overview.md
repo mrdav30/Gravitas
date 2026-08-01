@@ -33,6 +33,11 @@ instead of burying it in notes.
     as releases become available, and revalidate every downstream consumer.
     Treat local links as temporary validation scaffolding, not release
     dependency changes.
+- [`Full-Domain Triangle-Pair Contact`](2026-07-31-full-domain-triangle-pair-contact-plan.md)
+  - Phases 1 and 2 are complete. FixedMathSharp owns the exact rigid-triangle
+    contact relation, and Gravitas has adopted it as the sole concave mesh-pair
+    authority while deleting the narrowed scalar SAT. Phase 3 parity audit and
+    Phase 4 release closure remain.
 - [`Benchmark Signal Hardening`](benchmark-signal-hardening-backlog.md)
   - Reproduce and close confirmed release-relevant signals alongside the owning
     library change. Do not broaden this into speculative optimization work.

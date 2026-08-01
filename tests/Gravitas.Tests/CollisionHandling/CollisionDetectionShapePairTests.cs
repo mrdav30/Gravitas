@@ -2211,24 +2211,6 @@ public sealed class CollisionDetectionShapePairTests
     }
 
     [Fact]
-    public void MeshMesh_ShouldPreserveTriangleContact()
-    {
-        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
-        ScenarioBody<LSMeshCollider> first = scenario.CreateBody(
-            CreateHorizontalPlaneMesh(),
-            PhysicsScenarioBuilder.Vector(0, 0, 0),
-            FixedQuaternion.Identity);
-        ScenarioBody<LSMeshCollider> second = scenario.CreateBody(
-            CreateVerticalPlaneMesh(),
-            PhysicsScenarioBuilder.Vector(0, 0, 0),
-            FixedQuaternion.Identity);
-
-        CollisionPair pair = AssertCollision(scenario, first.Collider, second.Collider, CollisionType.Mesh_Mesh);
-
-        pair.Manifold.HasContact.Should().BeTrue();
-    }
-
-    [Fact]
     public void MeshMesh_WithRotatedConvexMeshSeparatedByEdgeAxis_ShouldNotUseReducedSatFalsePositive()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
@@ -2319,25 +2301,6 @@ public sealed class CollisionDetectionShapePairTests
             Vector3d.Zero,
             FixedQuaternion.Identity);
         CollisionPair pair = scenario.CreatePair(mesh.Collider, cuboid.Collider);
-
-        long allocatedBytes = MeasureAllocatedBytes(() => EnsureCollision(pair));
-
-        allocatedBytes.Should().Be(0);
-    }
-
-    [Fact]
-    public void MeshMeshSatChecks_ShouldNotAllocateAfterWarmup()
-    {
-        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
-        ScenarioBody<LSMeshCollider> first = scenario.CreateBody(
-            CreateHorizontalPlaneMesh(),
-            PhysicsScenarioBuilder.Vector(0, 0, 0),
-            FixedQuaternion.Identity);
-        ScenarioBody<LSMeshCollider> second = scenario.CreateBody(
-            CreateVerticalPlaneMesh(),
-            PhysicsScenarioBuilder.Vector(0, 0, 0),
-            FixedQuaternion.Identity);
-        CollisionPair pair = scenario.CreatePair(first.Collider, second.Collider);
 
         long allocatedBytes = MeasureAllocatedBytes(() => EnsureCollision(pair));
 

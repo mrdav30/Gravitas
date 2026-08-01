@@ -58,11 +58,52 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 
 | Signal | Status | Priority | Tracking |
 | ------ | ------ | -------- | -------- |
+| Exact triangle-pair contacts regress dense concave-mesh throughput | Optimized, still observed | High | Profile prepared rigid-triangle reuse without restoring narrowed SAT authority |
 | Exact canonical OBB contacts regress ordinary narrow-phase throughput | Partially corrected | High | Add a proven exact ordinary-domain path in FixedMathSharp with the current wide kernels as fallback |
 | Exact 3D contact response adds measurable ordinary-domain cost | Optimized, still observed | Medium | Profile the paired atomic preflight and friction stages without weakening full-domain rejection |
 | Mesh scale rebuild allocates with subdivision count | Observed | Low | Isolate prepared BVH rebuild and scale-validation buffers before changing capacity policy |
 | Mixed public sweep traversal stalls on extreme sparse-grid spans | Observed | Medium | Isolate GridTracer clipping and cell-visit scaling independently of narrow phase |
 | Mixed discrete broad-phase refresh allocates at 32 moving CCD pairs | Isolated | Low | Reproduce capacity-growth threshold independently of rotational CCD |
+
+### Signal: Exact Triangle-Pair Contacts Regress Dense Concave-Mesh Throughput
+
+**Discovered:** 2026-08-01  
+**Source:** full-domain triangle-pair Phase 2 comparison against its preserved
+scalar mesh/mesh baseline  
+**Status:** Shared exact-projection and depth-ranking duplication removed;
+correctness and warmed allocation gates are green, while the remaining exact
+relation cost is still release-relevant.
+
+The unchanged 64-pair Short in-process rows reported:
+
+| Row | Scalar baseline | Initial exact | Final optimized exact |
+| --- | ---: | ---: | ---: |
+| Ordinary convex mesh/mesh | `5.168 ms` | `4.921 ms` | `4.839 ms` |
+| Concave mesh/mesh | `16.120 ms` | `98.489 ms` | `70.553 ms` |
+| Dense concave mesh/mesh | `105.139 ms` | `570.378 ms` | `400.501 ms` |
+| Contact-heavy concave mesh/mesh | `163.956 ms` | `804.559 ms` | `564.147 ms` |
+| Closed dense mesh/mesh | `747.173 ms` | `3,641.633 ms` | `2,532.822 ms` |
+
+FixedMathSharp now computes each triangle's basis-axis projections once per
+axis and cancels identical positive common denominators during normalized-depth
+ranking. Those policy-neutral deletions recovered roughly `28-30%` of the
+initial exact dense-row cost without changing axis order, contact results, or
+warmed `0 B` behavior. The ordinary convex row remains comparable because it
+uses the existing convex-hull relation rather than the concave triangle-pair
+generator.
+
+The remaining gap is the measured cost of invoking the complete wide
+triangle/triangle relation for every BVH-admitted candidate; candidate counts
+and traversal complexity did not change. The smallest next isolation step is a
+profiler comparison of per-candidate rational-basis/edge preparation,
+projection, depth ranking, and exact anchor construction, followed by prepared
+rigid-triangle reuse only where one authored triangle is paired with multiple
+candidates. Do not restore the deleted scalar SAT, add a narrowed prefilter, or
+create a second answer path that can disagree with the full-domain authority.
+Preserved artifacts are under
+`artifacts/benchmarks/2026-07-31-triangle-pair-baseline`,
+`artifacts/benchmarks/2026-07-31-triangle-pair-gravitas-after`, and
+`artifacts/benchmarks/2026-07-31-triangle-pair-after-denominator-cancellation`.
 
 ### Signal: Exact Canonical OBB Contacts Regress Ordinary Narrow-Phase Throughput
 
@@ -917,9 +958,12 @@ Promote a signal from this backlog into a dedicated dated plan when it has:
 
 ## Current Recommendation
 
-The mixed discrete broad-phase refresh threshold is the only active measured
-signal. It is low priority because the CCD-owned preparation, search, response,
-handoff, reset, and completion paths remain allocation-free, but it should be
-reproduced without rotational motion before release. Keep this document as the
-intake bucket for future measured signals; promote broader work into a dated
-feature plan when the scope outgrows a focused patch.
+The exact triangle-pair contact and canonical OBB rows are the highest-priority
+active measured signals. Preserve their exact full-domain authorities while
+profiling reusable preparation and other proven shared work; do not restore
+narrowed prefilters or competing answer paths. The mixed discrete broad-phase
+refresh threshold remains a lower-priority capacity signal because the
+CCD-owned preparation, search, response, handoff, reset, and completion paths
+remain allocation-free. Keep this document as the intake bucket for future
+measured signals; promote broader work into a dated feature plan when the scope
+outgrows a focused patch.

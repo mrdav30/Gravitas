@@ -29,20 +29,20 @@ records follow with their original discovery context.
 - Treat local links as unstaged validation scaffolding. Do not publish or
   release with them in place.
 - FixedMathSharp foundation hardening is complete. The current locally linked
-  geometry and arithmetic extensions pass 2,628 Release and 2,607 ReleaseLean
-  tests at 46,756/46,756 reachable lines, 8,648/8,648 branches, and
-  3,413/3,413 methods. Retain the local link while the remaining Gravitas queue
+  geometry and arithmetic extensions pass 2,648 Release and 2,627 ReleaseLean
+  tests at 47,095/47,095 reachable lines, 8,698/8,698 branches, and
+  3,419/3,419 methods. Retain the local link while the remaining Gravitas queue
   is hardened.
 - SwiftCollections has no library-specific active issue at this checkpoint; its
   place in the sequence is a full downstream compatibility and release gate.
 - GridForge's runtime-identity defect is resolved. Keep the lower stack locally
   linked while the remaining Gravitas queue is hardened so another downstream
   discovery does not force a partial release cycle.
-- Gravitas's current Release run passes 3,919 tests at 56,012/56,012 lines,
-  15,889/15,889 branches, and 5,348/5,348 methods. ReleaseLean passes 3,864
-  tests. Exact body point transforms and the existing 3D, 2D, and mixed
-  response allocation gates remain at zero managed bytes; measured timing
-  signals remain in the benchmark backlog.
+- Gravitas's current Release run passes 3,923 tests at 55,848/55,848 lines,
+  15,833/15,833 branches, and 5,321/5,321 methods. ReleaseLean passes 3,868
+  tests. Exact body point transforms, mesh-pair contact, and the existing 3D,
+  2D, and mixed response allocation gates remain at zero managed bytes;
+  measured timing signals remain in the benchmark backlog.
 - After the Gravitas queue closes, release the lower stack in dependency order,
   replace local links with released packages at each layer, and rerun Gravitas
   `Release`, `ReleaseLean`, coverage, replay, and relevant benchmark gates.
@@ -59,26 +59,28 @@ records follow with their original discovery context.
 **Affected area:** convex mesh/mesh triangle contact fallback, exact SAT axis
 projection and penetration ranking; related mesh query reducers
 
-`MeshTriangleContactGenerator.TryTestTriangles(...)` first expresses both
-triangles in one rigid frame, but then projects vertices with ordinary
-`Vector3d.Dot`, subtracts the narrowed scalar interval endpoints, and ranks
-axes through `overlap * overlap` and
-`depth * depth * axisMagnitudeSquared`. Large representable relative geometry
-or unnormalized edge-cross axes can therefore saturate before separation,
-minimum-depth selection, or normal orientation. Scalar-face origin cancellation
-alone does not protect this arithmetic, and broad-phase overlap does not bound
-the intermediate projection products.
+RCA: the former `MeshTriangleContactGenerator.TryTestTriangles(...)` expressed
+both triangles in one rigid frame, but then projected vertices with ordinary
+`Vector3d.Dot`, subtracted narrowed scalar interval endpoints, and ranked axes
+through saturated squared products. Large representable relative geometry or
+unnormalized edge-cross axes could therefore change separation, minimum-depth
+selection, or normal orientation before the final public result was known.
 
-The optimal fix is a reusable FixedMathSharp triangle/triangle axis-penetration
-contract that retains vertex projections, interval overlap, axis magnitude,
-and normalized-depth ordering in wide arithmetic, then narrows only the final
-oriented unit axis and penetration depth. Gravitas should consume that contract
-instead of adding local clamps or rescaling heuristics. Cover mirrored scalar
-limits, long relative triangles, tiny and large edge-cross axes, separation,
-touching, minimum-axis ties, clamped final depth, and warmed zero-allocation
-behavior. Audit convex-mesh query and mixed reducers for equivalent scalar
-projection/ranking paths; do not assume a discrete 3D collision fix provides
-query parity.
+Phases 1 and 2 of the
+[`Full-Domain Triangle-Pair Contact`](2026-07-31-full-domain-triangle-pair-contact-plan.md)
+plan are complete. FixedMathSharp now owns the reusable exact rigid-triangle
+contact relation, and Gravitas preserves its BVH candidate traversal while
+delegating each admitted pair to that sole authority. The scalar SAT,
+projection/depth helpers, cached `CollisionTriangle`, synthetic witness
+fallback, and wrapper-only tests were deleted. Reversed dispatch preserves
+stable collider-ID ownership, exact local anchors, inverse normals, depth, and
+clamp state; the warmed path remains allocation-free.
+
+The issue remains active until Phase 3 audits convex-mesh query and mixed
+triangle consumers for the same root cause and Phase 4 completes documentation,
+coverage, performance, and release closure. The remaining exact concave-mesh
+throughput signal is tracked separately in
+[`benchmark-signal-hardening-backlog.md`](benchmark-signal-hardening-backlog.md).
 
 ## Resolved Issues
 
