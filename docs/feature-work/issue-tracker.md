@@ -51,6 +51,8 @@ records follow with their original discovery context.
 
 1. **FixedMathSharp / Gravitas:**
    [Mesh Triangle-Triangle SAT Can Saturate Before Axis Classification](#mesh-triangle-triangle-sat-can-saturate-before-axis-classification).
+2. **Gravitas:**
+   [Scaled Mesh Query Faces Use Authored Unscaled Normals](#scaled-mesh-query-faces-use-authored-unscaled-normals).
 
 ### Mesh Triangle-Triangle SAT Can Saturate Before Axis Classification
 
@@ -76,11 +78,57 @@ fallback, and wrapper-only tests were deleted. Reversed dispatch preserves
 stable collider-ID ownership, exact local anchors, inverse normals, depth, and
 clamp state; the warmed path remains allocation-free.
 
-The issue remains active until Phase 3 audits convex-mesh query and mixed
-triangle consumers for the same root cause and Phase 4 completes documentation,
-coverage, performance, and release closure. The remaining exact concave-mesh
-throughput signal is tracked separately in
+Phases 1 through 3 are complete. Phase 3 found no other consumer of the
+triangle-pair scalar SAT: convex sweeps use GJK, sphere sweeps use finite
+surface relations, mixed circle mesh sweeps use the exact finite-slab projected
+circle relation, and mixed mesh prisms use the wide triangle/prism relation.
+The focused Phase 3 parity slice passed 711/711 under both Release and
+ReleaseLean. This item remains queue item 1 until Phase 4 completes
+documentation, coverage, performance, and release closure. The remaining exact
+concave-mesh throughput signal is tracked
+separately in
 [`benchmark-signal-hardening-backlog.md`](benchmark-signal-hardening-backlog.md).
+
+### Scaled Mesh Query Faces Use Authored Unscaled Normals
+
+**Discovered:** 2026-08-01  
+**Source:** Full-Domain Triangle-Pair Contact Phase 3 swept-sphere audit  
+**Affected area:** non-uniformly scaled mesh face queries in
+`SweptSphereQueryWorker` and `RaycastSegmentWorker`
+
+RCA: `PhysicsMesh.GetLocalTriangleVertices(...)` returns committed
+`_scaledLocalVertices`, but both consumers pair those vertices with
+`PhysicsMesh.FaceNormals[triangleIndex]`, which is calculated from authored
+`_localVertices`. `PhysicsMesh` already computes the matching
+`_scaledFaceNormals` during scale preparation and uses it for
+`GetFaceNormalWorld(...)`. Under non-uniform scale, the workers therefore solve
+and classify against a different plane from the triangle passed to
+`FixedTriangle.ContainsProjection(...)`. Projection containment cannot repair
+the mismatch because it intentionally projects an off-plane point onto the
+triangle.
+
+Evidence: for authored triangle `A=(0,0,0)`, `B=(1,0,0)`, `C=(0,1,1)` with
+scale `(1,1,2)`, the committed triangle is `(0,0,0)`, `(1,0,0)`, `(0,1,2)`.
+Its true normal is `(0,-2/sqrt(5),1/sqrt(5))`, while the authored cached normal
+is `(0,-1/sqrt(2),1/sqrt(2))`; their dot product is `3/sqrt(10)`, not one. For
+interior `P=(1/3,1/3,2/3)`, radius `1/10`, and a sweep from `P-n0` to `P+n0`,
+the real first face contact is `1 - sqrt(10)/30 ~= 0.8945907447`, while the
+worker's authored-normal plane reports `1 - 1/10 - 1/(3*sqrt(2)) ~=
+0.6642977396`; the gap is `~= 0.2302930051`, far beyond Q32.32 rounding.
+`PhysicsMeshScaleTests.SlantedTriangle_WithNonUniformScale_ShouldUseScaledNormalAreaAndProjection`
+already proves the authored and scaled normals can differ. The same
+scaled-vertices/unscaled-normal pair is present in
+`RaycastSegmentWorker.CheckMeshOverlaps(...)` before its local plane solve, so
+that sibling is structurally proven by the same source pairing. Its separate
+literal regression belongs to this issue's implementation work.
+
+Direction: keep scaled normal ownership in `PhysicsMesh`. Expose the committed
+scaled local face normal through one focused mesh accessor, then make both
+workers consume it beside `GetLocalTriangleVertices(...)`; do not recompute
+normals independently in query workers or substitute a triangle-pair contact
+relation. Add the explicit swept-sphere reproducer above and a matching
+scaled-mesh raycast regression before implementation. Validate deterministic
+candidate ordering and warmed zero-allocation query paths.
 
 ## Resolved Issues
 

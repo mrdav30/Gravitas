@@ -36,7 +36,7 @@ BenchmarkDotNet, Coverlet, ReportGenerator, local FixedMathSharp project links.
 
 ---
 
-**Status:** Phase 2 complete; stopped for user review  
+**Status:** Phase 3 complete; stopped because Phase 3 added a new release-blocking queue item  
 **Started:** 2026-07-31  
 **Repositories:** FixedMathSharp, Gravitas  
 **Queue item:** `Mesh Triangle-Triangle SAT Can Saturate Before Axis Classification`
@@ -810,22 +810,44 @@ Phase 2.
 **Goal:** Prove whether any other triangle consumer shares this exact root cause
 without broadening the fix to unrelated geometry.
 
-- [ ] Audit `ConvexSweepQueryWorker`, `SweptSphereQueryWorker`, mixed circle-
+- [x] Audit `ConvexSweepQueryWorker`, `SweptSphereQueryWorker`, mixed circle-
   against-3D reducers, and mixed mesh finite-prism collision for unnormalized
   triangle-axis projection followed by narrowed interval overlap or normalized-
   depth ranking.
-- [ ] Confirm reducers already delegating to `FixedTriangle` finite-axis,
+- [x] Confirm reducers already delegating to `FixedTriangle` finite-axis,
   projected-circle, convex-hull, or finite-slab relations need no change.
-- [ ] If a caller performs the same triangle-pair SAT, adopt
+- [x] If a caller performs the same triangle-pair SAT, adopt
   `FixedTriangle.TryGetContact(...)` and add one family-level regression.
-- [ ] If the audit finds a different arithmetic root cause, add one ordered
+- [x] If the audit finds a different arithmetic root cause, add one ordered
   issue-tracker entry with RCA and evidence; do not hide it inside this plan or
   implement an unrelated solver.
-- [ ] Record the audited files and outcome in this phase, run any affected
+- [x] Record the audited files and outcome in this phase, run any affected
   query/mixed suites, and obtain an independent parity review.
 
-**Review checkpoint:** Stop only if Phase 3 changes production behavior or adds
-a new release-blocking issue; otherwise continue to closure.
+**Phase 3 evidence:** No same-root caller exists. `ConvexSweepQueryWorker`
+uses support-mapped conservative advancement/GJK with `FixedTriangle` exact
+closest-point and projected-barycentric predicates; it does not run
+triangle-pair SAT. `SweptSphereQueryWorker` uses a local normalized-plane face
+solve followed by exact `FixedTriangle.ContainsProjection`, plus exact
+finite-cylinder-edge and sphere-vertex relations. Mixed
+circle-against-3D mesh sweeps delegate each candidate to
+`FixedTriangle.TryGetFiniteSlabProjectedCircleSweep`, while mixed mesh
+circle/capsule slabs delegate to `FixedTriangle` finite-slab relations and
+mixed mesh polygon/AABB prisms delegate to
+`FixedConvexPrismRelations.TryGetTriangleContact`. The triangle/prism SAT
+already retains wide projection numerators and exact squared-axis-depth
+ranking. No path needs `FixedTriangle.TryGetContact(...)` or a competing
+answer path. See the two Phase 3 audit reports under
+`.superpowers/sdd/2026-07-31-full-domain-triangle-pair-contact-plan/`.
+
+**Validation:** the focused Phase 3 parity slice passed 711/711 under both
+Release and ReleaseLean. Independent parity review confirmed the same-root
+result. The audit also proved a separate non-uniform-scale mesh-query
+face-normal defect, now ordered as queue item 2 in `issue-tracker.md`.
+
+**Review checkpoint:** Stop for user review. Phase 3 added a new
+release-blocking issue; queue item 1 remains the current plan and still owns
+Phase 4 closure.
 
 ### Phase 4: Coverage, Performance, Documentation, And Queue Closure
 
