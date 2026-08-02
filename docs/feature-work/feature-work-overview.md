@@ -39,6 +39,20 @@ instead of burying it in notes.
 
 ## Recently Completed
 
+- [`Exact Triangle-Pair Throughput Optimization`](done/2026-08-02-exact-triangle-pair-throughput-plan.md)
+  - Completed 2026-08-02. A sampled dense-row profile isolated generic
+    wide-multiply dispatch inside exact triangle projection. FixedMathSharp now
+    owns an exact `Signed576`-by-`long` specialization, and the unchanged
+    Gravitas concave rows improved by a repeatable `13.7-15.4%` without a new
+    public API, answer path, or warmed allocation.
+  - FixedMathSharp passes 2,653 Release and 2,632 ReleaseLean tests at
+    47,137/47,137 lines, 8,706/8,706 branches, and 3,421/3,421 methods. Gravitas
+    passes 3,925 Release and 3,870 ReleaseLean tests at 43,911/43,911 lines,
+    12,845/12,845 branches, and 4,510/4,510 methods. Standard and Lean packages
+    build warning-free for both target frameworks. The focused optimization is
+    complete; the broader exact-versus-deleted-scalar signal remains active and
+    is narrowed to the remaining projection and normalized-depth arithmetic.
+
 - [`Scaled Mesh Query Normal`](done/2026-08-01-scaled-mesh-query-normal-plan.md)
   - Completed 2026-08-01. Mesh raycasts and swept-sphere queries now consume
     the face normal committed with their non-uniformly scaled triangle vertices.
@@ -63,9 +77,9 @@ instead of burying it in notes.
     15,833/15,833 branches, and 5,322/5,322 methods. Standard and Lean packages
     build warning-free for both target frameworks; all 72 named Gravitas
     allocation guards plus the direct FixedMathSharp relation guard pass. The
-    dense concave throughput gap remains an explicit benchmark signal, and the
-    parity audit captured the separate scaled-mesh query-normal issue as the
-    next ordered queue item.
+    dense concave throughput gap remains an explicit benchmark signal; the
+    2026-08-02 follow-up above narrowed it after another repeatable improvement.
+    The parity audit also captured the separate scaled-mesh query-normal issue.
 
 - [`Exact Radial Segment Distance`](done/2026-07-31-radial-segment-distance-plan.md)
   - Completed 2026-07-31. FixedMathSharp segment APIs now solve circle and

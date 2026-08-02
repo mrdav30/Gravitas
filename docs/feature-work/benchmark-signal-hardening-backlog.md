@@ -58,7 +58,7 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 
 | Signal | Status | Priority | Tracking |
 | ------ | ------ | -------- | -------- |
-| Exact triangle-pair contacts regress dense concave-mesh throughput | Optimized, still observed | High | Profile prepared rigid-triangle reuse without restoring narrowed SAT authority |
+| Exact triangle-pair contacts regress dense concave-mesh throughput | Improved, still observed | High | Reprofile remaining exact projection and normalized-depth arithmetic before proposing another change |
 | Exact canonical OBB contacts regress ordinary narrow-phase throughput | Partially corrected | High | Add a proven exact ordinary-domain path in FixedMathSharp with the current wide kernels as fallback |
 | Exact 3D contact response adds measurable ordinary-domain cost | Optimized, still observed | Medium | Profile the paired atomic preflight and friction stages without weakening full-domain rejection |
 | Mesh scale rebuild allocates with subdivision count | Observed | Low | Isolate prepared BVH rebuild and scale-validation buffers before changing capacity policy |
@@ -70,9 +70,10 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 **Discovered:** 2026-08-01  
 **Source:** full-domain triangle-pair Phase 2 comparison against its preserved
 scalar mesh/mesh baseline  
-**Status:** Shared exact-projection and depth-ranking duplication removed;
-correctness and warmed allocation gates are green, while the remaining exact
-relation cost is still release-relevant.
+**Status:** Shared exact-projection and depth-ranking duplication removed; a
+signed one-limb wide-multiply specialization recovered another repeatable
+`13.7-15.4%` across the affected rows. Correctness and warmed allocation gates
+are green, while the remaining exact relation cost is still release-relevant.
 
 The unchanged 64-pair Short in-process rows reported:
 
@@ -94,12 +95,10 @@ generator.
 
 The remaining gap is the measured cost of invoking the complete wide
 triangle/triangle relation for every BVH-admitted candidate; candidate counts
-and traversal complexity did not change. The smallest next isolation step is a
-profiler comparison of per-candidate rational-basis/edge preparation,
-projection, depth ranking, and exact anchor construction, followed by prepared
-rigid-triangle reuse only where one authored triangle is paired with multiple
-candidates. Do not restore the deleted scalar SAT, add a narrowed prefilter, or
-create a second answer path that can disagree with the full-domain authority.
+and traversal complexity did not change. That evidence led to the per-candidate
+profile recorded in the 2026-08-02 follow-up below. Do not restore the deleted
+scalar SAT, add a narrowed prefilter, or create a second answer path that can
+disagree with the full-domain authority.
 Preserved artifacts are under
 `artifacts/benchmarks/2026-07-31-triangle-pair-baseline`,
 `artifacts/benchmarks/2026-07-31-triangle-pair-gravitas-after`, and
@@ -115,6 +114,38 @@ remain the runtime allocation authority; this document does not assign a cause
 to the differing in-process MemoryDiagnoser readings. The closure artifacts
 are under
 `artifacts/benchmarks/2026-08-01-triangle-pair-closure`.
+
+The 2026-08-02 follow-up profiled the unchanged dense row and isolated generic
+wide-multiply dispatch inside exact projection as the next shared cost. Raw
+`Fixed64` coordinates were widened to `Signed192` even though each operand is a
+proven signed one-word factor. FixedMathSharp now owns an exact
+`Signed576`-by-`long` specialization, and triangle projection calls that owner
+directly without changing the result width, axis order, tie behavior, contact
+anchors, or public API.
+
+| Row | Refreshed baseline | Retained change | Confirmation |
+| --- | ---: | ---: | ---: |
+| Ordinary convex mesh/mesh | `4.836 ms` | `4.933 ms` | control only |
+| Concave mesh/mesh | `70.351 ms` | `60.213 ms` | `59.761 ms` |
+| Dense concave mesh/mesh | `405.224 ms` | `342.682 ms` | `343.474 ms` |
+| Contact-heavy concave mesh/mesh | `556.972 ms` | `480.926 ms` | `480.773 ms` |
+| Closed dense mesh/mesh | `2.566 s` | `2.170 s` | `2.155 s` |
+
+The direct FixedMathSharp `TrianglePairPrimary` row improved from the prior
+`64.221 us` closure to `54.33 us`, or `15.4%`, with `0 B` reported. All `18`
+focused Gravitas triangle/concave/allocation regressions pass, and the direct
+warmed guards remain the allocation authority at `0 B`; the small, variable
+BenchmarkDotNet allocation readings are not treated as runtime allocations.
+
+Common-denominator hoisting and eager/lazy second-edge preparation were also
+measured and reverted because they did not produce a repeatable end-to-end
+gain on the unchanged Gravitas rows. The optimized exact rows remain
+approximately `2.9-3.7x` slower than the deleted scalar baseline, so the signal
+stays active. Its next step is narrowed to a fresh profile of the remaining
+exact projection and normalized-depth arithmetic; prepared triangle reuse is
+not the evidence-backed default. The focused implementation plan and complete
+release gates are preserved in
+[`2026-08-02-exact-triangle-pair-throughput-plan.md`](done/2026-08-02-exact-triangle-pair-throughput-plan.md).
 
 ### Signal: Exact Canonical OBB Contacts Regress Ordinary Narrow-Phase Throughput
 
@@ -971,9 +1002,9 @@ Promote a signal from this backlog into a dedicated dated plan when it has:
 
 The exact triangle-pair contact and canonical OBB rows are the highest-priority
 active measured signals. Preserve their exact full-domain authorities while
-profiling reusable preparation and other proven shared work; do not restore
-narrowed prefilters or competing answer paths. The mixed discrete broad-phase
-refresh threshold remains a lower-priority capacity signal because the
+reprofiling the remaining shared arithmetic; do not restore narrowed prefilters
+or competing answer paths. The mixed discrete broad-phase refresh threshold
+remains a lower-priority capacity signal because the
 CCD-owned preparation, search, response, handoff, reset, and completion paths
 remain allocation-free. Keep this document as the intake bucket for future
 measured signals; promote broader work into a dated feature plan when the scope
