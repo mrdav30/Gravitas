@@ -1,7 +1,7 @@
 # Exact Canonical OBB Throughput Hardening
 
 **Created:** 2026-08-02  
-**Status:** Phase 1 complete; paused for review  
+**Status:** Phase 2 complete; paused for review  
 **Signal:** Exact canonical OBB contacts regress ordinary narrow-phase throughput
 
 ## Goal
@@ -284,17 +284,84 @@ Confirmation artifacts:
 
 ### Phase 2: Triangle And Convex-Hull Adoption
 
-- [ ] Hoist each exact target-local candidate-axis projection out of vertex
+- [x] Hoist each exact target-local candidate-axis projection out of vertex
       loops.
-- [ ] Route fixed triangles and arbitrary convex point spans through the shared
+- [x] Route fixed triangles and arbitrary convex point spans through the shared
       canonical projection reducer without allocating transformed-vertex
       buffers.
-- [ ] Preserve face, box-axis, and edge-cross order plus support-point ties.
-- [ ] Measure `TrianglePrimary`, `ConvexHullPrimary`, and both Gravitas
+- [x] Preserve face, box-axis, and edge-cross order plus support-point ties.
+- [x] Measure `TrianglePrimary`, `ConvexHullPrimary`, and both Gravitas
       mesh/cuboid rows independently.
-- [ ] Re-achieve 100% reachable coverage in FixedMathSharp and Gravitas, then
+- [x] Re-achieve 100% reachable coverage in FixedMathSharp and Gravitas, then
       remove superseded point-span projection helpers and duplicate arithmetic.
-- [ ] Pause for review.
+- [x] Pause for review.
+
+#### Phase 2 Execution Record
+
+1. Capture a fresh pre-source-change baseline for the direct triangle and
+   convex-hull relations plus both Gravitas mesh/cuboid rows. Keep the phase
+   evidence separate from the earlier investigation baseline so the retained
+   result is compared against the exact Phase 1 source boundary.
+2. Add behavioral fixtures before changing the reducers: strict first-axis and
+   first-support ties, a distinct third-vertex support winner, exact positive
+   edge-cross output, rotated near-limit translation equivalence, nonzero point
+   span slices, and warmed zero-allocation execution.
+3. Reuse `WideRationalBasis3d.CreateRelative(...)` to place target points and
+   candidate axes in the box-local exact frame. Compute the three target-local
+   axis projections once per candidate, then scan authored raw coordinates
+   directly instead of transforming or buffering vertices.
+4. Preserve the existing triangle axis order—box axes, triangle face, then
+   `AB`, `BC`, and `CA` crossed with each box axis—and preserve convex-hull
+   topology order. Retain strict first-candidate and first-support tie ownership;
+   transform only the winning axis back to world space.
+5. Move the reusable exact axis dot product and prepared rigid projections to
+   their existing common owners. Delete the superseded transformed-offset
+   projection, duplicate OBB axis projection, duplicate triangle projection,
+   and duplicate convex-hull support scan rather than retaining forwarding
+   helpers or a fallback kernel.
+6. Run full Release, ReleaseLean, coverage, package, and benchmark gates for
+   both repositories. Rerun each benchmark twice from the final source and
+   request independent correctness, performance/bloat, and test-quality review.
+
+#### Phase 2 Result
+
+- Triangle and arbitrary convex point spans now share the canonical exact
+  relative-frame projection primitives. No transformed-vertex buffer, compact
+  answer path, second full-domain kernel, allocation, or public API was added.
+- Exact classification, candidate order, strict ties, support witnesses,
+  nearest-even depth, clamped-depth reporting, and both local contact anchors
+  remain authoritative across ordinary, rotated, degenerate, and near-limit
+  inputs.
+- Fresh direct baselines were `79.198 us` median for `TrianglePrimary` and
+  `375.649 us` for `ConvexHullPrimary`. Final confirmation medians were
+  `51.208 us` / `51.149 us` and `135.960 us` / `135.085 us`: approximately
+  `35.3%`–`35.4%` and `63.8%`–`64.0%` faster, respectively.
+- Fresh Gravitas baselines were `7.049 ms` median for convex mesh/cuboid and
+  `7.044 ms` for concave mesh/cuboid. Final confirmation medians were
+  `4.873 ms` / `4.756 ms` and `4.708 ms` / `4.758 ms`: approximately
+  `30.9%`–`32.5%` and `32.5%`–`33.2%` faster. Every measured row reported
+  `0 B`.
+- FixedMathSharp Release passed 2,662 core tests plus 8 Chronicler tests;
+  ReleaseLean passed 2,641 core tests plus 8 Chronicler tests. Gravitas Release
+  passed 3,925 tests and ReleaseLean passed 3,870 tests. Both target-framework
+  package builds remained warning-free.
+- Final FixedMathSharp coverage is 47,301/47,301 lines, 8,708/8,708 branches,
+  and 3,425/3,425 methods. Final Gravitas coverage is 43,911/43,911 lines,
+  12,845/12,845 branches, and 4,510/4,510 methods.
+- Independent review found no unresolved correctness issue. Copy-heavy exact
+  operands were changed to `in` parameters, duplicated dot/support/projection
+  owners were deleted, the internal prepared-projection fixture was made
+  rotation-sensitive, and missing translation/tie/edge-cross contracts were
+  added before closure.
+
+Phase 2 artifacts:
+
+- `../FixedMathSharp/artifacts/benchmarks/2026-08-02-obb-phase2-baseline`
+- `../FixedMathSharp/artifacts/benchmarks/2026-08-02-obb-phase2-final-confirmation-1`
+- `../FixedMathSharp/artifacts/benchmarks/2026-08-02-obb-phase2-final-confirmation-2`
+- `artifacts/benchmarks/2026-08-02-obb-phase2-baseline`
+- `artifacts/benchmarks/2026-08-02-obb-phase2-final-confirmation-1`
+- `artifacts/benchmarks/2026-08-02-obb-phase2-final-confirmation-2`
 
 ### Phase 3: Finite-Capsule Adoption
 
