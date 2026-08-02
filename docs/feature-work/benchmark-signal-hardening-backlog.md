@@ -58,7 +58,7 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 
 | Signal | Status | Priority | Tracking |
 | ------ | ------ | -------- | -------- |
-| Exact canonical OBB contacts regress ordinary narrow-phase throughput | Partially corrected | High | Add a proven exact ordinary-domain path in FixedMathSharp with the current wide kernels as fallback |
+| Exact canonical OBB contacts regress ordinary narrow-phase throughput | Promoted | High | Execute the [exact canonical OBB throughput plan](2026-08-02-exact-canonical-obb-throughput-plan.md) |
 | Exact 3D contact response adds measurable ordinary-domain cost | Optimized, still observed | Medium | Profile the paired atomic preflight and friction stages without weakening full-domain rejection |
 | Mesh scale rebuild allocates with subdivision count | Observed | Low | Isolate prepared BVH rebuild and scale-validation buffers before changing capacity policy |
 | Mixed public sweep traversal stalls on extreme sparse-grid spans | Observed | Medium | Isolate GridTracer clipping and cell-visit scaling independently of narrow phase |
@@ -167,9 +167,11 @@ and
 **Discovered:** 2026-07-27  
 **Source:** canonical-collider Task 9 comparison against the preserved Task 0
 short in-process baseline  
-**Status:** Exact-winner ranking corrected redundant depth rounding; the
-remaining cost is isolated to the exact wide `FixedOrientedBox` relation
-kernels. Correctness and allocation gates remain green.
+**Status:** Promoted to the
+[`Exact Canonical OBB Throughput Hardening`](2026-08-02-exact-canonical-obb-throughput-plan.md)
+plan. Exact-winner ranking corrected redundant depth rounding; the remaining
+cost is isolated to the exact wide `FixedOrientedBox` relation kernels.
+Correctness and allocation gates remain green.
 
 The same Release build, BenchmarkDotNet job, hardware, parameters, and contact
 fixtures reported the following ordinary-domain changes:

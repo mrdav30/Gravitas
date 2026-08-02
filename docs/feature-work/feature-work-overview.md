@@ -23,6 +23,11 @@ instead of burying it in notes.
 
 ## Active Release-Scope
 
+- [`Exact Canonical OBB Throughput Hardening`](2026-08-02-exact-canonical-obb-throughput-plan.md)
+  - Rework competitive box, triangle/hull, and finite-capsule contacts around an
+    exact canonical OBB-local frame. Preserve full-domain wide fallback,
+    deterministic feature ownership, canonical anchors, zero allocation, and
+    100% coverage while measuring retention independently for each family.
 - [`Cross-Stack Issue Resolution`](issue-tracker.md)
   - Resolve release-blocking issues in dependency order: `FixedMathSharp`,
     `SwiftCollections`, `GridForge`, then Gravitas. Use the `develop` worktrees
