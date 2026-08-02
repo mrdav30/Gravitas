@@ -1,7 +1,7 @@
 # Exact Canonical OBB Throughput Hardening
 
 **Created:** 2026-08-02  
-**Status:** Design approved; implementation pending  
+**Status:** Phase 1 complete; paused for review  
 **Signal:** Exact canonical OBB contacts regress ordinary narrow-phase throughput
 
 ## Goal
@@ -178,6 +178,13 @@ permanent implementations for convenience.
 
 ## Phased Work Plan
 
+Every implementation phase closes independently before review. FixedMathSharp
+and Gravitas must each retain 100% reachable line, branch, and method coverage
+at that boundary. The phase review also removes newly unreachable branches,
+superseded helpers, one-line forwarding hops, and duplicated arithmetic instead
+of carrying cleanup debt into Phase 5. Tests must protect meaningful behavior;
+do not add reflection or API-shape assertions solely to satisfy coverage.
+
 ### Phase 0: Baseline And Design
 
 - [x] Reproduce all four direct FixedMathSharp rows.
@@ -190,15 +197,90 @@ permanent implementations for convenience.
 
 ### Phase 1: Relative-Frame Foundation And Box/Box
 
-- [ ] Add focused equivalence tests before changing the box/box kernel.
-- [ ] Centralize only the relative-frame arithmetic repeated by current OBB
+- [x] Add focused equivalence tests before changing the box/box kernel.
+- [x] Centralize only the relative-frame arithmetic repeated by current OBB
       relations.
-- [ ] Implement exact 15-axis box/box reduction in the canonical box frame.
-- [ ] Preserve winner ordering, normal direction, anchors, and clamped-depth
+- [x] Implement exact 15-axis box/box reduction in the canonical box frame.
+- [x] Preserve winner ordering, normal direction, anchors, and clamped-depth
       behavior across ordinary, tie, degenerate-axis, and extreme inputs.
-- [ ] Measure direct `BoxPrimary` and Gravitas cuboid/cuboid rows; retain only a
+- [x] Measure direct `BoxPrimary` and Gravitas cuboid/cuboid rows; retain only a
       proven result.
-- [ ] Pause for review.
+- [x] Re-achieve 100% reachable coverage in FixedMathSharp and Gravitas, then
+      remove any superseded box/box helpers or duplicate projection logic.
+- [x] Pause for review.
+
+#### Phase 1 Execution Record
+
+1. Characterize the existing public contract in
+   `FixedOrientedBox.Box.Tests.cs`: retain the exact rotated cross-axis winner,
+   add an equal-depth face tie, and repeat the rotated fixture near the scalar
+   limits to prove translation invariance without materializing world points.
+2. Add one focused internal arithmetic test for an exact relative rational
+   basis, then implement that composition on `WideRationalBasis3d`. Reuse the
+   same basis-dot owner from relative bounds and expose basis rows/columns from
+   the basis itself instead of retaining box-local forwarding helpers.
+3. Replace the box/box world's repeated rigid projections with the canonical
+   15-axis formulas. Preserve the existing candidate order
+   `A0, B0, A1, B1, A2, B2`, then `Ai x Bj`; retain the current exact
+   normalized-depth comparator and nearest-even materialization; construct the
+   world-space axis only for the winner.
+4. Delete the superseded generic box/box reducer after the full-domain width
+   proof and public differential fixtures pass. Move any touched shared
+   projection helper to its existing common owner rather than adding a façade
+   or a second box implementation.
+5. Run the focused box suite, the complete FixedMathSharp and Gravitas Release
+   suites, and project-wide coverage analysis. The phase does not close until
+   both repositories report 100% reachable line, branch, and method coverage
+   and the diff contains no newly unreachable or assertion-only code.
+6. Build the Release benchmark projects and run `BoxPrimary` plus Gravitas
+   cuboid/cuboid twice. Retain the rewrite only if both confirmations clear the
+   documented per-family gate with `0 B`, or if a smaller result removes
+   meaningful code while remaining performance-neutral.
+7. Request independent arithmetic/correctness and hot-path reviews, resolve
+   findings, update this record with measured evidence, and stop for review.
+
+#### Phase 1 Result
+
+- The old world-axis box reducer was replaced by one exact relative-frame
+  kernel. The full normalized-quaternion/raw-coordinate domain fits the existing
+  `Signed192`, `Signed320`, and `Signed576` owners, so no compact fallback or
+  second implementation remains.
+- Candidate order remains `A0, B0, A1, B1, A2, B2`, then the nine `Ai x Bj`
+  axes. Only the winning world axis is constructed; the existing exact depth,
+  normal, and matched-anchor materializers remain authoritative.
+- Relative basis composition, basis-axis access, point projection, extent
+  projection, and box-radius projection reuse existing owners. The phase also
+  deleted the previous generic box reducer, local basis-axis helper, duplicate
+  basis dot product, duplicate rigid-local point projection, and misplaced
+  convex-prism radius owner.
+- Meaningful fixtures now pin exact cross-axis output, first- and second-box
+  face winners, strict equal-depth tie ownership, parallel-axis degeneration,
+  skew cross-axis separation, near-limit translation invariance including
+  anchor displacement, opposite scalar-face separation, and clamped full-domain
+  depth.
+- Direct `BoxPrimary` confirmation medians were `32.030 us` and `32.195 us`
+  versus `64.503 us` baseline: approximately `50.3%` and `50.1%` faster.
+- Gravitas 64-pair cuboid/cuboid confirmation medians were `1.326 ms` and
+  `1.314 ms` versus `2.471 ms` baseline: approximately `46.3%` and `46.8%`
+  faster. All four confirmation rows reported `0 B`.
+- FixedMathSharp Release passed 2,658 core tests plus 8 Chronicler tests;
+  ReleaseLean passed 2,637 core tests plus 8 Chronicler tests. Gravitas Release
+  passed 3,925 tests and ReleaseLean passed 3,870 tests. With local links,
+  switching standard/Lean gates requires a configuration-specific restore so
+  shared lower-stack assets cannot leak between configurations.
+- Final FixedMathSharp coverage is 53,122/53,122 lines, 8,776/8,776 branches,
+  and 3,416/3,416 reported methods. Final Gravitas coverage is 43,911/43,911
+  lines, 12,845/12,845 branches, and 4,510/4,510 methods.
+- Independent arithmetic, performance, and test reviews found no unresolved
+  issue. Their two actionable checks—shared rigid-point adoption and a rotated
+  max-to-min separation fixture—were resolved before closure.
+
+Confirmation artifacts:
+
+- `../FixedMathSharp/artifacts/benchmarks/2026-08-02-obb-phase1-confirmation-1`
+- `../FixedMathSharp/artifacts/benchmarks/2026-08-02-obb-phase1-confirmation-2`
+- `artifacts/benchmarks/2026-08-02-obb-phase1-confirmation-1`
+- `artifacts/benchmarks/2026-08-02-obb-phase1-confirmation-2`
 
 ### Phase 2: Triangle And Convex-Hull Adoption
 
@@ -210,6 +292,8 @@ permanent implementations for convenience.
 - [ ] Preserve face, box-axis, and edge-cross order plus support-point ties.
 - [ ] Measure `TrianglePrimary`, `ConvexHullPrimary`, and both Gravitas
       mesh/cuboid rows independently.
+- [ ] Re-achieve 100% reachable coverage in FixedMathSharp and Gravitas, then
+      remove superseded point-span projection helpers and duplicate arithmetic.
 - [ ] Pause for review.
 
 ### Phase 3: Finite-Capsule Adoption
@@ -218,6 +302,8 @@ permanent implementations for convenience.
 - [ ] Preserve exact radial separation, feature rank, endpoint/edge ownership,
       support anchors, and full-domain fallback.
 - [ ] Measure `CapsulePrimary` and Gravitas cuboid/capsule rows.
+- [ ] Re-achieve 100% reachable coverage in FixedMathSharp and Gravitas, then
+      remove superseded capsule-axis helpers and duplicate arithmetic.
 - [ ] Pause for review.
 
 ### Phase 4: Evidence-Gated Residual Optimization
@@ -229,6 +315,8 @@ permanent implementations for convenience.
       simplifies code with neutral performance.
 - [ ] Stop rather than introduce a second approximate answer path or permanent
       relation-specific bloat.
+- [ ] Re-achieve 100% reachable coverage in FixedMathSharp and Gravitas before
+      retaining any residual optimization.
 
 ### Phase 5: Coverage, Documentation, And Cross-Stack Closure
 
