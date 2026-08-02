@@ -58,22 +58,28 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 
 | Signal | Status | Priority | Tracking |
 | ------ | ------ | -------- | -------- |
-| Exact triangle-pair contacts regress dense concave-mesh throughput | Improved, still observed | High | Reprofile remaining exact projection and normalized-depth arithmetic before proposing another change |
 | Exact canonical OBB contacts regress ordinary narrow-phase throughput | Partially corrected | High | Add a proven exact ordinary-domain path in FixedMathSharp with the current wide kernels as fallback |
 | Exact 3D contact response adds measurable ordinary-domain cost | Optimized, still observed | Medium | Profile the paired atomic preflight and friction stages without weakening full-domain rejection |
 | Mesh scale rebuild allocates with subdivision count | Observed | Low | Isolate prepared BVH rebuild and scale-validation buffers before changing capacity policy |
 | Mixed public sweep traversal stalls on extreme sparse-grid spans | Observed | Medium | Isolate GridTracer clipping and cell-visit scaling independently of narrow phase |
 | Mixed discrete broad-phase refresh allocates at 32 moving CCD pairs | Isolated | Low | Reproduce capacity-growth threshold independently of rotational CCD |
 
+## Experimental Signals
+
+| Signal | Status | Revisit When |
+| ------ | ------ | ----------- |
+| Exact triangle-pair contacts regress dense concave-mesh throughput | Capacity-sensitive; local optimization exhausted | A topology or exact classifier design can reduce complete triangle-pair SAT evaluations without a competing answer path |
+
 ### Signal: Exact Triangle-Pair Contacts Regress Dense Concave-Mesh Throughput
 
 **Discovered:** 2026-08-01  
 **Source:** full-domain triangle-pair Phase 2 comparison against its preserved
 scalar mesh/mesh baseline  
-**Status:** Shared exact-projection and depth-ranking duplication removed; a
-signed one-limb wide-multiply specialization recovered another repeatable
-`13.7-15.4%` across the affected rows. Correctness and warmed allocation gates
-are green, while the remaining exact relation cost is still release-relevant.
+**Status:** Experimental capacity guidance. Shared exact-projection and
+depth-ranking duplication plus the retained signed one-limb specialization
+recovered substantial throughput. A final bounded pass found no further local
+change worth retaining; dense dynamic concave mesh/mesh contact is not a
+competitive release path.
 
 The unchanged 64-pair Short in-process rows reported:
 
@@ -141,11 +147,20 @@ Common-denominator hoisting and eager/lazy second-edge preparation were also
 measured and reverted because they did not produce a repeatable end-to-end
 gain on the unchanged Gravitas rows. The optimized exact rows remain
 approximately `2.9-3.7x` slower than the deleted scalar baseline, so the signal
-stays active. Its next step is narrowed to a fresh profile of the remaining
-exact projection and normalized-depth arithmetic; prepared triangle reuse is
-not the evidence-backed default. The focused implementation plan and complete
-release gates are preserved in
-[`2026-08-02-exact-triangle-pair-throughput-plan.md`](done/2026-08-02-exact-triangle-pair-throughput-plan.md).
+remained material after the retained work. A final experimental pass tested an
+exact signed two-limb multiplication specialization and invocation-local rigid
+frame preparation. The direct specialization improved only `0.6%`; frame
+preparation left the affected Gravitas rows between `0.28%` and `1.04%` slower.
+Both changes were reverted exactly.
+
+Evidence now favors reducing complete exact SAT evaluations; the tested
+two-limb dispatch and frame preparation were not material. Revisit only through
+a separate topology or exact-classifier design; do not grow the current
+relation with more local special cases. The focused plans and evidence are
+preserved in
+[`2026-08-02-exact-triangle-pair-throughput-plan.md`](done/2026-08-02-exact-triangle-pair-throughput-plan.md)
+and
+[`2026-08-02-experimental-triangle-pair-throughput-plan.md`](done/2026-08-02-experimental-triangle-pair-throughput-plan.md).
 
 ### Signal: Exact Canonical OBB Contacts Regress Ordinary Narrow-Phase Throughput
 
@@ -1000,11 +1015,13 @@ Promote a signal from this backlog into a dedicated dated plan when it has:
 
 ## Current Recommendation
 
-The exact triangle-pair contact and canonical OBB rows are the highest-priority
-active measured signals. Preserve their exact full-domain authorities while
-reprofiling the remaining shared arithmetic; do not restore narrowed prefilters
-or competing answer paths. The mixed discrete broad-phase refresh threshold
-remains a lower-priority capacity signal because the
+The canonical OBB row is the highest-priority active measured signal. Preserve
+its exact full-domain authority while investigating a proven ordinary-domain
+path. Dense concave mesh/mesh throughput is now experimental capacity guidance;
+prefer primitive, convex, compound, or partitioned static-concave authoring and
+do not restore narrowed prefilters or competing answer paths. The mixed
+discrete broad-phase refresh threshold remains a lower-priority capacity signal
+because the
 CCD-owned preparation, search, response, handoff, reset, and completion paths
 remain allocation-free. Keep this document as the intake bucket for future
 measured signals; promote broader work into a dated feature plan when the scope

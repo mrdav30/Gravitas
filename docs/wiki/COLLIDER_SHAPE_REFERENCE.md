@@ -244,6 +244,13 @@ consistently wound, closed two-manifold. The property describes topology only;
 representability contract. `MeshVolumeValidationResult.NonManifoldVertex`
 distinguishes a pinched or disconnected vertex fan from an ordinary open edge.
 
+Exact concave mesh/mesh contact is supported, but dense overlapping tessellated
+surface pairs are an experimental, capacity-sensitive per-step workload. Cost
+scales with BVH-admitted triangle pairs and their exact full-domain SAT axes.
+Prefer `Convex` when the authored geometry satisfies its enforced contract;
+otherwise use deterministic convex decomposition, authored compound proxies,
+or partitioned static concave surfaces for competitive runtime paths.
+
 Mesh closest-surface queries always return a point on an authored triangle.
 They seed an exact upper-bound candidate, query the local triangle BVH inside a
 conservative cube that contains every point capable of improving that bound,

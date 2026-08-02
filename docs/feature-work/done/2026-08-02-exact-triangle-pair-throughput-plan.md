@@ -88,12 +88,12 @@ The post-change workload trace retains the same stack shape:
 | Dominant inner arithmetic | `MultiplySigned576`, `MultiplySigned320`, `GetMagnitudeBitLength` |
 | Small contributors | BVH traversal, manifold ownership, triangle preparation |
 
-The focused phase is complete, but the broader signal remains active because
-the exact concave rows are still materially slower than the deleted saturating
-scalar baseline. The next investigation is narrowed to a fresh profile of the
-remaining exact projection and normalized-depth arithmetic. Prepared triangle
-reuse is not the next default action because both profiling and direct
-experiments gave it a small or non-repeatable end-to-end return.
+At this phase boundary the broader signal remained active because the exact
+concave rows were still materially slower than the deleted saturating scalar
+baseline. The final bounded
+[`Experimental Exact Triangle-Pair Throughput Pass`](2026-08-02-experimental-triangle-pair-throughput-plan.md)
+found no additional local change worth retaining and reclassified the remaining
+cost as experimental capacity guidance.
 
 ## Rejected Alternatives
 

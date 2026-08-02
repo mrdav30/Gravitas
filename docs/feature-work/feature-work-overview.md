@@ -39,6 +39,17 @@ instead of burying it in notes.
 
 ## Recently Completed
 
+- [`Experimental Exact Triangle-Pair Throughput Pass`](done/2026-08-02-experimental-triangle-pair-throughput-plan.md)
+  - Completed 2026-08-02 with no production change retained. Exact signed
+    two-limb multiplication improved the direct triangle row only `0.6%`, and
+    invocation-local rigid-frame preparation left affected Gravitas rows flat
+    to `1.04%` slower. Both experiments were reverted exactly.
+  - Evidence now favors reducing complete exact SAT work per BVH-admitted
+    triangle pair. Dense dynamic concave mesh/mesh collision is now
+    experimental capacity guidance; competitive release authoring should favor
+    primitives, convex meshes, decomposed compounds, or partitioned static
+    concave surfaces.
+
 - [`Exact Triangle-Pair Throughput Optimization`](done/2026-08-02-exact-triangle-pair-throughput-plan.md)
   - Completed 2026-08-02. A sampled dense-row profile isolated generic
     wide-multiply dispatch inside exact triangle projection. FixedMathSharp now
@@ -50,8 +61,9 @@ instead of burying it in notes.
     passes 3,925 Release and 3,870 ReleaseLean tests at 43,911/43,911 lines,
     12,845/12,845 branches, and 4,510/4,510 methods. Standard and Lean packages
     build warning-free for both target frameworks. The focused optimization is
-    complete; the broader exact-versus-deleted-scalar signal remains active and
-    is narrowed to the remaining projection and normalized-depth arithmetic.
+    complete. The final bounded follow-up above found no additional local
+    change worth retaining and moved the broader signal to experimental
+    capacity guidance.
 
 - [`Scaled Mesh Query Normal`](done/2026-08-01-scaled-mesh-query-normal-plan.md)
   - Completed 2026-08-01. Mesh raycasts and swept-sphere queries now consume
