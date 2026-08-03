@@ -58,14 +58,15 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 
 | Signal                                                              | Status   | Priority | Tracking                                                                                  |
 | ------------------------------------------------------------------- | -------- | -------- | ----------------------------------------------------------------------------------------- |
-| Mixed public sweep traversal stalls on extreme sparse-grid spans    | Observed | Medium   | Isolate GridTracer clipping and cell-visit scaling independently of narrow phase          |
+| Mixed public sweep traversal stalls on extreme sparse-grid spans    | Promoted | High     | Upstream GridForge `2026-08-03-two-tier-grid-spatial-index-plan.md`                        |
 | Mixed discrete broad-phase refresh allocates at 32 moving CCD pairs | Isolated | Low      | Reproduce capacity-growth threshold independently of rotational CCD                       |
 
 ### Signal: Mixed Public Sweep Traversal Stalls On Extreme Sparse-Grid Spans
 
 **Discovered:** 2026-07-19  
 **Source:** focused mixed swept-circle public-query regression  
-**Status:** Observed; terminated run, no completed timing sample
+**Status:** Promoted to upstream GridForge implementation; terminated baseline,
+no completed timing sample
 
 A temporary focused public mixed-query diagnostic swept from `-200,000` to
 `+200,000` with radius `100,000` through a sparse grid configured with
@@ -76,12 +77,20 @@ not the finite-axis narrow-phase contract it was intended to verify.
 
 The same finite-axis reducer completes promptly when invoked below public
 candidate gathering, so the signal is in broad-phase traversal rather than the
-exact narrow-phase solve. The run was terminated rather than benchmarked to
-completion; do not treat it as a stable latency measurement. The smallest next
-step is a bounded GridTracer profiler harness that records visited cells and
-active-grid clipping for long sparse spans, then determines whether traversal
-should skip unoccupied world space or whether the public query needs an explicit
-world-span contract.
+exact narrow-phase solve. Follow-up isolation found the dominant stall occurs
+even earlier: default `GridWorld` registration maps the grid across
+`4,001^3`, or `64,048,012,001`, top-level hash cells. Constructing the world
+with a matching 100,000-unit hash scale makes the same public query complete,
+but requiring every host to tune one global scale to its largest streamed grid
+is not an acceptable contract.
+
+The approved upstream plan is
+`GridForge/docs/feature-work/2026-08-03-two-tier-grid-spatial-index-plan.md`.
+It retains the ordinary fixed spatial-hash fast path, routes automatically
+classified oversized grids into `SwiftFixedBVH<ushort>`, preserves adaptive
+active-grid scans for huge query bounds, and requires matched before/after
+GridForge plus Gravitas artifacts. The terminated run remains the honest exact
+baseline; do not invent a pre-change latency from a run that did not finish.
 
 ### Signal: Mixed Discrete Broad-Phase Refresh Allocation At 32 Pairs
 
