@@ -39,6 +39,17 @@ instead of burying it in notes.
 
 ## Recently Completed
 
+- [`Mesh Scale Rebuild Throughput Hardening`](done/2026-08-03-mesh-scale-rebuild-throughput-plan.md)
+  - Completed 2026-08-03. Convex meshes now build one immutable support-vertex
+    topology and refit only transactional node bounds after scale changes. The
+    second support-index buffer, repeated per-node sorting, and retained
+    construction comparer were deleted without changing exact support results
+    or authored-order ties.
+  - Subdivision 8 and 16 scale-rebuild rows drop from `4,032 B/op` and
+    `16,320 B/op` to `0 B/op` while improving by `7.9%` and `7.8%` against the
+    refreshed baseline. Gravitas passes 3,928 Release and 3,873 ReleaseLean
+    tests at 100% reachable line, branch, and method coverage.
+
 - [`Exact 3D Contact Response Throughput Hardening`](done/2026-08-03-exact-contact-response-throughput-plan.md)
   - Completed 2026-08-03. FixedMathSharp now proves compact identical-frame and
     identity-frame point-anchor differences before entering the general exact

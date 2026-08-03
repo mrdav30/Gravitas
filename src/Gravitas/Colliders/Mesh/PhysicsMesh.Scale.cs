@@ -196,11 +196,8 @@ public partial class PhysicsMesh
                 (_preparedTriangleBVH, _triangleBVH);
             if (_supportVertexIndices != null)
             {
-                (_supportVertexIndices, _preparedSupportVertexIndices) =
-                    (_preparedSupportVertexIndices, _supportVertexIndices);
                 (_supportTreeNodes, _preparedSupportTreeNodes) =
                     (_preparedSupportTreeNodes, _supportTreeNodes);
-                _supportTreeNodeCount = _preparedSupportTreeNodeCount;
             }
 
             _scaledLocalBounds = _preparedScaledLocalBounds;
@@ -349,19 +346,27 @@ public partial class PhysicsMesh
             out _preparedSurfaceMassProperties);
 
         BuildTriangleBVH(_preparedTriangleBVH, _preparedScaledLocalVertices);
-        if (_preparedSupportVertexIndices != null)
+        if (_supportVertexIndices != null)
         {
-            for (int i = 0; i < _preparedSupportVertexIndices.Length; i++)
-                _preparedSupportVertexIndices[i] = i;
-
-            _preparedSupportTreeNodeCount = 0;
-            BuildSupportTreeNode(
-                _preparedScaledLocalVertices,
-                _preparedSupportVertexIndices,
-                _preparedSupportTreeNodes!,
-                ref _preparedSupportTreeNodeCount,
-                0,
-                _preparedSupportVertexIndices.Length);
+            if (!_scaleInitialized)
+            {
+                _supportTreeNodeCount = 0;
+                BuildSupportTreeNode(
+                    _preparedScaledLocalVertices,
+                    _supportVertexIndices,
+                    _preparedSupportTreeNodes!,
+                    new SupportVertexIndexComparer(),
+                    ref _supportTreeNodeCount,
+                    0,
+                    _supportVertexIndices.Length);
+            }
+            else
+            {
+                RefitSupportTree(
+                    _preparedScaledLocalVertices,
+                    _supportTreeNodes!,
+                    _preparedSupportTreeNodes!);
+            }
         }
     }
 

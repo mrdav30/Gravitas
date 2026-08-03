@@ -58,40 +58,8 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 
 | Signal                                                              | Status   | Priority | Tracking                                                                                  |
 | ------------------------------------------------------------------- | -------- | -------- | ----------------------------------------------------------------------------------------- |
-| Mesh scale rebuild allocates with subdivision count                 | Observed | Low      | Isolate prepared BVH rebuild and scale-validation buffers before changing capacity policy |
 | Mixed public sweep traversal stalls on extreme sparse-grid spans    | Observed | Medium   | Isolate GridTracer clipping and cell-visit scaling independently of narrow phase          |
 | Mixed discrete broad-phase refresh allocates at 32 moving CCD pairs | Isolated | Low      | Reproduce capacity-growth threshold independently of rotational CCD                       |
-
-### Signal: Mesh Scale Rebuild Allocates With Subdivision Count
-
-**Discovered:** 2026-07-28  
-**Source:** exact contact-lever Phase 4 mesh mass-property ShortRun  
-**Status:** Observed outside the semantic mass-property kernel
-
-The final one-pass
-`MeshMassPropertyBenchmarks.UpdateNonUniformMeshScaleAndCalculateSurfaceInertia`
-row reports `0 B/op` at subdivision 1, `4,032 B/op` at subdivision 8, and
-`16,320 B/op` at subdivision 16. Mean times are `39.244 us`, `2.179 ms`, and
-`8.718 ms`, respectively, about `61-65%` faster than the pre-review Phase 4
-baseline of `101.3 us`, `6.178 ms`, and `24.505 ms`.
-
-Phase 4 now computes uniform shell mass properties in one wide FixedMathSharp
-pass and retains no semantic per-face weights or mass-property scratch on
-`PhysicsMesh`. Its two-part compound inertia benchmark also remains
-allocation-free. The unchanged scale-dependent allocation therefore belongs
-outside the semantic mass-property kernel and still needs isolation across
-prepared triangle-BVH rebuild and retained-capacity behavior.
-
-Command:
-
-```powershell
-dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll mesh-mass-property --filter "*UpdateNonUniformMeshScaleAndCalculateSurfaceInertia*" --job short --warmupCount 1 --iterationCount 3
-```
-
-The smallest next step is a profiler or allocation guard that measures
-`PrepareScaledGeometry` with and without prepared BVH reconstruction. Do not add
-speculative preallocation until the allocating owner and representative rebuild
-frequency are proven.
 
 ### Signal: Mixed Public Sweep Traversal Stalls On Extreme Sparse-Grid Spans
 
@@ -234,6 +202,7 @@ and
 
 | Signal                                                      | Status | Closed     | Resolution                                                                                                                                                                                                                                  |
 | ----------------------------------------------------------- | ------ | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Mesh scale rebuild allocation                               | Closed | 2026-08-03 | Convex support topology is built once and scale changes refit transactional node bounds in linear time; subdivision 8/16 rows fall from 4,032/16,320 B to 0 B and improve by 7.9%/7.8%                                                        |
 | Exact 3D contact-response ordinary throughput               | Closed | 2026-08-03 | Exact aligned-frame point anchors improve direct rows by 61.0-95.9% and the unchanged 24-row Gravitas matrix by 46.4% median versus the exact baseline; confirmation remains within 0.7% median at 0 B and 100% coverage                    |
 | Exact canonical OBB ordinary throughput                     | Closed | 2026-08-03 | One exact relative-frame kernel per relation improves matched direct rows by 35.3-64.0% and Gravitas rows by 30.9-55.7%; full DefaultJob confirmations remain at 0 B and 100% reachable coverage                                            |
 | Physics-material combine numeric hardening                  | Closed | 2026-07-13 | Overflow-safe average and geometric-mean edge handling preserve deterministic coefficient semantics; the default geometric-material response benchmark remains allocation-free with no credible timing regression                           |
@@ -246,6 +215,55 @@ and
 | 3D dynamic shape-exact BDN allocation signal                | Closed | 2026-06-23 | Shared exact-sweep bounds prefilters removed the scaling allocation/time signal from 3D dynamic false-positive rows                                                                                                                         |
 | 3D full-runtime CCD allocation                              | Closed | 2026-06-23 | GridForge allocation-free line tracing plus Gravitas 3D raycast adoption                                                                                                                                                                    |
 | Grounding raycast probe allocation                          | Closed | 2026-06-23 | Same raycast trace fix removed automatic ray-grounding allocation                                                                                                                                                                           |
+
+### Closed Signal: Mesh Scale Rebuild Allocation
+
+**Discovered:** 2026-07-28 **Closed:** 2026-08-03
+
+**Initial evidence:** A refreshed focused ShortRun of
+`MeshMassPropertyBenchmarks.UpdateNonUniformMeshScaleAndCalculateSurfaceInertia`
+reported:
+
+| Subdivision | Mean | Allocated |
+| ---: | ---: | ---: |
+| 1 | `38.394 us` | `0 B/op` |
+| 8 | `2.166 ms` | `4,032 B/op` |
+| 16 | `8.822 ms` | `16,320 B/op` |
+
+**RCA:** Triangle-BVH rebuilding, scaled face data, and surface mass properties
+remain allocation-free. Convex support-tree preparation instead sorted every
+non-leaf vertex range after every scale change through a retained reference
+comparer. Each `Array.Sort(...)` call allocated 64 bytes; the subdivision-8 and
+subdivision-16 trees have 63 and 255 non-leaf nodes, exactly accounting for the
+measured totals.
+
+**Resolution:** `PhysicsMesh` now builds its support-vertex partition once.
+Subsequent scale candidates refit leaf bounds from that immutable partition and
+branch bounds bottom-up into the existing prepared node buffer. Publication
+still swaps complete committed/prepared node buffers transactionally. The
+second support-index array, its publication swap, repeated sorting, and retained
+construction comparer were deleted. Exact support selection and authored-order
+ties are unchanged.
+
+The unchanged command now reports:
+
+| Subdivision | Baseline | Confirmation | Delta | Allocated |
+| ---: | ---: | ---: | ---: | ---: |
+| 1 | `38.394 us` | `37.755 us` | `-1.7%` | `0 B/op` |
+| 8 | `2.166 ms` | `1.994 ms` | `-7.9%` | `0 B/op` |
+| 16 | `8.822 ms` | `8.131 ms` | `-7.8%` | `0 B/op` |
+
+Gravitas passes 3,928 Release and 3,873 ReleaseLean tests. Coverage remains
+55,869/55,869 lines, 15,833/15,833 branches, and 5,321/5,321 methods. The
+focused plan and complete evidence are preserved in
+[`2026-08-03-mesh-scale-rebuild-throughput-plan.md`](done/2026-08-03-mesh-scale-rebuild-throughput-plan.md).
+
+Artifacts:
+
+- `artifacts/benchmarks/2026-08-03-mesh-scale-rebuild-baseline`
+- `artifacts/benchmarks/2026-08-03-mesh-scale-rebuild-topology-refit-first-pass`
+- `artifacts/benchmarks/2026-08-03-mesh-scale-rebuild-topology-refit-confirmation`
+- `tests/Gravitas.Tests/TestResults/coverage-analysis-mesh-scale-rebuild-20260803`
 
 ### Closed Signal: Replay Hash Collider-ID Churn Scaling
 

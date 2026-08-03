@@ -122,9 +122,64 @@ public sealed class PhysicsMeshScaleTests
     }
 
     [Fact]
+    public void DenseSupportTree_FailedPreparedScale_ShouldPreserveCommittedAndLaterRefittedResults()
+    {
+        CreateSubdividedClosedCubeTopology(8, out Vector3d[] vertices, out int[] triangles);
+        for (int i = 0; i < vertices.Length; i++)
+            vertices[i] *= (Fixed64)100;
+
+        var mesh = new PhysicsMesh(
+            vertices,
+            triangles,
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
+        Vector3d tiedDirection = Vector3d.Right;
+        AssertSupportMatchesAuthoredOrderBruteForce(mesh, tiedDirection);
+        Vector3d committedSupport = mesh.GetSupportVertexWorld(tiedDirection);
+
+        Action prepare = () => mesh.PrepareTransformation(
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            Vector3d.One * (Fixed64)16,
+            Vector3d.One,
+            MeshInertiaPolicy.RequireClosedVolume);
+
+        prepare.Should().Throw<ArgumentException>().WithMessage("*NonRepresentableVolume*");
+        mesh.GetSupportVertexWorld(tiedDirection).Should().Be(committedSupport);
+        mesh.OwnerScale.Should().Be(Vector3d.One);
+
+        PrepareAndPublish(mesh, new Vector3d(Fixed64.Half, Fixed64.One, Fixed64.One));
+        AssertSupportMatchesAuthoredOrderBruteForce(mesh, tiedDirection);
+        PrepareAndPublish(mesh, new Vector3d(Fixed64.One, Fixed64.Half, Fixed64.One));
+        AssertSupportMatchesAuthoredOrderBruteForce(mesh, tiedDirection);
+    }
+
+    [Fact]
     public void ChangedMeshPreparation_AfterWarmup_ShouldAllocateZeroBytes()
     {
         PhysicsMesh mesh = CreateOffsetTriangleMesh();
+        Vector3d firstScale = new((Fixed64)2, (Fixed64)3, Fixed64.One);
+        Vector3d secondScale = new((Fixed64)3, (Fixed64)2, Fixed64.One);
+        PrepareAndPublish(mesh, firstScale);
+        PrepareAndPublish(mesh, secondScale);
+
+        long before = GC.GetAllocatedBytesForCurrentThread();
+        PrepareAndPublish(mesh, firstScale);
+        PrepareAndPublish(mesh, secondScale);
+        long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+
+        allocated.Should().Be(0);
+    }
+
+    [Fact]
+    public void DenseConvexMeshScaleChange_AfterWarmup_ShouldAllocateZeroBytes()
+    {
+        CreateSubdividedClosedCubeTopology(8, out Vector3d[] vertices, out int[] triangles);
+        var mesh = new PhysicsMesh(
+            vertices,
+            triangles,
+            Vector3d.Zero,
+            FixedQuaternion.Identity);
         Vector3d firstScale = new((Fixed64)2, (Fixed64)3, Fixed64.One);
         Vector3d secondScale = new((Fixed64)3, (Fixed64)2, Fixed64.One);
         PrepareAndPublish(mesh, firstScale);
@@ -600,20 +655,8 @@ public sealed class PhysicsMeshScaleTests
             FixedQuaternion.FromEulerAnglesInDegrees((Fixed64)15, (Fixed64)25, (Fixed64)35),
             new Vector3d((Fixed64)2, (Fixed64)3, (Fixed64)4));
         Vector3d direction = new((Fixed64)7, (Fixed64)(-3), (Fixed64)5);
-        Vector3d expected = mesh.GetVertexWorld(0);
-        Fixed64 expectedProjection = Vector3d.Dot(expected, direction);
-        for (int i = 1; i < mesh.VertexCount; i++)
-        {
-            Vector3d candidate = mesh.GetVertexWorld(i);
-            Fixed64 projection = Vector3d.Dot(candidate, direction);
-            if (projection <= expectedProjection)
-                continue;
 
-            expected = candidate;
-            expectedProjection = projection;
-        }
-
-        mesh.GetSupportVertexWorld(direction).Should().Be(expected);
+        AssertSupportMatchesAuthoredOrderBruteForce(mesh, direction);
     }
 
     [Fact]
@@ -1482,6 +1525,23 @@ public sealed class PhysicsMeshScaleTests
             Vector3d.One,
             null);
         mesh.PublishPreparedTransformation();
+    }
+
+    private static void AssertSupportMatchesAuthoredOrderBruteForce(
+        PhysicsMesh mesh,
+        Vector3d direction)
+    {
+        Vector3d expected = mesh.GetVertexWorld(0);
+        for (int i = 1; i < mesh.VertexCount; i++)
+        {
+            Vector3d candidate = mesh.GetVertexWorld(i);
+            if (Vector3d.CompareProjection(candidate, expected, direction) <= 0)
+                continue;
+
+            expected = candidate;
+        }
+
+        mesh.GetSupportVertexWorld(direction).Should().Be(expected);
     }
 
     private static Vector3d[] GetWorldVertices(PhysicsMesh mesh)

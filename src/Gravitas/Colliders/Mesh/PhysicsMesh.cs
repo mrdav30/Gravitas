@@ -40,12 +40,9 @@ namespace Gravitas.Colliders
         private Vector3d[] _scaledLocalVertices;
         private Vector3d[] _preparedScaledLocalVertices;
         private int[]? _supportVertexIndices;
-        private int[]? _preparedSupportVertexIndices;
         private SupportTreeNode[]? _supportTreeNodes;
         private SupportTreeNode[]? _preparedSupportTreeNodes;
         private int _supportTreeNodeCount;
-        private int _preparedSupportTreeNodeCount;
-        private readonly SupportVertexIndexComparer? _supportVertexIndexComparer;
 
         /// <summary>
         /// Holds the source vertices in local mesh space.
@@ -172,10 +169,8 @@ namespace Gravitas.Colliders
             if (Mode == MeshColliderMode.Convex && _localVertices.Length > SupportTreeVertexThreshold)
             {
                 _supportVertexIndices = CreateSupportVertexIndices(_localVertices.Length);
-                _preparedSupportVertexIndices = new int[_localVertices.Length];
                 _supportTreeNodes = new SupportTreeNode[(2 * _localVertices.Length) - 1];
                 _preparedSupportTreeNodes = new SupportTreeNode[(2 * _localVertices.Length) - 1];
-                _supportVertexIndexComparer = new SupportVertexIndexComparer();
             }
 
             PrepareTransformation(position, rotation, Vector3d.One, Vector3d.One, null);
@@ -556,6 +551,7 @@ namespace Gravitas.Colliders
             Vector3d[] vertices,
             int[] vertexIndices,
             SupportTreeNode[] nodes,
+            SupportVertexIndexComparer comparer,
             ref int nodeCount,
             int start,
             int count)
@@ -583,12 +579,12 @@ namespace Gravitas.Colliders
             }
 
             int axis = GetDominantAxis(max - min);
-            _supportVertexIndexComparer!.Reset(vertices, axis);
+            comparer.Reset(vertices, axis);
             Array.Sort(
                 vertexIndices,
                 start,
                 count,
-                _supportVertexIndexComparer);
+                comparer);
 
             int leftCount = count / 2;
             int rightCount = count - leftCount;
@@ -596,6 +592,7 @@ namespace Gravitas.Colliders
                 vertices,
                 vertexIndices,
                 nodes,
+                comparer,
                 ref nodeCount,
                 start,
                 leftCount);
@@ -603,6 +600,7 @@ namespace Gravitas.Colliders
                 vertices,
                 vertexIndices,
                 nodes,
+                comparer,
                 ref nodeCount,
                 start + leftCount,
                 rightCount);
@@ -614,6 +612,48 @@ namespace Gravitas.Colliders
                 rightIndex,
                 minVertexIndex);
             return nodeIndex;
+        }
+
+        private void RefitSupportTree(
+            Vector3d[] vertices,
+            SupportTreeNode[] sourceNodes,
+            SupportTreeNode[] targetNodes)
+        {
+            // Children follow their parent in the immutable preorder topology,
+            // so reverse traversal makes both child bounds available first.
+            for (int i = _supportTreeNodeCount - 1; i >= 0; i--)
+            {
+                SupportTreeNode source = sourceNodes[i];
+                if (source.IsLeaf)
+                {
+                    CalculateSupportRangeBounds(
+                        vertices,
+                        _supportVertexIndices!,
+                        source.Start,
+                        source.Count,
+                        out Vector3d min,
+                        out Vector3d max,
+                        out int minVertexIndex);
+                    targetNodes[i] = SupportTreeNode.CreateLeaf(
+                        source.Index,
+                        min,
+                        max,
+                        source.Start,
+                        source.Count,
+                        minVertexIndex);
+                    continue;
+                }
+
+                SupportTreeNode left = targetNodes[source.Left];
+                SupportTreeNode right = targetNodes[source.Right];
+                targetNodes[i] = SupportTreeNode.CreateBranch(
+                    source.Index,
+                    Vector3d.Min(left.Min, right.Min),
+                    Vector3d.Max(left.Max, right.Max),
+                    source.Left,
+                    source.Right,
+                    source.MinVertexIndex);
+            }
         }
 
         private static void CalculateSupportRangeBounds(
