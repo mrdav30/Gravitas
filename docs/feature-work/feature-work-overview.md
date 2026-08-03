@@ -39,6 +39,18 @@ instead of burying it in notes.
 
 ## Recently Completed
 
+- [`Exact 3D Contact Response Throughput Hardening`](done/2026-08-03-exact-contact-response-throughput-plan.md)
+  - Completed 2026-08-03. FixedMathSharp now proves compact identical-frame and
+    identity-frame point-anchor differences before entering the general exact
+    two-frame reducer. It adds no public API, physics policy, cache, or second
+    answer path; failed compact proofs retain the full-domain fallback.
+  - Direct same-frame identity and rotated rows improve by `95.9%` and `61.0%`.
+    The unchanged 24-row Gravitas matrix improves by `46.4%` median versus the
+    exact-response baseline and `36.0%` versus the older compact implementation;
+    a second optimized matrix is within `0.7%` median. Every row remains at
+    `0 B`, both repositories retain 100% reachable coverage, and no residual
+    solver experiment was required.
+
 - [`Exact Canonical OBB Throughput Hardening`](done/2026-08-02-exact-canonical-obb-throughput-plan.md)
   - Completed 2026-08-03. Box, triangle/hull, and finite-capsule contacts now
     use single exact relative-frame kernels with deterministic feature ownership,

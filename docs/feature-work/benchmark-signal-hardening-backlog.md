@@ -56,66 +56,11 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 
 ## Active Signals
 
-| Signal                                                              | Status                    | Priority | Tracking                                                                                        |
-| ------------------------------------------------------------------- | ------------------------- | -------- | ----------------------------------------------------------------------------------------------- |
-| Exact 3D contact response adds measurable ordinary-domain cost      | Optimized, still observed | Medium   | Profile the paired atomic preflight and friction stages without weakening full-domain rejection |
-| Mesh scale rebuild allocates with subdivision count                 | Observed                  | Low      | Isolate prepared BVH rebuild and scale-validation buffers before changing capacity policy       |
-| Mixed public sweep traversal stalls on extreme sparse-grid spans    | Observed                  | Medium   | Isolate GridTracer clipping and cell-visit scaling independently of narrow phase                |
-| Mixed discrete broad-phase refresh allocates at 32 moving CCD pairs | Isolated                  | Low      | Reproduce capacity-growth threshold independently of rotational CCD                             |
-
-### Signal: Exact 3D Contact Response Adds Measurable Ordinary-Domain Cost
-
-**Discovered:** 2026-07-28  
-**Source:** exact contact-lever Phase 2 comparison against the preserved
-pre-Phase-2 collision-response ShortRun  
-**Status:** Optimized compact proof path retained; zero allocation and exact
-behavior are closed, while the remaining timing gap is still measurable.
-
-Phase 2 added checked impulse composition, paired current-state preflight,
-atomic application, and exact semantic-lever fallback. An initial
-checked-everywhere implementation regressed ordinary response substantially. The
-final implementation proves conservative compact bounds for ordinary
-point-velocity and angular-response chains, then uses checked FixedMathSharp
-arithmetic only outside those bounds.
-
-Across the more stable 16-pair cells, final medians remain `9.5-21.6%` above the
-preserved compact baseline:
-
-| Contact shape         |    Default material |   Distinct material |
-| --------------------- | ------------------: | ------------------: |
-| Single                | `860.8 -> 976.3 us` | `851.3 -> 948.4 us` |
-| Face manifold         | `2.735 -> 3.326 ms` | `2.995 -> 3.281 ms` |
-| Resting face manifold | `2.508 -> 2.867 ms` | `2.488 -> 2.786 ms` |
-| Cylinder              | `506.9 -> 584.1 us` | `501.6 -> 595.8 us` |
-| Mesh                  | `2.203 -> 2.595 ms` | `2.286 -> 2.641 ms` |
-| Compound part         | `511.4 -> 605.2 us` | `552.3 -> 604.9 us` |
-
-All 24 final benchmark cells report zero managed allocation. The 64-pair
-ShortRun cells remain too noisy for a trustworthy ratio because the benchmark
-uses one invocation and three iterations. The smallest next step is a profiler
-or longer-run decomposition of contact construction, normal solve, atomic
-preflight, and friction response. Do not remove paired atomicity, restore
-saturating intermediate arithmetic, or widen FixedMathSharp's public surface
-solely to chase this signal.
-
-The final semantic-response review changed only the no-inline exact fallback;
-the benchmarked compact proof path and the medians above are unchanged. Focused
-wide-response and rotational-CCD allocation guards remain at zero managed bytes
-after warmup.
-
-Phase 4 friction closure on 2026-07-30 reran 32 prepared 3D/mixed and 10 pure 2D
-response ShortRun cells. Every cell remained at `0 B/op`; the mixed 16-pair
-medians (`1.380 ms` default, `1.370 ms` distinct) remained comparable to the
-preserved `1.417 ms` and `1.355 ms` baseline, and the pure-2D rows retained
-stable 64-to-1,024-pair scaling. The 3D cells showed no broad regression
-pattern, although the single-contact medians (`1.090 ms` and `1.076 ms`) were
-above the Phase 2 post-change sample while several manifold rows improved.
-Because these ShortRun iterations remain below a reliable timing duration, this
-is a zero-allocation and no-gross-regression closure gate, not evidence to close
-the active profiling signal. The exact 3D, 2D, and mixed fallback allocation
-tests also pass `3/3` at zero managed bytes. Artifacts are retained under
-`artifacts/benchmarks/2026-07-30-friction-phase4-closure` and
-`artifacts/benchmarks/2026-07-30-friction-phase4-closure-2d`.
+| Signal                                                              | Status   | Priority | Tracking                                                                                  |
+| ------------------------------------------------------------------- | -------- | -------- | ----------------------------------------------------------------------------------------- |
+| Mesh scale rebuild allocates with subdivision count                 | Observed | Low      | Isolate prepared BVH rebuild and scale-validation buffers before changing capacity policy |
+| Mixed public sweep traversal stalls on extreme sparse-grid spans    | Observed | Medium   | Isolate GridTracer clipping and cell-visit scaling independently of narrow phase          |
+| Mixed discrete broad-phase refresh allocates at 32 moving CCD pairs | Isolated | Low      | Reproduce capacity-growth threshold independently of rotational CCD                       |
 
 ### Signal: Mesh Scale Rebuild Allocates With Subdivision Count
 
@@ -289,6 +234,7 @@ and
 
 | Signal                                                      | Status | Closed     | Resolution                                                                                                                                                                                                                                  |
 | ----------------------------------------------------------- | ------ | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Exact 3D contact-response ordinary throughput               | Closed | 2026-08-03 | Exact aligned-frame point anchors improve direct rows by 61.0-95.9% and the unchanged 24-row Gravitas matrix by 46.4% median versus the exact baseline; confirmation remains within 0.7% median at 0 B and 100% coverage                    |
 | Exact canonical OBB ordinary throughput                     | Closed | 2026-08-03 | One exact relative-frame kernel per relation improves matched direct rows by 35.3-64.0% and Gravitas rows by 30.9-55.7%; full DefaultJob confirmations remain at 0 B and 100% reachable coverage                                            |
 | Physics-material combine numeric hardening                  | Closed | 2026-07-13 | Overflow-safe average and geometric-mean edge handling preserve deterministic coefficient semantics; the default geometric-material response benchmark remains allocation-free with no credible timing regression                           |
 | Replay hash collider-ID churn scaling                       | Closed | 2026-07-05 | 2D and 3D collider registration now uses a shared reusable-slot registry; authoritative replay hashes traverse canonical live registration order with dense replay ordinals, while deleted ID history remains outside replay identity       |
@@ -967,10 +913,10 @@ Promote a signal from this backlog into a dedicated dated plan when it has:
 
 ## Current Recommendation
 
-Exact canonical OBB throughput is closed with single-path full-domain kernels.
-Dense concave mesh/mesh throughput is now experimental capacity guidance; prefer
-primitive, convex, compound, or partitioned static-concave authoring and do not
-restore narrowed prefilters or competing answer paths. The mixed discrete
+Exact 3D contact-response and canonical OBB throughput are closed with shared
+full-domain owners and no competing answer paths. Dense concave mesh/mesh
+throughput remains experimental capacity guidance; prefer primitive, convex,
+compound, or partitioned static-concave authoring. The mixed discrete
 broad-phase refresh threshold remains a lower-priority capacity signal because
 the CCD-owned preparation, search, response, handoff, reset, and completion
 paths remain allocation-free. Keep this document as the intake bucket for future
