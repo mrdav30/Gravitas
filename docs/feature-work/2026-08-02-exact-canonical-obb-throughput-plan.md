@@ -1,7 +1,7 @@
 # Exact Canonical OBB Throughput Hardening
 
 **Created:** 2026-08-02  
-**Status:** Phase 2 complete; paused for review  
+**Status:** Phase 3 complete; paused for review  
 **Signal:** Exact canonical OBB contacts regress ordinary narrow-phase throughput
 
 ## Goal
@@ -365,13 +365,63 @@ Phase 2 artifacts:
 
 ### Phase 3: Finite-Capsule Adoption
 
-- [ ] Express current finite capsule feature axes in the canonical box frame.
-- [ ] Preserve exact radial separation, feature rank, endpoint/edge ownership,
+- [x] Express current finite capsule feature axes in the canonical box frame.
+- [x] Preserve exact radial separation, feature rank, endpoint/edge ownership,
       support anchors, and full-domain fallback.
-- [ ] Measure `CapsulePrimary` and Gravitas cuboid/capsule rows.
-- [ ] Re-achieve 100% reachable coverage in FixedMathSharp and Gravitas, then
+- [x] Measure `CapsulePrimary` and Gravitas cuboid/capsule rows.
+- [x] Re-achieve 100% reachable coverage in FixedMathSharp and Gravitas, then
       remove superseded capsule-axis helpers and duplicate arithmetic.
-- [ ] Pause for review.
+- [x] Pause for review.
+
+Phase 3 result:
+
+- FixedMathSharp now expresses box faces, box/capsule cross axes, vertex/core
+  axes, and endpoint/edge axes in one exact box-local frame. It transforms only
+  the winning normal back to world space and retains the existing exact radial,
+  depth, rank, ownership, and anchor contracts.
+- Query-wide denominator, scale, extent, capsule-length, and vertex projection
+  invariants are computed once. Edge-center work is shared across endpoint
+  signs, large exact values use read-only references, and the superseded OBB
+  world-radius, world-center, edge-reconstruction, and forwarding helpers were
+  deleted. Shared convex-hull/capsule owners remain live and unchanged.
+- Exact behavior tests now pin equal-rank first-candidate precedence, later
+  rank-zero replacement on an exact tie, rotated endpoint/edge parity,
+  perpendicular segment-surface support with a free box coordinate, translated
+  full-domain non-face behavior, rigid-pose corner identity, and zero warmed
+  allocations. Recorded deliberate mutations failed each matching fixture.
+- Fresh direct baseline: `CapsulePrimary` mean `258.064 us`, median
+  `257.767 us`, `0 B`. Final confirmations were mean/median
+  `156.638/155.690 us` and `155.472/153.880 us`, or `39.6%` and `40.3%`
+  faster by median, both `0 B`.
+- Fresh Gravitas baseline: 64 cuboid/capsule pairs mean `11.295 ms`, median
+  `11.294 ms`, `0 B`. Final confirmations were mean/median `5.040/5.006 ms`
+  and `5.114/5.114 ms`, or `55.7%` and `54.7%` faster by median, both `0 B`.
+- FixedMathSharp Release passed 2,669 tests plus 8 Chronicler integration tests;
+  ReleaseLean passed 2,648 plus 8. Gravitas Release passed 3,925 tests and
+  ReleaseLean passed 3,870. Standard and Lean package builds remained
+  warning-free for `net8.0` and `netstandard2.1`.
+- Final FixedMathSharp reachable coverage is 47,468/47,468 lines,
+  8,722/8,722 branches, and 3,486/3,486 methods. Final Gravitas reachable
+  coverage is 43,232/43,232 lines, 12,843/12,843 branches, and 4,487/4,487
+  methods. Generated MemoryPack formatters and compiler-generated automatic
+  property accessors remain outside the reachable-code gate rather than being
+  padded with hollow tests.
+- Independent correctness and quality re-reviews approved the correlated
+  full-domain width proof, local/world algebraic equivalence, deterministic
+  feature contracts, invariant hoists, allocation behavior, and deletion of
+  zombie helpers. No Gravitas production change, new public API, approximate
+  prefilter, cache, fallback kernel, or managed allocation was added.
+
+Phase 3 artifacts:
+
+- `../FixedMathSharp/artifacts/benchmarks/2026-08-02-obb-phase3-baseline`
+- `../FixedMathSharp/artifacts/benchmarks/2026-08-02-obb-phase3-final-confirmation-1`
+- `../FixedMathSharp/artifacts/benchmarks/2026-08-02-obb-phase3-final-confirmation-2`
+- `artifacts/benchmarks/2026-08-02-obb-phase3-baseline`
+- `artifacts/benchmarks/2026-08-02-obb-phase3-final-confirmation-1`
+- `artifacts/benchmarks/2026-08-02-obb-phase3-final-confirmation-2`
+- `../FixedMathSharp/tests/FixedMathSharp.Tests/TestResults/coverage-analysis`
+- `tests/Gravitas.Tests/TestResults/coverage-analysis`
 
 ### Phase 4: Evidence-Gated Residual Optimization
 
