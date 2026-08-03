@@ -203,23 +203,23 @@ BenchmarkDotNet short in-process runs can occasionally report `1 B/op` noise on
 otherwise allocation-guarded paths. Treat repeatable non-zero values as a reason
 to add or tighten explicit allocation tests before changing the algorithm.
 
-| Alias                          | Covered paths                                                                                                                                                                                                                                                                           |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `query-service`                | `RaycastAll`, `OverlapCircleAll`, directional `OverlapCircleInDirection`, swept-sphere queries, convex-source sweeps, high-vertex convex mesh source scaling, and overlapping-context queries.                                                                                          |
-| `query-projection-scaling`     | X/Z `OverlapCircleAll` scaling across dense and sparse grids as the semantically irrelevant world Y range grows.                                                                                                                               |
-| `dynamic-candidate-index-update-scaling` | Translation-only update and update-plus-query cost for the unique widest 3D and planar candidate as index population grows.                                                                                             |
-| `radial-raycast`               | Direct sphere, capsule, and finite-cylinder segment intervals; swept-sphere capsule/cylinder reduction; and mixed circle-slab reduction at ordinary and saturation-prone Q32.32 scales.                                                                                                  |
-| `simulation-allocation`        | `SolidBody.LateSimulate`, grounding raycast probes, collision partition distribution, and active-pair late simulation.                                                                                                                                                                  |
-| `continuous-collision`         | Discrete fast body movement baseline and opt-in CCD sweep/clamp against thin static geometry.                                                                                                                                                                                           |
-| `kinematic-active-ccd-scaling` | host-driven kinematic active-source CCD rows for no-hit, first-hit, dense-hit, rotational, and mixed source scenarios.                                                                                                                                                                  |
-| `collision-partition`          | dynamic/static registration and partitioning, partitioned simulation, and reset plus dynamic re-registration churn.                                                                                                                                                                     |
-| `collision-detection`          | prepared primitive pairs, non-SAT primitive pairs, primitive manifold generation, cuboid face-manifold generation, cuboid SAT, cuboid/capsule, mesh/capsule, mesh/cylinder, mesh/cuboid, mesh/mesh, and compound/primitive checks.                                                      |
-| `collision-response`           | manifold response solver cost across single-contact, face-manifold, resting face-manifold, cylinder-contact, and mesh-contact prepared pairs, with pair-count scaling.                                                                                                                  |
-| `mixed-collision-response`     | constrained mixed 3D/2D response cost for prepared sphere/circle contacts, including single-pass pairs and bounded mixed-iteration loops.                                                                                                                                               |
-| `diagnostics`                  | Disabled/enabled force and torque event hooks plus disabled/enabled primitive and mesh collider debug draw capture.                                                                                                                                                                     |
-| `partition-culling`            | dynamic collider repartitioning after teleports, direct partition add/remove churn, and culled-pair invalidation after movement.                                                                                                                                                        |
-| `physics-2d`                   | pure 2D body integration, GridForge-backed 2D partition response, direct angular contact response, direct two-contact manifold response, convex/convex two-contact manifold detection, sweep baseline comparisons, required 2D shape-pair checks, `OverlapCircleAll`, and `RaycastAll`. |
-| `replay-hash`                  | deterministic authoritative replay hash cost for sparse 3D, dense 3D, pure 2D, mixed, and cache-inclusive solver/hash modes.                                                                                                                                                            |
+| Alias                                    | Covered paths                                                                                                                                                                                                                                                                           |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `query-service`                          | `RaycastAll`, `OverlapCircleAll`, directional `OverlapCircleInDirection`, swept-sphere queries, convex-source sweeps, high-vertex convex mesh source scaling, and overlapping-context queries.                                                                                          |
+| `query-projection-scaling`               | X/Z `OverlapCircleAll` scaling across dense and sparse grids as the semantically irrelevant world Y range grows.                                                                                                                                                                        |
+| `dynamic-candidate-index-update-scaling` | Translation-only update and update-plus-query cost for the unique widest 3D and planar candidate as index population grows.                                                                                                                                                             |
+| `radial-raycast`                         | Direct sphere, capsule, and finite-cylinder segment intervals; swept-sphere capsule/cylinder reduction; and mixed circle-slab reduction at ordinary and saturation-prone Q32.32 scales.                                                                                                 |
+| `simulation-allocation`                  | `SolidBody.LateSimulate`, grounding raycast probes, collision partition distribution, and active-pair late simulation.                                                                                                                                                                  |
+| `continuous-collision`                   | Discrete fast body movement baseline and opt-in CCD sweep/clamp against thin static geometry.                                                                                                                                                                                           |
+| `kinematic-active-ccd-scaling`           | host-driven kinematic active-source CCD rows for no-hit, first-hit, dense-hit, rotational, and mixed source scenarios.                                                                                                                                                                  |
+| `collision-partition`                    | dynamic/static registration and partitioning, partitioned simulation, and reset plus dynamic re-registration churn.                                                                                                                                                                     |
+| `collision-detection`                    | prepared primitive pairs, non-SAT primitive pairs, primitive manifold generation, cuboid face-manifold generation, cuboid SAT, cuboid/capsule, mesh/capsule, mesh/cylinder, mesh/cuboid, mesh/mesh, and compound/primitive checks.                                                      |
+| `collision-response`                     | manifold response solver cost across single-contact, face-manifold, resting face-manifold, cylinder-contact, and mesh-contact prepared pairs, with pair-count scaling.                                                                                                                  |
+| `mixed-collision-response`               | constrained mixed 3D/2D response cost for prepared sphere/circle contacts, including single-pass pairs and bounded mixed-iteration loops.                                                                                                                                               |
+| `diagnostics`                            | Disabled/enabled force and torque event hooks plus disabled/enabled primitive and mesh collider debug draw capture.                                                                                                                                                                     |
+| `partition-culling`                      | dynamic collider repartitioning after teleports, direct partition add/remove churn, and culled-pair invalidation after movement.                                                                                                                                                        |
+| `physics-2d`                             | pure 2D body integration, GridForge-backed 2D partition response, direct angular contact response, direct two-contact manifold response, convex/convex two-contact manifold detection, sweep baseline comparisons, required 2D shape-pair checks, `OverlapCircleAll`, and `RaycastAll`. |
+| `replay-hash`                            | deterministic authoritative replay hash cost for sparse 3D, dense 3D, pure 2D, mixed, and cache-inclusive solver/hash modes.                                                                                                                                                            |
 
 `continuous-collision-evidence` and `continuous-collision-toi-iteration` are
 intentionally omitted from the allocation smoke command because they are heavier
@@ -230,23 +230,6 @@ Collider shape work has a focused selection:
 ```bash
 dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll collider-shape --filter "*" -j Short -i --exporters json
 ```
-
-### 2026-07-27 Canonical Geometry Closure
-
-The Task 9 comparison retained the Task 0 and final short in-process artifacts
-under `artifacts/benchmarks`. Exact candidate ranking now rounds only the
-winning `FixedOrientedBox` contact depth. The affected 64-pair rows improved
-from `5.113` to `2.499 ms` for cuboid/cuboid, `25.209` to `10.835 ms` for
-cuboid/capsule, and about `12.0` to `7.0 ms` for mesh/cuboid. Capsule runtime
-shape rebuild improved from `1.609` to `1.376 ms`, and compound movement from
-`62.82` to `58.76 us`.
-
-These are short-run diagnostic measurements, not a claim of parity with the
-older saturating geometry. The remaining exact ordinary-domain throughput gap
-is tracked in
-`docs/feature-work/benchmark-signal-hardening-backlog.md`. Allocation tests,
-not the occasional single-digit-byte in-process runner noise, remain the
-authoritative allocation gate.
 
 ## CI Guidance
 

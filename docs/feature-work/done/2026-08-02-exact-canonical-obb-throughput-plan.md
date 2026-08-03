@@ -1,7 +1,8 @@
 # Exact Canonical OBB Throughput Hardening
 
 **Created:** 2026-08-02  
-**Status:** Phase 3 complete; paused for review  
+**Status:** Complete  
+**Completed:** 2026-08-03  
 **Signal:** Exact canonical OBB contacts regress ordinary narrow-phase throughput
 
 ## Goal
@@ -148,21 +149,14 @@ relative-frame state. Do not add forwarding owners or speculative public APIs.
    vertex-to-axis features, and endpoint-to-edge features in box-local space.
    Preserve the current feature ranking and exact radical comparison.
 
-### Compact Exact Path And Fallback
+### Single Exact Path
 
 Ordinary inputs should use the narrowest proven existing fixed-width values.
 Admission is checked and exact; it must never clamp, saturate, or approximate an
-intermediate. If a required value cannot be represented by the compact kernel,
-the query routes atomically to the current full-domain wide kernel.
-
-A compact separation result is authoritative because every predicate evaluated
-before it is exact. A compact overflow or unproven-width result is not a physics
-answer and must fall back without publishing partial contact state.
-
-Keep the current wide implementation only as long as it remains necessary for
-full-domain fallback or differential validation. Delete superseded arithmetic
-when the canonical kernel proves the same full domain; do not leave two complete
-permanent implementations for convenience.
+intermediate. Each relation should use one canonical exact kernel whose widths
+are proven for the complete authored raw domain. Delete superseded arithmetic
+when that proof holds; do not retain compact/fallback pairs or parallel answer
+paths for convenience.
 
 ### API And Ownership
 
@@ -367,7 +361,7 @@ Phase 2 artifacts:
 
 - [x] Express current finite capsule feature axes in the canonical box frame.
 - [x] Preserve exact radial separation, feature rank, endpoint/edge ownership,
-      support anchors, and full-domain fallback.
+      support anchors, and full-domain behavior.
 - [x] Measure `CapsulePrimary` and Gravitas cuboid/capsule rows.
 - [x] Re-achieve 100% reachable coverage in FixedMathSharp and Gravitas, then
       remove superseded capsule-axis helpers and duplicate arithmetic.
@@ -425,36 +419,105 @@ Phase 3 artifacts:
 
 ### Phase 4: Evidence-Gated Residual Optimization
 
-- [ ] Reprofile every retained family using the same fixtures.
-- [ ] Apply only shared arithmetic or invariant-work deletion supported by the
+- [x] Reprofile every retained family using the same fixtures.
+- [x] Apply only shared arithmetic or invariant-work deletion supported by the
       new trace.
-- [ ] Revert any experiment below the per-family gate unless it materially
+- [x] Revert any experiment below the per-family gate unless it materially
       simplifies code with neutral performance.
-- [ ] Stop rather than introduce a second approximate answer path or permanent
+- [x] Stop rather than introduce a second approximate answer path or permanent
       relation-specific bloat.
-- [ ] Re-achieve 100% reachable coverage in FixedMathSharp and Gravitas before
+- [x] Re-achieve 100% reachable coverage in FixedMathSharp and Gravitas before
       retaining any residual optimization.
+
+#### Phase 4 Result
+
+- A fresh sampled profile confirmed that the remaining cost sits in shared exact
+  wide comparison and sparse coordinate-axis arithmetic rather than Gravitas
+  dispatch, allocation, or a hidden duplicate SAT path.
+- Two isolated experiments were measured twice. Bit-length-aware normalized
+  magnitude comparison was neutral or slower. A shared coordinate-axis cross
+  specialization peaked at `4.2%` on convex hull and stayed neutral/noisy for
+  triangle and capsule. Both missed the `5%` family gate and were reverted in
+  full; no Phase 4 production code remains.
+- The retained design therefore stays smaller: one exact full-domain kernel per
+  relation, no approximation, cache, extra public API, or relation-specific
+  fast path.
+
+Phase 4 artifacts:
+
+- `../FixedMathSharp/artifacts/benchmarks/2026-08-03-obb-phase4-profile`
+- `../FixedMathSharp/artifacts/benchmarks/2026-08-03-obb-phase4-bitlength-run1`
+- `../FixedMathSharp/artifacts/benchmarks/2026-08-03-obb-phase4-bitlength-run2`
+- `../FixedMathSharp/artifacts/benchmarks/2026-08-03-obb-phase4-coordinate-final-run1`
+- `../FixedMathSharp/artifacts/benchmarks/2026-08-03-obb-phase4-coordinate-final-run2`
 
 ### Phase 5: Coverage, Documentation, And Cross-Stack Closure
 
-- [ ] Run focused ordinary, extreme, tie-order, anchor, and allocation tests.
-- [ ] Re-achieve 100% reachable line, branch, and method coverage in every
+- [x] Run focused ordinary, extreme, tie-order, anchor, and allocation tests.
+- [x] Re-achieve 100% reachable line, branch, and method coverage in every
       modified repository without hollow API-shape tests.
-- [ ] Run Release and ReleaseLean suites, both target-framework package builds,
+- [x] Run Release and ReleaseLean suites, both target-framework package builds,
       and relevant CRAP/complexity review.
-- [ ] Rerun each direct and Gravitas benchmark twice from authoritative Release
+- [x] Rerun each direct and Gravitas benchmark twice from authoritative Release
       project builds and record retained/rejected evidence.
-- [ ] Update benchmark READMEs, complexity exceptions, this plan, the backlog,
+- [x] Update benchmark READMEs, complexity exceptions, this plan, the backlog,
       and feature-work overview.
-- [ ] Obtain independent correctness and performance review before closure.
-- [ ] Move this plan to `done` only after the retained source and evidence agree.
+- [x] Obtain independent correctness and performance review before closure.
+- [x] Move this plan to `done` only after the retained source and evidence agree.
+
+#### Phase 5 Result
+
+- Full `DefaultJob` confirmations retained the Phase 1-3 gains. Direct medians
+  were `49.665/50.879 us` for triangle, `33.555/34.406 us` for box,
+  `160.818/160.443 us` for capsule, and `133.765/132.994 us` for convex hull.
+  The matched-command phase comparisons established causal improvements of
+  `35.3-35.4%`, `50.1-50.3%`, `39.6-40.3%`, and `63.8-64.0%`; cross-job
+  percentages against the earlier short investigation baseline are not used.
+- Matching 64-pair Gravitas medians were `1.360/1.386 ms` for cuboid/cuboid,
+  `5.340/5.366 ms` for cuboid/capsule, `4.737/4.878 ms` for convex mesh/cuboid,
+  and `4.722/4.812 ms` for concave mesh/cuboid. The matched-command phase
+  comparisons established causal improvements of `46.3-46.8%`, `54.7-55.7%`,
+  `30.9-32.5%`, and `32.5-33.2%`. Every row reported `0 B`.
+- One combined benchmark child process exited unexpectedly during the capsule
+  row. Its result was discarded; an immediate isolated full run and the second
+  complete run passed with consistent timing and zero allocation. Independent
+  RCA found no unsafe code or reproducible library defect, so no speculative
+  runtime workaround was retained.
+- FixedMathSharp passes 2,669 Release and 2,648 ReleaseLean tests plus eight
+  Chronicler integration tests in each configuration. Its fresh coverage is
+  53,304/53,304 lines, 8,786/8,786 branches, and 3,418/3,418 methods; all 3,414
+  CRAP-analyzed methods are fully covered and the nine scores above 30 are
+  registered complexity floors.
+- Gravitas passes 3,926 Release and 3,871 ReleaseLean tests. Its fresh Release
+  coverage is 43,911/43,911 lines, 12,845/12,845 branches, and 4,510/4,510
+  methods; all 4,510 analyzed methods are fully covered and the 27 scores above
+  30 are coverage-safe complexity floors.
+- GridForge passes 483 Release and 483 ReleaseLean tests after removing redundant
+  local shim project edges; the released transitive package remains the sole
+  shim owner. Standard and Lean package builds remain warning-free for
+  `net8.0` and `netstandard2.1`.
+- The final source adds only one behavioral Gravitas regression fixture for
+  canonical mesh/cuboid anchor ownership. Recorded mutation removed the
+  collider/anchor swap and failed that fixture, proving it protects behavior
+  rather than API shape. Independent correctness, performance, and documentation
+  reviews found no unresolved release issue.
+
+Final full-duration artifacts:
+
+- `../FixedMathSharp/artifacts/benchmarks/2026-08-03-obb-phase5-full-confirmation-1`
+- `../FixedMathSharp/artifacts/benchmarks/2026-08-03-obb-phase5-full-confirmation-2`
+- `artifacts/benchmarks/2026-08-03-obb-phase5-full-confirmation-1`
+- `artifacts/benchmarks/2026-08-03-obb-phase5-capsule-crash-repro-1`
+- `artifacts/benchmarks/2026-08-03-obb-phase5-full-confirmation-2`
+- `../FixedMathSharp/tests/FixedMathSharp.Tests/TestResults/coverage-analysis-obb-closure-20260803`
+- `tests/Gravitas.Tests/TestResults/coverage-analysis-obb-closure-20260803-release`
 
 ## Closure Gates
 
 - Every contact result remains deterministic and exact across the complete
   authored raw domain.
-- Compact and fallback paths agree on classification, winning feature, normal,
-  depth, clamping, and both anchors wherever both can execute.
+- The single canonical exact kernels preserve classification, winning feature,
+  normal, depth, clamping, and both anchors across ordinary and extreme inputs.
 - All affected direct and Gravitas benchmark rows remain allocation-free after
   warmup.
 - Each retained family normally improves by at least `5%` repeatably; the goal

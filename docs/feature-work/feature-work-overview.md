@@ -23,11 +23,6 @@ instead of burying it in notes.
 
 ## Active Release-Scope
 
-- [`Exact Canonical OBB Throughput Hardening`](2026-08-02-exact-canonical-obb-throughput-plan.md)
-  - Rework competitive box, triangle/hull, and finite-capsule contacts around an
-    exact canonical OBB-local frame. Preserve full-domain wide fallback,
-    deterministic feature ownership, canonical anchors, zero allocation, and
-    100% coverage while measuring retention independently for each family.
 - [`Cross-Stack Issue Resolution`](issue-tracker.md)
   - Resolve release-blocking issues in dependency order: `FixedMathSharp`,
     `SwiftCollections`, `GridForge`, then Gravitas. Use the `develop` worktrees
@@ -43,6 +38,16 @@ instead of burying it in notes.
     library change. Do not broaden this into speculative optimization work.
 
 ## Recently Completed
+
+- [`Exact Canonical OBB Throughput Hardening`](done/2026-08-02-exact-canonical-obb-throughput-plan.md)
+  - Completed 2026-08-03. Box, triangle/hull, and finite-capsule contacts now
+    use single exact relative-frame kernels with deterministic feature ownership,
+    canonical anchors, zero allocation, and complete raw-domain behavior.
+  - Matched-command phase comparisons improve direct FixedMathSharp rows by
+    `35.3-64.0%` and matching Gravitas rows by `30.9-55.7%`; two full
+    `DefaultJob` confirmations establish stable final timings at `0 B`. Both
+    repositories retain 100% reachable coverage, and residual experiments below
+    the `5%` family gate were reverted completely.
 
 - [`Experimental Exact Triangle-Pair Throughput Pass`](done/2026-08-02-experimental-triangle-pair-throughput-plan.md)
   - Completed 2026-08-02 with no production change retained. Exact signed
@@ -193,11 +198,9 @@ instead of burying it in notes.
     passes 2,575 Release and 2,554 ReleaseLean tests at exact 100% coverage.
     Gravitas passes 3,669 Release and 3,614 ReleaseLean tests at 37,548/37,548
     lines, 11,865/11,865 branches, and 4,246/4,246 methods; repeated replay and
-    allocation gates are green. The correctness work is closed, while the
-    exact-winner optimization reduced the measured ordinary-domain
-    `FixedOrientedBox` cost by 37-46%. The remaining throughput gap stays a
-    high-priority benchmark signal rather than being hidden behind downstream
-    approximation.
+    allocation gates are green. The later exact relative-frame throughput pass
+    closes the ordinary-domain signal with repeatable `30.9-64.0%` improvements
+    across the affected direct and Gravitas families.
 - [`Full-Domain Conic Query And Triangle Arithmetic`](issue-tracker.md#cone-triangle-face-interiors-are-reduced-without-edge-crossings)
   - Completed 2026-07-22. FixedMathSharp now owns exact allocation-free
     finite-cone segment intervals for apex-authored and centered cones, while

@@ -56,156 +56,12 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 
 ## Active Signals
 
-| Signal | Status | Priority | Tracking |
-| ------ | ------ | -------- | -------- |
-| Exact canonical OBB contacts regress ordinary narrow-phase throughput | Promoted | High | Execute the [exact canonical OBB throughput plan](2026-08-02-exact-canonical-obb-throughput-plan.md) |
-| Exact 3D contact response adds measurable ordinary-domain cost | Optimized, still observed | Medium | Profile the paired atomic preflight and friction stages without weakening full-domain rejection |
-| Mesh scale rebuild allocates with subdivision count | Observed | Low | Isolate prepared BVH rebuild and scale-validation buffers before changing capacity policy |
-| Mixed public sweep traversal stalls on extreme sparse-grid spans | Observed | Medium | Isolate GridTracer clipping and cell-visit scaling independently of narrow phase |
-| Mixed discrete broad-phase refresh allocates at 32 moving CCD pairs | Isolated | Low | Reproduce capacity-growth threshold independently of rotational CCD |
-
-## Experimental Signals
-
-| Signal | Status | Revisit When |
-| ------ | ------ | ----------- |
-| Exact triangle-pair contacts regress dense concave-mesh throughput | Capacity-sensitive; local optimization exhausted | A topology or exact classifier design can reduce complete triangle-pair SAT evaluations without a competing answer path |
-
-### Signal: Exact Triangle-Pair Contacts Regress Dense Concave-Mesh Throughput
-
-**Discovered:** 2026-08-01  
-**Source:** full-domain triangle-pair Phase 2 comparison against its preserved
-scalar mesh/mesh baseline  
-**Status:** Experimental capacity guidance. Shared exact-projection and
-depth-ranking duplication plus the retained signed one-limb specialization
-recovered substantial throughput. A final bounded pass found no further local
-change worth retaining; dense dynamic concave mesh/mesh contact is not a
-competitive release path.
-
-The unchanged 64-pair Short in-process rows reported:
-
-| Row | Scalar baseline | Initial exact | Final optimized exact | Closure confirmation |
-| --- | ---: | ---: | ---: | ---: |
-| Ordinary convex mesh/mesh | `5.168 ms` | `4.921 ms` | `4.839 ms` | `4.900 ms` |
-| Concave mesh/mesh | `16.120 ms` | `98.489 ms` | `70.553 ms` | `70.005 ms` |
-| Dense concave mesh/mesh | `105.139 ms` | `570.378 ms` | `400.501 ms` | `397.087 ms` |
-| Contact-heavy concave mesh/mesh | `163.956 ms` | `804.559 ms` | `564.147 ms` | `556.138 ms` |
-| Closed dense mesh/mesh | `747.173 ms` | `3,641.633 ms` | `2,532.822 ms` | `2,519.288 ms` |
-
-FixedMathSharp now computes each triangle's basis-axis projections once per
-axis and cancels identical positive common denominators during normalized-depth
-ranking. Those policy-neutral deletions recovered roughly `28-30%` of the
-initial exact dense-row cost without changing axis order, contact results, or
-warmed `0 B` behavior. The ordinary convex row remains comparable because it
-uses the existing convex-hull relation rather than the concave triangle-pair
-generator.
-
-The remaining gap is the measured cost of invoking the complete wide
-triangle/triangle relation for every BVH-admitted candidate; candidate counts
-and traversal complexity did not change. That evidence led to the per-candidate
-profile recorded in the 2026-08-02 follow-up below. Do not restore the deleted
-scalar SAT, add a narrowed prefilter, or create a second answer path that can
-disagree with the full-domain authority.
-Preserved artifacts are under
-`artifacts/benchmarks/2026-07-31-triangle-pair-baseline`,
-`artifacts/benchmarks/2026-07-31-triangle-pair-gravitas-after`, and
-`artifacts/benchmarks/2026-07-31-triangle-pair-after-denominator-cancellation`.
-
-The 2026-08-01 closure rerun used the same 64-pair Short in-process job. Its
-point estimates stayed within `-1.42%` to `+1.26%` of the final optimized run,
-so it confirms the retained signal without supporting another performance
-claim. MemoryDiagnoser reported fixed `78 B` / `624 B` readings on the longer
-in-process rows; all 72 direct warmed Gravitas allocation guards, including the
-concave and dense mesh paths, measured exactly `0 B`, so the direct guards
-remain the runtime allocation authority; this document does not assign a cause
-to the differing in-process MemoryDiagnoser readings. The closure artifacts
-are under
-`artifacts/benchmarks/2026-08-01-triangle-pair-closure`.
-
-The 2026-08-02 follow-up profiled the unchanged dense row and isolated generic
-wide-multiply dispatch inside exact projection as the next shared cost. Raw
-`Fixed64` coordinates were widened to `Signed192` even though each operand is a
-proven signed one-word factor. FixedMathSharp now owns an exact
-`Signed576`-by-`long` specialization, and triangle projection calls that owner
-directly without changing the result width, axis order, tie behavior, contact
-anchors, or public API.
-
-| Row | Refreshed baseline | Retained change | Confirmation |
-| --- | ---: | ---: | ---: |
-| Ordinary convex mesh/mesh | `4.836 ms` | `4.933 ms` | control only |
-| Concave mesh/mesh | `70.351 ms` | `60.213 ms` | `59.761 ms` |
-| Dense concave mesh/mesh | `405.224 ms` | `342.682 ms` | `343.474 ms` |
-| Contact-heavy concave mesh/mesh | `556.972 ms` | `480.926 ms` | `480.773 ms` |
-| Closed dense mesh/mesh | `2.566 s` | `2.170 s` | `2.155 s` |
-
-The direct FixedMathSharp `TrianglePairPrimary` row improved from the prior
-`64.221 us` closure to `54.33 us`, or `15.4%`, with `0 B` reported. All `18`
-focused Gravitas triangle/concave/allocation regressions pass, and the direct
-warmed guards remain the allocation authority at `0 B`; the small, variable
-BenchmarkDotNet allocation readings are not treated as runtime allocations.
-
-Common-denominator hoisting and eager/lazy second-edge preparation were also
-measured and reverted because they did not produce a repeatable end-to-end
-gain on the unchanged Gravitas rows. The optimized exact rows remain
-approximately `2.9-3.7x` slower than the deleted scalar baseline, so the signal
-remained material after the retained work. A final experimental pass tested an
-exact signed two-limb multiplication specialization and invocation-local rigid
-frame preparation. The direct specialization improved only `0.6%`; frame
-preparation left the affected Gravitas rows between `0.28%` and `1.04%` slower.
-Both changes were reverted exactly.
-
-Evidence now favors reducing complete exact SAT evaluations; the tested
-two-limb dispatch and frame preparation were not material. Revisit only through
-a separate topology or exact-classifier design; do not grow the current
-relation with more local special cases. The focused plans and evidence are
-preserved in
-[`2026-08-02-exact-triangle-pair-throughput-plan.md`](done/2026-08-02-exact-triangle-pair-throughput-plan.md)
-and
-[`2026-08-02-experimental-triangle-pair-throughput-plan.md`](done/2026-08-02-experimental-triangle-pair-throughput-plan.md).
-
-### Signal: Exact Canonical OBB Contacts Regress Ordinary Narrow-Phase Throughput
-
-**Discovered:** 2026-07-27  
-**Source:** canonical-collider Task 9 comparison against the preserved Task 0
-short in-process baseline  
-**Status:** Promoted to the
-[`Exact Canonical OBB Throughput Hardening`](2026-08-02-exact-canonical-obb-throughput-plan.md)
-plan. Exact-winner ranking corrected redundant depth rounding; the remaining
-cost is isolated to the exact wide `FixedOrientedBox` relation kernels.
-Correctness and allocation gates remain green.
-
-The same Release build, BenchmarkDotNet job, hardware, parameters, and contact
-fixtures reported the following ordinary-domain changes:
-
-| Row | Task 0 | Task 9 |
-| --- | -----: | -----: |
-| 64 rotated cuboid/cuboid pairs | 385.66 us | 5.113 ms |
-| 64 rotated cuboid/capsule pairs | 411.69 us | 25.209 ms |
-| 64 convex mesh/cuboid pairs | 1.363 ms | 12.035 ms |
-| 64 concave mesh/cuboid pairs | 1.368 ms | 12.106 ms |
-
-The first root-cause correction retains each candidate's exact overlap and
-squared-axis terms, selects the exact winner, and rounds only that final depth.
-Direct FixedMathSharp rows improved by 37-46% without allocations. The affected
-Gravitas rerun improved cuboid/cuboid from `5.113` to `2.499 ms`,
-cuboid/capsule from `25.209` to `10.835 ms`, and mesh/cuboid rows from about
-`12.0` to `7.0 ms`. The remaining gap is still release-relevant.
-
-The benchmark assembly loads the optimized Release FixedMathSharp binary, and
-all four fixtures still report 64 contacts, excluding the known local-link
-Debug mapping problem and an early-rejection workload change. Direct
-FixedMathSharp probes now place the ordinary OBB/triangle row at `87.787 us`
-after exact-winner ranking; the Gravitas rows route through the same full-domain
-relation family.
-
-This is the expected cost center of replacing saturating world-corner and
-endpoint authority with exact wide relations, but the remaining magnitude is
-not release-neutral. The smallest useful next step is an exact common-domain
-path inside FixedMathSharp that returns the same contact anchors and tie
-ordering, with the current wide kernels retained for overflow, cancellation,
-and scalar-face cases. Do not restore Gravitas-local SAT, cached world geometry,
-or an approximate early answer. The preserved artifacts are:
-`artifacts/benchmarks/task9-canonical-geometry-baseline-20260722` and
-`artifacts/benchmarks/task9-canonical-geometry-final-optimized-20260727`.
+| Signal                                                              | Status                    | Priority | Tracking                                                                                        |
+| ------------------------------------------------------------------- | ------------------------- | -------- | ----------------------------------------------------------------------------------------------- |
+| Exact 3D contact response adds measurable ordinary-domain cost      | Optimized, still observed | Medium   | Profile the paired atomic preflight and friction stages without weakening full-domain rejection |
+| Mesh scale rebuild allocates with subdivision count                 | Observed                  | Low      | Isolate prepared BVH rebuild and scale-validation buffers before changing capacity policy       |
+| Mixed public sweep traversal stalls on extreme sparse-grid spans    | Observed                  | Medium   | Isolate GridTracer clipping and cell-visit scaling independently of narrow phase                |
+| Mixed discrete broad-phase refresh allocates at 32 moving CCD pairs | Isolated                  | Low      | Reproduce capacity-growth threshold independently of rotational CCD                             |
 
 ### Signal: Exact 3D Contact Response Adds Measurable Ordinary-Domain Cost
 
@@ -217,22 +73,22 @@ behavior are closed, while the remaining timing gap is still measurable.
 
 Phase 2 added checked impulse composition, paired current-state preflight,
 atomic application, and exact semantic-lever fallback. An initial
-checked-everywhere implementation regressed ordinary response substantially.
-The final implementation proves conservative compact bounds for ordinary
+checked-everywhere implementation regressed ordinary response substantially. The
+final implementation proves conservative compact bounds for ordinary
 point-velocity and angular-response chains, then uses checked FixedMathSharp
 arithmetic only outside those bounds.
 
-Across the more stable 16-pair cells, final medians remain `9.5-21.6%` above
-the preserved compact baseline:
+Across the more stable 16-pair cells, final medians remain `9.5-21.6%` above the
+preserved compact baseline:
 
-| Contact shape | Default material | Distinct material |
-| --- | ---: | ---: |
-| Single | `860.8 -> 976.3 us` | `851.3 -> 948.4 us` |
-| Face manifold | `2.735 -> 3.326 ms` | `2.995 -> 3.281 ms` |
+| Contact shape         |    Default material |   Distinct material |
+| --------------------- | ------------------: | ------------------: |
+| Single                | `860.8 -> 976.3 us` | `851.3 -> 948.4 us` |
+| Face manifold         | `2.735 -> 3.326 ms` | `2.995 -> 3.281 ms` |
 | Resting face manifold | `2.508 -> 2.867 ms` | `2.488 -> 2.786 ms` |
-| Cylinder | `506.9 -> 584.1 us` | `501.6 -> 595.8 us` |
-| Mesh | `2.203 -> 2.595 ms` | `2.286 -> 2.641 ms` |
-| Compound part | `511.4 -> 605.2 us` | `552.3 -> 604.9 us` |
+| Cylinder              | `506.9 -> 584.1 us` | `501.6 -> 595.8 us` |
+| Mesh                  | `2.203 -> 2.595 ms` | `2.286 -> 2.641 ms` |
+| Compound part         | `511.4 -> 605.2 us` | `552.3 -> 604.9 us` |
 
 All 24 final benchmark cells report zero managed allocation. The 64-pair
 ShortRun cells remain too noisy for a trustworthy ratio because the benchmark
@@ -247,18 +103,17 @@ the benchmarked compact proof path and the medians above are unchanged. Focused
 wide-response and rotational-CCD allocation guards remain at zero managed bytes
 after warmup.
 
-Phase 4 friction closure on 2026-07-30 reran 32 prepared 3D/mixed and 10 pure
-2D response ShortRun cells. Every cell remained at `0 B/op`; the mixed
-16-pair medians (`1.380 ms` default, `1.370 ms` distinct) remained comparable
-to the preserved `1.417 ms` and `1.355 ms` baseline, and the pure-2D rows
-retained stable 64-to-1,024-pair scaling. The 3D cells showed no broad
-regression pattern, although the single-contact medians (`1.090 ms` and
-`1.076 ms`) were above the Phase 2 post-change sample while several manifold
-rows improved. Because these ShortRun iterations remain below a reliable
-timing duration, this is a zero-allocation and no-gross-regression closure
-gate, not evidence to close the active profiling signal. The exact 3D, 2D, and
-mixed fallback allocation tests also pass `3/3` at zero managed bytes.
-Artifacts are retained under
+Phase 4 friction closure on 2026-07-30 reran 32 prepared 3D/mixed and 10 pure 2D
+response ShortRun cells. Every cell remained at `0 B/op`; the mixed 16-pair
+medians (`1.380 ms` default, `1.370 ms` distinct) remained comparable to the
+preserved `1.417 ms` and `1.355 ms` baseline, and the pure-2D rows retained
+stable 64-to-1,024-pair scaling. The 3D cells showed no broad regression
+pattern, although the single-contact medians (`1.090 ms` and `1.076 ms`) were
+above the Phase 2 post-change sample while several manifold rows improved.
+Because these ShortRun iterations remain below a reliable timing duration, this
+is a zero-allocation and no-gross-regression closure gate, not evidence to close
+the active profiling signal. The exact 3D, 2D, and mixed fallback allocation
+tests also pass `3/3` at zero managed bytes. Artifacts are retained under
 `artifacts/benchmarks/2026-07-30-friction-phase4-closure` and
 `artifacts/benchmarks/2026-07-30-friction-phase4-closure-2d`.
 
@@ -275,9 +130,9 @@ row reports `0 B/op` at subdivision 1, `4,032 B/op` at subdivision 8, and
 `8.718 ms`, respectively, about `61-65%` faster than the pre-review Phase 4
 baseline of `101.3 us`, `6.178 ms`, and `24.505 ms`.
 
-Phase 4 now computes uniform shell mass properties in one wide
-FixedMathSharp pass and retains no semantic per-face weights or mass-property
-scratch on `PhysicsMesh`. Its two-part compound inertia benchmark also remains
+Phase 4 now computes uniform shell mass properties in one wide FixedMathSharp
+pass and retains no semantic per-face weights or mass-property scratch on
+`PhysicsMesh`. Its two-part compound inertia benchmark also remains
 allocation-free. The unchanged scale-dependent allocation therefore belongs
 outside the semantic mass-property kernel and still needs isolation across
 prepared triangle-BVH rebuild and retained-capacity behavior.
@@ -323,12 +178,11 @@ world-span contract.
 
 The mixed 3D-to-2D end-to-end rows measured `0 B/op` at 1 and 8 pairs. Repeated
 short runs reported a small, run-dependent 32-pair signal: initially `48 B/op`
-and finally `10 B/op`. Focused warmed guards for
-CCD preparation, interval search, response, handoff, reset, and completion all
-remain allocation-free. Temporary test-side phase instrumentation localized the
-recurring sample to the pre-existing mixed discrete
-`GravitasMixedCollisionService.LateSimulate` partition refresh and broad-phase
-capacity-growth path after CCD completes.
+and finally `10 B/op`. Focused warmed guards for CCD preparation, interval
+search, response, handoff, reset, and completion all remain allocation-free.
+Temporary test-side phase instrumentation localized the recurring sample to the
+pre-existing mixed discrete `GravitasMixedCollisionService.LateSimulate`
+partition refresh and broad-phase capacity-growth path after CCD completes.
 
 Keep the honest 1/8/32 benchmark row. The smallest next step is to reproduce the
 same threshold without rotational motion, identify which retained partition or
@@ -336,10 +190,106 @@ candidate buffer grows, and decide whether an explicit warm-capacity policy is
 justified by representative world churn. Do not add speculative production
 preallocation merely to hide this benchmark sample.
 
+## Experimental Signals
+
+| Signal                                                             | Status                                           | Revisit When                                                                                                            |
+| ------------------------------------------------------------------ | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| Exact triangle-pair contacts regress dense concave-mesh throughput | Capacity-sensitive; local optimization exhausted | A topology or exact classifier design can reduce complete triangle-pair SAT evaluations without a competing answer path |
+
+### Signal: Exact Triangle-Pair Contacts Regress Dense Concave-Mesh Throughput
+
+**Discovered:** 2026-08-01  
+**Source:** full-domain triangle-pair Phase 2 comparison against its preserved
+scalar mesh/mesh baseline  
+**Status:** Experimental capacity guidance. Shared exact-projection and
+depth-ranking duplication plus the retained signed one-limb specialization
+recovered substantial throughput. A final bounded pass found no further local
+change worth retaining; dense dynamic concave mesh/mesh contact is not a
+competitive release path.
+
+The unchanged 64-pair Short in-process rows reported:
+
+| Row                             | Scalar baseline |  Initial exact | Final optimized exact | Closure confirmation |
+| ------------------------------- | --------------: | -------------: | --------------------: | -------------------: |
+| Ordinary convex mesh/mesh       |      `5.168 ms` |     `4.921 ms` |            `4.839 ms` |           `4.900 ms` |
+| Concave mesh/mesh               |     `16.120 ms` |    `98.489 ms` |           `70.553 ms` |          `70.005 ms` |
+| Dense concave mesh/mesh         |    `105.139 ms` |   `570.378 ms` |          `400.501 ms` |         `397.087 ms` |
+| Contact-heavy concave mesh/mesh |    `163.956 ms` |   `804.559 ms` |          `564.147 ms` |         `556.138 ms` |
+| Closed dense mesh/mesh          |    `747.173 ms` | `3,641.633 ms` |        `2,532.822 ms` |       `2,519.288 ms` |
+
+FixedMathSharp now computes each triangle's basis-axis projections once per axis
+and cancels identical positive common denominators during normalized-depth
+ranking. Those policy-neutral deletions recovered roughly `28-30%` of the
+initial exact dense-row cost without changing axis order, contact results, or
+warmed `0 B` behavior. The ordinary convex row remains comparable because it
+uses the existing convex-hull relation rather than the concave triangle-pair
+generator.
+
+The remaining gap is the measured cost of invoking the complete wide
+triangle/triangle relation for every BVH-admitted candidate; candidate counts
+and traversal complexity did not change. That evidence led to the per-candidate
+profile recorded in the 2026-08-02 follow-up below. Do not restore the deleted
+scalar SAT, add a narrowed prefilter, or create a second answer path that can
+disagree with the full-domain authority. Preserved artifacts are under
+`artifacts/benchmarks/2026-07-31-triangle-pair-baseline`,
+`artifacts/benchmarks/2026-07-31-triangle-pair-gravitas-after`, and
+`artifacts/benchmarks/2026-07-31-triangle-pair-after-denominator-cancellation`.
+
+The 2026-08-01 closure rerun used the same 64-pair Short in-process job. Its
+point estimates stayed within `-1.42%` to `+1.26%` of the final optimized run,
+so it confirms the retained signal without supporting another performance claim.
+MemoryDiagnoser reported fixed `78 B` / `624 B` readings on the longer
+in-process rows; all 72 direct warmed Gravitas allocation guards, including the
+concave and dense mesh paths, measured exactly `0 B`, so the direct guards
+remain the runtime allocation authority; this document does not assign a cause
+to the differing in-process MemoryDiagnoser readings. The closure artifacts are
+under `artifacts/benchmarks/2026-08-01-triangle-pair-closure`.
+
+The 2026-08-02 follow-up profiled the unchanged dense row and isolated generic
+wide-multiply dispatch inside exact projection as the next shared cost. Raw
+`Fixed64` coordinates were widened to `Signed192` even though each operand is a
+proven signed one-word factor. FixedMathSharp now owns an exact
+`Signed576`-by-`long` specialization, and triangle projection calls that owner
+directly without changing the result width, axis order, tie behavior, contact
+anchors, or public API.
+
+| Row                             | Refreshed baseline | Retained change | Confirmation |
+| ------------------------------- | -----------------: | --------------: | -----------: |
+| Ordinary convex mesh/mesh       |         `4.836 ms` |      `4.933 ms` | control only |
+| Concave mesh/mesh               |        `70.351 ms` |     `60.213 ms` |  `59.761 ms` |
+| Dense concave mesh/mesh         |       `405.224 ms` |    `342.682 ms` | `343.474 ms` |
+| Contact-heavy concave mesh/mesh |       `556.972 ms` |    `480.926 ms` | `480.773 ms` |
+| Closed dense mesh/mesh          |          `2.566 s` |       `2.170 s` |    `2.155 s` |
+
+The direct FixedMathSharp `TrianglePairPrimary` row improved from the prior
+`64.221 us` closure to `54.33 us`, or `15.4%`, with `0 B` reported. All `18`
+focused Gravitas triangle/concave/allocation regressions pass, and the direct
+warmed guards remain the allocation authority at `0 B`; the small, variable
+BenchmarkDotNet allocation readings are not treated as runtime allocations.
+
+Common-denominator hoisting and eager/lazy second-edge preparation were also
+measured and reverted because they did not produce a repeatable end-to-end gain
+on the unchanged Gravitas rows. The optimized exact rows remain approximately
+`2.9-3.7x` slower than the deleted scalar baseline, so the signal remained
+material after the retained work. A final experimental pass tested an exact
+signed two-limb multiplication specialization and invocation-local rigid frame
+preparation. The direct specialization improved only `0.6%`; frame preparation
+left the affected Gravitas rows between `0.28%` and `1.04%` slower. Both changes
+were reverted exactly.
+
+Evidence now favors reducing complete exact SAT evaluations; the tested two-limb
+dispatch and frame preparation were not material. Revisit only through a
+separate topology or exact-classifier design; do not grow the current relation
+with more local special cases. The focused plans and evidence are preserved in
+[`2026-08-02-exact-triangle-pair-throughput-plan.md`](done/2026-08-02-exact-triangle-pair-throughput-plan.md)
+and
+[`2026-08-02-experimental-triangle-pair-throughput-plan.md`](done/2026-08-02-experimental-triangle-pair-throughput-plan.md).
+
 ## Closed Signals
 
 | Signal                                                      | Status | Closed     | Resolution                                                                                                                                                                                                                                  |
 | ----------------------------------------------------------- | ------ | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Exact canonical OBB ordinary throughput                     | Closed | 2026-08-03 | One exact relative-frame kernel per relation improves matched direct rows by 35.3-64.0% and Gravitas rows by 30.9-55.7%; full DefaultJob confirmations remain at 0 B and 100% reachable coverage                                            |
 | Physics-material combine numeric hardening                  | Closed | 2026-07-13 | Overflow-safe average and geometric-mean edge handling preserve deterministic coefficient semantics; the default geometric-material response benchmark remains allocation-free with no credible timing regression                           |
 | Replay hash collider-ID churn scaling                       | Closed | 2026-07-05 | 2D and 3D collider registration now uses a shared reusable-slot registry; authoritative replay hashes traverse canonical live registration order with dense replay ordinals, while deleted ID history remains outside replay identity       |
 | Pure 2D response position-correction repartition allocation | Closed | 2026-06-28 | Gravitas reuses empty retained partitions for immediate repartitioning; GridForge stores the common single voxel partition inline and keeps diagnostic names off success paths                                                              |
@@ -1017,14 +967,12 @@ Promote a signal from this backlog into a dedicated dated plan when it has:
 
 ## Current Recommendation
 
-The canonical OBB row is the highest-priority active measured signal. Preserve
-its exact full-domain authority while investigating a proven ordinary-domain
-path. Dense concave mesh/mesh throughput is now experimental capacity guidance;
-prefer primitive, convex, compound, or partitioned static-concave authoring and
-do not restore narrowed prefilters or competing answer paths. The mixed
-discrete broad-phase refresh threshold remains a lower-priority capacity signal
-because the
-CCD-owned preparation, search, response, handoff, reset, and completion paths
-remain allocation-free. Keep this document as the intake bucket for future
+Exact canonical OBB throughput is closed with single-path full-domain kernels.
+Dense concave mesh/mesh throughput is now experimental capacity guidance; prefer
+primitive, convex, compound, or partitioned static-concave authoring and do not
+restore narrowed prefilters or competing answer paths. The mixed discrete
+broad-phase refresh threshold remains a lower-priority capacity signal because
+the CCD-owned preparation, search, response, handoff, reset, and completion
+paths remain allocation-free. Keep this document as the intake bucket for future
 measured signals; promote broader work into a dated feature plan when the scope
 outgrows a focused patch.

@@ -337,8 +337,9 @@ passes 3,614. Three repeated replay runs pass 84 tests each, all 68 allocation
 guards pass, and the benchmark comparison plus exact-winner optimization are
 retained in
 [`benchmark-signal-hardening-backlog.md`](benchmark-signal-hardening-backlog.md)
-because exact ordinary OBB contacts still require a separate
-adaptive-performance hardening pass.
+and closed by the
+[`Exact Canonical OBB Throughput Hardening`](done/2026-08-02-exact-canonical-obb-throughput-plan.md)
+plan with allocation-free, fully covered relative-frame kernels.
 
 ### Finite-Slab Projection Support Math Is Full-Domain
 

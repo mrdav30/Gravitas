@@ -2144,6 +2144,63 @@ public sealed class CollisionDetectionShapePairTests
     }
 
     [Fact]
+    public void MeshCuboid_ConvexFallbackShouldAssignCanonicalAnchorsToPairColliders()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        Vector3d meshOrigin = new((Fixed64)2, (Fixed64)(-1), (Fixed64)3);
+        FixedQuaternion cuboidRotation =
+            FixedQuaternion.FromEulerAnglesInDegrees(
+                (Fixed64)30,
+                Fixed64.Zero,
+                Fixed64.Zero);
+        Vector3d cuboidOrigin = meshOrigin + new Vector3d(
+            Fixed64.FromFraction(1, 4),
+            Fixed64.FromFraction(1, 16),
+            Fixed64.FromFraction(-1, 32));
+        ScenarioBody<LSMeshCollider> mesh = scenario.CreateBody(
+            MeshTestFixtures.CreateConvexCube(),
+            meshOrigin,
+            FixedQuaternion.Identity);
+        ScenarioBody<LSCuboidCollider> cuboid = scenario.CreateBody(
+            new LSCuboidCollider
+            {
+                Size = new Vector3d(
+                    Fixed64.FromFraction(1, 8),
+                    Fixed64.FromFraction(1, 4),
+                    Fixed64.FromFraction(3, 8))
+            },
+            cuboidOrigin,
+            cuboidRotation);
+
+        CollisionPair pair = AssertCollision(
+            scenario,
+            cuboid.Collider,
+            mesh.Collider,
+            CollisionType.Mesh_Cuboid);
+        ManifoldContact contact = pair.Manifold.PrimaryContact;
+
+        pair.ColliderA.Should().BeSameAs(mesh.Collider);
+        pair.ColliderB.Should().BeSameAs(cuboid.Collider);
+        contact.AnchorA.Origin.Should().Be(meshOrigin);
+        contact.AnchorA.Rotation.Should().Be(FixedQuaternion.Identity);
+        contact.AnchorA.LocalPoint.Should().Be(new Vector3d(
+            Fixed64.Half,
+            -Fixed64.Half,
+            -Fixed64.Half));
+        contact.AnchorA.LocalDisplacement.Should().Be(Vector3d.Zero);
+        contact.AnchorB.Origin.Should().Be(cuboidOrigin);
+        contact.AnchorB.Rotation.Should().Be(cuboidRotation);
+        contact.AnchorB.LocalPoint.Should().Be(new Vector3d(
+            Fixed64.FromFraction(-1, 16),
+            Fixed64.FromFraction(-1, 8),
+            Fixed64.FromFraction(-3, 16)));
+        contact.AnchorB.LocalDisplacement.Should().Be(Vector3d.Zero);
+        contact.Normal.Should().Be(Vector3d.Right);
+        contact.Depth.Should().Be(Fixed64.FromFraction(5, 16));
+        contact.DepthIsClamped.Should().BeFalse();
+    }
+
+    [Fact]
     public void MeshCuboid_WithRotatedCuboidSeparatedByEdgeAxis_ShouldNotUseReducedFallbackFalsePositive()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
