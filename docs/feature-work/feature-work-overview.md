@@ -39,6 +39,19 @@ instead of burying it in notes.
 
 ## Recently Completed
 
+- [`Mixed Discrete Broad-Phase Signal Closure`](benchmark-signal-hardening-backlog.md#closed-signal-mixed-discrete-broad-phase-allocation-at-32-pairs)
+  - Completed 2026-08-04. The original run-dependent 32-pair allocation no
+    longer reproduces: two rotational confirmations and corrected sparse,
+    dense, and churn broad-phase rows report `0 B/op` through 1,024 colliders.
+  - The audit repaired a stale benchmark that stopped before `LateSimulate`,
+    stabilized its workload with trigger pairs, isolated per-row setup, and
+    removed an unrepresentative 4,096-collider monolithic dense-grid case that
+    exceeded `2.6 GB` before measurement. No production preallocation or second
+    runtime path was added, and no new release-relevant signal remains.
+  - Release and `ReleaseLean` pass 3,930 and 3,875 tests. Fresh coverage remains
+    at 100% across 55,869 lines, 15,833 branches, and 5,321 ReportGenerator
+    methods; both package configurations build without warnings.
+
 - [`Mesh Scale Rebuild Throughput Hardening`](done/2026-08-03-mesh-scale-rebuild-throughput-plan.md)
   - Completed 2026-08-03. Convex meshes now build one immutable support-vertex
     topology and refit only transactional node bounds after scale changes. The

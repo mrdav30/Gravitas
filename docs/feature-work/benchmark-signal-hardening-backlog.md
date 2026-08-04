@@ -56,29 +56,8 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 
 ## Active Signals
 
-| Signal                                                              | Status   | Priority | Tracking                                                                                  |
-| ------------------------------------------------------------------- | -------- | -------- | ----------------------------------------------------------------------------------------- |
-| Mixed discrete broad-phase refresh allocates at 32 moving CCD pairs | Isolated | Low      | Reproduce capacity-growth threshold independently of rotational CCD                       |
-
-### Signal: Mixed Discrete Broad-Phase Refresh Allocation At 32 Pairs
-
-**Discovered:** 2026-07-19  
-**Source:** `RotationalMovingPairCcdBenchmarks` mixed 3D-to-2D ShortRun  
-**Status:** Isolated; no CCD runtime defect confirmed
-
-The mixed 3D-to-2D end-to-end rows measured `0 B/op` at 1 and 8 pairs. Repeated
-short runs reported a small, run-dependent 32-pair signal: initially `48 B/op`
-and finally `10 B/op`. Focused warmed guards for CCD preparation, interval
-search, response, handoff, reset, and completion all remain allocation-free.
-Temporary test-side phase instrumentation localized the recurring sample to the
-pre-existing mixed discrete `GravitasMixedCollisionService.LateSimulate`
-partition refresh and broad-phase capacity-growth path after CCD completes.
-
-Keep the honest 1/8/32 benchmark row. The smallest next step is to reproduce the
-same threshold without rotational motion, identify which retained partition or
-candidate buffer grows, and decide whether an explicit warm-capacity policy is
-justified by representative world churn. Do not add speculative production
-preallocation merely to hide this benchmark sample.
+No active release-relevant benchmark signals remain. New measured concerns
+should be added here before they are promoted into implementation work.
 
 ## Experimental Signals
 
@@ -179,6 +158,7 @@ and
 
 | Signal                                                      | Status | Closed     | Resolution                                                                                                                                                                                                                                  |
 | ----------------------------------------------------------- | ------ | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Mixed discrete broad-phase allocation at 32 pairs           | Closed | 2026-08-04 | Two independent rotational runs and corrected sparse, dense, and churn broad-phase rows reproduce `0 B/op`; the stale benchmark lifecycle and unrepresentative 4,096-collider monolithic-grid row were repaired without speculative runtime preallocation |
 | Mixed public sweep traversal on extreme sparse-grid spans   | Closed | 2026-08-04 | GridForge's two-tier hash/BVH index replaces 64-billion-cell registration with active-grid scaling; Gravitas completes the exact public sweep in 14.8-16.0 us at 0 B with deterministic candidate and hit order; full evidence is retained in GridForge's completed two-tier spatial-index plan |
 | Mesh scale rebuild allocation                               | Closed | 2026-08-03 | Convex support topology is built once and scale changes refit transactional node bounds in linear time; subdivision 8/16 rows fall from 4,032/16,320 B to 0 B and improve by 7.9%/7.8%                                                        |
 | Exact 3D contact-response ordinary throughput               | Closed | 2026-08-03 | Exact aligned-frame point anchors improve direct rows by 61.0-95.9% and the unchanged 24-row Gravitas matrix by 46.4% median versus the exact baseline; confirmation remains within 0.7% median at 0 B and 100% coverage                    |
@@ -193,6 +173,58 @@ and
 | 3D dynamic shape-exact BDN allocation signal                | Closed | 2026-06-23 | Shared exact-sweep bounds prefilters removed the scaling allocation/time signal from 3D dynamic false-positive rows                                                                                                                         |
 | 3D full-runtime CCD allocation                              | Closed | 2026-06-23 | GridForge allocation-free line tracing plus Gravitas 3D raycast adoption                                                                                                                                                                    |
 | Grounding raycast probe allocation                          | Closed | 2026-06-23 | Same raycast trace fix removed automatic ray-grounding allocation                                                                                                                                                                           |
+
+### Closed Signal: Mixed Discrete Broad-Phase Allocation At 32 Pairs
+
+**Discovered:** 2026-07-19 **Closed:** 2026-08-04
+
+The original `RotationalMovingPairCcdBenchmarks` mixed 3D-to-2D ShortRun was
+already allocation-free at 1 and 8 pairs, while repeated 32-pair runs reported
+a small, run-dependent `48 B/op` to `10 B/op`. Focused guards excluded CCD
+preparation, search, response, handoff, reset, and completion and localized the
+sample to mixed discrete partition refresh after CCD.
+
+The current locally linked stack no longer reproduces the signal. Two
+independent unchanged rotational ShortRuns reported `0 B/op` at 1, 8, and 32
+pairs. The independent broad-phase check then found that
+`MixedBroadPhaseBenchmarks` still called only `Simulate()` after mixed contact
+work moved to `LateSimulate()` in June, so it had become an empty benchmark.
+The repaired workload now:
+
+- executes the complete `Simulate()` / `LateSimulate()` fixed-step contract;
+- uses bodyless 3D triggers against dynamic 2D bodies so partitioning,
+  candidate generation, narrow phase, and pair lifecycle stay active without
+  solver-driven scene drift;
+- rejects setup that produces no broad-phase candidates; and
+- gives each row target-specific setup and cleanup instead of constructing all
+  three worlds in every benchmark process.
+
+Final ShortRun evidence:
+
+| Method                             | Collider count | Mean       | Allocated |
+| ---------------------------------- | -------------: | ---------: | --------: |
+| SparseCandidateGathering           |             32 | `334.8 us` |    `0 B`  |
+| DenseCandidateGathering            |             32 | `497.8 us` |    `0 B`  |
+| RetainedPartitionCleanupAfterChurn |             32 | `817.4 us` |    `0 B`  |
+| SparseCandidateGathering           |          1,024 | `28.96 ms` |    `0 B`  |
+| DenseCandidateGathering            |          1,024 | `23.64 ms` |    `0 B`  |
+| RetainedPartitionCleanupAfterChurn |          1,024 | `84.33 ms` |    `0 B`  |
+
+The old 4,096-collider row created one monolithic dense voxel grid for a sparse
+address-space workload. Even after target-specific setup, it exceeded `2.6 GB`
+before the first timed operation. GridForge already provides sparse storage and
+streamed multi-grid ownership for that world shape, so the routine benchmark
+now retains the exact 32-pair threshold and a 1,024-collider stress point rather
+than measuring an unrepresentative setup-memory ceiling.
+
+**Resolution:** No production capacity hint or preallocation was added. The
+original signal is absent under repeated end-to-end and independently corrected
+broad-phase measurement, all retained rows are allocation-free, and the only
+new findings were benchmark-harness defects corrected in the benchmark itself.
+Release and `ReleaseLean` pass 3,930 and 3,875 tests respectively. Fresh
+ReportGenerator evidence remains at 100%: 55,869/55,869 lines,
+15,833/15,833 branches, and 5,321/5,321 methods. Both package configurations
+build for `net8.0` and `netstandard2.1` without warnings.
 
 ### Closed Signal: Mesh Scale Rebuild Allocation
 
@@ -909,12 +941,8 @@ Promote a signal from this backlog into a dedicated dated plan when it has:
 
 ## Current Recommendation
 
-Exact 3D contact-response and canonical OBB throughput are closed with shared
-full-domain owners and no competing answer paths. Dense concave mesh/mesh
+All release-relevant benchmark signals are closed. Dense concave mesh/mesh
 throughput remains experimental capacity guidance; prefer primitive, convex,
-compound, or partitioned static-concave authoring. The mixed discrete
-broad-phase refresh threshold remains a lower-priority capacity signal because
-the CCD-owned preparation, search, response, handoff, reset, and completion
-paths remain allocation-free. Keep this document as the intake bucket for future
-measured signals; promote broader work into a dated feature plan when the scope
-outgrows a focused patch.
+compound, or partitioned static-concave authoring. Keep this document as the
+intake bucket for future measured signals and promote broader work into a dated
+feature plan when the scope outgrows a focused patch.

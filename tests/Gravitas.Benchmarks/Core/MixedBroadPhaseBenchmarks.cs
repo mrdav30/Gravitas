@@ -16,50 +16,86 @@ public class MixedBroadPhaseBenchmarks
     private SwiftList<SolidBody2D> _churnBodies2D;
     private bool _churnToggle;
 
-    [Params(64, 1024, 4096)]
+    [Params(32, 1024)]
     public int ColliderCount { get; set; }
 
-    [GlobalSetup]
-    public void Setup()
+    [GlobalSetup(Target = nameof(SparseCandidateGathering))]
+    public void SetupSparse()
     {
-        int extentX = ExtentForCount(ColliderCount);
-        int extentZ = ExtentForRows(ColliderCount);
-        _sparseContext = CreateMixedContext(extentX, extentZ, clearAllPools: true);
-        _denseContext = CreateMixedContext(64, 64);
-        _churnContext = CreateMixedContext(extentX + 64, extentZ + 64);
+        _sparseContext = CreateMixedContext(
+            SparseExtentX(ColliderCount),
+            SparseExtentZ(ColliderCount),
+            clearAllPools: true);
+
+        for (int i = 0; i < ColliderCount; i++)
+        {
+            Vector2d position = SparsePositionForIndex(i);
+            _ = CreateTriggerSphere3D(_sparseContext, new Vector3d(position.X, Fixed64.Zero, position.Y));
+            _ = CreateCircle2D(_sparseContext, position);
+        }
+
+        AdvanceMixedFrame(_sparseContext);
+        ValidateCandidates(_sparseContext, "sparse");
+    }
+
+    [GlobalSetup(Target = nameof(DenseCandidateGathering))]
+    public void SetupDense()
+    {
+        _denseContext = CreateMixedContext(
+            DenseExtentX(ColliderCount),
+            DenseExtentZ(ColliderCount),
+            clearAllPools: true);
+
+        for (int i = 0; i < ColliderCount; i++)
+        {
+            Vector2d position = DensePositionForIndex(i);
+            _ = CreateTriggerSphere3D(_denseContext, new Vector3d(position.X, Fixed64.Zero, position.Y));
+            _ = CreateCircle2D(_denseContext, position);
+        }
+
+        AdvanceMixedFrame(_denseContext);
+        ValidateCandidates(_denseContext, "dense");
+    }
+
+    [GlobalSetup(Target = nameof(RetainedPartitionCleanupAfterChurn))]
+    public void SetupChurn()
+    {
+        _churnContext = CreateMixedContext(
+            SparseExtentX(ColliderCount) + 64,
+            SparseExtentZ(ColliderCount) + 64,
+            clearAllPools: true);
         _churnBodies2D = new SwiftList<SolidBody2D>(ColliderCount);
 
         for (int i = 0; i < ColliderCount; i++)
         {
             Vector2d position = SparsePositionForIndex(i);
-            _ = CreateSphere3D(_sparseContext, new Vector3d(position.X, Fixed64.Zero, position.Y), immovable: false);
-            _ = CreateCircle2D(_sparseContext, position, immovable: true);
-
             Vector2d churnPosition = position + new Vector2d((Fixed64)16, Fixed64.Zero);
-            _ = CreateSphere3D(_churnContext, new Vector3d(churnPosition.X, Fixed64.Zero, churnPosition.Y), immovable: false);
-            _churnBodies2D.Add(CreateCircle2D(_churnContext, churnPosition, immovable: true));
+            _ = CreateTriggerSphere3D(_churnContext, new Vector3d(churnPosition.X, Fixed64.Zero, churnPosition.Y));
+            _churnBodies2D.Add(CreateCircle2D(_churnContext, churnPosition));
         }
 
-        for (int i = 0; i < ColliderCount; i++)
-        {
-            Vector2d position = DensePositionForIndex(i);
-            _ = CreateSphere3D(_denseContext, new Vector3d(position.X, Fixed64.Zero, position.Y), immovable: false);
-            _ = CreateCircle2D(_denseContext, position, immovable: true);
-        }
-
-        _sparseContext.Simulate();
-        _denseContext.Simulate();
-        _churnContext.Simulate();
+        AdvanceMixedFrame(_churnContext);
+        ValidateCandidates(_churnContext, "churn");
     }
 
-    [GlobalCleanup]
-    public void Cleanup()
+    [GlobalCleanup(Target = nameof(SparseCandidateGathering))]
+    public void CleanupSparse()
     {
         _sparseContext?.Dispose();
-        _denseContext?.Dispose();
-        _churnContext?.Dispose();
         _sparseContext = null;
+    }
+
+    [GlobalCleanup(Target = nameof(DenseCandidateGathering))]
+    public void CleanupDense()
+    {
+        _denseContext?.Dispose();
         _denseContext = null;
+    }
+
+    [GlobalCleanup(Target = nameof(RetainedPartitionCleanupAfterChurn))]
+    public void CleanupChurn()
+    {
+        _churnContext?.Dispose();
         _churnContext = null;
         _churnBodies2D = null;
     }
@@ -67,14 +103,14 @@ public class MixedBroadPhaseBenchmarks
     [Benchmark]
     public int SparseCandidateGathering()
     {
-        _sparseContext.Simulate();
+        AdvanceMixedFrame(_sparseContext);
         return _sparseContext.MixedCollisions.LastBroadPhaseCandidateCount;
     }
 
     [Benchmark]
     public int DenseCandidateGathering()
     {
-        _denseContext.Simulate();
+        AdvanceMixedFrame(_denseContext);
         return _denseContext.MixedCollisions.LastBroadPhaseCandidateCount;
     }
 
@@ -89,9 +125,24 @@ public class MixedBroadPhaseBenchmarks
             _churnBodies2D[i].SetPosition(SparsePositionForIndex(i) + offset);
 
         _churnToggle = !_churnToggle;
-        _churnContext.Simulate();
+        AdvanceMixedFrame(_churnContext);
         return _churnContext.MixedCollisions.RetainedPartitionCount
             + _churnContext.MixedCollisions.InactivePartitionCount;
+    }
+
+    private static void AdvanceMixedFrame(GravitasWorldContext context)
+    {
+        context.Simulate();
+        context.LateSimulate();
+    }
+
+    private static void ValidateCandidates(GravitasWorldContext context, string scenario)
+    {
+        if (context.MixedCollisions.LastBroadPhaseCandidateCount == 0)
+        {
+            throw new InvalidOperationException(
+                $"Mixed broad-phase benchmark setup produced no {scenario} candidates.");
+        }
     }
 
     private static GravitasWorldContext CreateMixedContext(int extentX, int extentZ, bool clearAllPools = false)
@@ -110,29 +161,25 @@ public class MixedBroadPhaseBenchmarks
         return context;
     }
 
-    private static SolidBody CreateSphere3D(GravitasWorldContext context, Vector3d position, bool immovable)
+    private static LSSphereCollider CreateTriggerSphere3D(GravitasWorldContext context, Vector3d position)
     {
         var agent = new BenchmarkMatterAgent(context, position);
-        var collider = new LSSphereCollider();
-        var body = new SolidBody(agent, collider)
+        var collider = new LSSphereCollider
         {
-            Mass = Fixed64.One
+            IsTrigger = true
         };
-        body.Initialize(
-            position,
-            FixedQuaternion.Identity,
-            immovable ? BodyMotionType.Static : BodyMotionType.Dynamic);
-        return body;
+        collider.InitializeWithNoBody(agent);
+        return collider;
     }
 
-    private static SolidBody2D CreateCircle2D(GravitasWorldContext context, Vector2d position, bool immovable)
+    private static SolidBody2D CreateCircle2D(GravitasWorldContext context, Vector2d position)
     {
         var agent = new BenchmarkMatterAgent(context, new Vector3d(position.X, Fixed64.Zero, position.Y));
         var body = new SolidBody2D(agent, new LSCircleCollider2D(Fixed64.Half))
         {
             Mass = Fixed64.One
         };
-        body.Initialize(position, motionType: immovable ? BodyMotionType.Static : BodyMotionType.Dynamic);
+        body.Initialize(position, motionType: BodyMotionType.Dynamic);
         return body;
     }
 
@@ -155,15 +202,29 @@ public class MixedBroadPhaseBenchmarks
         return new Vector2d((Fixed64)(x * 2) + localOffset, (Fixed64)(z * 2));
     }
 
-    private static int ExtentForCount(int count)
+    private static int SparseExtentX(int count)
     {
         int width = count < 64 ? count : 64;
         return 16 + (width * 3);
     }
 
-    private static int ExtentForRows(int count)
+    private static int SparseExtentZ(int count)
     {
         int rows = (count + 63) / 64;
         return 16 + (rows * 3);
+    }
+
+    private static int DenseExtentX(int count)
+    {
+        int clusterCount = (count + 3) / 4;
+        int columns = clusterCount < 16 ? clusterCount : 16;
+        return 16 + (columns * 2);
+    }
+
+    private static int DenseExtentZ(int count)
+    {
+        int clusterCount = (count + 3) / 4;
+        int rows = (clusterCount + 15) / 16;
+        return 16 + (rows * 2);
     }
 }
