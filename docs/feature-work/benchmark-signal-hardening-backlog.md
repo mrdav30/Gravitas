@@ -58,39 +58,7 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 
 | Signal                                                              | Status   | Priority | Tracking                                                                                  |
 | ------------------------------------------------------------------- | -------- | -------- | ----------------------------------------------------------------------------------------- |
-| Mixed public sweep traversal stalls on extreme sparse-grid spans    | Promoted | High     | Upstream GridForge `2026-08-03-two-tier-grid-spatial-index-plan.md`                        |
 | Mixed discrete broad-phase refresh allocates at 32 moving CCD pairs | Isolated | Low      | Reproduce capacity-growth threshold independently of rotational CCD                       |
-
-### Signal: Mixed Public Sweep Traversal Stalls On Extreme Sparse-Grid Spans
-
-**Discovered:** 2026-07-19  
-**Source:** focused mixed swept-circle public-query regression  
-**Status:** Promoted to upstream GridForge implementation; terminated baseline,
-no completed timing sample
-
-A temporary focused public mixed-query diagnostic swept from `-200,000` to
-`+200,000` with radius `100,000` through a sparse grid configured with
-`100,000`-unit rectangular cells. Its isolated Release run did not complete
-within approximately 30 seconds and was terminated. The diagnostic was not
-retained as a unit test because its dominant behavior was broad-phase traversal,
-not the finite-axis narrow-phase contract it was intended to verify.
-
-The same finite-axis reducer completes promptly when invoked below public
-candidate gathering, so the signal is in broad-phase traversal rather than the
-exact narrow-phase solve. Follow-up isolation found the dominant stall occurs
-even earlier: default `GridWorld` registration maps the grid across
-`4,001^3`, or `64,048,012,001`, top-level hash cells. Constructing the world
-with a matching 100,000-unit hash scale makes the same public query complete,
-but requiring every host to tune one global scale to its largest streamed grid
-is not an acceptable contract.
-
-The approved upstream plan is
-`GridForge/docs/feature-work/2026-08-03-two-tier-grid-spatial-index-plan.md`.
-It retains the ordinary fixed spatial-hash fast path, routes automatically
-classified oversized grids into `SwiftFixedBVH<ushort>`, preserves adaptive
-active-grid scans for huge query bounds, and requires matched before/after
-GridForge plus Gravitas artifacts. The terminated run remains the honest exact
-baseline; do not invent a pre-change latency from a run that did not finish.
 
 ### Signal: Mixed Discrete Broad-Phase Refresh Allocation At 32 Pairs
 
@@ -211,6 +179,7 @@ and
 
 | Signal                                                      | Status | Closed     | Resolution                                                                                                                                                                                                                                  |
 | ----------------------------------------------------------- | ------ | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Mixed public sweep traversal on extreme sparse-grid spans   | Closed | 2026-08-04 | GridForge's two-tier hash/BVH index replaces 64-billion-cell registration with active-grid scaling; Gravitas completes the exact public sweep in 14.8-16.0 us at 0 B with deterministic candidate and hit order; full evidence is retained in GridForge's completed two-tier spatial-index plan |
 | Mesh scale rebuild allocation                               | Closed | 2026-08-03 | Convex support topology is built once and scale changes refit transactional node bounds in linear time; subdivision 8/16 rows fall from 4,032/16,320 B to 0 B and improve by 7.9%/7.8%                                                        |
 | Exact 3D contact-response ordinary throughput               | Closed | 2026-08-03 | Exact aligned-frame point anchors improve direct rows by 61.0-95.9% and the unchanged 24-row Gravitas matrix by 46.4% median versus the exact baseline; confirmation remains within 0.7% median at 0 B and 100% coverage                    |
 | Exact canonical OBB ordinary throughput                     | Closed | 2026-08-03 | One exact relative-frame kernel per relation improves matched direct rows by 35.3-64.0% and Gravitas rows by 30.9-55.7%; full DefaultJob confirmations remain at 0 B and 100% reachable coverage                                            |
