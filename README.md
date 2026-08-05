@@ -3,11 +3,12 @@
 ![Gravitas Icon](https://raw.githubusercontent.com/mrdav30/gravitas/main/icon.png)
 
 [![Build](https://github.com/mrdav30/Gravitas/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/mrdav30/Gravitas/actions/workflows/build-and-test.yml)
-[![Branch Coverage](https://mrdav30.github.io/Gravitas/coverage/badge_branchcoverage.svg)](https://mrdav30.github.io/Gravitas/coverage/)
+[![Branch Coverage](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fmrdav30.github.io%2FGravitas%2Fcoverage%2FSummary.json&query=%24.summary.branchcoverage&suffix=%25&label=branch%20coverage&color=brightgreen)](https://mrdav30.github.io/Gravitas/coverage/)
 [![NuGet](https://img.shields.io/nuget/v/Gravitas.svg)](https://www.nuget.org/packages/Gravitas)
 [![NuGet Lean](https://img.shields.io/nuget/v/Gravitas.Lean.svg?label=nuget%20lean)](https://www.nuget.org/packages/Gravitas.Lean)
 [![License](https://img.shields.io/github/license/mrdav30/Gravitas.svg)](https://github.com/mrdav30/Gravitas/blob/main/LICENSE)
 [![Frameworks](https://img.shields.io/badge/frameworks-netstandard2.1%20%7C%20net8.0-512BD4.svg)](https://github.com/mrdav30/Gravitas)
+[![Discord](https://img.shields.io/badge/discord-join%20community-5865F2?logo=discord&logoColor=white)](https://discord.gg/mhwK2QFNBA)
 
 **Deterministic physics for lockstep simulations and games.**
 
@@ -264,6 +265,15 @@ Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) and
 Prefer focused changes with release-mode validation. Determinism, physics
 correctness, low time complexity, and allocation behavior are first-order design
 constraints.
+
+## Community And Support
+
+For questions, discussions, or general support, join the official Discord
+community:
+
+**[Join the Discord Server](https://discord.gg/mhwK2QFNBA)**
+
+For bug reports or feature requests, please open an issue in this repository.
 
 ## License
 
