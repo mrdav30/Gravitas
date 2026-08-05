@@ -34,10 +34,10 @@
 		</PackageReference>
 	</ItemGroup>
 	<ItemGroup Condition="'$(DisableMemoryPack)' != 'true'">
-		<PackageReference Include="FixedMathSharp.FluentAssertions" Version="6.0.0" />
+		<PackageReference Include="FixedMathSharp.FluentAssertions" Version="7.0.0" />
 	</ItemGroup>
 	<ItemGroup Condition="'$(DisableMemoryPack)' == 'true'">
-		<PackageReference Include="FixedMathSharp.FluentAssertions.Lean" Version="6.0.0" />
+		<PackageReference Include="FixedMathSharp.FluentAssertions.Lean" Version="7.0.0" />
 	</ItemGroup>
 	<ItemGroup>
 		<Compile Include="..\Gravitas.SharedBenchmarkSupport\ContinuousCollisionBenchmarkLayout.cs" Link="Support\ContinuousCollisionBenchmarkLayout.cs" />

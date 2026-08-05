@@ -48,8 +48,11 @@
 	<!-- NuGet Packaging Metadata -->
 	<PropertyGroup>
 		<Authors>mrdav30</Authors>
-		<Description></Description>
-		<PackageIconUrl>icon.png</PackageIconUrl>
+		<Description>Deterministic fixed-point physics for lockstep simulations and games.</Description>
+		<PackageTags></PackageTags>
+		<RepositoryUrl>https://github.com/mrdav30/Gravitas</RepositoryUrl>
+		<PackageIcon>icon.png</PackageIcon>
+		<PackageIconUrl>https://raw.githubusercontent.com/mrdav30/gravitas/main/icon.png</PackageIconUrl>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<PackageLicenseFile>LICENSE</PackageLicenseFile>
 		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
@@ -90,22 +93,30 @@
 	<!-- Dependencies and Package References -->
 	<ItemGroup Condition="'$(DisableMemoryPack)' != 'true'">
 		<PackageReference Include="MemoryPack" Version="1.21.4" />
-		<PackageReference Include="FixedMathSharp" Version="6.0.0" />
-		<PackageReference Include="FixedMathSharp.Chronicler" Version="6.0.0" />
-		<PackageReference Include="SwiftCollections" Version="6.0.0" />
-		<PackageReference Include="SwiftCollections.FixedMathSharp" Version="6.0.0" />
-		<PackageReference Include="GridForge" Version="8.0.0" />
-		<PackageReference Include="Chronicler.Core" Version="0.3.0" />
+		<PackageReference Include="FixedMathSharp" Version="7.0.0" Condition="'$(UseLocalLsfStack)' != 'true'" />
+		<PackageReference Include="FixedMathSharp.Chronicler" Version="7.0.0" Condition="'$(UseLocalLsfStack)' != 'true'" />
+		<PackageReference Include="SwiftCollections" Version="7.0.0" Condition="'$(UseLocalLsfStack)' != 'true'" />
+		<PackageReference Include="SwiftCollections.FixedMathSharp" Version="7.0.0" Condition="'$(UseLocalLsfStack)' != 'true'" />
+		<PackageReference Include="GridForge" Version="9.0.0" Condition="'$(UseLocalLsfStack)' != 'true'" />
+		<PackageReference Include="Chronicler.Core" Version="0.4.0" Condition="'$(UseLocalLsfStack)' != 'true'" />
 	</ItemGroup>
 
 	<ItemGroup Condition="'$(DisableMemoryPack)' == 'true'">
-		<PackageReference Include="FixedMathSharp.Lean" Version="6.0.0" />
-		<PackageReference Include="FixedMathSharp.Chronicler.Lean" Version="6.0.0" />
-		<PackageReference Include="SwiftCollections.Lean" Version="6.0.0" />
-		<PackageReference Include="SwiftCollections.FixedMathSharp.Lean" Version="6.0.0" />
-		<PackageReference Include="GridForge.Lean" Version="8.0.0" />
-		<PackageReference Include="Chronicler.Core.Lean" Version="0.3.0" />
-		<PackageReference Include="Chronicler.MemoryPackShim" Version="0.3.0" PrivateAssets="all" />
+		<PackageReference Include="FixedMathSharp.Lean" Version="7.0.0" Condition="'$(UseLocalLsfStack)' != 'true'" />
+		<PackageReference Include="FixedMathSharp.Chronicler.Lean" Version="7.0.0" Condition="'$(UseLocalLsfStack)' != 'true'" />
+		<PackageReference Include="SwiftCollections.Lean" Version="7.0.0" Condition="'$(UseLocalLsfStack)' != 'true'" />
+		<PackageReference Include="SwiftCollections.FixedMathSharp.Lean" Version="7.0.0" Condition="'$(UseLocalLsfStack)' != 'true'" />
+		<PackageReference Include="GridForge.Lean" Version="9.0.0" Condition="'$(UseLocalLsfStack)' != 'true'" />
+		<PackageReference Include="Chronicler.Core.Lean" Version="0.4.0" Condition="'$(UseLocalLsfStack)' != 'true'" />
+		<PackageReference Include="Chronicler.MemoryPackShim" Version="0.4.0" Condition="'$(UseLocalLsfStack)' != 'true'" />
+	</ItemGroup>
+
+	<ItemGroup Condition="'$(UseLocalLsfStack)' == 'true'">
+		<ProjectReference Include="..\..\..\FixedMathSharp\src\FixedMathSharp\FixedMathSharp.csproj" />
+		<ProjectReference Include="..\..\..\FixedMathSharp\src\FixedMathSharp.Chronicler\FixedMathSharp.Chronicler.csproj" />
+		<ProjectReference Include="..\..\..\SwiftCollections\src\SwiftCollections\SwiftCollections.csproj" />
+		<ProjectReference Include="..\..\..\SwiftCollections\src\SwiftCollections.FixedMathSharp\SwiftCollections.FixedMathSharp.csproj" />
+		<ProjectReference Include="..\..\..\GridForge\src\GridForge\GridForge.csproj" />
 	</ItemGroup>
 
 	<ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.1'">
