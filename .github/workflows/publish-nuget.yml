@@ -56,21 +56,29 @@ jobs:
         uses: gittools/actions/gitversion/execute@v4.5.0
 
       - name: Validate release tag version
+        id: release-version
         shell: bash
         env:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
-          PACKAGE_VERSION: ${{ steps.gitversion.outputs.semVer }}
+          GITVERSION_BASE: ${{ steps.gitversion.outputs.majorMinorPatch }}
         run: |
           set -euo pipefail
 
           release_version="${RELEASE_TAG#v}"
           release_version="${release_version#V}"
+          release_base="${release_version%%-*}"
 
-          if [[ "$release_version" != "$PACKAGE_VERSION" ]]; then
-            echo "::error::Release tag '$RELEASE_TAG' resolves to '$release_version', but GitVersion produced package version '$PACKAGE_VERSION'."
+          if [[ ! "$release_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$ ]]; then
+            echo "::error::Release tag '$RELEASE_TAG' is not a supported package version."
             exit 1
           fi
 
+          if [[ "$release_base" != "$GITVERSION_BASE" ]]; then
+            echo "::error::Release tag '$RELEASE_TAG' has base version '$release_base', but GitVersion produced '$GITVERSION_BASE'."
+            exit 1
+          fi
+
+          echo "package-version=$release_version" >> "$GITHUB_OUTPUT"
           echo "Release version validated: $release_version"
 
       - name: Cache NuGet packages
@@ -91,10 +99,10 @@ jobs:
       - name: Build Release packages
         shell: bash
         env:
-          PACKAGE_VERSION: ${{ steps.gitversion.outputs.semVer }}
+          PACKAGE_VERSION: ${{ steps.release-version.outputs.package-version }}
           ASSEMBLY_VERSION: ${{ steps.gitversion.outputs.assemblySemVer }}
           FILE_VERSION: ${{ steps.gitversion.outputs.assemblySemFileVer }}
-          INFORMATIONAL_VERSION: ${{ steps.gitversion.outputs.informationalVersion }}
+          INFORMATIONAL_VERSION: ${{ steps.release-version.outputs.package-version }}+Sha.${{ steps.gitversion.outputs.shortSha }}
         run: |
           set -euo pipefail
 
@@ -115,10 +123,10 @@ jobs:
       - name: Build ReleaseLean packages
         shell: bash
         env:
-          PACKAGE_VERSION: ${{ steps.gitversion.outputs.semVer }}
+          PACKAGE_VERSION: ${{ steps.release-version.outputs.package-version }}
           ASSEMBLY_VERSION: ${{ steps.gitversion.outputs.assemblySemVer }}
           FILE_VERSION: ${{ steps.gitversion.outputs.assemblySemFileVer }}
-          INFORMATIONAL_VERSION: ${{ steps.gitversion.outputs.informationalVersion }}
+          INFORMATIONAL_VERSION: ${{ steps.release-version.outputs.package-version }}+Sha.${{ steps.gitversion.outputs.shortSha }}
         run: |
           set -euo pipefail
 
@@ -136,7 +144,7 @@ jobs:
       - name: Validate package artifacts
         shell: bash
         env:
-          PACKAGE_VERSION: ${{ steps.gitversion.outputs.semVer }}
+          PACKAGE_VERSION: ${{ steps.release-version.outputs.package-version }}
         run: |
           set -euo pipefail
 
@@ -177,7 +185,7 @@ jobs:
       - name: Upload package artifact
         uses: actions/upload-artifact@v7
         with:
-          name: nuget-packages-${{ steps.gitversion.outputs.semVer }}
+          name: nuget-packages-${{ steps.release-version.outputs.package-version }}
           path: ${{ env.NUGET_OUTPUT }}/*
           if-no-files-found: error
 
