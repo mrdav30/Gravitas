@@ -11,10 +11,10 @@ contact anchors, paired atomic application, deterministic impulse ordering,
 full-domain fallback behavior, or the zero-allocation runtime contract.
 
 Retain only changes that remove demonstrated work. A timing-only optimization
-should normally improve its affected direct and downstream rows by at least
-`5%` repeatably. Smaller changes may remain only when they delete meaningful
-code or provide an independently useful policy-neutral specialization without
-regressing sibling rows.
+should normally improve its affected direct and downstream rows by at least `5%`
+repeatably. Smaller changes may remain only when they delete meaningful code or
+provide an independently useful policy-neutral specialization without regressing
+sibling rows.
 
 ## Preserved Evidence
 
@@ -32,14 +32,14 @@ lower-stack binaries and the same BenchmarkDotNet job:
 Current response is slower in `23/24` cells. The median gap is `17.6%`; all rows
 remain at `0 B/op`. At 64 pairs the representative gaps are:
 
-| Contact shape | Pre-hardening | Current | Delta |
-| --- | ---: | ---: | ---: |
-| Single | `566.5 us` | `736.1 us` | `+29.9%` |
-| Face manifold | `1.826 ms` | `2.098 ms` | `+14.9%` |
-| Resting face | `1.675 ms` | `1.851 ms` | `+10.5%` |
-| Cylinder | `375.7 us` | `448.3 us` | `+19.3%` |
-| Mesh | `1.594 ms` | `1.801 ms` | `+13.0%` |
-| Compound part | `375.3 us` | `433.5 us` | `+15.5%` |
+| Contact shape | Pre-hardening |    Current |    Delta |
+| ------------- | ------------: | ---------: | -------: |
+| Single        |    `566.5 us` | `736.1 us` | `+29.9%` |
+| Face manifold |    `1.826 ms` | `2.098 ms` | `+14.9%` |
+| Resting face  |    `1.675 ms` | `1.851 ms` | `+10.5%` |
+| Cylinder      |    `375.7 us` | `448.3 us` | `+19.3%` |
+| Mesh          |    `1.594 ms` | `1.801 ms` | `+13.0%` |
+| Compound part |    `375.3 us` | `433.5 us` | `+15.5%` |
 
 Artifacts:
 
@@ -49,17 +49,16 @@ Artifacts:
 ## Root Cause
 
 A sampled Release trace of the ordinary 64-pair single-contact path attributes
-roughly `44%` inclusive time to
-`WidePointAnchor3d.TryGetRelativeOffset(...)`. Contact response currently sends
-each contact anchor and its owning body's center-of-mass anchor through the
-general two-frame rational reducer even though ordinary contacts usually place
-both anchors in the same rigid frame.
+roughly `44%` inclusive time to `WidePointAnchor3d.TryGetRelativeOffset(...)`.
+Contact response currently sends each contact anchor and its owning body's
+center-of-mass anchor through the general two-frame rational reducer even though
+ordinary contacts usually place both anchors in the same rigid frame.
 
-The general reducer constructs two rational quaternion bases, evaluates six
-wide rotated projections, forms three wide ratios, and rounds all three final
+The general reducer constructs two rational quaternion bases, evaluates six wide
+rotated projections, forms three wide ratios, and rounds all three final
 coordinates. That work is required for unrelated frames and for local
-differences that cannot be represented before rotation, but it is redundant
-when both anchors share a frame and their exact local difference is compact.
+differences that cannot be represented before rotation, but it is redundant when
+both anchors share a frame and their exact local difference is compact.
 
 The normal solver and exact ratio machinery remain visible in the trace, but
 they are not the first optimization target while anchor reduction dominates the
@@ -88,15 +87,15 @@ by the profile and downstream contact fixtures:
 
 This is a policy-neutral FixedMathSharp optimization of an existing public
 contract. It adds no API, cache, new arithmetic owner, approximate gate, or
-second semantic answer. Exact local residuals and independent local
-translations continue through the existing exact reducer.
+second semantic answer. Exact local residuals and independent local translations
+continue through the existing exact reducer.
 
 ## Phased Work Plan
 
 Every phase must retain 100% reachable line, branch, and method coverage in each
 touched repository. Tests should protect numerical behavior rather than API
-shape, and newly unreachable or superseded code should be deleted before a
-phase closes.
+shape, and newly unreachable or superseded code should be deleted before a phase
+closes.
 
 ### Phase 0: Evidence And Design
 
@@ -159,35 +158,35 @@ phase closes.
 The direct auto-invocation benchmark uses three launches, 20 warmups, and 30
 measured iterations. Against the matching pre-change artifact:
 
-| Point-anchor relation | Baseline | Final | Delta | Allocated |
-| --- | ---: | ---: | ---: | ---: |
-| Same identity frame | `1.984 us` | `82.00 ns` | `-95.9%` | `0 B` |
-| Same rotated frame | `2.118 us` | `826.36 ns` | `-61.0%` | `0 B` |
-| Identity frames, different origins | n/a | `78.65 ns` | new guard | `0 B` |
+| Point-anchor relation              |   Baseline |       Final |     Delta | Allocated |
+| ---------------------------------- | ---------: | ----------: | --------: | --------: |
+| Same identity frame                | `1.984 us` |  `82.00 ns` |  `-95.9%` |     `0 B` |
+| Same rotated frame                 | `2.118 us` | `826.36 ns` |  `-61.0%` |     `0 B` |
+| Identity frames, different origins |        n/a |  `78.65 ns` | new guard |     `0 B` |
 
 The unchanged 24-row Gravitas matrix was repeated twice with 100 warmups and 20
-measured iterations. The confirmation differs from the first optimized matrix
-by only `0.7%` median. Across all 24 rows it is `46.4%` faster than the preserved
-exact-response baseline and `36.0%` faster than the older compact
-pre-hardening implementation. Representative 64-pair confirmation rows are:
+measured iterations. The confirmation differs from the first optimized matrix by
+only `0.7%` median. Across all 24 rows it is `46.4%` faster than the preserved
+exact-response baseline and `36.0%` faster than the older compact pre-hardening
+implementation. Representative 64-pair confirmation rows are:
 
-| Contact shape | Pre-hardening | Exact baseline | Final | Delta vs pre-hardening |
-| --- | ---: | ---: | ---: | ---: |
-| Single | `566.5 us` | `736.1 us` | `497.91 us` | `-12.1%` |
-| Face manifold | `1.826 ms` | `2.098 ms` | `1.123 ms` | `-38.5%` |
-| Resting face | `1.675 ms` | `1.851 ms` | `839.82 us` | `-49.9%` |
-| Cylinder | `375.7 us` | `448.3 us` | `235.62 us` | `-37.3%` |
-| Mesh | `1.594 ms` | `1.801 ms` | `825.91 us` | `-48.2%` |
-| Compound part | `375.3 us` | `433.5 us` | `233.65 us` | `-37.7%` |
+| Contact shape | Pre-hardening | Exact baseline |       Final | Delta vs pre-hardening |
+| ------------- | ------------: | -------------: | ----------: | ---------------------: |
+| Single        |    `566.5 us` |     `736.1 us` | `497.91 us` |               `-12.1%` |
+| Face manifold |    `1.826 ms` |     `2.098 ms` |  `1.123 ms` |               `-38.5%` |
+| Resting face  |    `1.675 ms` |     `1.851 ms` | `839.82 us` |               `-49.9%` |
+| Cylinder      |    `375.7 us` |     `448.3 us` | `235.62 us` |               `-37.3%` |
+| Mesh          |    `1.594 ms` |     `1.801 ms` | `825.91 us` |               `-48.2%` |
+| Compound part |    `375.3 us` |     `433.5 us` | `233.65 us` |               `-37.7%` |
 
 Every direct and downstream row reports `0 B/op`. The existing generic point
 anchor and exact residual paths remain unchanged fallbacks. Coverage review
 deleted two superseded scale-zero branches rather than manufacturing tests for
 paths made unreachable by the public zero-scale result.
 
-Independent review found no production defect. Its only test-quality finding
-was closed with raw-unit round-to-even coverage and an exact expected vector for
-the unrepresentable-local wide fallback.
+Independent review found no production defect. Its only test-quality finding was
+closed with raw-unit round-to-even coverage and an exact expected vector for the
+unrepresentable-local wide fallback.
 
 Validation:
 

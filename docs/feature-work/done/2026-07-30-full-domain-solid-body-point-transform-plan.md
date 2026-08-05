@@ -3,10 +3,9 @@
 **Status:** Complete, including the approved ownership and 2D-parity fast
 follow.
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use
-> `superpowers:executing-plans` to implement this plan task-by-task in the
-> owner-approved current `develop` worktrees. Use
-> `superpowers:test-driven-development` while changing behavior,
+> **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:executing-plans`
+> to implement this plan task-by-task in the owner-approved current `develop`
+> worktrees. Use `superpowers:test-driven-development` while changing behavior,
 > `superpowers:requesting-code-review` before closure, and
 > `superpowers:verification-before-completion` before reporting completion.
 > Checkboxes are the living progress record.
@@ -15,11 +14,12 @@ follow.
 complete representable `Fixed64` domain without changing the authoritative
 body-pose or host hierarchy-scale contract.
 
-**Original Architecture:** Reuse FixedMathSharp's existing exact forward scaled-point
-transform. Add its missing inverse counterpart so world subtraction, inverse
-rotation, and component division remain one rational operation until final
-round-half-to-even materialization. `SolidBody` exposes matching throwing and
-`Try*` pairs; the throwing methods delegate to the nonthrowing contract.
+**Original Architecture:** Reuse FixedMathSharp's existing exact forward
+scaled-point transform. Add its missing inverse counterpart so world
+subtraction, inverse rotation, and component division remain one rational
+operation until final round-half-to-even materialization. `SolidBody` exposes
+matching throwing and `Try*` pairs; the throwing methods delegate to the
+nonthrowing contract.
 
 **Tech Stack:** C# 11, Q32.32 `Fixed64`, FixedMathSharp fixed-width wide
 arithmetic, Gravitas `SolidBody`, xUnit v3, BenchmarkDotNet, `Release`, and
@@ -50,14 +50,12 @@ arithmetic, Gravitas `SolidBody`, xUnit v3, BenchmarkDotNet, `Release`, and
 ## Locked Design
 
 1. FixedMathSharp adds
-   `FixedQuaternion.TryInverseTransformScaledPoint(origin, worldPoint, scale,
-   out localPoint)`.
-2. The inverse evaluates
-   `InverseRotate(worldPoint - origin) / scale` as one exact rational expression
-   per final local coordinate. Zero scale and a zero quaternion fail
-   atomically.
-3. Generic scaled 3D transform mechanics move from the oriented-box reducer to
-   a focused numerics-wide owner alongside the new inverse. Existing public
+   `FixedQuaternion.TryInverseTransformScaledPoint(origin, worldPoint, scale, out localPoint)`.
+2. The inverse evaluates `InverseRotate(worldPoint - origin) / scale` as one
+   exact rational expression per final local coordinate. Zero scale and a zero
+   quaternion fail atomically.
+3. Generic scaled 3D transform mechanics move from the oriented-box reducer to a
+   focused numerics-wide owner alongside the new inverse. Existing public
    `TryTransformScaledPoint` and `Vector3d.TryComposeScaledLocalPoints` retain
    their signatures and behavior; no forwarding-only layer remains.
 4. `SolidBody.TryTransformPoint(...)` first obtains strict canonical host scale,
@@ -67,10 +65,10 @@ arithmetic, Gravitas `SolidBody`, xUnit v3, BenchmarkDotNet, `Release`, and
 6. Existing `TransformPoint(...)` and `InverseTransformPoint(...)` remain the
    concise convenience surface and throw when their corresponding `Try*`
    operation fails.
-7. The original issue did not add a `SolidBody2D` point-transform API because
-   no public counterpart existed. The approved fast follow below supersedes
-   that narrow closure decision after the ownership review established a
-   first-class transform and body-level parity contract.
+7. The original issue did not add a `SolidBody2D` point-transform API because no
+   public counterpart existed. The approved fast follow below supersedes that
+   narrow closure decision after the ownership review established a first-class
+   transform and body-level parity contract.
 
 ## Alternatives Rejected
 
@@ -78,8 +76,8 @@ arithmetic, Gravitas `SolidBody`, xUnit v3, BenchmarkDotNet, `Release`, and
   already-rounded scale/rotation coefficients and general matrix inversion
   introduces a broader failure contract than the explicit TRS operation.
 - **Gravitas-only wide helper:** scale/rotation/translation point conversion is
-  reusable deterministic mathematics and the exact forward half already lives
-  in FixedMathSharp.
+  reusable deterministic mathematics and the exact forward half already lives in
+  FixedMathSharp.
 - **Only `Try*` methods:** forcing every ordinary adapter call to handle a
   boolean would make the public surface needlessly cumbersome.
 - **Only throwing methods:** expected domain-boundary and singular-transform
@@ -121,8 +119,7 @@ inverse and Gravitas adoption are the complete root-cause fix.
   `../FixedMathSharp/tests/FixedMathSharp.Tests/Numerics/ScaledCompositeTransform.Tests.cs`
 - Modify:
   `../FixedMathSharp/tests/FixedMathSharp.Benchmarks/QuaternionBenchmarks.cs`
-- Update:
-  `../FixedMathSharp/docs/MIGRATION.md`
+- Update: `../FixedMathSharp/docs/MIGRATION.md`
 
 - [x] Add failing ordinary, anisotropic, mirrored-scale, scalar-face
       cancellation, singular-scale, zero-quaternion, true final-overflow,
@@ -149,14 +146,10 @@ bytes.
 
 **Files:**
 
-- Modify:
-  `src/Gravitas/Core/3D/SolidBody.cs`
-- Modify:
-  `tests/Gravitas.Tests/Core/SolidBodyIntegrationTests.cs`
-- Modify or create a focused benchmark row under:
-  `tests/Gravitas.Benchmarks`
-- Update:
-  `docs/wiki/HOST_INTEGRATION.md`
+- Modify: `src/Gravitas/Core/3D/SolidBody.cs`
+- Modify: `tests/Gravitas.Tests/Core/SolidBodyIntegrationTests.cs`
+- Modify or create a focused benchmark row under: `tests/Gravitas.Benchmarks`
+- Update: `docs/wiki/HOST_INTEGRATION.md`
 
 - [x] Add failing regressions for forward cancellation, inverse cancellation,
       anisotropic mirrored scale, singular scale, unavailable hierarchy scale,
@@ -175,9 +168,9 @@ atomically; convenience calls throw for unavailable hierarchy scale, singular
 inverse scale, or a truly unrepresentable final point. Root transforms retain
 the existing direct-scale fast path. The full Gravitas `Release` coverage run
 passes 3,866 tests at 43,664/43,664 lines, 12,775/12,775 branches, and
-4,503/4,503 methods; `ReleaseLean` passes 3,811 tests. Ordinary and
-full-domain round trips measure 3.520 us and 2.484 us respectively at zero
-managed allocation in ShortRun.
+4,503/4,503 methods; `ReleaseLean` passes 3,811 tests. Ordinary and full-domain
+round trips measure 3.520 us and 2.484 us respectively at zero managed
+allocation in ShortRun.
 
 ## Phase 3: Closure
 
@@ -188,8 +181,8 @@ managed allocation in ShortRun.
 - [x] Audit pure 2D parity and record the no-new-API decision.
 - [x] Request independent cross-stack code review and resolve all findings.
 - [x] Move this plan to `docs/feature-work/done`.
-- [x] Move the issue from the ordered queue to resolved history with verification
-      evidence.
+- [x] Move the issue from the ordered queue to resolved history with
+      verification evidence.
 - [x] Update `feature-work-overview.md`.
 
 **Phase 3 result:** Standard and Lean multi-target package builds are
@@ -197,10 +190,10 @@ warning-free, both full suites and exact coverage gates pass, and all four
 focused benchmark rows allocate zero managed bytes. Host and migration docs
 state the exact failure contract. Pure 2D intentionally retains its existing
 internal exact transforms without adding an unused body-level API. Independent
-cross-stack review confirmed the arithmetic derivation, ownership, API,
-failure, test, and performance contracts and requested only complete generated
-XML failure documentation, generic local-space terminology, and final plan
-movement; all findings are resolved.
+cross-stack review confirmed the arithmetic derivation, ownership, API, failure,
+test, and performance contracts and requested only complete generated XML
+failure documentation, generic local-space terminology, and final plan movement;
+all findings are resolved.
 
 ---
 
@@ -232,9 +225,9 @@ physics-pose conversion.
    - `GetLocalPoint` / `TryGetLocalPoint`
 6. `SolidBody2D` exposes the same authoritative API using `Vector2d` and the
    Gravitas X/Z simulation-plane convention.
-7. Body conversion uses authoritative position and rotation plus the
-   collider's committed owner-scale snapshot. It does not combine
-   authoritative body state with a newly read, potentially mutated host scale.
+7. Body conversion uses authoritative position and rotation plus the collider's
+   committed owner-scale snapshot. It does not combine authoritative body state
+   with a newly read, potentially mutated host scale.
 8. `FixedTransform` conversion answers the current authored, host, or
    presentation snapshot. Body conversion answers the current deterministic
    simulation state. The two may intentionally differ during visual
@@ -271,14 +264,12 @@ physics-pose conversion.
 
 **Interfaces:**
 
-- Produces:
-  `Vector3d TransformPoint(Vector3d point)`,
+- Produces: `Vector3d TransformPoint(Vector3d point)`,
   `bool TryTransformPoint(Vector3d point, out Vector3d result)`,
   `Vector3d InverseTransformPoint(Vector3d point)`,
-  `bool TryInverseTransformPoint(Vector3d point, out Vector3d result)`,
-  and explicit X/Z `Vector2d` counterparts named in the locked contract.
-- Reuses:
-  `TryGetLocalToWorldMatrix`, `TryGetVerifiedInverse`, and
+  `bool TryInverseTransformPoint(Vector3d point, out Vector3d result)`, and
+  explicit X/Z `Vector2d` counterparts named in the locked contract.
+- Reuses: `TryGetLocalToWorldMatrix`, `TryGetVerifiedInverse`, and
   `Fixed4x4.TryTransformAffinePoint`.
 
 - [x] Add focused failing tests proving that 3D conversion uses the complete
@@ -293,57 +284,57 @@ physics-pose conversion.
 - [x] Run:
 
       ```powershell
-      dotnet test tests/FixedMathSharp.Tests/FixedMathSharp.Tests.csproj `
-        -c Release --no-restore `
-        --filter "FullyQualifiedName~FixedTransformTests"
-      ```
+          dotnet test tests/FixedMathSharp.Tests/FixedMathSharp.Tests.csproj `
+            -c Release --no-restore `
+            --filter "FullyQualifiedName~FixedTransformTests"
+          ```
 
-      Confirm the new tests fail because the point-conversion APIs are absent.
+          Confirm the new tests fail because the point-conversion APIs are absent.
+
 - [x] Implement the throwing wrappers as direct delegates to their `Try*`
       counterparts:
 
       ```csharp
-      public Vector3d TransformPoint(Vector3d point)
-      {
-          if (!TryTransformPoint(point, out Vector3d result))
-              throw new InvalidOperationException(
-                  "The composed transform or final world point is not representable.");
-          return result;
-      }
-      ```
+          public Vector3d TransformPoint(Vector3d point)
+          {
+              if (!TryTransformPoint(point, out Vector3d result))
+                  throw new InvalidOperationException(
+                      "The composed transform or final world point is not representable.");
+              return result;
+          }
+          ```
 
 - [x] Implement 3D `Try*` conversion through strict matrix composition and one
       exact affine-point materialization:
 
       ```csharp
-      public bool TryTransformPoint(Vector3d point, out Vector3d result)
-      {
-          if (!TryGetLocalToWorldMatrix(out Fixed4x4 matrix))
+          public bool TryTransformPoint(Vector3d point, out Vector3d result)
           {
-              result = default;
-              return false;
-          }
+              if (!TryGetLocalToWorldMatrix(out Fixed4x4 matrix))
+              {
+                  result = default;
+                  return false;
+              }
 
-          return Fixed4x4.TryTransformAffinePoint(matrix, point, out result);
-      }
-      ```
+              return Fixed4x4.TryTransformAffinePoint(matrix, point, out result);
+          }
+          ```
 
 - [x] Make `TryGetWorldToLocalMatrix` obtain the strict composed matrix before
       verifying its inverse; it must not invert the saturating
       `LocalToWorldMatrix` view.
-- [x] Build an internal planar affine matrix from the composed X/Z block and
-      X/Z translation only. Preserve in-plane shear, use unit Y, and reject
-      nonzero `M12`, `M21`, `M23`, or `M32` before forward or inverse
-      conversion.
+- [x] Build an internal planar affine matrix from the composed X/Z block and X/Z
+      translation only. Preserve in-plane shear, use unit Y, and reject nonzero
+      `M12`, `M21`, `M23`, or `M32` before forward or inverse conversion.
 - [x] Run the focused command again and confirm every new and existing
       `FixedTransformTests` test passes.
 
 **Task 1 result:** `FixedTransform` now owns strict current-snapshot 3D and
 explicit X/Z point conversion. The 3D surface retains the complete composed
-affine hierarchy, including shear. The X/Z surface retains in-plane affine
-terms and rejects pitch-, roll-, or parent-induced plane coupling. Forward and
-inverse failures are atomic, and inverse verification uses exact matrix
-multiplication with the existing canonical fixed-point error bound.
+affine hierarchy, including shear. The X/Z surface retains in-plane affine terms
+and rejects pitch-, roll-, or parent-induced plane coupling. Forward and inverse
+failures are atomic, and inverse verification uses exact matrix multiplication
+with the existing canonical fixed-point error bound.
 
 ### Task 2: FixedMathSharp Exact 2D Inverse Scaled-Point Contract
 
@@ -383,19 +374,19 @@ multiplication with the existing canonical fixed-point error bound.
 - [x] Run:
 
       ```powershell
-      dotnet test tests/FixedMathSharp.Tests/FixedMathSharp.Tests.csproj `
-        -c Release --no-restore `
-        --filter "FullyQualifiedName~ScaledCompositeTransformTests"
-      ```
+          dotnet test tests/FixedMathSharp.Tests/FixedMathSharp.Tests.csproj `
+            -c Release --no-restore `
+            --filter "FullyQualifiedName~ScaledCompositeTransformTests"
+          ```
 
-      Confirm failure occurs because the inverse planar API is absent.
+          Confirm failure occurs because the inverse planar API is absent.
+
 - [x] Implement the public method as the narrow entry to the existing internal
       wide owner.
-- [x] In `WideVector2dTransform`, retain
-      `worldPoint - origin`, inverse rotation, and component division as signed
-      wide numerators and denominators until the final round-half-to-even
-      `Fixed64` conversion. A zero scale component fails the complete operation
-      and returns `default`.
+- [x] In `WideVector2dTransform`, retain `worldPoint - origin`, inverse
+      rotation, and component division as signed wide numerators and
+      denominators until the final round-half-to-even `Fixed64` conversion. A
+      zero scale component fails the complete operation and returns `default`.
 - [x] Re-run the focused tests and the affected benchmark smoke test; confirm
       ordinary and full-domain paths allocate zero managed bytes.
 
@@ -409,20 +400,14 @@ full-domain benchmark smoke rows report zero managed allocation.
 
 **Files:**
 
-- Modify:
-  `src/Gravitas/Colliders/3D/LSCollider.ShapeTransaction.cs`
-- Modify:
-  `src/Gravitas/Colliders/2D/LSCollider2D.ShapeTransaction.cs`
-- Modify:
-  `src/Gravitas/Core/3D/SolidBody.cs`
-- Modify:
-  `src/Gravitas/Core/2D/SolidBody2D.cs`
-- Modify:
-  `tests/Gravitas.Tests/Core/SolidBodyIntegrationTests.cs`
+- Modify: `src/Gravitas/Colliders/3D/LSCollider.ShapeTransaction.cs`
+- Modify: `src/Gravitas/Colliders/2D/LSCollider2D.ShapeTransaction.cs`
+- Modify: `src/Gravitas/Core/3D/SolidBody.cs`
+- Modify: `src/Gravitas/Core/2D/SolidBody2D.cs`
+- Modify: `tests/Gravitas.Tests/Core/SolidBodyIntegrationTests.cs`
 - Modify or create:
   `tests/Gravitas.Tests/Core/SolidBody2DPointTransformTests.cs`
-- Modify:
-  `tests/Gravitas.Benchmarks/Core/SolidBodyPointTransformBenchmarks.cs`
+- Modify: `tests/Gravitas.Benchmarks/Core/SolidBodyPointTransformBenchmarks.cs`
 
 **Interfaces:**
 
@@ -451,35 +436,36 @@ full-domain benchmark smoke rows report zero managed allocation.
 - [x] Run:
 
       ```powershell
-      dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj `
-        -c Release --no-restore `
-        --filter "FullyQualifiedName~SolidBodyIntegrationTests|FullyQualifiedName~SolidBody2DPointTransformTests"
-      ```
+          dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj `
+            -c Release --no-restore `
+            --filter "FullyQualifiedName~SolidBodyIntegrationTests|FullyQualifiedName~SolidBody2DPointTransformTests"
+          ```
 
-      Confirm the renamed/parity tests fail because the approved body APIs and
-      committed-scale accessors are absent.
-- [x] Add allocation-free internal committed-scale accessors that return
-      `false` before the first shape commit rather than falling back to mutable
-      host state.
+          Confirm the renamed/parity tests fail because the approved body APIs and
+          committed-scale accessors are absent.
+
+- [x] Add allocation-free internal committed-scale accessors that return `false`
+      before the first shape commit rather than falling back to mutable host
+      state.
 - [x] Replace the legacy 3D `TransformPoint` surface with the authoritative
       `Get*Point` pairs and use the committed scale:
 
       ```csharp
-      public bool TryGetWorldPoint(Vector3d point, out Vector3d result)
-      {
-          if (!Collider.TryGetCommittedOwnerScale(out Vector3d scale))
+          public bool TryGetWorldPoint(Vector3d point, out Vector3d result)
           {
-              result = default;
-              return false;
-          }
+              if (!Collider.TryGetCommittedOwnerScale(out Vector3d scale))
+              {
+                  result = default;
+                  return false;
+              }
 
-          return Rotation.TryTransformScaledPoint(
-              Position3d,
-              point,
-              scale,
-              out result);
-      }
-      ```
+              return Rotation.TryTransformScaledPoint(
+                  Position3d,
+                  point,
+                  scale,
+                  out result);
+          }
+          ```
 
 - [x] Add the 2D counterparts over `_position`, `_rotation`, committed planar
       owner scale, `Vector2d.TryTransformScaledPoint`, and the Task 2 inverse.
@@ -501,19 +487,15 @@ three benchmark smoke rows pass without managed allocation.
 
 **Files:**
 
-- Modify:
-  `../FixedMathSharp/docs/wiki/coordinate-conventions.md`
-- Modify:
-  `../FixedMathSharp/docs/MIGRATION.md`
-- Modify:
-  `docs/wiki/HOST_INTEGRATION.md`
-- Modify:
-  `docs/feature-work/feature-work-overview.md`
+- Modify: `../FixedMathSharp/docs/wiki/coordinate-conventions.md`
+- Modify: `../FixedMathSharp/docs/MIGRATION.md`
+- Modify: `docs/wiki/HOST_INTEGRATION.md`
+- Modify: `docs/feature-work/feature-work-overview.md`
 - Modify:
   `docs/feature-work/2026-07-30-full-domain-solid-body-point-transform-plan.md`
 
-- [x] Document current-snapshot `FixedTransform` conversion, explicit X/Z
-      plane admission, and strict failure behavior.
+- [x] Document current-snapshot `FixedTransform` conversion, explicit X/Z plane
+      admission, and strict failure behavior.
 - [x] Document authoritative body conversion, the expected divergence from
       presentation transforms during interpolation, adapter ownership, and the
       prohibition on native double interpolation.
@@ -534,17 +516,16 @@ three benchmark smoke rows pass without managed allocation.
       correctness, determinism, performance, maintainability, API, test, and
       documentation finding.
 - [x] Record final test counts, coverage counts, allocation evidence, and
-      benchmark results here; mark the fast follow complete and return this
-      plan to `docs/feature-work/done`.
+      benchmark results here; mark the fast follow complete and return this plan
+      to `docs/feature-work/done`.
 
-**Task 4 result:** FixedMathSharp passes 2,603 `Release` and 2,582
-`ReleaseLean` tests at 44,334/44,334 lines, 8,393/8,393 branches, and
-3,320/3,320 methods. Gravitas passes 3,870 `Release` and 3,815 `ReleaseLean`
-tests at 43,028/43,028 lines, 12,779/12,779 branches, and 4,486/4,486 methods.
-Standard and Lean multi-target package builds are warning-free. ShortRun
-ordinary and full-domain planar inverse rows measure 1.673 us and 0.905 us;
-3D ordinary, 3D full-domain, and 2D ordinary body round trips measure 3.714 us,
-2.467 us, and 2.512 us. Every row and warmed allocation assertion reports zero
-managed bytes. The ordinary 3D result remains within the prior ShortRun noise
-band and the full-domain result is unchanged. Independent cross-stack review
-reported no findings.
+**Task 4 result:** FixedMathSharp passes 2,603 `Release` and 2,582 `ReleaseLean`
+tests at 44,334/44,334 lines, 8,393/8,393 branches, and 3,320/3,320 methods.
+Gravitas passes 3,870 `Release` and 3,815 `ReleaseLean` tests at 43,028/43,028
+lines, 12,779/12,779 branches, and 4,486/4,486 methods. Standard and Lean
+multi-target package builds are warning-free. ShortRun ordinary and full-domain
+planar inverse rows measure 1.673 us and 0.905 us; 3D ordinary, 3D full-domain,
+and 2D ordinary body round trips measure 3.714 us, 2.467 us, and 2.512 us. Every
+row and warmed allocation assertion reports zero managed bytes. The ordinary 3D
+result remains within the prior ShortRun noise band and the full-domain result
+is unchanged. Independent cross-stack review reported no findings.

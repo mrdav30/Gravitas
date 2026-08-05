@@ -7,14 +7,13 @@
 ## Goal
 
 Attempt one final bounded optimization pass without weakening the exact
-full-domain triangle relation or creating concave-specific production
-machinery. Retain a change only when unchanged Gravitas rows improve by at
-least `5%` repeatably, controls remain stable, warmed allocation stays `0 B`,
-and every modified repository retains 100% reachable line, branch, and method
-coverage.
+full-domain triangle relation or creating concave-specific production machinery.
+Retain a change only when unchanged Gravitas rows improve by at least `5%`
+repeatably, controls remain stable, warmed allocation stays `0 B`, and every
+modified repository retains 100% reachable line, branch, and method coverage.
 
-If the experiments miss that gate, revert them and classify the remaining
-signal as experimental capacity guidance. The deleted scalar relation is not a
+If the experiments miss that gate, revert them and classify the remaining signal
+as experimental capacity guidance. The deleted scalar relation is not a
 correctness-compatible target.
 
 ## Evidence And Design
@@ -23,8 +22,8 @@ The retained signed one-limb specialization improved the affected rows by
 `13.7-15.4%`, but the post-change profile still centers on
 `WideArithmetic.MultiplySigned576`, `MultiplySigned320`, and
 `GetMagnitudeBitLength`. Quaternion-derived rational-basis coefficients and
-denominators are exact signed two-limb values in ordinary normalized inputs,
-yet they still pay the generic `Signed576` by `Signed192` dispatch.
+denominators are exact signed two-limb values in ordinary normalized inputs, yet
+they still pay the generic `Signed576` by `Signed192` dispatch.
 
 The experiments are ordered by breadth and expected value:
 
@@ -101,12 +100,12 @@ return did not justify another branch in the shared arithmetic owner.
 Invocation-local rigid-frame preparation produced the following unchanged
 64-pair Short in-process results:
 
-| Row | Prior confirmation | Frame preparation | Change |
-| --- | ---: | ---: | ---: |
-| Concave mesh/mesh | `59.761 ms` | `60.220 ms` | `+0.77%` |
-| Dense concave mesh/mesh | `343.474 ms` | `344.444 ms` | `+0.28%` |
-| Contact-heavy concave mesh/mesh | `480.773 ms` | `482.460 ms` | `+0.35%` |
-| Closed dense mesh/mesh | `2.155 s` | `2.177 s` | `+1.04%` |
+| Row                             | Prior confirmation | Frame preparation |   Change |
+| ------------------------------- | -----------------: | ----------------: | -------: |
+| Concave mesh/mesh               |        `59.761 ms` |       `60.220 ms` | `+0.77%` |
+| Dense concave mesh/mesh         |       `343.474 ms` |      `344.444 ms` | `+0.28%` |
+| Contact-heavy concave mesh/mesh |       `480.773 ms` |      `482.460 ms` | `+0.35%` |
+| Closed dense mesh/mesh          |          `2.155 s` |         `2.177 s` | `+1.04%` |
 
 The ordinary convex mesh/mesh control measured `4.798 ms` and continued to use
 its separate convex relation. The focused 13 FixedMathSharp triangle-contact
@@ -117,14 +116,13 @@ test code from either rejected experiment remains.
 The evidence now favors reducing complete exact SAT evaluations: every
 BVH-admitted triangle pair can require up to 17 exact axes, while the tested
 two-limb dispatch and frame preparation were immaterial. A material improvement
-likely requires a separately designed topology or algorithm change, such as exact
-coplanar patch ownership or a proven exact miss classifier, rather than another
-local arithmetic or setup tweak. Dense dynamic concave mesh/mesh collision is
-therefore classified as experimental capacity-sensitive behavior. Primitive,
-convex, decomposed compound, and partitioned static-concave authoring remain the
-competitive release paths.
+likely requires a separately designed topology or algorithm change, such as
+exact coplanar patch ownership or a proven exact miss classifier, rather than
+another local arithmetic or setup tweak. Dense dynamic concave mesh/mesh
+collision is therefore classified as experimental capacity-sensitive behavior.
+Primitive, convex, decomposed compound, and partitioned static-concave authoring
+remain the competitive release paths.
 
 Rejected experiment artifacts are preserved under
 `../FixedMathSharp/artifacts/benchmarks/2026-08-02-triangle-pair-signed128-experiment`
-and
-`artifacts/benchmarks/2026-08-02-triangle-pair-frame-hoist-experiment`.
+and `artifacts/benchmarks/2026-08-02-triangle-pair-frame-hoist-experiment`.

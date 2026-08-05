@@ -13,34 +13,33 @@ simulations and games. It sits in the LSF stack after:
 4. `Gravitas` - deterministic physics, collision, raycasting, and simulation
    orchestration.
 
-This repository is in first-public-release hardening. Expect heavy redesigns
-where correctness, deterministic behavior, physical plausibility, or hot-path
-complexity demands them. Backward compatibility is not required unless the user
-explicitly asks for it. Do not preserve weak APIs with adapters or band-aid
-layers when a clean redesign is the right engineering move.
+Public API compatibility matters. Breaking changes should be intentional,
+documented, and reserved for cases where correctness, deterministic behavior,
+physical plausibility, or long-term maintainability justifies a major-version
+change. Do not preserve a flawed contract with adapters or band-aid layers when
+the task explicitly permits a clean redesign.
 
-Current priorities:
+Priorities:
 
 1. Preserve deterministic behavior first.
 2. Correct physics and collision behavior before broad refactors.
 3. Keep runtime hot paths low-complexity and allocation-conscious from the
    start.
 4. Support engine-agnostic hosts without renderer or ECS coupling.
-5. Build toward first-class 3D and 2D support, with an eventual mixed 2D/3D
-   simulation model.
-6. Maintain focused tests and benchmark baselines as release hardening proceeds.
+5. Maintain first-class 3D, pure 2D, and explicit mixed 2D/3D runtime paths.
+6. Maintain focused tests and benchmark baselines with behavior changes.
 
 ## Start Here
 
 Read these in order before making non-trivial changes:
 
-1. [`README.md`](README.md) for current package orientation.
-2. The stack context, when sibling repositories are available:
-   - `../FixedMathSharp/AGENTS.md` and `../FixedMathSharp/README.md`
-   - `../SwiftCollections/AGENTS.md` and `../SwiftCollections/README.md`
-   - `../GridForge/AGENTS.md` and `../GridForge/README.md`
-   - `../Chronicler/AGENTS.md` and `../Chronicler/README.md` when serialization
-     behavior is involved.
+1. [`README.md`](README.md) for package orientation.
+2. The affected lower-stack repository documentation:
+   - [FixedMathSharp](https://github.com/mrdav30/FixedMathSharp)
+   - [SwiftCollections](https://github.com/mrdav30/SwiftCollections)
+   - [GridForge](https://github.com/mrdav30/GridForge)
+   - [Chronicler](https://github.com/mrdav30/Chronicler) when serialization
+     behavior is involved
 3. [`docs/wiki/OVERVIEW.md`](docs/wiki/OVERVIEW.md), then the matching wiki page
    for the area being changed:
    [`HOST_INTEGRATION.md`](docs/wiki/HOST_INTEGRATION.md),
@@ -51,9 +50,9 @@ Read these in order before making non-trivial changes:
    [`SERIALIZATION.md`](docs/wiki/SERIALIZATION.md), or
    [`DIAGNOSTICS.md`](docs/wiki/DIAGNOSTICS.md) and
    [`DIAGNOSTIC_ADAPTERS.md`](docs/wiki/DIAGNOSTIC_ADAPTERS.md).
-4. Feature-work coordination docs when a task is part of ongoing hardening:
+4. Feature-work coordination docs when a task belongs to an active design:
    - [`feature-work-overview.md`](docs/feature-work/feature-work-overview.md)
-     for release scope, recommended ordering, and links to active plans.
+     for task scope, recommended ordering, and links to active plans.
    - [`benchmark-signal-hardening-backlog.md`](docs/feature-work/benchmark-signal-hardening-backlog.md)
      for measured benchmark, allocation, scaling, and profiler signals.
    - [`issue-tracker.md`](docs/feature-work/issue-tracker.md) for out-of-scope
@@ -73,22 +72,30 @@ Read these in order before making non-trivial changes:
 
 ## Source Of Truth
 
-When code, README, and generated docs disagree, prefer the code and project
-files. Keep docs honest as the library sheds outdated copied scaffolding.
+When code, README text, generated docs, and benchmark scaffolding disagree,
+prefer source, project files, tests, and workflows.
 
 Keep these aligned whenever behavior, public API, package shape, or developer
 workflow changes:
 
 - [`README.md`](README.md)
-- [`docs/wiki`](docs/wiki), especially when runtime ownership, host integration,
-  collision behavior, query behavior, serialization/replay behavior, lifecycle
-  order, or known runtime boundaries change.
-- [`docs/feature-work`](docs/feature-work) when hardening phase progress,
-  deferred decisions, experiment results, or follow-up plans change.
+- [`AGENTS.md`](AGENTS.md)
+- [`docs/api`](docs/api) for the generated API-site configuration and landing
+  content
+- [`docs/wiki`](docs/wiki), the source content for the GitHub Wiki, especially
+  when runtime ownership, host integration, collision behavior, query behavior,
+  serialization/replay behavior, lifecycle order, or known runtime boundaries
+  change.
+- [`docs/feature-work`](docs/feature-work) when active-plan progress, deferred
+  decisions, experiment results, or follow-up plans change.
 - [`tests/Gravitas.Tests`](tests/Gravitas.Tests)
 - [`tests/Gravitas.Benchmarks`](tests/Gravitas.Benchmarks) when performance
   claims or hot paths change.
 - Relevant workflow files under [`.github/workflows`](.github/workflows).
+
+Keep links within `docs/wiki` repository-friendly with their `.md` extensions.
+The wiki sync workflow rewrites wiki routes and repository source links for the
+published GitHub Wiki.
 
 ## Repository Map
 
@@ -109,7 +116,8 @@ workflow changes:
 | [`src/Gravitas/Support`](src/Gravitas/Support)                     | Layers, lifecycle hooks, coroutine scaffolding, transient state helpers                                            | Keep engine-specific assumptions out.                                                                                                  |
 | [`tests/Gravitas.Tests`](tests/Gravitas.Tests)                     | xUnit v3 test project                                                                                              | Covers runtime, settings, collision, partitions, queries, serialization, CCD, and authored shape behavior.                             |
 | [`tests/Gravitas.Benchmarks`](tests/Gravitas.Benchmarks)           | BenchmarkDotNet project                                                                                            | Covers context lifecycle, registration/partitioning, simulation, queries, diagnostics, mixed broad phase, 2D, meshes, and CCD scaling. |
-| [`docs/wiki`](docs/wiki)                                           | Developer-facing architecture and usage notes                                                                      | Keep current with runtime, host integration, collision, query, serialization/replay, and diagnostics changes.                          |
+| [`docs/api`](docs/api)                                             | DocFX configuration and documentation-site landing content                                                         | Generated output under `docs/api/obj` is ignored.                                                                                      |
+| [`docs/wiki`](docs/wiki)                                           | Developer-facing architecture and usage notes                                                                      | Keep aligned with runtime, host integration, collision, query, serialization/replay, and diagnostics changes.                          |
 
 Ignore generated output when reviewing structure:
 
@@ -120,9 +128,9 @@ Ignore generated output when reviewing structure:
 - `.vs/`
 - `BenchmarkDotNet.Artifacts/`
 
-## Runtime Architecture Snapshot
+## Runtime Architecture
 
-The current runtime uses explicit world-context ownership:
+The runtime uses explicit world-context ownership:
 
 - `GravitasWorldContext` is the host-facing runtime shell. It owns the
   `GridWorld`, context settings, physical environment, deterministic clock,
@@ -143,10 +151,10 @@ The current runtime uses explicit world-context ownership:
   `PhysicsRuntimeMode.Both` deliberately runs pure 2D and pure 3D side by side
   without cross-dimensional contacts.
 - `GravitasCollisionService` maps colliders into GridForge voxels through
-  `GridWorld` spatial hash and active-grid access, `WorldVoxelIndex`, and
+  `GridTracer` coverage, active-grid access, `WorldVoxelIndex`, and
   `PhysicsPartition`, using `SwiftCollections` pools and duplicate-check sets.
-  Partition membership is role aware: bodyless and explicit static colliders
-  are static, kinematic colliders are kinematic, and dynamic colliders remain
+  Partition membership is role aware: bodyless and explicit static colliders are
+  static, kinematic colliders are kinematic, and dynamic colliders remain
   dynamic regardless of their frozen solver axes.
 - `GravitasCollision2DService` maps pure 2D X/Z bounds into GridForge voxels
   through `PhysicsPartition2D`, using the internal Y=0 storage plane as
@@ -204,7 +212,7 @@ server, a test harness, or another simulation runner.
 | `Simulate`      | Fixed-rate simulation step                                 | Perform authoritative deterministic mutation only here or in `LateSimulate`.                                                |
 | `LateSimulate`  | End of the same fixed-rate step                            | Process deterministic deferred queues, pair cleanup, body late simulation, and post-step bookkeeping.                       |
 | `Visualize`     | Render/update frame                                        | Interpolate or publish presentation state. Do not mutate authoritative simulation state.                                    |
-| `LateVisualize` | Late render/update frame                                   | Currently hook-only; add built-in presentation work only for a real runtime invariant.                                      |
+| `LateVisualize` | Late render/update frame                                   | Hook-only; add built-in presentation work only for a real runtime invariant.                                                |
 | `UpdateGUI`     | Host UI/debug draw pass                                    | Keep this outside core physics unless it is diagnostics-only and non-authoritative.                                         |
 | `Deactivate`    | Session end, object disable, or object pooling             | Release registrations and pooled runtime state so the object/context can be reused or disposed.                             |
 | `Quit`          | Application shutdown                                       | Host concern. Core physics should not require application-lifetime callbacks for correctness.                               |
@@ -215,8 +223,8 @@ for visualization and host-facing presentation only.
 
 ## 2D, 3D, And Mixed-Dimension Direction
 
-Gravitas still has deeper 3D coverage, but pure 2D has a first-class runtime
-path through `SolidBody2D`, `LSCollider2D`, `GravitasPhysics2DService`,
+Gravitas provides first-class 3D, pure 2D, and mixed 2D/3D runtime paths. The
+pure 2D path uses `SolidBody2D`, `LSCollider2D`, `GravitasPhysics2DService`,
 `GravitasCollision2DService`, `PhysicsPartition2D`, `ColliderShapeDefinition2D`,
 `CompoundColliderPart2D`, and `LSCompoundCollider2D`. `PhysicsRuntimeMode` is a
 validated bitmask: `TwoD`, `ThreeD`, `Both`, and `Mixed` are valid settings
@@ -225,13 +233,13 @@ the dedicated mixed lifecycle path. `LSCollider2D` also caches a mixed
 `FixedBoundBox` using `PhysicsSettings.Mixed2DHalfThickness`, optional
 per-collider `MixedHalfThicknessOverride`, and the host transform's Y position.
 The mixed broad phase emits deterministic candidate keys through
-`PhysicsMixedPartition`; `CollisionDetectionMixed` covers current 3D primitive,
-compound, and mesh colliders against embedded 2D circle, AABB, and convex
-polygon slabs. `CollisionPairMixed` and `CollisionResponseMixed` provide the
-constrained impulse model: planar X/Z impulse can move 2D bodies, while vertical
-Y impulse affects only the 3D participant. Mixed diagnostics, explicit mixed
-queries, slab debug draw, and mixed CCD target collection are implemented;
-richer solver behavior remains future hardening work.
+`PhysicsMixedPartition`; `CollisionDetectionMixed` covers supported 3D
+primitive, compound, and mesh colliders against embedded 2D circle, AABB, and
+convex polygon slabs. `CollisionPairMixed` and `CollisionResponseMixed` provide
+the constrained impulse model: planar X/Z impulse can move 2D bodies, while
+vertical Y impulse affects only the 3D participant. Mixed diagnostics, explicit
+mixed queries, slab debug draw, and mixed CCD target collection use the same
+explicit dimension boundary.
 
 When adding or redesigning dimension-sensitive behavior:
 
@@ -246,14 +254,12 @@ When adding or redesigning dimension-sensitive behavior:
   slabs/prisms centered on host-transform Y, dimension-tagged pair identity,
   explicit trigger/contact events, and a plane-constrained 2D impulse model.
 - Keep dimensional choices explicit in public APIs and tests.
-- Avoid naming that implies engine-specific behavior. `SolidBody` is the current
-  term; future redesigns may rename or split it if that clarifies body
-  semantics.
+- Avoid naming that implies engine-specific behavior.
 
 ## Physics Quality Bar
 
-Future agents should bring senior simulation-physics judgment, not just general
-C# instincts.
+Physics changes require simulation-domain judgment, not just general C#
+instincts.
 
 Prefer:
 
@@ -270,17 +276,16 @@ Avoid:
 - arbitrary magic constants without documentation or tests.
 - silent clamping that hides unstable physics instead of fixing the model.
 - visual-only corrections in runtime simulation state.
-- fixes that only handle the current example while leaving the general collision
-  or integration issue unresolved.
+- fixes that only handle the reported example while leaving the general
+  collision or integration issue unresolved.
 - changes that improve one scenario by making another shape pair or dimension
   mode less physically coherent.
 
 ## Experimental Design And Evidence Bar
 
-Gravitas is the core value target of the LSF stack. Much of the current physics
-logic is experimental by design: it follows useful patterns from other physics
-systems where they help, but it should not copy another engine just because that
-engine's approach is familiar.
+Gravitas may use established or novel physics designs when the evidence supports
+them. It should not copy another engine merely because that engine's approach is
+familiar.
 
 Thinking outside the box is welcome when the evidence is strong. Novel
 algorithms, data layouts, collision strategies, integration models, or
@@ -310,9 +315,11 @@ The main external packages shape how this project should be changed:
   `FixedQuaternion`, `FixedTransform`, `Fixed3x3`, `Fixed4x4`, deterministic
   bounds, geometry primitives, and reusable barycentric product helpers such as
   `Fixed3x3.CreateBarycentricProductSums(...)`. Before hand-rolling spatial
-  math, review `../FixedMathSharp/src/FixedMathSharp/Geometry`, especially
-  `FixedBoundBox`, `FixedBoundArea`, `BoundingSphere`, `BoundingFrustum`,
-  `FixedRay`, `FixedPlane`, `ContainmentType`, and `FixedPlaneIntersectionType`.
+  math, review the
+  [FixedMathSharp geometry source](https://github.com/mrdav30/FixedMathSharp/tree/main/src/FixedMathSharp/Geometry),
+  especially `FixedBoundBox`, `FixedBoundArea`, `BoundingSphere`,
+  `BoundingFrustum`, `FixedRay`, `FixedPlane`, `ContainmentType`, and
+  `FixedPlaneIntersectionType`.
 - `SwiftCollections`: prefer `SwiftBucket`, `SwiftList`, `SwiftQueue`,
   `SwiftStack`, `SwiftHashSet`, object pools, and related low-allocation types
   in runtime or hot-path code. For broad-phase or spatial-query experiments,
@@ -348,8 +355,8 @@ Use this ownership test before adding or moving code:
   quaternions, computational geometry, exact ratios, fixed-width wide
   operations, rounding, and final materialization whose contract is meaningful
   without a physics engine.
-- Gravitas owns rigid-body meaning and policy: bodies, colliders, contacts,
-  mass and inertia interpretation, mobility constraints, impulses, restitution,
+- Gravitas owns rigid-body meaning and policy: bodies, colliders, contacts, mass
+  and inertia interpretation, mobility constraints, impulses, restitution,
   friction, solver accumulation, warm starts, CCD response, and physics-specific
   failure or threshold decisions.
 - If a type or method would be awkward or misleading in a general fixed-point
@@ -359,12 +366,12 @@ Use this ownership test before adding or moving code:
 Promoting a FixedMathSharp member from `private` to `internal` is appropriate
 only when all of the following are true:
 
-- Gravitas has a current production use, not a speculative future use.
+- Gravitas has an implemented production use, not a speculative use.
 - The operation is policy-neutral math or geometry owned by FixedMathSharp.
 - Its width, sign, rounding, overflow, and failure contract can be stated
   independently of bodies, colliders, contacts, or solver policy.
-- The narrowest required member or focused owner is promoted; unrelated
-  helpers and private state remain private.
+- The narrowest required member or focused owner is promoted; unrelated helpers
+  and private state remain private.
 - FixedMathSharp tests continue to verify the internal arithmetic contract, and
   Gravitas tests verify the physics semantics built on top of it.
 
@@ -381,24 +388,27 @@ host-facing APIs. `Gravitas.Tests` and `Gravitas.Benchmarks` must exercise them
 through Gravitas-owned internal behavior; do not request additional
 FixedMathSharp friendship for those assemblies.
 
-Any consumed FixedMathSharp internal change is a coordinated compatibility
-event even when neither public API changes. Update both repositories together,
-retain local project links through validation, preserve 100% reachable line,
-branch, and method coverage, and rerun affected allocation and performance
-gates. Release FixedMathSharp first, then validate Gravitas against the released
-package before releasing Gravitas.
+Any consumed FixedMathSharp internal change is a coordinated compatibility event
+even when neither public API changes. Update both repositories together,
+validate with `UseLocalLsfStack=true`, preserve 100% reachable line, branch, and
+method coverage, and rerun affected allocation and performance gates. Release
+FixedMathSharp first, then validate Gravitas against the released package before
+releasing Gravitas.
 
 Do not casually replace these with standard floating-point, general-purpose
 collections, or non-deterministic alternatives.
 
-When a lower-stack API change would make Gravitas cleaner or safer, prefer a
-local project reference to the sibling repository over a downstream workaround.
-Apply the reference consistently to the main library, tests, and benchmarks as
-needed, because local project references sometimes need to be explicit in test
-projects as well. Treat these local links as active validation scaffolding:
-leave them unstaged/uncommitted unless the repository owner explicitly asks to
-commit them, and restore package references before release validation unless the
-user explicitly asks to leave local links in place.
+When coordinated lower-stack validation is required, use the repository's
+`UseLocalLsfStack` MSBuild property instead of editing project references:
+
+```bash
+dotnet restore Gravitas.slnx -p:UseLocalLsfStack=true
+dotnet test Gravitas.slnx --configuration Release -p:UseLocalLsfStack=true
+```
+
+This mode expects the sibling LSF repositories at the relative locations
+declared in `src/Gravitas/Gravitas.csproj`. Package-based restore remains the
+release-validation path.
 
 ## Determinism Rules
 
@@ -457,7 +467,7 @@ Optimization rules:
   structures before creating custom bounds, ray, plane, BVH, octree, or spatial
   hash code. If existing primitives are skipped, document why they do not fit.
 - For hot-path work, capture a benchmark baseline before source changes when no
-  current artifact exists, then compare the same benchmark after the change.
+  suitable artifact exists, then compare the same benchmark after the change.
   Explain why the new path is measurably better or complexity-safer.
 - Pool only when lifetime and ownership are obvious and testable.
 - Clear or return pooled collections on every path, including early exits.
@@ -467,14 +477,13 @@ Optimization rules:
 - Add or update benchmarks for meaningful changes to collision dispatch,
   partitioning, raycasting, pooling, or broad-phase behavior.
 
-## Serialization Status
+## Serialization
 
-Serialization is explicit deterministic state-transfer infrastructure under
-release hardening. Read
+Serialization is explicit deterministic state-transfer infrastructure. Read
 [`docs/wiki/SERIALIZATION.md`](docs/wiki/SERIALIZATION.md) before changing
 `RecordData`, settings snapshots, load defaults, or replay tests.
 
-Current behavior observed in source:
+Behavior defined by source:
 
 - Runtime body and collider state use explicit Chronicler
   `IRecordable.RecordData(...)` methods.
@@ -484,8 +493,8 @@ Current behavior observed in source:
   collider IDs, service indices, partition coordinates, pair tables, query
   buffers, diagnostic buffers, delegates, lifecycle hooks, and visual
   interpolation buffers are not snapshot identity.
-- Settings and layer helpers currently use MemoryPack attributes directly;
-  verify the Lean build when touching them.
+- Settings and layer helpers use MemoryPack attributes directly; verify the Lean
+  build when touching them.
 - The project has `Release` and `ReleaseLean` configurations. `ReleaseLean`
   defines `GRAVITAS_DISABLE_MEMORYPACK` and is expected to keep the same core
   physics API without built-in MemoryPack dependency.
@@ -512,7 +521,7 @@ Observed project conventions:
 - `LangVersion` is `11.0`.
 - `ImplicitUsings` are disabled.
 - Library nullable context is enabled.
-- Tests use nullable context enabled; benchmarks currently disable nullable.
+- Tests enable nullable context; benchmarks disable nullable context.
 - XML documentation output is generated for the library, while `.editorconfig`
   silences `CS1591`.
 - Namespace-folder matching is not enforced.
@@ -569,6 +578,9 @@ abstraction would hide ordering, units, or mutation rules.
 
 ## Testing Workflow
 
+[`global.json`](global.json) selects the .NET 10 SDK for solution tooling. Keep
+the .NET 8 runtime installed to execute the `net8.0` tests and benchmarks.
+
 Use these baseline commands:
 
 ```bash
@@ -591,6 +603,13 @@ For focused test work, prefer the unit test project:
 dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj --configuration Release
 ```
 
+After a `Release` build, generate the local API site with:
+
+```bash
+dotnet tool restore
+dotnet tool run docfx docs/api/docfx.json
+```
+
 Important notes:
 
 - `tests/Gravitas.Tests` contains focused runtime, settings, collision,
@@ -599,8 +618,14 @@ Important notes:
   alongside behavior changes.
 - Building the library produces NuGet packages because `GeneratePackageOnBuild`
   is enabled.
-- CI builds and tests `Release` and `ReleaseLean` on Ubuntu and Windows.
-- Coverage workflow runs the xUnit project with `XPlat Code Coverage`.
+- [Build CI](.github/workflows/build-and-test.yml) tests `Release` and
+  `ReleaseLean` on Ubuntu and Windows.
+- After a successful `main` push, the
+  [coverage workflow](.github/workflows/coverage.yml) enforces 100% reachable
+  line, branch, and method coverage, then publishes the DocFX site and the
+  coverage report beneath `/coverage` as one GitHub Pages artifact.
+- [Wiki sync](.github/workflows/sync-wiki.yml) publishes `docs/wiki` after the
+  same build gate and rewrites repository links for GitHub Wiki navigation.
 
 ## Versioning And Release Workflow
 
@@ -691,15 +716,14 @@ itself deterministic, documented, and justified by the algorithm.
 For both humans and AI agents, use this order:
 
 1. Read the relevant docs, source files, and project files.
-2. Read the active feature-work plan when the change belongs to a release
-   hardening phase, and treat it as a living context guide.
+2. Read the active feature-work plan when the change belongs to an active
+   design, and treat it as a living context guide.
 3. Identify deterministic invariants, simulation phase effects, global/static
    state, and pooling ownership.
 4. For hot-path optimization work, capture a benchmark baseline before source
-   changes if a relevant current artifact does not already exist.
-5. Decide whether the current design should be preserved or redesigned. Since
-   backward compatibility is not required unless requested, prefer the clean
-   deterministic design over compatibility scaffolding.
+   changes if a relevant artifact does not already exist.
+5. Decide whether the design should be preserved or intentionally changed.
+   Preserve public compatibility unless the task permits a breaking redesign.
 6. Check whether touched files are approaching the `1000` line warning
    threshold, and split by helper, service, or responsibility-based partial
    before adding more behavior.
@@ -744,11 +768,10 @@ If you are an automated coding agent working in this repository:
 - Keep files navigable. If a touched file is near or above `1000` lines,
   consider a focused helper, context-owned service, or responsibility-based
   partial split as part of the same change.
-- For performance work, benchmark before changing hot-path code when no current
+- For performance work, benchmark before changing hot-path code when no suitable
   artifact exists, then rerun the same benchmark after the change.
-- Use local project references to sibling LSF repositories when that produces a
-  better lower-stack API instead of downstream workarounds. Remember to update
-  test and benchmark projects too when local reference resolution requires it.
+- Use `UseLocalLsfStack=true` for coordinated sibling-repository validation
+  instead of editing project references by hand.
 - Do not stage, commit, tag, push, publish packages, or create GitHub releases
   unless explicitly requested. The repository owner normally handles those
   steps.
@@ -766,8 +789,8 @@ If you are an automated coding agent working in this repository:
 
 ## Guidance For Human Contributors
 
-This codebase is small enough that local consistency matters, but early enough
-that clean redesigns are welcome when they improve the physics foundation.
+Local consistency matters, and clean redesigns are welcome when the task permits
+an intentional breaking change that improves the physics foundation.
 
 Prefer:
 

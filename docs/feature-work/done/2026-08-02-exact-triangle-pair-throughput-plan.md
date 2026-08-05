@@ -10,8 +10,8 @@ Reduce the measured cost of dense concave mesh/mesh contacts without changing
 the exact full-domain triangle relation, deterministic axis and tie ordering,
 canonical anchors, clamped-depth behavior, or warmed allocation contract.
 
-Success is evidence-gated. Retain only changes that produce a repeatable gain
-on the unchanged benchmark rows and preserve 100% reachable line, branch, and
+Success is evidence-gated. Retain only changes that produce a repeatable gain on
+the unchanged benchmark rows and preserve 100% reachable line, branch, and
 method coverage in every modified repository. Matching the deleted saturating
 scalar implementation is not a correctness-compatible target.
 
@@ -19,19 +19,19 @@ scalar implementation is not a correctness-compatible target.
 
 The refreshed 64-pair Short in-process medians are:
 
-| Row | 2026-08-02 median |
-| --- | ---: |
-| Ordinary convex mesh/mesh | `4.836 ms` |
-| Concave mesh/mesh | `70.351 ms` |
-| Dense concave mesh/mesh | `405.224 ms` |
-| Contact-heavy concave mesh/mesh | `556.972 ms` |
-| Closed dense mesh/mesh | `2.566 s` |
+| Row                             | 2026-08-02 median |
+| ------------------------------- | ----------------: |
+| Ordinary convex mesh/mesh       |        `4.836 ms` |
+| Concave mesh/mesh               |       `70.351 ms` |
+| Dense concave mesh/mesh         |      `405.224 ms` |
+| Contact-heavy concave mesh/mesh |      `556.972 ms` |
+| Closed dense mesh/mesh          |         `2.566 s` |
 
 These results are materially unchanged from the 2026-08-01 closure. A sampled
 profile of the dense row centers the measured collision path in
 `FixedTriangle.TryGetContact`. Projection and normalized-depth arithmetic
-dominate; BVH traversal, manifold ownership, rational-basis construction,
-edge preparation, and exact anchor construction do not.
+dominate; BVH traversal, manifold ownership, rational-basis construction, edge
+preparation, and exact anchor construction do not.
 
 Within the exact relation, the largest shared costs are
 `WideArithmetic.MultiplySigned576`, `MultiplySigned320`, and the projection
@@ -43,8 +43,8 @@ their factor is a proven signed 64-bit value.
 ## Design
 
 1. Specialize the existing FixedMathSharp wide multiply owner for signed
-   one-limb factors. Keep the same exact result type and full-width fallback;
-   do not introduce a second geometry answer path.
+   one-limb factors. Keep the same exact result type and full-width fallback; do
+   not introduce a second geometry answer path.
 2. Prove the specialization across zero, both signs, `long.MinValue`, carry
    propagation, narrow and full-width multiplicands, and the established
    finite-axis fit boundary. Preserve the generic path for wider factors.
@@ -52,8 +52,8 @@ their factor is a proven signed 64-bit value.
    mesh/mesh rows. Revert the specialization if the improvement is not
    repeatable or if another affected wide workload regresses materially.
 4. Only if a material signal remains, profile again before considering a
-   prepared rigid-triangle representation. Preparation is not part of this
-   first change because the current trace gives it a small upper bound and the
+   prepared rigid-triangle representation. Preparation is not part of this first
+   change because the current trace gives it a small upper bound and the
    existing relation recomputation is simpler and safer.
 
 ## Outcome
@@ -66,13 +66,13 @@ complement product; no public API or competing geometry path was added.
 
 The unchanged 64-pair Short in-process medians are:
 
-| Row | Refreshed baseline | Retained change | Confirmation |
-| --- | ---: | ---: | ---: |
-| Ordinary convex mesh/mesh | `4.836 ms` | `4.933 ms` | control only |
-| Concave mesh/mesh | `70.351 ms` | `60.213 ms` | `59.761 ms` |
-| Dense concave mesh/mesh | `405.224 ms` | `342.682 ms` | `343.474 ms` |
-| Contact-heavy concave mesh/mesh | `556.972 ms` | `480.926 ms` | `480.773 ms` |
-| Closed dense mesh/mesh | `2.566 s` | `2.170 s` | `2.155 s` |
+| Row                             | Refreshed baseline | Retained change | Confirmation |
+| ------------------------------- | -----------------: | --------------: | -----------: |
+| Ordinary convex mesh/mesh       |         `4.836 ms` |      `4.933 ms` | control only |
+| Concave mesh/mesh               |        `70.351 ms` |     `60.213 ms` |  `59.761 ms` |
+| Dense concave mesh/mesh         |       `405.224 ms` |    `342.682 ms` | `343.474 ms` |
+| Contact-heavy concave mesh/mesh |       `556.972 ms` |    `480.926 ms` | `480.773 ms` |
+| Closed dense mesh/mesh          |          `2.566 s` |       `2.170 s` |    `2.155 s` |
 
 The four affected rows improved by approximately `13.7-15.4%`, and the
 independent confirmation reproduced the gain. The direct FixedMathSharp
@@ -81,12 +81,12 @@ independent confirmation reproduced the gain. The direct FixedMathSharp
 
 The post-change workload trace retains the same stack shape:
 
-| Role | Observed owner |
-| --- | --- |
-| Exact relation authority | `FixedTriangle.TryGetContact` |
-| Dominant phase | `WideTriangleRelations.TryKeepPairAxis` |
+| Role                      | Observed owner                                                    |
+| ------------------------- | ----------------------------------------------------------------- |
+| Exact relation authority  | `FixedTriangle.TryGetContact`                                     |
+| Dominant phase            | `WideTriangleRelations.TryKeepPairAxis`                           |
 | Dominant inner arithmetic | `MultiplySigned576`, `MultiplySigned320`, `GetMagnitudeBitLength` |
-| Small contributors | BVH traversal, manifold ownership, triangle preparation |
+| Small contributors        | BVH traversal, manifold ownership, triangle preparation           |
 
 At this phase boundary the broader signal remained active because the exact
 concave rows were still materially slower than the deleted saturating scalar
@@ -97,8 +97,8 @@ cost as experimental capacity guidance.
 
 ## Rejected Alternatives
 
-- Restore scalar SAT or add a narrowed scalar prefilter: faster but can
-  disagree with the exact full-domain authority.
+- Restore scalar SAT or add a narrowed scalar prefilter: faster but can disagree
+  with the exact full-domain authority.
 - Cache prepared data across frames or mutate `PhysicsMesh` ownership: adds
   invalidation, memory, and lifecycle complexity before profiling justifies it.
 - Rewrite all magnitude multiplication around active spans: that optimization
@@ -106,8 +106,8 @@ cost as experimental capacity guidance.
 - Hoist a common quaternion denominator: no repeatable direct gain and longer
   signatures.
 - Prepare the second triangle's edge data eagerly or lazily: a small direct-row
-  movement did not survive the unchanged Gravitas rows, so both experiments
-  were reverted.
+  movement did not survive the unchanged Gravitas rows, so both experiments were
+  reverted.
 
 ## Work Plan
 

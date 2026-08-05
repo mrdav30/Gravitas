@@ -46,40 +46,40 @@ serialized state therefore cannot silently change tunneling policy.
 
 ### `SolidBody`
 
-| Path                    | Target set                                                           | Reducer policy                                                                                                                            |
-| ----------------------- | -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| Stationary 3D           | bodyless, static-role, and stationary kinematic 3D colliders         | Source collider proxy sphere, then shape-exact validation where supported.                                                                |
+| Path                    | Target set                                                           | Reducer policy                                                                                                                                |
+| ----------------------- | -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Stationary 3D           | bodyless, static-role, and stationary kinematic 3D colliders         | Source collider proxy sphere, then shape-exact validation where supported.                                                                    |
 | Moving 3D               | dynamic and moving kinematic 3D bodies                               | Prepared pair trajectories, exact validation for supported source families, conservative proxy behavior where no exact source reducer exists. |
-| Mixed stationary 2D     | bodyless, static-role, and stationary kinematic 2D slabs             | Same reducer policy as public `QueryMixed.SweepSphereAgainst2D`.                                                                          |
-| Mixed moving 2D         | dynamic and moving kinematic 2D bodies                               | Prepared pair trajectories, conservative mixed proxy candidate, then bounded handoff.                                                     |
-| Kinematic active source | static-style blockers and dynamic 3D/2D targets before first blocker | Frame-start pose to host target pose, using the underlying dimension-local or mixed reducer.                                              |
+| Mixed stationary 2D     | bodyless, static-role, and stationary kinematic 2D slabs             | Same reducer policy as public `QueryMixed.SweepSphereAgainst2D`.                                                                              |
+| Mixed moving 2D         | dynamic and moving kinematic 2D bodies                               | Prepared pair trajectories, conservative mixed proxy candidate, then bounded handoff.                                                         |
+| Kinematic active source | static-style blockers and dynamic 3D/2D targets before first blocker | Frame-start pose to host target pose, using the underlying dimension-local or mixed reducer.                                                  |
 
 ### `SolidBody2D`
 
-| Path                    | Target set                                                           | Reducer policy                                                                                                              |
-| ----------------------- | -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| Stationary 2D           | bodyless, static-role, and stationary kinematic 2D colliders         | Source circle sweep, refined by mover shape where needed.                                                                   |
+| Path                    | Target set                                                           | Reducer policy                                                                                                                  |
+| ----------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Stationary 2D           | bodyless, static-role, and stationary kinematic 2D colliders         | Source circle sweep, refined by mover shape where needed.                                                                       |
 | Moving 2D               | dynamic and moving kinematic 2D bodies                               | Prepared pair trajectories, then exact mover-shape validation for circle, capsule, AABB, convex polygon, and compound families. |
-| Mixed stationary 3D     | bodyless, static-role, and stationary kinematic 3D colliders         | Same reducer policy as public `QueryMixed.SweepCircleAgainst3D`.                                                            |
-| Mixed moving 3D         | dynamic and moving kinematic 3D bodies                               | Prepared pair trajectories, conservative mixed proxy candidate, then bounded handoff.                                      |
-| Kinematic active source | static-style blockers and dynamic 2D/3D targets before first blocker | Frame-start pose to host target pose, using the underlying dimension-local or mixed reducer.                                |
+| Mixed stationary 3D     | bodyless, static-role, and stationary kinematic 3D colliders         | Same reducer policy as public `QueryMixed.SweepCircleAgainst3D`.                                                                |
+| Mixed moving 3D         | dynamic and moving kinematic 3D bodies                               | Prepared pair trajectories, conservative mixed proxy candidate, then bounded handoff.                                           |
+| Kinematic active source | static-style blockers and dynamic 2D/3D targets before first blocker | Frame-start pose to host target pose, using the underlying dimension-local or mixed reducer.                                    |
 
 ## Stationary And Kinematic Targets
 
-Static-style CCD targets include bodyless colliders, explicit static bodies,
-and stationary kinematic bodies. Freeze axes do not change a body's CCD role.
+Static-style CCD targets include bodyless colliders, explicit static bodies, and
+stationary kinematic bodies. Freeze axes do not change a body's CCD role.
 Translational source admission follows `CanTranslate`; rotational source and
 target admission follows independent `CanRotate`, so a position-frozen dynamic
 body can still sweep changing rotational bounds. Fully locked dynamic bodies
 remain indexed for deterministic counterpart access but do not start CCD work.
 
-Moving kinematic targets are captured in the same frame-prepared candidate
-index and piecewise trajectory model as moving dynamic targets, so their sampled
-pose does not depend on body registration or service order. Public sweep queries
-can report dynamic, kinematic, static, and bodyless targets according to normal
-query filters. Final CCD target admission uses the owning collision
-service's physical-pair gate, including collider lifecycle, authored filters,
-hierarchy rules, and linked-joint collision suppression.
+Moving kinematic targets are captured in the same frame-prepared candidate index
+and piecewise trajectory model as moving dynamic targets, so their sampled pose
+does not depend on body registration or service order. Public sweep queries can
+report dynamic, kinematic, static, and bodyless targets according to normal
+query filters. Final CCD target admission uses the owning collision service's
+physical-pair gate, including collider lifecycle, authored filters, hierarchy
+rules, and linked-joint collision suppression.
 
 For kinematic active-source CCD, hosts write deterministic target transforms
 before `context.LateSimulate()`. Gravitas captures the frame-start pose, reads
@@ -110,17 +110,17 @@ and kinematic 2D, 3D, and mixed CCD.
 Relative circle and sphere reducers keep motion as an endpoint-free direction
 plus physical distance. They compare the exact hit distance with the active
 overlap boundary, reconstruct both bodies from their authored trajectory
-segments, and only then materialize normalized time for arbitration. This
-avoids constructing an unrepresentable relative endpoint or collapsing
-distinct spatial contacts during early Q32.32 time conversion.
+segments, and only then materialize normalized time for arbitration. This avoids
+constructing an unrepresentable relative endpoint or collapsing distinct spatial
+contacts during early Q32.32 time conversion.
 
 Mixed moving-pair admission encloses an embedded 2D shape with the ceiling-safe
 Euclidean combination of its planar pivot radius and slab half-thickness. That
 radial interval is geometry-only: exact reducers or sampled contact normals own
 closing-direction admission and candidate-speed ranking. A conservative proxy
 therefore cannot reject a real slab-closing contact merely because the proxy
-normal is separating, and it cannot promote an enclosing-proxy-only hit after
-an exact reducer certifies a miss.
+normal is separating, and it cannot promote an enclosing-proxy-only hit after an
+exact reducer certifies a miss.
 
 Candidate results use stable ordering:
 
@@ -134,11 +134,11 @@ same-frame handoff processing so dense contact chains do not depend on traversal
 side effects. Queue admission deduplicates a body only while that body owns an
 unread entry. Dequeue releases that ownership before consumption, allowing a
 later same-frame relay to append the body again under the same deterministic
-iteration budget. Requeued work that exceeds the budget is explicitly
-discarded rather than left as stale continuation state. A later terminal
-handoff update (no remaining time or no resulting motion) likewise cancels any
-older pending continuation for that body; latest-state-wins includes the
-absence of further work.
+iteration budget. Requeued work that exceeds the budget is explicitly discarded
+rather than left as stale continuation state. A later terminal handoff update
+(no remaining time or no resulting motion) likewise cancels any older pending
+continuation for that body; latest-state-wins includes the absence of further
+work.
 
 ## Mixed CCD
 
@@ -147,9 +147,9 @@ Mixed CCD uses explicit mixed query reducers only in `PhysicsRuntimeMode.Mixed`.
 cross-dimensional CCD.
 
 3D swept-sphere mixed CCD routes through `QueryMixed.SweepSphereAgainst2D`.
-Circle slabs use the exact spherical dilation of their finite vertical
-cylinder, including rounded cap rims. Capsule slabs use an exact union of their
-expanded planar side and cap cores, four sphere-dilated straight rims, and two
+Circle slabs use the exact spherical dilation of their finite vertical cylinder,
+including rounded cap rims. Capsule slabs use an exact union of their expanded
+planar side and cap cores, four sphere-dilated straight rims, and two
 sphere-dilated vertical endpoint cylinders. Both reducers retain full-domain
 finite-axis arithmetic through the final distance and report `Exact`. AABB,
 convex polygon, and supported compound slab hits use their exact finite-slab
@@ -167,14 +167,14 @@ proxy candidates used by dynamic CCD paths.
 ## Rotational CCD
 
 Rotational CCD is bounded and deterministic across same-dimensional and mixed
-pairs. When either participant has rotational motion, source translation,
-source rotation, target translation, and target rotation compete in one
-normalized-time arbiter. It traverses intervals earliest-first for each
-candidate and samples both prepared poses at each midpoint. Shape-specific
-closest-feature separation, with a conservative AABB fallback where no tighter
-proof exists, certifies an interval only when its gap exceeds an
-outward-rounded bound on both participants' linear and pivot-centered angular
-travel. The bound also scales fixed-point pose uncertainty by pivot radius.
+pairs. When either participant has rotational motion, source translation, source
+rotation, target translation, and target rotation compete in one normalized-time
+arbiter. It traverses intervals earliest-first for each candidate and samples
+both prepared poses at each midpoint. Shape-specific closest-feature separation,
+with a conservative AABB fallback where no tighter proof exists, certifies an
+interval only when its gap exceeds an outward-rounded bound on both
+participants' linear and pivot-centered angular travel. The bound also scales
+fixed-point pose uncertainty by pivot radius.
 
 An unresolved interval is subdivided until a fixed depth or per-candidate work
 budget. A witnessed contact can apply the contact-point response and bounded
@@ -187,17 +187,16 @@ by normalized time, target dimension, and stable collider identity.
 Trajectory mutation and dirty-overlay admission share a deterministic frame
 budget. If either participant cannot reserve all state required for an atomic
 pair update, Gravitas conservatively clamps before mutating either body and
-reports the CCD iteration limit. Linear-only handoffs preserve unrelated
-angular acceleration, and angular-only handoffs preserve unrelated linear
-acceleration.
+reports the CCD iteration limit. Linear-only handoffs preserve unrelated angular
+acceleration, and angular-only handoffs preserve unrelated linear acceleration.
 
-Rotational broad-phase radii are measured from each body's actual rotation pivot,
-not merely from the collider center, so local offsets and remote compound parts
-remain inside the candidate volume. Unsupported collision pairs are skipped
-explicitly. If the required pivot radius exceeds the scalar domain, candidate
-admission scans the bounded context registry instead of issuing an effectively
-unbounded GridForge query. Dynamic and kinematic moving targets use their
-prepared piecewise trajectories; mixed candidates are admitted only in
+Rotational broad-phase radii are measured from each body's actual rotation
+pivot, not merely from the collider center, so local offsets and remote compound
+parts remain inside the candidate volume. Unsupported collision pairs are
+skipped explicitly. If the required pivot radius exceeds the scalar domain,
+candidate admission scans the bounded context registry instead of issuing an
+effectively unbounded GridForge query. Dynamic and kinematic moving targets use
+their prepared piecewise trajectories; mixed candidates are admitted only in
 `PhysicsRuntimeMode.Mixed`, never in `Both`.
 
 ## Diagnostics And Replay
@@ -224,12 +223,12 @@ through solver-cache hash mode when useful for drift RCA.
 
 ## Source Map
 
-| Area                 | Source                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 3D body CCD          | [`src/Gravitas/Core/3D/SolidBody.ContinuousCollision.cs`](../../src/Gravitas/Core/3D/SolidBody.ContinuousCollision.cs), [`src/Gravitas/Core/3D/SolidBody.ContinuousCollision.Dynamic.cs`](../../src/Gravitas/Core/3D/SolidBody.ContinuousCollision.Dynamic.cs), [`src/Gravitas/Core/3D/SolidBody.ContinuousCollision.Kinematic.cs`](../../src/Gravitas/Core/3D/SolidBody.ContinuousCollision.Kinematic.cs), and the focused `SolidBody.ContinuousCollision.Rotational*.cs` partials.             |
+| Area                 | Source                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 3D body CCD          | [`src/Gravitas/Core/3D/SolidBody.ContinuousCollision.cs`](../../src/Gravitas/Core/3D/SolidBody.ContinuousCollision.cs), [`src/Gravitas/Core/3D/SolidBody.ContinuousCollision.Dynamic.cs`](../../src/Gravitas/Core/3D/SolidBody.ContinuousCollision.Dynamic.cs), [`src/Gravitas/Core/3D/SolidBody.ContinuousCollision.Kinematic.cs`](../../src/Gravitas/Core/3D/SolidBody.ContinuousCollision.Kinematic.cs), and the focused `SolidBody.ContinuousCollision.Rotational*.cs` partials.               |
 | 2D body CCD          | [`src/Gravitas/Core/2D/SolidBody2D.ContinuousCollision.cs`](../../src/Gravitas/Core/2D/SolidBody2D.ContinuousCollision.cs), [`src/Gravitas/Core/2D/SolidBody2D.ContinuousCollision.Dynamic.cs`](../../src/Gravitas/Core/2D/SolidBody2D.ContinuousCollision.Dynamic.cs), [`src/Gravitas/Core/2D/SolidBody2D.ContinuousCollision.Kinematic.cs`](../../src/Gravitas/Core/2D/SolidBody2D.ContinuousCollision.Kinematic.cs), and the focused `SolidBody2D.ContinuousCollision.Rotational*.cs` partials. |
-| 3D service CCD       | [`src/Gravitas/Core/3D/GravitasPhysicsService.ContinuousCollision.cs`](../../src/Gravitas/Core/3D/GravitasPhysicsService.ContinuousCollision.cs)                                                                                                                                                                                                                                                                                           |
-| 2D service CCD       | [`src/Gravitas/Core/2D/GravitasPhysics2DService.ContinuousCollision.cs`](../../src/Gravitas/Core/2D/GravitasPhysics2DService.ContinuousCollision.cs)                                                                                                                                                                                                                                                                                       |
-| CCD common helpers   | [`src/Gravitas/CollisionHandling/Continuous`](../../src/Gravitas/CollisionHandling/Continuous)                                                                                                                                                                                                                                                                                                                                             |
-| Mixed query reducers | [`src/Gravitas/Queries/Mixed`](../../src/Gravitas/Queries/Mixed)                                                                                                                                                                                                                                                                                                                                                                           |
-| CCD tests            | [`tests/Gravitas.Tests/CollisionHandling/ContinuousCollisionDetectionTests.cs`](../../tests/Gravitas.Tests/CollisionHandling/ContinuousCollisionDetectionTests.cs), [`tests/Gravitas.Tests/Physics2D/ContinuousCollision2DTests.cs`](../../tests/Gravitas.Tests/Physics2D/ContinuousCollision2DTests.cs), [`tests/Gravitas.Tests/MixedDimensions/MixedQueryCcdTests.cs`](../../tests/Gravitas.Tests/MixedDimensions/MixedQueryCcdTests.cs) |
+| 3D service CCD       | [`src/Gravitas/Core/3D/GravitasPhysicsService.ContinuousCollision.cs`](../../src/Gravitas/Core/3D/GravitasPhysicsService.ContinuousCollision.cs)                                                                                                                                                                                                                                                                                                                                                   |
+| 2D service CCD       | [`src/Gravitas/Core/2D/GravitasPhysics2DService.ContinuousCollision.cs`](../../src/Gravitas/Core/2D/GravitasPhysics2DService.ContinuousCollision.cs)                                                                                                                                                                                                                                                                                                                                               |
+| CCD common helpers   | [`src/Gravitas/CollisionHandling/Continuous`](../../src/Gravitas/CollisionHandling/Continuous)                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Mixed query reducers | [`src/Gravitas/Queries/Mixed`](../../src/Gravitas/Queries/Mixed)                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| CCD tests            | [`tests/Gravitas.Tests/CollisionHandling/ContinuousCollisionDetectionTests.cs`](../../tests/Gravitas.Tests/CollisionHandling/ContinuousCollisionDetectionTests.cs), [`tests/Gravitas.Tests/Physics2D/ContinuousCollision2DTests.cs`](../../tests/Gravitas.Tests/Physics2D/ContinuousCollision2DTests.cs), [`tests/Gravitas.Tests/MixedDimensions/MixedQueryCcdTests.cs`](../../tests/Gravitas.Tests/MixedDimensions/MixedQueryCcdTests.cs)                                                         |

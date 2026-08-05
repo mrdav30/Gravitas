@@ -7,9 +7,9 @@
 ## Goal
 
 Separate a body's runtime role from its constrained degrees of freedom so a
-dynamic body may lock every translation axis while retaining angular motion.
-The redesign must remain deterministic, engine agnostic, allocation-conscious,
-and symmetric across 2D, 3D, and mixed simulation paths.
+dynamic body may lock every translation axis while retaining angular motion. The
+redesign must remain deterministic, engine agnostic, allocation-conscious, and
+symmetric across 2D, 3D, and mixed simulation paths.
 
 ## Confirmed Root Cause
 
@@ -56,8 +56,8 @@ public enum BodyMotionType
 - Bodies expose read-only `MotionType`, `IsDynamic`, `IsKinematic`, and
   `IsStatic` inspection properties.
 - `SetMotionType(BodyMotionType motionType)` owns runtime role transitions. A
-  mutable property is deliberately avoided because a transition changes
-  service membership, partition membership, CCD state, and sleep state.
+  mutable property is deliberately avoided because a transition changes service
+  membership, partition membership, CCD state, and sleep state.
 - Undefined enum values and undefined freeze bits fail explicitly.
 - Keep `IsPositionFullyFrozen` and `IsRotationFullyFrozen` as the symmetric
   read-only names in both dimensions. Remove `AngularMotionFrozen` and
@@ -68,8 +68,8 @@ public enum BodyMotionType
 - `CanTranslate` continues to mean that at least one solver-responsive
   translational degree of freedom exists.
 - `CanRotate` is independent of `CanTranslate` and requires a dynamic, active
-  body with valid angular inertia and at least one unfrozen rotational degree
-  of freedom.
+  body with valid angular inertia and at least one unfrozen rotational degree of
+  freedom.
 - Internal `HasSolverMobility` is `CanTranslate || CanRotate` and is the body
   admission rule for awake state, islands, joints, integration, sleep,
   visualization, and rotational CCD.
@@ -80,11 +80,11 @@ public enum BodyMotionType
 
 ### Runtime Transitions
 
-- Motion-type changes are atomic and permitted only outside the whole
-  `Simulate` to `LateSimulate` fixed-step transaction. A change after
-  `Simulate` but before its matching `LateSimulate`, or reentrantly from any
-  context, service, body, collision, constraint, or lifecycle callback entry
-  path, fails clearly rather than being silently deferred.
+- Motion-type changes are atomic and permitted only outside the whole `Simulate`
+  to `LateSimulate` fixed-step transaction. A change after `Simulate` but before
+  its matching `LateSimulate`, or reentrantly from any context, service, body,
+  collision, constraint, or lifecycle callback entry path, fails clearly rather
+  than being silently deferred.
 - Dynamic-to-kinematic and kinematic-to-dynamic keep body/collider identity but
   clear incompatible accumulated force, velocity, sleep, pending handoff, and
   dirty CCD state before repartitioning.
@@ -118,8 +118,8 @@ public enum BodyMotionType
 - Remove serialized `IsKinematic` and the separate 2D `_isDynamic` truth.
 - Read and validate motion type and freeze bits before applying loaded state.
   Population of an already-registered shell uses the same privileged atomic
-  transition path and ordering as a public transition, without bypassing
-  service membership, cache, partition, or inertia invariants.
+  transition path and ordering as a public transition, without bypassing service
+  membership, cache, partition, or inertia invariants.
 - Bump the `body.2d` and `body.3d` replay section contracts from version 3 to
   version 4.
 - Gravitas has not released yet, so no legacy role inference or compatibility
@@ -133,8 +133,8 @@ public enum BodyMotionType
 - Do not add a second public mobility abstraction until a concrete host need
   exists.
 - Do not rebuild joints or contact pairs merely because a body's role changes.
-- Do not introduce allocations or general-purpose BCL collections in runtime
-  hot paths.
+- Do not introduce allocations or general-purpose BCL collections in runtime hot
+  paths.
 
 ## Phase 1: Contract Regressions And API Adoption
 
@@ -166,8 +166,8 @@ public enum BodyMotionType
 
 - [x] Make collider static classification depend only on body role or bodyless
       ownership.
-- [x] Add focused simulated-body membership helpers so static transitions do
-      not dessimilate colliders, joints, or contact pairs.
+- [x] Add focused simulated-body membership helpers so static transitions do not
+      dessimilate colliders, joints, or contact pairs.
 - [x] Repartition pure 2D, pure 3D, and mixed collider membership after an
       accepted role transition.
 - [x] Clear incompatible force, velocity, sleep, contact warm-start, joint
@@ -179,8 +179,8 @@ public enum BodyMotionType
       from direct service/body entry paths.
 - [x] Migrate ragdoll activation/deactivation/load to a prevalidated atomic
       batch transition.
-- [x] Cover every transition direction, identity preservation, partition
-      role changes, pair/joint preservation, repeated transitions, deterministic
+- [x] Cover every transition direction, identity preservation, partition role
+      changes, pair/joint preservation, repeated transitions, deterministic
       replay, and warmed zero-allocation behavior.
 - [x] Cover post-`Simulate`/pre-`LateSimulate` rejection, callback and direct
       service/body reentrancy, warmed contact/joint invalidation, interpolation
@@ -253,9 +253,8 @@ fresh final evidence is recorded.
   `CollisionNotificationExceptions.cs:30`, producing 12 `CS0012` diagnostics
   across `net8.0` and `netstandard2.1`. This is the previously recorded
   lower-stack local-link packaging blocker and was not masked in Gravitas.
-- Coverage verification: 3,237 tests; 33,894/33,894 lines,
-  12,211/12,211 branches, and 4,206/4,206 methods. The extracted method-gap
-  report is empty.
+- Coverage verification: 3,237 tests; 33,894/33,894 lines, 12,211/12,211
+  branches, and 4,206/4,206 methods. The extracted method-gap report is empty.
 - Replay verification: 80/80 focused replay and determinism tests passed.
 - Benchmark verification: warmed motion-role transitions measure about 15.146
   microseconds for 3D and 6.751 microseconds for 2D, both with zero managed
@@ -271,9 +270,9 @@ without overloading freeze axes as runtime identity. Dynamic translation and
 rotation mobility are independent across 2D, 3D, mixed response, constraints,
 sleep, visualization, partitioning, and CCD. Role transitions, ragdoll batches,
 serialization population, and explicit static pose changes prevalidate before
-mutation, preserve runtime object identity, clear incompatible solver state,
-and refresh pure and mixed partitions atomically. Static 3D colliders can leave
-and re-enter a grid and remain immediately query-visible.
+mutation, preserve runtime object identity, clear incompatible solver state, and
+refresh pure and mixed partitions atomically. Static 3D colliders can leave and
+re-enter a grid and remain immediately query-visible.
 
 The first-alpha contract is documented directly without a migration layer or
 legacy API aliases. Substantive 2D/3D/mixed, serialization, replay, lifecycle,

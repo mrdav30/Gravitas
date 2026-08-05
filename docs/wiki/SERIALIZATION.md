@@ -24,15 +24,15 @@ testing, and replay tools.
 
 ## Ownership Contract
 
-| Host-created shell                                 | Serialized state                                                                                                                                              |
-| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GravitasWorldContext` and `GridWorld`             | Settings that affect deterministic execution.                                                                                                                 |
-| `IMatterAgent`, `FixedTransform`, engine wrappers  | Body position, rotation, motion type, velocities, force/torque stores, gravity scale, sleep, CCD, freeze axes.                                                |
-| `SolidBody`, `SolidBody2D`                         | 3D grounding state and 2D planar support state.                                                                                                               |
-| Concrete `LSCollider` and `LSCollider2D` types     | Active/trigger state for bodyless trigger volumes, layer, local ignored physical layers, material, local offset, shape inputs, mixed half-thickness override. |
-| Compound runtime shells and private part colliders | Authored shape/part values needed to rebuild deterministic geometry.                                                                                          |
-| Existing registered `Joint3D`, `Joint2D`, ragdoll runtimes | Joint enabled state, type, frames, limits, motors, linked collision policy, ragdoll activation state.                                              |
-| Renderer, ECS, networking, pooling, editor state   | Nothing. These remain host-owned.                                                                                                                             |
+| Host-created shell                                         | Serialized state                                                                                                                                              |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GravitasWorldContext` and `GridWorld`                     | Settings that affect deterministic execution.                                                                                                                 |
+| `IMatterAgent`, `FixedTransform`, engine wrappers          | Body position, rotation, motion type, velocities, force/torque stores, gravity scale, sleep, CCD, freeze axes.                                                |
+| `SolidBody`, `SolidBody2D`                                 | 3D grounding state and 2D planar support state.                                                                                                               |
+| Concrete `LSCollider` and `LSCollider2D` types             | Active/trigger state for bodyless trigger volumes, layer, local ignored physical layers, material, local offset, shape inputs, mixed half-thickness override. |
+| Compound runtime shells and private part colliders         | Authored shape/part values needed to rebuild deterministic geometry.                                                                                          |
+| Existing registered `Joint3D`, `Joint2D`, ragdoll runtimes | Joint enabled state, type, frames, limits, motors, linked collision policy, ragdoll activation state.                                                         |
+| Renderer, ECS, networking, pooling, editor state           | Nothing. These remain host-owned.                                                                                                                             |
 
 Runtime-owned state that should not be serialized:
 
@@ -41,9 +41,8 @@ Runtime-owned state that should not be serialized:
 - collision pairs, pair holder references, warm runtime pair caches, query
   buffers, diagnostic buffers, and pooled collections.
 - derived collider bounds and transformed mesh caches. Absolute endpoints,
-  corners, and contact/query witnesses are materialized on demand from
-  canonical rigid-frame and local geometry rather than stored as runtime
-  authority.
+  corners, and contact/query witnesses are materialized on demand from canonical
+  rigid-frame and local geometry rather than stored as runtime authority.
 - context-local joint IDs, ragdoll IDs, articulation suppression tables, and
   service-owned joint/ragdoll arrays.
 - lifecycle hooks, delegates, renderer callbacks, and event subscribers.
@@ -53,8 +52,8 @@ Runtime-owned state that should not be serialized:
 On load, bodies publish restored authoritative position and rotation into their
 existing host transform. A restored 3D quaternion is scale-safely normalized
 before any runtime shape or host state observes it; a zero quaternion resolves
-to identity. 3D visual interpolation buffers reset from that authoritative
-state instead of being treated as replay truth.
+to identity. 3D visual interpolation buffers reset from that authoritative state
+instead of being treated as replay truth.
 
 Continuous-collision modes are validated at the settings and body publication
 boundaries. `Inherit`, `Discrete`, `Continuous`, and `Auto` load normally;
@@ -67,23 +66,23 @@ when the field is absent. Motion type and freeze masks are validated before any
 loaded body state is published. Loading a different role into an already
 registered shell reconciles simulated-body membership, partitions, CCD state,
 and solver caches through the same atomic lifecycle invariants as a public role
-transition. Undefined roles or freeze bits fail without partially publishing
-the new state.
+transition. Undefined roles or freeze bits fail without partially publishing the
+new state.
 
 ## Recordable Types
 
-| Type                                    | What it records                                                                                                                                                                            | What it does not own                                             |
-| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------- |
+| Type                                    | What it records                                                                                                                                                                                         | What it does not own                                             |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
 | `SolidBody`                             | 3D position/height, rotation, motion type, freeze axes, motion stores, mass, COM, gravity scale, sleep, CCD, grounding/probe state, owned collider state.                                               | `FixedTransform` identity, service IDs, partitions, pairs.       |
 | `SolidBody2D`                           | X/Z position, scalar rotation, motion type, freeze axes, planar motion stores, scalar angular state, mass, COM, scalar moment policy, gravity, grounding/probe state, sleep, CCD, owned collider state. | Host transform identity, runtime service IDs, query buffers.     |
-| `LSCollider`                            | 3D active state, bodyless trigger state, layer/filter state, local ignored physical mask, material, shape state.                                                                           | Context-owned collider ID, partition identity, pairs/events.     |
-| `LSCollider2D`                          | 2D active state, bodyless trigger state, layer/filter state, material, shape-local values, mixed half-thickness override.                                                                  | Context-owned collider ID, private runtime pair/partition state. |
-| `ColliderShapeDefinition`               | Data-only 3D authoring/import values for primitive, mesh, and compound part inputs.                                                                                                        | Runtime body, context, collider ID, pairs, hierarchy, events.    |
-| `ColliderShapeDefinition2D`             | Data-only 2D authoring/import values for circle, capsule, AABB, convex polygon, triangle convenience, and compound parts.                                                                  | Runtime body, context, collider ID, pairs, hierarchy, events.    |
-| `PhysicsSettingsSaver`                  | Frame rate, collision matrix, ground mask, CCD settings, restitution threshold, retained partition cleanup, runtime mode, mixed 2D thickness.                                              | Runtime service state.                                           |
-| `Joint3D` / `Joint2D`                   | Mutable joint continuation state: enabled flag, type, frames/anchors, limits, motors, linked-collider policy.                                                                              | Body link construction, service joint IDs, solver caches.        |
-| `RagdollRuntime3D` / `RagdollRuntime2D` | Runtime activation state for existing handles.                                                                                                                                             | Definitions, link bodies, colliders, joint ownership.            |
-| `PhysicsLayer` / `PhysicsLayerMask`     | JSON/MemoryPack-friendly value fields.                                                                                                                                                     | Chronicler graph identity.                                       |
+| `LSCollider`                            | 3D active state, bodyless trigger state, layer/filter state, local ignored physical mask, material, shape state.                                                                                        | Context-owned collider ID, partition identity, pairs/events.     |
+| `LSCollider2D`                          | 2D active state, bodyless trigger state, layer/filter state, material, shape-local values, mixed half-thickness override.                                                                               | Context-owned collider ID, private runtime pair/partition state. |
+| `ColliderShapeDefinition`               | Data-only 3D authoring/import values for primitive, mesh, and compound part inputs.                                                                                                                     | Runtime body, context, collider ID, pairs, hierarchy, events.    |
+| `ColliderShapeDefinition2D`             | Data-only 2D authoring/import values for circle, capsule, AABB, convex polygon, triangle convenience, and compound parts.                                                                               | Runtime body, context, collider ID, pairs, hierarchy, events.    |
+| `PhysicsSettingsSaver`                  | Frame rate, collision matrix, ground mask, CCD settings, restitution threshold, retained partition cleanup, runtime mode, mixed 2D thickness.                                                           | Runtime service state.                                           |
+| `Joint3D` / `Joint2D`                   | Mutable joint continuation state: enabled flag, type, frames/anchors, limits, motors, linked-collider policy.                                                                                           | Body link construction, service joint IDs, solver caches.        |
+| `RagdollRuntime3D` / `RagdollRuntime2D` | Runtime activation state for existing handles.                                                                                                                                                          | Definitions, link bodies, colliders, joint ownership.            |
+| `PhysicsLayer` / `PhysicsLayerMask`     | JSON/MemoryPack-friendly value fields.                                                                                                                                                                  | Chronicler graph identity.                                       |
 
 Collider geometry can derive default COM/mass properties for new shells, but
 populated snapshots restore body-owned COM state directly where that state is
@@ -93,19 +92,18 @@ Pair-local contact caches and joint solver caches are rebuildable runtime data
 unless a drift investigation explicitly hashes them through
 `GravitasReplayHashMode.AuthoritativeWithSolverCaches`.
 
-When solver caches are included, contact and query-adjacent witnesses are
-hashed as the canonical `Origin`, `Rotation`, `LocalPoint`, and
-`LocalDisplacement` components of
-their `ContactAnchor` or `ContactAnchor2D` frame. A clipped or unavailable
-rotated offset or absolute world point is not replay truth.
-Derived bounds and other rebuildable shape caches remain outside the
-authoritative shape hash and are covered only by their dedicated cache section.
+When solver caches are included, contact and query-adjacent witnesses are hashed
+as the canonical `Origin`, `Rotation`, `LocalPoint`, and `LocalDisplacement`
+components of their `ContactAnchor` or `ContactAnchor2D` frame. A clipped or
+unavailable rotated offset or absolute world point is not replay truth. Derived
+bounds and other rebuildable shape caches remain outside the authoritative shape
+hash and are covered only by their dedicated cache section.
 
 Joint and ragdoll handles are valid serialization targets only while registered
-with their owning constraint service. Endpoint teardown removes dependent
-joints and any owning ragdoll before collider identity release; removed handles
-reject save and load operations instead of applying state to a later pooled body
-or collider lifetime. Context reset and disposal invalidate those handles by the
+with their owning constraint service. Endpoint teardown removes dependent joints
+and any owning ragdoll before collider identity release; removed handles reject
+save and load operations instead of applying state to a later pooled body or
+collider lifetime. Context reset and disposal invalidate those handles by the
 same rule.
 
 ## Replay Workflow

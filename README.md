@@ -3,7 +3,7 @@
 ![Gravitas Icon](https://raw.githubusercontent.com/mrdav30/gravitas/main/icon.png)
 
 [![Build](https://github.com/mrdav30/Gravitas/actions/workflows/build-and-test.yml/badge.svg)](https://github.com/mrdav30/Gravitas/actions/workflows/build-and-test.yml)
-[![Coverage](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fmrdav30.github.io%2FGravitas%2FSummary.json&query=%24.summary.linecoverage&suffix=%25&label=coverage&color=brightgreen)](https://mrdav30.github.io/Gravitas/)
+[![Branch Coverage](https://mrdav30.github.io/Gravitas/coverage/badge_branchcoverage.svg)](https://mrdav30.github.io/Gravitas/coverage/)
 [![NuGet](https://img.shields.io/nuget/v/Gravitas.svg)](https://www.nuget.org/packages/Gravitas)
 [![NuGet Lean](https://img.shields.io/nuget/v/Gravitas.Lean.svg?label=nuget%20lean)](https://www.nuget.org/packages/Gravitas.Lean)
 [![License](https://img.shields.io/github/license/mrdav30/Gravitas.svg)](https://github.com/mrdav30/Gravitas/blob/main/LICENSE)
@@ -22,19 +22,19 @@ Gravitas is an engine-agnostic fixed-point physics library for simulation-heavy
 - `Chronicler.Core` for deterministic state transfer and shared save/apply
   lifecycle helpers.
 
-## Project Status
+## API Stability
 
-Gravitas is under active first-public-release hardening and is not API-stable
-while deterministic behavior, physics correctness, runtime complexity, and
-engine-agnostic integration are refined. The 3D path is the deepest slice, with
-first-class pure 2D and mixed 2D/3D runtime paths.
+Gravitas maintains first-class 3D, pure 2D, and mixed 2D/3D runtime paths.
+Public API changes should be intentional and documented; major-version changes
+may refine contracts when determinism, physics correctness, physical
+plausibility, or maintainability requires it.
 
 The unit test project includes focused runtime, settings, query, partition,
 coroutine, collision, CCD, constraints, ragdolls, serialization, 2D, and
 mixed-dimension coverage. The benchmark project covers context lifecycle,
 registration, partitioning, simulation, queries, diagnostics, mesh paths,
-constraints, mixed broad phase, and CCD scaling. Use this README as current
-orientation, and use [AGENTS.md](AGENTS.md) for detailed contributor guidance.
+constraints, mixed broad phase, and CCD scaling. Use [AGENTS.md](AGENTS.md) for
+detailed contributor guidance.
 
 ## Why Gravitas?
 
@@ -46,8 +46,9 @@ orientation, and use [AGENTS.md](AGENTS.md) for detailed contributor guidance.
   tracing, `PhysicsPartition`, and `PhysicsPartition2D`.
 - Runtime systems for 3D, pure 2D, and mixed 2D/3D bodies/colliders, authored
   shape definitions, compound collision assets, collision pairs, collision
-  detection/response, 2D/3D joints and ragdolls, opt-in CCD, raycasts, circlecasts,
-  swept queries, pure 2D overlap/raycast queries, and physics settings.
+  detection/response, 2D/3D joints and ragdolls, opt-in CCD, raycasts,
+  swept-sphere and swept-circle queries, pure 2D overlap/raycast queries, and
+  physics settings.
 - Mixed 2D/3D simulation where 2D bodies are embedded as explicit finite
   slabs/prisms and constrained to X/Z impulse response.
 
@@ -65,11 +66,11 @@ Gravitas is configured for two package variants:
 
 - `Gravitas`: Includes `MemoryPack` and depends on the standard
   `FixedMathSharp`, `SwiftCollections`, `SwiftCollections.FixedMathSharp`,
-  `GridForge`, and `Chronicler.Core` packages.
+  `FixedMathSharp.Chronicler`, `GridForge`, and `Chronicler.Core` packages.
 - `Gravitas.Lean`: Excludes the direct `MemoryPack` package and swaps to the
   lean dependency chain: `FixedMathSharp.Lean`, `SwiftCollections.Lean`,
-  `SwiftCollections.FixedMathSharp.Lean`, `GridForge.Lean`, and
-  `Chronicler.Core.Lean`.
+  `SwiftCollections.FixedMathSharp.Lean`, `FixedMathSharp.Chronicler.Lean`,
+  `GridForge.Lean`, `Chronicler.Core.Lean`, and `Chronicler.MemoryPackShim`.
 
 Both variants are intended to expose the same core physics API. The difference
 is whether built-in MemoryPack support and the standard dependency chain are
@@ -91,10 +92,10 @@ SwiftCollections and GridForge are then validated and released in dependency
 order before Gravitas is rebuilt against the exact released FixedMathSharp
 version and the complete package-only lower stack.
 
-Install via NuGet:
+The install command above selects the standard package. To use the lean
+dependency profile instead:
 
 ```bash
-dotnet add package Gravitas
 dotnet add package Gravitas.Lean
 ```
 
@@ -144,8 +145,8 @@ Gravitas is centered around explicit world-context ownership:
     freedom available to a dynamic body.
 11. `LSCollider` and `LSCollider2D` are closed public runtime hierarchies that
     own shape state, bounds, layers, collider-local physical ignore masks,
-    trigger/contact events, and GridForge partition coordinates. Engine
-    adapters should map host assets into `ColliderShapeDefinition` or
+    trigger/contact events, and GridForge partition coordinates. Engine adapters
+    should map host assets into `ColliderShapeDefinition` or
     `ColliderShapeDefinition2D`, then call `CreateCollider()` to obtain the
     common runtime base type.
 
@@ -173,10 +174,13 @@ according to the host's fixed-frame loop.
 | -------------------------------------------------------- | ----------------------------------------------------------------------- |
 | [`src/Gravitas`](src/Gravitas)                           | Main library project.                                                   |
 | [`tests/Gravitas.Tests`](tests/Gravitas.Tests)           | xUnit v3 test project with focused runtime/settings/query coverage.     |
-| [`tests/Gravitas.Benchmarks`](tests/Gravitas.Benchmarks) | BenchmarkDotNet project scaffold and benchmark runner.                  |
+| [`tests/Gravitas.Benchmarks`](tests/Gravitas.Benchmarks) | BenchmarkDotNet benchmarks and alias runner.                            |
 | [`.github/workflows`](.github/workflows)                 | CI, coverage, release, NuGet publish, Discord, and wiki-sync workflows. |
 
 ## Build And Test
+
+Install the SDK selected by [`global.json`](global.json) and the .NET 8 runtime
+used by the test and benchmark executables.
 
 ```bash
 dotnet restore Gravitas.slnx
@@ -214,7 +218,7 @@ dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f 
 dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll list
 ```
 
-Run all benchmarks once benchmark classes exist:
+Run all benchmarks:
 
 ```bash
 dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0
@@ -226,11 +230,22 @@ details and benchmark authoring notes.
 
 ## Documentation
 
-- [AGENTS.md](AGENTS.md) is the main contributor guide for deterministic,
-  performance-sensitive, and physics-design work.
-- [`docs/wiki/OVERVIEW.md`](docs/wiki/OVERVIEW.md) is the developer-facing
-  architecture guide for context ownership, host integration, collisions,
-  queries, serialization/replay, diagnostics, and host diagnostic adapters.
+- [Documentation site](https://mrdav30.github.io/Gravitas/)
+- [API reference](https://mrdav30.github.io/Gravitas/api/Gravitas.html)
+- [GitHub Wiki](https://github.com/mrdav30/Gravitas/wiki/Home)
+- [Coverage report](https://mrdav30.github.io/Gravitas/coverage/)
+- [AGENTS.md](AGENTS.md) for deterministic, performance-sensitive, and
+  physics-design contributor guidance
+- [`docs/wiki/OVERVIEW.md`](docs/wiki/OVERVIEW.md) for context ownership, host
+  integration, collisions, queries, serialization/replay, and diagnostics
+
+Build the API site locally from the repository root:
+
+```bash
+dotnet build src/Gravitas/Gravitas.csproj --configuration Release --framework net8.0
+dotnet tool restore
+dotnet tool run docfx docs/api/docfx.json
+```
 
 If behavior changes, keep code, tests, this README, and benchmark documentation
 aligned.

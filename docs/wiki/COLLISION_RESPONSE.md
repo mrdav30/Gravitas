@@ -69,9 +69,9 @@ Non-trigger 3D response:
 
 1. builds solver contacts from the pair manifold, collider bodies, contact
    points, relative COM arms, penetration depth, and pair-oriented normal.
-2. derives linear and angular solver mobility independently: translation
-   freezes zero constrained inverse mass, rotation freezes zero constrained
-   inverse inertia, and static or kinematic roles contribute neither.
+2. derives linear and angular solver mobility independently: translation freezes
+   zero constrained inverse mass, rotation freezes zero constrained inverse
+   inertia, and static or kinematic roles contribute neither.
 3. applies positional correction only for depth above
    `CollisionResponse.PenetrationSlop`.
 4. shares correction across active manifold contacts.
@@ -119,12 +119,12 @@ linear velocity deltas and scalar angular velocity deltas from COM-relative
 normal and tangent friction impulses.
 
 Ordinary 2D friction uses the compact scalar tangent solve only while point
-velocity, effective mass, friction limits, cache accumulation/removal, and
-final body deltas remain representable without losing nonzero terms. Failed
-proofs route once to the exact Coulomb-line owner, which keeps the cached
-tangent impulse and solved delta exact until final round-to-even
-materialization. Static-limit classification uses the signed interval directly,
-so `Fixed64.MinValue` is not mistaken for a smaller saturated magnitude.
+velocity, effective mass, friction limits, cache accumulation/removal, and final
+body deltas remain representable without losing nonzero terms. Failed proofs
+route once to the exact Coulomb-line owner, which keeps the cached tangent
+impulse and solved delta exact until final round-to-even materialization.
+Static-limit classification uses the signed interval directly, so
+`Fixed64.MinValue` is not mistaken for a smaller saturated magnitude.
 
 ## Mixed Response
 
@@ -145,10 +145,9 @@ Mixed friction maps 2D linear velocity and contact arms explicitly into world
 X/Z before constructing point velocity. The compact path proves tangent
 projection and normalization, every linear/angular effective-mass term,
 friction-limit multiplication, and final impulse materialization. Any failed
-proof routes once to the existing uncached exact Coulomb disk; no parallel
-mixed wide solver or warm-start cache is introduced. Exact fallback preserves
-the same planar constraint: world Y response remains exclusive to the 3D
-participant.
+proof routes once to the existing uncached exact Coulomb disk; no parallel mixed
+wide solver or warm-start cache is introduced. Exact fallback preserves the same
+planar constraint: world Y response remains exclusive to the 3D participant.
 
 ## Materials
 
@@ -191,9 +190,9 @@ separate tuning knobs.
 non-kinematic body can sleep after linear and angular speed remain at or below
 explicit thresholds for `SleepFrameThreshold` fixed frames.
 
-Sleeping clears accumulated force, velocity, torque, acceleration, and
-pending position-correction state, but does not remove the collider from
-GridForge partitions.
+Sleeping clears accumulated force, velocity, torque, acceleration, and pending
+position-correction state, but does not remove the collider from GridForge
+partitions.
 
 Deterministic wake stimuli include:
 

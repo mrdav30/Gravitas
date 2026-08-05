@@ -56,8 +56,8 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 
 ## Active Signals
 
-No active release-relevant benchmark signals remain. New measured concerns
-should be added here before they are promoted into implementation work.
+No active benchmark signals remain. Add new measured concerns here before they
+are promoted into implementation work.
 
 ## Experimental Signals
 
@@ -156,31 +156,31 @@ and
 
 ## Closed Signals
 
-| Signal                                                      | Status | Closed     | Resolution                                                                                                                                                                                                                                  |
-| ----------------------------------------------------------- | ------ | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Mixed discrete broad-phase allocation at 32 pairs           | Closed | 2026-08-04 | Two independent rotational runs and corrected sparse, dense, and churn broad-phase rows reproduce `0 B/op`; the stale benchmark lifecycle and unrepresentative 4,096-collider monolithic-grid row were repaired without speculative runtime preallocation |
+| Signal                                                      | Status | Closed     | Resolution                                                                                                                                                                                                                                                                                      |
+| ----------------------------------------------------------- | ------ | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Mixed discrete broad-phase allocation at 32 pairs           | Closed | 2026-08-04 | Two independent rotational runs and corrected sparse, dense, and churn broad-phase rows reproduce `0 B/op`; the stale benchmark lifecycle and unrepresentative 4,096-collider monolithic-grid row were repaired without speculative runtime preallocation                                       |
 | Mixed public sweep traversal on extreme sparse-grid spans   | Closed | 2026-08-04 | GridForge's two-tier hash/BVH index replaces 64-billion-cell registration with active-grid scaling; Gravitas completes the exact public sweep in 14.8-16.0 us at 0 B with deterministic candidate and hit order; full evidence is retained in GridForge's completed two-tier spatial-index plan |
-| Mesh scale rebuild allocation                               | Closed | 2026-08-03 | Convex support topology is built once and scale changes refit transactional node bounds in linear time; subdivision 8/16 rows fall from 4,032/16,320 B to 0 B and improve by 7.9%/7.8%                                                        |
-| Exact 3D contact-response ordinary throughput               | Closed | 2026-08-03 | Exact aligned-frame point anchors improve direct rows by 61.0-95.9% and the unchanged 24-row Gravitas matrix by 46.4% median versus the exact baseline; confirmation remains within 0.7% median at 0 B and 100% coverage                    |
-| Exact canonical OBB ordinary throughput                     | Closed | 2026-08-03 | One exact relative-frame kernel per relation improves matched direct rows by 35.3-64.0% and Gravitas rows by 30.9-55.7%; full DefaultJob confirmations remain at 0 B and 100% reachable coverage                                            |
-| Physics-material combine numeric hardening                  | Closed | 2026-07-13 | Overflow-safe average and geometric-mean edge handling preserve deterministic coefficient semantics; the default geometric-material response benchmark remains allocation-free with no credible timing regression                           |
-| Replay hash collider-ID churn scaling                       | Closed | 2026-07-05 | 2D and 3D collider registration now uses a shared reusable-slot registry; authoritative replay hashes traverse canonical live registration order with dense replay ordinals, while deleted ID history remains outside replay identity       |
-| Pure 2D response position-correction repartition allocation | Closed | 2026-06-28 | Gravitas reuses empty retained partitions for immediate repartitioning; GridForge stores the common single voxel partition inline and keeps diagnostic names off success paths                                                              |
-| SwiftCollections sort hot-path allocation                   | Closed | 2026-06-24 | SwiftCollections owns allocation-free sort and sorted-key APIs; Gravitas removed `SwiftListSortUtility`                                                                                                                                     |
-| Mixed mesh finite-slab triangle scaling signal              | Closed | 2026-06-24 | Mixed and pure 3D query services expose mesh-triangle candidate counts, dedicated triangle-volume benchmarks cover dense and false-positive mesh targets, and pure 3D convex-source mesh sweeps use ordered lower-bound triangle candidates |
-| Pure 2D dynamic CCD candidate asymmetry                     | Closed | 2026-06-23 | 2D uses a planar candidate index, skips mixed CCD indexing outside mixed mode, and benchmark resets use 2D reset parity                                                                                                                     |
-| 3D shape-exact false-positive cost                          | Closed | 2026-06-23 | Static CCD uses exact-source sweeps for non-sphere convex movers before conservative sphere fallback refinement                                                                                                                             |
-| 3D dynamic shape-exact BDN allocation signal                | Closed | 2026-06-23 | Shared exact-sweep bounds prefilters removed the scaling allocation/time signal from 3D dynamic false-positive rows                                                                                                                         |
-| 3D full-runtime CCD allocation                              | Closed | 2026-06-23 | GridForge allocation-free line tracing plus Gravitas 3D raycast adoption                                                                                                                                                                    |
-| Grounding raycast probe allocation                          | Closed | 2026-06-23 | Same raycast trace fix removed automatic ray-grounding allocation                                                                                                                                                                           |
+| Mesh scale rebuild allocation                               | Closed | 2026-08-03 | Convex support topology is built once and scale changes refit transactional node bounds in linear time; subdivision 8/16 rows fall from 4,032/16,320 B to 0 B and improve by 7.9%/7.8%                                                                                                          |
+| Exact 3D contact-response ordinary throughput               | Closed | 2026-08-03 | Exact aligned-frame point anchors improve direct rows by 61.0-95.9% and the unchanged 24-row Gravitas matrix by 46.4% median versus the exact baseline; confirmation remains within 0.7% median at 0 B and 100% coverage                                                                        |
+| Exact canonical OBB ordinary throughput                     | Closed | 2026-08-03 | One exact relative-frame kernel per relation improves matched direct rows by 35.3-64.0% and Gravitas rows by 30.9-55.7%; full DefaultJob confirmations remain at 0 B and 100% reachable coverage                                                                                                |
+| Physics-material combine numeric hardening                  | Closed | 2026-07-13 | Overflow-safe average and geometric-mean edge handling preserve deterministic coefficient semantics; the default geometric-material response benchmark remains allocation-free with no credible timing regression                                                                               |
+| Replay hash collider-ID churn scaling                       | Closed | 2026-07-05 | 2D and 3D collider registration now uses a shared reusable-slot registry; authoritative replay hashes traverse canonical live registration order with dense replay ordinals, while deleted ID history remains outside replay identity                                                           |
+| Pure 2D response position-correction repartition allocation | Closed | 2026-06-28 | Gravitas reuses empty retained partitions for immediate repartitioning; GridForge stores the common single voxel partition inline and keeps diagnostic names off success paths                                                                                                                  |
+| SwiftCollections sort hot-path allocation                   | Closed | 2026-06-24 | SwiftCollections owns allocation-free sort and sorted-key APIs; Gravitas removed `SwiftListSortUtility`                                                                                                                                                                                         |
+| Mixed mesh finite-slab triangle scaling signal              | Closed | 2026-06-24 | Mixed and pure 3D query services expose mesh-triangle candidate counts, dedicated triangle-volume benchmarks cover dense and false-positive mesh targets, and pure 3D convex-source mesh sweeps use ordered lower-bound triangle candidates                                                     |
+| Pure 2D dynamic CCD candidate asymmetry                     | Closed | 2026-06-23 | 2D uses a planar candidate index, skips mixed CCD indexing outside mixed mode, and benchmark resets use 2D reset parity                                                                                                                                                                         |
+| 3D shape-exact false-positive cost                          | Closed | 2026-06-23 | Static CCD uses exact-source sweeps for non-sphere convex movers before conservative sphere fallback refinement                                                                                                                                                                                 |
+| 3D dynamic shape-exact BDN allocation signal                | Closed | 2026-06-23 | Shared exact-sweep bounds prefilters removed the scaling allocation/time signal from 3D dynamic false-positive rows                                                                                                                                                                             |
+| 3D full-runtime CCD allocation                              | Closed | 2026-06-23 | GridForge allocation-free line tracing plus Gravitas 3D raycast adoption                                                                                                                                                                                                                        |
+| Grounding raycast probe allocation                          | Closed | 2026-06-23 | Same raycast trace fix removed automatic ray-grounding allocation                                                                                                                                                                                                                               |
 
 ### Closed Signal: Mixed Discrete Broad-Phase Allocation At 32 Pairs
 
 **Discovered:** 2026-07-19 **Closed:** 2026-08-04
 
 The original `RotationalMovingPairCcdBenchmarks` mixed 3D-to-2D ShortRun was
-already allocation-free at 1 and 8 pairs, while repeated 32-pair runs reported
-a small, run-dependent `48 B/op` to `10 B/op`. Focused guards excluded CCD
+already allocation-free at 1 and 8 pairs, while repeated 32-pair runs reported a
+small, run-dependent `48 B/op` to `10 B/op`. Focused guards excluded CCD
 preparation, search, response, handoff, reset, and completion and localized the
 sample to mixed discrete partition refresh after CCD.
 
@@ -188,43 +188,43 @@ The current locally linked stack no longer reproduces the signal. Two
 independent unchanged rotational ShortRuns reported `0 B/op` at 1, 8, and 32
 pairs. The independent broad-phase check then found that
 `MixedBroadPhaseBenchmarks` still called only `Simulate()` after mixed contact
-work moved to `LateSimulate()` in June, so it had become an empty benchmark.
-The repaired workload now:
+work moved to `LateSimulate()` in June, so it had become an empty benchmark. The
+repaired workload now:
 
 - executes the complete `Simulate()` / `LateSimulate()` fixed-step contract;
-- uses bodyless 3D triggers against dynamic 2D bodies so partitioning,
-  candidate generation, narrow phase, and pair lifecycle stay active without
-  solver-driven scene drift;
+- uses bodyless 3D triggers against dynamic 2D bodies so partitioning, candidate
+  generation, narrow phase, and pair lifecycle stay active without solver-driven
+  scene drift;
 - rejects setup that produces no broad-phase candidates; and
 - gives each row target-specific setup and cleanup instead of constructing all
   three worlds in every benchmark process.
 
 Final ShortRun evidence:
 
-| Method                             | Collider count | Mean       | Allocated |
+| Method                             | Collider count |       Mean | Allocated |
 | ---------------------------------- | -------------: | ---------: | --------: |
-| SparseCandidateGathering           |             32 | `334.8 us` |    `0 B`  |
-| DenseCandidateGathering            |             32 | `497.8 us` |    `0 B`  |
-| RetainedPartitionCleanupAfterChurn |             32 | `817.4 us` |    `0 B`  |
-| SparseCandidateGathering           |          1,024 | `28.96 ms` |    `0 B`  |
-| DenseCandidateGathering            |          1,024 | `23.64 ms` |    `0 B`  |
-| RetainedPartitionCleanupAfterChurn |          1,024 | `84.33 ms` |    `0 B`  |
+| SparseCandidateGathering           |             32 | `334.8 us` |     `0 B` |
+| DenseCandidateGathering            |             32 | `497.8 us` |     `0 B` |
+| RetainedPartitionCleanupAfterChurn |             32 | `817.4 us` |     `0 B` |
+| SparseCandidateGathering           |          1,024 | `28.96 ms` |     `0 B` |
+| DenseCandidateGathering            |          1,024 | `23.64 ms` |     `0 B` |
+| RetainedPartitionCleanupAfterChurn |          1,024 | `84.33 ms` |     `0 B` |
 
 The old 4,096-collider row created one monolithic dense voxel grid for a sparse
 address-space workload. Even after target-specific setup, it exceeded `2.6 GB`
 before the first timed operation. GridForge already provides sparse storage and
-streamed multi-grid ownership for that world shape, so the routine benchmark
-now retains the exact 32-pair threshold and a 1,024-collider stress point rather
+streamed multi-grid ownership for that world shape, so the routine benchmark now
+retains the exact 32-pair threshold and a 1,024-collider stress point rather
 than measuring an unrepresentative setup-memory ceiling.
 
 **Resolution:** No production capacity hint or preallocation was added. The
 original signal is absent under repeated end-to-end and independently corrected
-broad-phase measurement, all retained rows are allocation-free, and the only
-new findings were benchmark-harness defects corrected in the benchmark itself.
+broad-phase measurement, all retained rows are allocation-free, and the only new
+findings were benchmark-harness defects corrected in the benchmark itself.
 Release and `ReleaseLean` pass 3,930 and 3,875 tests respectively. Fresh
-ReportGenerator evidence remains at 100%: 55,869/55,869 lines,
-15,833/15,833 branches, and 5,321/5,321 methods. Both package configurations
-build for `net8.0` and `netstandard2.1` without warnings.
+ReportGenerator evidence remains at 100%: 55,869/55,869 lines, 15,833/15,833
+branches, and 5,321/5,321 methods. Both package configurations build for
+`net8.0` and `netstandard2.1` without warnings.
 
 ### Closed Signal: Mesh Scale Rebuild Allocation
 
@@ -234,11 +234,11 @@ build for `net8.0` and `netstandard2.1` without warnings.
 `MeshMassPropertyBenchmarks.UpdateNonUniformMeshScaleAndCalculateSurfaceInertia`
 reported:
 
-| Subdivision | Mean | Allocated |
-| ---: | ---: | ---: |
-| 1 | `38.394 us` | `0 B/op` |
-| 8 | `2.166 ms` | `4,032 B/op` |
-| 16 | `8.822 ms` | `16,320 B/op` |
+| Subdivision |        Mean |     Allocated |
+| ----------: | ----------: | ------------: |
+|           1 | `38.394 us` |      `0 B/op` |
+|           8 |  `2.166 ms` |  `4,032 B/op` |
+|          16 |  `8.822 ms` | `16,320 B/op` |
 
 **RCA:** Triangle-BVH rebuilding, scaled face data, and surface mass properties
 remain allocation-free. Convex support-tree preparation instead sorted every
@@ -250,18 +250,18 @@ measured totals.
 **Resolution:** `PhysicsMesh` now builds its support-vertex partition once.
 Subsequent scale candidates refit leaf bounds from that immutable partition and
 branch bounds bottom-up into the existing prepared node buffer. Publication
-still swaps complete committed/prepared node buffers transactionally. The
-second support-index array, its publication swap, repeated sorting, and retained
+still swaps complete committed/prepared node buffers transactionally. The second
+support-index array, its publication swap, repeated sorting, and retained
 construction comparer were deleted. Exact support selection and authored-order
 ties are unchanged.
 
 The unchanged command now reports:
 
-| Subdivision | Baseline | Confirmation | Delta | Allocated |
-| ---: | ---: | ---: | ---: | ---: |
-| 1 | `38.394 us` | `37.755 us` | `-1.7%` | `0 B/op` |
-| 8 | `2.166 ms` | `1.994 ms` | `-7.9%` | `0 B/op` |
-| 16 | `8.822 ms` | `8.131 ms` | `-7.8%` | `0 B/op` |
+| Subdivision |    Baseline | Confirmation |   Delta | Allocated |
+| ----------: | ----------: | -----------: | ------: | --------: |
+|           1 | `38.394 us` |  `37.755 us` | `-1.7%` |  `0 B/op` |
+|           8 |  `2.166 ms` |   `1.994 ms` | `-7.9%` |  `0 B/op` |
+|          16 |  `8.822 ms` |   `8.131 ms` | `-7.8%` |  `0 B/op` |
 
 Gravitas passes 3,928 Release and 3,873 ReleaseLean tests. Coverage remains
 55,869/55,869 lines, 15,833/15,833 branches, and 5,321/5,321 methods. The
@@ -392,10 +392,10 @@ managed allocation across the selected 64-body and 1024-body 2D response rows.
 
 **Touched files:**
 
-- `../GridForge/src/GridForge/Spatial/PartitionProvider.cs`
-- `../GridForge/src/GridForge/Grids/Nodes/Voxel.cs`
-- `../GridForge/tests/GridForge.Tests/Spatial/SpatialTypes.Tests.cs`
-- `../GridForge/tests/GridForge.Tests/Grids/Voxel.Tests.cs`
+- [GridForge `PartitionProvider.cs`](https://github.com/mrdav30/GridForge/blob/main/src/GridForge/Spatial/PartitionProvider.cs)
+- [GridForge `Voxel.cs`](https://github.com/mrdav30/GridForge/blob/main/src/GridForge/Grids/Nodes/Voxel.cs)
+- [GridForge spatial type tests](https://github.com/mrdav30/GridForge/blob/main/tests/GridForge.Tests/Spatial/SpatialTypes.Tests.cs)
+- [GridForge voxel tests](https://github.com/mrdav30/GridForge/blob/main/tests/GridForge.Tests/Grids/Voxel.Tests.cs)
 - `src/Gravitas/Core/2D/GravitasCollision2DService.cs`
 - `src/Gravitas/Core/3D/GravitasCollisionService.cs`
 - `src/Gravitas/Core/Mixed/GravitasMixedCollisionService.Partitioning.cs`
@@ -441,10 +441,10 @@ allocation contract.
 
 **Touched files:**
 
-- `../SwiftCollections/src/SwiftCollections/Collection/SwiftList.cs`
-- `../SwiftCollections/src/SwiftCollections/Collection/SwiftSortedList.cs`
-- `../SwiftCollections/src/SwiftCollections/Utility/SwiftArraySortHelper.cs`
-- `../SwiftCollections/src/SwiftCollections/Collection/SwiftSparseSet.cs`
+- [SwiftCollections `SwiftList.cs`](https://github.com/mrdav30/SwiftCollections/blob/main/src/SwiftCollections/Collection/SwiftList.cs)
+- [SwiftCollections `SwiftSortedList.cs`](https://github.com/mrdav30/SwiftCollections/blob/main/src/SwiftCollections/Collection/SwiftSortedList.cs)
+- [SwiftCollections `SwiftArraySortHelper.cs`](https://github.com/mrdav30/SwiftCollections/blob/main/src/SwiftCollections/Utility/SwiftArraySortHelper.cs)
+- [SwiftCollections `SwiftSparseSet.cs`](https://github.com/mrdav30/SwiftCollections/blob/main/src/SwiftCollections/Collection/SwiftSparseSet.cs)
 - `src/Gravitas/Core/3D/GravitasCollisionService.cs`
 - `src/Gravitas/Core/2D/GravitasPhysics2DService.cs`
 - `src/Gravitas/Core/2D/GravitasCollision2DService.cs`

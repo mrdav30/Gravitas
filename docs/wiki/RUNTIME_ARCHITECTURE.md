@@ -59,22 +59,22 @@ registry is process-wide metadata, not simulation state.
 Most host code should interact with the context and domain objects. Mutable
 implementation details stay inside services.
 
-| Service                         | Primary responsibility                                                                       |
-| ------------------------------- | -------------------------------------------------------------------------------------------- |
-| `GravitasPhysicsService`        | 3D body/collider registration, 3D CCD, 3D pairs, 3D response islands, sleep.                 |
-| `GravitasConstraint3DService`   | Context-local 3D joints, ragdolls, linked-collider filtering, metrics, replay hashing.       |
-| `GravitasPhysics2DService`      | 2D body/collider registration, 2D CCD, 2D pairs, response islands, grounding, visualization. |
-| `GravitasConstraint2DService`   | Context-local 2D joints, ragdolls, linked-collider filtering, metrics, replay hashing.       |
-| `GravitasMixedCollisionService` | Dedicated mixed 2D/3D broad phase, pair lifecycle, constrained response, partition cleanup.  |
-| `GravitasCollisionService`      | GridForge-backed 3D partitions, duplicate suppression, culling, retained partition cleanup.  |
-| `GravitasCollision2DService`    | GridForge-backed 2D partitions, awake dynamic membership, retained partition cleanup.        |
+| Service                         | Primary responsibility                                                                          |
+| ------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `GravitasPhysicsService`        | 3D body/collider registration, 3D CCD, 3D pairs, 3D response islands, sleep.                    |
+| `GravitasConstraint3DService`   | Context-local 3D joints, ragdolls, linked-collider filtering, metrics, replay hashing.          |
+| `GravitasPhysics2DService`      | 2D body/collider registration, 2D CCD, 2D pairs, response islands, grounding, visualization.    |
+| `GravitasConstraint2DService`   | Context-local 2D joints, ragdolls, linked-collider filtering, metrics, replay hashing.          |
+| `GravitasMixedCollisionService` | Dedicated mixed 2D/3D broad phase, pair lifecycle, constrained response, partition cleanup.     |
+| `GravitasCollisionService`      | GridForge-backed 3D partitions, duplicate suppression, culling, retained partition cleanup.     |
+| `GravitasCollision2DService`    | GridForge-backed 2D partitions, awake dynamic membership, retained partition cleanup.           |
 | `GravitasQuery3DService`        | 3D raycasts, swept-sphere and convex-source sweeps, cone volumes, X/Z projected-circle overlap. |
-| `GravitasQuery2DService`        | 2D overlaps, segment raycasts, swept-circle queries, hit ordering.                           |
-| `GravitasQueryMixedService`     | Explicit mixed sphere-against-2D and circle-against-3D sweeps.                               |
-| `GravitasCoroutineService`      | Lockstep coroutines and context-bound waits.                                                 |
-| `GravitasDiagnosticSink`        | Disabled-by-default event and debug draw buffers.                                            |
-| `GravitasLifecycleHooks`        | Ordered simulate, late-simulate, visualize, late-visualize, reset, and frame-rate callbacks. |
-| `GravitasReplayHashService`     | Fixed-order replay hash contributor over authoritative context/runtime state.                |
+| `GravitasQuery2DService`        | 2D overlaps, segment raycasts, swept-circle queries, hit ordering.                              |
+| `GravitasQueryMixedService`     | Explicit mixed sphere-against-2D and circle-against-3D sweeps.                                  |
+| `GravitasCoroutineService`      | Lockstep coroutines and context-bound waits.                                                    |
+| `GravitasDiagnosticSink`        | Disabled-by-default event and debug draw buffers.                                               |
+| `GravitasLifecycleHooks`        | Ordered simulate, late-simulate, visualize, late-visualize, reset, and frame-rate callbacks.    |
+| `GravitasReplayHashService`     | Fixed-order replay hash contributor over authoritative context/runtime state.                   |
 
 ## Frame Phases
 
@@ -188,17 +188,17 @@ solver degrees of freedom and never determine service or partition ownership.
 3D joints use context-local IDs allocated by `GravitasConstraint3DService`.
 Removing a joint releases solver cache and linked-collider suppression state,
 but does not reuse that joint ID in the same context. 2D joints follow the same
-context-local ownership principle through `GravitasConstraint2DService`. A
-joint belongs to the current registered lifetimes of both endpoint bodies.
+context-local ownership principle through `GravitasConstraint2DService`. A joint
+belongs to the current registered lifetimes of both endpoint bodies.
 Deactivating either endpoint removes every attached joint before the collider's
 reusable ID is released. Intrusive per-endpoint registration links make each
 joint unlink O(1), so teardown is O(attached joints) instead of scanning either
-the endpoint list, the context's peak joint range, or the suppression table.
-The links retain reverse-registration teardown order after unrelated endpoint
+the endpoint list, the context's peak joint range, or the suppression table. The
+links retain reverse-registration teardown order after unrelated endpoint
 removals.
 
-Ragdolls are atomic articulation registrations. A body can belong to at most
-one registered ragdoll, `RemoveRagdoll(...)` removes the runtime and all owned
+Ragdolls are atomic articulation registrations. A body can belong to at most one
+registered ragdoll, `RemoveRagdoll(...)` removes the runtime and all owned
 joints and suppression references, and deactivating any link performs the same
 removal automatically. A ragdoll-owned joint cannot be removed independently.
 Removed joint and ragdoll handles remain inspectable, but mutation and
@@ -221,8 +221,8 @@ contexts. These checks are core invariants.
 
 - position, exposed as `Position3d`.
 - normalized rotation and derived basis vectors. Public body admission and
-  replay population scale-safely normalize quaternions before publishing
-  runtime state; a zero quaternion resolves to identity.
+  replay population scale-safely normalize quaternions before publishing runtime
+  state; a zero quaternion resolves to identity.
 - visual interpolation buffers.
 - linear/angular velocity, acceleration, impulses, drag, friction, and
   restitution inputs.
@@ -233,13 +233,13 @@ contexts. These checks are core invariants.
 - deterministic sleep state.
 - Chronicler record data.
 
-`BodyMotionType` separates solver-controlled dynamic, host-controlled
-kinematic, and immobile static ownership. `FreezeAxes` independently constrains
-the linear and angular degrees of freedom of a dynamic body. Consequently, a
+`BodyMotionType` separates solver-controlled dynamic, host-controlled kinematic,
+and immobile static ownership. `FreezeAxes` independently constrains the linear
+and angular degrees of freedom of a dynamic body. Consequently, a
 position-frozen dynamic body can still integrate rotation, remain awake, solve
-off-center contacts and joints, run rotational CCD, and publish visualization.
-A fully locked dynamic body remains in dynamic partition membership but does
-not seed awake solver work.
+off-center contacts and joints, run rotational CCD, and publish visualization. A
+fully locked dynamic body remains in dynamic partition membership but does not
+seed awake solver work.
 
 Body movement happens in `SolidBody.LateSimulate()`, called by
 `GravitasPhysicsService.LateSimulate()`. Dynamic bodies with solver mobility

@@ -1,16 +1,16 @@
 # Scaled Mesh Query Normal Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use
-> `superpowers:subagent-driven-development` or
-> `superpowers:executing-plans` to implement this plan task-by-task. Steps use
-> checkbox (`- [ ]`) syntax for tracking.
+> `superpowers:subagent-driven-development` or `superpowers:executing-plans` to
+> implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for
+> tracking.
 
-**Goal:** Make non-uniformly scaled mesh raycasts and swept-sphere queries
-solve against the same committed triangle plane as their scaled vertices.
+**Goal:** Make non-uniformly scaled mesh raycasts and swept-sphere queries solve
+against the same committed triangle plane as their scaled vertices.
 
 **Architecture:** `PhysicsMesh` remains the sole owner of scale-derived face
-normals. One bounds-checked internal accessor exposes the committed scaled
-local normal; the two local-frame query workers consume it without per-query
+normals. One bounds-checked internal accessor exposes the committed scaled local
+normal; the two local-frame query workers consume it without per-query
 recomputation or a new abstraction.
 
 **Tech Stack:** C#, .NET 8 / .NET Standard 2.1, FixedMathSharp Q32.32 geometry,
@@ -44,18 +44,18 @@ SwiftCollections, xUnit v3, Microsoft code coverage.
 
 - [x] **Step 1: Add the swept-sphere reproducer**
 
-  Use authored `A=(0,0,0)`, `B=(1,0,0)`, `C=(0,1,1)`, committed scale
-  `(1,1,2)`, interior point `P=(1/3,1/3,2/3)`, authored unit normal
-  `n0=(0,-1/sqrt(2),1/sqrt(2))`, radius `1/10`, and segment `P-n0` to
-  `P+n0`. Assert the first distance is the independently derived Q32.32 value
+  Use authored `A=(0,0,0)`, `B=(1,0,0)`, `C=(0,1,1)`, committed scale `(1,1,2)`,
+  interior point `P=(1/3,1/3,2/3)`, authored unit normal
+  `n0=(0,-1/sqrt(2),1/sqrt(2))`, radius `1/10`, and segment `P-n0` to `P+n0`.
+  Assert the first distance is the independently derived Q32.32 value
   `Fixed64.FromRaw(3_842_237_992)` (`1 - sqrt(10)/30`), plus the matching
   center.
 
 - [x] **Step 2: Add the raycast reproducer**
 
-  Reuse the same committed triangle and segment. Assert the unique
-  intersection is `P`; the authored-normal plane instead returns the distinct
-  point `(1/3,1/2,1/2)`.
+  Reuse the same committed triangle and segment. Assert the unique intersection
+  is `P`; the authored-normal plane instead returns the distinct point
+  `(1/3,1/2,1/2)`.
 
 - [x] **Step 3: Keep both warmed reproductions allocation-free**
 
@@ -93,8 +93,7 @@ SwiftCollections, xUnit v3, Microsoft code coverage.
 - [x] **Step 2: Replace both authored-normal reads**
 
   Beside each `GetLocalTriangleVertices(...)` call, replace
-  `FaceNormals[triangleIndex]` with
-  `GetScaledLocalFaceNormal(triangleIndex)`.
+  `FaceNormals[triangleIndex]` with `GetScaledLocalFaceNormal(triangleIndex)`.
 
 - [x] **Step 3: Prove both regressions pass**
 

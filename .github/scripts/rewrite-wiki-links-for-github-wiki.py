@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
-"""Rewrite copied docs/wiki page links for GitHub wiki publishing."""
+"""Rewrite copied wiki-page and repository links for GitHub Wiki publishing."""
 
 import argparse
 import posixpath
 import sys
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 
 def rewrite_wiki_links(wiki_dir, repository, sync_sha, source_dir="docs/wiki", repo_root="."):
     wiki_dir = Path(wiki_dir)
+    repo_root = Path(repo_root).resolve()
     source_dir = normalize_posix_path(source_dir)
 
     if not wiki_dir.is_dir():
@@ -24,6 +25,9 @@ def rewrite_wiki_links(wiki_dir, repository, sync_sha, source_dir="docs/wiki", r
             relative_file,
             page_routes,
             source_dir,
+            repository,
+            sync_sha,
+            repo_root,
         )
 
         if rewritten != original:
@@ -40,7 +44,15 @@ def get_page_routes(wiki_dir):
     return routes
 
 
-def rewrite_markdown(content, relative_file, page_routes, source_dir):
+def rewrite_markdown(
+    content,
+    relative_file,
+    page_routes,
+    source_dir,
+    repository,
+    sync_sha,
+    repo_root,
+):
     lines = content.splitlines(keepends=True)
     rewritten = []
     in_fence = False
@@ -69,6 +81,9 @@ def rewrite_markdown(content, relative_file, page_routes, source_dir):
                 relative_file,
                 page_routes,
                 source_dir,
+                repository,
+                sync_sha,
+                repo_root,
                 line_number,
             )
         )
@@ -87,7 +102,16 @@ def get_fence_marker(line):
     return None
 
 
-def rewrite_line(line, relative_file, page_routes, source_dir, line_number):
+def rewrite_line(
+    line,
+    relative_file,
+    page_routes,
+    source_dir,
+    repository,
+    sync_sha,
+    repo_root,
+    line_number,
+):
     result = []
     index = 0
     in_code = False
@@ -119,6 +143,9 @@ def rewrite_line(line, relative_file, page_routes, source_dir, line_number):
             relative_file,
             page_routes,
             source_dir,
+            repository,
+            sync_sha,
+            repo_root,
             line_number,
         )
         result.append("[")
@@ -157,26 +184,54 @@ def try_parse_link(line, start):
     return text, target, close_paren + 1
 
 
-def rewrite_target(target, relative_file, page_routes, source_dir, line_number):
+def rewrite_target(
+    target,
+    relative_file,
+    page_routes,
+    source_dir,
+    repository,
+    sync_sha,
+    repo_root,
+    line_number,
+):
     if should_ignore_target(target):
         return target
 
     target_path, fragment = split_fragment(target)
-    if not target_path or not target_path.endswith(".md"):
+    if not target_path:
         return target
 
     current_source_dir = posixpath.dirname(posixpath.join(source_dir, relative_file))
     resolved_repo_path = normalize_posix_path(posixpath.join(current_source_dir, target_path))
 
-    if not is_within_or_equal(resolved_repo_path, source_dir):
+    if target_path.endswith(".md") and is_within_or_equal(resolved_repo_path, source_dir):
+        wiki_relative_path = posixpath.relpath(resolved_repo_path, source_dir)
+        if wiki_relative_path in page_routes:
+            return page_routes[wiki_relative_path] + fragment
+
+        raise FileNotFoundError(
+            f"{relative_file}:{line_number}: wiki page link target does not exist: {target}"
+        )
+
+    if resolved_repo_path == ".." or resolved_repo_path.startswith("../"):
         return target
 
-    wiki_relative_path = posixpath.relpath(resolved_repo_path, source_dir)
-    if wiki_relative_path in page_routes:
-        return page_routes[wiki_relative_path] + fragment
+    repo_path = (repo_root / Path(*resolved_repo_path.split("/"))).resolve()
+    try:
+        repo_path.relative_to(repo_root)
+    except ValueError:
+        return target
 
-    raise FileNotFoundError(
-        f"{relative_file}:{line_number}: wiki page link target does not exist: {target}"
+    if repo_path.is_file():
+        route_kind = "blob"
+    elif repo_path.is_dir():
+        route_kind = "tree"
+    else:
+        return target
+
+    return (
+        f"https://github.com/{repository}/{route_kind}/{sync_sha}/"
+        f"{quote(resolved_repo_path, safe='/')}{fragment}"
     )
 
 
@@ -216,8 +271,8 @@ def parse_args(argv):
         description="Rewrite copied docs/wiki Markdown links for GitHub wiki publishing."
     )
     parser.add_argument("wiki_dir", help="Directory containing the copied wiki Markdown files.")
-    parser.add_argument("repository", help="Accepted for sync workflow compatibility; not used.")
-    parser.add_argument("sync_sha", help="Accepted for sync workflow compatibility; not used.")
+    parser.add_argument("repository", help="GitHub owner/name used for repository links.")
+    parser.add_argument("sync_sha", help="Commit SHA used for generated repository links.")
     parser.add_argument(
         "--source-dir",
         default="docs/wiki",
@@ -226,7 +281,7 @@ def parse_args(argv):
     parser.add_argument(
         "--repo-root",
         default=".",
-        help="Accepted for sync workflow compatibility; not used.",
+        help="Repository root used to resolve repo-local links.",
     )
     return parser.parse_args(argv)
 

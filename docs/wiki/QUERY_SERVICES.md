@@ -67,8 +67,8 @@ used for queries, compound cuboid parts, grounding, or CCD.
 Mesh raycasts and swept-sphere queries solve against one committed local
 geometry snapshot. Non-uniform scale publishes scaled vertices and their
 matching face normals together; query workers consume those cached values
-without recomputing normals or allocating per triangle. Authored vertices
-remain the source for later scale transactions, not query-plane authority.
+without recomputing normals or allocating per triangle. Authored vertices remain
+the source for later scale transactions, not query-plane authority.
 
 ### 2D Queries
 
@@ -110,13 +110,12 @@ distances only when their direction is normalized.
 `Physics3DHit`, `Physics2DHit`, and `PhysicsMixedHit` retain surface witnesses
 as rigid-frame anchors with separate local feature terms. Classification,
 distance, ordering, diagnostics, and deterministic replay do not require an
-absolute point to be representable.
-The familiar `Point`, `Point3D`, and `Point2D` properties remain convenient for
-ordinary coordinates, but throw `InvalidOperationException` when the
-conceptual witness lies outside the `Fixed64` scalar range. Use `TryGetPoint`,
-`TryGetPoint3D`, or `TryGetPoint2D` when a query may approach a scalar face.
-Returning `false` from a witness materialization method does not invalidate the
-query hit.
+absolute point to be representable. The familiar `Point`, `Point3D`, and
+`Point2D` properties remain convenient for ordinary coordinates, but throw
+`InvalidOperationException` when the conceptual witness lies outside the
+`Fixed64` scalar range. Use `TryGetPoint`, `TryGetPoint3D`, or `TryGetPoint2D`
+when a query may approach a scalar face. Returning `false` from a witness
+materialization method does not invalidate the query hit.
 
 ## Common Usage
 

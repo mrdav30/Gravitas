@@ -50,7 +50,7 @@ class RewriteWikiLinksForGithubWikiTests(unittest.TestCase):
         self.assertIn("[Home](Home)", content)
         self.assertIn("[Common Workflows](Common-Workflows#register-a-grid)", content)
 
-    def test_leaves_markdown_links_outside_wiki_source_unchanged(self):
+    def test_rewrites_repository_file_links_to_the_tested_commit(self):
         rewriter = load_rewriter()
 
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -59,7 +59,11 @@ class RewriteWikiLinksForGithubWikiTests(unittest.TestCase):
             repo_root = root / "repo"
             wiki_dir.mkdir()
             (repo_root / "docs" / "wiki").mkdir(parents=True)
-            (wiki_dir / "Overview.md").write_text("[Readme](../../README.md)", encoding="utf-8")
+            (repo_root / "README.md").write_text("# Readme\n", encoding="utf-8")
+            (wiki_dir / "Overview.md").write_text(
+                "[Readme](../../README.md#install)",
+                encoding="utf-8",
+            )
 
             rewriter.rewrite_wiki_links(
                 wiki_dir=wiki_dir,
@@ -71,7 +75,40 @@ class RewriteWikiLinksForGithubWikiTests(unittest.TestCase):
 
             content = (wiki_dir / "Overview.md").read_text(encoding="utf-8")
 
-        self.assertIn("[Readme](../../README.md)", content)
+        self.assertIn(
+            "[Readme](https://github.com/mrdav30/Gravitas/blob/abc123/README.md#install)",
+            content,
+        )
+
+    def test_rewrites_repository_directory_links_to_the_tested_commit(self):
+        rewriter = load_rewriter()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = pathlib.Path(temp_dir)
+            wiki_dir = root / "wiki"
+            repo_root = root / "repo"
+            wiki_dir.mkdir()
+            (repo_root / "docs" / "wiki").mkdir(parents=True)
+            (repo_root / "src" / "Gravitas").mkdir(parents=True)
+            (wiki_dir / "Overview.md").write_text(
+                "[Source](../../src/Gravitas)",
+                encoding="utf-8",
+            )
+
+            rewriter.rewrite_wiki_links(
+                wiki_dir=wiki_dir,
+                repository="mrdav30/Gravitas",
+                sync_sha="abc123",
+                source_dir="docs/wiki",
+                repo_root=repo_root,
+            )
+
+            content = (wiki_dir / "Overview.md").read_text(encoding="utf-8")
+
+        self.assertIn(
+            "[Source](https://github.com/mrdav30/Gravitas/tree/abc123/src/Gravitas)",
+            content,
+        )
 
     def test_ignores_external_images_code_and_non_markdown_local_links(self):
         rewriter = load_rewriter()

@@ -140,11 +140,11 @@ dimension/type properties to route shape payloads. 2D probe points are stored in
 the X/Z debug plane: event X is planar X, event Z is planar Y, and event Y is
 zero.
 
-Contact and mixed-query views expose `HasPoint*` flags because canonical
-surface anchors can describe a valid hit whose absolute world coordinate is
-outside the `Fixed64` scalar domain. Point fields are zero when their matching
-flag is false; adapters should omit that marker while still reporting the
-contact, normal, depth, or query distance.
+Contact and mixed-query views expose `HasPoint*` flags because canonical surface
+anchors can describe a valid hit whose absolute world coordinate is outside the
+`Fixed64` scalar domain. Point fields are zero when their matching flag is
+false; adapters should omit that marker while still reporting the contact,
+normal, depth, or query distance.
 
 The views are read-only wrappers over the event value. Visitors and views do not
 change capture storage, event ordering, diagnostic buffering, or disabled path
@@ -177,17 +177,17 @@ views and are measurement state, not extra tuning knobs.
 primitive draw descriptions; hosts translate them into their own debug drawing
 API.
 
-| Kind           | Required payload                                  |
-| -------------- | ------------------------------------------------- |
-| `Line`         | `Start`, `End`, `Color`                           |
-| `Ray`          | `Start`, `End`, `Color`                           |
-| `Point`        | `Center`, `Radius`, `Color`                       |
-| `WireSphere`   | `Center`, `Radius`, `Color`                       |
-| `WireBox`      | `Center`, `HalfExtents`, `Rotation`, `Color`      |
+| Kind           | Required payload                                      |
+| -------------- | ----------------------------------------------------- |
+| `Line`         | `Start`, `End`, `Color`                               |
+| `Ray`          | `Start`, `End`, `Color`                               |
+| `Point`        | `Center`, `Radius`, `Color`                           |
+| `WireSphere`   | `Center`, `Radius`, `Color`                           |
+| `WireBox`      | `Center`, `HalfExtents`, `Rotation`, `Color`          |
 | `WireCapsule`  | `Center`, `Radius`, `AxisLength`, `Rotation`, `Color` |
-| `WireCylinder` | `Center`, `Radius`, `Height`, `Rotation`, `Color` |
-| `WireCone`     | `Center`, `Radius`, `Height`, `Rotation`, `Color` |
-| `WireTriangle` | `PointA`, `PointB`, `PointC`, `Color`             |
+| `WireCylinder` | `Center`, `Radius`, `Height`, `Rotation`, `Color`     |
+| `WireCone`     | `Center`, `Radius`, `Height`, `Rotation`, `Color`     |
+| `WireTriangle` | `PointA`, `PointB`, `PointC`, `Color`                 |
 
 Host renderers can consume draw commands through
 `GravitasDebugDrawCommandVisitor` and

@@ -1,8 +1,8 @@
 # Rotational Moving-Pair CCD Hardening Plan
 
 > **For agentic workers:** Use systematic debugging, test-driven development,
-> verification before completion, and an independent final code review for
-> every commit. Keep this document current as implementation evidence changes.
+> verification before completion, and an independent final code review for every
+> commit. Keep this document current as implementation evidence changes.
 
 **Status:** Complete (2026-07-19)
 
@@ -38,8 +38,8 @@ scene-graph ownership, engine dependencies, or per-frame allocations.
 2. Candidate order is normalized time, target dimension, then stable collider
    ID. `Both` never admits cross-dimensional candidates.
 3. Interval pruning bounds source and target linear travel, angular arc travel,
-   and fixed-point uncertainty. Unrepresentable bounds subdivide
-   conservatively; they never certify separation.
+   and fixed-point uncertainty. Unrepresentable bounds subdivide conservatively;
+   they never certify separation.
 4. A witnessed contact uses contact-point relative velocity and constrained
    inverse mass/inertia. A conservative unwitnessed clamp never invents an
    impulse.
@@ -47,17 +47,17 @@ scene-graph ownership, engine dependencies, or per-frame allocations.
    authored trajectory while the dynamic target receives a bounded handoff.
 6. Handoffs continue both translation and rotation for the remaining time and
    encode all pending authoritative state in replay hashing.
-7. Existing static/bodyless behavior, queue budgets, callback-abort cleanup,
-   and warmed zero-allocation paths remain intact.
+7. Existing static/bodyless behavior, queue budgets, callback-abort cleanup, and
+   warmed zero-allocation paths remain intact.
 8. Prepared motion is a canonical piecewise trajectory, not one overwritten
-   start/end pair. Same-frame impacts preserve the pre-impact history that
-   later bodies must sample. Phase 1 retains every distinct increasing impact;
-   the Phase 3 arbiter must reject a pair atomically at its deterministic
-   mutation budget before making the final storage bound structural.
+   start/end pair. Same-frame impacts preserve the pre-impact history that later
+   bodies must sample. Phase 1 retains every distinct increasing impact; the
+   Phase 3 arbiter must reject a pair atomically at its deterministic mutation
+   budget before making the final storage bound structural.
 9. The frame-start candidate index is immutable after preparation. Impact-
-   changed trajectories enter a service-owned, TOI-budget-bounded dirty
-   overlay so the rotational arbiter cannot miss a body accelerated outside its
-   original swept bounds. A final consumer audit confirmed that the legacy
+   changed trajectories enter a service-owned, TOI-budget-bounded dirty overlay
+   so the rotational arbiter cannot miss a body accelerated outside its original
+   swept bounds. A final consumer audit confirmed that the legacy
    translation-only narrow phase still flattens multi-segment target motion to
    an endpoint chord; that separate parity defect is retained in the active
    issue tracker rather than hidden in this plan.
@@ -75,9 +75,9 @@ response. Admission changes begin only after both contracts are green.
 
 ## Phase 0: Baseline And Contract Regressions
 
-- [x] Record focused current 2D/3D rotational tests and benchmark baselines.
-      The existing rotational slice passed 23/23 before source changes. The
-      short static-near-miss baseline at candidate counts 1/8/32 measured
+- [x] Record focused current 2D/3D rotational tests and benchmark baselines. The
+      existing rotational slice passed 23/23 before source changes. The short
+      static-near-miss baseline at candidate counts 1/8/32 measured
       1.599/8.609/32.471 ms in 3D and 0.609/3.032/11.082 ms in 2D, with zero
       managed allocation.
 - [x] Add failing pure-rotation regressions for dynamic 2D and 3D targets.
@@ -92,13 +92,13 @@ response. Admission changes begin only after both contracts are green.
 - [x] Extend 2D/3D CCD snapshots with final frame rotation, angular velocity,
       angular distance, and kinematic authored endpoints.
 - [x] Prepare linear and angular integration once from the normal body policy
-      before ordered processing; do not predict through a divergent duplicate
-      or consume force/torque twice.
+      before ordered processing; do not predict through a divergent duplicate or
+      consume force/torque twice.
 - [x] Represent prepared motion as pre-sized canonical piecewise trajectories
       and consume queued force/torque exactly once before ordered body
       processing. Equal- or earlier-fraction mutations replace obsolete tail
-      pieces; distinct increasing impacts remain lossless until Phase 3 owns
-      the mutation bound.
+      pieces; distinct increasing impacts remain lossless until Phase 3 owns the
+      mutation bound.
 - [x] Include moving kinematic bodies in the bounded candidate indices.
 - [x] Exclude moving kinematics from duplicate static-query admission when the
       unified arbiter begins consuming the new index.
@@ -114,12 +114,12 @@ response. Admission changes begin only after both contracts are green.
 - [x] Keep response calculation side-effect-free until every finite delta is
       proven, then apply both participants atomically.
 - [x] Cover frozen axes, infinite/zero effective mass, separating/tangent
-      contact, pure angular closing speed, and mixed planar constraints.
-      The focused 2D/3D/mixed response and warm-start slice passes 106 tests
-      with zero allocations in the scalar-free kernels. A wider 3D fused
+      contact, pure angular closing speed, and mixed planar constraints. The
+      focused 2D/3D/mixed response and warm-start slice passes 106 tests with
+      zero allocations in the scalar-free kernels. A wider 3D fused
       inverse-inertia matrix product-sum/divide remains a lower-math-layer
-      hardening candidate; the current extraction does not regress the
-      discrete solver's established Q32.32 boundary.
+      hardening candidate; the current extraction does not regress the discrete
+      solver's established Q32.32 boundary.
 
 ## Phase 3: Rotational Handoff Continuation
 
@@ -163,12 +163,13 @@ response. Admission changes begin only after both contracts are green.
       pre-existing mixed discrete broad-phase partition refresh/capacity growth
       rather than CCD preparation, search, response, handoff, reset, or
       completion. The benchmark hardening backlog retains the signal.
-- [x] Run the full `Release` suite and package/benchmark builds. The suite passes
-      3,056/3,056; the library/package and benchmark projects build with zero
-      warnings and errors. `ReleaseLean` reaches a known local-link validation
-      boundary: GridForge's MemoryPack-bearing local project reference is not
-      propagated into the Lean compile, producing 12 `CS0012` dependency
-      errors. Repeat the Lean gate after restoring released package references.
+- [x] Run the full `Release` suite and package/benchmark builds. The suite
+      passes 3,056/3,056; the library/package and benchmark projects build with
+      zero warnings and errors. `ReleaseLean` reaches a known local-link
+      validation boundary: GridForge's MemoryPack-bearing local project
+      reference is not propagated into the Lean compile, producing 12 `CS0012`
+      dependency errors. Repeat the Lean gate after restoring released package
+      references.
 - [x] Restore the repository's 100% coverage gate. The authoritative
       Coverlet/ReportGenerator artifact reports 100% line (33,555/33,555),
       branch (12,237/12,237), and method (4,167/4,167) coverage. Coverage work

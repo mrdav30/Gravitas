@@ -1,14 +1,14 @@
 # Gravitas Benchmarks
 
-This project is the BenchmarkDotNet scaffold for Gravitas physics hot paths.
-
-The runner, alias catalog, and deterministic fixture helpers are in place.
-Benchmark classes cover context lifecycle, registration/partitioning,
-simulation, query-service paths, replay hashing, and diagnostics.
+This project provides BenchmarkDotNet coverage for Gravitas physics hot paths.
+Its alias runner and deterministic fixtures cover context lifecycle,
+registration/partitioning, simulation, query services, replay hashing, and
+diagnostics.
 
 ## Requirements
 
-- .NET 8 SDK
+- The SDK selected by the repository's `global.json`
+- .NET 8 runtime for the `net8.0` benchmark executable
 - `Release` configuration for meaningful measurements
 
 Avoid measuring `Debug` builds except when diagnosing benchmark setup failures.
@@ -54,7 +54,7 @@ dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll coll
 Multiple aliases can run together:
 
 ```bash
-dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll collision-detection partitioning
+dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll collision-detection collision-partition
 ```
 
 ### Forward BenchmarkDotNet arguments
@@ -91,8 +91,8 @@ candidate-index, relative sweep, and shape-exact attribution:
 dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll continuous-collision-evidence --filter "*Evidence*" --exporters json
 ```
 
-These rows are intentionally manual for now; do not wire them into CI until the
-repo-wide benchmark publication/gating strategy is settled.
+Keep these evidence rows manual unless the repository adopts an explicit
+benchmark publication and gating strategy.
 
 `piecewise-translational-ccd` isolates the allocation and bounded-scaling cost
 of reducing one-, two-, and four-segment moving-target trajectories in the 2D
@@ -189,7 +189,7 @@ regressions can be compared against known results.
 
 ## Allocation Smoke Targets
 
-For quick allocation checks around the current steady-state hot paths, run:
+For quick allocation checks around steady-state hot paths, run:
 
 ```bash
 dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll query-service simulation-allocation continuous-collision collision-detection collision-response mixed-collision-response collision-partition partition-culling diagnostics physics-2d mixed-broad-phase replay-hash --filter "*" -j Short -i --exporters json
@@ -241,7 +241,6 @@ direct command when isolating benchmark compilation locally:
 dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj --configuration Release
 ```
 
-Running full benchmarks in CI is optional until local variance is understood.
-When performance gates are introduced, prefer BenchmarkDotNet comparison support
-or stored baseline artifacts over raw timing thresholds, which are sensitive to
-runner hardware.
+Full benchmark execution is optional in CI. Performance gates should use
+BenchmarkDotNet comparison support or stored baseline artifacts rather than raw
+timing thresholds, which are sensitive to runner hardware.

@@ -41,11 +41,11 @@ bound body before broad-phase refresh.
 
 Every changed 3D snapshot is prepared and validated before its canonical
 geometry, bounds, mesh transforms, compound parts, runtime version, mass
-properties, or partition ownership are published. A failed live scale,
-rotation, or geometry candidate therefore leaves the last committed runtime
-shape intact; correcting the input allows the next simulation pass to rebuild
-normally. Compound preparation walks every part in authored order and publishes
-none of them until every candidate succeeds.
+properties, or partition ownership are published. A failed live scale, rotation,
+or geometry candidate therefore leaves the last committed runtime shape intact;
+correcting the input allows the next simulation pass to rebuild normally.
+Compound preparation walks every part in authored order and publishes none of
+them until every candidate succeeds.
 
 2D colliders use the same helper pattern where the payload is dimension-free.
 Runtime-shape dirtying uses a 2D snapshot payload; query stamps, pair state, and
@@ -74,12 +74,12 @@ values are data-first authored descriptors, not independent runtime identities.
 
 ## Authoring Surfaces
 
-| Authoring type              | Runtime owner                                              |
-| --------------------------- | ---------------------------------------------------------- |
+| Authoring type              | Runtime owner                                                            |
+| --------------------------- | ------------------------------------------------------------------------ |
 | `ColliderShapeDefinition`   | built-in `LSCollider` implementations and `LSCompoundCollider` parts     |
-| `CompoundColliderPart`      | 3D compound authoring                                      |
+| `CompoundColliderPart`      | 3D compound authoring                                                    |
 | `ColliderShapeDefinition2D` | built-in `LSCollider2D` implementations and `LSCompoundCollider2D` parts |
-| `CompoundColliderPart2D`    | 2D compound authoring                                      |
+| `CompoundColliderPart2D`    | 2D compound authoring                                                    |
 
 Shape definitions should be used by importers, tooling, and offline-authored
 compound assets. Runtime collider shells own context binding, collider IDs,
@@ -92,15 +92,15 @@ queries, diagnostics, and replay hashing.
 
 ## 3D Shape Families
 
-| Shape           | Runtime notes                                                                                                                                                                        |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Sphere          | Center/radius support, simple mass and inertia.                                                                                                                                      |
+| Shape           | Runtime notes                                                                                                                                                                                            |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sphere          | Center/radius support, simple mass and inertia.                                                                                                                                                          |
 | Capsule         | Canonical center, normalized rigid frame, local axis, full cylindrical axis length, and radius; rotation-aware projected frontal area and solid capsule mass properties with sphere and thin-rod limits. |
-| Cuboid          | Face, edge, corner support; `Cuboid` covers axis-aligned and oriented cuboid dispatch.                                                                                               |
-| Finite cylinder | Canonical center, normalized rigid frame, local axis, full axis length, and radius; flat-cap and side relations derive conceptual endpoints only inside exact operations.          |
-| Finite cone     | Canonical center, normalized rigid frame, local base-to-apex axis, full height, and radius; analytic support/closest-surface geometry and COM stay center-relative.                 |
-| Mesh            | Convex or concave target geometry with triangle candidates and cached mass properties.                                                                                               |
-| Compound        | Stable part-order reduction under one public collider identity, with solid-volume mass distribution and deterministic equal-mass fallback when every part measure quantizes to zero. |
+| Cuboid          | Face, edge, corner support; `Cuboid` covers axis-aligned and oriented cuboid dispatch.                                                                                                                   |
+| Finite cylinder | Canonical center, normalized rigid frame, local axis, full axis length, and radius; flat-cap and side relations derive conceptual endpoints only inside exact operations.                                |
+| Finite cone     | Canonical center, normalized rigid frame, local base-to-apex axis, full height, and radius; analytic support/closest-surface geometry and COM stay center-relative.                                      |
+| Mesh            | Convex or concave target geometry with triangle candidates and cached mass properties.                                                                                                                   |
+| Compound        | Stable part-order reduction under one public collider identity, with solid-volume mass distribution and deterministic equal-mass fallback when every part measure quantizes to zero.                     |
 
 Cones use analytic support and closest-surface geometry instead of generating a
 runtime triangle fan. Mesh colliders use cached closed-volume mass properties by
@@ -122,11 +122,12 @@ volumes to zero, the tensor uses the thin-rod limit
 
 A finite cylinder must retain a positive scaled full axis length when its
 runtime shape is rebuilt. Gravitas does not require an odd raw-unit length to
-have a representable half-height or materialized cap centers; exact centered-axis
-relations retain the full length through classification and witness selection.
-A positive authored height that scales to zero is still rejected because it
-does not retain the cylinder's flat-cap contract. Capsules remain different by
-design: a collapsed capsule center segment is the well-defined sphere limit.
+have a representable half-height or materialized cap centers; exact
+centered-axis relations retain the full length through classification and
+witness selection. A positive authored height that scales to zero is still
+rejected because it does not retain the cylinder's flat-cap contract. Capsules
+remain different by design: a collapsed capsule center segment is the
+well-defined sphere limit.
 
 3D compound colliders distribute uniform-density mass by each solid part's
 volume rather than by the public `Area` value, whose drag/diagnostic meaning is
@@ -248,22 +249,22 @@ Exact concave mesh/mesh contact is supported, but dense overlapping tessellated
 surface pairs are an experimental, capacity-sensitive per-step workload. Cost
 scales with BVH-admitted triangle pairs and their exact full-domain SAT axes.
 Prefer `Convex` when the authored geometry satisfies its enforced contract;
-otherwise use deterministic convex decomposition, authored compound proxies,
-or partitioned static concave surfaces for competitive runtime paths.
+otherwise use deterministic convex decomposition, authored compound proxies, or
+partitioned static concave surfaces for competitive runtime paths.
 
-Mesh closest-surface queries always return a point on an authored triangle.
-They seed an exact upper-bound candidate, query the local triangle BVH inside a
-conservative cube that contains every point capable of improving that bound,
-and use a stable, allocation-free full triangle scan only when the bound cannot
-be represented. Broad-phase bounds are never substituted for mesh geometry,
+Mesh closest-surface queries always return a point on an authored triangle. They
+seed an exact upper-bound candidate, query the local triangle BVH inside a
+conservative cube that contains every point capable of improving that bound, and
+use a stable, allocation-free full triangle scan only when the bound cannot be
+represented. Broad-phase bounds are never substituted for mesh geometry,
 including mesh/sphere contacts and circle overlap queries. Full-domain
 FixedMathSharp triangle and squared-distance predicates preserve the closest
 authored candidate even when public Q32.32 distance values would saturate.
-Primitive, mesh, and compound closest-surface selection likewise owns a
-semantic surface anchor before optional point or scalar-distance
-materialization. Projected overlap queries classify exact X/Z geometry and
-retain that real 3D anchor; clipped broad-phase boxes and invented coordinates
-are never narrow-phase substitutes.
+Primitive, mesh, and compound closest-surface selection likewise owns a semantic
+surface anchor before optional point or scalar-distance materialization.
+Projected overlap queries classify exact X/Z geometry and retain that real 3D
+anchor; clipped broad-phase boxes and invented coordinates are never
+narrow-phase substitutes.
 
 This validation is intentionally breaking for assets that previously selected
 `Convex` despite violating its geometry contract. Author raw terrain, triangle
@@ -272,14 +273,14 @@ convex decomposition when a moving or support-mapped collider needs multiple
 convex parts.
 
 Runtime mesh points follow one explicit centered transform contract:
-`origin + rotation * Scale(sourcePoint - authoredBoundsCenter, ownerScale,
-partScale)`. Rotation must be a normalized, representable quaternion. Owner and
-part scale factors remain separate until each final centered coordinate is
-formed, must be strictly positive and diagonally applied, and must preserve
-representable centered vertices, triangle areas, total area, and selected mass
-properties. Invalid standalone meshes reject before collider registration.
-Compound owners prepare every mesh part before publishing any part, so a failed
-scale/rotation change cannot leave half-updated geometry.
+`origin + rotation * Scale(sourcePoint - authoredBoundsCenter, ownerScale, partScale)`.
+Rotation must be a normalized, representable quaternion. Owner and part scale
+factors remain separate until each final centered coordinate is formed, must be
+strictly positive and diagonally applied, and must preserve representable
+centered vertices, triangle areas, total area, and selected mass properties.
+Invalid standalone meshes reject before collider registration. Compound owners
+prepare every mesh part before publishing any part, so a failed scale/rotation
+change cannot leave half-updated geometry.
 
 Scaled mesh bounds use FixedMathSharp's full-domain nearest-even midpoint.
 Same-sign extreme coordinates are therefore valid when the exact bounds size,
@@ -290,8 +291,8 @@ Collider broad-phase boxes are analytical conservative intersections with the
 representable coordinate domain. Clipping applies only to final AABB endpoints;
 it is never reused as narrow-phase geometry. Cuboids retain
 `FixedOrientedBox(center, orientation, halfExtents)`, while capsules, cylinders,
-and cones retain center, normalized rigid-frame rotation, normalized local
-axis, full axis length, and radius. Their public `WorldAxis` values are derived
+and cones retain center, normalized rigid-frame rotation, normalized local axis,
+full axis length, and radius. Their public `WorldAxis` values are derived
 convenience projections for callers and diagnostics; exact support and contact
 construction stays in the authoritative rigid frame.
 
@@ -305,8 +306,8 @@ views or internal query seams. Scale changes rebuild the scale-dependent local
 triangle BVH, bounds, support ordering, and face normal/area caches in prepared
 buffers before swapping them into committed state. World normals use the rigid
 rotation of the inverse-transpose-scaled local normal and are normalized before
-projection. Frontal area is the positive projected physical triangle area and
-is invariant to direction magnitude.
+projection. Frontal area is the positive projected physical triangle area and is
+invariant to direction magnitude.
 
 Closed-volume mass properties transform analytic covariance under diagonal
 scale. `SurfaceApproximation` performs stable two-pass thin-shell integration:

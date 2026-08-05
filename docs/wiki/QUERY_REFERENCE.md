@@ -20,8 +20,8 @@ public query paths expose exact public hits.
 `Physics2DHit`, `Physics3DHit`, and `PhysicsMixedHit` retain authoritative
 surface witnesses as local-frame contact anchors. An anchor keeps its
 representable origin and rotation separate from two additive local feature
-terms, so collision classification does not require a rotated offset or
-absolute point to fit in one `Fixed64` coordinate.
+terms, so collision classification does not require a rotated offset or absolute
+point to fit in one `Fixed64` coordinate.
 
 The `Point`, `Point3D`, and `Point2D` convenience properties return a world
 point when the final coordinate is representable and throw otherwise. Use the
@@ -94,8 +94,8 @@ Reducer notes:
 - starting inside a raycast target returns distance zero.
 - Capsule raycasts and circle sweeps use the full-domain finite-segment capsule
   distance interval, with target radius and sweep expansion kept separate until
-  the exact comparison. Hit points are reconstructed directly from the
-  authored segment and returned distance.
+  the exact comparison. Hit points are reconstructed directly from the authored
+  segment and returned distance.
 - compounds report the owner once through stable part reduction.
 
 ### Mixed
@@ -120,8 +120,8 @@ Reducer notes:
 - supported 3D primitive slabs, finite cones at any rotation, mesh triangles,
   and compounds report `Exact`.
 - conservative fallback labels are reserved for safe internal proxy candidates
-  that must not create false negatives; they are not a custom-collider
-  extension mechanism.
+  that must not create false negatives; they are not a custom-collider extension
+  mechanism.
 - concave/raw mesh-source sweeps are `NotSupported`; author stable convex
   compound source parts.
 
@@ -133,11 +133,11 @@ Every public query family also has typed batch access on its owning service.
 Batch APIs keep dimensional semantics explicit instead of routing all queries
 through one tagged request type.
 
-| Service      | Batch families                                                                     |
-| ------------ | ---------------------------------------------------------------------------------- |
+| Service      | Batch families                                                                             |
+| ------------ | ------------------------------------------------------------------------------------------ |
 | `Query3D`    | raycast, swept sphere, registered source sweeps, cone volume, X/Z projected-circle overlap |
-| `Query2D`    | raycast, overlap, swept circle                                                     |
-| `QueryMixed` | sphere-against-2D and circle-against-3D                                            |
+| `Query2D`    | raycast, overlap, swept circle                                                             |
+| `QueryMixed` | sphere-against-2D and circle-against-3D                                                    |
 
 Closest-hit batches take a typed request span and one output hit span. The
 output span must contain at least one slot per request. A miss writes the
@@ -230,13 +230,13 @@ does not require an edge crossing or an axis/face intersection. Exact ties keep
 edge order, and equal-distance mesh hits keep triangle index order.
 
 The 3D `OverlapCircle` family classifies the complete X/Z projection of each
-supported 3D collider. It is not a `Query2D` call, not a swept circle, and not
-a swept sphere. Query Y does not affect candidate discovery, classification,
+supported 3D collider. It is not a `Query2D` call, not a swept circle, and not a
+swept sphere. Query Y does not affect candidate discovery, classification,
 distance, direction, or ordering. Exact containment is a zero-distance overlap;
 an exact positive separation retains its direction for directional filtering
 even when the public Q32.32 distance and offset round to zero. Equal compound
-parts and mesh triangles retain earlier authored order. Every hit owns a real
-3D surface `ContactAnchor`; callers use `Physics3DHit.TryGetPoint(...)` when a
+parts and mesh triangles retain earlier authored order. Every hit owns a real 3D
+surface `ContactAnchor`; callers use `Physics3DHit.TryGetPoint(...)` when a
 materialized coordinate is required.
 
 Directional projected-circle queries ignore direction Y and reject a zero X/Z

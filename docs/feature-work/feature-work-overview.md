@@ -3,36 +3,29 @@
 ## Purpose
 
 This document is a living overview of Gravitas feature work. It tracks the
-current release-scope, recently completed work, and future / evidence-gated
-plans. It is not a backlog of all possible work, but a curated view of the most
-important work for the first public release and beyond.
+active scope, recently completed work, and deferred or evidence-gated plans. It
+is a curated view rather than a backlog of every possible feature.
 
-## Release Closure Trackers
+## Coordination Trackers
 
-These evergreen closure trackers should stay visible before release and after
-release. Keep them empty when possible, and promote broad work into dated plans
+Keep these trackers empty when possible, and promote broad work into dated plans
 instead of burying it in notes.
 
 1. [`Benchmark Signal Hardening Backlog`](benchmark-signal-hardening-backlog.md)
    - Measured allocation or runtime-cost signals must be reproduced, resolved,
-     or closed with a no-change decision before release.
+     or closed with a documented no-change decision.
 2. [`Issue Tracker`](issue-tracker.md)
    - Bugs, correctness risks, documentation defects, and feature-work-discovered
      issues should be triaged, tested, and committed independently from feature
      design plans.
 
-## Active Release-Scope
+## Active Coordination
 
 - [`Cross-Stack Issue Resolution`](issue-tracker.md)
-  - Resolve release-blocking issues in dependency order: `FixedMathSharp`,
-    `SwiftCollections`, `GridForge`, then Gravitas. Use the `develop` worktrees
-    under `F:/gamedevrepos` and temporary local project references throughout
-    the consumer chain while validating lower-stack changes. Retain those links
-    until the complete cross-stack issue queue and final ownership pass are
-    closed, then release each library sequentially, restore package references
-    as releases become available, and revalidate every downstream consumer.
-    Treat local links as temporary validation scaffolding, not release
-    dependency changes.
+  - Resolve cross-stack issues in dependency order: `FixedMathSharp`,
+    `SwiftCollections`, `GridForge`, then Gravitas. Package references are the
+    default; use `UseLocalLsfStack=true` only for coordinated validation of
+    unreleased sibling changes, then revalidate against released packages.
 - [`Benchmark Signal Hardening`](benchmark-signal-hardening-backlog.md)
   - Reproduce and close confirmed release-relevant signals alongside the owning
     library change. Do not broaden this into speculative optimization work.
@@ -41,8 +34,8 @@ instead of burying it in notes.
 
 - [`Mixed Discrete Broad-Phase Signal Closure`](benchmark-signal-hardening-backlog.md#closed-signal-mixed-discrete-broad-phase-allocation-at-32-pairs)
   - Completed 2026-08-04. The original run-dependent 32-pair allocation no
-    longer reproduces: two rotational confirmations and corrected sparse,
-    dense, and churn broad-phase rows report `0 B/op` through 1,024 colliders.
+    longer reproduces: two rotational confirmations and corrected sparse, dense,
+    and churn broad-phase rows report `0 B/op` through 1,024 colliders.
   - The audit repaired a stale benchmark that stopped before `LateSimulate`,
     stabilized its workload with trigger pairs, isolated per-row setup, and
     removed an unrepresentative 4,096-collider monolithic dense-grid case that
@@ -56,8 +49,8 @@ instead of burying it in notes.
   - Completed 2026-08-03. Convex meshes now build one immutable support-vertex
     topology and refit only transactional node bounds after scale changes. The
     second support-index buffer, repeated per-node sorting, and retained
-    construction comparer were deleted without changing exact support results
-    or authored-order ties.
+    construction comparer were deleted without changing exact support results or
+    authored-order ties.
   - Subdivision 8 and 16 scale-rebuild rows drop from `4,032 B/op` and
     `16,320 B/op` to `0 B/op` while improving by `7.9%` and `7.8%` against the
     refreshed baseline. Gravitas passes 3,928 Release and 3,873 ReleaseLean
@@ -77,8 +70,9 @@ instead of burying it in notes.
 
 - [`Exact Canonical OBB Throughput Hardening`](done/2026-08-02-exact-canonical-obb-throughput-plan.md)
   - Completed 2026-08-03. Box, triangle/hull, and finite-capsule contacts now
-    use single exact relative-frame kernels with deterministic feature ownership,
-    canonical anchors, zero allocation, and complete raw-domain behavior.
+    use single exact relative-frame kernels with deterministic feature
+    ownership, canonical anchors, zero allocation, and complete raw-domain
+    behavior.
   - Matched-command phase comparisons improve direct FixedMathSharp rows by
     `35.3-64.0%` and matching Gravitas rows by `30.9-55.7%`; two full
     `DefaultJob` confirmations establish stable final timings at `0 B`. Both
@@ -88,13 +82,12 @@ instead of burying it in notes.
 - [`Experimental Exact Triangle-Pair Throughput Pass`](done/2026-08-02-experimental-triangle-pair-throughput-plan.md)
   - Completed 2026-08-02 with no production change retained. Exact signed
     two-limb multiplication improved the direct triangle row only `0.6%`, and
-    invocation-local rigid-frame preparation left affected Gravitas rows flat
-    to `1.04%` slower. Both experiments were reverted exactly.
+    invocation-local rigid-frame preparation left affected Gravitas rows flat to
+    `1.04%` slower. Both experiments were reverted exactly.
   - Evidence now favors reducing complete exact SAT work per BVH-admitted
-    triangle pair. Dense dynamic concave mesh/mesh collision is now
-    experimental capacity guidance; competitive release authoring should favor
-    primitives, convex meshes, decomposed compounds, or partitioned static
-    concave surfaces.
+    triangle pair. Dense dynamic concave mesh/mesh collision is now experimental
+    capacity guidance; competitive release authoring should favor primitives,
+    convex meshes, decomposed compounds, or partitioned static concave surfaces.
 
 - [`Exact Triangle-Pair Throughput Optimization`](done/2026-08-02-exact-triangle-pair-throughput-plan.md)
   - Completed 2026-08-02. A sampled dense-row profile isolated generic
@@ -107,21 +100,20 @@ instead of burying it in notes.
     passes 3,925 Release and 3,870 ReleaseLean tests at 43,911/43,911 lines,
     12,845/12,845 branches, and 4,510/4,510 methods. Standard and Lean packages
     build warning-free for both target frameworks. The focused optimization is
-    complete. The final bounded follow-up above found no additional local
-    change worth retaining and moved the broader signal to experimental
-    capacity guidance.
+    complete. The final bounded follow-up above found no additional local change
+    worth retaining and moved the broader signal to experimental capacity
+    guidance.
 
 - [`Scaled Mesh Query Normal`](done/2026-08-01-scaled-mesh-query-normal-plan.md)
-  - Completed 2026-08-01. Mesh raycasts and swept-sphere queries now consume
-    the face normal committed with their non-uniformly scaled triangle vertices.
-    The unreferenced authored-normal cache and its per-mesh array allocation
-    were deleted after a cross-stack caller audit.
+  - Completed 2026-08-01. Mesh raycasts and swept-sphere queries now consume the
+    face normal committed with their non-uniformly scaled triangle vertices. The
+    unreferenced authored-normal cache and its per-mesh array allocation were
+    deleted after a cross-stack caller audit.
   - Gravitas passes 3,925 Release and 3,870 ReleaseLean tests at 55,839/55,839
-    lines, 15,829/15,829 branches, and 5,320/5,320 methods. Both corrected
-    query paths remain at zero managed bytes after warmup, standard and Lean
-    packages build warning-free for both targets, and the existing dense-mesh
-    sweep benchmark remains comparable to baseline. The correctness queue is
-    empty.
+    lines, 15,829/15,829 branches, and 5,320/5,320 methods. Both corrected query
+    paths remain at zero managed bytes after warmup, standard and Lean packages
+    build warning-free for both targets, and the existing dense-mesh sweep
+    benchmark remains comparable to baseline. The correctness queue is empty.
 
 - [`Full-Domain Triangle-Pair Contact`](done/2026-07-31-full-domain-triangle-pair-contact-plan.md)
   - Completed 2026-08-01. FixedMathSharp owns one full-domain rigid-triangle
@@ -168,63 +160,60 @@ instead of burying it in notes.
     12,865/12,865 branches, and 4,531/4,531 methods. Dense and sparse
     projected-circle rows remain approximately 5.4 us from 8 through 1,024
     vertical cells with zero allocation. Translation-only updates of the unique
-    widest candidate and the following query remain flat from 64 through
-    16,384 entries when ordering is retained; independent closure review found
-    no remaining critical or important issue.
+    widest candidate and the following query remain flat from 64 through 16,384
+    entries when ordering is retained; independent closure review found no
+    remaining critical or important issue.
 - [`Full-Domain SolidBody Point Transform`](done/2026-07-30-full-domain-solid-body-point-transform-plan.md)
   - Completed 2026-07-30. `FixedTransform` now owns strict current-snapshot 3D
     and explicit X/Z point conversion. `SolidBody` and `SolidBody2D` expose
-    dimensionally symmetric authoritative `GetWorldPoint` / `GetLocalPoint`
-    APIs over committed collider owner scale, so mutable presentation state
-    cannot enter deterministic simulation queries.
+    dimensionally symmetric authoritative `GetWorldPoint` / `GetLocalPoint` APIs
+    over committed collider owner scale, so mutable presentation state cannot
+    enter deterministic simulation queries.
   - FixedMathSharp passes 2,603 Release and 2,582 ReleaseLean tests at
-    44,334/44,334 lines, 8,393/8,393 branches, and 3,320/3,320 methods.
-    Gravitas passes 3,870 Release and 3,815 ReleaseLean tests at
-    43,028/43,028 lines, 12,779/12,779 branches, and 4,486/4,486 methods.
-    Standard and Lean package builds are warning-free, all five focused
-    ShortRun rows allocate zero managed bytes, and independent review reported
-    no findings.
+    44,334/44,334 lines, 8,393/8,393 branches, and 3,320/3,320 methods. Gravitas
+    passes 3,870 Release and 3,815 ReleaseLean tests at 43,028/43,028 lines,
+    12,779/12,779 branches, and 4,486/4,486 methods. Standard and Lean package
+    builds are warning-free, all five focused ShortRun rows allocate zero
+    managed bytes, and independent review reported no findings.
 - [`Full-Domain Friction Response`](done/2026-07-29-full-domain-friction-response-plan.md)
   - Completed 2026-07-30. Gravitas now retains exact 3D cached Coulomb-disk
     accumulation, pure-2D Coulomb-line response, and mixed two-axis response
-    whenever compact arithmetic cannot prove the complete operation safe.
-    True final overflow rejects atomically; ordinary contacts keep the compact
-    path, and warmed exact fallbacks allocate zero managed bytes.
-  - Gravitas passes 3,861 Release and 3,806 ReleaseLean tests at
-    43,653/43,653 lines, 12,775/12,775 branches, and 4,501/4,501 methods.
-    Forty-two representative 3D, 2D, and mixed response benchmark rows report
-    zero managed allocation without a gross compact-path regression.
+    whenever compact arithmetic cannot prove the complete operation safe. True
+    final overflow rejects atomically; ordinary contacts keep the compact path,
+    and warmed exact fallbacks allocate zero managed bytes.
+  - Gravitas passes 3,861 Release and 3,806 ReleaseLean tests at 43,653/43,653
+    lines, 12,775/12,775 branches, and 4,501/4,501 methods. Forty-two
+    representative 3D, 2D, and mixed response benchmark rows report zero managed
+    allocation without a gross compact-path regression.
 - [`FixedMathSharp / Gravitas Ownership Boundary`](done/2026-07-28-fixedmathsharp-gravitas-ownership-boundary-plan.md)
-  - Completed 2026-07-29. FixedMathSharp now owns reusable exact math,
-    semantic geometry, and internal wide mechanics; Gravitas is its sole
-    intentional non-test friend and owns rigid-body levers, mass semantics,
-    normal/friction policy, and exact response. The pass removed intermediate
-    v7 physics APIs, centralized proven wide duplication, and reorganized
-    geometry by coherent owners without exposing raw wide types.
+  - Completed 2026-07-29. FixedMathSharp now owns reusable exact math, semantic
+    geometry, and internal wide mechanics; Gravitas is its sole intentional
+    non-test friend and owns rigid-body levers, mass semantics, normal/friction
+    policy, and exact response. The pass removed intermediate v7 physics APIs,
+    centralized proven wide duplication, and reorganized geometry by coherent
+    owners without exposing raw wide types.
   - FixedMathSharp passes 2,590 Release and 2,569 ReleaseLean tests plus eight
-    Chronicler tests in each mode at 49,416/49,416 authored lines,
-    8,340/8,340 branches, and 3,238/3,238 methods. Gravitas passes 3,818
-    Release and 3,763 ReleaseLean tests at 42,180/42,180 lines,
-    12,627/12,627 branches, and 4,474/4,474 methods. Standard and Lean
-    package-only validation is warning-free across both target frameworks;
-    38 focused anchor/response benchmark rows report zero managed allocation.
-    The published-package relink and revalidation remain in the sequential
-    release gates below.
+    Chronicler tests in each mode at 49,416/49,416 authored lines, 8,340/8,340
+    branches, and 3,238/3,238 methods. Gravitas passes 3,818 Release and 3,763
+    ReleaseLean tests at 42,180/42,180 lines, 12,627/12,627 branches, and
+    4,474/4,474 methods. Standard and Lean package-only validation is
+    warning-free across both target frameworks; 38 focused anchor/response
+    benchmark rows report zero managed allocation. The published-package relink
+    and revalidation remain in the sequential release gates below.
 - [`Exact Contact Lever And Mass Response`](done/2026-07-27-exact-contact-lever-response-plan.md)
   - Completed 2026-07-28. FixedMathSharp retains semantic 2D/3D point anchors,
     contact relations, and exact anchor-distance ordering without exposing raw
     wide arithmetic. Gravitas owns contact levers, mass points, positive
     weights, compact representable paths, and allocation-free exact fallback
-    across 2D, 3D, mixed response, rotational CCD, compound mass properties,
-    and embedded mixed boundaries. Runtime collider hierarchies are closed;
-    host adapters author built-in geometry through
-    `ColliderShapeDefinition*.CreateCollider()`.
-    FixedMathSharp passes 2,638 Release and 2,617 ReleaseLean tests at
-    47,462/47,462 lines, 8,732/8,732 branches, and 3,500/3,500 methods.
-    Gravitas passes 3,776 Release and 3,721 ReleaseLean tests at
-    40,072/40,072 lines, 12,365/12,365 branches, and 4,368/4,368 methods;
-    replay, allocation, package, documentation, and independent-review gates
-    are closed.
+    across 2D, 3D, mixed response, rotational CCD, compound mass properties, and
+    embedded mixed boundaries. Runtime collider hierarchies are closed; host
+    adapters author built-in geometry through
+    `ColliderShapeDefinition*.CreateCollider()`. FixedMathSharp passes 2,638
+    Release and 2,617 ReleaseLean tests at 47,462/47,462 lines, 8,732/8,732
+    branches, and 3,500/3,500 methods. Gravitas passes 3,776 Release and 3,721
+    ReleaseLean tests at 40,072/40,072 lines, 12,365/12,365 branches, and
+    4,368/4,368 methods; replay, allocation, package, documentation, and
+    independent-review gates are closed.
 - [`Canonical Collider Geometry And Exact Scale Admission`](issue-tracker.md#finite-axis-collider-geometry-uses-canonical-rigid-frames)
   - Completed 2026-07-27. FixedMathSharp owns strict transform composition,
     fused scaled dimensions, centered finite-axis relations, local convex
@@ -244,44 +233,43 @@ instead of burying it in notes.
     high-resolution point intervals for concave-mesh edge reduction.
     `FixedTriangle` separately owns exact projected containment plus
     face-interior cone hits even when no edge or cone axis crosses the triangle.
-    Extreme
-    coordinates, clipped opposite lobes, roots near half-even boundaries,
-    non-cardinal authored endpoint contact, long-edge spatial witnesses,
-    triangle feature ties, and tiny nonzero segments retain full-domain
-    behavior. The authoritative Gravitas Release artifact passes 3,238 tests at
-    100% line, branch, and method coverage; ReleaseLean passes 3,183 tests.
-    FixedMathSharp passes 1,714 Release and 1,693 ReleaseLean tests plus eight
-    Chronicler tests in each configuration at exact 100% coverage. The final
-    warmed cone raycast, concave-mesh overlap, mesh/cone collision, and oblique
-    long/narrow bounds rows remain allocation-free.
+    Extreme coordinates, clipped opposite lobes, roots near half-even
+    boundaries, non-cardinal authored endpoint contact, long-edge spatial
+    witnesses, triangle feature ties, and tiny nonzero segments retain
+    full-domain behavior. The authoritative Gravitas Release artifact passes
+    3,238 tests at 100% line, branch, and method coverage; ReleaseLean passes
+    3,183 tests. FixedMathSharp passes 1,714 Release and 1,693 ReleaseLean tests
+    plus eight Chronicler tests in each configuration at exact 100% coverage.
+    The final warmed cone raycast, concave-mesh overlap, mesh/cone collision,
+    and oblique long/narrow bounds rows remain allocation-free.
 - [`Body Motion Type And Solver Mobility Hardening`](done/2026-07-20-body-motion-type-and-solver-mobility-plan.md)
   - Completed 2026-07-20. Adds explicit Dynamic, Kinematic, and Static body
-    roles while keeping translation and rotation freeze constraints
-    independent across 2D, 3D, mixed response, constraints, partitions, CCD,
-    serialization, replay, and host presentation. Atomic transition and pose
-    contracts preserve runtime identity and reject invalid hierarchy-composed
-    transforms before observable mutation. The authoritative Release artifact
-    passes 3,237 tests at 100% line, branch, and method coverage; warmed 3D/2D
-    role transitions remain allocation-free.
+    roles while keeping translation and rotation freeze constraints independent
+    across 2D, 3D, mixed response, constraints, partitions, CCD, serialization,
+    replay, and host presentation. Atomic transition and pose contracts preserve
+    runtime identity and reject invalid hierarchy-composed transforms before
+    observable mutation. The authoritative Release artifact passes 3,237 tests
+    at 100% line, branch, and method coverage; warmed 3D/2D role transitions
+    remain allocation-free.
 - [`Finite-Axis Full-Domain Projection Closure`](issue-tracker.md#finite-axis-capsule-cylinder-and-mesh-edge-projections-can-saturate-before-solving)
   - Completed 2026-07-19. FixedMathSharp now owns exact bounded-ray and
     authored-segment physical-distance capsule/cylinder intervals, and Gravitas
     consumes them across 2D, 3D, mixed, raycast, sweep, and mesh-edge reducers.
-    The authoritative Gravitas Release artifact passes 3,103 tests at 100%
-    line, branch, and method coverage; FixedMathSharp also retains exact 100%
+    The authoritative Gravitas Release artifact passes 3,103 tests at 100% line,
+    branch, and method coverage; FixedMathSharp also retains exact 100%
     coverage. Final finite-axis benchmark rows remain allocation-free, while
-    radial distance precision and the remaining conservative rim/support
-    models stay explicitly queued as separate work.
+    radial distance precision and the remaining conservative rim/support models
+    stay explicitly queued as separate work.
 - [`Rotational Moving-Pair CCD Hardening`](done/2026-07-18-rotational-moving-pair-ccd-plan.md)
   - Completed 2026-07-19. Pure 2D, pure 3D, and mixed rotational CCD now owns
     moving dynamic and kinematic targets through order-independent piecewise
     trajectories, stable normalized-time arbitration, contact-point angular
-    response, and bounded atomic handoffs. The authoritative 3,056-test
-    artifact reports 100% line, branch, and method coverage; the focused
-    1/8/32-pair benchmark remains approximately linear with only the separately
-    tracked mixed broad-phase capacity-growth allocation signal.
+    response, and bounded atomic handoffs. The authoritative 3,056-test artifact
+    reports 100% line, branch, and method coverage; the focused 1/8/32-pair
+    benchmark remains approximately linear with only the separately tracked
+    mixed broad-phase capacity-growth allocation signal.
 
-- [`FixedMathSharp Foundation Hardening`](../../../FixedMathSharp/docs/feature-work/done/2026-07-14-fixedmathsharp-foundation-hardening-plan.md)
+- [`FixedMathSharp Foundation Hardening`](https://github.com/mrdav30/FixedMathSharp/blob/main/docs/feature-work/done/2026-07-14-fixedmathsharp-foundation-hardening-plan.md)
   - Completed 2026-07-17. FixedMathSharp now owns the shared full-domain
     arithmetic, vector/quaternion, segment/triangle, and transform contracts;
     Gravitas consumes those contracts without duplicate math. The final artifact
@@ -419,10 +407,9 @@ instead of burying it in notes.
     deterministic discrete islands, cylinder/mesh contact quality, and mixed
     response islands are covered by tests, docs, and benchmark signal.
 
-## Future / Evidence-Gated
+## Deferred / Evidence-Gated
 
-The following work is not currently in the active release-scope, but it is
-evidence-gated and may be promoted into dated plans once measured risks or a
+The following work may be promoted into dated plans when measured risks or a
 host-facing need appears.
 
 - [`Mesh Tooling Simplification And Decomposition`](2026-06-17-mesh-tooling-simplification-and-decomposition-plan.md)
@@ -430,11 +417,11 @@ host-facing need appears.
     after the runtime collision boundary is solid.
 - [`Mass Inertia Tooling And Diagnostics Follow-Up`](2026-06-19-mass-inertia-tooling-and-diagnostics-follow-up-plan.md)
   - Principal-axis tooling, COM markers, and richer mass-property payloads are
-    useful when demand appears, but the runtime mass/inertia model is already
-    release-capable.
+    useful when demand appears; the runtime already covers the core mass and
+    inertia contract.
 - [`Benchmark Publishing And CCD Diagnostics`](2026-06-21-benchmark-publishing-and-ccd-diagnostics-plan.md)
   - Publishing, baseline comparison, CI integration, and host-visible diagnostic
-    polish can follow once the release-critical physics behavior is nailed down.
+    polish remain evidence-gated until an explicit publication need exists.
 - **Scene / Fixture Authoring Definitions**
   - Hold until engine-specific adapter packages and sample projects clarify the
     real public authoring needs. Gravitas can already be configured directly
@@ -455,15 +442,10 @@ host-facing need appears.
 1. Keep the benchmark backlog and issue tracker as intake buckets; promote new
    measured risks into dated plans only when they are broader than a focused
    patch.
-2. Resolve the remaining cross-stack issues, including Gravitas-owned
-   lifecycle, admission, geometry, and numeric-range blocks, while retaining
-   the temporary local project references.
-3. Release FixedMathSharp from the reviewed hardening tree.
-4. Update SwiftCollections to the released FixedMathSharp package, run its full
-   validation, and release SwiftCollections before advancing the chain.
-5. Update GridForge to the released lower-stack packages, validate its resolved
-   runtime-identity hardening and downstream consumers, and release GridForge.
-6. Update Gravitas to the released package versions, remove every temporary
-   local link, and rerun `Release`, `ReleaseLean`, coverage, replay, allocation,
-   and relevant benchmark gates against package-only dependencies before its
-   first public release.
+2. Resolve a cross-stack defect in the repository that owns the behavior.
+3. Validate downstream consumers with `UseLocalLsfStack=true` when coordinated
+   source changes are required.
+4. Release dependencies before their consumers, then restore package-based
+   validation at each layer.
+5. Run Gravitas `Release`, `ReleaseLean`, coverage, replay, allocation, and
+   relevant benchmark gates against the released package chain.

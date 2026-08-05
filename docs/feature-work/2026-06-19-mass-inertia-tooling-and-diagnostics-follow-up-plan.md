@@ -1,15 +1,15 @@
 # Mass Inertia Tooling And Diagnostics Follow-Up Plan
 
 **Date:** 2026-06-19  
-**Status:** Post-alpha / evidence-gated  
+**Status:** Deferred / evidence-gated  
 **Owner:** Gravitas runtime/collision hardening, with possible FixedMathSharp
 tooling support
 
 ## Purpose
 
-The 3D/mixed mass-inertia solver hardening is complete for Gravitas runtime
-alpha scope. This plan preserves the remaining non-core follow-up ideas that
-should not live as dangling deferred notes inside the completed solver plan.
+The 3D/mixed mass-inertia solver covers the core Gravitas runtime contract. This
+plan preserves non-core follow-up ideas that should not live as dangling
+deferred notes inside the completed solver plan.
 
 These items should start only when there is evidence that the current runtime
 shape is insufficient: authoring friction, host diagnostics need, benchmark

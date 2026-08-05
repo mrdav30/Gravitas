@@ -17,36 +17,20 @@
 
 ## Active Issues
 
-No active correctness issues remain. New release-blocking discoveries should
-be added here in explicit execution order.
+No active correctness issues remain. Add new discoveries here in explicit
+execution order.
 
-### Release Workflow
+### Validation Workflow
 
-- Use the `develop` worktrees under `F:/gamedevrepos` and temporary local
-  project references through the dependency chain while lower-stack changes are
-  under validation. Apply explicit links to library, test, and benchmark
-  projects when transitive resolution is insufficient.
-- Treat local links as unstaged validation scaffolding. Do not publish or
-  release with them in place.
-- FixedMathSharp foundation hardening is complete. The current locally linked
-  geometry and arithmetic extensions pass 2,649 Release and 2,628 ReleaseLean
-  tests at 47,095/47,095 reachable lines, 8,698/8,698 branches, and
-  3,419/3,419 methods. Retain the local link through the final benchmark and
-  cross-stack release gates.
-- SwiftCollections has no library-specific active issue at this checkpoint; its
-  place in the sequence is a full downstream compatibility and release gate.
-- GridForge's runtime-identity defect is resolved. Keep the lower stack locally
-  linked through the final Gravitas release gates so another downstream
-  discovery does not force a partial release cycle.
-- Gravitas's current Release run passes 3,925 tests at 55,839/55,839 lines,
-  15,829/15,829 branches, and 5,320/5,320 methods. ReleaseLean passes 3,870
-  tests. Exact body point transforms, mesh-pair contact, and the existing 3D,
-  2D, and mixed response allocation gates remain at zero managed bytes;
-  measured timing signals remain in the benchmark backlog.
-- With the Gravitas correctness queue empty, close the release-relevant
-  benchmark backlog, then release the lower stack in dependency order. Replace
-  local links with released packages at each layer and rerun Gravitas `Release`,
-  `ReleaseLean`, coverage, replay, and relevant benchmark gates.
+- Use package references for normal development and release validation.
+- Use `UseLocalLsfStack=true` only when an unreleased lower-stack change must be
+  validated across sibling repositories.
+- Resolve defects in the repository that owns the behavior, then release and
+  validate packages in dependency order.
+- Before release, run Gravitas `Release`, `ReleaseLean`, coverage, replay,
+  allocation, and relevant benchmark gates against package dependencies.
+- Keep volatile test and coverage counts in generated reports or dated
+  verification records rather than this active section.
 
 ### Ordered Queue
 
@@ -63,9 +47,9 @@ No active items.
 `SweptSphereQueryWorker` and `RaycastSegmentWorker`
 
 RCA: both workers paired committed scaled triangle vertices with an authored
-unscaled face normal. Under non-uniform scale, the resulting plane differed
-from the triangle used for projection containment and could publish the wrong
-ray intersection or swept-sphere distance.
+unscaled face normal. Under non-uniform scale, the resulting plane differed from
+the triangle used for projection containment and could publish the wrong ray
+intersection or swept-sphere distance.
 
 Fix: `PhysicsMesh` now exposes its transactionally committed scaled local face
 normal through one bounds-checked internal accessor. Both workers consume it
@@ -79,11 +63,11 @@ Verification:
 - Literal non-uniform-scale raycast and swept-sphere regressions fail on the
   former authored plane, pass on the committed plane, and remain at `0 B`
   managed allocation after warmup.
-- The two containing query suites and three stable all-hit/raw-distance
-  ordering regressions pass.
+- The two containing query suites and three stable all-hit/raw-distance ordering
+  regressions pass.
 - Full `Release` passes 3,925 tests and `ReleaseLean` passes 3,870 tests.
-  Independent coverage reports 55,839/55,839 lines, 15,829/15,829 branches,
-  and 5,320/5,320 methods.
+  Independent coverage reports 55,839/55,839 lines, 15,829/15,829 branches, and
+  5,320/5,320 methods.
 - Standard and Lean package builds pass for `net8.0` and `netstandard2.1` with
   zero warnings. The existing dense-mesh swept-sphere Dry signal remains
   comparable at subdivisions 8/16/32: `26.71 ms`, `49.70 ms`, and `179.33 ms`
@@ -141,17 +125,17 @@ trajectory reconstruction, and predecessor-owned shared boundaries could
 override otherwise exact geometry.
 
 FixedMathSharp now exposes direct circle and sphere physical-distance intervals
-on `FixedSegment2d` and `FixedSegment`, backed by the existing one-final-rounding
-wide radial kernel. Its narrow internal direction-and-distance contracts let
-Gravitas avoid manufacturing an unrepresentable relative endpoint without
-exposing wide arithmetic publicly. Gravitas query and CCD consumers preserve
-authored source and target trajectories through exact-distance ordering, then
-materialize normalized time only for final arbitration. Mixed CCD uses a
-ceiling-safe Euclidean slab proxy, treats proxy intervals as geometry-only,
-uses exact or sampled contact normals for closing policy, and gives a
-right-continuous successor segment ownership of shared boundaries.
-`RadialSweepAdmission`, dead relative-sweep wrappers, and their wrapper-only
-tests were deleted.
+on `FixedSegment2d` and `FixedSegment`, backed by the existing
+one-final-rounding wide radial kernel. Its narrow internal
+direction-and-distance contracts let Gravitas avoid manufacturing an
+unrepresentable relative endpoint without exposing wide arithmetic publicly.
+Gravitas query and CCD consumers preserve authored source and target
+trajectories through exact-distance ordering, then materialize normalized time
+only for final arbitration. Mixed CCD uses a ceiling-safe Euclidean slab proxy,
+treats proxy intervals as geometry-only, uses exact or sampled contact normals
+for closing policy, and gives a right-continuous successor segment ownership of
+shared boundaries. `RadialSweepAdmission`, dead relative-sweep wrappers, and
+their wrapper-only tests were deleted.
 
 Verification:
 
@@ -160,8 +144,8 @@ Verification:
 - Gravitas passes 3,919 Release and 3,864 ReleaseLean tests at 100% line
   (56,012/56,012), branch (15,889/15,889), and method (5,348/5,348) coverage.
 - All 56 warmed Gravitas allocation guards pass. Existing radial and relative
-  CCD Dry benchmark rows retain zero managed allocation, including ordinary
-  and 100,000-scale radial segments and 256/1,024-body relative sweeps.
+  CCD Dry benchmark rows retain zero managed allocation, including ordinary and
+  100,000-scale radial segments and 256/1,024-body relative sweeps.
 - Standard and Lean package builds pass for `net8.0` and `netstandard2.1` with
   zero warnings. Independent whole-change review found no Critical, Important,
   or Minor issue.
@@ -210,8 +194,8 @@ vertical-scaling benchmark, documentation, and independent-review evidence.
 
 The prior helpers chained Q32.32 scale, rotation, translation, subtraction, and
 division, allowing a saturated intermediate to hide a representable final
-coordinate. FixedMathSharp now owns one internal scaled-3D transform kernel.
-The existing forward API and new
+coordinate. FixedMathSharp now owns one internal scaled-3D transform kernel. The
+existing forward API and new
 `FixedQuaternion.TryInverseTransformScaledPoint(...)` retain the complete
 operation in wide arithmetic until one final round-half-to-even materialization
 per coordinate. The generic mechanics moved out of the oriented-box owner
@@ -235,8 +219,8 @@ FixedMathSharp passes 2,603 `Release` and 2,582 `ReleaseLean` tests at exact
 100% coverage across 44,334 lines, 8,393 branches, and 3,320 methods. Gravitas
 passes 3,870 `Release` and 3,815 `ReleaseLean` tests at exact 100% coverage
 across 43,028 lines, 12,779 branches, and 4,486 methods. ShortRun 3D ordinary,
-3D full-domain, and 2D ordinary body round trips measure 3.714 us, 2.467 us,
-and 2.512 us respectively with zero managed allocation. The implementation and
+3D full-domain, and 2D ordinary body round trips measure 3.714 us, 2.467 us, and
+2.512 us respectively with zero managed allocation. The implementation and
 evidence are retained in
 [`Full-Domain SolidBody Point Transform`](done/2026-07-30-full-domain-solid-body-point-transform-plan.md).
 
@@ -248,18 +232,17 @@ evidence are retained in
 Gravitas now preserves point velocity, effective mass, cached impulse
 accumulation and removal, friction-limit construction, Coulomb line/disk
 classification, and final body deltas until one deterministic round-to-even
-materialization. Proven-safe ordinary contacts retain compact 3D, 2D, and
-mixed paths; unsafe intermediates route once to the existing allocation-free
-exact response owners. True final overflow rejects the friction delta
-atomically without partially mutating either body or publishing partial
-tangent caches.
+materialization. Proven-safe ordinary contacts retain compact 3D, 2D, and mixed
+paths; unsafe intermediates route once to the existing allocation-free exact
+response owners. True final overflow rejects the friction delta atomically
+without partially mutating either body or publishing partial tangent caches.
 
 The complete Release suite passes 3,861 tests at 43,653/43,653 lines,
-12,775/12,775 branches, and 4,501/4,501 methods. ReleaseLean passes 3,806
-tests, focused replay passes 85/85, warmed exact 3D/2D/mixed allocation gates
-remain at zero managed bytes, and 42 representative response benchmark rows
-report zero allocation without a gross compact-path regression. The
-implementation and evidence are retained in
+12,775/12,775 branches, and 4,501/4,501 methods. ReleaseLean passes 3,806 tests,
+focused replay passes 85/85, warmed exact 3D/2D/mixed allocation gates remain at
+zero managed bytes, and 42 representative response benchmark rows report zero
+allocation without a gross compact-path regression. The implementation and
+evidence are retained in
 [`Full-Domain Friction Response`](done/2026-07-29-full-domain-friction-response-plan.md).
 
 ### True Unrepresentable Contact Lever Arms Preserve Physical Response
@@ -268,14 +251,13 @@ implementation and evidence are retained in
 **Resolved:** 2026-07-28
 
 FixedMathSharp now retains exact semantic 2D/3D levers, mass points, and
-positive weights through point-velocity, effective-mass, lever-dependent
-contact friction response, warm-start, proportional-share, weighted-center,
-and parallel-axis calculations. Gravitas keeps compact materialized vectors as
-the ordinary fast
-path and enters the allocation-free semantic path only when the complete
-expression cannot be proven representable. A truly unrepresentable final body
-delta still rejects atomically; intermediate scalar overflow no longer drops a
-physical contact or child mass contribution.
+positive weights through point-velocity, effective-mass, lever-dependent contact
+friction response, warm-start, proportional-share, weighted-center, and
+parallel-axis calculations. Gravitas keeps compact materialized vectors as the
+ordinary fast path and enters the allocation-free semantic path only when the
+complete expression cannot be proven representable. A truly unrepresentable
+final body delta still rejects atomically; intermediate scalar overflow no
+longer drops a physical contact or child mass contribution.
 
 Pure 2D, 3D, mixed response, rotational CCD, compound mass properties, replay,
 diagnostics, mirrored scalar faces, and warmed allocation behavior share that
@@ -306,8 +288,8 @@ exact geometric decision.
 
 `LSCuboidCollider` stores one center/orientation/half-extents representation.
 Discrete, mixed, mesh, query, CCD, replay, and diagnostic paths no longer treat
-clipped or cached world corners as geometry. Bounds are derived analytically
-and clipped only at the representable-domain boundary.
+clipped or cached world corners as geometry. Bounds are derived analytically and
+clipped only at the representable-domain boundary.
 
 ### Collider Scale Composition Is Exact And Transactional
 
@@ -327,15 +309,15 @@ partially updated.
 
 2D boxes and polygons retain stable scaled-local boundaries plus canonical
 planar rotation. Pure 2D and mixed relations consume origin/rotation/local
-offsets directly; absolute vertices and clipped broad-phase bounds are no
-longer fed back into exact collision or query decisions.
+offsets directly; absolute vertices and clipped broad-phase bounds are no longer
+fed back into exact collision or query decisions.
 
-The shared Task 9 release artifact passes 2,575 FixedMathSharp Release tests
-and 3,669 Gravitas Release tests at exact 100% line, branch, and method
-coverage. FixedMathSharp ReleaseLean passes 2,554 tests; Gravitas ReleaseLean
-passes 3,614. Three repeated replay runs pass 84 tests each, all 68 allocation
-guards pass, and the benchmark comparison plus exact-winner optimization are
-retained in
+The shared Task 9 release artifact passes 2,575 FixedMathSharp Release tests and
+3,669 Gravitas Release tests at exact 100% line, branch, and method coverage.
+FixedMathSharp ReleaseLean passes 2,554 tests; Gravitas ReleaseLean passes
+3,614. Three repeated replay runs pass 84 tests each, all 68 allocation guards
+pass, and the benchmark comparison plus exact-winner optimization are retained
+in
 [`benchmark-signal-hardening-backlog.md`](benchmark-signal-hardening-backlog.md)
 and closed by the
 [`Exact Canonical OBB Throughput Hardening`](done/2026-08-02-exact-canonical-obb-throughput-plan.md)
@@ -352,12 +334,12 @@ admission, and exact 2D polygon predicates
 
 RCA: `FiniteSlabProjectionSweep` scaled its GJK simplex only after capsule,
 cylinder, and cone support candidates had already been reconstructed through
-saturating `Fixed64` products. Rotated extreme geometry could therefore lose
-the winning support before GJK began. The opposite mixed direction squared
-narrowed planar and vertical distances, allowing two saturated values to turn
-an extreme separated sphere/convex-slab start into a false distance-zero hit.
-The old rotated-cone fallback also reproduced a divide-by-zero in its generic
-GJK triangle reducer.
+saturating `Fixed64` products. Rotated extreme geometry could therefore lose the
+winning support before GJK began. The opposite mixed direction squared narrowed
+planar and vertical distances, allowing two saturated values to turn an extreme
+separated sphere/convex-slab start into a false distance-zero hit. The old
+rotated-cone fallback also reproduced a divide-by-zero in its generic GJK
+triangle reducer.
 
 FixedMathSharp now owns the public, allocation-free `FixedSlabProjection`
 capsule, cylinder, and cone operations. Shape-semantic wide internals retain
@@ -384,20 +366,20 @@ Regression coverage includes extreme rotated supports, large clipped
 cross-sections, cone stationary-root and stable-tie cases, scalar-face support
 failure, near-orthogonal advancement overflow, endpoint tolerance, reciprocal
 extreme separation, polygon nearest-edge ordering, deterministic oracle cases,
-and warmed allocation guards. FixedMathSharp passes 1,784 Release tests,
-1,763 ReleaseLean tests, and explicit `netstandard2.1` compilation at
-15,072/15,072 lines and 4,684/4,684 branches. Gravitas passes 3,261 Release and
-3,206 ReleaseLean tests, both `netstandard2.1` configurations with zero
-warnings, 52 determinism/replay tests, and 66 allocation tests at
-33,466/33,466 lines, 12,045/12,045 branches, and 4,164/4,164 methods.
+and warmed allocation guards. FixedMathSharp passes 1,784 Release tests, 1,763
+ReleaseLean tests, and explicit `netstandard2.1` compilation at 15,072/15,072
+lines and 4,684/4,684 branches. Gravitas passes 3,261 Release and 3,206
+ReleaseLean tests, both `netstandard2.1` configurations with zero warnings, 52
+determinism/replay tests, and 66 allocation tests at 33,466/33,466 lines,
+12,045/12,045 branches, and 4,164/4,164 methods.
 
 The exact admitted-path benchmark reports capsule/cylinder/cone means of
-`9.498/7.958/11.773 ms` for 64 targets and
-`155.987/123.107/205.485 ms` for 1,024 targets. Forced partial clipping reports
-`22.689/29.758/81.119 ms` and `363.324/443.336/1,292.68 ms` respectively. Every
-case reports zero managed allocation. The clipped path is intentionally more
-expensive than the deleted narrow arithmetic because it now preserves the
-actual finite geometry rather than saturating before the solve.
+`9.498/7.958/11.773 ms` for 64 targets and `155.987/123.107/205.485 ms` for
+1,024 targets. Forced partial clipping reports `22.689/29.758/81.119 ms` and
+`363.324/443.336/1,292.68 ms` respectively. Every case reports zero managed
+allocation. The clipped path is intentionally more expensive than the deleted
+narrow arithmetic because it now preserves the actual finite geometry rather
+than saturating before the solve.
 
 Independent final review approved the cross-stack ownership, full-domain math,
 determinism, allocation behavior, tests, documentation, and scope with no
@@ -451,8 +433,8 @@ existing exact finite-capsule comparison at both scales.
 sweeps; mixed circle- and capsule-slab queries and CCD
 
 The old cylinder reducer independently expanded radius and half-height, forming
-a sharp cylinder that overcontained the true spherical Minkowski dilation at
-its cap rims. The mixed circle-slab path inherited the same proxy. The mixed
+a sharp cylinder that overcontained the true spherical Minkowski dilation at its
+cap rims. The mixed circle-slab path inherited the same proxy. The mixed
 capsule-slab path also expanded each cap-plane core segment as a 3D capsule,
 which overexpanded its horizontal rim away from the cap plane. All three paths
 could therefore report early or false diagonal-rim hits while their arithmetic
@@ -481,13 +463,13 @@ half-even roots, near-unit axes, opposite scalar faces, and direction symmetry;
 and keeps the exact query paths at zero managed allocation. FixedMathSharp
 passes 1,742 core and eight Chronicler Release tests at 14,310/14,310 lines,
 4,448/4,448 branches, and 1,996/1,996 ReportGenerator methods. Gravitas passes
-3,244 Release and 3,189 ReleaseLean tests at 33,706/33,706 lines,
-12,129/12,129 branches, and 4,192/4,192 methods.
+3,244 Release and 3,189 ReleaseLean tests at 33,706/33,706 lines, 12,129/12,129
+branches, and 4,192/4,192 methods.
 
 The final rounded-rim benchmark reports 61.75 microseconds for the 3D cylinder
-and 68.24 microseconds for the mixed circle slab at scale 1, and 89.91 and
-80.64 microseconds respectively at scale 100,000, with zero managed allocation
-in every row. The exact solver is intentionally more expensive than the former
+and 68.24 microseconds for the mixed circle slab at scale 1, and 89.91 and 80.64
+microseconds respectively at scale 100,000, with zero managed allocation in
+every row. The exact solver is intentionally more expensive than the former
 sharp proxy; its specialized fixed-width path remains roughly an order of
 magnitude faster than the initial generic exact prototype.
 
@@ -530,8 +512,8 @@ ReportGenerator methods. Gravitas passes 3,238 Release and 3,183 ReleaseLean
 tests at 33,732/33,732 lines, 12,133/12,133 branches, and 4,191/4,191
 ReportGenerator methods.
 
-The final warmed 64-target concave-mesh cone query remains statistically flat
-at 4.189 ms versus the 4.118 ms baseline, with zero managed allocation. The
+The final warmed 64-target concave-mesh cone query remains statistically flat at
+4.189 ms versus the 4.118 ms baseline, with zero managed allocation. The
 representative 64-pair mesh/cone collision row reports 236.6 microseconds with
 zero managed allocation.
 
@@ -602,23 +584,22 @@ serialization, replay, and host integration
 
 The root cause was an overloaded constraint mask: full position freeze also
 acted as the runtime's implicit static-body identity, and `CanRotate` depended
-on `CanTranslate`. That leaked one authored choice into collider buckets,
-awake admission, effective mass, constraints, CCD, serialization, and
-presentation, making a translation-locked spinner impossible to model
-coherently.
+on `CanTranslate`. That leaked one authored choice into collider buckets, awake
+admission, effective mass, constraints, CCD, serialization, and presentation,
+making a translation-locked spinner impossible to model coherently.
 
 Gravitas now owns explicit `Dynamic`, `Kinematic`, and `Static` body roles
 through `BodyMotionType`, while translation and rotation mobility remain
 independent solver constraints. Role-aware 2D, 3D, and mixed paths preserve
 body, collider, pair, joint, and host identity; reconcile simulated-body and
-partition membership; and clear incompatible motion, sleep, CCD, warm-start,
-and joint caches atomically. Public transitions, ragdoll batches, registered
+partition membership; and clear incompatible motion, sleep, CCD, warm-start, and
+joint caches atomically. Public transitions, ragdoll batches, registered
 serialization population, and explicit static pose changes validate before
 commit. Static pose refresh is immediately visible to pure and mixed queries,
-including a collider leaving and re-entering the grid. `ResetPosition` also
-uses a tentative host-pose transaction that validates the exact candidate
-hierarchy scale and rotation for every active role and restores exact local
-components before any body, collider, or partition mutation on rejection.
+including a collider leaving and re-entering the grid. `ResetPosition` also uses
+a tentative host-pose transaction that validates the exact candidate hierarchy
+scale and rotation for every active role and restores exact local components
+before any body, collider, or partition mutation on rejection.
 
 Substantive regressions cover all six role transitions, translation-locked
 angular response, fully locked bodies, 2D/3D/mixed partition and CCD parity,
@@ -641,9 +622,9 @@ important findings. See the completed
 same-frame requeues, and dirty candidate overlays
 
 Translational moving-pair CCD now reduces the target's canonical trajectory
-segment by segment over the source's remaining frame interval. Each target
-slice is paired with the same source-time slice, the existing exact 2D and 3D
-shape reducers remain authoritative, and segment-local hits map back to source
+segment by segment over the source's remaining frame interval. Each target slice
+is paired with the same source-time slice, the existing exact 2D and 3D shape
+reducers remain authoritative, and segment-local hits map back to source
 distance without flattening an outward-and-return path into its endpoint chord.
 The mixed directions retain their documented conservative proxy while consuming
 the same piecewise timing contract. Dynamic and kinematic paths share the same
@@ -659,13 +640,13 @@ range. Exact-distance cross-dimension selection now shares one explicit policy:
 
 Regression coverage includes outward-return dynamic and kinematic targets in
 pure 2D, pure 3D, and both mixed directions; stop/reverse boundary ownership;
-registration-order invariance; repeated replay hashes; causal relay budgets;
-and warmed zero-allocation reduction. The dedicated benchmark reports bounded
+registration-order invariance; repeated replay hashes; causal relay budgets; and
+warmed zero-allocation reduction. The dedicated benchmark reports bounded
 segment scaling with no managed allocation: one/two/four target segments take
-about 0.55/0.93/1.76 microseconds in 2D and 1.08/1.51/2.37 microseconds in 3D
-on the current short-run host. Final authoritative verification passed all
-3,123 `Release` tests at 100% line, branch, and method coverage: 33,539/33,539
-lines, 12,137/12,137 branches, and 4,158/4,158 methods.
+about 0.55/0.93/1.76 microseconds in 2D and 1.08/1.51/2.37 microseconds in 3D on
+the current short-run host. Final authoritative verification passed all 3,123
+`Release` tests at 100% line, branch, and method coverage: 33,539/33,539 lines,
+12,137/12,137 branches, and 4,158/4,158 methods.
 
 ### Derived Bound Centers And Extents Were Not Full-Domain
 
@@ -678,12 +659,12 @@ GridForge grid centers; Gravitas mesh validation, mixed slab queries, and 3D
 broad-phase proxies
 
 FixedMathSharp now owns one strict 2D/3D derived-bound contract: exact
-nearest-even centers, conservative scopes, exact representable sizes, and
-atomic centered mutations. Unrepresentable public extents fail explicitly
-instead of saturating to an under-bound. Separately named clipped factories
-provide the intentional world-domain intersection required by spatial proxies
-whose conceptual shape crosses a scalar face. `FixedRange` follows the same
-exact midpoint/difference rules.
+nearest-even centers, conservative scopes, exact representable sizes, and atomic
+centered mutations. Unrepresentable public extents fail explicitly instead of
+saturating to an under-bound. Separately named clipped factories provide the
+intentional world-domain intersection required by spatial proxies whose
+conceptual shape crosses a scalar face. `FixedRange` follows the same exact
+midpoint/difference rules.
 
 Downstream, SwiftCollections' `FixedBoundVolume` now delegates to one canonical
 `FixedBoundBox`, and its octree compares child spans directly in unsigned raw
@@ -693,32 +674,31 @@ union-volume growth and clamps only the final public `long` metric. GridForge
 derives `GridCenter` through the shared exact midpoint. Gravitas mesh validation
 accepts valid same-sign extreme centers while still rejecting genuinely
 unrepresentable sizes, mixed mesh-slab queries use exact reference centers, and
-collider broad-phase bounds opt into explicit domain clipping instead of
-relying on incidental saturating operators. Exact rotated OBB geometry at a
-scalar face remains the separately tracked canonical-half-extent issue. The
-audit also removed the now-unused mesh vector representability wrapper and
-simplified collider-bound refresh ownership.
+collider broad-phase bounds opt into explicit domain clipping instead of relying
+on incidental saturating operators. Exact rotated OBB geometry at a scalar face
+remains the separately tracked canonical-half-extent issue. The audit also
+removed the now-unused mesh vector representability wrapper and simplified
+collider-bound refresh ownership.
 
 Regression coverage includes same-sign and opposite scalar faces, raw midpoint
 ties, representable scope with unrepresentable size, full-domain octree roots
-and BVH unions, atomic failure, serialization continuity, circle/proxy
-clipping, mesh scale admission, mixed slab hit points, and downstream
-grid-center parity. FixedMathSharp passed 1,655 Debug tests at
-13,855/13,855 lines, 3,952/3,952 branches, and 1,808/1,808 methods. Gravitas
-passed 3,105 Release tests at 33,266/33,266
-lines, 12,091/12,091 branches, and 4,148/4,148 methods. Centered bounds
-construction became materially faster with zero managed allocation; direct
-min/max construction remained flat. SwiftCollections' canonical volume layout
-also traded a few nanoseconds of repeated metadata recomputation for a much
-smaller pass-by-value copy path, with both paths remaining allocation-free.
+and BVH unions, atomic failure, serialization continuity, circle/proxy clipping,
+mesh scale admission, mixed slab hit points, and downstream grid-center parity.
+FixedMathSharp passed 1,655 Debug tests at 13,855/13,855 lines, 3,952/3,952
+branches, and 1,808/1,808 methods. Gravitas passed 3,105 Release tests at
+33,266/33,266 lines, 12,091/12,091 branches, and 4,148/4,148 methods. Centered
+bounds construction became materially faster with zero managed allocation;
+direct min/max construction remained flat. SwiftCollections' canonical volume
+layout also traded a few nanoseconds of repeated metadata recomputation for a
+much smaller pass-by-value copy path, with both paths remaining allocation-free.
 The exact volume-expansion hot path measured about 10.46 nanoseconds versus
 17.15 nanoseconds for the reconstructed legacy formula; its full-domain case
 measured about 10.27 nanoseconds, with zero managed allocation. Configuration
 gates passed FixedMathSharp `Release` (1,655 core plus 8 Chronicler tests) and
 `ReleaseLean` (1,634 plus 8), SwiftCollections `Release` (1,096) and
 `ReleaseLean` (1,068), GridForge `Release` and `ReleaseLean` (460), and the
-explicitly linked Gravitas `Release` test-project gate (3,105). The
-Gravitas `ReleaseLean` local-link gate remains blocked by the already documented
+explicitly linked Gravitas `Release` test-project gate (3,105). The Gravitas
+`ReleaseLean` local-link gate remains blocked by the already documented
 GridForge MemoryPack public-type leak; it is still deferred to the
 package-reference release gate rather than masked downstream.
 
@@ -737,29 +717,30 @@ until the final Q32.32 result. Required radii round outward; successful results
 are containment-safe; and deterministic constructions whose required radius is
 not representable throw `OverflowException` instead of returning a saturated
 under-bound sphere. The docs explicitly retain deterministic Ritter-style
-point/frustum construction and Q32.32 lattice-center merge semantics rather
-than claiming a mathematically minimum sphere.
+point/frustum construction and Q32.32 lattice-center merge semantics rather than
+claiming a mathematically minimum sphere.
 
 Extreme-pair seeding compares exact squared distances from the midpoint to its
-two actual endpoints. Reversed secondary axes cannot select the nearer
-endpoint, and coordinate-wise synthesis cannot invent a farther corner that
-falsely requires an unrepresentable radius.
+two actual endpoints. Reversed secondary axes cannot select the nearer endpoint,
+and coordinate-wise synthesis cannot invent a farther corner that falsely
+requires an unrepresentable radius.
 
 The shared final-parity coordinate ratio removed duplicate segment interpolation
 code and its invariant-specific single-word path reduced existing segment
-reconstruction rows from roughly 514/759 nanoseconds to about 121/118 nanoseconds
-at unit/100,000 scale with zero allocation. Ordinary 1,024-point array/span
-sphere construction measured about 8.77/8.80 microseconds with zero allocation
-versus the former saturated approximation's roughly 4.84/4.60 microseconds;
-asymmetric full-domain merge measured about 321 nanoseconds with zero allocation.
-FixedMathSharp verification passed 1,640 core plus 8 Chronicler tests in
-`Release`, 1,619 core plus 8 Chronicler tests in `ReleaseLean`, and reported
-100% coverage across 13,826 lines, 3,930 branches, and 1,801 methods. The locally
-linked Gravitas `Release` test-project gate passed all 3,103 tests. Its
-`ReleaseLean` solution gate remains subject to the already documented GridForge
-local-link MemoryPack type leak and is deferred to the package-reference release
-gate. No Gravitas workaround was added. The audit exposed the separate derived
-area/box center and extent issue now first in the active queue.
+reconstruction rows from roughly 514/759 nanoseconds to about 121/118
+nanoseconds at unit/100,000 scale with zero allocation. Ordinary 1,024-point
+array/span sphere construction measured about 8.77/8.80 microseconds with zero
+allocation versus the former saturated approximation's roughly 4.84/4.60
+microseconds; asymmetric full-domain merge measured about 321 nanoseconds with
+zero allocation. FixedMathSharp verification passed 1,640 core plus 8 Chronicler
+tests in `Release`, 1,619 core plus 8 Chronicler tests in `ReleaseLean`, and
+reported 100% coverage across 13,826 lines, 3,930 branches, and 1,801 methods.
+The locally linked Gravitas `Release` test-project gate passed all 3,103 tests.
+Its `ReleaseLean` solution gate remains subject to the already documented
+GridForge local-link MemoryPack type leak and is deferred to the
+package-reference release gate. No Gravitas workaround was added. The audit
+exposed the separate derived area/box center and extent issue now first in the
+active queue.
 
 ### Finite-Axis Capsule, Cylinder, And Mesh-Edge Projections Can Saturate Before Solving
 
@@ -767,34 +748,34 @@ area/box center and extent issue now first in the active queue.
 **Resolved:** 2026-07-19  
 **Source:** full-domain radial interval consumer audit
 
-FixedMathSharp now owns allocation-free finite-axis capsule intervals in 2D
-and 3D plus finite-cylinder and separately expanded affine-cylinder intervals
-in 3D. Endpoint differences, radial projection, quadratic roots, axial
-clipping, and root-to-chord reconstruction remain in exact wide integer
-arithmetic until one final half-to-even Q32.32 spatial-distance conversion.
-The contract returns both distances, reconstructs points directly from the
-authored segment, preserves exact inclusive-start and strict-end containment,
-reduces collapsed capsules to the sphere or circle limit, and explicitly
-rejects collapsed cylinders whose flat cap normal would be undefined.
+FixedMathSharp now owns allocation-free finite-axis capsule intervals in 2D and
+3D plus finite-cylinder and separately expanded affine-cylinder intervals in 3D.
+Endpoint differences, radial projection, quadratic roots, axial clipping, and
+root-to-chord reconstruction remain in exact wide integer arithmetic until one
+final half-to-even Q32.32 spatial-distance conversion. The contract returns both
+distances, reconstructs points directly from the authored segment, preserves
+exact inclusive-start and strict-end containment, reduces collapsed capsules to
+the sphere or circle limit, and explicitly rejects collapsed cylinders whose
+flat cap normal would be undefined.
 
 Gravitas migrated its 2D capsule raycasts and sweeps, 3D capsule/cylinder
 raycasts, swept-sphere capsule/cylinder and mesh-edge projections, and mixed
 finite-axis reducers to the lower-stack contract. Capsule feature selection now
-considers the cylindrical side and both endpoint hemispheres together instead
-of short-circuiting seams or far features. Runtime admission also rejects a
-scaled cylinder whose axis has collapsed before registration mutates collider
-or service state, including compound parts.
+considers the cylindrical side and both endpoint hemispheres together instead of
+short-circuiting seams or far features. Runtime admission also rejects a scaled
+cylinder whose axis has collapsed before registration mutates collider or
+service state, including compound parts.
 
 The closure preserved exact 100% hand-authored coverage in both repositories.
 FixedMathSharp reports 13,691/13,691 lines, 3,908/3,908 branches, and
 1,777/1,777 methods. FixedMathSharp Release passed 1,623 core plus 8 Chronicler
 tests and ReleaseLean passed 1,602 core plus 8 Chronicler tests. Gravitas's
 authoritative coverage-enabled Release run passed 3,103 tests and reports
-33,271/33,271 lines, 12,093/12,093 branches, and 4,149/4,149 methods.
-The locally linked ReleaseLean gate passes 3,064 tests after configuration-
-scoped dependency restores and builds both library targets with zero warnings.
-CRAP analysis reports 19 fully covered methods above 30, all structural
-complexity floors rather than uncovered risk.
+33,271/33,271 lines, 12,093/12,093 branches, and 4,149/4,149 methods. The
+locally linked ReleaseLean gate passes 3,064 tests after configuration- scoped
+dependency restores and builds both library targets with zero warnings. CRAP
+analysis reports 19 fully covered methods above 30, all structural complexity
+floors rather than uncovered risk.
 
 The dedicated Gravitas short-run benchmark measured exact capsule and cylinder
 segment intervals, swept-sphere reducers, and the mixed circle-slab reducer at
@@ -804,13 +785,12 @@ measured 1.462-1.821 microseconds. Lower-stack common finite-axis rows measured
 approximately 2.3-2.9 microseconds, its arbitrary-raw cylinder stress row
 approximately 8.9 microseconds, and warmed centered-capsule distance rows
 approximately 4.0-4.8 microseconds across normal and 100,000-unit inputs. All
-lower-stack rows allocated zero managed bytes. Existing end-to-end 2D, 3D
-mesh, and both mixed capsule sweep benchmarks remained allocation-free at 64
-and 1,024 candidate scales. These short runs are regression signals, not
-canonical performance claims. Follow-up audits separated the remaining
-sharp-rim, rounded capsule-slab rim, and finite convex-slab support-model risks
-into their own active issues instead of hiding them inside this arithmetic
-closure.
+lower-stack rows allocated zero managed bytes. Existing end-to-end 2D, 3D mesh,
+and both mixed capsule sweep benchmarks remained allocation-free at 64 and 1,024
+candidate scales. These short runs are regression signals, not canonical
+performance claims. Follow-up audits separated the remaining sharp-rim, rounded
+capsule-slab rim, and finite convex-slab support-model risks into their own
+active issues instead of hiding them inside this arithmetic closure.
 
 ### Rotational CCD Omits Dynamic And Mixed Targets
 
@@ -837,11 +817,11 @@ Verification: the authoritative `Release` coverage run passes 3,056 tests and
 reports 100% line (33,555/33,555), branch (12,237/12,237), and method
 (4,167/4,167) coverage. Library/package and benchmark builds complete with zero
 warnings or errors. Twelve 1/8/32-pair benchmark rows remain approximately
-linear and allocation-free except for the separately tracked small 32-pair
-mixed discrete broad-phase capacity-growth signal. Independent final review
-found the three lifecycle/response defects above; all were corrected with
-behavior regressions before closure. The completed design and detailed evidence
-are retained in
+linear and allocation-free except for the separately tracked small 32-pair mixed
+discrete broad-phase capacity-growth signal. Independent final review found the
+three lifecycle/response defects above; all were corrected with behavior
+regressions before closure. The completed design and detailed evidence are
+retained in
 [`2026-07-18-rotational-moving-pair-ccd-plan.md`](done/2026-07-18-rotational-moving-pair-ccd-plan.md).
 
 ### 3D CCD Handoff Callback Failure Could Abandon Queue Cleanup
@@ -905,10 +885,9 @@ standard and Lean suites, full Gravitas Release validation, focused ordinary,
 extreme-scale, sub-raw-segment, authored-endpoint, and mixed-slab regressions,
 and zero-allocation benchmarks. Gravitas ShortRun medians were 1.425/1.669 us
 for sphere segments and 3.326/4.217 us for mixed circle slabs at scales 1 and
-100,000 respectively, with 0 B allocated. Finite-axis
-capsule/cylinder/mesh-edge projection, sphere construction/merge, and conic
-quadratics remain explicitly separate active issues rather than being masked by
-the radial result.
+100,000 respectively, with 0 B allocated. Finite-axis capsule/cylinder/mesh-edge
+projection, sphere construction/merge, and conic quadratics remain explicitly
+separate active issues rather than being masked by the radial result.
 
 ### Relative CCD Quadratic Saturation Could Miss Extreme-Range Crossings
 
@@ -917,8 +896,8 @@ the radial result.
 **Affected area:** FixedMathSharp radial rays; Gravitas 2D, 3D, and mixed radial
 sweeps and relative continuous collision
 
-RCA: relative sphere/circle sweeps formed their quadratic directly in Q32.32.
-At large separations or displacements, squared terms saturated before the
+RCA: relative sphere/circle sweeps formed their quadratic directly in Q32.32. At
+large separations or displacements, squared terms saturated before the
 discriminant and root were evaluated. Query reducers duplicated variants of the
 same arithmetic. A crossing could collapse to a wrong endpoint candidate,
 produce the wrong normal, and be rejected despite broad-phase admission.
@@ -928,8 +907,8 @@ retains 65-bit endpoint differences, `Signed192` coefficients, a `Signed320`
 discriminant, exact bounded-root ordering, and nearest-even conversion only at
 the public `Fixed64` boundary. `FixedRay` and `FixedRay2d` expose bounded radial
 intersection overloads with exact nonnegative radius expansion. Full-domain
-vector direction and endpoint-distance helpers support downstream
-reconstruction without saturated subtraction or squared magnitude.
+vector direction and endpoint-distance helpers support downstream reconstruction
+without saturated subtraction or squared magnitude.
 
 At that checkpoint Gravitas centralized radial admission in
 `RadialSweepAdmission`, used exact normalized-frame roots, and retained
@@ -974,15 +953,15 @@ Fix: `Convex` now admits exactly one connected closed convex two-manifold shell
 or one connected open coplanar triangulation that fills a single convex polygon.
 Construction uses a deterministic exact-position-welded topology view while
 preserving authored vertices and triangle order. It rejects unused vertices,
-duplicate faces, disconnected components or vertex links, edge
-non-manifoldness, inconsistent winding, reflex closed edges, and open folds,
-holes, or overlaps. `Concave` remains the explicit arbitrary open, closed, or
-disconnected surface mode. Both modes expose cached `IsClosedSurface` topology,
-including exact seam handling and pinched-vertex rejection.
+duplicate faces, disconnected components or vertex links, edge non-manifoldness,
+inconsistent winding, reflex closed edges, and open folds, holes, or overlaps.
+`Concave` remains the explicit arbitrary open, closed, or disconnected surface
+mode. Both modes expose cached `IsClosedSurface` topology, including exact seam
+handling and pinched-vertex rejection.
 
 Closest-surface queries now seed an authored triangle, prove a conservative BVH
-search cube from that exact upper bound, and fall back to a stable full scan only
-when the bound is unrepresentable. Exact FixedMathSharp orientation,
+search cube from that exact upper bound, and fall back to a stable full scan
+only when the bound is unrepresentable. Exact FixedMathSharp orientation,
 triple-product, and squared-distance predicates prevent saturation from changing
 validation or selection. Equal-distance winners use authored triangle index,
 including exact shared-feature hits with different normals. Mesh/sphere and
@@ -1043,10 +1022,10 @@ Verification:
 - Added 2D and 3D regressions for contact windows between endpoints and
   midpoints, plus offset circle/sphere regressions for pivot-centered candidate
   admission and scale-propagated evaluated-pose error coverage.
-- The focused rotational, near-miss, and angular-tunneling surface passes all
-  51 tests, including existing unsupported-pair and allocation contracts.
-- Dense unresolved-candidate benchmarks cover 2D and 3D aggregate interval
-  costs at `1`, `8`, and `32` admitted targets. The final short-run means were
+- The focused rotational, near-miss, and angular-tunneling surface passes all 51
+  tests, including existing unsupported-pair and allocation contracts.
+- Dense unresolved-candidate benchmarks cover 2D and 3D aggregate interval costs
+  at `1`, `8`, and `32` admitted targets. The final short-run means were
   `1.80`/`4.90`/`7.23` ms in 3D and `0.73`/`1.33`/`1.98` ms in 2D.
 - Benchmark and full-suite release evidence are recorded in the resolving
   commit.
@@ -1062,9 +1041,9 @@ RCA: both public 3D impulse methods multiplied their inverse-mass response by
 `DeltaTime`, treating instantaneous momentum transfer as a continuous force.
 `AddLinearImpulse(...)` additionally routed through the fixed-step velocity and
 pose update, so a host command could apply gravity and move, ground, or sweep a
-body before the next simulation phase. Collision, mixed-response, and
-constraint solvers already applied velocity deltas directly and did not
-compensate for this behavior.
+body before the next simulation phase. Collision, mixed-response, and constraint
+solvers already applied velocity deltas directly and did not compensate for this
+behavior.
 
 Fix: 3D linear and angular impulse now apply the physical frame-rate-invariant
 contracts `deltaVelocity = impulse * EffectiveInverseMass` and
@@ -1084,8 +1063,8 @@ Verification:
 - Audited collision, CCD, constraint, diagnostics, and benchmark callers;
   fixtures that encoded the old frame-scaled inputs now use explicit velocity
   targets and true impulses, and CCD helpers advance through the lifecycle.
-- `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj -c Release
-  --no-restore` passed all 2,734 tests.
+- `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj -c Release --no-restore`
+  passed all 2,734 tests.
 - `dotnet build src/Gravitas/Gravitas.csproj -c Release --no-restore` passed for
   `net8.0` and `netstandard2.1`; the benchmark project also built cleanly.
 - `ReleaseLean` remains deferred to the package-reference release gate because
@@ -1118,11 +1097,11 @@ shape-dimension conversion path, so no speculative 2D surface was added.
 Verification: RED tests reproduced primitive geometry leaking into a rotated,
 nonuniformly scaled point and the silent singular inverse. Primitive and
 compound round trips now use only host scale, while the singular inverse fails
-explicitly. Focused regressions pass `3/3`, the complete `SolidBodyIntegrationTests`
-surface passes `23/23`, and full locally linked suites pass `2731/2731` in
-`Release` and `2692/2692` in `ReleaseLean`. Both configurations build the
-`net8.0` and `netstandard2.1` package targets with zero warnings. Both modified
-methods report 100% line and branch coverage.
+explicitly. Focused regressions pass `3/3`, the complete
+`SolidBodyIntegrationTests` surface passes `23/23`, and full locally linked
+suites pass `2731/2731` in `Release` and `2692/2692` in `ReleaseLean`. Both
+configurations build the `net8.0` and `netstandard2.1` package targets with zero
+warnings. Both modified methods report 100% line and branch coverage.
 
 ### CCD Handoff Dedupe Could Strand A Same-Frame Requeued Body
 
@@ -1146,13 +1125,13 @@ therefore append A at the queue tail in stable FIFO order, while repeated
 updates before dequeue retain the existing latest-state-wins dedupe. Requeued
 work remains governed by the same shared iteration budget; exhaustion reaches
 the existing explicit discard path. The added `SwiftHashSet.Remove(...)` is
-expected O(1), allocation-free, and does not expose hash iteration order.
-Mixed responses already route target handoffs through these dimensional queues,
-so no parallel mixed implementation was required. Final review also exposed
-the complementary latest-state edge: a terminal update could clear ignored
-collider references while leaving an older pending continuation intact. The 2D
-and 3D body paths now discard that superseded continuation atomically when the
-new update has no remaining time or resulting motion.
+expected O(1), allocation-free, and does not expose hash iteration order. Mixed
+responses already route target handoffs through these dimensional queues, so no
+parallel mixed implementation was required. Final review also exposed the
+complementary latest-state edge: a terminal update could clear ignored collider
+references while leaving an older pending continuation intact. The 2D and 3D
+body paths now discard that superseded continuation atomically when the new
+update has no remaining time or resulting motion.
 
 Verification: symmetric 2D and 3D RED regressions use a perfectly elastic
 `A -> B <- C` relay cycle that returns a handoff to A after its first dequeue.
@@ -1204,13 +1183,13 @@ Verification: RED regressions reproduced the duplicate A exit after B was
 rebound, direct captured-pair reentry from a deferred exit, skipped B dispatch,
 and first-callback short-circuiting. GREEN assertions prove at-most-once
 delivery, untouched rebound lifetime state, complete owner/holder cleanup,
-stable exception order, and no notifying-shell pool reuse. Matching 2D and
-mixed RED regressions reproduced first-callback short-circuiting and early
+stable exception order, and no notifying-shell pool reuse. Matching 2D and mixed
+RED regressions reproduced first-callback short-circuiting and early
 deferred-guard release; GREEN assertions prove stable A/B and 3D/2D exception
 order with both guards retained through exit dispatch. The combined lifecycle
 surface passes `125/125`; full locally linked suites pass `2723/2723` in
-`Release` and `2684/2684` in `ReleaseLean`. Both configurations build
-`net8.0` and `netstandard2.1` package targets with zero warnings.
+`Release` and `2684/2684` in `ReleaseLean`. Both configurations build `net8.0`
+and `netstandard2.1` package targets with zero warnings.
 
 ### Continuous-Collision Modes Accepted Undefined Enum Values
 
@@ -1228,20 +1207,19 @@ and silently use discrete movement.
 
 Fix: one enum-adjacent validation policy now admits only `Inherit`, `Discrete`,
 `Continuous`, and `Auto`. Context settings and both body properties reject
-undefined values with `ArgumentOutOfRangeException` before changing their
-stored mode. Body replay loads through a validated local value, so a rejected
-payload does not publish the corrupt mode, while `PhysicsSettingsSaver`
-materialization rejects invalid authored or deserialized values before
-replacing context settings. Context-level `Inherit` remains valid and
-deliberately resolves to `Discrete` when no concrete body or hierarchy override
-exists.
+undefined values with `ArgumentOutOfRangeException` before changing their stored
+mode. Body replay loads through a validated local value, so a rejected payload
+does not publish the corrupt mode, while `PhysicsSettingsSaver` materialization
+rejects invalid authored or deserialized values before replacing context
+settings. Context-level `Inherit` remains valid and deliberately resolves to
+`Discrete` when no concrete body or hierarchy override exists.
 
-Verification: first-invalid (`4`) and byte-maximum (`255`) regressions cover
-3D and 2D body assignment, context settings, settings application, and both
-body replay paths, including preservation of the previously valid value after
+Verification: first-invalid (`4`) and byte-maximum (`255`) regressions cover 3D
+and 2D body assignment, context settings, settings application, and both body
+replay paths, including preservation of the previously valid value after
 rejection. Existing 2D and 3D context-`Inherit` behavior remains covered. The
-focused suite passes `14/14`; the full locally linked suites pass `2716/2716`
-in `Release` and `2677/2677` in `ReleaseLean`. Both configurations build the
+focused suite passes `14/14`; the full locally linked suites pass `2716/2716` in
+`Release` and `2677/2677` in `ReleaseLean`. Both configurations build the
 `net8.0` and `netstandard2.1` package targets with zero warnings.
 
 ### Non-Unit Quaternion Admission Can Collapse Runtime Shape Axes
@@ -1265,14 +1243,14 @@ scale-safely normalizes before publishing authoritative or visual state.
 runtime parts and replay hashing share that exact stored orientation. Zero maps
 to identity, scaled and saturated inputs use FixedMathSharp's full-domain
 normalization, and already near-unit values retain their deterministic
-representation. Direct `PhysicsMesh` transform APIs remain intentionally
-strict and still reject non-normalized rotations; compound mesh parts reach
-that validation only after descriptor normalization.
+representation. Direct `PhysicsMesh` transform APIs remain intentionally strict
+and still reject non-normalized rotations; compound mesh parts reach that
+validation only after descriptor normalization.
 
 Verification: focused regressions cover zero, scaled, saturated, near-unit, and
 axis-collapsing quaternions across body initialization, public mutation, visual
-state, compound primitives, compound meshes, cone bounds, replay population,
-and direct mesh rejection. The full locally linked suites pass `2704/2704` in
+state, compound primitives, compound meshes, cone bounds, replay population, and
+direct mesh rejection. The full locally linked suites pass `2704/2704` in
 `Release` and `2665/2665` in `ReleaseLean`; Lean builds both `net8.0` and
 `netstandard2.1` and produces both packages with zero warnings.
 
@@ -1297,13 +1275,12 @@ reconciles exact ref-counted suppressions and never scans the context's peak
 joint range or the whole suppression table. Intrusive endpoint links make each
 unlink O(1), preserve reverse-registration teardown order, and keep total body
 teardown O(attached joints). Ragdolls are atomic registrations: a body can
-belong to one registered ragdoll, link teardown or
-`RemoveRagdoll(...)` removes the runtime and all owned joints, independent
-owned-joint removal is rejected, and stale joint/ragdoll handles cannot mutate
-or serialize later simulation lifetimes. Their intrusive registration-order
-chain gives O(1) removal without making replay hashes depend on removal history.
-Context reset and disposal invalidate all handles, and mutating constraint APIs
-reject a disposed context.
+belong to one registered ragdoll, link teardown or `RemoveRagdoll(...)` removes
+the runtime and all owned joints, independent owned-joint removal is rejected,
+and stale joint/ragdoll handles cannot mutate or serialize later simulation
+lifetimes. Their intrusive registration-order chain gives O(1) removal without
+making replay hashes depend on removal history. Context reset and disposal
+invalidate all handles, and mutating constraint APIs reject a disposed context.
 
 Verification: symmetric tests cover both endpoint positions, multiple attached
 joints, same-shell reinitialization, different-body collider rebinding, solver
@@ -1336,11 +1313,10 @@ Fix: GridForge commit `0c5420f` added process-unique 64-bit world identity and a
 nonrepeating grid generation owned by each world, preserved across
 non-deactivating reset. `WorldVoxelIndex` now validates the world token, the
 recyclable `GridIndex`, the grid generation, and the voxel coordinate. GridForge
-commit `cc2c451` changed unique traversal to
-`SwiftHashSet<WorldVoxelIndex>` and removed hash-derived voxel and scan-cell
-identity. Gravitas commit `598c2de` consumes the exact key in 3D query
-deduplication and adds same-configuration replacement regressions for pure 2D,
-3D, and mixed partitions.
+commit `cc2c451` changed unique traversal to `SwiftHashSet<WorldVoxelIndex>` and
+removed hash-derived voxel and scan-cell identity. Gravitas commit `598c2de`
+consumes the exact key in 3D query deduplication and adds same-configuration
+replacement regressions for pure 2D, 3D, and mixed partitions.
 
 Verification: with Gravitas locally linked to the corrected GridForge, each
 2D/3D/mixed regression proves the stale coordinate fails, the replacement grid
@@ -1359,7 +1335,7 @@ and averaging; Gravitas 2D, 3D, and mixed query/CCD sweep admission, GJK,
 conservative advancement, and concave-mesh hit geometry
 
 **Follow-up status:** Closed by
-[`FixedMathSharp Foundation Hardening`](../../../FixedMathSharp/docs/feature-work/done/2026-07-14-fixedmathsharp-foundation-hardening-plan.md).
+[`FixedMathSharp Foundation Hardening`](https://github.com/mrdav30/FixedMathSharp/blob/main/docs/feature-work/done/2026-07-14-fixedmathsharp-foundation-hardening-plan.md).
 FixedMathSharp now owns the shared full-domain arithmetic and Gravitas consumes
 it without local overflow helpers. The odd-raw GJK expansion boundary is fixed
 and committed. The separately tracked relative-CCD quadratic issue remains
@@ -1795,11 +1771,11 @@ after enter-callback removal.
 Historical RCA: the former closest-point and normalized-direction quadratic
 disagreed by one raw unit for a near-tangent fixture, so the discriminant was
 clamped to zero. Full-domain radial hardening later proved that the stored
-Q32.32 values in that fixture are an exact one-raw-unit miss, not a tangent;
-the clamp therefore invented a contact.
+Q32.32 values in that fixture are an exact one-raw-unit miss, not a tangent; the
+clamp therefore invented a contact.
 
-Superseding fix: sphere segments now use the authored segment over `[0, 1]`
-and FixedMathSharp's exact bounded interval solver. Exact stored-value tangency
+Superseding fix: sphere segments now use the authored segment over `[0, 1]` and
+FixedMathSharp's exact bounded interval solver. Exact stored-value tangency
 still returns one hit, while the historical `(0,0,0)->(3,4,0)` fixture against
 center `(1/5,3/10,0)` and radius `1/50` is retained as an explicit near-miss
 regression. No epsilon or discriminant clamp remains.

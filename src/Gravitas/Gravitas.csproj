@@ -48,8 +48,8 @@
 	<!-- NuGet Packaging Metadata -->
 	<PropertyGroup>
 		<Authors>mrdav30</Authors>
-		<Description>Deterministic fixed-point physics for lockstep simulations and games.</Description>
-		<PackageTags></PackageTags>
+		<Description>High-performance, engine-agnostic fixed-point physics for deterministic 2D, 3D, and mixed-dimension lockstep games and simulations.</Description>
+		<PackageTags>physics;physics-engine;fixed-point;fixed-point-physics;deterministic;lockstep;simulation;game-development;dotnet;2d-physics;3d-physics;collision-detection;rigid-body;continuous-collision-detection;engine-agnostic</PackageTags>
 		<RepositoryUrl>https://github.com/mrdav30/Gravitas</RepositoryUrl>
 		<PackageIcon>icon.png</PackageIcon>
 		<PackageIconUrl>https://raw.githubusercontent.com/mrdav30/gravitas/main/icon.png</PackageIconUrl>

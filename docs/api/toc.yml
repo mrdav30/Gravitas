@@ -1,0 +1,10 @@
+items:
+  - name: Home
+    href: index.md
+  - name: API Reference
+    href: obj/api/
+    homepage: obj/api/Gravitas.yml
+  - name: Wiki
+    href: https://github.com/mrdav30/Gravitas/wiki
+  - name: Coverage
+    href: https://mrdav30.github.io/Gravitas/coverage/

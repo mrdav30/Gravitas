@@ -17,14 +17,13 @@ API when scale changes do not require rebuilding support-tree topology.
 
 The focused ShortRun benchmark reports:
 
-| Subdivision | Mean | Allocated |
-| ---: | ---: | ---: |
-| 1 | `38.394 us` | `0 B/op` |
-| 8 | `2.166 ms` | `4,032 B/op` |
-| 16 | `8.822 ms` | `16,320 B/op` |
+| Subdivision |        Mean |     Allocated |
+| ----------: | ----------: | ------------: |
+|           1 | `38.394 us` |      `0 B/op` |
+|           8 |  `2.166 ms` |  `4,032 B/op` |
+|          16 |  `8.822 ms` | `16,320 B/op` |
 
-Artifact:
-`artifacts/benchmarks/2026-08-03-mesh-scale-rebuild-baseline`.
+Artifact: `artifacts/benchmarks/2026-08-03-mesh-scale-rebuild-baseline`.
 
 ## Root Cause
 
@@ -34,9 +33,9 @@ allocates 64 bytes through the reference comparer. The 8- and 16-subdivision
 meshes contain 63 and 255 non-leaf nodes, exactly accounting for the observed
 `4,032 B/op` and `16,320 B/op`.
 
-Diagnostic isolation confirms that repeated scale preparation is
-allocation-free when the support tree is absent; triangle-BVH reconstruction,
-scaled face data, and mesh mass properties are not allocating owners.
+Diagnostic isolation confirms that repeated scale preparation is allocation-free
+when the support tree is absent; triangle-BVH reconstruction, scaled face data,
+and mesh mass properties are not allocating owners.
 
 ## Approved Design
 
@@ -78,8 +77,8 @@ minimum source indices do not change.
 - [x] Retain 100% reachable line, branch, and method coverage.
 - [x] Repeat the exact benchmark and confirm `0 B/op` at every subdivision.
 - [x] Confirm support correctness and query throughput do not regress. An
-      extreme `32:1:1/32` scale probe matched a topology built directly from
-      the scaled vertices and remained within `-3.0%` to `+0.6%` across five
+      extreme `32:1:1/32` scale probe matched a topology built directly from the
+      scaled vertices and remained within `-3.0%` to `+0.6%` across five
       alternating rounds.
 
 ### Phase 4: Documentation And Closure
@@ -95,11 +94,11 @@ minimum source indices do not change.
 
 The unchanged focused ShortRun was repeated twice. The confirmation run reports:
 
-| Subdivision | Baseline | Confirmation | Delta | Allocated |
-| ---: | ---: | ---: | ---: | ---: |
-| 1 | `38.394 us` | `37.755 us` | `-1.7%` | `0 B/op` |
-| 8 | `2.166 ms` | `1.994 ms` | `-7.9%` | `0 B/op` |
-| 16 | `8.822 ms` | `8.131 ms` | `-7.8%` | `0 B/op` |
+| Subdivision |    Baseline | Confirmation |   Delta | Allocated |
+| ----------: | ----------: | -----------: | ------: | --------: |
+|           1 | `38.394 us` |  `37.755 us` | `-1.7%` |  `0 B/op` |
+|           8 |  `2.166 ms` |   `1.994 ms` | `-7.9%` |  `0 B/op` |
+|          16 |  `8.822 ms` |   `8.131 ms` | `-7.8%` |  `0 B/op` |
 
 The dense unit guard independently measures two subdivision-8 scale changes at
 exactly `0 B`, down from the pre-change `8,064 B`. Existing authored-order

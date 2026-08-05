@@ -3,7 +3,8 @@
 **Created:** 2026-08-02  
 **Status:** Complete  
 **Completed:** 2026-08-03  
-**Signal:** Exact canonical OBB contacts regress ordinary narrow-phase throughput
+**Signal:** Exact canonical OBB contacts regress ordinary narrow-phase
+throughput
 
 ## Goal
 
@@ -29,11 +30,11 @@ The baseline was captured before source changes from the Release binaries on
 
 ### Direct FixedMathSharp Relations
 
-| Row | Mean | Median |
-| --- | ---: | ---: |
-| `TrianglePrimary` | `77.951 us` | `77.641 us` |
-| `BoxPrimary` | `64.528 us` | `64.503 us` |
-| `CapsulePrimary` | `258.988 us` | `258.119 us` |
+| Row                 |         Mean |       Median |
+| ------------------- | -----------: | -----------: |
+| `TrianglePrimary`   |  `77.951 us` |  `77.641 us` |
+| `BoxPrimary`        |  `64.528 us` |  `64.503 us` |
+| `CapsulePrimary`    | `258.988 us` | `258.119 us` |
 | `ConvexHullPrimary` | `367.617 us` | `367.314 us` |
 
 Artifacts:
@@ -41,12 +42,12 @@ Artifacts:
 
 ### Gravitas Narrow Phase
 
-| Row | Mean | Median |
-| --- | ---: | ---: |
-| 64 rotated cuboid/cuboid pairs | `2.473 ms` | `2.471 ms` |
+| Row                             |        Mean |      Median |
+| ------------------------------- | ----------: | ----------: |
+| 64 rotated cuboid/cuboid pairs  |  `2.473 ms` |  `2.471 ms` |
 | 64 rotated cuboid/capsule pairs | `11.088 ms` | `11.082 ms` |
-| 64 convex mesh/cuboid pairs | `7.122 ms` | `7.113 ms` |
-| 64 concave mesh/cuboid pairs | `7.087 ms` | `7.085 ms` |
+| 64 convex mesh/cuboid pairs     |  `7.122 ms` |  `7.113 ms` |
+| 64 concave mesh/cuboid pairs    |  `7.087 ms` |  `7.085 ms` |
 
 Artifacts: `artifacts/benchmarks/2026-08-02-obb-investigation-baseline`.
 
@@ -82,15 +83,14 @@ dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll `
     --artifacts artifacts/benchmarks/2026-08-02-obb-investigation-baseline
 ```
 
-The matching historical scalar rows were `385.66 us`, `411.69 us`,
-`1.363 ms`, and `1.368 ms`. Those rows used narrower, saturating geometry and
-remain useful only as evidence that ordinary contacts have substantial
-optimization headroom.
+The matching historical scalar rows were `385.66 us`, `411.69 us`, `1.363 ms`,
+and `1.368 ms`. Those rows used narrower, saturating geometry and remain useful
+only as evidence that ordinary contacts have substantial optimization headroom.
 
 ## Root Cause
 
-Gravitas performs candidate gathering and manifold handoff, then routes the
-four rows directly through FixedMathSharp's `FixedOrientedBox` relations. The
+Gravitas performs candidate gathering and manifold handoff, then routes the four
+rows directly through FixedMathSharp's `FixedOrientedBox` relations. The
 remaining regression is not caused by Gravitas orchestration, managed
 allocation, or local project-reference configuration.
 
@@ -119,9 +119,9 @@ Profile artifacts:
 
 ### Canonical Exact Computation Frame
 
-Use the oriented box's local frame as the exact computation frame. In that
-frame the box is centered and axis-aligned, while the target pose is represented
-by one exact relative rational rotation and translation.
+Use the oriented box's local frame as the exact computation frame. In that frame
+the box is centered and axis-aligned, while the target pose is represented by
+one exact relative rational rotation and translation.
 
 This changes the algebra, not the answer:
 
@@ -205,10 +205,10 @@ do not add reflection or API-shape assertions solely to satisfy coverage.
 
 #### Phase 1 Execution Record
 
-1. Characterize the existing public contract in
-   `FixedOrientedBox.Box.Tests.cs`: retain the exact rotated cross-axis winner,
-   add an equal-depth face tie, and repeat the rotated fixture near the scalar
-   limits to prove translation invariance without materializing world points.
+1. Characterize the existing public contract in `FixedOrientedBox.Box.Tests.cs`:
+   retain the exact rotated cross-axis winner, add an equal-depth face tie, and
+   repeat the rotated fixture near the scalar limits to prove translation
+   invariance without materializing world points.
 2. Add one focused internal arithmetic test for an exact relative rational
    basis, then implement that composition on `WideRationalBasis3d`. Reuse the
    same basis-dot owner from relative bounds and expose basis rows/columns from
@@ -220,12 +220,12 @@ do not add reflection or API-shape assertions solely to satisfy coverage.
    world-space axis only for the winner.
 4. Delete the superseded generic box/box reducer after the full-domain width
    proof and public differential fixtures pass. Move any touched shared
-   projection helper to its existing common owner rather than adding a façade
-   or a second box implementation.
+   projection helper to its existing common owner rather than adding a façade or
+   a second box implementation.
 5. Run the focused box suite, the complete FixedMathSharp and Gravitas Release
    suites, and project-wide coverage analysis. The phase does not close until
-   both repositories report 100% reachable line, branch, and method coverage
-   and the diff contains no newly unreachable or assertion-only code.
+   both repositories report 100% reachable line, branch, and method coverage and
+   the diff contains no newly unreachable or assertion-only code.
 6. Build the Release benchmark projects and run `BoxPrimary` plus Gravitas
    cuboid/cuboid twice. Retain the rewrite only if both confirmations clear the
    documented per-family gate with `0 B`, or if a smaller result removes
@@ -249,9 +249,8 @@ do not add reflection or API-shape assertions solely to satisfy coverage.
   convex-prism radius owner.
 - Meaningful fixtures now pin exact cross-axis output, first- and second-box
   face winners, strict equal-depth tie ownership, parallel-axis degeneration,
-  skew cross-axis separation, near-limit translation invariance including
-  anchor displacement, opposite scalar-face separation, and clamped full-domain
-  depth.
+  skew cross-axis separation, near-limit translation invariance including anchor
+  displacement, opposite scalar-face separation, and clamped full-domain depth.
 - Direct `BoxPrimary` confirmation medians were `32.030 us` and `32.195 us`
   versus `64.503 us` baseline: approximately `50.3%` and `50.1%` faster.
 - Gravitas 64-pair cuboid/cuboid confirmation medians were `1.326 ms` and
@@ -304,15 +303,15 @@ Confirmation artifacts:
    candidate axes in the box-local exact frame. Compute the three target-local
    axis projections once per candidate, then scan authored raw coordinates
    directly instead of transforming or buffering vertices.
-4. Preserve the existing triangle axis order—box axes, triangle face, then
-   `AB`, `BC`, and `CA` crossed with each box axis—and preserve convex-hull
-   topology order. Retain strict first-candidate and first-support tie ownership;
+4. Preserve the existing triangle axis order—box axes, triangle face, then `AB`,
+   `BC`, and `CA` crossed with each box axis—and preserve convex-hull topology
+   order. Retain strict first-candidate and first-support tie ownership;
    transform only the winning axis back to world space.
 5. Move the reusable exact axis dot product and prepared rigid projections to
    their existing common owners. Delete the superseded transformed-offset
-   projection, duplicate OBB axis projection, duplicate triangle projection,
-   and duplicate convex-hull support scan rather than retaining forwarding
-   helpers or a fallback kernel.
+   projection, duplicate OBB axis projection, duplicate triangle projection, and
+   duplicate convex-hull support scan rather than retaining forwarding helpers
+   or a fallback kernel.
 6. Run full Release, ReleaseLean, coverage, package, and benchmark gates for
    both repositories. Rerun each benchmark twice from the final source and
    request independent correctness, performance/bloat, and test-quality review.
@@ -331,10 +330,9 @@ Confirmation artifacts:
   `51.208 us` / `51.149 us` and `135.960 us` / `135.085 us`: approximately
   `35.3%`–`35.4%` and `63.8%`–`64.0%` faster, respectively.
 - Fresh Gravitas baselines were `7.049 ms` median for convex mesh/cuboid and
-  `7.044 ms` for concave mesh/cuboid. Final confirmation medians were
-  `4.873 ms` / `4.756 ms` and `4.708 ms` / `4.758 ms`: approximately
-  `30.9%`–`32.5%` and `32.5%`–`33.2%` faster. Every measured row reported
-  `0 B`.
+  `7.044 ms` for concave mesh/cuboid. Final confirmation medians were `4.873 ms`
+  / `4.756 ms` and `4.708 ms` / `4.758 ms`: approximately `30.9%`–`32.5%` and
+  `32.5%`–`33.2%` faster. Every measured row reported `0 B`.
 - FixedMathSharp Release passed 2,662 core tests plus 8 Chronicler tests;
   ReleaseLean passed 2,641 core tests plus 8 Chronicler tests. Gravitas Release
   passed 3,925 tests and ReleaseLean passed 3,870 tests. Both target-framework
@@ -384,22 +382,21 @@ Phase 3 result:
   full-domain non-face behavior, rigid-pose corner identity, and zero warmed
   allocations. Recorded deliberate mutations failed each matching fixture.
 - Fresh direct baseline: `CapsulePrimary` mean `258.064 us`, median
-  `257.767 us`, `0 B`. Final confirmations were mean/median
-  `156.638/155.690 us` and `155.472/153.880 us`, or `39.6%` and `40.3%`
-  faster by median, both `0 B`.
+  `257.767 us`, `0 B`. Final confirmations were mean/median `156.638/155.690 us`
+  and `155.472/153.880 us`, or `39.6%` and `40.3%` faster by median, both `0 B`.
 - Fresh Gravitas baseline: 64 cuboid/capsule pairs mean `11.295 ms`, median
-  `11.294 ms`, `0 B`. Final confirmations were mean/median `5.040/5.006 ms`
-  and `5.114/5.114 ms`, or `55.7%` and `54.7%` faster by median, both `0 B`.
+  `11.294 ms`, `0 B`. Final confirmations were mean/median `5.040/5.006 ms` and
+  `5.114/5.114 ms`, or `55.7%` and `54.7%` faster by median, both `0 B`.
 - FixedMathSharp Release passed 2,669 tests plus 8 Chronicler integration tests;
   ReleaseLean passed 2,648 plus 8. Gravitas Release passed 3,925 tests and
   ReleaseLean passed 3,870. Standard and Lean package builds remained
   warning-free for `net8.0` and `netstandard2.1`.
-- Final FixedMathSharp reachable coverage is 47,468/47,468 lines,
-  8,722/8,722 branches, and 3,486/3,486 methods. Final Gravitas reachable
-  coverage is 43,232/43,232 lines, 12,843/12,843 branches, and 4,487/4,487
-  methods. Generated MemoryPack formatters and compiler-generated automatic
-  property accessors remain outside the reachable-code gate rather than being
-  padded with hollow tests.
+- Final FixedMathSharp reachable coverage is 47,468/47,468 lines, 8,722/8,722
+  branches, and 3,486/3,486 methods. Final Gravitas reachable coverage is
+  43,232/43,232 lines, 12,843/12,843 branches, and 4,487/4,487 methods.
+  Generated MemoryPack formatters and compiler-generated automatic property
+  accessors remain outside the reachable-code gate rather than being padded with
+  hollow tests.
 - Independent correctness and quality re-reviews approved the correlated
   full-domain width proof, local/world algebraic equivalence, deterministic
   feature contracts, invariant hoists, allocation behavior, and deletion of
@@ -440,8 +437,8 @@ Phase 3 artifacts:
   triangle and capsule. Both missed the `5%` family gate and were reverted in
   full; no Phase 4 production code remains.
 - The retained design therefore stays smaller: one exact full-domain kernel per
-  relation, no approximation, cache, extra public API, or relation-specific
-  fast path.
+  relation, no approximation, cache, extra public API, or relation-specific fast
+  path.
 
 Phase 4 artifacts:
 
@@ -463,7 +460,8 @@ Phase 4 artifacts:
 - [x] Update benchmark READMEs, complexity exceptions, this plan, the backlog,
       and feature-work overview.
 - [x] Obtain independent correctness and performance review before closure.
-- [x] Move this plan to `done` only after the retained source and evidence agree.
+- [x] Move this plan to `done` only after the retained source and evidence
+      agree.
 
 #### Phase 5 Result
 
@@ -492,9 +490,9 @@ Phase 4 artifacts:
   coverage is 43,911/43,911 lines, 12,845/12,845 branches, and 4,510/4,510
   methods; all 4,510 analyzed methods are fully covered and the 27 scores above
   30 are coverage-safe complexity floors.
-- GridForge passes 483 Release and 483 ReleaseLean tests after removing redundant
-  local shim project edges; the released transitive package remains the sole
-  shim owner. Standard and Lean package builds remain warning-free for
+- GridForge passes 483 Release and 483 ReleaseLean tests after removing
+  redundant local shim project edges; the released transitive package remains
+  the sole shim owner. Standard and Lean package builds remain warning-free for
   `net8.0` and `netstandard2.1`.
 - The final source adds only one behavioral Gravitas regression fixture for
   canonical mesh/cuboid anchor ownership. Recorded mutation removed the

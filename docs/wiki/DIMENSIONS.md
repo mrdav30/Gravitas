@@ -50,11 +50,11 @@ bit combinations are rejected as settings values.
 
 ## Public Surface
 
-| Domain      | Bodies                    | Colliders                           | Constraints                      | Queries              |
-| ----------- | ------------------------- | ----------------------------------- | -------------------------------- | -------------------- |
-| 3D          | `SolidBody`               | built-in `LSCollider` implementations   | `Joint3D`, `RagdollRuntime3D` | `context.Query3D` |
-| 2D          | `SolidBody2D`             | built-in `LSCollider2D` implementations | `Joint2D`, `RagdollRuntime2D` | `context.Query2D` |
-| Mixed 2D/3D | Existing 3D and 2D bodies | 3D colliders plus embedded 2D slabs | Mixed contacts, not mixed joints | `context.QueryMixed` |
+| Domain      | Bodies                    | Colliders                               | Constraints                      | Queries              |
+| ----------- | ------------------------- | --------------------------------------- | -------------------------------- | -------------------- |
+| 3D          | `SolidBody`               | built-in `LSCollider` implementations   | `Joint3D`, `RagdollRuntime3D`    | `context.Query3D`    |
+| 2D          | `SolidBody2D`             | built-in `LSCollider2D` implementations | `Joint2D`, `RagdollRuntime2D`    | `context.Query2D`    |
+| Mixed 2D/3D | Existing 3D and 2D bodies | 3D colliders plus embedded 2D slabs     | Mixed contacts, not mixed joints | `context.QueryMixed` |
 
 Supported 3D collider types:
 
@@ -109,9 +109,9 @@ transform during `LateSimulate()`.
 Linear impulse uses mass-distance-per-time units and changes velocity
 immediately by `impulse * EffectiveInverseMass`. Angular impulse uses
 mass-distance-squared-per-time units and changes angular velocity immediately
-through `EffectiveInverseInertiaTensor`. Neither impulse API applies
-`DeltaTime` or advances pose. `AddForce(...)` and `AddTorque(...)` instead queue
-continuous inputs whose acceleration is integrated during the next fixed step.
+through `EffectiveInverseInertiaTensor`. Neither impulse API applies `DeltaTime`
+or advances pose. `AddForce(...)` and `AddTorque(...)` instead queue continuous
+inputs whose acceleration is integrated during the next fixed step.
 
 3D contact response uses full 3D COM-relative contact arms, `Fixed3x3` inverse
 inertia tensors, collider surface materials, normal impulses, tangent friction,
@@ -171,19 +171,18 @@ during `LateSimulate()` and project its X/Z position into authoritative
 | Immediate yaw impulse         | `AddAngularImpulse(...)`                       |
 | Queued yaw torque             | `AddTorque(...)`                               |
 
-Pure 2D impulse and continuous-force units match the 3D contract. Planar and
-yaw impulses change velocity immediately without applying `DeltaTime` or
-advancing pose; planar force and yaw torque are integrated during the next
-fixed step.
+Pure 2D impulse and continuous-force units match the 3D contract. Planar and yaw
+impulses change velocity immediately without applying `DeltaTime` or advancing
+pose; planar force and yaw torque are integrated during the next fixed step.
 
 `BodyFreezeAxes2D.PositionX` maps to world X. `BodyFreezeAxes2D.PositionY` maps
 to world Z, not world height. `BodyMotionType` selects solver-controlled
 `Dynamic`, host-controlled `Kinematic`, or immobile `Static` ownership in both
 dimensions. Freeze masks then constrain dynamic degrees of freedom without
 changing that role. A fully position-frozen dynamic body has zero effective
-linear mass but may retain angular response; a yaw-frozen body may retain
-linear response. Static, kinematic, inactive, and non-positive-mass states
-contribute zero applicable solver mobility.
+linear mass but may retain angular response; a yaw-frozen body may retain linear
+response. Static, kinematic, inactive, and non-positive-mass states contribute
+zero applicable solver mobility.
 
 2D contact response uses planar COM-relative contact arms, scalar inverse
 moment, collider surface materials, normal impulses, tangent Coulomb friction,
@@ -207,8 +206,8 @@ Shape definitions are data-only authoring/import surfaces. Runtime collider
 shells own context binding, collider IDs, partition state, pair state, events,
 and query stamps.
 
-| Domain | Definition types                                      | Runtime materialization                                            | Mass properties                                                                      |
-| ------ | ----------------------------------------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
+| Domain | Definition types                                      | Runtime materialization                                                          | Mass properties                                                                      |
+| ------ | ----------------------------------------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
 | 3D     | `ColliderShapeDefinition`, `CompoundColliderPart`     | built-in `LSCollider` implementations and private `LSCompoundCollider` parts     | local center of mass, shape-derived mass distribution, and `Fixed3x3` inertia tensor |
 | 2D     | `ColliderShapeDefinition2D`, `CompoundColliderPart2D` | built-in `LSCollider2D` implementations and private `LSCompoundCollider2D` parts | local center of mass, area, and scalar moment of inertia                             |
 
@@ -233,8 +232,8 @@ consumes X/Z and rejects a composed basis that leaves its simulation plane; 3D
 consumes X/Y/Z. Multiple negative scales do not become valid merely because
 their signs cancel, and rotated nonuniform hierarchy scale that produces real
 shear is rejected instead of being approximated as diagonal scale. Invalid
-physics scale is rejected atomically without rewriting the host's authored
-local transform.
+physics scale is rejected atomically without rewriting the host's authored local
+transform.
 
 Compound owner and part scales are retained as separate factors until the final
 canonical dimension or centered coordinate is formed. Exact fused admission

@@ -122,15 +122,14 @@ full-domain rigid-frame contact relation. Compound paths scan parts in stable
 declaration order and return the owner collider as the public identity.
 
 Finite axes, oriented cuboids, and planar convex shapes retain center-relative
-canonical geometry through narrow phase. Contact witnesses use
-`ContactAnchor` or `ContactAnchor2D`: a representable origin, normalized frame
-rotation, and representable local point. Solvers and replay hashes consume that
-canonical frame directly, so a valid contact is not dropped or deformed merely
-because its rotated offset or absolute world point crosses a `Fixed64` scalar
-face. `Origin`, `Rotation`, `LocalPoint`, and `LocalDisplacement` expose the
-canonical components. The two local terms remain separate until exact
-evaluation so a representable world witness is not lost to an overflowing
-local intermediate.
+canonical geometry through narrow phase. Contact witnesses use `ContactAnchor`
+or `ContactAnchor2D`: a representable origin, normalized frame rotation, and
+representable local point. Solvers and replay hashes consume that canonical
+frame directly, so a valid contact is not dropped or deformed merely because its
+rotated offset or absolute world point crosses a `Fixed64` scalar face.
+`Origin`, `Rotation`, `LocalPoint`, and `LocalDisplacement` expose the canonical
+components. The two local terms remain separate until exact evaluation so a
+representable world witness is not lost to an overflowing local intermediate.
 `Offset` and legacy `PointA`/`PointB` views materialize derived coordinates and
 throw when the requested view is not representable; domain-edge callers should
 use `TryGetOffset` and the matching `TryGetPoint*` method.
@@ -140,12 +139,12 @@ reconstructs a Gravitas-owned `ExactLever3D` from contact anchors only when the
 complete compact expression cannot be proven representable. Point velocity,
 effective mass, warm-start completion, friction, and final body deltas then
 remain exact through one final checked narrowing. Compound mass properties use
-the Gravitas-owned `ExactMassPoint3D`, `ExactMassPoint2D`, and
-`ExactMassWeight` types for the equivalent weighted-center and parallel-axis
-contract; no saturated child center or weight is admitted as physical data.
-These internal physics semantics consume FixedMathSharp's policy-neutral wide
-arithmetic through the intentional friend-assembly boundary and never enter
-Gravitas public signatures.
+the Gravitas-owned `ExactMassPoint3D`, `ExactMassPoint2D`, and `ExactMassWeight`
+types for the equivalent weighted-center and parallel-axis contract; no
+saturated child center or weight is admitted as physical data. These internal
+physics semantics consume FixedMathSharp's policy-neutral wide arithmetic
+through the intentional friend-assembly boundary and never enter Gravitas public
+signatures.
 
 `ExactContactResponseKernel` is the sole owner of the exact normal,
 accumulated-normal, Coulomb-line, and Coulomb-disk response policy.
@@ -194,11 +193,10 @@ exit callbacks.
 pairs and 3D/2D for mixed pairs. Exit admission is consumed before user
 delegates run, so callback failure or reentrant teardown does not retry an
 already admitted exit against the same pair lifetime. Both admitted sides are
-attempted even if the first throws: one exception is re-thrown with its
-original stack, while multiple failures are reported as an `AggregateException`
-in pair order. Deferred exits retain the pair's notification guard until
-cleanup finishes, preventing direct deactivation from reentering the same
-separation.
+attempted even if the first throws: one exception is re-thrown with its original
+stack, while multiple failures are reported as an `AggregateException` in pair
+order. Deferred exits retain the pair's notification guard until cleanup
+finishes, preventing direct deactivation from reentering the same separation.
 
 3D and 2D response both:
 

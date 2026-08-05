@@ -226,8 +226,8 @@ body.Initialize(
 Initialization binds the body and collider to `agent.Context`, allocates
 context-local body/collider IDs, calculates runtime shape data, and partitions
 the collider. `FixedTransform` and Gravitas body admission both preserve a
-normalized orientation invariant. Scaled or extreme finite quaternion inputs
-are scale-safely normalized, and a zero quaternion resolves to identity before
+normalized orientation invariant. Scaled or extreme finite quaternion inputs are
+scale-safely normalized, and a zero quaternion resolves to identity before
 runtime shape state is published.
 
 ### 2D Body
@@ -280,11 +280,11 @@ floor.InitializeWithNoBody(agent);
 A body with all translation axes frozen is different from a static body or a
 bodyless collider. Select the runtime role explicitly:
 
-| Role | Ownership |
-| ---- | --------- |
-| `BodyMotionType.Dynamic` | Solver controlled. `FreezeAxes` independently constrains translation and rotation. |
-| `BodyMotionType.Kinematic` | Host controlled. Gravitas samples deterministic host motion and CCD, but applies no solver impulse. |
-| `BodyMotionType.Static` | Immobile and excluded from simulated-body iteration. Use explicit pose setters to reposition it between fixed steps. |
+| Role                       | Ownership                                                                                                            |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `BodyMotionType.Dynamic`   | Solver controlled. `FreezeAxes` independently constrains translation and rotation.                                   |
+| `BodyMotionType.Kinematic` | Host controlled. Gravitas samples deterministic host motion and CCD, but applies no solver impulse.                  |
+| `BodyMotionType.Static`    | Immobile and excluded from simulated-body iteration. Use explicit pose setters to reposition it between fixed steps. |
 
 For example, a rotating platform that must not translate is a `Dynamic` body
 with `BodyFreezeAxes3D.Position`; the 2D equivalent uses
@@ -293,12 +293,12 @@ body role. `LSCollider.IsStatic` and `LSCollider2D.IsStatic` report only an
 explicit `Static` body or bodyless ownership.
 
 Call `SetMotionType(...)` to change a registered body's role between fixed-step
-transactions. The transition preserves body, collider, pair, and joint
-identity, but clears incompatible motion, sleep, CCD, contact warm-start, and
-joint-solver state before repartitioning. It rejects calls before
-initialization, after deactivation or context reset, during an open fixed-step
-transaction, and from simulation callbacks. Ragdoll role changes use their
-atomic runtime operation rather than transitioning links individually.
+transactions. The transition preserves body, collider, pair, and joint identity,
+but clears incompatible motion, sleep, CCD, contact warm-start, and joint-solver
+state before repartitioning. It rejects calls before initialization, after
+deactivation or context reset, during an open fixed-step transaction, and from
+simulation callbacks. Ragdoll role changes use their atomic runtime operation
+rather than transitioning links individually.
 
 Static bodies do not poll their host transforms. `SetPosition(...)`,
 `SetRotation(...)`, and 3D `UpdateRotation(...)` are the authoritative explicit
@@ -338,16 +338,16 @@ final canonical value is not representable or physically valid. Intermediate
 Q32.32 saturation is never accepted as a plausible runtime dimension.
 
 Use `FixedTransform.TransformPoint(...)`, `InverseTransformPoint(...)`, and
-their explicit X/Z counterparts when converting through the current authored
-or presentation snapshot.
+their explicit X/Z counterparts when converting through the current authored or
+presentation snapshot.
 
 Use `SolidBody.GetWorldPoint(...)` / `GetLocalPoint(...)`, or the matching
-`SolidBody2D` methods, for gameplay conversion through the authoritative
-physics pose. These body methods use the collider's last committed owner-scale
-snapshot, not a newly read host scale, so render interpolation or a pending
-adapter mutation cannot change simulation queries. Their `Try*` counterparts
-return `false` with a zero output before the first shape commit or when the
-final coordinate is outside the Q32.32 domain.
+`SolidBody2D` methods, for gameplay conversion through the authoritative physics
+pose. These body methods use the collider's last committed owner-scale snapshot,
+not a newly read host scale, so render interpolation or a pending adapter
+mutation cannot change simulation queries. Their `Try*` counterparts return
+`false` with a zero output before the first shape commit or when the final
+coordinate is outside the Q32.32 domain.
 
 Engine adapters should treat Gravitas as the sole simulation authority. Publish
 the visual pose to the engine transform, and disable native rigid-body

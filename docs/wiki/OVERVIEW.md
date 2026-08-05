@@ -6,6 +6,11 @@ SwiftCollections for low-allocation runtime data structures, GridForge for
 world/grid ownership, and context-owned Gravitas services for physics runtime
 state.
 
+Project resources: [documentation site](https://mrdav30.github.io/Gravitas/),
+[API reference](https://mrdav30.github.io/Gravitas/api/Gravitas.html),
+[coverage report](https://mrdav30.github.io/Gravitas/coverage/), and
+[wiki home](Home.md).
+
 The core runtime rule is simple: there is no process-wide physics world. A
 simulation happens inside a `GravitasWorldContext`, and every body, collider,
 partition, query, coroutine, diagnostic buffer, and clock value belongs to that
@@ -46,11 +51,11 @@ flowchart TD
 Gravitas is the physics layer of a small deterministic stack. Read the sibling
 project docs when you need the lower-level contracts behind a Gravitas API.
 
-| Library          | What Gravitas uses it for                                                                                        | More                                          |
-| ---------------- | ---------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
-| FixedMathSharp   | `Fixed64`, deterministic vectors, quaternions, transforms, matrices, bounds, rays, planes, and geometry helpers. | [README](../../../FixedMathSharp/README.md)   |
-| SwiftCollections | Low-allocation lists, sets, queues, pools, and caller-owned buffers used by hot-path services and query APIs.    | [README](../../../SwiftCollections/README.md) |
-| GridForge        | Explicit `GridWorld` ownership, voxel identities, traversal, partition backing, and spatial candidate gathering. | [README](../../../GridForge/README.md)        |
+| Library          | What Gravitas uses it for                                                                                        | More                                                      |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| FixedMathSharp   | `Fixed64`, deterministic vectors, quaternions, transforms, matrices, bounds, rays, planes, and geometry helpers. | [Repository](https://github.com/mrdav30/FixedMathSharp)   |
+| SwiftCollections | Low-allocation lists, sets, queues, pools, and caller-owned buffers used by hot-path services and query APIs.    | [Repository](https://github.com/mrdav30/SwiftCollections) |
+| GridForge        | Explicit `GridWorld` ownership, voxel identities, traversal, partition backing, and spatial candidate gathering. | [Repository](https://github.com/mrdav30/GridForge)        |
 
 ## Reading Path
 
@@ -137,7 +142,7 @@ Gravitas owns, per context:
 
 | Area          | Supported surface                                                                                                                                                                          |
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 3D            | primitive, mesh, and compound colliders; explicit dynamic/kinematic/static bodies; CCD; constraints; ragdolls; grounding; queries; diagnostics; replay.                                           |
+| 3D            | primitive, mesh, and compound colliders; explicit dynamic/kinematic/static bodies; CCD; constraints; ragdolls; grounding; queries; diagnostics; replay.                                    |
 | 2D            | circle, capsule, AABB, convex polygon, and compound colliders; planar body dynamics; scalar angular response; grounding/support; CCD; constraints; ragdolls; queries; diagnostics; replay. |
 | Mixed 2D/3D   | embedded 2D slabs, mixed broad phase, mixed pairs, constrained response, explicit mixed queries, mixed CCD hooks, dimension-tagged diagnostics, slab debug draw.                           |
 | Collision     | deterministic broad phase, narrow phase, manifolds, response islands, warm starts, materials, sleep/wake, notifications, cleanup.                                                          |

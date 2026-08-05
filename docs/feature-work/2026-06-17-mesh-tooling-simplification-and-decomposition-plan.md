@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-17  
 **Expanded:** 2026-06-18  
-**Status:** Post-alpha / research-gated  
+**Status:** Deferred / research-gated  
 **Owner:** Gravitas asset-tooling research
 
 ## Purpose
@@ -48,7 +48,7 @@ the runtime cost or memory target.
 
 ## Scope
 
-This is tooling R&D, not an alpha runtime dependency.
+This is tooling R&D, not a runtime dependency.
 
 In scope:
 
@@ -330,7 +330,7 @@ it exists. A fixture without a specific failure mode or quality signal is noise.
 - [ ] Inventory FixedMathSharp, SwiftCollections, Chronicler, and GridForge APIs
       that can be reused for the first validation and fixture tasks.
 - [ ] Keep package metadata experimental so it cannot be mistaken for the
-      recommended alpha asset workflow before the evidence gates are met.
+      recommended asset workflow before the evidence gates are met.
 - [ ] Add only the minimal public API root required by the first validation
       task; avoid marker types with no behavior.
 - [ ] Add fixture helpers for deterministic source meshes and current runtime
@@ -472,10 +472,10 @@ dense meshes.
 - Do not promote it if piece count or implementation complexity fights runtime
   performance goals.
 
-**Exit criteria:** one strategy becomes the recommended alpha candidate only if
-it produces deterministic output, passes quality probes, and meets the Phase E
+**Exit criteria:** one strategy becomes the recommended candidate only if it
+produces deterministic output, passes quality probes, and meets the Phase E
 runtime-speedup threshold against raw dense mesh runtime benchmarks. Otherwise,
-Phase 7 exits with a validated "manual authored compound assets only for alpha"
+Phase 7 exits with a validated "manual authored compound assets only"
 recommendation.
 
 ### Tooling Phase H: Runtime Export And Authoring Experience
@@ -493,7 +493,7 @@ runtime `LSCompoundCollider`, and understand the quality/cost tradeoff.
 
 ### Tooling Phase I: Recommendation Gate
 
-Before recommending generated decomposition for alpha:
+Before recommending generated decomposition for adoption:
 
 - [ ] Run the fixture corpus through every promoted strategy.
 - [ ] Run runtime benchmarks comparing generated output against raw triangle BVH
@@ -522,9 +522,8 @@ An algorithm or tool phase is promotable only when all of these are true:
 - generated output keeps zero steady-state runtime allocation after warmup.
 - docs describe when not to use the tool.
 
-If no strategy satisfies these criteria, the correct alpha answer is to ship
-manual/authored compound collision assets and keep automatic decomposition as a
-post-alpha research track.
+If no strategy satisfies these criteria, retain manual/authored compound
+collision assets and keep automatic decomposition as a research track.
 
 ## Open Design Questions
 
@@ -539,10 +538,10 @@ post-alpha research track.
 - Should simplification be allowed before decomposition, or should it remain an
   explicit independent tool until proven safe?
 
-## Current Recommendation
+## Standing Recommendation
 
-For alpha, do not promise automatic convex decomposition yet. The runtime path
-is already coherent:
+Do not promise automatic convex decomposition until the evidence gates are met.
+The runtime path is already coherent:
 
 - simple concave physics meshes can use raw `LSMeshCollider` triangle BVH.
 - complex dense collision assets should be authored offline as compound convex
@@ -551,11 +550,9 @@ is already coherent:
   default.
 
 Phase 7 should build the evidence platform and prototype strategies, then let
-the numbers choose the first recommended automatic tooling path. My current bet
-is that a deterministic split/merge approximation will be easier to make robust,
-while source-triangle growth is the more interesting experiment for reducing
-piece count on game-friendly closed meshes. Neither should be accepted without
-the Phase E scoreboard.
+the numbers choose the recommended automatic tooling path. Deterministic
+split/merge approximation and source-triangle growth remain hypotheses; neither
+should be accepted without the Phase E scoreboard.
 
 ## References
 

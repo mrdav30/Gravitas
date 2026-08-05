@@ -37,10 +37,9 @@ shape inputs, `LSCollider` rebuilds runtime shape data and asks
 internal snapshot so several local edits before a simulation call collapse into
 one bounds/shape rebuild.
 
-Prepared canonical geometry, analytical conservative bounds, and mass
-properties commit atomically. Bounds clipped to the representable coordinate
-domain exist only for partition coverage; narrow phase always consumes the
-canonical shape.
+Prepared canonical geometry, analytical conservative bounds, and mass properties
+commit atomically. Bounds clipped to the representable coordinate domain exist
+only for partition coverage; narrow phase always consumes the canonical shape.
 
 `GravitasCollisionService.PartitionObject(...)`:
 
@@ -97,19 +96,19 @@ comparable because the services intentionally own separate ID spaces.
 
 Membership is explicit:
 
-| Collider/body state                   | Partition bucket           |
-| ------------------------------------- | -------------------------- |
-| Bodyless collider                     | static                     |
-| `MotionType == BodyMotionType.Static` | static                     |
-| `MotionType == BodyMotionType.Kinematic` | kinematic               |
-| `MotionType == BodyMotionType.Dynamic` | dynamic                   |
-| Awake dynamic body with solver mobility | dynamic plus awake-dynamic |
+| Collider/body state                      | Partition bucket           |
+| ---------------------------------------- | -------------------------- |
+| Bodyless collider                        | static                     |
+| `MotionType == BodyMotionType.Static`    | static                     |
+| `MotionType == BodyMotionType.Kinematic` | kinematic                  |
+| `MotionType == BodyMotionType.Dynamic`   | dynamic                    |
+| Awake dynamic body with solver mobility  | dynamic plus awake-dynamic |
 
 Freeze axes never change the partition role. Partial freezes and fully locked
-dynamic bodies remain in dynamic membership; the solver constrains their
-degrees of freedom through effective mass and inertia. A fully locked dynamic
-body does not seed awake pair distribution because it has no solver mobility,
-but it remains available to contacts, queries, wake propagation, and an awake
+dynamic bodies remain in dynamic membership; the solver constrains their degrees
+of freedom through effective mass and inertia. A fully locked dynamic body does
+not seed awake pair distribution because it has no solver mobility, but it
+remains available to contacts, queries, wake propagation, and an awake
 counterpart's candidate traversal.
 
 Only awake dynamic membership activates pair distribution for solver work.
