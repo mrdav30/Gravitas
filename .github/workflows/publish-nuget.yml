@@ -59,7 +59,7 @@ jobs:
         shell: bash
         env:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
-          PACKAGE_VERSION: ${{ steps.gitversion.outputs.majorMinorPatch }}
+          PACKAGE_VERSION: ${{ steps.gitversion.outputs.semVer }}
         run: |
           set -euo pipefail
 
@@ -91,7 +91,7 @@ jobs:
       - name: Build Release packages
         shell: bash
         env:
-          PACKAGE_VERSION: ${{ steps.gitversion.outputs.majorMinorPatch }}
+          PACKAGE_VERSION: ${{ steps.gitversion.outputs.semVer }}
           ASSEMBLY_VERSION: ${{ steps.gitversion.outputs.assemblySemVer }}
           FILE_VERSION: ${{ steps.gitversion.outputs.assemblySemFileVer }}
           INFORMATIONAL_VERSION: ${{ steps.gitversion.outputs.informationalVersion }}
@@ -115,7 +115,7 @@ jobs:
       - name: Build ReleaseLean packages
         shell: bash
         env:
-          PACKAGE_VERSION: ${{ steps.gitversion.outputs.majorMinorPatch }}
+          PACKAGE_VERSION: ${{ steps.gitversion.outputs.semVer }}
           ASSEMBLY_VERSION: ${{ steps.gitversion.outputs.assemblySemVer }}
           FILE_VERSION: ${{ steps.gitversion.outputs.assemblySemFileVer }}
           INFORMATIONAL_VERSION: ${{ steps.gitversion.outputs.informationalVersion }}
@@ -136,7 +136,7 @@ jobs:
       - name: Validate package artifacts
         shell: bash
         env:
-          PACKAGE_VERSION: ${{ steps.gitversion.outputs.majorMinorPatch }}
+          PACKAGE_VERSION: ${{ steps.gitversion.outputs.semVer }}
         run: |
           set -euo pipefail
 
@@ -177,7 +177,7 @@ jobs:
       - name: Upload package artifact
         uses: actions/upload-artifact@v7
         with:
-          name: nuget-packages-${{ steps.gitversion.outputs.majorMinorPatch }}
+          name: nuget-packages-${{ steps.gitversion.outputs.semVer }}
           path: ${{ env.NUGET_OUTPUT }}/*
           if-no-files-found: error
 
