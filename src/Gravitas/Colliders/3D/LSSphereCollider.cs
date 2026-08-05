@@ -13,14 +13,17 @@ using System;
 
 namespace Gravitas.Colliders;
 
+/// <summary>Represents a runtime 3D sphere collider.</summary>
 public sealed class LSSphereCollider : LSCollider
 {
     private Fixed64 _scaledRadius = Fixed64.Half;
     private Fixed64 _preparedRadius;
     private Fixed64 _preparedArea;
 
+    /// <summary>Creates a sphere collider with default dimensions.</summary>
     public LSSphereCollider() { }
 
+    /// <summary>Creates a runtime sphere from an authored shape definition.</summary>
     public LSSphereCollider(ColliderShapeDefinition definition)
     {
         definition.EnsureKind(ColliderShapeDefinitionKind.Sphere);
@@ -28,16 +31,20 @@ public sealed class LSSphereCollider : LSCollider
         Radius = definition.Radius;
     }
 
+    /// <inheritdoc/>
     public override ColliderType Shape => ColliderType.Sphere;
 
+    /// <inheritdoc/>
     public override int Priority => ColliderSettings.GetPriority(Shape);
 
+    /// <inheritdoc/>
     protected override void OnRadiusChanged()
     {
         Fixed64 diameter = _radius * 2;
         _size = new Vector3d(diameter, diameter, diameter);
     }
 
+    /// <inheritdoc/>
     public override Fixed64 ScaledRadius => _scaledRadius;
 
     private protected override void PrepareShape(in ColliderShapeSnapshot snapshot)
@@ -94,6 +101,7 @@ public sealed class LSSphereCollider : LSCollider
         return tensor;
     }
 
+    /// <inheritdoc/>
     public override Vector3d ClosestPointOnSurface(Vector3d other)
     {
         FixedPointAnchor anchor =
@@ -105,6 +113,7 @@ public sealed class LSSphereCollider : LSCollider
             "The closest sphere surface point is outside the representable coordinate domain.");
     }
 
+    /// <inheritdoc/>
     public override Vector3d GetNormalAtPoint(Vector3d point)
     {
         if (point == Center)
@@ -131,6 +140,7 @@ public sealed class LSSphereCollider : LSCollider
                 out normal,
                 out _);
 
+    /// <inheritdoc/>
     public override bool ColliderOverlapsRay(RaycastSegmentWorker worker, ref SwiftList<Vector3d> outputIntersectionPoints) =>
         worker.CheckSphereOverlaps(this, ref outputIntersectionPoints);
 }

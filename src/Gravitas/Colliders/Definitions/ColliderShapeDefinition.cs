@@ -357,6 +357,7 @@ public readonly struct ColliderShapeDefinition : IEquatable<ColliderShapeDefinit
         }
     }
 
+    /// <inheritdoc/>
     public bool Equals(ColliderShapeDefinition other)
     {
         if (Kind != other.Kind
@@ -387,9 +388,11 @@ public readonly struct ColliderShapeDefinition : IEquatable<ColliderShapeDefinit
         return true;
     }
 
+    /// <inheritdoc/>
     public override bool Equals(object? obj) =>
         obj is ColliderShapeDefinition other && Equals(other);
 
+    /// <inheritdoc/>
     public override int GetHashCode()
     {
         unchecked
@@ -413,9 +416,11 @@ public readonly struct ColliderShapeDefinition : IEquatable<ColliderShapeDefinit
         }
     }
 
+    /// <summary>Determines whether two authored 3D shape definitions are equal.</summary>
     public static bool operator ==(ColliderShapeDefinition left, ColliderShapeDefinition right) =>
         left.Equals(right);
 
+    /// <summary>Determines whether two authored 3D shape definitions are not equal.</summary>
     public static bool operator !=(ColliderShapeDefinition left, ColliderShapeDefinition right) =>
         !left.Equals(right);
 }

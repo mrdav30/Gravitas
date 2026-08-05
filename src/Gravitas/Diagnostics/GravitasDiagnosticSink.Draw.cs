@@ -12,6 +12,9 @@ using Gravitas.Constraints;
 
 namespace Gravitas.Diagnostics;
 
+/// <content>
+/// Provides host-driven collider, joint, and primitive debug draw capture.
+/// </content>
 public sealed partial class GravitasDiagnosticSink
 {
     /// <summary>

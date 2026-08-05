@@ -73,8 +73,10 @@ public sealed partial class GravitasDiagnosticSink
             commands[i].DispatchTo(visitor);
     }
 
+    /// <summary>Gets the number of captured diagnostic events.</summary>
     public int EventCount => _events.Count;
 
+    /// <summary>Gets the number of captured debug draw commands.</summary>
     public int DrawCommandCount => _drawCommands.Count;
 
     internal int EventCapacity => _events.Capacity;

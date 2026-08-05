@@ -18,6 +18,9 @@ namespace Gravitas.Queries;
 /// </summary>
 public readonly struct Physics3DHit
 {
+    /// <summary>
+    /// Creates a 3D query hit from a world-space surface witness.
+    /// </summary>
     public Physics3DHit(LSCollider? collider, Vector3d point, Vector3d normal, Fixed64 distance, Vector3d direction)
         : this(
             collider,
@@ -49,8 +52,14 @@ public readonly struct Physics3DHit
         Direction = direction;
     }
 
+    /// <summary>
+    /// Gets the collider reported by the query, if any.
+    /// </summary>
     public LSCollider? Collider { get; }
 
+    /// <summary>
+    /// Gets the collider's body, or <see langword="null"/> for a bodyless hit.
+    /// </summary>
     public SolidBody? Body { get; }
 
     /// <summary>
@@ -83,9 +92,18 @@ public readonly struct Physics3DHit
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool TryGetPoint(out Vector3d point) => Anchor.TryGetWorldPoint(out point);
 
+    /// <summary>
+    /// Gets the world-space surface normal.
+    /// </summary>
     public Vector3d Normal { get; }
 
+    /// <summary>
+    /// Gets the distance from the query origin to the hit.
+    /// </summary>
     public Fixed64 Distance { get; }
 
+    /// <summary>
+    /// Gets the query direction associated with the hit.
+    /// </summary>
     public Vector3d Direction { get; }
 }

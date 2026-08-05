@@ -53,16 +53,20 @@ public sealed partial class GravitasPhysics2DService
     private int _continuousCollisionPreparedToken = int.MinValue;
     private bool _continuousCollisionPreparedMixedIndex;
 
+    /// <summary>Creates the pure 2D physics service for a world context.</summary>
     public GravitasPhysics2DService(GravitasWorldContext context)
     {
         SwiftThrowHelper.ThrowIfNull(context, nameof(context));
         _context = context;
     }
 
+    /// <summary>Gets the number of registered dynamic bodies.</summary>
     public int BodyCount { get; private set; }
 
+    /// <summary>Gets the number of registered 2D colliders.</summary>
     public int ColliderCount => _colliders.Count;
 
+    /// <summary>Gets or sets whether this service advances pure 2D physics.</summary>
     public bool SimulatePhysics { get; set; } = true;
 
     internal int LastBroadPhaseCandidateCount { get; private set; }
@@ -168,6 +172,7 @@ public sealed partial class GravitasPhysics2DService
         _colliders.Remove(collider);
     }
 
+    /// <summary>Runs the authoritative pure 2D simulation phase.</summary>
     public void Simulate()
     {
         _context.EnterSimulationPhase();
@@ -184,6 +189,7 @@ public sealed partial class GravitasPhysics2DService
         }
     }
 
+    /// <summary>Completes deferred pure 2D collision, response, and bookkeeping work.</summary>
     public void LateSimulate()
     {
         _context.EnterSimulationPhase();
@@ -258,12 +264,14 @@ public sealed partial class GravitasPhysics2DService
             body.UpdateSleepStateAfterPhysicsStep();
     }
 
+    /// <summary>Publishes interpolated presentation state for registered 2D bodies.</summary>
     public void Visualize()
     {
         foreach (SolidBody2D body in _dynamicBodies)
             body.OnVisualize();
     }
 
+    /// <summary>Clears all context-local pure 2D registration and solver state.</summary>
     public void Reset()
     {
         DiscardContinuousCollisionHandoffQueue();

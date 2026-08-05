@@ -17,8 +17,10 @@ namespace Gravitas.CollisionHandling;
 /// </summary>
 public static class CollisionResponse2D
 {
+    /// <summary>Penetration tolerated before positional correction is applied.</summary>
     public static readonly Fixed64 PenetrationSlop = (Fixed64)0.01f;
 
+    /// <summary>Fraction of excess penetration corrected by the solver.</summary>
     public static readonly Fixed64 PenetrationCorrectionPercent = Fixed64.One;
 
     internal static void Resolve(CollisionPair2D pair) =>

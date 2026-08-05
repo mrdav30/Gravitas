@@ -12,6 +12,7 @@ namespace Gravitas;
 
 public partial class SolidBody
 {
+    /// <summary>Records or restores deterministic body state through Chronicler.</summary>
     public void RecordData(IChronicler chronicler)
     {
         GroundingMode groundingMode = GroundingMode;

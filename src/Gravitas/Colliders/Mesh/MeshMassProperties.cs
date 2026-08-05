@@ -15,6 +15,7 @@ namespace Gravitas.Colliders;
 /// </summary>
 public readonly struct MeshMassProperties
 {
+    /// <summary>Creates deterministic closed-volume mass properties.</summary>
     public MeshMassProperties(
         Fixed64 volume,
         Vector3d centerOfMass,

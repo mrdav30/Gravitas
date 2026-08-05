@@ -26,6 +26,7 @@ public sealed class LSCompoundCollider : LSCollider
     private readonly ExactMassPoint3D[] _massPointScratch;
     private readonly ExactMassWeight[] _massWeightScratch;
 
+    /// <summary>Creates a runtime compound collider from authored 3D parts.</summary>
     public LSCompoundCollider(params CompoundColliderPart[] parts)
     {
         SwiftThrowHelper.ThrowIfNull(parts, nameof(parts));
@@ -49,10 +50,13 @@ public sealed class LSCompoundCollider : LSCollider
         }
     }
 
+    /// <inheritdoc/>
     public override ColliderType Shape => ColliderType.Compound;
 
+    /// <inheritdoc/>
     public override int Priority => ColliderSettings.GetPriority(Shape);
 
+    /// <inheritdoc/>
     public override Fixed64 ScaledRadius
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -62,14 +66,17 @@ public sealed class LSCompoundCollider : LSCollider
                 .GetCurrentCenteredProxyRadius(this);
     }
 
+    /// <summary>Gets the authored parts in stable source order.</summary>
     public ReadOnlySpan<CompoundColliderPart> Parts => _parts;
 
+    /// <summary>Gets the number of authored compound parts.</summary>
     public int PartCount
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get => _parts.Length;
     }
 
+    /// <summary>Gets the stable runtime part identifier for a source-order index.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public int GetPartId(int index)
     {
@@ -308,6 +315,7 @@ public sealed class LSCompoundCollider : LSCollider
         return representable;
     }
 
+    /// <inheritdoc/>
     public override Fixed64 GetFrontalArea(Vector3d direction)
     {
         Fixed64 area = Fixed64.Zero;
@@ -316,6 +324,7 @@ public sealed class LSCompoundCollider : LSCollider
         return area;
     }
 
+    /// <inheritdoc/>
     public override Vector3d ClosestPointOnSurface(Vector3d other)
     {
         FixedPointAnchor anchor =
@@ -327,6 +336,7 @@ public sealed class LSCompoundCollider : LSCollider
             "The closest compound surface point is outside the representable coordinate domain.");
     }
 
+    /// <inheritdoc/>
     public override Vector3d GetNormalAtPoint(Vector3d point)
     {
         _ = GetClosestSurfaceAnchor(
@@ -367,6 +377,7 @@ public sealed class LSCompoundCollider : LSCollider
         return closest;
     }
 
+    /// <inheritdoc/>
     public override bool ColliderOverlapsRay(RaycastSegmentWorker worker, ref SwiftList<Vector3d> outputIntersectionPoints)
     {
         bool hit = false;
@@ -387,6 +398,7 @@ public sealed class LSCompoundCollider : LSCollider
         return collider;
     }
 
+    /// <inheritdoc/>
     protected override void OnMaterialChanged()
     {
         for (int i = 0; i < _parts.Length; i++)

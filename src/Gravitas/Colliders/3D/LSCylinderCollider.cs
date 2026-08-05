@@ -13,6 +13,7 @@ using System;
 
 namespace Gravitas.Colliders;
 
+/// <summary>Represents a finite runtime 3D cylinder whose local axis follows Y.</summary>
 public sealed class LSCylinderCollider : LSCollider
 {
     private Fixed64 _scaledRadius = Fixed64.Half;
@@ -21,8 +22,10 @@ public sealed class LSCylinderCollider : LSCollider
     private Vector3d _preparedAxis;
     private Fixed64 _preparedArea;
 
+    /// <summary>Creates a cylinder collider with default dimensions.</summary>
     public LSCylinderCollider() { }
 
+    /// <summary>Creates a runtime cylinder from an authored shape definition.</summary>
     public LSCylinderCollider(ColliderShapeDefinition definition)
     {
         definition.EnsureKind(ColliderShapeDefinitionKind.Cylinder);
@@ -31,9 +34,12 @@ public sealed class LSCylinderCollider : LSCollider
         Size = definition.Size;
     }
 
+    /// <inheritdoc/>
     public override ColliderType Shape => ColliderType.Cylinder;
+    /// <inheritdoc/>
     public override int Priority => ColliderSettings.GetPriority(Shape);
 
+    /// <inheritdoc/>
     public override Fixed64 ScaledRadius => _scaledRadius;
 
     /// <summary>
@@ -47,12 +53,14 @@ public sealed class LSCylinderCollider : LSCollider
     /// </summary>
     public Vector3d WorldAxis { get; private set; } = Vector3d.Up;
 
+    /// <inheritdoc/>
     protected override void OnRadiusChanged()
     {
         Fixed64 diameter = _radius * 2;
         _size = new Vector3d(diameter, _size.Y, diameter);
     }
 
+    /// <inheritdoc/>
     protected override Vector3d NormalizeSize(Vector3d value) =>
         new(_radius * 2, value.Y, _radius * 2);
 
@@ -85,11 +93,13 @@ public sealed class LSCylinderCollider : LSCollider
         return tensor;
     }
 
+    /// <inheritdoc/>
     public override bool ColliderOverlapsRay(RaycastSegmentWorker worker, ref SwiftList<Vector3d> outputIntersectionPoints)
     {
         return worker.CheckCylinderOverlaps(this, ref outputIntersectionPoints);
     }
 
+    /// <inheritdoc/>
     public override Vector3d ClosestPointOnSurface(Vector3d other)
     {
         FixedPointAnchor surfaceAnchor =
@@ -103,6 +113,7 @@ public sealed class LSCylinderCollider : LSCollider
         return surfacePoint;
     }
 
+    /// <inheritdoc/>
     public override Vector3d GetNormalAtPoint(Vector3d point)
     {
         _ = GetClosestSurfaceAnchor(
@@ -160,6 +171,7 @@ public sealed class LSCylinderCollider : LSCollider
         Area = _preparedArea;
     }
 
+    /// <inheritdoc/>
     public override Fixed64 GetFrontalArea(Vector3d direction)
     {
         Fixed64 directionMagnitude = direction.Magnitude;

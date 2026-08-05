@@ -13,11 +13,18 @@ namespace Gravitas.Colliders;
 /// </summary>
 public enum ColliderShapeDefinitionKind
 {
+    /// <summary>No authored shape.</summary>
     Undefined = 0,
+    /// <summary>An authored sphere.</summary>
     Sphere = 1,
+    /// <summary>An authored capsule.</summary>
     Capsule = 2,
+    /// <summary>An authored cuboid.</summary>
     Cuboid = 3,
+    /// <summary>An authored finite cylinder.</summary>
     Cylinder = 4,
+    /// <summary>An authored finite cone.</summary>
     Cone = 5,
+    /// <summary>An authored convex triangle mesh.</summary>
     ConvexMesh = 6
 }

@@ -12,6 +12,9 @@ namespace Gravitas.Queries;
 /// </summary>
 public readonly struct PhysicsQueryHitRange
 {
+    /// <summary>
+    /// Creates a range within a shared batch hit buffer.
+    /// </summary>
     public PhysicsQueryHitRange(int start, int count)
     {
         Start = start;

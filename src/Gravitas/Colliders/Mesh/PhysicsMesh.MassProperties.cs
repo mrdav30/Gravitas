@@ -27,6 +27,7 @@ public partial class PhysicsMesh
 
     internal int ClosedVolumeScaleEvaluationCount { get; private set; }
 
+    /// <summary>Calculates closed-volume mesh inertia for the supplied mass.</summary>
     public Fixed3x3 CalculateInertiaTensor(Fixed64 mass) =>
         CalculateInertiaTensor(mass, MeshInertiaPolicy.RequireClosedVolume);
 

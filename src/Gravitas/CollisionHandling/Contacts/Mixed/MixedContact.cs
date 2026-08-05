@@ -18,6 +18,7 @@ namespace Gravitas.CollisionHandling;
 /// </summary>
 public readonly struct MixedContact
 {
+    /// <summary>Creates a mixed contact from world-space witness points.</summary>
     public MixedContact(
         Vector3d point3D,
         Vector3d point2D,
@@ -122,19 +123,26 @@ public readonly struct MixedContact
         HasContact = true;
     }
 
+    /// <summary>Gets whether this value contains a valid mixed contact.</summary>
     public bool HasContact { get; }
 
+    /// <summary>Gets the authoritative contact anchor on the 3D collider.</summary>
     public ContactAnchor Anchor3D { get; }
 
+    /// <summary>Gets the authoritative contact anchor on the embedded 2D collider.</summary>
     public ContactAnchor Anchor2D { get; }
 
+    /// <summary>Gets the world-space witness point on the 3D collider.</summary>
     public Vector3d Point3D => GetRequiredWorldPoint(Anchor3D, nameof(Point3D));
 
+    /// <summary>Gets the world-space witness point on the embedded 2D collider.</summary>
     public Vector3d Point2D => GetRequiredWorldPoint(Anchor2D, nameof(Point2D));
 
+    /// <summary>Attempts to resolve the 3D anchor to a world-space point.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool TryGetPoint3D(out Vector3d point) => Anchor3D.TryGetWorldPoint(out point);
 
+    /// <summary>Attempts to resolve the embedded 2D anchor to a world-space point.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool TryGetPoint2D(out Vector3d point) => Anchor2D.TryGetWorldPoint(out point);
 
@@ -182,6 +190,7 @@ public readonly struct MixedContact
     /// </summary>
     public Vector3d Normal3DTo2D { get; }
 
+    /// <summary>Gets the penetration depth along <see cref="Normal3DTo2D"/>.</summary>
     public Fixed64 Depth { get; }
 
     /// <summary>
@@ -190,10 +199,13 @@ public readonly struct MixedContact
     /// </summary>
     public bool DepthIsClamped { get; }
 
+    /// <summary>Gets whether the contact carries per-feature material values.</summary>
     public bool HasMaterialOverride { get; }
 
+    /// <summary>Gets the material sampled from the 3D contact feature.</summary>
     public PhysicsMaterial Material3D { get; }
 
+    /// <summary>Gets the material sampled from the embedded 2D contact feature.</summary>
     public PhysicsMaterial Material2D { get; }
 
     internal MixedContact WithMaterialOverride(PhysicsMaterial material3D, PhysicsMaterial material2D) =>

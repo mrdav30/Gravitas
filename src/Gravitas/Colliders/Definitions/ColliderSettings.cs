@@ -9,8 +9,10 @@ using System.Runtime.CompilerServices;
 
 namespace Gravitas.Colliders;
 
+/// <summary>Provides deterministic priority and collision-dispatch metadata for 3D collider shapes.</summary>
 public static class ColliderSettings
 {
+    /// <summary>Gets the narrow-phase priority used to order 3D colliders before dispatch.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int GetPriority(ColliderType type) =>
         type switch
@@ -26,6 +28,7 @@ public static class ColliderSettings
             _ => -1
         };
 
+    /// <summary>Resolves the narrow-phase collision type for an ordered pair of 3D collider shapes.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static CollisionType GetCollisionType(ColliderType type1, ColliderType type2) =>
         (type1, type2) switch

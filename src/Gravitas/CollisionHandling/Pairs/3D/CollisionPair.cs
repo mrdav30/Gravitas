@@ -22,38 +22,52 @@ internal enum CollisionResponseDispatchMode
 }
 
 /// <summary>
-/// Handles collision pairs between various types of colliders using the Separating Axis Theorem and maintains related state information.
+/// Owns deterministic 3D pair lifecycle, culling, contact, and notification state.
 /// </summary>
 public partial class CollisionPair
 {
+    /// <summary>Stores the host-controlled pair diagnostic flag.</summary>
     public bool Debug = true;
 
+    /// <summary>Gets whether this pooled pair currently represents two registered colliders.</summary>
     public bool Active { get; private set; }
 
     private bool _isPooledForDeactivation;
 
+    /// <summary>Gets the world context that owns this pair.</summary>
     public GravitasWorldContext Context { get; private set; } = null!;
 
+    /// <summary>Gets the GridForge world owned by <see cref="Context"/>.</summary>
     public GridWorld World => Context.World;
 
     // stores order in which they come in
+    /// <summary>Gets the first collider ID used to identify the pair.</summary>
     public int Id1 { get; private set; }
+    /// <summary>Gets the second collider ID used to identify the pair.</summary>
     public int Id2 { get; private set; }
 
+    /// <summary>Gets the collider selected to lead narrow-phase dispatch.</summary>
     public LSCollider ColliderA { get; private set; } = null!;
+    /// <summary>Gets the other collider in the pair.</summary>
     public LSCollider ColliderB { get; private set; } = null!;
 
+    /// <summary>Tracks the collision-service partition pass that last processed this pair.</summary>
     public uint PartitionVersion;
+    /// <summary>Tracks reuse of this pooled pair instance.</summary>
     public ushort PairVersion = 1;
 
+    /// <summary>Gets the last simulation frame in which this pair was updated.</summary>
     public int LastFrame { get; private set; }
+    /// <summary>Gets the last simulation frame in which this pair had contact.</summary>
     public int LastCollidedFrame { get; private set; }
 
     private Fixed64 _fastCollideDistance;
     private Fixed64 _fastDistance;
+    /// <summary>Gets the narrow-phase dispatch type for this collider combination.</summary>
     public CollisionType CollisionType { get; private set; }
     private bool _doPhysics = true;
 
+    /// <summary>Gets the remaining deferred updates before this pair is checked again.</summary>
     public short CullCounter { get; private set; }
     private bool _preventDistanceCull;
     private Fixed64 _fastDistanceOffset;
@@ -74,6 +88,7 @@ public partial class CollisionPair
 
     internal long LifetimeVersion => _lifetimeVersion;
 
+    /// <summary>Gets the deterministic contact manifold owned by this pair.</summary>
     public ContactManifold Manifold { get; } = new();
 
     private ContactWarmStartCache _warmStart;
@@ -125,6 +140,7 @@ public partial class CollisionPair
         Active = true;
     }
 
+    /// <summary>Orders the colliders for stable narrow-phase dispatch.</summary>
     public void AssignPriority(LSCollider c1, LSCollider c2)
     {
         if (ShouldFirstColliderLead(c1, c2))
@@ -252,6 +268,7 @@ public partial class CollisionPair
             bodyB.Wake();
     }
 
+    /// <summary>Raises contact or separation notifications for the current pair state.</summary>
     public void NotifyCollidersOfContact()
     {
         bool isColliding = _isColliding;
@@ -549,6 +566,7 @@ public partial class CollisionPair
         return Math.Max(1, step);
     }
 
+    /// <summary>Clears transient contact and notification state before reuse.</summary>
     public void Reset()
     {
         Manifold.Reset();

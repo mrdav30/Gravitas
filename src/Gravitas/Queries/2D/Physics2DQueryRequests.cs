@@ -16,6 +16,9 @@ namespace Gravitas.Queries;
 /// </summary>
 public readonly struct PhysicsRaycast2DRequest
 {
+    /// <summary>
+    /// Creates a pure 2D segment raycast request with an include layer mask.
+    /// </summary>
     public PhysicsRaycast2DRequest(Vector2d start, Vector2d end, PhysicsLayerMask layerMask)
     {
         Start = start;
@@ -23,15 +26,27 @@ public readonly struct PhysicsRaycast2DRequest
         LayerMask = layerMask;
     }
 
+    /// <summary>
+    /// Creates a pure 2D segment raycast request against all physics layers.
+    /// </summary>
     public PhysicsRaycast2DRequest(Vector2d start, Vector2d end)
         : this(start, end, PhysicsLayerMask.All)
     {
     }
 
+    /// <summary>
+    /// Gets the segment start in the X/Z plane.
+    /// </summary>
     public Vector2d Start { get; }
 
+    /// <summary>
+    /// Gets the segment end in the X/Z plane.
+    /// </summary>
     public Vector2d End { get; }
 
+    /// <summary>
+    /// Gets the included physics layers.
+    /// </summary>
     public PhysicsLayerMask LayerMask { get; }
 }
 
@@ -40,6 +55,9 @@ public readonly struct PhysicsRaycast2DRequest
 /// </summary>
 public readonly struct PhysicsOverlapCircle2DRequest
 {
+    /// <summary>
+    /// Creates a pure 2D circle-overlap request with an include layer mask.
+    /// </summary>
     public PhysicsOverlapCircle2DRequest(Vector2d center, Fixed64 radius, PhysicsLayerMask layerMask)
     {
         Center = center;
@@ -47,15 +65,27 @@ public readonly struct PhysicsOverlapCircle2DRequest
         LayerMask = layerMask;
     }
 
+    /// <summary>
+    /// Creates a pure 2D circle-overlap request against all physics layers.
+    /// </summary>
     public PhysicsOverlapCircle2DRequest(Vector2d center, Fixed64 radius)
         : this(center, radius, PhysicsLayerMask.All)
     {
     }
 
+    /// <summary>
+    /// Gets the circle center in the X/Z plane.
+    /// </summary>
     public Vector2d Center { get; }
 
+    /// <summary>
+    /// Gets the circle radius.
+    /// </summary>
     public Fixed64 Radius { get; }
 
+    /// <summary>
+    /// Gets the included physics layers.
+    /// </summary>
     public PhysicsLayerMask LayerMask { get; }
 }
 
@@ -64,6 +94,9 @@ public readonly struct PhysicsOverlapCircle2DRequest
 /// </summary>
 public readonly struct PhysicsOverlapAabb2DRequest
 {
+    /// <summary>
+    /// Creates a pure 2D axis-aligned box-overlap request with an include layer mask.
+    /// </summary>
     public PhysicsOverlapAabb2DRequest(Vector2d center, Vector2d size, PhysicsLayerMask layerMask)
     {
         Center = center;
@@ -71,15 +104,27 @@ public readonly struct PhysicsOverlapAabb2DRequest
         LayerMask = layerMask;
     }
 
+    /// <summary>
+    /// Creates a pure 2D axis-aligned box-overlap request against all physics layers.
+    /// </summary>
     public PhysicsOverlapAabb2DRequest(Vector2d center, Vector2d size)
         : this(center, size, PhysicsLayerMask.All)
     {
     }
 
+    /// <summary>
+    /// Gets the box center in the X/Z plane.
+    /// </summary>
     public Vector2d Center { get; }
 
+    /// <summary>
+    /// Gets the full box size in the X/Z plane.
+    /// </summary>
     public Vector2d Size { get; }
 
+    /// <summary>
+    /// Gets the included physics layers.
+    /// </summary>
     public PhysicsLayerMask LayerMask { get; }
 }
 
@@ -88,6 +133,9 @@ public readonly struct PhysicsOverlapAabb2DRequest
 /// </summary>
 public readonly struct PhysicsOverlapPolygon2DRequest
 {
+    /// <summary>
+    /// Creates a pure 2D convex-polygon overlap request with an include layer mask.
+    /// </summary>
     public PhysicsOverlapPolygon2DRequest(int vertexStart, int vertexCount, PhysicsLayerMask layerMask)
     {
         VertexStart = vertexStart;
@@ -95,15 +143,27 @@ public readonly struct PhysicsOverlapPolygon2DRequest
         LayerMask = layerMask;
     }
 
+    /// <summary>
+    /// Creates a pure 2D convex-polygon overlap request against all physics layers.
+    /// </summary>
     public PhysicsOverlapPolygon2DRequest(int vertexStart, int vertexCount)
         : this(vertexStart, vertexCount, PhysicsLayerMask.All)
     {
     }
 
+    /// <summary>
+    /// Gets the first polygon vertex index in the batch's shared vertex buffer.
+    /// </summary>
     public int VertexStart { get; }
 
+    /// <summary>
+    /// Gets the number of polygon vertices in the shared vertex buffer.
+    /// </summary>
     public int VertexCount { get; }
 
+    /// <summary>
+    /// Gets the included physics layers.
+    /// </summary>
     public PhysicsLayerMask LayerMask { get; }
 }
 
@@ -112,6 +172,9 @@ public readonly struct PhysicsOverlapPolygon2DRequest
 /// </summary>
 public readonly struct PhysicsSweepCircle2DRequest
 {
+    /// <summary>
+    /// Creates a pure 2D swept-circle request.
+    /// </summary>
     public PhysicsSweepCircle2DRequest(
         Vector2d start,
         Vector2d end,
@@ -128,20 +191,41 @@ public readonly struct PhysicsSweepCircle2DRequest
         IncludeTriggers = includeTriggers;
     }
 
+    /// <summary>
+    /// Creates a pure 2D swept-circle request against all physics layers.
+    /// </summary>
     public PhysicsSweepCircle2DRequest(Vector2d start, Vector2d end, Fixed64 radius)
         : this(start, end, radius, PhysicsLayerMask.All)
     {
     }
 
+    /// <summary>
+    /// Gets the swept-circle center's start in the X/Z plane.
+    /// </summary>
     public Vector2d Start { get; }
 
+    /// <summary>
+    /// Gets the swept-circle center's end in the X/Z plane.
+    /// </summary>
     public Vector2d End { get; }
 
+    /// <summary>
+    /// Gets the swept circle radius.
+    /// </summary>
     public Fixed64 Radius { get; }
 
+    /// <summary>
+    /// Gets the included physics layers.
+    /// </summary>
     public PhysicsLayerMask LayerMask { get; }
 
+    /// <summary>
+    /// Gets the collider omitted from candidate results, if any.
+    /// </summary>
     public LSCollider2D? ExcludedCollider { get; }
 
+    /// <summary>
+    /// Gets whether trigger colliders are included.
+    /// </summary>
     public bool IncludeTriggers { get; }
 }

@@ -26,6 +26,7 @@ public sealed class LSCompoundCollider2D : LSCollider2D
     private readonly ExactMassWeight[] _massWeightScratch;
     private readonly ContactManifold2D _partManifoldScratch = new();
 
+    /// <summary>Creates a runtime compound collider from authored pure 2D parts.</summary>
     public LSCompoundCollider2D(params CompoundColliderPart2D[] parts)
     {
         SwiftThrowHelper.ThrowIfNull(parts, nameof(parts));
@@ -46,8 +47,10 @@ public sealed class LSCompoundCollider2D : LSCollider2D
         }
     }
 
+    /// <inheritdoc/>
     public override ColliderType2D Shape => ColliderType2D.Compound;
 
+    /// <inheritdoc/>
     public override int Priority => ColliderSettings2D.GetPriority(Shape);
 
     /// <summary>
@@ -65,14 +68,17 @@ public sealed class LSCompoundCollider2D : LSCollider2D
         }
     }
 
+    /// <summary>Gets the authored parts in stable source order.</summary>
     public ReadOnlySpan<CompoundColliderPart2D> Parts => _parts;
 
+    /// <summary>Gets the number of authored compound parts.</summary>
     public int PartCount
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get => _parts.Length;
     }
 
+    /// <summary>Gets the stable runtime part identifier for a source-order index.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public int GetPartId(int index)
     {
@@ -89,6 +95,7 @@ public sealed class LSCompoundCollider2D : LSCollider2D
 
     internal ContactManifold2D PartManifoldScratch => _partManifoldScratch;
 
+    /// <inheritdoc/>
     public override bool ContainsPoint(Vector2d point)
     {
         for (int i = 0; i < _partColliders.Length; i++)
@@ -100,6 +107,7 @@ public sealed class LSCompoundCollider2D : LSCollider2D
         return false;
     }
 
+    /// <inheritdoc/>
     public override Vector2d GetClosestPoint(Vector2d point)
     {
         _ = TryGetClosestBoundaryAnchor(
@@ -114,6 +122,7 @@ public sealed class LSCompoundCollider2D : LSCollider2D
             "The closest compound surface point is outside the Fixed64 coordinate domain.");
     }
 
+    /// <inheritdoc/>
     public override Vector2d GetSupportPoint(Vector2d direction)
     {
         Vector2d bestPoint = _partColliders[0].GetSupportPoint(direction);
@@ -315,6 +324,7 @@ public sealed class LSCompoundCollider2D : LSCollider2D
         return collider;
     }
 
+    /// <inheritdoc/>
     protected override void OnMaterialChanged()
     {
         for (int i = 0; i < _parts.Length; i++)

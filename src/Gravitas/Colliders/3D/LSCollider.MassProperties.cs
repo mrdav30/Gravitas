@@ -13,7 +13,7 @@ namespace Gravitas.Colliders;
 
 public abstract partial class LSCollider
 {
-    // Default to total area for shapes where frontal area doesn't make sense.
+    /// <summary>Gets the frontal-area estimate for a world-space direction; the base implementation returns <see cref="Area"/>.</summary>
     public virtual Fixed64 GetFrontalArea(Vector3d direction) => Area;
 
     /// <summary>
@@ -49,6 +49,7 @@ public abstract partial class LSCollider
 
     internal virtual bool SupportsMassProperties => true;
 
+    /// <summary>Calculates inertia for a mass about a body-local reference point.</summary>
     public virtual Fixed3x3 CalculateInertiaTensor(
         Fixed64 mass,
         Vector3d localCenterOfMassOffset)

@@ -13,8 +13,14 @@ using System.Runtime.CompilerServices;
 
 namespace Gravitas;
 
+/// <summary>
+/// Stores context-local configuration for deterministic physics simulation.
+/// </summary>
 public sealed partial class PhysicsSettings
 {
+    /// <summary>
+    /// Default fixed-step frame rate in simulation frames per second.
+    /// </summary>
     public const int DefaultFrameRate = 32;
 
     /// <summary>
@@ -27,29 +33,66 @@ public sealed partial class PhysicsSettings
     /// </remarks>
     public const int MaxResolvableFrameRate = (int)(FixedMath.ONE_L / (FixedMath.DEFAULT_TOLERANCE_L + 1));
 
+    /// <summary>
+    /// Maximum number of physics layers represented by a layer mask.
+    /// </summary>
     public const int MaxLayers = 32;
 
+    /// <summary>
+    /// Default number of frames an empty partition remains retained for reuse.
+    /// </summary>
     public const int DefaultRetainedPartitionTimeToKillFrames = DefaultFrameRate * 10;
 
+    /// <summary>
+    /// Default maximum number of retained partitions checked per retirement sweep.
+    /// </summary>
     public const int DefaultRetainedPartitionRetirementSweepBudget = 64;
 
+    /// <summary>
+    /// Default maximum same-frame time-of-impact iterations for continuous collision.
+    /// </summary>
     public const int DefaultContinuousCollisionMaxToiIterations = 4;
 
+    /// <summary>
+    /// Default projected-impulse iteration count for discrete 3D constraint islands.
+    /// </summary>
     public const int DefaultDiscreteSolverIterations = 6;
 
+    /// <summary>
+    /// Default closing-speed threshold below which restitution is disabled.
+    /// </summary>
     public static readonly Fixed64 DefaultRestitutionVelocityThreshold = (Fixed64)0.25f;
 
+    /// <summary>
+    /// Default Y-axis half-thickness for 2D colliders embedded in mixed queries and contacts.
+    /// </summary>
     public static readonly Fixed64 DefaultMixed2DHalfThickness = Fixed64.Half;
 
+    /// <summary>
+    /// Default include mask used for ground and support checks.
+    /// </summary>
     public static readonly PhysicsLayerMask DefaultGroundCheckLayerMask = PhysicsLayerMask.FromLayer(new PhysicsLayer(0));
 
+    /// <summary>
+    /// Gets the fixed-step frame rate in simulation frames per second.
+    /// </summary>
     public int FrameRate { get; private set; }
 
     private readonly bool[,] _collisionMatrix;
+
+    /// <summary>
+    /// Gets the layer-to-layer physical collision enablement matrix.
+    /// </summary>
     public bool[,] CollisionMatrix => _collisionMatrix;
 
+    /// <summary>
+    /// Gets or sets whether reusable runtime collision objects are pooled.
+    /// </summary>
     public bool PoolingEnabled { get; set; } = true;
 
+    /// <summary>
+    /// Gets or sets the include mask used for ground and support checks.
+    /// </summary>
     public PhysicsLayerMask GroundCheckLayerMask { get; set; }
 
     private int _retainedPartitionTimeToKillFrames = DefaultRetainedPartitionTimeToKillFrames;
@@ -182,6 +225,9 @@ public sealed partial class PhysicsSettings
         }
     }
 
+    /// <summary>
+    /// Creates physics settings, using registered-layer defaults for omitted values.
+    /// </summary>
     public PhysicsSettings(
         int? frameRate,
         bool[,]? collisionMatrix,
@@ -192,6 +238,9 @@ public sealed partial class PhysicsSettings
         GroundCheckLayerMask = groundCheckLayerMask ?? DefaultGroundCheckLayerMask;
     }
 
+    /// <summary>
+    /// Sets the fixed-step frame rate after validating its representable range.
+    /// </summary>
     public void SetFrameRate(int frameRate)
     {
         ThrowIfInvalidFrameRate(frameRate);
@@ -210,12 +259,18 @@ public sealed partial class PhysicsSettings
         }
     }
 
+    /// <summary>
+    /// Creates settings with default values and the currently registered layer matrix.
+    /// </summary>
     public static PhysicsSettings DefaultSettings()
     {
         bool[,] collisionMatrix = GetRegisteredCollisionMatrix();
         return new PhysicsSettings(DefaultFrameRate, collisionMatrix);
     }
 
+    /// <summary>
+    /// Creates a fully enabled square collision matrix sized to the registered layer names.
+    /// </summary>
     public static bool[,] GetRegisteredCollisionMatrix()
     {
         SwiftList<string> layersList = new();

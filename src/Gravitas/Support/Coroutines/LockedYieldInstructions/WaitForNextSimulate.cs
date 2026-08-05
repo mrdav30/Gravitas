@@ -15,6 +15,9 @@ public readonly struct WaitForNextSimulate : ILockedYieldInstruction
     private readonly GravitasWorldContext _context;
     private readonly int _checkedInFrameCount;
 
+    /// <summary>
+    /// Creates an instruction that waits until the context advances to another simulation frame.
+    /// </summary>
     public WaitForNextSimulate(GravitasWorldContext context)
     {
         SwiftThrowHelper.ThrowIfNull(context, nameof(context));
@@ -26,14 +29,19 @@ public readonly struct WaitForNextSimulate : ILockedYieldInstruction
     /// <inheritdoc />
     public GravitasWorldContext Context => _context;
 
+    /// <inheritdoc />
     public bool KeepWaiting =>
          _context.FrameCount == _checkedInFrameCount;
 
+    /// <inheritdoc />
     public object? Current => null;
 
+    /// <inheritdoc />
     public bool MoveNext() => KeepWaiting;
 
+    /// <inheritdoc />
     public void Reset() { }
 
+    /// <inheritdoc />
     public void Dispose() { }
 }

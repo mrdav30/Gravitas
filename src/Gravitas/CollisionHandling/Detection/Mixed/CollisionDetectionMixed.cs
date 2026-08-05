@@ -18,6 +18,7 @@ namespace Gravitas.CollisionHandling;
 /// </summary>
 public static partial class CollisionDetectionMixed
 {
+    /// <summary>Tests a 3D collider against an embedded 2D collider.</summary>
     public static bool TryCollide(LSCollider collider3D, LSCollider2D collider2D, out MixedContact contact)
     {
         SwiftThrowHelper.ThrowIfNull(collider3D, nameof(collider3D));

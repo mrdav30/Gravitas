@@ -13,14 +13,17 @@ using System;
 
 namespace Gravitas.Colliders;
 
+/// <summary>Represents a runtime 3D cuboid collider.</summary>
 public sealed class LSCuboidCollider : LSCollider
 {
     private FixedOrientedBox _orientedBox;
     private FixedOrientedBox _preparedOrientedBox;
     private Fixed64 _preparedArea;
 
+    /// <inheritdoc/>
     public override ColliderType Shape => Rotation == FixedQuaternion.Identity ? ColliderType.AABox : ColliderType.OBBox;
 
+    /// <inheritdoc/>
     public override int Priority => ColliderSettings.GetPriority(Shape);
 
     /// <summary>
@@ -28,6 +31,7 @@ public sealed class LSCuboidCollider : LSCollider
     /// </summary>
     public FixedOrientedBox OrientedBox => _orientedBox;
 
+    /// <inheritdoc/>
     public override Fixed64 ScaledRadius =>
         HasCommittedShape
             ? CanonicalCenteredProxyRadius
@@ -69,8 +73,10 @@ public sealed class LSCuboidCollider : LSCollider
             (Fixed64)8);
     }
 
+    /// <summary>Creates a cuboid collider with default dimensions.</summary>
     public LSCuboidCollider() { }
 
+    /// <summary>Creates a runtime cuboid from an authored shape definition.</summary>
     public LSCuboidCollider(ColliderShapeDefinition definition)
         : this()
     {
@@ -118,6 +124,7 @@ public sealed class LSCuboidCollider : LSCollider
         return tensor;
     }
 
+    /// <inheritdoc/>
     public override Fixed64 GetFrontalArea(Vector3d direction)
     {
         if (direction.MagnitudeSquared <= Fixed64.Epsilon)
@@ -137,6 +144,7 @@ public sealed class LSCuboidCollider : LSCollider
             + GetProjectedFaceArea(halfExtents.X, halfExtents.Y, dotZ);
     }
 
+    /// <inheritdoc/>
     public override Vector3d ClosestPointOnSurface(Vector3d other)
     {
         FixedPointAnchor anchor =
@@ -148,6 +156,7 @@ public sealed class LSCuboidCollider : LSCollider
             "The selected cuboid surface point is outside the representable coordinate domain.");
     }
 
+    /// <inheritdoc/>
     public override Vector3d GetNormalAtPoint(Vector3d point) =>
         _orientedBox.GetNearestFaceNormal(point);
 
@@ -206,6 +215,7 @@ public sealed class LSCuboidCollider : LSCollider
             ? product
             : Fixed64.MaxValue;
 
+    /// <inheritdoc/>
     public override bool ColliderOverlapsRay(RaycastSegmentWorker worker, ref SwiftList<Vector3d> outputIntersectionPoints)
     {
         if (Shape == ColliderType.AABox)

@@ -17,18 +17,22 @@ namespace Gravitas.Colliders;
 /// </summary>
 public readonly struct CompoundColliderPart
 {
+    /// <summary>Creates a part from an authored 3D shape.</summary>
     public CompoundColliderPart(ColliderShapeDefinition shape)
         : this(shape, Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One, null)
     { }
 
+    /// <summary>Creates a part with a compound-local offset.</summary>
     public CompoundColliderPart(ColliderShapeDefinition shape, Vector3d localOffset)
         : this(shape, localOffset, FixedQuaternion.Identity, Vector3d.One, null)
     { }
 
+    /// <summary>Creates a part with a compound-local pose.</summary>
     public CompoundColliderPart(ColliderShapeDefinition shape, Vector3d localOffset, FixedQuaternion localRotation)
         : this(shape, localOffset, localRotation, Vector3d.One, null)
     { }
 
+    /// <summary>Creates a part with a compound-local transform and optional material override.</summary>
     public CompoundColliderPart(
         ColliderShapeDefinition shape,
         Vector3d localOffset,
@@ -88,15 +92,18 @@ public readonly struct CompoundColliderPart
         get => _hasMaterial || Shape.HasMaterial;
     }
 
+    /// <summary>Creates a sphere part.</summary>
     public static CompoundColliderPart Sphere(Fixed64 radius, Vector3d localOffset) =>
         new(ColliderShapeDefinition.Sphere(radius), localOffset);
 
+    /// <summary>Creates a sphere part with a material override.</summary>
     public static CompoundColliderPart Sphere(
         Fixed64 radius,
         Vector3d localOffset,
         PhysicsMaterial material) =>
         new(ColliderShapeDefinition.Sphere(radius), localOffset, FixedQuaternion.Identity, Vector3d.One, material);
 
+    /// <summary>Creates a transformed sphere part.</summary>
     public static CompoundColliderPart Sphere(
         Fixed64 radius,
         Vector3d localOffset,
@@ -104,9 +111,11 @@ public readonly struct CompoundColliderPart
         Vector3d localScale) =>
         new(ColliderShapeDefinition.Sphere(radius), localOffset, localRotation, localScale);
 
+    /// <summary>Creates a capsule part.</summary>
     public static CompoundColliderPart Capsule(Fixed64 radius, Fixed64 height, Vector3d localOffset) =>
         new(ColliderShapeDefinition.Capsule(radius, height), localOffset);
 
+    /// <summary>Creates a capsule part with a material override.</summary>
     public static CompoundColliderPart Capsule(
         Fixed64 radius,
         Fixed64 height,
@@ -114,6 +123,7 @@ public readonly struct CompoundColliderPart
         PhysicsMaterial material) =>
         new(ColliderShapeDefinition.Capsule(radius, height), localOffset, FixedQuaternion.Identity, Vector3d.One, material);
 
+    /// <summary>Creates a transformed capsule part.</summary>
     public static CompoundColliderPart Capsule(
         Fixed64 radius,
         Fixed64 height,
@@ -122,15 +132,18 @@ public readonly struct CompoundColliderPart
         Vector3d localScale) =>
         new(ColliderShapeDefinition.Capsule(radius, height), localOffset, localRotation, localScale);
 
+    /// <summary>Creates a cuboid part.</summary>
     public static CompoundColliderPart Cuboid(Vector3d size, Vector3d localOffset) =>
         new(ColliderShapeDefinition.Cuboid(size), localOffset);
 
+    /// <summary>Creates a cuboid part with a material override.</summary>
     public static CompoundColliderPart Cuboid(
         Vector3d size,
         Vector3d localOffset,
         PhysicsMaterial material) =>
         new(ColliderShapeDefinition.Cuboid(size), localOffset, FixedQuaternion.Identity, Vector3d.One, material);
 
+    /// <summary>Creates a transformed cuboid part.</summary>
     public static CompoundColliderPart Cuboid(
         Vector3d size,
         Vector3d localOffset,
@@ -138,9 +151,11 @@ public readonly struct CompoundColliderPart
         Vector3d localScale) =>
         new(ColliderShapeDefinition.Cuboid(size), localOffset, localRotation, localScale);
 
+    /// <summary>Creates a cylinder part.</summary>
     public static CompoundColliderPart Cylinder(Fixed64 radius, Fixed64 height, Vector3d localOffset) =>
         new(ColliderShapeDefinition.Cylinder(radius, height), localOffset);
 
+    /// <summary>Creates a cylinder part with a material override.</summary>
     public static CompoundColliderPart Cylinder(
         Fixed64 radius,
         Fixed64 height,
@@ -148,6 +163,7 @@ public readonly struct CompoundColliderPart
         PhysicsMaterial material) =>
         new(ColliderShapeDefinition.Cylinder(radius, height), localOffset, FixedQuaternion.Identity, Vector3d.One, material);
 
+    /// <summary>Creates a transformed cylinder part.</summary>
     public static CompoundColliderPart Cylinder(
         Fixed64 radius,
         Fixed64 height,
@@ -156,9 +172,11 @@ public readonly struct CompoundColliderPart
         Vector3d localScale) =>
         new(ColliderShapeDefinition.Cylinder(radius, height), localOffset, localRotation, localScale);
 
+    /// <summary>Creates a cone part.</summary>
     public static CompoundColliderPart Cone(Fixed64 radius, Fixed64 height, Vector3d localOffset) =>
         new(ColliderShapeDefinition.Cone(radius, height), localOffset);
 
+    /// <summary>Creates a cone part with a material override.</summary>
     public static CompoundColliderPart Cone(
         Fixed64 radius,
         Fixed64 height,
@@ -166,6 +184,7 @@ public readonly struct CompoundColliderPart
         PhysicsMaterial material) =>
         new(ColliderShapeDefinition.Cone(radius, height), localOffset, FixedQuaternion.Identity, Vector3d.One, material);
 
+    /// <summary>Creates a transformed cone part.</summary>
     public static CompoundColliderPart Cone(
         Fixed64 radius,
         Fixed64 height,
@@ -174,6 +193,7 @@ public readonly struct CompoundColliderPart
         Vector3d localScale) =>
         new(ColliderShapeDefinition.Cone(radius, height), localOffset, localRotation, localScale);
 
+    /// <summary>Creates a convex-mesh part.</summary>
     public static CompoundColliderPart ConvexMesh(
         Vector3d[] vertices,
         int[] triangles,
@@ -181,6 +201,7 @@ public readonly struct CompoundColliderPart
         MeshInertiaPolicy inertiaPolicy = MeshInertiaPolicy.RequireClosedVolume) =>
         new(ColliderShapeDefinition.ConvexMesh(vertices, triangles, inertiaPolicy), localOffset);
 
+    /// <summary>Creates a convex-mesh part with a material override.</summary>
     public static CompoundColliderPart ConvexMesh(
         Vector3d[] vertices,
         int[] triangles,
@@ -189,6 +210,7 @@ public readonly struct CompoundColliderPart
         MeshInertiaPolicy inertiaPolicy = MeshInertiaPolicy.RequireClosedVolume) =>
         new(ColliderShapeDefinition.ConvexMesh(vertices, triangles, inertiaPolicy), localOffset, FixedQuaternion.Identity, Vector3d.One, material);
 
+    /// <summary>Creates a transformed convex-mesh part.</summary>
     public static CompoundColliderPart ConvexMesh(
         Vector3d[] vertices,
         int[] triangles,

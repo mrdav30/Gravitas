@@ -191,6 +191,7 @@ public sealed partial class GravitasPhysicsService
         }
     }
 
+    /// <summary>Publishes interpolated presentation state for registered 3D bodies.</summary>
     public void Visualize()
     {
         int peak = _dynamicBodies.PeakCount;

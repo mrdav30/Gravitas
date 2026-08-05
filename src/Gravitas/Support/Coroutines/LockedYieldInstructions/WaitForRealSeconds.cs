@@ -17,6 +17,9 @@ public readonly struct WaitForRealSeconds : ILockedYieldInstruction
     private readonly GravitasWorldContext _context;
     private readonly Fixed64 _targetTime;
 
+    /// <summary>
+    /// Creates an instruction that waits for a nonnegative duration on the context's deterministic clock.
+    /// </summary>
     public WaitForRealSeconds(GravitasWorldContext context, Fixed64 seconds)
     {
         SwiftThrowHelper.ThrowIfNull(context, nameof(context));
@@ -29,13 +32,18 @@ public readonly struct WaitForRealSeconds : ILockedYieldInstruction
     /// <inheritdoc />
     public GravitasWorldContext Context => _context;
 
+    /// <inheritdoc />
     public bool KeepWaiting => _context.TotalTime < _targetTime;
 
+    /// <inheritdoc />
     public object? Current => null;
 
+    /// <inheritdoc />
     public bool MoveNext() => KeepWaiting;
 
+    /// <inheritdoc />
     public void Reset() { }
 
+    /// <inheritdoc />
     public void Dispose() { }
 }

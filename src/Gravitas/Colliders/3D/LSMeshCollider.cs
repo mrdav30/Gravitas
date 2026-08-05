@@ -15,18 +15,24 @@ using System.Runtime.CompilerServices;
 
 namespace Gravitas.Colliders;
 
+/// <summary>Represents a runtime 3D collider backed by deterministic triangle-mesh geometry.</summary>
 public sealed class LSMeshCollider : LSCollider
 {
     private readonly SwiftList<int> _triangleQueryBuffer = new();
 
+    /// <inheritdoc/>
     public override ColliderType Shape => ColliderType.Mesh;
 
+    /// <inheritdoc/>
     public override int Priority => ColliderSettings.GetPriority(Shape);
 
+    /// <inheritdoc/>
     public override Fixed64 Area => Mesh.TotalArea;
 
+    /// <summary>Gets the deterministic runtime mesh geometry.</summary>
     public PhysicsMesh Mesh { get; private set; }
 
+    /// <summary>Gets the mesh collision mode.</summary>
     public MeshColliderMode Mode => Mesh.Mode;
 
     /// <summary>
@@ -40,16 +46,19 @@ public sealed class LSMeshCollider : LSCollider
     /// </summary>
     public MeshInertiaPolicy InertiaPolicy { get; }
 
+    /// <summary>Creates a convex mesh collider from authored vertices and triangle indices.</summary>
     public LSMeshCollider(Vector3d[] vertices, int[] triangles)
         : this(vertices, triangles, MeshColliderMode.Convex, MeshInertiaPolicy.RequireClosedVolume)
     {
     }
 
+    /// <summary>Creates a mesh collider with an explicit collision mode.</summary>
     public LSMeshCollider(Vector3d[] vertices, int[] triangles, MeshColliderMode mode)
         : this(vertices, triangles, mode, MeshInertiaPolicy.RequireClosedVolume)
     {
     }
 
+    /// <summary>Creates a mesh collider with explicit collision and inertia policies.</summary>
     public LSMeshCollider(
         Vector3d[] vertices,
         int[] triangles,
@@ -66,6 +75,7 @@ public sealed class LSMeshCollider : LSCollider
         _bounds = Mesh.Bounds;
     }
 
+    /// <summary>Creates a runtime convex mesh from an authored shape definition.</summary>
     public LSMeshCollider(ColliderShapeDefinition definition)
         : this(
             GetVertices(definition),
@@ -76,6 +86,7 @@ public sealed class LSMeshCollider : LSCollider
         Material = definition.Material;
     }
 
+    /// <inheritdoc/>
     public override Fixed64 ScaledRadius
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -206,20 +217,24 @@ public sealed class LSMeshCollider : LSCollider
             center);
     }
 
+    /// <inheritdoc/>
     public override Fixed64 GetFrontalArea(Vector3d direction) =>
         Mesh.GetFrontalArea(direction);
 
+    /// <summary>Writes triangle indices near a world-space point into a caller-owned buffer.</summary>
     public void GetNearbyTriangles(Vector3d queryPoint, SwiftList<int> result)
     {
         FixedBoundVolume queryBounds = CreateQueryBounds(queryPoint, GetMeshQueryHalfExtent());
         GetTrianglesInBounds(queryBounds, result);
     }
 
+    /// <summary>Writes triangle indices overlapping world-space bounds into a caller-owned buffer.</summary>
     public void GetTrianglesInBounds(FixedBoundVolume queryBounds, SwiftList<int> result)
     {
         Mesh.GetTrianglesInWorldBounds(queryBounds, result);
     }
 
+    /// <inheritdoc/>
     public override Vector3d ClosestPointOnSurface(Vector3d queryPoint)
     {
         FixedPointAnchor closest =
@@ -494,6 +509,7 @@ public sealed class LSMeshCollider : LSCollider
         return true;
     }
 
+    /// <inheritdoc/>
     public override Vector3d GetNormalAtPoint(Vector3d point)
     {
         _ = GetClosestSurfaceAnchor(
@@ -512,6 +528,7 @@ public sealed class LSMeshCollider : LSCollider
         return true;
     }
 
+    /// <inheritdoc/>
     public override bool ColliderOverlapsRay(RaycastSegmentWorker worker, ref SwiftList<Vector3d> outputIntersectionPoints)
     {
         return worker.CheckMeshOverlaps(this, ref outputIntersectionPoints);

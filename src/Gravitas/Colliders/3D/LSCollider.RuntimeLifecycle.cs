@@ -14,6 +14,7 @@ namespace Gravitas.Colliders;
 
 public abstract partial class LSCollider
 {
+    /// <summary>Records the current bounds and partition role for broad-phase refresh checks.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void SetPreviousGridBounds() =>
         _partitionState.SetPreviousGridBounds(BoundsMin, BoundsMax, Context.Collisions.ResolvePartitionKind(this));
@@ -45,6 +46,7 @@ public abstract partial class LSCollider
         ClearParent();
     }
 
+    /// <summary>Unregisters this collider, or deactivates its owning body.</summary>
     public void Deactivate()
     {
         ThrowIfCompoundPartLifecycle(nameof(Deactivate));

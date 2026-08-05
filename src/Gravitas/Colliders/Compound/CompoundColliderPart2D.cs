@@ -17,14 +17,17 @@ namespace Gravitas.Colliders;
 /// </summary>
 public readonly struct CompoundColliderPart2D
 {
+    /// <summary>Creates a part from an authored pure 2D shape.</summary>
     public CompoundColliderPart2D(ColliderShapeDefinition2D shape)
         : this(shape, Vector2d.Zero, Fixed64.Zero, Vector2d.One, null)
     { }
 
+    /// <summary>Creates a part with a compound-local offset.</summary>
     public CompoundColliderPart2D(ColliderShapeDefinition2D shape, Vector2d localOffset)
         : this(shape, localOffset, Fixed64.Zero, Vector2d.One, null)
     { }
 
+    /// <summary>Creates a part with a compound-local pose.</summary>
     public CompoundColliderPart2D(
         ColliderShapeDefinition2D shape,
         Vector2d localOffset,
@@ -32,6 +35,7 @@ public readonly struct CompoundColliderPart2D
         : this(shape, localOffset, localRotation, Vector2d.One, null)
     { }
 
+    /// <summary>Creates a part with a compound-local transform and optional material override.</summary>
     public CompoundColliderPart2D(
         ColliderShapeDefinition2D shape,
         Vector2d localOffset,
@@ -90,15 +94,18 @@ public readonly struct CompoundColliderPart2D
         get => _hasMaterial || Shape.HasMaterial;
     }
 
+    /// <summary>Creates a circle part.</summary>
     public static CompoundColliderPart2D Circle(Fixed64 radius, Vector2d localOffset) =>
         new(ColliderShapeDefinition2D.Circle(radius), localOffset);
 
+    /// <summary>Creates a circle part with a material override.</summary>
     public static CompoundColliderPart2D Circle(
         Fixed64 radius,
         Vector2d localOffset,
         PhysicsMaterial material) =>
         new(ColliderShapeDefinition2D.Circle(radius), localOffset, Fixed64.Zero, Vector2d.One, material);
 
+    /// <summary>Creates a transformed circle part.</summary>
     public static CompoundColliderPart2D Circle(
         Fixed64 radius,
         Vector2d localOffset,
@@ -106,9 +113,11 @@ public readonly struct CompoundColliderPart2D
         Vector2d localScale) =>
         new(ColliderShapeDefinition2D.Circle(radius), localOffset, localRotation, localScale);
 
+    /// <summary>Creates a capsule part.</summary>
     public static CompoundColliderPart2D Capsule(Fixed64 radius, Fixed64 height, Vector2d localOffset) =>
         new(ColliderShapeDefinition2D.Capsule(radius, height), localOffset);
 
+    /// <summary>Creates a capsule part with a material override.</summary>
     public static CompoundColliderPart2D Capsule(
         Fixed64 radius,
         Fixed64 height,
@@ -116,6 +125,7 @@ public readonly struct CompoundColliderPart2D
         PhysicsMaterial material) =>
         new(ColliderShapeDefinition2D.Capsule(radius, height), localOffset, Fixed64.Zero, Vector2d.One, material);
 
+    /// <summary>Creates a transformed capsule part.</summary>
     public static CompoundColliderPart2D Capsule(
         Fixed64 radius,
         Fixed64 height,
@@ -124,15 +134,18 @@ public readonly struct CompoundColliderPart2D
         Vector2d localScale) =>
         new(ColliderShapeDefinition2D.Capsule(radius, height), localOffset, localRotation, localScale);
 
+    /// <summary>Creates an axis-aligned box part.</summary>
     public static CompoundColliderPart2D AABBox(Vector2d size, Vector2d localOffset) =>
         new(ColliderShapeDefinition2D.AABBox(size), localOffset);
 
+    /// <summary>Creates an axis-aligned box part with a material override.</summary>
     public static CompoundColliderPart2D AABBox(
         Vector2d size,
         Vector2d localOffset,
         PhysicsMaterial material) =>
         new(ColliderShapeDefinition2D.AABBox(size), localOffset, Fixed64.Zero, Vector2d.One, material);
 
+    /// <summary>Creates a transformed axis-aligned box part.</summary>
     public static CompoundColliderPart2D AABBox(
         Vector2d size,
         Vector2d localOffset,
@@ -140,15 +153,18 @@ public readonly struct CompoundColliderPart2D
         Vector2d localScale) =>
         new(ColliderShapeDefinition2D.AABBox(size), localOffset, localRotation, localScale);
 
+    /// <summary>Creates a convex-polygon part.</summary>
     public static CompoundColliderPart2D ConvexPolygon(Vector2d[] vertices, Vector2d localOffset) =>
         new(ColliderShapeDefinition2D.ConvexPolygon(vertices), localOffset);
 
+    /// <summary>Creates a convex-polygon part with a material override.</summary>
     public static CompoundColliderPart2D ConvexPolygon(
         Vector2d[] vertices,
         Vector2d localOffset,
         PhysicsMaterial material) =>
         new(ColliderShapeDefinition2D.ConvexPolygon(vertices), localOffset, Fixed64.Zero, Vector2d.One, material);
 
+    /// <summary>Creates a transformed convex-polygon part.</summary>
     public static CompoundColliderPart2D ConvexPolygon(
         Vector2d[] vertices,
         Vector2d localOffset,

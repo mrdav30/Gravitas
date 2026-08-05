@@ -16,6 +16,9 @@ public readonly struct WaitForFrames : ILockedYieldInstruction
     private readonly int _startFrameCount;
     private readonly uint _numberOfFrames;
 
+    /// <summary>
+    /// Creates an instruction that waits for a nonnegative number of simulation frames.
+    /// </summary>
     public WaitForFrames(GravitasWorldContext context, int numberOfFrames)
     {
         SwiftThrowHelper.ThrowIfNull(context, nameof(context));
@@ -29,14 +32,19 @@ public readonly struct WaitForFrames : ILockedYieldInstruction
     /// <inheritdoc />
     public GravitasWorldContext Context => _context;
 
+    /// <inheritdoc />
     public bool KeepWaiting =>
         unchecked((uint)(_context.FrameCount - _startFrameCount)) < _numberOfFrames;
 
+    /// <inheritdoc />
     public object? Current => null;
 
+    /// <inheritdoc />
     public bool MoveNext() => KeepWaiting;
 
+    /// <inheritdoc />
     public void Reset() { }
 
+    /// <inheritdoc />
     public void Dispose() { }
 }

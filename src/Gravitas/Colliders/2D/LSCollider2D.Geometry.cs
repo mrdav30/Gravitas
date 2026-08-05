@@ -14,10 +14,12 @@ namespace Gravitas.Colliders;
 
 public abstract partial class LSCollider2D
 {
+    /// <summary>Gets the planar runtime position.</summary>
     public Vector2d Position => _compoundOwner != null
         ? _compoundOwner.Center
         : ResolveStandalonePosition();
 
+    /// <summary>Gets the committed planar rotation in radians.</summary>
     public Fixed64 Rotation
     {
         get
@@ -33,6 +35,7 @@ public abstract partial class LSCollider2D
         }
     }
 
+    /// <summary>Gets the combined planar owner and compound-part scale.</summary>
     public virtual Vector2d LocalScale
     {
         get
@@ -88,14 +91,18 @@ public abstract partial class LSCollider2D
     public bool TryGetScaledLocalOffset(out Vector2d scaledLocalOffset) =>
         TryGetCurrentScaledOffset(out scaledLocalOffset);
 
+    /// <summary>Gets the collider center in planar world coordinates.</summary>
     public Vector2d Center => _hasCommittedShape
         ? _committedCenter
         : GetUncommittedCenter();
 
+    /// <summary>Gets whether a planar world-space point lies inside this collider.</summary>
     public abstract bool ContainsPoint(Vector2d point);
 
+    /// <summary>Gets the closest representable point on this collider to a planar world-space point.</summary>
     public abstract Vector2d GetClosestPoint(Vector2d point);
 
+    /// <summary>Gets the farthest representable point along a planar world-space direction.</summary>
     public abstract Vector2d GetSupportPoint(Vector2d direction);
 
     internal int VertexCount
@@ -398,6 +405,7 @@ public abstract partial class LSCollider2D
 
     internal abstract ExactMassWeight CalculatePreparedAreaForMassProperties();
 
+    /// <summary>Updates derived material state after <see cref="Material"/> changes.</summary>
     protected virtual void OnMaterialChanged() { }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -419,6 +427,7 @@ public abstract partial class LSCollider2D
                 partRelativePoint,
                 _preparedCompoundLocalRotation);
 
+    /// <summary>Marks derived runtime shape state for deterministic rebuilding.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     protected void MarkShapeDirty()
     {

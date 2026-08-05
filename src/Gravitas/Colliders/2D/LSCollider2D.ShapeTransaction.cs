@@ -18,6 +18,7 @@ public abstract partial class LSCollider2D
     private Vector2d _committedPartScale = Vector2d.One;
     private bool _hasCommittedShape;
 
+    /// <summary>Gets whether this collider has committed runtime shape state.</summary>
     protected bool HasCommittedShape => _hasCommittedShape;
 
     private ColliderShapeSnapshot2D _preparedSnapshot;
@@ -67,6 +68,7 @@ public abstract partial class LSCollider2D
             out _);
     }
 
+    /// <summary>Gets the current owner and compound-part scale factors separately.</summary>
     protected void GetCurrentScaleFactors(
         out Vector2d ownerScale,
         out Vector2d partScale)
@@ -406,6 +408,7 @@ public abstract partial class LSCollider2D
         PublishPreparedShape();
     }
 
+    /// <summary>Sets the bounds for the shape transaction being prepared.</summary>
     protected void SetPreparedBounds(FixedBoundArea bounds) =>
         _preparedBounds = bounds;
 

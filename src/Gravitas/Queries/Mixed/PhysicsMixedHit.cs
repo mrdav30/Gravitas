@@ -18,6 +18,9 @@ namespace Gravitas.Queries;
 /// </summary>
 public readonly struct PhysicsMixedHit
 {
+    /// <summary>
+    /// Creates a mixed query hit from world-space surface witnesses.
+    /// </summary>
     public PhysicsMixedHit(
         LSCollider? collider3D,
         LSCollider2D? collider2D,
@@ -72,12 +75,24 @@ public readonly struct PhysicsMixedHit
         Direction3D = direction3D;
     }
 
+    /// <summary>
+    /// Gets the 3D collider participating in the hit, if registered.
+    /// </summary>
     public LSCollider? Collider3D { get; }
 
+    /// <summary>
+    /// Gets the 2D collider participating in the hit, if registered.
+    /// </summary>
     public LSCollider2D? Collider2D { get; }
 
+    /// <summary>
+    /// Gets the 3D collider's body, if any.
+    /// </summary>
     public SolidBody? Body3D { get; }
 
+    /// <summary>
+    /// Gets the 2D collider's body, if any.
+    /// </summary>
     public SolidBody2D? Body2D { get; }
 
     /// <summary>
@@ -133,6 +148,9 @@ public readonly struct PhysicsMixedHit
     /// </summary>
     public Fixed64 Distance { get; }
 
+    /// <summary>
+    /// Gets the world-space sweep direction associated with the hit.
+    /// </summary>
     public Vector3d Direction3D { get; }
 
     /// <summary>

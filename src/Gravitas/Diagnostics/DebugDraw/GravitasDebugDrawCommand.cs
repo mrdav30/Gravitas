@@ -58,24 +58,34 @@ public readonly struct GravitasDebugDrawCommand
         Color = color;
     }
 
+    /// <summary>Gets the simulation frame in which the command was captured.</summary>
     public int Frame { get; }
 
+    /// <summary>Gets the command's sequence within its capture buffer.</summary>
     public int Sequence { get; }
 
+    /// <summary>Gets the command kind that determines how its payload is interpreted.</summary>
     public GravitasDebugDrawKind Kind { get; }
 
+    /// <summary>Gets the context-local collider identifier, or <c>-1</c> when unassociated.</summary>
     public int ColliderId { get; }
 
+    /// <summary>Gets the dimensional runtime surface of the associated collider.</summary>
     public GravitasColliderDimension ColliderDimension { get; }
 
+    /// <summary>Gets the associated 3D collider type.</summary>
     public ColliderType ColliderType { get; }
 
+    /// <summary>Gets the associated 2D collider type.</summary>
     public ColliderType2D Collider2DType { get; }
 
+    /// <summary>Gets the start point for line and ray commands.</summary>
     public Vector3d Start { get; }
 
+    /// <summary>Gets the end point for line and ray commands.</summary>
     public Vector3d End { get; }
 
+    /// <summary>Gets the center of a point or wireframe volume.</summary>
     public Vector3d Center { get; }
 
     /// <summary>
@@ -84,14 +94,19 @@ public readonly struct GravitasDebugDrawCommand
     /// </summary>
     public Vector3d HalfExtents { get; }
 
+    /// <summary>Gets the first vertex of a wireframe triangle.</summary>
     public Vector3d PointA { get; }
 
+    /// <summary>Gets the second vertex of a wireframe triangle.</summary>
     public Vector3d PointB { get; }
 
+    /// <summary>Gets the third vertex of a wireframe triangle.</summary>
     public Vector3d PointC { get; }
 
+    /// <summary>Gets the orientation of a wireframe volume.</summary>
     public FixedQuaternion Rotation { get; }
 
+    /// <summary>Gets the point or wireframe volume radius.</summary>
     public Fixed64 Radius { get; }
 
     /// <summary>
@@ -100,8 +115,10 @@ public readonly struct GravitasDebugDrawCommand
     /// </summary>
     public Fixed64 AxisLength { get; }
 
+    /// <summary>Gets the full height of a cylinder or cone.</summary>
     public Fixed64 Height { get; }
 
+    /// <summary>Gets the command color.</summary>
     public GravitasDiagnosticColor Color { get; }
 
     /// <summary>

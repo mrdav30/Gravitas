@@ -12,10 +12,16 @@ namespace Gravitas.Colliders;
 /// </summary>
 public enum ColliderType2D : byte
 {
+    /// <summary>No collider shape.</summary>
     None = 0,
+    /// <summary>A circle.</summary>
     Circle = 1,
+    /// <summary>An axis-aligned box.</summary>
     AABox = 2,
+    /// <summary>A convex polygon.</summary>
     ConvexPolygon = 3,
+    /// <summary>A compound collider.</summary>
     Compound = 4,
+    /// <summary>A capsule.</summary>
     Capsule = 5
 }

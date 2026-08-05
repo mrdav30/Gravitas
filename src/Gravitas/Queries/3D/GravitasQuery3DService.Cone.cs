@@ -17,6 +17,9 @@ using SwiftCollections.Query;
 
 namespace Gravitas.Queries;
 
+/// <content>
+/// Owns apex-origin 3D cone-volume overlap query behavior.
+/// </content>
 public sealed partial class GravitasQuery3DService
 {
     /// <summary>

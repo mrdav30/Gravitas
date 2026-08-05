@@ -15,6 +15,9 @@ namespace Gravitas.Queries;
 /// </summary>
 public readonly struct PhysicsRaycast3DRequest
 {
+    /// <summary>
+    /// Creates a 3D segment raycast request with an include layer mask.
+    /// </summary>
     public PhysicsRaycast3DRequest(Vector3d start, Vector3d end, PhysicsLayerMask layerMask)
     {
         Start = start;

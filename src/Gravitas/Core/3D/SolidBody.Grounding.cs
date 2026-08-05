@@ -29,10 +29,13 @@ public partial class SolidBody
     public GroundingMode GroundingMode { get; private set; } = GroundingMode.Automatic;
 
     // how close to the actor's feet (or whatever touches the ground) do we check for grounding
+    /// <summary>Vertical offset applied to the origin of automatic ground probes.</summary>
     public Fixed64 GroundOriginOffset = (Fixed64)0.5f;
 
+    /// <summary>Automatic ground-probe distance used while grounded.</summary>
     public Fixed64 GroundedDistanceRay = (Fixed64)0.5f;
 
+    /// <summary>Automatic ground-probe distance used while airborne.</summary>
     public Fixed64 GroundDownDistanceOnAir = (Fixed64)0.5f;
 
     /// <summary>
@@ -50,12 +53,15 @@ public partial class SolidBody
     private readonly Fixed64 _groundCheckThreshold = (Fixed64)0.01f;
     private readonly SwiftList<Physics3DHit> _groundProbeHits = new(DefaultBodyHitBufferCapacity);
 
+    /// <summary>Minimum downward snap distance used to preserve grounding across steps.</summary>
     public Fixed64 StepOffset = (Fixed64)0.5f;
 
     private Vector3d _groundNormal = Vector3d.Zero;
+    /// <summary>Gets the world-space normal of the current supporting surface.</summary>
     public Vector3d GroundNormal => _groundNormal;
 
     private FixedTransform? _hitPlatform;
+    /// <summary>Gets the transform of the current supporting collider, if available.</summary>
     public FixedTransform? HitPlatform => _hitPlatform;
 
     private Vector3d _hitPlatformPosition;
@@ -90,9 +96,11 @@ public partial class SolidBody
         return _hasHitPoint;
     }
 
+    /// <summary>Raised when the grounded state changes.</summary>
     public Action<bool>? OnGrounded;
 
     private bool _isGrounded;
+    /// <summary>Gets whether the body currently has valid ground support.</summary>
     public bool IsGrounded
     {
         get => _isGrounded;
@@ -114,10 +122,12 @@ public partial class SolidBody
     public bool WasGrounded => _wasGrounded;
 
     private Vector3d _lastGroundedPosition;
+    /// <summary>Gets the body position captured before its latest grounded movement.</summary>
     public Vector3d LastGroundedPosition => _lastGroundedPosition;
 
     #endregion
 
+    /// <summary>Temporarily disables automatic ground probes and clears grounded state.</summary>
     public void SkipGrounding(Fixed64 secs)
     {
         _skipGroundingCheck = true;
@@ -183,6 +193,7 @@ public partial class SolidBody
         _skipGroundingCheck = false;
     }
 
+    /// <summary>Immediately refreshes automatic grounded state.</summary>
     public void CheckGround()
     {
         CaptureGroundedTransitionState();

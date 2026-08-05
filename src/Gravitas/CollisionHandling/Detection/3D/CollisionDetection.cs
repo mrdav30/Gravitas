@@ -9,8 +9,10 @@ using Gravitas.Colliders;
 
 namespace Gravitas.CollisionHandling;
 
+/// <summary>Provides deterministic 3D narrow-phase collision checks.</summary>
 public static partial class CollisionDetection
 {
+    /// <summary>Rebuilds and tests the contact manifold for a collision pair.</summary>
     public static bool DoCollisionCheck(CollisionPair pair)
     {
         pair.Manifold.BeginUpdate(pair.Context.FrameCount);

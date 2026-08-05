@@ -25,8 +25,10 @@ public sealed class LSConeCollider : LSCollider
     private Vector3d _preparedAxis;
     private Fixed64 _preparedVolume;
 
+    /// <summary>Creates a cone collider with default dimensions.</summary>
     public LSConeCollider() { }
 
+    /// <summary>Creates a runtime cone from an authored shape definition.</summary>
     public LSConeCollider(ColliderShapeDefinition definition)
     {
         definition.EnsureKind(ColliderShapeDefinitionKind.Cone);
@@ -35,10 +37,13 @@ public sealed class LSConeCollider : LSCollider
         Size = definition.Size;
     }
 
+    /// <inheritdoc/>
     public override ColliderType Shape => ColliderType.Cone;
 
+    /// <inheritdoc/>
     public override int Priority => ColliderSettings.GetPriority(Shape);
 
+    /// <inheritdoc/>
     public override Fixed64 ScaledRadius => _scaledRadius;
 
     /// <summary>
@@ -57,12 +62,14 @@ public sealed class LSConeCollider : LSCollider
     /// </summary>
     public Fixed64 Volume { get; private set; }
 
+    /// <inheritdoc/>
     protected override void OnRadiusChanged()
     {
         Fixed64 diameter = _radius * 2;
         _size = new Vector3d(diameter, _size.Y, diameter);
     }
 
+    /// <inheritdoc/>
     protected override Vector3d NormalizeSize(Vector3d value) =>
         new(_radius * 2, value.Y, _radius * 2);
 
@@ -173,6 +180,7 @@ public sealed class LSConeCollider : LSCollider
         return tensor;
     }
 
+    /// <inheritdoc/>
     public override Fixed64 GetFrontalArea(Vector3d direction)
     {
         Fixed64 directionMagnitude = direction.Magnitude;
@@ -190,6 +198,7 @@ public sealed class LSConeCollider : LSCollider
         return axial * baseArea + radialFactor * triangularProfile;
     }
 
+    /// <inheritdoc/>
     public override Vector3d ClosestPointOnSurface(Vector3d other)
     {
         FixedPointAnchor surfaceAnchor =
@@ -203,6 +212,7 @@ public sealed class LSConeCollider : LSCollider
         return surfacePoint;
     }
 
+    /// <inheritdoc/>
     public override Vector3d GetNormalAtPoint(Vector3d point)
     {
         _ = GetClosestSurfaceAnchor(
@@ -226,6 +236,7 @@ public sealed class LSConeCollider : LSCollider
                 out normal,
                 out _);
 
+    /// <inheritdoc/>
     public override bool ColliderOverlapsRay(RaycastSegmentWorker worker, ref SwiftList<Vector3d> outputIntersectionPoints) =>
         worker.CheckConeOverlaps(this, ref outputIntersectionPoints);
 

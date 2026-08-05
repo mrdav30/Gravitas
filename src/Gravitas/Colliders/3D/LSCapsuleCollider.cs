@@ -13,6 +13,7 @@ using System;
 
 namespace Gravitas.Colliders;
 
+/// <summary>Represents a runtime 3D capsule collider whose local axis follows Y.</summary>
 public sealed class LSCapsuleCollider : LSCollider
 {
     private Fixed64 _scaledRadius = Fixed64.Half;
@@ -21,8 +22,10 @@ public sealed class LSCapsuleCollider : LSCollider
     private Vector3d _preparedAxis;
     private Fixed64 _preparedArea;
 
+    /// <summary>Creates a capsule collider with default dimensions.</summary>
     public LSCapsuleCollider() { }
 
+    /// <summary>Creates a runtime capsule from an authored shape definition.</summary>
     public LSCapsuleCollider(ColliderShapeDefinition definition)
     {
         definition.EnsureKind(ColliderShapeDefinitionKind.Capsule);
@@ -31,9 +34,12 @@ public sealed class LSCapsuleCollider : LSCollider
         Size = definition.Size;
     }
 
+    /// <inheritdoc/>
     public override ColliderType Shape => ColliderType.Capsule;
+    /// <inheritdoc/>
     public override int Priority => ColliderSettings.GetPriority(Shape);
 
+    /// <inheritdoc/>
     public override Fixed64 ScaledRadius => _scaledRadius;
 
     /// <summary>
@@ -48,12 +54,14 @@ public sealed class LSCapsuleCollider : LSCollider
     /// </summary>
     public Vector3d WorldAxis { get; private set; } = Vector3d.Up;
 
+    /// <inheritdoc/>
     protected override void OnRadiusChanged()
     {
         Fixed64 diameter = _radius * 2;
         _size = new Vector3d(diameter, _size.Y, diameter);
     }
 
+    /// <inheritdoc/>
     protected override Vector3d NormalizeSize(Vector3d value) =>
         new(_radius * 2, value.Y, _radius * 2);
 
@@ -218,6 +226,7 @@ public sealed class LSCapsuleCollider : LSCollider
     // If it's moving perpendicular to its main axis,
     // then the frontal area would be a rectangle with a semicircle on either end,
     // which would be (2r)*h + πr^2, where h is the height of the cylindrical part of the capsule.
+    /// <inheritdoc/>
     public override Fixed64 GetFrontalArea(Vector3d direction)
     {
         Fixed64 directionMagnitude = direction.Magnitude;
@@ -237,6 +246,7 @@ public sealed class LSCapsuleCollider : LSCollider
         return capArea + radialFactor * sideProfile;
     }
 
+    /// <inheritdoc/>
     public override Vector3d ClosestPointOnSurface(Vector3d other)
     {
         FixedPointAnchor surfaceAnchor =
@@ -250,6 +260,7 @@ public sealed class LSCapsuleCollider : LSCollider
         return surfacePoint;
     }
 
+    /// <inheritdoc/>
     public override Vector3d GetNormalAtPoint(Vector3d point)
     {
         _ = GetClosestSurfaceAnchor(
@@ -273,6 +284,7 @@ public sealed class LSCapsuleCollider : LSCollider
                 out normal,
                 out _);
 
+    /// <inheritdoc/>
     public override bool ColliderOverlapsRay(RaycastSegmentWorker worker, ref SwiftList<Vector3d> outputIntersectionPoints) =>
         worker.CheckCapsuleOverlaps(this, ref outputIntersectionPoints);
 }

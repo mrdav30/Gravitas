@@ -20,14 +20,19 @@ internal enum PhysicsPartitionMobilityKind
     Static = 2
 }
 
+/// <summary>
+/// Stores the 3D collider IDs assigned to one GridForge voxel.
+/// </summary>
 public class PhysicsPartition : IVoxelPartition, IRetainedPhysicsPartition<GravitasCollisionService>
 {
     private GravitasCollisionService? _owner;
     private int _emptySinceFrame = -1;
     private int _retainedIndex = -1;
 
+    /// <summary>Gets or sets the world voxel occupied by this partition.</summary>
     public WorldVoxelIndex WorldIndex { get; set; }
 
+    /// <summary>Gets or sets whether this partition is attached to a voxel.</summary>
     public bool IsPartitioned { get; set; }
 
     /// <summary>
@@ -40,12 +45,16 @@ public class PhysicsPartition : IVoxelPartition, IRetainedPhysicsPartition<Gravi
     /// </summary>
     public SwiftSparseSet? ContainedAwakeDynamicObjects;
 
+    /// <summary>Stores context-local kinematic collider IDs.</summary>
     public SwiftSparseSet? ContainedKinematicObjects;
 
+    /// <summary>Stores context-local static collider IDs.</summary>
     public SwiftSparseSet? ContainedStaticObjects;
 
+    /// <summary>Gets the active-partition slot, or <c>-1</c> when inactive.</summary>
     public int ActivationId { get; private set; }
 
+    /// <summary>Gets whether this partition has an active-partition slot.</summary>
     public bool IsAllocated => ActivationId != -1;
 
     internal bool IsEmpty =>
@@ -62,6 +71,7 @@ public class PhysicsPartition : IVoxelPartition, IRetainedPhysicsPartition<Gravi
     /// </summary>
     public int AwakeDynamicObjectCount => ContainedAwakeDynamicObjects?.Count ?? 0;
 
+    /// <summary>Gets the collision service that owns this partition.</summary>
     public GravitasCollisionService Owner
     {
         get
@@ -74,11 +84,13 @@ public class PhysicsPartition : IVoxelPartition, IRetainedPhysicsPartition<Gravi
         }
     }
 
+    /// <summary>Creates an inactive 3D physics partition.</summary>
     public PhysicsPartition()
     {
         ActivationId = -1;
     }
 
+    /// <summary>Attaches this partition to a voxel.</summary>
     public void OnAddToVoxel(Voxel voxel)
     {
         SwiftThrowHelper.ThrowIfTrue(_owner == null, nameof(PhysicsPartition), "PhysicsPartition is missing its owner collision service.");
@@ -162,6 +174,7 @@ public class PhysicsPartition : IVoxelPartition, IRetainedPhysicsPartition<Gravi
         pair.UpdateCollisionDeferred();
     }
 
+    /// <summary>Adds a dynamic collider ID to this partition.</summary>
     public void AddDynamicObject(int item)
     {
         ContainedDynamicObjects ??= new();
@@ -175,6 +188,7 @@ public class PhysicsPartition : IVoxelPartition, IRetainedPhysicsPartition<Gravi
             ActivationId = Owner.ActivatePartition(this);
     }
 
+    /// <summary>Adds a static collider ID to this partition.</summary>
     public void AddStaticObject(int item)
     {
         ContainedStaticObjects ??= new();
@@ -182,6 +196,7 @@ public class PhysicsPartition : IVoxelPartition, IRetainedPhysicsPartition<Gravi
             MarkOccupied();
     }
 
+    /// <summary>Adds a kinematic collider ID to this partition.</summary>
     public void AddKinematicObject(int item)
     {
         ContainedKinematicObjects ??= new();
@@ -189,6 +204,7 @@ public class PhysicsPartition : IVoxelPartition, IRetainedPhysicsPartition<Gravi
             MarkOccupied();
     }
 
+    /// <summary>Removes a dynamic collider ID from this partition.</summary>
     public void RemoveDynamicObject(int item)
     {
         if (ContainedDynamicObjects?.Remove(item) != true)
@@ -208,6 +224,7 @@ public class PhysicsPartition : IVoxelPartition, IRetainedPhysicsPartition<Gravi
         MarkEmptyIfUnoccupied();
     }
 
+    /// <summary>Removes a static collider ID from this partition.</summary>
     public void RemoveStaticObject(int item)
     {
         if (ContainedStaticObjects?.Remove(item) != true)
@@ -219,6 +236,7 @@ public class PhysicsPartition : IVoxelPartition, IRetainedPhysicsPartition<Gravi
         MarkEmptyIfUnoccupied();
     }
 
+    /// <summary>Removes a kinematic collider ID from this partition.</summary>
     public void RemoveKinematicObject(int item)
     {
         if (ContainedKinematicObjects?.Remove(item) != true)
@@ -262,6 +280,7 @@ public class PhysicsPartition : IVoxelPartition, IRetainedPhysicsPartition<Gravi
         return body == null || body.IsAwakeForCollision;
     }
 
+    /// <summary>Releases this partition when it is removed from a voxel.</summary>
     public void OnRemoveFromVoxel(Voxel voxel)
     {
         Owner.ReleasePartition(this);

@@ -23,11 +23,13 @@ public sealed class LSAABBoxCollider2D : LSCollider2D, IConvexVertexSource2D
     private Vector2d _scaledHalfExtents;
     private Vector2d _preparedHalfExtents;
 
+    /// <summary>Creates a pure 2D axis-aligned box with an authored size.</summary>
     public LSAABBoxCollider2D(Vector2d size)
     {
         Size = size;
     }
 
+    /// <summary>Creates a runtime box from an authored shape definition.</summary>
     public LSAABBoxCollider2D(ColliderShapeDefinition2D definition)
     {
         definition.EnsureKind(ColliderShapeDefinition2DKind.AABBox);
@@ -35,8 +37,10 @@ public sealed class LSAABBoxCollider2D : LSCollider2D, IConvexVertexSource2D
         Size = definition.Size;
     }
 
+    /// <inheritdoc/>
     public override ColliderType2D Shape => ColliderType2D.AABox;
 
+    /// <summary>Gets or sets the unscaled full box size.</summary>
     public Vector2d Size
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -56,8 +60,10 @@ public sealed class LSAABBoxCollider2D : LSCollider2D, IConvexVertexSource2D
         }
     }
 
+    /// <summary>Gets half of the authored unscaled size.</summary>
     public Vector2d HalfExtents => _halfExtents;
 
+    /// <summary>Gets the half extents after owner and compound-part scaling.</summary>
     public Vector2d ScaledHalfExtents
     {
         get
@@ -80,6 +86,7 @@ public sealed class LSAABBoxCollider2D : LSCollider2D, IConvexVertexSource2D
 
     Fixed64 IConvexVertexSource2D.Rotation => Fixed64.Zero;
 
+    /// <inheritdoc/>
     public override bool ContainsPoint(Vector2d point)
     {
         Span<Vector2d> offsets = stackalloc Vector2d[4];
@@ -87,6 +94,7 @@ public sealed class LSAABBoxCollider2D : LSCollider2D, IConvexVertexSource2D
         return FixedConvex2dRelations.ContainsPoint(point, Center, offsets);
     }
 
+    /// <inheritdoc/>
     public override Vector2d GetClosestPoint(Vector2d point)
     {
         Span<Vector2d> offsets = stackalloc Vector2d[4];
@@ -105,6 +113,7 @@ public sealed class LSAABBoxCollider2D : LSCollider2D, IConvexVertexSource2D
         return closest;
     }
 
+    /// <inheritdoc/>
     public override Vector2d GetSupportPoint(Vector2d direction)
     {
         Vector2d halfExtents = ScaledHalfExtents;
@@ -210,6 +219,7 @@ public sealed class LSAABBoxCollider2D : LSCollider2D, IConvexVertexSource2D
     private protected override void PublishShape() =>
         _scaledHalfExtents = _preparedHalfExtents;
 
+    /// <inheritdoc/>
     protected override void RecordShapeData(IChronicler chronicler)
     {
         Vector2d size = _size;

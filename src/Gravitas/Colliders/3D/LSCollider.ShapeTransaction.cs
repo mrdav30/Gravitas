@@ -18,6 +18,7 @@ public abstract partial class LSCollider
     private Vector3d _committedPartScale = Vector3d.One;
     private bool _hasCommittedShape;
 
+    /// <summary>Gets whether this collider has committed runtime shape state.</summary>
     protected bool HasCommittedShape => _hasCommittedShape;
 
     private ColliderShapeSnapshot _preparedSnapshot;
@@ -336,6 +337,7 @@ public abstract partial class LSCollider
         PublishPreparedShape();
     }
 
+    /// <summary>Sets the bounds for the shape transaction being prepared.</summary>
     protected void SetPreparedBounds(FixedBoundBox bounds) =>
         _preparedBounds = bounds;
 

@@ -18,6 +18,7 @@ namespace Gravitas.CollisionHandling;
 /// </summary>
 public sealed class ContactManifold2D : IEnumerable<ManifoldContact2D>
 {
+    /// <summary>Maximum number of contacts retained by a pure 2D manifold.</summary>
     public const int MaxContactCount = 2;
 
     private ManifoldContact2D _contact0;
@@ -71,6 +72,7 @@ public sealed class ContactManifold2D : IEnumerable<ManifoldContact2D>
         }
     }
 
+    /// <summary>Gets the contact at the specified deterministic order index.</summary>
     public ManifoldContact2D this[int index]
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -264,6 +266,7 @@ public sealed class ContactManifold2D : IEnumerable<ManifoldContact2D>
         SortContactsById();
     }
 
+    /// <summary>Returns an allocation-free enumerator over the active contacts.</summary>
     public Enumerator GetEnumerator() => new(this);
 
     IEnumerator<ManifoldContact2D> IEnumerable<ManifoldContact2D>.GetEnumerator() => GetEnumerator();
@@ -373,6 +376,7 @@ public sealed class ContactManifold2D : IEnumerable<ManifoldContact2D>
         }
     }
 
+    /// <summary>Enumerates the active contacts in deterministic order.</summary>
     public struct Enumerator : IEnumerator<ManifoldContact2D>
     {
         private readonly ContactManifold2D _manifold;
@@ -384,10 +388,12 @@ public sealed class ContactManifold2D : IEnumerable<ManifoldContact2D>
             _index = -1;
         }
 
+        /// <summary>Gets the current contact.</summary>
         public ManifoldContact2D Current => _manifold[_index];
 
         object IEnumerator.Current => Current;
 
+        /// <summary>Advances to the next active contact.</summary>
         public bool MoveNext()
         {
             int next = _index + 1;
@@ -398,8 +404,10 @@ public sealed class ContactManifold2D : IEnumerable<ManifoldContact2D>
             return true;
         }
 
+        /// <summary>Resets the enumerator to its initial position.</summary>
         public void Reset() => _index = -1;
 
+        /// <summary>Releases enumerator resources.</summary>
         public void Dispose() { }
     }
 }

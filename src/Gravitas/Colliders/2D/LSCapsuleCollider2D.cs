@@ -26,6 +26,7 @@ public sealed class LSCapsuleCollider2D : LSCollider2D
     private Fixed64 _preparedAxisLength;
     private Vector2d _preparedAxis;
 
+    /// <summary>Creates a pure 2D capsule with authored dimensions.</summary>
     public LSCapsuleCollider2D(Fixed64 radius, Fixed64 height)
     {
         ValidateDimensions(radius, height);
@@ -34,6 +35,7 @@ public sealed class LSCapsuleCollider2D : LSCollider2D
         MarkShapeDirty();
     }
 
+    /// <summary>Creates a runtime capsule from an authored shape definition.</summary>
     public LSCapsuleCollider2D(ColliderShapeDefinition2D definition)
     {
         definition.EnsureKind(ColliderShapeDefinition2DKind.Capsule);
@@ -46,6 +48,7 @@ public sealed class LSCapsuleCollider2D : LSCollider2D
         MarkShapeDirty();
     }
 
+    /// <inheritdoc/>
     public override ColliderType2D Shape => ColliderType2D.Capsule;
 
     /// <summary>
@@ -124,6 +127,7 @@ public sealed class LSCapsuleCollider2D : LSCollider2D
         }
     }
 
+    /// <inheritdoc/>
     public override bool ContainsPoint(Vector2d point)
         => FixedSegment2d.ContainsPointInCenteredCapsule(
             point,
@@ -134,6 +138,7 @@ public sealed class LSCapsuleCollider2D : LSCollider2D
             Fixed64.Zero,
             strict: false);
 
+    /// <inheritdoc/>
     public override Vector2d GetClosestPoint(Vector2d point)
     {
         Vector2d direction = FixedSegment2d.GetDirectionFromCenteredAxis(
@@ -174,6 +179,7 @@ public sealed class LSCapsuleCollider2D : LSCollider2D
         out Vector2d surfacePoint) =>
         TryGetSurfacePoint(point, normal, out surfacePoint);
 
+    /// <inheritdoc/>
     public override Vector2d GetSupportPoint(Vector2d direction)
     {
         if (TryGetSupportPoint(direction, out Vector2d support))
@@ -289,6 +295,7 @@ public sealed class LSCapsuleCollider2D : LSCollider2D
         WorldAxis = _preparedAxis;
     }
 
+    /// <inheritdoc/>
     protected override void RecordShapeData(IChronicler chronicler)
     {
         Fixed64 radius = _radius;

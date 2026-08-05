@@ -17,10 +17,13 @@ using System.Runtime.CompilerServices;
 
 namespace Gravitas;
 
+/// <summary>Represents deterministic 3D rigid-body state owned by one world context.</summary>
 public partial class SolidBody : IRecordable
 {
+    /// <summary>Stores the host-controlled body diagnostic flag.</summary>
     public bool Debug = false;
 
+    /// <summary>Gets whether the body is initialized and registered.</summary>
     public bool Active { get; private set; }
 
     private int _dynamicId = -1;
@@ -234,15 +237,18 @@ public partial class SolidBody : IRecordable
     public bool LastContinuousCollisionToiIterationLimitReached { get; private set; }
 
     private FixedTransform _positionTransform = null!;
+    /// <summary>Gets the host transform that receives authoritative or visual position updates.</summary>
     public FixedTransform PositionTransform => _positionTransform;
 
     private FixedTransform _rotationTransform = null!;
+    /// <summary>Gets the host transform that receives authoritative or visual rotation updates.</summary>
     public FixedTransform RotationTransform => _rotationTransform;
 
     #region Position Properties
 
     private bool _positionMutated;
     private bool _positionChangedBuffer;
+    /// <summary>Gets whether an authoritative position change awaits presentation.</summary>
     public bool PositionChangePending => _positionMutated || _positionChangedBuffer;
 
     private Vector2d _position2dUnmarked;
@@ -255,6 +261,7 @@ public partial class SolidBody : IRecordable
         _positionMutated = true;
     }
 
+    /// <summary>Gets the authoritative world-space position.</summary>
     public Vector3d Position3d
     {
         get => _position2dUnmarked.ToVector3d(_heightPosUnmarked);
@@ -269,6 +276,7 @@ public partial class SolidBody : IRecordable
     }
 
     private Fixed64 _heightPosUnmarked = Fixed64.Zero;  // Actor's transform position Y
+    /// <summary>Gets the authoritative world-space Y coordinate.</summary>
     public Fixed64 HeightPos
     {
         get => _heightPosUnmarked;
@@ -296,12 +304,15 @@ public partial class SolidBody : IRecordable
         ConvexSweepQueryWorker.ContactTolerance * (Fixed64)4;
 
 
+    /// <summary>Enables publishing interpolated positions to <see cref="PositionTransform"/>.</summary>
     public bool CanSetVisualPosition;
 
     private Vector3d _visualPosition;
+    /// <summary>Gets the current position interpolation endpoint.</summary>
     public Vector3d VisualPosition => _visualPosition;
 
     private Vector3d _lastVisualPosition;
+    /// <summary>Gets the previous position interpolation endpoint.</summary>
     public Vector3d LastVisualPosition => _lastVisualPosition;
 
     #endregion
@@ -310,10 +321,12 @@ public partial class SolidBody : IRecordable
 
     private bool _rotationMutated;
     private bool _rotationChangedBuffer;
+    /// <summary>Gets whether an authoritative rotation change awaits presentation.</summary>
     public bool RotationChangePending => _rotationMutated || _rotationChangedBuffer;
 
     private FixedQuaternion _rotation;
 
+    /// <summary>Gets the authoritative world-space rotation.</summary>
     public FixedQuaternion Rotation
     {
         get => _rotation;
@@ -326,16 +339,22 @@ public partial class SolidBody : IRecordable
         }
     }
 
+    /// <summary>Gets the body's world-space forward direction.</summary>
     public Vector3d Forward => _rotation.Rotate(Vector3d.Forward);
+    /// <summary>Gets the body's world-space up direction.</summary>
     public Vector3d Up => _rotation.Rotate(Vector3d.Up);
+    /// <summary>Gets the body's world-space right direction.</summary>
     public Vector3d Right => _rotation.Rotate(Vector3d.Right);
 
+    /// <summary>Enables publishing interpolated rotations to <see cref="RotationTransform"/>.</summary>
     public bool CanSetVisualRotation;
 
     private FixedQuaternion _visualRotation;
+    /// <summary>Gets the current rotation interpolation endpoint.</summary>
     public FixedQuaternion VisualRotation => _visualRotation;
 
     private FixedQuaternion _lastVisualRotation;
+    /// <summary>Gets the previous rotation interpolation endpoint.</summary>
     public FixedQuaternion LastVisualRotation => _lastVisualRotation;
 
     /// <summary>
@@ -347,8 +366,10 @@ public partial class SolidBody : IRecordable
         get => (_freezeAxes & BodyFreezeAxes3D.Rotation) == BodyFreezeAxes3D.Rotation;
     }
 
+    /// <summary>Controls visual rotation interpolation when the host agent is not interacting.</summary>
     public Fixed64 DefaultRotationSpeed = (Fixed64)30; // 1 for NPC...
 
+    /// <summary>Controls visual rotation interpolation while the host agent is interacting.</summary>
     public Fixed64 InteractionRotationSpeed = (Fixed64)3; // 0.15 for NPC...
 
     private Fixed64 _rotationSpeed;
@@ -364,6 +385,7 @@ public partial class SolidBody : IRecordable
     /// AKA units per second the unit is moving
     /// </summary>
     private Vector3d _linearVelocity;
+    /// <summary>Gets the authoritative world-space linear velocity.</summary>
     public Vector3d LinearVelocity => _linearVelocity;
 
     private Vector3d _linearDirection;
@@ -372,6 +394,7 @@ public partial class SolidBody : IRecordable
     /// Represents the angular velocity of the body.
     /// </summary>
     private Vector3d _angularVelocity;
+    /// <summary>Gets the authoritative world-space angular velocity.</summary>
     public Vector3d AngularVelocity => _angularVelocity;
 
     private Vector3d _angularDirection;
@@ -385,6 +408,7 @@ public partial class SolidBody : IRecordable
     private Fixed3x3 _worldInertiaTensor;
     private Fixed3x3 _inverseLocalInertiaTensor;
     private Fixed3x3 _inverseInertiaTensor;
+    /// <summary>Gets the constrained world-space inverse inertia tensor.</summary>
     public Fixed3x3 InverseInertiaTensor => _inverseInertiaTensor;
 
     /// <summary>
@@ -500,6 +524,7 @@ public partial class SolidBody : IRecordable
         }
     }
 
+    /// <summary>Gets whether both linear and angular velocity are exactly zero.</summary>
     public bool IsAtRest => _linearVelocity.IsZero && _angularVelocity.IsZero;
 
     private bool _isSleeping;
@@ -580,6 +605,7 @@ public partial class SolidBody : IRecordable
 
     // LinearVelocity magnitude
     private Fixed64 _linearSpeed;
+    /// <summary>Gets the magnitude of <see cref="LinearVelocity"/>.</summary>
     public Fixed64 LinearSpeed => _linearSpeed;
 
     /// <summary>
@@ -590,14 +616,17 @@ public partial class SolidBody : IRecordable
     private Vector3d _deltaAcceleration;
 
     private Vector3d _linearAcceleration;
+    /// <summary>Gets the linear acceleration measured during the latest integration step.</summary>
     public Vector3d LinearAcceleration => _linearAcceleration;
 
     private Fixed64 _angularSpeed;
+    /// <summary>Gets the magnitude of <see cref="AngularVelocity"/>.</summary>
     public Fixed64 AngularSpeed => _angularSpeed;
 
     private Vector3d _angularAccelerationStore;
 
     private Vector3d _angularAcceleration;
+    /// <summary>Gets the angular acceleration measured during the latest integration step.</summary>
     public Vector3d AngularAcceleration => _angularAcceleration;
 
 
@@ -622,10 +651,12 @@ public partial class SolidBody : IRecordable
     //  Divide the weight (in Newtons) by the acceleration of gravity to determine the mass of an object (measured in Kilograms).
     //  On Earth, gravity accelerates at 9.8 meters per second squared (9.8 m/s^2)
     //  ex: 150 Pounds x PhysicsEnvironment.PoundToNewton = 667 Newtons / 9.8 m/s^2 = 68 kilograms * PhysicsEnvironment.KilogramToPound = 150 Pounds
+    /// <summary>Mass used by integration and collision response.</summary>
     public Fixed64 Mass;
 
     // InverseMass is the reciprocal of mass, which is useful for performance reasons
     // when mass is used in calculations.
+    /// <summary>Gets the reciprocal mass, or zero when <see cref="Mass"/> is zero.</summary>
     public Fixed64 InverseMass => Mass != Fixed64.Zero
         ? Fixed64.One / Mass
         : Fixed64.Zero;
@@ -635,12 +666,16 @@ public partial class SolidBody : IRecordable
     // ex: 68 kg * 9.8 m/s^2 = 667 Newtons / PhysicsEnvironment.PoundToNewton = 150 Pounds
     private Fixed64 Weight => Mass * Context.Environment.Gravity * _gravityScale;
 
+    /// <summary>Gets the host agent that owns this body.</summary>
     public IMatterAgent Agent { get; private set; } = null!;
 
+    /// <summary>Gets the world context supplied by the host agent.</summary>
     public GravitasWorldContext Context { get; private set; } = null!;
 
+    /// <summary>Gets the GridForge world owned by <see cref="Context"/>.</summary>
     public GridWorld World => Context.World;
 
+    /// <summary>Gets the runtime collider attached to this body.</summary>
     public LSCollider Collider { get; private set; } = null!;
 
     /// <summary>
@@ -649,6 +684,7 @@ public partial class SolidBody : IRecordable
     /// </summary>
     public Action? OnMoved;
 
+    /// <summary>Creates a 3D body bound to a host agent and collider.</summary>
     public SolidBody(IMatterAgent agent, LSCollider collider)
     {
         SwiftThrowHelper.ThrowIfNull(agent, nameof(agent));
@@ -674,6 +710,7 @@ public partial class SolidBody : IRecordable
         _rotationInterpoleSpeed = Fixed64.Zero;
     }
 
+    /// <summary>Initializes and registers the body at an authoritative world pose.</summary>
     public void Initialize(
         Vector3d startPosition,
         FixedQuaternion startRotation,
@@ -728,6 +765,7 @@ public partial class SolidBody : IRecordable
     }
 
 
+    /// <summary>Completes deferred body integration and post-step bookkeeping.</summary>
     public void LateSimulate()
     {
         Context.EnterSimulationPhase();
@@ -905,6 +943,7 @@ public partial class SolidBody : IRecordable
         }
     }
 
+    /// <summary>Releases the body's collider and context-local registration.</summary>
     public void Deactivate()
     {
         if (!ReferenceEquals(Collider.Body, this))
@@ -918,6 +957,7 @@ public partial class SolidBody : IRecordable
         Active = false;
     }
 
+    /// <summary>Sets an authoritative target rotation and visual interpolation rate.</summary>
     public void UpdateRotation(FixedQuaternion targetRotation, Fixed64 bufferInterpolation)
     {
         FixedQuaternion normalizedRotation = targetRotation.Normalized;
@@ -1007,6 +1047,7 @@ public partial class SolidBody : IRecordable
         return Rotation.TryInverseTransformScaledPoint(Position3d, point, scale, out result);
     }
 
+    /// <summary>Resets the authoritative pose, motion, grounding, and presentation state.</summary>
     public void ResetPosition(Vector3d position = default, FixedQuaternion rotation = default)
     {
         FixedQuaternion normalizedRotation = rotation.Normalized;

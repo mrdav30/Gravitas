@@ -77,6 +77,7 @@ public sealed partial class SolidBody2D
         RefreshAngularSpeed();
     }
 
+    /// <summary>Sets the authoritative planar position and refreshes collider state.</summary>
     public void SetPosition(Vector2d position)
     {
         PreflightStaticPoseChange();
@@ -92,6 +93,7 @@ public sealed partial class SolidBody2D
         RefreshStaticColliderAfterExplicitPoseChange();
     }
 
+    /// <summary>Sets the authoritative yaw rotation and refreshes collider state.</summary>
     public void SetRotation(Fixed64 rotation)
     {
         PreflightStaticPoseChange();

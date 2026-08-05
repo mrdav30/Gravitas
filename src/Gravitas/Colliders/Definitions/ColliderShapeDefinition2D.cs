@@ -223,6 +223,7 @@ public readonly struct ColliderShapeDefinition2D : IEquatable<ColliderShapeDefin
             "2D capsule height must be at least the capsule diameter.");
     }
 
+    /// <inheritdoc/>
     public bool Equals(ColliderShapeDefinition2D other)
     {
         if (Kind != other.Kind
@@ -244,9 +245,11 @@ public readonly struct ColliderShapeDefinition2D : IEquatable<ColliderShapeDefin
         return true;
     }
 
+    /// <inheritdoc/>
     public override bool Equals(object? obj) =>
         obj is ColliderShapeDefinition2D other && Equals(other);
 
+    /// <inheritdoc/>
     public override int GetHashCode()
     {
         unchecked
@@ -266,9 +269,11 @@ public readonly struct ColliderShapeDefinition2D : IEquatable<ColliderShapeDefin
         }
     }
 
+    /// <summary>Determines whether two authored 2D shape definitions are equal.</summary>
     public static bool operator ==(ColliderShapeDefinition2D left, ColliderShapeDefinition2D right) =>
         left.Equals(right);
 
+    /// <summary>Determines whether two authored 2D shape definitions are not equal.</summary>
     public static bool operator !=(ColliderShapeDefinition2D left, ColliderShapeDefinition2D right) =>
         !left.Equals(right);
 }

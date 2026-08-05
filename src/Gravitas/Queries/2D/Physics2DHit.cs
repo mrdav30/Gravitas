@@ -18,6 +18,9 @@ namespace Gravitas.Queries;
 /// </summary>
 public readonly struct Physics2DHit
 {
+    /// <summary>
+    /// Creates a 2D query hit from a world-space surface witness.
+    /// </summary>
     public Physics2DHit(LSCollider2D collider, Vector2d point, Vector2d normal, Fixed64 distance)
         : this(
             collider,
@@ -43,8 +46,14 @@ public readonly struct Physics2DHit
         Distance = distance;
     }
 
+    /// <summary>
+    /// Gets the collider reported by the query.
+    /// </summary>
     public LSCollider2D Collider { get; }
 
+    /// <summary>
+    /// Gets the collider's body, or <see langword="null"/> for a bodyless collider.
+    /// </summary>
     public SolidBody2D? Body { get; }
 
     /// <summary>
@@ -76,7 +85,13 @@ public readonly struct Physics2DHit
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool TryGetPoint(out Vector2d point) => Anchor.TryGetWorldPoint(out point);
 
+    /// <summary>
+    /// Gets the world-space surface normal.
+    /// </summary>
     public Vector2d Normal { get; }
 
+    /// <summary>
+    /// Gets the distance from the query origin to the hit.
+    /// </summary>
     public Fixed64 Distance { get; }
 }

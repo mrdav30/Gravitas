@@ -20,18 +20,27 @@ public sealed partial class GravitasQueryMixedService
     private readonly SwiftList<LSCollider> _candidates3D = new();
     private readonly SwiftList<int> _meshTriangleCandidates = new();
 
+    /// <summary>
+    /// Creates a mixed query service owned by the specified world context.
+    /// </summary>
     public GravitasQueryMixedService(GravitasWorldContext context)
     {
         SwiftThrowHelper.ThrowIfNull(context, nameof(context));
         _context = context;
     }
 
+    /// <summary>
+    /// Gets the world context that owns this query service.
+    /// </summary>
     public GravitasWorldContext Context => _context;
 
     internal int LastQueryCandidateCount { get; private set; }
 
     internal int LastMeshTriangleCandidateCount { get; private set; }
 
+    /// <summary>
+    /// Clears reusable mixed-query buffers and diagnostic counters.
+    /// </summary>
     public void Reset()
     {
         _candidates2D.FastClear();

@@ -14,6 +14,9 @@ using System.Collections.Generic;
 
 namespace Gravitas.Colliders
 {
+    /// <summary>
+    /// Owns immutable authored triangle topology and committed deterministic runtime mesh geometry.
+    /// </summary>
     public partial class PhysicsMesh
     {
         private const int SupportTreeVertexThreshold = 32;
@@ -70,11 +73,13 @@ namespace Gravitas.Colliders
         public ReadOnlySpan<int> Triangles => _triangles;
 
         private readonly int _triangleCount;
+        /// <summary>Gets the number of authored triangles.</summary>
         public int TriangleCount => _triangleCount;
 
         private readonly int[] _convexSatEdgeVertexPairs;
         internal ReadOnlySpan<int> ConvexSatEdgeVertexPairs => _convexSatEdgeVertexPairs;
 
+        /// <summary>Gets the mesh collision mode.</summary>
         public MeshColliderMode Mode { get; }
 
         /// <summary>
@@ -97,6 +102,7 @@ namespace Gravitas.Colliders
         /// </summary>
         internal SwiftFixedBVH<int> TriangleBVH => _triangleBVH;
 
+        /// <summary>Gets the number of committed triangle BVH builds.</summary>
         public int TriangleBvhBuildCount => _triangleBvhBuildCount;
 
         private FixedQuaternion _rotation = FixedQuaternion.Identity;
@@ -112,6 +118,7 @@ namespace Gravitas.Colliders
         internal FixedQuaternion Rotation => _rotation;
 
         private FixedBoundBox _bounds;
+        /// <summary>Gets the committed world-space axis-aligned bounds.</summary>
         public FixedBoundBox Bounds => _bounds;
 
         private readonly FixedBoundBox _localBounds;
@@ -121,9 +128,11 @@ namespace Gravitas.Colliders
         /// </summary>
         public FixedBoundBox LocalBounds => _localBounds;
 
+        /// <summary>Creates a convex runtime mesh at a world-space pose.</summary>
         public PhysicsMesh(Vector3d[] vertices, int[] triangles, Vector3d position, FixedQuaternion rotation)
             : this(vertices, triangles, position, rotation, MeshColliderMode.Convex) { }
 
+        /// <summary>Creates a runtime mesh with an explicit collision mode and world-space pose.</summary>
         public PhysicsMesh(
             Vector3d[] vertices,
             int[] triangles,
@@ -177,6 +186,7 @@ namespace Gravitas.Colliders
             PublishPreparedTransformation();
         }
 
+        /// <summary>Updates the mesh world-space position and rigid rotation.</summary>
         public void UpdatePosition(Vector3d position, FixedQuaternion rotation)
         {
             PrepareTransformation(position, rotation, _ownerScale, _partScale, null);
@@ -263,10 +273,7 @@ namespace Gravitas.Colliders
             return FixedBoundBox.FromMinMax(min, max);
         }
 
-        /// <summary>
-        /// Calculates solid closed-volume inertia for the supplied mass.
-        /// This is a geometry/topology API; callers apply body mobility gates before requesting inertia.
-        /// </summary>
+        /// <summary>Compares deterministic edge uses for topology validation.</summary>
         private static int CompareEdgeUses(EdgeUse first, EdgeUse second)
         {
             if (first.Key != second.Key)
@@ -278,6 +285,7 @@ namespace Gravitas.Colliders
             return first.TriangleIndex < second.TriangleIndex ? -1 : 1;
         }
 
+        /// <summary>Gets the projected mesh area facing a world-space direction.</summary>
         public Fixed64 GetFrontalArea(Vector3d direction)
         {
             Fixed64 directionMagnitude = direction.Magnitude;
@@ -296,6 +304,7 @@ namespace Gravitas.Colliders
             return totalArea;
         }
 
+        /// <summary>Gets one triangle's vertices in world space.</summary>
         public void GetTriangleVertices(int index, out Vector3d first, out Vector3d second, out Vector3d third)
         {
             if (TryGetTriangleVertices(index, out first, out second, out third))
@@ -703,6 +712,7 @@ namespace Gravitas.Colliders
                 direction.Y >= Fixed64.Zero ? max.Y : min.Y,
                 direction.Z >= Fixed64.Zero ? max.Z : min.Z);
 
+        /// <summary>Gets a triangle face normal in world space.</summary>
         public Vector3d GetFaceNormalWorld(int index)
         {
             SwiftThrowHelper.ThrowIfArrayIndexInvalid(index, _triangleCount, nameof(index));
@@ -712,6 +722,7 @@ namespace Gravitas.Colliders
             return worldNormal.Normalized;
         }
 
+        /// <summary>Writes triangle indices overlapping world-space bounds into a caller-owned buffer.</summary>
         public void GetTrianglesInWorldBounds(FixedBoundVolume worldBounds, SwiftList<int> result)
         {
             result.FastClear();
@@ -728,6 +739,7 @@ namespace Gravitas.Colliders
                 result);
         }
 
+        /// <summary>Writes triangle indices overlapping scaled-local bounds into a caller-owned buffer.</summary>
         public void GetTrianglesInLocalBounds(FixedBoundVolume localBounds, SwiftList<int> result)
         {
             result.FastClear();

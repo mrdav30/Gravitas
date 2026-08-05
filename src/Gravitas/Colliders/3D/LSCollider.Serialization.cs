@@ -14,6 +14,7 @@ namespace Gravitas.Colliders;
 
 public abstract partial class LSCollider
 {
+    /// <inheritdoc/>
     public void RecordData(IChronicler chronicler)
     {
         RecordValues.Look(chronicler, ref _debug, "Debug", false);

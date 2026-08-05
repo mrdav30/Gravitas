@@ -39,11 +39,16 @@ public abstract partial class LSCollider
 
     internal SwiftHashSet<int>? CollisionPairHolders => _pairState.CollisionPairHolders;
 
+    /// <summary>Handles a 3D contact notification for the other body.</summary>
     public delegate void BodyCollisionFunc(SolidBody other);
+    /// <summary>Raised while this collider is touching another collider that owns a 3D body.</summary>
     public event BodyCollisionFunc? OnContact;
+    /// <summary>Raised on the first simulation frame this collider touches another 3D body.</summary>
     public event BodyCollisionFunc? OnContactEnter;
+    /// <summary>Raised when this collider stops touching another 3D body.</summary>
     public event BodyCollisionFunc? OnContactExit;
 
+    /// <summary>Handles a 3D trigger notification for the other collider.</summary>
     public delegate void TriggerCollisionFunc(LSCollider other);
 
     /// <summary>
@@ -61,9 +66,13 @@ public abstract partial class LSCollider
     /// </summary>
     public event TriggerCollisionFunc? OnTriggerExit;
 
+    /// <summary>Handles a mixed contact or trigger notification for the other 2D collider.</summary>
     public delegate void MixedCollisionFunc(LSCollider2D other);
+    /// <summary>Raised while this collider has a physical mixed contact with a 2D collider.</summary>
     public event MixedCollisionFunc? OnMixedContact;
+    /// <summary>Raised when this collider begins a physical mixed contact with a 2D collider.</summary>
     public event MixedCollisionFunc? OnMixedContactEnter;
+    /// <summary>Raised when this collider ends a physical mixed contact with a 2D collider.</summary>
     public event MixedCollisionFunc? OnMixedContactExit;
 
     /// <summary>

@@ -86,6 +86,7 @@ public partial class SolidBody
         SetRotationTransformWorldRotation(Rotation);
     }
 
+    /// <summary>Advances authoritative pose-change buffers used by presentation and culling.</summary>
     public void CheckChangedValues()
     {
         // Keep each buffer set until the next visualization pass so the host
@@ -113,6 +114,7 @@ public partial class SolidBody
         }
     }
 
+    /// <summary>Advances the position interpolation endpoints.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void SetVisualPosition(Vector3d position)
     {
@@ -120,6 +122,7 @@ public partial class SolidBody
         _visualPosition = position;
     }
 
+    /// <summary>Advances the rotation interpolation endpoints.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void SetVisualRotation(FixedQuaternion rotation) =>
         StoreVisualRotation(rotation.Normalized);

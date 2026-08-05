@@ -14,48 +14,90 @@ using System.Text.Json.Serialization;
 
 namespace Gravitas;
 
+/// <summary>
+/// Stores one serialized row of a physics collision matrix.
+/// </summary>
 [Serializable]
 [MemoryPackable]
 public partial struct MatrixRow
 {
+    /// <summary>
+    /// Collision enablement values for this matrix row.
+    /// </summary>
     [JsonInclude]
     public bool[] row;
 }
 
+/// <summary>
+/// Serializes optional physics settings and applies them to an explicit world context.
+/// </summary>
 [Serializable]
 [MemoryPackable]
 public sealed partial class PhysicsSettingsSaver : DefaultSaver
 {
+    /// <summary>
+    /// Optional fixed-step frame rate in simulation frames per second.
+    /// </summary>
     [JsonInclude]
     public int? FrameRate;
 
+    /// <summary>
+    /// Optional square layer-to-layer collision matrix.
+    /// </summary>
     [JsonInclude]
     public MatrixRow[]? CollisionMatrix;
 
+    /// <summary>
+    /// Optional include-mask bits for ground and support checks.
+    /// </summary>
     [JsonInclude]
     public int? GroundCheckLayerMaskBits;
 
+    /// <summary>
+    /// Optional default continuous-collision mode.
+    /// </summary>
     [JsonInclude]
     public ContinuousCollisionMode? DefaultContinuousCollisionMode;
 
+    /// <summary>
+    /// Optional maximum same-frame continuous-collision time-of-impact iterations.
+    /// </summary>
     [JsonInclude]
     public int? ContinuousCollisionMaxToiIterations;
 
+    /// <summary>
+    /// Optional discrete 3D constraint-island solver iteration count.
+    /// </summary>
     [JsonInclude]
     public int? DiscreteSolverIterations;
 
+    /// <summary>
+    /// Optional closing-speed threshold below which restitution is disabled.
+    /// </summary>
     [JsonInclude]
     public Fixed64? RestitutionVelocityThreshold;
 
+    /// <summary>
+    /// Optional number of frames an empty partition remains retained for reuse.
+    /// </summary>
     [JsonInclude]
     public int? RetainedPartitionTimeToKillFrames;
 
+    /// <summary>
+    /// Optional maximum retained partitions checked per retirement sweep.
+    /// </summary>
     [JsonInclude]
     public int? RetainedPartitionRetirementSweepBudget;
 
+    /// <summary>
+    /// Optional dimensional runtime mode.
+    /// </summary>
     [JsonInclude]
     public PhysicsRuntimeMode? RuntimeMode;
 
+    /// <summary>
+    /// Optional Y-axis half-thickness for 2D colliders embedded in mixed queries and contacts.
+    /// </summary>
     [JsonInclude]
     public Fixed64? Mixed2DHalfThickness;
 
@@ -63,18 +105,27 @@ public sealed partial class PhysicsSettingsSaver : DefaultSaver
     [MemoryPackIgnore]
     private GravitasWorldContext? _context;
 
+    /// <summary>
+    /// Binds the context used by the inherited early-apply phase.
+    /// </summary>
     public void BindContext(GravitasWorldContext context)
     {
         SwiftThrowHelper.ThrowIfNull(context, nameof(context));
         _context = context;
     }
 
+    /// <summary>
+    /// Creates and applies these settings to the specified context.
+    /// </summary>
     public void ApplyTo(GravitasWorldContext context)
     {
         SwiftThrowHelper.ThrowIfNull(context, nameof(context));
         context.ApplySettings(CreateSettings());
     }
 
+    /// <summary>
+    /// Creates validated physics settings, using defaults for omitted values.
+    /// </summary>
     public PhysicsSettings CreateSettings()
     {
         var settings = new PhysicsSettings(
@@ -104,6 +155,9 @@ public sealed partial class PhysicsSettingsSaver : DefaultSaver
         return settings;
     }
 
+    /// <summary>
+    /// Applies these settings to the context bound by <see cref="BindContext"/>.
+    /// </summary>
     protected override void OnEarlyApply()
     {
         SwiftThrowHelper.ThrowIfTrue(

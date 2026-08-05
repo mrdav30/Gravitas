@@ -31,13 +31,16 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
 
     #region Fields and Properties
 
+    /// <summary>Controls collider debug diagnostics.</summary>
     protected bool _debug;
+    /// <summary>Controls collider shape debug drawing.</summary>
     protected bool _drawShape;
     private bool _drawPartitions;
     private bool _drawBoundingBox;
 
     private bool _active = true;
     private bool _deactivationInProgress;
+    /// <summary>Gets or sets whether this collider participates in runtime physics.</summary>
     public bool IsActive
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -93,6 +96,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
     }
 
     private int _id = -1;
+    /// <summary>Gets the context-local runtime collider identifier.</summary>
     public int Id => _id;
 
     private int _serviceIndex = -1;
@@ -114,6 +118,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
     internal IMatterAgent? AgentOrNull => _agent;
 
     private GravitasWorldContext? _context;
+    /// <summary>Gets the world context to which this collider is bound.</summary>
     public GravitasWorldContext Context
     {
         get
@@ -127,6 +132,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
     }
 
     private SolidBody? _body;
+    /// <summary>Gets the owning 3D body, or <see langword="null"/> for a bodyless collider.</summary>
     public SolidBody? Body => _body;
 
     /// <summary>
@@ -154,6 +160,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
 
     internal LSCompoundCollider? CompoundOwner => _compoundOwner;
 
+    /// <summary>Gets the runtime world position, or sets it for a bodyless collider.</summary>
     public Vector3d Position
     {
         get => _compoundOwner?.Center
@@ -181,6 +188,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
         }
     }
 
+    /// <summary>Gets the committed world rotation, or sets it for a bodyless collider.</summary>
     public FixedQuaternion Rotation
     {
         get => _hasCommittedShape
@@ -208,11 +216,13 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
         }
     }
 
-    // For dynamic colliders, this is the velocity of the body. For static colliders, this is always zero.
+    /// <summary>Gets the owning body's linear velocity, or zero for a bodyless collider.</summary>
     public Vector3d Velocity => Body?.LinearVelocity ?? Vector3d.Zero;
 
+    /// <summary>Gets the GridForge world owned by this collider's context.</summary>
     public GridWorld World => Context.World;
 
+    /// <summary>Gets the transform that supplies this collider's runtime pose.</summary>
     public FixedTransform Transform => _compoundOwner?.Transform
         ?? Body?.PositionTransform
         ?? _agent?.Transform
@@ -221,6 +231,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
     private PhysicsLayer _layer = new();
     private PhysicsLayerMask _ignoredCollisionLayers = PhysicsLayerMask.None;
 
+    /// <summary>Gets or sets the single physics layer used for collision and query filtering.</summary>
     public PhysicsLayer Layer
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -268,6 +279,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
         }
     }
 
+    /// <summary>Gets whether this collider currently has 3D broad-phase partition membership.</summary>
     public bool IsPartitioned => _partitionState.IsPartitioned;
 
     /// <summary>
@@ -305,9 +317,12 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
         }
     }
 
+    /// <summary>Gets the runtime 3D shape family.</summary>
     public abstract ColliderType Shape { get; }
+    /// <summary>Gets the deterministic narrow-phase ordering priority.</summary>
     public abstract int Priority { get; }
 
+    /// <summary>Stores the unscaled radius for radius-based collider shapes.</summary>
     protected Fixed64 _radius = Fixed64.Half;
 
     /// <summary>
@@ -340,8 +355,10 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
     /// <value>The radius.</value>
     public virtual Fixed64 ScaledRadius => GetCurrentScaledRadius();
 
+    /// <summary>Gets the squared scaled bounding radius.</summary>
     public Fixed64 ScaledRadiusSqr => ScaledRadius * ScaledRadius;
 
+    /// <summary>Stores the unscaled local collider size.</summary>
     protected Vector3d _size = Vector3d.One;
 
     /// <summary>
@@ -363,10 +380,12 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
         }
     }
 
+    /// <summary>Gets the committed shape-specific measure used as the frontal-area fallback.</summary>
     public virtual Fixed64 Area { get; protected set; } = Fixed64.Zero;
 
     #region Grid & Partition Bounds
 
+    /// <summary>Gets the combined owner and compound-part scale.</summary>
     public virtual Vector3d LocalScale
     {
         get
@@ -435,9 +454,13 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
         : throw new InvalidOperationException(
             "Collider has no committed runtime shape.");
 
+    /// <summary>Stores the committed world-space axis-aligned bounds.</summary>
     protected FixedBoundBox _bounds;
+    /// <summary>Gets the committed world-space axis-aligned bounds.</summary>
     public FixedBoundBox Bounds => _bounds;
+    /// <summary>Gets the minimum corner of <see cref="Bounds"/>.</summary>
     public Vector3d BoundsMin => _bounds.Min;
+    /// <summary>Gets the maximum corner of <see cref="Bounds"/>.</summary>
     public Vector3d BoundsMax => _bounds.Max;
 
     internal SwiftList<WorldVoxelIndex>? PartitionCoordinates => _partitionState.Coordinates;
@@ -468,10 +491,15 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
         set => _queryState.CircleQueryVersion = value;
     }
 
+    /// <summary>Gets whether this collider has a hierarchy parent.</summary>
     public bool IsChild => _hierarchyState.IsChild;
+    /// <summary>Gets whether this collider is configured as or currently owns a hierarchy parent.</summary>
     public bool IsParent => _hierarchyState.IsParent;
+    /// <summary>Gets the context-local identifier of the parent collider, or -1 when unparented.</summary>
     public int ParentId => ParentKey.Id;
+    /// <summary>Gets the 3D parent collider, when the parent belongs to the 3D runtime.</summary>
     public LSCollider? Parent3D => _hierarchyState.Parent as LSCollider;
+    /// <summary>Gets the 2D parent collider, when the parent belongs to the 2D runtime.</summary>
     public LSCollider2D? Parent2D => _hierarchyState.Parent as LSCollider2D;
     internal LSCollider? TopParent3D => _hierarchyState.TopParent as LSCollider;
     internal LSCollider2D? TopParent2D => _hierarchyState.TopParent as LSCollider2D;
@@ -491,6 +519,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
         InitCore(body.Agent);
     }
 
+    /// <summary>Binds and registers this collider as a bodyless runtime collider.</summary>
     public void InitializeWithNoBody(IMatterAgent agent)
     {
         ThrowIfCompoundPartLifecycle(nameof(InitializeWithNoBody));
@@ -553,8 +582,10 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
         InitialPartition();
     }
 
+    /// <summary>Validates or prepares derived shape state before runtime registration.</summary>
     protected virtual void OnBeforeInitialize(IMatterAgent agent) { }
 
+    /// <summary>Runs derived initialization after runtime registration.</summary>
     protected virtual void OnInitialize() { }
 
     internal void ValidateCurrentRuntimeTransform()
@@ -580,9 +611,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
         MarkBroadPhaseChanged();
     }
 
-    // Dynamic Colliders attached to a body will be updated by the body
-    // Static Colliders need to be updated by whatever is updating the static collider
-    // Even if the collider is inactive, if the body is active, the collider will be updated
+    /// <summary>Refreshes bodyless collider shape and broad-phase state for one simulation step.</summary>
     public void Simulate()
     {
         ThrowIfCompoundPartLifecycle(nameof(Simulate));
@@ -664,24 +693,28 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
             context.MixedCollisions.Refresh3DColliderPartition(this);
     }
 
+    /// <summary>Assigns a 3D hierarchy parent used for collision exclusion.</summary>
     public void SetParent(LSCollider parent)
     {
         ThrowIfCompoundPartLifecycle(nameof(SetParent));
         _hierarchyState.SetParent(this, parent);
     }
 
+    /// <summary>Assigns a 2D hierarchy parent used for mixed collision exclusion.</summary>
     public void SetParent(LSCollider2D parent)
     {
         ThrowIfCompoundPartLifecycle(nameof(SetParent));
         _hierarchyState.SetParent(this, parent);
     }
 
+    /// <summary>Removes this collider from its current hierarchy parent.</summary>
     public void ClearParent()
     {
         ThrowIfCompoundPartLifecycle(nameof(ClearParent));
         _hierarchyState.ClearParent(this);
     }
 
+    /// <summary>Gets whether hierarchy rules exclude collision with another 3D collider.</summary>
     public bool IsSibling(LSCollider other)
     {
         return _hierarchyState.ExcludesCollisionWith(other._hierarchyState, HierarchyKey, other.HierarchyKey);
@@ -710,6 +743,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
     internal bool RebuildRuntimeShapeOnly(bool refreshMassProperties = true) =>
         RebuildRuntimeShapeState(refreshMassProperties);
 
+    /// <summary>Marks derived runtime shape state for deterministic rebuilding.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     protected void MarkShapeDirty()
     {
@@ -726,10 +760,13 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void MarkBroadPhaseChanged() => _partitionState.MarkBroadPhaseChanged();
 
+    /// <summary>Updates derived authored dimensions after <see cref="Radius"/> changes.</summary>
     protected virtual void OnRadiusChanged() { }
 
+    /// <summary>Updates derived material state after <see cref="Material"/> changes.</summary>
     protected virtual void OnMaterialChanged() { }
 
+    /// <summary>Normalizes an authored size for the derived shape.</summary>
     protected virtual Vector3d NormalizeSize(Vector3d value) => value;
 
     private static void ValidateSize(Vector3d value)
@@ -741,7 +778,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
     }
 
     /// <summary>
-    /// The point on the surface of the capsule that's nearest to the given point
+    /// Gets the point on this collider's surface nearest to a world-space point.
     /// </summary>
     /// <param name="other"></param>
     /// <returns></returns>

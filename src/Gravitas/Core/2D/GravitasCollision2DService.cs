@@ -44,6 +44,7 @@ public sealed class GravitasCollision2DService
     private int _retainedPartitionRetirementCursor;
     private bool _isDistributing;
 
+    /// <summary>Creates the pure 2D collision partition service for a world context.</summary>
     public GravitasCollision2DService(GravitasWorldContext context)
     {
         SwiftThrowHelper.ThrowIfNull(context, nameof(context));
@@ -51,16 +52,21 @@ public sealed class GravitasCollision2DService
         _releaseRetainedPartition = ReleasePartition;
     }
 
+    /// <summary>Gets the world context that owns this service.</summary>
     public GravitasWorldContext Context => _context;
 
+    /// <summary>Gets the current partition-distribution pass version.</summary>
     public uint Version { get; private set; } = 1;
 
+    /// <summary>Gets the number of partitions participating in collision work.</summary>
     public int ActivePartitionCount => _activePartitions.Count;
 
+    /// <summary>Gets the number of partitions available for reuse.</summary>
     public int InactivePartitionCount => _inactivePartitionPool.Count;
 
     internal int RetainedPartitionCount => _retainedPartitions.Count;
 
+    /// <summary>Clears all context-local 2D partitioning state.</summary>
     public void Reset()
     {
         DetachRetainedPartitions();

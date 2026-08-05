@@ -16,6 +16,9 @@ using SwiftCollections;
 
 namespace Gravitas.Queries;
 
+/// <content>
+/// Owns partition traversal for 3D raycasts, swept spheres, and registered-source sweeps.
+/// </content>
 public sealed partial class GravitasQuery3DService
 {
     private void TraceLineForClosestHit(

@@ -12,6 +12,7 @@ namespace Gravitas;
 
 public sealed partial class SolidBody2D
 {
+    /// <summary>Records or restores deterministic body state through Chronicler.</summary>
     public void RecordData(IChronicler chronicler)
     {
         bool active = Active;

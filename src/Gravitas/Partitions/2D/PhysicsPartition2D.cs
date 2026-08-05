@@ -13,31 +13,43 @@ using System.Runtime.CompilerServices;
 
 namespace Gravitas;
 
+/// <summary>
+/// Stores the pure 2D collider IDs assigned to one GridForge voxel.
+/// </summary>
 public sealed class PhysicsPartition2D : IVoxelPartition, IRetainedPhysicsPartition<GravitasCollision2DService>
 {
     private GravitasCollision2DService? _owner;
     private int _emptySinceFrame = -1;
     private int _retainedIndex = -1;
 
+    /// <summary>Creates an inactive 2D physics partition.</summary>
     public PhysicsPartition2D()
     {
         ActivationId = -1;
     }
 
+    /// <summary>Gets or sets the world voxel occupied by this partition.</summary>
     public WorldVoxelIndex WorldIndex { get; set; }
 
+    /// <summary>Gets or sets whether this partition is attached to a voxel.</summary>
     public bool IsPartitioned { get; set; }
 
+    /// <summary>Stores context-local dynamic collider IDs.</summary>
     public SwiftSparseSet? ContainedDynamicObjects;
 
+    /// <summary>Stores the awake subset of the dynamic collider IDs.</summary>
     public SwiftSparseSet? ContainedAwakeDynamicObjects;
 
+    /// <summary>Stores context-local kinematic collider IDs.</summary>
     public SwiftSparseSet? ContainedKinematicObjects;
 
+    /// <summary>Stores context-local static collider IDs.</summary>
     public SwiftSparseSet? ContainedStaticObjects;
 
+    /// <summary>Gets the active-partition slot, or <c>-1</c> when inactive.</summary>
     public int ActivationId { get; private set; }
 
+    /// <summary>Gets whether this partition has an active-partition slot.</summary>
     public bool IsAllocated => ActivationId != -1;
 
     internal bool IsEmpty =>
@@ -49,8 +61,10 @@ public sealed class PhysicsPartition2D : IVoxelPartition, IRetainedPhysicsPartit
 
     internal int RetainedIndex => _retainedIndex;
 
+    /// <summary>Gets the number of awake dynamic IDs in this partition.</summary>
     public int AwakeDynamicObjectCount => ContainedAwakeDynamicObjects?.Count ?? 0;
 
+    /// <summary>Gets the collision service that owns this partition.</summary>
     public GravitasCollision2DService Owner
     {
         get
@@ -63,6 +77,7 @@ public sealed class PhysicsPartition2D : IVoxelPartition, IRetainedPhysicsPartit
         }
     }
 
+    /// <summary>Attaches this partition to a voxel.</summary>
     public void OnAddToVoxel(Voxel voxel)
     {
         SwiftThrowHelper.ThrowIfTrue(
@@ -130,6 +145,7 @@ public sealed class PhysicsPartition2D : IVoxelPartition, IRetainedPhysicsPartit
             destination.Add(source.DenseKeys[i]);
     }
 
+    /// <summary>Adds a dynamic collider ID to this partition.</summary>
     public void AddDynamicObject(int item)
     {
         ContainedDynamicObjects ??= new();
@@ -143,6 +159,7 @@ public sealed class PhysicsPartition2D : IVoxelPartition, IRetainedPhysicsPartit
             ActivationId = Owner.ActivatePartition(this);
     }
 
+    /// <summary>Adds a static collider ID to this partition.</summary>
     public void AddStaticObject(int item)
     {
         ContainedStaticObjects ??= new();
@@ -150,6 +167,7 @@ public sealed class PhysicsPartition2D : IVoxelPartition, IRetainedPhysicsPartit
             MarkOccupied();
     }
 
+    /// <summary>Adds a kinematic collider ID to this partition.</summary>
     public void AddKinematicObject(int item)
     {
         ContainedKinematicObjects ??= new();
@@ -157,6 +175,7 @@ public sealed class PhysicsPartition2D : IVoxelPartition, IRetainedPhysicsPartit
             MarkOccupied();
     }
 
+    /// <summary>Removes a dynamic collider ID from this partition.</summary>
     public void RemoveDynamicObject(int item)
     {
         if (ContainedDynamicObjects?.Remove(item) != true)
@@ -175,6 +194,7 @@ public sealed class PhysicsPartition2D : IVoxelPartition, IRetainedPhysicsPartit
         MarkEmptyIfUnoccupied();
     }
 
+    /// <summary>Removes a static collider ID from this partition.</summary>
     public void RemoveStaticObject(int item)
     {
         if (ContainedStaticObjects?.Remove(item) != true)
@@ -186,6 +206,7 @@ public sealed class PhysicsPartition2D : IVoxelPartition, IRetainedPhysicsPartit
         MarkEmptyIfUnoccupied();
     }
 
+    /// <summary>Removes a kinematic collider ID from this partition.</summary>
     public void RemoveKinematicObject(int item)
     {
         if (ContainedKinematicObjects?.Remove(item) != true)
@@ -197,8 +218,10 @@ public sealed class PhysicsPartition2D : IVoxelPartition, IRetainedPhysicsPartit
         MarkEmptyIfUnoccupied();
     }
 
+    /// <summary>Returns whether a dynamic collider ID is marked awake.</summary>
     public bool ContainsAwakeDynamicObject(int item) => ContainedAwakeDynamicObjects?.Contains(item) == true;
 
+    /// <summary>Updates the awake state for a dynamic collider in this partition.</summary>
     public void SetDynamicObjectAwake(int item, bool awake)
     {
         if (ContainedDynamicObjects?.Contains(item) != true)
@@ -223,6 +246,7 @@ public sealed class PhysicsPartition2D : IVoxelPartition, IRetainedPhysicsPartit
         return body == null || body.IsAwakeForCollision;
     }
 
+    /// <summary>Releases this partition when it is removed from a voxel.</summary>
     public void OnRemoveFromVoxel(Voxel voxel)
     {
         Owner.ReleasePartition(this);
@@ -291,6 +315,7 @@ public sealed class PhysicsPartition2D : IVoxelPartition, IRetainedPhysicsPartit
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void MarkEmpty(int frame) => _emptySinceFrame = frame;
 
+    /// <summary>Updates the world voxel index used by this partition.</summary>
     public void SetParentIndex(WorldVoxelIndex parentIndex) => WorldIndex = parentIndex;
 
     int IRetainedPhysicsPartition<GravitasCollision2DService>.RetainedIndex => RetainedIndex;

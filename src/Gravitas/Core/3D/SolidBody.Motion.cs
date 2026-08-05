@@ -251,6 +251,7 @@ public partial class SolidBody
     }
 
 
+    /// <summary>Sets the authoritative world position and refreshes collider state.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void SetPosition(Vector3d position)
     {
@@ -267,6 +268,7 @@ public partial class SolidBody
         PublishExplicitBodyPose(preparedPose);
     }
 
+    /// <summary>Sets the authoritative world-space Y coordinate.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void SetHeight(Fixed64 height)
     {
@@ -285,6 +287,7 @@ public partial class SolidBody
         PublishExplicitBodyPose(preparedPose);
     }
 
+    /// <summary>Sets the authoritative world rotation and refreshes collider state.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void SetRotation(FixedQuaternion quaternion)
     {

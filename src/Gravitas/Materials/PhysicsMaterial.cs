@@ -178,6 +178,7 @@ public readonly partial struct PhysicsMaterial : IEquatable<PhysicsMaterial>
         return leftPriority >= rightPriority ? left : right;
     }
 
+    /// <inheritdoc/>
     public bool Equals(PhysicsMaterial other) =>
         StaticFriction == other.StaticFriction
         && DynamicFriction == other.DynamicFriction
@@ -185,9 +186,11 @@ public readonly partial struct PhysicsMaterial : IEquatable<PhysicsMaterial>
         && FrictionCombine == other.FrictionCombine
         && RestitutionCombine == other.RestitutionCombine;
 
+    /// <inheritdoc/>
     public override bool Equals(object? obj) =>
         obj is PhysicsMaterial other && Equals(other);
 
+    /// <inheritdoc/>
     public override int GetHashCode()
     {
         unchecked
@@ -201,9 +204,11 @@ public readonly partial struct PhysicsMaterial : IEquatable<PhysicsMaterial>
         }
     }
 
+    /// <summary>Determines whether two materials have equal coefficients and combine policies.</summary>
     public static bool operator ==(PhysicsMaterial left, PhysicsMaterial right) =>
         left.Equals(right);
 
+    /// <summary>Determines whether two materials differ in any coefficient or combine policy.</summary>
     public static bool operator !=(PhysicsMaterial left, PhysicsMaterial right) =>
         !left.Equals(right);
 

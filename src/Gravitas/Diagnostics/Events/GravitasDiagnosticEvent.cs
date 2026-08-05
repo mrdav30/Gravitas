@@ -70,38 +70,55 @@ public readonly struct GravitasDiagnosticEvent
         Hit = hit;
     }
 
+    /// <summary>Gets the simulation frame in which the event was captured.</summary>
     public int Frame { get; }
 
+    /// <summary>Gets the event's sequence within its capture buffer.</summary>
     public int Sequence { get; }
 
+    /// <summary>Gets the event kind that determines how its payload is interpreted.</summary>
     public GravitasDiagnosticEventKind Kind { get; }
 
+    /// <summary>Gets the context-local body, ragdoll, or diagnostic root identifier.</summary>
     public int BodyId { get; }
 
+    /// <summary>Gets the context-local joint identifier.</summary>
     public int JointId { get; }
 
+    /// <summary>Gets the first context-local collider identifier.</summary>
     public int ColliderAId { get; }
 
+    /// <summary>Gets the second context-local collider identifier.</summary>
     public int ColliderBId { get; }
 
+    /// <summary>Gets the dimensional runtime surface of the first collider.</summary>
     public GravitasColliderDimension ColliderADimension { get; }
 
+    /// <summary>Gets the dimensional runtime surface of the second collider.</summary>
     public GravitasColliderDimension ColliderBDimension { get; }
 
+    /// <summary>Gets the 3D type of the first collider.</summary>
     public ColliderType ColliderAType { get; }
 
+    /// <summary>Gets the 3D type of the second collider.</summary>
     public ColliderType ColliderBType { get; }
 
+    /// <summary>Gets the 2D type of the first collider.</summary>
     public ColliderType2D ColliderA2DType { get; }
 
+    /// <summary>Gets the 2D type of the second collider.</summary>
     public ColliderType2D ColliderB2DType { get; }
 
+    /// <summary>Gets the event-specific start vector.</summary>
     public Vector3d Start { get; }
 
+    /// <summary>Gets the event-specific end vector.</summary>
     public Vector3d End { get; }
 
+    /// <summary>Gets the first event-specific point.</summary>
     public Vector3d PointA { get; }
 
+    /// <summary>Gets the second event-specific point.</summary>
     public Vector3d PointB { get; }
 
     /// <summary>
@@ -114,16 +131,22 @@ public readonly struct GravitasDiagnosticEvent
     /// </summary>
     public bool HasPointB { get; }
 
+    /// <summary>Gets the event-specific vector payload.</summary>
     public Vector3d Vector { get; }
 
+    /// <summary>Gets the first event-specific fixed-point scalar.</summary>
     public Fixed64 ScalarA { get; }
 
+    /// <summary>Gets the second event-specific fixed-point scalar.</summary>
     public Fixed64 ScalarB { get; }
 
+    /// <summary>Gets the first event-specific integer value.</summary>
     public int DataA { get; }
 
+    /// <summary>Gets the second event-specific integer value.</summary>
     public int DataB { get; }
 
+    /// <summary>Gets the event-specific result flag.</summary>
     public bool Hit { get; }
 
     /// <summary>
@@ -404,7 +427,7 @@ public readonly struct GravitasDiagnosticEvent
     }
 
     /// <summary>
-    /// Tries to decode this event as a 3D joint diagnostic view.
+    /// Tries to decode this event as a joint diagnostic view.
     /// </summary>
     public bool TryAsJoint(out GravitasJointDiagnosticView view)
     {
@@ -422,7 +445,7 @@ public readonly struct GravitasDiagnosticEvent
     }
 
     /// <summary>
-    /// Tries to decode this event as a 3D ragdoll diagnostic view.
+    /// Tries to decode this event as a ragdoll active-state diagnostic view.
     /// </summary>
     public bool TryAsRagdoll(out GravitasRagdollDiagnosticView view)
     {

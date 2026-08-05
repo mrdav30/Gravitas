@@ -21,11 +21,13 @@ public sealed class LSCircleCollider2D : LSCollider2D
     private Fixed64 _scaledRadius;
     private Fixed64 _preparedRadius;
 
+    /// <summary>Creates a pure 2D circle with an authored radius.</summary>
     public LSCircleCollider2D(Fixed64 radius)
     {
         Radius = radius;
     }
 
+    /// <summary>Creates a runtime circle from an authored shape definition.</summary>
     public LSCircleCollider2D(ColliderShapeDefinition2D definition)
     {
         definition.EnsureKind(ColliderShapeDefinition2DKind.Circle);
@@ -33,8 +35,10 @@ public sealed class LSCircleCollider2D : LSCollider2D
         Radius = definition.Radius;
     }
 
+    /// <inheritdoc/>
     public override ColliderType2D Shape => ColliderType2D.Circle;
 
+    /// <summary>Gets or sets the unscaled circle radius.</summary>
     public Fixed64 Radius
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -50,12 +54,14 @@ public sealed class LSCircleCollider2D : LSCollider2D
         }
     }
 
+    /// <summary>Gets the radius after owner and compound-part scaling.</summary>
     public Fixed64 ScaledRadius
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get => GetMassPropertyRadius();
     }
 
+    /// <inheritdoc/>
     public override bool ContainsPoint(Vector2d point) =>
         FixedSegment2d.ContainsPointInCenteredCapsule(
             point,
@@ -65,6 +71,7 @@ public sealed class LSCircleCollider2D : LSCollider2D
             ScaledRadius,
             Fixed64.Zero);
 
+    /// <inheritdoc/>
     public override Vector2d GetClosestPoint(Vector2d point)
     {
         if (TryGetClosestBoundaryAnchor(
@@ -79,6 +86,7 @@ public sealed class LSCircleCollider2D : LSCollider2D
             "The closest circle surface point is outside the Fixed64 coordinate domain.");
     }
 
+    /// <inheritdoc/>
     public override Vector2d GetSupportPoint(Vector2d direction)
     {
         if (direction == Vector2d.Zero)
@@ -171,6 +179,7 @@ public sealed class LSCircleCollider2D : LSCollider2D
     private protected override void PublishShape() =>
         _scaledRadius = _preparedRadius;
 
+    /// <inheritdoc/>
     protected override void RecordShapeData(IChronicler chronicler)
     {
         Fixed64 radius = _radius;

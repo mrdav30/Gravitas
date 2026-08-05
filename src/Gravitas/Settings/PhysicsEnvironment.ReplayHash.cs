@@ -10,6 +10,9 @@ using FixedMathSharp.Chronicler;
 
 namespace Gravitas;
 
+/// <content>
+/// Contributes physical environment values to deterministic replay hashes.
+/// </content>
 public sealed partial class PhysicsEnvironment
 {
     internal void ContributeReplayHash(ref ChronicleHashWriter writer)

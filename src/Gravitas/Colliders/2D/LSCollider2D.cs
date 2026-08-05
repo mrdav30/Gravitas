@@ -73,8 +73,11 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
     private ColliderPairState<CollisionPair2D> _pairState;
     private ColliderHierarchyState _hierarchyState;
 
+    /// <summary>Handles a pure 2D contact notification for the other body.</summary>
     public delegate void Body2DCollisionFunc(SolidBody2D other);
+    /// <summary>Handles a pure 2D trigger notification for the other collider.</summary>
     public delegate void Trigger2DCollisionFunc(LSCollider2D other);
+    /// <summary>Handles a mixed contact or trigger notification for the other 3D collider.</summary>
     public delegate void Mixed2DCollisionFunc(LSCollider other);
 
     /// <summary>
@@ -107,8 +110,11 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
     /// </summary>
     public event Trigger2DCollisionFunc? OnTriggerExit;
 
+    /// <summary>Raised while this collider has a physical mixed contact with a 3D collider.</summary>
     public event Mixed2DCollisionFunc? OnMixedContact;
+    /// <summary>Raised when this collider begins a physical mixed contact with a 3D collider.</summary>
     public event Mixed2DCollisionFunc? OnMixedContactEnter;
+    /// <summary>Raised when this collider ends a physical mixed contact with a 3D collider.</summary>
     public event Mixed2DCollisionFunc? OnMixedContactExit;
 
     /// <summary>
@@ -126,6 +132,7 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
     /// </summary>
     public event Mixed2DCollisionFunc? OnMixedTriggerExit;
 
+    /// <summary>Gets the context-local runtime collider identifier.</summary>
     public int Id => _id;
 
     internal int ReplayOrdinal => _replayOrdinal;
@@ -160,6 +167,7 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
 
     internal SwiftHashSet<int>? CollisionPairHolders => _pairState.CollisionPairHolders;
 
+    /// <summary>Gets the owning 2D body, or <see langword="null"/> for a bodyless collider.</summary>
     public SolidBody2D? Body => _body;
 
     /// <summary>
@@ -170,6 +178,7 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
 
     internal bool RequiresServiceSideRefresh => _body == null || _body.DynamicId < 0;
 
+    /// <summary>Gets the host agent to which this collider is bound.</summary>
     public IMatterAgent Agent
     {
         get
@@ -184,6 +193,7 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
 
     internal IMatterAgent? AgentOrNull => _agent;
 
+    /// <summary>Gets the world context to which this collider is bound.</summary>
     public GravitasWorldContext Context
     {
         get
@@ -196,6 +206,7 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
         }
     }
 
+    /// <summary>Gets or sets whether this collider participates in runtime physics.</summary>
     public bool IsActive
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -291,8 +302,10 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
         }
     }
 
+    /// <summary>Gets the runtime pure 2D shape family.</summary>
     public abstract ColliderType2D Shape { get; }
 
+    /// <summary>Gets the deterministic pure 2D narrow-phase ordering priority.</summary>
     public virtual int Priority => ColliderSettings2D.GetPriority(Shape);
 
     internal uint RaycastVersion
@@ -311,14 +324,19 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
         set => _queryState.CircleQueryVersion = value;
     }
 
+    /// <summary>Gets whether this collider has a hierarchy parent.</summary>
     public bool IsChild => _hierarchyState.IsChild;
 
+    /// <summary>Gets whether this collider is configured as or currently owns a hierarchy parent.</summary>
     public bool IsParent => _hierarchyState.IsParent;
 
+    /// <summary>Gets the context-local identifier of the parent collider, or -1 when unparented.</summary>
     public int ParentId => ParentKey.Id;
 
+    /// <summary>Gets the 2D parent collider, when the parent belongs to the 2D runtime.</summary>
     public LSCollider2D? Parent2D => _hierarchyState.Parent as LSCollider2D;
 
+    /// <summary>Gets the 3D parent collider, when the parent belongs to the 3D runtime.</summary>
     public LSCollider? Parent3D => _hierarchyState.Parent as LSCollider;
 
     internal LSCollider2D? TopParent2D => _hierarchyState.TopParent as LSCollider2D;
@@ -339,6 +357,7 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
 
     IColliderHierarchyNode? IColliderHierarchyNode.HierarchyParent => _hierarchyState.Parent;
 
+    /// <summary>Gets or sets the unscaled local center offset.</summary>
     public Vector2d LocalOffset
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -353,6 +372,7 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
         }
     }
 
+    /// <summary>Gets the committed pure 2D world-space bounds.</summary>
     public FixedBoundArea Bounds => _bounds;
 
     internal FixedBoundBox MixedBounds3D => _mixedBounds3D;
@@ -386,12 +406,16 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
         }
     }
 
+    /// <summary>Gets the minimum world X coordinate of <see cref="Bounds"/>.</summary>
     public Fixed64 MinX => _bounds.Min.X;
 
+    /// <summary>Gets the maximum world X coordinate of <see cref="Bounds"/>.</summary>
     public Fixed64 MaxX => _bounds.Max.X;
 
+    /// <summary>Gets the minimum planar Y coordinate of <see cref="Bounds"/>.</summary>
     public Fixed64 MinY => _bounds.Min.Y;
 
+    /// <summary>Gets the maximum planar Y coordinate of <see cref="Bounds"/>.</summary>
     public Fixed64 MaxY => _bounds.Max.Y;
 
     internal void Initialize(SolidBody2D body)
@@ -399,6 +423,7 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
         InitCore(body.Agent, body);
     }
 
+    /// <summary>Binds and registers this collider as a bodyless pure 2D collider.</summary>
     public void InitializeWithNoBody(IMatterAgent agent)
     {
         ThrowIfCompoundPartLifecycle(nameof(InitializeWithNoBody));
@@ -454,6 +479,7 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
         PublishPreparedShape();
     }
 
+    /// <summary>Validates or prepares derived shape state before runtime registration.</summary>
     protected virtual void OnBeforeInitialize(IMatterAgent agent) { }
 
     internal void SetPhysicsState(int id, int serviceIndex, int replayOrder)
@@ -528,6 +554,7 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
         _preparedContext = null;
     }
 
+    /// <summary>Unregisters this collider, or deactivates its owning body.</summary>
     public void Deactivate()
     {
         ThrowIfCompoundPartLifecycle(nameof(Deactivate));
@@ -545,6 +572,7 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
         ClearBindingState();
     }
 
+    /// <summary>Refreshes bodyless collider shape and broad-phase state for one simulation step.</summary>
     public void Simulate()
     {
         ThrowIfCompoundPartLifecycle(nameof(Simulate));
@@ -574,24 +602,28 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
             CaptureShapeSnapshot(),
             requireRepresentableMassPoint: true);
 
+    /// <summary>Assigns a 2D hierarchy parent used for collision exclusion.</summary>
     public void SetParent(LSCollider2D parent)
     {
         ThrowIfCompoundPartLifecycle(nameof(SetParent));
         _hierarchyState.SetParent(this, parent);
     }
 
+    /// <summary>Assigns a 3D hierarchy parent used for mixed collision exclusion.</summary>
     public void SetParent(LSCollider parent)
     {
         ThrowIfCompoundPartLifecycle(nameof(SetParent));
         _hierarchyState.SetParent(this, parent);
     }
 
+    /// <summary>Removes this collider from its current hierarchy parent.</summary>
     public void ClearParent()
     {
         ThrowIfCompoundPartLifecycle(nameof(ClearParent));
         _hierarchyState.ClearParent(this);
     }
 
+    /// <summary>Gets whether hierarchy rules exclude collision with another 2D collider.</summary>
     public bool IsSibling(LSCollider2D other) =>
         _hierarchyState.ExcludesCollisionWith(other._hierarchyState, HierarchyKey, other.HierarchyKey);
 
@@ -765,6 +797,7 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
                 _compoundLocalRotation);
     }
 
+    /// <summary>Rotates a planar vector and removes fixed-point epsilon residue.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     protected static Vector2d Rotate(Vector2d value, Fixed64 radians)
     {
@@ -774,6 +807,7 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
         return ClampNearZero(Vector2d.Rotate(value, radians));
     }
 
+    /// <summary>Replaces vector components within fixed-point epsilon of zero.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     protected static Vector2d ClampNearZero(Vector2d value)
     {
@@ -821,6 +855,7 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
             "Loaded 2D trigger state is invalid for a collider attached to a SolidBody2D.");
     }
 
+    /// <inheritdoc/>
     public void RecordData(IChronicler chronicler)
     {
         RecordValues.Look(chronicler, ref _isActive, "Active", true);
@@ -839,6 +874,7 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
         }
     }
 
+    /// <summary>Records derived authored shape data.</summary>
     protected virtual void RecordShapeData(IChronicler chronicler) { }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

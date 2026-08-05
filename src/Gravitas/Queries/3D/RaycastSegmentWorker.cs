@@ -54,6 +54,9 @@ public sealed class RaycastSegmentWorker
         _calculateIntersections = calculateIntersectionPoints;
     }
 
+    /// <summary>
+    /// Checks whether a sphere collider overlaps the prepared segment.
+    /// </summary>
     public bool CheckSphereOverlaps(LSSphereCollider sphereCollider, ref SwiftList<Vector3d> outputIntersectionPoints) =>
         CheckSphereOverlaps(
             new FixedBoundSphere(sphereCollider.Center, sphereCollider.ScaledRadius),
@@ -102,6 +105,9 @@ public sealed class RaycastSegmentWorker
         return true;
     }
 
+    /// <summary>
+    /// Checks whether a capsule collider overlaps the prepared segment.
+    /// </summary>
     public bool CheckCapsuleOverlaps(LSCapsuleCollider capsuleCollider, ref SwiftList<Vector3d> outputIntersectionPoints)
     {
         if (!_segmentIsValid)
@@ -135,6 +141,9 @@ public sealed class RaycastSegmentWorker
         return true;
     }
 
+    /// <summary>
+    /// Checks whether a cylinder collider overlaps the prepared segment.
+    /// </summary>
     public bool CheckCylinderOverlaps(LSCylinderCollider cylinderCollider, ref SwiftList<Vector3d> outputIntersectionPoints)
     {
         if (!_segmentIsValid)
@@ -169,6 +178,9 @@ public sealed class RaycastSegmentWorker
         return true;
     }
 
+    /// <summary>
+    /// Checks whether a cone collider overlaps the prepared segment.
+    /// </summary>
     public bool CheckConeOverlaps(LSConeCollider coneCollider, ref SwiftList<Vector3d> outputIntersectionPoints)
     {
         if (!_segmentIsValid)
@@ -202,6 +214,9 @@ public sealed class RaycastSegmentWorker
         return true;
     }
 
+    /// <summary>
+    /// Checks whether a mesh collider overlaps the prepared segment.
+    /// </summary>
     public bool CheckMeshOverlaps(LSMeshCollider meshCollider, ref SwiftList<Vector3d> outputIntersectionPoints)
     {
         if (!_segmentIsValid)
@@ -252,6 +267,9 @@ public sealed class RaycastSegmentWorker
         return intersects;
     }
 
+    /// <summary>
+    /// Checks whether a cuboid's axis-aligned bounds overlap the prepared segment.
+    /// </summary>
     public bool CheckAABBoxOverlaps(LSCuboidCollider aabox, ref SwiftList<Vector3d> outputIntersectionPoints) =>
          CheckAABBoxOverlaps(aabox.BoundsMin, aabox.BoundsMax, ref outputIntersectionPoints);
 

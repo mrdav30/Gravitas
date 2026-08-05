@@ -17,6 +17,7 @@ namespace Gravitas.CollisionHandling;
 /// </summary>
 public readonly struct ManifoldContact2D
 {
+    /// <summary>Creates a deterministic planar contact from world-space witness points.</summary>
     public ManifoldContact2D(
         ulong contactId,
         Vector2d pointA,

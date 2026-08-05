@@ -22,6 +22,7 @@ public sealed class LSPolygonCollider2D : LSCollider2D, IConvexVertexSource2D
     private Vector2d[] _scaledLocalVertices;
     private Vector2d[] _scaledLocalVerticesScratch;
 
+    /// <summary>Creates a pure 2D convex polygon from authored local vertices.</summary>
     public LSPolygonCollider2D(params Vector2d[] vertices)
     {
         _localVertices = Array.Empty<Vector2d>();
@@ -30,6 +31,7 @@ public sealed class LSPolygonCollider2D : LSCollider2D, IConvexVertexSource2D
         SetLocalVertices(vertices, markDirty: true);
     }
 
+    /// <summary>Creates a runtime convex polygon from an authored shape definition.</summary>
     public LSPolygonCollider2D(ColliderShapeDefinition2D definition)
     {
         definition.EnsureKind(ColliderShapeDefinition2DKind.ConvexPolygon);
@@ -40,8 +42,10 @@ public sealed class LSPolygonCollider2D : LSCollider2D, IConvexVertexSource2D
         SetLocalVertices(definition.GetPolygonVerticesForRuntime(), markDirty: true);
     }
 
+    /// <inheritdoc/>
     public override ColliderType2D Shape => ColliderType2D.ConvexPolygon;
 
+    /// <summary>Gets the polygon vertex count.</summary>
     public int Count => _scaledLocalVertices.Length;
 
     /// <summary>
@@ -83,6 +87,7 @@ public sealed class LSPolygonCollider2D : LSCollider2D, IConvexVertexSource2D
         return TryGetVertex(index, out vertex);
     }
 
+    /// <inheritdoc/>
     public override bool ContainsPoint(Vector2d point) =>
         FixedConvex2dRelations.ContainsPoint(
             point,
@@ -90,6 +95,7 @@ public sealed class LSPolygonCollider2D : LSCollider2D, IConvexVertexSource2D
             Rotation,
             _scaledLocalVertices);
 
+    /// <inheritdoc/>
     public override Vector2d GetClosestPoint(Vector2d point)
     {
         if (ContainsPoint(point))
@@ -110,6 +116,7 @@ public sealed class LSPolygonCollider2D : LSCollider2D, IConvexVertexSource2D
             "The closest polygon point is outside the Fixed64 coordinate domain.");
     }
 
+    /// <inheritdoc/>
     public override Vector2d GetSupportPoint(Vector2d direction)
     {
         FixedPointAnchor2d anchor = FixedConvex2dRelations.GetSupportAnchor(
@@ -225,6 +232,7 @@ public sealed class LSPolygonCollider2D : LSCollider2D, IConvexVertexSource2D
         _scaledLocalVerticesScratch = offsets;
     }
 
+    /// <inheritdoc/>
     protected override void RecordShapeData(IChronicler chronicler)
     {
         Vector2d[] vertices = _localVertices;

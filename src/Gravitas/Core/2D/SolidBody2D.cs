@@ -16,7 +16,7 @@ using System.Runtime.CompilerServices;
 namespace Gravitas;
 
 /// <summary>
-/// First-class pure 2D deterministic body state.
+/// Represents deterministic pure 2D body state owned by one world context.
 /// </summary>
 public sealed partial class SolidBody2D : IRecordable
 {
@@ -53,6 +53,7 @@ public sealed partial class SolidBody2D : IRecordable
     private readonly SwiftList<int> _rotationalContinuousCollisionCandidateIds = new();
     private readonly SwiftList<PhysicsMixedHit> _continuousMixedCollisionHits = new();
 
+    /// <summary>Creates a pure 2D body bound to a host agent and collider.</summary>
     public SolidBody2D(IMatterAgent agent, LSCollider2D collider)
     {
         SwiftThrowHelper.ThrowIfNull(agent, nameof(agent));
@@ -62,10 +63,13 @@ public sealed partial class SolidBody2D : IRecordable
         Collider = collider;
     }
 
+    /// <summary>Gets the host agent that owns this body.</summary>
     public IMatterAgent Agent { get; }
 
+    /// <summary>Gets the world context supplied by the host agent.</summary>
     public GravitasWorldContext Context { get; }
 
+    /// <summary>Gets the runtime 2D collider attached to this body.</summary>
     public LSCollider2D Collider { get; }
 
     /// <summary>
@@ -74,6 +78,7 @@ public sealed partial class SolidBody2D : IRecordable
     /// </summary>
     public int DynamicId { get; internal set; } = -1;
 
+    /// <summary>Gets whether the body is initialized and registered.</summary>
     public bool Active { get; private set; }
 
     private BodyFreezeAxes2D _freezeAxes;
@@ -284,6 +289,7 @@ public sealed partial class SolidBody2D : IRecordable
         get => (_freezeAxes & BodyFreezeAxes2D.Rotation) == BodyFreezeAxes2D.Rotation;
     }
 
+    /// <summary>Gets or sets the body mass used to derive solver mass properties.</summary>
     public Fixed64 Mass
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -298,6 +304,7 @@ public sealed partial class SolidBody2D : IRecordable
         }
     }
 
+    /// <summary>Gets the reciprocal mass, or zero when the mass is non-positive.</summary>
     public Fixed64 InverseMass => _mass > Fixed64.Zero ? Fixed64.One / _mass : Fixed64.Zero;
 
     /// <summary>
@@ -360,32 +367,42 @@ public sealed partial class SolidBody2D : IRecordable
         return allowedScale > Fixed64.Zero ? InverseMass * allowedScale : Fixed64.Zero;
     }
 
+    /// <summary>Gets the scalar moment of inertia around the yaw axis.</summary>
     public Fixed64 MomentOfInertia => _momentOfInertia;
 
+    /// <summary>Gets the reciprocal yaw moment of inertia.</summary>
     public Fixed64 InverseMomentOfInertia => _inverseMomentOfInertia;
 
+    /// <summary>Gets the signed yaw velocity.</summary>
     public Fixed64 AngularVelocity => _angularVelocity;
 
+    /// <summary>Gets the accumulated yaw acceleration.</summary>
     public Fixed64 AngularAcceleration => _angularAccelerationStore;
 
+    /// <summary>Gets the absolute yaw speed.</summary>
     public Fixed64 AngularSpeed => _angularSpeed;
 
+    /// <summary>Gets the authoritative planar X/Z position.</summary>
     public Vector2d Position
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get => _position;
     }
 
+    /// <summary>Gets the authoritative yaw rotation.</summary>
     public Fixed64 Rotation
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get => _rotation;
     }
 
+    /// <summary>Gets the authoritative planar linear velocity.</summary>
     public Vector2d LinearVelocity => _linearVelocity;
 
+    /// <summary>Gets the magnitude of <see cref="LinearVelocity"/>.</summary>
     public Fixed64 LinearSpeed => _linearSpeed;
 
+    /// <summary>Gets or sets the planar gravity acceleration applied to this body.</summary>
     public Vector2d Gravity { get; set; } = Vector2d.Zero;
 
     private Fixed64 _gravityScale = Fixed64.One;
@@ -472,10 +489,12 @@ public sealed partial class SolidBody2D : IRecordable
         }
     }
 
+    /// <summary>Gets whether the body is sleeping.</summary>
     public bool IsSleeping => _isSleeping;
 
     internal bool IsAwakeForCollision => HasSolverMobility && !IsSleeping;
 
+    /// <summary>Initializes and registers the body at an authoritative planar pose.</summary>
     public void Initialize(
         Vector2d position,
         Fixed64 rotation = default,
@@ -615,6 +634,7 @@ public sealed partial class SolidBody2D : IRecordable
             Context.Collisions2D.RefreshPartitionAwakeState(Collider);
     }
 
+    /// <summary>Puts an eligible body to sleep and clears its motion.</summary>
     public void Sleep()
     {
         if (!CanSleep)
@@ -633,6 +653,7 @@ public sealed partial class SolidBody2D : IRecordable
         Context.Collisions2D.RefreshPartitionAwakeState(Collider);
     }
 
+    /// <summary>Wakes the body and resumes collision participation.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Wake()
     {
