@@ -1,11 +1,42 @@
 # Contributing
 
+Thanks for helping improve Gravitas. Determinism and physics correctness come
+first; focused changes with explicit ownership and verification are easiest to
+review.
+
 For substantial API, architecture, serialization, or physics changes, open an
 issue or discussion before implementation so the intended contract is clear.
 Focused fixes can proceed directly through a pull request.
 
-Please note we have a code of conduct, please follow it in all your interactions
-with the project.
+## Development Setup
+
+[`global.json`](global.json) selects the .NET SDK used for solution tooling.
+Keep the .NET 8 runtime installed for the `net8.0` tests and benchmarks.
+
+```bash
+dotnet restore Gravitas.slnx
+dotnet build Gravitas.slnx --configuration Release
+dotnet test Gravitas.slnx --configuration Release
+```
+
+Run the Lean configuration when a change touches dependencies, serialization,
+MemoryPack conditionals, or shared runtime APIs:
+
+```bash
+dotnet build Gravitas.slnx --configuration ReleaseLean
+dotnet test Gravitas.slnx --configuration ReleaseLean
+```
+
+Build the documentation site after a Release build when changing XML docs,
+`docs/api`, or API navigation:
+
+```bash
+dotnet tool restore
+dotnet tool run docfx docs/api/docfx.json --warningsAsErrors
+```
+
+See [AGENTS.md](AGENTS.md) for the full architecture, determinism, testing,
+serialization, benchmark, and local LSF stack guidance.
 
 ## Pull Request Process
 
@@ -19,6 +50,19 @@ with the project.
    derive versions through GitVersion.
 5. Exclude generated build, test, coverage, package, and benchmark artifacts
    from the pull request.
+
+## Documentation
+
+- Keep the root README short, welcoming, and focused on why someone would use
+  Gravitas.
+- Put task-oriented guidance and cross-cutting behavior in `docs/wiki`; keep
+  links between wiki pages relative and include their `.md` extensions.
+- Keep public XML documentation factual and useful because it feeds the DocFX
+  API reference.
+- Update the matching wiki page whenever lifecycle, dimensional behavior,
+  collision, queries, serialization, replay, or diagnostics change.
+
+Please follow the code of conduct in all project interactions.
 
 ## Code of Conduct
 
@@ -91,7 +135,7 @@ members of the project's leadership.
 ### Attribution
 
 This Code of Conduct is adapted from the [Contributor Covenant][homepage],
-version 1.4, available at [http://contributor-covenant.org/version/1/4][version]
+version 1.4, available at the [version 1.4 text][version].
 
-[homepage]: http://contributor-covenant.org
-[version]: http://contributor-covenant.org/version/1/4/
+[homepage]: https://www.contributor-covenant.org/
+[version]: https://www.contributor-covenant.org/version/1/4/code-of-conduct/

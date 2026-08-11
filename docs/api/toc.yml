@@ -4,7 +4,23 @@ items:
   - name: API Reference
     href: obj/api/
     homepage: obj/api/Gravitas.yml
-  - name: Wiki
-    href: https://github.com/mrdav30/Gravitas/wiki
-  - name: Coverage
-    href: https://mrdav30.github.io/Gravitas/coverage/
+  - name: Guides
+    items:
+      - name: Getting Started
+        href: https://github.com/mrdav30/Gravitas/wiki/GETTING_STARTED
+      - name: Host Integration
+        href: https://github.com/mrdav30/Gravitas/wiki/HOST_INTEGRATION
+      - name: Runtime Modes
+        href: https://github.com/mrdav30/Gravitas/wiki/DIMENSIONS
+      - name: Collision Pipeline
+        href: https://github.com/mrdav30/Gravitas/wiki/COLLISION_PIPELINE
+      - name: Query Services
+        href: https://github.com/mrdav30/Gravitas/wiki/QUERY_SERVICES
+  - name: Resources
+    items:
+      - name: Wiki
+        href: https://github.com/mrdav30/Gravitas/wiki
+      - name: Source
+        href: https://github.com/mrdav30/Gravitas
+      - name: Core Test Coverage
+        href: https://mrdav30.github.io/Gravitas/coverage/

@@ -40,8 +40,9 @@ Read these in order before making non-trivial changes:
    - [GridForge](https://github.com/mrdav30/GridForge)
    - [Chronicler](https://github.com/mrdav30/Chronicler) when serialization
      behavior is involved
-3. [`docs/wiki/OVERVIEW.md`](docs/wiki/OVERVIEW.md), then the matching wiki page
-   for the area being changed:
+3. [`docs/wiki/GETTING_STARTED.md`](docs/wiki/GETTING_STARTED.md) for the public
+   integration path and [`docs/wiki/OVERVIEW.md`](docs/wiki/OVERVIEW.md) for the
+   technical map, then the matching wiki page for the area being changed:
    [`HOST_INTEGRATION.md`](docs/wiki/HOST_INTEGRATION.md),
    [`RUNTIME_ARCHITECTURE.md`](docs/wiki/RUNTIME_ARCHITECTURE.md),
    [`COLLISION_PIPELINE.md`](docs/wiki/COLLISION_PIPELINE.md),
@@ -80,8 +81,8 @@ workflow changes:
 
 - [`README.md`](README.md)
 - [`AGENTS.md`](AGENTS.md)
-- [`docs/api`](docs/api) for the generated API-site configuration and landing
-  content
+- [`docs/api`](docs/api) for the generated API-site configuration, landing
+  content, namespace overrides, logo, repository link, and custom theme
 - [`docs/wiki`](docs/wiki), the source content for the GitHub Wiki, especially
   when runtime ownership, host integration, collision behavior, query behavior,
   serialization/replay behavior, lifecycle order, or known runtime boundaries
@@ -116,8 +117,8 @@ published GitHub Wiki.
 | [`src/Gravitas/Support`](src/Gravitas/Support)                     | Layers, lifecycle hooks, coroutine scaffolding, transient state helpers                                            | Keep engine-specific assumptions out.                                                                                                  |
 | [`tests/Gravitas.Tests`](tests/Gravitas.Tests)                     | xUnit v3 test project                                                                                              | Covers runtime, settings, collision, partitions, queries, serialization, CCD, and authored shape behavior.                             |
 | [`tests/Gravitas.Benchmarks`](tests/Gravitas.Benchmarks)           | BenchmarkDotNet project                                                                                            | Covers context lifecycle, registration/partitioning, simulation, queries, diagnostics, mixed broad phase, 2D, meshes, and CCD scaling. |
-| [`docs/api`](docs/api)                                             | DocFX configuration and documentation-site landing content                                                         | Generated output under `docs/api/obj` is ignored.                                                                                      |
-| [`docs/wiki`](docs/wiki)                                           | Developer-facing architecture and usage notes                                                                      | Keep aligned with runtime, host integration, collision, query, serialization/replay, and diagnostics changes.                          |
+| [`docs/api`](docs/api)                                             | DocFX configuration, branded landing content, namespace overrides, and theme                                        | Generated output under `docs/api/obj` is ignored. Build with warnings as errors and preserve the logo, repository action, and local-link checks. |
+| [`docs/wiki`](docs/wiki)                                           | User guides plus developer-facing architecture and usage notes                                                      | Keep `GETTING_STARTED.md` approachable and align deeper pages with runtime, host integration, collision, query, serialization/replay, and diagnostics changes. |
 
 Ignore generated output when reviewing structure:
 
@@ -607,7 +608,7 @@ After a `Release` build, generate the local API site with:
 
 ```bash
 dotnet tool restore
-dotnet tool run docfx docs/api/docfx.json
+dotnet tool run docfx docs/api/docfx.json --warningsAsErrors
 ```
 
 Important notes:
@@ -622,8 +623,9 @@ Important notes:
   `ReleaseLean` on Ubuntu and Windows.
 - After a successful `main` push, the
   [coverage workflow](.github/workflows/coverage.yml) enforces 100% reachable
-  line, branch, and method coverage, then publishes the DocFX site and the
-  coverage report beneath `/coverage` as one GitHub Pages artifact.
+  line, branch, and method coverage, builds DocFX with warnings as errors,
+  verifies the branded resources and local links, then publishes the DocFX site
+  and the coverage report beneath `/coverage` as one GitHub Pages artifact.
 - [Wiki sync](.github/workflows/sync-wiki.yml) publishes `docs/wiki` after the
   same build gate and rewrites repository links for GitHub Wiki navigation.
 
@@ -777,6 +779,9 @@ If you are an automated coding agent working in this repository:
   steps.
 - If you change a public API or behavior, update tests and docs in the same
   pass.
+- Keep the root README concise and product-focused. Put installation, benefits,
+  a small accurate example, and documentation routes there; move architecture,
+  lifecycle, and subsystem detail into `docs/wiki` or the API reference.
 - If you change runtime architecture, host integration, collision flow, query
   behavior, lifecycle order, or known runtime boundaries, update the matching
   page under `docs/wiki`.

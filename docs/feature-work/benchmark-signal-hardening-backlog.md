@@ -15,6 +15,11 @@ this backlog.
 
 ## Intake Rules
 
+- Signal IDs use `GRV-Benchmark-NNN`. The next available ID is
+  `GRV-Benchmark-018`.
+- Assign an ID at intake and never reuse it, including after a signal closes or
+  moves into a dated plan. Check this file's Git history before advancing or
+  repairing the counter.
 - Add a signal only when it comes from a benchmark, allocation guardrail,
   profiler trace, or repeated validation run.
 - Record the command, date, affected row or test, measured value, why it
@@ -61,11 +66,11 @@ are promoted into implementation work.
 
 ## Experimental Signals
 
-| Signal                                                             | Status                                           | Revisit When                                                                                                            |
-| ------------------------------------------------------------------ | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
-| Exact triangle-pair contacts regress dense concave-mesh throughput | Capacity-sensitive; local optimization exhausted | A topology or exact classifier design can reduce complete triangle-pair SAT evaluations without a competing answer path |
+| Signal                                                                                 | Status                                           | Revisit When                                                                                                            |
+| -------------------------------------------------------------------------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| GRV-Benchmark-014 — Exact triangle-pair contacts regress dense concave-mesh throughput | Capacity-sensitive; local optimization exhausted | A topology or exact classifier design can reduce complete triangle-pair SAT evaluations without a competing answer path |
 
-### Signal: Exact Triangle-Pair Contacts Regress Dense Concave-Mesh Throughput
+### GRV-Benchmark-014 — Exact Triangle-Pair Contacts Regress Dense Concave-Mesh Throughput
 
 **Discovered:** 2026-08-01  
 **Source:** full-domain triangle-pair Phase 2 comparison against its preserved
@@ -156,25 +161,26 @@ and
 
 ## Closed Signals
 
-| Signal                                                      | Status | Closed     | Resolution                                                                                                                                                                                                                                                                                      |
-| ----------------------------------------------------------- | ------ | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Mixed discrete broad-phase allocation at 32 pairs           | Closed | 2026-08-04 | Two independent rotational runs and corrected sparse, dense, and churn broad-phase rows reproduce `0 B/op`; the stale benchmark lifecycle and unrepresentative 4,096-collider monolithic-grid row were repaired without speculative runtime preallocation                                       |
-| Mixed public sweep traversal on extreme sparse-grid spans   | Closed | 2026-08-04 | GridForge's two-tier hash/BVH index replaces 64-billion-cell registration with active-grid scaling; Gravitas completes the exact public sweep in 14.8-16.0 us at 0 B with deterministic candidate and hit order; full evidence is retained in GridForge's completed two-tier spatial-index plan |
-| Mesh scale rebuild allocation                               | Closed | 2026-08-03 | Convex support topology is built once and scale changes refit transactional node bounds in linear time; subdivision 8/16 rows fall from 4,032/16,320 B to 0 B and improve by 7.9%/7.8%                                                                                                          |
-| Exact 3D contact-response ordinary throughput               | Closed | 2026-08-03 | Exact aligned-frame point anchors improve direct rows by 61.0-95.9% and the unchanged 24-row Gravitas matrix by 46.4% median versus the exact baseline; confirmation remains within 0.7% median at 0 B and 100% coverage                                                                        |
-| Exact canonical OBB ordinary throughput                     | Closed | 2026-08-03 | One exact relative-frame kernel per relation improves matched direct rows by 35.3-64.0% and Gravitas rows by 30.9-55.7%; full DefaultJob confirmations remain at 0 B and 100% reachable coverage                                                                                                |
-| Physics-material combine numeric hardening                  | Closed | 2026-07-13 | Overflow-safe average and geometric-mean edge handling preserve deterministic coefficient semantics; the default geometric-material response benchmark remains allocation-free with no credible timing regression                                                                               |
-| Replay hash collider-ID churn scaling                       | Closed | 2026-07-05 | 2D and 3D collider registration now uses a shared reusable-slot registry; authoritative replay hashes traverse canonical live registration order with dense replay ordinals, while deleted ID history remains outside replay identity                                                           |
-| Pure 2D response position-correction repartition allocation | Closed | 2026-06-28 | Gravitas reuses empty retained partitions for immediate repartitioning; GridForge stores the common single voxel partition inline and keeps diagnostic names off success paths                                                                                                                  |
-| SwiftCollections sort hot-path allocation                   | Closed | 2026-06-24 | SwiftCollections owns allocation-free sort and sorted-key APIs; Gravitas removed `SwiftListSortUtility`                                                                                                                                                                                         |
-| Mixed mesh finite-slab triangle scaling signal              | Closed | 2026-06-24 | Mixed and pure 3D query services expose mesh-triangle candidate counts, dedicated triangle-volume benchmarks cover dense and false-positive mesh targets, and pure 3D convex-source mesh sweeps use ordered lower-bound triangle candidates                                                     |
-| Pure 2D dynamic CCD candidate asymmetry                     | Closed | 2026-06-23 | 2D uses a planar candidate index, skips mixed CCD indexing outside mixed mode, and benchmark resets use 2D reset parity                                                                                                                                                                         |
-| 3D shape-exact false-positive cost                          | Closed | 2026-06-23 | Static CCD uses exact-source sweeps for non-sphere convex movers before conservative sphere fallback refinement                                                                                                                                                                                 |
-| 3D dynamic shape-exact BDN allocation signal                | Closed | 2026-06-23 | Shared exact-sweep bounds prefilters removed the scaling allocation/time signal from 3D dynamic false-positive rows                                                                                                                                                                             |
-| 3D full-runtime CCD allocation                              | Closed | 2026-06-23 | GridForge allocation-free line tracing plus Gravitas 3D raycast adoption                                                                                                                                                                                                                        |
-| Grounding raycast probe allocation                          | Closed | 2026-06-23 | Same raycast trace fix removed automatic ray-grounding allocation                                                                                                                                                                                                                               |
+| Signal                                                                                  | Status | Closed     | Resolution                                                                                                                                                                                                                                                                                      |
+| --------------------------------------------------------------------------------------- | ------ | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GRV-Benchmark-012 — Mixed discrete broad-phase allocation at 32 pairs                   | Closed | 2026-08-04 | Two independent rotational runs and corrected sparse, dense, and churn broad-phase rows reproduce `0 B/op`; the stale benchmark lifecycle and unrepresentative 4,096-collider monolithic-grid row were repaired without speculative runtime preallocation                                       |
+| GRV-Benchmark-017 — Mixed public sweep traversal on extreme sparse-grid spans           | Closed | 2026-08-04 | GridForge's two-tier hash/BVH index replaces 64-billion-cell registration with active-grid scaling; Gravitas completes the exact public sweep in 14.8-16.0 us at 0 B with deterministic candidate and hit order; full evidence is retained in GridForge's completed two-tier spatial-index plan |
+| GRV-Benchmark-013 — Mesh scale rebuild allocation                                       | Closed | 2026-08-03 | Convex support topology is built once and scale changes refit transactional node bounds in linear time; subdivision 8/16 rows fall from 4,032/16,320 B to 0 B and improve by 7.9%/7.8%                                                                                                          |
+| GRV-Benchmark-015 — Exact 3D contact-response ordinary throughput                       | Closed | 2026-08-03 | Exact aligned-frame point anchors improve direct rows by 61.0-95.9% and the unchanged 24-row Gravitas matrix by 46.4% median versus the exact baseline; confirmation remains within 0.7% median at 0 B and 100% coverage                                                                        |
+| GRV-Benchmark-016 — Exact canonical OBB ordinary throughput                             | Closed | 2026-08-03 | One exact relative-frame kernel per relation improves matched direct rows by 35.3-64.0% and Gravitas rows by 30.9-55.7%; full DefaultJob confirmations remain at 0 B and 100% reachable coverage                                                                                                |
+| GRV-Benchmark-011 — Physics-material combine numeric hardening                          | Closed | 2026-07-13 | Overflow-safe average and geometric-mean edge handling preserve deterministic coefficient semantics; the default geometric-material response benchmark remains allocation-free with no credible timing regression                                                                               |
+| GRV-Benchmark-010 — Checked mesh scale and thin-shell cache cost                        | Closed | 2026-07-12 | Scale changes retain deterministic O(triangle-count) checked rebuilding, while successfully validated shell and volume properties are cached and repeated cached reads remain allocation-free                                                                                                  |
+| GRV-Benchmark-009 — Replay hash collider-ID churn scaling                               | Closed | 2026-07-05 | 2D and 3D collider registration now uses a shared reusable-slot registry; authoritative replay hashes traverse canonical live registration order with dense replay ordinals, while deleted ID history remains outside replay identity                                                           |
+| GRV-Benchmark-008 — Pure 2D response position-correction repartition allocation         | Closed | 2026-06-28 | Gravitas reuses empty retained partitions for immediate repartitioning; GridForge stores the common single voxel partition inline and keeps diagnostic names off success paths                                                                                                                  |
+| GRV-Benchmark-005 — SwiftCollections sort hot-path allocation                           | Closed | 2026-06-24 | SwiftCollections owns allocation-free sort and sorted-key APIs; Gravitas removed `SwiftListSortUtility`                                                                                                                                                                                         |
+| GRV-Benchmark-006 — Mixed mesh finite-slab triangle scaling signal                      | Closed | 2026-06-24 | Mixed and pure 3D query services expose mesh-triangle candidate counts, dedicated triangle-volume benchmarks cover dense and false-positive mesh targets, and pure 3D convex-source mesh sweeps use ordered lower-bound triangle candidates                                                     |
+| GRV-Benchmark-001 — Pure 2D dynamic CCD candidate asymmetry                             | Closed | 2026-06-23 | 2D uses a planar candidate index, skips mixed CCD indexing outside mixed mode, and benchmark resets use 2D reset parity                                                                                                                                                                         |
+| GRV-Benchmark-002 — 3D shape-exact false-positive cost                                  | Closed | 2026-06-23 | Static CCD uses exact-source sweeps for non-sphere convex movers before conservative sphere fallback refinement                                                                                                                                                                                 |
+| GRV-Benchmark-007 — 3D dynamic shape-exact BDN allocation signal                        | Closed | 2026-06-23 | Shared exact-sweep bounds prefilters removed the scaling allocation/time signal from 3D dynamic false-positive rows                                                                                                                                                                             |
+| GRV-Benchmark-003 — 3D full-runtime CCD allocation                                      | Closed | 2026-06-23 | GridForge allocation-free line tracing plus Gravitas 3D raycast adoption                                                                                                                                                                                                                        |
+| GRV-Benchmark-004 — Grounding raycast probe allocation                                  | Closed | 2026-06-23 | Same raycast trace fix removed automatic ray-grounding allocation                                                                                                                                                                                                                               |
 
-### Closed Signal: Mixed Discrete Broad-Phase Allocation At 32 Pairs
+### GRV-Benchmark-012 — Mixed Discrete Broad-Phase Allocation At 32 Pairs
 
 **Discovered:** 2026-07-19 **Closed:** 2026-08-04
 
@@ -226,7 +232,7 @@ ReportGenerator evidence remains at 100%: 55,869/55,869 lines, 15,833/15,833
 branches, and 5,321/5,321 methods. Both package configurations build for
 `net8.0` and `netstandard2.1` without warnings.
 
-### Closed Signal: Mesh Scale Rebuild Allocation
+### GRV-Benchmark-013 — Mesh Scale Rebuild Allocation
 
 **Discovered:** 2026-07-28 **Closed:** 2026-08-03
 
@@ -275,7 +281,7 @@ Artifacts:
 - `artifacts/benchmarks/2026-08-03-mesh-scale-rebuild-topology-refit-confirmation`
 - `tests/Gravitas.Tests/TestResults/coverage-analysis-mesh-scale-rebuild-20260803`
 
-### Closed Signal: Replay Hash Collider-ID Churn Scaling
+### GRV-Benchmark-009 — Replay Hash Collider-ID Churn Scaling
 
 **Discovered:** 2026-07-05 **Closed:** 2026-07-05
 
@@ -340,7 +346,7 @@ hashing remains allocation-free after churn. Added registry tests proving
 reusable IDs, context-local lookup, compact service indices, and `-1` inactive
 sentinels.
 
-### Closed Signal: Pure 2D Response Position-Correction Repartition Allocation
+### GRV-Benchmark-008 — Pure 2D Response Position-Correction Repartition Allocation
 
 **Discovered:** 2026-06-26 **Closed:** 2026-06-28
 
@@ -403,7 +409,7 @@ managed allocation across the selected 64-body and 1024-body 2D response rows.
 - `tests/Gravitas.Tests/CollisionHandling/CollisionResponseInvariantTests.cs`
 - `tests/Gravitas.Tests/MixedDimensions/MixedBroadPhaseTests.cs`
 
-### Closed Signal: SwiftCollections Sort Hot-Path Allocation
+### GRV-Benchmark-005 — SwiftCollections Sort Hot-Path Allocation
 
 **Discovered:** 2026-06-22 **Closed:** 2026-06-24
 
@@ -457,7 +463,7 @@ local project references, Gravitas Release/ReleaseLean allocation guardrails
 pass, and the Gravitas simulation allocation benchmark smoke rows remain at
 `0 B/op`.
 
-### Signal: Mixed Mesh Finite-Slab Triangle Scaling Signal
+### GRV-Benchmark-006 — Mixed Mesh Finite-Slab Triangle Scaling Signal
 
 **Discovered:** 2026-06-23
 
@@ -537,7 +543,7 @@ cost by triangle candidate volume, not only collider count. Mixed keeps stable
 authored triangle tie-breaks without speculative reducer overhead, and pure 3D
 avoids the measured convex-source concave-mesh triangle-order bottleneck.
 
-### Signal: Pure 2D Dynamic CCD Candidate Asymmetry
+### GRV-Benchmark-001 — Pure 2D Dynamic CCD Candidate Asymmetry
 
 **Discovered:** 2026-06-21
 
@@ -612,7 +618,7 @@ planar-vs-3D index shape, and benchmark reset asymmetry. The runtime path keeps
 2D planar candidate ordering stable with duplicate suppression preserved, and
 the attribution benchmark no longer shows a 2D candidate-gathering penalty.
 
-### Signal: 3D Shape-Exact False-Positive Cost
+### GRV-Benchmark-002 — 3D Shape-Exact False-Positive Cost
 
 **Discovered:** 2026-06-21
 
@@ -664,7 +670,7 @@ The focused `ContinuousCollisionDetectionTests` and
 the runtime path was optimized without weakening exact-source correctness, and
 focused CCD/query tests plus before/after benchmarks validate the change.
 
-### Signal: 3D Dynamic Shape-Exact BDN Allocation Signal
+### GRV-Benchmark-007 — 3D Dynamic Shape-Exact BDN Allocation Signal
 
 **Discovered:** 2026-06-23
 
@@ -719,7 +725,7 @@ benchmark row, the dynamic false-positive xUnit allocation guard remains green,
 and the remaining BDN byte counts match runner noise rather than a runtime
 allocation slope.
 
-### Signal: 3D Full-Runtime CCD Allocation
+### GRV-Benchmark-003 — 3D Full-Runtime CCD Allocation
 
 **Discovered:** 2026-06-21
 
@@ -797,7 +803,7 @@ unless a future guardrail reproduces them.
 benchmark rows were rerun, and a 3D `RaycastAll` allocation guard protects the
 runtime path.
 
-### Signal: Grounding Raycast Probe Allocation
+### GRV-Benchmark-004 — Grounding Raycast Probe Allocation
 
 **Discovered:** 2026-06-21
 
@@ -844,7 +850,7 @@ which depended on the enumerable GridForge line-trace path.
 **Closure criteria:** Met. The runtime allocation was eliminated and the 3D
 raycast path has a focused xUnit allocation guard.
 
-### Closed Signal: Checked Mesh Scale And Thin-Shell Cache Cost
+### GRV-Benchmark-010 — Checked Mesh Scale And Thin-Shell Cache Cost
 
 **Status:** Closed 2026-07-12
 
@@ -883,7 +889,7 @@ default-scale initialization path; checked prevalidation is promoted at commit
 and pose-only updates retain the cache. Retain both transform and cached-read
 rows as regression signals for future mesh transform or mass-property work.
 
-### Closed Signal: Physics-Material Combine Numeric Hardening
+### GRV-Benchmark-011 — Physics-Material Combine Numeric Hardening
 
 **Status:** Closed 2026-07-13
 

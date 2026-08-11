@@ -5,6 +5,7 @@ deterministic simulation harness, or unit test creates the host objects and
 calls Gravitas at deterministic points.
 
 This page is the practical starting point for wiring Gravitas into a host. For
+the shortest end-to-end setup, read [Getting Started](GETTING_STARTED.md). For
 runtime ownership details, read [Runtime Architecture](RUNTIME_ARCHITECTURE.md).
 For replay and snapshot boundaries, read
 [Serialization And Replay](SERIALIZATION.md).

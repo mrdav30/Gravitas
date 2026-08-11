@@ -1,0 +1,113 @@
+:root {
+  --grv-violet-rgb: 151, 77, 220;
+  --grv-lavender-rgb: 216, 180, 254;
+}
+
+body {
+  --bs-primary-rgb: var(--grv-violet-rgb);
+  --bs-link-color-rgb: 105, 43, 172;
+  --bs-link-hover-color-rgb: 126, 53, 204;
+}
+
+[data-bs-theme="dark"] body {
+  --bs-link-color-rgb: var(--grv-lavender-rgb);
+  --bs-link-hover-color-rgb: 236, 214, 255;
+}
+
+#logo {
+  width: 2rem;
+  height: 2rem;
+  margin-inline-end: 0.5rem;
+  object-fit: contain;
+}
+
+.grv-hero {
+  margin-block: 1rem 2.5rem;
+  padding: clamp(1.5rem, 4vw, 3rem);
+  border: 1px solid rgba(var(--grv-violet-rgb), 0.38);
+  border-radius: 1rem;
+  background:
+    radial-gradient(circle at 91% 10%, rgba(var(--grv-lavender-rgb), 0.28), transparent 32%),
+    radial-gradient(circle at 75% 44%, rgba(var(--grv-violet-rgb), 0.18), transparent 46%),
+    var(--bs-tertiary-bg);
+}
+
+.grv-hero h1 {
+  max-width: 16ch;
+  margin-block: 0.2rem 0.75rem;
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  line-height: 1.05;
+}
+
+.grv-hero > p:not(.grv-kicker) {
+  max-width: 62ch;
+  font-size: 1.08rem;
+}
+
+.grv-kicker {
+  margin: 0;
+  color: rgb(105, 43, 172);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+[data-bs-theme="dark"] .grv-kicker {
+  color: rgb(var(--grv-lavender-rgb));
+}
+
+.grv-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.grv-actions a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.5rem;
+  padding: 0.5rem 0.9rem;
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.4rem;
+  color: var(--bs-body-color);
+  font-weight: 600;
+  line-height: 1.25;
+  text-decoration: none;
+}
+
+.grv-actions a:first-child {
+  border-color: rgb(var(--grv-violet-rgb));
+  background: rgb(var(--grv-violet-rgb));
+  color: #fff;
+}
+
+.grv-actions a:hover,
+.grv-actions a:focus-visible {
+  border-color: rgb(var(--grv-violet-rgb));
+  box-shadow: 0 0 0 0.2rem rgba(var(--grv-violet-rgb), 0.2);
+}
+
+.grv-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  gap: 1rem;
+  margin-block: 1rem 2.5rem;
+}
+
+.grv-card {
+  padding: 1.25rem;
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.75rem;
+  background: var(--bs-body-bg);
+  box-shadow: 0 0.35rem 1.1rem rgba(var(--grv-violet-rgb), 0.08);
+}
+
+.grv-card h3 {
+  margin-top: 0;
+  font-size: 1.05rem;
+}
+
+.grv-card p {
+  margin-bottom: 0;
+}

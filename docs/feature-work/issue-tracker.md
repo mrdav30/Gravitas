@@ -2,6 +2,10 @@
 
 ## Tracker Rules
 
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-069`.
+- Assign an ID when an issue enters this tracker, keep it through resolution,
+  and never reuse an ID even if an entry is later removed. Check this file's Git
+  history before advancing or repairing the counter.
 - Add new items when feature work uncovers a suspected bug, stale doc, test
   smell, performance anomaly, or correctness risk.
 - Keep each item scoped tightly enough to fix and verify independently.
@@ -38,7 +42,7 @@ No active items.
 
 ## Resolved Issues
 
-### Scaled Mesh Query Faces Used Authored Unscaled Normals
+### GRV-Issue-068 — Scaled Mesh Query Faces Used Authored Unscaled Normals
 
 **Discovered:** 2026-08-01  
 **Resolved:** 2026-08-01  
@@ -76,7 +80,7 @@ Verification:
   no findings. The completed plan is retained at
   [`Scaled Mesh Query Normal`](done/2026-08-01-scaled-mesh-query-normal-plan.md).
 
-### Mesh Triangle-Triangle SAT Could Saturate Before Axis Classification
+### GRV-Issue-067 — Mesh Triangle-Triangle SAT Could Saturate Before Axis Classification
 
 **Discovered:** 2026-07-24  
 **Resolved:** 2026-08-01  
@@ -105,7 +109,7 @@ rather than reopening the correctness issue. The completed implementation plan
 is retained at
 [`Full-Domain Triangle-Pair Contact`](done/2026-07-31-full-domain-triangle-pair-contact-plan.md).
 
-### Radial Segment Parameters Could Collapse Spatially Distinct Query Hits
+### GRV-Issue-066 — Radial Segment Parameters Could Collapse Spatially Distinct Query Hits
 
 **Discovered:** 2026-07-20  
 **Resolved:** 2026-07-31  
@@ -150,7 +154,7 @@ Verification:
   zero warnings. Independent whole-change review found no Critical, Important,
   or Minor issue.
 
-### 3D Closest-Surface And Overlap-Circle Classification Are Not Full-Domain
+### GRV-Issue-065 — 3D Closest-Surface And Overlap-Circle Classification Are Not Full-Domain
 
 **Discovered:** 2026-07-22  
 **Resolved:** 2026-07-31  
@@ -184,7 +188,7 @@ Verification: the completed
 records full standard/Lean test, exact coverage, zero-allocation, dense/sparse
 vertical-scaling benchmark, documentation, and independent-review evidence.
 
-### SolidBody Point Transforms Can Saturate Before Their Final World Or Local Coordinate
+### GRV-Issue-064 — SolidBody Point Transforms Can Saturate Before Their Final World Or Local Coordinate
 
 **Discovered:** 2026-07-22  
 **Resolved:** 2026-07-30  
@@ -224,7 +228,7 @@ across 43,028 lines, 12,779 branches, and 4,486 methods. ShortRun 3D ordinary,
 evidence are retained in
 [`Full-Domain SolidBody Point Transform`](done/2026-07-30-full-domain-solid-body-point-transform-plan.md).
 
-### Extreme Friction Accumulation And Cone Clamping Are Not Full-Domain
+### GRV-Issue-063 — Extreme Friction Accumulation And Cone Clamping Are Not Full-Domain
 
 **Discovered:** 2026-07-28  
 **Resolved:** 2026-07-30
@@ -245,7 +249,7 @@ allocation without a gross compact-path regression. The implementation and
 evidence are retained in
 [`Full-Domain Friction Response`](done/2026-07-29-full-domain-friction-response-plan.md).
 
-### True Unrepresentable Contact Lever Arms Preserve Physical Response
+### GRV-Issue-062 — True Unrepresentable Contact Lever Arms Preserve Physical Response
 
 **Discovered:** 2026-07-22  
 **Resolved:** 2026-07-28
@@ -269,7 +273,7 @@ through the public closest-point fallback.
 The implementation and release evidence are retained in
 [`Exact Contact Lever And Mass Response`](done/2026-07-27-exact-contact-lever-response-plan.md).
 
-### Finite-Axis Collider Geometry Uses Canonical Rigid Frames
+### GRV-Issue-061 — Finite-Axis Collider Geometry Uses Canonical Rigid Frames
 
 **Discovered:** 2026-07-19  
 **Resolved:** 2026-07-27
@@ -281,7 +285,7 @@ anchors and centered-axis FixedMathSharp relations instead of reconstructed
 world endpoints. Broad-phase and presentation values may clip only after the
 exact geometric decision.
 
-### Oriented Cuboids Use One Canonical `FixedOrientedBox`
+### GRV-Issue-060 — Oriented Cuboids Use One Canonical `FixedOrientedBox`
 
 **Discovered:** 2026-07-20  
 **Resolved:** 2026-07-27
@@ -291,7 +295,7 @@ Discrete, mixed, mesh, query, CCD, replay, and diagnostic paths no longer treat
 clipped or cached world corners as geometry. Bounds are derived analytically and
 clipped only at the representable-domain boundary.
 
-### Collider Scale Composition Is Exact And Transactional
+### GRV-Issue-059 — Collider Scale Composition Is Exact And Transactional
 
 **Discovered:** 2026-07-19  
 **Resolved:** 2026-07-27
@@ -302,7 +306,7 @@ bodyless-pose change. Invalid final geometry rejects atomically without leaving
 the host transform, partitions, mass properties, or committed collider state
 partially updated.
 
-### 2D Convex Geometry Retains Local Boundary Authority
+### GRV-Issue-058 — 2D Convex Geometry Retains Local Boundary Authority
 
 **Discovered:** 2026-07-22  
 **Resolved:** 2026-07-27
@@ -323,7 +327,7 @@ and closed by the
 [`Exact Canonical OBB Throughput Hardening`](done/2026-08-02-exact-canonical-obb-throughput-plan.md)
 plan with allocation-free, fully covered relative-frame kernels.
 
-### Finite-Slab Projection Support Math Is Full-Domain
+### GRV-Issue-057 — Finite-Slab Projection Support Math Is Full-Domain
 
 **Discovered:** 2026-07-19  
 **Resolved:** 2026-07-22  
@@ -386,7 +390,7 @@ determinism, allocation behavior, tests, documentation, and scope with no
 actionable findings. The guarded 190-bit cone-direction reduction remains a
 useful future randomized-oracle target, not a confirmed defect.
 
-### Swept-Sphere Cuboid Dilation Uses Exact Rounded Features
+### GRV-Issue-056 — Swept-Sphere Cuboid Dilation Uses Exact Rounded Features
 
 **Discovered:** 2026-07-22  
 **Resolved:** 2026-07-22  
@@ -424,7 +428,7 @@ microseconds respectively, with zero managed allocation in every row. The exact
 path is intentionally slower than the incorrect sharp proxy but faster than the
 existing exact finite-capsule comparison at both scales.
 
-### Swept-Sphere Finite Extrusions Use Exact Spherical Dilation
+### GRV-Issue-055 — Swept-Sphere Finite Extrusions Use Exact Spherical Dilation
 
 **Discovered:** 2026-07-19  
 **Resolved:** 2026-07-22  
@@ -473,7 +477,7 @@ every row. The exact solver is intentionally more expensive than the former
 sharp proxy; its specialized fixed-width path remains roughly an order of
 magnitude faster than the initial generic exact prototype.
 
-### Cone-Triangle Face Interiors Are Reduced Without Edge Crossings
+### GRV-Issue-054 — Cone-Triangle Face Interiors Are Reduced Without Edge Crossings
 
 **Discovered:** 2026-07-21  
 **Resolved:** 2026-07-22  
@@ -517,7 +521,7 @@ The final warmed 64-target concave-mesh cone query remains statistically flat at
 representative 64-pair mesh/cone collision row reports 236.6 microseconds with
 zero managed allocation.
 
-### Conic Query Quadratics Remain Full-Domain Until Final Hit Narrowing
+### GRV-Issue-053 — Conic Query Quadratics Remain Full-Domain Until Final Hit Narrowing
 
 **Discovered:** 2026-07-18  
 **Resolved:** 2026-07-21  
@@ -573,7 +577,7 @@ with zero managed allocation. Single-operation `Dry` samples measured 8.446,
 wide-solver JIT cost and are retained as startup evidence rather than throughput
 estimates.
 
-### Explicit Body Roles Preserve Independent Angular Mobility
+### GRV-Issue-052 — Explicit Body Roles Preserve Independent Angular Mobility
 
 **Discovered:** 2026-07-19  
 **Resolved:** 2026-07-20  
@@ -613,7 +617,7 @@ branch, and method coverage: 33,894/33,894 lines, 12,211/12,211 branches, and
 important findings. See the completed
 [`Body Motion Type And Solver Mobility Hardening Plan`](done/2026-07-20-body-motion-type-and-solver-mobility-plan.md).
 
-### Translational CCD Preserves Piecewise Target Trajectories
+### GRV-Issue-051 — Translational CCD Preserves Piecewise Target Trajectories
 
 **Discovered:** 2026-07-19  
 **Resolved:** 2026-07-20  
@@ -648,7 +652,7 @@ the current short-run host. Final authoritative verification passed all 3,123
 `Release` tests at 100% line, branch, and method coverage: 33,539/33,539 lines,
 12,137/12,137 branches, and 4,158/4,158 methods.
 
-### Derived Bound Centers And Extents Were Not Full-Domain
+### GRV-Issue-050 — Derived Bound Centers And Extents Were Not Full-Domain
 
 **Discovered:** 2026-07-20  
 **Resolved:** 2026-07-20  
@@ -702,7 +706,7 @@ explicitly linked Gravitas `Release` test-project gate (3,105). The Gravitas
 GridForge MemoryPack public-type leak; it is still deferred to the
 package-reference release gate rather than masked downstream.
 
-### Sphere Construction And Merge Paths Were Not Full-Domain
+### GRV-Issue-049 — Sphere Construction And Merge Paths Were Not Full-Domain
 
 **Discovered:** 2026-07-18  
 **Resolved:** 2026-07-20  
@@ -742,7 +746,7 @@ package-reference release gate. No Gravitas workaround was added. The audit
 exposed the separate derived area/box center and extent issue now first in the
 active queue.
 
-### Finite-Axis Capsule, Cylinder, And Mesh-Edge Projections Can Saturate Before Solving
+### GRV-Issue-048 — Finite-Axis Capsule, Cylinder, And Mesh-Edge Projections Can Saturate Before Solving
 
 **Discovered:** 2026-07-18  
 **Resolved:** 2026-07-19  
@@ -792,7 +796,7 @@ performance claims. Follow-up audits separated the remaining sharp-rim, rounded
 capsule-slab rim, and finite convex-slab support-model risks into their own
 active issues instead of hiding them inside this arithmetic closure.
 
-### Rotational CCD Omits Dynamic And Mixed Targets
+### GRV-Issue-047 — Rotational CCD Omits Dynamic And Mixed Targets
 
 **Resolved:** 2026-07-19  
 **Source:** between-sample rotational CCD final parity review  
@@ -824,7 +828,7 @@ regressions before closure. The completed design and detailed evidence are
 retained in
 [`2026-07-18-rotational-moving-pair-ccd-plan.md`](done/2026-07-18-rotational-moving-pair-ccd-plan.md).
 
-### 3D CCD Handoff Callback Failure Could Abandon Queue Cleanup
+### GRV-Issue-046 — 3D CCD Handoff Callback Failure Could Abandon Queue Cleanup
 
 **Resolved:** 2026-07-18  
 **Source:** same-frame CCD handoff dedupe final lifecycle review  
@@ -854,7 +858,7 @@ the same cleanup contract, and a 3D failure aborts a prepared 2D batch. All 51
 handoff-focused tests and three relevant warmed allocation guards pass. Full
 validation passes 2,793 Release and 2,754 ReleaseLean tests.
 
-### Full-Domain Radial Bounds And Query Intervals Were Incomplete
+### GRV-Issue-045 — Full-Domain Radial Bounds And Query Intervals Were Incomplete
 
 **Resolved:** 2026-07-18  
 **Source:** relative CCD exact-root migration and mixed-query parity review  
@@ -889,7 +893,7 @@ for sphere segments and 3.326/4.217 us for mixed circle slabs at scales 1 and
 projection, sphere construction/merge, and conic quadratics remain explicitly
 separate active issues rather than being masked by the radial result.
 
-### Relative CCD Quadratic Saturation Could Miss Extreme-Range Crossings
+### GRV-Issue-044 — Relative CCD Quadratic Saturation Could Miss Extreme-Range Crossings
 
 **Resolved:** 2026-07-18  
 **Source:** 95%-to-100% coverage hardening, shared relative-sweep review  
@@ -935,7 +939,7 @@ Verification:
   FixedMathSharp radial-ray means were `196.7 ns` in 2D and `119.2 ns` in 3D,
   also with zero managed allocation.
 
-### Convex Mesh Mode Accepted Invalid Topology And Could Collide In Empty Bounds Space
+### GRV-Issue-043 — Convex Mesh Mode Accepted Invalid Topology And Could Collide In Empty Bounds Space
 
 **Resolved:** 2026-07-18  
 **Source:** 95%-to-100% coverage hardening, mesh/sphere fallback review  
@@ -985,7 +989,7 @@ Verification:
   `7.246 ms` for subdivision levels `1`, `8`, and `16`, allocating `10.25 KB`,
   `557.9 KB`, and `2,222.99 KB` respectively.
 
-### Rotational CCD Could Miss Contacts Between Bounded Pose Samples
+### GRV-Issue-042 — Rotational CCD Could Miss Contacts Between Bounded Pose Samples
 
 **Resolved:** 2026-07-18  
 **Source:** 95%-to-100% coverage hardening, rotational CCD review  
@@ -1030,7 +1034,7 @@ Verification:
 - Benchmark and full-suite release evidence are recorded in the resolving
   commit.
 
-### 3D Angular Impulse Scaled Immediate Velocity By Frame Delta
+### GRV-Issue-041 — 3D Angular Impulse Scaled Immediate Velocity By Frame Delta
 
 **Resolved:** 2026-07-18  
 **Source:** 95%-to-100% coverage hardening, 2D/3D motion parity review  
@@ -1071,7 +1075,7 @@ Verification:
   the intentionally retained local GridForge project link exposes MemoryPack
   interfaces without its package assembly in that configuration.
 
-### SolidBody Point Transforms Used Collider Dimensions As Transform Scale
+### GRV-Issue-040 — SolidBody Point Transforms Used Collider Dimensions As Transform Scale
 
 **Resolved:** 2026-07-18  
 **Source:** 95%-to-100% coverage hardening, 3D compound `ScaledSize` review  
@@ -1103,7 +1107,7 @@ suites pass `2731/2731` in `Release` and `2692/2692` in `ReleaseLean`. Both
 configurations build the `net8.0` and `netstandard2.1` package targets with zero
 warnings. Both modified methods report 100% line and branch coverage.
 
-### CCD Handoff Dedupe Could Strand A Same-Frame Requeued Body
+### GRV-Issue-039 — CCD Handoff Dedupe Could Strand A Same-Frame Requeued Body
 
 **Resolved:** 2026-07-18  
 **Source:** 95%-to-100% coverage hardening, dimensional CCD service admission
@@ -1149,7 +1153,7 @@ regressions pass `6/6`; the complete 2D, 3D, and mixed CCD surface passes
 `netstandard2.1` package targets with zero warnings. Both modified queue methods
 report 100% line and branch coverage.
 
-### 3D Exit Callback Failure Duplicated Reentrant Separation Notifications
+### GRV-Issue-038 — 3D Exit Callback Failure Duplicated Reentrant Separation Notifications
 
 **Resolved:** 2026-07-18  
 **Source:** 95%-to-100% coverage hardening, 3D collision-pair lifecycle review  
@@ -1191,7 +1195,7 @@ surface passes `125/125`; full locally linked suites pass `2723/2723` in
 `Release` and `2684/2684` in `ReleaseLean`. Both configurations build `net8.0`
 and `netstandard2.1` package targets with zero warnings.
 
-### Continuous-Collision Modes Accepted Undefined Enum Values
+### GRV-Issue-037 — Continuous-Collision Modes Accepted Undefined Enum Values
 
 **Resolved:** 2026-07-17  
 **Source:** 95%-to-100% coverage hardening, 3D CCD helper review  
@@ -1222,7 +1226,7 @@ focused suite passes `14/14`; the full locally linked suites pass `2716/2716` in
 `Release` and `2677/2677` in `ReleaseLean`. Both configurations build the
 `net8.0` and `netstandard2.1` package targets with zero warnings.
 
-### Non-Unit Quaternion Admission Can Collapse Runtime Shape Axes
+### GRV-Issue-036 — Non-Unit Quaternion Admission Can Collapse Runtime Shape Axes
 
 **Resolved:** 2026-07-17  
 **Source:** 95%-to-100% coverage hardening, cone-bounds fallback review  
@@ -1254,7 +1258,7 @@ direct mesh rejection. The full locally linked suites pass `2704/2704` in
 `Release` and `2665/2665` in `ReleaseLean`; Lean builds both `net8.0` and
 `netstandard2.1` and produces both packages with zero warnings.
 
-### Registered Joints Can Outlive Their Body And Collider Lifetimes
+### GRV-Issue-035 — Registered Joints Can Outlive Their Body And Collider Lifetimes
 
 **Resolved:** 2026-07-17  
 **Source:** 95%-to-100% coverage hardening, 3D joint replay-hash lifecycle
@@ -1296,7 +1300,7 @@ branch coverage. Project-wide coverage is `99.9%` line and `99.8%` branch; the
 remaining six lines and eleven branches are confined to the separately queued
 continuous-collision handoff paths.
 
-### GridForge Reuses Grid Spawn Tokens Across Pooled Generations
+### GRV-Issue-034 — GridForge Reuses Grid Spawn Tokens Across Pooled Generations
 
 **Resolved:** 2026-07-17  
 **Source:** 95%-to-100% coverage hardening, 3D partition teardown review  
@@ -1326,7 +1330,7 @@ traversal regressions cover duplicate suppression, synthetic hash collisions,
 and `0 B` warm reusable-set traversal. The local project links remain temporary
 uncommitted release-validation scaffolding.
 
-### Extreme Convex Sweeps Can Normalize To Non-Unit Directions
+### GRV-Issue-033 — Extreme Convex Sweeps Can Normalize To Non-Unit Directions
 
 **Resolved:** 2026-07-14  
 **Source:** 95%-to-100% coverage hardening, convex sweep termination review  
@@ -1384,7 +1388,7 @@ Verification:
 - Local project links remain unstaged and must be removed before package release
   validation.
 
-### Extreme Collider Bounds Underestimated CCD Proxy Radius
+### GRV-Issue-032 — Extreme Collider Bounds Underestimated CCD Proxy Radius
 
 **Resolved:** 2026-07-13  
 **Source:** 95%-to-100% coverage hardening, 3D CCD helper review  
@@ -1417,7 +1421,7 @@ Verification:
   reported no remaining Critical or Important issues.
 - Local project links remain unstaged and must be removed before release.
 
-### FixedMathSharp Rays Now Treat Only Exact-Zero Slab Directions As Parallel
+### GRV-Issue-031 — FixedMathSharp Rays Now Treat Only Exact-Zero Slab Directions As Parallel
 
 **Resolved:** 2026-07-13  
 **Source:** 95%-to-100% coverage hardening, shared segment-box clipping review  
@@ -1444,7 +1448,7 @@ Verification:
 - Independent review found no correctness, scope, API, determinism, or
   performance issues.
 
-### FixedMathSharp Vector Midpoints Saturated Before Halving
+### GRV-Issue-030 — FixedMathSharp Vector Midpoints Saturated Before Halving
 
 **Resolved:** 2026-07-13  
 **Source:** 95%-to-100% coverage hardening, physics-material average review  
@@ -1475,7 +1479,7 @@ Verification:
 - Local project links remain unstaged and must be removed before release;
   Gravitas will transition to the published package after FixedMathSharp ships.
 
-### Overlong Settings Collision Matrix Rows Were Silently Truncated
+### GRV-Issue-029 — Overlong Settings Collision Matrix Rows Were Silently Truncated
 
 **Resolved:** 2026-07-13  
 **Source:** 95%-to-100% coverage hardening, final settings branch review  
@@ -1504,7 +1508,7 @@ Verification:
   `TestResults/coverage-settings-square-validation-task83-final-authoritative-root-comparable/a12df29a-6fdf-4bdb-a3ac-8c0c11751a0d/coverage.cobertura.xml`
   passes 2,555/2,555 full `Release` tests and reports 10,407/10,407 branches.
 
-### Pending CCD Replay Hashes Depended On Deleted Collider ID History
+### GRV-Issue-028 — Pending CCD Replay Hashes Depended On Deleted Collider ID History
 
 **Resolved:** 2026-07-13  
 **Source:** 95%-to-100% coverage hardening, dimensional body replay review  
@@ -1537,7 +1541,7 @@ Verification:
   `TestResults/coverage-body-replay-task76-final-authoritative-root-comparable/89757f3d-f55c-41d5-998b-e1d4f97f8d20/coverage.cobertura.xml`
   passes 2,549/2,549 full `Release` tests.
 
-### Mesh-Cone Triangle Containment Used Contact-Oriented Normals
+### GRV-Issue-027 — Mesh-Cone Triangle Containment Used Contact-Oriented Normals
 
 **Resolved:** 2026-07-13  
 **Source:** 95%-to-100% coverage hardening, mesh-cone branch review  
@@ -1572,7 +1576,7 @@ Verification:
   reports 100% line, branch, and method coverage for
   `CollisionDetection.Cone.cs`; full `Release` passes 2,547/2,547 tests.
 
-### Small CCD Proxy Radii Could Turn Tangency Into A Closing Hit
+### GRV-Issue-026 — Small CCD Proxy Radii Could Turn Tangency Into A Closing Hit
 
 **Resolved:** 2026-07-13  
 **Source:** 95%-to-100% coverage hardening, shared relative-sweep review  
@@ -1602,7 +1606,7 @@ Verification:
   reports 100% line, branch, and method coverage for `ContinuousCollisionMath`;
   full `Release` passes 2,543/2,543 tests.
 
-### Mesh Scale And Surface-Shell Mass Did Not Match Authored Geometry
+### GRV-Issue-025 — Mesh Scale And Surface-Shell Mass Did Not Match Authored Geometry
 
 **Resolved:** 2026-07-12  
 **Source:** 95%-to-100% coverage hardening, mesh transform/mass follow-up  
@@ -1653,7 +1657,7 @@ Verification:
   same subdivision; its reviewed artifact is
   `artifacts/benchmarks/2026-07-12-task46-mesh-scale-cache-fix2`.
 
-### 3D Compound Mass And Geometry Used Incompatible Frames And Measures
+### GRV-Issue-024 — 3D Compound Mass And Geometry Used Incompatible Frames And Measures
 
 **Discovered:** 2026-07-12  
 **Resolved:** 2026-07-12  
@@ -1695,7 +1699,7 @@ line, branch, and method coverage; full coverage-enabled `Release` passes
 2,433/2,433, `ReleaseLean` passes 2,396/2,396, both library targets build
 without warnings, and independent review approved.
 
-### 3D Motion State Could Leak Across Reuse And Apply Incorrect Rotational Dynamics
+### GRV-Issue-023 — 3D Motion State Could Leak Across Reuse And Apply Incorrect Rotational Dynamics
 
 **Discovered:** 2026-07-12  
 **Resolved:** 2026-07-12  
@@ -1734,7 +1738,7 @@ exclude the removed stale correction state. A service-phase CCD regression
 proves queued linear handoff processing preserves angular velocity, speed,
 acceleration, and rotation exactly after the normal body step.
 
-### Synchronous 2D Contact Callbacks Could Corrupt Pair Teardown And Reuse
+### GRV-Issue-022 — Synchronous 2D Contact Callbacks Could Corrupt Pair Teardown And Reuse
 
 **Discovered:** 2026-07-12  
 **Resolved:** 2026-07-12  
@@ -1761,7 +1765,7 @@ cleanup removal of a later key, nested multi-pair deactivation with exact exit
 counts, distinct pooled replacements, and pooled/unpooled position equality
 after enter-callback removal.
 
-### Fixed-Point Sphere Tangency Could Be Rejected By Normalization Residue
+### GRV-Issue-021 — Fixed-Point Sphere Tangency Could Be Rejected By Normalization Residue
 
 **Discovered:** 2026-07-12  
 **Resolved:** 2026-07-12  
@@ -1780,7 +1784,7 @@ still returns one hit, while the historical `(0,0,0)->(3,4,0)` fixture against
 center `(1/5,3/10,0)` and radius `1/50` is retained as an explicit near-miss
 regression. No epsilon or discriminant clamp remains.
 
-### Context Disposal Ordering Could Admit Inactive Worlds And Invalidate Disabled CCD Handoffs
+### GRV-Issue-020 — Context Disposal Ordering Could Admit Inactive Worlds And Invalidate Disabled CCD Handoffs
 
 **Discovered:** 2026-07-11  
 **Resolved:** 2026-07-11  
@@ -1806,7 +1810,7 @@ pending 3D and 2D handoffs, advances the public context clock and hook phase,
 and proves both body states remain unchanged and both handoffs remain consumable
 afterward.
 
-### Partition Teardown Logged Errors After Host Grid Removal
+### GRV-Issue-019 — Partition Teardown Logged Errors After Host Grid Removal
 
 **Discovered:** 2026-07-11  
 **Resolved:** 2026-07-11  
@@ -1833,7 +1837,7 @@ assert no error logs. Both collision service files report 100%
 line/branch/method coverage; full `Release` passes 2,132/2,132; independent
 review approved.
 
-### Repeated Bodyless Initialization Could Orphan Collider Registrations
+### GRV-Issue-018 — Repeated Bodyless Initialization Could Orphan Collider Registrations
 
 **Discovered:** 2026-07-11  
 **Resolved:** 2026-07-11  
@@ -1861,7 +1865,7 @@ Verification:
 - Full coverage-enabled `Release` passes 2,129/2,129; affected collider files
   remain at 100% line/branch/method coverage; independent review approved.
 
-### Deactivation Duplicated Teardown And Allowed Stale Collider Ownership
+### GRV-Issue-017 — Deactivation Duplicated Teardown And Allowed Stale Collider Ownership
 
 **Discovered:** 2026-07-11  
 **Resolved:** 2026-07-11  
@@ -1905,7 +1909,7 @@ Verification:
   targets; independent final review approved after three P1 findings were
   resolved.
 
-### Cuboid Frontal Area Selected The Wrong Face And Ignored Diagonal Projection
+### GRV-Issue-016 — Cuboid Frontal Area Selected The Wrong Face And Ignored Diagonal Projection
 
 **Discovered:** 2026-07-11  
 **Resolved:** 2026-07-11  
@@ -1935,7 +1939,7 @@ Verification:
 - Full coverage-enabled `Release` passes 2,109/2,109, `ReleaseLean` builds both
   targets, and independent review approved with no findings.
 
-### Capsule Drag And Inertia Ignored Direction And Hemisphere Centroids
+### GRV-Issue-015 — Capsule Drag And Inertia Ignored Direction And Hemisphere Centroids
 
 **Discovered:** 2026-07-12  
 **Resolved:** 2026-07-12  
@@ -1968,7 +1972,7 @@ line/branch/method coverage; full coverage-enabled `Release` passes 2,422/2,422,
 `ReleaseLean` builds both targets without warnings, and independent review
 approved.
 
-### Inactive SolidBody2D Loads Could Preserve Or Invent Runtime Activity
+### GRV-Issue-014 — Inactive SolidBody2D Loads Could Preserve Or Invent Runtime Activity
 
 **Discovered:** 2026-07-11  
 **Resolved:** 2026-07-11  
@@ -2001,7 +2005,7 @@ Verification:
   line/branch/method coverage, full `Release` passes 2,106/2,106, `ReleaseLean`
   builds both targets, and independent review approved.
 
-### 2D Collider Teardown And Load Paths Could Preserve Invalid Runtime Ownership
+### GRV-Issue-013 — 2D Collider Teardown And Load Paths Could Preserve Invalid Runtime Ownership
 
 **Discovered:** 2026-07-11  
 **Resolved:** 2026-07-11  
@@ -2034,7 +2038,7 @@ Verification:
   passes 2,104/2,104, `ReleaseLean` builds both targets, and independent review
   approved after both teardown defects were resolved.
 
-### 2D Query Version Reuse Could Suppress Live Colliders
+### GRV-Issue-012 — 2D Query Version Reuse Could Suppress Live Colliders
 
 **Discovered:** 2026-07-11  
 **Resolved:** 2026-07-11  
@@ -2061,7 +2065,7 @@ Verification:
 - The query service and support files report 100% line/branch/method coverage;
   full `Release` passes 2,104/2,104 and independent review approved.
 
-### 3D Collider Active-State Transitions Could Leave Invalid Partition Ownership
+### GRV-Issue-011 — 3D Collider Active-State Transitions Could Leave Invalid Partition Ownership
 
 **Discovered:** 2026-07-11  
 **Resolved:** 2026-07-11  
@@ -2099,7 +2103,7 @@ Verification:
   2,091/2,091, `ReleaseLean` builds both targets, and independent review
   approved after three lifecycle findings were resolved.
 
-### 3D Query Version Reuse Could Suppress Live Colliders
+### GRV-Issue-010 — 3D Query Version Reuse Could Suppress Live Colliders
 
 **Discovered:** 2026-07-11  
 **Resolved:** 2026-07-11  
@@ -2131,7 +2135,7 @@ Verification:
   line/branch coverage, full `Release` passes 2,085/2,085, and independent
   review approved the registry scan and reset lifecycle.
 
-### CCD Rejected Finite Heavy-Body Response As Zero Inverse Mass
+### GRV-Issue-009 — CCD Rejected Finite Heavy-Body Response As Zero Inverse Mass
 
 **Discovered:** 2026-07-10  
 **Resolved:** 2026-07-10  
@@ -2175,7 +2179,7 @@ Verification:
 - The complete leading 3D dynamic TOI resolver reports 100% focused branch
   coverage and full `Release` passes 2,052/2,052; independent review approved.
 
-### Exhausted CCD Budget Left Pending Body Handoffs Alive
+### GRV-Issue-008 — Exhausted CCD Budget Left Pending Body Handoffs Alive
 
 **Discovered:** 2026-07-10  
 **Resolved:** 2026-07-10  
@@ -2216,7 +2220,7 @@ Verification:
   CCD test classes pass 178/178, full `Release` passes 2,036/2,036, and
   independent review approved the final lifecycle and reset ordering.
 
-### Context-Driven Mixed CCD Handoffs Could Drain Per Service Before The Shared Budget
+### GRV-Issue-007 — Context-Driven Mixed CCD Handoffs Could Drain Per Service Before The Shared Budget
 
 **Discovered:** 2026-07-06  
 **Resolved:** 2026-07-06  
@@ -2252,7 +2256,7 @@ Verification:
 - Ran full coverage collection: 1153 tests passed, branch coverage reached
   79.9%.
 
-### 2D Active-State Toggle Preserved Mixed Partition Membership
+### GRV-Issue-006 — 2D Active-State Toggle Preserved Mixed Partition Membership
 
 **Discovered:** 2026-07-06  
 **Resolved:** 2026-07-06  
@@ -2278,7 +2282,7 @@ Verification:
 - Included the regression in the Workstream 4 focused serialization/replay/
   authoring test slice and full coverage run.
 
-### Reduced SAT Helper Could False-Positive Rotated Cuboid And Convex Mesh-Mesh Paths
+### GRV-Issue-005 — Reduced SAT Helper Could False-Positive Rotated Cuboid And Convex Mesh-Mesh Paths
 
 **Discovered:** 2026-07-06  
 **Resolved:** 2026-07-06  
@@ -2311,7 +2315,7 @@ Verification:
   mesh/mesh regression failed before the convex mesh SAT fix.
 - Ran focused shape-pair and mesh/collider suites.
 
-### Mesh-Cuboid Fallback SAT Could False-Positive Without Edge-Cross Axes
+### GRV-Issue-004 — Mesh-Cuboid Fallback SAT Could False-Positive Without Edge-Cross Axes
 
 **Discovered:** 2026-07-06  
 **Resolved:** 2026-07-06  
@@ -2342,7 +2346,7 @@ Verification:
 - Added a steady-state allocation guard for the convex fallback.
 - Ran the focused `CollisionDetectionShapePairTests` suite.
 
-### Rotated Cuboid Raycast Clipped The Enclosing AABB Instead Of Local Slabs
+### GRV-Issue-003 — Rotated Cuboid Raycast Clipped The Enclosing AABB Instead Of Local Slabs
 
 **Discovered:** 2026-07-06  
 **Resolved:** 2026-07-06  
@@ -2366,7 +2370,7 @@ Verification:
 - Verified the regression failed before the fix and passed after the fix.
 - Ran the focused 3D raycast test suite.
 
-### 3D Direct Collider Inactive Load Preserved Stale Partition State
+### GRV-Issue-002 — 3D Direct Collider Inactive Load Preserved Stale Partition State
 
 **Discovered:** 2026-07-06  
 **Resolved:** 2026-07-06  
@@ -2392,7 +2396,7 @@ Verification:
 - Ran full `Release`, full `ReleaseLean`, coverage collection, and
   `git diff --check`.
 
-### Mixed Discrete Response Can Reverse Restitution-Heavy Kinematic CCD Handoff Velocity
+### GRV-Issue-001 — Mixed Discrete Response Can Reverse Restitution-Heavy Kinematic CCD Handoff Velocity
 
 **Discovered:** 2026-06-23  
 **Resolved:** 2026-06-25  

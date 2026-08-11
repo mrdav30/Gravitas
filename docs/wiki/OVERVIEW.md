@@ -11,6 +11,10 @@ Project resources: [documentation site](https://mrdav30.github.io/Gravitas/),
 [coverage report](https://mrdav30.github.io/Gravitas/coverage/), and
 [wiki home](Home.md).
 
+If this is your first Gravitas integration, start with
+[Getting Started](GETTING_STARTED.md) before using this page as the technical
+map.
+
 The core runtime rule is simple: there is no process-wide physics world. A
 simulation happens inside a `GravitasWorldContext`, and every body, collider,
 partition, query, coroutine, diagnostic buffer, and clock value belongs to that
@@ -61,6 +65,7 @@ project docs when you need the lower-level contracts behind a Gravitas API.
 
 | Need                                                          | Read                                                                |
 | ------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Build and step a first world                                  | [Getting Started](GETTING_STARTED.md)                                |
 | Wire Gravitas into a host loop                                | [Host Integration](HOST_INTEGRATION.md)                             |
 | Understand context services, lifecycle, and ownership         | [Runtime Architecture](RUNTIME_ARCHITECTURE.md)                     |
 | Choose between 2D, 3D, `Both`, and `Mixed`                    | [2D, 3D, And Runtime Modes](DIMENSIONS.md)                          |
