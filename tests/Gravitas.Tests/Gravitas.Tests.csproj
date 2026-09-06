@@ -9,6 +9,7 @@
 		<Configurations>Debug;Release;ReleaseLean</Configurations>
 		<OutputType>Exe</OutputType>
 		<DisableMemoryPack Condition="'$(DisableMemoryPack)' == ''">false</DisableMemoryPack>
+		<DisableTransitiveProjectReferences Condition="'$(UseLocalLsfStack)' == 'true'">true</DisableTransitiveProjectReferences>
 	</PropertyGroup>
 	<PropertyGroup Condition="'$(Configuration)' == 'ReleaseLean'">
 		<DisableMemoryPack>true</DisableMemoryPack>
@@ -32,6 +33,18 @@
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 			<PrivateAssets>all</PrivateAssets>
 		</PackageReference>
+	</ItemGroup>
+	<ItemGroup Condition="'$(UseLocalLsfStack)' == 'true'">
+		<ProjectReference Include="..\..\..\FixedMathSharp\src\FixedMathSharp\FixedMathSharp.csproj"
+			AdditionalProperties="Configuration=$(Configuration);SemVer=7.1.0;AssemblySemVer=7.1.0.0" />
+		<ProjectReference Include="..\..\..\FixedMathSharp\src\FixedMathSharp.Chronicler\FixedMathSharp.Chronicler.csproj"
+			AdditionalProperties="Configuration=$(Configuration);SemVer=7.1.0;AssemblySemVer=7.1.0.0" />
+		<ProjectReference Include="..\..\..\SwiftCollections\src\SwiftCollections\SwiftCollections.csproj"
+			AdditionalProperties="Configuration=$(Configuration);SemVer=7.0.0;AssemblySemVer=7.0.0.0" />
+		<ProjectReference Include="..\..\..\SwiftCollections\src\SwiftCollections.FixedMathSharp\SwiftCollections.FixedMathSharp.csproj"
+			AdditionalProperties="Configuration=$(Configuration);SemVer=7.1.0;AssemblySemVer=7.1.0.0" />
+		<ProjectReference Include="..\..\..\GridForge\src\GridForge\GridForge.csproj"
+			AdditionalProperties="Configuration=$(Configuration);SemVer=9.1.0;AssemblySemVer=9.1.0.0" />
 	</ItemGroup>
 	<ItemGroup Condition="'$(DisableMemoryPack)' != 'true'">
 		<PackageReference Include="FixedMathSharp.FluentAssertions" Version="7.1.0" />
