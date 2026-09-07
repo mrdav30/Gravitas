@@ -86,6 +86,9 @@ before `context.LateSimulate()`. Gravitas captures the frame-start pose, reads
 the host transform as the requested target pose, sweeps between those poses, and
 clips the first static-style blocker. Dynamic targets crossed before the first
 blocker are woken and position-corrected through service-owned handoff queues.
+At a shape-exact contact already present at frame start, the target's outward
+surface normal decides whether motion is closing. Tangential or separating
+motion continues without publishing a false blocker or dynamic handoff.
 Discrete contact response samples the same prepared kinematic end velocity, so
 authored same-frame linear and angular motion contributes consistently even when
 the kinematic body was processed earlier in service order.

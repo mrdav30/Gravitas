@@ -173,7 +173,11 @@ public partial class SolidBody
             else
                 refined = candidate;
 
-            if (!IsClosingContinuousCollisionHit(displacement, refined.Normal))
+            Vector3d closingNormal = hitsAreShapeExact
+                ? ResolveShapeExactContinuousClosingNormal(candidate)
+                : refined.Normal;
+
+            if (!IsClosingContinuousCollisionHit(displacement, closingNormal))
                 continue;
 
             if (found && !ContinuousCollisionHitComesBefore(refined, best))
@@ -499,6 +503,7 @@ public partial class SolidBody
                 target.Collider.RebuildRuntimeShapeOnly(refreshMassProperties: false);
 
                 Physics3DHit relativeHit = default;
+                Vector3d closingNormal = normal;
                 bool foundExact = false;
                 if (radialPair)
                 {
@@ -529,6 +534,7 @@ public partial class SolidBody
                         normal,
                         radialEntryDistance,
                         relativeDirection);
+                    closingNormal = relativeHit.Normal;
                 }
                 else if (!radialPair && Collider is LSSphereCollider sourceSphere)
                 {
@@ -538,6 +544,8 @@ public partial class SolidBody
                         relativeDisplacement,
                         relativeDirection,
                         out relativeHit);
+                    if (foundExact)
+                        closingNormal = relativeHit.Normal;
                 }
                 else if (!radialPair && target.Collider is LSSphereCollider targetSphere)
                 {
@@ -547,6 +555,8 @@ public partial class SolidBody
                         relativeDirection,
                         out relativeHit,
                         out _);
+                    if (foundExact)
+                        closingNormal = relativeHit.Normal;
                 }
                 else if (IsExactConvexSourceSupported(Collider))
                 {
@@ -554,9 +564,14 @@ public partial class SolidBody
                     foundExact = _shapeExactContinuousConvexSweepWorker
                         .TrySweepPreparedSource(
                             target.Collider,
-                            out Physics3DHit convexHit);
+                            out Physics3DHit shapeExactConvexHit);
                     if (foundExact)
-                        relativeHit = ApplyShapeExactContinuousContactSlop(convexHit);
+                    {
+                        relativeHit = ApplyShapeExactContinuousContactSlop(
+                            shapeExactConvexHit);
+                        closingNormal = ResolveShapeExactContinuousClosingNormal(
+                            shapeExactConvexHit);
+                    }
                 }
 
                 if (exactSupported && !foundExact)
@@ -585,7 +600,7 @@ public partial class SolidBody
                 }
 
                 Fixed64 localClosingSpeed =
-                    -Vector3d.Dot(relativeDisplacement, normal);
+                    -Vector3d.Dot(relativeDisplacement, closingNormal);
                 if (!ContinuousCollisionMath.TryNormalizeTranslationalClosingSpeed(
                         localClosingSpeed,
                         sourceEndTime - sourceStartTime,

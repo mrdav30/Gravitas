@@ -8,6 +8,7 @@
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
+using Gravitas.Queries;
 using System;
 using System.Runtime.CompilerServices;
 
@@ -88,6 +89,22 @@ public partial class SolidBody
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool IsClosingContinuousCollisionHit(Vector3d displacement, Vector3d normal) =>
         Vector3d.Dot(displacement, normal) < -Fixed64.Epsilon;
+
+    private static Vector3d ResolveShapeExactContinuousClosingNormal(
+        Physics3DHit hit)
+    {
+        // Query normals oppose the sweep; start-contact admission instead
+        // needs the target's outward surface normal.
+        if (hit.Distance > ShapeExactContinuousContactSlop
+            || !hit.TryGetPoint(out Vector3d startContactPoint))
+        {
+            return hit.Normal;
+        }
+
+        Vector3d surfaceNormal = hit.Collider!.GetNormalAtPoint(
+            startContactPoint);
+        return surfaceNormal;
+    }
 
     private bool IsValidContinuousCollisionTarget(LSCollider hitCollider)
     {

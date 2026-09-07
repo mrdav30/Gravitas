@@ -2,7 +2,7 @@
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-069`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-070`.
 - Assign an ID when an issue enters this tracker, keep it through resolution,
   and never reuse an ID even if an entry is later removed. Check this file's Git
   history before advancing or repairing the counter.
@@ -41,6 +41,41 @@ execution order.
 No active items.
 
 ## Resolved Issues
+
+### GRV-Issue-069 — Shape-Exact 3D CCD Could Treat Separating Start Contacts As Closing
+
+**Discovered:** 2026-09-06  
+**Resolved:** 2026-09-06  
+**Source:** Trailblazer Navigation Hardening Phase 1, Gravitas stair-contact
+integration  
+**Affected area:** 3D shape-exact CCD against stationary and moving targets
+
+RCA: the convex sweep query contract orients its reported normal against the
+sweep direction. That is useful for public query results, but a zero-time CCD
+contact must classify closing motion against the target's outward surface
+normal. Reusing the sweep-oriented normal could therefore treat tangential or
+separating motion as closing. The initial stationary-target correction recovered
+the outward normal, but the equivalent moving dynamic/kinematic relative-hit
+path still consumed the sweep-oriented normal and could publish a false hit or
+handoff.
+
+Fix: one shape-exact start-contact helper now recovers the target's outward
+surface normal within the existing contact-slop boundary. Stationary and moving
+relative-hit paths use that normal only for closing-direction admission; the
+original exact hit and deterministic ordering remain unchanged.
+
+Verification:
+
+- Added static-support, adjacent-riser, separating, and multi-grid kinematic
+  cylinder regressions through the public late-simulate lifecycle.
+- Added a moving-pair regression proving a kinematic cylinder separating from a
+  sleeping dynamic support does not publish a TOI iteration, wake the support,
+  or mutate its position or velocity.
+- The moving-pair regression failed before the shared-normal correction because
+  the source reported one false TOI iteration, then passed after the fix.
+- The five focused kinematic-cylinder regressions pass in both `Release` and
+  `ReleaseLean`; the 19 existing dynamic-relative CCD regressions also pass in
+  both configurations against the coordinated local LSF stack.
 
 ### GRV-Issue-068 — Scaled Mesh Query Faces Used Authored Unscaled Normals
 
