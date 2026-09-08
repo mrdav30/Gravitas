@@ -7,6 +7,8 @@
 
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
+using SwiftCollections;
+using System;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas;
@@ -39,6 +41,24 @@ internal sealed partial class GravitasMixedCollisionService
     internal void RemovePairsFor3DCollider(LSCollider collider)
     {
         SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
+        int removalStart = QueuePairsFor3DCollider(collider);
+        RemoveQueuedPairs(removalStart, _pairsToRemove.Count);
+    }
+
+    internal void InvalidatePairsFor3DColliderReconfiguration(
+        LSCollider collider,
+        ref SwiftList<Exception>? notificationExceptions)
+    {
+        SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
+        int removalStart = QueuePairsFor3DCollider(collider);
+        RemoveQueuedPairs(
+            removalStart,
+            _pairsToRemove.Count,
+            ref notificationExceptions);
+    }
+
+    private int QueuePairsFor3DCollider(LSCollider collider)
+    {
         int removalStart = _pairsToRemove.Count;
         foreach (var pairEntry in _pairs)
         {
@@ -49,7 +69,7 @@ internal sealed partial class GravitasMixedCollisionService
             _pairsToRemove.Add(new MixedPairLifetimeToken(pair));
         }
 
-        RemoveQueuedPairs(removalStart, _pairsToRemove.Count);
+        return removalStart;
     }
 
     internal void RemovePairsFor2DCollider(LSCollider2D collider)
@@ -189,6 +209,34 @@ internal sealed partial class GravitasMixedCollisionService
         {
             for (int i = removalStart; i < removalEnd; i++)
                 RemoveCurrentPair(_pairsToRemove[i]);
+        }
+        finally
+        {
+            if (removalStart == 0)
+                _pairsToRemove.FastClear();
+        }
+    }
+
+    private void RemoveQueuedPairs(
+        int removalStart,
+        int removalEnd,
+        ref SwiftList<Exception>? notificationExceptions)
+    {
+        try
+        {
+            for (int i = removalStart; i < removalEnd; i++)
+            {
+                try
+                {
+                    RemoveCurrentPair(_pairsToRemove[i]);
+                }
+                catch (Exception exception)
+                {
+                    CollisionNotificationExceptions.Capture(
+                        ref notificationExceptions,
+                        exception);
+                }
+            }
         }
         finally
         {

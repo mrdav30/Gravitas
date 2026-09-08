@@ -42,6 +42,7 @@ flowchart LR
 | Register a 3D body              | `new SolidBody(agent, collider).Initialize(...)`           |
 | Register a 2D body              | `new SolidBody2D(agent, collider).Initialize(...)`         |
 | Register bodyless geometry      | `collider.InitializeWithNoBody(agent)`                     |
+| Reconfigure a 3D primitive body | `body.TryReconfigureCollider(...)`                         |
 | Set runtime mode                | `context.Settings.RuntimeMode`                             |
 | Run 3D constraints/ragdolls     | `context.Constraints3D`                                    |
 | Run 2D constraints/ragdolls     | `context.Constraints2D`                                    |
@@ -318,6 +319,66 @@ membership immediately. The bodyless 3D `LSCollider.Position` and `Rotation`
 setters are the transactional alternative: they validate the tentative world
 pose and publish the host transform, canonical geometry, mass properties, and
 partitions only after the whole candidate succeeds.
+
+### Reconfiguring A Registered 3D Body
+
+Use `SolidBody.TryReconfigureCollider(...)` when a registered 3D agent changes
+physical profile without changing runtime identity: for example, standing to
+crouching, then returning to standing. The current focused surface supports
+sphere, capsule, and finite-cylinder bodies. A definition must stay in the
+collider's existing shape family; it cannot turn a capsule into a sphere or
+replace compound, cuboid, cone, or mesh geometry.
+
+Call it between fixed steps with the complete desired geometry, local offset,
+and authoritative body-root position:
+
+```csharp
+using FixedMathSharp;
+using Gravitas;
+using Gravitas.Colliders;
+
+ColliderReconfigurationStatus result = body.TryReconfigureCollider(
+    ColliderShapeDefinition.Capsule(
+        radius: Fixed64.Half,
+        height: Fixed64.One),
+    localOffset: Vector3d.Up * Fixed64.Half,
+    position: body.Position3d,
+    out LSCollider? blocker,
+    out System.Exception? notificationException,
+    publishSynchronizedState: null);
+```
+
+`Applied` means the geometry and pose were published together. `Unchanged`
+means the requested authored and committed state already matched. `Blocked`
+returns the first physically eligible collider, in stable registration order,
+that the candidate would positively penetrate. Exact zero-depth support or
+floor contact is accepted, and trigger volumes do not block reconfiguration.
+
+The definition contributes geometry only. The existing collider keeps its
+material, filters, hierarchy, event subscriptions, rotation, service identity,
+and body motion state. An accepted change refreshes mass properties, pure and
+mixed broad-phase membership, and query visibility; it invalidates existing
+contact pairs, warm starts, CCD trajectories, and joint solver caches. A blocked
+or invalid attempt leaves the authored and committed shape, body and host pose,
+partitions, pairs, serialized payload, and replay hash unchanged. Default,
+unsupported, wrong-family, unrepresentable, and unsafe-lifecycle requests throw
+rather than partially publishing state.
+
+Pair-separation callbacks from an accepted reconfiguration run after the new
+geometry, root pose, mass properties, and partitions are coherent. A
+coordinating adapter can supply `publishSynchronizedState`; Gravitas invokes it
+after physical publication (or confirmation of `Unchanged`) and before any
+separation callback, and does not invoke it for `Blocked`. The publisher must
+leave dependent state committed even if a host notification throws because the
+physical transaction cannot roll back at that point.
+
+Pair retirement continues in stable order if the publisher or a separation
+callback throws. Gravitas returns one failure directly through
+`notificationException`, or several as an `AggregateException`. That value
+reports a post-commit notification failure; it does not change `result` from
+`Applied` or `Unchanged`, and the host must not retry the accepted
+reconfiguration. A coordinating adapter should rethrow the returned exception
+with its original stack only after the call completes.
 
 Authored `FixedTransform.LocalScale` may be signed or zero, but physical
 collider dimensions may not. Gravitas requires every consumed authored local

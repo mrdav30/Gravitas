@@ -29,4 +29,14 @@ internal static class CollisionNotificationExceptions
 
         throw new AggregateException(exceptions);
     }
+
+    internal static Exception? ToException(SwiftList<Exception>? exceptions)
+    {
+        if (exceptions == null)
+            return null;
+
+        return exceptions.Count == 1
+            ? exceptions[0]
+            : new AggregateException(exceptions);
+    }
 }

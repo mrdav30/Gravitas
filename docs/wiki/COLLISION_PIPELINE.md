@@ -198,6 +198,15 @@ stack, while multiple failures are reported as an `AggregateException` in pair
 order. Deferred exits retain the pair's notification guard until cleanup
 finishes, preventing direct deactivation from reentering the same separation.
 
+`SolidBody.TryReconfigureCollider(...)` keeps its transaction status separate
+from post-commit notification failure. After physical publication, its optional
+synchronized-state publisher runs before pair exits, so a coordinating consumer
+can publish dependent state before any callback observes the transaction. Pair
+retirement continues across publisher or callback failures before one exception
+is returned directly through `notificationException` or several are aggregated.
+A notification failure must not be treated as a request to retry the already
+accepted shape change.
+
 3D and 2D response both:
 
 - combine contact rows with enabled joint rows.

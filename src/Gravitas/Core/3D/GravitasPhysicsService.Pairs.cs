@@ -9,6 +9,7 @@ using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Support;
 using SwiftCollections;
+using System;
 
 namespace Gravitas;
 
@@ -116,6 +117,29 @@ public sealed partial class GravitasPhysicsService
 
     internal void RemovePairsForCollider(LSCollider collider)
     {
+        SwiftList<Exception>? notificationExceptions = null;
+        RemovePairsForCollider(
+            collider,
+            clearRuntimeRelationships: true,
+            deferNotificationExceptions: false,
+            ref notificationExceptions);
+    }
+
+    internal void InvalidatePairsForColliderReconfiguration(
+        LSCollider collider,
+        ref SwiftList<Exception>? notificationExceptions) =>
+        RemovePairsForCollider(
+            collider,
+            clearRuntimeRelationships: false,
+            deferNotificationExceptions: true,
+            ref notificationExceptions);
+
+    private void RemovePairsForCollider(
+        LSCollider collider,
+        bool clearRuntimeRelationships,
+        bool deferNotificationExceptions,
+        ref SwiftList<Exception>? notificationExceptions)
+    {
         int deactivationStart = _pairsPendingDeactivation.Count;
         SwiftDictionary<int, CollisionPair>? collisionPairs = collider.CollisionPairs;
         if (collisionPairs != null)
@@ -143,12 +167,30 @@ public sealed partial class GravitasPhysicsService
             for (int i = deactivationStart; i < deactivationEnd; i++)
             {
                 CollisionPairLifetimeToken token = _pairsPendingDeactivation[i];
-                if (token.IsCurrentLifetime)
+                if (!token.IsCurrentLifetime)
+                    continue;
+
+                if (!deferNotificationExceptions)
+                {
                     FullDeactivateCollisionPair(token.Pair);
+                    continue;
+                }
+
+                try
+                {
+                    FullDeactivateCollisionPair(token.Pair);
+                }
+                catch (Exception exception)
+                {
+                    CollisionNotificationExceptions.Capture(
+                        ref notificationExceptions,
+                        exception);
+                }
             }
 
             collider.ClearCollisionPairState();
-            collider.ClearRuntimeRelationships();
+            if (clearRuntimeRelationships)
+                collider.ClearRuntimeRelationships();
         }
         finally
         {

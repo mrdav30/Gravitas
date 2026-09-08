@@ -2,7 +2,7 @@
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-070`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-071`.
 - Assign an ID when an issue enters this tracker, keep it through resolution,
   and never reuse an ID even if an entry is later removed. Check this file's Git
   history before advancing or repairing the counter.
@@ -41,6 +41,41 @@ execution order.
 No active items.
 
 ## Resolved Issues
+
+### GRV-Issue-070 — Collider Reconfiguration Exit Failure Could Interrupt Publication
+
+**Discovered:** 2026-09-08  
+**Resolved:** 2026-09-08  
+**Source:** Trailblazer Navigation Hardening Phase 2 independent review  
+**Affected area:** 3D collider reconfiguration and pure/mixed pair retirement
+
+RCA: `SolidBody.TryReconfigureCollider(...)` retired existing collision pairs
+before publishing the accepted shape and root pose. Pair retirement invokes
+separation callbacks, so one callback failure could escape with an already
+removed pair while the body still exposed its previous geometry and pose. The
+same ordering risk existed for both pure 3D and mixed 3D/2D pairs.
+
+Fix: accepted reconfiguration now publishes geometry, pose, mass properties,
+pure and mixed partitions, wake state, and solver-cache invalidation before
+pair notifications run. An optional synchronized-state publisher runs after
+physical publication and before pair notifications, preventing a coordinating
+consumer's callbacks from observing cross-library half-state. Reconfiguration-
+specific retirement captures publisher and callback failures and continues
+retiring every captured pair in stable order. The public transaction returns one
+notification failure directly or several as an `AggregateException`, separately
+from its accepted status. The failure is explicitly post-commit and does not
+make the transaction retryable.
+
+Verification:
+
+- Added a pure 3D regression where synchronized publication and both separation
+  callbacks throw; it proves physical state publishes first, pair callbacks see
+  synchronized dependent state, every pair retires, and failures retain stable
+  publisher-then-pair order.
+- Added a mixed 3D/2D regression proving its throwing exit callback observes the
+  accepted shape and pose after the mixed pair is retired.
+- All 15 focused collider-reconfiguration tests pass in both `Release` and
+  `ReleaseLean`.
 
 ### GRV-Issue-069 — Shape-Exact 3D CCD Could Treat Separating Start Contacts As Closing
 

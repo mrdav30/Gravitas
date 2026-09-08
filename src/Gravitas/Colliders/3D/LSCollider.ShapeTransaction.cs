@@ -227,12 +227,11 @@ public abstract partial class LSCollider
         ValidateShapeCandidate(snapshot);
         _preparedSnapshot = snapshot;
         PrepareShape(snapshot);
-        if (requireRepresentableMassPoint
-            && !CalculatePreparedLocalMassPoint().TryGetPoint(out _))
-        {
-            throw new System.InvalidOperationException(
-                "The collider's body-local center of mass is outside the Fixed64 coordinate domain.");
-        }
+        SwiftThrowHelper.ThrowIfTrue(
+            requireRepresentableMassPoint
+                && !CalculatePreparedLocalMassPoint().TryGetPoint(out _),
+            nameof(requireRepresentableMassPoint),
+            "The collider's body-local center of mass is outside the Fixed64 coordinate domain.");
     }
 
     private void PublishPreparedShape()
@@ -284,6 +283,66 @@ public abstract partial class LSCollider
 
     internal void PublishPreparedExplicitBodyPose()
     {
+        PublishPreparedShape();
+        _body!.RefreshMassPropertiesFromColliderShape();
+    }
+
+    internal void PrepareDetachedBodyReconfigurationCandidate(
+        SolidBody body,
+        Vector3d localOffset,
+        Vector3d position,
+        FixedQuaternion rotation)
+    {
+        _body = body;
+        _agent = body.Agent;
+        _context = body.Context;
+        _offset = localOffset;
+        PrepareStandaloneInitialization(
+            body.Agent,
+            useRequestedPose: true,
+            position,
+            rotation);
+        PublishPreparedShape();
+    }
+
+    internal bool MatchesCommittedReconfigurationCandidate(LSCollider candidate) =>
+        !_runtimeShapeState.ShouldRebuild(candidate._preparedSnapshot);
+
+    internal void PrepareBodyReconfiguration(
+        ColliderShapeDefinition definition,
+        Vector3d localOffset,
+        Vector3d position,
+        FixedQuaternion rotation)
+    {
+        Vector3d ownerScale = ColliderScalePolicy.CaptureScale(_agent!.Transform);
+        SwiftThrowHelper.ThrowIfArgument(
+            !rotation.TryTransformScaledPoint(
+                position,
+                localOffset,
+                ownerScale,
+                out Vector3d center),
+            nameof(position),
+            "Collider center must be representable after applying the requested body pose.");
+        var snapshot = new ColliderShapeSnapshot(
+            center,
+            rotation,
+            ownerScale,
+            Vector3d.One,
+            localOffset,
+            definition.Size,
+            definition.Radius);
+        PrepareRuntimeShape(
+            snapshot,
+            requireRepresentableMassPoint: true);
+    }
+
+    internal void PublishPreparedBodyReconfiguration(
+        ColliderShapeDefinition definition,
+        Vector3d localOffset)
+    {
+        _offset = localOffset;
+        _radius = definition.Radius;
+        _size = definition.Size;
         PublishPreparedShape();
         _body!.RefreshMassPropertiesFromColliderShape();
     }

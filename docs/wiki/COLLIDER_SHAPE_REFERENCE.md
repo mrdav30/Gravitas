@@ -8,6 +8,8 @@ technical companion to [Collision Pipeline](COLLISION_PIPELINE.md).
 
 - Runtime colliders are not serialized asset definitions.
 - Shape definitions are data-only authoring/import surfaces.
+- Registered sphere, capsule, and finite-cylinder bodies can transactionally
+  change same-family geometry through `SolidBody.TryReconfigureCollider(...)`.
 - Compound colliders own one public collider identity and stable private part
   order.
 - Mesh colliders can be valid simulation/query targets; concave mesh source
@@ -84,6 +86,16 @@ values are data-first authored descriptors, not independent runtime identities.
 Shape definitions should be used by importers, tooling, and offline-authored
 compound assets. Runtime collider shells own context binding, collider IDs,
 partition coordinates, pair state, events, and query stamps.
+
+For a registered `SolidBody`, `TryReconfigureCollider(...)` treats a
+`ColliderShapeDefinition` as geometry input rather than as a replacement
+runtime collider. The definition kind must match the current sphere, capsule,
+or finite-cylinder family. The operation stages exact canonical geometry and
+bounds on a detached candidate, rejects positive penetration, then publishes
+authored and committed shape state together. Material, physical filters,
+hierarchy, event subscriptions, rotation, identity, and motion state remain on
+the existing collider and body. Other shape families are deliberately outside
+this focused public contract.
 
 `CompoundColliderPart` scale-safely normalizes its authored local rotation once
 at construction, with a zero quaternion resolving to identity. The stored value

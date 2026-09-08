@@ -88,6 +88,14 @@ Collider geometry can derive default COM/mass properties for new shells, but
 populated snapshots restore body-owned COM state directly where that state is
 authoritative.
 
+A successful `SolidBody.TryReconfigureCollider(...)` becomes ordinary
+authoritative body/collider state: the published body root, local offset, and
+primitive geometry are recorded by the existing serialization paths. The
+operation itself, detached fit candidate, returned blocker, invalidated pairs,
+and refreshed partition coordinates are not serialized. A blocked or invalid
+attempt publishes nothing, so its serialized payload and authoritative replay
+hash remain unchanged.
+
 Pair-local contact caches and joint solver caches are rebuildable runtime data
 unless a drift investigation explicitly hashes them through
 `GravitasReplayHashMode.AuthoritativeWithSolverCaches`.
