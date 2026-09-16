@@ -2,7 +2,7 @@
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-071`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-072`.
 - Assign an ID when an issue enters this tracker, keep it through resolution,
   and never reuse an ID even if an entry is later removed. Check this file's Git
   history before advancing or repairing the counter.
@@ -41,6 +41,45 @@ execution order.
 No active items.
 
 ## Resolved Issues
+
+### GRV-Issue-071 — Local-Stack Outputs Selected Published Math Binaries
+
+**Discovered:** 2026-09-15  
+**Resolved:** 2026-09-15  
+**Source:** Trailblazer direct-visibility cross-stack prerequisite validation  
+**Affected area:** local-stack library output, test host, and benchmark parent
+
+RCA: Gravitas retained direct sibling `FixedMathSharp` project references in
+local-stack mode, but the library, test, and benchmark project boundaries did
+not suppress same-version math package assets contributed transitively. NuGet
+therefore selected the published package binaries for copied output even while
+the sibling projects built successfully. `Release` copied published
+`netstandard2.1`/host hashes `EB3B9E...`/`731A3D...` instead of sibling
+`496ADE...`/`8B125C...`; `ReleaseLean` copied `B7D265...`/`8A5138...` instead of
+`91218E...`/`BF21DA...`.
+
+Fix: in local-stack mode only, the Gravitas library and both executable hosts
+retain their direct sibling project reference while excluding compile and
+runtime assets from the matching standard or Lean `FixedMathSharp` package.
+Normal package-backed evaluation and builds are unchanged.
+
+Verification:
+
+- Both local-stack configurations build the complete solution for the library's
+  `netstandard2.1` and `net8.0` targets with zero warnings.
+- The final library copy, test host, and benchmark parent match their applicable
+  sibling math hashes in both configurations; test/benchmark dependency
+  manifests identify math as a direct reference rather than a package runtime
+  asset. Copied GridForge binaries also match sibling output.
+- Full local-stack tests pass `3,950/3,950` in `Release` and `3,895/3,895` in
+  `ReleaseLean`.
+- Both coverage runs report `56,091/56,091` lines, `15,906/15,906` branches,
+  and `5,340/5,340` methods.
+- Fresh normal package-mode solution builds still pass in both configurations,
+  and every captured math/GridForge output hash matches its pre-change package
+  baseline exactly.
+- No benchmark workload was run. This correction certifies the direct benchmark
+  parent only; it makes no claim about BenchmarkDotNet-generated child projects.
 
 ### GRV-Issue-070 — Collider Reconfiguration Exit Failure Could Interrupt Publication
 
