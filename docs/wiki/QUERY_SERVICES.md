@@ -117,6 +117,14 @@ absolute point to be representable. The familiar `Point`, `Point3D`, and
 when a query may approach a scalar face. Returning `false` from a witness
 materialization method does not invalidate the query hit.
 
+A 2D circle sweep that starts touching or overlapping a target reports zero
+travel distance but still retains the **target's surface witness**, not the
+probe's starting center. It preserves the anchor even when that point cannot
+be materialized. At coincident circle centers, the deterministic fallback is
+world +X. When a circle probe lies on a capsule's centerline, the fallback is
+the capsule's local +X radial side, rotated with the capsule. The witness and
+outward normal describe the same side of the target.
+
 ## Common Usage
 
 ```csharp

@@ -36,6 +36,7 @@ internal static partial class QueryDetection2D
                 circle.Rotation,
                 Fixed64.Zero,
                 circle.ScaledRadius,
+                Vector2d.Right,
                 circle,
                 out hit);
         if (collider is LSCapsuleCollider2D capsule)
@@ -46,6 +47,7 @@ internal static partial class QueryDetection2D
                 capsule.Rotation,
                 capsule.AxisLength,
                 capsule.ScaledRadius,
+                capsule.WorldAxis.RotatedRight,
                 capsule,
                 out hit);
         if (collider is not IConvexVertexSource2D)
@@ -99,6 +101,7 @@ internal static partial class QueryDetection2D
         Fixed64 targetRotation,
         Fixed64 targetAxisLength,
         Fixed64 targetRadius,
+        Vector2d targetFallbackNormal,
         LSCollider2D target,
         out Physics2DHit hit)
     {
@@ -111,7 +114,7 @@ internal static partial class QueryDetection2D
                 targetRotation,
                 targetAxisLength,
                 targetRadius,
-                ResolveQueryFallbackNormal(queryCenter, targetCenter),
+                -targetFallbackNormal,
                 out FixedContactAnchors2d contact))
         {
             hit = default;
@@ -128,9 +131,7 @@ internal static partial class QueryDetection2D
         hit = new Physics2DHit(
             target,
             new ContactAnchor2D(contact.SecondAnchor),
-            queryCenter == targetCenter
-                ? ResolveQueryFallbackNormal(queryCenter, targetCenter)
-                : -contact.Normal,
+            -contact.Normal,
             distance);
         return true;
     }
@@ -243,7 +244,7 @@ internal static partial class QueryDetection2D
 
         if (TryOverlapCircle(start, radius, collider, out Physics2DHit overlapHit))
         {
-            hit = new Physics2DHit(collider, start, overlapHit.Normal, Fixed64.Zero);
+            hit = new Physics2DHit(collider, overlapHit.Anchor, overlapHit.Normal, Fixed64.Zero);
             return true;
         }
 

@@ -2,7 +2,7 @@
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-074`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-076`.
 - Assign an ID when an issue enters this tracker, keep it through resolution,
   and never reuse an ID even if an entry is later removed. Check this file's Git
   history before advancing or repairing the counter.
@@ -38,6 +38,54 @@
 No active issues are queued.
 
 ## Resolved Issues
+
+### GRV-Issue-075 - Centerline circle/capsule queries disagree on the surface side
+
+- **Discovered / resolved:** 2026-09-21 during the native Trailblazer 2D preflight.
+- **Evidence:** At `df19151`, a circle probe at a target circle/capsule center
+  returned a normal opposite its surface witness. Away from a capsule's center,
+  but on its axis, the center-to-center fallback could instead put the witness
+  inside the capsule. Eight new upright, rotated and degenerate cases reproduced
+  these failures in public overlap and initial-overlap sweep queries.
+- **Fix:** Supply one radial fallback to the existing centered-contact kernel,
+  with its required query-to-target sign, then use that contact's outward
+  target normal consistently. Coincident circles use world +X; capsule-axis ties
+  use local +X from the cached world axis. No extra solver, public API or
+  point materialization is needed.
+
+### GRV-Issue-074 - Initially overlapping circle sweeps discard the target witness
+
+- **Discovered / resolved:** 2026-09-21; Trailblazer `TRB-Issue-150` owns the
+  cross-stack discovery record.
+- **Evidence:** At `df19151`, sweeping a radius-1/2 circle downward from
+  `(0,1/2)` against a floor at planar height zero returned `(0,1/2)` as its
+  surface point instead of `(0,0)`. `TrySweepCircle` replaced the overlap's
+  target anchor with the probe start. It also changed an unrepresentable target
+  witness into a falsely representable point at scalar faces.
+- **Fix:** Preserve the overlap hit's rigid-frame anchor and normal while
+  retaining zero **sweep travel**. Do not copy overlap distance or require an
+  absolute witness. Compound owner selection and authored-order ties remain
+  unchanged.
+- **Regression evidence:** `Physics2DSweepWitnessTests` adds 32 behavioral cases
+  across both fixes: circle/capsule/box/polygon/compound touch, penetration and
+  ordinary entry; floor support; compound ties; both scalar faces; and
+  centerline fallback consistency. The witness regressions failed before the
+  fixes; two existing expectations that encoded the wrong probe-center point
+  were corrected. The native preflight now passes 52 checks with zero witness
+  gaps, plus 15 slope/support geometry checks.
+
+Windows source-stack verification for both fixes: Release **4,053** and
+ReleaseLean **3,998** tests pass. Both configurations retain exact
+**56,196/56,196 lines, 16,018/16,018 branches and 5,346/5,346 fully covered
+methods**; the two fewer branches remove the inconsistent normal override.
+Full solution builds pass both target frameworks without warnings or errors.
+Coverage is retained under `artifacts/issue150/`; release-package validation
+remains deferred with the coordinated upstream releases.
+The same managed test outputs also pass on Ubuntu/WSL .NET 8.0.26 in both
+configurations; this is runtime execution, not an independent Linux build.
+Both downstream Trailblazer suites pass on Windows/Linux in standard/Lean,
+and both repositories' DocFX builds pass with zero warnings/errors.
+Independent source/simplicity review found no blocking findings.
 
 ### GRV-Issue-073 - Rotational static stops use the inward contact normal
 

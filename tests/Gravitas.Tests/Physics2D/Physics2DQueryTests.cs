@@ -953,7 +953,7 @@ public sealed class Physics2DQueryTests
         hit.Should().BeTrue();
         sweepHit.Collider.Should().BeSameAs(body.Collider);
         sweepHit.Distance.Should().Be(Fixed64.Zero);
-        sweepHit.Point.Should().Be(Vector2d.Zero);
+        sweepHit.Point.Should().Be(Vector2d.Right * Fixed64.Half);
         sweepHit.Normal.Should().Be(Vector2d.Right);
     }
 
@@ -1863,7 +1863,7 @@ public sealed class Physics2DQueryTests
 
         overlapHit.Collider.Should().BeSameAs(capsule.Collider);
         overlapHit.Distance.Should().Be(Fixed64.Zero);
-        overlapHit.Point.Should().Be(Vector2d.Zero);
+        overlapHit.Point.Should().Be(Vector2d.Right * Fixed64.Half);
 
         QueryDetection2D.TrySweepCircle(
             new Vector2d((Fixed64)(-3), Fixed64.Zero),
