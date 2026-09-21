@@ -1889,7 +1889,10 @@ public sealed partial class ContinuousCollision2DTests
         Fixed64 proxyRadius = Fixed64.Epsilon + Fixed64.Epsilon;
         SolidBody2D source = CreateBody(
             context,
-            new LSCircleCollider2D(proxyRadius),
+            new LSCircleCollider2D(proxyRadius)
+            {
+                LocalOffset = Vector2d.Right * proxyRadius
+            },
             Vector2d.Zero,
             immovable: false);
         source.LocalCenterOfMassOffset = Vector2d.Right;
@@ -1899,6 +1902,7 @@ public sealed partial class ContinuousCollision2DTests
         source.AddAngularImpulse(requestedAngularVelocity / source.EffectiveInverseMomentOfInertia);
         Fixed64 appliedAngularVelocity = source.AngularVelocity;
         appliedAngularVelocity.Should().BeGreaterThan(Fixed64.Epsilon);
+        source.ResolveContinuousCollisionProxyRadius().Should().BeGreaterThan(Fixed64.Epsilon);
         (appliedAngularVelocity.Abs() * source.ResolveContinuousCollisionProxyRadius())
             .Should().BeLessThanOrEqualTo(Fixed64.Epsilon);
 
@@ -1917,13 +1921,18 @@ public sealed partial class ContinuousCollision2DTests
         _ = CreateBody(context, new LSCircleCollider2D(Fixed64.One), Vector2d.Zero, immovable: true);
         SolidBody2D source = CreateBody(
             context,
-            new LSCircleCollider2D(smallPositiveValue),
+            new LSCircleCollider2D(smallPositiveValue)
+            {
+                LocalOffset = Vector2d.Right * smallPositiveValue
+            },
             Vector2d.Zero,
             immovable: false,
             isKinematic: true);
         source.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
         source.SetRotation(smallPositiveValue);
-        (smallPositiveValue * smallPositiveValue).Should().BeLessThanOrEqualTo(Fixed64.Epsilon);
+        source.ResolveContinuousCollisionProxyRadius().Should().BeGreaterThan(Fixed64.Epsilon);
+        (smallPositiveValue * source.ResolveContinuousCollisionProxyRadius())
+            .Should().BeLessThanOrEqualTo(Fixed64.Epsilon);
         var candidates = new SwiftList<Physics2DHit>();
         context.Query2D.OverlapCircleAgainstStaticAll(
             Vector2d.Zero,

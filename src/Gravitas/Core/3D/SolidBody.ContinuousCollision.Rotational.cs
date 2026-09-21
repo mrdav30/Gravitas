@@ -15,6 +15,10 @@ namespace Gravitas;
 
 public partial class SolidBody
 {
+    /// <summary>Gets whether body rotation leaves this collider's occupied geometry unchanged.</summary>
+    internal bool HasRotationInvariantCollider =>
+        Collider is LSSphereCollider && Collider.LocalOffset == Vector3d.Zero;
+
     private bool TryResolveRotationalContinuousCollision(
         Vector3d startPosition,
         ref Vector3d proposedPosition,
@@ -44,7 +48,11 @@ public partial class SolidBody
 
         Fixed64 pivotRadius = ResolveContinuousCollisionProxyRadius();
         Vector3d initialDisplacement = proposedPosition - startPosition;
-        Fixed64 angularDistance = _angularVelocity.Magnitude * initialRemainingTime;
+        // A centered sphere turns without sweeping new geometry. Keep target
+        // rotation admission below: another body's rotation can still hit it.
+        Fixed64 angularDistance = HasRotationInvariantCollider
+            ? Fixed64.Zero
+            : _angularVelocity.Magnitude * initialRemainingTime;
         bool targetRequiresRotationalSampling = angularDistance <= Fixed64.Epsilon
             && HasNearbyRotationalContinuousCollisionTarget(
                 startPosition,
@@ -100,7 +108,9 @@ public partial class SolidBody
                     motionSegmentStartRotation,
                     motionSegmentAngularVelocity,
                     segmentElapsedTime);
-                angularDistance = motionSegmentAngularVelocity.Magnitude * remainingTime;
+                angularDistance = HasRotationInvariantCollider
+                    ? Fixed64.Zero
+                    : motionSegmentAngularVelocity.Magnitude * remainingTime;
                 GatherRotationalContinuousCollisionCandidates(
                     currentPosition,
                     segmentEnd,
@@ -245,10 +255,24 @@ public partial class SolidBody
                 }
 
                 LastContinuousCollisionToiIterationCount++;
-                StopRotationalContinuousCollision(
-                    useMixed
-                        ? -mixedHit.Contact.Normal3DTo2D
-                        : ResolveSourceContactNormal(target!, contact));
+                bool unresolvedInterval = !responseWitnessIsEarliest
+                    || !(useMixed ? mixedHit.HasContact : hasContact);
+                if (unresolvedInterval)
+                {
+                    // A later witness cannot supply a response at this frontier.
+                    // Retain momentum while the stationary tail bounds this frame.
+                    LastContinuousCollisionToiIterationLimitReached =
+                        remainingTime - consumedTime > Fixed64.Epsilon;
+                    if (LastContinuousCollisionToiIterationLimitReached)
+                        Context.Physics.ReportContinuousCollisionIterationLimit();
+                }
+                else
+                {
+                    StopRotationalContinuousCollision(
+                        useMixed
+                            ? -mixedHit.Contact.Normal3DTo2D
+                            : ResolveSourceOutwardContactNormal(target!, contact));
+                }
                 if (CanAppendContinuousCollisionSegment(impactElapsedTime))
                 {
                     _ = Context.Physics.TryReserveContinuousCollisionCandidateRefresh(this);
@@ -293,7 +317,11 @@ public partial class SolidBody
 
         Fixed64 pivotRadius = ResolveContinuousCollisionProxyRadius();
         Vector3d displacement = proposedPosition - startPosition;
-        Fixed64 angularDistance = ResolveKinematicAngularDistanceRadians(startRotation, proposedRotation);
+        // Preserve the host's orientation, but do not treat an invariant sphere
+        // as a rotating obstacle against its own tangential support contacts.
+        Fixed64 angularDistance = HasRotationInvariantCollider
+            ? Fixed64.Zero
+            : ResolveKinematicAngularDistanceRadians(startRotation, proposedRotation);
         bool targetRequiresRotationalSampling = angularDistance <= Fixed64.Epsilon
             && HasNearbyRotationalContinuousCollisionTarget(
                 startPosition,
@@ -340,9 +368,9 @@ public partial class SolidBody
             {
                 Vector3d segmentDisplacement = (proposedPosition - currentPosition);
                 FixedQuaternion segmentTargetRotation = targetRotation;
-                angularDistance = ResolveKinematicAngularDistanceRadians(
-                    currentRotation,
-                    segmentTargetRotation);
+                angularDistance = HasRotationInvariantCollider
+                    ? Fixed64.Zero
+                    : ResolveKinematicAngularDistanceRadians(currentRotation, segmentTargetRotation);
                 GatherRotationalContinuousCollisionCandidates(
                     currentPosition,
                     proposedPosition,
@@ -459,13 +487,13 @@ public partial class SolidBody
                     currentRotation,
                     segmentTargetRotation,
                     eventTime).Normalized;
-                Fixed64 impactElapsedTime = elapsedTime + remainingTime * eventTime;
+                Fixed64 conservativeConsumedTime = remainingTime * eventTime;
+                Fixed64 impactElapsedTime = elapsedTime + conservativeConsumedTime;
                 if (deferUnresolvedWitness)
                 {
                     conservativeRefinementCount++;
-                    Fixed64 consumedTime = remainingTime * eventTime;
                     elapsedTime = impactElapsedTime;
-                    remainingTime -= consumedTime;
+                    remainingTime -= conservativeConsumedTime;
                     continue;
                 }
 
@@ -474,6 +502,15 @@ public partial class SolidBody
                 // Their prepared authored segment is therefore the only retained
                 // segment before this terminal clamp, so the validated positive
                 // TOI budget always admits this single replacement tail.
+                bool unresolvedInterval = !responseWitnessIsEarliest
+                    || !(useMixed ? mixedHit.HasContact : hasContact);
+                if (unresolvedInterval)
+                {
+                    LastContinuousCollisionToiIterationLimitReached =
+                        remainingTime - conservativeConsumedTime > Fixed64.Epsilon;
+                    if (LastContinuousCollisionToiIterationLimitReached)
+                        Context.Physics.ReportContinuousCollisionIterationLimit();
+                }
                 _ = Context.Physics.TryReserveContinuousCollisionCandidateRefresh(this);
                 AppendContinuousCollisionSegment(
                     currentPosition,
@@ -824,7 +861,7 @@ public partial class SolidBody
         return true;
     }
 
-    private Vector3d ResolveSourceContactNormal(
+    private Vector3d ResolveSourceOutwardContactNormal(
         LSCollider target,
         ManifoldContact contact)
     {
@@ -833,7 +870,7 @@ public partial class SolidBody
             out _,
             out _,
             out bool sourceIsA);
-        return sourceIsA ? contact.Normal : -contact.Normal;
+        return sourceIsA ? -contact.Normal : contact.Normal;
     }
 
     private bool IsMovingRotationalContinuousCollisionTarget(SolidBody target)

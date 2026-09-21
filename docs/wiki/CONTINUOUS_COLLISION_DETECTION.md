@@ -13,8 +13,8 @@ handoff queues.
 - Moving dynamic and kinematic targets use frame-prepared candidate indexing.
 - Kinematic bodies can act as active swept sources from frame-start pose to host
   target pose.
-- Translation and rotation compete in one normalized-time arbiter whenever
-  either participant has rotational motion.
+- Translation and geometry-changing rotation compete in one normalized-time
+  arbiter; rotating round shapes at their own center do not enlarge their sweep.
 - Mixed CCD runs only in `PhysicsRuntimeMode.Mixed`.
 - Service-level handoff queues handle dense same-frame contact chains.
 - Public query APIs remain query APIs; CCD uses internal target filters where
@@ -94,6 +94,19 @@ authored same-frame linear and angular motion contributes consistently even when
 the kinematic body was processed earlier in service order.
 
 ## Dynamic Candidate Ordering
+
+A sphere or planar circle with an exactly zero collider-local offset occupies
+the same geometry while turning. Gravitas still applies its requested rotation
+and preserves angular state, but does not charge that turn as a geometric sweep.
+An offset round collider still sweeps about its body pivot. Nearby rotating
+obstacles can require rotational sampling even when the source is centered or
+stationary, including opposite-dimensional obstacles in Mixed mode.
+
+For a centered round source already touching a supported convex primitive,
+tangential or separating motion does not become a rotational blocker merely
+because another nearby object is rotating. Closing motion is still tested.
+Compounds and concave targets retain conservative handling: a non-closing
+contact on one child is not proof that another child is clear.
 
 Moving-pair CCD uses immutable frame-start candidate indices plus bounded dirty
 overlays for bodies whose same-frame handoff changes their remaining swept
@@ -180,9 +193,14 @@ participants' linear and pivot-centered angular travel. The bound also scales
 fixed-point pose uncertainty by pivot radius.
 
 An unresolved interval is subdivided until a fixed depth or per-candidate work
-budget. A witnessed contact can apply the contact-point response and bounded
-handoffs atomically. If the search cannot prove separation or witness contact,
-it clamps at the unresolved interval's lower time without inventing an impulse.
+budget. A witnessed earliest contact can apply the contact-point response and
+bounded handoffs atomically. A later contact is not a response at an earlier
+unresolved boundary. If bounded refinement cannot advance that boundary, an
+admitted terminal clamp preserves dynamic momentum, retains a stationary
+trajectory for the rest of the frame, and reports the CCD limit when frame time
+remains. This also applies when no contact has been witnessed: uncertainty can
+require a safe stop, but
+does not justify an impulse or discarded angular motion.
 Only the immediate prior pair is excluded from continuation, so a deterministic
 `A -> B -> A` same-frame chain remains admissible. Candidate results are ordered
 by normalized time, target dimension, and stable collider identity.

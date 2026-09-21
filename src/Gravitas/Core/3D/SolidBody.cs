@@ -232,7 +232,7 @@ public partial class SolidBody : IRecordable
     public int LastContinuousCollisionToiIterationCount { get; private set; }
 
     /// <summary>
-    /// Gets whether the most recent late simulation step reached the configured continuous-collision TOI iteration limit.
+    /// Gets whether a CCD work/state limit or unresolved refinement required a conservative clamp in the most recent late simulation step.
     /// </summary>
     public bool LastContinuousCollisionToiIterationLimitReached { get; private set; }
 

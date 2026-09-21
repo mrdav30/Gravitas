@@ -18,7 +18,8 @@ public sealed partial class MixedQueryCcdTests
 
         second.Should().Be(first);
         first.Rotation.Should().BeLessThan(RotationalMixedQuarterTurn);
-        first.AngularVelocity.Should().Be(Fixed64.Zero);
+        first.AngularVelocity.Should().Be(RotationalMixedQuarterTurn);
+        first.LimitReached.Should().BeTrue();
         first.ToiIterations.Should().BeGreaterThan(0);
         first.TargetPosition.Should().Be(first.ExpectedTargetPosition);
     }
@@ -36,7 +37,8 @@ public sealed partial class MixedQueryCcdTests
         ((Fixed64)90 - retainedRotation)
             .Should()
             .BeGreaterThan(Fixed64.Zero);
-        first.AngularVelocity.Should().Be(Vector3d.Zero);
+        first.AngularVelocity.Should().Be(first.ExpectedAngularVelocity);
+        first.LimitReached.Should().BeTrue();
         first.ToiIterations.Should().BeGreaterThan(0);
         first.TargetPosition.Should().Be(first.ExpectedTargetPosition);
     }
@@ -196,6 +198,9 @@ public sealed partial class MixedQueryCcdTests
 
         blade.ApplyCollisionAngularVelocityDelta(RotationalMixedQuarterTurn);
         context.LateSimulate();
+        // This unsupported pair has no exact contact witness to justify an impulse.
+        CollisionDetectionMixed.TryCollide(target, blade.Collider, out _).Should().BeFalse();
+        blade.SampleContinuousCollisionAngularVelocity(Fixed64.One).Should().Be(Fixed64.Zero);
 
         return (
             blade.Rotation,
@@ -209,6 +214,7 @@ public sealed partial class MixedQueryCcdTests
     private static (
         FixedQuaternion Rotation,
         Vector3d AngularVelocity,
+        Vector3d ExpectedAngularVelocity,
         int ToiIterations,
         bool LimitReached,
         Vector2d TargetPosition,
@@ -216,6 +222,7 @@ public sealed partial class MixedQueryCcdTests
     {
         using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
         context.Environment.DampingFactor = Fixed64.Zero;
+        context.Environment.AirDensity = Fixed64.Zero;
         var sourceCollider = new UnsupportedTestCollider3D
         {
             InertiaTensor = Fixed3x3.Identity,
@@ -230,11 +237,15 @@ public sealed partial class MixedQueryCcdTests
         LSCollider2D target = CreateBodylessCircle2D(context, targetPosition);
 
         blade.Body.AddAngularImpulse(Vector3d.Up * RotationalMixedQuarterTurn);
+        Vector3d expectedAngularVelocity = blade.Body.AngularVelocity;
         context.LateSimulate();
+        CollisionDetectionMixed.TryCollide(blade.Collider, target, out _).Should().BeFalse();
+        blade.Body.SampleContinuousCollisionAngularVelocity(Fixed64.One).Should().Be(Vector3d.Zero);
 
         return (
             blade.Body.Rotation,
             blade.Body.AngularVelocity,
+            expectedAngularVelocity,
             blade.Body.LastContinuousCollisionToiIterationCount,
             blade.Body.LastContinuousCollisionToiIterationLimitReached,
             target.Center,

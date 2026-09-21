@@ -770,7 +770,7 @@ public sealed partial class ContinuousCollisionDetectionTests
     {
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();
         scenario.Context.Environment.DampingFactor = Fixed64.Zero;
-        _ = scenario.CreateStaticSphere(new Vector3d(Fixed64.FromFraction(3, 2), Fixed64.Zero, Fixed64.FromFraction(-5, 4)));
+        LSSphereCollider target = scenario.CreateStaticSphere(new Vector3d(Fixed64.FromFraction(3, 2), Fixed64.Zero, Fixed64.FromFraction(-5, 4)));
         ScenarioBody<LSCuboidCollider> blade = scenario.CreateBody(
             new LSCuboidCollider
             {
@@ -794,11 +794,16 @@ public sealed partial class ContinuousCollisionDetectionTests
 
         blade.Body.Position3d.X.Should().BeLessThan(Fixed64.Zero);
         FixedQuaternion.Angle(blade.Body.Rotation, fullRotation).Should().BeGreaterThan(Fixed64.Zero);
-        blade.Body.AngularVelocity.Should().Be(Vector3d.Zero);
+        CollisionDetection.DoCollisionCheck(scenario.CreatePair(blade.Collider, target)).Should().BeFalse();
+        blade.Body.AngularVelocity.Should().Be(Vector3d.Up * angularVelocity);
+        blade.Body.LinearVelocity.Should().Be(Vector3d.Right * (Fixed64)2);
+        blade.Body.LastContinuousCollisionToiIterationLimitReached.Should().BeTrue();
+        blade.Body.SampleContinuousCollisionLinearVelocity(Fixed64.One).Should().Be(Vector3d.Zero);
+        blade.Body.SampleContinuousCollisionAngularVelocity(Fixed64.One).Should().Be(Vector3d.Zero);
     }
 
     [Fact]
-    public void ContinuousMode_WithLowerPriorityRotatingSource_ShouldClampAndClearAngularVelocity()
+    public void ContinuousMode_WithLowerPriorityRotatingSource_ShouldClampUnresolvedFrontierAndPreserveMomentum()
     {
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();
         scenario.Context.Environment.DampingFactor = Fixed64.Zero;
@@ -835,10 +840,11 @@ public sealed partial class ContinuousCollisionDetectionTests
         scenario.Context.LateSimulate();
 
         FixedQuaternion.Angle(blade.Body.Rotation, fullRotation).Should().BeGreaterThan(Fixed64.Zero);
-        blade.Body.AngularVelocity.Should().Be(Vector3d.Zero);
-        blade.Body.LinearVelocity.Y.Should().Be(tangentialSpeed);
-        new Vector3d(blade.Body.LinearVelocity.X, Fixed64.Zero, blade.Body.LinearVelocity.Z)
-            .MagnitudeSquared.Should().BeLessThan(closingVelocity.MagnitudeSquared);
+        CollisionDetection.DoCollisionCheck(scenario.CreatePair(blade.Collider, target.Collider)).Should().BeFalse();
+        blade.Body.AngularVelocity.Should().Be(Vector3d.Up * angularVelocity);
+        blade.Body.LinearVelocity.Should().Be(closingVelocity + Vector3d.Up * tangentialSpeed);
+        blade.Body.LastContinuousCollisionToiIterationLimitReached.Should().BeTrue();
+        blade.Body.SampleContinuousCollisionAngularVelocity(Fixed64.One).Should().Be(Vector3d.Zero);
         blade.Body.SampleContinuousCollisionLinearVelocity(Fixed64.One)
             .Should()
             .Be(Vector3d.Zero);
@@ -1157,19 +1163,25 @@ public sealed partial class ContinuousCollisionDetectionTests
         scenario.Context.Environment.DampingFactor = Fixed64.Zero;
         _ = scenario.CreateStaticSphere(new Vector3d(Fixed64.FromFraction(1, 4), Fixed64.Zero, Fixed64.Zero));
         ScenarioBody<LSSphereCollider> source = scenario.CreateBody(
-            new LSSphereCollider { Radius = Fixed64.Epsilon },
+            new LSSphereCollider
+            {
+                Radius = Fixed64.Epsilon * Fixed64.Half,
+                LocalOffset = Vector3d.Right * (Fixed64.Epsilon * Fixed64.Half)
+            },
             Vector3d.Zero,
             FixedQuaternion.Identity);
         source.Body.LocalCenterOfMassOffset = Vector3d.Right;
         source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
         DisableGroundQueries(source.Body);
         source.Body.CanRotate.Should().BeTrue();
+        source.Body.ResolveContinuousCollisionProxyRadius().Should().Be(Fixed64.Epsilon);
         Fixed64 angularVelocity = (Fixed64)4;
 
         source.Body.ApplyCollisionAngularVelocityDelta(Vector3d.Up * angularVelocity);
         source.Body.LateSimulate();
 
         source.Body.AngularVelocity.Y.Should().Be(angularVelocity);
+        source.Body.Rotation.Should().NotBe(FixedQuaternion.Identity);
         source.Body.LastContinuousCollisionToiIterationCount.Should().Be(0);
     }
 
@@ -1181,7 +1193,11 @@ public sealed partial class ContinuousCollisionDetectionTests
         _ = scenario.CreateStaticSphere(new Vector3d(Fixed64.FromFraction(1, 4), Fixed64.Zero, Fixed64.Zero));
         Fixed64 proxyRadius = Fixed64.FromFraction(1, 65536);
         ScenarioBody<LSSphereCollider> source = scenario.CreateBody(
-            new LSSphereCollider { Radius = proxyRadius },
+            new LSSphereCollider
+            {
+                Radius = proxyRadius,
+                LocalOffset = Vector3d.Right * proxyRadius
+            },
             Vector3d.Zero,
             FixedQuaternion.Identity);
         source.Body.LocalCenterOfMassOffset = Vector3d.Right;
@@ -1189,12 +1205,15 @@ public sealed partial class ContinuousCollisionDetectionTests
         DisableGroundQueries(source.Body);
         source.Body.CanRotate.Should().BeTrue();
         Fixed64 angularVelocity = Fixed64.FromFraction(1, 65536);
-        (angularVelocity * source.Collider.ScaledRadius).Should().BeLessThanOrEqualTo(Fixed64.Epsilon);
+        source.Body.ResolveContinuousCollisionProxyRadius().Should().BeGreaterThan(Fixed64.Epsilon);
+        (angularVelocity * source.Body.ResolveContinuousCollisionProxyRadius())
+            .Should().BeLessThanOrEqualTo(Fixed64.Epsilon);
 
         source.Body.ApplyCollisionAngularVelocityDelta(Vector3d.Up * angularVelocity);
         source.Body.LateSimulate();
 
         source.Body.AngularVelocity.Y.Should().Be(angularVelocity);
+        source.Body.Rotation.Should().NotBe(FixedQuaternion.Identity);
         source.Body.LastContinuousCollisionToiIterationCount.Should().Be(0);
     }
 
@@ -2551,11 +2570,16 @@ public sealed partial class ContinuousCollisionDetectionTests
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();
         _ = scenario.CreateStaticSphere(new Vector3d(Fixed64.Half, Fixed64.Zero, Fixed64.Zero));
         ScenarioBody<LSSphereCollider> source = scenario.CreateBody(
-            new LSSphereCollider { Radius = Fixed64.Epsilon },
+            new LSSphereCollider
+            {
+                Radius = Fixed64.Epsilon * Fixed64.Half,
+                LocalOffset = Vector3d.Right * (Fixed64.Epsilon * Fixed64.Half)
+            },
             Vector3d.Zero,
             FixedQuaternion.Identity,
             isKinematic: true);
         source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        source.Body.ResolveContinuousCollisionProxyRadius().Should().Be(Fixed64.Epsilon);
         source.Body.SetRotation(PhysicsScenarioBuilder.Yaw(90));
         var candidates = new SwiftCollections.SwiftList<Gravitas.Queries.Physics3DHit>();
         scenario.Context.Query3D.OverlapSphereAgainstStaticAll(
@@ -2579,7 +2603,11 @@ public sealed partial class ContinuousCollisionDetectionTests
         Fixed64 smallPositiveRadius = Fixed64.Epsilon * (Fixed64)2;
         _ = scenario.CreateStaticSphere(new Vector3d(Fixed64.Half, Fixed64.Zero, Fixed64.Zero));
         ScenarioBody<LSSphereCollider> source = scenario.CreateBody(
-            new LSSphereCollider { Radius = smallPositiveRadius },
+            new LSSphereCollider
+            {
+                Radius = smallPositiveRadius,
+                LocalOffset = Vector3d.Right * smallPositiveRadius
+            },
             Vector3d.Zero,
             FixedQuaternion.Identity,
             isKinematic: true);
@@ -2588,7 +2616,9 @@ public sealed partial class ContinuousCollisionDetectionTests
         Fixed64 angularDistance = FixedMath.DegToRad(
             FixedQuaternion.Angle(startRotation, FixedQuaternion.Identity));
         angularDistance.Should().BeGreaterThan(Fixed64.Epsilon);
-        (angularDistance * smallPositiveRadius).Should().BeLessThanOrEqualTo(Fixed64.Epsilon);
+        source.Body.ResolveContinuousCollisionProxyRadius().Should().BeGreaterThan(Fixed64.Epsilon);
+        (angularDistance * source.Body.ResolveContinuousCollisionProxyRadius())
+            .Should().BeLessThanOrEqualTo(Fixed64.Epsilon);
         source.Body.SetRotation(startRotation);
 
         scenario.Context.LateSimulate();

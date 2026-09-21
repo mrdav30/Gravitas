@@ -11,6 +11,7 @@ using Gravitas.CollisionHandling;
 using Gravitas.Queries;
 using Gravitas.Support;
 using SwiftCollections;
+using SwiftCollections.Query;
 
 namespace Gravitas;
 
@@ -33,14 +34,27 @@ public partial class SolidBody
                 }
             }
 
+            if (Context.Settings.RuntimeMode.RunsMixedContacts())
+            {
+                int mixedColliderCount = Context.Physics2D.ColliderCount;
+                for (int i = 0; i < mixedColliderCount; i++)
+                {
+                    if (IsRotatingContinuousCollisionTarget(
+                        Context.Physics2D.GetColliderByServiceIndex(i).Body))
+                    {
+                        return true;
+                    }
+                }
+            }
+
             return false;
         }
 
-        SwiftList<int> candidateIds = Context.Physics.QueryContinuousCollisionCandidates(
-            DynamicCcdCandidateIndex.CreateSweptSphereBounds(
-                startPosition,
-                displacement,
-                pivotRadius));
+        FixedBoundVolume bounds = DynamicCcdCandidateIndex.CreateSweptSphereBounds(
+            startPosition,
+            displacement,
+            pivotRadius);
+        SwiftList<int> candidateIds = Context.Physics.QueryContinuousCollisionCandidates(bounds);
         for (int i = 0; i < candidateIds.Count; i++)
         {
             SolidBody target = Context.Physics.GetContinuousCollisionCandidate(candidateIds[i]);
@@ -48,6 +62,17 @@ public partial class SolidBody
             {
                 return true;
             }
+        }
+
+        if (!Context.Settings.RuntimeMode.RunsMixedContacts())
+            return false;
+
+        candidateIds = Context.Physics2D.QueryMixedContinuousCollisionCandidates(bounds);
+        for (int i = 0; i < candidateIds.Count; i++)
+        {
+            SolidBody2D target = Context.Physics2D.GetContinuousCollisionCandidate(candidateIds[i]);
+            if (IsRotatingContinuousCollisionTarget(target))
+                return true;
         }
 
         return false;
@@ -63,7 +88,16 @@ public partial class SolidBody
         }
 
         target.EnsureContinuousCollisionFramePrepared(Context.LateSimulateToken);
-        return target.HasContinuousCollisionRotationalMotion;
+        return !target.HasRotationInvariantCollider && target.HasContinuousCollisionRotationalMotion;
+    }
+
+    private bool IsRotatingContinuousCollisionTarget(SolidBody2D? target)
+    {
+        if (target == null || !IsMovingMixedRotationalContinuousCollisionTarget(target))
+            return false;
+
+        target.EnsureContinuousCollisionFramePrepared(Context.LateSimulateToken);
+        return !target.HasRotationInvariantCollider && target.HasContinuousCollisionRotationalMotion;
     }
 
     internal int GatherRotationalContinuousCollisionCandidates(
@@ -169,10 +203,12 @@ public partial class SolidBody
 
         for (int hitIndex = 0; hitIndex < _continuousCollisionHits.Count; hitIndex++)
         {
-            LSCollider target = _continuousCollisionHits[hitIndex].Collider!;
+            Physics3DHit hit = _continuousCollisionHits[hitIndex];
+            LSCollider target = hit.Collider!;
             if (target == ignoredTarget
                 || !IsValidContinuousCollisionTarget(target)
                 || ColliderSettings.GetCollisionType(Collider.Shape, target.Shape) == CollisionType.None
+                || CanExcludeInvariantTangentialContact(hit, displacement)
                 || !TryFindEarliestRotationalContinuousCollisionAgainstTarget(
                     target,
                     startPosition,
@@ -269,5 +305,21 @@ public partial class SolidBody
         contactTime = earliestContactTime;
         hitTarget = earliestTarget;
         return true;
+    }
+
+    private bool CanExcludeInvariantTangentialContact(Physics3DHit hit, Vector3d displacement)
+    {
+        // A supporting plane certifies non-closing straight motion only for one
+        // convex shape. A compound/concave target may hide a later blocking part.
+        if (!HasRotationInvariantCollider
+            || hit.Collider is not (LSCuboidCollider or LSSphereCollider or LSCapsuleCollider
+                or LSCylinderCollider or LSConeCollider)
+            || hit.Normal == Vector3d.Zero)
+            return false;
+
+        Vector3d normal = ResolveShapeExactContinuousClosingNormal(hit);
+        // These sealed primitives produce a nonzero outward normal at their
+        // surface anchor; an unrepresentable anchor retains the admitted normal.
+        return !IsClosingContinuousCollisionHit(displacement, normal);
     }
 }

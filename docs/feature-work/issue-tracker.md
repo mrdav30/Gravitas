@@ -2,7 +2,7 @@
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-072`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-074`.
 - Assign an ID when an issue enters this tracker, keep it through resolution,
   and never reuse an ID even if an entry is later removed. Check this file's Git
   history before advancing or repairing the counter.
@@ -21,9 +21,6 @@
 
 ## Active Issues
 
-No active correctness issues remain. Add new discoveries here in explicit
-execution order.
-
 ### Validation Workflow
 
 - Use package references for normal development and release validation.
@@ -38,9 +35,54 @@ execution order.
 
 ### Ordered Queue
 
-No active items.
+No active issues are queued.
 
 ## Resolved Issues
+
+### GRV-Issue-073 - Rotational static stops use the inward contact normal
+
+- **Resolved:** 2026-09-20 with full local-stack verification and independent review.
+- **Discovered:** 2026-09-20, earliest-contact controls during Trailblazer integration Phase 2.
+- **Evidence:** A real closing overlap against a static 3D mesh retained its
+  incoming velocity after the rotational stop. `ManifoldContact` and `Contact2D`
+  define normals from A toward B, but the closing-velocity projection requires
+  the target's outward normal toward the source. Both same-dimensional stop
+  paths supplied the opposite direction at baseline `aa48f7c`.
+- **Fix:** Reverse only the same-dimensional conversion at
+  this stop boundary, respecting canonical collider ordering in 3D. Mixed
+  contact signs are already correct and remain unchanged. Focused tests use
+  actual initial contacts and prepared body simulation to distinguish CCD from
+  later discrete impulses. Closing velocity is removed only at a witnessed contact.
+
+### GRV-Issue-072 - Centered sphere and circle turning can freeze support motion
+
+- **Resolved:** 2026-09-20 with full local-stack verification and independent review.
+- **Discovered:** 2026-09-20, Trailblazer integration Phase 2 ladder approach and dismount.
+- **Evidence:** A radius-1/8 centered sphere/circle tangent to a box, requesting
+  X displacement 1/1024 and a small yaw, accepted only 1/8192 of the requested
+  travel. Pure turning was also clamped. Rotational admission treated pose
+  rotation as changing geometry, and interval search repeatedly witnessed the
+  unchanged support contact. A nearby but separated rotating blade also admitted
+  unrelated tangential support into interval search.
+- **Fix:** Distinguish geometric angular travel for exact
+  centered spheres/circles without changing orientation, angular velocity, or
+  trajectory storage. Preserve rotating-target admission. At static convex
+  primitive candidates, reuse non-closing translational admission; do not use
+  one contact normal to discard compounds or concave targets. Offset primitives
+  retain their rotational sweep.
+- **Focused evidence:** The expanded CCD/mixed suite passes 880 tests, including uniform/nonuniform
+  scale, pure turning, tangent movement, downward/wall blocking, dynamic motion,
+  real blade impact in both registration orders, separated blades, and existing
+  offset-sphere/circle controls. Artifacts: `artifacts/gravitas-integration/rotation/`.
+  All affected collision paths have exact line and branch coverage.
+
+Final verification for both fixes: Release 4,021 tests and ReleaseLean 3,966,
+with exact 56,196/56,196 lines, 16,020/16,020 branches, and 5,346/5,346 fully
+covered methods in each configuration. Both full solution builds and DocFX
+are warning-free. Trailblazer's final adapter consumers pass 84/80 tests with
+exact coverage and unchanged repeated/restored traces. Local-source artifacts
+are retained under `artifacts/gravitas-integration/coverage/release-verified`
+and `releaselean-verified`; released-package validation remains separate.
 
 ### GRV-Issue-071 — Local-Stack Outputs Selected Published Math Binaries
 

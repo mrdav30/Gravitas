@@ -192,7 +192,7 @@ public sealed partial class MixedQueryCcdTests
     }
 
     [Fact]
-    public void MixedContinuous2D_RefinementExhaustion_ShouldClampReportAndRefreshOutsideResponseBudget()
+    public void MixedContinuous2D_UnresolvedRotationalFrontier_ShouldClampReportAndPreserveMomentum()
     {
         var sourceFirst = Run2DRefinementExhaustion(targetFirst: false);
         var sourceFirstRepeat = Run2DRefinementExhaustion(targetFirst: false);
@@ -220,7 +220,7 @@ public sealed partial class MixedQueryCcdTests
     }
 
     [Fact]
-    public void MixedContinuous3D_RefinementExhaustion_ShouldClampReportAndRefreshOutsideResponseBudget()
+    public void MixedContinuous3D_UnresolvedRotationalFrontier_ShouldClampReportAndPreserveMomentum()
     {
         var sourceFirst = Run3DRefinementExhaustion(targetFirst: false);
         var sourceFirstRepeat = Run3DRefinementExhaustion(targetFirst: false);
@@ -240,7 +240,8 @@ public sealed partial class MixedQueryCcdTests
         Vector3d certifiedFrontier = new(
             Fixed64.FromRaw(13_314_398_618L),
             Fixed64.Zero,
-            Fixed64.FromRaw(-247_317_022L));
+            // The rotational arbiter anchors each slice to the original motion segment.
+            Fixed64.FromRaw(-247_317_021L));
         sourceFirst.SourcePosition.Should().Be(certifiedFrontier);
         sourceFirst.TerminalStart.Should().Be(certifiedFrontier);
         sourceFirst.TerminalEnd.Should().Be(certifiedFrontier);
@@ -251,8 +252,79 @@ public sealed partial class MixedQueryCcdTests
         sourceFirst.IsMixedPartitioned.Should().BeTrue();
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void MixedContinuous2D_TranslationalUnresolvedFrontier_ShouldClampWithoutInventingContact(
+        bool sourceKinematic)
+    {
+        var sourceFirst = Run2DRefinementExhaustion(
+            targetFirst: false, translationalOnly: true, sourceKinematic);
+        var sourceFirstRepeat = Run2DRefinementExhaustion(
+            targetFirst: false, translationalOnly: true, sourceKinematic);
+        var targetFirst = Run2DRefinementExhaustion(
+            targetFirst: true, translationalOnly: true, sourceKinematic);
+
+        sourceFirstRepeat.Should().Be(sourceFirst);
+        targetFirst.Should().Be(sourceFirst);
+        sourceFirst.SourceToiIterations.Should().Be(1);
+        sourceFirst.SourcePosition.X.Should().Be(
+            Fixed64.FromFraction(13, 4) + Fixed64.FromFraction(1, 8192));
+        sourceFirst.SourcePosition.Y.Should().BeGreaterThan(Fixed64.FromFraction(-1, 10));
+        sourceFirst.SourcePosition.Y.Should().BeLessThan(Fixed64.FromFraction(1, 10));
+        sourceFirst.ColliderCenter.Should().Be(sourceFirst.SourcePosition);
+        if (!sourceKinematic)
+        {
+            sourceFirst.SourceLimitReached.Should().BeTrue();
+            sourceFirst.IslandLimitReached.Should().BeTrue();
+            sourceFirst.SourceVelocity.Should().Be(
+                Vector2d.Forward * Fixed64.FromFraction(1, 5));
+            sourceFirst.TerminalStart.Should().Be(sourceFirst.SourcePosition);
+            sourceFirst.TerminalEnd.Should().Be(sourceFirst.SourcePosition);
+            sourceFirst.TerminalDisplacement.Should().Be(Vector2d.Zero);
+            sourceFirst.FrontierCandidateRetained.Should().BeTrue();
+            sourceFirst.StaleTailCandidateRetained.Should().BeFalse();
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void MixedContinuous3D_TranslationalUnresolvedFrontier_ShouldClampWithoutInventingContact(
+        bool sourceKinematic)
+    {
+        var sourceFirst = Run3DRefinementExhaustion(
+            targetFirst: false, translationalOnly: true, sourceKinematic);
+        var sourceFirstRepeat = Run3DRefinementExhaustion(
+            targetFirst: false, translationalOnly: true, sourceKinematic);
+        var targetFirst = Run3DRefinementExhaustion(
+            targetFirst: true, translationalOnly: true, sourceKinematic);
+
+        sourceFirstRepeat.Should().Be(sourceFirst);
+        targetFirst.Should().Be(sourceFirst);
+        sourceFirst.SourceToiIterations.Should().Be(1);
+        sourceFirst.SourcePosition.X.Should().Be(
+            Fixed64.FromFraction(13, 4) + Fixed64.FromFraction(1, 8192));
+        sourceFirst.SourcePosition.Y.Should().Be(Fixed64.Zero);
+        sourceFirst.SourcePosition.Z.Should().BeGreaterThan(Fixed64.FromFraction(-1, 10));
+        sourceFirst.SourcePosition.Z.Should().BeLessThan(Fixed64.FromFraction(1, 10));
+        sourceFirst.ColliderCenter.Should().Be(sourceFirst.SourcePosition);
+        if (!sourceKinematic)
+        {
+            sourceFirst.SourceLimitReached.Should().BeTrue();
+            sourceFirst.IslandLimitReached.Should().BeTrue();
+            sourceFirst.SourceVelocity.Should().Be(
+                Vector3d.Forward * Fixed64.FromFraction(1, 5));
+            sourceFirst.TerminalStart.Should().Be(sourceFirst.SourcePosition);
+            sourceFirst.TerminalEnd.Should().Be(sourceFirst.SourcePosition);
+            sourceFirst.TerminalDisplacement.Should().Be(Vector3d.Zero);
+            sourceFirst.FrontierCandidateRetained.Should().BeTrue();
+            sourceFirst.StaleTailCandidateRetained.Should().BeFalse();
+        }
+    }
+
     [Fact]
-    public void MixedKinematic2D_RefinementExhaustion_ShouldClampAtCertifiedFrontier()
+    public void MixedKinematic2D_UnresolvedRotationalFrontier_ShouldClampAtCertifiedFrontier()
     {
         using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
         ScenarioBody<LSCuboidCollider> target = CreateRotationalMixedBlade3D(context);
@@ -280,12 +352,16 @@ public sealed partial class MixedQueryCcdTests
         context.LateSimulate();
 
         source.LastContinuousCollisionToiIterationCount.Should().Be(1);
+        source.LastContinuousCollisionToiIterationLimitReached.Should().BeTrue();
+        context.Physics2D.LastContinuousCollisionIslandLimitReached.Should().BeTrue();
         source.Position.Should().NotBe(requested);
         source.Agent.Transform.LocalPosition.ToVector2d().Should().Be(source.Position);
+        source.SampleContinuousCollisionLinearVelocity(Fixed64.One).Should().Be(Vector2d.Zero);
+        source.SampleContinuousCollisionAngularVelocity(Fixed64.One).Should().Be(Fixed64.Zero);
     }
 
     [Fact]
-    public void MixedKinematic3D_RefinementExhaustion_ShouldClampAtCertifiedFrontier()
+    public void MixedKinematic3D_UnresolvedRotationalFrontier_ShouldClampAtCertifiedFrontier()
     {
         using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
         SolidBody2D target = CreateRotationalMixedBlade2D(context);
@@ -316,16 +392,27 @@ public sealed partial class MixedQueryCcdTests
         context.LateSimulate();
 
         source.Body.LastContinuousCollisionToiIterationCount.Should().Be(1);
+        source.Body.LastContinuousCollisionToiIterationLimitReached.Should().BeTrue();
+        context.Physics.LastContinuousCollisionIslandLimitReached.Should().BeTrue();
         source.Body.Position3d.Should().NotBe(requested);
         source.Body.Agent.Transform.LocalPosition.Should().Be(
             source.Body.Position3d);
+        source.Body.SampleContinuousCollisionLinearVelocity(Fixed64.One).Should().Be(Vector3d.Zero);
+        source.Body.SampleContinuousCollisionAngularVelocity(Fixed64.One).Should().Be(Vector3d.Zero);
     }
 
     private static RefinementExhaustionResult2D Run2DRefinementExhaustion(
-        bool targetFirst)
+        bool targetFirst,
+        bool translationalOnly = false,
+        bool sourceKinematic = false)
     {
         using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
         context.Settings.ContinuousCollisionMaxToiIterations = 1;
+        if (translationalOnly)
+        {
+            context.Environment.Gravity = Fixed64.Zero;
+            context.Environment.AirDensity = Fixed64.Zero;
+        }
 
         FixedQuaternion startRotation = FixedQuaternion.FromAxisAngle(
             Vector3d.Up,
@@ -334,30 +421,60 @@ public sealed partial class MixedQueryCcdTests
             Vector3d.Up,
             FixedMath.DegToRad((Fixed64)45));
         Vector2d sourcePosition = new(
-            Fixed64.FromFraction(31, 10),
+            translationalOnly
+                ? Fixed64.FromFraction(13, 4) + Fixed64.FromFraction(1, 8192)
+                : Fixed64.FromFraction(31, 10),
             Fixed64.FromFraction(-1, 10));
+        BodyMotionType sourceMotion = sourceKinematic
+            ? BodyMotionType.Kinematic
+            : BodyMotionType.Dynamic;
 
         ScenarioBody<LSCuboidCollider> target;
         SolidBody2D source;
         if (targetFirst)
         {
             target = CreateRotationalMixedBlade3D(context);
-            source = CreateRefinementSource2D(context, sourcePosition);
+            source = CreateRefinementSource2D(context, sourcePosition, sourceMotion);
         }
         else
         {
-            source = CreateRefinementSource2D(context, sourcePosition);
+            source = CreateRefinementSource2D(context, sourcePosition, sourceMotion);
             target = CreateRotationalMixedBlade3D(context);
         }
 
-        target.Body.ResetPosition(Vector3d.Zero, startRotation);
+        target.Body.ResetPosition(
+            Vector3d.Zero, translationalOnly ? FixedQuaternion.Identity : startRotation);
         target.Body.ContinuousCollisionMode = ContinuousCollisionMode.Discrete;
         source.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
-        target.Body.Agent.Transform.LocalRotation = targetRotation;
-        source.AddLinearImpulse(
-            Vector2d.Forward * Fixed64.FromFraction(1, 5));
+        if (translationalOnly)
+        {
+            target.Body.Agent.Transform.LocalPosition =
+                -Vector3d.Forward * Fixed64.FromFraction(1, 5);
+            (source.Collider.MixedBounds3D.Min.X - target.Collider.Bounds.Max.X)
+                .Should().Be(Fixed64.FromFraction(1, 8192));
+        }
+        else
+        {
+            target.Body.Agent.Transform.LocalRotation = targetRotation;
+        }
+        if (sourceKinematic)
+            source.Agent.Transform.LocalPosition =
+                (sourcePosition + Vector2d.Forward * Fixed64.FromFraction(1, 5))
+                .ToVector3d(Fixed64.Zero);
+        else
+            source.AddLinearImpulse(Vector2d.Forward * Fixed64.FromFraction(1, 5));
 
         context.LateSimulate();
+
+        if (translationalOnly)
+        {
+            source.HasContinuousCollisionRotationalMotion.Should().BeFalse();
+            target.Body.HasContinuousCollisionRotationalMotion.Should().BeFalse();
+            (source.Collider.MixedBounds3D.Min.X - target.Collider.Bounds.Max.X)
+                .Should().Be(Fixed64.FromFraction(1, 8192));
+            if (sourceKinematic)
+                source.Agent.Transform.LocalPosition.ToVector2d().Should().Be(source.Position);
+        }
 
         ContinuousCollisionMotionSegment2D terminal =
             source.GetContinuousCollisionTrajectorySegment(
@@ -402,18 +519,24 @@ public sealed partial class MixedQueryCcdTests
     }
 
     private static RefinementExhaustionResult3D Run3DRefinementExhaustion(
-        bool targetFirst)
+        bool targetFirst,
+        bool translationalOnly = false,
+        bool sourceKinematic = false)
     {
         using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
         context.Environment.Gravity = Fixed64.Zero;
         context.Settings.ContinuousCollisionMaxToiIterations = 1;
+        if (translationalOnly)
+            context.Environment.AirDensity = Fixed64.Zero;
 
         Fixed64 startRotation =
             -FixedMath.DegToRad((Fixed64)45);
         Fixed64 targetRotation =
             FixedMath.DegToRad((Fixed64)45);
         Vector3d sourcePosition = new(
-            Fixed64.FromFraction(31, 10),
+            translationalOnly
+                ? Fixed64.FromFraction(13, 4) + Fixed64.FromFraction(1, 8192)
+                : Fixed64.FromFraction(31, 10),
             Fixed64.Zero,
             Fixed64.FromFraction(-1, 10));
 
@@ -422,23 +545,46 @@ public sealed partial class MixedQueryCcdTests
         if (targetFirst)
         {
             target = CreateRotationalMixedBlade2D(context);
-            source = CreateRefinementSource3D(context, sourcePosition);
+            source = CreateRefinementSource3D(context, sourcePosition, sourceKinematic);
         }
         else
         {
-            source = CreateRefinementSource3D(context, sourcePosition);
+            source = CreateRefinementSource3D(context, sourcePosition, sourceKinematic);
             target = CreateRotationalMixedBlade2D(context);
         }
 
-        target.ResetPosition(Vector2d.Zero, startRotation);
+        target.ResetPosition(Vector2d.Zero, translationalOnly ? Fixed64.Zero : startRotation);
         target.ContinuousCollisionMode = ContinuousCollisionMode.Discrete;
         source.Body.ContinuousCollisionMode =
             ContinuousCollisionMode.Continuous;
-        target.Agent.Transform.LocalRotationXZRadians = targetRotation;
-        source.Body.AddLinearImpulse(
-            Vector3d.Forward * Fixed64.FromFraction(1, 5));
+        if (translationalOnly)
+        {
+            target.Agent.Transform.LocalPosition =
+                -Vector3d.Forward * Fixed64.FromFraction(1, 5);
+            (source.Collider.Bounds.Min.X - target.Collider.MixedBounds3D.Max.X)
+                .Should().Be(Fixed64.FromFraction(1, 8192));
+        }
+        else
+        {
+            target.Agent.Transform.LocalRotationXZRadians = targetRotation;
+        }
+        if (sourceKinematic)
+            source.Body.Agent.Transform.LocalPosition =
+                sourcePosition + Vector3d.Forward * Fixed64.FromFraction(1, 5);
+        else
+            source.Body.AddLinearImpulse(Vector3d.Forward * Fixed64.FromFraction(1, 5));
 
         context.LateSimulate();
+
+        if (translationalOnly)
+        {
+            source.Body.HasContinuousCollisionRotationalMotion.Should().BeFalse();
+            target.HasContinuousCollisionRotationalMotion.Should().BeFalse();
+            (source.Collider.Bounds.Min.X - target.Collider.MixedBounds3D.Max.X)
+                .Should().Be(Fixed64.FromFraction(1, 8192));
+            if (sourceKinematic)
+                source.Body.Agent.Transform.LocalPosition.Should().Be(source.Body.Position3d);
+        }
 
         ContinuousCollisionMotionSegment3D terminal =
             source.Body.GetContinuousCollisionTrajectorySegment(
@@ -509,14 +655,16 @@ public sealed partial class MixedQueryCcdTests
 
     private static ScenarioBody<LSCuboidCollider> CreateRefinementSource3D(
         GravitasWorldContext context,
-        Vector3d position) =>
+        Vector3d position,
+        bool isKinematic = false) =>
         CreateBody3D(
             context,
             new LSCuboidCollider
             {
                 Size = Vector3d.One * Fixed64.Half
             },
-            position);
+            position,
+            isKinematic: isKinematic);
 
     private readonly record struct RefinementExhaustionResult2D(
         Vector2d SourcePosition,

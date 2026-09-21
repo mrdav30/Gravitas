@@ -11,13 +11,19 @@ using Gravitas.CollisionHandling;
 using Gravitas.Queries;
 using Gravitas.Support;
 using SwiftCollections;
+using SwiftCollections.Query;
 using System;
 
 namespace Gravitas;
 
 public sealed partial class SolidBody2D
 {
-    private bool HasNearbyRotationalContinuousCollisionTarget(
+    /// <summary>Gets whether body rotation leaves this collider's occupied geometry unchanged.</summary>
+    internal bool HasRotationInvariantCollider =>
+        Collider is LSCircleCollider2D && Collider.LocalOffset == Vector2d.Zero;
+
+    /// <summary>Reports whether the conservative source sweep admits a rotating target owned by this source.</summary>
+    internal bool HasNearbyRotationalContinuousCollisionTarget(
         Vector2d startPosition,
         Vector2d displacement,
         Fixed64 pivotRadius)
@@ -36,6 +42,41 @@ public sealed partial class SolidBody2D
             }
         }
 
+        if (!Context.Settings.RuntimeMode.RunsMixedContacts())
+            return false;
+
+        if (pivotRadius == Fixed64.MaxValue)
+        {
+            int colliderCount = Context.Physics.ColliderCount;
+            for (int i = 0; i < colliderCount; i++)
+            {
+                if (IsRotatingContinuousCollisionTarget(
+                    Context.Physics.GetColliderByServiceIndex(i).Body))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        Vector3d start3D = new(startPosition.X, Collider.MixedSlabCenterY, startPosition.Y);
+        Vector3d end3D = new(
+            startPosition.X + displacement.X,
+            Collider.MixedSlabCenterY,
+            startPosition.Y + displacement.Y);
+        FixedBoundVolume bounds = DynamicCcdCandidateIndex.CreateBoundsBetween(
+            start3D,
+            end3D,
+            new Vector3d(pivotRadius, Collider.MixedHalfThickness, pivotRadius));
+        candidateIds = Context.Physics.QueryContinuousCollisionCandidates(bounds);
+        for (int i = 0; i < candidateIds.Count; i++)
+        {
+            SolidBody target = Context.Physics.GetContinuousCollisionCandidate(candidateIds[i]);
+            if (IsRotatingContinuousCollisionTarget(target))
+                return true;
+        }
+
         return false;
     }
 
@@ -48,7 +89,16 @@ public sealed partial class SolidBody2D
         }
 
         target.EnsureContinuousCollisionFramePrepared(Context.LateSimulateToken);
-        return target.HasContinuousCollisionRotationalMotion;
+        return !target.HasRotationInvariantCollider && target.HasContinuousCollisionRotationalMotion;
+    }
+
+    private bool IsRotatingContinuousCollisionTarget(SolidBody? target)
+    {
+        if (target == null || !IsMovingMixedRotationalContinuousCollisionTarget(target))
+            return false;
+
+        target.EnsureContinuousCollisionFramePrepared(Context.LateSimulateToken);
+        return !target.HasRotationInvariantCollider && target.HasContinuousCollisionRotationalMotion;
     }
 
     private bool ShouldUseRotationalContinuousCollisionArbiter(
@@ -67,7 +117,11 @@ public sealed partial class SolidBody2D
             return false;
 
         Vector2d displacement = proposedPosition - startPosition;
-        Fixed64 angularDistance = (proposedRotation - startRotation).Abs();
+        // Centered circles do not sweep new geometry when they turn. Nearby
+        // rotating targets still require the shared rotational arbiter below.
+        Fixed64 angularDistance = HasRotationInvariantCollider
+            ? Fixed64.Zero
+            : (proposedRotation - startRotation).Abs();
         bool targetRequiresRotationalSampling = angularDistance <= Fixed64.Epsilon
             && HasNearbyRotationalContinuousCollisionTarget(
                 startPosition,
@@ -159,6 +213,8 @@ public sealed partial class SolidBody2D
                     angularDelta = Fixed64.Zero;
                     angularDistance = Fixed64.Zero;
                 }
+                if (HasRotationInvariantCollider)
+                    angularDistance = Fixed64.Zero;
                 int hitCount = GatherRotationalContinuousCollisionCandidates(
                     currentPosition,
                     segmentEnd,
@@ -271,12 +327,23 @@ public sealed partial class SolidBody2D
                 LastContinuousCollisionToiIterationCount++;
                 if (!canResolveMovingPair)
                 {
-                    if (!IsKinematic)
+                    bool unresolvedInterval = !responseWitnessIsEarliest
+                        || !(useMixed ? mixedHit.HasContact : hasContact);
+                    if (unresolvedInterval)
+                    {
+                        // A later witness cannot supply a response at this frontier.
+                        // Retain momentum while the stationary tail bounds this frame.
+                        LastContinuousCollisionToiIterationLimitReached =
+                            remainingAfterImpact > Fixed64.Epsilon;
+                        if (LastContinuousCollisionToiIterationLimitReached)
+                            Context.Physics2D.ReportContinuousCollisionIterationLimit();
+                    }
+                    else if (!IsKinematic)
                     {
                         StopRotationalContinuousCollision(
                             useMixed
                                 ? mixedHit.Contact.Normal3DTo2D.ToVector2d()
-                                : contact.Normal);
+                                : -contact.Normal);
                     }
                     AppendContinuousCollisionFrameSegment(
                         currentPosition,
@@ -457,9 +524,11 @@ public sealed partial class SolidBody2D
         int staticHitCount = _continuousCollisionHits.Count;
         for (int hitIndex = 0; hitIndex < staticHitCount; hitIndex++)
         {
-            LSCollider2D target = _continuousCollisionHits[hitIndex].Collider;
+            Physics2DHit hit = _continuousCollisionHits[hitIndex];
+            LSCollider2D target = hit.Collider;
             if (!IsValidContinuousCollisionTarget(target)
                 || ColliderSettings2D.GetCollisionType(Collider.Shape, target.Shape) == CollisionType2D.None
+                || CanExcludeInvariantTangentialContact(hit, displacement)
                 || !TryFindEarliestRotationalContinuousCollisionAgainstTarget(
                     target,
                     startPosition,
@@ -715,6 +784,12 @@ public sealed partial class SolidBody2D
             }
         }
     }
+
+    private bool CanExcludeInvariantTangentialContact(Physics2DHit hit, Vector2d displacement) =>
+        HasRotationInvariantCollider
+        && hit.Collider is LSAABBoxCollider2D or LSCircleCollider2D or LSCapsuleCollider2D or LSPolygonCollider2D
+        && hit.Normal != Vector2d.Zero
+        && !IsClosingContinuousCollisionHit(displacement, hit.Normal);
 
     private bool IsRotationalIntervalSeparated(LSCollider2D target, Fixed64 motionBound)
     {

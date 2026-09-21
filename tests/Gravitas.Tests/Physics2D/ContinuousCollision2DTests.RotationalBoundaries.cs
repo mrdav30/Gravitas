@@ -1,6 +1,7 @@
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
+using Gravitas.CollisionHandling;
 using Xunit;
 
 namespace Gravitas.Tests.Physics2D;
@@ -212,7 +213,7 @@ public sealed partial class ContinuousCollision2DTests
         SolidBody2D blade = CreateRotationalMovingPairBlade2D(
             context,
             isKinematic);
-        _ = CreateBody(
+        SolidBody2D target = CreateBody(
             context,
             new LSAABBoxCollider2D(new Vector2d(
                 Fixed64.FromFraction(2, 5),
@@ -231,7 +232,10 @@ public sealed partial class ContinuousCollision2DTests
 
         blade.Rotation.Should().BeLessThan(endRotation);
         blade.LastContinuousCollisionToiIterationCount.Should().Be(1);
+        CollisionDetection2D.TryCollide(blade.Collider, target.Collider, out _).Should().BeFalse();
+        blade.LastContinuousCollisionToiIterationLimitReached.Should().BeTrue();
+        blade.SampleContinuousCollisionAngularVelocity(Fixed64.One).Should().Be(Fixed64.Zero);
         if (!isKinematic)
-            blade.AngularVelocity.Should().Be(Fixed64.Zero);
+            blade.AngularVelocity.Should().Be(endRotation - startRotation);
     }
 }
