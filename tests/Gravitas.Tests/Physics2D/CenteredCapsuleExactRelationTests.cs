@@ -20,6 +20,28 @@ namespace Gravitas.Tests.Physics2D;
 public sealed class CenteredCapsuleExactRelationTests
 {
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CapsuleSidePolygonVertex_TangencyUsesTheSameWorldWitness(bool reverseOrder)
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        SolidBody2D capsule = CreateBody(context,
+            new LSCapsuleCollider2D(Fixed64.One, (Fixed64)6), Vector2d.Zero);
+        SolidBody2D polygon = CreateBody(context,
+            new LSPolygonCollider2D(new Vector2d(1, 1), new Vector2d(3, 0), new Vector2d(3, 2)),
+            Vector2d.Zero);
+
+        CollisionDetection2D.TryCollide(
+            reverseOrder ? polygon.Collider : capsule.Collider,
+            reverseOrder ? capsule.Collider : polygon.Collider,
+            out Contact2D contact).Should().BeTrue();
+        contact.Depth.Should().Be(Fixed64.Zero);
+        contact.Normal.Should().Be(reverseOrder ? Vector2d.Left : Vector2d.Right);
+        contact.PointA.Should().Be(new Vector2d(1, 1));
+        contact.PointB.Should().Be(new Vector2d(1, 1));
+    }
+
+    [Theory]
     [InlineData(false, -1)]
     [InlineData(false, 0)]
     [InlineData(false, 1)]
