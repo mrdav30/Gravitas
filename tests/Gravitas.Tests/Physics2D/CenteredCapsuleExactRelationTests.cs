@@ -20,6 +20,55 @@ namespace Gravitas.Tests.Physics2D;
 public sealed class CenteredCapsuleExactRelationTests
 {
     [Theory]
+    [InlineData(false, -1)]
+    [InlineData(false, 0)]
+    [InlineData(false, 1)]
+    [InlineData(true, -1)]
+    [InlineData(true, 0)]
+    [InlineData(true, 1)]
+    public void RoundedConvexContact_AtExactCorner_DistinguishesOneRawRadiusStep(
+        bool useCapsule,
+        long radiusStep)
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        Fixed64 radius = Fixed64.FromRaw(((Fixed64)5).m_rawValue + radiusStep);
+        LSCollider2D shape = useCapsule
+            ? new LSCapsuleCollider2D(radius, radius * Fixed64.Two + Fixed64.Two)
+            : new LSCircleCollider2D(radius);
+        _ = CreateBody(context, shape, new Vector2d(3, useCapsule ? 5 : 4));
+        SolidBody2D box = CreateBody(context, new LSAABBoxCollider2D(Vector2d.One),
+            new Vector2d(-Fixed64.Half, -Fixed64.Half));
+
+        bool collided = CollisionDetection2D.TryCollide(shape, box.Collider, out Contact2D contact);
+        collided.Should().Be(radiusStep >= 0);
+        contact.Depth.Should().Be(Fixed64.FromRaw(Math.Max(radiusStep, 0)));
+        if (collided)
+        {
+            contact.Normal.Should().Be(new Vector2d(Fixed64.FromFraction(-3, 5), Fixed64.FromFraction(-4, 5)));
+            CollisionDetection2D.TryCollide(box.Collider, shape, out Contact2D reversed).Should().BeTrue();
+            reversed.Depth.Should().Be(contact.Depth);
+            reversed.Normal.Should().Be(-contact.Normal);
+        }
+    }
+
+    [Fact]
+    public void CapsuleConvexQueries_AtExactCorner_RetainOverlapAndSweepStartContact()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        SolidBody2D capsule = CreateBody(context, new LSCapsuleCollider2D((Fixed64)5, (Fixed64)12),
+            new Vector2d(3, 5));
+        SolidBody2D box = CreateBody(context, new LSAABBoxCollider2D(Vector2d.One),
+            new Vector2d(-Fixed64.Half, -Fixed64.Half));
+        Vector2d[] polygon = { new(-1, -1), new(0, -1), new(0, 0), new(-1, 0) };
+
+        QueryDetection2D.TryOverlapPolygon(polygon, Vector2d.Zero, capsule.Collider, out _).Should().BeTrue();
+        QueryDetection2D.TryOverlapCircle(new Vector2d(3, 4), (Fixed64)5, box.Collider, out _).Should().BeTrue();
+        QueryDetection2D.TrySweepMoverShape(capsule.Collider, Vector2d.Right, box.Collider,
+            out Physics2DHit hit).Should().BeTrue();
+        hit.Distance.Should().Be(Fixed64.Zero);
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public void CapsuleConvexSweep_AtScalarFace_DoesNotRequireRepresentableAxisEndpoints(
