@@ -2,7 +2,7 @@
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-076`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-078`.
 - Assign an ID when an issue enters this tracker, keep it through resolution,
   and never reuse an ID even if an entry is later removed. Check this file's Git
   history before advancing or repairing the counter.
@@ -35,7 +35,52 @@
 
 ### Ordered Queue
 
-No active issues are queued.
+### GRV-Issue-076 - Narrow simulation time breaks long-running lifecycle work
+
+- **Confirmed:** 2026-09-22 at `21a22ab1ac8ac2d16fb8a41fcf1f65659029378d`.
+- **Status:** Open; pre-existing. Shared timing migration is planned in
+  Chronicler's `docs/feature-work/deterministicSimulationTimingPlan.md`, Phase 4.
+- **Evidence:** A real context crossing `int.MaxValue`, then deactivating a
+  sphere, retains 27 empty partitions beyond a two-frame retirement lifetime;
+  the same scenario at frame zero retires all of them. `EmptySinceFrame < 0`
+  treats the wrapped stamp as unset. A coroutine waiting one second at the
+  saturated `Fixed64` time resumes on the next 1/32-second step. The clock stops
+  advancing seconds while frames continue; converting 67,108,864 seconds at
+  32 Hz returns 2,147,483,647 frames instead of 2,147,483,648.
+- **Control:** A two-frame coroutine wait started before the signed boundary
+  resumes exactly once at the correct step. Its unsigned difference is
+  wrap-safe for this bounded wait; not every frame consumer has the same defect.
+- **Reproduction:** Phase 0's `TimingBoundaryProbeTests` source, commands and
+  outputs are retained under Chronicler `artifacts/timing/phase0`. The timing
+  plan records the setup and expected observations. These intentionally red
+  probes are not skipped tests in the normal suite; promote their behavior
+  assertions into the owning suites with the migration.
+- **Required fix:** Adopt wide elapsed time and absolute stamps, including
+  partition, contact, CCD-token, diagnostic/replay and affected record consumers.
+  Preserve bounded counters and reset/restore ownership; reject genuine clock
+  exhaustion before mutation. No runtime fix is claimed by this evidence entry.
+
+### GRV-Issue-077 - Local-stack benchmark child fails while the launcher reports success
+
+- **Confirmed:** 2026-09-22 at `21a22ab`, during shared timing baseline capture.
+- **Status:** Open; benchmark tooling, not a physics failure.
+- **Evidence:** `world-context --filter '*RunEmptySimulationFrame*'` in local
+  stack mode encountered CS2012 while parallel project instances wrote the same
+  SwiftCollections intermediate DLL. BenchmarkDotNet reported zero executed
+  benchmarks and an NA result, but `Program.Main` returned zero after ignoring
+  the returned summaries. The exit code therefore falsely signals success.
+  Original log: Chronicler `artifacts/timing/phase0/gravitas-benchmark.log`.
+- **Follow-up:** `BuildInParallel=false` lets the generated project compile,
+  but its child fails to load GridForge 9.1.0.0. The parent output contains that
+  identity while the generated child has GridForge and SwiftCollections 0.0.0.0.
+  Log: `gravitas-serial-build.log` beside the original. This is a source-mode
+  generated build graph problem, not evidence of a physics runtime regression.
+- **Required fix:** Preserve one consistent source-built dependency identity
+  through generated benchmark builds and check validation/build/execution
+  results before returning success, while allowing genuine informational
+  help/list commands. Keep this a
+  focused runner correction, not a new benchmark regression project or CI gate.
+  Until then, inspect complete benchmark logs and reports, not only process exit.
 
 ## Resolved Issues
 
