@@ -339,13 +339,18 @@ public sealed class Physics2DPartitionBroadPhaseTests
         hits.Should().NotContain(hit => ReferenceEquals(hit.Collider, deactivated));
     }
 
-    [Fact]
-    public void Deactivate_WithRetainedPartitionTtk_ShouldRetireAndPoolEmpty2DPartitions()
+    [Theory]
+    [InlineData(0L)]
+    [InlineData((long)int.MaxValue)]
+    [InlineData(long.MaxValue - 2)]
+    public void Deactivate_WithRetainedPartitionTtk_ShouldRetireAndPoolEmpty2DPartitions(long frame)
     {
         using GravitasWorldContext context = CreateContext(extent: 16);
         context.Settings.RetainedPartitionTimeToKillFrames = 1;
         context.Settings.RetainedPartitionRetirementSweepBudget = 1024;
         SolidBody2D body = CreateCircle(context, Vector2d.Zero, immovable: false);
+        TimingTestUtility.SetClock(context, frame, new Chronicler.Timing.ChronicleTimestamp(1, 0));
+        Step(context);
         int retainedBeforeDeactivate = context.Collisions2D.RetainedPartitionCount;
 
         body.Deactivate();

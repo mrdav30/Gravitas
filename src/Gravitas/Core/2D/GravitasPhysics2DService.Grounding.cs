@@ -45,7 +45,7 @@ public sealed partial class GravitasPhysics2DService
         internal bool IsCurrentLifetime => Pair.LifetimeVersion == _lifetimeVersion;
     }
 
-    private void RefreshGroundingFromDiscreteResponse(int frame)
+    private void RefreshGroundingFromDiscreteResponse(long frame)
     {
         int snapshotStart = _groundingBodySnapshot.Count;
         _groundingBodySnapshot.EnsureCapacity(snapshotStart + _dynamicBodies.Count);
@@ -127,9 +127,9 @@ public sealed partial class GravitasPhysics2DService
         }
     }
 
-    internal static bool ShouldUseDiscreteGroundingPair(CollisionPair2D pair, int frame) =>
+    internal static bool ShouldUseDiscreteGroundingPair(CollisionPair2D pair, long frame) =>
         pair.LastFrame == frame && !pair.ColliderA.IsTrigger && !pair.ColliderB.IsTrigger;
 
-    internal static bool ShouldUseDiscreteGroundingManifold(ContactManifold2D manifold, int frame) =>
+    internal static bool ShouldUseDiscreteGroundingManifold(ContactManifold2D manifold, long frame) =>
         manifold.HasContact && manifold.LastUpdatedFrame == frame;
 }

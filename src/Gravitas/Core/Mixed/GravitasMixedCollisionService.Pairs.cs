@@ -99,7 +99,7 @@ internal sealed partial class GravitasMixedCollisionService
             && !_context.Physics.IsLayerCollisionDisabled(collider3D.Layer, collider2D.Layer);
     }
 
-    private void ProcessCandidate(MixedColliderKey candidate, int frame)
+    private void ProcessCandidate(MixedColliderKey candidate, long frame)
     {
         if (!_context.Physics.TryGetColliderById(candidate.Collider3DId, out LSCollider? collider3D)
             || !_context.Physics2D.TryGetColliderById(candidate.Collider2DId, out LSCollider2D? collider2D))
@@ -136,7 +136,7 @@ internal sealed partial class GravitasMixedCollisionService
             _mixedResponsePairs.Add(pair);
     }
 
-    private void CleanupUntouchedPairs(int frame)
+    private void CleanupUntouchedPairs(long frame)
     {
         int removalStart = _pairsToRemove.Count;
         foreach (var pairEntry in _pairs)
@@ -168,7 +168,7 @@ internal sealed partial class GravitasMixedCollisionService
         }
     }
 
-    private bool TryKeepUntouchedPair(CollisionPairMixed pair, int frame)
+    private bool TryKeepUntouchedPair(CollisionPairMixed pair, long frame)
     {
         LSCollider collider3D = pair.Collider3D;
         LSCollider2D collider2D = pair.Collider2D;

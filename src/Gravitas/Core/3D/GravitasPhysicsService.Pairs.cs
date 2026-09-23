@@ -257,7 +257,7 @@ public sealed partial class GravitasPhysicsService
                 }
 
                 bool preservedSleepingContact = instancePair.TryPreserveSleepingRestingContact();
-                int passedFrames = _context.FrameCount - instancePair.LastCollidedFrame;
+                long passedFrames = _context.FrameCount - instancePair.LastCollidedFrame;
                 if (!preservedSleepingContact && passedFrames >= InactiveFrameThreshold)
                     FullDeactivateCollisionPair(instancePair);
                 else

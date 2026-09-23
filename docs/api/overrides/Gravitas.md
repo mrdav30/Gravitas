@@ -6,7 +6,8 @@ summary: *content
 Gravitas provides deterministic fixed-point 2D, 3D, and mixed-dimension
 physics for engine-agnostic .NET hosts. Its explicit world contexts own bodies,
 colliders, collision response, constraints, queries, replay state, and
-renderer-neutral diagnostics.
+renderer-neutral diagnostics. Simulation timing uses long frame stamps and
+Chronicler wide timestamps while fixed-point step integration stays in Fixed64.
 
 Gravitas is the physics layer of the Lockstep Simulation Framework. It builds on
 [FixedMathSharp](https://github.com/mrdav30/FixedMathSharp),

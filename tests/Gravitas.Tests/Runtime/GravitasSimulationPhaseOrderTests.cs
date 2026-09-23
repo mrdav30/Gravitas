@@ -1,4 +1,5 @@
 using FixedMathSharp;
+using Chronicler.Timing;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
@@ -146,7 +147,7 @@ public sealed class GravitasSimulationPhaseOrderTests
         bool hasContact = pair?.Manifold.HasContact ?? false;
         return new SimulationSnapshot(
             scenario.Context.FrameCount,
-            scenario.Context.TotalTime,
+            scenario.Context.ElapsedTime,
             left.Body.Position3d,
             right.Body.Position3d,
             left.Body.LinearVelocity,
@@ -158,8 +159,8 @@ public sealed class GravitasSimulationPhaseOrderTests
     }
 
     private readonly record struct SimulationSnapshot(
-        int FrameCount,
-        Fixed64 TotalTime,
+        long FrameCount,
+        ChronicleTimestamp ElapsedTime,
         Vector3d LeftPosition,
         Vector3d RightPosition,
         Vector3d LeftVelocity,

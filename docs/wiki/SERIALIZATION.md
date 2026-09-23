@@ -71,6 +71,18 @@ new state.
 
 ## Recordable Types
 
+The 3D body record starts with `BodySchemaVersion = 1` and a signed 64-bit
+`LastGroundCheckFrame`. A nonnegative value is an absolute simulation frame;
+`-1` means no cached probe. Missing or unsupported schema versions and invalid
+negative stamps reject before any body fields are changed, consistently in
+JSON and MemoryPack. Unversioned narrow-frame body snapshots are not accepted.
+
+The 2D body does not persist its ground-check frame: its support lookup cache is
+invalidated on population and rebuilt by simulation. Its record shape is
+unchanged. Neither body record restores the containing world's clock. Hosts
+must coordinate matching timeline and runtime-shell state before continuation;
+there is no live-world rewind API.
+
 | Type                                    | What it records                                                                                                                                                                                         | What it does not own                                             |
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
 | `SolidBody`                             | 3D position/height, rotation, motion type, freeze axes, motion stores, mass, COM, gravity scale, sleep, CCD, grounding/probe state, owned collider state.                                               | `FixedTransform` identity, service IDs, partitions, pairs.       |
@@ -162,9 +174,14 @@ The authoritative hash follows the same boundary as
 
 Replay hashes use Chronicler's `ChronicleHash` value and hash-writer mechanics.
 Gravitas owns the physics-specific inclusion policy and deterministic ordering.
-The `body.2d` and `body.3d` replay sections are version 4 because motion type is
-now explicit hash input. Sparse transports that omit a default-valued
-`MotionType` deterministically resolve it to `Dynamic`.
+The root `gravitas.replay` section is version 2: frame and late-phase stamps
+are signed 64-bit values, and elapsed time is ordered whole seconds (`long`)
+then fractional seconds (`uint`). Affected body, pair, manifold, and cache
+sections are versioned independently for their widened stamps. The `body.3d`
+section is version 6; `body.2d` remains version 4 because it does not record a
+ground-check stamp. Hashes from older schema versions are not comparable.
+Sparse transports that omit a default-valued `MotionType` deterministically
+resolve it to `Dynamic`.
 
 ```mermaid
 flowchart LR

@@ -211,7 +211,7 @@ public sealed partial class SolidBody2D
         bool found = false;
         Physics2DHit best = default;
         Fixed64 bestClosingSpeed = Fixed64.Zero;
-        int token = Context.LateSimulateToken;
+        long token = Context.LateSimulateToken;
         SwiftList<int> candidateIds = Context.Physics2D.QueryPlanarContinuousCollisionCandidates(
             DynamicCcdCandidateIndex2D.CreateSweptCircleBounds(startPosition, sourceDisplacement, proxyRadius));
         for (int candidateIndex = 0; candidateIndex < candidateIds.Count; candidateIndex++)
@@ -486,7 +486,7 @@ public sealed partial class SolidBody2D
         Fixed64 sourceRadius = ResolveMixedContinuousCollisionProxyRadius();
         bool found = false;
         DynamicMixedIntervalHit best = default;
-        int token = Context.LateSimulateToken;
+        long token = Context.LateSimulateToken;
         SwiftList<int> candidateIds = Context.Physics.QueryContinuousCollisionCandidates(
             DynamicCcdCandidateIndex.CreateSweptSphereBounds(sourceStart, sourceDisplacement, sourceRadius));
         for (int candidateIndex = 0; candidateIndex < candidateIds.Count; candidateIndex++)

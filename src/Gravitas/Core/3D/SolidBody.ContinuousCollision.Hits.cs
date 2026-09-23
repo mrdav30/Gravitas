@@ -360,7 +360,7 @@ public partial class SolidBody
         bool found = false;
         Physics3DHit best = default;
         Fixed64 bestClosingSpeed = Fixed64.Zero;
-        int token = Context.LateSimulateToken;
+        long token = Context.LateSimulateToken;
         SwiftList<int> candidateIds = Context.Physics.QueryContinuousCollisionCandidates(
             DynamicCcdCandidateIndex.CreateSweptSphereBounds(startPosition, sourceDisplacement, proxyRadius));
         for (int candidateIndex = 0; candidateIndex < candidateIds.Count; candidateIndex++)
@@ -721,7 +721,7 @@ public partial class SolidBody
         Vector3d sourceDirection = sourceDisplacement.Normalized;
         bool found = false;
         DynamicMixedIntervalHit best = default;
-        int token = Context.LateSimulateToken;
+        long token = Context.LateSimulateToken;
         SwiftList<int> candidateIds = Context.Physics2D.QueryMixedContinuousCollisionCandidates(
             DynamicCcdCandidateIndex.CreateSweptSphereBounds(startPosition, sourceDisplacement, proxyRadius));
         for (int candidateIndex = 0; candidateIndex < candidateIds.Count; candidateIndex++)

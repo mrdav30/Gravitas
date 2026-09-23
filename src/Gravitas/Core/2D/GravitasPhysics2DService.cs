@@ -50,7 +50,7 @@ public sealed partial class GravitasPhysics2DService
     private readonly SwiftHashSet<SolidBody2D> _processedContinuousCollisionBodies = new();
     private readonly SwiftHashSet<SolidBody2D> _queuedContinuousCollisionHandoffBodies = new();
     private readonly SwiftList<SolidBody2D> _continuousCollisionHandoffQueue = new();
-    private int _continuousCollisionPreparedToken = int.MinValue;
+    private long _continuousCollisionPreparedToken = -1;
     private bool _continuousCollisionPreparedMixedIndex;
 
     /// <summary>Creates the pure 2D physics service for a world context.</summary>
@@ -249,7 +249,7 @@ public sealed partial class GravitasPhysics2DService
         EnsureFrameCapacity();
         _processedPairKeys.Clear();
         _discreteResponsePairs.FastClear();
-        int frame = _context.FrameCount;
+        long frame = _context.FrameCount;
         _context.Collisions2D.CheckAndDistributeCollisions();
         ExpandDiscreteResponsePairs(frame);
         SolveDiscreteResponsePairs();
@@ -299,7 +299,7 @@ public sealed partial class GravitasPhysics2DService
         _continuousCollisionCandidateIds.FastClear();
         _dirtyContinuousCollisionCandidateIds.FastClear();
         _processedContinuousCollisionBodies.Clear();
-        _continuousCollisionPreparedToken = int.MinValue;
+        _continuousCollisionPreparedToken = -1;
         _continuousCollisionPreparedMixedIndex = false;
         BodyCount = 0;
         LastBroadPhaseCandidateCount = 0;

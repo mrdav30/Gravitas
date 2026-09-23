@@ -51,7 +51,7 @@ public class WorldContextBenchmarks
     }
 
     [Benchmark]
-    public int RunEmptySimulationFrame()
+    public long RunEmptySimulationFrame()
     {
         _emptyContext.Simulate();
         _emptyContext.LateSimulate();

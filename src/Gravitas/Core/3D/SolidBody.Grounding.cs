@@ -48,7 +48,7 @@ public partial class SolidBody
     /// </summary>
     public Fixed64 GroundProbeRadius { get; set; }
 
-    private int _lastGroundCheckFrame = 0;
+    private long _lastGroundCheckFrame = -1;
     private const int _groundCheckFrameThreshold = 10;
     private readonly Fixed64 _groundCheckThreshold = (Fixed64)0.01f;
     private readonly SwiftList<Physics3DHit> _groundProbeHits = new(DefaultBodyHitBufferCapacity);
@@ -232,6 +232,7 @@ public partial class SolidBody
         bool frameGuard = !force
             && !hitPlatformMoved
             && Vector3d.Distance(_lastPosition, Position3d) < _groundCheckThreshold
+            && _lastGroundCheckFrame >= 0
             && Context.FrameCount - _lastGroundCheckFrame < _groundCheckFrameThreshold;
         if (frameGuard)
             return;

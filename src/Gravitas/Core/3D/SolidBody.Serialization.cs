@@ -15,6 +15,19 @@ public partial class SolidBody
     /// <summary>Records or restores deterministic body state through Chronicler.</summary>
     public void RecordData(IChronicler chronicler)
     {
+        // Validate timing before publishing any body fields. Numeric coercion must not
+        // silently admit an obsolete narrow-frame snapshot in one transport only.
+        int bodySchemaVersion = 1;
+        RecordValues.Look(chronicler, ref bodySchemaVersion, "BodySchemaVersion", 0);
+        if (chronicler.Mode == SerializationMode.Loading)
+            SwiftThrowHelper.ThrowIfTrue(bodySchemaVersion != 1, nameof(SolidBody),
+                "The body schema is missing or unsupported.");
+        long lastGroundCheckFrame = _lastGroundCheckFrame;
+        RecordValues.Look(chronicler, ref lastGroundCheckFrame, "LastGroundCheckFrame", -1L);
+        if (chronicler.Mode == SerializationMode.Loading)
+            SwiftThrowHelper.ThrowIfTrue(lastGroundCheckFrame < -1, nameof(SolidBody),
+                "The grounding frame must be nonnegative or the unset value -1.");
+
         GroundingMode groundingMode = GroundingMode;
         GroundProbeMode groundProbeMode = GroundProbeMode;
         Fixed64 groundProbeRadius = GroundProbeRadius;
@@ -47,7 +60,6 @@ public partial class SolidBody
         RecordValues.Look(chronicler, ref groundProbeMode, "GroundProbeMode", GroundProbeMode.Auto);
         RecordValues.Look(chronicler, ref groundProbeRadius, "GroundProbeRadius");
         RecordValues.Look(chronicler, ref _skipGroundingCheck, "SkipGroundingCheck", false);
-        RecordValues.Look(chronicler, ref _lastGroundCheckFrame, "LastGroundCheckFrame");
         RecordValues.Look(chronicler, ref StepOffset, "StepOffset");
         RecordValues.Look(chronicler, ref _groundNormal, "GroundNormal");
         RecordValues.Look(chronicler, ref _hitPlatformPosition, "HitPlatformPosition");
@@ -87,6 +99,7 @@ public partial class SolidBody
         if (chronicler.Mode == SerializationMode.Loading)
         {
             ApplyLoadedMotionType(motionType);
+            _lastGroundCheckFrame = lastGroundCheckFrame;
             ContinuousCollisionMode = continuousCollisionMode;
             _rotation = _rotation.Normalized;
             _freezeAxes = freezeAxes;

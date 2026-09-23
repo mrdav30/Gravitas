@@ -28,7 +28,7 @@ public sealed class CollisionPairCullingTests
         pair.Manifold.HasContact.Should().BeTrue();
         pair.Deactivate();
 
-        int lastFrame = pair.LastFrame;
+        long lastFrame = pair.LastFrame;
         short cullCounter = pair.CullCounter;
         int diagnosticCount = scenario.Context.Diagnostics.EventCount;
         int exitCountAfterDeactivate = exitCount;

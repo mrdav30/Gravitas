@@ -202,7 +202,7 @@ public partial class SolidBody
         Fixed64 sourceLength)
     {
         Vector3d sourceDisplacement = proposedPosition - startPosition;
-        int token = Context.LateSimulateToken;
+        long token = Context.LateSimulateToken;
         SwiftList<int> candidateIds = Context.Physics.QueryContinuousCollisionCandidates(
             DynamicCcdCandidateIndex.CreateSweptSphereBounds(startPosition, sourceDisplacement, proxyRadius));
         for (int candidateIndex = 0; candidateIndex < candidateIds.Count; candidateIndex++)
@@ -246,7 +246,7 @@ public partial class SolidBody
             return;
 
         Vector3d sourceDisplacement = proposedPosition - startPosition;
-        int token = Context.LateSimulateToken;
+        long token = Context.LateSimulateToken;
         SwiftList<int> candidateIds = Context.Physics2D.QueryMixedContinuousCollisionCandidates(
             DynamicCcdCandidateIndex.CreateSweptSphereBounds(startPosition, sourceDisplacement, proxyRadius));
         for (int candidateIndex = 0; candidateIndex < candidateIds.Count; candidateIndex++)

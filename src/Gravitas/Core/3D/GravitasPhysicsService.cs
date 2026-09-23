@@ -48,7 +48,7 @@ public sealed partial class GravitasPhysicsService
     private readonly SwiftHashSet<SolidBody> _processedContinuousCollisionBodies = new(DefaultBodySize);
     private readonly SwiftHashSet<SolidBody> _queuedContinuousCollisionHandoffBodies = new(DefaultBodySize);
     private readonly SwiftList<SolidBody> _continuousCollisionHandoffQueue = new(DefaultBodySize);
-    private int _continuousCollisionPreparedToken = int.MinValue;
+    private long _continuousCollisionPreparedToken = -1;
 
     /// <summary>
     /// Initializes a new physics service for the supplied context.
@@ -226,7 +226,7 @@ public sealed partial class GravitasPhysicsService
         _dirtyContinuousCollisionBodyIds.Clear();
         _dirtyContinuousCollisionBodies.FastClear();
         _processedContinuousCollisionBodies.Clear();
-        _continuousCollisionPreparedToken = int.MinValue;
+        _continuousCollisionPreparedToken = -1;
         LastContinuousCollisionIslandCount = 0;
         LastContinuousCollisionIslandIterationCount = 0;
         LastContinuousCollisionIslandLimitReached = false;

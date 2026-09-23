@@ -58,11 +58,11 @@ public sealed partial class SolidBody2D
         writer.WriteVector2d(_lastGroundedPosition);
         writer.WriteEnum(_continuousCollisionMode);
 
-        writer.WriteSection("body.2d.ccd-authoritative", 3);
+        writer.WriteSection("body.2d.ccd-authoritative", 4);
         writer.WriteBool(_continuousCollisionHandoffPending);
         if (_continuousCollisionHandoffPending)
         {
-            writer.WriteInt32(_continuousCollisionHandoffToken);
+            writer.WriteInt64(_continuousCollisionHandoffToken);
             writer.WriteFixed64(_continuousCollisionHandoffRemainingTime);
             writer.WriteInt32(_continuousCollisionHandoffIgnoredCollider3D?.ReplayOrdinal ?? -1);
             writer.WriteInt32(_continuousCollisionHandoffIgnoredCollider2D?.ReplayOrdinal ?? -1);
@@ -72,10 +72,10 @@ public sealed partial class SolidBody2D
         if (mode != GravitasReplayHashMode.AuthoritativeWithSolverCaches)
             return;
 
-        writer.WriteSection("body.2d.solver-caches", 3);
-        writer.WriteInt32(_continuousCollisionFrameToken);
+        writer.WriteSection("body.2d.solver-caches", 4);
+        writer.WriteInt64(_continuousCollisionFrameToken);
         WriteContinuousCollisionTrajectory(ref writer);
-        writer.WriteInt32(_continuousCollisionHandoffToken);
+        writer.WriteInt64(_continuousCollisionHandoffToken);
         writer.WriteFixed64(_continuousCollisionHandoffRemainingTime);
         writer.WriteInt32(LastContinuousCollisionToiIterationCount);
         writer.WriteBool(LastContinuousCollisionToiIterationLimitReached);

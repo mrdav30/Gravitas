@@ -212,7 +212,7 @@ public sealed class Physics2DSimulationTests
         Vector2d position = body.Position;
         Vector2d velocity = body.LinearVelocity;
         int candidateCount = context.Physics2D.LastBroadPhaseCandidateCount;
-        int lateSimulateToken = context.LateSimulateToken;
+        long lateSimulateToken = context.LateSimulateToken;
         context.Physics2D.SimulatePhysics = false;
 
         context.Physics2D.Simulate();

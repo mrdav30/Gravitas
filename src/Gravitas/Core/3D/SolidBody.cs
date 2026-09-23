@@ -201,12 +201,12 @@ public partial class SolidBody : IRecordable
     internal void SetDynamicId(int dynamicId) => _dynamicId = dynamicId;
 
     private ContinuousCollisionMode _continuousCollisionMode = ContinuousCollisionMode.Inherit;
-    private int _continuousCollisionFrameToken = int.MinValue;
+    private long _continuousCollisionFrameToken = -1;
     private readonly SwiftList<ContinuousCollisionMotionSegment3D> _continuousCollisionTrajectory =
         new(PhysicsSettings.DefaultContinuousCollisionMaxToiIterations + 1);
     private Vector3d _continuousCollisionAngularVelocityStepStart;
     private bool _continuousCollisionHandoffPending;
-    private int _continuousCollisionHandoffToken = int.MinValue;
+    private long _continuousCollisionHandoffToken = -1;
     private Fixed64 _continuousCollisionHandoffRemainingTime;
 
     /// <summary>
@@ -738,7 +738,7 @@ public partial class SolidBody : IRecordable
         _wasGrounded = false;
         _groundedTransitionCapturedForStep = false;
         _skipGroundingCheck = false;
-        _lastGroundCheckFrame = int.MinValue;
+        _lastGroundCheckFrame = -1;
         ResetGroundCalculations();
 
         _positionChangedBuffer = true;

@@ -57,9 +57,9 @@ public partial class CollisionPair
     public ushort PairVersion = 1;
 
     /// <summary>Gets the last simulation frame in which this pair was updated.</summary>
-    public int LastFrame { get; private set; }
+    public long LastFrame { get; private set; }
     /// <summary>Gets the last simulation frame in which this pair had contact.</summary>
-    public int LastCollidedFrame { get; private set; }
+    public long LastCollidedFrame { get; private set; }
 
     private Fixed64 _fastCollideDistance;
     private Fixed64 _fastDistance;
@@ -549,7 +549,7 @@ public partial class CollisionPair
         int timeScore = 0;
         int cullTimeStep = Context.Environment.CullTimeStep;
         if (cullTimeStep > 0)
-            timeScore = Math.Clamp((Context.FrameCount - LastCollidedFrame) / cullTimeStep, 0, Context.Environment.CullTimeMax);
+            timeScore = (int)Math.Clamp((Context.FrameCount - LastCollidedFrame) / cullTimeStep, 0, Context.Environment.CullTimeMax);
 
         CullCounter = (short)Math.Clamp(distanceScore + timeScore - velocityScore, 0, short.MaxValue);
     }

@@ -2,7 +2,7 @@ using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Support;
 using System;
-using System.Reflection;
+using Chronicler.Timing;
 using Xunit;
 
 namespace Gravitas.Tests.Support.Coroutines;
@@ -82,7 +82,7 @@ public sealed class LockedYieldInstructionTests
     }
 
     [Fact]
-    public void WaitForFrames_WhenFrameCounterWraps_ShouldCompleteAfterRequestedFrames()
+    public void WaitForFrames_WhenFrameCounterCrossesIntRange_ShouldCompleteAfterRequestedFrames()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         SetFrameCount(context, int.MaxValue - 1);
@@ -100,7 +100,7 @@ public sealed class LockedYieldInstructionTests
     }
 
     [Fact]
-    public void WaitForNextSimulate_WhenFrameCounterWraps_ShouldCompleteOnNextFrame()
+    public void WaitForNextSimulate_WhenFrameCounterCrossesIntRange_ShouldCompleteOnNextFrame()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         SetFrameCount(context, int.MaxValue);
@@ -176,13 +176,6 @@ public sealed class LockedYieldInstructionTests
 
     private static void SetFrameCount(GravitasWorldContext context, int frameCount)
     {
-        FieldInfo clockField = typeof(GravitasWorldContext).GetField(
-            "_clock",
-            BindingFlags.Instance | BindingFlags.NonPublic)!;
-        object clock = clockField.GetValue(context)!;
-        PropertyInfo frameCountProperty = clock.GetType().GetProperty(
-            nameof(GravitasWorldContext.FrameCount),
-            BindingFlags.Instance | BindingFlags.Public)!;
-        frameCountProperty.SetValue(clock, frameCount);
+        TimingTestUtility.SetClock(context, frameCount, new ChronicleTimestamp(1, 0));
     }
 }

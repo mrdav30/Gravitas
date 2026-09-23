@@ -17,7 +17,7 @@ namespace Gravitas.Diagnostics;
 public readonly struct GravitasDebugDrawCommand
 {
     internal GravitasDebugDrawCommand(
-        int frame,
+        long frame,
         int sequence,
         GravitasDebugDrawKind kind,
         int colliderId,
@@ -59,7 +59,7 @@ public readonly struct GravitasDebugDrawCommand
     }
 
     /// <summary>Gets the simulation frame in which the command was captured.</summary>
-    public int Frame { get; }
+    public long Frame { get; }
 
     /// <summary>Gets the command's sequence within its capture buffer.</summary>
     public int Sequence { get; }

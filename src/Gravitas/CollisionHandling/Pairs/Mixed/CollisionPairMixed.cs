@@ -44,7 +44,7 @@ internal sealed partial class CollisionPairMixed
 
     public GravitasWorldContext Context => Collider3D.Context;
 
-    public int LastFrame { get; private set; } = -1;
+    public long LastFrame { get; private set; } = -1;
 
     public MixedContact Contact { get; private set; }
 
@@ -73,7 +73,7 @@ internal sealed partial class CollisionPairMixed
         Contact = default;
     }
 
-    public void MarkColliding(int frame, MixedContact contact)
+    public void MarkColliding(long frame, MixedContact contact)
     {
         bool changed = !_isColliding;
         _isColliding = true;
@@ -136,12 +136,12 @@ internal sealed partial class CollisionPairMixed
         CollisionNotificationExceptions.ThrowIfAny(notificationExceptions);
     }
 
-    public void MarkResting(int frame)
+    public void MarkResting(long frame)
     {
         LastFrame = frame;
     }
 
-    public void MarkResting(int frame, MixedContact contact)
+    public void MarkResting(long frame, MixedContact contact)
     {
         Contact = contact;
         LastFrame = frame;

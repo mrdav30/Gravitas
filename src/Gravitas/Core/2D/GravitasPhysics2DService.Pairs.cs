@@ -89,7 +89,7 @@ public sealed partial class GravitasPhysics2DService
         return found;
     }
 
-    private void ProcessCandidate(LSCollider2D first, LSCollider2D second, int frame)
+    private void ProcessCandidate(LSCollider2D first, LSCollider2D second, long frame)
     {
         ulong key = CreatePairKey(first.Id, second.Id);
         bool hasPair = _pairs.TryGetValue(key, out CollisionPair2D pair);
@@ -146,7 +146,7 @@ public sealed partial class GravitasPhysics2DService
         pair.ColliderB.TryAddCollisionPairHolder(pair.Id1);
     }
 
-    private void ExpandDiscreteResponsePairs(int frame)
+    private void ExpandDiscreteResponsePairs(long frame)
     {
         if (_discreteResponsePairs.Count == 0)
             return;
@@ -171,7 +171,7 @@ public sealed partial class GravitasPhysics2DService
         }
     }
 
-    private void AddExistingResponsePairs(LSCollider2D collider, int frame)
+    private void AddExistingResponsePairs(LSCollider2D collider, long frame)
     {
         _existingResponsePairCandidates.FastClear();
         SwiftDictionary<int, CollisionPair2D>? ownedPairs = collider.CollisionPairs;
@@ -200,7 +200,7 @@ public sealed partial class GravitasPhysics2DService
             TryAddExistingResponsePair(_existingResponsePairCandidates[i], frame);
     }
 
-    private void TryAddExistingResponsePair(CollisionPair2D pair, int frame)
+    private void TryAddExistingResponsePair(CollisionPair2D pair, long frame)
     {
         ulong key = CreatePairKey(pair.Id1, pair.Id2);
         if (!_pairs.TryGetValue(key, out CollisionPair2D currentPair)
@@ -263,7 +263,7 @@ public sealed partial class GravitasPhysics2DService
             && !first.IsSibling(second);
     }
 
-    private void CleanupUntouchedPairs(int frame)
+    private void CleanupUntouchedPairs(long frame)
     {
         _pairsToRemove.FastClear();
         foreach (var pairEntry in _pairs)
@@ -288,7 +288,7 @@ public sealed partial class GravitasPhysics2DService
         }
     }
 
-    private bool TryKeepUntouchedPair(CollisionPair2D pair, int frame)
+    private bool TryKeepUntouchedPair(CollisionPair2D pair, long frame)
     {
         LSCollider2D first = pair.ColliderA;
         LSCollider2D second = pair.ColliderB;

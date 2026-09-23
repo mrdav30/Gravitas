@@ -10,31 +10,42 @@ namespace Gravitas.Support;
 /// <summary>
 /// A coroutine yield instruction that waits for a specified number of Gravitas simulation frames.
 /// </summary>
+/// <remarks>
+/// Uses a checked deadline in the context's current clock lifetime. Reading an
+/// instruction after context reset or disposal throws; reads never consume frames.
+/// </remarks>
 public readonly struct WaitForFrames : ILockedYieldInstruction
 {
     private readonly GravitasWorldContext _context;
-    private readonly int _startFrameCount;
-    private readonly uint _numberOfFrames;
+    private readonly object _lifetime;
+    private readonly long _deadlineFrame;
 
     /// <summary>
     /// Creates an instruction that waits for a nonnegative number of simulation frames.
     /// </summary>
-    public WaitForFrames(GravitasWorldContext context, int numberOfFrames)
+    public WaitForFrames(GravitasWorldContext context, long numberOfFrames)
     {
         SwiftThrowHelper.ThrowIfNull(context, nameof(context));
-        SwiftThrowHelper.ThrowIfNegative(numberOfFrames, nameof(numberOfFrames));
+        SwiftThrowHelper.ThrowIfArgumentOutOfRange(numberOfFrames < 0, null,
+            nameof(numberOfFrames), "Wait frame count cannot be negative.");
 
         _context = context;
-        _startFrameCount = context.FrameCount;
-        _numberOfFrames = (uint)numberOfFrames;
+        _lifetime = context.CaptureClockLifetime();
+        _deadlineFrame = context.GetDeadlineFrame(numberOfFrames);
     }
 
     /// <inheritdoc />
     public GravitasWorldContext Context => _context;
 
     /// <inheritdoc />
-    public bool KeepWaiting =>
-        unchecked((uint)(_context.FrameCount - _startFrameCount)) < _numberOfFrames;
+    public bool KeepWaiting
+    {
+        get
+        {
+            _context.ValidateClockLifetime(_lifetime);
+            return _context.FrameCount < _deadlineFrame;
+        }
+    }
 
     /// <inheritdoc />
     public object? Current => null;

@@ -59,14 +59,14 @@ public sealed partial class GravitasPhysics2DService
         if (mode != GravitasReplayHashMode.AuthoritativeWithSolverCaches)
             return;
 
-        writer.WriteSection("physics.2d.caches", 3);
+        writer.WriteSection("physics.2d.caches", 4);
         writer.WriteInt32(_colliders.PeakCount);
         writer.WriteInt32(_processedPairKeys.Count);
         writer.WriteInt32(_pairs.Count);
         writer.WriteInt32(_pairsToRemove.Count);
         writer.WriteInt32(_cachedPairs.Count);
         writer.WriteInt32(_discreteResponsePairs.Count);
-        writer.WriteInt32(_continuousCollisionPreparedToken);
+        writer.WriteInt64(_continuousCollisionPreparedToken);
         writer.WriteBool(_continuousCollisionPreparedMixedIndex);
         writer.WriteInt32(_planarContinuousCollisionCandidates.Count);
         writer.WriteInt32(_dirtyPlanarContinuousCollisionCandidates.Count);

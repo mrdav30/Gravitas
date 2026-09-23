@@ -17,7 +17,7 @@ namespace Gravitas.Diagnostics;
 public readonly struct GravitasDiagnosticEvent
 {
     internal GravitasDiagnosticEvent(
-        int frame,
+        long frame,
         int sequence,
         GravitasDiagnosticEventKind kind,
         int bodyId,
@@ -71,7 +71,7 @@ public readonly struct GravitasDiagnosticEvent
     }
 
     /// <summary>Gets the simulation frame in which the event was captured.</summary>
-    public int Frame { get; }
+    public long Frame { get; }
 
     /// <summary>Gets the event's sequence within its capture buffer.</summary>
     public int Sequence { get; }

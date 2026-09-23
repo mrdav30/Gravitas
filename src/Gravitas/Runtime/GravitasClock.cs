@@ -5,7 +5,9 @@
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
+using Chronicler.Timing;
 using FixedMathSharp;
+using FixedMathSharp.Chronicler;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas;
@@ -15,9 +17,16 @@ namespace Gravitas;
 /// </summary>
 internal sealed class GravitasClock
 {
+    private readonly ChronicleClock _timeline = new(FixedChronicleTime.FromFixed64(
+        Fixed64.One / (Fixed64)PhysicsSettings.DefaultFrameRate));
+
+    internal object Lifetime { get; private set; } = new();
+
     private int _frameRate = PhysicsSettings.DefaultFrameRate;
 
     private Fixed64 _deltaTime = Fixed64.One / (Fixed64)PhysicsSettings.DefaultFrameRate;
+
+    private Fixed64 _invDeltaTime = Fixed64.One / (Fixed64.One / (Fixed64)PhysicsSettings.DefaultFrameRate);
 
     /// <summary>
     /// Gets the fixed simulation frame rate.
@@ -32,17 +41,19 @@ internal sealed class GravitasClock
     /// <summary>
     /// Gets the reciprocal of the current fixed time step.
     /// </summary>
-    public Fixed64 InvDeltaTime => Fixed64.One / _deltaTime;
+    public Fixed64 InvDeltaTime => _invDeltaTime;
 
     /// <summary>
     /// Gets the number of simulated frames.
     /// </summary>
-    public int FrameCount { get; private set; }
+    public long FrameCount => _timeline.FrameCount;
 
     /// <summary>
     /// Gets the total simulated time in seconds.
     /// </summary>
-    public Fixed64 TotalTime { get; private set; }
+    public ChronicleTimestamp ElapsedTime => _timeline.ElapsedTime;
+
+    internal long GetDeadlineFrame(long framesFromNow) => _timeline.GetDeadlineFrame(framesFromNow);
 
     /// <summary>
     /// Gets the accumulated visualization time since the last late-simulate reset.
@@ -69,8 +80,7 @@ internal sealed class GravitasClock
     /// </summary>
     public void Simulate()
     {
-        FrameCount++;
-        TotalTime += _deltaTime;
+        _timeline.Advance();
     }
 
     /// <summary>
@@ -102,8 +112,8 @@ internal sealed class GravitasClock
     /// </summary>
     public void Reset()
     {
-        FrameCount = 0;
-        TotalTime = Fixed64.Zero;
+        Lifetime = new object();
+        _timeline.Reset();
         AccumulatedTime = Fixed64.Zero;
         ExpectedAccumulation = Fixed64.Zero;
         ResetAccumulation = false;
@@ -119,16 +129,18 @@ internal sealed class GravitasClock
         PhysicsSettings.ThrowIfInvalidFrameRate(frameRate);
         _frameRate = frameRate;
         _deltaTime = Fixed64.One / (Fixed64)_frameRate;
+        _invDeltaTime = Fixed64.One / _deltaTime;
+        _timeline.SetStepDuration(FixedChronicleTime.FromFixed64(_deltaTime));
     }
 
     /// <summary>
-    /// Calculates the frame index containing the specified fixed-point timestamp.
+    /// Counts complete steps at the current step size, not historical frame indices.
     /// </summary>
-    /// <param name="timestamp">The timestamp to resolve.</param>
-    /// <returns>The zero-based frame index for the timestamp.</returns>
+    /// <param name="duration">The nonnegative duration in seconds.</param>
+    /// <returns>The number of complete steps in the duration.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public int GetFrameFromTime(Fixed64 timestamp)
+    public long GetFrameCountForDuration(Fixed64 duration)
     {
-        return (timestamp * InvDeltaTime).FloorToInt();
+        return FixedChronicleTime.GetFrameCountForDuration(duration, _deltaTime);
     }
 }

@@ -149,7 +149,7 @@ public sealed class CollisionResponse2DAngularTests
 
     private static void MarkColliding(
         CollisionPair2D pair,
-        int frame,
+        long frame,
         Vector2d pointA,
         Vector2d pointB,
         Vector2d normal,

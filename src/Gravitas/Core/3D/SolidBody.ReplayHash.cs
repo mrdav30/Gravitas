@@ -16,7 +16,7 @@ public partial class SolidBody
         ref ChronicleHashWriter writer,
         GravitasReplayHashMode mode)
     {
-        writer.WriteSection("body.3d", 5);
+        writer.WriteSection("body.3d", 6);
         writer.WriteInt32(_dynamicId);
         writer.WriteBool(Debug);
         writer.WriteBool(Active);
@@ -32,7 +32,7 @@ public partial class SolidBody
         writer.WriteEnum(GroundProbeMode);
         writer.WriteFixed64(GroundProbeRadius);
         writer.WriteBool(_skipGroundingCheck);
-        writer.WriteInt32(_lastGroundCheckFrame);
+        writer.WriteInt64(_lastGroundCheckFrame);
         writer.WriteFixed64(StepOffset);
         writer.WriteVector3d(_groundNormal);
         writer.WriteVector3d(_hitPlatformPosition);
@@ -69,11 +69,11 @@ public partial class SolidBody
         writer.WriteVector3d(_normalForce);
         writer.WriteFixed64(Mass);
 
-        writer.WriteSection("body.3d.ccd-authoritative", 3);
+        writer.WriteSection("body.3d.ccd-authoritative", 4);
         writer.WriteBool(_continuousCollisionHandoffPending);
         if (_continuousCollisionHandoffPending)
         {
-            writer.WriteInt32(_continuousCollisionHandoffToken);
+            writer.WriteInt64(_continuousCollisionHandoffToken);
             writer.WriteFixed64(_continuousCollisionHandoffRemainingTime);
             writer.WriteInt32(_continuousCollisionHandoffIgnoredCollider3D?.ReplayOrdinal ?? -1);
             writer.WriteInt32(_continuousCollisionHandoffIgnoredCollider2D?.ReplayOrdinal ?? -1);
@@ -83,11 +83,11 @@ public partial class SolidBody
         if (mode != GravitasReplayHashMode.AuthoritativeWithSolverCaches)
             return;
 
-        writer.WriteSection("body.3d.solver-caches", 3);
-        writer.WriteInt32(_continuousCollisionFrameToken);
+        writer.WriteSection("body.3d.solver-caches", 4);
+        writer.WriteInt64(_continuousCollisionFrameToken);
         writer.WriteVector3d(_continuousCollisionAngularVelocityStepStart);
         WriteContinuousCollisionTrajectory(ref writer);
-        writer.WriteInt32(_continuousCollisionHandoffToken);
+        writer.WriteInt64(_continuousCollisionHandoffToken);
         writer.WriteFixed64(_continuousCollisionHandoffRemainingTime);
         writer.WriteInt32(LastContinuousCollisionToiIterationCount);
         writer.WriteBool(LastContinuousCollisionToiIterationLimitReached);

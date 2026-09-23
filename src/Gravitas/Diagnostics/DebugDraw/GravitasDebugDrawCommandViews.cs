@@ -21,7 +21,7 @@ public readonly struct GravitasLineDebugDrawView
     public GravitasDebugDrawCommand Command { get; }
 
     /// <summary>Gets the simulation frame in which the command was captured.</summary>
-    public int Frame => Command.Frame;
+    public long Frame => Command.Frame;
 
     /// <summary>Gets the command's sequence within its capture buffer.</summary>
     public int Sequence => Command.Sequence;
@@ -59,7 +59,7 @@ public readonly struct GravitasRayDebugDrawView
     public GravitasDebugDrawCommand Command { get; }
 
     /// <summary>Gets the simulation frame in which the command was captured.</summary>
-    public int Frame => Command.Frame;
+    public long Frame => Command.Frame;
 
     /// <summary>Gets the command's sequence within its capture buffer.</summary>
     public int Sequence => Command.Sequence;
@@ -97,7 +97,7 @@ public readonly struct GravitasPointDebugDrawView
     public GravitasDebugDrawCommand Command { get; }
 
     /// <summary>Gets the simulation frame in which the command was captured.</summary>
-    public int Frame => Command.Frame;
+    public long Frame => Command.Frame;
 
     /// <summary>Gets the command's sequence within its capture buffer.</summary>
     public int Sequence => Command.Sequence;
@@ -135,7 +135,7 @@ public readonly struct GravitasWireSphereDebugDrawView
     public GravitasDebugDrawCommand Command { get; }
 
     /// <summary>Gets the simulation frame in which the command was captured.</summary>
-    public int Frame => Command.Frame;
+    public long Frame => Command.Frame;
 
     /// <summary>Gets the command's sequence within its capture buffer.</summary>
     public int Sequence => Command.Sequence;
@@ -173,7 +173,7 @@ public readonly struct GravitasWireBoxDebugDrawView
     public GravitasDebugDrawCommand Command { get; }
 
     /// <summary>Gets the simulation frame in which the command was captured.</summary>
-    public int Frame => Command.Frame;
+    public long Frame => Command.Frame;
 
     /// <summary>Gets the command's sequence within its capture buffer.</summary>
     public int Sequence => Command.Sequence;
@@ -214,7 +214,7 @@ public readonly struct GravitasWireCapsuleDebugDrawView
     public GravitasDebugDrawCommand Command { get; }
 
     /// <summary>Gets the simulation frame in which the command was captured.</summary>
-    public int Frame => Command.Frame;
+    public long Frame => Command.Frame;
 
     /// <summary>Gets the command's sequence within its capture buffer.</summary>
     public int Sequence => Command.Sequence;
@@ -260,7 +260,7 @@ public readonly struct GravitasWireCylinderDebugDrawView
     public GravitasDebugDrawCommand Command { get; }
 
     /// <summary>Gets the simulation frame in which the command was captured.</summary>
-    public int Frame => Command.Frame;
+    public long Frame => Command.Frame;
 
     /// <summary>Gets the command's sequence within its capture buffer.</summary>
     public int Sequence => Command.Sequence;
@@ -304,7 +304,7 @@ public readonly struct GravitasWireTriangleDebugDrawView
     public GravitasDebugDrawCommand Command { get; }
 
     /// <summary>Gets the simulation frame in which the command was captured.</summary>
-    public int Frame => Command.Frame;
+    public long Frame => Command.Frame;
 
     /// <summary>Gets the command's sequence within its capture buffer.</summary>
     public int Sequence => Command.Sequence;
@@ -345,7 +345,7 @@ public readonly struct GravitasWireConeDebugDrawView
     public GravitasDebugDrawCommand Command { get; }
 
     /// <summary>Gets the simulation frame in which the command was captured.</summary>
-    public int Frame => Command.Frame;
+    public long Frame => Command.Frame;
 
     /// <summary>Gets the command's sequence within its capture buffer.</summary>
     public int Sequence => Command.Sequence;

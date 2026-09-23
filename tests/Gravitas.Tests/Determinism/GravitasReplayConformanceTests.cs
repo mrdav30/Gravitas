@@ -1,3 +1,4 @@
+using Chronicler.Timing;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
@@ -11,6 +12,88 @@ namespace Gravitas.Tests.Determinism;
 
 public sealed class GravitasReplayConformanceTests
 {
+    private readonly ITestOutputHelper _output;
+
+    public GravitasReplayConformanceTests(ITestOutputHelper output) => _output = output;
+
+    [Theory]
+    [InlineData(PhysicsRuntimeMode.ThreeD)]
+    [InlineData(PhysicsRuntimeMode.TwoD)]
+    [InlineData(PhysicsRuntimeMode.Mixed)]
+    public void WideClockReplayPreservesContactsAndPhaseProgression(PhysicsRuntimeMode mode)
+    {
+        using var first = CreateScenario();
+        using var second = CreateScenario();
+        using var control = CreateScenario();
+        const long initialFrame = int.MaxValue - 2L;
+        var origin = new ChronicleTimestamp(3155760000L, 0);
+        TimingTestUtility.SetClock(first, initialFrame, origin);
+        TimingTestUtility.SetClock(second, initialFrame, origin);
+        TimingTestUtility.SetLateToken(first, initialFrame);
+        TimingTestUtility.SetLateToken(second, initialFrame);
+        int contacts = 0;
+        if (mode == PhysicsRuntimeMode.TwoD)
+            GetBody2D(first, 0).Collider.OnContactEnter += _ => contacts++;
+        else if (mode == PhysicsRuntimeMode.Mixed)
+            GetBody2D(first, 0).Collider.OnMixedContactEnter += _ => contacts++;
+
+        for (int step = 1; step <= 8; step++)
+        {
+            first.Simulate();
+            first.LateSimulate();
+            second.Simulate();
+            second.LateSimulate();
+            control.Simulate();
+            control.LateSimulate();
+            if (mode == PhysicsRuntimeMode.ThreeD)
+            {
+                Assert.Equal(GetMover3D(control).Position3d, GetMover3D(first).Position3d);
+                Assert.Equal(GetMover3D(control).Rotation, GetMover3D(first).Rotation);
+                Assert.Equal(GetMover3D(control).LinearVelocity, GetMover3D(first).LinearVelocity);
+            }
+            else
+            {
+                Assert.Equal(GetBody2D(control, 0).Position, GetBody2D(first, 0).Position);
+                Assert.Equal(GetBody2D(control, 0).Rotation, GetBody2D(first, 0).Rotation);
+                Assert.Equal(GetBody2D(control, 0).LinearVelocity, GetBody2D(first, 0).LinearVelocity);
+            }
+            Assert.Equal(initialFrame + step, first.FrameCount);
+            Assert.Equal(initialFrame + step, first.LateSimulateToken);
+            Assert.True(first.ElapsedTime > origin);
+            var hash = first.ComputeReplayHash(GravitasReplayHashMode.AuthoritativeWithSolverCaches);
+            Assert.Equal(hash, second.ComputeReplayHash(GravitasReplayHashMode.AuthoritativeWithSolverCaches));
+            _output.WriteLine($"wide-replay:{mode}:{step}:{hash}");
+        }
+        if (mode == PhysicsRuntimeMode.ThreeD)
+        {
+            Assert.True(GetMover3D(first).Position3d.X < Fixed64.Half, "CCD must stop the mover before the thin wall.");
+            Assert.True(GetMover3D(first).LinearVelocity.X <= Fixed64.Zero);
+        }
+        else
+            Assert.True(contacts > 0, "The trace must actually exercise collision contacts, not just an empty clock.");
+
+        GravitasWorldContext CreateScenario()
+        {
+            var context = mode switch
+            {
+                PhysicsRuntimeMode.ThreeD => Create3DContinuousCollisionReplayScenario(),
+                PhysicsRuntimeMode.TwoD => CreatePure2DReplayScenario(),
+                _ => CreateMixedReplayScenario()
+            };
+            if (mode == PhysicsRuntimeMode.ThreeD)
+                GetMover3D(context).ApplyCollisionLinearVelocityDelta(Vector3d.Right * (Fixed64)8);
+            else
+                GetBody2D(context, 0).ApplyCollisionLinearVelocityDelta(Vector2d.Right * (Fixed64)8);
+            return context;
+        }
+
+        static SolidBody GetMover3D(GravitasWorldContext context)
+        {
+            Assert.True(context.Physics.TryGetColliderById(1, out var collider));
+            return collider!.Body!;
+        }
+    }
+
     public static TheoryData<GravitasSerializationTransport> Transports =>
         GravitasSerializationTransportCases.All();
 
@@ -94,11 +177,12 @@ public sealed class GravitasReplayConformanceTests
         GravitasSerializationTransport transport)
     {
         using GravitasWorldContext sourceContext = CreatePure2DReplayScenario();
-        SolidBody2D source = GetBody2D(sourceContext, colliderId: 1);
+        SolidBody2D source = GetBody2D(sourceContext, colliderId: 0);
 
         using GravitasWorldContext restoredContext = CreatePure2DReplayScenario();
-        SolidBody2D restored = GetBody2D(restoredContext, colliderId: 1);
+        SolidBody2D restored = GetBody2D(restoredContext, colliderId: 0);
 
+        Assert.Equal(BodyMotionType.Dynamic, source.MotionType);
         AdvanceBoth(sourceContext, restoredContext, frameCount: 4);
 
         source.AddTorque((Fixed64)2);

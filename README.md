@@ -110,7 +110,7 @@ Gravitas is the physics layer in a modular deterministic simulation stack:
 | [FixedMathSharp](https://github.com/mrdav30/FixedMathSharp)     | Fixed-point scalars, transforms, and full-domain geometry |
 | [SwiftCollections](https://github.com/mrdav30/SwiftCollections) | Low-allocation collections, pools, and spatial structures |
 | [GridForge](https://github.com/mrdav30/GridForge)               | Explicit voxel worlds, traversal, and partition backing   |
-| [Chronicler](https://github.com/mrdav30/Chronicler)             | Deterministic state transfer and replay infrastructure    |
+| [Chronicler](https://github.com/mrdav30/Chronicler)             | Deterministic state transfer, wide timing, and replay     |
 
 ## Contributing
 

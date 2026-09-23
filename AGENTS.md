@@ -415,6 +415,13 @@ Package-based restore remains the release-validation path.
 
 ## Determinism Rules
 
+The context composes Chronicler's `ChronicleClock`: absolute frame/phase stamps
+are `long`, absolute elapsed time is `ChronicleTimestamp`, and integration steps
+remain `Fixed64`. Subtract timestamps before explicitly narrowing a bounded
+duration. Do not reintroduce a narrow absolute clock or reciprocal-based duration
+counting. Preserve preflight exhaustion checks and reset-lifetime invalidation
+for retained waits. See the clock contract in `docs/wiki/RUNTIME_ARCHITECTURE.md`.
+
 Any change that affects simulation order, iteration order, rounding, collision
 pair identity, partition traversal, contact generation, integration, or update
 timing is high risk.

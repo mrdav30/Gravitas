@@ -54,10 +54,10 @@ internal sealed partial class GravitasMixedCollisionService
     private readonly Action<PhysicsMixedPartition> _releaseRetainedPartition;
 
     private int _retainedPartitionRetirementCursor;
-    private int _cached3DQueryRefreshFrame = int.MinValue;
-    private int _cached3DQueryRefreshLateToken = int.MinValue;
-    private int _cached2DQueryRefreshFrame = int.MinValue;
-    private int _cached2DQueryRefreshLateToken = int.MinValue;
+    private long _cached3DQueryRefreshFrame = -1;
+    private long _cached3DQueryRefreshLateToken = -1;
+    private long _cached2DQueryRefreshFrame = -1;
+    private long _cached2DQueryRefreshLateToken = -1;
 
     internal GravitasMixedCollisionService(GravitasWorldContext context)
     {
@@ -133,7 +133,7 @@ internal sealed partial class GravitasMixedCollisionService
 
         _candidatePairs.SortInPlace(CandidatePairComparer);
         LastBroadPhaseCandidateCount = _candidatePairs.Count;
-        int frame = _context.FrameCount;
+        long frame = _context.FrameCount;
         for (int i = 0; i < _candidatePairs.Count; i++)
             ProcessCandidate(_candidatePairs[i], frame);
 
@@ -173,10 +173,10 @@ internal sealed partial class GravitasMixedCollisionService
         _mixedResponsePairs.FastClear();
         _mixedIslandNodes.FastClear();
         _mixedIslandConstraints.FastClear();
-        _cached3DQueryRefreshFrame = int.MinValue;
-        _cached3DQueryRefreshLateToken = int.MinValue;
-        _cached2DQueryRefreshFrame = int.MinValue;
-        _cached2DQueryRefreshLateToken = int.MinValue;
+        _cached3DQueryRefreshFrame = -1;
+        _cached3DQueryRefreshLateToken = -1;
+        _cached2DQueryRefreshFrame = -1;
+        _cached2DQueryRefreshLateToken = -1;
         Version = 1;
         LastBroadPhaseCandidateCount = 0;
         SimulateCount = 0;

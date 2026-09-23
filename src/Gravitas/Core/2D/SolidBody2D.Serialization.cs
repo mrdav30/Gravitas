@@ -115,6 +115,7 @@ public sealed partial class SolidBody2D
             _groundedTransitionCapturedForStep = false;
             _groundCollider = null;
             _groundColliderBroadPhaseVersion = 0;
+            _lastGroundCheckFrame = -1;
             ClearGroundContactCandidate();
         }
 

@@ -27,13 +27,13 @@ internal static class CollisionDetection2D
         return TryCollide(new CollisionWorkItem2D(colliderA, colliderB, collisionType), out contact);
     }
 
-    internal static bool TryCollide(CollisionPair2D pair, ContactManifold2D manifold, int frame)
+    internal static bool TryCollide(CollisionPair2D pair, ContactManifold2D manifold, long frame)
     {
         SwiftThrowHelper.ThrowIfNull(pair, nameof(pair));
         return TryCollide(CollisionWorkItem2D.Create(pair), manifold, frame);
     }
 
-    internal static bool TryCollide(CollisionWorkItem2D item, ContactManifold2D manifold, int frame)
+    internal static bool TryCollide(CollisionWorkItem2D item, ContactManifold2D manifold, long frame)
     {
         SwiftThrowHelper.ThrowIfNull(manifold, nameof(manifold));
         manifold.BeginUpdate(frame);

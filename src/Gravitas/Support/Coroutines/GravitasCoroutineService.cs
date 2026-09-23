@@ -221,7 +221,7 @@ public sealed class GravitasCoroutineService
     /// <summary>
     /// Creates a frame-count wait instruction bound to this service's context.
     /// </summary>
-    public WaitForFrames WaitForFrames(int frames) => new(_context, frames);
+    public WaitForFrames WaitForFrames(long frames) => new(_context, frames);
 
     /// <summary>
     /// Creates a next-simulation-frame wait instruction bound to this service's context.

@@ -159,7 +159,7 @@ public partial class SolidBody
         return segment.Displacement / remainingFraction;
     }
 
-    internal void EnsureContinuousCollisionFramePrepared(int token)
+    internal void EnsureContinuousCollisionFramePrepared(long token)
     {
         if (_continuousCollisionFrameToken == token)
             return;
@@ -246,7 +246,7 @@ public partial class SolidBody
 
     private void InvalidateContinuousCollisionTrajectory()
     {
-        _continuousCollisionFrameToken = int.MinValue;
+        _continuousCollisionFrameToken = -1;
         _continuousCollisionAngularVelocityStepStart = Vector3d.Zero;
         _continuousCollisionTrajectory.FastClear();
     }

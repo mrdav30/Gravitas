@@ -374,8 +374,8 @@ internal sealed partial class GravitasMixedCollisionService
             return;
         }
 
-        int frame = _context.FrameCount;
-        int lateToken = _context.LateSimulateToken;
+        long frame = _context.FrameCount;
+        long lateToken = _context.LateSimulateToken;
         // CCD batches query stable opposite-dimension targets many times in one late-sim phase.
         // Cache only the partition refresh; every sweep still gathers and sorts its own hits.
         if (_cached3DQueryRefreshFrame == frame && _cached3DQueryRefreshLateToken == lateToken)
@@ -401,8 +401,8 @@ internal sealed partial class GravitasMixedCollisionService
             return;
         }
 
-        int frame = _context.FrameCount;
-        int lateToken = _context.LateSimulateToken;
+        long frame = _context.FrameCount;
+        long lateToken = _context.LateSimulateToken;
         // CCD batches query stable opposite-dimension targets many times in one late-sim phase.
         // Cache only the partition refresh; every sweep still gathers and sorts its own hits.
         if (_cached2DQueryRefreshFrame == frame && _cached2DQueryRefreshLateToken == lateToken)

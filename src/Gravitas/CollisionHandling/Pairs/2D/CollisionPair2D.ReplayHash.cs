@@ -18,11 +18,11 @@ internal sealed partial class CollisionPair2D
         ref ChronicleHashWriter writer,
         GravitasReplayHashMode mode)
     {
-        writer.WriteSection("pair.2d", 2);
+        writer.WriteSection("pair.2d", 3);
         writer.WriteInt32(ColliderA.ReplayOrdinal);
         writer.WriteInt32(ColliderB.ReplayOrdinal);
         writer.WriteEnum(CollisionType);
-        writer.WriteInt32(LastFrame);
+        writer.WriteInt64(LastFrame);
         writer.WriteBool(_isColliding);
         ContributeManifoldReplayHash(ref writer, Manifold);
         ContributeWarmStartReplayHash(ref writer, _warmStart);
@@ -32,8 +32,8 @@ internal sealed partial class CollisionPair2D
         ref ChronicleHashWriter writer,
         ContactManifold2D manifold)
     {
-        writer.WriteSection("manifold.2d", 4);
-        writer.WriteInt32(manifold.LastUpdatedFrame);
+        writer.WriteSection("manifold.2d", 5);
+        writer.WriteInt64(manifold.LastUpdatedFrame);
         writer.WriteInt32(manifold.Count);
         for (int i = 0; i < manifold.Count; i++)
         {

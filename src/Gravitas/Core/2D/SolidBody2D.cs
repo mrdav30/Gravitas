@@ -43,11 +43,11 @@ public sealed partial class SolidBody2D : IRecordable
     private Fixed64 _sleepLinearSpeedThreshold = (Fixed64)0.001f;
     private Fixed64 _sleepAngularSpeedThreshold = (Fixed64)0.001f;
     private ContinuousCollisionMode _continuousCollisionMode = ContinuousCollisionMode.Inherit;
-    private int _continuousCollisionFrameToken = int.MinValue;
+    private long _continuousCollisionFrameToken = -1;
     private readonly SwiftList<ContinuousCollisionMotionSegment2D> _continuousCollisionTrajectory =
         new(PhysicsSettings.DefaultContinuousCollisionMaxToiIterations + 1);
     private bool _continuousCollisionHandoffPending;
-    private int _continuousCollisionHandoffToken = int.MinValue;
+    private long _continuousCollisionHandoffToken = -1;
     private Fixed64 _continuousCollisionHandoffRemainingTime;
     private readonly SwiftList<Physics2DHit> _continuousCollisionHits = new();
     private readonly SwiftList<int> _rotationalContinuousCollisionCandidateIds = new();

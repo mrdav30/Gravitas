@@ -267,7 +267,7 @@ public sealed class GravitasDebugDrawCommandViewTests
     }
 
     private static void AssertExpectedMetadata(
-        int frame,
+        long frame,
         int sequence,
         int colliderId,
         GravitasColliderDimension colliderDimension,

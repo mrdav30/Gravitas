@@ -88,7 +88,7 @@ public class CollisionPartitionBenchmarks
     }
 
     [Benchmark]
-    public int SimulatePartitionedDynamicSpheres()
+    public long SimulatePartitionedDynamicSpheres()
     {
         _simulateContext.Simulate();
         _simulateContext.LateSimulate();

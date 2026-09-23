@@ -17,11 +17,11 @@ internal sealed partial class CollisionPairMixed
         ref ChronicleHashWriter writer,
         GravitasReplayHashMode mode)
     {
-        writer.WriteSection("pair.mixed", 5);
+        writer.WriteSection("pair.mixed", 6);
         writer.WriteInt32(Collider3D.ReplayOrdinal);
         writer.WriteInt32(Collider2D.ReplayOrdinal);
         writer.WriteUInt64(MixedColliderKey.CreateKey(Collider3D.ReplayOrdinal, Collider2D.ReplayOrdinal));
-        writer.WriteInt32(LastFrame);
+        writer.WriteInt64(LastFrame);
         writer.WriteBool(_isColliding);
         writer.WriteBool(_isTriggerPair);
         writer.WriteBool(Contact.HasContact);

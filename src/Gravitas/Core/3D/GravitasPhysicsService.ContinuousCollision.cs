@@ -17,7 +17,7 @@ public sealed partial class GravitasPhysicsService
 {
     internal void PrepareContinuousCollisionFrame()
     {
-        int token = _context.LateSimulateToken;
+        long token = _context.LateSimulateToken;
         if (_continuousCollisionPreparedToken == token)
             return;
 
@@ -143,7 +143,7 @@ public sealed partial class GravitasPhysicsService
         _queuedContinuousCollisionHandoffBodies.Remove(body);
         _continuousCollisionHandoffQueue.Remove(body);
         body.DiscardContinuousCollisionHandoff();
-        _continuousCollisionPreparedToken = int.MinValue;
+        _continuousCollisionPreparedToken = -1;
     }
 
     internal bool TryReserveContinuousCollisionCandidateRefresh(

@@ -63,7 +63,7 @@ while keeping allocated buffers. `Disable()` clears and stops capture.
 
 | Field                                      | Meaning                                                                            |
 | ------------------------------------------ | ---------------------------------------------------------------------------------- |
-| `Frame`                                    | Owning context frame count when captured.                                          |
+| `Frame`                                    | Owning context's `long` frame count when captured.                                 |
 | `Sequence`                                 | Capture order inside the current buffer.                                           |
 | `Kind`                                     | Event payload type.                                                                |
 | `BodyId`, `JointId`                        | Context-local IDs, or `-1` when not applicable.                                    |
@@ -80,6 +80,9 @@ while keeping allocated buffers. `Disable()` clears and stops capture.
 
 The stream is scoped to one context. Collider, body, and joint IDs are not
 global and must be resolved through the same context that produced the event.
+Events, draw commands, and all typed views preserve the full 64-bit frame stamp.
+Host log/replay schemas should preserve that width as well; sequence numbers and
+buffer counts remain bounded `int` values.
 
 ## Event Families
 

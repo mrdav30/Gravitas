@@ -1,3 +1,4 @@
+using Chronicler.Timing;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
@@ -135,14 +136,18 @@ public sealed class GravitasDiagnosticSinkTests
         command2D.Sequence.Should().Be(0);
     }
 
-    [Fact]
-    public void EnabledDiagnostics_ShouldRecordDeterministicEventsAndStayContextScoped()
+    [Theory]
+    [InlineData(0L)]
+    [InlineData((long)int.MaxValue + 1)]
+    [InlineData(long.MaxValue)]
+    public void EnabledDiagnostics_ShouldRecordDeterministicEventsAndStayContextScoped(long frame)
     {
         using PhysicsScenarioBuilder firstScenario = PhysicsScenarioBuilder.Create();
         using PhysicsScenarioBuilder secondScenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSSphereCollider> first = firstScenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
         ScenarioBody<LSSphereCollider> second = secondScenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
 
+        TimingTestUtility.SetClock(firstScenario.Context, frame, new ChronicleTimestamp(1, 0));
         firstScenario.Context.Diagnostics.Enable(eventCapacity: 8, drawCommandCapacity: 8);
         first.Body.AddForce(new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.Zero));
         first.Body.AddTorque(new Vector3d(Fixed64.Zero, (Fixed64)3, Fixed64.Zero));
@@ -151,6 +156,8 @@ public sealed class GravitasDiagnosticSinkTests
 
         ReadOnlySpan<GravitasDiagnosticEvent> events = firstScenario.Context.Diagnostics.Events;
         events.Length.Should().Be(4);
+        foreach (var diagnostic in events)
+            Assert.Equal(frame, diagnostic.Frame);
         events[0].Kind.Should().Be(GravitasDiagnosticEventKind.ForceDelta);
         events[0].Sequence.Should().Be(0);
         events[0].BodyId.Should().Be(first.Body.DynamicId);
@@ -334,7 +341,7 @@ public sealed class GravitasDiagnosticSinkTests
 
         scenario.Context.Diagnostics.Enable(eventCapacity: 4, drawCommandCapacity: 4);
         scenario.Context.Simulate();
-        int firstFrame = scenario.Context.FrameCount;
+        long firstFrame = scenario.Context.FrameCount;
 
         sphere.Body.AddForce(new Vector3d(Fixed64.One, Fixed64.Zero, Fixed64.Zero));
         scenario.Context.Diagnostics.CapturePoint(Vector3d.Zero, Fixed64.Half, GravitasDiagnosticColor.Red);
@@ -346,7 +353,7 @@ public sealed class GravitasDiagnosticSinkTests
 
         scenario.Context.Diagnostics.Clear();
         scenario.Context.Simulate();
-        int secondFrame = scenario.Context.FrameCount;
+        long secondFrame = scenario.Context.FrameCount;
 
         sphere.Body.AddTorque(new Vector3d(Fixed64.Zero, Fixed64.One, Fixed64.Zero));
         scenario.Context.Diagnostics.CaptureLine(Vector3d.Zero, Vector3d.Right, GravitasDiagnosticColor.Yellow);

@@ -21,7 +21,7 @@ public readonly struct GravitasForceDeltaDiagnosticView
     public GravitasDiagnosticEvent Event { get; }
 
     /// <summary>Gets the simulation frame in which the force was captured.</summary>
-    public int Frame => Event.Frame;
+    public long Frame => Event.Frame;
 
     /// <summary>Gets the event's sequence within its capture buffer.</summary>
     public int Sequence => Event.Sequence;
@@ -56,7 +56,7 @@ public readonly struct GravitasTorqueDeltaDiagnosticView
     public GravitasDiagnosticEvent Event { get; }
 
     /// <summary>Gets the simulation frame in which the torque was captured.</summary>
-    public int Frame => Event.Frame;
+    public long Frame => Event.Frame;
 
     /// <summary>Gets the event's sequence within its capture buffer.</summary>
     public int Sequence => Event.Sequence;
@@ -88,7 +88,7 @@ public readonly struct GravitasVelocityDeltaDiagnosticView
     public GravitasDiagnosticEvent Event { get; }
 
     /// <summary>Gets the simulation frame in which the velocity change was captured.</summary>
-    public int Frame => Event.Frame;
+    public long Frame => Event.Frame;
 
     /// <summary>Gets the event's sequence within its capture buffer.</summary>
     public int Sequence => Event.Sequence;
@@ -129,7 +129,7 @@ public readonly struct GravitasGroundProbeDiagnosticView
     public GravitasDiagnosticEvent Event { get; }
 
     /// <summary>Gets the simulation frame in which the probe was captured.</summary>
-    public int Frame => Event.Frame;
+    public long Frame => Event.Frame;
 
     /// <summary>Gets the event's sequence within its capture buffer.</summary>
     public int Sequence => Event.Sequence;
@@ -200,7 +200,7 @@ public readonly struct GravitasRayQueryDiagnosticView
     public GravitasDiagnosticEvent Event { get; }
 
     /// <summary>Gets the simulation frame in which the query was captured.</summary>
-    public int Frame => Event.Frame;
+    public long Frame => Event.Frame;
 
     /// <summary>Gets the event's sequence within its capture buffer.</summary>
     public int Sequence => Event.Sequence;
@@ -250,7 +250,7 @@ public readonly struct GravitasCircleQueryDiagnosticView
     public GravitasDiagnosticEvent Event { get; }
 
     /// <summary>Gets the simulation frame in which the query was captured.</summary>
-    public int Frame => Event.Frame;
+    public long Frame => Event.Frame;
 
     /// <summary>Gets the event's sequence within its capture buffer.</summary>
     public int Sequence => Event.Sequence;
@@ -300,7 +300,7 @@ public readonly struct GravitasQuerySummaryDiagnosticView
     public GravitasDiagnosticEvent Event { get; }
 
     /// <summary>Gets the simulation frame in which the summary was captured.</summary>
-    public int Frame => Event.Frame;
+    public long Frame => Event.Frame;
 
     /// <summary>Gets the event's sequence within its capture buffer.</summary>
     public int Sequence => Event.Sequence;
@@ -344,7 +344,7 @@ public readonly struct GravitasContactDiagnosticView
     public GravitasDiagnosticEvent Event { get; }
 
     /// <summary>Gets the simulation frame in which the contact was captured.</summary>
-    public int Frame => Event.Frame;
+    public long Frame => Event.Frame;
 
     /// <summary>Gets the event's sequence within its capture buffer.</summary>
     public int Sequence => Event.Sequence;
@@ -400,7 +400,7 @@ public readonly struct GravitasResponseImpulseDiagnosticView
     public GravitasDiagnosticEvent Event { get; }
 
     /// <summary>Gets the simulation frame in which the impulse was captured.</summary>
-    public int Frame => Event.Frame;
+    public long Frame => Event.Frame;
 
     /// <summary>Gets the event's sequence within its capture buffer.</summary>
     public int Sequence => Event.Sequence;
@@ -450,7 +450,7 @@ public readonly struct GravitasMixedQueryDiagnosticView
     public GravitasDiagnosticEvent Event { get; }
 
     /// <summary>Gets the simulation frame in which the query was captured.</summary>
-    public int Frame => Event.Frame;
+    public long Frame => Event.Frame;
 
     /// <summary>Gets the event's sequence within its capture buffer.</summary>
     public int Sequence => Event.Sequence;
@@ -515,7 +515,7 @@ public readonly struct GravitasMixedContactDiagnosticView
     public GravitasDiagnosticEvent Event { get; }
 
     /// <summary>Gets the simulation frame in which the contact was captured.</summary>
-    public int Frame => Event.Frame;
+    public long Frame => Event.Frame;
 
     /// <summary>Gets the event's sequence within its capture buffer.</summary>
     public int Sequence => Event.Sequence;
@@ -574,7 +574,7 @@ public readonly struct GravitasMixedResponseImpulseDiagnosticView
     public GravitasDiagnosticEvent Event { get; }
 
     /// <summary>Gets the simulation frame in which the impulse was captured.</summary>
-    public int Frame => Event.Frame;
+    public long Frame => Event.Frame;
 
     /// <summary>Gets the event's sequence within its capture buffer.</summary>
     public int Sequence => Event.Sequence;
@@ -636,7 +636,7 @@ public readonly struct GravitasMixedResponseIslandDiagnosticView
     public GravitasDiagnosticEvent Event { get; }
 
     /// <summary>Gets the simulation frame in which the island result was captured.</summary>
-    public int Frame => Event.Frame;
+    public long Frame => Event.Frame;
 
     /// <summary>Gets the event's sequence within its capture buffer.</summary>
     public int Sequence => Event.Sequence;
@@ -665,7 +665,7 @@ public readonly struct GravitasJointDiagnosticView
     public GravitasDiagnosticEvent Event { get; }
 
     /// <summary>Gets the simulation frame in which the joint event was captured.</summary>
-    public int Frame => Event.Frame;
+    public long Frame => Event.Frame;
 
     /// <summary>Gets the event's sequence within its capture buffer.</summary>
     public int Sequence => Event.Sequence;
@@ -738,7 +738,7 @@ public readonly struct GravitasRagdollDiagnosticView
     public GravitasDiagnosticEvent Event { get; }
 
     /// <summary>Gets the simulation frame in which the state change was captured.</summary>
-    public int Frame => Event.Frame;
+    public long Frame => Event.Frame;
 
     /// <summary>Gets the event's sequence within its capture buffer.</summary>
     public int Sequence => Event.Sequence;

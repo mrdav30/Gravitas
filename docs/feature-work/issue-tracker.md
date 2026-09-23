@@ -2,7 +2,7 @@
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-078`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-079`.
 - Assign an ID when an issue enters this tracker, keep it through resolution,
   and never reuse an ID even if an entry is later removed. Check this file's Git
   history before advancing or repairing the counter.
@@ -35,31 +35,6 @@
 
 ### Ordered Queue
 
-### GRV-Issue-076 - Narrow simulation time breaks long-running lifecycle work
-
-- **Confirmed:** 2026-09-22 at `21a22ab1ac8ac2d16fb8a41fcf1f65659029378d`.
-- **Status:** Open; pre-existing. Shared timing migration is planned in
-  Chronicler's `docs/feature-work/deterministicSimulationTimingPlan.md`, Phase 4.
-- **Evidence:** A real context crossing `int.MaxValue`, then deactivating a
-  sphere, retains 27 empty partitions beyond a two-frame retirement lifetime;
-  the same scenario at frame zero retires all of them. `EmptySinceFrame < 0`
-  treats the wrapped stamp as unset. A coroutine waiting one second at the
-  saturated `Fixed64` time resumes on the next 1/32-second step. The clock stops
-  advancing seconds while frames continue; converting 67,108,864 seconds at
-  32 Hz returns 2,147,483,647 frames instead of 2,147,483,648.
-- **Control:** A two-frame coroutine wait started before the signed boundary
-  resumes exactly once at the correct step. Its unsigned difference is
-  wrap-safe for this bounded wait; not every frame consumer has the same defect.
-- **Reproduction:** Phase 0's `TimingBoundaryProbeTests` source, commands and
-  outputs are retained under Chronicler `artifacts/timing/phase0`. The timing
-  plan records the setup and expected observations. These intentionally red
-  probes are not skipped tests in the normal suite; promote their behavior
-  assertions into the owning suites with the migration.
-- **Required fix:** Adopt wide elapsed time and absolute stamps, including
-  partition, contact, CCD-token, diagnostic/replay and affected record consumers.
-  Preserve bounded counters and reset/restore ownership; reject genuine clock
-  exhaustion before mutation. No runtime fix is claimed by this evidence entry.
-
 ### GRV-Issue-077 - Local-stack benchmark child fails while the launcher reports success
 
 - **Confirmed:** 2026-09-22 at `21a22ab`, during shared timing baseline capture.
@@ -83,6 +58,42 @@
   Until then, inspect complete benchmark logs and reports, not only process exit.
 
 ## Resolved Issues
+
+### GRV-Issue-078 - Planar restore conformance test selected the static wall
+
+- **Discovered / resolved:** 2026-09-23 during shared timing acceptance review.
+- **Evidence:** At `7edc2f1`,
+  `ReplayHashTrace_ShouldMatchAfterChroniclerRestore2D` selected collider ID 1,
+  the static box, rather than ID 0, the dynamic circle. Its force/torque edits
+  therefore did not exercise restoration of moving-body state. Adding a dynamic
+  role assertion failed for both JSON and MemoryPack.
+- **Fix:** Select the moving body in both worlds and keep the role assertion.
+  The existing serialize/populate and 16-step hash-continuation checks now
+  operate on the intended body. Both transport cases pass; this was a test
+  coverage weakness, not evidence of a production serialization defect.
+  A dedicated box-size/closest-point round trip covers the shape-writing branch
+  that the wrong-body case previously exercised incidentally.
+
+### GRV-Issue-076 - Narrow simulation time breaks long-running lifecycle work
+
+- **Confirmed:** 2026-09-22 at `21a22ab1ac8ac2d16fb8a41fcf1f65659029378d`.
+- **Resolved:** 2026-09-23 by the shared timing plan's Gravitas migration.
+- **Original evidence:** Crossing `int.MaxValue` retained 27 empty partitions
+  beyond their two-frame lifetime; the frame-zero control retired them. A
+  one-second coroutine resumed early at saturated Fixed64 time, and converting
+  67,108,864 seconds at 32 Hz returned 2,147,483,647 instead of 2,147,483,648.
+- **Fix:** Compose Chronicler's clock, expose wide elapsed timestamps and long
+  absolute frame/phase stamps, count durations by exact raw division, and give
+  waits checked deadlines plus reset-lifetime ownership. Contacts, CCD,
+  partitions, diagnostics, replay hashes and the affected 3D body record use
+  the widened contract; bounded simulation counters remain bounded.
+- **Verification:** `GravitasTimingBoundaryTests`, `GravitasWideClockTests`,
+  2D/mixed partition retirement, 2D grounding-cache expiry, body transport tests,
+  and wide-clock replay/contact controls cover the old boundary and genuine
+  exhaustion. Obsolete 3D records and exhausted clocks reject before the
+  corresponding mutation boundary. Exact matrix/coverage/benchmark evidence
+  is in Chronicler's `docs/feature-work/deterministicSimulationTimingPlan.md`,
+  Phase 4 execution record. `GRV-Issue-077` remains a separate tooling issue.
 
 ### GRV-Issue-075 - Centerline circle/capsule queries disagree on the surface side
 

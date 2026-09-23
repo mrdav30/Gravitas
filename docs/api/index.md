@@ -73,7 +73,7 @@ Gravitas builds physics policy on focused lower layers:
 - [GridForge](https://github.com/mrdav30/GridForge) for explicit voxel worlds,
   traversal, and physics-partition backing.
 - [Chronicler](https://github.com/mrdav30/Chronicler) for deterministic state
-  transfer and replay infrastructure.
+  transfer, wide simulation timing, and replay infrastructure.
 
 ## Resources
 

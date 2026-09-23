@@ -917,7 +917,7 @@ public sealed class PhysicsPartitionTests
 
         public bool IsAllocated { get; }
 
-        public int EmptySinceFrame { get; }
+        public long EmptySinceFrame { get; }
 
         public int RemovedFromVoxelCount { get; private set; }
 

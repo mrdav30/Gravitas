@@ -24,7 +24,7 @@ public sealed class ContactManifold2D : IEnumerable<ManifoldContact2D>
     private ManifoldContact2D _contact0;
     private ManifoldContact2D _contact1;
     private int _count;
-    private int _lastUpdatedFrame = -1;
+    private long _lastUpdatedFrame = -1;
 
     /// <summary>
     /// Number of active contacts in this manifold.
@@ -47,7 +47,7 @@ public sealed class ContactManifold2D : IEnumerable<ManifoldContact2D>
     /// <summary>
     /// Simulation frame in which the active contacts were last rebuilt.
     /// </summary>
-    public int LastUpdatedFrame
+    public long LastUpdatedFrame
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get => _lastUpdatedFrame;
@@ -86,7 +86,7 @@ public sealed class ContactManifold2D : IEnumerable<ManifoldContact2D>
     /// <summary>
     /// Clears contacts and records the frame for a new narrow-phase pass.
     /// </summary>
-    public void BeginUpdate(int frame)
+    public void BeginUpdate(long frame)
     {
         _count = 0;
         _lastUpdatedFrame = frame;

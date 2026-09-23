@@ -25,7 +25,7 @@ internal enum MixedPartitionMobilityKind
 internal sealed class PhysicsMixedPartition : IVoxelPartition, IRetainedPhysicsPartition<GravitasMixedCollisionService>
 {
     private GravitasMixedCollisionService? _owner;
-    private int _emptySinceFrame = -1;
+    private long _emptySinceFrame = -1;
     private int _retainedIndex = -1;
 
     public PhysicsMixedPartition()
@@ -65,7 +65,7 @@ internal sealed class PhysicsMixedPartition : IVoxelPartition, IRetainedPhysicsP
         && (ContainedKinematic2DObjects?.Count ?? 0) == 0
         && (ContainedStatic2DObjects?.Count ?? 0) == 0;
 
-    internal int EmptySinceFrame => _emptySinceFrame;
+    internal long EmptySinceFrame => _emptySinceFrame;
 
     internal int RetainedIndex => _retainedIndex;
 
@@ -320,7 +320,7 @@ internal sealed class PhysicsMixedPartition : IVoxelPartition, IRetainedPhysicsP
 
     bool IRetainedPhysicsPartition<GravitasMixedCollisionService>.IsEmpty => IsEmpty;
 
-    int IRetainedPhysicsPartition<GravitasMixedCollisionService>.EmptySinceFrame => EmptySinceFrame;
+    long IRetainedPhysicsPartition<GravitasMixedCollisionService>.EmptySinceFrame => EmptySinceFrame;
 
     bool IRetainedPhysicsPartition<GravitasMixedCollisionService>.IsOwnedBy(GravitasMixedCollisionService owner) => IsOwnedBy(owner);
 
@@ -470,5 +470,5 @@ internal sealed class PhysicsMixedPartition : IVoxelPartition, IRetainedPhysicsP
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private void MarkEmpty(int frame) => _emptySinceFrame = frame;
+    private void MarkEmpty(long frame) => _emptySinceFrame = frame;
 }

@@ -24,7 +24,7 @@ public sealed partial class SolidBody2D
     private bool _useGravityDerivedGroundUpDirection = true;
     private Vector2d _groundUpDirection = DefaultGroundUpDirection;
     private Fixed64 _groundProbeRadius;
-    private int _lastGroundCheckFrame = int.MinValue;
+    private long _lastGroundCheckFrame = -1;
     private const int GroundCheckFrameThreshold = 10;
     private readonly Fixed64 _groundCheckPositionThreshold = Fixed64.FromFraction(1, 100);
     private readonly SwiftList<Physics2DHit> _groundProbeHits = new();
@@ -382,6 +382,7 @@ public sealed partial class SolidBody2D
             && IsValidGroundCollider(cachedGroundCollider)
             && cachedGroundCollider.BroadPhaseVersion == _groundColliderBroadPhaseVersion
             && Vector2d.Distance(_lastGroundedPosition, _position) < _groundCheckPositionThreshold
+            && _lastGroundCheckFrame >= 0
             && Context.FrameCount - _lastGroundCheckFrame < GroundCheckFrameThreshold;
         if (frameGuard)
             return;
@@ -603,7 +604,7 @@ public sealed partial class SolidBody2D
         _lastGroundedPosition = position;
         _groundCollider = null;
         _groundColliderBroadPhaseVersion = 0;
-        _lastGroundCheckFrame = int.MinValue;
+        _lastGroundCheckFrame = -1;
         ClearGroundContactCandidate();
     }
 

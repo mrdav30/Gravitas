@@ -42,7 +42,7 @@ internal sealed partial class CollisionPair2D
 
     public CollisionType2D CollisionType { get; private set; }
 
-    public int LastFrame { get; private set; } = -1;
+    public long LastFrame { get; private set; } = -1;
 
     public bool IsColliding => _isColliding;
 
@@ -91,7 +91,7 @@ internal sealed partial class CollisionPair2D
         return colliderA.Id <= colliderB.Id;
     }
 
-    public void MarkColliding(int frame)
+    public void MarkColliding(long frame)
     {
         if (!Manifold.HasContact)
             return;
@@ -107,7 +107,7 @@ internal sealed partial class CollisionPair2D
         NotifyColliders(isColliding: true, changed);
     }
 
-    internal void MarkCollidingDeferred(int frame)
+    internal void MarkCollidingDeferred(long frame)
     {
         if (!Manifold.HasContact)
             return;
@@ -116,7 +116,7 @@ internal sealed partial class CollisionPair2D
         NotifyColliders(isColliding: true, changed);
     }
 
-    public void MarkResting(int frame)
+    public void MarkResting(long frame)
     {
         LastFrame = frame;
     }
@@ -349,7 +349,7 @@ internal sealed partial class CollisionPair2D
         _pendingBodyB = null;
     }
 
-    private bool MarkCollidingState(int frame)
+    private bool MarkCollidingState(long frame)
     {
         bool changed = !_isColliding;
         _isColliding = true;

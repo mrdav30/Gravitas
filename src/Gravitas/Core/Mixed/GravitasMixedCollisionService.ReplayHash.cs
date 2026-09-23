@@ -40,7 +40,7 @@ internal sealed partial class GravitasMixedCollisionService
         if (mode != GravitasReplayHashMode.AuthoritativeWithSolverCaches)
             return;
 
-        writer.WriteSection("physics.mixed.caches", 1);
+        writer.WriteSection("physics.mixed.caches", 2);
         writer.WriteInt32(ActivePartitionCount);
         writer.WriteInt32(InactivePartitionCount);
         writer.WriteInt32(RetainedPartitionCount);
@@ -50,9 +50,9 @@ internal sealed partial class GravitasMixedCollisionService
         writer.WriteInt32(LateSimulateCount);
         writer.WriteInt32(VisualizeCount);
         writer.WriteInt32(_retainedPartitionRetirementCursor);
-        writer.WriteInt32(_cached3DQueryRefreshFrame);
-        writer.WriteInt32(_cached3DQueryRefreshLateToken);
-        writer.WriteInt32(_cached2DQueryRefreshFrame);
-        writer.WriteInt32(_cached2DQueryRefreshLateToken);
+        writer.WriteInt64(_cached3DQueryRefreshFrame);
+        writer.WriteInt64(_cached3DQueryRefreshLateToken);
+        writer.WriteInt64(_cached2DQueryRefreshFrame);
+        writer.WriteInt64(_cached2DQueryRefreshLateToken);
     }
 }

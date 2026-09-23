@@ -216,8 +216,11 @@ public sealed class MixedBroadPhaseTests
         child2D.Collider.ExcludesMixedCollisionWith(child3D.Collider).Should().BeTrue();
     }
 
-    [Fact]
-    public void Simulate_WithRetainedMixedPartitions_ShouldRetireAndPoolAfterTtk()
+    [Theory]
+    [InlineData(0L)]
+    [InlineData((long)int.MaxValue)]
+    [InlineData(long.MaxValue - 2)]
+    public void Simulate_WithRetainedMixedPartitions_ShouldRetireAndPoolAfterTtk(long frame)
     {
         using GravitasWorldContext context = CreateMixedContext();
         context.Settings.RetainedPartitionTimeToKillFrames = 1;
@@ -225,6 +228,7 @@ public sealed class MixedBroadPhaseTests
         ScenarioBody<LSSphereCollider> body3D = CreateSphere3D(context, Vector3d.Zero, immovable: false);
         SolidBody2D body2D = CreateCircle2D(context, Vector2d.Zero, immovable: false);
 
+        TimingTestUtility.SetClock(context, frame, new Chronicler.Timing.ChronicleTimestamp(1, 0));
         Step(context);
         int retainedBeforeDeactivate = context.MixedCollisions.RetainedPartitionCount;
 

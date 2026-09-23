@@ -17,7 +17,7 @@ public sealed partial class GravitasPhysics2DService
 {
     internal void PrepareContinuousCollisionFrame()
     {
-        int token = _context.LateSimulateToken;
+        long token = _context.LateSimulateToken;
         bool buildMixedIndex = _context.Settings.RuntimeMode.RunsMixedContacts();
         if (_continuousCollisionPreparedToken == token
             && _continuousCollisionPreparedMixedIndex == buildMixedIndex)
@@ -128,7 +128,7 @@ public sealed partial class GravitasPhysics2DService
         _queuedContinuousCollisionHandoffBodies.Remove(body);
         _continuousCollisionHandoffQueue.Remove(body);
         body.DiscardContinuousCollisionHandoff();
-        _continuousCollisionPreparedToken = int.MinValue;
+        _continuousCollisionPreparedToken = -1;
         _continuousCollisionPreparedMixedIndex = false;
     }
 

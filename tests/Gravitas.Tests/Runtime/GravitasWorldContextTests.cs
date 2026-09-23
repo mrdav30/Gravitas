@@ -1,4 +1,6 @@
 using FixedMathSharp;
+using FixedMathSharp.Chronicler;
+using Chronicler.Timing;
 using FluentAssertions;
 using GridForge.Configuration;
 using GridForge.Grids;
@@ -143,9 +145,9 @@ public sealed class GravitasWorldContextTests
         contextA.Reset();
 
         contextA.FrameCount.Should().Be(0);
-        contextA.TotalTime.Should().Be(Fixed64.Zero);
+        contextA.ElapsedTime.Should().Be(ChronicleTimestamp.Zero);
         contextB.FrameCount.Should().Be(2);
-        contextB.TotalTime.Should().Be(contextB.DeltaTime * 2);
+        contextB.ElapsedTime.Should().Be(ChronicleTimestamp.Zero + FixedChronicleTime.FromFixed64(contextB.DeltaTime * 2));
     }
 
     [Fact]

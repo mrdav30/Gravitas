@@ -20,7 +20,7 @@ internal interface IRetainedPhysicsPartition<in TOwner> : IVoxelPartition
 
     bool IsAllocated { get; }
 
-    int EmptySinceFrame { get; }
+    long EmptySinceFrame { get; }
 
     bool IsOwnedBy(TOwner owner);
 
@@ -124,7 +124,7 @@ internal static class RetainedPartitionLifecycle
         GridWorld world,
         TOwner owner,
         int budget,
-        int currentFrame,
+        long currentFrame,
         int timeToKillFrames,
         Action<TPartition> releasePartition,
         ref int retirementCursor)
@@ -203,14 +203,14 @@ internal static class RetainedPartitionLifecycle
     private static bool ShouldRetire<TPartition, TOwner>(
         TPartition partition,
         TOwner owner,
-        int currentFrame,
+        long currentFrame,
         int timeToKillFrames)
         where TPartition : class, IRetainedPhysicsPartition<TOwner>
     {
         if (!partition.IsOwnedBy(owner) || !partition.IsEmpty || partition.IsAllocated || partition.EmptySinceFrame < 0)
             return false;
 
-        int idleFrames = currentFrame - partition.EmptySinceFrame;
+        long idleFrames = currentFrame - partition.EmptySinceFrame;
         return idleFrames >= timeToKillFrames;
     }
 

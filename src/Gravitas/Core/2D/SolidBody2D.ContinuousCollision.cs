@@ -163,7 +163,7 @@ public sealed partial class SolidBody2D
         return segment.Displacement / remainingFraction;
     }
 
-    internal void EnsureContinuousCollisionFramePrepared(int token)
+    internal void EnsureContinuousCollisionFramePrepared(long token)
     {
         if (_continuousCollisionFrameToken == token)
             return;
@@ -427,7 +427,7 @@ public sealed partial class SolidBody2D
 
     private void InvalidateContinuousCollisionFrame()
     {
-        _continuousCollisionFrameToken = int.MinValue;
+        _continuousCollisionFrameToken = -1;
         _continuousCollisionTrajectory.FastClear();
     }
 }

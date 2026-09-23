@@ -17,15 +17,15 @@ public partial class CollisionPair
         ref ChronicleHashWriter writer,
         GravitasReplayHashMode mode)
     {
-        writer.WriteSection("pair.3d", 2);
+        writer.WriteSection("pair.3d", 3);
         writer.WriteBool(Active);
         writer.WriteInt32(ColliderA.ReplayOrdinal);
         writer.WriteInt32(ColliderB.ReplayOrdinal);
         writer.WriteEnum(CollisionType);
         writer.WriteUInt32(PartitionVersion);
         writer.WriteInt32(PairVersion);
-        writer.WriteInt32(LastFrame);
-        writer.WriteInt32(LastCollidedFrame);
+        writer.WriteInt64(LastFrame);
+        writer.WriteInt64(LastCollidedFrame);
         writer.WriteBool(_doPhysics);
         writer.WriteInt32(CullCounter);
         writer.WriteBool(_preventDistanceCull);
@@ -50,8 +50,8 @@ public partial class CollisionPair
         ref ChronicleHashWriter writer,
         ContactManifold manifold)
     {
-        writer.WriteSection("manifold.3d", 6);
-        writer.WriteInt32(manifold.LastUpdatedFrame);
+        writer.WriteSection("manifold.3d", 7);
+        writer.WriteInt64(manifold.LastUpdatedFrame);
         writer.WriteInt32(manifold.Count);
         for (int i = 0; i < manifold.Count; i++)
         {

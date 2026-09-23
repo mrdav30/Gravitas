@@ -137,7 +137,7 @@ stays centralized in Gravitas.
 public interface IHostDiagnosticLogSink
 {
     void Write(
-        int frame,
+        long frame,
         int sequence,
         GravitasDiagnosticEventKind kind,
         string payload);
@@ -203,7 +203,7 @@ and draw commands in order:
 public readonly struct DiagnosticFrameCapture
 {
     public DiagnosticFrameCapture(
-        int frame,
+        long frame,
         GravitasDiagnosticEvent[] events,
         GravitasDebugDrawCommand[] drawCommands)
     {
@@ -212,7 +212,7 @@ public readonly struct DiagnosticFrameCapture
         DrawCommands = drawCommands;
     }
 
-    public int Frame { get; }
+    public long Frame { get; }
 
     public GravitasDiagnosticEvent[] Events { get; }
 

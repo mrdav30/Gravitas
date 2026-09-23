@@ -26,7 +26,7 @@ internal enum PhysicsPartitionMobilityKind
 public class PhysicsPartition : IVoxelPartition, IRetainedPhysicsPartition<GravitasCollisionService>
 {
     private GravitasCollisionService? _owner;
-    private int _emptySinceFrame = -1;
+    private long _emptySinceFrame = -1;
     private int _retainedIndex = -1;
 
     /// <summary>Gets or sets the world voxel occupied by this partition.</summary>
@@ -62,7 +62,7 @@ public class PhysicsPartition : IVoxelPartition, IRetainedPhysicsPartition<Gravi
         && (ContainedKinematicObjects?.Count ?? 0) == 0
         && (ContainedStaticObjects?.Count ?? 0) == 0;
 
-    internal int EmptySinceFrame => _emptySinceFrame;
+    internal long EmptySinceFrame => _emptySinceFrame;
 
     internal int RetainedIndex => _retainedIndex;
 
@@ -347,7 +347,7 @@ public class PhysicsPartition : IVoxelPartition, IRetainedPhysicsPartition<Gravi
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private void MarkEmpty(int frame) => _emptySinceFrame = frame;
+    private void MarkEmpty(long frame) => _emptySinceFrame = frame;
 
     /// <summary>
     /// Sets the parent index for the current voxel in the world.
@@ -359,7 +359,7 @@ public class PhysicsPartition : IVoxelPartition, IRetainedPhysicsPartition<Gravi
 
     bool IRetainedPhysicsPartition<GravitasCollisionService>.IsEmpty => IsEmpty;
 
-    int IRetainedPhysicsPartition<GravitasCollisionService>.EmptySinceFrame => EmptySinceFrame;
+    long IRetainedPhysicsPartition<GravitasCollisionService>.EmptySinceFrame => EmptySinceFrame;
 
     bool IRetainedPhysicsPartition<GravitasCollisionService>.IsOwnedBy(GravitasCollisionService owner) => IsOwnedBy(owner);
 

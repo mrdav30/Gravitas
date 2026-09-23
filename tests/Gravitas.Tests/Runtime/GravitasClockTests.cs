@@ -1,4 +1,6 @@
 using FixedMathSharp;
+using FixedMathSharp.Chronicler;
+using Chronicler.Timing;
 using FluentAssertions;
 using System;
 using System.Collections.Generic;
@@ -19,7 +21,7 @@ public sealed class GravitasClockTests
     }
 
     [Fact]
-    public void Simulate_ShouldAdvanceFrameCountAndTotalTime()
+    public void Simulate_ShouldAdvanceFrameCountAndElapsedTime()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
 
@@ -27,7 +29,7 @@ public sealed class GravitasClockTests
         context.Simulate();
 
         context.FrameCount.Should().Be(2);
-        context.TotalTime.Should().Be(context.DeltaTime * 2);
+        context.ElapsedTime.Should().Be(ChronicleTimestamp.Zero + FixedChronicleTime.FromFixed64(context.DeltaTime * 2));
     }
 
     [Fact]
@@ -61,14 +63,14 @@ public sealed class GravitasClockTests
     }
 
     [Fact]
-    public void GetFrameFromTime_ShouldUseCurrentFrameRate()
+    public void GetFrameCountForDuration_ShouldUseCurrentFrameRate()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         context.SetFrameRate(4);
 
-        context.GetFrameFromTime(Fixed64.Zero).Should().Be(0);
-        context.GetFrameFromTime(Fixed64.FromFraction(1, 4)).Should().Be(1);
-        context.GetFrameFromTime(Fixed64.FromFraction(3, 4)).Should().Be(3);
+        context.GetFrameCountForDuration(Fixed64.Zero).Should().Be(0);
+        context.GetFrameCountForDuration(Fixed64.FromFraction(1, 4)).Should().Be(1);
+        context.GetFrameCountForDuration(Fixed64.FromFraction(3, 4)).Should().Be(3);
     }
 
     [Fact]

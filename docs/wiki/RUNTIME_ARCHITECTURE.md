@@ -127,17 +127,32 @@ hook-only until a real presentation invariant needs that phase.
 
 ## Clock State
 
-`GravitasClock` stores:
+`GravitasClock` composes Chronicler's `ChronicleClock` for the authoritative
+timeline. Gravitas owns frame-rate policy and visualization separately:
 
-- `FrameRate`
-- `DeltaTime`
-- `InvDeltaTime`
-- `FrameCount`
-- `TotalTime`
-- `AccumulatedTime`
-- `ExpectedAccumulation`
-- `ResetAccumulation`
-- `ResetAccumulationThisVisualize`
+| Context value | Meaning |
+| --- | --- |
+| `long FrameCount` | Number of completed simulation advances in this lifetime |
+| `ChronicleTimestamp ElapsedTime` | Accumulated simulation seconds and exact binary fraction |
+| `Fixed64 DeltaTime` / `InvDeltaTime` | Cached integration step and reciprocal |
+| `int FrameRate` | Configured steps per second |
+| `AccumulatedTime` / `ExpectedAccumulation` | Presentation accumulation and interpolation fraction |
+
+Absolute time is not a `Fixed64`: a long-running world can exceed its seconds
+range while ordinary movement still uses small, exactly representable steps.
+Subtract timestamps from the same context lifetime first, then explicitly
+convert the resulting duration with `FixedChronicleTime.ToFixed64` or
+`TryToFixed64` from `FixedMathSharp.Chronicler`.
+
+`SetFrameRate` changes future steps without recalculating elapsed history.
+`GetFrameCountForDuration(duration)` returns the number of complete steps at
+the current step size, using exact raw-unit division rounded down. It does not
+map an old timestamp to its historical frame.
+
+`Reset()` starts a new frame/time-zero lifetime while preserving the configured
+step. Frame and elapsed-time exhaustion reject before the containing simulation
+phase mutates world state; counters never wrap or saturate. This is not a promise
+to roll back arbitrary exceptions raised later by physics or host callbacks.
 
 Simulation code should use context time values rather than wall-clock APIs.
 `Visualize()` advances deterministic accumulation by the fixed delta, not by
@@ -145,10 +160,17 @@ elapsed real time. `ExpectedAccumulation` is clamped to one simulation frame so
 visual interpolation cannot overshoot its target.
 
 Context-owned coroutine waits observe this clock without mutating it. Frame
-waits remain correct when the signed frame counter wraps, while duration waits
-compare against `TotalTime`. Every yielded `ILockedYieldInstruction` must belong
-to the same context as its coroutine. A mismatched instruction faults and ends
-the coroutine rather than mixing context clocks.
+waits use checked `long` deadlines; duration waits compare wide elapsed-time
+deadlines, so changing the step size does not change the requested number of
+seconds. Zero-length waits are already satisfied. Reading `KeepWaiting` never
+consumes a frame or time. An unrepresentable deadline throws at construction.
+
+Every yielded `ILockedYieldInstruction` must belong to the same context as its
+coroutine. Built-in waits also retain the context's transient clock lifetime:
+reading a wait after context reset throws `InvalidOperationException`, even if
+the new run has the same frame number; a disposed context rejects reads too.
+Neither lifetime identity nor pending waits are serialized or hashed. A
+mismatched instruction faults and ends the coroutine rather than mixing clocks.
 
 Coroutine simulation snapshots the handles present at coroutine-phase entry.
 Coroutines started during coroutine simulation therefore begin on the next step,

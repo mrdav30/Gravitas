@@ -6,6 +6,7 @@
 //=======================================================================
 
 using Chronicler;
+using Chronicler.Timing;
 using FixedMathSharp;
 using Gravitas.CollisionHandling;
 using Gravitas.Diagnostics;
@@ -22,9 +23,8 @@ namespace Gravitas;
 /// Owns Gravitas runtime state for one explicit <see cref="GridWorld"/>.
 /// </summary>
 /// <remarks>
-/// This is the context-first host API for multi-world Gravitas usage. Phase 1 owns
-/// world lifetime, deterministic clock state, and lifecycle hooks; later phases move
-/// physics registries, collision partitioning, query buffers, and coroutine state here.
+/// Owns world lifetime, deterministic timing, physics registries, collision
+/// partitioning, queries, coroutines, and lifecycle hooks for one simulation.
 /// </remarks>
 public sealed class GravitasWorldContext : IDisposable
 {
@@ -40,7 +40,7 @@ public sealed class GravitasWorldContext : IDisposable
 
     private bool _disposed;
 
-    private int _lateSimulateToken;
+    private long _lateSimulateToken;
 
     private int _simulationPhaseDepth;
 
@@ -209,7 +209,7 @@ public sealed class GravitasWorldContext : IDisposable
     /// <summary>
     /// Gets this context's simulated frame count.
     /// </summary>
-    public int FrameCount
+    public long FrameCount
     {
         get
         {
@@ -219,14 +219,14 @@ public sealed class GravitasWorldContext : IDisposable
     }
 
     /// <summary>
-    /// Gets this context's total simulated time.
+    /// Gets elapsed simulation time, preserving the history of step-size changes.
     /// </summary>
-    public Fixed64 TotalTime
+    public ChronicleTimestamp ElapsedTime
     {
         get
         {
             ThrowIfDisposed();
-            return _clock.TotalTime;
+            return _clock.ElapsedTime;
         }
     }
 
@@ -263,7 +263,26 @@ public sealed class GravitasWorldContext : IDisposable
         }
     }
 
-    internal int LateSimulateToken => _lateSimulateToken;
+    internal long LateSimulateToken => _lateSimulateToken;
+
+    internal object CaptureClockLifetime()
+    {
+        ThrowIfDisposed();
+        return _clock.Lifetime;
+    }
+
+    internal void ValidateClockLifetime(object lifetime)
+    {
+        ThrowIfDisposed();
+        SwiftThrowHelper.ThrowIfTrue(!ReferenceEquals(lifetime, _clock.Lifetime),
+            nameof(GravitasWorldContext), "The wait belongs to a previous simulation lifetime.");
+    }
+
+    internal long GetDeadlineFrame(long framesFromNow)
+    {
+        ThrowIfDisposed();
+        return _clock.GetDeadlineFrame(framesFromNow);
+    }
 
     /// <summary>
     /// Gets this context's visualization accumulation expressed in simulation frames.
@@ -323,15 +342,24 @@ public sealed class GravitasWorldContext : IDisposable
     /// <summary>
     /// Advances this context's deterministic simulation clock and ordered simulate hooks.
     /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// The frame counter or required late-simulation phase counter is exhausted.
+    /// </exception>
+    /// <exception cref="OverflowException">The next elapsed timestamp is unrepresentable.</exception>
+    /// <remarks>Timing exhaustion rejects before this call changes world state.</remarks>
     public void Simulate()
     {
         ThrowIfDisposed();
+        PhysicsRuntimeMode runtimeMode = Settings.RuntimeMode;
+        if ((runtimeMode.Runs3D() && Physics.SimulatePhysics)
+            || (runtimeMode.Runs2D() && Physics2D.SimulatePhysics))
+            ThrowIfLateSimulateTokenExhausted();
+        // Clock exhaustion must reject before opening the containing fixed step.
+        _clock.Simulate();
         _fixedStepOpen = true;
         EnterSimulationPhase();
         try
         {
-            _clock.Simulate();
-            PhysicsRuntimeMode runtimeMode = Settings.RuntimeMode;
             if (runtimeMode.Runs3D())
                 Physics.Simulate();
             if (runtimeMode.Runs2D())
@@ -356,19 +384,23 @@ public sealed class GravitasWorldContext : IDisposable
     /// <summary>
     /// Runs this context's late-simulation step.
     /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// The independent late-simulation phase counter is exhausted. Rejection occurs
+    /// before this call changes world state.
+    /// </exception>
     public void LateSimulate()
     {
         ThrowIfDisposed();
+        PhysicsRuntimeMode runtimeMode = Settings.RuntimeMode;
+        bool willRun3D = runtimeMode.Runs3D() && Physics.SimulatePhysics;
+        bool willRun2D = runtimeMode.Runs2D() && Physics2D.SimulatePhysics;
+        if (willRun3D || willRun2D)
+            AdvanceLateSimulateToken();
         _fixedStepOpen = true;
         EnterSimulationPhase();
         try
         {
             _clock.LateSimulate();
-            PhysicsRuntimeMode runtimeMode = Settings.RuntimeMode;
-            bool willRun3D = runtimeMode.Runs3D() && Physics.SimulatePhysics;
-            bool willRun2D = runtimeMode.Runs2D() && Physics2D.SimulatePhysics;
-            if (willRun3D || willRun2D)
-                AdvanceLateSimulateToken();
             if (willRun3D)
                 Physics.PrepareContinuousCollisionFrame();
             if (willRun2D)
@@ -439,7 +471,15 @@ public sealed class GravitasWorldContext : IDisposable
         }
     }
 
-    internal void AdvanceLateSimulateToken() => _lateSimulateToken++;
+    internal void AdvanceLateSimulateToken()
+    {
+        ThrowIfLateSimulateTokenExhausted();
+        _lateSimulateToken++;
+    }
+
+    private void ThrowIfLateSimulateTokenExhausted() =>
+        SwiftThrowHelper.ThrowIfTrue(_lateSimulateToken == long.MaxValue,
+            nameof(GravitasWorldContext), "The late-simulation phase counter is exhausted.");
 
     /// <summary>
     /// Runs this context's visualization accumulation step.
@@ -518,14 +558,15 @@ public sealed class GravitasWorldContext : IDisposable
     }
 
     /// <summary>
-    /// Calculates the frame index containing the specified fixed-point timestamp.
+    /// Counts complete steps in a duration using the current fixed step size.
     /// </summary>
-    /// <param name="timestamp">The timestamp to resolve.</param>
-    /// <returns>The zero-based frame index for the timestamp.</returns>
-    public int GetFrameFromTime(Fixed64 timestamp)
+    /// <param name="duration">A nonnegative duration in seconds.</param>
+    /// <returns>The complete-step count, rounded down using exact raw-unit division.</returns>
+    /// <remarks>This is not a historical timestamp-to-frame lookup.</remarks>
+    public long GetFrameCountForDuration(Fixed64 duration)
     {
         ThrowIfDisposed();
-        return _clock.GetFrameFromTime(timestamp);
+        return _clock.GetFrameCountForDuration(duration);
     }
 
     internal IDisposable RegisterOnSimulate(string owner, int order, Action callback)

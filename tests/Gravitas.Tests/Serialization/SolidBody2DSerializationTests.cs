@@ -840,6 +840,22 @@ public sealed class SolidBody2DSerializationTests
         target.IsMixedPartitioned.Should().BeFalse();
     }
 
+    [Theory]
+    [MemberData(nameof(Transports))]
+    public void PopulateBoxCollider_ShouldRestoreSizeAndClosestPointGeometry(GravitasSerializationTransport transport)
+    {
+        var source = new LSAABBoxCollider2D(new Vector2d((Fixed64)6, (Fixed64)4));
+        object payload = GravitasSerializationHarness.Serialize(source, transport);
+        var target = new LSAABBoxCollider2D(Vector2d.One);
+
+        GravitasSerializationHarness.Populate(target, payload, transport);
+
+        target.Size.Should().Be(source.Size);
+        target.HalfExtents.Should().Be(new Vector2d((Fixed64)3, (Fixed64)2));
+        target.GetClosestPoint(new Vector2d((Fixed64)9, Fixed64.Zero))
+            .Should().Be(new Vector2d((Fixed64)3, Fixed64.Zero));
+    }
+
     private static void AddCrossRoleCases(
         TheoryData<GravitasSerializationTransport, BodyMotionType, BodyMotionType> cases,
         GravitasSerializationTransport transport)

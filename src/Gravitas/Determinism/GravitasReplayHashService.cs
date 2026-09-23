@@ -17,15 +17,16 @@ internal static class GravitasReplayHashService
         GravitasReplayHashMode mode)
     {
         var writer = new ChronicleHashWriter();
-        writer.WriteSection("gravitas.replay", 1);
+        writer.WriteSection("gravitas.replay", 2);
         writer.WriteEnum(mode);
         writer.WriteEnum(context.Settings.RuntimeMode);
         writer.WriteInt32(context.FrameRate);
         writer.WriteFixed64(context.DeltaTime);
         writer.WriteFixed64(context.InvDeltaTime);
-        writer.WriteInt32(context.FrameCount);
-        writer.WriteFixed64(context.TotalTime);
-        writer.WriteInt32(context.LateSimulateToken);
+        writer.WriteInt64(context.FrameCount);
+        writer.WriteInt64(context.ElapsedTime.WholeSeconds);
+        writer.WriteUInt32(context.ElapsedTime.FractionalSecond);
+        writer.WriteInt64(context.LateSimulateToken);
 
         PhysicsRuntimeMode runtimeMode = context.Settings.RuntimeMode;
         if (runtimeMode.Runs3D())
