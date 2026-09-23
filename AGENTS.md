@@ -407,9 +407,11 @@ dotnet restore Gravitas.slnx -p:UseLocalLsfStack=true
 dotnet test Gravitas.slnx --configuration Release -p:UseLocalLsfStack=true
 ```
 
-This mode expects the sibling LSF repositories at the relative locations
-declared in `src/Gravitas/Gravitas.csproj`. Package-based restore remains the
-release-validation path.
+This mode expects the sibling LSF repositories, including Chronicler, at the
+relative locations declared in `src/Gravitas/Gravitas.csproj`. Core, tests, and
+benchmarks explicitly select source Chronicler and its Lean shim. Their local
+0.4.0 identities coordinate the existing graph; they are not release versions.
+Package-based restore remains the release-validation path.
 
 ## Determinism Rules
 
