@@ -2,7 +2,7 @@
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-082`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-083`.
 - Assign an ID when an issue enters this tracker, keep it through resolution,
   and never reuse an ID even if an entry is later removed. Check this file's Git
   history before advancing or repairing the counter.
@@ -34,6 +34,38 @@
   verification records rather than this active section.
 
 ### Ordered Queue
+
+### GRV-Issue-082 - Cylinder contact can miss a triangle crossing below its cap
+
+- **Confirmed:** 2026-09-24 while validating the separate strict posture repair.
+  The unchanged ordinary mesh/cylinder contact path returns false for an actual
+  surface intrusion. `CylinderTriangleContactRegressionTests` retains the
+  executable public-path failure; this is not a strict-predicate regression.
+- **Reproduction:** A cylinder centered at zero with radius 5, height 10 and
+  identity rotation intersects the concave-mesh triangle `(0,7,-5)`,
+  `(10,1,-5)`, `(5,4,5)`. The point `(4,23/5,0)` is in the triangle and strictly
+  inside the cylinder. The triangle's closest point to the cylinder center has
+  Y coordinate `175/34 > 5`, outside the upper cap.
+- **Cause:** `MeshTriangleContactGenerator.TryAddCylinderTriangleContact` first
+  tries axis-aligned cap support samples, then tests only the triangle point
+  closest to the cylinder center. That point need not minimize distance to the
+  finite cylinder. The triangle can enter the radial interior after cap clipping
+  even though the selected center-nearest witness lies above the cap.
+- **Impact:** Ordinary discrete contact can miss a real triangle/cylinder
+  intersection. The new exact posture predicate detects and blocks this same
+  intrusion, but Boolean classification alone does not construct a solver
+  contact normal, depth and pair of witnesses.
+- **Verification:** The public regression fails in
+  `artifacts/strict-3d-clearance-focused-release.log`; all 57 focused strict
+  clearance cases pass in that run. Reproduce with
+  `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj -c Release
+  -p:UseLocalLsfStack=true --filter FullyQualifiedName~CylinderTriangleContactRegressionTests`.
+- **Next action:** Derive complete finite-cylinder/triangle contact features
+  and truthful contact materialization in the owning geometry/solver layers.
+  Preserve strict versus closed boundaries, authored rigid frames, allocations
+  and contact ordering. Do not turn a Boolean hit into a fabricated contact or
+  silently replace this regression with an assertion of the old false result.
+  Ordinary response repair remains separate from `GRV-Issue-081`.
 
 ### GRV-Issue-081 - Rounded contact depth is insufficient for strict posture clearance
 
