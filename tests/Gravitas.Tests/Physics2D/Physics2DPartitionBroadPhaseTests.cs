@@ -268,10 +268,11 @@ public sealed class Physics2DPartitionBroadPhaseTests
     }
 
     [Fact]
-    public void ShapeRefresh_During2DDistribution_ShouldDeferUntilNextQueryBoundary()
+    public void ShapeRefresh_During2DDistribution_ShouldFinishAtCompletedStepBoundary()
     {
         using GravitasWorldContext context = CreateContext(extent: 32);
-        _ = CreateCircle(context, Vector2d.Zero, immovable: false);
+        SolidBody2D body = CreateCircle(context, Vector2d.Zero, immovable: false);
+        body.UseManualGrounding();
         LSCircleCollider2D trigger = CreateBodylessCircle(
             context,
             new Vector2d(Fixed64.Half, Fixed64.Zero),
@@ -282,6 +283,7 @@ public sealed class Physics2DPartitionBroadPhaseTests
             isTrigger: false);
         var hits = new SwiftList<Physics2DHit>();
         int entered = 0;
+        int originalPartitionCount = expanding.PartitionCoordinates!.Count;
 
         context.Query2D.OverlapCircleAll(Vector2d.Zero, Fixed64.One, hits);
         hits.Should().NotContain(hit => ReferenceEquals(hit.Collider, expanding));
@@ -296,6 +298,7 @@ public sealed class Physics2DPartitionBroadPhaseTests
         Step(context);
 
         entered.Should().Be(1);
+        expanding.PartitionCoordinates!.Count.Should().BeGreaterThan(originalPartitionCount);
         context.Query2D.OverlapCircleAll(Vector2d.Zero, Fixed64.One, hits).Should().BeGreaterThan(0);
         hits.Should().Contain(hit => ReferenceEquals(hit.Collider, expanding));
     }

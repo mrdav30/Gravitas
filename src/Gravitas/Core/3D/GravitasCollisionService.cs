@@ -138,6 +138,20 @@ public sealed class GravitasCollisionService
     internal bool IsPartitionRefreshRequired(LSCollider collider) =>
         !collider.MatchesPartitionGridBounds(collider.BoundsMin, collider.BoundsMax, ResolvePartitionKind(collider));
 
+    internal void RebuildPartitionsAfterWorldChange()
+    {
+        DetachRetainedPartitions();
+        _planarQueryCandidates.Clear();
+        for (int i = 0; i < _context.Physics.ColliderCount; i++)
+        {
+            LSCollider collider = _context.Physics.GetColliderByServiceIndex(i);
+            collider.MarkUnpartitioned();
+            collider.ClearPartitionCoordinates();
+            collider.RepartitionCommittedShape();
+        }
+        _planarQueryWorldVersion = _context.World.Version;
+    }
+
     internal int ResolvePartitionKind(LSCollider collider) => (int)GetMobilityKind(collider);
 
     internal bool PartitionObject(
@@ -260,6 +274,7 @@ public sealed class GravitasCollisionService
         DynamicCcdPlanarBounds bounds,
         SwiftList<int> results)
     {
+        _context.RefreshQueryPartitions();
         if (_planarQueryWorldVersion != _context.World.Version)
             RebuildPlanarQueryCandidates();
 

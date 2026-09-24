@@ -26,7 +26,7 @@ namespace Gravitas;
 /// Owns world lifetime, deterministic timing, physics registries, collision
 /// partitioning, queries, coroutines, and lifecycle hooks for one simulation.
 /// </remarks>
-public sealed class GravitasWorldContext : IDisposable
+public sealed partial class GravitasWorldContext : IDisposable
 {
     private static readonly object _worldOwnershipLock = new();
 
@@ -45,6 +45,8 @@ public sealed class GravitasWorldContext : IDisposable
     private int _simulationPhaseDepth;
 
     private bool _fixedStepOpen;
+
+    internal bool IsBetweenFixedSteps => !_disposed && !_fixedStepOpen && _simulationPhaseDepth == 0;
 
     internal void EnterSimulationPhase() => _simulationPhaseDepth++;
 
@@ -77,6 +79,8 @@ public sealed class GravitasWorldContext : IDisposable
         Query3D = new GravitasQuery3DService(this);
         QueryMixed = new GravitasQueryMixedService(this);
         Coroutines = new GravitasCoroutineService(this);
+        _observedGridChangeSequence = World.ChangeSequence;
+        World.OnChangeCommitted += OnQueryPartitionWorldChange;
     }
 
     /// <summary>
@@ -356,6 +360,7 @@ public sealed class GravitasWorldContext : IDisposable
             ThrowIfLateSimulateTokenExhausted();
         // Clock exhaustion must reject before opening the containing fixed step.
         _clock.Simulate();
+        RefreshQueryPartitions();
         _fixedStepOpen = true;
         EnterSimulationPhase();
         try
@@ -396,6 +401,7 @@ public sealed class GravitasWorldContext : IDisposable
         bool willRun2D = runtimeMode.Runs2D() && Physics2D.SimulatePhysics;
         if (willRun3D || willRun2D)
             AdvanceLateSimulateToken();
+        RefreshQueryPartitions();
         _fixedStepOpen = true;
         EnterSimulationPhase();
         try
@@ -424,6 +430,7 @@ public sealed class GravitasWorldContext : IDisposable
             ExitSimulationPhase();
             _fixedStepOpen = false;
         }
+        RefreshQueryPartitions();
     }
 
     private void ProcessQueuedContinuousCollisionHandoffs(bool runs3D, bool runs2D)
@@ -615,6 +622,7 @@ public sealed class GravitasWorldContext : IDisposable
 
             Constraints3D.Reset();
             Constraints2D.Reset();
+            World.OnChangeCommitted -= OnQueryPartitionWorldChange;
             _disposed = true;
             try
             {

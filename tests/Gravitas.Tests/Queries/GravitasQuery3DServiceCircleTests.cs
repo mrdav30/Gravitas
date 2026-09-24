@@ -666,6 +666,9 @@ public sealed class GravitasQuery3DServiceCircleTests
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         LSSphereCollider collider = CreateBodylessSphere(context, Vector3d.Zero);
+        // Finish normal topology reconciliation before injecting the stale entry;
+        // otherwise that repair removes it before the query's defensive filter runs.
+        context.RefreshQueryPartitions().Should().BeTrue();
         for (int i = 0; i < collider.PartitionCoordinates!.Count; i++)
         {
             context.World.TryGetVoxel(collider.PartitionCoordinates[i], out Voxel? voxel).Should().BeTrue();

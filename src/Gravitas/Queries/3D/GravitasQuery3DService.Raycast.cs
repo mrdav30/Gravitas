@@ -878,6 +878,7 @@ public sealed partial class GravitasQuery3DService
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private uint NextRaycastVersion()
     {
+        _context.RefreshQueryPartitions();
         RaycastVersion++;
         if (RaycastVersion == 0)
         {
@@ -891,6 +892,7 @@ public sealed partial class GravitasQuery3DService
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private uint NextCircleVersion()
     {
+        _context.RefreshQueryPartitions();
         CircleVersion++;
         if (CircleVersion == 0)
         {

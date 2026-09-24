@@ -271,6 +271,7 @@ public sealed class GravitasCollision2DService
         SwiftList<LSCollider2D> candidates,
         bool staticStyleOnly = false)
     {
+        _context.RefreshQueryPartitions();
         RefreshDeferredColliderPartitions();
         candidates.FastClear();
 
@@ -326,7 +327,7 @@ public sealed class GravitasCollision2DService
         return false;
     }
 
-    private void RefreshDeferredColliderPartitions()
+    internal void RefreshDeferredColliderPartitions()
     {
         if (_deferredPartitionRefreshIds.Count == 0)
             return;
@@ -339,6 +340,18 @@ public sealed class GravitasCollision2DService
         }
 
         _deferredPartitionRefreshIds.Clear();
+    }
+
+    internal void RebuildPartitionsAfterWorldChange()
+    {
+        DetachRetainedPartitions();
+        for (int i = 0; i < _context.Physics2D.ColliderCount; i++)
+        {
+            LSCollider2D collider = _context.Physics2D.GetColliderByServiceIndex(i);
+            collider.MarkUnpartitioned();
+            collider.ClearPartitionCoordinates();
+            RefreshColliderPartition(collider);
+        }
     }
 
     private void CollectCoveredPartitions(

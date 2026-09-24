@@ -599,6 +599,11 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
     private void InitialPartition()
     {
         RebuildRuntimeShapeState();
+        RepartitionCommittedShape();
+    }
+
+    internal void RepartitionCommittedShape()
+    {
         if (!IsActive)
             return;
 

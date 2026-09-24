@@ -409,7 +409,26 @@ public sealed class MixedBroadPhaseTests
         context.World.TryGetVoxel(replacementCoordinate, out Voxel? replacementVoxel).Should().BeTrue();
         replacementVoxel!.TryGetPartition(out PhysicsMixedPartition? replacementPartition).Should().BeTrue();
         replacementPartition!.ContainedDynamic3DObjects!.Contains(replacement3D.Collider.Id).Should().BeTrue();
-        replacementPartition.ContainedDynamic2DObjects!.Contains(replacement2D.Collider.Id).Should().BeTrue();
+        bool hasSharedPartition = false;
+        foreach (WorldVoxelIndex coordinate in replacement2D.Collider.MixedPartitionCoordinates!)
+        {
+            coordinate.GridSpawnToken.Should().Be(replacementCoordinate.GridSpawnToken);
+            coordinate.GridSpawnToken.Should().NotBe(staleCoordinate.GridSpawnToken);
+            context.World.TryGetVoxel(coordinate, out Voxel? voxel2D).Should().BeTrue();
+            voxel2D!.TryGetPartition(out PhysicsMixedPartition? partition2D).Should().BeTrue();
+            partition2D!.ContainedDynamic2DObjects!.Contains(replacement2D.Collider.Id).Should().BeTrue();
+            hasSharedPartition |= partition2D.ContainedDynamic3DObjects?.Contains(replacement3D.Collider.Id) == true;
+        }
+        foreach (WorldVoxelIndex coordinate in replacement3D.Collider.MixedPartitionCoordinates!)
+        {
+            coordinate.GridSpawnToken.Should().Be(replacementCoordinate.GridSpawnToken);
+            context.World.TryGetVoxel(coordinate, out Voxel? voxel3D).Should().BeTrue();
+            voxel3D!.TryGetPartition(out PhysicsMixedPartition? partition3D).Should().BeTrue();
+            partition3D!.ContainedDynamic3DObjects!.Contains(replacement3D.Collider.Id).Should().BeTrue();
+        }
+        // Restored same-dimension membership can move the two bodies differently;
+        // their first covered cell is not required to be their shared cell.
+        hasSharedPartition.Should().BeTrue();
     }
 
     [Fact]
