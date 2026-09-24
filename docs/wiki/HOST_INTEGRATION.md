@@ -71,6 +71,17 @@ Authoritative simulation state belongs in `Simulate` and `LateSimulate`.
 `Visualize` and `LateVisualize` are for interpolation and presentation; do not
 use them to apply gameplay commands or physics corrections.
 
+The context owns its clock. When integrating Trailblazer, advance each context
+once per gameplay step with matching represented step durations; the adapter
+does not synchronize clocks or compensate for a missed advance. Apply rate
+changes to both contexts at the same fixed-step boundary. Their numeric frames
+can differ if initial world preparation advanced one earlier.
+
+Reset is a host-coordinated lifecycle boundary, not rollback. Stop the loop,
+discard pending work and old waits, coordinate context resets and runtime-shell
+reconstruction, then resume. Populating a body does not restore the world clock;
+neither context exposes a live-clock rewind API.
+
 ## Minimal Setup
 
 ### Host Agent

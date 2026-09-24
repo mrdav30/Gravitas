@@ -99,6 +99,8 @@ creates the grid, host adapter, collider, and dynamic body behind that loop.
   public namespaces, types, and members.
 - [Coverage Report](https://mrdav30.github.io/Gravitas/coverage/) — inspect the
   current test-suite coverage.
+- [Migration Guide](https://github.com/mrdav30/Gravitas/blob/main/docs/MIGRATION.md) — update clock consumers and persisted
+  timing data across intentional contract changes.
 - [Contributing](CONTRIBUTING.md) — build, test, and prepare a focused change.
 
 ## Built On The LSF Stack

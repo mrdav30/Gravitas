@@ -151,7 +151,7 @@ map an old timestamp to its historical frame.
 
 `Reset()` starts a new frame/time-zero lifetime while preserving the configured
 step. Frame and elapsed-time exhaustion reject before the containing simulation
-phase mutates world state; counters never wrap or saturate. This is not a promise
+phase mutates world state; the authoritative clock never wraps or saturates. This is not a promise
 to roll back arbitrary exceptions raised later by physics or host callbacks.
 
 Simulation code should use context time values rather than wall-clock APIs.

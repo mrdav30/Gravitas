@@ -92,8 +92,9 @@
   and wide-clock replay/contact controls cover the old boundary and genuine
   exhaustion. Obsolete 3D records and exhausted clocks reject before the
   corresponding mutation boundary. Exact matrix/coverage/benchmark evidence
-  is in Chronicler's `docs/feature-work/deterministicSimulationTimingPlan.md`,
-  Phase 4 execution record. `GRV-Issue-077` remains a separate tooling issue.
+  is in Chronicler's `docs/feature-work/done/deterministicSimulationTimingPlan.md`,
+  Phase 4 execution record and Phase 6 cross-stack closeout.
+  `GRV-Issue-077` remains a separate tooling issue.
 
 ### GRV-Issue-075 - Centerline circle/capsule queries disagree on the surface side
 
