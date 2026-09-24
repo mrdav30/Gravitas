@@ -16,8 +16,6 @@ namespace Gravitas;
 /// <content>Owns exact, transactional 3D collider reconfiguration.</content>
 public partial class SolidBody
 {
-    private readonly ContactManifold _colliderReconfigurationManifold = new();
-
     /// <summary>
     /// Attempts to replace this registered body's primitive geometry and root
     /// pose without replacing its collider, body, or host identity.
@@ -153,15 +151,7 @@ public partial class SolidBody
             if (collisionType == CollisionType.None)
                 continue;
 
-            _colliderReconfigurationManifold.BeginUpdate(Context.FrameCount);
-            var workItem = new CollisionWorkItem(
-                Context,
-                first,
-                second,
-                collisionType,
-                _colliderReconfigurationManifold);
-            if (!CollisionDetection.DoCollisionCheck(workItem)
-                || !HasPositivePenetration(_colliderReconfigurationManifold))
+            if (!CollisionDetection.DoesPostureCandidatePenetrate(candidate, other))
             {
                 continue;
             }
@@ -235,17 +225,6 @@ public partial class SolidBody
         return parent.TryInverseTransformPoint(position, out Vector3d localPosition)
             && parent.TryTransformPoint(localPosition, out Vector3d roundTrip)
             && roundTrip.FuzzyEqualAbsolute(position, Fixed64.Epsilon);
-    }
-
-    private static bool HasPositivePenetration(ContactManifold manifold)
-    {
-        for (int i = 0; i < manifold.Count; i++)
-        {
-            if (manifold[i].Depth > Fixed64.Zero)
-                return true;
-        }
-
-        return false;
     }
 
     private static ColliderType GetSupportedRuntimeShape(
