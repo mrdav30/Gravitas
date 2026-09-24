@@ -16,7 +16,7 @@ namespace Gravitas.CollisionHandling;
 /// <summary>
 /// Deterministic pure 2D narrow-phase collision checks.
 /// </summary>
-internal static class CollisionDetection2D
+internal static partial class CollisionDetection2D
 {
     internal static bool TryCollide(LSCollider2D colliderA, LSCollider2D colliderB, out Contact2D contact)
     {

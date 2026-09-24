@@ -295,6 +295,15 @@ public sealed class LSCapsuleCollider2D : LSCollider2D
         WorldAxis = _preparedAxis;
     }
 
+    internal void CopyPreparedReconfiguration(LSCapsuleCollider2D candidate)
+    {
+        _radius = candidate._radius;
+        _height = candidate._height;
+        _preparedRadius = candidate._preparedRadius;
+        _preparedAxisLength = candidate._preparedAxisLength;
+        _preparedAxis = candidate._preparedAxis;
+    }
+
     /// <inheritdoc/>
     protected override void RecordShapeData(IChronicler chronicler)
     {

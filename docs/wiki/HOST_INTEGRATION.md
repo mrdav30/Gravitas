@@ -331,7 +331,7 @@ setters are the transactional alternative: they validate the tentative world
 pose and publish the host transform, canonical geometry, mass properties, and
 partitions only after the whole candidate succeeds.
 
-### Reconfiguring A Registered 3D Body
+### Reconfiguring A Registered Body
 
 Use `SolidBody.TryReconfigureCollider(...)` when a registered 3D agent changes
 physical profile without changing runtime identity: for example, standing to
@@ -362,7 +362,7 @@ ColliderReconfigurationStatus result = body.TryReconfigureCollider(
 `Applied` means the geometry and pose were published together. `Unchanged`
 means the requested authored and committed state already matched. `Blocked`
 returns the first physically eligible collider, in stable registration order,
-that the candidate would positively penetrate. Exact zero-depth support or
+that the candidate would positively penetrate. Exact touching at a support or
 floor contact is accepted, and trigger volumes do not block reconfiguration.
 
 The definition contributes geometry only. The existing collider keeps its
@@ -374,6 +374,27 @@ or invalid attempt leaves the authored and committed shape, body and host pose,
 partitions, pairs, serialized payload, and replay hash unchanged. Default,
 unsupported, wrong-family, unrepresentable, and unsafe-lifecycle requests throw
 rather than partially publishing state.
+
+The native counterpart is `SolidBody2D.TryReconfigureCollider(...)`, with
+`ColliderShapeDefinition2D`, planar `Vector2d` offset/root position, and an
+`LSCollider2D` blocker. It supports circle-to-circle and capsule-to-capsule
+replacement in pure `TwoD` mode. A capsule with height `2 * radius` is a compact
+posture of the same collider, not a replacement identity. Host world Y and the
+accepted rotation are retained. Other runtime modes reject rather than omit
+potential cross-dimensional blockers.
+
+Native 2D admission distinguishes exact touching from positive penetration
+before contact-depth rounding. Even a penetration smaller than one raw
+fixed-point unit rejects the transaction; a rounded solver depth of zero is
+not evidence that a replacement fits. The same check covers direct colliders
+and each compound part without generating contact manifolds.
+
+Both transactions test the whole replacement shape against physically eligible
+registered colliders, including blockers outside physics grids. This rare
+explicit operation can scan the registry and allocate. Semantic validation is
+completed before publication; this is not a promise to recover from process-level
+allocation failure. Hosts must prepare their own fallible navigation/controller
+state before calling, then publish that prepared state through the callback.
 
 Pair-separation callbacks from an accepted reconfiguration run after the new
 geometry, root pose, mass properties, and partitions are coherent. A
@@ -390,6 +411,9 @@ reports a post-commit notification failure; it does not change `result` from
 `Applied` or `Unchanged`, and the host must not retry the accepted
 reconfiguration. A coordinating adapter should rethrow the returned exception
 with its original stack only after the call completes.
+
+If a callback deactivates and reinitializes a body, retirement from the old
+transaction cannot clear pairs belonging to the replacement registration.
 
 Authored `FixedTransform.LocalScale` may be signed or zero, but physical
 collider dimensions may not. Gravitas requires every consumed authored local

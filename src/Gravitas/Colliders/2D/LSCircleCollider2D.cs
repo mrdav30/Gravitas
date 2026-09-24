@@ -179,6 +179,12 @@ public sealed class LSCircleCollider2D : LSCollider2D
     private protected override void PublishShape() =>
         _scaledRadius = _preparedRadius;
 
+    internal void CopyPreparedReconfiguration(LSCircleCollider2D candidate)
+    {
+        _radius = candidate._radius;
+        _preparedRadius = candidate._preparedRadius;
+    }
+
     /// <inheritdoc/>
     protected override void RecordShapeData(IChronicler chronicler)
     {
