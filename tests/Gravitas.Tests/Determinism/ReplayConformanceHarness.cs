@@ -1,4 +1,4 @@
-using Chronicler;
+using Chronicler.Hashing;
 using FluentAssertions;
 using System;
 

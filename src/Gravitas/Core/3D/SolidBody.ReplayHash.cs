@@ -5,7 +5,7 @@
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
-using Chronicler;
+using Chronicler.Hashing;
 using FixedMathSharp.Chronicler;
 
 namespace Gravitas;

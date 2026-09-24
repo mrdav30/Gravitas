@@ -1,4 +1,5 @@
 using Chronicler;
+using Chronicler.Serialization;
 using Xunit;
 
 namespace Gravitas.Tests.Serialization;

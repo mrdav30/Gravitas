@@ -1,4 +1,4 @@
-using Chronicler;
+using Chronicler.Hashing;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Support;

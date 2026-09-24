@@ -1,5 +1,29 @@
 # Gravitas Migration Guide
 
+## Chronicler v1.0.0
+
+When building Gravitas with Chronicler v1.0.0, import `Chronicler.Hashing` for
+`ChronicleHash` returned by `GravitasWorldContext.ComputeReplayHash()` and for
+`ChronicleHashWriter` extensions. Import `Chronicler.Serialization` for JSON and
+MemoryPack serializers, converters, and payload editing. Recording contracts,
+helpers, and `DefaultSaver` remain in `Chronicler`; timing remains in
+`Chronicler.Timing`. Rebuild consuming assemblies together because the moved
+types have new CLR identities.
+
+Replace removed `SerializationPayloadEditor` convenience methods with typed
+transport calls: `JsonRecordSerializer.Serialize` / `Populate`,
+`MemoryPackRecordSerializer.Serialize` / `Populate`, and the editor's
+`SetJsonValue`, `RemoveJsonProperty`, `SetMemoryPackValue`, or
+`RemoveMemoryPackEntry`. JSON payloads are strings; MemoryPack payloads are byte
+arrays and require the standard package. Pass `writeIndented: true` to JSON
+serialization to preserve the old convenience method's formatting.
+
+This namespace migration preserves Gravitas's recorded schemas, type names,
+and replay hash stream. Existing payloads and unchanged replay vectors need no
+conversion. The timing schema changes described below are a separate migration.
+See the [Chronicler migration guide](https://github.com/mrdav30/Chronicler/blob/main/docs/MIGRATION.md)
+for the complete API mapping.
+
 ## Shared simulation timing
 
 When upgrading from the narrow-clock API, update host code and stored data

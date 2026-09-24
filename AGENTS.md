@@ -338,7 +338,9 @@ The main external packages shape how this project should be changed:
   state or duplicate topology/traversal helpers in Gravitas.
 - `Chronicler.Core`: use explicit `IRecordable.RecordData(...)` for runtime
   state transfer into existing host-created objects, and use Chronicler's
-  `DefaultSaver` for reusable save/apply phase helpers.
+  `DefaultSaver` for reusable save/apply phase helpers. Recording stays in
+  `Chronicler`; transports and payload editing use `Chronicler.Serialization`,
+  and replay hash values/writers use `Chronicler.Hashing`.
 - `MemoryPack`: standard package support only. Lean builds should avoid direct
   MemoryPack dependencies or isolate them behind `GRAVITAS_DISABLE_MEMORYPACK`
   compatible files.
@@ -411,6 +413,9 @@ This mode expects the sibling LSF repositories, including Chronicler, at the
 relative locations declared in `src/Gravitas/Gravitas.csproj`. Core, tests, and
 benchmarks explicitly select source Chronicler and its Lean shim. Their local
 0.4.0 identities coordinate the existing graph; they are not release versions.
+Tests also select the source `FixedMathSharp.FluentAssertions` helper in this
+mode. Set `$env:UseLocalLsfStack = 'true'` to carry local selection into child
+builds, including benchmark-generated projects.
 Package-based restore remains the release-validation path.
 
 ## Determinism Rules

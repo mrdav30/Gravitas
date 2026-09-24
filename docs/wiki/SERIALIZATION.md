@@ -172,7 +172,8 @@ The authoritative hash follows the same boundary as
 - solver caches and diagnostic counters are included only in
   `AuthoritativeWithSolverCaches` mode for RCA.
 
-Replay hashes use Chronicler's `ChronicleHash` value and hash-writer mechanics.
+Replay hashes use `Chronicler.Hashing.ChronicleHash` and Chronicler's
+hash-writer mechanics.
 Gravitas owns the physics-specific inclusion policy and deterministic ordering.
 The root `gravitas.replay` section is version 2: frame and late-phase stamps
 are signed 64-bit values, and elapsed time is ordered whole seconds (`long`)
@@ -192,6 +193,13 @@ flowchart LR
 ```
 
 ## Transport Notes
+
+Import `Chronicler.Serialization` for `JsonRecordSerializer`,
+`MemoryPackRecordSerializer`, converters, and `SerializationPayloadEditor`.
+Recording contracts and helpers remain in `Chronicler`; replay hash values and
+writers use `Chronicler.Hashing`. Rebuild consuming assemblies together when
+updating these imports. See the [migration guide](../MIGRATION.md#chronicler-v100)
+for the payload-editor replacements and hash compatibility notes.
 
 Standard `Release` builds include MemoryPack support through the standard
 dependency chain. `ReleaseLean` defines `GRAVITAS_DISABLE_MEMORYPACK`, excludes

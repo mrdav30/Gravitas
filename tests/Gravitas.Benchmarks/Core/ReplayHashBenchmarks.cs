@@ -1,5 +1,5 @@
 using BenchmarkDotNet.Attributes;
-using Chronicler;
+using Chronicler.Hashing;
 using FixedMathSharp;
 using Gravitas.Colliders;
 using GridForge.Configuration;

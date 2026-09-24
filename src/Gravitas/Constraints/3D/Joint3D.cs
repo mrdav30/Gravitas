@@ -6,6 +6,7 @@
 //=======================================================================
 
 using Chronicler;
+using Chronicler.Hashing;
 using FixedMathSharp;
 using FixedMathSharp.Chronicler;
 

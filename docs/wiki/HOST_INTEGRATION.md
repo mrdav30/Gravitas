@@ -665,7 +665,7 @@ count, Gravitas should replay to the same authoritative body, collider, clock,
 and contact state.
 
 ```csharp
-using Chronicler;
+using Chronicler.Hashing;
 
 context.Simulate();
 context.LateSimulate();
