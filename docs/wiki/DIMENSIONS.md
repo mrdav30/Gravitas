@@ -351,7 +351,10 @@ queries gather GridForge-backed partition candidates, suppress duplicates, apply
 layer masks, run exact 3D shape or mesh checks, and sort by deterministic hit
 ordering.
 
-2D queries live on `GravitasWorldContext.Query2D`:
+2D queries live on `GravitasWorldContext.Query2D`. Its explicit `QuerySupport`
+operation selects physically eligible static/kinematic support before reducing
+compound hits; see [Physical 2D Support](QUERY_SERVICES.md#physical-2d-support).
+Ordinary geometry queries remain independent of physical pair filtering:
 
 ```csharp
 context.Query2D.OverlapCircle(center, radius, out Physics2DHit circleHit);

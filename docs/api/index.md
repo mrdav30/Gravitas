@@ -46,7 +46,8 @@ description: API reference and guides for deterministic fixed-point 2D, 3D, and 
   <div class="grv-card">
     <h3><a href="xref:Gravitas.Queries">Ask the world</a></h3>
     <p>Raycast, overlap, sweep, batch, and reduce 2D, 3D, or mixed hits with
-    stable ordering and caller-owned buffers.</p>
+    stable ordering and caller-owned buffers. Native 2D support probes apply
+    physical collision policy before selecting a surface.</p>
   </div>
   <div class="grv-card">
     <h3><a href="xref:Gravitas.Diagnostics">See the physics</a></h3>

@@ -6,8 +6,9 @@ Queries are explicit context-owned services:
 - `GravitasWorldContext.Query2D`
 - `GravitasWorldContext.QueryMixed`
 
-The services share the collision broad-phase data structures but keep query
-truth separate from physical pair filtering. This page is the readable API
+The services share the collision broad-phase data structures. General geometry
+queries keep query truth separate from physical pair filtering; the explicit
+2D support query applies that filtering. This page is the readable API
 guide. For the full query matrix, reducer policies, and per-family notes, read
 [Query Reference](QUERY_REFERENCE.md).
 
@@ -19,7 +20,8 @@ guide. For the full query matrix, reducer policies, and per-family notes, read
 - All-hit APIs write into caller-owned `SwiftList<T>` buffers.
 - Batch APIs use typed request spans and caller-owned output/range buffers.
 - Public query `PhysicsLayerMask` values are include masks.
-- Public query services do not apply collider-local physical ignore masks.
+- General geometry queries do not apply collider-local physical ignore masks.
+  `Query2D.QuerySupport` intentionally does: it asks what can support a real collider.
 - Query services are same-thread and non-reentrant per context service.
 
 ```mermaid
@@ -203,6 +205,67 @@ Request order is preserved in closest-hit output and all-hit ranges. Hits inside
 each request keep the same deterministic ordering as the matching single-query
 API.
 
+## Physical 2D Support
+
+Use `Query2D.QuerySupport` between complete fixed steps when a controller needs
+the nearest surface that can physically support its registered collider. The
+circle travels opposite `Up`; the request normalizes that nonzero direction.
+Radius and distance must be positive, including distances as small as one raw
+fixed-point unit. `MinimumNormalDot` is an inclusive threshold in `(0, 1]`.
+
+This partial integration snippet assumes an initialized `SolidBody2D body` and
+its owning `context`. Probe placement is controller policy, not inferred from
+the body's shape:
+
+```csharp
+using FixedMathSharp;
+using Gravitas.Queries;
+using Gravitas.Support;
+
+var probe = new Physics2DSupportQuery(
+    source: body.Collider,
+    center: body.Position,
+    radius: Fixed64.Half,
+    up: Vector2d.Forward,
+    distance: Fixed64.One,
+    minimumNormalDot: Fixed64.Half,
+    layers: PhysicsLayerMask.All);
+
+Physics2DSupportQueryStatus status = context.Query2D.QuerySupport(probe, out var support);
+```
+
+`Found` returns a target-surface `Physics2DHit`, not the probe center, along with
+`SampledFrame` and `IsCurrentLifetime`. The lifetime check rejects default,
+removed, reset, and recycled registrations; it does not certify that a moving
+surface still occupies its sampled position. `NoSupport` means the complete
+probe found no eligible surface. `WorldNotReady` and `Unrepresentable` are not
+evidence of empty space; all non-`Found` results clear the hit. Invalid request
+arguments or a source not actively registered in this context throw.
+
+Support includes bodyless, static, and kinematic targets, but excludes triggers
+and dynamic carriers. It respects both colliders' physical ignore masks, the
+layer matrix, hierarchy, linked-joint exclusions, and the query include mask.
+Normal filtering happens before compound-part selection, so a wall cannot hide
+an eligible floor part. Ties use distance, owner ID, then authored part order.
+
+Discovery uses the existing 2D physics index at world Y = 0, independently of
+the actor's host Y. As with other indexed queries, targets must be represented
+by physical grid cells. Candidate buffers are reused but may grow; this is a
+synchronous query without a hard work or allocation ceiling.
+
+## Grid Changes And Query Readiness
+
+At stable between-frame boundaries, both dimensional indexes reconcile grid
+replacement and sparse-cell changes before sampling. Reconciliation rebinds
+committed geometry; it does not publish pending authored shape edits. Relevant
+world changes are combined into one refresh, while ordinary queries and
+obstacle-only events do not trigger a registry-wide rebuild. Callback-deferred
+2D partition updates finish at the completed fixed-step boundary.
+
+Do not sample physical support during `Simulate`/`LateSimulate`, their open
+transaction, or a grid-change callback whose committed change has not reached
+the context. `QuerySupport` returns `WorldNotReady` at those boundaries.
+
 ## Layer Mask Semantics
 
 Queries accept `PhysicsLayerMask layerMask` as an include mask:
@@ -215,10 +278,10 @@ Queries accept `PhysicsLayerMask layerMask` as an include mask:
 Use `PhysicsLayer` for a collider's single collision/filter layer and
 `PhysicsLayerMask` for query or ground-check filters.
 
-Public query services do not apply `LSCollider.IgnoredCollisionLayers` or
+General geometry query services do not apply `LSCollider.IgnoredCollisionLayers` or
 `LSCollider2D.IgnoredCollisionLayers`. Those masks are physical
 collider-to-collider filters for collision pairs, CCD, and grounding/support.
-Queries report whatever the caller's include mask, trigger flag, and explicit
+Those queries report whatever the caller's include mask, trigger flag, and explicit
 excluded-collider arguments select.
 
 ## Hit Data
@@ -249,8 +312,8 @@ explicit caller-owned query job/state design with tests and benchmarks.
 - Keep 2D, 3D, and mixed query services explicit.
 - Keep all-hit buffers caller-owned.
 - Preserve deterministic hit ordering.
-- Use query include masks, not physical ignore masks, for public query
-  filtering.
+- Use query include masks for general geometry filtering; physical support also
+  applies the source collider's collision policy.
 - Keep mesh-source boundaries explicit.
 - Treat `ReducerKind` as part of mixed query truth.
 - Add benchmarks when query candidate gathering, reducer math, batching, or hit

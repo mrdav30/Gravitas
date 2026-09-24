@@ -84,6 +84,7 @@ by distance and collider ID.
 | `OverlapPolygon`, `OverlapPolygonAll` | convex 2D polygon area | circle, capsule, AABB, convex polygon, compound |
 | `Raycast`, `RaycastAll`               | 2D segment             | circle, capsule, AABB, convex polygon, compound |
 | `SweepCircle`, `SweepCircleAll`       | 2D circle              | circle, capsule, AABB, convex polygon, compound |
+| `QuerySupport` | registered source policy plus downward circle probe | physically eligible bodyless/static/kinematic circle, capsule, AABB, polygon, compound |
 
 Reducer notes:
 
@@ -97,6 +98,11 @@ Reducer notes:
   the exact comparison. Hit points are reconstructed directly from the authored
   segment and returned distance.
 - compounds report the owner once through stable part reduction.
+- Support probes apply physical pair and normal eligibility before compound
+  reduction. Unlike generic sweeps, they accept every positive distance and
+  distinguish `NoSupport` from an unready or unrepresentable query. See
+  [Physical 2D Support](QUERY_SERVICES.md#physical-2d-support) for lifecycle and
+  sampled-lifetime rules.
 
 ### Mixed
 
