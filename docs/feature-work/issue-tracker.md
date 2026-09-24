@@ -2,7 +2,7 @@
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-079`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-082`.
 - Assign an ID when an issue enters this tracker, keep it through resolution,
   and never reuse an ID even if an entry is later removed. Check this file's Git
   history before advancing or repairing the counter.
@@ -34,6 +34,86 @@
   verification records rather than this active section.
 
 ### Ordered Queue
+
+### GRV-Issue-081 - Rounded contact depth is insufficient for strict posture clearance
+
+- **Confirmed:** 2026-09-24 during independent native posture review. Existing
+  3D sphere/capsule posture replacement and the new 2D circle/capsule counterpart
+  all accept a genuinely penetrating candidate when its contact depth rounds
+  to zero. Four regression cases fail in `artifacts/posture-review-red.log`.
+- **Reproduction:** In 2D, a size-2 box centered at `(-1, -1)` has its nearest
+  corner at the origin. Grow a radius-4 circle or zero-axis capsule to radius 5
+  at `(3 + epsilon, 4 - epsilon)`, with epsilon = one raw Q32.32 unit. The 3D
+  sphere/capsule control uses a size-2 cuboid centered at `(-1, 0, -1)` and a
+  candidate at `(3 + epsilon, 0, 4 - epsilon)`. Its nearest point lies on the
+  cuboid's vertical edge at the origin. The squared distance is
+  `25 - 2*epsilon + 2*epsilon*epsilon`, strictly less than 25. Penetration is
+  approximately 0.2 raw units, but nearest-even depth is zero. `Applied` is
+  observed where strict clearance requires `Blocked`.
+- **Boundary:** A rounded solver displacement is not an exact overlap
+  classification. Do not change contact-depth rounding, use an epsilon, or
+  silently redefine strict clearance to mean representable positive depth.
+- **Required direction:** Preserve exact separation/tangency/penetration truth
+  through FixedMathSharp-owned geometry and consume it for posture admission.
+  Evaluate both dimensions and every supported source/target family, including
+  compound parts and 3D mesh features. A radial-only 3D patch is not complete
+  parity. Existing solver contact depths and response behavior should remain
+  unchanged.
+- **Status:** Open; blocks completion of native posture prerequisites. The
+  shared FixedMathSharp repair was authorized on 2026-09-24 and is in progress.
+  Classification-only predicates reuse centered-axis distance and convex SAT
+  kernels without changing solver-depth rounding. Complete 3D admission also
+  spans cylinder, cone, box and mesh kernels; a subset passing is not completion.
+- **Additional finding:** The existing cylinder/capsule contact authority has
+  a separate geometric false positive at the finite rim, not just rounded
+  depth. FixedMathSharp `FMS-Issue-023` owns executable separated, tangent and
+  one-raw-offset evidence. That pair cannot become exact strict clearance just
+  by exposing the sign of the current solver's selected projection.
+- **Current slice:** Native 2D posture now consumes the exact predicates for
+  circles, capsules, boxes, polygons, and compound leaves. It retains scalar
+  rotation authority (not the separately normalized cached world axis), stable
+  root blocker identity, and physical pair filtering. The original two native
+  2D regressions and all direct/compound target-family near-boundary controls
+  pass in focused Release and both full source-mode configurations, including
+  an exact noncardinal rotated-capsule compound control. Existing 3D admission
+  is not yet switched; its two original sub-raw regressions remain red.
+  Curved-shape completeness remains a blocker, not a rounded-depth fallback
+  presented as an exact solution.
+
+### GRV-Issue-079 - Physical grid changes can leave unmoved colliders undiscoverable
+
+- **Confirmed:** 2026-09-24 against `198d272`, while reviewing native support
+  prerequisites in both dimensions.
+- **Evidence:** Replacing a grid with the same configuration or inserting a
+  sparse voxel leaves existing unchanged 2D/3D colliders absent from query
+  results. Four new regression cases failed before the owning refresh repair;
+  projected-circle counterparts also reproduced the omission.
+- **Fix in progress:** Reconcile committed collider partition membership once
+  per batch of physical grid changes, at the owning fixed-step/query boundary.
+  Ordinary queries and obstacle-only changes must not force registry scans.
+  Pending authored geometry must remain unpublished. Callback-deferred 2D
+  refresh must complete without an incidental automatic-grounding query.
+- **Verification:** Focused RED/GREEN evidence is retained in
+  `artifacts/support-posture-red.log` and readiness logs. Full source-stack
+  matrix, coverage and final review remain pending; not release-certified.
+
+### GRV-Issue-080 - Reconfiguration callbacks can invalidate fresh 3D pair ownership
+
+- **Confirmed:** 2026-09-24 against `198d272`, using publisher and separation
+  callbacks that deactivate/reinitialize the source body and create fresh pairs.
+  Both regressions fail in `artifacts/posture-3d-lifetime-red.log`.
+- **Impact:** Retirement for an accepted old transaction can clear pairs from a
+  replacement registration. Two additional regressions reproduce the related
+  shared-retirement-snapshot hazard: resetting the world from the first of two
+  separation callbacks makes subsequent retirement throw `IndexOutOfRangeException`.
+- **Fix in progress:** Guard collider registration lifetimes around retirement
+  and retire exact pair ownership without bulk-clearing newly created state.
+  An invocation-local snapshot now survives reset and nested transactions.
+  Preserve accepted status and aggregate post-commit notification exceptions.
+- **Verification:** Registration recycling, reset, nested transactions and native
+  2D counterpart regressions pass the focused Release follow-up. Independent
+  re-review approves this correction. Full source-stack matrix and coverage
+  remain pending; `GRV-Issue-081` is a separate unresolved acceptance blocker.
 
 ### GRV-Issue-077 - Local-stack benchmark child fails while the launcher reports success
 
