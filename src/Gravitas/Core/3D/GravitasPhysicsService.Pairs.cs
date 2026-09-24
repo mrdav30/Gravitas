@@ -140,12 +140,18 @@ public sealed partial class GravitasPhysicsService
         bool deferNotificationExceptions,
         ref SwiftList<Exception>? notificationExceptions)
     {
-        int deactivationStart = _pairsPendingDeactivation.Count;
+        var registration = new ColliderLifetimeToken(collider);
+        // Accepted reconfiguration callbacks may reset the context or start a
+        // nested transaction. Their snapshot must outlive service scratch state.
+        SwiftList<CollisionPairLifetimeToken> pending = deferNotificationExceptions
+            ? new SwiftList<CollisionPairLifetimeToken>()
+            : _pairsPendingDeactivation;
+        int deactivationStart = pending.Count;
         SwiftDictionary<int, CollisionPair>? collisionPairs = collider.CollisionPairs;
         if (collisionPairs != null)
         {
             foreach (var pairEntry in collisionPairs)
-                _pairsPendingDeactivation.Add(new CollisionPairLifetimeToken(pairEntry.Value));
+                pending.Add(new CollisionPairLifetimeToken(pairEntry.Value));
         }
 
         SwiftHashSet<int>? collisionPairHolders = collider.CollisionPairHolders;
@@ -157,16 +163,16 @@ public sealed partial class GravitasPhysicsService
                     continue;
 
                 if (holder!.TryGetCollisionPair(collider.Id, out CollisionPair? pair))
-                    _pairsPendingDeactivation.Add(new CollisionPairLifetimeToken(pair!));
+                    pending.Add(new CollisionPairLifetimeToken(pair!));
             }
         }
 
-        int deactivationEnd = _pairsPendingDeactivation.Count;
+        int deactivationEnd = pending.Count;
         try
         {
             for (int i = deactivationStart; i < deactivationEnd; i++)
             {
-                CollisionPairLifetimeToken token = _pairsPendingDeactivation[i];
+                CollisionPairLifetimeToken token = pending[i];
                 if (!token.IsCurrentLifetime)
                     continue;
 
@@ -188,14 +194,18 @@ public sealed partial class GravitasPhysicsService
                 }
             }
 
-            collider.ClearCollisionPairState();
-            if (clearRuntimeRelationships)
+            // Exact retirement already removes old references. Reconfiguration
+            // callbacks may create fresh pairs, including on a new registration.
+            if (clearRuntimeRelationships && registration.IsCurrentLifetime)
+            {
+                collider.ClearCollisionPairState();
                 collider.ClearRuntimeRelationships();
+            }
         }
         finally
         {
             if (deactivationStart == 0)
-                _pairsPendingDeactivation.FastClear();
+                pending.FastClear();
         }
     }
 

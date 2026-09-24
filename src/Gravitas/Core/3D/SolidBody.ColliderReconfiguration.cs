@@ -26,7 +26,7 @@ public partial class SolidBody
     /// Sphere, capsule, and finite-cylinder definitions are supported. The
     /// definition must match the collider's existing family. Material, filters,
     /// hierarchy, events, rotation, motion, and runtime identity are retained.
-    /// A zero-depth support contact is accepted; any physically eligible 3D
+    /// Exact touching at support is accepted; any physically eligible 3D
     /// collider with positive penetration rejects the whole transaction.
     /// <paramref name="publishSynchronizedState"/> runs exactly once after an
     /// applied physical state is committed, or after an unchanged state is
@@ -191,16 +191,19 @@ public partial class SolidBody
             Context.MixedCollisions.Refresh3DColliderPartition(Collider);
         Wake();
 
+        var registration = new ColliderLifetimeToken(Collider);
         SwiftList<Exception>? notificationExceptions = null;
         CaptureSynchronizedStatePublication(
             publishSynchronizedState,
             ref notificationExceptions);
-        Context.Physics.InvalidatePairsForColliderReconfiguration(
-            Collider,
-            ref notificationExceptions);
-        Context.MixedCollisions.InvalidatePairsFor3DColliderReconfiguration(
-            Collider,
-            ref notificationExceptions);
+        if (registration.IsCurrentLifetime)
+            Context.Physics.InvalidatePairsForColliderReconfiguration(
+                Collider,
+                ref notificationExceptions);
+        if (registration.IsCurrentLifetime)
+            Context.MixedCollisions.InvalidatePairsFor3DColliderReconfiguration(
+                Collider,
+                ref notificationExceptions);
         return CollisionNotificationExceptions.ToException(notificationExceptions);
     }
 
