@@ -140,13 +140,15 @@
   FixedMathSharp `artifacts/grv081-final-benchmarks`, with fixtures retained in
   its existing benchmark project.
 - **Evidence:** Owning behavior fixtures are permanent. Full captures are in
-  `artifacts/grv081-final-release` and `grv081-final-lean`. FixedMathSharp's
-  complete suites also reach full line/branch/method coverage while retaining
-  six ordinary-contact failures. These Windows source-mode results do not
-  certify Linux, released packages, or an entirely green stack.
-- **Separate findings:** FixedMathSharp FMS-Issue-023/024/025 and Gravitas
+  `artifacts/grv081-final-release` and `grv081-final-lean`. At that checkpoint,
+  FixedMathSharp's complete suites reached full line/branch/method coverage
+  while retaining six ordinary-contact failures. These Windows source-mode
+  results do not certify Linux, released packages, or an entirely green stack.
+- **Separate findings:** FixedMathSharp FMS-Issue-023 subsequently received a
+  complete cylinder/capsule contact repair, exact behavior coverage and measured
+  follow-up optimizations. FixedMathSharp FMS-Issue-024/025 and Gravitas
   GRV-Issue-082 remain ordinary contact-generation defects, not unresolved
-  posture classification. FMS-Issue-023/024 and GRV-Issue-082 keep their failing
+  posture classification. FMS-Issue-024 and GRV-Issue-082 keep their failing
   public assertions enabled; FMS-Issue-025 retains its numerical reproducer and
   historical RED evidence in the owning tracker.
   FixedMathSharp FMS-Issue-026 separately bounds a pathological depth-correction
