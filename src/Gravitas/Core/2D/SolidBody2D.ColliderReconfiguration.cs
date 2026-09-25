@@ -20,9 +20,9 @@ public sealed partial class SolidBody2D
     /// Supports circle-to-circle and capsule-to-capsule replacement only in
     /// <see cref="PhysicsRuntimeMode.TwoD"/>. The definition contributes geometry;
     /// material, filters, hierarchy, events, rotation, motion, and host world Y
-    /// are retained. Exact touching is allowed; positive penetration
-    /// against any physically eligible registered collider rejects the change,
-    /// including colliders outside grid coverage. Triggers do not block it.
+    /// are retained. Exact touching is allowed; any positive penetration,
+    /// even below one raw unit, against an eligible registered collider rejects
+    /// the change, including outside grid coverage. Triggers do not block it.
     /// This synchronous operation may scan the registry and allocate. It makes
     /// no work, timing, or allocation-failure recovery guarantee.
     /// The publisher runs once after physical publication or confirmation of

@@ -383,11 +383,14 @@ posture of the same collider, not a replacement identity. Host world Y and the
 accepted rotation are retained. Other runtime modes reject rather than omit
 potential cross-dimensional blockers.
 
-Native 2D admission distinguishes exact touching from positive penetration
+Both 2D and 3D admission distinguish exact touching from positive penetration
 before contact-depth rounding. Even a penetration smaller than one raw
 fixed-point unit rejects the transaction; a rounded solver depth of zero is
-not evidence that a replacement fits. The same check covers direct colliders
-and each compound part without generating contact manifolds.
+not evidence that a replacement fits. Classification uses committed geometry
+and authoritative rigid frames for direct colliders and each compound part,
+without generating contact manifolds. In 3D, a closed convex mesh also blocks
+enclosure; open and concave meshes test their authored surfaces, not an
+invented filled interior.
 
 Both transactions test the whole replacement shape against physically eligible
 registered colliders, including blockers outside physics grids. This rare

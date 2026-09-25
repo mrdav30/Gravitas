@@ -24,8 +24,8 @@ public partial class SolidBody
     /// Sphere, capsule, and finite-cylinder definitions are supported. The
     /// definition must match the collider's existing family. Material, filters,
     /// hierarchy, events, rotation, motion, and runtime identity are retained.
-    /// Exact touching at support is accepted; any physically eligible 3D
-    /// collider with positive penetration rejects the whole transaction.
+    /// Exact touching is accepted; any physically eligible 3D collider with
+    /// positive penetration, even below one raw unit, rejects the transaction.
     /// <paramref name="publishSynchronizedState"/> runs exactly once after an
     /// applied physical state is committed, or after an unchanged state is
     /// confirmed, and before separation callbacks. It does not run for a blocked

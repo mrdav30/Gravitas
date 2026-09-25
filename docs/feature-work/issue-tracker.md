@@ -67,85 +67,6 @@
   silently replace this regression with an assertion of the old false result.
   Ordinary response repair remains separate from `GRV-Issue-081`.
 
-### GRV-Issue-081 - Rounded contact depth is insufficient for strict posture clearance
-
-- **Confirmed:** 2026-09-24 during independent native posture review. Existing
-  3D sphere/capsule posture replacement and the new 2D circle/capsule counterpart
-  all accept a genuinely penetrating candidate when its contact depth rounds
-  to zero. Four regression cases fail in `artifacts/posture-review-red.log`.
-- **Reproduction:** In 2D, a size-2 box centered at `(-1, -1)` has its nearest
-  corner at the origin. Grow a radius-4 circle or zero-axis capsule to radius 5
-  at `(3 + epsilon, 4 - epsilon)`, with epsilon = one raw Q32.32 unit. The 3D
-  sphere/capsule control uses a size-2 cuboid centered at `(-1, 0, -1)` and a
-  candidate at `(3 + epsilon, 0, 4 - epsilon)`. Its nearest point lies on the
-  cuboid's vertical edge at the origin. The squared distance is
-  `25 - 2*epsilon + 2*epsilon*epsilon`, strictly less than 25. Penetration is
-  approximately 0.2 raw units, but nearest-even depth is zero. `Applied` is
-  observed where strict clearance requires `Blocked`.
-- **Boundary:** A rounded solver displacement is not an exact overlap
-  classification. Do not change contact-depth rounding, use an epsilon, or
-  silently redefine strict clearance to mean representable positive depth.
-- **Required direction:** Preserve exact separation/tangency/penetration truth
-  through FixedMathSharp-owned geometry and consume it for posture admission.
-  Evaluate both dimensions and every supported source/target family, including
-  compound parts and 3D mesh features. A radial-only 3D patch is not complete
-  parity. Existing solver contact depths and response behavior should remain
-  unchanged.
-- **Status:** Open; blocks completion of native posture prerequisites. The
-  shared FixedMathSharp repair was authorized on 2026-09-24 and is in progress.
-  Classification-only predicates reuse centered-axis distance and convex SAT
-  kernels without changing solver-depth rounding. Complete 3D admission also
-  spans cylinder, cone, box and mesh kernels; a subset passing is not completion.
-- **Additional finding:** The existing cylinder/capsule contact authority has
-  a separate geometric false positive at the finite rim, not just rounded
-  depth. FixedMathSharp `FMS-Issue-023` owns executable separated, tangent and
-  one-raw-offset evidence. That pair cannot become exact strict clearance just
-  by exposing the sign of the current solver's selected projection.
-- **Current slice:** Native 2D posture now consumes the exact predicates for
-  circles, capsules, boxes, polygons, and compound leaves. It retains scalar
-  rotation authority (not the separately normalized cached world axis), stable
-  root blocker identity, and physical pair filtering. The original two native
-  2D regressions and all direct/compound target-family near-boundary controls
-  pass in focused Release and both full source-mode configurations, including
-  an exact noncardinal rotated-capsule compound control. Existing 3D admission
-  is not yet switched; its two original sub-raw regressions remain red.
-  Curved-shape completeness remains a blocker, not a rounded-depth fallback
-  presented as an exact solution.
-
-### GRV-Issue-079 - Physical grid changes can leave unmoved colliders undiscoverable
-
-- **Confirmed:** 2026-09-24 against `198d272`, while reviewing native support
-  prerequisites in both dimensions.
-- **Evidence:** Replacing a grid with the same configuration or inserting a
-  sparse voxel leaves existing unchanged 2D/3D colliders absent from query
-  results. Four new regression cases failed before the owning refresh repair;
-  projected-circle counterparts also reproduced the omission.
-- **Fix in progress:** Reconcile committed collider partition membership once
-  per batch of physical grid changes, at the owning fixed-step/query boundary.
-  Ordinary queries and obstacle-only changes must not force registry scans.
-  Pending authored geometry must remain unpublished. Callback-deferred 2D
-  refresh must complete without an incidental automatic-grounding query.
-- **Verification:** Focused RED/GREEN evidence is retained in
-  `artifacts/support-posture-red.log` and readiness logs. Full source-stack
-  matrix, coverage and final review remain pending; not release-certified.
-
-### GRV-Issue-080 - Reconfiguration callbacks can invalidate fresh 3D pair ownership
-
-- **Confirmed:** 2026-09-24 against `198d272`, using publisher and separation
-  callbacks that deactivate/reinitialize the source body and create fresh pairs.
-  Both regressions fail in `artifacts/posture-3d-lifetime-red.log`.
-- **Impact:** Retirement for an accepted old transaction can clear pairs from a
-  replacement registration. Two additional regressions reproduce the related
-  shared-retirement-snapshot hazard: resetting the world from the first of two
-  separation callbacks makes subsequent retirement throw `IndexOutOfRangeException`.
-- **Fix in progress:** Guard collider registration lifetimes around retirement
-  and retire exact pair ownership without bulk-clearing newly created state.
-  An invocation-local snapshot now survives reset and nested transactions.
-  Preserve accepted status and aggregate post-commit notification exceptions.
-- **Verification:** Registration recycling, reset, nested transactions and native
-  2D counterpart regressions pass the focused Release follow-up. Independent
-  re-review approves this correction. Full source-stack matrix and coverage
-  remain pending; `GRV-Issue-081` is a separate unresolved acceptance blocker.
 
 ### GRV-Issue-077 - Local-stack benchmark child fails while the launcher reports success
 
@@ -170,6 +91,100 @@
   Until then, inspect complete benchmark logs and reports, not only process exit.
 
 ## Resolved Issues
+
+### GRV-Issue-081 - Rounded contact depth is insufficient for strict posture clearance
+
+- **Confirmed / resolved:** 2026-09-24. Independent native posture review
+  reproduced positive penetration admitted by existing 3D sphere/capsule and
+  new 2D circle/capsule replacement because its contact depth rounded to zero.
+  All four original regression cases failed before the owning repair.
+- **Reproduction:** A size-2 2D box at `(-1,-1)` has its nearest corner at the
+  origin. Grow a radius-4 circle or zero-axis capsule to radius 5 at
+  `(3+epsilon,4-epsilon)`, where epsilon is one raw Q32.32 unit. The 3D control
+  uses a size-2 cuboid at `(-1,0,-1)` and candidate at `(3+epsilon,0,4-epsilon)`.
+  Squared distance is `25-2*epsilon+2*epsilon*epsilon < 25`: penetration is about
+  0.2 raw units, but nearest-even contact depth is zero. Admission incorrectly
+  returned `Applied` rather than `Blocked`.
+- **Fix:** Consume FixedMathSharp-owned exact strict classification before
+  contact-depth rounding across every supported candidate/target family in
+  both dimensions. Complete finite cap/rim and cone-generator authorities
+  replace reliance on incomplete selected contact directions. Compound leaves
+  retain root blocker identity; 3D mesh admission retains authored rigid frames,
+  closed-convex enclosure and open/concave surface semantics. Physical filtering,
+  stable order, full registered-body discovery and transactional rejection are
+  unchanged. No epsilon, rounded endpoint, sampled-axis acceptance fallback or
+  contact-manifold construction is used for posture admission.
+- **Review:** Independent reviewers checked finite-feature completeness,
+  fixed-width arithmetic bounds, exact common-sign intervals, conservative
+  root/leaf bounds, and 2D/3D dispatcher parity. Three circle-polynomial defects
+  found during review were reproduced and corrected before final verification.
+- **Verification:** All 57 focused 3D strict-clearance cases pass in Release
+  and ReleaseLean, including the original sub-raw regressions, finite rims,
+  cap-clipped triangles and transformed/scaled compounds and meshes. The native
+  2D family, rotation, filtering and lifetime regressions also pass. Complete
+  source-mode suites report 4,274 passed / 1 known failure in Release and
+  4,215 passed / 1 known failure in Lean, with zero skips or exclusions.
+  Gravitas has 100% line, branch and method coverage in both configurations
+  (44,687 / 44,685 sequence points, 13,270 branches, 4,570 / 4,569 methods).
+  Both library targets build without warnings/errors. Trailblazer's complete
+  core and adapter suites also pass in both source-stack configurations.
+  DocFX builds with warnings treated as errors complete without warnings.
+- **Measured boundary:** The existing FixedMathSharp benchmark runner reports
+  zero managed allocation in all 12 final rows. Matching positive
+  cylinder/capsule and cylinder/cylinder geometry costs 0.397 / 0.859 us for
+  strict classification versus 27.477 / 24.881 us for contact construction.
+  Difficult separated-rim queries cost 95.60 / 291.90 us; no comparison to an
+  incorrect old contact result is claimed. These Windows/.NET 8/i7-9700K
+  geometry microbenchmarks are not whole-transaction or frame measurements;
+  reconfiguration still can scan the registry and allocate. Full JSON is in
+  FixedMathSharp `artifacts/grv081-final-benchmarks`, with fixtures retained in
+  its existing benchmark project.
+- **Evidence:** Owning behavior fixtures are permanent. Full captures are in
+  `artifacts/grv081-final-release` and `grv081-final-lean`. FixedMathSharp's
+  complete suites also reach full line/branch/method coverage while retaining
+  six ordinary-contact failures. These Windows source-mode results do not
+  certify Linux, released packages, or an entirely green stack.
+- **Separate findings:** FixedMathSharp FMS-Issue-023/024/025 and Gravitas
+  GRV-Issue-082 remain ordinary contact-generation defects, not unresolved
+  posture classification. FMS-Issue-023/024 and GRV-Issue-082 keep their failing
+  public assertions enabled; FMS-Issue-025 retains its numerical reproducer and
+  historical RED evidence in the owning tracker.
+  FixedMathSharp FMS-Issue-026 separately bounds a pathological depth-correction
+  loop using its existing exact search, without changing returned results.
+  Classification alone does not fabricate solver normals, depths or witnesses.
+
+### GRV-Issue-080 - Reconfiguration callbacks can invalidate fresh 3D pair ownership
+
+- **Confirmed / resolved:** 2026-09-24, originally reproduced against `198d272`.
+  Publisher and separation callbacks that deactivate/reinitialize the source
+  could let old retirement clear fresh pairs. Resetting the world during the
+  first of two separation callbacks also invalidated a shared retirement
+  snapshot and threw `IndexOutOfRangeException`.
+- **Fix:** Guard registration lifetimes, retire exact old pair ownership, and
+  use an invocation-local snapshot that survives reset and nested transactions.
+  Preserve accepted status and aggregate post-commit notification exceptions.
+- **Verification:** Registration recycling, reset, nested transactions and
+  native 2D counterpart controls pass. Independent review and the complete
+  Release/Lean coverage matrix recorded under GRV-Issue-081 include this repair.
+  Commit `4bc5010` isolates the production correction; RED evidence remains in
+  the owning regression tests and `artifacts/posture-3d-lifetime-red.log`.
+
+### GRV-Issue-079 - Physical grid changes can leave unmoved colliders undiscoverable
+
+- **Confirmed / resolved:** 2026-09-24, originally reproduced against `198d272`.
+  Replacing a grid with the same configuration or inserting a sparse voxel
+  left unchanged 2D/3D colliders absent from query results; projected-circle
+  counterparts reproduced the same omission.
+- **Fix:** Reconcile committed partition membership once per batch of physical
+  grid changes at the owning fixed-step/query boundary. Ordinary queries and
+  obstacle-only changes do not force registry scans; pending authored geometry
+  remains unpublished. Callback-deferred 2D refresh completes without relying
+  on an incidental grounding query.
+- **Verification:** The four original failures and the native/projected,
+  sparse/replaced-grid, committed-geometry and callback-deferred controls pass.
+  Full Release/Lean tests and coverage are recorded under GRV-Issue-081.
+  Commit `622753b` isolates the correction; the original RED capture is
+  `artifacts/support-posture-red.log`.
 
 ### GRV-Issue-078 - Planar restore conformance test selected the static wall
 
