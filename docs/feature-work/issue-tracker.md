@@ -2,7 +2,7 @@
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-083`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-086`.
 - Assign an ID when an issue enters this tracker, keep it through resolution,
   and never reuse an ID even if an entry is later removed. Check this file's Git
   history before advancing or repairing the counter.
@@ -34,6 +34,112 @@
   verification records rather than this active section.
 
 ### Ordered Queue
+
+### GRV-Issue-083 - 2D circle contacts compare saturated squared distances
+
+- **Confirmed:** 2026-09-25 at `e85cda8f1e42acd0669211a8fda21e99c1251d80`,
+  with FixedMathSharp `6368582`, during the FMS-Issue-024 neighboring-solver
+  audit. This is a discrete-contact defect, not an arbitrary 3D circle-distance
+  defect or a recurrence of the repaired radial-query issue GRV-Issue-045.
+- **Reproduction:** In `CollisionDetection2DTests`, use `Create2DContext` and
+  `CreateBody` to initialize static `LSCircleCollider2D` bodies with radius
+  `25000`, at `(0,0)` and `(40000,40000)`, zero rotation and unit scale.
+  `CollisionDetection2D.BoundsOverlap` returns true: the AABBs overlap by
+  `10000` on both axes. Exact squared distance is `3200000000`, greater than
+  squared radius sum `2500000000`, so the circles are disjoint.
+  Nevertheless, `CollisionDetection2D.TryCollide(first, second, out contact)`
+  returns true with depth `3659.049988158513` and normal
+  `(0.8631674575153738,0.8631674575153738)`. The equivalent
+  `FixedBoundCircle.Intersects` correctly returns false.
+- **Cause:** `CollisionDetection2D.TryCircleCircle` forms the center difference,
+  radius sum and both squares in scalar `Fixed64`. Both squared values in this
+  fixture saturate to `Fixed64.MaxValue` before comparison; subsequent square
+  root, normal and depth calculations use the saturated distance. The normal
+  is not unit length either. Bounds admission does not make these intermediate
+  quantities representable.
+- **Verification:** Built the current Release local-stack test project with
+  zero warnings/errors, then executed its existing initialization helpers and
+  actual narrow-phase dispatcher through a PowerShell 7.6.5 reflection probe.
+  No collider fields were fabricated. This was a direct contact reproduction,
+  not a full simulation-step test or a completed regression-test matrix. A
+  direct call to the existing FixedMathSharp zero-axis capsule contact query
+  also correctly rejected the same separated geometry.
+- **Next action:** Add the enabled regression alongside
+  `tests/Gravitas.Tests/Physics2D/CollisionDetection2DTests.cs`. Investigate
+  reusing `FixedSegment2d.TryGetCenteredCapsulesContact` with zero axis lengths
+  for exact classification, normal, depth and anchors; do not add a second
+  circle-contact arithmetic implementation or only patch the Boolean check.
+  Validate ordinary/tiny/full-domain cases, touching versus strict overlap,
+  coincident centers, pair reversal, manifold propagation, nearest-even depth,
+  clamping, allocations and matching 3D policy where applicable. Keep this
+  independent from the cylinder-pair repair.
+
+### GRV-Issue-084 - Mixed cylinder/circle-slab contact duplicates incomplete directions
+
+- **Confirmed:** 2026-09-25 at `e85cda8f1e42acd0669211a8fda21e99c1251d80`,
+  with FixedMathSharp `6368582`. Companion consumer issue to FMS-Issue-024;
+  an upstream cylinder-pair fix alone will not fix this implementation.
+- **Reproduction:** In `MixedNarrowPhaseTests`, use `CreateMixedContext`,
+  `CreateBody3D` and `CreateBody2D`. The 3D `LSCylinderCollider` has radius 1,
+  size `(1,2,1)`, unit scale and center `(7/4,7/4,11/8)`. Its rotation is
+  `(0,0,-q,q)`, with `q=Fixed64.FromRaw(3037000500)`, making its exact rigid
+  local +Y axis world +X. The embedded `LSCircleCollider2D` has center zero,
+  radius 1 and `MixedHalfThicknessOverride=1` (an upright height-2 cylinder).
+  The bounds overlap, but the solids are disjoint: their cap-constrained Z
+  reaches sum to `sqrt(7)/2`, which is less than `11/8`.
+  Public `CollisionDetectionMixed.TryCollide` nevertheless returns true with
+  depth `0.06729760253801942` and normal approximately
+  `(-0.4318894504,-0.4318894504,-0.7917973259)`.
+- **Cause:** `TryTestCylinderCircleSlab` independently tests the cylinder axis,
+  world up, their cross product and a closest-centerline direction. It does not
+  delegate to `FixedSegment.TryGetCenteredFiniteCylindersContact`. These are the
+  same incomplete feature choices exposed by FMS-Issue-024, with additional
+  downstream scalar direction/projection arithmetic.
+- **Verification:** Executed the existing mixed test helpers and public contact
+  entry point against a fresh Release local-stack build through PowerShell
+  7.6.5 reflection. Geometry was initialized through ordinary collider/body
+  APIs; no private shape data was substituted. This is not a full simulation
+  response or cross-runtime validation claim.
+- **Next action:** Coordinate with FMS-Issue-024: add the mixed regression and
+  delegate cylinder/circle-slab geometry to the complete upstream cylinder-pair
+  contact authority, retaining mixed pair order, anchor ownership, materials
+  and response constraints here. Remove the obsolete cylinder-specific axis
+  path after checking shared callers. Include separated, tangent, penetrating,
+  cap, rotated, full-domain and allocation controls. Other mixed shape families
+  are not certified by this reproduction; record further concrete failures
+  separately rather than asserting that similar-looking code must be wrong.
+
+### GRV-Issue-085 - Mixed capsule/circle-slab contact bypasses the complete upstream query
+
+- **Confirmed:** 2026-09-25 at `e85cda8f1e42acd0669211a8fda21e99c1251d80`,
+  with FixedMathSharp `6368582`. Separate from GRV-Issue-084: the upstream
+  cylinder/capsule repair FMS-Issue-023 is already available, but this mixed
+  consumer still uses its independent incomplete contact directions.
+- **Reproduction:** Use the same `MixedNarrowPhaseTests` setup as GRV-Issue-084.
+  The 3D `LSCapsuleCollider` has radius 1, total height 22 (core length 20),
+  unit scale, center `(83/4,7/4,0)` and rotation `(0,0,-q,q)`, with
+  `q=Fixed64.FromRaw(3037000500)`. The embedded circle slab at zero has radius
+  10 and `MixedHalfThicknessOverride=1`. The closest capsule-core endpoint
+  is `(43/4,7/4,0)`; its squared distance from the cylinder cap rim is
+  `(3/4)^2+(3/4)^2=9/8`, greater than capsule radius squared 1. The shapes are
+  separated despite overlapping bounds.
+- **Observed:** Public `CollisionDetectionMixed.TryCollide` returns true with
+  depth `0.19961997726932168`. Calling
+  `FixedSegment.TryGetCenteredFiniteCylinderCapsuleContact` for the same slab
+  cylinder and capsule returns false. Both observations were executed against
+  the fresh Release local-stack build using the existing initialization helpers
+  through PowerShell 7.6.5 reflection; no private shape values were fabricated.
+- **Cause:** `TryTestCapsuleCircleSlab` selects world up, the capsule axis,
+  their cross product and one closest-centerline direction. It bypasses the
+  complete finite cylinder/capsule authority, so releasing the upstream fix
+  alone does not repair the mixed path.
+- **Next action:** Add the enabled mixed regression, delegate to the existing
+  upstream cylinder/capsule contact query and remove obsolete capsule-specific
+  projection code after checking shared callers. Reverse the cylinder-first
+  result into the existing 3D-capsule-to-2D-slab normal/anchor convention.
+  Preserve mixed material, contact and response policy. Validate tangent and
+  penetrating rims, ordinary/rotated/full-domain controls, allocations and
+  standard/Lean coverage. No new geometry solver is required.
 
 ### GRV-Issue-082 - Cylinder contact can miss a triangle crossing below its cap
 
