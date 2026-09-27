@@ -229,47 +229,20 @@ public static partial class CollisionDetectionMixed
         out AxisPenetration penetration)
     {
         penetration = default;
-        Vector3d cylinderAxis = GetRigidUpAxis(cylinder.Rotation);
-        if (!CheckCylinderCircleSlabAxis(
-                cylinder,
-                circle,
-                cylinderAxis,
-                cylinderAxis,
-                ref penetration))
+        // Keep the full admitted half-thickness: doubling in Fixed64 would
+        // shorten slabs whose physical full height exceeds the scalar domain.
+        Signed192 slabLength = WideArithmetic.AddSigned192(
+            Signed192.Raw(circle.MixedHalfThickness), Signed192.Raw(circle.MixedHalfThickness));
+        if (!WideConvexPrismRelations.TryGetPositiveRadiusCylinderPairPenetration(
+                cylinder.Center, cylinder.Rotation, Vector3d.Up,
+                Signed192.Raw(cylinder.Height), cylinder.ScaledRadius,
+                GetEmbeddedCenter3D(circle), FixedQuaternion.Identity, Vector3d.Up,
+                slabLength, circle.ScaledRadius,
+                out Vector3d normal, out Fixed64 depth, out bool depthIsClamped))
             return false;
 
-        CheckCylinderCircleSlabAxis(
-            cylinder,
-            circle,
-            cylinderAxis,
-            Vector3d.Up,
-            ref penetration);
-
-        if (!CheckCylinderCircleSlabAxis(
-                cylinder,
-                circle,
-                cylinderAxis,
-                Vector3d.Cross(cylinderAxis, Vector3d.Up),
-                ref penetration))
-            return false;
-
-        Vector3d closestFeatureAxis =
-            FixedSegment.GetClosestDirectionBetweenCenteredAxes(
-                cylinder.Center,
-                cylinderAxis,
-                cylinder.Height,
-                GetEmbeddedCenter3D(circle),
-                Vector3d.Up,
-                circle.MixedHalfThickness * Fixed64.Two);
-        if (!CheckCylinderCircleSlabAxis(
-                cylinder,
-                circle,
-                cylinderAxis,
-                closestFeatureAxis,
-                ref penetration))
-            return false;
-
-        return penetration.HasValue;
+        penetration = new AxisPenetration(normal, depth, depthIsClamped);
+        return true;
     }
 
     private static bool TryTestConeCircleSlab(
@@ -622,40 +595,6 @@ public static partial class CollisionDetectionMixed
         return true;
     }
 
-    private static bool CheckCylinderCircleSlabAxis(
-        LSCylinderCollider cylinder,
-        LSCircleCollider2D circle,
-        Vector3d cylinderAxis,
-        Vector3d axis,
-        ref AxisPenetration penetration)
-    {
-        if (!TryNormalizeAxis(axis, out Vector3d normalizedAxis))
-            return true;
-
-        if (!FixedSegment.TryGetCenteredFiniteCylinderCapsuleSlabAxisPenetration(
-                normalizedAxis,
-                cylinder.Center,
-                cylinderAxis,
-                cylinder.Height,
-                cylinder.ScaledRadius,
-                GetEmbeddedCenter3D(circle),
-                Vector2d.Forward,
-                Fixed64.Zero,
-                circle.ScaledRadius,
-                circle.MixedHalfThickness,
-                out Vector3d orientedAxis,
-                out Fixed64 depth,
-                out bool depthIsClamped))
-        {
-            return false;
-        }
-
-        return KeepAxisPenetration(
-            orientedAxis,
-            depth,
-            depthIsClamped,
-            ref penetration);
-    }
 
     private static bool CheckConeCircleSlabAxis(
         LSConeCollider cone,

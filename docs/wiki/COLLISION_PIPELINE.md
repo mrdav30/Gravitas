@@ -158,6 +158,14 @@ require a public closest point or representable query-to-boundary distance to
 produce a contact witness. Exact compound candidate ranking preserves authored
 part order on ties.
 
+Mixed cylinder/circle-slab contacts use the same finite-cylinder geometry
+authority as 3D cylinder pairs in FixedMathSharp. Slab half-thickness remains
+exact even when its full height exceeds the `Fixed64` scalar domain; it is not
+saturated into a shorter cylinder. Gravitas retains the 3D-to-2D normal
+convention, canonical support anchors, material ownership, and constrained
+mixed response. This shared geometry path does not change the contact rules for
+other mixed shape families.
+
 For shape state, pair matrices, SAT invariants, mesh policy, and compound
 ownership details, read [Collider Shape Reference](COLLIDER_SHAPE_REFERENCE.md).
 

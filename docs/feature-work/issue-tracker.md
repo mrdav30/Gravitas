@@ -74,41 +74,6 @@
   clamping, allocations and matching 3D policy where applicable. Keep this
   independent from the cylinder-pair repair.
 
-### GRV-Issue-084 - Mixed cylinder/circle-slab contact duplicates incomplete directions
-
-- **Confirmed:** 2026-09-25 at `e85cda8f1e42acd0669211a8fda21e99c1251d80`,
-  with FixedMathSharp `6368582`. Companion consumer issue to FMS-Issue-024;
-  an upstream cylinder-pair fix alone will not fix this implementation.
-- **Reproduction:** In `MixedNarrowPhaseTests`, use `CreateMixedContext`,
-  `CreateBody3D` and `CreateBody2D`. The 3D `LSCylinderCollider` has radius 1,
-  size `(1,2,1)`, unit scale and center `(7/4,7/4,11/8)`. Its rotation is
-  `(0,0,-q,q)`, with `q=Fixed64.FromRaw(3037000500)`, making its exact rigid
-  local +Y axis world +X. The embedded `LSCircleCollider2D` has center zero,
-  radius 1 and `MixedHalfThicknessOverride=1` (an upright height-2 cylinder).
-  The bounds overlap, but the solids are disjoint: their cap-constrained Z
-  reaches sum to `sqrt(7)/2`, which is less than `11/8`.
-  Public `CollisionDetectionMixed.TryCollide` nevertheless returns true with
-  depth `0.06729760253801942` and normal approximately
-  `(-0.4318894504,-0.4318894504,-0.7917973259)`.
-- **Cause:** `TryTestCylinderCircleSlab` independently tests the cylinder axis,
-  world up, their cross product and a closest-centerline direction. It does not
-  delegate to `FixedSegment.TryGetCenteredFiniteCylindersContact`. These are the
-  same incomplete feature choices exposed by FMS-Issue-024, with additional
-  downstream scalar direction/projection arithmetic.
-- **Verification:** Executed the existing mixed test helpers and public contact
-  entry point against a fresh Release local-stack build through PowerShell
-  7.6.5 reflection. Geometry was initialized through ordinary collider/body
-  APIs; no private shape data was substituted. This is not a full simulation
-  response or cross-runtime validation claim.
-- **Next action:** Coordinate with FMS-Issue-024: add the mixed regression and
-  delegate cylinder/circle-slab geometry to the complete upstream cylinder-pair
-  contact authority, retaining mixed pair order, anchor ownership, materials
-  and response constraints here. Remove the obsolete cylinder-specific axis
-  path after checking shared callers. Include separated, tangent, penetrating,
-  cap, rotated, full-domain and allocation controls. Other mixed shape families
-  are not certified by this reproduction; record further concrete failures
-  separately rather than asserting that similar-looking code must be wrong.
-
 ### GRV-Issue-085 - Mixed capsule/circle-slab contact bypasses the complete upstream query
 
 - **Confirmed:** 2026-09-25 at `e85cda8f1e42acd0669211a8fda21e99c1251d80`,
@@ -198,6 +163,39 @@
 
 ## Resolved Issues
 
+### GRV-Issue-084 - Mixed cylinder/circle-slab contact duplicates incomplete directions
+
+- **Confirmed / resolved:** 2026-09-25 / 2026-09-26, coordinated with the
+  [completed FMS-Issue-024 design and validation record](https://github.com/mrdav30/FixedMathSharp/blob/main/docs/feature-work/done/2026-09-25-cylinder-pair-contact-design.md).
+- **Reproduction:** At `e85cda8` with FixedMathSharp `6368582`, create an upright
+  circle slab at zero with radius/half-thickness 1 and a radius-1, height-2
+  cylinder at `(7/4,7/4,11/8)`, rotated onto +X with quaternion `(0,0,-q,q)`,
+  `q=Fixed64.FromRaw(3037000500)`. Bounds overlap, but exact cap-constrained Z
+  reaches sum to `sqrt(7)/2 < 11/8`. The old public mixed dispatcher nevertheless
+  reported contact with depth about `0.0672976`.
+- **Fix:** Replace the independent incomplete selected-direction reducer with
+  FixedMathSharp's complete positive-radius cylinder-pair relation through the
+  existing internal geometry boundary. Carry full slab height exactly even for
+  `Fixed64.MaxValue` half-thickness. Remove the obsolete helper, preserving
+  canonical support anchors, pair ordering, materials and response policy.
+  Capsule/circle-slab and other shape families remain separate issues.
+- **Verification:** Against the working tree based on `97fee61`, all 14 mixed
+  cases pass in both complete source-stack configurations: mirrored separation,
+  exact tangency, one-raw and quarter-unit inward/outward neighbors, parallel
+  caps, canonical anchors, maximum slab thickness and warmed allocations.
+  Release has 4287 passed / one existing GRV-Issue-082 failure; ReleaseLean has
+  4228 passed / the same failure, with no skips. Both retain 100% line/branch/
+  method coverage: 44639/44637 lines, 13262 branches, 4569/4568 method records.
+  Both target frameworks build without warnings/errors. Reports are under
+  `artifacts/grv084-final-Release` and `-ReleaseLean`. Neither full suite is
+  claimed green while the unrelated triangle/cylinder regression remains red.
+- **Performance and release boundary:** The upstream matched capture completed
+  every child successfully; difficult exact nonparallel contacts still cost
+  roughly 11.57–25.14ms each on the measured machine. That limitation is retained
+  in FixedMathSharp's benchmark backlog, not implicitly accepted by closing this
+  correctness issue. Released-package validation remains separate from source
+  mode. Independent correctness/Ponytail reviews found no outstanding findings.
+
 ### GRV-Issue-081 - Rounded contact depth is insufficient for strict posture clearance
 
 - **Confirmed / resolved:** 2026-09-24. Independent native posture review
@@ -252,11 +250,12 @@
   results do not certify Linux, released packages, or an entirely green stack.
 - **Separate findings:** FixedMathSharp FMS-Issue-023 subsequently received a
   complete cylinder/capsule contact repair, exact behavior coverage and measured
-  follow-up optimizations. FixedMathSharp FMS-Issue-024/025 and Gravitas
-  GRV-Issue-082 remain ordinary contact-generation defects, not unresolved
-  posture classification. FMS-Issue-024 and GRV-Issue-082 keep their failing
-  public assertions enabled; FMS-Issue-025 retains its numerical reproducer and
-  historical RED evidence in the owning tracker.
+  follow-up optimizations. FMS-Issue-024 is also repaired, with its public
+  regressions passing and the mixed consumer migrated under GRV-Issue-084 above.
+  FixedMathSharp FMS-Issue-025 and Gravitas GRV-Issue-082 remain ordinary
+  contact-generation defects, not unresolved posture classification.
+  GRV-Issue-082 keeps its failing public assertion enabled; FMS-Issue-025 retains
+  its numerical reproducer and historical RED evidence in the owning tracker.
   FixedMathSharp FMS-Issue-026 separately bounds a pathological depth-correction
   loop using its existing exact search, without changing returned results.
   Classification alone does not fabricate solver normals, depths or witnesses.
