@@ -252,10 +252,11 @@
   complete cylinder/capsule contact repair, exact behavior coverage and measured
   follow-up optimizations. FMS-Issue-024 is also repaired, with its public
   regressions passing and the mixed consumer migrated under GRV-Issue-084 above.
-  FixedMathSharp FMS-Issue-025 and Gravitas GRV-Issue-082 remain ordinary
-  contact-generation defects, not unresolved posture classification.
-  GRV-Issue-082 keeps its failing public assertion enabled; FMS-Issue-025 retains
-  its numerical reproducer and historical RED evidence in the owning tracker.
+  FixedMathSharp FMS-Issue-025 now has a complete box/cylinder contact repair,
+  including the cap-clipped miss, exact minimum-depth and edge/rim regressions.
+  Gravitas consumes the unchanged manifold API; no adapter migration is needed.
+  GRV-Issue-082 remains an ordinary cylinder/triangle contact-generation defect,
+  not unresolved posture classification, and keeps its failing assertion enabled.
   FixedMathSharp FMS-Issue-026 separately bounds a pathological depth-correction
   loop using its existing exact search, without changing returned results.
   Classification alone does not fabricate solver normals, depths or witnesses.
