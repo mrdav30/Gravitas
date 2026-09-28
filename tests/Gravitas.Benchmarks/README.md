@@ -66,6 +66,31 @@ dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll all 
 dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll collision-detection --filter "*Sphere*"
 ```
 
+The launcher returns nonzero for malformed arguments, unmatched filters,
+critical validation errors, build failures, and reported child executions with
+missing workload results or nonzero exits. Successful earlier launches do not
+hide later failures. Valid help, list, version and information commands return
+zero. Retain the complete logs when interpreting measurements; the exit code
+checks the results exposed by BenchmarkDotNet, not unreported diagnoser work.
+
+### Coordinated source-stack builds
+
+When validating unreleased sibling libraries, build the runner explicitly in
+source mode:
+
+```powershell
+dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0 -p:UseLocalLsfStack=true -p:BuildInParallel=false -m:1
+dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll world-context --filter '*RunEmptySimulationFrame*' --job Dry
+```
+
+The compiled runner carries source mode into generated benchmark builds,
+disables implicit transitive project references that bypass the explicitly
+versioned source edges, and serializes those project builds. No launch-time
+environment variable is required. Generated jobs retain the runner's build
+configuration: to check Lean, replace `Release` with `ReleaseLean` in both
+commands. CLI job choices such as `Dry` still apply. Dry runs validate execution,
+not throughput. Package mode remains the default and is a separate release gate.
+
 ### Fast development check
 
 Use BenchmarkDotNet's short in-process job for quick local smoke runs. This

@@ -139,10 +139,12 @@
   Ordinary response repair remains separate from `GRV-Issue-081`.
 
 
+## Resolved Issues
+
 ### GRV-Issue-077 - Local-stack benchmark child fails while the launcher reports success
 
 - **Confirmed:** 2026-09-22 at `21a22ab`, during shared timing baseline capture.
-- **Status:** Open; benchmark tooling, not a physics failure.
+- **Resolved:** 2026-09-27; benchmark tooling only, no physics changes.
 - **Evidence:** `world-context --filter '*RunEmptySimulationFrame*'` in local
   stack mode encountered CS2012 while parallel project instances wrote the same
   SwiftCollections intermediate DLL. BenchmarkDotNet reported zero executed
@@ -154,14 +156,41 @@
   identity while the generated child has GridForge and SwiftCollections 0.0.0.0.
   Log: `gravitas-serial-build.log` beside the original. This is a source-mode
   generated build graph problem, not evidence of a physics runtime regression.
-- **Required fix:** Preserve one consistent source-built dependency identity
-  through generated benchmark builds and check validation/build/execution
-  results before returning success, while allowing genuine informational
-  help/list commands. Keep this a
-  focused runner correction, not a new benchmark regression project or CI gate.
-  Until then, inspect complete benchmark logs and reports, not only process exit.
-
-## Resolved Issues
+- **Current reproduction:** At `7f499c0`, an invalid option and unmatched filter
+  both returned zero. A serialized generated build completed but its child
+  failed to load GridForge 9.1.0.0; its output contained GridForge and
+  FixedMathSharp 0.0.0.0. The generated root did not inherit
+  `DisableTransitiveProjectReferences`, so SDK-added project edges bypassed
+  explicit source dependency versions. Capture: `artifacts/grv077-before`.
+- **Fix:** Reuse the existing FixedMathSharp runner's argument/result checks.
+  Reject empty execution selections, critical validation/build/report failures
+  and every reported unsuccessful/nonzero child exit, including failures after
+  earlier results. Preserve valid help/list/version/info commands. A build-only
+  job mutator carries the compiled configuration and, for source-built runners,
+  source mode, explicit-reference protection and serial project builds into
+  generated children. CLI jobs such as `Dry` remain unchanged; package mode
+  remains the default.
+- **Verification:** A one-off launcher probe failed before the repair and
+  passed 26 cases afterward, including build, partial-launch and post-result
+  exit failures. Captures remain under `artifacts/benchmark-exit-codes`; the
+  probe was removed after review and is not a maintained test or CI gate.
+  The actual `world-context` empty-frame `Dry`
+  child passes in Release and ReleaseLean without launch-time source-mode
+  environment variables. All seven standard and eight Lean LSF assembly
+  identities match the parent; Lean contains the shim, not MemoryPack runtime
+  DLLs. Captures: `artifacts/grv077-release` and `artifacts/grv077-lean`.
+  Independent correctness/Ponytail review found no remaining blockers.
+- **Full matrix:** Both solution configurations build for netstandard2.1 and
+  net8.0 without warnings/errors. Release passes 4,287 tests and ReleaseLean
+  passes 4,228; each has only the existing enabled GRV-Issue-082 failure, with
+  no skips. Runtime line/branch/method coverage remains 100% in both:
+  44,639 / 44,637 lines, 13,262 branches, and 4,569 / 4,568 methods. Reports:
+  `artifacts/grv077-tests-release` and `artifacts/grv077-tests-lean`.
+- **Evidence boundary:** These are Windows/.NET 8 source-stack execution
+  checks, not throughput measurements or released-package validation. Continue
+  inspecting full logs and expected launches; summaries do not expose every
+  separate diagnoser execution. The benchmark README retains the reproduction
+  commands and launcher-check instructions.
 
 ### GRV-Issue-084 - Mixed cylinder/circle-slab contact duplicates incomplete directions
 
@@ -329,7 +358,7 @@
   corresponding mutation boundary. Exact matrix/coverage/benchmark evidence
   is in Chronicler's `docs/feature-work/done/deterministicSimulationTimingPlan.md`,
   Phase 4 execution record and Phase 6 cross-stack closeout.
-  `GRV-Issue-077` remains a separate tooling issue.
+  The separate benchmark-tooling repair is recorded under `GRV-Issue-077`.
 
 ### GRV-Issue-075 - Centerline circle/capsule queries disagree on the surface side
 
