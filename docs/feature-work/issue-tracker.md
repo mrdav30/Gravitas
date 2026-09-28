@@ -2,7 +2,7 @@
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-086`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-087`.
 - Assign an ID when an issue enters this tracker, keep it through resolution,
   and never reuse an ID even if an entry is later removed. Check this file's Git
   history before advancing or repairing the counter.
@@ -106,40 +106,104 @@
   penetrating rims, ordinary/rotated/full-domain controls, allocations and
   standard/Lean coverage. No new geometry solver is required.
 
-### GRV-Issue-082 - Cylinder contact can miss a triangle crossing below its cap
+### GRV-Issue-086 - Mesh/cone contact drops a real intersection when the center offset is unrepresentable
 
-- **Confirmed:** 2026-09-24 while validating the separate strict posture repair.
-  The unchanged ordinary mesh/cylinder contact path returns false for an actual
-  surface intrusion. `CylinderTriangleContactRegressionTests` retains the
-  executable public-path failure; this is not a strict-predicate regression.
-- **Reproduction:** A cylinder centered at zero with radius 5, height 10 and
-  identity rotation intersects the concave-mesh triangle `(0,7,-5)`,
-  `(10,1,-5)`, `(5,4,5)`. The point `(4,23/5,0)` is in the triangle and strictly
-  inside the cylinder. The triangle's closest point to the cylinder center has
-  Y coordinate `175/34 > 5`, outside the upper cap.
-- **Cause:** `MeshTriangleContactGenerator.TryAddCylinderTriangleContact` first
-  tries axis-aligned cap support samples, then tests only the triangle point
-  closest to the cylinder center. That point need not minimize distance to the
-  finite cylinder. The triangle can enter the radial interior after cap clipping
-  even though the selected center-nearest witness lies above the cap.
-- **Impact:** Ordinary discrete contact can miss a real triangle/cylinder
-  intersection. The new exact posture predicate detects and blocks this same
-  intrusion, but Boolean classification alone does not construct a solver
-  contact normal, depth and pair of witnesses.
-- **Verification:** The public regression fails in
-  `artifacts/strict-3d-clearance-focused-release.log`; all 57 focused strict
-  clearance cases pass in that run. Reproduce with
-  `dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj -c Release
-  -p:UseLocalLsfStack=true --filter FullyQualifiedName~CylinderTriangleContactRegressionTests`.
-- **Next action:** Derive complete finite-cylinder/triangle contact features
-  and truthful contact materialization in the owning geometry/solver layers.
-  Preserve strict versus closed boundaries, authored rigid frames, allocations
-  and contact ordering. Do not turn a Boolean hit into a fabricated contact or
-  silently replace this regression with an assertion of the old false result.
-  Ordinary response repair remains separate from `GRV-Issue-081`.
-
+- **Confirmed:** 2026-09-27 while verifying GRV-Issue-082, from Gravitas
+  `0a6f480` with the local FixedMathSharp source stack. This is an existing
+  cone-path defect, not introduced by the cylinder repair.
+- **Reproduction:** Create a concave `SurfaceApproximation` mesh with local
+  vertices `(-3,-1,0)`, `(3,-1,0)`, `(0,1,0)` at world `(3,0,0)` and identity
+  rotation. Create an identity `LSConeCollider` with `Size=Vector3d.One`,
+  `Radius=Fixed64.MaxValue`, and center
+  `(Fixed64.MinValue + Fixed64.Two, 0, 0)`. Bounds overlap, but public
+  `CollisionDetection.DoCollisionCheck(new CollisionPair(mesh, cone))`
+  returns false.
+- **Independent geometric proof:** Write `epsilon=2^-32` and `M=2^31`.
+  The point `(1,-1/2+epsilon,0)` is strictly inside the triangle: its left
+  and right edges at that height are `3/4+3*epsilon/2` and
+  `21/4-3*epsilon/2`. Its distance from the cone axis is `M-1`, while the
+  cone radius at that height is `(M-epsilon)*(1-epsilon)`, exceeding that
+  distance by `1/2-epsilon+epsilon^2`. The miss is not a tangency convention.
+- **Cause:** `CollisionDetection.Cone.cs` skips the admitted triangle when
+  `coneCenterAnchor.TryGetLocalPointIn(...)` cannot materialize the center in
+  the mesh's scalar coordinate range. The concave path has no fallback.
+  A representability check is being used as geometric rejection.
+- **Evidence:** The original cone row of
+  `FiniteAxisMeshContact_WithOverlappingClippedBoundsAndUnrepresentableFrameOffset_ShouldReject`
+  passed its incorrect false expectation in
+  `artifacts/grv082-checkpoints/contacts-release.trx`. Independent review
+  confirmed the proof above. The shared separated control now moves the
+  local apex to `(6,1,0)`; that is a genuine gap, not the reproduction here.
+  The original cylinder case is retained separately as a positive regression.
+- **Next action:** Add the enabled cone regression with the original vertices,
+  then repair contact generation using canonical frames and truthful selected
+  features. Removing the guard alone is not sufficient if later calculations
+  still require the unrepresentable center offset. Keep this separate from
+  GRV-Issue-082 and verify cone-specific cap, side, rim, witness and allocation
+  behavior in both package configurations.
 
 ## Resolved Issues
+
+### GRV-Issue-082 - Cylinder contact can miss a triangle crossing below its cap
+
+**Resolved:** 2026-09-28.
+
+**Reproduction and cause:** A radius-5, height-10 cylinder at zero intersects
+triangle `(0,7,-5)`, `(10,1,-5)`, `(5,4,5)`: `(4,23/5,0)` lies strictly
+inside both. The former center-nearest fallback chose triangle Y=`175/34 > 5`
+and missed the hit. It could also pair a surface depth with an unrelated face
+normal. The mixed circle-slab path admitted the separated oblique-rim fixture
+now retained in the FixedMathSharp contact tests.
+
+**Fix:** FixedMathSharp owns complete finite triangle/cylinder contact selection,
+sharing cylinder support algebra, stationary quartics and exact root signs with
+its existing box/cylinder owner. Paired witnesses and normal/depth are selected
+together before final rounding; full-width circle-slab thickness and zero-core
+capsule slabs share this owner. Gravitas removed the center-nearest fallback and
+approximate cap-alignment test. Only exact cap/face winners may be enriched.
+Enrichment preserves the selected depth and clamp flag, including odd raw
+heights, and geometric success no longer depends on manifold count growth after
+deduplication or capacity reduction.
+
+**Regression evidence:** Enabled tests cover the original intrusion, oblique
+rim normals and paired anchors, one-raw gap/touch boundaries, full-domain center
+offsets, cap-only enrichment, duplicate/reversed faces, mixed circle slabs and
+zero allocations. The final cap-depth review additionally reproduced both
+nearest-even errors (one raw instead of zero/two) with a two-triangle mesh that
+keeps its canonical origin fixed; both pass after preserving primary metadata.
+Upstream tests cover analytic and genuine-root witnesses, half-raw ties,
+zero-radius cores, clamp boundaries, independent intrusion classification and
+bounded worker-stack use. No coverage exclusion or skipped test was added.
+
+**Validation:** Windows, `UseLocalLsfStack=true`, serial workloads on two cores:
+
+- Gravitas full solution: Release **4,304/4,304**, ReleaseLean **4,245/4,245**.
+- Gravitas Release: **56,541/56,541 lines**, **16,306/16,306 branches**,
+  **5,385/5,385 methods**; Lean: **56,539/56,539**, **16,306/16,306**,
+  **5,384/5,384**, respectively.
+- FixedMathSharp full solution: Release **3,762 core + 49 integration** tests,
+  Lean **3,743 core + 49 integration**, followed by three public boundary tests
+  in each configuration after those test cases were added. Runtime sources were
+  unchanged between the full and supplemental runs.
+- Combined full/supplemental upstream coverage: Release **51,926/51,926 lines**,
+  **11,382/11,382 branches**, **3,845/3,845 methods**; Lean
+  **52,019/52,019**, **11,382/11,382**, **3,841/3,841**, respectively.
+- Both libraries built for `netstandard2.1` and `net8.0` in both configurations.
+  Independent geometry and Ponytail reviews completed, including the final
+  cap-depth correction.
+- Both generated API sites built with DocFX warnings-as-errors: zero warnings
+  and zero errors. All twelve focused cylinder/circle-slab benchmark rows
+  completed their preflights and measured zero managed allocation.
+
+Reports and TRX captures are under `artifacts/grv082-final-*-coverage`,
+`artifacts/grv082-final-*-supplement` and `artifacts/grv082-final-*-report` in
+the owning repository. The source-mode results do not establish published
+package availability. Performance evidence is recorded separately in
+[GRV-Benchmark-018](benchmark-signal-hardening-backlog.md#grv-benchmark-018--complete-trianglecylinder-contact-cost).
+
+The separately reproduced positive-core capsule-slab and unrepresentable
+mesh/cone defects remain **FMS-Issue-027** and **GRV-Issue-086**; neither is a
+reason to retain an incomplete cylinder contact path.
 
 ### GRV-Issue-077 - Local-stack benchmark child fails while the launcher reports success
 

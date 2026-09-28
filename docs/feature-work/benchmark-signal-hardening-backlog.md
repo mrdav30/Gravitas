@@ -16,7 +16,7 @@ this backlog.
 ## Intake Rules
 
 - Signal IDs use `GRV-Benchmark-NNN`. The next available ID is
-  `GRV-Benchmark-018`.
+  `GRV-Benchmark-019`.
 - Assign an ID at intake and never reuse it, including after a signal closes or
   moves into a dated plan. Check this file's Git history before advancing or
   repairing the counter.
@@ -61,8 +61,92 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 
 ## Active Signals
 
-No active benchmark signals remain. Add new measured concerns here before they
-are promoted into implementation work.
+### GRV-Benchmark-018 — Complete Triangle/Cylinder Contact Cost
+
+**Discovered:** 2026-09-27; final aggregate capture 2026-09-28.  
+**Status:** Measured follow-up after the GRV-Issue-082 correctness repair.  
+**Owners:** FixedMathSharp's triangle/cylinder contact selection and witness
+materialization; Gravitas's mesh candidate traversal and cap enrichment.
+
+The complete contact owner repairs missed intrusions, false rim contacts and
+mismatched normal/depth/witness output. Its exact geometry is the correctness
+baseline; the previous center-nearest approximation is not an acceptable fast
+fallback.
+
+Same-machine BenchmarkDotNet comparison: Windows, Intel i7-9700K, .NET 8.0.29,
+SDK 10.0.302, two-core process affinity, one workload at a time, two launches,
+five warmups and fifteen measured iterations per launch. Means are **per batch
+of 64 collider pairs**, not per contact or simulation frame. All rows measured
+zero managed allocation.
+
+| Row | Previous incomplete path | Unpruned implementation | Face certificate / pruning | Final |
+| --- | ---: | ---: | ---: | ---: |
+| `CheckMeshCylinderPairs` | 3.812 ms | 32.664 ms | 8.348 ms | **6.064 ms** |
+| `CheckConcaveMeshCylinderPairs` | 2.835 ms | 62.688 ms | 5.469 ms | **3.825 ms** |
+
+Final standard deviations were 0.1549 and 0.1034 ms; 99.9% confidence-interval
+half-widths were 0.1035 and 0.0691 ms. The final path takes about **59% / 35%
+more time than the incomplete predecessor**, but **81% / 94% less than the
+unpruned implementation**. The unpruned capture preceded the final one-round
+rim-witness correction, so that comparison includes both correctness and
+performance changes, not an isolated optimization attribution.
+
+Retained reductions use exact proofs: an inscribed-ball face certificate,
+duplicate analytic/root-boundary removal, winner-only world-normal work, and
+principal-direction cancellation before depth rounding. None replace an
+uncertain result with a tolerance, sampled axis or early false answer. The final
+bounded pass cut another 27% / 30% from the preceding refined aggregate rows.
+
+Reproduce from the repository root in coordinated source mode:
+
+```powershell
+$env:DOTNET_PROCESSOR_COUNT = '2'
+dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0 -p:UseLocalLsfStack=true -m:1 -p:BuildInParallel=false -p:UseSharedCompilation=false -nr:false
+dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll collision-detection --filter '*CheckMeshCylinderPairs*' '*CheckConcaveMeshCylinderPairs*' --launchCount 2 --warmupCount 5 --iterationCount 15 --artifacts artifacts/grv082-final-bench
+dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll mesh-cylinder-contact --filter '*' --launchCount 2 --warmupCount 5 --iterationCount 15 --artifacts artifacts/grv082-final-focused-bench
+```
+
+Also constrain process affinity to two cores when comparing with this capture;
+the environment variable alone is not a CPU-affinity setting. The focused rows
+preflight expected classification and certified depths outside measurement.
+They distinguish cap/side faces, the original intrusion, oblique rim contact,
+rim touch and a rim gap for cylinder and mixed circle-slab consumers. Cylinder
+cap contacts may build a four-point manifold; mixed circle slabs return one
+contact, so those columns are not identical workloads.
+
+Final focused means, **microseconds per query**, with zero managed allocation
+in all twelve rows:
+
+| Geometry | Cylinder / triangle | Circle slab / triangle |
+| --- | ---: | ---: |
+| Cap face | 57.05 us | 21.63 us |
+| Side face | 31.94 us | 31.83 us |
+| Original cap intrusion | 1,055.12 us | 1,053.47 us |
+| Oblique rim | 1,179.01 us | 1,160.16 us |
+| Rim touch | 846.88 us | 833.32 us |
+| Rim gap | 44.24 us | 44.01 us |
+
+The unpruned cylinder cap/side rows were 269.91 / 828.68 us. Those ordinary
+features benefited substantially from the retained certificates and work
+removal; the intrusion/rim rows did not show a comparable reduction. General
+contact at roughly one millisecond per query remains a meaningful capacity
+concern, not a cost hidden by the aggregate improvement. BenchmarkDotNet flagged
+multimodal cylinder cap-face and rim-touch distributions and removed four
+circle-slab cap-face outliers. Retain the report's uncertainty and do not claim
+small percentage changes on these rows without a fresh matched comparison.
+
+The disposable reports are under `artifacts/grv082-before-bench`,
+`artifacts/grv082-unpruned-bench`, `artifacts/grv082-refined-bench`,
+`artifacts/grv082-final-bench` and the corresponding `*-focused-bench` folders.
+The old runtime baselines are Gravitas `0a6f480` and FixedMathSharp `fd1cb8f`;
+the final runtime is the GRV-Issue-082 repair on top of those revisions.
+
+**Next useful action:** Isolate the retained edge/rim chart, root-comparison and
+paired-witness costs on the focused rows before proposing another optimization.
+Prefer a proof that avoids nonwinning work, preserving complete feature
+admission, exact tie ordering, one-round witnesses, zero allocations and both
+target frameworks. Keep this performance follow-up separate from the resolved
+contact-correctness issue and the unrelated positive-core capsule-slab defect.
 
 ## Experimental Signals
 
@@ -947,8 +1031,8 @@ Promote a signal from this backlog into a dedicated dated plan when it has:
 
 ## Current Recommendation
 
-All release-relevant benchmark signals are closed. Dense concave mesh/mesh
-throughput remains experimental capacity guidance; prefer primitive, convex,
-compound, or partitioned static-concave authoring. Keep this document as the
-intake bucket for future measured signals and promote broader work into a dated
-feature plan when the scope outgrows a focused patch.
+Use GRV-Benchmark-018 for any further triangle/cylinder performance work; its
+complete exact contact behavior is the baseline to preserve. Dense concave
+mesh/mesh throughput remains experimental capacity guidance; prefer primitive,
+convex, compound, or partitioned static-concave authoring. Promote broader work
+into a dated feature plan only when the scope outgrows a focused patch.

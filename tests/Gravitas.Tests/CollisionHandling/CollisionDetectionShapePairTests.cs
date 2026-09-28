@@ -1473,7 +1473,10 @@ public sealed class CollisionDetectionShapePairTests
             {
                 new Vector3d((Fixed64)(-3), -Fixed64.One, Fixed64.Zero),
                 new Vector3d((Fixed64)3, -Fixed64.One, Fixed64.Zero),
-                new Vector3d(Fixed64.Zero, Fixed64.One, Fixed64.Zero)
+                // At the cylinder's lowest cap (Y=-1/2), the left edge is
+                // X=9/4 in world space, beyond its rightmost X=2-oneRaw.
+                // Bounds still overlap, but the actual triangle is separated.
+                new Vector3d((Fixed64)6, Fixed64.One, Fixed64.Zero)
             },
             new[] { 0, 1, 2 },
             MeshColliderMode.Concave,
@@ -1509,14 +1512,6 @@ public sealed class CollisionDetectionShapePairTests
                 mesh.Mesh.Rotation,
                 out _)
             .Should().BeFalse();
-        if (finiteAxis is LSCylinderCollider cylinder)
-        {
-            CylinderContactGeometry.IsAxisAligned(
-                    cylinder.Rotation,
-                    Vector3d.Up,
-                    mesh.Mesh.GetFaceNormalWorld(0))
-                .Should().BeFalse();
-        }
         AssertNoCollision(
             scenario,
             mesh,

@@ -317,125 +317,25 @@ internal static class MeshTriangleContactGenerator
             out Vector3d second,
             out Vector3d third);
         var triangle = new FixedTriangle(first, second, third);
-        var cylinderCenter = new FixedPointAnchor(
-            cylinder.Center,
-            FixedQuaternion.Identity,
-            Vector3d.Zero);
-        Vector3d normal = OrientNormal(
-            mesh.Mesh.CreatePointAnchor(triangle.Centroid),
-            cylinderCenter,
-            mesh.Mesh.GetFaceNormalWorld(triangleIndex));
-        if (TryAddCylinderCapTriangleContacts(
-                pair,
-                mesh,
-                triangle,
-                cylinder,
-                normal))
-        {
-            return true;
-        }
-
-        if (!cylinderCenter.TryGetLocalPointIn(
-                mesh.Mesh.Origin,
-                mesh.Mesh.Rotation,
-                out Vector3d localCylinderCenter))
-        {
-            return false;
-        }
-
-        Vector3d localPointOnMesh =
-            triangle.ClosestPoint(localCylinderCenter);
-        FixedPointAnchor meshAnchor =
-            mesh.Mesh.CreatePointAnchor(localPointOnMesh);
-        // The closest point belongs to the admitted triangle candidate, so its
-        // cylinder-frame offset is finite once the center entered the mesh frame.
-        _ = meshAnchor.TryGetLocalPointIn(
-            cylinder.Center,
-            cylinder.Rotation,
-            out Vector3d localPointInCylinder);
-        if (!FixedSegment.ContainsPointInCenteredFiniteCylinder(
-                localPointInCylinder,
-                Vector3d.Zero,
-                Vector3d.Up,
-                cylinder.Height,
-                cylinder.ScaledRadius))
-        {
-            return false;
-        }
-        // Exact containment proves the centered canonical surface offset
-        // remains inside the admitted radius and height.
-        _ = FixedSegment.TryGetClosestCenteredFiniteCylinderSurfaceOffset(
-            localPointInCylinder,
-            Vector3d.Zero,
-            Vector3d.Up,
-            cylinder.Height,
-            cylinder.ScaledRadius,
-            Vector3d.Right,
-            out Vector3d localCylinderPoint,
-            out _,
-            out Fixed64 signedDistance);
-
-        Fixed64 depth = -signedDistance;
-        AddContact(
-            pair,
-            new ContactAnchor(meshAnchor),
-            new ContactAnchor(
-                cylinder.Center,
-                cylinder.Rotation,
-                localCylinderPoint),
-            depth,
-            normal,
-            depthIsClamped: false);
-        return true;
-    }
-
-    private static bool TryAddCylinderCapTriangleContacts(
-        CollisionWorkItem pair,
-        LSMeshCollider mesh,
-        FixedTriangle triangle,
-        LSCylinderCollider cylinder,
-        Vector3d normal)
-    {
-        if (!CylinderContactGeometry.IsAxisAligned(
-                cylinder.Rotation,
-                Vector3d.Up,
-                normal))
-            return false;
-
-        int initialCount = pair.Manifold.Count;
-        CylinderContactGeometry.GetCapBasis(cylinder, out Vector3d tangentA, out Vector3d tangentB);
-        TryAddCylinderCapTriangleContact(pair, mesh, triangle, cylinder, -normal + tangentA, normal);
-        TryAddCylinderCapTriangleContact(pair, mesh, triangle, cylinder, -normal - tangentA, normal);
-        TryAddCylinderCapTriangleContact(pair, mesh, triangle, cylinder, -normal + tangentB, normal);
-        TryAddCylinderCapTriangleContact(pair, mesh, triangle, cylinder, -normal - tangentB, normal);
-
-        if (pair.Manifold.Count > initialCount)
-            return true;
-
-        TryAddCylinderCapTriangleContact(pair, mesh, triangle, cylinder, -normal, normal);
-        return pair.Manifold.Count > initialCount;
-    }
-
-    private static void TryAddCylinderCapTriangleContact(
-        CollisionWorkItem pair,
-        LSMeshCollider mesh,
-        FixedTriangle triangle,
-        LSCylinderCollider cylinder,
-        Vector3d supportDirection,
-        Vector3d normal)
-    {
-        if (!triangle.TryGetCenteredFiniteCylinderSupportContact(
+        if (!triangle.TryGetCenteredFiniteCylinderContact(
                 mesh.Mesh.Origin,
                 mesh.Mesh.Rotation,
                 cylinder.Center,
                 cylinder.Rotation,
                 cylinder.Height,
                 cylinder.ScaledRadius,
-                supportDirection,
-                normal,
-                out FixedContactAnchors contact))
+                out FixedContactAnchors contact,
+                out bool isCapFaceContact))
         {
-            return;
+            return false;
+        }
+
+        // Enrichment belongs only to a certified cap/triangle-face winner.
+        // Nearly parallel rim contacts must retain their selected witnesses.
+        if (isCapFaceContact && TryAddCylinderCapTriangleContacts(
+                pair, mesh, triangle, cylinder, contact))
+        {
+            return true;
         }
 
         AddContact(
@@ -445,6 +345,60 @@ internal static class MeshTriangleContactGenerator
             contact.Depth,
             contact.Normal,
             contact.DepthIsClamped);
+        return true;
+    }
+
+    private static bool TryAddCylinderCapTriangleContacts(
+        CollisionWorkItem pair,
+        LSMeshCollider mesh,
+        FixedTriangle triangle,
+        LSCylinderCollider cylinder,
+        in FixedContactAnchors primary)
+    {
+        Vector3d normal = primary.Normal;
+        CylinderContactGeometry.GetCapBasis(cylinder, out Vector3d tangentA, out Vector3d tangentB);
+        // A valid support can be deduplicated or lose the four-contact reduction.
+        // Geometric success must not depend on whether the manifold count grew.
+        bool found = TryAddCylinderCapTriangleContact(pair, mesh, triangle, cylinder, -normal + tangentA, primary);
+        found |= TryAddCylinderCapTriangleContact(pair, mesh, triangle, cylinder, -normal - tangentA, primary);
+        found |= TryAddCylinderCapTriangleContact(pair, mesh, triangle, cylinder, -normal + tangentB, primary);
+        found |= TryAddCylinderCapTriangleContact(pair, mesh, triangle, cylinder, -normal - tangentB, primary);
+        return found || TryAddCylinderCapTriangleContact(pair, mesh, triangle, cylinder, -normal, primary);
+    }
+
+    private static bool TryAddCylinderCapTriangleContact(
+        CollisionWorkItem pair,
+        LSMeshCollider mesh,
+        FixedTriangle triangle,
+        LSCylinderCollider cylinder,
+        Vector3d supportDirection,
+        in FixedContactAnchors primary)
+    {
+        if (!triangle.TryGetCenteredFiniteCylinderSupportContact(
+                mesh.Mesh.Origin,
+                mesh.Mesh.Rotation,
+                cylinder.Center,
+                cylinder.Rotation,
+                cylinder.Height,
+                cylinder.ScaledRadius,
+                supportDirection,
+                primary.Normal,
+                out FixedContactAnchors contact))
+        {
+            return false;
+        }
+
+        // Parallel cap/face samples share the selected exact plane gap.
+        // The support query rounds into the triangle frame before measuring
+        // depth; keep it for anchors only, avoiding a second depth rounding.
+        AddContact(
+            pair,
+            new ContactAnchor(contact.FirstAnchor),
+            new ContactAnchor(contact.SecondAnchor),
+            primary.Depth,
+            primary.Normal,
+            primary.DepthIsClamped);
+        return true;
     }
 
     private static void GetTriangleBoundsInFrame(
