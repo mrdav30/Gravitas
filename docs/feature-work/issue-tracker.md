@@ -201,8 +201,12 @@ the owning repository. The source-mode results do not establish published
 package availability. Performance evidence is recorded separately in
 [GRV-Benchmark-018](benchmark-signal-hardening-backlog.md#grv-benchmark-018--complete-trianglecylinder-contact-cost).
 
-The separately reproduced positive-core capsule-slab and unrepresentable
-mesh/cone defects remain **FMS-Issue-027** and **GRV-Issue-086**; neither is a
+The separately reproduced positive-core capsule-slab defect, **FMS-Issue-027**,
+was resolved upstream on 2026-09-28 with complete stadium-prism contacts.
+`MixedNarrowPhaseTests.CapsuleTriangle.cs` verifies separated rims, exact
+interior-rim depth/normal/anchors and middle-cap contacts through the actual
+mixed dispatcher. Both package configurations retain full reachable coverage.
+The unrepresentable mesh/cone defect remains **GRV-Issue-086**; it is not a
 reason to retain an incomplete cylinder contact path.
 
 ### GRV-Issue-077 - Local-stack benchmark child fails while the launcher reports success

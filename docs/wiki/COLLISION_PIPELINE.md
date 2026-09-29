@@ -129,6 +129,10 @@ Gravitas may enrich a selected parallel cap/triangle-face contact with support
 samples while preserving the selected exact depth and clamp flag. A nearly
 parallel rim contact keeps its own selected witnesses instead.
 Mixed mesh/circle-slab contacts use the same triangle/cylinder geometry.
+Mixed mesh/capsule-slab contacts similarly delegate to the complete planar
+capsule-slab query. Its flat caps, straight sides and rounded-end rims are
+distinct features; the shape is not a rounded 3D capsule or just two end
+cylinders. The selected paired anchors can lie in the middle of the core.
 
 Finite axes, oriented cuboids, and planar convex shapes retain center-relative
 canonical geometry through narrow phase. Contact witnesses use `ContactAnchor`
