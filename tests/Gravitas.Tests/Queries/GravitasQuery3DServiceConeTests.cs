@@ -737,7 +737,7 @@ public sealed class GravitasQuery3DServiceConeTests
     }
 
     [Fact]
-    public void OverlapCone_WhenOriginCannotEnterConcaveMeshFrame_ShouldReject()
+    public void OverlapCone_WithSeparatedMeshAndUnrepresentableLocalApex_ShouldReject()
     {
         using GravitasWorldContext context =
             GravitasWorldContext.CreateOwned();
@@ -781,6 +781,62 @@ public sealed class GravitasQuery3DServiceConeTests
         context.Query3D.LastQueryCandidateCount.Should().Be(1);
         context.Query3D.LastMeshTriangleCandidateCount
             .Should().BeGreaterThan(0);
+    }
+
+    [Fact]
+    public void OverlapCone_WithIntersectingMeshAndUnrepresentableLocalApex_ShouldReturnFirstAxialHit()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        var mesh = new LSMeshCollider(
+            new[]
+            {
+                new Vector3d(-3, -1, 0),
+                new Vector3d(3, -1, 0),
+                new Vector3d(0, 1, 0)
+            },
+            new[] { 0, 1, 2 },
+            MeshColliderMode.Concave,
+            MeshInertiaPolicy.SurfaceApproximation);
+        mesh.InitializeWithNoBody(new TestMatterAgent(scenario.Context,
+            new FixedTransform(new Vector3d(3, 0, 0), FixedQuaternion.Identity, Vector3d.One)));
+        var apex = new Vector3d(Fixed64.MinValue + (Fixed64)2, Fixed64.Half, Fixed64.Zero);
+        var hits = new SwiftList<Physics3DHit>(1);
+
+        bool found = scenario.Context.Query3D.OverlapCone(
+            apex, Vector3d.Down, Fixed64.One, Fixed64.MaxValue, out Physics3DHit closest, IncludeLayerZero);
+        int count = scenario.Context.Query3D.OverlapConeAll(
+            apex, Vector3d.Down, Fixed64.One, Fixed64.MaxValue, IncludeLayerZero, hits);
+
+        // The first contact is on the left sloping edge near (3/4, -1/2, 0).
+        // The enormous radius puts it just before the base, not outside the mesh.
+        found.Should().BeTrue();
+        closest.Collider.Should().BeSameAs(mesh);
+        closest.Distance.Should().BeInRange(Fixed64.One - Fixed64.FromRaw(4), Fixed64.One);
+        closest.Point.X.Should().BeInRange(Fixed64.FromFraction(3, 4) - Fixed64.FromRaw(4), Fixed64.FromFraction(3, 4) + Fixed64.FromRaw(4));
+        closest.Point.Y.Should().BeInRange(-Fixed64.Half, -Fixed64.Half + Fixed64.FromRaw(4));
+        closest.Point.Z.Should().Be(Fixed64.Zero);
+        count.Should().Be(1);
+        hits[0].Should().Be(closest);
+
+        PhysicsOverlapCone3DRequest[] requests =
+        {
+            new(apex, Vector3d.Down, Fixed64.One, Fixed64.MaxValue, IncludeLayerZero),
+            new(apex, Vector3d.Up, Fixed64.One, Fixed64.MaxValue, IncludeLayerZero)
+        };
+        var closestHits = new Physics3DHit[2];
+        var ranges = new PhysicsQueryHitRange[2];
+        scenario.Context.Query3D.OverlapConeBatch(requests, closestHits).Should().Be(1);
+        scenario.Context.Query3D.OverlapConeAllBatch(requests, hits, ranges).Should().Be(1);
+        closestHits[0].Should().Be(closest);
+        closestHits[1].Should().Be(default(Physics3DHit));
+        ranges[0].Count.Should().Be(1);
+        ranges[1].Count.Should().Be(0);
+        hits[ranges[0].Start].Should().Be(closest);
+        long allocated = AllocationTestHelper.MeasureSteadyState(() =>
+            scenario.Context.Query3D.OverlapConeAll(apex, Vector3d.Down, Fixed64.One,
+                Fixed64.MaxValue, IncludeLayerZero, hits));
+        allocated.Should().Be(0);
+        hits[0].Should().Be(closest);
     }
 
     [Fact]

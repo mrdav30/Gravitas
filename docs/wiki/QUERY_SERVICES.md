@@ -48,7 +48,9 @@ full-domain `FixedTriangle` contract. Stable AB, BC, CA boundary candidates and
 the exact face-interior candidate are compared before final hit narrowing, so a
 cone section wholly contained by a large triangle is not dependent on an edge
 crossing or an axis/face intersection. Equal-distance mesh hits retain triangle
-index order, and the warmed query path remains allocation-free.
+index order, and the warmed query path remains allocation-free. The query keeps
+the world-space cone and the triangle's authored rigid frame separate; an apex
+that cannot fit in mesh-local scalar coordinates is not a reason to miss a hit.
 
 The 3D projected-circle family classifies the complete X/Z projection of each
 supported collider. Query Y is ignored. Exact containment is a zero-distance

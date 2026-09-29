@@ -32,6 +32,12 @@ instead of burying it in notes.
 
 ## Recently Completed
 
+- [`Canonical-Frame Cone-Volume Queries`](issue-tracker.md#grv-issue-087---cone-volume-queries-reject-an-intersecting-mesh-when-the-apex-cannot-enter-its-scalar-frame)
+  - Completed 2026-09-29. Closest/all-hit and batch cone queries preserve the
+    authored mesh frame through FixedMathSharp's shared minimum-axial query.
+    Unrepresentable intermediate coordinates no longer reject genuine hits;
+    deterministic candidate order and allocation-free warmed queries remain.
+
 - [`Complete Triangle/Cone Contact`](done/2026-09-28-complete-triangle-cone-contact-plan.md)
   - Completed 2026-09-29. FixedMathSharp now selects complete triangle/cone
     contacts in authored frames; Gravitas consumes coherent normal/depth/anchors
@@ -41,7 +47,8 @@ instead of burying it in notes.
     Release and ReleaseLean. Exact face certificates and shared depth reduction
     cut ordinary face costs by 67–89% from the first complete solver; measured
     remaining costs are GRV-Benchmark-019. Fresh shared-owner controls detected
-    no material regression. The separate cone-volume query bug is GRV-Issue-087.
+    no material regression. The separate cone-volume query bug was resolved as
+    GRV-Issue-087.
 
 - [`Mixed Discrete Broad-Phase Signal Closure`](benchmark-signal-hardening-backlog.md#closed-signal-mixed-discrete-broad-phase-allocation-at-32-pairs)
   - Completed 2026-08-04. The original run-dependent 32-pair allocation no

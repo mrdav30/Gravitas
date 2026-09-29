@@ -234,6 +234,11 @@ candidates with the exact face-interior candidate before returning one
 maximum-scale lattice witness, so a cone section wholly contained by a triangle
 does not require an edge crossing or an axis/face intersection. Exact ties keep
 edge order, and equal-distance mesh hits keep triangle index order.
+The reducer retains the cone's world-space definition and exact rational mesh
+rotation through classification. It does not narrow the apex into mesh-local
+coordinates or materialize transformed triangle vertices. The selected witness
+is rounded once in the triangle's authored frame and returned as a contact
+anchor; use `TryGetPoint` if a world-space `Vector3d` is needed.
 
 The 3D `OverlapCircle` family classifies the complete X/Z projection of each
 supported 3D collider. It is not a `Query2D` call, not a swept circle, and not a

@@ -106,8 +106,52 @@
   penetrating rims, ordinary/rotated/full-domain controls, allocations and
   standard/Lean coverage. No new geometry solver is required.
 
+## Resolved Issues
 
 ### GRV-Issue-087 - Cone-volume queries reject an intersecting mesh when the apex cannot enter its scalar frame
+
+**Resolved:** 2026-09-29.
+
+**Fix:** The cone-volume reducer now passes the world-space cone and the mesh's
+canonical frame to FixedMathSharp's minimum-axial triangle query. It no longer
+uses failed scalar-frame conversion as a separation proof or rounds the inverse
+rotation before classification. Scalar and rigid queries share edge/face
+selection and the existing bounded conic reducer; no penetration solver or
+second Gravitas geometry implementation was added.
+
+**Regressions:** Closest/all-hit and both batch entry points return the expected
+earliest axial witness for the original full-domain fixture, while the genuinely
+separated mesh still rejects. Rotated/full-domain faces, exact apex contact,
+finite caps, reversed winding, quaternion-sign equivalence, root-rounding ties
+and allocation-free warmed queries are covered upstream. Independent review
+also caught a near-unit-axis edge/face ranking mismatch; its failing exact
+witness regression now passes using the existing wide-ratio conversion.
+
+**Verification:** FixedMathSharp passes 3,917 / 3,896 core tests in Release /
+ReleaseLean plus 49 integration tests in each configuration; core coverage is
+100% reachable line, branch and method. The focused Debug arithmetic run
+passes 186 cases. Gravitas passes 4,318 / 4,259 tests with 100% reachable line,
+branch and method coverage in Release / ReleaseLean. No exclusions were added.
+Both full solutions build for netstandard2.1 and net8.0 in both configurations;
+both DocFX sites pass warnings-as-errors. Independent correctness, arithmetic
+and Ponytail reviews have no outstanding findings. Source-stack validation uses
+`UseLocalLsfStack=true`; it is not published-package validation.
+Coverage/build evidence is under `artifacts/grv087/final-*` in each repository.
+
+**Performance:** The existing `OverlapConeAllAcrossConcaveMeshTargets` row
+(`ColliderCount=64`) measures **3.440 ms before / 3.158 ms after**, about **8.2%
+lower mean time**, with **0 B/op**. Both use Release, .NET 8.0.29, two launches,
+five warmups and fifteen measured iterations on the same two-core-affinity host.
+The first frame-preserving implementation measured 3.796 ms; retaining the
+proven exact-translation path and reusing its scalar projection removed that
+avoidable cost. An earlier optimized run measured 3.166 ms. These are this
+ordinary query scenario's results, not a claim about every geometry workload
+or the cost of newly admitted extreme-coordinate hits. Baseline source was
+Gravitas `4d69d81` / FixedMathSharp `0323efb`; logs and BenchmarkDotNet reports
+are under `artifacts/grv087/baseline*`, `current*`, `optimized*` and
+`final-benchmark*` in Gravitas.
+
+**Original evidence:**
 
 - **Confirmed:** 2026-09-28 during GRV-Issue-086 caller review, from Gravitas
   `3471085` / FixedMathSharp `3f7a606`. This query path is independent of
@@ -126,19 +170,11 @@
   its axial distance are representable; failure to represent an intermediate
   is not a separation proof. Both closest-hit and all-hit entry points share
   this reducer.
-- **Evidence:** Direct public closest-hit query using existing Release
+- **Original probe:** Direct public closest-hit query using existing Release
   local-stack assemblies in PowerShell/.NET `10.0.11`; internal counters were
   read only to establish broad-phase admission. No private geometry was
   fabricated. This was not a new build or the .NET 8 regression suite; the
-  all-hit entry point still needs its own execution regression.
-- **Next action:** Add closest/all-hit regressions and preserve canonical
-  frames through the existing minimum-axial cone/triangle query. Reuse exact
-  query arithmetic, maintain axial-distance ordering and authored triangle
-  tie-breaking, and verify rotated/full-domain witnesses and allocations.
-  A minimum-depth contact query is not a substitute for the earliest-axial
-  surface witness required here. Keep this separate from GRV-Issue-086.
-
-## Resolved Issues
+  all-hit entry point had not yet been exercised at discovery.
 
 ### GRV-Issue-086 - Mesh/cone contact uses incomplete triangle sampling and scalar-frame rejection
 
@@ -167,7 +203,7 @@ package availability evidence.
 67% versus the first complete solver. Some previously correct ordinary cases
 remain slower than the incomplete predecessor, and curved/full-domain cases
 remain expensive. Follow-up is **GRV-Benchmark-019**; the distinct minimum-axial
-cone-volume query defect remains **GRV-Issue-087**.
+cone-volume query defect was separately resolved as **GRV-Issue-087**.
 
 **Original evidence:**
 
@@ -287,7 +323,7 @@ was resolved upstream on 2026-09-28 with complete stadium-prism contacts.
 interior-rim depth/normal/anchors and middle-cap contacts through the actual
 mixed dispatcher. Both package configurations retain full reachable coverage.
 The separately tracked mesh/cone contact defect was subsequently resolved as
-**GRV-Issue-086**; its cone-volume-query sibling remains **GRV-Issue-087**.
+**GRV-Issue-086**; its cone-volume-query sibling was resolved as **GRV-Issue-087**.
 
 ### GRV-Issue-077 - Local-stack benchmark child fails while the launcher reports success
 

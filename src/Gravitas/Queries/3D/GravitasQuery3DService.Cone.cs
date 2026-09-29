@@ -331,16 +331,6 @@ public sealed partial class GravitasQuery3DService
             origin,
             FixedQuaternion.Identity,
             Vector3d.Zero);
-        if (!queryOriginAnchor.TryGetLocalPointIn(
-                mesh.Mesh.Origin,
-                mesh.Mesh.Rotation,
-                out Vector3d localOrigin))
-        {
-            hit = default;
-            return false;
-        }
-        Vector3d localDirection =
-            mesh.Mesh.Rotation.Inverse().Rotate(direction);
 
         for (int i = 0; i < _meshTriangleCandidates.Count; i++)
         {
@@ -352,17 +342,17 @@ public sealed partial class GravitasQuery3DService
                 out Vector3d third);
             Vector3d normal = mesh.Mesh.GetFaceNormalWorld(triangleIndex);
             if (!new FixedTriangle(first, second, third).TryGetFiniteConeIntersectionMinimumAxialPoint(
-                    localOrigin,
-                    localDirection,
+                    mesh.Mesh.Origin,
+                    mesh.Mesh.Rotation,
+                    origin,
+                    direction,
                     length,
                     endRadius,
-                    out Vector3d localPoint))
+                    out FixedPointAnchor pointAnchor))
             {
                 continue;
             }
 
-            FixedPointAnchor pointAnchor =
-                mesh.Mesh.CreatePointAnchor(localPoint);
             Fixed64 axialDistance = FixedMath.Min(
                 pointAnchor.ProjectNonNegativeOffsetFrom(
                     queryOriginAnchor,
