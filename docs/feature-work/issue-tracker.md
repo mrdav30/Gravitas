@@ -2,7 +2,7 @@
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-087`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-088`.
 - Assign an ID when an issue enters this tracker, keep it through resolution,
   and never reuse an ID even if an entry is later removed. Check this file's Git
   history before advancing or repairing the counter.
@@ -106,8 +106,12 @@
   penetrating rims, ordinary/rotated/full-domain controls, allocations and
   standard/Lean coverage. No new geometry solver is required.
 
-### GRV-Issue-086 - Mesh/cone contact drops a real intersection when the center offset is unrepresentable
+### GRV-Issue-086 - Mesh/cone contact uses incomplete triangle sampling and scalar-frame rejection
 
+- **Coordination:** [Complete Triangle/Cone Contact](2026-09-28-complete-triangle-cone-contact-plan.md)
+  captures the approved direction, exact touching/separation contract, reuse
+  boundaries and verification gates. Its written design is ready for review;
+  the issue remains open until the implementation is verified.
 - **Confirmed:** 2026-09-27 while verifying GRV-Issue-082, from Gravitas
   `0a6f480` with the local FixedMathSharp source stack. This is an existing
   cone-path defect, not introduced by the cylinder repair.
@@ -135,12 +139,73 @@
   confirmed the proof above. The shared separated control now moves the
   local apex to `(6,1,0)`; that is a genuine gap, not the reproduction here.
   The original cylinder case is retained separately as a positive regression.
-- **Next action:** Add the enabled cone regression with the original vertices,
-  then repair contact generation using canonical frames and truthful selected
-  features. Removing the guard alone is not sufficient if later calculations
-  still require the unrepresentable center offset. Keep this separate from
-  GRV-Issue-082 and verify cone-specific cap, side, rim, witness and allocation
-  behavior in both package configurations.
+- **Expanded investigation (2026-09-28):** The same owner also fails at ordinary
+  coordinates; this is not only a full-domain conversion defect. For an
+  identity cone at zero with radius `1` and height `2`, use an identity concave
+  triangle at zero with vertices `(4/5,0,0)`, `(4/5,-2,0)`, `(2,-2,0)`.
+  Bounds overlap, but the dispatcher returns false. The point `(9/10,-19/20,0)`
+  is strictly inside both: the triangle spans X from `4/5` to `137/100` at
+  that height, while the cone's cross-section radius is `39/40`. The nearest
+  triangle point to the cone center is outside the cone; the single cone
+  support projected onto the triangle plane is outside the triangle. Neither
+  failed sample proves separation.
+- **Inconsistent contact evidence:** With the same radius-1, height-2 cone,
+  triangle `(0,-2,-2)`, `(0,2,-2)`, `(0,0,2)` returns depth
+  `0.4472135955002159`, normal `(1,0,0)`, mesh anchor `(0,0,0)` and cone anchor
+  approximately `(0.4,0.2,0)`. The selected nearest-surface depth is not the
+  penetration along the returned triangle-face normal; the witness displacement
+  is not parallel to that normal and has the wrong signed orientation. The
+  closest-surface routine supplies its own normal, but this consumer discards
+  it and retains the separately chosen triangle normal.
+- **Current verification boundary:** Read-only inspection at Gravitas
+  `3471085` / FixedMathSharp `3f7a606`, followed by direct probes of the existing
+  Release local-stack assemblies using the real scenario initializer and
+  collision dispatcher in PowerShell/.NET `10.0.11`. The original full-domain
+  miss and both ordinary cases above were reproduced; exact upstream cone
+  containment confirmed the interior witnesses. These are diagnostic probes,
+  not a new build, a .NET 8 regression suite, or throughput measurements.
+- **Next action:** Replace this incomplete mesh-triangle selection with a
+  canonical-frame finite cone/triangle contact relation owned by FixedMathSharp.
+  Reuse the existing exact frame, support, candidate-ranking and root arithmetic
+  where their contracts fit; select the cone base, side, rim or apex together
+  with matching triangle features, depth, normal and paired witnesses. The
+  existing explicitly named cone support-projection query is not a complete
+  intersection query and should not be silently redefined. Capture the original
+  and ordinary regressions first, then verify rotated/full-domain, touching/gap,
+  winding, odd-raw height, degenerate, allocation and standard/Lean coverage
+  behavior. Capture matching cone baselines before replacing the runtime path
+  and retain cylinder/capsule-slab controls for any shared arithmetic changes.
+
+### GRV-Issue-087 - Cone-volume queries reject an intersecting mesh when the apex cannot enter its scalar frame
+
+- **Confirmed:** 2026-09-28 during GRV-Issue-086 caller review, from Gravitas
+  `3471085` / FixedMathSharp `3f7a606`. This query path is independent of
+  mesh/cone collision contact generation.
+- **Reproduction:** In the existing `PhysicsScenarioBuilder` grid, initialize
+  one bodyless concave `SurfaceApproximation` mesh with local vertices
+  `(-3,-1,0)`, `(3,-1,0)`, `(0,1,0)`, identity rotation and origin `(3,0,0)`.
+  Call `context.Query3D.OverlapCone` with apex
+  `(Fixed64.MinValue + Fixed64.Two, 1/2, 0)`, direction `Vector3d.Down`,
+  length `1`, end radius `Fixed64.MaxValue` and `PhysicsLayerMask.FromLayer(0)`.
+  It returns false after admitting one collider and one mesh triangle. This
+  cone is the same geometric volume as the original GRV-Issue-086 fixture;
+  `(1,-1/2+2^-32,0)` is strictly inside the triangle and cone.
+- **Cause:** `TryBuildConeHitForConcaveMesh` rejects when the query apex cannot
+  be materialized in the mesh's local scalar frame. The geometric witness and
+  its axial distance are representable; failure to represent an intermediate
+  is not a separation proof. Both closest-hit and all-hit entry points share
+  this reducer.
+- **Evidence:** Direct public closest-hit query using existing Release
+  local-stack assemblies in PowerShell/.NET `10.0.11`; internal counters were
+  read only to establish broad-phase admission. No private geometry was
+  fabricated. This was not a new build or the .NET 8 regression suite; the
+  all-hit entry point still needs its own execution regression.
+- **Next action:** Add closest/all-hit regressions and preserve canonical
+  frames through the existing minimum-axial cone/triangle query. Reuse exact
+  query arithmetic, maintain axial-distance ordering and authored triangle
+  tie-breaking, and verify rotated/full-domain witnesses and allocations.
+  A minimum-depth contact query is not a substitute for the earliest-axial
+  surface witness required here. Keep this separate from GRV-Issue-086.
 
 ## Resolved Issues
 

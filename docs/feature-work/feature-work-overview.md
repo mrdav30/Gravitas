@@ -21,6 +21,12 @@ instead of burying it in notes.
 
 ## Active Coordination
 
+- [`Complete Triangle/Cone Contact`](2026-09-28-complete-triangle-cone-contact-plan.md)
+  - Design ready for review for GRV-Issue-086. FixedMathSharp will own complete
+    canonical-frame cone/triangle contact selection; Gravitas will replace its
+    incomplete sampling path while preserving mesh traversal and containment
+    policy. Reuse existing exact arithmetic and verify matching performance and
+    coverage. The separate cone-volume query defect remains GRV-Issue-087.
 - [`Cross-Stack Issue Resolution`](issue-tracker.md)
   - Resolve cross-stack issues in dependency order: `FixedMathSharp`,
     `SwiftCollections`, `GridForge`, then Gravitas. Package references are the
