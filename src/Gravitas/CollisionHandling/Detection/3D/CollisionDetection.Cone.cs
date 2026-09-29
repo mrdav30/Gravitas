@@ -170,98 +170,27 @@ public static partial class CollisionDetection
                 out Vector3d first,
                 out Vector3d second,
                 out Vector3d third);
-            Vector3d windingNormal = mesh.Mesh.GetFaceNormalWorld(triangleIndex);
             var triangle = new FixedTriangle(first, second, third);
-            var coneCenterAnchor = new FixedPointAnchor(
-                cone.Center,
-                FixedQuaternion.Identity,
-                Vector3d.Zero);
-            if (!coneCenterAnchor.TryGetLocalPointIn(
-                    mesh.Mesh.Origin,
-                    mesh.Mesh.Rotation,
-                    out Vector3d localConeCenter))
+            // Admission and the complete contact must belong to the same
+            // feature; a nearest-center sample can miss a side intersection.
+            if (!triangle.TryGetCenteredFiniteConeContact(
+                    mesh.Mesh.Origin, mesh.Mesh.Rotation,
+                    cone.Center, cone.Rotation, cone.Height, cone.ScaledRadius,
+                    out FixedContactAnchors contact))
             {
                 continue;
             }
 
-            Vector3d candidatePointOnMesh =
-                triangle.ClosestPoint(localConeCenter);
-            FixedPointAnchor candidateMeshAnchor =
-                mesh.Mesh.CreatePointAnchor(candidatePointOnMesh);
-            Vector3d candidateNormalMeshToCone =
-                OrientNormal(
-                    candidateMeshAnchor,
-                    coneCenterAnchor,
-                    windingNormal).Normalized;
-            FixedPointAnchor candidateConeAnchor;
-            Fixed64 candidateDepth;
-            bool candidateDepthIsClamped;
-            // The closest point belongs to a triangle already admitted into
-            // the cone's candidate bounds, so its cone-frame offset is finite.
-            _ = candidateMeshAnchor.TryGetLocalPointIn(
-                cone.Center,
-                cone.Rotation,
-                out Vector3d localPointInCone);
-            bool closestMeshPointInsideCone =
-                FixedSegment.ContainsPointInCenteredFiniteCone(
-                    localPointInCone,
-                    Vector3d.Zero,
-                    Vector3d.Up,
-                    cone.Height,
-                    cone.ScaledRadius);
-            if (closestMeshPointInsideCone)
-            {
-                // Exact containment proves the centered canonical surface
-                // offset remains inside the admitted radius and height.
-                _ = FixedSegment.TryGetClosestCenteredFiniteConeSurfaceOffset(
-                    localPointInCone,
-                    Vector3d.Zero,
-                    Vector3d.Up,
-                    cone.Height,
-                    cone.ScaledRadius,
-                    Vector3d.Right,
-                    out Vector3d localConePoint,
-                    out _,
-                    out Fixed64 signedDistance);
-
-                candidateDepth = -signedDistance;
-                candidateDepthIsClamped = false;
-                candidateConeAnchor = new FixedPointAnchor(
-                    cone.Center,
-                    cone.Rotation,
-                    localConePoint);
-            }
-            else if (triangle.TryGetCenteredFiniteConeSupportContact(
-                         mesh.Mesh.Origin,
-                         mesh.Mesh.Rotation,
-                         cone.Center,
-                         cone.Rotation,
-                         cone.Height,
-                         cone.ScaledRadius,
-                         -candidateNormalMeshToCone,
-                         candidateNormalMeshToCone,
-                         out FixedContactAnchors contact))
-            {
-                candidateMeshAnchor = contact.FirstAnchor;
-                candidateConeAnchor = contact.SecondAnchor;
-                candidateDepth = contact.Depth;
-                candidateDepthIsClamped = contact.DepthIsClamped;
-            }
-            else
-            {
-                continue;
-            }
-
-            if (found && candidateDepth >= bestDepth)
+            if (found && contact.Depth >= bestDepth)
                 continue;
 
             found = true;
-            bestDepth = candidateDepth;
-            meshAnchor = new ContactAnchor(candidateMeshAnchor);
-            coneAnchor = new ContactAnchor(candidateConeAnchor);
-            normalMeshToCone = candidateNormalMeshToCone;
-            depth = candidateDepth;
-            depthIsClamped = candidateDepthIsClamped;
+            bestDepth = contact.Depth;
+            meshAnchor = new ContactAnchor(contact.FirstAnchor);
+            coneAnchor = new ContactAnchor(contact.SecondAnchor);
+            normalMeshToCone = contact.Normal;
+            depth = contact.Depth;
+            depthIsClamped = contact.DepthIsClamped;
         }
 
         return found;
@@ -282,19 +211,6 @@ public static partial class CollisionDetection
 
         cone = (LSConeCollider)pair.ColliderB;
         convex = pair.ColliderA;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Vector3d OrientNormal(
-        in FixedPointAnchor source,
-        in FixedPointAnchor target,
-        Vector3d normal)
-    {
-        Vector3d resolved = normal.Normalized;
-        return source.ProjectNonNegativeOffsetFrom(target, resolved)
-                > Fixed64.Zero
-            ? -resolved
-            : resolved;
     }
 
 }

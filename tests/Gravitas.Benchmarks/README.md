@@ -103,6 +103,15 @@ dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll all 
 
 Do not treat short-run numbers as canonical measurements.
 
+### Mesh/cone contacts
+
+The `mesh-cone-contact` selection measures base, side, apex, oblique-rim,
+interior stationary-rim, touching/separated and full-domain contacts through mesh
+dispatch. Setup verifies classification and the known exact depths before
+timing; the unrepresentable-relative-center case checks intersection without
+forcing a narrowed center. Compare individual rows rather than averaging
+ordinary face contacts with curved-feature work.
+
 ### Continuous collision evidence
 
 `dynamic-ccd-scaling` keeps short dynamic CCD regression rows, while

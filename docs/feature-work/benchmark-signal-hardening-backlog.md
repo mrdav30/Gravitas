@@ -16,7 +16,7 @@ this backlog.
 ## Intake Rules
 
 - Signal IDs use `GRV-Benchmark-NNN`. The next available ID is
-  `GRV-Benchmark-019`.
+  `GRV-Benchmark-020`.
 - Assign an ID at intake and never reuse it, including after a signal closes or
   moves into a dated plan. Check this file's Git history before advancing or
   repairing the counter.
@@ -60,6 +60,75 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 ```
 
 ## Active Signals
+
+### GRV-Benchmark-019 — Complete Triangle/Cone Contact Cost
+
+**Discovered:** 2026-09-29.  
+**Status:** Measured performance follow-up to the GRV-Issue-086 correctness repair.  
+**Owners:** FixedMathSharp's triangle/cone support selection, rim roots and paired
+witnesses; Gravitas's mesh candidate traversal.
+
+Correctness, resource proofs and shared-owner control evidence are retained in
+the [completed contact plan](done/2026-09-28-complete-triangle-cone-contact-plan.md).
+
+The complete contact query replaces missed intersections and inconsistent
+normal/depth/anchor output. Its exact geometry is the correctness baseline.
+The bounded optimization pass reused the existing face-disk certificate and
+principal-axis depth reducer; it did not introduce an approximate fallback,
+new arithmetic engine, cache or allocation.
+
+Matched Windows/i7-9700K measurements use .NET 8.0.29, SDK 10.0.302, two launches,
+five warmups and fifteen measured iterations per launch. The launcher is
+BelowNormal with affinity mask 3 and `DOTNET_PROCESSOR_COUNT=2`; only one heavy
+workload runs at a time. Values below are **microseconds per dispatched query**,
+not batches or simulation frames. Every row reports zero managed allocation.
+
+| Geometry | Old incomplete path | Initial complete solver | Final mean | Final standard deviation |
+| --- | ---: | ---: | ---: | ---: |
+| Base face | 19.983 | 152.1 | 33.89 | 0.676 |
+| Side face | 17.525 | 567.4 | 62.57 | 1.193 |
+| Apex face | 28.838 — wrong depth | 169.3 | 55.67 | 1.331 |
+| Side intrusion | 15.407 — missed contact | 301.5 | 283.08 | 6.321 |
+| Oblique rim | 17.403 — missed contact | 905.3 | 850.98 | 31.440 |
+| Interior stationary rim | Not captured | Not captured | 1,407.39 | 32.889 |
+| Rim touch | 17.932 — missed touch | 703.1 | 692.58 | 13.452 |
+| Rim gap | 17.652 | 122.0 | 120.78 | 2.479 |
+| Unrepresentable relative center | 6.069 — missed contact | 1,708.7 | 1,652.05 | 31.686 |
+
+Final base/side/apex costs are about 78% / 89% / 67% lower than the initial
+complete implementation. The old base/side/gap rows had the correct answers
+for these fixtures and remain cheaper: the final costs are approximately
+1.70x / 3.57x / 6.84x theirs. Five other old rows returned the wrong result and
+are repair-cost comparisons, not equivalent-correctness speed regressions.
+The interior-rim row was added with its independent exact-depth oracle after
+the old baseline. General curved/full-domain work near 0.7–1.7 ms per query is
+still a meaningful cost; ordinary paths also merit further profiling.
+
+All eighteen final cone child launches passed their semantic setup checks.
+BenchmarkDotNet flags multimodal apex and oblique-rim distributions. Small
+curved-row differences are descriptive, not established gains: interior-rim,
+rim-touch and rim-gap intervals overlap the preceding certificate-only run.
+
+Reproduce from the repository root after a local-stack Release benchmark build:
+
+```powershell
+dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0 -p:UseLocalLsfStack=true -m:1 -p:BuildInParallel=false
+dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll mesh-cone-contact --launchCount 2 --warmupCount 5 --iterationCount 15 --affinity 3 --artifacts artifacts/grv086/cone-recheck
+```
+
+Apply the launcher limits above as well; the affinity option alone does not set
+process priority or the runtime's processor-count hint. Setup verifies expected
+classification and certified depths before measurement. Original and final
+reports are under `artifacts/grv086/baseline`, `initial-complete`, `final`
+(certificate-only) and `optimized-and-controls`.
+
+**Next useful action:** Measure duplicate axial/face support preparation for
+horizontal faces, then profile nonwinning rim charts, root ranking and witness
+materialization. Reuse shared improvements where they also help
+[triangle/cylinder contacts](#grv-benchmark-018--complete-trianglecylinder-contact-cost).
+Preserve complete admission, exact ties, canonical paired witnesses, raw-neighbor
+classification, bounded stack use and zero allocations. This is separate from
+the cone-volume-query correctness defect, GRV-Issue-087.
 
 ### GRV-Benchmark-018 — Complete Triangle/Cylinder Contact Cost
 

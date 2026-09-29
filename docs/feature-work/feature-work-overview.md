@@ -21,12 +21,6 @@ instead of burying it in notes.
 
 ## Active Coordination
 
-- [`Complete Triangle/Cone Contact`](2026-09-28-complete-triangle-cone-contact-plan.md)
-  - Design ready for review for GRV-Issue-086. FixedMathSharp will own complete
-    canonical-frame cone/triangle contact selection; Gravitas will replace its
-    incomplete sampling path while preserving mesh traversal and containment
-    policy. Reuse existing exact arithmetic and verify matching performance and
-    coverage. The separate cone-volume query defect remains GRV-Issue-087.
 - [`Cross-Stack Issue Resolution`](issue-tracker.md)
   - Resolve cross-stack issues in dependency order: `FixedMathSharp`,
     `SwiftCollections`, `GridForge`, then Gravitas. Package references are the
@@ -37,6 +31,17 @@ instead of burying it in notes.
     library change. Do not broaden this into speculative optimization work.
 
 ## Recently Completed
+
+- [`Complete Triangle/Cone Contact`](done/2026-09-28-complete-triangle-cone-contact-plan.md)
+  - Completed 2026-09-29. FixedMathSharp now selects complete triangle/cone
+    contacts in authored frames; Gravitas consumes coherent normal/depth/anchors
+    and removes incomplete sampling and scalar-frame rejection. Positive gaps
+    reject without changing closed-convex fallback or CCD policy.
+  - Both repositories retain 100% reachable line, branch and method coverage in
+    Release and ReleaseLean. Exact face certificates and shared depth reduction
+    cut ordinary face costs by 67–89% from the first complete solver; measured
+    remaining costs are GRV-Benchmark-019. Fresh shared-owner controls detected
+    no material regression. The separate cone-volume query bug is GRV-Issue-087.
 
 - [`Mixed Discrete Broad-Phase Signal Closure`](benchmark-signal-hardening-backlog.md#closed-signal-mixed-discrete-broad-phase-allocation-at-32-pairs)
   - Completed 2026-08-04. The original run-dependent 32-pair allocation no

@@ -1288,7 +1288,7 @@ public sealed class CollisionDetectionShapePairTests
     }
 
     [Fact]
-    public void MeshCone_WithConeSideCrossingTrianglePlane_ShouldUseConeSupportContact()
+    public void MeshCone_WithConeSideCrossingTrianglePlane_ShouldReturnPairedSideContact()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSMeshCollider> wall = scenario.CreateBody(
@@ -1307,7 +1307,7 @@ public sealed class CollisionDetectionShapePairTests
     }
 
     [Fact]
-    public void MeshCone_WithBackFacingTriangleCrossingConeSide_ShouldUseWindingForContainment()
+    public void MeshCone_WithBackFacingTriangleCrossingConeSide_ShouldOrientTowardCone()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSMeshCollider> wall = scenario.CreateBody(
@@ -1385,7 +1385,7 @@ public sealed class CollisionDetectionShapePairTests
     }
 
     [Fact]
-    public void MeshConeTriangleSupport_AtPositiveEpsilonGap_ShouldAdmitZeroDepthToleranceContact()
+    public void MeshConeTriangle_AtPositiveEpsilonGap_ShouldRejectSeparatedGeometry()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         Fixed64 planeXShift = Fixed64.FromFraction(1, 6)
@@ -1401,13 +1401,9 @@ public sealed class CollisionDetectionShapePairTests
             scenario,
             new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.Zero));
 
-        CollisionPair pair = AssertCollision(scenario, mesh.Collider, cone.Collider, CollisionType.Mesh_Cone);
-
-        Vector3d.Dot(
-                pair.Manifold.PrimaryContact.PointB - pair.Manifold.PrimaryContact.PointA,
-                pair.Manifold.PrimaryContact.Normal)
-            .Should().Be(Fixed64.Epsilon);
-        pair.Manifold.PrimaryContact.Depth.Should().Be(Fixed64.Zero);
+        // This plane has normal (3,4,0)/5. Its offset is just below the
+        // cone's minimum projection, so the shapes have a real positive gap.
+        AssertNoCollision(scenario, mesh.Collider, cone.Collider, CollisionType.Mesh_Cone);
     }
 
     [Fact]

@@ -129,6 +129,13 @@ Gravitas may enrich a selected parallel cap/triangle-face contact with support
 samples while preserving the selected exact depth and clamp flag. A nearly
 parallel rim contact keeps its own selected witnesses instead.
 Mixed mesh/circle-slab contacts use the same triangle/cylinder geometry.
+Mesh/cone contacts likewise select a complete triangle/cone relation, including
+the base disk, rim, apex and lateral generators. The selected normal, depth and
+both anchors describe one feature; the triangle point nearest the cone center
+is not an intersection test. A genuine positive gap contributes no contact from
+that triangle, while exact touching remains a zero-depth contact. Closed-convex
+mesh containment still uses its separate convex fallback when no surface
+triangle intersects. This does not add a speculative margin or replace CCD.
 Mixed mesh/capsule-slab contacts similarly delegate to the complete planar
 capsule-slab query. Its flat caps, straight sides and rounded-end rims are
 distinct features; the shape is not a rounded 3D capsule or just two end
