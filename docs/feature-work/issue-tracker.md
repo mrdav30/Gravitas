@@ -101,6 +101,10 @@
   straight sides, rounded ends, exact rigid frames and minimum-depth selection;
   a nonzero-core slab is not a single cylinder or a rounded 3D capsule. Keep
   this separate from GRV-Issue-085, with an independently measured baseline.
+- **Coordination:** The proposed
+  [Complete Capsule/Slab Contact plan](2026-09-29-complete-capsule-slab-contact-plan.md)
+  captures the cross-repository design, proof/baseline gate, integration and
+  closeout checks. The issue remains open; implementation has not started.
 
 ## Resolved Issues
 

@@ -21,6 +21,12 @@ instead of burying it in notes.
 
 ## Active Coordination
 
+- [`Complete Capsule/Slab Contact`](2026-09-29-complete-capsule-slab-contact-plan.md)
+  - Proposed cross-repository repair for GRV-Issue-088; awaiting plan review.
+    FixedMathSharp owns complete whole-shape geometry; Gravitas replaces its
+    limited nonzero-core direction checks. Proof, regression baselines, exact
+    contacts, resource limits and full coverage gate the cutover. GRV-Benchmark-020
+    remains separate, with existing cylinder/circle-slab paths used as controls.
 - [`Cross-Stack Issue Resolution`](issue-tracker.md)
   - Resolve cross-stack issues in dependency order: `FixedMathSharp`,
     `SwiftCollections`, `GridForge`, then Gravitas. Package references are the
