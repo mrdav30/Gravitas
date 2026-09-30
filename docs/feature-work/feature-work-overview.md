@@ -32,6 +32,15 @@ instead of burying it in notes.
 
 ## Recently Completed
 
+- [`Complete Capsule/Circle-Slab Contacts`](issue-tracker.md#grv-issue-085---mixed-capsulecircle-slab-contact-bypasses-the-complete-upstream-query)
+  - Completed 2026-09-29. Mixed capsule contacts reuse FixedMathSharp's complete
+    cylinder/capsule geometry, including zero-core planar capsule slabs. The
+    incomplete direction helpers are removed, full slab thickness is retained,
+    and exact rim classification, minimum depth and canonical anchors agree
+    with the shared 3D contract. Nonzero-core capsule slabs are tracked separately
+    as GRV-Issue-088. The measured complete-query cost, including equivalent 3D
+    controls, is retained as GRV-Benchmark-020.
+
 - [`Canonical-Frame Cone-Volume Queries`](issue-tracker.md#grv-issue-087---cone-volume-queries-reject-an-intersecting-mesh-when-the-apex-cannot-enter-its-scalar-frame)
   - Completed 2026-09-29. Closest/all-hit and batch cone queries preserve the
     authored mesh frame through FixedMathSharp's shared minimum-axial query.

@@ -16,7 +16,7 @@ this backlog.
 ## Intake Rules
 
 - Signal IDs use `GRV-Benchmark-NNN`. The next available ID is
-  `GRV-Benchmark-020`.
+  `GRV-Benchmark-021`.
 - Assign an ID at intake and never reuse it, including after a signal closes or
   moves into a dated plan. Check this file's Git history before advancing or
   repairing the counter.
@@ -60,6 +60,64 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 ```
 
 ## Active Signals
+
+### GRV-Benchmark-020 — Complete Capsule/Circle-Slab Contact Cost
+
+**Discovered:** 2026-09-29.  
+**Status:** Measured performance follow-up to the GRV-Issue-085 correctness repair.  
+**Owner:** FixedMathSharp's shared cylinder/capsule feature selection and exact
+depth reduction; Gravitas consumes that owner for mixed circle slabs and 3D
+cylinders.
+
+The complete query rejects separated cap rims and selects minimum depth before
+rounding. The previous mixed direction subset could return a false contact or
+nonminimum depth; its cheaper wrong answers are not correctness-equivalent
+optimization targets. Ordinary cap, side and zero-core fixtures did return the
+correct answers before the repair, and their additional cost is real.
+
+Matched Windows 11/i7-9700K measurements use .NET 8.0.29, SDK 10.0.302, one
+launch, three warmups and ten measured iterations per row. The launcher is
+BelowNormal with affinity mask 3 and `DOTNET_PROCESSOR_COUNT=2`; only one heavy
+workload runs at a time. Values are **microseconds per dispatched query**, not
+batches or simulation frames. Every row reports **0 B/op**.
+
+| Geometry | Old mixed path | Complete mixed, first run | Complete mixed, confirmation | Equivalent 3D cylinder, confirmation |
+| --- | ---: | ---: | ---: | ---: |
+| Cap | 12.27 | 19.32 | 19.07 | 21.51 |
+| Side | 16.70 | 25.66 | 25.12 | 26.35 |
+| Zero capsule core | 16.67 | 25.78 | 24.75 | 26.01 |
+| Endpoint rim | 30.54 — nonminimum depth | 106.69 | 108.18 | 108.30 |
+| Separated endpoint rim | 30.62 — false contact | 25.78 | 25.54 | 25.90 |
+| Oblique interior rim | 36.70 — nonminimum depth | 1,224.40 | 1,191.51 | 1,196.17 |
+
+The mixed confirmation's standard deviations are 0.099 / 0.080 / 0.103 /
+1.051 / 0.159 / 8.028 microseconds in table order. Equivalent 3D controls show
+the same expensive curved-feature behavior. These are complete wrapper costs:
+3D also validates public inputs and updates a manifold, while mixed constructs
+its canonical contact. Their difference does not isolate adapter overhead, and
+there is no historical 3D baseline for these new fixtures.
+
+**Next isolation step:** Profile the shared cylinder/capsule candidate and
+ellipse-depth reducers on the oblique-interior and endpoint-rim fixtures,
+retaining cap/side/zero-core controls. Prefer reuse or exact feature certificates
+within that owner; do not restore the incomplete direction subset, add a second
+mixed solver or approximate the result. Preserve full-domain classification,
+nearest-even depth, deterministic ties, canonical anchors and zero allocation.
+
+**Reproduce:** Build `Gravitas.slnx -c Release -p:UseLocalLsfStack=true`, then:
+
+```powershell
+dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll capsule-circle-contact --warmupCount 3 --iterationCount 10 --launchCount 1 --exporters json --artifacts artifacts/grv085/after-confirm
+```
+
+Baseline source: Gravitas `04805b8` and FixedMathSharp `9833123`. Fixture geometry
+and the measured mixed method were unchanged between captures; corrected-answer
+setup assertions and the paired 3D control were added after the legacy capture.
+Setup checks classification, known quarter-unit depths and cross-path depth
+agreement. Reports and raw measurements are under `artifacts/grv085/before`,
+`after` and `after-confirm`; retain the individual rows rather than an average
+that hides the curved-feature cost. Correctness evidence is retained in
+[GRV-Issue-085](issue-tracker.md#grv-issue-085---mixed-capsulecircle-slab-contact-bypasses-the-complete-upstream-query).
 
 ### GRV-Benchmark-019 — Complete Triangle/Cone Contact Cost
 

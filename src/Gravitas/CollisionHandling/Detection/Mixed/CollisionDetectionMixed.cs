@@ -137,11 +137,16 @@ public static partial class CollisionDetectionMixed
         if (embedded is LSAABBoxCollider2D or LSPolygonCollider2D)
             return TryGetCapsuleConvexPrismContact(capsule, embedded, out contact);
 
-        bool collided = embedded.Shape == ColliderType2D.Circle
-            ? TryTestCapsuleCircleSlab(capsule, (LSCircleCollider2D)embedded, out AxisPenetration penetration)
-            : TryTestCapsuleCapsuleSlab(capsule, (LSCapsuleCollider2D)embedded, out penetration);
+        if (embedded is LSCircleCollider2D circle)
+            return TryGetCapsuleCircleSlabContact(capsule, circle, circle.ScaledRadius, out contact);
 
-        return collided
+        var prism = (LSCapsuleCollider2D)embedded;
+        // A zero-core planar capsule is the same circle slab, independent
+        // of its authored planar rotation. Keep that geometry with one owner.
+        if (prism.AxisLength == Fixed64.Zero)
+            return TryGetCapsuleCircleSlabContact(capsule, prism, prism.ScaledRadius, out contact);
+
+        return TryTestCapsuleCapsuleSlab(capsule, prism, out AxisPenetration penetration)
             ? BuildCapsuleContact(capsule, embedded, penetration, out contact)
             : NoContact(out contact);
     }
@@ -174,53 +179,25 @@ public static partial class CollisionDetectionMixed
             : NoContact(out contact);
     }
 
-    private static bool TryTestCapsuleCircleSlab(
+    private static bool TryGetCapsuleCircleSlabContact(
         LSCapsuleCollider capsule,
-        LSCircleCollider2D circle,
-        out AxisPenetration penetration)
+        LSCollider2D slab,
+        Fixed64 radius,
+        out MixedContact contact)
     {
-        penetration = default;
-        Vector3d capsuleAxis = GetRigidUpAxis(capsule.Rotation);
-        CheckCapsuleCircleSlabAxis(
-            capsule,
-            circle,
-            capsuleAxis,
-            Vector3d.Up,
-            ref penetration);
+        // Keep the admitted half-thickness even when full height is wider
+        // than Fixed64. The complete query owns rim and interior-core minima.
+        Signed192 length = WideArithmetic.AddSigned192(
+            Signed192.Raw(slab.MixedHalfThickness), Signed192.Raw(slab.MixedHalfThickness));
+        if (!WideConvexPrismRelations.TryGetCenteredFiniteCylinderCapsulePenetration(
+                GetEmbeddedCenter3D(slab), FixedQuaternion.Identity, Vector3d.Up, length, radius,
+                capsule.Center, capsule.Rotation, Vector3d.Up, capsule.AxisLength, capsule.ScaledRadius,
+                out Vector3d normal, out Fixed64 depth, out bool depthIsClamped))
+            return NoContact(out contact);
 
-        if (!CheckCapsuleCircleSlabAxis(
-                capsule,
-                circle,
-                capsuleAxis,
-                capsuleAxis,
-                ref penetration))
-            return false;
-
-        if (!CheckCapsuleCircleSlabAxis(
-                capsule,
-                circle,
-                capsuleAxis,
-                Vector3d.Cross(capsuleAxis, Vector3d.Up),
-                ref penetration))
-            return false;
-
-        Vector3d closestFeatureAxis =
-            FixedSegment.GetClosestDirectionBetweenCenteredAxes(
-                capsule.Center,
-                capsuleAxis,
-                capsule.AxisLength,
-                GetEmbeddedCenter3D(circle),
-                Vector3d.Up,
-                circle.MixedHalfThickness * Fixed64.Two);
-        if (!CheckCapsuleCircleSlabAxis(
-                capsule,
-                circle,
-                capsuleAxis,
-                closestFeatureAxis,
-                ref penetration))
-            return false;
-
-        return penetration.HasValue;
+        // The geometry query is cylinder-first; mixed contacts are 3D-to-2D.
+        contact = BuildCanonicalSupportContact(capsule, slab, -normal, depth, depthIsClamped);
+        return true;
     }
 
     private static bool TryTestCylinderCircleSlab(
@@ -556,45 +533,6 @@ public static partial class CollisionDetectionMixed
 
         return penetration.HasValue;
     }
-
-    private static bool CheckCapsuleCircleSlabAxis(
-        LSCapsuleCollider capsule,
-        LSCircleCollider2D circle,
-        Vector3d capsuleAxis,
-        Vector3d axis,
-        ref AxisPenetration penetration)
-    {
-        if (!TryNormalizeAxis(axis, out Vector3d normalizedAxis))
-            return true;
-
-        if (!FixedSegment.TryGetCenteredFiniteCylinderCapsuleAxisPenetration(
-            normalizedAxis,
-            GetEmbeddedCenter3D(circle),
-            Vector3d.Up,
-            circle.MixedHalfThickness * Fixed64.Two,
-            circle.ScaledRadius,
-            capsule.Center,
-            capsuleAxis,
-            capsule.AxisLength,
-            capsule.ScaledRadius,
-            out Vector3d circleToCapsuleAxis,
-            out Fixed64 depth,
-            out bool depthIsClamped))
-        {
-            return false;
-        }
-
-        if (!penetration.HasValue || depth < penetration.Depth)
-        {
-            penetration = new AxisPenetration(
-                -circleToCapsuleAxis,
-                depth,
-                depthIsClamped);
-        }
-
-        return true;
-    }
-
 
     private static bool CheckConeCircleSlabAxis(
         LSConeCollider cone,

@@ -103,6 +103,19 @@ dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll all 
 
 Do not treat short-run numbers as canonical measurements.
 
+### Capsule/circle-slab contacts
+
+The `capsule-circle-contact` selection measures mixed capsule/circle-slab side,
+cap, endpoint-rim, separated-rim, oblique interior-rim and zero-core contacts.
+The paired `CylinderContact` rows use equivalent 3D cylinders to check whether
+expensive geometry affects both paths. They compare complete wrappers: the 3D
+path also validates inputs and updates its manifold, so their difference is not
+an isolated measurement of mixed integration overhead. Setup verifies both
+classifications, depth agreement and the independently known quarter-unit depths.
+Historical selected-axis results include false contacts and nonminimum depths;
+their timings are implementation costs, not equivalent-correctness targets.
+These are individual narrow-phase queries, not complete simulation frames.
+
 ### Mesh/cone contacts
 
 The `mesh-cone-contact` selection measures base, side, apex, oblique-rim,

@@ -2,7 +2,7 @@
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-088`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-089`.
 - Assign an ID when an issue enters this tracker, keep it through resolution,
   and never reuse an ID even if an entry is later removed. Check this file's Git
   history before advancing or repairing the counter.
@@ -74,39 +74,91 @@
   clamping, allocations and matching 3D policy where applicable. Keep this
   independent from the cylinder-pair repair.
 
-### GRV-Issue-085 - Mixed capsule/circle-slab contact bypasses the complete upstream query
+### GRV-Issue-088 - Mixed capsule/nonzero-core capsule-slab contact retains incomplete directions
 
-- **Confirmed:** 2026-09-25 at `e85cda8f1e42acd0669211a8fda21e99c1251d80`,
-  with FixedMathSharp `6368582`. Separate from GRV-Issue-084: the upstream
-  cylinder/capsule repair FMS-Issue-023 is already available, but this mixed
-  consumer still uses its independent incomplete contact directions.
-- **Reproduction:** Use the same `MixedNarrowPhaseTests` setup as GRV-Issue-084.
-  The 3D `LSCapsuleCollider` has radius 1, total height 22 (core length 20),
-  unit scale, center `(83/4,7/4,0)` and rotation `(0,0,-q,q)`, with
-  `q=Fixed64.FromRaw(3037000500)`. The embedded circle slab at zero has radius
-  10 and `MixedHalfThicknessOverride=1`. The closest capsule-core endpoint
-  is `(43/4,7/4,0)`; its squared distance from the cylinder cap rim is
-  `(3/4)^2+(3/4)^2=9/8`, greater than capsule radius squared 1. The shapes are
-  separated despite overlapping bounds.
-- **Observed:** Public `CollisionDetectionMixed.TryCollide` returns true with
-  depth `0.19961997726932168`. Calling
-  `FixedSegment.TryGetCenteredFiniteCylinderCapsuleContact` for the same slab
-  cylinder and capsule returns false. Both observations were executed against
-  the fresh Release local-stack build using the existing initialization helpers
-  through PowerShell 7.6.5 reflection; no private shape values were fabricated.
-- **Cause:** `TryTestCapsuleCircleSlab` selects world up, the capsule axis,
-  their cross product and one closest-centerline direction. It bypasses the
-  complete finite cylinder/capsule authority, so releasing the upstream fix
-  alone does not repair the mixed path.
-- **Next action:** Add the enabled mixed regression, delegate to the existing
-  upstream cylinder/capsule contact query and remove obsolete capsule-specific
-  projection code after checking shared callers. Reverse the cylinder-first
-  result into the existing 3D-capsule-to-2D-slab normal/anchor convention.
-  Preserve mixed material, contact and response policy. Validate tangent and
-  penetrating rims, ordinary/rotated/full-domain controls, allocations and
-  standard/Lean coverage. No new geometry solver is required.
+- **Confirmed:** 2026-09-29 while validating GRV-Issue-085 against Gravitas
+  `04805b8` plus its local fix and FixedMathSharp `9833123` plus the shared
+  penetration extraction. This is the unchanged nonzero-core slab path, not
+  a regression introduced by the circle-slab repair.
+- **Reproduction:** Reuse GRV-Issue-085's 3D capsule: radius 1, total height 22,
+  center `(83/4,7/4,0)`, rotation `(0,0,-q,q)` where
+  `q=Fixed64.FromRaw(3037000500)`. At the origin use an unrotated
+  `LSCapsuleCollider2D(radius:10,height:22)` with half-thickness 1. Its planar
+  core has length 2 along Z. At Z=0 the nearest cap-rim point is `(10,1,0)`;
+  the closest 3D core endpoint is `(43/4,7/4,0)`. The squared gap is `9/8`,
+  strictly greater than the 3D capsule's radius squared 1. Extending the slab
+  core along Z cannot reduce this X/Y gap.
+- **Observed:** The public mixed query returns true, depth
+  `0.13923784578219056`, normal approximately
+  `(-0.9870072698686272,-0.16067560226656497,0)`. The equivalent zero-core slab
+  now correctly rejects through GRV-Issue-085's complete circle-slab route.
+  Reproduced through the existing `MixedNarrowPhaseTests` initialization
+  helpers using PowerShell reflection against the fresh Release local-stack
+  assembly; no private geometry was fabricated.
+- **Cause / next action:** `TryTestCapsuleCapsuleSlab` still selects a limited
+  direction set. Add the enabled regression and establish a complete reusable
+  capsule-versus-extruded-stadium query in FixedMathSharp. Preserve flat caps,
+  straight sides, rounded ends, exact rigid frames and minimum-depth selection;
+  a nonzero-core slab is not a single cylinder or a rounded 3D capsule. Keep
+  this separate from GRV-Issue-085, with an independently measured baseline.
 
 ## Resolved Issues
+
+### GRV-Issue-085 - Mixed capsule/circle-slab contact bypasses the complete upstream query
+
+- **Confirmed:** 2026-09-25 at `e85cda8f1e42acd0669211a8fda21e99c1251d80`
+  with FixedMathSharp `6368582`; reproduced again on 2026-09-29 before repair.
+- **Reproduction:** A 3D capsule of radius 1 and total height 22 (core 20),
+  center `(83/4,7/4,0)`, rotation `(0,0,-q,q)` with
+  `q=Fixed64.FromRaw(3037000500)`, faces a radius-10 circle slab at the origin
+  with half-thickness 1. The closest core endpoint `(43/4,7/4,0)` has cap-rim
+  squared gap `9/8 > 1`. Bounds overlap, but the shapes do not.
+- **Old behavior / cause:** Mixed contact returned true with depth
+  `0.19961997726932168`; the complete upstream query returned false. The mixed
+  implementation selected only world up, capsule axis, their cross product
+  and a closest-centerline direction. The equivalent zero-core planar capsule
+  also misclassified the gap. Doubling slab half-thickness in `Fixed64`
+  additionally shortened valid very tall circle slabs and could reject overlap.
+- **Resolved:** 2026-09-29. Both circle slabs and zero-core planar capsule slabs
+  now share FixedMathSharp's complete cylinder/capsule penetration owner. That
+  owner retains full cylinder length wider than `Fixed64`, using the existing
+  proved arithmetic widths. Its public contact API, exact feature selection,
+  tie ordering and support anchors remain unchanged. Gravitas reverses the
+  cylinder-first normal and keeps its canonical support/material/response path.
+  The two obsolete capsule/circle direction helpers were removed.
+- **Regression evidence:** `MixedNarrowPhaseTests.CapsuleCircle.cs` covers
+  separated rims, exact tangency and one-raw penetration, oblique interior rims,
+  admitted maximum half-thickness, conceptual-depth clamping and allocation-free
+  warmed contacts. Before the repair, 14 of the 19 focused mixed cases failed;
+  afterward all 237 mixed narrow-phase cases passed. Upstream wide-length and
+  existing cylinder/capsule and cylinder-pair controls passed 243 cases.
+  A subsequent two-raw-unit positive-core regression verifies that only an
+  exactly zero core takes the circle route: the stadium's extra endpoint extent
+  remains visible in its exact contact depth.
+- **Verification:** FixedMathSharp passes 3,932 / 3,911 core tests in Release /
+  ReleaseLean, plus 49 Chronicler integration tests in each configuration.
+  Gravitas passes 4,335 / 4,276 tests. Both repositories retain exact 100%
+  reachable line, branch and method coverage in both configurations, without
+  new exclusions. Both full solutions build for netstandard2.1 and net8.0
+  with zero warnings/errors. The 15 focused wide-length Debug regressions also
+  pass, and both DocFX sites build with warnings treated as errors.
+  Independent correctness, arithmetic and Ponytail
+  reviews have no outstanding findings. Coverage evidence is under
+  `artifacts/grv085/coverage-release`, `coverage-lean`, `report-release` and
+  `report-lean` in FixedMathSharp; Gravitas's final reports use
+  `coverage-release-final`, `coverage-lean`, `report-release-final` and
+  `report-lean` under the same artifact root.
+- **Performance:** The repeated mixed benchmark remains allocation-free but is
+  not an overall speedup: ordinary cap/side/zero-core costs rise, endpoint-rim
+  contact costs about 108 microseconds and oblique interior-rim contact about
+  1.19 milliseconds. Equivalent complete 3D controls have the same expensive
+  curved-feature behavior. Before/after fixtures, repeated timings, limitations
+  and the next shared-owner profiling step are captured in
+  [GRV-Benchmark-020](benchmark-signal-hardening-backlog.md#grv-benchmark-020--complete-capsulecircle-slab-contact-cost).
+- **Scope:** Nonzero-core planar capsule slabs remain a separate shape and are
+  tracked as GRV-Issue-088. Package consumers require the matching FixedMathSharp
+  release before Gravitas release validation; source-stack builds do not replace
+  that gate.
 
 ### GRV-Issue-087 - Cone-volume queries reject an intersecting mesh when the apex cannot enter its scalar frame
 
