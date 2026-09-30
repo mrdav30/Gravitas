@@ -16,7 +16,7 @@ this backlog.
 ## Intake Rules
 
 - Signal IDs use `GRV-Benchmark-NNN`. The next available ID is
-  `GRV-Benchmark-022`.
+  `GRV-Benchmark-023`.
 - Assign an ID at intake and never reuse it, including after a signal closes or
   moves into a dated plan. Check this file's Git history before advancing or
   repairing the counter.
@@ -60,6 +60,94 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 ```
 
 ## Active Signals
+
+### GRV-Benchmark-022 — Exact Pure-2D Circle Contact Cost
+
+**Discovered:** 2026-09-30 while implementing GRV-Issue-083.  
+**Status:** Shared-owner optimization complete; remaining exact-contact premium
+retained for review.  
+**Owner:** FixedMathSharp's existing centered-capsule relation with two zero
+core lengths; Gravitas forwards complete contact anchors, normal, depth and clamp.
+
+Replacing saturated scalar circle arithmetic fixes large-coordinate false hits,
+tiny-distance underflow and incorrect depth/clamping. However, the complete
+query adds substantial cost even to ordinary cases where the old result was
+correct. These fixtures preserve the same geometry and measured dispatcher
+before/after; setup verifies classification, normal, depth and clamp, not exact
+anchor-representation equivalence with the old rounded-offset implementation.
+
+Windows 11 / i7-9700K, .NET 8.0.29, SDK 10.0.302; two launches, five warmups,
+fifteen 250 ms iterations, CPU mask 3, BelowNormal launcher and
+`DOTNET_PROCESSOR_COUNT=2`, with one heavy workload at a time. Values are
+**microseconds per direct query**, not simulation frames. All rows allocate
+**0 B/op**. Error is the half-width of the 99.9% confidence interval.
+
+| Geometry | Previous scalar path | Initial complete query | Optimized complete query | Optimized error |
+| --- | ---: | ---: | ---: | ---: |
+| Axis | 0.06659 | 5.4363 | 0.9125 | 0.00248 |
+| Coincident | 0.04828 | 2.6035 | 0.6277 | 0.00371 |
+| Diagonal | 0.11101 | 4.3406 | 1.4513 | 0.00853 |
+| Large axis | 0.10016 | 5.4263 | 0.9548 | 0.00236 |
+| Rotated | 0.06712 | 5.8454 | 1.6113 | 0.00974 |
+| Bounds-admitted separation | 0.02542 | 0.9027 | 0.2182 | 0.00077 |
+
+The initial slowdown was 35.5-87.1x. Shared-owner work removes 66.6-83.2% of
+that complete-query time, but the remaining cost is still 8.6-24.0x the old scalar
+path. This is a substantial reduction, not scalar-cost parity or an accepted
+full-simulation budget. Retain the raw distributions, including a baseline
+bimodality warning; the final Gravitas run reported no multimodality warning.
+The old path is not a full-domain correctness target. In particular, comparing
+an exact squared distance alone would not repair normal, depth or anchor terms.
+
+**Shared-owner optimization, 2026-09-30:** EventPipe sampling of the complete
+circle query's Axis fixture put approximately 45% of inclusive query samples in
+depth reduction and 29% in its product square root; these overlap and are not additive. Parameter
+construction, local offsets, normalization and retained radial terms added work.
+FixedMathSharp now represents point cores directly over denominator one, reuses
+its narrower exact root, classifies conceptual depth before rounding, and skips
+irrelevant axis rotations/zero offsets. Cardinal normalization skips roots and
+division. Both dimensions share the existing residual owner, whose retained low
+word is computed directly with equivalent unchecked integer arithmetic. No
+second Gravitas solver, approximation, cache, public API or dependency was added.
+
+Matched upstream `zero-core-contact` runs use the same settings and geometry as
+above, plus a nonzero-core capsule control. Values remain **microseconds per
+query**, with **0 B/op** throughout:
+
+| Geometry | Circle before | Circle optimized | Sphere before | Sphere optimized |
+| --- | ---: | ---: | ---: | ---: |
+| Axis | 5.3077 | 0.9135 | 9.4406 | 1.1843 |
+| Coincident | 2.6306 | 0.6104 | 6.6275 | 0.7644 |
+| Diagonal | 4.4942 | 1.4536 | 8.7157 | 1.7991 |
+| Large axis | 5.6523 | 0.9243 | 9.8707 | 1.2599 |
+| Rotated | 6.1178 | 1.6234 | 8.9603 | 1.7449 |
+| Separation | 0.9026 | 0.2007 | 2.3985 | 0.1489 |
+| Nonzero capsule control | 6.0087 | 3.8004 | 10.1398 | 7.7200 |
+
+The axis-sphere distribution is bimodal; its 99.9% interval is
+`1.1843 +/- 0.03092 us`, still well separated from the old result. Full upstream
+distributions and logs are in FixedMathSharp's `artifacts/grv083/before` and
+`after`; the baseline runtime is `787afae`, with the same benchmark harness.
+These direct geometry results are not full-step or cross-platform measurements.
+This optimization is separate from the oblique polynomial costs in
+GRV-Benchmark-020/021.
+
+**Reproduce:** Build the Release benchmark project with
+`-p:UseLocalLsfStack=true -m:1 -p:BuildInParallel=false`, then run
+`dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll circle-contact --launchCount 2 --warmupCount 5 --iterationCount 15 --iterationTime 250 --affinity 3 --exporters json --artifacts artifacts/grv083/optimized`.
+Baseline runtime source is Gravitas `b8b4115` with FixedMathSharp `787afae`;
+the `after` capture adds only the Gravitas zero-core delegation; `optimized`
+also includes the upstream changes described above. Reports and raw measurements
+are in `artifacts/grv083/before`, `after` and `optimized`; build logs are alongside.
+
+**Remaining signal:** Rotated and diagonal fixtures remain the slowest measured
+circle cases; this is not a new stage-level CPU breakdown. Do not replace exact
+witness terms with rounded offsets or add a second circle kernel merely to match
+the incomplete predecessor's cost.
+Use a real high-contact-count workload to establish whether further shared
+normalization/anchor profiling is warranted; these query timings alone do not
+establish a frame-budget regression. The performance signal stays open rather
+than assuming the remaining premium has been accepted.
 
 ### GRV-Benchmark-021 — Complete Capsule/Stadium-Slab Curved Contact Cost
 

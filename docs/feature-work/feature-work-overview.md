@@ -26,11 +26,25 @@ instead of burying it in notes.
     `SwiftCollections`, `GridForge`, then Gravitas. Package references are the
     default; use `UseLocalLsfStack=true` only for coordinated validation of
     unreleased sibling changes, then revalidate against released packages.
+  - The active correctness queue is clear. GRV-Issue-083's circle-contact repair
+    and shared upstream optimization are complete; its remaining measured
+    exact-contact premium stays open as GRV-Benchmark-022.
 - [`Benchmark Signal Hardening`](benchmark-signal-hardening-backlog.md)
   - Reproduce and close confirmed release-relevant signals alongside the owning
     library change. Do not broaden this into speculative optimization work.
 
 ## Recently Completed
+
+- [`Exact 2D Circle Contacts`](issue-tracker.md#grv-issue-083---2d-circle-contacts-compare-saturated-squared-distances)
+  - Completed 2026-09-30. Circle contacts retain wide classification, correctly
+    rounded depth, conceptual clamping and authored radial anchors through the
+    existing FixedMathSharp zero-core capsule owner. No second Gravitas solver
+    or public API was added.
+  - Shared point-core, root, normalization and residual work removes 66.6-83.2%
+    of the first complete-query cost; sphere and nonzero-capsule controls also
+    improve. Both repositories retain 100% reachable line/branch/method coverage
+    in Release and Lean. GRV-Benchmark-022 preserves the remaining premium over
+    the incomplete predecessor without assuming that premium is accepted.
 
 - [`Complete Capsule/Slab Contact`](done/2026-09-29-complete-capsule-slab-contact-plan.md)
   - Completed 2026-09-30; GRV-Issue-088 is resolved. Both repositories retain

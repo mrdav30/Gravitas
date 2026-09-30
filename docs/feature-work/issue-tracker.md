@@ -35,8 +35,15 @@
 
 ### Ordered Queue
 
+No active correctness issues. Remaining measured performance costs are tracked
+in the benchmark backlog, including GRV-Benchmark-022.
+
+## Resolved Issues
+
 ### GRV-Issue-083 - 2D circle contacts compare saturated squared distances
 
+- **Resolved:** 2026-09-30. The correctness repair and focused shared-owner
+  optimization are complete; remaining exact-contact cost is tracked separately.
 - **Confirmed:** 2026-09-25 at `e85cda8f1e42acd0669211a8fda21e99c1251d80`,
   with FixedMathSharp `6368582`, during the FMS-Issue-024 neighboring-solver
   audit. This is a discrete-contact defect, not an arbitrary 3D circle-distance
@@ -57,24 +64,67 @@
   root, normal and depth calculations use the saturated distance. The normal
   is not unit length either. Bounds admission does not make these intermediate
   quantities representable.
-- **Verification:** Built the current Release local-stack test project with
+- **Initial reproduction:** Built the then-current Release local-stack test project with
   zero warnings/errors, then executed its existing initialization helpers and
   actual narrow-phase dispatcher through a PowerShell 7.6.5 reflection probe.
   No collider fields were fabricated. This was a direct contact reproduction,
   not a full simulation-step test or a completed regression-test matrix. A
   direct call to the existing FixedMathSharp zero-axis capsule contact query
   also correctly rejected the same separated geometry.
-- **Next action:** Add the enabled regression alongside
-  `tests/Gravitas.Tests/Physics2D/CollisionDetection2DTests.cs`. Investigate
-  reusing `FixedSegment2d.TryGetCenteredCapsulesContact` with zero axis lengths
-  for exact classification, normal, depth and anchors; do not add a second
-  circle-contact arithmetic implementation or only patch the Boolean check.
-  Validate ordinary/tiny/full-domain cases, touching versus strict overlap,
-  coincident centers, pair reversal, manifold propagation, nearest-even depth,
-  clamping, allocations and matching 3D policy where applicable. Keep this
-  independent from the cylinder-pair repair.
-
-## Resolved Issues
+- **Implementation:** `TryCircleCircle` now reuses
+  `FixedSegment2d.TryGetCenteredCapsulesContact` with zero core lengths, just as
+  the 3D sphere path uses its dimensional counterpart. The explicit-axis
+  overload avoids rotating irrelevant zero cores while preserving authored
+  anchor frames, inclusive tangency and the coincident world-+X fallback.
+  Complete upstream anchors and the conceptual-depth clamp flag are forwarded
+  through the existing manifold/compound path. FixedMathSharp also optimizes
+  this shared owner for both circle and sphere point cores, reuses narrower
+  exact square roots and shares allocation-free anchor residual arithmetic.
+  The public API and exact contact contract are unchanged upstream.
+- **Regression evidence:** The original enabled .NET 8 regression fails against
+  unchanged source; the expanded first matrix exposes 12 failures in 17 cases,
+  and a further four-case raw matrix exposes three more failures. These cover
+  scalar-square saturation/underflow, radius and center-span overflow, raw
+  neighbors, rounded depth, conceptual clamping and rotated anchor ownership.
+  The rotation fixture uses cardinal contact and exact quarter turns: diagonal
+  normals are rounded Fixed64 values, not infinitely precise rational witnesses.
+  Logs and TRX results are under `artifacts/grv083`.
+- **Upstream verification, 2026-09-30:** FixedMathSharp passes 4,038 / 4,017
+  core tests in Release / ReleaseLean, plus 49 Chronicler integration tests in
+  each. The configured core/FluentAssertions Cobertura report is exactly 100%:
+  Release has 52,626/52,626 lines, 12,088/12,088 branches and 3,934 covered
+  methods; Lean has 52,719/52,719 lines,
+  12,088/12,088 branches and 3,930 covered methods. No exclusions changed.
+  Tests pin full-domain radius/center spans, pre-rounding clamping, raw
+  neighbors, 2D/3D parity, product-root width boundaries, nonzero-core endpoint
+  rounding and retained residuals after both overflow cancellation and axial
+  double rounding. An obsolete residual-bound constant and its redundant
+  range assertions were removed; exact-value regressions replace them. The
+  focused Debug arithmetic/anchor run also passes all 125 cases.
+- **Final validation, 2026-09-30:** Full Windows local-stack suites, rebuilt
+  against the optimized FixedMathSharp source, pass: Release
+  4,363 tests and ReleaseLean 4,304 tests, with no failures or skips. Both
+  configurations retain 100% reachable line, branch and method coverage without
+  exclusion changes. Raw Cobertura counts are 44,363/44,363 lines,
+  13,218/13,218 branches and 4,561 covered methods in Release; Lean has
+  44,361/44,361 lines, 13,218/13,218 branches and 4,560 covered methods. Both
+  solution builds validate `netstandard2.1` and `net8.0` with zero warnings or
+  errors; DocFX passes with warnings as errors. The new 21-case regressions
+  include zero-allocation direct and manifold checks. Logs, TRX, coverage and
+  benchmark artifacts are under `artifacts/grv083`; the final full-suite reports
+  use `final-coverage-release` and `final-coverage-releaselean` in both repositories.
+  This is source-mode Windows evidence, not released-package or Linux validation.
+- **Performance disposition:** Shared-owner optimization removes 66.6-83.2% of
+  the initial complete-query time in the six matched Gravitas fixtures, with
+  zero allocation. Axis contact is 5.4363 -> 0.9125 microseconds; rotated contact
+  is 5.8454 -> 1.6113 microseconds. Upstream sphere and nonzero-capsule controls
+  also improve. The exact path still costs 8.6-24.0x the old incomplete scalar
+  path; this is not scalar-cost parity or an accepted whole-frame budget.
+  Keep that remaining signal open in
+  [GRV-Benchmark-022](benchmark-signal-hardening-backlog.md#grv-benchmark-022--exact-pure-2d-circle-contact-cost).
+  Closing the reproduced arithmetic defect does not close that performance
+  signal or assume acceptance of its remaining premium. Independent correctness,
+  numerical/evidence and Ponytail reviews have no outstanding findings.
 
 ### GRV-Issue-088 - Mixed capsule/nonzero-core capsule-slab contact retains incomplete directions
 

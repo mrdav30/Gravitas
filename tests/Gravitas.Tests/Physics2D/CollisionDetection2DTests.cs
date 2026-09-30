@@ -8,7 +8,7 @@ using Xunit;
 
 namespace Gravitas.Tests.Physics2D;
 
-public sealed class CollisionDetection2DTests
+public sealed partial class CollisionDetection2DTests
 {
     public static TheoryData<ColliderType2D, ColliderType2D, Vector2d, Fixed64, Vector2d, Fixed64> OverlappingBoundsSeparatedPairs =>
         new()

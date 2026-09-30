@@ -172,6 +172,12 @@ accumulated-normal, Coulomb-line, and Coulomb-disk response policy.
 dimension-specific state into that kernel; they do not duplicate its arithmetic
 or expose the FixedMathSharp internal representation.
 
+Pure 2D circle/circle contacts use FixedMathSharp's zero-core capsule relation,
+matching the geometry ownership of 3D sphere contacts. Classification precedes
+distance and depth rounding, including at tiny and extreme coordinates. Exact
+touching is a zero-depth contact; coincident centers use world +X. Radial anchor
+terms and the conceptual-depth clamping flag survive manifold construction.
+
 Embedded 2D mixed volumes also select planar boundary anchors semantically.
 Built-in circles, capsules, boxes, polygons, and compounds therefore do not
 require a public closest point or representable query-to-boundary distance to

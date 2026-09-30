@@ -130,27 +130,33 @@ internal static partial class CollisionDetection2D
 
     private static bool TryCircleCircle(LSCircleCollider2D colliderA, LSCircleCollider2D colliderB, out Contact2D contact)
     {
-        Vector2d delta = colliderB.Center - colliderA.Center;
-        Fixed64 radius = colliderA.ScaledRadius + colliderB.ScaledRadius;
-        Fixed64 distanceSquared = delta.MagnitudeSquared;
-        if (distanceSquared > radius * radius)
+        // Circles are zero-core capsules. Keep classification and depth wide,
+        // and retain exact radial anchor terms rather than rounded offsets.
+        // A zero core needs no rotated axis; rotation still owns its anchor frame.
+        if (!FixedSegment2d.TryGetCenteredCapsulesContact(
+                colliderA.Center,
+                colliderA.Rotation,
+                Vector2d.Forward,
+                Fixed64.Zero,
+                colliderA.ScaledRadius,
+                colliderB.Center,
+                colliderB.Rotation,
+                Vector2d.Forward,
+                Fixed64.Zero,
+                colliderB.ScaledRadius,
+                Vector2d.Right,
+                out FixedContactAnchors2d fixedContact))
         {
             contact = default;
             return false;
         }
 
-        Fixed64 distance = distanceSquared > Fixed64.Zero ? FixedMath.Sqrt(distanceSquared) : Fixed64.Zero;
-        Vector2d normal = distance > Fixed64.Zero ? delta / distance : Vector2d.Right;
-        Fixed64 depth = radius - distance;
         contact = new Contact2D(
-            new ContactAnchor2D(
-                colliderA.Center,
-                normal * colliderA.ScaledRadius),
-            new ContactAnchor2D(
-                colliderB.Center,
-                -normal * colliderB.ScaledRadius),
-            normal,
-            depth);
+            new ContactAnchor2D(fixedContact.FirstAnchor),
+            new ContactAnchor2D(fixedContact.SecondAnchor),
+            fixedContact.Normal,
+            fixedContact.Depth,
+            fixedContact.DepthIsClamped);
         return true;
     }
 
