@@ -21,12 +21,6 @@ instead of burying it in notes.
 
 ## Active Coordination
 
-- [`Complete Capsule/Slab Contact`](2026-09-29-complete-capsule-slab-contact-plan.md)
-  - Proposed cross-repository repair for GRV-Issue-088; awaiting plan review.
-    FixedMathSharp owns complete whole-shape geometry; Gravitas replaces its
-    limited nonzero-core direction checks. Proof, regression baselines, exact
-    contacts, resource limits and full coverage gate the cutover. GRV-Benchmark-020
-    remains separate, with existing cylinder/circle-slab paths used as controls.
 - [`Cross-Stack Issue Resolution`](issue-tracker.md)
   - Resolve cross-stack issues in dependency order: `FixedMathSharp`,
     `SwiftCollections`, `GridForge`, then Gravitas. Package references are the
@@ -38,14 +32,23 @@ instead of burying it in notes.
 
 ## Recently Completed
 
+- [`Complete Capsule/Slab Contact`](done/2026-09-29-complete-capsule-slab-contact-plan.md)
+  - Completed 2026-09-30; GRV-Issue-088 is resolved. Both repositories retain
+    100% measured line/branch/method coverage in Release/ReleaseLean; focused
+    Debug/resource checks and DocFX pass. Ordinary cap/side/end fixtures improve
+    37-41%. The user accepted the remaining complete-query cost for now.
+  - GRV-Benchmark-021 remains open alongside GRV-Benchmark-020. Their shared
+    analytic materializer and related but distinct oblique root paths are
+    documented for coordinated profiling; no common CPU hotspot is yet proved.
+
 - [`Complete Capsule/Circle-Slab Contacts`](issue-tracker.md#grv-issue-085---mixed-capsulecircle-slab-contact-bypasses-the-complete-upstream-query)
   - Completed 2026-09-29. Mixed capsule contacts reuse FixedMathSharp's complete
     cylinder/capsule geometry, including zero-core planar capsule slabs. The
     incomplete direction helpers are removed, full slab thickness is retained,
     and exact rim classification, minimum depth and canonical anchors agree
-    with the shared 3D contract. Nonzero-core capsule slabs are tracked separately
-    as GRV-Issue-088. The measured complete-query cost, including equivalent 3D
-    controls, is retained as GRV-Benchmark-020.
+    with the shared 3D contract. Nonzero-core capsule slabs were subsequently
+    repaired as GRV-Issue-088. The measured complete-query cost, including
+    equivalent 3D controls, is retained as GRV-Benchmark-020.
 
 - [`Canonical-Frame Cone-Volume Queries`](issue-tracker.md#grv-issue-087---cone-volume-queries-reject-an-intersecting-mesh-when-the-apex-cannot-enter-its-scalar-frame)
   - Completed 2026-09-29. Closest/all-hit and batch cone queries preserve the

@@ -74,6 +74,8 @@
   clamping, allocations and matching 3D policy where applicable. Keep this
   independent from the cylinder-pair repair.
 
+## Resolved Issues
+
 ### GRV-Issue-088 - Mixed capsule/nonzero-core capsule-slab contact retains incomplete directions
 
 - **Confirmed:** 2026-09-29 while validating GRV-Issue-085 against Gravitas
@@ -95,18 +97,24 @@
   Reproduced through the existing `MixedNarrowPhaseTests` initialization
   helpers using PowerShell reflection against the fresh Release local-stack
   assembly; no private geometry was fabricated.
-- **Cause / next action:** `TryTestCapsuleCapsuleSlab` still selects a limited
-  direction set. Add the enabled regression and establish a complete reusable
-  capsule-versus-extruded-stadium query in FixedMathSharp. Preserve flat caps,
-  straight sides, rounded ends, exact rigid frames and minimum-depth selection;
-  a nonzero-core slab is not a single cylinder or a rounded 3D capsule. Keep
-  this separate from GRV-Issue-085, with an independently measured baseline.
-- **Coordination:** The proposed
-  [Complete Capsule/Slab Contact plan](2026-09-29-complete-capsule-slab-contact-plan.md)
-  captures the cross-repository design, proof/baseline gate, integration and
-  closeout checks. The issue remains open; implementation has not started.
-
-## Resolved Issues
+- **Cause:** The removed `TryTestCapsuleCapsuleSlab` selected an incomplete
+  direction set. Exact projections on those directions did not establish the
+  whole shape's minimum penetration; a nonzero-core slab is not a single
+  cylinder or a rounded 3D capsule.
+- **Resolved 2026-09-30:** FixedMathSharp now owns a complete signed
+  capsule/stadium-slab support query. Gravitas delegates to it, retains canonical
+  anchors/materials, and removes capsule-only direction helpers. The enabled
+  separated-rim regression, raw neighbors, whole-shape containment, tiny cores,
+  oblique roots, wide/clamped inputs, runtime response and zero allocation pass.
+  Both repositories retain 100% measured line/branch/method coverage in Release
+  and ReleaseLean; Debug resource checks and both DocFX sites also pass.
+- **Coordination:** The completed
+  [Complete Capsule/Slab Contact plan](done/2026-09-29-complete-capsule-slab-contact-plan.md)
+  retains the proof, matched baseline, full verification and review evidence.
+  The correctness defect no longer reproduces. The user accepted the remaining
+  curved-query cost for now on 2026-09-30. GRV-Benchmark-021 remains open and
+  cross-linked with GRV-Benchmark-020 for coordinated profiling; acceptance of
+  this correctness repair does not close either performance signal.
 
 ### GRV-Issue-085 - Mixed capsule/circle-slab contact bypasses the complete upstream query
 
@@ -159,10 +167,10 @@
   curved-feature behavior. Before/after fixtures, repeated timings, limitations
   and the next shared-owner profiling step are captured in
   [GRV-Benchmark-020](benchmark-signal-hardening-backlog.md#grv-benchmark-020--complete-capsulecircle-slab-contact-cost).
-- **Scope:** Nonzero-core planar capsule slabs remain a separate shape and are
-  tracked as GRV-Issue-088. Package consumers require the matching FixedMathSharp
-  release before Gravitas release validation; source-stack builds do not replace
-  that gate.
+- **Scope:** Nonzero-core planar capsule slabs remain a separate shape and were
+  subsequently repaired as GRV-Issue-088. Package consumers require the matching
+  FixedMathSharp release before Gravitas release validation; source-stack builds
+  do not replace that gate.
 
 ### GRV-Issue-087 - Cone-volume queries reject an intersecting mesh when the apex cannot enter its scalar frame
 

@@ -141,14 +141,14 @@ public static partial class CollisionDetectionMixed
             return TryGetCapsuleCircleSlabContact(capsule, circle, circle.ScaledRadius, out contact);
 
         var prism = (LSCapsuleCollider2D)embedded;
-        // A zero-core planar capsule is the same circle slab, independent
-        // of its authored planar rotation. Keep that geometry with one owner.
-        if (prism.AxisLength == Fixed64.Zero)
-            return TryGetCapsuleCircleSlabContact(capsule, prism, prism.ScaledRadius, out contact);
+        if (!WideConvexPrismRelations.TryGetCenteredCapsuleSlabCapsulePenetration(
+                GetEmbeddedCenter3D(prism), prism.Rotation, prism.AxisLength, prism.ScaledRadius, prism.MixedHalfThickness,
+                capsule.Center, capsule.Rotation, capsule.AxisLength, capsule.ScaledRadius,
+                out Vector3d normal, out Fixed64 depth, out bool depthIsClamped))
+            return NoContact(out contact);
 
-        return TryTestCapsuleCapsuleSlab(capsule, prism, out AxisPenetration penetration)
-            ? BuildCapsuleContact(capsule, embedded, penetration, out contact)
-            : NoContact(out contact);
+        contact = BuildCanonicalSupportContact(capsule, prism, -normal, depth, depthIsClamped);
+        return true;
     }
 
     private static bool TryCylinderEmbedded2D(LSCylinderCollider cylinder, LSCollider2D embedded, out MixedContact contact)
@@ -274,86 +274,6 @@ public static partial class CollisionDetectionMixed
         if (!CheckConeCircleSlabAxis(
                 cone,
                 circle,
-                closestFeatureAxis,
-                ref penetration))
-            return false;
-
-        return penetration.HasValue;
-    }
-
-    private static bool TryTestCapsuleCapsuleSlab(
-        LSCapsuleCollider capsule,
-        LSCapsuleCollider2D prism,
-        out AxisPenetration penetration)
-    {
-        penetration = default;
-        Vector3d capsuleAxis = GetRigidUpAxis(capsule.Rotation);
-        GetEmbeddedCapsuleAxes(
-            prism,
-            out Vector2d prismPlanarAxis,
-            out Vector3d prismAxis,
-            out Vector3d prismNormal);
-
-        if (!CheckCapsulePrismAxis(
-                capsule,
-                prism,
-                capsuleAxis,
-                prismPlanarAxis,
-                capsuleAxis,
-                ref penetration))
-            return false;
-
-        CheckCapsulePrismAxis(
-            capsule,
-            prism,
-            capsuleAxis,
-            prismPlanarAxis,
-            Vector3d.Up,
-            ref penetration);
-
-        if (!CheckCapsulePrismAxis(
-                capsule,
-                prism,
-                capsuleAxis,
-                prismPlanarAxis,
-                Vector3d.Cross(capsuleAxis, Vector3d.Up),
-                ref penetration))
-            return false;
-
-        if (!CheckEmbeddedCapsuleAxes(
-                capsule,
-                capsuleAxis,
-                prism,
-                prismPlanarAxis,
-                prismAxis,
-                prismNormal,
-                ref penetration)
-            || !CheckCapsuleEmbeddedCapsuleEdgeAxis(
-                capsule,
-                capsuleAxis,
-                prism,
-                prismPlanarAxis,
-                prismAxis,
-                ref penetration))
-        {
-            return false;
-        }
-
-        Vector3d closestFeatureAxis =
-            FixedSegment.GetClosestDirectionBetweenCenteredAxes(
-                capsule.Center,
-                capsuleAxis,
-                capsule.AxisLength,
-                GetEmbeddedCenter3D(prism),
-                prism.AxisLength <= Fixed64.Epsilon
-                    ? Vector3d.Up
-                    : prismAxis,
-                prism.AxisLength);
-        if (!CheckCapsulePrismAxis(
-                capsule,
-                prism,
-                capsuleAxis,
-                prismPlanarAxis,
                 closestFeatureAxis,
                 ref penetration))
             return false;
@@ -568,40 +488,6 @@ public static partial class CollisionDetectionMixed
             ref penetration);
     }
 
-    private static bool CheckCapsulePrismAxis(
-        LSCapsuleCollider capsule,
-        LSCapsuleCollider2D prism,
-        Vector3d capsuleAxis,
-        Vector2d prismAxis,
-        Vector3d axis,
-        ref AxisPenetration penetration)
-    {
-        if (!TryNormalizeAxis(axis, out Vector3d normalizedAxis))
-            return true;
-
-        if (!FixedSegment.TryGetCenteredCapsuleCapsuleSlabAxisPenetration(
-                normalizedAxis,
-                capsule.Center,
-                capsuleAxis,
-                capsule.AxisLength,
-                capsule.ScaledRadius,
-                GetEmbeddedCenter3D(prism),
-                prismAxis,
-                prism.AxisLength,
-                prism.ScaledRadius,
-                prism.MixedHalfThickness,
-                out Vector3d orientedAxis,
-                out Fixed64 depth,
-                out bool depthIsClamped))
-            return false;
-
-        return KeepAxisPenetration(
-            orientedAxis,
-            depth,
-            depthIsClamped,
-            ref penetration);
-    }
-
     private static bool CheckCylinderPrismAxis(
         LSCylinderCollider cylinder,
         LSCapsuleCollider2D prism,
@@ -688,31 +574,6 @@ public static partial class CollisionDetectionMixed
     }
 
     private static bool CheckEmbeddedCapsuleAxes(
-        LSCapsuleCollider capsule3D,
-        Vector3d capsule3DAxis,
-        LSCapsuleCollider2D capsule2D,
-        Vector2d capsule2DPlanarAxis,
-        Vector3d capsule2DAxis,
-        Vector3d capsule2DNormal,
-        ref AxisPenetration penetration)
-    {
-        return CheckCapsulePrismAxis(
-                capsule3D,
-                capsule2D,
-                capsule3DAxis,
-                capsule2DPlanarAxis,
-                capsule2DAxis,
-                ref penetration)
-            && CheckCapsulePrismAxis(
-                capsule3D,
-                capsule2D,
-                capsule3DAxis,
-                capsule2DPlanarAxis,
-                capsule2DNormal,
-                ref penetration);
-    }
-
-    private static bool CheckEmbeddedCapsuleAxes(
         LSCylinderCollider cylinder,
         Vector3d cylinderAxis,
         LSCapsuleCollider2D capsule,
@@ -759,23 +620,6 @@ public static partial class CollisionDetectionMixed
                 ref penetration);
     }
 
-    private static bool CheckCapsuleEmbeddedCapsuleEdgeAxis(
-        LSCapsuleCollider capsule3D,
-        Vector3d capsule3DAxis,
-        LSCapsuleCollider2D capsule2D,
-        Vector2d capsule2DPlanarAxis,
-        Vector3d capsule2DAxis,
-        ref AxisPenetration penetration)
-    {
-        return CheckCapsulePrismAxis(
-            capsule3D,
-            capsule2D,
-            capsule3DAxis,
-            capsule2DPlanarAxis,
-            Vector3d.Cross(capsule3DAxis, capsule2DAxis),
-            ref penetration);
-    }
-
     private static bool CheckCylinderEmbeddedCapsuleEdgeAxis(
         LSCylinderCollider cylinder,
         Vector3d cylinderAxis,
@@ -807,21 +651,6 @@ public static partial class CollisionDetectionMixed
             capsulePlanarAxis,
             Vector3d.Cross(coneAxis, capsuleAxis),
             ref penetration);
-    }
-
-    private static bool BuildCapsuleContact(
-        LSCapsuleCollider capsule,
-        LSCollider2D embedded,
-        AxisPenetration penetration,
-        out MixedContact contact)
-    {
-        contact = BuildCanonicalSupportContact(
-            capsule,
-            embedded,
-            penetration.Axis,
-            penetration.Depth,
-            penetration.DepthIsClamped);
-        return true;
     }
 
     private static bool BuildCylinderContact(

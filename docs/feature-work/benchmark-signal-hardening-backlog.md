@@ -16,7 +16,7 @@ this backlog.
 ## Intake Rules
 
 - Signal IDs use `GRV-Benchmark-NNN`. The next available ID is
-  `GRV-Benchmark-021`.
+  `GRV-Benchmark-022`.
 - Assign an ID at intake and never reuse it, including after a signal closes or
   moves into a dated plan. Check this file's Git history before advancing or
   repairing the counter.
@@ -61,6 +61,41 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 
 ## Active Signals
 
+### GRV-Benchmark-021 — Complete Capsule/Stadium-Slab Curved Contact Cost
+
+**Discovered:** 2026-09-30.  
+**Status:** Open performance follow-up; GRV-Issue-088 correctness repair and
+remaining cost accepted on 2026-09-30. Acceptance closes the defect, not this signal.  
+**Owner:** FixedMathSharp's complete capsule/stadium-slab feature selection,
+shared circular-rim algebra and signed value-root comparison.
+
+The complete query fixes false contacts and nonminimum penetration. Its refined
+oblique-interior rim costs **942.95 ± 20.152 microseconds/query** and straight
+rim **80.81 ± 1.157 microseconds/query**, both **0 B/op**. Error is the half-width
+of the 99.9% confidence interval. The first complete solver took 1326.22 and
+208.38 microseconds respectively; exact whole-shape certificates, removal of
+duplicate fan work and whole-chart admission reduced that cost by 29% and 61%.
+The old 62.86 / 51.27 microsecond results were incorrect and are not equivalent
+optimization targets. Ordinary cap/side/end rows are now 37-41% faster than the
+old path. Existing mixed circle-slab and 3D controls remain separate evidence
+under GRV-Benchmark-020.
+
+**Next isolation step:** Profile admitted oblique roots, squared-value mapping
+and exact winner comparisons in the existing `capsule-slab-contact` fixtures.
+Coordinate with GRV-Benchmark-020 using the
+[shared investigation context](#capsule-rim-cost-relationship-grv-benchmark-020-and-021).
+Prefer proved nonwinning-feature certificates or shared algebra reuse; retain
+strict raw-neighbor classification, whole-shape minimum depth, stable ties,
+canonical anchors, bounded scratch and zero allocation. Do not restore a
+direction subset or combine constituent-cylinder depths.
+
+**Reproduce:** after a Release local-stack benchmark build, run
+`dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll capsule-slab-contact --launchCount 2 --warmupCount 5 --iterationCount 15 --iterationTime 250 --affinity 3 --exporters json --artifacts artifacts/grv088/refined`.
+Use `DOTNET_PROCESSOR_COUNT=2`, BelowNormal priority and one heavy workload.
+The [completed repair plan](done/2026-09-29-complete-capsule-slab-contact-plan.md#refined-matched-performance)
+retains the source revisions, Windows/.NET environment, full matched table and
+control evidence; raw distributions are in `artifacts/grv088/refined/`.
+
 ### GRV-Benchmark-020 — Complete Capsule/Circle-Slab Contact Cost
 
 **Discovered:** 2026-09-29.  
@@ -99,8 +134,10 @@ there is no historical 3D baseline for these new fixtures.
 
 **Next isolation step:** Profile the shared cylinder/capsule candidate and
 ellipse-depth reducers on the oblique-interior and endpoint-rim fixtures,
-retaining cap/side/zero-core controls. Prefer reuse or exact feature certificates
-within that owner; do not restore the incomplete direction subset, add a second
+retaining cap/side/zero-core controls. Coordinate with GRV-Benchmark-021 using
+the [shared investigation context](#capsule-rim-cost-relationship-grv-benchmark-020-and-021).
+Prefer reuse or exact feature certificates within that owner; do not restore
+the incomplete direction subset, add a second
 mixed solver or approximate the result. Preserve full-domain classification,
 nearest-even depth, deterministic ties, canonical anchors and zero allocation.
 
@@ -118,6 +155,42 @@ agreement. Reports and raw measurements are under `artifacts/grv085/before`,
 `after` and `after-confirm`; retain the individual rows rather than an average
 that hides the curved-feature cost. Correctness evidence is retained in
 [GRV-Issue-085](issue-tracker.md#grv-issue-085---mixed-capsulecircle-slab-contact-bypasses-the-complete-upstream-query).
+
+#### Capsule Rim Cost Relationship (GRV-Benchmark-020 And 021)
+
+Source inspection on 2026-09-30 connects these signals without establishing a
+shared CPU hotspot. Keep both fixture families and their measured results
+distinct; investigate them together, starting with oblique contacts and then
+endpoint/straight-rim output materialization.
+
+The fixture names describe different features:
+
+| Fixture | Capsule feature | Slab feature |
+| --- | --- | --- |
+| `EndpointRim` (020) | Core endpoint | Circular cap rim |
+| `StraightRim` (021) | Core endpoint | Straight cap edge |
+| Oblique interior rim (both) | Interior of tilted core | Curved cap rim |
+
+Both endpoint/straight-rim fixtures have analytic whole-shape closest-point
+certificates and reuse `MaterializeCylinderCapsulePenetration` for exact depth
+and normal rounding; neither needs the oblique polynomial solver. They are not
+matched geometry: the endpoint fixture has irrational depth/normal components,
+while the straight-rim fixture has rational results. Their timings alone cannot
+establish which solver is intrinsically cheaper.
+
+The oblique paths both require wide arithmetic, polynomial roots, exact
+comparisons and final rounding, but use different specialized root-selection
+paths. The cylinder ellipse solver selects a largest-positive parameter root
+under an unrestricted-domain proof. The stadium solver admits constrained
+end-region roots and maps/compares their signed gaps through value roots, reusing
+circular-rim algebra also consumed by triangle contacts. Copying the cylinder's
+reflection/root-selection shortcut could discard a valid stadium contact.
+
+Profile these stages side by side before attributing cost to a shared leaf or
+merging solvers. Prefer demonstrated shared arithmetic/materialization wins or
+proved feature certificates; retain ordinary mixed/3D and affected triangle
+controls. Similar exact algebra does not yet prove the same dominant function,
+an unavoidable correctness cost, or an optimization that will benefit both.
 
 ### GRV-Benchmark-019 — Complete Triangle/Cone Contact Cost
 

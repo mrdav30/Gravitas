@@ -189,6 +189,15 @@ retains the 3D-to-2D normal convention, canonical support anchors, material
 ownership, and constrained mixed response. This shared geometry path does not
 change the contact rules for other mixed shape families.
 
+Capsule contacts with a positive-core 2D capsule slab also use a complete
+FixedMathSharp query. The slab's flat caps, straight sides and rounded ends
+participate in one minimum-penetration calculation. Treating its middle box and
+end cylinders as separate contacts cannot determine that whole-shape depth.
+Tiny positive and odd-raw core lengths retain their authored shape and rotation;
+only an exactly zero core reduces to the circle-slab path. Capsule radius is
+included before separation and rounding, so exact touching remains contact
+and a positive sub-raw penetration can correctly return zero rounded depth.
+
 For shape state, pair matrices, SAT invariants, mesh policy, and compound
 ownership details, read [Collider Shape Reference](COLLIDER_SHAPE_REFERENCE.md).
 
