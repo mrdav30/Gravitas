@@ -103,6 +103,28 @@ dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll all 
 
 Do not treat short-run numbers as canonical measurements.
 
+### Pure-2D circle contact simulation
+
+The `circle-contact-simulation` selection measures 64 and 1024 independent
+dynamic/static circle pairs with axis-aligned, diagonal and rotated geometry.
+GridForge cells are 16 units in X/Z and one unit in Y, matching pair spacing
+to keep this a sustained-contact workload rather than a fine-voxel scaling test.
+`ResetAndFullSimulationStep` runs both context `Simulate` and `LateSimulate`,
+including broad phase, contact generation, response and bookkeeping. Each
+invocation resets dynamic pose and all accumulated motion; sleep is disabled
+so repeated invocations retain the same contact workload. Setup verifies known
+contact depths/normals, one active contact per pair, candidate counts and
+repeatable post-response body state across warmed frames.
+
+`ResetAndDetectContacts` measures the same pose reset plus direct dispatcher
+queries over those pairs. Both rows include reset cost; their difference is
+useful attribution evidence, not an exact measurement of any single stage.
+The `circle-contact` selection remains the individual-query geometry baseline.
+
+```powershell
+dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll circle-contact-simulation --filter '*' --exporters json
+```
+
 ### Capsule/circle-slab contacts
 
 The `capsule-circle-contact` selection measures mixed capsule/circle-slab side,

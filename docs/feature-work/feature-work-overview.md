@@ -27,8 +27,10 @@ instead of burying it in notes.
     default; use `UseLocalLsfStack=true` only for coordinated validation of
     unreleased sibling changes, then revalidate against released packages.
   - The active correctness queue is clear. GRV-Issue-083's circle-contact repair
-    and shared upstream optimization are complete; its remaining measured
-    exact-contact premium stays open as GRV-Benchmark-022.
+    and shared upstream optimization are complete. GRV-Benchmark-022 is closed
+    after the committed shared normalization improvement and documented decision
+    to retain the exact contact path. Larger-scene partition/grounding scaling
+    remains open as GRV-Benchmark-023.
 - [`Benchmark Signal Hardening`](benchmark-signal-hardening-backlog.md)
   - Reproduce and close confirmed release-relevant signals alongside the owning
     library change. Do not broaden this into speculative optimization work.
@@ -43,8 +45,14 @@ instead of burying it in notes.
   - Shared point-core, root, normalization and residual work removes 66.6-83.2%
     of the first complete-query cost; sphere and nonzero-capsule controls also
     improve. Both repositories retain 100% reachable line/branch/method coverage
-    in Release and Lean. GRV-Benchmark-022 preserves the remaining premium over
-    the incomplete predecessor without assuming that premium is accepted.
+    in Release and Lean in that capture.
+  - The 2026-10-02 GRV-Benchmark-022 follow-up removes redundant shared vector
+    rescaling, preserves raw results and improves diagonal/rotated direct queries
+    by 7.2%/3.7%. A sustained 64/1024-pair workload keeps the remaining exact
+    premium visible without claiming a full-step speedup or accepting a frame
+    budget. Its larger partition/grounding costs are tracked in GRV-Benchmark-023.
+    Fresh Release/ReleaseLean builds and suites pass in both repositories with
+    exact 100% reachable line/branch/method coverage and no review findings.
 
 - [`Complete Capsule/Slab Contact`](done/2026-09-29-complete-capsule-slab-contact-plan.md)
   - Completed 2026-09-30; GRV-Issue-088 is resolved. Both repositories retain

@@ -36,7 +36,7 @@
 ### Ordered Queue
 
 No active correctness issues. Remaining measured performance costs are tracked
-in the benchmark backlog, including GRV-Benchmark-022.
+in the benchmark backlog.
 
 ## Resolved Issues
 
@@ -44,33 +44,33 @@ in the benchmark backlog, including GRV-Benchmark-022.
 
 - **Resolved:** 2026-09-30. The correctness repair and focused shared-owner
   optimization are complete; remaining exact-contact cost is tracked separately.
-- **Confirmed:** 2026-09-25 at `e85cda8f1e42acd0669211a8fda21e99c1251d80`,
-  with FixedMathSharp `6368582`, during the FMS-Issue-024 neighboring-solver
-  audit. This is a discrete-contact defect, not an arbitrary 3D circle-distance
-  defect or a recurrence of the repaired radial-query issue GRV-Issue-045.
+- **Confirmed:** 2026-09-25 at `e85cda8f1e42acd0669211a8fda21e99c1251d80`, with
+  FixedMathSharp `6368582`, during the FMS-Issue-024 neighboring-solver audit.
+  This is a discrete-contact defect, not an arbitrary 3D circle-distance defect
+  or a recurrence of the repaired radial-query issue GRV-Issue-045.
 - **Reproduction:** In `CollisionDetection2DTests`, use `Create2DContext` and
   `CreateBody` to initialize static `LSCircleCollider2D` bodies with radius
   `25000`, at `(0,0)` and `(40000,40000)`, zero rotation and unit scale.
   `CollisionDetection2D.BoundsOverlap` returns true: the AABBs overlap by
   `10000` on both axes. Exact squared distance is `3200000000`, greater than
-  squared radius sum `2500000000`, so the circles are disjoint.
-  Nevertheless, `CollisionDetection2D.TryCollide(first, second, out contact)`
-  returns true with depth `3659.049988158513` and normal
+  squared radius sum `2500000000`, so the circles are disjoint. Nevertheless,
+  `CollisionDetection2D.TryCollide(first, second, out contact)` returns true
+  with depth `3659.049988158513` and normal
   `(0.8631674575153738,0.8631674575153738)`. The equivalent
   `FixedBoundCircle.Intersects` correctly returns false.
 - **Cause:** `CollisionDetection2D.TryCircleCircle` forms the center difference,
   radius sum and both squares in scalar `Fixed64`. Both squared values in this
   fixture saturate to `Fixed64.MaxValue` before comparison; subsequent square
-  root, normal and depth calculations use the saturated distance. The normal
-  is not unit length either. Bounds admission does not make these intermediate
+  root, normal and depth calculations use the saturated distance. The normal is
+  not unit length either. Bounds admission does not make these intermediate
   quantities representable.
-- **Initial reproduction:** Built the then-current Release local-stack test project with
-  zero warnings/errors, then executed its existing initialization helpers and
-  actual narrow-phase dispatcher through a PowerShell 7.6.5 reflection probe.
-  No collider fields were fabricated. This was a direct contact reproduction,
-  not a full simulation-step test or a completed regression-test matrix. A
-  direct call to the existing FixedMathSharp zero-axis capsule contact query
-  also correctly rejected the same separated geometry.
+- **Initial reproduction:** Built the then-current Release local-stack test
+  project with zero warnings/errors, then executed its existing initialization
+  helpers and actual narrow-phase dispatcher through a PowerShell 7.6.5
+  reflection probe. No collider fields were fabricated. This was a direct
+  contact reproduction, not a full simulation-step test or a completed
+  regression-test matrix. A direct call to the existing FixedMathSharp zero-axis
+  capsule contact query also correctly rejected the same separated geometry.
 - **Implementation:** `TryCircleCircle` now reuses
   `FixedSegment2d.TryGetCenteredCapsulesContact` with zero core lengths, just as
   the 3D sphere path uses its dimensional counterpart. The explicit-axis
@@ -79,8 +79,8 @@ in the benchmark backlog, including GRV-Benchmark-022.
   Complete upstream anchors and the conceptual-depth clamp flag are forwarded
   through the existing manifold/compound path. FixedMathSharp also optimizes
   this shared owner for both circle and sphere point cores, reuses narrower
-  exact square roots and shares allocation-free anchor residual arithmetic.
-  The public API and exact contact contract are unchanged upstream.
+  exact square roots and shares allocation-free anchor residual arithmetic. The
+  public API and exact contact contract are unchanged upstream.
 - **Regression evidence:** The original enabled .NET 8 regression fails against
   unchanged source; the expanded first matrix exposes 12 failures in 17 cases,
   and a further four-case raw matrix exposes three more failures. These cover
@@ -93,71 +93,74 @@ in the benchmark backlog, including GRV-Benchmark-022.
   core tests in Release / ReleaseLean, plus 49 Chronicler integration tests in
   each. The configured core/FluentAssertions Cobertura report is exactly 100%:
   Release has 52,626/52,626 lines, 12,088/12,088 branches and 3,934 covered
-  methods; Lean has 52,719/52,719 lines,
-  12,088/12,088 branches and 3,930 covered methods. No exclusions changed.
-  Tests pin full-domain radius/center spans, pre-rounding clamping, raw
-  neighbors, 2D/3D parity, product-root width boundaries, nonzero-core endpoint
-  rounding and retained residuals after both overflow cancellation and axial
-  double rounding. An obsolete residual-bound constant and its redundant
-  range assertions were removed; exact-value regressions replace them. The
-  focused Debug arithmetic/anchor run also passes all 125 cases.
+  methods; Lean has 52,719/52,719 lines, 12,088/12,088 branches and 3,930
+  covered methods. No exclusions changed. Tests pin full-domain radius/center
+  spans, pre-rounding clamping, raw neighbors, 2D/3D parity, product-root width
+  boundaries, nonzero-core endpoint rounding and retained residuals after both
+  overflow cancellation and axial double rounding. An obsolete residual-bound
+  constant and its redundant range assertions were removed; exact-value
+  regressions replace them. The focused Debug arithmetic/anchor run also passes
+  all 125 cases.
 - **Final validation, 2026-09-30:** Full Windows local-stack suites, rebuilt
-  against the optimized FixedMathSharp source, pass: Release
-  4,363 tests and ReleaseLean 4,304 tests, with no failures or skips. Both
-  configurations retain 100% reachable line, branch and method coverage without
-  exclusion changes. Raw Cobertura counts are 44,363/44,363 lines,
-  13,218/13,218 branches and 4,561 covered methods in Release; Lean has
-  44,361/44,361 lines, 13,218/13,218 branches and 4,560 covered methods. Both
-  solution builds validate `netstandard2.1` and `net8.0` with zero warnings or
-  errors; DocFX passes with warnings as errors. The new 21-case regressions
-  include zero-allocation direct and manifold checks. Logs, TRX, coverage and
-  benchmark artifacts are under `artifacts/grv083`; the final full-suite reports
-  use `final-coverage-release` and `final-coverage-releaselean` in both repositories.
-  This is source-mode Windows evidence, not released-package or Linux validation.
+  against the optimized FixedMathSharp source, pass: Release 4,363 tests and
+  ReleaseLean 4,304 tests, with no failures or skips. Both configurations retain
+  100% reachable line, branch and method coverage without exclusion changes. Raw
+  Cobertura counts are 44,363/44,363 lines, 13,218/13,218 branches and 4,561
+  covered methods in Release; Lean has 44,361/44,361 lines, 13,218/13,218
+  branches and 4,560 covered methods. Both solution builds validate
+  `netstandard2.1` and `net8.0` with zero warnings or errors; DocFX passes with
+  warnings as errors. The new 21-case regressions include zero-allocation direct
+  and manifold checks. Logs, TRX, coverage and benchmark artifacts are under
+  `artifacts/grv083`; the final full-suite reports use `final-coverage-release`
+  and `final-coverage-releaselean` in both repositories. This is source-mode
+  Windows evidence, not released-package or Linux validation.
 - **Performance disposition:** Shared-owner optimization removes 66.6-83.2% of
   the initial complete-query time in the six matched Gravitas fixtures, with
-  zero allocation. Axis contact is 5.4363 -> 0.9125 microseconds; rotated contact
-  is 5.8454 -> 1.6113 microseconds. Upstream sphere and nonzero-capsule controls
-  also improve. The exact path still costs 8.6-24.0x the old incomplete scalar
-  path; this is not scalar-cost parity or an accepted whole-frame budget.
-  Keep that remaining signal open in
-  [GRV-Benchmark-022](benchmark-signal-hardening-backlog.md#grv-benchmark-022--exact-pure-2d-circle-contact-cost).
-  Closing the reproduced arithmetic defect does not close that performance
-  signal or assume acceptance of its remaining premium. Independent correctness,
-  numerical/evidence and Ponytail reviews have no outstanding findings.
+  zero allocation. Axis contact is 5.4363 -> 0.9125 microseconds; rotated
+  contact is 5.8454 -> 1.6113 microseconds. Upstream sphere and nonzero-capsule
+  controls also improve. The exact path still costs 8.6-24.0x the old incomplete
+  scalar path; this is not scalar-cost parity or an accepted whole-frame budget.
+  The direct-query investigation is now closed in
+  [GRV-Benchmark-022](benchmark-signal-hardening-backlog.md#grv-benchmark-022--exact-pure-2d-circle-contact-cost)
+  after further shared normalization improvement and a documented decision to
+  retain the exact solver. Larger-scene partition/grounding scaling remains open
+  in GRV-Benchmark-023; whole-frame cost has not been accepted. Independent
+  correctness, numerical/evidence and Ponytail reviews have no outstanding
+  findings.
 
 ### GRV-Issue-088 - Mixed capsule/nonzero-core capsule-slab contact retains incomplete directions
 
 - **Confirmed:** 2026-09-29 while validating GRV-Issue-085 against Gravitas
   `04805b8` plus its local fix and FixedMathSharp `9833123` plus the shared
-  penetration extraction. This is the unchanged nonzero-core slab path, not
-  a regression introduced by the circle-slab repair.
+  penetration extraction. This is the unchanged nonzero-core slab path, not a
+  regression introduced by the circle-slab repair.
 - **Reproduction:** Reuse GRV-Issue-085's 3D capsule: radius 1, total height 22,
   center `(83/4,7/4,0)`, rotation `(0,0,-q,q)` where
   `q=Fixed64.FromRaw(3037000500)`. At the origin use an unrotated
   `LSCapsuleCollider2D(radius:10,height:22)` with half-thickness 1. Its planar
-  core has length 2 along Z. At Z=0 the nearest cap-rim point is `(10,1,0)`;
-  the closest 3D core endpoint is `(43/4,7/4,0)`. The squared gap is `9/8`,
-  strictly greater than the 3D capsule's radius squared 1. Extending the slab
-  core along Z cannot reduce this X/Y gap.
+  core has length 2 along Z. At Z=0 the nearest cap-rim point is `(10,1,0)`; the
+  closest 3D core endpoint is `(43/4,7/4,0)`. The squared gap is `9/8`, strictly
+  greater than the 3D capsule's radius squared 1. Extending the slab core along
+  Z cannot reduce this X/Y gap.
 - **Observed:** The public mixed query returns true, depth
   `0.13923784578219056`, normal approximately
   `(-0.9870072698686272,-0.16067560226656497,0)`. The equivalent zero-core slab
   now correctly rejects through GRV-Issue-085's complete circle-slab route.
-  Reproduced through the existing `MixedNarrowPhaseTests` initialization
-  helpers using PowerShell reflection against the fresh Release local-stack
-  assembly; no private geometry was fabricated.
+  Reproduced through the existing `MixedNarrowPhaseTests` initialization helpers
+  using PowerShell reflection against the fresh Release local-stack assembly; no
+  private geometry was fabricated.
 - **Cause:** The removed `TryTestCapsuleCapsuleSlab` selected an incomplete
   direction set. Exact projections on those directions did not establish the
   whole shape's minimum penetration; a nonzero-core slab is not a single
   cylinder or a rounded 3D capsule.
 - **Resolved 2026-09-30:** FixedMathSharp now owns a complete signed
-  capsule/stadium-slab support query. Gravitas delegates to it, retains canonical
-  anchors/materials, and removes capsule-only direction helpers. The enabled
-  separated-rim regression, raw neighbors, whole-shape containment, tiny cores,
-  oblique roots, wide/clamped inputs, runtime response and zero allocation pass.
-  Both repositories retain 100% measured line/branch/method coverage in Release
-  and ReleaseLean; Debug resource checks and both DocFX sites also pass.
+  capsule/stadium-slab support query. Gravitas delegates to it, retains
+  canonical anchors/materials, and removes capsule-only direction helpers. The
+  enabled separated-rim regression, raw neighbors, whole-shape containment, tiny
+  cores, oblique roots, wide/clamped inputs, runtime response and zero
+  allocation pass. Both repositories retain 100% measured line/branch/method
+  coverage in Release and ReleaseLean; Debug resource checks and both DocFX
+  sites also pass.
 - **Coordination:** The completed
   [Complete Capsule/Slab Contact plan](done/2026-09-29-complete-capsule-slab-contact-plan.md)
   retains the proof, matched baseline, full verification and review evidence.
@@ -168,8 +171,8 @@ in the benchmark backlog, including GRV-Benchmark-022.
 
 ### GRV-Issue-085 - Mixed capsule/circle-slab contact bypasses the complete upstream query
 
-- **Confirmed:** 2026-09-25 at `e85cda8f1e42acd0669211a8fda21e99c1251d80`
-  with FixedMathSharp `6368582`; reproduced again on 2026-09-29 before repair.
+- **Confirmed:** 2026-09-25 at `e85cda8f1e42acd0669211a8fda21e99c1251d80` with
+  FixedMathSharp `6368582`; reproduced again on 2026-09-29 before repair.
 - **Reproduction:** A 3D capsule of radius 1 and total height 22 (core 20),
   center `(83/4,7/4,0)`, rotation `(0,0,-q,q)` with
   `q=Fixed64.FromRaw(3037000500)`, faces a radius-10 circle slab at the origin
@@ -177,15 +180,15 @@ in the benchmark backlog, including GRV-Benchmark-022.
   squared gap `9/8 > 1`. Bounds overlap, but the shapes do not.
 - **Old behavior / cause:** Mixed contact returned true with depth
   `0.19961997726932168`; the complete upstream query returned false. The mixed
-  implementation selected only world up, capsule axis, their cross product
-  and a closest-centerline direction. The equivalent zero-core planar capsule
-  also misclassified the gap. Doubling slab half-thickness in `Fixed64`
-  additionally shortened valid very tall circle slabs and could reject overlap.
+  implementation selected only world up, capsule axis, their cross product and a
+  closest-centerline direction. The equivalent zero-core planar capsule also
+  misclassified the gap. Doubling slab half-thickness in `Fixed64` additionally
+  shortened valid very tall circle slabs and could reject overlap.
 - **Resolved:** 2026-09-29. Both circle slabs and zero-core planar capsule slabs
   now share FixedMathSharp's complete cylinder/capsule penetration owner. That
   owner retains full cylinder length wider than `Fixed64`, using the existing
-  proved arithmetic widths. Its public contact API, exact feature selection,
-  tie ordering and support anchors remain unchanged. Gravitas reverses the
+  proved arithmetic widths. Its public contact API, exact feature selection, tie
+  ordering and support anchors remain unchanged. Gravitas reverses the
   cylinder-first normal and keeps its canonical support/material/response path.
   The two obsolete capsule/circle direction helpers were removed.
 - **Regression evidence:** `MixedNarrowPhaseTests.CapsuleCircle.cs` covers
@@ -193,23 +196,22 @@ in the benchmark backlog, including GRV-Benchmark-022.
   admitted maximum half-thickness, conceptual-depth clamping and allocation-free
   warmed contacts. Before the repair, 14 of the 19 focused mixed cases failed;
   afterward all 237 mixed narrow-phase cases passed. Upstream wide-length and
-  existing cylinder/capsule and cylinder-pair controls passed 243 cases.
-  A subsequent two-raw-unit positive-core regression verifies that only an
-  exactly zero core takes the circle route: the stadium's extra endpoint extent
-  remains visible in its exact contact depth.
+  existing cylinder/capsule and cylinder-pair controls passed 243 cases. A
+  subsequent two-raw-unit positive-core regression verifies that only an exactly
+  zero core takes the circle route: the stadium's extra endpoint extent remains
+  visible in its exact contact depth.
 - **Verification:** FixedMathSharp passes 3,932 / 3,911 core tests in Release /
   ReleaseLean, plus 49 Chronicler integration tests in each configuration.
   Gravitas passes 4,335 / 4,276 tests. Both repositories retain exact 100%
-  reachable line, branch and method coverage in both configurations, without
-  new exclusions. Both full solutions build for netstandard2.1 and net8.0
-  with zero warnings/errors. The 15 focused wide-length Debug regressions also
-  pass, and both DocFX sites build with warnings treated as errors.
-  Independent correctness, arithmetic and Ponytail
-  reviews have no outstanding findings. Coverage evidence is under
-  `artifacts/grv085/coverage-release`, `coverage-lean`, `report-release` and
-  `report-lean` in FixedMathSharp; Gravitas's final reports use
-  `coverage-release-final`, `coverage-lean`, `report-release-final` and
-  `report-lean` under the same artifact root.
+  reachable line, branch and method coverage in both configurations, without new
+  exclusions. Both full solutions build for netstandard2.1 and net8.0 with zero
+  warnings/errors. The 15 focused wide-length Debug regressions also pass, and
+  both DocFX sites build with warnings treated as errors. Independent
+  correctness, arithmetic and Ponytail reviews have no outstanding findings.
+  Coverage evidence is under `artifacts/grv085/coverage-release`,
+  `coverage-lean`, `report-release` and `report-lean` in FixedMathSharp;
+  Gravitas's final reports use `coverage-release-final`, `coverage-lean`,
+  `report-release-final` and `report-lean` under the same artifact root.
 - **Performance:** The repeated mixed benchmark remains allocation-free but is
   not an overall speedup: ordinary cap/side/zero-core costs rise, endpoint-rim
   contact costs about 108 microseconds and oblique interior-rim contact about
@@ -237,20 +239,20 @@ second Gravitas geometry implementation was added.
 earliest axial witness for the original full-domain fixture, while the genuinely
 separated mesh still rejects. Rotated/full-domain faces, exact apex contact,
 finite caps, reversed winding, quaternion-sign equivalence, root-rounding ties
-and allocation-free warmed queries are covered upstream. Independent review
-also caught a near-unit-axis edge/face ranking mismatch; its failing exact
-witness regression now passes using the existing wide-ratio conversion.
+and allocation-free warmed queries are covered upstream. Independent review also
+caught a near-unit-axis edge/face ranking mismatch; its failing exact witness
+regression now passes using the existing wide-ratio conversion.
 
 **Verification:** FixedMathSharp passes 3,917 / 3,896 core tests in Release /
 ReleaseLean plus 49 integration tests in each configuration; core coverage is
-100% reachable line, branch and method. The focused Debug arithmetic run
-passes 186 cases. Gravitas passes 4,318 / 4,259 tests with 100% reachable line,
-branch and method coverage in Release / ReleaseLean. No exclusions were added.
-Both full solutions build for netstandard2.1 and net8.0 in both configurations;
-both DocFX sites pass warnings-as-errors. Independent correctness, arithmetic
-and Ponytail reviews have no outstanding findings. Source-stack validation uses
-`UseLocalLsfStack=true`; it is not published-package validation.
-Coverage/build evidence is under `artifacts/grv087/final-*` in each repository.
+100% reachable line, branch and method. The focused Debug arithmetic run passes
+186 cases. Gravitas passes 4,318 / 4,259 tests with 100% reachable line, branch
+and method coverage in Release / ReleaseLean. No exclusions were added. Both
+full solutions build for netstandard2.1 and net8.0 in both configurations; both
+DocFX sites pass warnings-as-errors. Independent correctness, arithmetic and
+Ponytail reviews have no outstanding findings. Source-stack validation uses
+`UseLocalLsfStack=true`; it is not published-package validation. Coverage/build
+evidence is under `artifacts/grv087/final-*` in each repository.
 
 **Performance:** The existing `OverlapConeAllAcrossConcaveMeshTargets` row
 (`ColliderCount=64`) measures **3.440 ms before / 3.158 ms after**, about **8.2%
@@ -259,11 +261,11 @@ five warmups and fifteen measured iterations on the same two-core-affinity host.
 The first frame-preserving implementation measured 3.796 ms; retaining the
 proven exact-translation path and reusing its scalar projection removed that
 avoidable cost. An earlier optimized run measured 3.166 ms. These are this
-ordinary query scenario's results, not a claim about every geometry workload
-or the cost of newly admitted extreme-coordinate hits. Baseline source was
-Gravitas `4d69d81` / FixedMathSharp `0323efb`; logs and BenchmarkDotNet reports
-are under `artifacts/grv087/baseline*`, `current*`, `optimized*` and
-`final-benchmark*` in Gravitas.
+ordinary query scenario's results, not a claim about every geometry workload or
+the cost of newly admitted extreme-coordinate hits. Baseline source was Gravitas
+`4d69d81` / FixedMathSharp `0323efb`; logs and BenchmarkDotNet reports are under
+`artifacts/grv087/baseline*`, `current*`, `optimized*` and `final-benchmark*` in
+Gravitas.
 
 **Original evidence:**
 
@@ -274,16 +276,16 @@ are under `artifacts/grv087/baseline*`, `current*`, `optimized*` and
   one bodyless concave `SurfaceApproximation` mesh with local vertices
   `(-3,-1,0)`, `(3,-1,0)`, `(0,1,0)`, identity rotation and origin `(3,0,0)`.
   Call `context.Query3D.OverlapCone` with apex
-  `(Fixed64.MinValue + Fixed64.Two, 1/2, 0)`, direction `Vector3d.Down`,
-  length `1`, end radius `Fixed64.MaxValue` and `PhysicsLayerMask.FromLayer(0)`.
-  It returns false after admitting one collider and one mesh triangle. This
-  cone is the same geometric volume as the original GRV-Issue-086 fixture;
+  `(Fixed64.MinValue + Fixed64.Two, 1/2, 0)`, direction `Vector3d.Down`, length
+  `1`, end radius `Fixed64.MaxValue` and `PhysicsLayerMask.FromLayer(0)`. It
+  returns false after admitting one collider and one mesh triangle. This cone is
+  the same geometric volume as the original GRV-Issue-086 fixture;
   `(1,-1/2+2^-32,0)` is strictly inside the triangle and cone.
 - **Cause:** `TryBuildConeHitForConcaveMesh` rejects when the query apex cannot
   be materialized in the mesh's local scalar frame. The geometric witness and
-  its axial distance are representable; failure to represent an intermediate
-  is not a separation proof. Both closest-hit and all-hit entry points share
-  this reducer.
+  its axial distance are representable; failure to represent an intermediate is
+  not a separation proof. Both closest-hit and all-hit entry points share this
+  reducer.
 - **Original probe:** Direct public closest-hit query using existing Release
   local-stack assemblies in PowerShell/.NET `10.0.11`; internal counters were
   read only to establish broad-phase admission. No private geometry was
@@ -295,21 +297,21 @@ are under `artifacts/grv087/baseline*`, `current*`, `optimized*` and
 **Resolved:** 2026-09-29. Full evidence and measured performance controls are in
 [Complete Triangle/Cone Contact](done/2026-09-28-complete-triangle-cone-contact-plan.md).
 
-**Fix:** FixedMathSharp owns the complete canonical-frame cone/triangle relation.
-Gravitas now consumes one feature's normal, depth, clamp flag and both anchors;
-the incomplete sampling and scalar-frame rejection branches are removed.
-Touching is inclusive, genuine positive gaps reject, and the existing
+**Fix:** FixedMathSharp owns the complete canonical-frame cone/triangle
+relation. Gravitas now consumes one feature's normal, depth, clamp flag and both
+anchors; the incomplete sampling and scalar-frame rejection branches are
+removed. Touching is inclusive, genuine positive gaps reject, and the existing
 closed-convex fallback and CCD policies are unchanged.
 
 **Validation:** Both full source-stack solutions build for `netstandard2.1` and
-`net8.0` in Release and ReleaseLean. FixedMathSharp passes 3,886 / 3,865 core tests
-plus 49 integration tests per configuration; Gravitas passes 4,317 / 4,258.
-All retain 100% reachable line, branch and method coverage with no new
+`net8.0` in Release and ReleaseLean. FixedMathSharp passes 3,886 / 3,865 core
+tests plus 49 integration tests per configuration; Gravitas passes 4,317 /
+4,258. All retain 100% reachable line, branch and method coverage with no new
 exclusions. The 47 focused upstream cone cases include raw-neighbor boundaries,
 paired witnesses, full-domain and 1 MiB worker-stack regressions. All nine cone
 and eighteen shared cylinder/capsule-slab benchmark rows are allocation-free;
-fresh old-source controls detected no material shared-path regression.
-Both DocFX sites pass warnings-as-errors; independent correctness and Ponytail
+fresh old-source controls detected no material shared-path regression. Both
+DocFX sites pass warnings-as-errors; independent correctness and Ponytail
 reviews have no outstanding findings. Source-mode validation is not published
 package availability evidence.
 
@@ -329,74 +331,74 @@ cone-volume query defect was separately resolved as **GRV-Issue-087**.
   rotation. Create an identity `LSConeCollider` with `Size=Vector3d.One`,
   `Radius=Fixed64.MaxValue`, and center
   `(Fixed64.MinValue + Fixed64.Two, 0, 0)`. Bounds overlap, but public
-  `CollisionDetection.DoCollisionCheck(new CollisionPair(mesh, cone))`
-  returns false.
-- **Independent geometric proof:** Write `epsilon=2^-32` and `M=2^31`.
-  The point `(1,-1/2+epsilon,0)` is strictly inside the triangle: its left
-  and right edges at that height are `3/4+3*epsilon/2` and
-  `21/4-3*epsilon/2`. Its distance from the cone axis is `M-1`, while the
-  cone radius at that height is `(M-epsilon)*(1-epsilon)`, exceeding that
-  distance by `1/2-epsilon+epsilon^2`. The miss is not a tangency convention.
+  `CollisionDetection.DoCollisionCheck(new CollisionPair(mesh, cone))` returns
+  false.
+- **Independent geometric proof:** Write `epsilon=2^-32` and `M=2^31`. The point
+  `(1,-1/2+epsilon,0)` is strictly inside the triangle: its left and right edges
+  at that height are `3/4+3*epsilon/2` and `21/4-3*epsilon/2`. Its distance from
+  the cone axis is `M-1`, while the cone radius at that height is
+  `(M-epsilon)*(1-epsilon)`, exceeding that distance by `1/2-epsilon+epsilon^2`.
+  The miss is not a tangency convention.
 - **Cause:** `CollisionDetection.Cone.cs` skips the admitted triangle when
   `coneCenterAnchor.TryGetLocalPointIn(...)` cannot materialize the center in
-  the mesh's scalar coordinate range. The concave path has no fallback.
-  A representability check is being used as geometric rejection.
+  the mesh's scalar coordinate range. The concave path has no fallback. A
+  representability check is being used as geometric rejection.
 - **Evidence:** The original cone row of
   `FiniteAxisMeshContact_WithOverlappingClippedBoundsAndUnrepresentableFrameOffset_ShouldReject`
   passed its incorrect false expectation in
   `artifacts/grv082-checkpoints/contacts-release.trx`. Independent review
-  confirmed the proof above. The shared separated control now moves the
-  local apex to `(6,1,0)`; that is a genuine gap, not the reproduction here.
-  The original cylinder case is retained separately as a positive regression.
+  confirmed the proof above. The shared separated control now moves the local
+  apex to `(6,1,0)`; that is a genuine gap, not the reproduction here. The
+  original cylinder case is retained separately as a positive regression.
 - **Expanded investigation (2026-09-28):** The same owner also fails at ordinary
-  coordinates; this is not only a full-domain conversion defect. For an
-  identity cone at zero with radius `1` and height `2`, use an identity concave
-  triangle at zero with vertices `(4/5,0,0)`, `(4/5,-2,0)`, `(2,-2,0)`.
-  Bounds overlap, but the dispatcher returns false. The point `(9/10,-19/20,0)`
-  is strictly inside both: the triangle spans X from `4/5` to `137/100` at
-  that height, while the cone's cross-section radius is `39/40`. The nearest
-  triangle point to the cone center is outside the cone; the single cone
-  support projected onto the triangle plane is outside the triangle. Neither
-  failed sample proves separation.
+  coordinates; this is not only a full-domain conversion defect. For an identity
+  cone at zero with radius `1` and height `2`, use an identity concave triangle
+  at zero with vertices `(4/5,0,0)`, `(4/5,-2,0)`, `(2,-2,0)`. Bounds overlap,
+  but the dispatcher returns false. The point `(9/10,-19/20,0)` is strictly
+  inside both: the triangle spans X from `4/5` to `137/100` at that height,
+  while the cone's cross-section radius is `39/40`. The nearest triangle point
+  to the cone center is outside the cone; the single cone support projected onto
+  the triangle plane is outside the triangle. Neither failed sample proves
+  separation.
 - **Inconsistent contact evidence:** With the same radius-1, height-2 cone,
   triangle `(0,-2,-2)`, `(0,2,-2)`, `(0,0,2)` returns depth
   `0.4472135955002159`, normal `(1,0,0)`, mesh anchor `(0,0,0)` and cone anchor
   approximately `(0.4,0.2,0)`. The selected nearest-surface depth is not the
   penetration along the returned triangle-face normal; the witness displacement
   is not parallel to that normal and has the wrong signed orientation. The
-  closest-surface routine supplies its own normal, but this consumer discards
-  it and retains the separately chosen triangle normal.
-- **Initial verification boundary:** Read-only inspection at Gravitas
-  `3471085` / FixedMathSharp `3f7a606`, followed by direct probes of the existing
-  Release local-stack assemblies using the real scenario initializer and
-  collision dispatcher in PowerShell/.NET `10.0.11`. The original full-domain
-  miss and both ordinary cases above were reproduced; exact upstream cone
-  containment confirmed the interior witnesses. These are diagnostic probes,
-  not a new build, a .NET 8 regression suite, or throughput measurements.
+  closest-surface routine supplies its own normal, but this consumer discards it
+  and retains the separately chosen triangle normal.
+- **Initial verification boundary:** Read-only inspection at Gravitas `3471085`
+  / FixedMathSharp `3f7a606`, followed by direct probes of the existing Release
+  local-stack assemblies using the real scenario initializer and collision
+  dispatcher in PowerShell/.NET `10.0.11`. The original full-domain miss and
+  both ordinary cases above were reproduced; exact upstream cone containment
+  confirmed the interior witnesses. These are diagnostic probes, not a new
+  build, a .NET 8 regression suite, or throughput measurements.
 
 ### GRV-Issue-082 - Cylinder contact can miss a triangle crossing below its cap
 
 **Resolved:** 2026-09-28.
 
 **Reproduction and cause:** A radius-5, height-10 cylinder at zero intersects
-triangle `(0,7,-5)`, `(10,1,-5)`, `(5,4,5)`: `(4,23/5,0)` lies strictly
-inside both. The former center-nearest fallback chose triangle Y=`175/34 > 5`
-and missed the hit. It could also pair a surface depth with an unrelated face
+triangle `(0,7,-5)`, `(10,1,-5)`, `(5,4,5)`: `(4,23/5,0)` lies strictly inside
+both. The former center-nearest fallback chose triangle Y=`175/34 > 5` and
+missed the hit. It could also pair a surface depth with an unrelated face
 normal. The mixed circle-slab path admitted the separated oblique-rim fixture
 now retained in the FixedMathSharp contact tests.
 
-**Fix:** FixedMathSharp owns complete finite triangle/cylinder contact selection,
-sharing cylinder support algebra, stationary quartics and exact root signs with
-its existing box/cylinder owner. Paired witnesses and normal/depth are selected
-together before final rounding; full-width circle-slab thickness and zero-core
-capsule slabs share this owner. Gravitas removed the center-nearest fallback and
-approximate cap-alignment test. Only exact cap/face winners may be enriched.
-Enrichment preserves the selected depth and clamp flag, including odd raw
-heights, and geometric success no longer depends on manifold count growth after
-deduplication or capacity reduction.
+**Fix:** FixedMathSharp owns complete finite triangle/cylinder contact
+selection, sharing cylinder support algebra, stationary quartics and exact root
+signs with its existing box/cylinder owner. Paired witnesses and normal/depth
+are selected together before final rounding; full-width circle-slab thickness
+and zero-core capsule slabs share this owner. Gravitas removed the
+center-nearest fallback and approximate cap-alignment test. Only exact cap/face
+winners may be enriched. Enrichment preserves the selected depth and clamp flag,
+including odd raw heights, and geometric success no longer depends on manifold
+count growth after deduplication or capacity reduction.
 
-**Regression evidence:** Enabled tests cover the original intrusion, oblique
-rim normals and paired anchors, one-raw gap/touch boundaries, full-domain center
+**Regression evidence:** Enabled tests cover the original intrusion, oblique rim
+normals and paired anchors, one-raw gap/touch boundaries, full-domain center
 offsets, cap-only enrichment, duplicate/reversed faces, mixed circle slabs and
 zero allocations. The final cap-depth review additionally reproduced both
 nearest-even errors (one raw instead of zero/two) with a two-triangle mesh that
@@ -416,8 +418,8 @@ bounded worker-stack use. No coverage exclusion or skipped test was added.
   in each configuration after those test cases were added. Runtime sources were
   unchanged between the full and supplemental runs.
 - Combined full/supplemental upstream coverage: Release **51,926/51,926 lines**,
-  **11,382/11,382 branches**, **3,845/3,845 methods**; Lean
-  **52,019/52,019**, **11,382/11,382**, **3,841/3,841**, respectively.
+  **11,382/11,382 branches**, **3,845/3,845 methods**; Lean **52,019/52,019**,
+  **11,382/11,382**, **3,841/3,841**, respectively.
 - Both libraries built for `netstandard2.1` and `net8.0` in both configurations.
   Independent geometry and Ponytail reviews completed, including the final
   cap-depth correction.
@@ -437,7 +439,8 @@ was resolved upstream on 2026-09-28 with complete stadium-prism contacts.
 interior-rim depth/normal/anchors and middle-cap contacts through the actual
 mixed dispatcher. Both package configurations retain full reachable coverage.
 The separately tracked mesh/cone contact defect was subsequently resolved as
-**GRV-Issue-086**; its cone-volume-query sibling was resolved as **GRV-Issue-087**.
+**GRV-Issue-086**; its cone-volume-query sibling was resolved as
+**GRV-Issue-087**.
 
 ### GRV-Issue-077 - Local-stack benchmark child fails while the launcher reports success
 
@@ -449,8 +452,8 @@ The separately tracked mesh/cone contact defect was subsequently resolved as
   benchmarks and an NA result, but `Program.Main` returned zero after ignoring
   the returned summaries. The exit code therefore falsely signals success.
   Original log: Chronicler `artifacts/timing/phase0/gravitas-benchmark.log`.
-- **Follow-up:** `BuildInParallel=false` lets the generated project compile,
-  but its child fails to load GridForge 9.1.0.0. The parent output contains that
+- **Follow-up:** `BuildInParallel=false` lets the generated project compile, but
+  its child fails to load GridForge 9.1.0.0. The parent output contains that
   identity while the generated child has GridForge and SwiftCollections 0.0.0.0.
   Log: `gravitas-serial-build.log` beside the original. This is a source-mode
   generated build graph problem, not evidence of a physics runtime regression.
@@ -468,24 +471,24 @@ The separately tracked mesh/cone contact defect was subsequently resolved as
   source mode, explicit-reference protection and serial project builds into
   generated children. CLI jobs such as `Dry` remain unchanged; package mode
   remains the default.
-- **Verification:** A one-off launcher probe failed before the repair and
-  passed 26 cases afterward, including build, partial-launch and post-result
-  exit failures. Captures remain under `artifacts/benchmark-exit-codes`; the
-  probe was removed after review and is not a maintained test or CI gate.
-  The actual `world-context` empty-frame `Dry`
-  child passes in Release and ReleaseLean without launch-time source-mode
-  environment variables. All seven standard and eight Lean LSF assembly
-  identities match the parent; Lean contains the shim, not MemoryPack runtime
-  DLLs. Captures: `artifacts/grv077-release` and `artifacts/grv077-lean`.
-  Independent correctness/Ponytail review found no remaining blockers.
+- **Verification:** A one-off launcher probe failed before the repair and passed
+  26 cases afterward, including build, partial-launch and post-result exit
+  failures. Captures remain under `artifacts/benchmark-exit-codes`; the probe
+  was removed after review and is not a maintained test or CI gate. The actual
+  `world-context` empty-frame `Dry` child passes in Release and ReleaseLean
+  without launch-time source-mode environment variables. All seven standard and
+  eight Lean LSF assembly identities match the parent; Lean contains the shim,
+  not MemoryPack runtime DLLs. Captures: `artifacts/grv077-release` and
+  `artifacts/grv077-lean`. Independent correctness/Ponytail review found no
+  remaining blockers.
 - **Full matrix:** Both solution configurations build for netstandard2.1 and
   net8.0 without warnings/errors. Release passes 4,287 tests and ReleaseLean
   passes 4,228; each has only the existing enabled GRV-Issue-082 failure, with
-  no skips. Runtime line/branch/method coverage remains 100% in both:
-  44,639 / 44,637 lines, 13,262 branches, and 4,569 / 4,568 methods. Reports:
+  no skips. Runtime line/branch/method coverage remains 100% in both: 44,639 /
+  44,637 lines, 13,262 branches, and 4,569 / 4,568 methods. Reports:
   `artifacts/grv077-tests-release` and `artifacts/grv077-tests-lean`.
-- **Evidence boundary:** These are Windows/.NET 8 source-stack execution
-  checks, not throughput measurements or released-package validation. Continue
+- **Evidence boundary:** These are Windows/.NET 8 source-stack execution checks,
+  not throughput measurements or released-package validation. Continue
   inspecting full logs and expected launches; summaries do not expose every
   separate diagnoser execution. The benchmark README retains the reproduction
   commands and launcher-check instructions.
@@ -494,12 +497,12 @@ The separately tracked mesh/cone contact defect was subsequently resolved as
 
 - **Confirmed / resolved:** 2026-09-25 / 2026-09-26, coordinated with the
   [completed FMS-Issue-024 design and validation record](https://github.com/mrdav30/FixedMathSharp/blob/main/docs/feature-work/done/2026-09-25-cylinder-pair-contact-design.md).
-- **Reproduction:** At `e85cda8` with FixedMathSharp `6368582`, create an upright
-  circle slab at zero with radius/half-thickness 1 and a radius-1, height-2
-  cylinder at `(7/4,7/4,11/8)`, rotated onto +X with quaternion `(0,0,-q,q)`,
-  `q=Fixed64.FromRaw(3037000500)`. Bounds overlap, but exact cap-constrained Z
-  reaches sum to `sqrt(7)/2 < 11/8`. The old public mixed dispatcher nevertheless
-  reported contact with depth about `0.0672976`.
+- **Reproduction:** At `e85cda8` with FixedMathSharp `6368582`, create an
+  upright circle slab at zero with radius/half-thickness 1 and a radius-1,
+  height-2 cylinder at `(7/4,7/4,11/8)`, rotated onto +X with quaternion
+  `(0,0,-q,q)`, `q=Fixed64.FromRaw(3037000500)`. Bounds overlap, but exact
+  cap-constrained Z reaches sum to `sqrt(7)/2 < 11/8`. The old public mixed
+  dispatcher nevertheless reported contact with depth about `0.0672976`.
 - **Fix:** Replace the independent incomplete selected-direction reducer with
   FixedMathSharp's complete positive-radius cylinder-pair relation through the
   existing internal geometry boundary. Carry full slab height exactly even for
@@ -518,48 +521,50 @@ The separately tracked mesh/cone contact defect was subsequently resolved as
   claimed green while the unrelated triangle/cylinder regression remains red.
 - **Performance and release boundary:** The upstream matched capture completed
   every child successfully; difficult exact nonparallel contacts still cost
-  roughly 11.57–25.14ms each on the measured machine. That limitation is retained
-  in FixedMathSharp's benchmark backlog, not implicitly accepted by closing this
-  correctness issue. Released-package validation remains separate from source
-  mode. Independent correctness/Ponytail reviews found no outstanding findings.
+  roughly 11.57–25.14ms each on the measured machine. That limitation is
+  retained in FixedMathSharp's benchmark backlog, not implicitly accepted by
+  closing this correctness issue. Released-package validation remains separate
+  from source mode. Independent correctness/Ponytail reviews found no
+  outstanding findings.
 
 ### GRV-Issue-081 - Rounded contact depth is insufficient for strict posture clearance
 
 - **Confirmed / resolved:** 2026-09-24. Independent native posture review
-  reproduced positive penetration admitted by existing 3D sphere/capsule and
-  new 2D circle/capsule replacement because its contact depth rounded to zero.
-  All four original regression cases failed before the owning repair.
+  reproduced positive penetration admitted by existing 3D sphere/capsule and new
+  2D circle/capsule replacement because its contact depth rounded to zero. All
+  four original regression cases failed before the owning repair.
 - **Reproduction:** A size-2 2D box at `(-1,-1)` has its nearest corner at the
   origin. Grow a radius-4 circle or zero-axis capsule to radius 5 at
   `(3+epsilon,4-epsilon)`, where epsilon is one raw Q32.32 unit. The 3D control
-  uses a size-2 cuboid at `(-1,0,-1)` and candidate at `(3+epsilon,0,4-epsilon)`.
-  Squared distance is `25-2*epsilon+2*epsilon*epsilon < 25`: penetration is about
-  0.2 raw units, but nearest-even contact depth is zero. Admission incorrectly
-  returned `Applied` rather than `Blocked`.
+  uses a size-2 cuboid at `(-1,0,-1)` and candidate at
+  `(3+epsilon,0,4-epsilon)`. Squared distance is
+  `25-2*epsilon+2*epsilon*epsilon < 25`: penetration is about 0.2 raw units, but
+  nearest-even contact depth is zero. Admission incorrectly returned `Applied`
+  rather than `Blocked`.
 - **Fix:** Consume FixedMathSharp-owned exact strict classification before
-  contact-depth rounding across every supported candidate/target family in
-  both dimensions. Complete finite cap/rim and cone-generator authorities
-  replace reliance on incomplete selected contact directions. Compound leaves
-  retain root blocker identity; 3D mesh admission retains authored rigid frames,
-  closed-convex enclosure and open/concave surface semantics. Physical filtering,
-  stable order, full registered-body discovery and transactional rejection are
-  unchanged. No epsilon, rounded endpoint, sampled-axis acceptance fallback or
-  contact-manifold construction is used for posture admission.
+  contact-depth rounding across every supported candidate/target family in both
+  dimensions. Complete finite cap/rim and cone-generator authorities replace
+  reliance on incomplete selected contact directions. Compound leaves retain
+  root blocker identity; 3D mesh admission retains authored rigid frames,
+  closed-convex enclosure and open/concave surface semantics. Physical
+  filtering, stable order, full registered-body discovery and transactional
+  rejection are unchanged. No epsilon, rounded endpoint, sampled-axis acceptance
+  fallback or contact-manifold construction is used for posture admission.
 - **Review:** Independent reviewers checked finite-feature completeness,
   fixed-width arithmetic bounds, exact common-sign intervals, conservative
   root/leaf bounds, and 2D/3D dispatcher parity. Three circle-polynomial defects
   found during review were reproduced and corrected before final verification.
-- **Verification:** All 57 focused 3D strict-clearance cases pass in Release
-  and ReleaseLean, including the original sub-raw regressions, finite rims,
+- **Verification:** All 57 focused 3D strict-clearance cases pass in Release and
+  ReleaseLean, including the original sub-raw regressions, finite rims,
   cap-clipped triangles and transformed/scaled compounds and meshes. The native
   2D family, rotation, filtering and lifetime regressions also pass. Complete
-  source-mode suites report 4,274 passed / 1 known failure in Release and
-  4,215 passed / 1 known failure in Lean, with zero skips or exclusions.
-  Gravitas has 100% line, branch and method coverage in both configurations
-  (44,687 / 44,685 sequence points, 13,270 branches, 4,570 / 4,569 methods).
-  Both library targets build without warnings/errors. Trailblazer's complete
-  core and adapter suites also pass in both source-stack configurations.
-  DocFX builds with warnings treated as errors complete without warnings.
+  source-mode suites report 4,274 passed / 1 known failure in Release and 4,215
+  passed / 1 known failure in Lean, with zero skips or exclusions. Gravitas has
+  100% line, branch and method coverage in both configurations (44,687 / 44,685
+  sequence points, 13,270 branches, 4,570 / 4,569 methods). Both library targets
+  build without warnings/errors. Trailblazer's complete core and adapter suites
+  also pass in both source-stack configurations. DocFX builds with warnings
+  treated as errors complete without warnings.
 - **Measured boundary:** The existing FixedMathSharp benchmark runner reports
   zero managed allocation in all 12 final rows. Matching positive
   cylinder/capsule and cylinder/cylinder geometry costs 0.397 / 0.859 us for
@@ -583,10 +588,11 @@ The separately tracked mesh/cone contact defect was subsequently resolved as
   including the cap-clipped miss, exact minimum-depth and edge/rim regressions.
   Gravitas consumes the unchanged manifold API; no adapter migration is needed.
   GRV-Issue-082 remains an ordinary cylinder/triangle contact-generation defect,
-  not unresolved posture classification, and keeps its failing assertion enabled.
-  FixedMathSharp FMS-Issue-026 separately bounds a pathological depth-correction
-  loop using its existing exact search, without changing returned results.
-  Classification alone does not fabricate solver normals, depths or witnesses.
+  not unresolved posture classification, and keeps its failing assertion
+  enabled. FixedMathSharp FMS-Issue-026 separately bounds a pathological
+  depth-correction loop using its existing exact search, without changing
+  returned results. Classification alone does not fabricate solver normals,
+  depths or witnesses.
 
 ### GRV-Issue-080 - Reconfiguration callbacks can invalidate fresh 3D pair ownership
 
@@ -607,18 +613,18 @@ The separately tracked mesh/cone contact defect was subsequently resolved as
 ### GRV-Issue-079 - Physical grid changes can leave unmoved colliders undiscoverable
 
 - **Confirmed / resolved:** 2026-09-24, originally reproduced against `198d272`.
-  Replacing a grid with the same configuration or inserting a sparse voxel
-  left unchanged 2D/3D colliders absent from query results; projected-circle
+  Replacing a grid with the same configuration or inserting a sparse voxel left
+  unchanged 2D/3D colliders absent from query results; projected-circle
   counterparts reproduced the same omission.
 - **Fix:** Reconcile committed partition membership once per batch of physical
   grid changes at the owning fixed-step/query boundary. Ordinary queries and
   obstacle-only changes do not force registry scans; pending authored geometry
-  remains unpublished. Callback-deferred 2D refresh completes without relying
-  on an incidental grounding query.
+  remains unpublished. Callback-deferred 2D refresh completes without relying on
+  an incidental grounding query.
 - **Verification:** The four original failures and the native/projected,
   sparse/replaced-grid, committed-geometry and callback-deferred controls pass.
-  Full Release/Lean tests and coverage are recorded under GRV-Issue-081.
-  Commit `622753b` isolates the correction; the original RED capture is
+  Full Release/Lean tests and coverage are recorded under GRV-Issue-081. Commit
+  `622753b` isolates the correction; the original RED capture is
   `artifacts/support-posture-red.log`.
 
 ### GRV-Issue-078 - Planar restore conformance test selected the static wall
@@ -632,8 +638,8 @@ The separately tracked mesh/cone contact defect was subsequently resolved as
 - **Fix:** Select the moving body in both worlds and keep the role assertion.
   The existing serialize/populate and 16-step hash-continuation checks now
   operate on the intended body. Both transport cases pass; this was a test
-  coverage weakness, not evidence of a production serialization defect.
-  A dedicated box-size/closest-point round trip covers the shape-writing branch
+  coverage weakness, not evidence of a production serialization defect. A
+  dedicated box-size/closest-point round trip covers the shape-writing branch
   that the wrong-body case previously exercised incidentally.
 
 ### GRV-Issue-076 - Narrow simulation time breaks long-running lifecycle work
@@ -647,30 +653,31 @@ The separately tracked mesh/cone contact defect was subsequently resolved as
 - **Fix:** Compose Chronicler's clock, expose wide elapsed timestamps and long
   absolute frame/phase stamps, count durations by exact raw division, and give
   waits checked deadlines plus reset-lifetime ownership. Contacts, CCD,
-  partitions, diagnostics, replay hashes and the affected 3D body record use
-  the widened contract; bounded simulation counters remain bounded.
+  partitions, diagnostics, replay hashes and the affected 3D body record use the
+  widened contract; bounded simulation counters remain bounded.
 - **Verification:** `GravitasTimingBoundaryTests`, `GravitasWideClockTests`,
-  2D/mixed partition retirement, 2D grounding-cache expiry, body transport tests,
-  and wide-clock replay/contact controls cover the old boundary and genuine
-  exhaustion. Obsolete 3D records and exhausted clocks reject before the
-  corresponding mutation boundary. Exact matrix/coverage/benchmark evidence
-  is in Chronicler's `docs/feature-work/done/deterministicSimulationTimingPlan.md`,
-  Phase 4 execution record and Phase 6 cross-stack closeout.
-  The separate benchmark-tooling repair is recorded under `GRV-Issue-077`.
+  2D/mixed partition retirement, 2D grounding-cache expiry, body transport
+  tests, and wide-clock replay/contact controls cover the old boundary and
+  genuine exhaustion. Obsolete 3D records and exhausted clocks reject before the
+  corresponding mutation boundary. Exact matrix/coverage/benchmark evidence is
+  in Chronicler's `docs/feature-work/done/deterministicSimulationTimingPlan.md`,
+  Phase 4 execution record and Phase 6 cross-stack closeout. The separate
+  benchmark-tooling repair is recorded under `GRV-Issue-077`.
 
 ### GRV-Issue-075 - Centerline circle/capsule queries disagree on the surface side
 
-- **Discovered / resolved:** 2026-09-21 during the native Trailblazer 2D preflight.
+- **Discovered / resolved:** 2026-09-21 during the native Trailblazer 2D
+  preflight.
 - **Evidence:** At `df19151`, a circle probe at a target circle/capsule center
   returned a normal opposite its surface witness. Away from a capsule's center,
   but on its axis, the center-to-center fallback could instead put the witness
   inside the capsule. Eight new upright, rotated and degenerate cases reproduced
   these failures in public overlap and initial-overlap sweep queries.
 - **Fix:** Supply one radial fallback to the existing centered-contact kernel,
-  with its required query-to-target sign, then use that contact's outward
-  target normal consistently. Coincident circles use world +X; capsule-axis ties
-  use local +X from the cached world axis. No extra solver, public API or
-  point materialization is needed.
+  with its required query-to-target sign, then use that contact's outward target
+  normal consistently. Coincident circles use world +X; capsule-axis ties use
+  local +X from the cached world axis. No extra solver, public API or point
+  materialization is needed.
 
 ### GRV-Issue-074 - Initially overlapping circle sweeps discard the target witness
 
@@ -696,67 +703,71 @@ The separately tracked mesh/cone contact defect was subsequently resolved as
 Windows source-stack verification for both fixes: Release **4,053** and
 ReleaseLean **3,998** tests pass. Both configurations retain exact
 **56,196/56,196 lines, 16,018/16,018 branches and 5,346/5,346 fully covered
-methods**; the two fewer branches remove the inconsistent normal override.
-Full solution builds pass both target frameworks without warnings or errors.
-Coverage is retained under `artifacts/issue150/`; release-package validation
-remains deferred with the coordinated upstream releases.
-The same managed test outputs also pass on Ubuntu/WSL .NET 8.0.26 in both
-configurations; this is runtime execution, not an independent Linux build.
-Both downstream Trailblazer suites pass on Windows/Linux in standard/Lean,
-and both repositories' DocFX builds pass with zero warnings/errors.
-Independent source/simplicity review found no blocking findings.
+methods**; the two fewer branches remove the inconsistent normal override. Full
+solution builds pass both target frameworks without warnings or errors. Coverage
+is retained under `artifacts/issue150/`; release-package validation remains
+deferred with the coordinated upstream releases. The same managed test outputs
+also pass on Ubuntu/WSL .NET 8.0.26 in both configurations; this is runtime
+execution, not an independent Linux build. Both downstream Trailblazer suites
+pass on Windows/Linux in standard/Lean, and both repositories' DocFX builds pass
+with zero warnings/errors. Independent source/simplicity review found no
+blocking findings.
 
 ### GRV-Issue-073 - Rotational static stops use the inward contact normal
 
-- **Resolved:** 2026-09-20 with full local-stack verification and independent review.
-- **Discovered:** 2026-09-20, earliest-contact controls during Trailblazer integration Phase 2.
+- **Resolved:** 2026-09-20 with full local-stack verification and independent
+  review.
+- **Discovered:** 2026-09-20, earliest-contact controls during Trailblazer
+  integration Phase 2.
 - **Evidence:** A real closing overlap against a static 3D mesh retained its
   incoming velocity after the rotational stop. `ManifoldContact` and `Contact2D`
   define normals from A toward B, but the closing-velocity projection requires
   the target's outward normal toward the source. Both same-dimensional stop
   paths supplied the opposite direction at baseline `aa48f7c`.
-- **Fix:** Reverse only the same-dimensional conversion at
-  this stop boundary, respecting canonical collider ordering in 3D. Mixed
-  contact signs are already correct and remain unchanged. Focused tests use
-  actual initial contacts and prepared body simulation to distinguish CCD from
-  later discrete impulses. Closing velocity is removed only at a witnessed contact.
+- **Fix:** Reverse only the same-dimensional conversion at this stop boundary,
+  respecting canonical collider ordering in 3D. Mixed contact signs are already
+  correct and remain unchanged. Focused tests use actual initial contacts and
+  prepared body simulation to distinguish CCD from later discrete impulses.
+  Closing velocity is removed only at a witnessed contact.
 
 ### GRV-Issue-072 - Centered sphere and circle turning can freeze support motion
 
-- **Resolved:** 2026-09-20 with full local-stack verification and independent review.
-- **Discovered:** 2026-09-20, Trailblazer integration Phase 2 ladder approach and dismount.
+- **Resolved:** 2026-09-20 with full local-stack verification and independent
+  review.
+- **Discovered:** 2026-09-20, Trailblazer integration Phase 2 ladder approach
+  and dismount.
 - **Evidence:** A radius-1/8 centered sphere/circle tangent to a box, requesting
   X displacement 1/1024 and a small yaw, accepted only 1/8192 of the requested
   travel. Pure turning was also clamped. Rotational admission treated pose
   rotation as changing geometry, and interval search repeatedly witnessed the
   unchanged support contact. A nearby but separated rotating blade also admitted
   unrelated tangential support into interval search.
-- **Fix:** Distinguish geometric angular travel for exact
-  centered spheres/circles without changing orientation, angular velocity, or
-  trajectory storage. Preserve rotating-target admission. At static convex
-  primitive candidates, reuse non-closing translational admission; do not use
-  one contact normal to discard compounds or concave targets. Offset primitives
-  retain their rotational sweep.
-- **Focused evidence:** The expanded CCD/mixed suite passes 880 tests, including uniform/nonuniform
-  scale, pure turning, tangent movement, downward/wall blocking, dynamic motion,
-  real blade impact in both registration orders, separated blades, and existing
-  offset-sphere/circle controls. Artifacts: `artifacts/gravitas-integration/rotation/`.
-  All affected collision paths have exact line and branch coverage.
+- **Fix:** Distinguish geometric angular travel for exact centered
+  spheres/circles without changing orientation, angular velocity, or trajectory
+  storage. Preserve rotating-target admission. At static convex primitive
+  candidates, reuse non-closing translational admission; do not use one contact
+  normal to discard compounds or concave targets. Offset primitives retain their
+  rotational sweep.
+- **Focused evidence:** The expanded CCD/mixed suite passes 880 tests, including
+  uniform/nonuniform scale, pure turning, tangent movement, downward/wall
+  blocking, dynamic motion, real blade impact in both registration orders,
+  separated blades, and existing offset-sphere/circle controls. Artifacts:
+  `artifacts/gravitas-integration/rotation/`. All affected collision paths have
+  exact line and branch coverage.
 
 Final verification for both fixes: Release 4,021 tests and ReleaseLean 3,966,
 with exact 56,196/56,196 lines, 16,020/16,020 branches, and 5,346/5,346 fully
-covered methods in each configuration. Both full solution builds and DocFX
-are warning-free. Trailblazer's final adapter consumers pass 84/80 tests with
-exact coverage and unchanged repeated/restored traces. Local-source artifacts
-are retained under `artifacts/gravitas-integration/coverage/release-verified`
-and `releaselean-verified`; released-package validation remains separate.
+covered methods in each configuration. Both full solution builds and DocFX are
+warning-free. Trailblazer's final adapter consumers pass 84/80 tests with exact
+coverage and unchanged repeated/restored traces. Local-source artifacts are
+retained under `artifacts/gravitas-integration/coverage/release-verified` and
+`releaselean-verified`; released-package validation remains separate.
 
 ### GRV-Issue-071 — Local-Stack Outputs Selected Published Math Binaries
 
-**Discovered:** 2026-09-15  
-**Resolved:** 2026-09-15  
-**Source:** Trailblazer direct-visibility cross-stack prerequisite validation  
-**Affected area:** local-stack library output, test host, and benchmark parent
+**Discovered:** 2026-09-15 **Resolved:** 2026-09-15 **Source:** Trailblazer
+direct-visibility cross-stack prerequisite validation **Affected area:**
+local-stack library output, test host, and benchmark parent
 
 RCA: Gravitas retained direct sibling `FixedMathSharp` project references in
 local-stack mode, but the library, test, and benchmark project boundaries did
@@ -782,8 +793,8 @@ Verification:
   asset. Copied GridForge binaries also match sibling output.
 - Full local-stack tests pass `3,950/3,950` in `Release` and `3,895/3,895` in
   `ReleaseLean`.
-- Both coverage runs report `56,091/56,091` lines, `15,906/15,906` branches,
-  and `5,340/5,340` methods.
+- Both coverage runs report `56,091/56,091` lines, `15,906/15,906` branches, and
+  `5,340/5,340` methods.
 - Fresh normal package-mode solution builds still pass in both configurations,
   and every captured math/GridForge output hash matches its pre-change package
   baseline exactly.
@@ -792,10 +803,9 @@ Verification:
 
 ### GRV-Issue-070 — Collider Reconfiguration Exit Failure Could Interrupt Publication
 
-**Discovered:** 2026-09-08  
-**Resolved:** 2026-09-08  
-**Source:** Trailblazer Navigation Hardening Phase 2 independent review  
-**Affected area:** 3D collider reconfiguration and pure/mixed pair retirement
+**Discovered:** 2026-09-08 **Resolved:** 2026-09-08 **Source:** Trailblazer
+Navigation Hardening Phase 2 independent review **Affected area:** 3D collider
+reconfiguration and pure/mixed pair retirement
 
 RCA: `SolidBody.TryReconfigureCollider(...)` retired existing collision pairs
 before publishing the accepted shape and root pose. Pair retirement invokes
@@ -804,15 +814,15 @@ removed pair while the body still exposed its previous geometry and pose. The
 same ordering risk existed for both pure 3D and mixed 3D/2D pairs.
 
 Fix: accepted reconfiguration now publishes geometry, pose, mass properties,
-pure and mixed partitions, wake state, and solver-cache invalidation before
-pair notifications run. An optional synchronized-state publisher runs after
-physical publication and before pair notifications, preventing a coordinating
-consumer's callbacks from observing cross-library half-state. Reconfiguration-
-specific retirement captures publisher and callback failures and continues
-retiring every captured pair in stable order. The public transaction returns one
-notification failure directly or several as an `AggregateException`, separately
-from its accepted status. The failure is explicitly post-commit and does not
-make the transaction retryable.
+pure and mixed partitions, wake state, and solver-cache invalidation before pair
+notifications run. An optional synchronized-state publisher runs after physical
+publication and before pair notifications, preventing a coordinating consumer's
+callbacks from observing cross-library half-state. Reconfiguration- specific
+retirement captures publisher and callback failures and continues retiring every
+captured pair in stable order. The public transaction returns one notification
+failure directly or several as an `AggregateException`, separately from its
+accepted status. The failure is explicitly post-commit and does not make the
+transaction retryable.
 
 Verification:
 
@@ -827,11 +837,9 @@ Verification:
 
 ### GRV-Issue-069 — Shape-Exact 3D CCD Could Treat Separating Start Contacts As Closing
 
-**Discovered:** 2026-09-06  
-**Resolved:** 2026-09-06  
-**Source:** Trailblazer Navigation Hardening Phase 1, Gravitas stair-contact
-integration  
-**Affected area:** 3D shape-exact CCD against stationary and moving targets
+**Discovered:** 2026-09-06 **Resolved:** 2026-09-06 **Source:** Trailblazer
+Navigation Hardening Phase 1, Gravitas stair-contact integration **Affected
+area:** 3D shape-exact CCD against stationary and moving targets
 
 RCA: the convex sweep query contract orients its reported normal against the
 sweep direction. That is useful for public query results, but a zero-time CCD
@@ -862,11 +870,10 @@ Verification:
 
 ### GRV-Issue-068 — Scaled Mesh Query Faces Used Authored Unscaled Normals
 
-**Discovered:** 2026-08-01  
-**Resolved:** 2026-08-01  
-**Source:** Full-Domain Triangle-Pair Contact Phase 3 swept-sphere audit  
-**Affected area:** non-uniformly scaled mesh face queries in
-`SweptSphereQueryWorker` and `RaycastSegmentWorker`
+**Discovered:** 2026-08-01 **Resolved:** 2026-08-01 **Source:** Full-Domain
+Triangle-Pair Contact Phase 3 swept-sphere audit **Affected area:**
+non-uniformly scaled mesh face queries in `SweptSphereQueryWorker` and
+`RaycastSegmentWorker`
 
 RCA: both workers paired committed scaled triangle vertices with an authored
 unscaled face normal. Under non-uniform scale, the resulting plane differed from
@@ -900,9 +907,8 @@ Verification:
 
 ### GRV-Issue-067 — Mesh Triangle-Triangle SAT Could Saturate Before Axis Classification
 
-**Discovered:** 2026-07-24  
-**Resolved:** 2026-08-01  
-**Source:** canonical-collider coverage closure and collision math review
+**Discovered:** 2026-07-24 **Resolved:** 2026-08-01 **Source:**
+canonical-collider coverage closure and collision math review
 
 The former Gravitas mesh-pair fallback projected and ranked triangle axes
 through narrowed scalar arithmetic. FixedMathSharp now owns the reusable
@@ -929,12 +935,10 @@ is retained at
 
 ### GRV-Issue-066 — Radial Segment Parameters Could Collapse Spatially Distinct Query Hits
 
-**Discovered:** 2026-07-20  
-**Resolved:** 2026-07-31  
-**Source:** authored-segment finite-axis distance closure  
-**Affected area:** FixedMathSharp radial segment output; Gravitas 2D circle
-raycasts/sweeps, 3D sphere raycasts/sweeps, relative radial CCD, and mixed
-radial reducers
+**Discovered:** 2026-07-20 **Resolved:** 2026-07-31 **Source:** authored-segment
+finite-axis distance closure **Affected area:** FixedMathSharp radial segment
+output; Gravitas 2D circle raycasts/sweeps, 3D sphere raycasts/sweeps, relative
+radial CCD, and mixed radial reducers
 
 RCA: the prior wide radial solver narrowed each root to a Q32.32 ray parameter
 before segment consumers reconstructed physical distance. Long authored chords
@@ -974,13 +978,10 @@ Verification:
 
 ### GRV-Issue-065 — 3D Closest-Surface And Overlap-Circle Classification Are Not Full-Domain
 
-**Discovered:** 2026-07-22  
-**Resolved:** 2026-07-31  
-**Source:** finite-axis closest-surface authority audit; exact 2D boundary
-closure review  
-**Affected area:** public 3D closest-surface APIs, compound and mesh feature
-selection, the complete 3D projected-circle query family, and
-`Physics3DHit.ContactAnchor`
+**Discovered:** 2026-07-22 **Resolved:** 2026-07-31 **Source:** finite-axis
+closest-surface authority audit; exact 2D boundary closure review **Affected
+area:** public 3D closest-surface APIs, compound and mesh feature selection, the
+complete 3D projected-circle query family, and `Physics3DHit.ContactAnchor`
 
 RCA: closest-feature selection, representable 3D distance, and final point
 materialization were coupled. Saturating subtraction or an unrepresentable
@@ -1008,11 +1009,10 @@ vertical-scaling benchmark, documentation, and independent-review evidence.
 
 ### GRV-Issue-064 — SolidBody Point Transforms Can Saturate Before Their Final World Or Local Coordinate
 
-**Discovered:** 2026-07-22  
-**Resolved:** 2026-07-30  
-**Source:** canonical scale-admission final public-API audit  
-**Affected area:** `FixedTransform` current-snapshot conversion, authoritative
-3D/2D body point conversion, committed collider scale, and host adapters
+**Discovered:** 2026-07-22 **Resolved:** 2026-07-30 **Source:** canonical
+scale-admission final public-API audit **Affected area:** `FixedTransform`
+current-snapshot conversion, authoritative 3D/2D body point conversion,
+committed collider scale, and host adapters
 
 The prior helpers chained Q32.32 scale, rotation, translation, subtraction, and
 division, allowing a saturated intermediate to hide a representable final
@@ -1048,8 +1048,7 @@ evidence are retained in
 
 ### GRV-Issue-063 — Extreme Friction Accumulation And Cone Clamping Are Not Full-Domain
 
-**Discovered:** 2026-07-28  
-**Resolved:** 2026-07-30
+**Discovered:** 2026-07-28 **Resolved:** 2026-07-30
 
 Gravitas now preserves point velocity, effective mass, cached impulse
 accumulation and removal, friction-limit construction, Coulomb line/disk
@@ -1069,8 +1068,7 @@ evidence are retained in
 
 ### GRV-Issue-062 — True Unrepresentable Contact Lever Arms Preserve Physical Response
 
-**Discovered:** 2026-07-22  
-**Resolved:** 2026-07-28
+**Discovered:** 2026-07-22 **Resolved:** 2026-07-28
 
 FixedMathSharp now retains exact semantic 2D/3D levers, mass points, and
 positive weights through point-velocity, effective-mass, lever-dependent contact
@@ -1093,8 +1091,7 @@ The implementation and release evidence are retained in
 
 ### GRV-Issue-061 — Finite-Axis Collider Geometry Uses Canonical Rigid Frames
 
-**Discovered:** 2026-07-19  
-**Resolved:** 2026-07-27
+**Discovered:** 2026-07-19 **Resolved:** 2026-07-27
 
 Capsules, cylinders, and cones now retain center, normalized rigid frame,
 normalized local axis, full axis length, and radius as simulation authority.
@@ -1105,8 +1102,7 @@ exact geometric decision.
 
 ### GRV-Issue-060 — Oriented Cuboids Use One Canonical `FixedOrientedBox`
 
-**Discovered:** 2026-07-20  
-**Resolved:** 2026-07-27
+**Discovered:** 2026-07-20 **Resolved:** 2026-07-27
 
 `LSCuboidCollider` stores one center/orientation/half-extents representation.
 Discrete, mixed, mesh, query, CCD, replay, and diagnostic paths no longer treat
@@ -1115,8 +1111,7 @@ clipped only at the representable-domain boundary.
 
 ### GRV-Issue-059 — Collider Scale Composition Is Exact And Transactional
 
-**Discovered:** 2026-07-19  
-**Resolved:** 2026-07-27
+**Discovered:** 2026-07-19 **Resolved:** 2026-07-27
 
 FixedMathSharp owns fused scaled-dimension arithmetic, and Gravitas validates
 owner/part scale composition before publishing a primitive, mesh, compound, or
@@ -1126,8 +1121,7 @@ partially updated.
 
 ### GRV-Issue-058 — 2D Convex Geometry Retains Local Boundary Authority
 
-**Discovered:** 2026-07-22  
-**Resolved:** 2026-07-27
+**Discovered:** 2026-07-22 **Resolved:** 2026-07-27
 
 2D boxes and polygons retain stable scaled-local boundaries plus canonical
 planar rotation. Pure 2D and mixed relations consume origin/rotation/local
@@ -1147,12 +1141,10 @@ plan with allocation-free, fully covered relative-frame kernels.
 
 ### GRV-Issue-057 — Finite-Slab Projection Support Math Is Full-Domain
 
-**Discovered:** 2026-07-19  
-**Resolved:** 2026-07-22  
-**Source:** finite-axis consumer closure audit  
-**Affected area:** FixedMathSharp capsule/cylinder/cone finite-slab support;
-Gravitas mixed circle-against-3D sweeps, sphere-against-2D convex-slab start
-admission, and exact 2D polygon predicates
+**Discovered:** 2026-07-19 **Resolved:** 2026-07-22 **Source:** finite-axis
+consumer closure audit **Affected area:** FixedMathSharp capsule/cylinder/cone
+finite-slab support; Gravitas mixed circle-against-3D sweeps, sphere-against-2D
+convex-slab start admission, and exact 2D polygon predicates
 
 RCA: `FiniteSlabProjectionSweep` scaled its GJK simplex only after capsule,
 cylinder, and cone support candidates had already been reconstructed through
@@ -1210,11 +1202,10 @@ useful future randomized-oracle target, not a confirmed defect.
 
 ### GRV-Issue-056 — Swept-Sphere Cuboid Dilation Uses Exact Rounded Features
 
-**Discovered:** 2026-07-22  
-**Resolved:** 2026-07-22  
-**Source:** exact finite-extrusion caller parity audit  
-**Affected area:** FixedMathSharp `FixedSegment`; Gravitas cuboid and compound
-sphere sweeps, grounding, and static-target sphere/cuboid CCD
+**Discovered:** 2026-07-22 **Resolved:** 2026-07-22 **Source:** exact
+finite-extrusion caller parity audit **Affected area:** FixedMathSharp
+`FixedSegment`; Gravitas cuboid and compound sphere sweeps, grounding, and
+static-target sphere/cuboid CCD
 
 The previous cuboid reducer expanded every local half-extent by the swept sphere
 radius and clipped against that larger sharp box. The proxy overcontained the
@@ -1248,11 +1239,10 @@ existing exact finite-capsule comparison at both scales.
 
 ### GRV-Issue-055 — Swept-Sphere Finite Extrusions Use Exact Spherical Dilation
 
-**Discovered:** 2026-07-19  
-**Resolved:** 2026-07-22  
-**Source:** finite-axis interval migration and mixed-reducer coverage closure  
-**Affected area:** FixedMathSharp finite-cylinder geometry; Gravitas 3D cylinder
-sweeps; mixed circle- and capsule-slab queries and CCD
+**Discovered:** 2026-07-19 **Resolved:** 2026-07-22 **Source:** finite-axis
+interval migration and mixed-reducer coverage closure **Affected area:**
+FixedMathSharp finite-cylinder geometry; Gravitas 3D cylinder sweeps; mixed
+circle- and capsule-slab queries and CCD
 
 The old cylinder reducer independently expanded radius and half-height, forming
 a sharp cylinder that overcontained the true spherical Minkowski dilation at its
@@ -1297,11 +1287,9 @@ magnitude faster than the initial generic exact prototype.
 
 ### GRV-Issue-054 — Cone-Triangle Face Interiors Are Reduced Without Edge Crossings
 
-**Discovered:** 2026-07-21  
-**Resolved:** 2026-07-22  
-**Source:** conic-query full-domain migration  
-**Affected area:** FixedMathSharp `FixedTriangle`; Gravitas concave-mesh cone
-queries and shared mesh-triangle geometry consumers
+**Discovered:** 2026-07-21 **Resolved:** 2026-07-22 **Source:** conic-query
+full-domain migration **Affected area:** FixedMathSharp `FixedTriangle`;
+Gravitas concave-mesh cone queries and shared mesh-triangle geometry consumers
 
 FixedMathSharp now owns the complete apex-authored finite-cone/triangle
 contract. `FixedTriangle.TryGetFiniteConeIntersectionMinimumAxialPoint(...)`
@@ -1341,10 +1329,8 @@ zero managed allocation.
 
 ### GRV-Issue-053 — Conic Query Quadratics Remain Full-Domain Until Final Hit Narrowing
 
-**Discovered:** 2026-07-18  
-**Resolved:** 2026-07-21  
-**Source:** radial consumer audit  
-**Affected area:** FixedMathSharp finite-cone segment geometry,
+**Discovered:** 2026-07-18 **Resolved:** 2026-07-21 **Source:** radial consumer
+audit **Affected area:** FixedMathSharp finite-cone segment geometry,
 `RaycastSegmentWorker`, and `GravitasQuery3DService` cone-volume mesh reduction
 
 The root cause was duplicated downstream conic math. Both the cone-collider
@@ -1397,12 +1383,10 @@ estimates.
 
 ### GRV-Issue-052 — Explicit Body Roles Preserve Independent Angular Mobility
 
-**Discovered:** 2026-07-19  
-**Resolved:** 2026-07-20  
-**Source:** rotational moving-pair CCD final mobility review  
-**Affected area:** 2D/3D body roles, freeze-axis semantics, pure/mixed
-partitioning, response islands, joints, sleep, visualization, CCD,
-serialization, replay, and host integration
+**Discovered:** 2026-07-19 **Resolved:** 2026-07-20 **Source:** rotational
+moving-pair CCD final mobility review **Affected area:** 2D/3D body roles,
+freeze-axis semantics, pure/mixed partitioning, response islands, joints, sleep,
+visualization, CCD, serialization, replay, and host integration
 
 The root cause was an overloaded constraint mask: full position freeze also
 acted as the runtime's implicit static-body identity, and `CanRotate` depended
@@ -1437,11 +1421,10 @@ important findings. See the completed
 
 ### GRV-Issue-051 — Translational CCD Preserves Piecewise Target Trajectories
 
-**Discovered:** 2026-07-19  
-**Resolved:** 2026-07-20  
-**Source:** rotational moving-pair CCD final trajectory-consumer review  
-**Affected area:** 2D/3D/mixed translational moving-pair CCD, kinematic pushes,
-same-frame requeues, and dirty candidate overlays
+**Discovered:** 2026-07-19 **Resolved:** 2026-07-20 **Source:** rotational
+moving-pair CCD final trajectory-consumer review **Affected area:** 2D/3D/mixed
+translational moving-pair CCD, kinematic pushes, same-frame requeues, and dirty
+candidate overlays
 
 Translational moving-pair CCD now reduces the target's canonical trajectory
 segment by segment over the source's remaining frame interval. Each target slice
@@ -1472,13 +1455,11 @@ the current short-run host. Final authoritative verification passed all 3,123
 
 ### GRV-Issue-050 — Derived Bound Centers And Extents Were Not Full-Domain
 
-**Discovered:** 2026-07-20  
-**Resolved:** 2026-07-20  
-**Source:** FixedMathSharp sphere-construction full-domain audit  
-**Affected area:** FixedMathSharp bounds/range/circle derivation;
-SwiftCollections fixed query volumes, octree subdivision, and BVH insertion;
-GridForge grid centers; Gravitas mesh validation, mixed slab queries, and 3D
-broad-phase proxies
+**Discovered:** 2026-07-20 **Resolved:** 2026-07-20 **Source:** FixedMathSharp
+sphere-construction full-domain audit **Affected area:** FixedMathSharp
+bounds/range/circle derivation; SwiftCollections fixed query volumes, octree
+subdivision, and BVH insertion; GridForge grid centers; Gravitas mesh
+validation, mixed slab queries, and 3D broad-phase proxies
 
 FixedMathSharp now owns one strict 2D/3D derived-bound contract: exact
 nearest-even centers, conservative scopes, exact representable sizes, and atomic
@@ -1526,11 +1507,10 @@ package-reference release gate rather than masked downstream.
 
 ### GRV-Issue-049 — Sphere Construction And Merge Paths Were Not Full-Domain
 
-**Discovered:** 2026-07-18  
-**Resolved:** 2026-07-20  
-**Source:** exact radial predicate migration and release audit  
-**Affected area:** FixedMathSharp `FixedBoundSphere` factories and exact
-coordinate interpolation shared with finite segments
+**Discovered:** 2026-07-18 **Resolved:** 2026-07-20 **Source:** exact radial
+predicate migration and release audit **Affected area:** FixedMathSharp
+`FixedBoundSphere` factories and exact coordinate interpolation shared with
+finite segments
 
 `FixedBoundSphere.CreateFromBoundingBox`, `CreateFromFrustum`,
 `CreateFromPoints`, and `CreateMerged` now retain midpoint, squared-distance
@@ -1566,9 +1546,8 @@ active queue.
 
 ### GRV-Issue-048 — Finite-Axis Capsule, Cylinder, And Mesh-Edge Projections Can Saturate Before Solving
 
-**Discovered:** 2026-07-18  
-**Resolved:** 2026-07-19  
-**Source:** full-domain radial interval consumer audit
+**Discovered:** 2026-07-18 **Resolved:** 2026-07-19 **Source:** full-domain
+radial interval consumer audit
 
 FixedMathSharp now owns allocation-free finite-axis capsule intervals in 2D and
 3D plus finite-cylinder and separately expanded affine-cylinder intervals in 3D.
@@ -1616,10 +1595,9 @@ active issues instead of hiding them inside this arithmetic closure.
 
 ### GRV-Issue-047 — Rotational CCD Omits Dynamic And Mixed Targets
 
-**Resolved:** 2026-07-19  
-**Source:** between-sample rotational CCD final parity review  
-**Affected area:** 2D/3D rotational candidate gathering, mixed collision mode,
-dynamic target response, and same-frame CCD handoffs
+**Resolved:** 2026-07-19 **Source:** between-sample rotational CCD final parity
+review **Affected area:** 2D/3D rotational candidate gathering, mixed collision
+mode, dynamic target response, and same-frame CCD handoffs
 
 RCA: same-dimensional rotational CCD gathered only through static-target query
 surfaces, and pure rotation exited before dynamic candidate indexing or mixed
@@ -1648,10 +1626,10 @@ retained in
 
 ### GRV-Issue-046 — 3D CCD Handoff Callback Failure Could Abandon Queue Cleanup
 
-**Resolved:** 2026-07-18  
-**Source:** same-frame CCD handoff dedupe final lifecycle review  
-**Affected area:** queued 3D/2D handoff consumption, `SolidBody.OnMoved`, mixed
-handoff coordination, budget counters, and replay continuity
+**Resolved:** 2026-07-18 **Source:** same-frame CCD handoff dedupe final
+lifecycle review **Affected area:** queued 3D/2D handoff consumption,
+`SolidBody.OnMoved`, mixed handoff coordination, budget counters, and replay
+continuity
 
 RCA: queued 3D consumption invoked the public movement callback before the
 service recorded the completed iteration or closed its queue. A callback could
@@ -1678,11 +1656,10 @@ validation passes 2,793 Release and 2,754 ReleaseLean tests.
 
 ### GRV-Issue-045 — Full-Domain Radial Bounds And Query Intervals Were Incomplete
 
-**Resolved:** 2026-07-18  
-**Source:** relative CCD exact-root migration and mixed-query parity review  
-**Affected area:** FixedMathSharp radial predicates, bounded ray intervals, and
-cross-sections; Gravitas 3D sphere-segment raycasts and mixed circle-slab/sphere
-cross-section reducers
+**Resolved:** 2026-07-18 **Source:** relative CCD exact-root migration and
+mixed-query parity review **Affected area:** FixedMathSharp radial predicates,
+bounded ray intervals, and cross-sections; Gravitas 3D sphere-segment raycasts
+and mixed circle-slab/sphere cross-section reducers
 
 RCA: several circle/sphere predicates compared saturated squared values, and
 interval consumers recomputed two-root quadratics after narrowing. Gravitas's
@@ -1713,10 +1690,9 @@ separate active issues rather than being masked by the radial result.
 
 ### GRV-Issue-044 — Relative CCD Quadratic Saturation Could Miss Extreme-Range Crossings
 
-**Resolved:** 2026-07-18  
-**Source:** 95%-to-100% coverage hardening, shared relative-sweep review  
-**Affected area:** FixedMathSharp radial rays; Gravitas 2D, 3D, and mixed radial
-sweeps and relative continuous collision
+**Resolved:** 2026-07-18 **Source:** 95%-to-100% coverage hardening, shared
+relative-sweep review **Affected area:** FixedMathSharp radial rays; Gravitas
+2D, 3D, and mixed radial sweeps and relative continuous collision
 
 RCA: relative sphere/circle sweeps formed their quadratic directly in Q32.32. At
 large separations or displacements, squared terms saturated before the
@@ -1759,10 +1735,10 @@ Verification:
 
 ### GRV-Issue-043 — Convex Mesh Mode Accepted Invalid Topology And Could Collide In Empty Bounds Space
 
-**Resolved:** 2026-07-18  
-**Source:** 95%-to-100% coverage hardening, mesh/sphere fallback review  
-**Affected area:** mesh topology admission, closed-surface identity, exact
-surface queries, collision dispatch, and full-domain fixed-point predicates
+**Resolved:** 2026-07-18 **Source:** 95%-to-100% coverage hardening, mesh/sphere
+fallback review **Affected area:** mesh topology admission, closed-surface
+identity, exact surface queries, collision dispatch, and full-domain fixed-point
+predicates
 
 RCA: `MeshColliderMode.Convex` was only a label. Disconnected, concave, folded,
 or otherwise invalid triangle sets could enter convex collision paths, while an
@@ -1809,10 +1785,10 @@ Verification:
 
 ### GRV-Issue-042 — Rotational CCD Could Miss Contacts Between Bounded Pose Samples
 
-**Resolved:** 2026-07-18  
-**Source:** 95%-to-100% coverage hardening, rotational CCD review  
-**Affected area:** 2D/3D rotational CCD, pivot-centered candidate proxies,
-deterministic interval traversal, and conservative fixed-point separation
+**Resolved:** 2026-07-18 **Source:** 95%-to-100% coverage hardening, rotational
+CCD review **Affected area:** 2D/3D rotational CCD, pivot-centered candidate
+proxies, deterministic interval traversal, and conservative fixed-point
+separation
 
 RCA: both dimensional paths sampled only bounded substep endpoints and entered
 time-of-impact refinement only when an endpoint overlapped. A thin blade could
@@ -1854,10 +1830,9 @@ Verification:
 
 ### GRV-Issue-041 — 3D Angular Impulse Scaled Immediate Velocity By Frame Delta
 
-**Resolved:** 2026-07-18  
-**Source:** 95%-to-100% coverage hardening, 2D/3D motion parity review  
-**Affected area:** public force/impulse units, immediate body motion, and 2D/3D
-motion API parity
+**Resolved:** 2026-07-18 **Source:** 95%-to-100% coverage hardening, 2D/3D
+motion parity review **Affected area:** public force/impulse units, immediate
+body motion, and 2D/3D motion API parity
 
 RCA: both public 3D impulse methods multiplied their inverse-mass response by
 `DeltaTime`, treating instantaneous momentum transfer as a continuous force.
@@ -1895,9 +1870,8 @@ Verification:
 
 ### GRV-Issue-040 — SolidBody Point Transforms Used Collider Dimensions As Transform Scale
 
-**Resolved:** 2026-07-18  
-**Source:** 95%-to-100% coverage hardening, 3D compound `ScaledSize` review  
-**Affected area:** `SolidBody.TransformPoint(...)`,
+**Resolved:** 2026-07-18 **Source:** 95%-to-100% coverage hardening, 3D compound
+`ScaledSize` review **Affected area:** `SolidBody.TransformPoint(...)`,
 `SolidBody.InverseTransformPoint(...)`, host transform scale, and collider size
 semantics
 
@@ -1927,11 +1901,10 @@ warnings. Both modified methods report 100% line and branch coverage.
 
 ### GRV-Issue-039 — CCD Handoff Dedupe Could Strand A Same-Frame Requeued Body
 
-**Resolved:** 2026-07-18  
-**Source:** 95%-to-100% coverage hardening, dimensional CCD service admission
-review  
-**Affected area:** 2D/3D continuous-collision handoff queues, same-frame relay
-cycles, mixed CCD routing, iteration-budget ownership, and replay continuity
+**Resolved:** 2026-07-18 **Source:** 95%-to-100% coverage hardening, dimensional
+CCD service admission review **Affected area:** 2D/3D continuous-collision
+handoff queues, same-frame relay cycles, mixed CCD routing, iteration-budget
+ownership, and replay continuity
 
 RCA: each service's dedupe set represented every body seen anywhere in the
 current drain instead of only bodies that still owned an unread queue entry. If
@@ -1973,11 +1946,10 @@ report 100% line and branch coverage.
 
 ### GRV-Issue-038 — 3D Exit Callback Failure Duplicated Reentrant Separation Notifications
 
-**Resolved:** 2026-07-18  
-**Source:** 95%-to-100% coverage hardening, 3D collision-pair lifecycle review  
-**Affected area:** `CollisionPair.NotifyCollidersOfContact()`,
-`CollisionPair2D.NotifyColliders()`, `CollisionPairMixed.MarkColliding()`, and
-callback exception/reentrancy teardown
+**Resolved:** 2026-07-18 **Source:** 95%-to-100% coverage hardening, 3D
+collision-pair lifecycle review **Affected area:**
+`CollisionPair.NotifyCollidersOfContact()`, `CollisionPair2D.NotifyColliders()`,
+`CollisionPairMixed.MarkColliding()`, and callback exception/reentrancy teardown
 
 RCA: 3D separation flags remained admitted until after both user delegates
 returned. If collider A's exit callback reentrantly deactivated the pair and
@@ -2015,9 +1987,9 @@ and `netstandard2.1` package targets with zero warnings.
 
 ### GRV-Issue-037 — Continuous-Collision Modes Accepted Undefined Enum Values
 
-**Resolved:** 2026-07-17  
-**Source:** 95%-to-100% coverage hardening, 3D CCD helper review  
-**Affected area:** `PhysicsSettings.DefaultContinuousCollisionMode`,
+**Resolved:** 2026-07-17 **Source:** 95%-to-100% coverage hardening, 3D CCD
+helper review **Affected area:**
+`PhysicsSettings.DefaultContinuousCollisionMode`,
 `SolidBody.ContinuousCollisionMode`, `SolidBody2D.ContinuousCollisionMode`, and
 replay/settings population
 
@@ -2046,10 +2018,9 @@ focused suite passes `14/14`; the full locally linked suites pass `2716/2716` in
 
 ### GRV-Issue-036 — Non-Unit Quaternion Admission Can Collapse Runtime Shape Axes
 
-**Resolved:** 2026-07-17  
-**Source:** 95%-to-100% coverage hardening, cone-bounds fallback review  
-**Affected area:** `SolidBody` rotation admission, compound-part local
-rotations, collider shape state, and replay/load population
+**Resolved:** 2026-07-17 **Source:** 95%-to-100% coverage hardening, cone-bounds
+fallback review **Affected area:** `SolidBody` rotation admission, compound-part
+local rotations, collider shape state, and replay/load population
 
 RCA: `FixedTransform` already scale-safely normalized host rotations, but
 `SolidBody.Initialize(...)`, public body rotation mutators, and Chronicler load
@@ -2078,11 +2049,10 @@ direct mesh rejection. The full locally linked suites pass `2704/2704` in
 
 ### GRV-Issue-035 — Registered Joints Can Outlive Their Body And Collider Lifetimes
 
-**Resolved:** 2026-07-17  
-**Source:** 95%-to-100% coverage hardening, 3D joint replay-hash lifecycle
-review  
-**Affected area:** 2D/3D joint ownership, body/collider deactivation and reuse,
-linked-collision suppression, replay identity, and ragdoll lifecycle
+**Resolved:** 2026-07-17 **Source:** 95%-to-100% coverage hardening, 3D joint
+replay-hash lifecycle review **Affected area:** 2D/3D joint ownership,
+body/collider deactivation and reuse, linked-collision suppression, replay
+identity, and ragdoll lifecycle
 
 RCA: joint services owned registrations independently from endpoint body and
 collider lifetimes. Deactivating an endpoint released its reusable collider ID
@@ -2120,10 +2090,10 @@ continuous-collision handoff paths.
 
 ### GRV-Issue-034 — GridForge Reuses Grid Spawn Tokens Across Pooled Generations
 
-**Resolved:** 2026-07-17  
-**Source:** 95%-to-100% coverage hardening, 3D partition teardown review  
-**Affected area:** GridForge pooled `VoxelGrid` identity, exact traversal, and
-Gravitas 2D/3D/mixed partition and query consumers
+**Resolved:** 2026-07-17 **Source:** 95%-to-100% coverage hardening, 3D
+partition teardown review **Affected area:** GridForge pooled `VoxelGrid`
+identity, exact traversal, and Gravitas 2D/3D/mixed partition and query
+consumers
 
 RCA: GridForge derived world and grid allocation tokens from `GetHashCode()`
 values. Removing and re-adding an identical pooled grid could reuse both the
@@ -2150,11 +2120,10 @@ uncommitted release-validation scaffolding.
 
 ### GRV-Issue-033 — Extreme Convex Sweeps Can Normalize To Non-Unit Directions
 
-**Resolved:** 2026-07-14  
-**Source:** 95%-to-100% coverage hardening, convex sweep termination review  
-**Affected area:** FixedMathSharp vector magnitude, normalization, comparison,
-and averaging; Gravitas 2D, 3D, and mixed query/CCD sweep admission, GJK,
-conservative advancement, and concave-mesh hit geometry
+**Resolved:** 2026-07-14 **Source:** 95%-to-100% coverage hardening, convex
+sweep termination review **Affected area:** FixedMathSharp vector magnitude,
+normalization, comparison, and averaging; Gravitas 2D, 3D, and mixed query/CCD
+sweep admission, GJK, conservative advancement, and concave-mesh hit geometry
 
 **Follow-up status:** Closed by
 [`FixedMathSharp Foundation Hardening`](https://github.com/mrdav30/FixedMathSharp/blob/main/docs/feature-work/done/2026-07-14-fixedmathsharp-foundation-hardening-plan.md).
@@ -2208,10 +2177,10 @@ Verification:
 
 ### GRV-Issue-032 — Extreme Collider Bounds Underestimated CCD Proxy Radius
 
-**Resolved:** 2026-07-13  
-**Source:** 95%-to-100% coverage hardening, 3D CCD helper review  
-**Affected area:** FixedMathSharp vector magnitude/distance and Gravitas 2D/3D
-continuous-collision proxy radius, candidate admission, and `Auto` gating
+**Resolved:** 2026-07-13 **Source:** 95%-to-100% coverage hardening, 3D CCD
+helper review **Affected area:** FixedMathSharp vector magnitude/distance and
+Gravitas 2D/3D continuous-collision proxy radius, candidate admission, and
+`Auto` gating
 
 RCA: fixed-point vector magnitude and distance squared every component before
 taking the square root. Once the square sum saturated at `Fixed64.MaxValue`, a
@@ -2241,9 +2210,9 @@ Verification:
 
 ### GRV-Issue-031 — FixedMathSharp Rays Now Treat Only Exact-Zero Slab Directions As Parallel
 
-**Resolved:** 2026-07-13  
-**Source:** 95%-to-100% coverage hardening, shared segment-box clipping review  
-**Affected area:** FixedMathSharp `FixedRay` and `FixedRay2d` slab intersection
+**Resolved:** 2026-07-13 **Source:** 95%-to-100% coverage hardening, shared
+segment-box clipping review **Affected area:** FixedMathSharp `FixedRay` and
+`FixedRay2d` slab intersection
 
 RCA: both ray slab helpers classified direction components at or below
 `Fixed64.Epsilon` as parallel. `Fixed64.FromRaw(1)` is representable motion, so
@@ -2268,10 +2237,9 @@ Verification:
 
 ### GRV-Issue-030 — FixedMathSharp Vector Midpoints Saturated Before Halving
 
-**Resolved:** 2026-07-13  
-**Source:** 95%-to-100% coverage hardening, physics-material average review  
-**Affected area:** FixedMathSharp scalar and vector midpoint helpers plus
-Gravitas `PhysicsMaterialCombine.Average`
+**Resolved:** 2026-07-13 **Source:** 95%-to-100% coverage hardening,
+physics-material average review **Affected area:** FixedMathSharp scalar and
+vector midpoint helpers plus Gravitas `PhysicsMaterialCombine.Average`
 
 RCA: `Vector3d.Midpoint(...)` and `Vector4d.Midpoint(...)` computed each
 component as `(left + right) * Fixed64.Half`. Saturating addition therefore
@@ -2299,9 +2267,9 @@ Verification:
 
 ### GRV-Issue-029 — Overlong Settings Collision Matrix Rows Were Silently Truncated
 
-**Resolved:** 2026-07-13  
-**Source:** 95%-to-100% coverage hardening, final settings branch review  
-**Affected area:** `PhysicsSettingsSaver.CreateCollisionMatrix()`
+**Resolved:** 2026-07-13 **Source:** 95%-to-100% coverage hardening, final
+settings branch review **Affected area:**
+`PhysicsSettingsSaver.CreateCollisionMatrix()`
 
 RCA: settings load validation required each collision-matrix row to contain at
 least the outer row count, then copied only that many entries. A longer row was
@@ -2328,9 +2296,8 @@ Verification:
 
 ### GRV-Issue-028 — Pending CCD Replay Hashes Depended On Deleted Collider ID History
 
-**Resolved:** 2026-07-13  
-**Source:** 95%-to-100% coverage hardening, dimensional body replay review  
-**Affected area:** `SolidBody.ContributeReplayHash(...)` and
+**Resolved:** 2026-07-13 **Source:** 95%-to-100% coverage hardening, dimensional
+body replay review **Affected area:** `SolidBody.ContributeReplayHash(...)` and
 `SolidBody2D.ContributeReplayHash(...)`
 
 RCA: pending 2D/3D CCD handoffs hashed ignored collider references using
@@ -2361,9 +2328,9 @@ Verification:
 
 ### GRV-Issue-027 — Mesh-Cone Triangle Containment Used Contact-Oriented Normals
 
-**Resolved:** 2026-07-13  
-**Source:** 95%-to-100% coverage hardening, mesh-cone branch review  
-**Affected area:** `CollisionDetection.TryFindMeshConeTriangleContact(...)`
+**Resolved:** 2026-07-13 **Source:** 95%-to-100% coverage hardening, mesh-cone
+branch review **Affected area:**
+`CollisionDetection.TryFindMeshConeTriangleContact(...)`
 
 RCA: mesh-cone triangle detection oriented each face normal toward the cone
 before passing it to `MeshUtils.ClosestPointOnTriangle(...)` and
@@ -2396,9 +2363,9 @@ Verification:
 
 ### GRV-Issue-026 — Small CCD Proxy Radii Could Turn Tangency Into A Closing Hit
 
-**Resolved:** 2026-07-13  
-**Source:** 95%-to-100% coverage hardening, shared relative-sweep review  
-**Affected area:** `ContinuousCollisionMath` relative sphere and circle sweeps
+**Resolved:** 2026-07-13 **Source:** 95%-to-100% coverage hardening, shared
+relative-sweep review **Affected area:** `ContinuousCollisionMath` relative
+sphere and circle sweeps
 
 RCA: impact-normal selection compared the squared impact separation with the
 linear `Fixed64.Epsilon` threshold. Small, valid proxy radii could therefore
@@ -2426,10 +2393,9 @@ Verification:
 
 ### GRV-Issue-025 — Mesh Scale And Surface-Shell Mass Did Not Match Authored Geometry
 
-**Resolved:** 2026-07-12  
-**Source:** 95%-to-100% coverage hardening, mesh transform/mass follow-up  
-**Affected area:** `LSMeshCollider`, `PhysicsMesh`, compound mesh parts, and
-`MeshInertiaPolicy.SurfaceApproximation`
+**Resolved:** 2026-07-12 **Source:** 95%-to-100% coverage hardening, mesh
+transform/mass follow-up **Affected area:** `LSMeshCollider`, `PhysicsMesh`,
+compound mesh parts, and `MeshInertiaPolicy.SurfaceApproximation`
 
 RCA: `PhysicsMesh.UpdatePosition(...)` preserved only translation and rotation,
 so host and compound-part scale did not reach runtime mesh vertices, bounds,
@@ -2477,11 +2443,10 @@ Verification:
 
 ### GRV-Issue-024 — 3D Compound Mass And Geometry Used Incompatible Frames And Measures
 
-**Discovered:** 2026-07-12  
-**Resolved:** 2026-07-12  
-**Source:** 95%-to-100% coverage hardening, `LSCompoundCollider` block review  
-**Affected area:** 3D compound mass distribution, inertia, owner offsets,
-conservative query radius, and private part transforms
+**Discovered:** 2026-07-12 **Resolved:** 2026-07-12 **Source:** 95%-to-100%
+coverage hardening, `LSCompoundCollider` block review **Affected area:** 3D
+compound mass distribution, inertia, owner offsets, conservative query radius,
+and private part transforms
 
 RCA: `LSCompoundCollider` distributed mass by `Area`, whose 3D meaning varied
 between projected area, surface area, volume, and mesh triangle area. It also
@@ -2519,11 +2484,9 @@ without warnings, and independent review approved.
 
 ### GRV-Issue-023 — 3D Motion State Could Leak Across Reuse And Apply Incorrect Rotational Dynamics
 
-**Discovered:** 2026-07-12  
-**Resolved:** 2026-07-12  
-**Source:** 95%-to-100% coverage hardening, `SolidBody.Motion` review  
-**Affected area:** 3D body reset/reuse, grounded angular friction, and
-gyroscopic precession
+**Discovered:** 2026-07-12 **Resolved:** 2026-07-12 **Source:** 95%-to-100%
+coverage hardening, `SolidBody.Motion` review **Affected area:** 3D body
+reset/reuse, grounded angular friction, and gyroscopic precession
 
 RCA: `Initialize(...)` and `ResetPosition(...)` cleared visible velocities but
 left queued force/torque and cached angular acceleration state intact. Grounded
@@ -2558,11 +2521,10 @@ acceleration, and rotation exactly after the normal body step.
 
 ### GRV-Issue-022 — Synchronous 2D Contact Callbacks Could Corrupt Pair Teardown And Reuse
 
-**Discovered:** 2026-07-12  
-**Resolved:** 2026-07-12  
-**Source:** 95%-to-100% coverage hardening, 2D pair/response lifecycle review  
-**Affected area:** `GravitasPhysics2DService` response expansion, pair cleanup,
-deactivation, and pooling
+**Discovered:** 2026-07-12 **Resolved:** 2026-07-12 **Source:** 95%-to-100%
+coverage hardening, 2D pair/response lifecycle review **Affected area:**
+`GravitasPhysics2DService` response expansion, pair cleanup, deactivation, and
+pooling
 
 RCA: 2D contact enter/exit callbacks run synchronously while the service is
 walking pair registries. A callback that deactivated a collider could mutate the
@@ -2585,10 +2547,9 @@ after enter-callback removal.
 
 ### GRV-Issue-021 — Fixed-Point Sphere Tangency Could Be Rejected By Normalization Residue
 
-**Discovered:** 2026-07-12  
-**Resolved:** 2026-07-12  
-**Source:** 95%-to-100% coverage hardening, 3D raycast segment review  
-**Affected area:** `RaycastSegmentWorker.CheckSphereOverlaps(...)`
+**Discovered:** 2026-07-12 **Resolved:** 2026-07-12 **Source:** 95%-to-100%
+coverage hardening, 3D raycast segment review **Affected area:**
+`RaycastSegmentWorker.CheckSphereOverlaps(...)`
 
 Historical RCA: the former closest-point and normalized-direction quadratic
 disagreed by one raw unit for a near-tangent fixture, so the discriminant was
@@ -2604,11 +2565,10 @@ regression. No epsilon or discriminant clamp remains.
 
 ### GRV-Issue-020 — Context Disposal Ordering Could Admit Inactive Worlds And Invalidate Disabled CCD Handoffs
 
-**Discovered:** 2026-07-11  
-**Resolved:** 2026-07-11  
-**Source:** 95%-to-100% coverage hardening, world-context lifecycle review  
-**Affected area:** `GravitasWorldContext` world registration/disposal and
-disabled-service late-simulate CCD state
+**Discovered:** 2026-07-11 **Resolved:** 2026-07-11 **Source:** 95%-to-100%
+coverage hardening, world-context lifecycle review **Affected area:**
+`GravitasWorldContext` world registration/disposal and disabled-service
+late-simulate CCD state
 
 RCA: `Attach(...)` validated `GridWorld.IsActive` before taking the ownership
 lock, while owned-context disposal removed its registry entry before
@@ -2630,12 +2590,9 @@ afterward.
 
 ### GRV-Issue-019 — Partition Teardown Logged Errors After Host Grid Removal
 
-**Discovered:** 2026-07-11  
-**Resolved:** 2026-07-11  
-**Source:** 95%-to-100% coverage hardening, dimensional partition-service
-review  
-**Affected area:** 2D/3D partition clear and awake-state refresh after host grid
-lifecycle changes
+**Discovered:** 2026-07-11 **Resolved:** 2026-07-11 **Source:** 95%-to-100%
+coverage hardening, dimensional partition-service review **Affected area:**
+2D/3D partition clear and awake-state refresh after host grid lifecycle changes
 
 RCA: both collision services resolved every stored coordinate through
 `GridWorld.TryGetVoxel(...)` even after the host removed its grid. GridForge
@@ -2657,11 +2614,10 @@ review approved.
 
 ### GRV-Issue-018 — Repeated Bodyless Initialization Could Orphan Collider Registrations
 
-**Discovered:** 2026-07-11  
-**Resolved:** 2026-07-11  
-**Source:** 95%-to-100% coverage hardening, 3D partition service review  
-**Affected area:** 2D/3D bodyless collider initialization, registry identity,
-partition membership, and reset reuse
+**Discovered:** 2026-07-11 **Resolved:** 2026-07-11 **Source:** 95%-to-100%
+coverage hardening, 3D partition service review **Affected area:** 2D/3D
+bodyless collider initialization, registry identity, partition membership, and
+reset reuse
 
 RCA: `InitializeWithNoBody(...)` accepted an already registered collider. A
 second call assimilated the same object again, overwrote its current ID and
@@ -2685,11 +2641,10 @@ Verification:
 
 ### GRV-Issue-017 — Deactivation Duplicated Teardown And Allowed Stale Collider Ownership
 
-**Discovered:** 2026-07-11  
-**Resolved:** 2026-07-11  
-**Source:** 95%-to-100% coverage hardening, 3D grounding lifecycle review  
-**Affected area:** 2D/3D body and collider deactivation, physics-service
-dessimilation, partition ownership, reusable bindings, and 3D body loading
+**Discovered:** 2026-07-11 **Resolved:** 2026-07-11 **Source:** 95%-to-100%
+coverage hardening, 3D grounding lifecycle review **Affected area:** 2D/3D body
+and collider deactivation, physics-service dessimilation, partition ownership,
+reusable bindings, and 3D body loading
 
 RCA: ordinary 3D body deactivation emitted
 `Attempted to clear partitions for a non-partitioned collider` even though the
@@ -2729,11 +2684,9 @@ Verification:
 
 ### GRV-Issue-016 — Cuboid Frontal Area Selected The Wrong Face And Ignored Diagonal Projection
 
-**Discovered:** 2026-07-11  
-**Resolved:** 2026-07-11  
-**Source:** 95%-to-100% coverage hardening, `LSCuboidCollider` surface review  
-**Affected area:** 3D cuboid linear/angular drag area and authored collider
-geometry surface
+**Discovered:** 2026-07-11 **Resolved:** 2026-07-11 **Source:** 95%-to-100%
+coverage hardening, `LSCuboidCollider` surface review **Affected area:** 3D
+cuboid linear/angular drag area and authored collider geometry surface
 
 RCA: `LSCuboidCollider.GetFrontalArea(...)` compared absolute axis dot products
 as though the least-aligned axis were the most aligned, then returned one face
@@ -2759,10 +2712,9 @@ Verification:
 
 ### GRV-Issue-015 — Capsule Drag And Inertia Ignored Direction And Hemisphere Centroids
 
-**Discovered:** 2026-07-12  
-**Resolved:** 2026-07-12  
-**Source:** 95%-to-100% coverage hardening, `LSCapsuleCollider` block review  
-**Affected area:** 3D capsule linear/angular drag area and solid mass properties
+**Discovered:** 2026-07-12 **Resolved:** 2026-07-12 **Source:** 95%-to-100%
+coverage hardening, `LSCapsuleCollider` block review **Affected area:** 3D
+capsule linear/angular drag area and solid mass properties
 
 RCA: `LSCapsuleCollider.GetFrontalArea(...)` ignored its world direction and
 always returned the perpendicular capsule silhouette. The solid inertia model
@@ -2792,11 +2744,10 @@ approved.
 
 ### GRV-Issue-014 — Inactive SolidBody2D Loads Could Preserve Or Invent Runtime Activity
 
-**Discovered:** 2026-07-11  
-**Resolved:** 2026-07-11  
-**Source:** 95%-to-100% coverage hardening, `LSCollider2D` lifecycle review  
-**Affected area:** `SolidBody2D.RecordData(...)`, inactive body snapshot loads,
-body/collider registration teardown, and reusable shells
+**Discovered:** 2026-07-11 **Resolved:** 2026-07-11 **Source:** 95%-to-100%
+coverage hardening, `LSCollider2D` lifecycle review **Affected area:**
+`SolidBody2D.RecordData(...)`, inactive body snapshot loads, body/collider
+registration teardown, and reusable shells
 
 RCA: loading an inactive body snapshot into an initialized target assigned
 `Active=false` but left the body and collider in their runtime registries.
@@ -2825,11 +2776,10 @@ Verification:
 
 ### GRV-Issue-013 — 2D Collider Teardown And Load Paths Could Preserve Invalid Runtime Ownership
 
-**Discovered:** 2026-07-11  
-**Resolved:** 2026-07-11  
-**Source:** 95%-to-100% coverage hardening, `LSCollider2D` parity review  
-**Affected area:** 2D collider activation, body-owned teardown, unbound compound
-loads, and primary/mixed partition normalization
+**Discovered:** 2026-07-11 **Resolved:** 2026-07-11 **Source:** 95%-to-100%
+coverage hardening, `LSCollider2D` parity review **Affected area:** 2D collider
+activation, body-owned teardown, unbound compound loads, and primary/mixed
+partition normalization
 
 RCA: `LSCollider2D.Deactivate()` treated `IsActive=false` as equivalent to full
 runtime teardown. A registered bodyless collider first made inactive therefore
@@ -2858,11 +2808,9 @@ Verification:
 
 ### GRV-Issue-012 — 2D Query Version Reuse Could Suppress Live Colliders
 
-**Discovered:** 2026-07-11  
-**Resolved:** 2026-07-11  
-**Source:** 95%-to-100% coverage hardening, 2D query-stamp parity audit  
-**Affected area:** `GravitasQuery2DService` raycast, sweep, and overlap-query
-deduplication state
+**Discovered:** 2026-07-11 **Resolved:** 2026-07-11 **Source:** 95%-to-100%
+coverage hardening, 2D query-stamp parity audit **Affected area:**
+`GravitasQuery2DService` raycast, sweep, and overlap-query deduplication state
 
 RCA: pure 2D queries wrapped their raycast and overlap counters from
 `uint.MaxValue` to one and public reset rewound both counters to zero, but live
@@ -2885,11 +2833,10 @@ Verification:
 
 ### GRV-Issue-011 — 3D Collider Active-State Transitions Could Leave Invalid Partition Ownership
 
-**Discovered:** 2026-07-11  
-**Resolved:** 2026-07-11  
-**Source:** 95%-to-100% coverage hardening, `LSCollider` lifecycle review  
-**Affected area:** 3D collider activation, primary/mixed partition ownership,
-query visibility, and collider state loading
+**Discovered:** 2026-07-11 **Resolved:** 2026-07-11 **Source:** 95%-to-100%
+coverage hardening, `LSCollider` lifecycle review **Affected area:** 3D collider
+activation, primary/mixed partition ownership, query visibility, and collider
+state loading
 
 RCA: the 3D `SetStatus(...)` method changed only the active flag, unlike the 2D
 active-state lifecycle. Deactivated colliders could therefore remain in primary
@@ -2923,11 +2870,9 @@ Verification:
 
 ### GRV-Issue-010 — 3D Query Version Reuse Could Suppress Live Colliders
 
-**Discovered:** 2026-07-11  
-**Resolved:** 2026-07-11  
-**Source:** 95%-to-100% coverage hardening, 3D query surface review  
-**Affected area:** `GravitasQuery3DService` raycast, sweep, and circle-query
-deduplication state
+**Discovered:** 2026-07-11 **Resolved:** 2026-07-11 **Source:** 95%-to-100%
+coverage hardening, 3D query surface review **Affected area:**
+`GravitasQuery3DService` raycast, sweep, and circle-query deduplication state
 
 RCA: 3D queries stamp each visited collider with the current raycast or circle
 version. The service reserved zero as the reset sentinel and wrapped
@@ -2955,10 +2900,9 @@ Verification:
 
 ### GRV-Issue-009 — CCD Rejected Finite Heavy-Body Response As Zero Inverse Mass
 
-**Discovered:** 2026-07-10  
-**Resolved:** 2026-07-10  
-**Source:** 95%-to-100% coverage hardening, dynamic TOI loop review  
-**Affected area:** 2D, 3D, and mixed dynamic/kinematic CCD impulse response
+**Discovered:** 2026-07-10 **Resolved:** 2026-07-10 **Source:** 95%-to-100%
+coverage hardening, dynamic TOI loop review **Affected area:** 2D, 3D, and mixed
+dynamic/kinematic CCD impulse response
 
 RCA: CCD response treated a positive combined inverse mass less than or equal to
 `Fixed64.Epsilon` as immovable. For supported finite masses whose inverse mass
@@ -2999,11 +2943,10 @@ Verification:
 
 ### GRV-Issue-008 — Exhausted CCD Budget Left Pending Body Handoffs Alive
 
-**Discovered:** 2026-07-10  
-**Resolved:** 2026-07-10  
-**Source:** 95%-to-100% coverage hardening, queued CCD handoff audit  
-**Affected area:** `GravitasPhysicsService`, `GravitasPhysics2DService`,
-`SolidBody`, and `SolidBody2D` continuous-collision handoff state
+**Discovered:** 2026-07-10 **Resolved:** 2026-07-10 **Source:** 95%-to-100%
+coverage hardening, queued CCD handoff audit **Affected area:**
+`GravitasPhysicsService`, `GravitasPhysics2DService`, `SolidBody`, and
+`SolidBody2D` continuous-collision handoff state
 
 RCA: when the shared TOI budget was exhausted, each physics service cleared its
 handoff queue and deduplication set but did not clear the corresponding pending
@@ -3040,12 +2983,10 @@ Verification:
 
 ### GRV-Issue-007 — Context-Driven Mixed CCD Handoffs Could Drain Per Service Before The Shared Budget
 
-**Discovered:** 2026-07-06  
-**Resolved:** 2026-07-06  
-**Source:** Coverage Workstream 7 CCD handoff branch audit  
-**Affected area:** `GravitasWorldContext.LateSimulate`,
-`GravitasPhysicsService`, `GravitasPhysics2DService`, mixed 2D/3D continuous
-collision handoff chains
+**Discovered:** 2026-07-06 **Resolved:** 2026-07-06 **Source:** Coverage
+Workstream 7 CCD handoff branch audit **Affected area:**
+`GravitasWorldContext.LateSimulate`, `GravitasPhysicsService`,
+`GravitasPhysics2DService`, mixed 2D/3D continuous collision handoff chains
 
 RCA: direct `GravitasPhysicsService.LateSimulate()` and
 `GravitasPhysics2DService.LateSimulate()` correctly owned their local handoff
@@ -3076,11 +3017,9 @@ Verification:
 
 ### GRV-Issue-006 — 2D Active-State Toggle Preserved Mixed Partition Membership
 
-**Discovered:** 2026-07-06  
-**Resolved:** 2026-07-06  
-**Source:** Coverage Workstream 4 serialization/replay/authoring branch audit  
-**Affected area:** `LSCollider2D.IsActive`, mixed 2D/3D static collider
-partition membership
+**Discovered:** 2026-07-06 **Resolved:** 2026-07-06 **Source:** Coverage
+Workstream 4 serialization/replay/authoring branch audit **Affected area:**
+`LSCollider2D.IsActive`, mixed 2D/3D static collider partition membership
 
 RCA: pure 2D bodyless colliders can be toggled through `IsActive` without
 detaching from their host binding. The setter refreshed or cleared the pure 2D
@@ -3102,12 +3041,10 @@ Verification:
 
 ### GRV-Issue-005 — Reduced SAT Helper Could False-Positive Rotated Cuboid And Convex Mesh-Mesh Paths
 
-**Discovered:** 2026-07-06  
-**Resolved:** 2026-07-06  
-**Source:** Mesh-cuboid fallback SAT RCA  
-**Affected area:** `CollisionDetection.Cuboid`, `CollisionDetection.Mesh`,
-rotated cuboid vs cuboid and convex mesh vs convex mesh fallback contact
-generation
+**Discovered:** 2026-07-06 **Resolved:** 2026-07-06 **Source:** Mesh-cuboid
+fallback SAT RCA **Affected area:** `CollisionDetection.Cuboid`,
+`CollisionDetection.Mesh`, rotated cuboid vs cuboid and convex mesh vs convex
+mesh fallback contact generation
 
 RCA: the legacy `CollisionContext` SAT model prepared axes from face normals
 only. That was insufficient for non-axis-aligned cuboid/cuboid and convex
@@ -3135,12 +3072,9 @@ Verification:
 
 ### GRV-Issue-004 — Mesh-Cuboid Fallback SAT Could False-Positive Without Edge-Cross Axes
 
-**Discovered:** 2026-07-06  
-**Resolved:** 2026-07-06  
-**Source:** Coverage Workstream 1 zombie-code sweep and subagent geometry
-review  
-**Affected area:** `CollisionDetection.Mesh`, convex mesh vs cuboid fallback
-contact generation
+**Discovered:** 2026-07-06 **Resolved:** 2026-07-06 **Source:** Coverage
+Workstream 1 zombie-code sweep and subagent geometry review **Affected area:**
+`CollisionDetection.Mesh`, convex mesh vs cuboid fallback contact generation
 
 RCA: the common mesh-cuboid triangle manifold path already checks cuboid face
 normals, triangle normals, and triangle-edge x cuboid-edge axes. The fallback
@@ -3166,11 +3100,10 @@ Verification:
 
 ### GRV-Issue-003 — Rotated Cuboid Raycast Clipped The Enclosing AABB Instead Of Local Slabs
 
-**Discovered:** 2026-07-06  
-**Resolved:** 2026-07-06  
-**Source:** Coverage Workstream 1 branch inventory and subagent query review  
-**Affected area:** `RaycastSegmentWorker.CheckOBBoxOverlaps(...)`, 3D raycast
-queries against rotated `LSCuboidCollider`
+**Discovered:** 2026-07-06 **Resolved:** 2026-07-06 **Source:** Coverage
+Workstream 1 branch inventory and subagent query review **Affected area:**
+`RaycastSegmentWorker.CheckOBBoxOverlaps(...)`, 3D raycast queries against
+rotated `LSCuboidCollider`
 
 RCA: rotated cuboid raycasts first clipped the ray segment against the
 collider's enclosing world-space AABB, then rotated those world-space
@@ -3190,11 +3123,10 @@ Verification:
 
 ### GRV-Issue-002 — 3D Direct Collider Inactive Load Preserved Stale Partition State
 
-**Discovered:** 2026-07-06  
-**Resolved:** 2026-07-06  
-**Source:** Coverage Roadmap E review and 2D/3D serialization parity audit  
-**Affected area:** `LSCollider.RecordData(...)`, 3D bodyless collider
-serialization, primary and mixed partition state cleanup
+**Discovered:** 2026-07-06 **Resolved:** 2026-07-06 **Source:** Coverage Roadmap
+E review and 2D/3D serialization parity audit **Affected area:**
+`LSCollider.RecordData(...)`, 3D bodyless collider serialization, primary and
+mixed partition state cleanup
 
 RCA: 3D direct-collider serialization correctly wrote and loaded `Active=false`,
 but the inactive load branch only removed the collider from the partition
@@ -3216,10 +3148,9 @@ Verification:
 
 ### GRV-Issue-001 — Mixed Discrete Response Can Reverse Restitution-Heavy Kinematic CCD Handoff Velocity
 
-**Discovered:** 2026-06-23  
-**Resolved:** 2026-06-25  
-**Source:** CCD service-level island solver validation  
-**Affected area:** `CollisionResponseMixed`, mixed CCD handoff tests,
+**Discovered:** 2026-06-23 **Resolved:** 2026-06-25 **Source:** CCD
+service-level island solver validation **Affected area:**
+`CollisionResponseMixed`, mixed CCD handoff tests,
 `GravitasMixedCollisionService` full-frame response ordering
 
 RCA: the isolated pure-service CCD handoff was correct, but the later full-frame
