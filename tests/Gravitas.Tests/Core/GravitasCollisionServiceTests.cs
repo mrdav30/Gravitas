@@ -52,6 +52,28 @@ public sealed class GravitasCollisionServiceTests
     }
 
     [Fact]
+    public void ClearPartitionedObject_WhenBoundsAndRoleAreUnchanged_ShouldPreserveMembership()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSSphereCollider collider = CreateDynamicSphere(context);
+        WorldVoxelIndex coordinate = collider.PartitionCoordinates![0];
+        int coordinateCount = collider.PartitionCoordinates.Count;
+        int activeCount = context.Collisions.ActivePartitionCount;
+        context.World.TryGetVoxel(coordinate, out Voxel? voxel).Should().BeTrue();
+        voxel!.TryGetPartition(out PhysicsPartition? partition).Should().BeTrue();
+
+        context.Collisions.ClearPartitionedObject(collider).Should().BeFalse();
+
+        collider.IsPartitioned.Should().BeTrue();
+        collider.PartitionCoordinates.Count.Should().Be(coordinateCount);
+        collider.PartitionCoordinates[0].Should().Be(coordinate);
+        context.Collisions.ActivePartitionCount.Should().Be(activeCount);
+        partition!.ContainedDynamicObjects!.Contains(collider.Id).Should().BeTrue();
+        voxel.TryGetPartition(out PhysicsPartition? remaining).Should().BeTrue();
+        remaining.Should().BeSameAs(partition);
+    }
+
+    [Fact]
     public void ClearPartitionedObject_ShouldRetainEmptyPartitionsWithoutPoolingTwice()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();

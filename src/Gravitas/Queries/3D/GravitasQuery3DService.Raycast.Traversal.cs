@@ -255,7 +255,7 @@ public sealed partial class GravitasQuery3DService
     }
 
     private void ProcessColliderListForClosestHit(
-        SwiftSparseSet? colliderIds,
+        SwiftHashSet<int>? colliderIds,
         Vector3d origin,
         Vector3d direction,
         ref bool found,
@@ -264,9 +264,9 @@ public sealed partial class GravitasQuery3DService
         if (colliderIds == null)
             return;
 
-        for (int i = colliderIds.Count - 1; i >= 0; i--)
+        foreach (int colliderId in colliderIds)
         {
-            if (!TryBuildHitForCollider(colliderIds.DenseKeys[i], origin, direction, out Physics3DHit hit)
+            if (!TryBuildHitForCollider(colliderId, origin, direction, out Physics3DHit hit)
                 || !PhysicsHitSelectionPolicy.ShouldReplace(hit, found, closestHit))
             {
                 continue;
@@ -289,7 +289,7 @@ public sealed partial class GravitasQuery3DService
     }
 
     private void ProcessColliderListForAllHits(
-        SwiftSparseSet? colliderIds,
+        SwiftHashSet<int>? colliderIds,
         Vector3d origin,
         Vector3d direction,
         SwiftList<Physics3DHit> results)
@@ -297,9 +297,9 @@ public sealed partial class GravitasQuery3DService
         if (colliderIds == null)
             return;
 
-        for (int i = colliderIds.Count - 1; i >= 0; i--)
+        foreach (int colliderId in colliderIds)
         {
-            if (TryBuildHitForCollider(colliderIds.DenseKeys[i], origin, direction, out Physics3DHit hit))
+            if (TryBuildHitForCollider(colliderId, origin, direction, out Physics3DHit hit))
                 results.Add(hit);
         }
     }
@@ -334,7 +334,7 @@ public sealed partial class GravitasQuery3DService
     }
 
     private void ProcessColliderListForClosestSweepHit(
-        SwiftSparseSet? colliderIds,
+        SwiftHashSet<int>? colliderIds,
         Vector3d origin,
         Vector3d direction,
         ref bool found,
@@ -343,9 +343,9 @@ public sealed partial class GravitasQuery3DService
         if (colliderIds == null)
             return;
 
-        for (int i = colliderIds.Count - 1; i >= 0; i--)
+        foreach (int colliderId in colliderIds)
         {
-            if (!TryBuildSweepHitForCollider(colliderIds.DenseKeys[i], origin, direction, out Physics3DHit hit)
+            if (!TryBuildSweepHitForCollider(colliderId, origin, direction, out Physics3DHit hit)
                 || !PhysicsHitSelectionPolicy.ShouldReplace(hit, found, closestHit))
             {
                 continue;
@@ -402,7 +402,7 @@ public sealed partial class GravitasQuery3DService
     }
 
     private void ProcessColliderListForAllSweepHits(
-        SwiftSparseSet? colliderIds,
+        SwiftHashSet<int>? colliderIds,
         Vector3d origin,
         Vector3d direction,
         SwiftList<Physics3DHit> results)
@@ -410,24 +410,24 @@ public sealed partial class GravitasQuery3DService
         if (colliderIds == null)
             return;
 
-        for (int i = colliderIds.Count - 1; i >= 0; i--)
+        foreach (int colliderId in colliderIds)
         {
-            if (TryBuildSweepHitForCollider(colliderIds.DenseKeys[i], origin, direction, out Physics3DHit hit))
+            if (TryBuildSweepHitForCollider(colliderId, origin, direction, out Physics3DHit hit))
                 results.Add(hit);
         }
     }
 
     private void ProcessColliderListForClosestConvexSweepHit(
-        SwiftSparseSet? colliderIds,
+        SwiftHashSet<int>? colliderIds,
         ref bool found,
         ref Physics3DHit closestHit)
     {
         if (colliderIds == null)
             return;
 
-        for (int i = colliderIds.Count - 1; i >= 0; i--)
+        foreach (int colliderId in colliderIds)
         {
-            if (!TryBuildConvexSweepHitForCollider(colliderIds.DenseKeys[i], out Physics3DHit hit)
+            if (!TryBuildConvexSweepHitForCollider(colliderId, out Physics3DHit hit)
                 || !PhysicsHitSelectionPolicy.ShouldReplace(hit, found, closestHit))
             {
                 continue;
@@ -439,15 +439,15 @@ public sealed partial class GravitasQuery3DService
     }
 
     private void ProcessColliderListForAllConvexSweepHits(
-        SwiftSparseSet? colliderIds,
+        SwiftHashSet<int>? colliderIds,
         SwiftList<Physics3DHit> results)
     {
         if (colliderIds == null)
             return;
 
-        for (int i = colliderIds.Count - 1; i >= 0; i--)
+        foreach (int colliderId in colliderIds)
         {
-            if (TryBuildConvexSweepHitForCollider(colliderIds.DenseKeys[i], out Physics3DHit hit))
+            if (TryBuildConvexSweepHitForCollider(colliderId, out Physics3DHit hit))
                 results.Add(hit);
         }
     }

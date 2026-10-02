@@ -183,7 +183,7 @@ public sealed partial class GravitasQuery3DService
     }
 
     private void ProcessConeColliderListForClosestHit(
-        SwiftSparseSet? colliderIds,
+        SwiftHashSet<int>? colliderIds,
         Vector3d origin,
         Vector3d baseCenter,
         Vector3d direction,
@@ -196,9 +196,9 @@ public sealed partial class GravitasQuery3DService
         if (colliderIds == null)
             return;
 
-        for (int i = colliderIds.Count - 1; i >= 0; i--)
+        foreach (int colliderId in colliderIds)
         {
-            if (!TryBuildOverlapConeHit(colliderIds.DenseKeys[i], origin, baseCenter, direction, length, endRadius, out Physics3DHit hit)
+            if (!TryBuildOverlapConeHit(colliderId, origin, baseCenter, direction, length, endRadius, out Physics3DHit hit)
                 || !PhysicsHitSelectionPolicy.ShouldReplace(hit, found, closestHit))
             {
                 continue;
@@ -211,7 +211,7 @@ public sealed partial class GravitasQuery3DService
     }
 
     private void ProcessConeColliderListForAllHits(
-        SwiftSparseSet? colliderIds,
+        SwiftHashSet<int>? colliderIds,
         Vector3d origin,
         Vector3d baseCenter,
         Vector3d direction,
@@ -222,9 +222,9 @@ public sealed partial class GravitasQuery3DService
         if (colliderIds == null)
             return;
 
-        for (int i = colliderIds.Count - 1; i >= 0; i--)
+        foreach (int colliderId in colliderIds)
         {
-            if (TryBuildOverlapConeHit(colliderIds.DenseKeys[i], origin, baseCenter, direction, length, endRadius, out Physics3DHit hit))
+            if (TryBuildOverlapConeHit(colliderId, origin, baseCenter, direction, length, endRadius, out Physics3DHit hit))
                 results.Add(hit);
         }
     }

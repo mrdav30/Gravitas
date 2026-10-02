@@ -201,7 +201,7 @@ public sealed partial class GravitasQuery3DService
     }
 
     private void ProcessColliderListForAllSphereHits(
-        SwiftSparseSet? colliderIds,
+        SwiftHashSet<int>? colliderIds,
         Vector3d position,
         Fixed64 radius,
         SwiftList<Physics3DHit> results)
@@ -209,8 +209,8 @@ public sealed partial class GravitasQuery3DService
         if (colliderIds == null)
             return;
 
-        for (int i = colliderIds.Count - 1; i >= 0; i--)
-            if (TryBuildOverlapSphereHit(colliderIds.DenseKeys[i], position, radius, out Physics3DHit hitInfo))
+        foreach (int colliderId in colliderIds)
+            if (TryBuildOverlapSphereHit(colliderId, position, radius, out Physics3DHit hitInfo))
                 results.Add(hitInfo);
     }
 

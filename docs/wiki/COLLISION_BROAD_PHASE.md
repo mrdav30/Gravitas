@@ -29,6 +29,20 @@ Partition ownership must flow through the owning service. Do not manually return
 the same partition through a second path; that risks double-release and stale
 activation state.
 
+Membership storage is internal and grows with local collider population rather
+than global collider ID magnitude. Partition mutation methods maintain role,
+awake and retained-empty state together. Hosts can inspect role counts or copy
+sorted IDs into their own reusable buffers; see the
+[migration guide](../MIGRATION.md#partition-membership-ownership) for the removed
+mutable fields and inspection replacements.
+
+Movement traces exact new voxel coverage. Shared memberships survive unchanged;
+departed memberships are removed in their prior coordinate order, and new
+memberships follow tracer order. Mobility changes replace the old role even in
+shared voxels. Geometry/bounds versions still advance when membership is
+unchanged, so queries and support caches see shape changes normally. Coverage
+comparison uses full world voxel identities, including grid spawn tokens.
+
 ## 3D Partitioning
 
 When a collider initializes, moves, rotates, changes scale, or changes local
@@ -61,6 +75,13 @@ partitions are inactive and query-invisible. `PhysicsSettings`
 `RetainedPartitionTimeToKillFrames` controls the deterministic retention window,
 and `RetainedPartitionRetirementSweepBudget` bounds how many retained partitions
 the collision service checks per distribution step.
+
+An explicit dense list tracks eligible empty payloads. If the inactive pool is
+empty, rental detaches the last dense eligible entry in constant time;
+occupied registration does not search all retained payloads. Reoccupation and
+release remove eligibility immediately. Expiry keeps its bounded retained-list
+sweep. These cache reuse rules apply to pure 2D, 3D and mixed partitions;
+collision/query ordering still uses sorted spatial identities and collider IDs.
 
 `GravitasWorldContext.Reset()` is a stronger session boundary: it detaches
 retained Gravitas partition payloads from GridForge voxels, clears retained

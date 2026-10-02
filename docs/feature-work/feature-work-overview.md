@@ -26,11 +26,14 @@ instead of burying it in notes.
     `SwiftCollections`, `GridForge`, then Gravitas. Package references are the
     default; use `UseLocalLsfStack=true` only for coordinated validation of
     unreleased sibling changes, then revalidate against released packages.
-  - The active correctness queue is clear. GRV-Issue-083's circle-contact repair
+  - GRV-Issue-083's circle-contact repair
     and shared upstream optimization are complete. GRV-Benchmark-022 is closed
     after the committed shared normalization improvement and documented decision
     to retain the exact contact path. Larger-scene partition/grounding scaling
-    remains open as GRV-Benchmark-023.
+    remains open as GRV-Benchmark-023. Its registration and refresh defects are
+    repaired for review; remaining warmed full-step cost is still evidence-gated.
+    GRV-Issue-089 separately tracks runtime mass mutation leaving inertia or
+    awake membership stale.
 - [`Benchmark Signal Hardening`](benchmark-signal-hardening-backlog.md)
   - Reproduce and close confirmed release-relevant signals alongside the owning
     library change. Do not broaden this into speculative optimization work.

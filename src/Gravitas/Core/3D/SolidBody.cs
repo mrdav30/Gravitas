@@ -59,6 +59,7 @@ public partial class SolidBody : IRecordable
             if (Active)
                 RefreshInertiaTensor();
             RefreshPartitionMobility();
+            RefreshPartitionAwakeState();
         }
     }
 

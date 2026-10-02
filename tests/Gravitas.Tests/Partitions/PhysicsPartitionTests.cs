@@ -15,6 +15,66 @@ namespace Gravitas.Tests.Partitions;
 public sealed class PhysicsPartitionTests
 {
     [Fact]
+    public void StandalonePartition_StaticMembership_ShouldRemainUntrackedAcrossPoolReset()
+    {
+        var partition = new PhysicsPartition();
+        partition.AddStaticObject(19);
+        partition.AddStaticObject(19);
+        partition.AddKinematicObject(17);
+        partition.ContainedStaticObjects!.Count.Should().Be(1);
+        partition.ContainedKinematicObjects!.Count.Should().Be(1);
+        var ids = new SwiftList<int>();
+        partition.CopyAllColliderIds(ids);
+        ids.Should().Equal(17, 19);
+        partition.IsEmpty.Should().BeFalse();
+        partition.EmptySinceFrame.Should().Be(-1);
+        partition.RetainedIndex.Should().Be(-1);
+        partition.EmptyIndex.Should().Be(-1);
+
+        partition.ResetForPool();
+        partition.IsEmpty.Should().BeTrue();
+        partition.CopyAllColliderIds(ids);
+        ids.Should().BeEmpty();
+        partition.AddStaticObject(23);
+        partition.ContainedStaticObjects!.Contains(23).Should().BeTrue();
+        partition.ResetRetainedMembership();
+        partition.CopyAllColliderIds(ids);
+        ids.Should().BeEmpty();
+        partition.EmptySinceFrame.Should().Be(0);
+        partition.EmptyIndex.Should().Be(-1);
+    }
+
+    [Fact]
+    public void StandalonePartition2D_StaticMembership_ShouldRemainUntrackedAcrossPoolReset()
+    {
+        var partition = new PhysicsPartition2D();
+        partition.AddStaticObject(19);
+        partition.AddStaticObject(19);
+        partition.AddKinematicObject(17);
+        partition.ContainedStaticObjects!.Count.Should().Be(1);
+        partition.ContainedKinematicObjects!.Count.Should().Be(1);
+        var ids = new SwiftList<int>();
+        partition.CopyAllColliderIds(ids);
+        ids.Should().Equal(17, 19);
+        partition.IsEmpty.Should().BeFalse();
+        partition.EmptySinceFrame.Should().Be(-1);
+        partition.RetainedIndex.Should().Be(-1);
+        partition.EmptyIndex.Should().Be(-1);
+
+        partition.ResetForPool();
+        partition.IsEmpty.Should().BeTrue();
+        partition.CopyAllColliderIds(ids);
+        ids.Should().BeEmpty();
+        partition.AddStaticObject(23);
+        partition.ContainedStaticObjects!.Contains(23).Should().BeTrue();
+        partition.ResetRetainedMembership();
+        partition.CopyAllColliderIds(ids);
+        ids.Should().BeEmpty();
+        partition.EmptySinceFrame.Should().Be(0);
+        partition.EmptyIndex.Should().Be(-1);
+    }
+
+    [Fact]
     public void OnRemoveFromVoxel_WithoutOwner_ShouldThrowInvariantViolation()
     {
         var partition = new PhysicsPartition();
@@ -505,16 +565,17 @@ public sealed class PhysicsPartitionTests
     {
         var owner = new object();
         var retained = new SwiftList<RetainedPartitionProbe>();
+        var empty = new SwiftList<RetainedPartitionProbe>();
         RetainedPartitionProbe first = CreateProbe(owner);
         RetainedPartitionProbe second = CreateProbe(owner);
         RetainedPartitionProbe third = CreateProbe(owner);
 
-        RetainedPartitionLifecycle.Track(retained, owner, first, nameof(RetainedPartitionProbe));
-        RetainedPartitionLifecycle.Track(retained, owner, second, nameof(RetainedPartitionProbe));
-        RetainedPartitionLifecycle.Track(retained, owner, third, nameof(RetainedPartitionProbe));
+        RetainedPartitionLifecycle.Track(retained, empty, owner, first, nameof(RetainedPartitionProbe));
+        RetainedPartitionLifecycle.Track(retained, empty, owner, second, nameof(RetainedPartitionProbe));
+        RetainedPartitionLifecycle.Track(retained, empty, owner, third, nameof(RetainedPartitionProbe));
         int retirementCursor = 2;
 
-        RetainedPartitionLifecycle.Untrack(retained, owner, second, ref retirementCursor);
+        RetainedPartitionLifecycle.Untrack(retained, empty, owner, second, ref retirementCursor);
 
         retained.Count.Should().Be(2);
         retained[0].Should().BeSameAs(first);
@@ -523,12 +584,12 @@ public sealed class PhysicsPartitionTests
         third.RetainedIndex.Should().Be(1);
         retirementCursor.Should().Be(1);
 
-        RetainedPartitionLifecycle.Untrack(retained, owner, second, ref retirementCursor);
+        RetainedPartitionLifecycle.Untrack(retained, empty, owner, second, ref retirementCursor);
 
         retained.Count.Should().Be(2);
         second.RetainedIndex.Should().Be(-1);
 
-        RetainedPartitionLifecycle.Untrack(retained, owner, third, ref retirementCursor);
+        RetainedPartitionLifecycle.Untrack(retained, empty, owner, third, ref retirementCursor);
 
         retained.Count.Should().Be(1);
         retirementCursor.Should().Be(0);
@@ -539,13 +600,14 @@ public sealed class PhysicsPartitionTests
     {
         var owner = new object();
         var retained = new SwiftList<RetainedPartitionProbe>();
+        var empty = new SwiftList<RetainedPartitionProbe>();
         RetainedPartitionProbe tracked = CreateProbe(owner);
         RetainedPartitionProbe stale = CreateProbe(owner);
-        RetainedPartitionLifecycle.Track(retained, owner, tracked, nameof(RetainedPartitionProbe));
+        RetainedPartitionLifecycle.Track(retained, empty, owner, tracked, nameof(RetainedPartitionProbe));
         stale.SetRetainedIndex(tracked.RetainedIndex);
         int retirementCursor = 0;
 
-        RetainedPartitionLifecycle.Untrack(retained, owner, stale, ref retirementCursor);
+        RetainedPartitionLifecycle.Untrack(retained, empty, owner, stale, ref retirementCursor);
 
         retained.Count.Should().Be(1);
         retained[0].Should().BeSameAs(tracked);
@@ -559,12 +621,13 @@ public sealed class PhysicsPartitionTests
     {
         var owner = new object();
         var retained = new SwiftList<RetainedPartitionProbe>();
+        var empty = new SwiftList<RetainedPartitionProbe>();
         RetainedPartitionProbe partition = CreateProbe(owner);
 
-        RetainedPartitionLifecycle.Track(retained, owner, partition, nameof(RetainedPartitionProbe));
+        RetainedPartitionLifecycle.Track(retained, empty, owner, partition, nameof(RetainedPartitionProbe));
 
         Action trackAgain = () =>
-            RetainedPartitionLifecycle.Track(retained, owner, partition, nameof(RetainedPartitionProbe));
+            RetainedPartitionLifecycle.Track(retained, empty, owner, partition, nameof(RetainedPartitionProbe));
 
         trackAgain.Should()
             .Throw<ArgumentException>()
@@ -577,23 +640,23 @@ public sealed class PhysicsPartitionTests
         var owner = new object();
         var foreignOwner = new object();
         var retained = new SwiftList<RetainedPartitionProbe>();
+        var empty = new SwiftList<RetainedPartitionProbe>();
         var pool = new SwiftStack<RetainedPartitionProbe>();
-        var release = new RetainedPartitionProbeRelease(retained, pool, owner);
+        var release = new RetainedPartitionProbeRelease(retained, empty, pool, owner);
         RetainedPartitionProbe foreign = CreateProbe(foreignOwner);
         RetainedPartitionProbe allocated = CreateProbe(owner, isAllocated: true);
         RetainedPartitionProbe reusable = CreateProbe(owner);
 
-        RetainedPartitionLifecycle.Track(retained, foreignOwner, foreign, nameof(RetainedPartitionProbe));
-        RetainedPartitionLifecycle.Track(retained, owner, allocated, nameof(RetainedPartitionProbe));
-        RetainedPartitionLifecycle.Track(retained, owner, reusable, nameof(RetainedPartitionProbe));
+        RetainedPartitionLifecycle.Track(retained, empty, foreignOwner, foreign, nameof(RetainedPartitionProbe));
+        RetainedPartitionLifecycle.Track(retained, empty, owner, allocated, nameof(RetainedPartitionProbe));
+        RetainedPartitionLifecycle.Track(retained, empty, owner, reusable, nameof(RetainedPartitionProbe));
 
         bool retired = RetainedPartitionLifecycle.TryRetireEmptyForReuse(
-            retained,
+            empty,
             pool,
             new GridWorld(),
             owner,
-            release.Release,
-            ref release.Cursor);
+            release.Release);
 
         retired.Should().BeTrue();
         pool.Count.Should().Be(1);
@@ -609,17 +672,18 @@ public sealed class PhysicsPartitionTests
     {
         var owner = new object();
         var retained = new SwiftList<RetainedPartitionProbe>();
+        var empty = new SwiftList<RetainedPartitionProbe>();
         var pool = new SwiftStack<RetainedPartitionProbe>();
-        var release = new RetainedPartitionProbeRelease(retained, pool, owner);
+        var release = new RetainedPartitionProbeRelease(retained, empty, pool, owner);
         RetainedPartitionProbe notExpired = CreateProbe(owner, emptySinceFrame: 9);
         RetainedPartitionProbe notYetEmpty = CreateProbe(owner, emptySinceFrame: -1);
         RetainedPartitionProbe allocated = CreateProbe(owner, emptySinceFrame: 0, isAllocated: true);
         RetainedPartitionProbe expired = CreateProbe(owner, emptySinceFrame: 0);
 
-        RetainedPartitionLifecycle.Track(retained, owner, notExpired, nameof(RetainedPartitionProbe));
-        RetainedPartitionLifecycle.Track(retained, owner, notYetEmpty, nameof(RetainedPartitionProbe));
-        RetainedPartitionLifecycle.Track(retained, owner, allocated, nameof(RetainedPartitionProbe));
-        RetainedPartitionLifecycle.Track(retained, owner, expired, nameof(RetainedPartitionProbe));
+        RetainedPartitionLifecycle.Track(retained, empty, owner, notExpired, nameof(RetainedPartitionProbe));
+        RetainedPartitionLifecycle.Track(retained, empty, owner, notYetEmpty, nameof(RetainedPartitionProbe));
+        RetainedPartitionLifecycle.Track(retained, empty, owner, allocated, nameof(RetainedPartitionProbe));
+        RetainedPartitionLifecycle.Track(retained, empty, owner, expired, nameof(RetainedPartitionProbe));
 
         RetainedPartitionLifecycle.RetireExpired(
             retained,
@@ -641,38 +705,38 @@ public sealed class PhysicsPartitionTests
     }
 
     [Fact]
-    public void RetainedPartitionLifecycle_TryRetireEmptyForReuse_ShouldStopWhenReleaseDoesNotPool()
+    public void RetainedPartitionLifecycle_TryRetireEmptyForReuse_ShouldContinueWhenReleaseDoesNotPool()
     {
         var owner = new object();
         var retained = new SwiftList<RetainedPartitionProbe>();
+        var empty = new SwiftList<RetainedPartitionProbe>();
         var pool = new SwiftStack<RetainedPartitionProbe>();
         RetainedPartitionProbe releasedWithoutPooling = CreateProbe(owner);
         RetainedPartitionProbe reusable = CreateProbe(owner);
         int cursor = 0;
 
-        RetainedPartitionLifecycle.Track(retained, owner, releasedWithoutPooling, nameof(RetainedPartitionProbe));
-        RetainedPartitionLifecycle.Track(retained, owner, reusable, nameof(RetainedPartitionProbe));
+        RetainedPartitionLifecycle.Track(retained, empty, owner, reusable, nameof(RetainedPartitionProbe));
+        RetainedPartitionLifecycle.Track(retained, empty, owner, releasedWithoutPooling, nameof(RetainedPartitionProbe));
 
         void Release(RetainedPartitionProbe partition)
         {
-            RetainedPartitionLifecycle.Untrack(retained, owner, partition, ref cursor);
+            RetainedPartitionLifecycle.Untrack(retained, empty, owner, partition, ref cursor);
             partition.ResetForPool(owner);
             if (!ReferenceEquals(partition, releasedWithoutPooling))
                 pool.Push(partition);
         }
 
         bool retired = RetainedPartitionLifecycle.TryRetireEmptyForReuse(
-            retained,
+            empty,
             pool,
             new GridWorld(),
             owner,
-            Release,
-            ref cursor);
+            Release);
 
-        retired.Should().BeFalse();
-        pool.Count.Should().Be(0);
-        retained.Count.Should().Be(1);
-        retained[0].Should().BeSameAs(reusable);
+        retired.Should().BeTrue();
+        pool.Count.Should().Be(1);
+        pool.Peek().Should().BeSameAs(reusable);
+        retained.Count.Should().Be(0);
         releasedWithoutPooling.RetainedIndex.Should().Be(-1);
     }
 
@@ -684,14 +748,15 @@ public sealed class PhysicsPartitionTests
         context.World.TryGetVoxel(Vector3d.Zero, out Voxel? voxel).Should().BeTrue();
         var owner = new object();
         var retained = new SwiftList<RetainedPartitionProbe>();
+        var empty = new SwiftList<RetainedPartitionProbe>();
         var pool = new SwiftStack<RetainedPartitionProbe>();
-        var release = new RetainedPartitionProbeRelease(retained, pool, owner);
+        var release = new RetainedPartitionProbeRelease(retained, empty, pool, owner);
         RetainedPartitionProbe attachedOther = CreateProbe(owner);
         RetainedPartitionProbe stale = CreateProbe(owner);
 
         voxel!.TryAddPartition(attachedOther).Should().BeTrue();
         stale.SetParentIndex(attachedOther.WorldIndex);
-        RetainedPartitionLifecycle.Track(retained, owner, stale, nameof(RetainedPartitionProbe));
+        RetainedPartitionLifecycle.Track(retained, empty, owner, stale, nameof(RetainedPartitionProbe));
 
         RetainedPartitionLifecycle.RetireExpired(
             retained,
@@ -718,8 +783,9 @@ public sealed class PhysicsPartitionTests
         var owner = new object();
         var foreignOwner = new object();
         var retained = new SwiftList<RetainedPartitionProbe>();
+        var empty = new SwiftList<RetainedPartitionProbe>();
         var pool = new SwiftStack<RetainedPartitionProbe>();
-        var release = new RetainedPartitionProbeRelease(retained, pool, owner);
+        var release = new RetainedPartitionProbeRelease(retained, empty, pool, owner);
         RetainedPartitionProbe foreign = CreateProbe(foreignOwner);
         RetainedPartitionProbe occupied = CreateProbe(owner);
         RetainedPartitionProbe missing = CreateProbe(owner);
@@ -727,9 +793,9 @@ public sealed class PhysicsPartitionTests
         foreign.SetParentIndex(voxel!.WorldIndex);
         occupied.SetParentIndex(voxel.WorldIndex);
         missing.SetParentIndex(voxel.WorldIndex);
-        RetainedPartitionLifecycle.Track(retained, foreignOwner, foreign, nameof(RetainedPartitionProbe));
-        RetainedPartitionLifecycle.Track(retained, owner, occupied, nameof(RetainedPartitionProbe));
-        RetainedPartitionLifecycle.Track(retained, owner, missing, nameof(RetainedPartitionProbe));
+        RetainedPartitionLifecycle.Track(retained, empty, foreignOwner, foreign, nameof(RetainedPartitionProbe));
+        RetainedPartitionLifecycle.Track(retained, empty, owner, occupied, nameof(RetainedPartitionProbe));
+        RetainedPartitionLifecycle.Track(retained, empty, owner, missing, nameof(RetainedPartitionProbe));
 
         RetainedPartitionLifecycle.RetireExpired(
             retained,
@@ -759,20 +825,22 @@ public sealed class PhysicsPartitionTests
         var owner = new object();
         var foreignOwner = new object();
         var retained = new SwiftList<RetainedPartitionProbe>();
+        var empty = new SwiftList<RetainedPartitionProbe>();
         var pool = new SwiftStack<RetainedPartitionProbe>();
-        var release = new RetainedPartitionProbeRelease(retained, pool, owner);
+        var release = new RetainedPartitionProbeRelease(retained, empty, pool, owner);
         RetainedPartitionProbe attached = CreateProbe(owner);
         RetainedPartitionProbe detached = CreateProbe(owner);
         RetainedPartitionProbe foreign = CreateProbe(foreignOwner);
         attached.Removed = release.Release;
 
-        RetainedPartitionLifecycle.Track(retained, owner, detached, nameof(RetainedPartitionProbe));
-        RetainedPartitionLifecycle.Track(retained, owner, attached, nameof(RetainedPartitionProbe));
-        RetainedPartitionLifecycle.Track(retained, foreignOwner, foreign, nameof(RetainedPartitionProbe));
+        RetainedPartitionLifecycle.Track(retained, empty, owner, detached, nameof(RetainedPartitionProbe));
+        RetainedPartitionLifecycle.Track(retained, empty, owner, attached, nameof(RetainedPartitionProbe));
+        RetainedPartitionLifecycle.Track(retained, empty, foreignOwner, foreign, nameof(RetainedPartitionProbe));
         voxel!.TryAddPartition(attached).Should().BeTrue();
 
         RetainedPartitionLifecycle.DetachAll(
             retained,
+            empty,
             context.World,
             owner,
             release.Release,
@@ -794,20 +862,22 @@ public sealed class PhysicsPartitionTests
         context.World.TryGetVoxel(Vector3d.Zero, out Voxel? voxel).Should().BeTrue();
         var owner = new object();
         var retained = new SwiftList<RetainedPartitionProbe>();
+        var empty = new SwiftList<RetainedPartitionProbe>();
         var pool = new SwiftStack<RetainedPartitionProbe>();
-        var release = new RetainedPartitionProbeRelease(retained, pool, owner);
+        var release = new RetainedPartitionProbeRelease(retained, empty, pool, owner);
         RetainedPartitionProbe attached = CreateProbe(owner);
         attached.Removed = partition =>
         {
             int cursor = -1;
-            RetainedPartitionLifecycle.Untrack(retained, owner, partition, ref cursor);
+            RetainedPartitionLifecycle.Untrack(retained, empty, owner, partition, ref cursor);
             throw new InvalidOperationException("simulated partial release failure");
         };
-        RetainedPartitionLifecycle.Track(retained, owner, attached, nameof(RetainedPartitionProbe));
+        RetainedPartitionLifecycle.Track(retained, empty, owner, attached, nameof(RetainedPartitionProbe));
         voxel!.TryAddPartition(attached).Should().BeTrue();
 
         RetainedPartitionLifecycle.DetachAll(
             retained,
+            empty,
             context.World,
             owner,
             release.Release,
@@ -913,6 +983,8 @@ public sealed class PhysicsPartitionTests
 
         public int RetainedIndex { get; private set; } = -1;
 
+        public int EmptyIndex { get; set; } = -1;
+
         public bool IsEmpty { get; set; } = true;
 
         public bool IsAllocated { get; }
@@ -951,15 +1023,18 @@ public sealed class PhysicsPartitionTests
     private sealed class RetainedPartitionProbeRelease
     {
         private readonly SwiftList<RetainedPartitionProbe> _retained;
+        private readonly SwiftList<RetainedPartitionProbe> _empty;
         private readonly SwiftStack<RetainedPartitionProbe> _pool;
         private readonly object _owner;
 
         public RetainedPartitionProbeRelease(
             SwiftList<RetainedPartitionProbe> retained,
+            SwiftList<RetainedPartitionProbe> empty,
             SwiftStack<RetainedPartitionProbe> pool,
             object owner)
         {
             _retained = retained;
+            _empty = empty;
             _pool = pool;
             _owner = owner;
         }
@@ -968,7 +1043,7 @@ public sealed class PhysicsPartitionTests
 
         public void Release(RetainedPartitionProbe partition)
         {
-            RetainedPartitionLifecycle.Untrack(_retained, _owner, partition, ref Cursor);
+            RetainedPartitionLifecycle.Untrack(_retained, _empty, _owner, partition, ref Cursor);
             partition.ResetForPool(_owner);
             _pool.Push(partition);
         }

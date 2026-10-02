@@ -125,6 +125,42 @@ The `circle-contact` selection remains the individual-query geometry baseline.
 dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll circle-contact-simulation --filter '*' --exporters json
 ```
 
+### Pure-2D partition scaling
+
+`cold-circle-registration` and `circle-partition-maintenance` use the same
+radius-five diagonal circle pairs at 16-unit spacing. `ColliderCount` is the
+total dynamic plus static collider count (64, 256 or 1024); `CellSize` selects
+one-unit or 16-unit X/Z cells, with one-unit Y cells and padded grid bounds.
+Setup checks known contact geometry and warmed setup verifies one active
+contact/candidate per pair.
+
+`RegisterCirclePairs` constructs and registers bodies/colliders into a fresh
+context once per iteration. Context/grid and array creation happen outside the
+measurement; registration allocations are intentional and exclude grid setup.
+Cleanup validates the registered scene and disposes it outside measurement.
+The warmed rows separate translated pose reset plus partition refresh, forced
+automatic grounding probes, and retained-candidate distribution. Ground probes
+find no support because targets are above the dynamic circles.
+`DistributeRetainedCandidates` retains processed pair keys to isolate partition
+traversal, filtering and duplicate suppression; it deliberately skips repeated
+narrow phase and response. Use `circle-contact-simulation` for full-step costs.
+
+```powershell
+dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll cold-circle-registration circle-partition-maintenance --filter '*' --exporters json
+```
+
+These are manual scaling selections. Fine-cell cold registration can be very
+expensive before retained-partition scaling fixes; use filtered small counts
+when capturing the historical baseline. Compare allocation results per stage,
+and retain the cell size and collider count beside timing results.
+
+`partition-membership` compares existing sparse, hash and packed collection
+owners at 1, 8 and 64 local IDs starting at global ID 65536. It measures one
+add/remove plus sorted copy after warmup, with no managed allocations. Hash
+membership avoids global-ID-sized storage and wins the one-ID row; sparse
+membership is faster in the denser microbenchmarks. Keep this tradeoff visible
+when interpreting integrated partition results.
+
 ### Capsule/circle-slab contacts
 
 The `capsule-circle-contact` selection measures mixed capsule/circle-slab side,

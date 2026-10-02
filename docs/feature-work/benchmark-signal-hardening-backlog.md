@@ -64,7 +64,8 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 ### GRV-Benchmark-023 — Circle Workload Partition And Grounding Scaling
 
 **Discovered:** 2026-10-02 during GRV-Benchmark-022 isolation.  
-**Status:** Open; separate from exact contact-query cost.  
+**Status:** Partition defects repaired for review; remaining warmed full-step
+scaling stays open, separate from exact contact-query cost.  
 **Owner:** Gravitas retained partition rental/distribution and collider refresh,
 plus GridForge voxel partition lookup used by planar grounding.
 
@@ -91,7 +92,7 @@ to retire, allowing quadratic registration work. Per-partition sparse sets also
 grow with the highest global collider ID. The rental owner is shared by 2D,
 3D and mixed services; dimension parity matters for any repair.
 
-**Next isolation step:** Measure registration and warmed refresh/distribution
+**Original isolation step:** Measure registration and warmed refresh/distribution
 separately while varying cell size, covered voxels and collider count. Profile
 registration to distinguish rental scans from sparse-set growth. Preserve
 deterministic reuse, empty-partition reclamation and allocation guards; do not
@@ -110,6 +111,165 @@ large-scene cost. The full-step distributions include bimodality and short
 iteration warnings; preserve the raw results and establish a host frame budget
 before accepting this scaling. Final coarse results and traces are in
 `artifacts/grv-benchmark-022/after` and `coarse-profile*`.
+
+**Partition hardening, 2026-10-02:** The shared retained lifecycle now tracks a
+dense eligible-empty list instead of scanning occupied payloads on every cold
+rental. Membership transitions maintain independent retained/empty indices;
+reuse chooses the last dense eligible entry with ownership/occupancy checks,
+while expiry preserves its bounded retained-list sweep. Registration reserves
+eligible capacity for every retained payload, so a later wave of emptying cannot
+allocate. A counting regression reduces 32 occupied rentals from 496 prior
+`IsEmpty` reads to a linear bound. A strict moving-constraint regression exposed
+152 bytes of late eligible-list growth; capacity reservation fixes it without
+weakening the gate or increasing test warmup.
+
+All three partition types now use existing `SwiftHashSet<int>` membership
+storage sized by local population. A global ID of `1 << 20` previously allocated
+16,777,584 bytes for one dynamic membership and its awake subset in each mode;
+the new dimensional regression requires less than 16,384 bytes. Mutable public
+membership fields are internal to prevent edits bypassing lifecycle bookkeeping.
+Public role/awake counts and sorted caller-owned copies replace inspection; see
+the [migration guide](../MIGRATION.md#partition-membership-ownership).
+
+Pure 2D, 3D and mixed coverage refresh keeps memberships shared by the old/new
+voxel sets, removes departures in previous coordinate order and publishes in
+tracer order. Full `WorldVoxelIndex` identity includes grid/world lifetimes.
+Mobility changes replace the old role; surviving dynamic memberships synchronize
+awake state, and freeze/unfreeze transitions refresh awake membership directly.
+Bounds, geometry/version publication, planar candidate indexing, deferred
+refresh and topology rebuild semantics remain covered. Pure distribution paths
+reuse their existing sorted static-style copy helpers. No upstream source change,
+new collection owner, math kernel or voxel cache is needed.
+
+**Collection tradeoff:** `partition-membership` compares existing owners with
+global IDs starting at 65536. Add/remove plus sorted copy takes 15.06/11.78/19.39
+ns for sparse/hash/packed storage at one member; at 64 members it takes
+169.56/277.44/239.50 ns. All are 0 B/op after warmup. Hash storage addresses the
+global-ID memory failure and wins the one-member row, but its denser copy cost
+is a real tradeoff, not a universal collection speedup. Integrated scene rows
+remain the evidence for the affected workload.
+
+**Matched cold registration:** `ColliderCount` is the total number of dynamic
+plus static colliders, half as many independent radius-five diagonal pairs.
+Context/grid/array creation and cleanup are outside the measured registration.
+Error is half of the 99.9% confidence interval; allocations are KB/op.
+
+| Total colliders / XZ cell edge | Before mean +/- error (ms) | After mean +/- error (ms) | Before / after allocation (KB) |
+| --- | --- | --- | --- |
+| 64 / 1 | 118.890 +/- 2.1111 | 12.096 +/- 1.7149 | 5728.29 / 4107.09 |
+| 64 / 16 | 2.947 +/- 0.0492 | 2.975 +/- 0.0730 | 256.47 / 237.95 |
+| 256 / 1 | 2753.815 +/- 179.1855 | 41.426 +/- 39.1938 | 46411.04 / 16403.90 |
+| 256 / 16 | 11.940 +/- 0.6168 | 11.812 +/- 0.1554 | 1220.05 / 912.28 |
+| 1024 / 16 | 40.773 +/- 23.1878 | 33.453 +/- 21.3649 | 7982.59 / 3616.41 |
+
+The fine-cell 256-collider mean improves about 66 times and allocation falls
+64.7%; the after distribution is noisy (median 29.306 ms), so preserve the full
+samples. Coarse timing intervals overlap; do not claim those small differences
+as speedups. An additional after-only 1024-collider unit-cell row completes at
+123.281 +/- 11.1799 ms with 65,589.79 KB/op. It has no matched before result.
+Fine-cell allocations scale approximately fourfold per fourfold count increase
+over these three after rows, instead of following the highest global ID in every
+voxel. Artifacts: `artifacts/grv-benchmark-023/cold-before`, `cold-verified`.
+
+**Reproduce:** Set `$env:UseLocalLsfStack = 'true'` and
+`$env:DOTNET_PROCESSOR_COUNT = '2'`, use BelowNormal priority and one heavy
+workload. Build with
+`dotnet build Gravitas.slnx -c Release -p:UseLocalLsfStack=true -m:1 -p:BuildInParallel=false`.
+Run `cold-circle-registration --filter '*' --launchCount 1 --warmupCount 3 --iterationCount 8 --affinity 3 --exporters json`
+through the compiled benchmark DLL. The historical before capture filters out
+1024 unit-cell colliders. Warmed stage selections use
+`circle-partition-maintenance --filter '*ColliderCount: 64, CellSize: 1)*' '*ColliderCount: 1024, CellSize: 16)*' --launchCount 2 --warmupCount 5 --iterationCount 15 --iterationTime 250 --affinity 3 --exporters json`.
+The integrated control uses
+`circle-contact-simulation --filter '*ResetAndFullSimulationStep*Diagonal*'`
+with the same warmed job settings. Hardware is an i7-9700K on Windows 11,
+.NET SDK 10.0.302 / runtime 8.0.29, BenchmarkDotNet 0.15.8. Both source stacks
+use FixedMathSharp `00a38bd`; Gravitas before is `05ddcac`, after is the
+unstaged partition-hardening change in this working tree.
+
+**Grounding decision and remaining scope:** Preserve automatic ground probing
+when contact normals reject support. These above-body targets do not provide
+ground, and zero gravity or a rejected response normal does not prove that the
+probe can be omitted. Existing public support queries differ in allowed phases,
+tiny probes, compound-normal filtering and physical-pair policy; replacing the
+automatic sweep with them would change behavior. The remaining ground work uses
+the existing exact sweep owner. Do not remove GridForge synchronization or add
+another cache based on sampled attribution alone. The fresh full-step profile
+and warmed stage results below keep the remaining work explicit; no host frame
+budget has been accepted. Runtime mass mutation discovered in the awake review
+is independently tracked as GRV-Issue-089.
+
+**Matched warmed stages:** The translated row includes pose reset plus coverage
+refresh; retained distribution deliberately keeps processed pair keys and skips
+repeated narrow phase/response. Forced probes check the same above-body scene
+without a complete simulation step. Every row reports 0 B/op. These are separate
+stage workloads, not additive components of the full-step measurement.
+
+| Stage / total colliders / XZ cell edge | Before mean +/- error (us) | After mean +/- error (us) |
+| --- | --- | --- |
+| Translated refresh / 64 / 1 | 763.6 +/- 15.00 | 665.1 +/- 13.88 |
+| Retained distribution / 64 / 1 | 1340.9 +/- 11.89 | 1268.5 +/- 18.01 |
+| Forced automatic probes / 64 / 1 | 565.0 +/- 21.49 | 523.1 +/- 2.58 |
+| Translated refresh / 1024 / 16 | 2678.6 +/- 35.39 | 2605.6 +/- 11.46 |
+| Retained distribution / 1024 / 16 | 401.8 +/- 3.62 | 399.0 +/- 2.45 |
+| Forced automatic probes / 1024 / 16 | 1638.7 +/- 70.66 | 1467.9 +/- 7.71 |
+
+Fine-cell translated refresh improves 12.9% and retained distribution 5.4%.
+Coarse distribution intervals overlap. Grounding benefits from the partition
+storage change; its physical acceptance rules and exact sweep are unchanged.
+Raw results are in `artifacts/grv-benchmark-023/maintenance-before`,
+`maintenance-verified`, and `distribution-complete` (the final distribution
+confirmation after helper deduplication).
+
+**Integrated control:** `PairCount` here means independent dynamic/static
+pairs, twice as many total colliders; XZ cells have edge 16.
+
+| Diagonal pairs | Before full step mean +/- error (ms) | After full step mean +/- error (ms) | Allocation |
+| --- | --- | --- | --- |
+| 64 | 1.6085 +/- 0.11412 | 1.548 +/- 0.1146 | 0 B/op |
+| 1024 | 35.9930 +/- 0.46672 | 35.573 +/- 0.3858 | 0 B/op |
+
+These intervals overlap. Intermediate after captures range from 35.21 to
+35.50 ms for 1024 pairs; do not turn the small point-estimate difference into a
+stable full-frame speedup claim. Short-iteration warnings and bimodality remain
+in the raw distributions. Before results are in
+`artifacts/grv-benchmark-022/after`; final controls are in
+`artifacts/grv-benchmark-023/fullstep-complete`.
+
+The final actual-iteration-only EventPipe capture still attributes 31.0%
+inclusive to grounding refresh, 19.3% to generic swept-circle detection and
+12.5% to circle sweep geometry. Partition distribution accounts for 16.4%
+inclusive, with voxel partition lookup at 11.0% exclusive. These are overlapping
+sampled paths, not measured stage durations or proof of a lock bottleneck.
+The complete contact owner contributes 4.9% inclusive in this sample. Capture
+with the integrated 1024-pair filter, `--profiler EP --launchCount 1 --warmupCount 3 --iterationCount 5 --iterationTime 500`;
+artifacts are `fullstep-profile-complete` and
+`fullstep-profile-complete-actual-only.json` under the same directory.
+
+**Validation:** Final local-stack Release/ReleaseLean solution builds cover both
+`netstandard2.1` and `net8.0`; all 4401/4342 tests pass with no failures or skips.
+Final OpenCover/Cobertura root counts are exactly 44,491/44,491 sequence points,
+13,278/13,278 branches and 4,589/4,589 methods in Release; Lean has
+44,489/44,489 points, 13,278/13,278 branches and 4,588/4,588 methods.
+ReportGenerator also confirms zero uncovered lines, branches and methods.
+DocFX passes with warnings as errors; API-site branding, repository links and
+the workflow's local-link checks also pass. Logs, TRX and raw coverage are in
+`artifacts/grv-benchmark-023/*-final-review`; rendered reports are in
+`report-Release` and `report-ReleaseLean`. Regression coverage
+includes empty-registry swap-back/reset/reuse, all-dimension high-ID storage,
+sorted inspection, negative-ID validation, coverage deltas, retained identities,
+mobility changes, awake transitions, foreign contexts and strict allocation
+gates. Source review reports no remaining findings. No coverage exclusion changes
+or upstream source edits were made. This is Windows source-stack evidence;
+released-package validation remains deferred until the upstream release.
+
+**Next isolation step:** Keep the repaired cold-registration and allocation
+gates. Establish the host's warmed full-step budget, then isolate supported and
+unsupported automatic probes at increasing pair counts against direct radial
+sweep controls. Separate unavoidable exact geometry from repeated candidate
+lookup/distribution and retained-pair bookkeeping before choosing a new runtime
+change. Preserve query/grounding acceptance, compound behavior, stable ties,
+zero allocation and dimension parity. Registration repair does not by itself
+accept the remaining 1024-pair full-step cost.
 
 ### GRV-Benchmark-021 — Complete Capsule/Stadium-Slab Curved Contact Cost
 

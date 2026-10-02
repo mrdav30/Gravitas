@@ -1324,7 +1324,7 @@ public sealed class GravitasQuery3DServiceSweepTests
         {
             context.World.TryGetVoxel(dynamicTarget.PartitionCoordinates[i], out Voxel? voxel).Should().BeTrue();
             voxel!.TryGetPartition(out PhysicsPartition? partition).Should().BeTrue();
-            partition!.ContainedStaticObjects ??= new SwiftSparseSet();
+            partition!.ContainedStaticObjects ??= new SwiftHashSet<int>();
             partition.ContainedStaticObjects.Add(dynamicTarget.Id).Should().BeTrue();
         }
 

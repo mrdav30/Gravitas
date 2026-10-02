@@ -667,7 +667,7 @@ public sealed class Physics2DPartitionBroadPhaseTests
         dynamicIds.Count.Should().Be(0);
         staticIds.Count.Should().Be(0);
 
-        partition.ContainedDynamicObjects = new SwiftSparseSet();
+        partition.ContainedDynamicObjects = new SwiftHashSet<int>();
         partition.Distribute(dynamicIds, staticIds);
         dynamicIds.Count.Should().Be(0);
         staticIds.Count.Should().Be(0);
@@ -677,7 +677,7 @@ public sealed class Physics2DPartitionBroadPhaseTests
         dynamicIds.Count.Should().Be(0);
         staticIds.Count.Should().Be(0);
 
-        partition.ContainedAwakeDynamicObjects = new SwiftSparseSet();
+        partition.ContainedAwakeDynamicObjects = new SwiftHashSet<int>();
         partition.Distribute(dynamicIds, staticIds);
         dynamicIds.Count.Should().Be(0);
         staticIds.Count.Should().Be(0);

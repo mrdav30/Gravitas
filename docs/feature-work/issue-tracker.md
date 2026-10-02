@@ -2,7 +2,7 @@
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-089`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-090`.
 - Assign an ID when an issue enters this tracker, keep it through resolution,
   and never reuse an ID even if an entry is later removed. Check this file's Git
   history before advancing or repairing the counter.
@@ -35,8 +35,47 @@
 
 ### Ordered Queue
 
-No active correctness issues. Remaining measured performance costs are tracked
-in the benchmark backlog.
+### GRV-Issue-089 - Runtime mass changes leave inertia or awake membership stale
+
+- **Status:** Open. Separate correctness scope discovered during
+  `GRV-Benchmark-023`; the partition hardening does not resolve runtime mass
+  mutation ownership.
+- **Confirmed:** 2026-10-02 through registered pure 2D/3D bodies, using the
+  existing .NET 8 Release binaries built with `UseLocalLsfStack=true`. The
+  reflection probe ran under PowerShell's .NET 10.0.11 host, reused test fixture
+  initialization, and applied public body mutations and impulses. No production
+  fields were fabricated. This is direct executable evidence, not a completed
+  full-step regression matrix or mixed-mode validation.
+- **3D reproduction:** Initialize a radius-`0.5` sphere at `(4,4,4)` with
+  `Mass=1`, then assign `Mass=2`. `InverseInertiaTensor` remains unchanged. A
+  Y-axis angular impulse of `0.25` produces angular velocity
+  `2.4999999976716936`, versus `1.2500000002328306` for an otherwise equivalent
+  sphere initialized with `Mass=2`. Assigning `Mass=0` then makes
+  `CanTranslate=false`, but leaves `CanRotate=true` and the old inverse inertia.
+  Another `0.25` angular impulse increases angular velocity to
+  `4.999999995343387` despite the zero mass.
+- **2D reproduction:** Initialize a radius-`0.5` circle with `Mass=1`, then set
+  `Mass=0`. `CanTranslate` and `CanRotate` become false, but its existing
+  `PhysicsPartition2D` membership remains awake. Conversely, initialize a
+  dynamic circle with `Mass=0`, then set `Mass=1`: both mobility properties
+  become true while its existing membership remains absent from the awake set.
+  Neither sequence changes bounds or the dynamic partition role.
+- **Cause and impact:** 3D `SolidBody.Mass` is a public field with no inertia
+  refresh on mutation. The 2D setter refreshes mass properties but does not
+  synchronize partition awake state. Immediate angular response can therefore
+  use stale mass, and a newly movable 2D body can remain excluded from collision
+  distribution until another operation refreshes its awake membership.
+- **Follow-up:** Define and harden the post-initialization mass mutation
+  contract in the body owners. Verify positive/zero mass transitions, angular
+  mass scaling, awake membership, and 2D/3D/mixed parity while preserving
+  deterministic ordering and allocation gates.
+- **Evidence:** The ignored probe and output are
+  `artifacts/grv-benchmark-023/mass-mutation-probe.ps1` and
+  `artifacts/grv-benchmark-023/mass-mutation-probe.json`. Run the script against
+  the local-stack Release test output; it does not rebuild or leave failing
+  tests.
+
+Remaining measured performance costs are tracked in the benchmark backlog.
 
 ## Resolved Issues
 

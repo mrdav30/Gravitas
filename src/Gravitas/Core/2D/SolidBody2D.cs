@@ -105,6 +105,10 @@ public sealed partial class SolidBody2D : IRecordable
             _freezeAxes = value;
             ApplyFreezeConstraintsToMotion();
             RefreshPartitionMobility();
+            // Frozen axes do not change the dynamic role or coverage, but can
+            // change whether an existing membership participates in collisions.
+            if (Active)
+                Context.Collisions2D.RefreshPartitionAwakeState(Collider);
         }
     }
 

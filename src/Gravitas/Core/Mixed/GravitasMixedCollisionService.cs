@@ -7,6 +7,7 @@
 
 using Gravitas.CollisionHandling;
 using GridForge.Grids;
+using GridForge.Spatial;
 using SwiftCollections;
 using System;
 
@@ -29,11 +30,13 @@ internal sealed partial class GravitasMixedCollisionService
     private readonly GravitasWorldContext _context;
     private readonly SwiftBucket<PhysicsMixedPartition> _activePartitions = new(DefaultPartitionPoolCapacity);
     private readonly SwiftStack<PhysicsMixedPartition> _inactivePartitionPool = new(DefaultPartitionPoolCapacity);
-    private readonly SwiftStack<SwiftSparseSet> _inactivePartitionMembershipPool = new(DefaultPartitionPoolCapacity);
+    private readonly SwiftStack<SwiftHashSet<int>> _inactivePartitionMembershipPool = new(DefaultPartitionPoolCapacity);
     private readonly SwiftHashSet<ulong> _processedPairKeys = new();
     private readonly SwiftList<Voxel> _coveredVoxels = new();
+    private readonly SwiftHashSet<WorldVoxelIndex> _nextCoveredCoordinates = new();
     private readonly GridTraceScratch _traceScratch = new();
     private readonly SwiftList<PhysicsMixedPartition> _retainedPartitions = new();
+    private readonly SwiftList<PhysicsMixedPartition> _emptyRetainedPartitions = new();
     private readonly SwiftList<PhysicsMixedPartition> _distributionPartitions = new();
     private readonly SwiftList<int> _distributionDynamic3DIds = new();
     private readonly SwiftList<int> _distributionKinematic3DIds = new();
@@ -155,6 +158,7 @@ internal sealed partial class GravitasMixedCollisionService
         _inactivePartitionMembershipPool.Clear();
         _processedPairKeys.Clear();
         _coveredVoxels.FastClear();
+        _nextCoveredCoordinates.Clear();
         _traceScratch.Clear();
         _distributionPartitions.FastClear();
         _distributionDynamic3DIds.FastClear();

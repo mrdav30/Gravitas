@@ -100,25 +100,25 @@ published GitHub Wiki.
 
 ## Repository Map
 
-| Path                                                               | Purpose                                                                                                            | Notes                                                                                                                                  |
-| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
-| [`src/Gravitas`](src/Gravitas)                                     | Main library project                                                                                               | Multi-targets `netstandard2.1` and `net8.0`.                                                                                           |
-| [`src/Gravitas/Core`](src/Gravitas/Core)                           | Shared host agent interface plus dimensional runtime folders                                                       | Start here for body/registration architecture changes.                                                                                 |
-| [`src/Gravitas/Core/3D`](src/Gravitas/Core/3D)                     | 3D body, physics, collision, grounding, and inertia ownership                                                      | Keep 3D-only behavior out of pure 2D services.                                                                                         |
-| [`src/Gravitas/Core/2D`](src/Gravitas/Core/2D)                     | Pure 2D body, physics, collision, and planar CCD ownership                                                         | Keep 2D semantics first-class rather than accidental 3D projection.                                                                    |
-| [`src/Gravitas/Core/Mixed`](src/Gravitas/Core/Mixed)               | Dedicated mixed 2D/3D broad-phase, pair, and response lifecycle                                                    | Mixed mode is separate from `Both` and should stay explicit.                                                                           |
-| [`src/Gravitas/Runtime`](src/Gravitas/Runtime)                     | Explicit world context, deterministic clock, and lifecycle hooks                                                   | Start here for host integration changes.                                                                                               |
-| [`src/Gravitas/Colliders`](src/Gravitas/Colliders)                 | 3D and 2D collider bases, primitive colliders, shape definitions, compound collider data, and physics mesh helpers | Keep authored shape data separate from runtime collider state.                                                                         |
-| [`src/Gravitas/CollisionHandling`](src/Gravitas/CollisionHandling) | Collision detection, response, pairs, contact data                                                                 | Determinism and ordering are high risk here.                                                                                           |
-| [`src/Gravitas/Queries`](src/Gravitas/Queries)                     | 2D/3D raycast, swept-sphere, and overlap query support                                                             | Keep result ordering stable.                                                                                                           |
-| [`src/Gravitas/Diagnostics`](src/Gravitas/Diagnostics)             | Context-owned diagnostic events and engine-agnostic debug draw commands                                            | Keep disabled paths allocation-free and renderer-neutral.                                                                              |
-| [`src/Gravitas/Partitions`](src/Gravitas/Partitions)               | GridForge-backed physics partitions                                                                                | Tied to voxel ownership and pooling.                                                                                                   |
-| [`src/Gravitas/Settings`](src/Gravitas/Settings)                   | Physics settings and save helpers                                                                                  | Includes frame rate and layer collision matrix behavior.                                                                               |
-| [`src/Gravitas/Support`](src/Gravitas/Support)                     | Layers, lifecycle hooks, coroutine scaffolding, transient state helpers                                            | Keep engine-specific assumptions out.                                                                                                  |
-| [`tests/Gravitas.Tests`](tests/Gravitas.Tests)                     | xUnit v3 test project                                                                                              | Covers runtime, settings, collision, partitions, queries, serialization, CCD, and authored shape behavior.                             |
-| [`tests/Gravitas.Benchmarks`](tests/Gravitas.Benchmarks)           | BenchmarkDotNet project                                                                                            | Covers context lifecycle, registration/partitioning, simulation, queries, diagnostics, mixed broad phase, 2D, meshes, and CCD scaling. |
-| [`docs/api`](docs/api)                                             | DocFX configuration, branded landing content, namespace overrides, and theme                                        | Generated output under `docs/api/obj` is ignored. Build with warnings as errors and preserve the logo, repository action, and local-link checks. |
-| [`docs/wiki`](docs/wiki)                                           | User guides plus developer-facing architecture and usage notes                                                      | Keep `GETTING_STARTED.md` approachable and align deeper pages with runtime, host integration, collision, query, serialization/replay, and diagnostics changes. |
+| Path                                                               | Purpose                                                                                                            | Notes                                                                                                                                                          |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`src/Gravitas`](src/Gravitas)                                     | Main library project                                                                                               | Multi-targets `netstandard2.1` and `net8.0`.                                                                                                                   |
+| [`src/Gravitas/Core`](src/Gravitas/Core)                           | Shared host agent interface plus dimensional runtime folders                                                       | Start here for body/registration architecture changes.                                                                                                         |
+| [`src/Gravitas/Core/3D`](src/Gravitas/Core/3D)                     | 3D body, physics, collision, grounding, and inertia ownership                                                      | Keep 3D-only behavior out of pure 2D services.                                                                                                                 |
+| [`src/Gravitas/Core/2D`](src/Gravitas/Core/2D)                     | Pure 2D body, physics, collision, and planar CCD ownership                                                         | Keep 2D semantics first-class rather than accidental 3D projection.                                                                                            |
+| [`src/Gravitas/Core/Mixed`](src/Gravitas/Core/Mixed)               | Dedicated mixed 2D/3D broad-phase, pair, and response lifecycle                                                    | Mixed mode is separate from `Both` and should stay explicit.                                                                                                   |
+| [`src/Gravitas/Runtime`](src/Gravitas/Runtime)                     | Explicit world context, deterministic clock, and lifecycle hooks                                                   | Start here for host integration changes.                                                                                                                       |
+| [`src/Gravitas/Colliders`](src/Gravitas/Colliders)                 | 3D and 2D collider bases, primitive colliders, shape definitions, compound collider data, and physics mesh helpers | Keep authored shape data separate from runtime collider state.                                                                                                 |
+| [`src/Gravitas/CollisionHandling`](src/Gravitas/CollisionHandling) | Collision detection, response, pairs, contact data                                                                 | Determinism and ordering are high risk here.                                                                                                                   |
+| [`src/Gravitas/Queries`](src/Gravitas/Queries)                     | 2D/3D raycast, swept-sphere, and overlap query support                                                             | Keep result ordering stable.                                                                                                                                   |
+| [`src/Gravitas/Diagnostics`](src/Gravitas/Diagnostics)             | Context-owned diagnostic events and engine-agnostic debug draw commands                                            | Keep disabled paths allocation-free and renderer-neutral.                                                                                                      |
+| [`src/Gravitas/Partitions`](src/Gravitas/Partitions)               | GridForge-backed physics partitions                                                                                | Tied to voxel ownership and pooling.                                                                                                                           |
+| [`src/Gravitas/Settings`](src/Gravitas/Settings)                   | Physics settings and save helpers                                                                                  | Includes frame rate and layer collision matrix behavior.                                                                                                       |
+| [`src/Gravitas/Support`](src/Gravitas/Support)                     | Layers, lifecycle hooks, coroutine scaffolding, transient state helpers                                            | Keep engine-specific assumptions out.                                                                                                                          |
+| [`tests/Gravitas.Tests`](tests/Gravitas.Tests)                     | xUnit v3 test project                                                                                              | Covers runtime, settings, collision, partitions, queries, serialization, CCD, and authored shape behavior.                                                     |
+| [`tests/Gravitas.Benchmarks`](tests/Gravitas.Benchmarks)           | BenchmarkDotNet project                                                                                            | Covers context lifecycle, registration/partitioning, simulation, queries, diagnostics, mixed broad phase, 2D, meshes, and CCD scaling.                         |
+| [`docs/api`](docs/api)                                             | DocFX configuration, branded landing content, namespace overrides, and theme                                       | Generated output under `docs/api/obj` is ignored. Build with warnings as errors and preserve the logo, repository action, and local-link checks.               |
+| [`docs/wiki`](docs/wiki)                                           | User guides plus developer-facing architecture and usage notes                                                     | Keep `GETTING_STARTED.md` approachable and align deeper pages with runtime, host integration, collision, query, serialization/replay, and diagnostics changes. |
 
 Ignore generated output when reviewing structure:
 
@@ -197,6 +197,14 @@ The runtime uses explicit world-context ownership:
 Treat this architecture as intentionally evolvable. Context ownership, collider
 IDs, partition reuse, collision-pair ownership, and simulation phase ordering
 are high-risk areas.
+
+Partition membership collections are internal and scale with local membership,
+not the highest context-wide collider ID. Use public role counts and sorted
+caller-owned copy APIs for inspection. Preserve service-owned delta refresh,
+full `WorldVoxelIndex` identity, awake synchronization and dense empty-payload
+eligibility. Reserve eligibility capacity during registration; simulation-time
+emptying must remain allocation-free. Payload reuse order is deterministic
+dense-list order, not chronological emptying order.
 
 ## Lockstep Host Lifecycle
 
@@ -415,17 +423,18 @@ benchmarks explicitly select source Chronicler and its Lean shim. Their local
 0.4.0 identities coordinate the existing graph; they are not release versions.
 Tests also select the source `FixedMathSharp.FluentAssertions` helper in this
 mode. Set `$env:UseLocalLsfStack = 'true'` to carry local selection into child
-builds, including benchmark-generated projects.
-Package-based restore remains the release-validation path.
+builds, including benchmark-generated projects. Package-based restore remains
+the release-validation path.
 
 ## Determinism Rules
 
 The context composes Chronicler's `ChronicleClock`: absolute frame/phase stamps
 are `long`, absolute elapsed time is `ChronicleTimestamp`, and integration steps
 remain `Fixed64`. Subtract timestamps before explicitly narrowing a bounded
-duration. Do not reintroduce a narrow absolute clock or reciprocal-based duration
-counting. Preserve preflight exhaustion checks and reset-lifetime invalidation
-for retained waits. See the clock contract in `docs/wiki/RUNTIME_ARCHITECTURE.md`.
+duration. Do not reintroduce a narrow absolute clock or reciprocal-based
+duration counting. Preserve preflight exhaustion checks and reset-lifetime
+invalidation for retained waits. See the clock contract in
+`docs/wiki/RUNTIME_ARCHITECTURE.md`.
 
 Any change that affects simulation order, iteration order, rounding, collision
 pair identity, partition traversal, contact generation, integration, or update

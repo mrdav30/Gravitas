@@ -44,9 +44,6 @@ internal sealed partial class GravitasMixedCollisionService
             return false;
         }
 
-        if (collider.IsMixedPartitioned)
-            ClearPartitioned3DCollider(collider, force: true);
-
         return Partition3DCollider(collider, coverageMin, coverageMax);
     }
 
@@ -81,9 +78,6 @@ internal sealed partial class GravitasMixedCollisionService
             return false;
         }
 
-        if (collider.IsMixedPartitioned)
-            ClearPartitioned2DCollider(collider, force: true);
-
         return Partition2DCollider(collider, coverageMin, coverageMax);
     }
 
@@ -99,11 +93,27 @@ internal sealed partial class GravitasMixedCollisionService
             return false;
 
         SwiftList<WorldVoxelIndex> coordinates = collider.MixedPartitionCoordinates!;
-        GridWorld world = _context.World;
         MixedPartitionMobilityKind partitionKind = GetStoredMobilityKind(collider.MixedPartitionKind);
+        Remove3DPartitionMemberships(collider, coordinates, partitionKind, preserveCovered: false);
+
+        collider.MarkMixedUnpartitioned();
+        collider.ClearMixedPartitionCoordinates();
+        return true;
+    }
+
+    private void Remove3DPartitionMemberships(
+        LSCollider collider,
+        SwiftList<WorldVoxelIndex> coordinates,
+        MixedPartitionMobilityKind partitionKind,
+        bool preserveCovered)
+    {
+        GridWorld world = _context.World;
         for (int i = 0; i < coordinates.Count; i++)
         {
             WorldVoxelIndex coordinate = coordinates[i];
+            if (preserveCovered && _nextCoveredCoordinates.Contains(coordinate))
+                continue;
+
             if (!world.TryGetVoxel(coordinate, out Voxel? voxel)
                 || !voxel!.TryGetPartition(out PhysicsMixedPartition? partition))
             {
@@ -112,10 +122,6 @@ internal sealed partial class GravitasMixedCollisionService
 
             Remove3DObject(partition!, collider.Id, partitionKind);
         }
-
-        collider.MarkMixedUnpartitioned();
-        collider.ClearMixedPartitionCoordinates();
-        return true;
     }
 
     internal bool ClearPartitioned2DCollider(LSCollider2D collider, bool force = false)
@@ -130,11 +136,27 @@ internal sealed partial class GravitasMixedCollisionService
             return false;
 
         SwiftList<WorldVoxelIndex> coordinates = collider.MixedPartitionCoordinates!;
-        GridWorld world = _context.World;
         MixedPartitionMobilityKind partitionKind = GetStoredMobilityKind(collider.MixedPartitionKind);
+        Remove2DPartitionMemberships(collider, coordinates, partitionKind, preserveCovered: false);
+
+        collider.MarkMixedUnpartitioned();
+        collider.ClearMixedPartitionCoordinates();
+        return true;
+    }
+
+    private void Remove2DPartitionMemberships(
+        LSCollider2D collider,
+        SwiftList<WorldVoxelIndex> coordinates,
+        MixedPartitionMobilityKind partitionKind,
+        bool preserveCovered)
+    {
+        GridWorld world = _context.World;
         for (int i = 0; i < coordinates.Count; i++)
         {
             WorldVoxelIndex coordinate = coordinates[i];
+            if (preserveCovered && _nextCoveredCoordinates.Contains(coordinate))
+                continue;
+
             if (!world.TryGetVoxel(coordinate, out Voxel? voxel)
                 || !voxel!.TryGetPartition(out PhysicsMixedPartition? partition))
             {
@@ -143,10 +165,6 @@ internal sealed partial class GravitasMixedCollisionService
 
             Remove2DObject(partition!, collider.Id, partitionKind);
         }
-
-        collider.MarkMixedUnpartitioned();
-        collider.ClearMixedPartitionCoordinates();
-        return true;
     }
 
     internal void Refresh3DPartitionAwakeState(LSCollider collider)
@@ -341,19 +359,19 @@ internal sealed partial class GravitasMixedCollisionService
         _inactivePartitionPool.Push(partition);
     }
 
-    internal SwiftSparseSet RentPartitionMembership()
+    internal SwiftHashSet<int> RentPartitionMembership()
     {
         return _inactivePartitionMembershipPool.Count > 0
             ? _inactivePartitionMembershipPool.Pop()
-            : new SwiftSparseSet();
+            : new SwiftHashSet<int>();
     }
 
-    internal void ReleasePartitionMembership(ref SwiftSparseSet? membership)
+    internal void ReleasePartitionMembership(ref SwiftHashSet<int>? membership)
     {
         if (membership == null)
             return;
 
-        SwiftSparseSet released = membership;
+        SwiftHashSet<int> released = membership;
         membership = null;
         released.Clear();
         _inactivePartitionMembershipPool.Push(released);
@@ -420,11 +438,12 @@ internal sealed partial class GravitasMixedCollisionService
     {
         MixedPartitionMobilityKind kind = Get3DMobilityKind(collider);
         SwiftList<WorldVoxelIndex> coordinates = collider.GetOrCreateMixedPartitionCoordinates();
-        coordinates.FastClear();
-
         ScanCovered3DVoxels(collider, coverageMin, coverageMax, coordinates, kind);
         if (coordinates.Count == 0)
+        {
+            collider.MarkMixedUnpartitioned();
             return false;
+        }
 
         collider.MarkMixedPartitioned(coverageMin, coverageMax, (int)kind);
         return true;
@@ -434,11 +453,12 @@ internal sealed partial class GravitasMixedCollisionService
     {
         MixedPartitionMobilityKind kind = Get2DMobilityKind(collider);
         SwiftList<WorldVoxelIndex> coordinates = collider.GetOrCreateMixedPartitionCoordinates();
-        coordinates.FastClear();
-
         ScanCovered2DMixedVoxels(collider, coverageMin, coverageMax, coordinates, kind);
         if (coordinates.Count == 0)
+        {
+            collider.MarkMixedUnpartitioned();
             return false;
+        }
 
         collider.MarkMixedPartitioned(coverageMin, coverageMax, (int)kind);
         return true;
@@ -461,8 +481,21 @@ internal sealed partial class GravitasMixedCollisionService
             Fixed64.Half);
 
         var traversal = new GridTraversalState(world, GridTraversalPaddingMode.MaxCellEdge);
+        _nextCoveredCoordinates.Clear();
         for (int i = 0; i < _coveredVoxels.Count; i++)
-            TryPartition3DVoxel(collider, coordinates, _coveredVoxels[i], ref traversal, kind);
+        {
+            Voxel voxel = _coveredVoxels[i];
+            if (collider.IsPositionInBounds(traversal.GetCellEdge(voxel), voxel.WorldPosition))
+                _nextCoveredCoordinates.Add(voxel.WorldIndex);
+        }
+
+        // Remove departures in the previous coordinate order, then publish the
+        // new tracer order. Hash storage never determines simulation order.
+        MixedPartitionMobilityKind previousKind = GetStoredMobilityKind(collider.MixedPartitionKind);
+        Remove3DPartitionMemberships(collider, coordinates, previousKind, previousKind == kind);
+        coordinates.FastClear();
+        for (int i = 0; i < _coveredVoxels.Count; i++)
+            TryPartition3DVoxel(collider, coordinates, _coveredVoxels[i], kind);
     }
 
     private void ScanCovered2DMixedVoxels(
@@ -482,8 +515,19 @@ internal sealed partial class GravitasMixedCollisionService
             Fixed64.Half);
 
         var traversal = new GridTraversalState(world, GridTraversalPaddingMode.MaxCellEdge);
+        _nextCoveredCoordinates.Clear();
         for (int i = 0; i < _coveredVoxels.Count; i++)
-            TryPartition2DMixedVoxel(collider, coordinates, _coveredVoxels[i], ref traversal, kind);
+        {
+            Voxel voxel = _coveredVoxels[i];
+            if (collider.IsPositionInMixedBounds(traversal.GetCellEdge(voxel), voxel.WorldPosition))
+                _nextCoveredCoordinates.Add(voxel.WorldIndex);
+        }
+
+        MixedPartitionMobilityKind previousKind = GetStoredMobilityKind(collider.MixedPartitionKind);
+        Remove2DPartitionMemberships(collider, coordinates, previousKind, previousKind == kind);
+        coordinates.FastClear();
+        for (int i = 0; i < _coveredVoxels.Count; i++)
+            TryPartition2DMixedVoxel(collider, coordinates, _coveredVoxels[i], kind);
     }
 
     private void CollectCoveredMixedQueryPartitions(
@@ -538,32 +582,34 @@ internal sealed partial class GravitasMixedCollisionService
         LSCollider collider,
         SwiftList<WorldVoxelIndex> coordinates,
         Voxel voxel,
-        ref GridTraversalState traversal,
         MixedPartitionMobilityKind kind)
     {
-        Fixed64 cellEdge = traversal.GetCellEdge(voxel);
-        if (!collider.IsPositionInBounds(cellEdge, voxel.WorldPosition))
+        if (!_nextCoveredCoordinates.Contains(voxel.WorldIndex))
             return;
 
         PhysicsMixedPartition partition = GetOrCreatePartition(voxel);
         coordinates.Add(voxel.WorldIndex);
         Add3DObject(partition, collider.Id, kind);
+        // Duplicate additions leave membership unchanged, including its awake
+        // bit. Mixed refresh remains responsible for synchronizing that bit.
+        if (kind == MixedPartitionMobilityKind.Dynamic)
+            partition.SetDynamic3DObjectAwake(collider.Id, collider.Body!.IsAwakeForCollision);
     }
 
     private void TryPartition2DMixedVoxel(
         LSCollider2D collider,
         SwiftList<WorldVoxelIndex> coordinates,
         Voxel voxel,
-        ref GridTraversalState traversal,
         MixedPartitionMobilityKind kind)
     {
-        Fixed64 cellEdge = traversal.GetCellEdge(voxel);
-        if (!collider.IsPositionInMixedBounds(cellEdge, voxel.WorldPosition))
+        if (!_nextCoveredCoordinates.Contains(voxel.WorldIndex))
             return;
 
         PhysicsMixedPartition partition = GetOrCreatePartition(voxel);
         coordinates.Add(voxel.WorldIndex);
         Add2DObject(partition, collider.Id, kind);
+        if (kind == MixedPartitionMobilityKind.Dynamic)
+            partition.SetDynamic2DObjectAwake(collider.Id, collider.Body!.IsAwakeForCollision);
     }
 
     private PhysicsMixedPartition GetOrCreatePartition(Voxel voxel)
@@ -721,6 +767,7 @@ internal sealed partial class GravitasMixedCollisionService
 
     private void DetachRetainedPartitions() => RetainedPartitionLifecycle.DetachAll(
             _retainedPartitions,
+            _emptyRetainedPartitions,
             _context.World,
             this,
             _releaseRetainedPartition,
@@ -729,15 +776,20 @@ internal sealed partial class GravitasMixedCollisionService
 
     private void TrackRetainedPartition(PhysicsMixedPartition partition) => RetainedPartitionLifecycle.Track(
             _retainedPartitions,
+            _emptyRetainedPartitions,
             this,
             partition,
             nameof(PhysicsMixedPartition));
 
     private void UntrackRetainedPartition(PhysicsMixedPartition partition) => RetainedPartitionLifecycle.Untrack(
             _retainedPartitions,
+            _emptyRetainedPartitions,
             this,
             partition,
             ref _retainedPartitionRetirementCursor);
+
+    internal void RefreshRetainedPartitionEligibility(PhysicsMixedPartition partition) => RetainedPartitionLifecycle.RefreshEmptyEligibility(
+        _emptyRetainedPartitions, this, partition);
 
     private void RetireExpiredRetainedPartitions() => RetainedPartitionLifecycle.RetireExpired(
             _retainedPartitions,
@@ -750,11 +802,10 @@ internal sealed partial class GravitasMixedCollisionService
             ref _retainedPartitionRetirementCursor);
 
     private bool TryRetireEmptyRetainedPartitionForReuse() => RetainedPartitionLifecycle.TryRetireEmptyForReuse(
-            _retainedPartitions,
+            _emptyRetainedPartitions,
             _inactivePartitionPool,
             _context.World,
             this,
-            _releaseRetainedPartition,
-            ref _retainedPartitionRetirementCursor);
+            _releaseRetainedPartition);
 
 }

@@ -38,18 +38,18 @@ public class PhysicsPartition : IVoxelPartition, IRetainedPhysicsPartition<Gravi
     /// <summary>
     /// Stores context-local dynamic body IDs.
     /// </summary>
-    public SwiftSparseSet? ContainedDynamicObjects;
+    internal SwiftHashSet<int>? ContainedDynamicObjects;
 
     /// <summary>
     /// Stores the subset of dynamic collider IDs whose bodies can currently drive collision work.
     /// </summary>
-    public SwiftSparseSet? ContainedAwakeDynamicObjects;
+    internal SwiftHashSet<int>? ContainedAwakeDynamicObjects;
 
     /// <summary>Stores context-local kinematic collider IDs.</summary>
-    public SwiftSparseSet? ContainedKinematicObjects;
+    internal SwiftHashSet<int>? ContainedKinematicObjects;
 
     /// <summary>Stores context-local static collider IDs.</summary>
-    public SwiftSparseSet? ContainedStaticObjects;
+    internal SwiftHashSet<int>? ContainedStaticObjects;
 
     /// <summary>Gets the active-partition slot, or <c>-1</c> when inactive.</summary>
     public int ActivationId { get; private set; }
@@ -57,14 +57,22 @@ public class PhysicsPartition : IVoxelPartition, IRetainedPhysicsPartition<Gravi
     /// <summary>Gets whether this partition has an active-partition slot.</summary>
     public bool IsAllocated => ActivationId != -1;
 
-    internal bool IsEmpty =>
-        (ContainedDynamicObjects?.Count ?? 0) == 0
-        && (ContainedKinematicObjects?.Count ?? 0) == 0
-        && (ContainedStaticObjects?.Count ?? 0) == 0;
+    /// <summary>Gets the number of dynamic collider IDs, including sleeping bodies.</summary>
+    public int DynamicObjectCount => ContainedDynamicObjects?.Count ?? 0;
+
+    /// <summary>Gets the number of kinematic collider IDs.</summary>
+    public int KinematicObjectCount => ContainedKinematicObjects?.Count ?? 0;
+
+    /// <summary>Gets the number of static collider IDs.</summary>
+    public int StaticObjectCount => ContainedStaticObjects?.Count ?? 0;
+
+    internal bool IsEmpty => DynamicObjectCount == 0 && KinematicObjectCount == 0 && StaticObjectCount == 0;
 
     internal long EmptySinceFrame => _emptySinceFrame;
 
     internal int RetainedIndex => _retainedIndex;
+
+    internal int EmptyIndex { get; set; } = -1;
 
     /// <summary>
     /// Gets the number of awake dynamic IDs currently in this partition.
@@ -107,8 +115,10 @@ public class PhysicsPartition : IVoxelPartition, IRetainedPhysicsPartition<Gravi
         if (ContainedDynamicObjects == null || dynamicCount == 0 || ContainedAwakeDynamicObjects == null || awakeDynamicCount == 0)
             return;
 
-        ContainedDynamicObjects.CopySortedKeysTo(dynamicIds);
-        CopySortedStaticStyleIds(staticIds);
+        dynamicIds.FastClear();
+        CopyIds(ContainedDynamicObjects, dynamicIds);
+        dynamicIds.SortInPlace();
+        CopyStaticStyleColliderIds(staticIds);
 
         // Sleeping bodies stay query-visible in dynamic membership, while awake membership gates partition work.
         // Once an active partition is selected, all local dynamic links are emitted so the discrete
@@ -127,16 +137,10 @@ public class PhysicsPartition : IVoxelPartition, IRetainedPhysicsPartition<Gravi
         }
     }
 
-    private void CopySortedStaticStyleIds(SwiftList<int> destination)
+    /// <summary>Clears and fills caller-owned storage with all collider IDs in ascending order.</summary>
+    public void CopyAllColliderIds(SwiftList<int> destination)
     {
-        destination.FastClear();
-        CopyIds(ContainedKinematicObjects, destination);
-        CopyIds(ContainedStaticObjects, destination);
-        destination.SortInPlace();
-    }
-
-    internal void CopyAllColliderIds(SwiftList<int> destination)
-    {
+        SwiftThrowHelper.ThrowIfNull(destination, nameof(destination));
         destination.FastClear();
         CopyIds(ContainedDynamicObjects, destination);
         CopyIds(ContainedKinematicObjects, destination);
@@ -152,13 +156,13 @@ public class PhysicsPartition : IVoxelPartition, IRetainedPhysicsPartition<Gravi
         destination.SortInPlace();
     }
 
-    private static void CopyIds(SwiftSparseSet? source, SwiftList<int> destination)
+    private static void CopyIds(SwiftHashSet<int>? source, SwiftList<int> destination)
     {
         if (source == null)
             return;
 
-        for (int i = 0; i < source.Count; i++)
-            destination.Add(source.DenseKeys[i]);
+        foreach (int id in source)
+            destination.Add(id);
     }
 
     private void ProcessPair(int id1, int id2)
@@ -177,6 +181,7 @@ public class PhysicsPartition : IVoxelPartition, IRetainedPhysicsPartition<Gravi
     /// <summary>Adds a dynamic collider ID to this partition.</summary>
     public void AddDynamicObject(int item)
     {
+        SwiftThrowHelper.ThrowIfNegative(item, nameof(item));
         ContainedDynamicObjects ??= new();
         if (!ContainedDynamicObjects.Add(item))
             return;
@@ -191,6 +196,7 @@ public class PhysicsPartition : IVoxelPartition, IRetainedPhysicsPartition<Gravi
     /// <summary>Adds a static collider ID to this partition.</summary>
     public void AddStaticObject(int item)
     {
+        SwiftThrowHelper.ThrowIfNegative(item, nameof(item));
         ContainedStaticObjects ??= new();
         if (ContainedStaticObjects.Add(item))
             MarkOccupied();
@@ -199,6 +205,7 @@ public class PhysicsPartition : IVoxelPartition, IRetainedPhysicsPartition<Gravi
     /// <summary>Adds a kinematic collider ID to this partition.</summary>
     public void AddKinematicObject(int item)
     {
+        SwiftThrowHelper.ThrowIfNegative(item, nameof(item));
         ContainedKinematicObjects ??= new();
         if (ContainedKinematicObjects.Add(item))
             MarkOccupied();
@@ -334,10 +341,15 @@ public class PhysicsPartition : IVoxelPartition, IRetainedPhysicsPartition<Gravi
         IsPartitioned = false;
         _emptySinceFrame = -1;
         _retainedIndex = -1;
+        EmptyIndex = -1;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private void MarkOccupied() => _emptySinceFrame = -1;
+    private void MarkOccupied()
+    {
+        _emptySinceFrame = -1;
+        _owner?.RefreshRetainedPartitionEligibility(this);
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void MarkEmptyIfUnoccupied()
@@ -347,7 +359,11 @@ public class PhysicsPartition : IVoxelPartition, IRetainedPhysicsPartition<Gravi
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private void MarkEmpty(long frame) => _emptySinceFrame = frame;
+    private void MarkEmpty(long frame)
+    {
+        _emptySinceFrame = frame;
+        _owner?.RefreshRetainedPartitionEligibility(this);
+    }
 
     /// <summary>
     /// Sets the parent index for the current voxel in the world.
@@ -356,6 +372,12 @@ public class PhysicsPartition : IVoxelPartition, IRetainedPhysicsPartition<Gravi
     public void SetParentIndex(WorldVoxelIndex parentIndex) => WorldIndex = parentIndex;
 
     int IRetainedPhysicsPartition<GravitasCollisionService>.RetainedIndex => RetainedIndex;
+
+    int IRetainedPhysicsPartition<GravitasCollisionService>.EmptyIndex
+    {
+        get => EmptyIndex;
+        set => EmptyIndex = value;
+    }
 
     bool IRetainedPhysicsPartition<GravitasCollisionService>.IsEmpty => IsEmpty;
 

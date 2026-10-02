@@ -826,7 +826,7 @@ public sealed class MixedBroadPhaseTests
 
         source.AddStatic3DObject(7);
         source.AddStatic3DObject(9);
-        SwiftSparseSet releasedMembership = source.ContainedStatic3DObjects!;
+        SwiftHashSet<int> releasedMembership = source.ContainedStatic3DObjects!;
         source.RemoveStatic3DObject(7);
 
         source.ContainedStatic3DObjects.Should().BeSameAs(releasedMembership);
@@ -858,7 +858,7 @@ public sealed class MixedBroadPhaseTests
         using GravitasWorldContext context = CreateMixedContext();
         PhysicsMixedPartition original = context.MixedCollisions.RentPartition();
         original.AddStatic3DObject(7);
-        SwiftSparseSet originalMembership = original.ContainedStatic3DObjects!;
+        SwiftHashSet<int> originalMembership = original.ContainedStatic3DObjects!;
 
         context.MixedCollisions.ReleasePartition(original);
         PhysicsMixedPartition replacement = context.MixedCollisions.RentPartition();
@@ -1012,5 +1012,5 @@ public sealed class MixedBroadPhaseTests
         return partition!;
     }
 
-    private static bool ContainsId(SwiftSparseSet? set, int id) => set?.Contains(id) == true;
+    private static bool ContainsId(SwiftHashSet<int>? set, int id) => set?.Contains(id) == true;
 }

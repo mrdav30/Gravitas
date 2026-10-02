@@ -640,7 +640,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
     {
         MarkBroadPhaseChanged();
 
-        if (!Context.Collisions.ClearPartitionedObject(this))
+        if (!Context.Collisions.IsPartitionRefreshRequired(this))
             return;
 
         SwiftList<WorldVoxelIndex> partitionCoordinates = _partitionState.Coordinates!;
