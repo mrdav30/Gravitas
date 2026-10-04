@@ -33,10 +33,15 @@ instead of burying it in notes.
     remains open as GRV-Benchmark-023. Its registration and refresh defects are
     committed as `f23d836`. Shared radial endpoint evaluation and omitted unused
     host yaw are committed as FixedMathSharp `6789c09` and Gravitas `ee613db`.
-    Prepared 2D segments and nearest-accepted automatic grounding are now
-    measured and ready for review, retaining exact witnesses and 100% coverage.
+    Prepared 2D segments and nearest-accepted automatic grounding are committed
+    as Gravitas `6c0c2f0`, retaining exact witnesses and the prior coverage gates.
     Corrected-pose and paired selection controls preserve supported and
     unsupported cases; isolated selection and full-step intervals overlap.
+    The next refinement retains FixedMathSharp's centered-transform fast path
+    and GridForge's locked typed-lookup improvement for review. Streamed 3D
+    grounding was rejected after repeated sparse ray probes regressed by 8-10%;
+    public characterization tests and the benchmark fixture remain for future
+    investigation. Matched measurements and coverage gates track each owner.
     Remaining warmed full-step cost is still evidence-gated and no host frame
     budget has been accepted.
     GRV-Issue-089 separately tracks runtime mass mutation leaving inertia or

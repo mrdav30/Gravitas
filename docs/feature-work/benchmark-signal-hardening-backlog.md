@@ -66,7 +66,10 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 **Discovered:** 2026-10-02 during GRV-Benchmark-022 isolation.  
 **Status:** Partition phase committed as `f23d836`; shared radial-math and planar
 capture refinements committed as FixedMathSharp `6789c09` and Gravitas `ee613db`.
-Prepared 2D query and grounding-selection refinement is ready for review.
+Prepared 2D query and grounding-selection refinement committed as `6c0c2f0`.
+The centered-transform and locked lookup refinements are retained for review.
+Streamed 3D grounding was rejected after repeated sparse-ray regressions;
+its public characterization tests and benchmark fixture are retained.
 Remaining warmed full-step scaling stays open, separate from exact contact-query cost.  
 **Owner:** Gravitas retained partition rental/distribution and collider refresh,
 2D query preparation and ground-hit selection, plus GridForge voxel partition
@@ -453,13 +456,166 @@ Independent source, evidence and ponytail review found no remaining actionable i
 Gravitas DocFX builds with warnings as errors and passes API resource, branding,
 repository-action and local-link checks; log: `refinement3-Gravitas-docfx.log`.
 
-**Next isolation step:** Keep these corrected-pose and paired controls, and
-establish the host's warmed full-step budget. Refresh phase/CPU sampling before
-another runtime change. 3D automatic grounding still uses all-hit sorting;
-any counterpart experiment must preserve its distinct acceptance policy and
-raw all-hit diagnostic count/nearest witness. No voxel cache or synchronization
-change is justified by the current evidence. The remaining 1024-pair full-step
-cost has not been accepted.
+**Further refinement (2026-10-04):** A fresh actual-iteration-only CPU profile
+of the committed `6c0c2f0` workload still attributes 15.666% exclusive CPU to
+GridForge typed voxel partition lookup. Callers divide between 2D positional
+correction/repartition (43.02%, including fixture reset), planar sweeps (29.64%)
+and collider distribution (27.33%). Automatic 2D grounding contributes 27.072%
+inclusive; complete shape capture contributes 14.712%, including 7.517% in the
+forward-scaled planar transform. These shares overlap and are not independent
+frame costs. `refinement4-full-profile-actual-only.json` retains the attribution.
+That profiled child reports 24,624 raw allocated bytes over 12 operations;
+its cause was not attributed. Preserve this exception separately from the
+successful repeated allocation gates rather than assigning it to instrumentation.
+
+Centered 2D collider snapshots repeatedly transform zero local coordinates.
+FixedMathSharp's existing wide transform now returns the exact origin when both
+local point and displacement are zero, before constructing rotated wide
+numerators. This is policy-neutral arithmetic, applies through both public
+forward-scaled overloads and preserves zero/mirrored/extreme scales and full
+origin/yaw ranges. Nonzero input keeps the existing fused arithmetic and final
+rounding. Host scale admission and snapshot ownership remain unchanged.
+
+With two launches, five warmups and fifteen 500-ms iterations, the centered
+256-operation microbenchmark changes from 1196.942 +/- 12.674 to
+16.280 +/- 0.229 ns per transform; the nonzero control is
+1536.411 +/- 15.456 / 1500.423 +/- 18.673 ns. Both report 0 B/op.
+Two matched physics captures isolate only this math change:
+
+| Capture | Corrected-pose automatic probes, ms | Full 1024-pair diagonal step, ms |
+| --- | --- | --- |
+| Initial before | 9.478350 +/- 0.121474 | 36.543975 +/- 0.468481 |
+| Initial after | 9.963933 +/- 0.202656 | 34.223361 +/- 0.549934 |
+| Repeat before | 9.926890 +/- 0.167635 | 39.031101 +/- 0.605361 |
+| Repeat after | 9.767688 +/- 0.210000 | 33.779813 +/- 0.583872 |
+
+All summaries report 0 B/op. One initial after grounding child reports
+24,624 raw allocated bytes over 53 operations despite the final-launch zero
+summary; both repeat captures have exact zero raw bytes/collections in every
+child. Preserve the initial exception rather than inferring allocation from
+the last-launch summary. Both full-step pairs improve, but the before values
+vary materially; do not collapse them into one precise speedup percentage.
+Automatic grounding does not perform this transform work. Its repeat intervals
+overlap, preserving the control after the initial shift. Logs and JSON are
+`refinement4-transform-{before,after}`, `refinement4-{before,math-after}` and
+`refinement4-math-repeat-{before,after}`.
+
+The GridForge experiment resolves the existing exact type key directly through
+the provider while holding the same voxel monitor. Typed materialization,
+including boxed value copies, stays inside the lock. `HasPartition` and default
+lookup reuse this owner. Reset callbacks can clear or pool a still-published
+payload, so an unlocked positive-hit shortcut would weaken the current contract.
+No cache or synchronization redesign is introduced. Initial first-slot lookup
+means change from 19.550/19.555 ns to 18.682/18.516 ns at one/256 voxels, but the
+generic provider control also shifts. Native inlining removes a generic call
+while growing the voxel machine-code body from 191 to 416 bytes. A fresh
+runtime-only toggle confirms retrieval at 256 voxels, 19.6266 +/- 0.2135 to
+18.6804 +/- 0.1832 ns; presence checks, 20.0508 +/- 0.2773 to
+18.5102 +/- 0.2138 ns; and default lookup, 19.4804 +/- 0.2300 to
+18.9223 +/- 0.2364 ns. The untouched type-key control remains
+2.0077 +/- 0.0230 / 2.0146 +/- 0.0224 ns. The full 1024-pair step remains
+34.0187 +/- 0.4391 / 33.9997 +/- 0.4845 ms and corrected-pose probes remain
+9.7303 +/- 0.1491 / 9.7157 +/- 0.1252 ms, with overlapping intervals.
+Retain the small lookup improvement; no measurable full-step or grounding gain
+is claimed. All 24 child records in these matched micro/consumer captures have
+zero raw allocated bytes and collections, alongside 0 B/op summaries.
+The controls use the same two-launch/five-warmup/fifteen-500-ms-iteration job
+and CLI `--affinity 3`. Evidence is `refinement4-grid-repeat-{before,after}`
+and `refinement4-grid-consumer-{before,after}`. GridForge tracks the coordinated experiment as
+`GF-Benchmark-013`. Its benchmark runner also propagates the source-stack build
+properties explicitly, preserving Release/Lean and CLI job settings after two
+reproduced generated-child build failures.
+
+**Rejected 3D grounding experiment:** Streaming accepted supports through the
+existing ray/sphere traversal removed the all-hit buffer and sort, while
+separately preserving raw diagnostic minima/counts. Characterization confirmed
+the existing support policy, compound-owner witnesses, mesh counters and
+callback order. However, common one-target ray probes remained slower after
+readonly-reference/inlining changes, separate private value-type reducers,
+disabled-diagnostic gating and collider-only eligibility checks. Public closest
+controls recovered, but sparse automatic grounding did not. The production
+grounding and query workers have been restored to `6c0c2f0`.
+
+Representative matched results use two launches, five warmups, fifteen 500-ms
+iterations and CLI `--affinity 3`. Errors are 99.9% confidence half-widths:
+
+| 64-probe workload | Existing implementation, microseconds | Rejected final candidate, microseconds |
+| --- | --- | --- |
+| Ray, one target, unsupported | 179.834 +/- 2.892 | 194.275 +/- 3.036 |
+| Ray, one target, supported | 259.449 +/- 3.627 | 283.795 +/- 5.292 |
+| Public closest ray control | 169.820 +/- 2.688 | 167.119 +/- 4.718 |
+| Ray, eight targets, unsupported | 759.658 +/- 12.927 | 597.001 +/- 9.941 |
+| Ray, eight targets, supported | 838.863 +/- 12.895 | 686.102 +/- 10.794 |
+
+The one-target unsupported/control baselines are the old-runtime control repeat;
+supported and dense baselines are the initial old-runtime capture. Dense ray
+grounding improves about 18-21%, but repeated sparse ray grounding regresses
+about 8-10% with disjoint intervals. Sphere results do not establish a consistent
+dense-case gain; public closest-sphere control intervals overlap. This is a poor
+default tradeoff. All 20 children in the rejected final candidate have zero raw
+allocated bytes/collections and successful exits. Evidence retains
+`refinement4-ground3d-before-boolean`, `refinement4-ground3d-control-repeat-before`,
+the superseded variants, and `refinement4-ground3d-guarded`. The ignored
+`refinement4-ground3d-rejected-runtime.patch` preserves the rejected runtime diff.
+
+The retained public-only `ground-probe-selection3-d` fixture checks 64 identical
+probe workloads across ray/sphere, one/eight targets and supported/unsupported
+cases. Near raw hits may be physically rejected while the far floor is accepted.
+Setup checks complete all-hit witnesses, raw diagnostics and work counters;
+public closest-query rows control traversal cost. Its 16 cases and 37 public
+regression cases characterize the unchanged implementation, including
+disabled-to-enabled diagnostic parity. A Boolean mode parameter fixes an initial
+generated-build enum-reference failure without changing runtime references;
+failed captures remain separate from valid results.
+
+**Final retained-source validation:** All builds and tests use
+`UseLocalLsfStack=true`, in Release and ReleaseLean, with no failed or skipped
+tests. Solution builds cover both library target frameworks with zero
+warnings/errors. Owning raw OpenCover counts are:
+
+| Owner | Tests, Release / Lean | Sequence points, Release / Lean | Branches, each | Methods, Release / Lean |
+| --- | --- | --- | --- | --- |
+| FixedMathSharp core/FluentAssertions | 4140 / 4119 | 52678 / 52771 | 12142 | 3935 / 3931 |
+| GridForge | 1171 / 1171 | 9333 / 9333 | 4171 | 1145 / 1145 |
+| Gravitas | 4467 / 4408 | 44492 / 44490 | 13284 | 4595 / 4594 |
+
+Every listed point, branch and method is covered. FixedMathSharp's Chronicler
+suite adds 49 passing tests per configuration and an independently filtered
+100% report. Rendered reports confirm 100% lines, branches and fully covered
+methods without changing exclusions: FixedMathSharp/FluentAssertions and
+GridForge match the counts above; Gravitas' report aggregation totals
+56222/56220 lines, 16290 branches and 5405/5404 methods, all covered. Preserve
+raw and rendered counts separately. Evidence is
+`refinement4-coverage-summary.json`, `refinement4-<owner>-<configuration>-*`
+and `refinement4-retained-Gravitas-<configuration>-*`. Candidate-era captures
+remain historical evidence, not validation of the restored runtime.
+
+All 30 lookup smoke cases, one Lean generated-runner Dry case, five existing
+3D all-hit query cases and all 16 retained grounding fixture cases complete
+with successful child exits and exact zero raw allocated bytes/GC collections.
+The Lean runner retains its configuration and all three source-stack child
+properties. `refinement4-benchmark-validation.json` audits populated statistics,
+summary allocation and every raw child record, retaining the documented initial
+math-capture exception. Independent source, evidence and ponytail review found
+no actionable issues. These local source-stack results precede release-package
+validation; release FixedMathSharp first.
+All three DocFX builds pass with warnings as errors, API resources, branding,
+repository actions and local links verified. Logs are
+`refinement4-<owner>-docfx.log`.
+
+A fresh actual-iteration-only profile after the retained upstream changes
+attributes 16.151% exclusive sampled CPU to typed voxel lookup and 12.626%
+exclusive / 20.006% inclusive to 2D collider distribution. Automatic 2D grounding
+is 31.764% inclusive. The centered-transform arithmetic frame is effectively
+removed. These overlapping attribution shares are not matched timing gains;
+the profile child has zero raw allocation/collections. Evidence is
+`refinement4-final-profile-actual-only.json` and its trace capture.
+
+**Next isolation step:** Profile the remaining lookup/distribution/grounding
+work under the corrected-pose and containing-workload controls. Revisit 3D
+streaming only after profiling explains the sparse-ray regression, rather than
+adding another speculative specialization. The remaining warmed 1024-pair
+full-step cost has not been accepted; GRV-Benchmark-023 stays open.
 
 ### GRV-Benchmark-021 — Complete Capsule/Stadium-Slab Curved Contact Cost
 

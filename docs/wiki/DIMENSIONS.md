@@ -119,6 +119,25 @@ deterministic warm-start caches, grounding state, and sleep/wake rules. Shape
 mutation wakes sleeping bound bodies before broad-phase refresh, matching the 2D
 mutation contract.
 
+Automatic 3D grounding casts downward with the selected ray or swept-sphere
+probe and selects the nearest physically eligible static or kinematic support,
+with collider ID breaking equal-distance ties. Both colliders' ignored layers
+apply, and the source collider cannot support itself. Static and kinematic
+triggers remain eligible in 3D, which has no support-normal threshold; automatic
+2D grounding excludes triggers and applies its planar support-normal policy.
+
+The existing 3D query worker collects and sorts raw hits into a retained
+per-body buffer before grounding checks body eligibility. Compound colliders
+reduce their parts to one owner witness before that eligibility check. All raw intersections
+contribute to the `RayQuery` hit count and nearest raw witness independently of
+the accepted `GroundProbe` witness, so an ignored or dynamic nearest hit remains
+visible in query diagnostics. Traversal and mesh counters retain the complete
+query work. `RayQuery` precedes `GroundProbe`, and ground state is stored before
+the `OnGrounded` callback runs. Ray segment length must be positive; swept-sphere
+segment length must exceed `Epsilon`. A resolved sphere radius at or below
+`Epsilon` uses a ray while ground-probe diagnostics retain the resolved mode
+and radius.
+
 ## 2D Coordinate Contract
 
 2D uses the X/Z planar convention:

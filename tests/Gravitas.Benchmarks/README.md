@@ -185,6 +185,26 @@ membership avoids global-ID-sized storage and wins the one-ID row; sparse
 membership is faster in the denser microbenchmarks. Keep this tradeoff visible
 when interpreting integrated partition results.
 
+### 3D grounding and closest-query controls
+
+`ground-probe-selection3-d` measures 64 bodies with ray (`UseSphere=false`) or
+swept-sphere (`UseSphere=true`) probes and 1 or 8 reachable targets per probe.
+`Supported` selects eligible far support or only physically ignored targets.
+Near ignored targets remain raw query hits in the eight-target rows.
+`ForceAutomaticGroundProbes` includes ground-state writes with diagnostics
+disabled; `ClosestRawHits` runs public closest queries over the same geometry
+without applying body support eligibility.
+
+Setup validates complete closest witnesses against all-hit results, exact raw
+counts, accepted points/normals/distances, candidate counters and diagnostic
+events outside timing. Both methods are warmed before measurement. Use
+`MemoryDiagnoser` results to assess allocations alongside throughput; this
+fixture does not reset pose or advance a simulation step.
+
+```powershell
+dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll ground-probe-selection3-d --filter '*' --exporters json
+```
+
 ### Capsule/circle-slab contacts
 
 The `capsule-circle-contact` selection measures mixed capsule/circle-slab side,
