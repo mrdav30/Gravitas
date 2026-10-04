@@ -61,6 +61,58 @@ public sealed class ColliderBodylessPoseTransactionTests
     }
 
     [Fact]
+    public void PlanarScaleCapture_WhenYawIsOmitted_ShouldPreserveTheAdmittedMatrixAndScale()
+    {
+        FixedTransform transform = CreateRoundingSensitivePlanarHierarchy();
+        Vector2d fullScale = ColliderScalePolicy.CapturePlanar(
+            transform, out Fixed4x4 fullMatrix, out Fixed64 fullYaw);
+
+        Vector2d scaleOnly = ColliderScalePolicy.CapturePlanar(
+            transform, out Fixed4x4 scaleMatrix, out Fixed64 unusedYaw,
+            captureRotation: false);
+
+        fullYaw.Should().NotBe(Fixed64.Zero);
+        unusedYaw.Should().Be(Fixed64.Zero);
+        scaleOnly.Should().Be(fullScale);
+        scaleMatrix.Should().Be(fullMatrix);
+    }
+
+    [Fact]
+    public void BodyOwned2DPose_ShouldPreserveAdmittedScaleAndMixedHeightWithoutHostYaw()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        FixedTransform transform = CreateRoundingSensitivePlanarHierarchy();
+        Vector2d scale = ColliderScalePolicy.CapturePlanar(
+            transform, out Fixed4x4 matrix, out Fixed64 hostYaw);
+        Vector2d position = new(2, 3);
+        var collider = new LSCircleCollider2D(Fixed64.Half)
+        {
+            LocalOffset = Vector2d.Right
+        };
+        var body = new SolidBody2D(new TestMatterAgent(context, transform), collider);
+
+        body.Initialize(position, Fixed64.HalfPi);
+
+        collider.Rotation.Should().Be(Fixed64.HalfPi).And.NotBe(hostYaw);
+        collider.LocalScale.Should().Be(scale);
+        collider.MixedSlabCenterY.Should().Be(matrix.M42);
+        Vector2d.TryTransformScaledPoint(
+            position, Vector2d.Right, scale, Fixed64.HalfPi, out Vector2d center)
+            .Should().BeTrue();
+        collider.Center.Should().Be(center);
+
+        body.SetRotation(-Fixed64.HalfPi);
+
+        collider.Rotation.Should().Be(-Fixed64.HalfPi);
+        collider.LocalScale.Should().Be(scale);
+        collider.MixedSlabCenterY.Should().Be(matrix.M42);
+        Vector2d.TryTransformScaledPoint(
+            position, Vector2d.Right, scale, -Fixed64.HalfPi, out center)
+            .Should().BeTrue();
+        collider.Center.Should().Be(center);
+    }
+
+    [Fact]
     public void Position_WhenParentedShapeAdmissionFails_ShouldRestorePoseAndCommittedMixedState()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();

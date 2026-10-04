@@ -65,7 +65,8 @@ public abstract partial class LSCollider2D
         return ColliderScalePolicy.CapturePlanar(
             _agent.Transform,
             out _,
-            out _);
+            out _,
+            captureRotation: false);
     }
 
     /// <summary>Gets the current owner and compound-part scale factors separately.</summary>
@@ -134,7 +135,8 @@ public abstract partial class LSCollider2D
         Vector2d ownerScale = ColliderScalePolicy.CapturePlanar(
             agent.Transform,
             out Fixed4x4 worldMatrix,
-            out Fixed64 matrixRotation);
+            out Fixed64 matrixRotation,
+            captureRotation: !useRequestedPose);
         Vector2d center;
         Fixed64 rotation;
         if (useRequestedPose)

@@ -2,6 +2,7 @@ using BenchmarkDotNet.Attributes;
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
+using Gravitas.Queries;
 using GridForge.Configuration;
 using GridForge.Grids.Topology;
 using System;
@@ -107,17 +108,44 @@ public class CirclePartitionMaintenanceBenchmarks
 
     [Benchmark]
     public int ForceAutomaticGroundProbes()
+        => _scene.ForceAutomaticGroundProbes();
+
+    [GlobalCleanup]
+    public void Cleanup() => _scene?.Dispose();
+}
+
+/// <summary>Automatic probes at the corrected poses used by the full-step control.</summary>
+[MemoryDiagnoser]
+public class CircleAutomaticGroundingBenchmarks
+{
+    private CirclePartitionBenchmarkScene _scene;
+
+    [Params(64, 1024)]
+    public int PairCount { get; set; }
+
+    [GlobalSetup]
+    public void Setup()
     {
-        int grounded = 0;
-        for (int i = 0; i < _scene.Bodies.Length; i++)
-        {
-            SolidBody2D body = _scene.Bodies[i];
-            body.CheckGround();
-            if (body.IsGrounded)
-                grounded++;
-        }
-        return grounded;
+        _scene = new CirclePartitionBenchmarkScene(PairCount * 2, cellSize: 16);
+        _scene.RegisterBodies();
+        _scene.ValidateGeometry();
+        _scene.Context.Simulate();
+        _scene.Context.LateSimulate();
+        if (_scene.Context.Physics2D.LastBroadPhaseCandidateCount != PairCount)
+            throw new InvalidOperationException("Corrected grounding fixture candidate count changed.");
+        _scene.ValidateCorrectedGroundProbes();
+        int expectedGrounded = ForceAutomaticGroundProbesAfterResponse();
+        // Only the first row lacks a target below it. Each later row can be
+        // supported by the previous row's circle after positional correction.
+        if (expectedGrounded != PairCount - 32)
+            throw new InvalidOperationException($"Incorrect corrected support count: {expectedGrounded}.");
+        for (int i = 0; i < 4; i++)
+            if (ForceAutomaticGroundProbesAfterResponse() != expectedGrounded)
+                throw new InvalidOperationException("Corrected grounding support count changed between probes.");
     }
+
+    [Benchmark]
+    public int ForceAutomaticGroundProbesAfterResponse() => _scene.ForceAutomaticGroundProbes();
 
     [GlobalCleanup]
     public void Cleanup() => _scene?.Dispose();
@@ -125,6 +153,19 @@ public class CirclePartitionMaintenanceBenchmarks
 
 internal sealed class CirclePartitionBenchmarkScene : IDisposable
 {
+    internal int ForceAutomaticGroundProbes()
+    {
+        int grounded = 0;
+        for (int i = 0; i < Bodies.Length; i++)
+        {
+            SolidBody2D body = Bodies[i];
+            body.CheckGround();
+            if (body.IsGrounded)
+                grounded++;
+        }
+        return grounded;
+    }
+
     internal CirclePartitionBenchmarkScene(int colliderCount, int cellSize)
     {
         int pairCount = colliderCount / 2;
@@ -198,6 +239,23 @@ internal sealed class CirclePartitionBenchmarkScene : IDisposable
             if (!hasPair || !pair.IsColliding || pair.Manifold.Count != 1
                 || first.CollisionPairCount + first.CollisionPairHolderCount != 1)
                 throw new InvalidOperationException($"Incorrect retained partition fixture pair {i}.");
+        }
+    }
+
+    internal void ValidateCorrectedGroundProbes()
+    {
+        for (int i = 0; i < Bodies.Length; i++)
+        {
+            SolidBody2D body = Bodies[i];
+            Fixed64 radius = body.Collider.CanonicalGroundProbeRadius;
+            // Correction retains penetration slop, so the paired target still
+            // overlaps the full-radius probe but its normal rejects support.
+            // Nearby rows can supply valid support: keep those real query targets
+            // instead of assuming independent contact pairs mean independent probes.
+            if (body.Position == Positions[i]
+                || !QueryDetection2D.TryOverlapCircle(body.Position, radius, Targets[i], out Physics2DHit hit)
+                || Vector2d.Dot(hit.Normal.Normalized, Vector2d.Forward) >= body.GroundMinNormalDot)
+                throw new InvalidOperationException($"Incorrect corrected grounding geometry at pair {i}.");
         }
     }
 

@@ -139,8 +139,8 @@ context once per iteration. Context/grid and array creation happen outside the
 measurement; registration allocations are intentional and exclude grid setup.
 Cleanup validates the registered scene and disposes it outside measurement.
 The warmed rows separate translated pose reset plus partition refresh, forced
-automatic grounding probes, and retained-candidate distribution. Ground probes
-find no support because targets are above the dynamic circles.
+automatic grounding probes, and retained-candidate distribution. These ground
+probes run at reset poses and find no support from the above-body targets.
 `DistributeRetainedCandidates` retains processed pair keys to isolate partition
 traversal, filtering and duplicate suppression; it deliberately skips repeated
 narrow phase and response. Use `circle-contact-simulation` for full-step costs.
@@ -153,6 +153,23 @@ These are manual scaling selections. Fine-cell cold registration can be very
 expensive before retained-partition scaling fixes; use filtered small counts
 when capturing the historical baseline. Compare allocation results per stage,
 and retain the cell size and collider count beside timing results.
+
+`circle-automatic-grounding` isolates automatic probes at corrected poses after
+one full simulation step. `PairCount` is 64 or 1024 dynamic/static pairs, twice
+as many colliders, with 16-unit X/Z cells. Correction retains slop, so the paired
+target remains an initial full-radius overlap whose normal rejects support.
+Subsequent grid rows can find the preceding row's circle below them. Setup checks
+`PairCount - 32` supported bodies and stable results across repeated probes.
+The measured operation includes no pose reset or simulation step.
+
+`planar-scale-capture` compares the existing scale/admission capture with and
+without materializing host yaw at zero and one radian. Both paths use the same
+matrix decomposition and validation. The scale-only path represents body-owned
+poses that supply their own yaw; bodyless colliders still need host yaw.
+
+```powershell
+dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll circle-automatic-grounding planar-scale-capture --filter '*' --exporters json
+```
 
 `partition-membership` compares existing sparse, hash and packed collection
 owners at 1, 8 and 64 local IDs starting at global ID 65536. It measures one

@@ -19,7 +19,8 @@ internal static class ColliderScalePolicy
     internal static Vector2d CapturePlanar(
         FixedTransform transform,
         out Fixed4x4 worldMatrix,
-        out Fixed64 worldRotation)
+        out Fixed64 worldRotation,
+        bool captureRotation = true)
     {
         SwiftThrowHelper.ThrowIfNull(transform, nameof(transform));
         FixedTransform? current = transform;
@@ -35,7 +36,8 @@ internal static class ColliderScalePolicy
             && TryExtractPlanarTransform(
                 worldMatrix,
                 out worldScale,
-                out worldRotation);
+                out worldRotation,
+                captureRotation);
         SwiftThrowHelper.ThrowIfArgument(
             !captured,
             nameof(transform),
@@ -103,7 +105,8 @@ internal static class ColliderScalePolicy
     private static bool TryExtractPlanarTransform(
         Fixed4x4 matrix,
         out Vector2d scale,
-        out Fixed64 rotation)
+        out Fixed64 rotation,
+        bool captureRotation)
     {
         // A planar collider requires a block-diagonal X/Z and Y basis. Checking
         // both directions prevents scale extraction from silently discarding
@@ -136,9 +139,15 @@ internal static class ColliderScalePolicy
         }
 
         scale = planarScale.ToVector2d();
-        Vector3d right = planarRotation.Rotate(Vector3d.Right);
-        rotation = PlanarRotation.Canonicalize(
-            FixedMath.Atan2(right.Z, right.X));
+        rotation = Fixed64.Zero;
+        // Body-owned poses replace host yaw. Keep the same decomposition and
+        // admission checks, but omit yaw materialization when it is unused.
+        if (captureRotation)
+        {
+            Vector3d right = planarRotation.Rotate(Vector3d.Right);
+            rotation = PlanarRotation.Canonicalize(
+                FixedMath.Atan2(right.Z, right.X));
+        }
         return true;
     }
 

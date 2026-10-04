@@ -161,6 +161,10 @@ public sealed class ColliderExactScaleAdmissionTests
         var collider3D = new LSSphereCollider { Radius = Fixed64.FromRaw(1) };
         var collider2D = new LSCircleCollider2D(Fixed64.FromRaw(1));
 
+        Action capturePlanarScale = () => ColliderScalePolicy.CapturePlanar(
+            child, out _, out _, captureRotation: false);
+        capturePlanarScale.Should().Throw<ArgumentException>().WithParameterName("transform");
+
         Action initialize3D = () =>
             collider3D.InitializeWithNoBody(new TestMatterAgent(context, child));
         Action initialize2D = () =>
@@ -192,6 +196,10 @@ public sealed class ColliderExactScaleAdmissionTests
         var collider3D = new LSSphereCollider();
         var collider2D = new LSCircleCollider2D(Fixed64.Half);
 
+        Action capturePlanarScale = () => ColliderScalePolicy.CapturePlanar(
+            child, out _, out _, captureRotation: false);
+        capturePlanarScale.Should().Throw<ArgumentException>().WithParameterName("transform");
+
         Action initialize3D = () =>
             collider3D.InitializeWithNoBody(new TestMatterAgent(context, child));
         Action initialize2D = () =>
@@ -214,6 +222,10 @@ public sealed class ColliderExactScaleAdmissionTests
             FixedQuaternion.FromAxisAngle(Vector3d.Right, Fixed64.PiOver4),
             Vector3d.One);
         var collider = new LSCircleCollider2D(Fixed64.Half);
+
+        Action capturePlanarScale = () => ColliderScalePolicy.CapturePlanar(
+            transform, out _, out _, captureRotation: false);
+        capturePlanarScale.Should().Throw<ArgumentException>().WithParameterName("transform");
 
         Action initialize = () =>
             collider.InitializeWithNoBody(new TestMatterAgent(context, transform));
@@ -241,6 +253,10 @@ public sealed class ColliderExactScaleAdmissionTests
             .BeLessThanOrEqualTo(Fixed64.Epsilon);
         var collider = new LSCircleCollider2D(Fixed64.Half);
 
+        Action capturePlanarScale = () => ColliderScalePolicy.CapturePlanar(
+            transform, out _, out _, captureRotation: false);
+        capturePlanarScale.Should().Throw<ArgumentException>().WithParameterName("transform");
+
         Action initialize = () =>
             collider.InitializeWithNoBody(new TestMatterAgent(context, transform));
 
@@ -259,6 +275,10 @@ public sealed class ColliderExactScaleAdmissionTests
             FixedQuaternion.FromAxisAngle(Vector3d.Right, Fixed64.Pi),
             Vector3d.One);
         var collider = new LSCircleCollider2D(Fixed64.Half);
+
+        Action capturePlanarScale = () => ColliderScalePolicy.CapturePlanar(
+            transform, out _, out _, captureRotation: false);
+        capturePlanarScale.Should().Throw<ArgumentException>().WithParameterName("transform");
 
         Action initialize = () =>
             collider.InitializeWithNoBody(new TestMatterAgent(context, transform));

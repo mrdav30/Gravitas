@@ -64,8 +64,9 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 ### GRV-Benchmark-023 — Circle Workload Partition And Grounding Scaling
 
 **Discovered:** 2026-10-02 during GRV-Benchmark-022 isolation.  
-**Status:** Partition defects repaired for review; remaining warmed full-step
-scaling stays open, separate from exact contact-query cost.  
+**Status:** Partition phase committed as `f23d836`; shared radial-math and planar
+capture refinements are ready for review. Remaining warmed full-step scaling
+stays open, separate from exact contact-query cost.  
 **Owner:** Gravitas retained partition rental/distribution and collider refresh,
 plus GridForge voxel partition lookup used by planar grounding.
 
@@ -184,10 +185,10 @@ The integrated control uses
 with the same warmed job settings. Hardware is an i7-9700K on Windows 11,
 .NET SDK 10.0.302 / runtime 8.0.29, BenchmarkDotNet 0.15.8. Both source stacks
 use FixedMathSharp `00a38bd`; Gravitas before is `05ddcac`, after is the
-unstaged partition-hardening change in this working tree.
+partition-hardening change committed as `f23d836`.
 
 **Grounding decision and remaining scope:** Preserve automatic ground probing
-when contact normals reject support. These above-body targets do not provide
+when contact normals reject support. The paired above-body targets do not provide
 ground, and zero gravity or a rejected response normal does not prove that the
 probe can be omitted. Existing public support queries differ in allowed phases,
 tiny probes, compound-normal filtering and physical-pair policy; replacing the
@@ -245,7 +246,7 @@ with the integrated 1024-pair filter, `--profiler EP --launchCount 1 --warmupCou
 artifacts are `fullstep-profile-complete` and
 `fullstep-profile-complete-actual-only.json` under the same directory.
 
-**Validation:** Final local-stack Release/ReleaseLean solution builds cover both
+**Partition-phase validation:** Final local-stack Release/ReleaseLean solution builds cover both
 `netstandard2.1` and `net8.0`; all 4401/4342 tests pass with no failures or skips.
 Final OpenCover/Cobertura root counts are exactly 44,491/44,491 sequence points,
 13,278/13,278 branches and 4,589/4,589 methods in Release; Lean has
@@ -262,14 +263,116 @@ gates. Source review reports no remaining findings. No coverage exclusion change
 or upstream source edits were made. This is Windows source-stack evidence;
 released-package validation remains deferred until the upstream release.
 
-**Next isolation step:** Keep the repaired cold-registration and allocation
-gates. Establish the host's warmed full-step budget, then isolate supported and
-unsupported automatic probes at increasing pair counts against direct radial
-sweep controls. Separate unavoidable exact geometry from repeated candidate
-lookup/distribution and retained-pair bookkeeping before choosing a new runtime
-change. Preserve query/grounding acceptance, compound behavior, stable ties,
-zero allocation and dimension parity. Registration repair does not by itself
-accept the remaining 1024-pair full-step cost.
+**Experiment refinement, 2026-10-02:** The shared FixedMathSharp distance solver
+now evaluates unit-interval endpoint signs as `C`, `A + 2B + C`, `B`, and `A + B`
+for `f(t) = A*t*t + 2B*t + C`. Widened sums replace general rational endpoint
+products only on `[0, 1]`. Bounded intervals, discriminants, root construction,
+rounding and final distance mapping retain the existing owner. Circle, sphere,
+capsule caps and rounded-cylinder cap consumers share this change; no physics
+policy or second math kernel moves upstream.
+
+Gravitas also omits host-yaw materialization when a body-owned requested pose
+replaces it, or when the caller only needs scale. Exact matrix composition,
+planar decomposition, ancestry/reflection/shear admission and mixed slab height
+are unchanged. Bodyless poses still capture host yaw. Tests exercise nonidentity
+parented transforms, requested-pose ownership and invalid transform hierarchies.
+
+The new `circle-automatic-grounding` control probes after positional response,
+matching the full-step geometry. The paired circle remains an initial full-radius
+probe overlap because correction retains slop, but its normal rejects support.
+Rows after the first can find the preceding row's circle below them: setup checks
+exactly `PairCount - 32` supported bodies and repeatable probe results. Independent
+contact pairs do not imply independent support probes. The older maintenance
+control resets poses into overlap and remains a separate unsupported workload.
+
+Fresh matched radial controls use two launches, five warmups, fifteen 250-ms
+iterations and the environment above. Error is half the 99.9% interval; all rows
+report 0 B/op.
+
+| Shared distance interval / scale | Before mean +/- error (ns) | After mean +/- error (ns) |
+| --- | --- | --- |
+| Circle / 1 | 3828.9 +/- 18.00 | 3304.82 +/- 17.454 |
+| Sphere / 1 | 3866.7 +/- 30.14 | 3302.94 +/- 26.690 |
+| Circle moving away / 1 | 539.1 +/- 3.72 | 87.88 +/- 1.661 |
+| Sphere moving away / 1 | 576.6 +/- 7.16 | 120.68 +/- 1.388 |
+| Circle / 100000 | 5455.9 +/- 27.68 | 4921.34 +/- 24.061 |
+| Sphere / 100000 | 5514.1 +/- 69.26 | 4980.02 +/- 53.401 |
+| Circle moving away / 100000 | 554.3 +/- 17.01 | 89.89 +/- 0.490 |
+| Sphere moving away / 100000 | 569.5 +/- 5.26 | 122.01 +/- 0.208 |
+
+Regular interval cost falls 9.7-14.6%; moving-away misses fall 78.6-83.8%.
+The direct planar capture control measures 813.7 +/- 8.88 versus
+674.4 +/- 9.17 ns at zero host yaw, and 1175.9 +/- 16.23 versus
+792.9 +/- 5.11 ns at one radian (17.1% / 32.6% lower, 0 B/op).
+For corrected automatic probes, the math-only 1024-pair control changes from
+9929.9 +/- 250.65 us to 9233.5 +/- 168.92 us (7.0% lower). The 64-pair
+411.2 +/- 2.77 us and 406.4 +/- 7.00 us intervals overlap. The math-only full
+step also overlaps its baseline: 36.695 +/- 0.710 versus 35.980 +/- 0.938 ms.
+
+With both refinements the fresh 1024-pair full-step control measures
+34.469 +/- 0.3244 ms at 0 B/op. Its matched fresh baseline is
+36.695 +/- 0.710 ms (6.1% lower point estimate); the committed partition-phase
+capture was already faster at 35.573 +/- 0.3858 ms. Preserve baseline drift,
+short-iteration warnings and multimodal distributions rather than treating a
+single capture as a universal frame-time gain. The 64-pair combined result is
+1.503 +/- 0.1040 ms and supports no small-scene speedup claim.
+An independent two-launch confirmation with 500-ms iterations measures
+34.404 +/- 0.5312 ms at 0 B/op, consistent with the final capture. It confirms
+the after result under a longer iteration protocol; it is not a new matched
+before/after pair.
+The final corrected-pose 1024-pair probe confirmation measures
+9005.3 +/- 71.88 us at 0 B/op (9.3% below its fresh baseline).
+
+Raw results live under `artifacts/grv-benchmark-023/`: `refinement-math-before-verified`,
+`refinement-math-after`, `refinement-corrected-before-verified`,
+`refinement-corrected-math-after`, `refinement-full-before`,
+`refinement-full-math-after`, `refinement-full-final`, `refinement-full-confirmation`,
+`refinement-planar-control-verified`, and `refinement-corrected-final`. Failed setup/build
+captures are preserved separately and supply no timing evidence. The initial
+short full-step pilot reported 3.44 KB/op; the longer matched controls report
+0 B/op and existing strict allocation gates remain authoritative.
+
+**Refinement validation:** Both local-stack solutions build for `netstandard2.1`
+and `net8.0` in Release/ReleaseLean with zero warnings/errors. Gravitas passes
+4403/4344 tests; FixedMathSharp passes 4138/4117 core tests plus 49 Chronicler
+tests per configuration, with no failures or skips. Exact OpenCover counts are:
+
+| Repository / configuration | Covered sequence points | Covered branches | Covered methods |
+| --- | --- | --- | --- |
+| Gravitas / Release | 44496 / 44496 | 13280 / 13280 | 4589 / 4589 |
+| Gravitas / ReleaseLean | 44494 / 44494 | 13280 / 13280 | 4588 / 4588 |
+| FixedMathSharp / Release | 52675 / 52675 | 12138 / 12138 | 3935 / 3935 |
+| FixedMathSharp / ReleaseLean | 52768 / 52768 | 12138 / 12138 | 3931 / 3931 |
+
+No coverage exclusions or allocation gates were changed. All 32 raw final
+benchmark GC records have zero allocation and collection counters. Independent
+source/evidence review reports no actionable findings. Builds, TRX and coverage
+are in `artifacts/grv-benchmark-023/refinement-<repository>-<configuration>-*`.
+Rendered reports verify core/FluentAssertions from the core suite and Chronicler
+from its owning suite (85/85 lines, 12/12 branches, 18/18 fully covered methods
+in both configurations). Merging Chronicler's partial core dependency capture
+into the complete core report lost three covered lines in the Lean aggregation;
+the raw complete capture and core-only rendered control both remain fully covered.
+The failed merged-format control is retained, without modifying raw visits.
+ReportGenerator confirms zero uncovered lines, branches and fully covered methods
+for every owning assembly/configuration; see `refinement-coverage-summary.json`.
+All 463 upstream Short smoke cases have successful child exits and populated
+statistics, including 62 zero-allocation finite-axis controls. The smoke uses
+one launch, three warmups and three 10-ms iterations; its timings are not
+performance evidence. Both DocFX builds pass with warnings as errors, and API
+resources, branding, repository actions and local links pass. Logs and exports
+are `refinement-math-smoke*` and `refinement-<repository>-docfx.log`.
+FixedMathSharp must release before Gravitas's released-package revalidation;
+this evidence uses Windows sibling source with `UseLocalLsfStack=true`.
+
+**Next isolation step:** Keep the repaired registration/allocation gates and
+corrected-pose control. Establish the host's warmed full-step budget. Measure
+repeated segment-length materialization and nearest-accepted automatic support
+selection before choosing another runtime change; preserve compound reduction,
+stable ties, query/grounding acceptance and dimension parity. These remain
+candidates, not implemented optimizations. No voxel cache or synchronization
+change is justified by the current evidence. The remaining 1024-pair full-step
+cost has not been accepted.
 
 ### GRV-Benchmark-021 — Complete Capsule/Stadium-Slab Curved Contact Cost
 
