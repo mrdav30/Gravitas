@@ -140,6 +140,14 @@ Grounding is modeled as planar support in the 2D simulation plane:
 `SolidBody2D.IsGrounded`, `WasGrounded`, `GroundNormal`, `GroundPoint`, and
 `LastGroundedPosition` are X/Z-plane values.
 
+Automatic 2D probes select the nearest physically eligible support by distance,
+then collider ID. A nearer rejected normal or ignored collider does not hide
+farther support. Each compound first reduces its authored parts to one witness;
+automatic grounding then applies the body's support policy to that witness.
+This differs from explicit `Query2D.QuerySupport`, which filters support parts
+before reduction. Automatic ray probes accept positive representable travel
+lengths below `Epsilon`; swept-circle probes require travel longer than `Epsilon`.
+
 Dynamic 2D bodies publish their authoritative planar position and yaw rotation
 back to the host `FixedTransform` during `Visualize()` whenever the runtime mode
 runs the 2D service (`TwoD`, `Both`, or `Mixed`). The host transform's

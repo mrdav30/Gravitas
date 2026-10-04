@@ -185,8 +185,30 @@ internal static partial class QueryDetection2D
             return false;
         }
 
+        return TryRaycastPrepared(start, end, segment, segmentLength, collider, out hit);
+    }
+
+    // The caller has admitted the exact endpoint difference and its positive,
+    // representable length. Keep shape bounds checks local to each compound part.
+    internal static bool TryRaycast(
+        Vector2d start, Vector2d end, Vector2d segment, Fixed64 segmentLength,
+        LSCollider2D collider, out Physics2DHit hit)
+    {
+        if (!SegmentBoundsOverlap(start, end, collider))
+        {
+            hit = default;
+            return false;
+        }
+
+        return TryRaycastPrepared(start, end, segment, segmentLength, collider, out hit);
+    }
+
+    private static bool TryRaycastPrepared(
+        Vector2d start, Vector2d end, Vector2d segment, Fixed64 segmentLength,
+        LSCollider2D collider, out Physics2DHit hit)
+    {
         if (collider is LSCompoundCollider2D compound)
-            return TryRaycastCompound(start, end, compound, out hit);
+            return TryRaycastCompound(start, end, segment, segmentLength, compound, out hit);
 
         if (ContainsPointExact(collider, start))
         {
@@ -239,8 +261,30 @@ internal static partial class QueryDetection2D
             return false;
         }
 
+        return TrySweepCirclePrepared(start, end, segment, segmentLength, radius, collider, out hit);
+    }
+
+    // Generic sweeps admit travel greater than Epsilon. Authored support queries
+    // retain their separate distance domain and stationary-contact semantics.
+    internal static bool TrySweepCircle(
+        Vector2d start, Vector2d end, Vector2d segment, Fixed64 segmentLength,
+        Fixed64 radius, LSCollider2D collider, out Physics2DHit hit)
+    {
+        if (!SweepBoundsOverlap(start, end, radius, collider))
+        {
+            hit = default;
+            return false;
+        }
+
+        return TrySweepCirclePrepared(start, end, segment, segmentLength, radius, collider, out hit);
+    }
+
+    private static bool TrySweepCirclePrepared(
+        Vector2d start, Vector2d end, Vector2d segment, Fixed64 segmentLength,
+        Fixed64 radius, LSCollider2D collider, out Physics2DHit hit)
+    {
         if (collider is LSCompoundCollider2D compound)
-            return TrySweepCircleCompound(start, end, radius, compound, out hit);
+            return TrySweepCircleCompound(start, end, segment, segmentLength, radius, compound, out hit);
 
         if (TryOverlapCircle(start, radius, collider, out Physics2DHit overlapHit))
         {
@@ -299,6 +343,8 @@ internal static partial class QueryDetection2D
             return TrySweepCircle(
                 circle.Center,
                 end,
+                displacement,
+                displacementLength,
                 circle.ScaledRadius,
                 target,
                 out hit);

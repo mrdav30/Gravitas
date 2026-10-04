@@ -65,10 +65,12 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 
 **Discovered:** 2026-10-02 during GRV-Benchmark-022 isolation.  
 **Status:** Partition phase committed as `f23d836`; shared radial-math and planar
-capture refinements are ready for review. Remaining warmed full-step scaling
-stays open, separate from exact contact-query cost.  
+capture refinements committed as FixedMathSharp `6789c09` and Gravitas `ee613db`.
+Prepared 2D query and grounding-selection refinement is ready for review.
+Remaining warmed full-step scaling stays open, separate from exact contact-query cost.  
 **Owner:** Gravitas retained partition rental/distribution and collider refresh,
-plus GridForge voxel partition lookup used by planar grounding.
+2D query preparation and ground-hit selection, plus GridForge voxel partition
+lookup used by planar grounding.
 
 An exploratory `circle-contact-simulation` capture with default unit cells
 measured 64 diagonal pairs at 13.35 ms/step and 1024 axis pairs at 42.59 ms/step.
@@ -365,12 +367,97 @@ are `refinement-math-smoke*` and `refinement-<repository>-docfx.log`.
 FixedMathSharp must release before Gravitas's released-package revalidation;
 this evidence uses Windows sibling source with `UseLocalLsfStack=true`.
 
-**Next isolation step:** Keep the repaired registration/allocation gates and
-corrected-pose control. Establish the host's warmed full-step budget. Measure
-repeated segment-length materialization and nearest-accepted automatic support
-selection before choosing another runtime change; preserve compound reduction,
-stable ties, query/grounding acceptance and dimension parity. These remain
-candidates, not implemented optimizations. No voxel cache or synchronization
+**Prepared-query refinement (2026-10-03):** Closest/all-hit 2D services now pass
+their admitted exact segment and representable length through the existing
+detector and compound parts. Circle CCD reuses its admitted displacement after
+exact endpoint addition. Raw entry points retain their rejection order;
+normalization, authored support distance, and the saturating reverse-convex
+path are unchanged. No new runtime type, math owner or upstream edit is needed.
+
+Automatic 2D grounding reuses the closest-hit loops with the body's existing
+pure acceptance policy. Only accepted aggregate collider witnesses enter the
+distance/owner-ID reducer. Compound parts still reduce before support filtering;
+ray candidate counts and static-style sweep exclusions are unchanged. This
+removes the per-body hit collection, retained capacity and additional hit sort.
+Diagnostics, support writes and callback lifetime validation still follow
+selection. Public all-hit buffers and explicit `QuerySupport` keep their contracts.
+
+Fresh controls start from Gravitas `ee613db` and FixedMathSharp `6789c09`, using
+the same Windows/local-stack environment above. The requested CLI argument is
+`--affinity 3`; BenchmarkDotNet records the job display as `Affinity=11` in
+every capture. Preserve that command/display pair when reproducing the run.
+The 1024-pair scenes contain 2048 colliders. Timings below are ms/op, with the
+half-width of the 99.9% confidence interval; every row reports 0 B/op.
+
+| Capture | Corrected-pose automatic probes | Full diagonal simulation step |
+| --- | --- | --- |
+| Fresh committed baseline | 10.3778 +/- 0.1907 | 39.3280 +/- 0.6776 |
+| Prepared segment only | 10.1208 +/- 0.1868 | 38.2636 +/- 0.5886 |
+| Prepared segment plus nearest accepted | 9.8572 +/- 0.2201 | 38.8105 +/- 0.7148 |
+
+These use two launches, five warmups and fifteen iterations: 250 ms for probes,
+500 ms for full steps. The probe baseline/length captures have short observed
+iterations; length/combined distributions are multimodal. The length/combined
+full runs also include the detection-only control (4.4819 +/- 0.0606 and
+4.5939 +/- 0.0672 ms); the fresh full baseline selects only the full step.
+Probe point estimates improve 5.0% from today's baseline, but neither the
+isolated length nor selection increment establishes a standalone speedup.
+Full-step intervals overlap, including the combined result's higher point
+estimate than length alone. No stable full-step gain is claimed. These fresh
+baselines are slower than the preceding phase; preserve that drift.
+
+`circle-ground-query-selection` pairs collect/sort/filter against nearest
+accepted selection at identical corrected poses, with prepared segment reuse
+in both paths. Setup compares the complete witness for every body and checks
+32/992 supported bodies at 64/1024 pairs. With the same two-launch job and
+500-ms iterations, its ms/op results are:
+
+| Pairs | Collect/sort/filter | Nearest accepted | Allocation |
+| --- | --- | --- | --- |
+| 64 | 0.4099 +/- 0.00675 | 0.4017 +/- 0.00612 | 0 B/op |
+| 1024 | 9.2889 +/- 0.12977 | 9.1682 +/- 0.16019 | 0 B/op |
+
+Intervals overlap in both sizes; the paired run also reports multimodality and
+outliers, so retain the raw samples. Retain the existing-owner streaming design
+for its removed per-body storage and hit sort, with exact witness parity and
+no measured material regression; do not claim an isolated selection speedup.
+Raw JSON, logs and summaries are under `artifacts/grv-benchmark-023/` as
+`refinement3-ground-{before,length,stream}`, `refinement3-full-{before,length,stream}`,
+`refinement3-selection-paired`, `refinement3-timing-summary.json` and
+`refinement3-selection-summary.json`.
+
+**Prepared-query validation:** Release/ReleaseLean solution builds cover both
+targets with zero warnings/errors. All 4430/4371 tests pass without skips,
+including 27 new prepared-query and automatic-probe regression cases.
+Exact OpenCover counts are:
+
+| Configuration | Covered sequence points | Covered branches | Covered methods |
+| --- | --- | --- | --- |
+| Release | 44492 / 44492 | 13284 / 13284 | 4595 / 4595 |
+| ReleaseLean | 44490 / 44490 | 13284 / 13284 | 4594 / 4594 |
+
+ReportGenerator also verifies zero uncovered lines, branches and fully covered
+methods (56222/56220 lines, 16290 branches, 5405/5404 methods). Existing collector
+exclusions and strict allocation gates are unchanged. The first complete capture
+found a missing public all-hit geometric-miss branch after grounding stopped
+using that path; a direct overlapping-bounds/missed-circle regression closes it.
+The failed coverage control is retained separately. Final builds, TRX, raw
+coverage and rendered reports use `refinement3-final-Gravitas-<configuration>-*`;
+the exact rendered counts are in `refinement3-coverage-summary.json`.
+All ten affected public 2D raycast/sweep Short smoke rows have populated
+statistics, successful child exits and 0 B/op; short timings are not performance
+evidence. Across the before/length/combined, paired and smoke captures, all 34
+raw GC records have zero allocation/collection counters. Exports and validation
+counts are `refinement3-query-smoke*` and `refinement3-benchmark-validation.json`.
+Independent source, evidence and ponytail review found no remaining actionable issues.
+Gravitas DocFX builds with warnings as errors and passes API resource, branding,
+repository-action and local-link checks; log: `refinement3-Gravitas-docfx.log`.
+
+**Next isolation step:** Keep these corrected-pose and paired controls, and
+establish the host's warmed full-step budget. Refresh phase/CPU sampling before
+another runtime change. 3D automatic grounding still uses all-hit sorting;
+any counterpart experiment must preserve its distinct acceptance policy and
+raw all-hit diagnostic count/nearest witness. No voxel cache or synchronization
 change is justified by the current evidence. The remaining 1024-pair full-step
 cost has not been accepted.
 

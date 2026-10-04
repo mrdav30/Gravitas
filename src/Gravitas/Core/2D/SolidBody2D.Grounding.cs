@@ -9,7 +9,6 @@ using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Queries;
-using SwiftCollections;
 using System;
 using System.Runtime.CompilerServices;
 
@@ -27,7 +26,6 @@ public sealed partial class SolidBody2D
     private long _lastGroundCheckFrame = -1;
     private const int GroundCheckFrameThreshold = 10;
     private readonly Fixed64 _groundCheckPositionThreshold = Fixed64.FromFraction(1, 100);
-    private readonly SwiftList<Physics2DHit> _groundProbeHits = new();
 
     private bool _isGrounded;
     private bool _wasGrounded;
@@ -431,54 +429,14 @@ public sealed partial class SolidBody2D
         out Physics2DHit hit)
     {
         if (mode == GroundProbeMode2D.SweptCircle && radius > Fixed64.Epsilon)
-            return TryFindGroundHitWithSweptCircle(start, end, radius, out hit);
+            return Context.Query2D.SweepCircleForGrounding(start, end, radius, this, out hit);
 
-        return TryFindGroundHitWithRay(start, end, out hit);
+        return Context.Query2D.RaycastForGrounding(start, end, this, out hit);
     }
 
-    private bool TryFindGroundHitWithRay(Vector2d start, Vector2d end, out Physics2DHit hit)
-    {
-        int hitCount = Context.Query2D.RaycastAll(start, end, Context.Settings.GroundCheckLayerMask, _groundProbeHits);
-        for (int i = 0; i < hitCount; i++)
-        {
-            Physics2DHit current = _groundProbeHits[i];
-            if (!IsValidGroundHit(current))
-                continue;
-
-            hit = current;
-            return true;
-        }
-
-        hit = default;
-        return false;
-    }
-
-    private bool TryFindGroundHitWithSweptCircle(Vector2d start, Vector2d end, Fixed64 radius, out Physics2DHit hit)
-    {
-        int hitCount = Context.Query2D.SweepCircleAgainstStaticAll(
-            start,
-            end,
-            radius,
-            Context.Settings.GroundCheckLayerMask,
-            _groundProbeHits,
-            Collider,
-            includeTriggers: false);
-
-        for (int i = 0; i < hitCount; i++)
-        {
-            Physics2DHit current = _groundProbeHits[i];
-            if (!IsValidGroundHit(current))
-                continue;
-
-            hit = current;
-            return true;
-        }
-
-        hit = default;
-        return false;
-    }
-
-    private bool IsValidGroundHit(Physics2DHit hit)
+    // Query reducers apply this pure body policy to each collider's already
+    // reduced witness, preserving compound-part ordering before ground filtering.
+    internal bool IsValidGroundHit(Physics2DHit hit)
     {
         LSCollider2D hitCollider = hit.Collider;
         if (ReferenceEquals(hitCollider, Collider))

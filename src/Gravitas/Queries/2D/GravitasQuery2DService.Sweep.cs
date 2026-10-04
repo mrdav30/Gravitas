@@ -37,6 +37,20 @@ public sealed partial class GravitasQuery2DService
         LSCollider2D? excludedCollider = null,
         bool includeTriggers = true)
     {
+        return SweepCircleCore(start, end, radius, layerMask, out hit, excludedCollider, includeTriggers, groundingBody: null);
+    }
+
+    internal bool SweepCircleForGrounding(
+        Vector2d start, Vector2d end, Fixed64 radius, SolidBody2D body, out Physics2DHit hit)
+    {
+        return SweepCircleCore(start, end, radius, _context.Settings.GroundCheckLayerMask,
+            out hit, body.Collider, includeTriggers: false, body);
+    }
+
+    private bool SweepCircleCore(
+        Vector2d start, Vector2d end, Fixed64 radius, PhysicsLayerMask layerMask,
+        out Physics2DHit hit, LSCollider2D? excludedCollider, bool includeTriggers, SolidBody2D? groundingBody)
+    {
         SwiftThrowHelper.ThrowIfArgument(radius <= Fixed64.Zero, nameof(radius), "2D sweep radius must be greater than zero.");
 
         if (!Vector2d.TrySubtract(end, start, out Vector2d segment)
@@ -56,7 +70,8 @@ public sealed partial class GravitasQuery2DService
             layerMask,
             queryVersion,
             raycastQuery: true,
-            _queryCandidates);
+            _queryCandidates,
+            staticStyleOnly: groundingBody is not null);
 
         LastQueryCandidateCount = _queryCandidates.Count;
         bool found = false;
@@ -64,9 +79,12 @@ public sealed partial class GravitasQuery2DService
         for (int i = 0; i < _queryCandidates.Count; i++)
         {
             LSCollider2D collider = _queryCandidates[i];
+            // Reduce compound parts before body policy; a rejected owner cannot
+            // contribute a later part just because that part has a support normal.
             if (!IsEligibleSweepCandidate(collider, excludedCollider, includeTriggers)
-                || !QueryDetection2D.TrySweepCircle(start, end, radius, collider, out Physics2DHit candidate)
-                || !PhysicsHitSelectionPolicy.ShouldReplace(candidate, found, closest))
+                || !QueryDetection2D.TrySweepCircle(start, end, segment, segmentLength, radius, collider, out Physics2DHit candidate)
+                || !PhysicsHitSelectionPolicy.ShouldReplace(candidate, found, closest)
+                || (groundingBody is not null && !groundingBody.IsValidGroundHit(candidate)))
             {
                 continue;
             }
@@ -168,7 +186,7 @@ public sealed partial class GravitasQuery2DService
         {
             LSCollider2D collider = _queryCandidates[i];
             if (IsEligibleSweepCandidate(collider, excludedCollider, includeTriggers)
-                && QueryDetection2D.TrySweepCircle(start, end, radius, collider, out Physics2DHit hit))
+                && QueryDetection2D.TrySweepCircle(start, end, segment, segmentLength, radius, collider, out Physics2DHit hit))
             {
                 results.Add(hit);
             }

@@ -32,9 +32,13 @@ instead of burying it in notes.
     to retain the exact contact path. Larger-scene partition/grounding scaling
     remains open as GRV-Benchmark-023. Its registration and refresh defects are
     committed as `f23d836`. Shared radial endpoint evaluation and omitted unused
-    host yaw are the next reviewed refinements; the corrected-pose grounding
-    control preserves supported and unsupported cases. Remaining warmed full-step
-    cost is still evidence-gated and no host frame budget has been accepted.
+    host yaw are committed as FixedMathSharp `6789c09` and Gravitas `ee613db`.
+    Prepared 2D segments and nearest-accepted automatic grounding are now
+    measured and ready for review, retaining exact witnesses and 100% coverage.
+    Corrected-pose and paired selection controls preserve supported and
+    unsupported cases; isolated selection and full-step intervals overlap.
+    Remaining warmed full-step cost is still evidence-gated and no host frame
+    budget has been accepted.
     GRV-Issue-089 separately tracks runtime mass mutation leaving inertia or
     awake membership stale.
 - [`Benchmark Signal Hardening`](benchmark-signal-hardening-backlog.md)

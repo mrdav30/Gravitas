@@ -162,13 +162,20 @@ Subsequent grid rows can find the preceding row's circle below them. Setup check
 `PairCount - 32` supported bodies and stable results across repeated probes.
 The measured operation includes no pose reset or simulation step.
 
+`circle-ground-query-selection` compares collect/sort/filter with nearest
+accepted grounding selection on those same corrected poses. Both paths reuse
+prepared segments and apply the body's support policy. Setup compares every
+complete hit witness and the 32/992 supported bodies at 64/1024 pairs. Timed
+methods return the selected-owner/count checksum and include query selection
+only; ground-state writes and diagnostics belong to `circle-automatic-grounding`.
+
 `planar-scale-capture` compares the existing scale/admission capture with and
 without materializing host yaw at zero and one radian. Both paths use the same
 matrix decomposition and validation. The scale-only path represents body-owned
 poses that supply their own yaw; bodyless colliders still need host yaw.
 
 ```powershell
-dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll circle-automatic-grounding planar-scale-capture --filter '*' --exporters json
+dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll circle-automatic-grounding circle-ground-query-selection planar-scale-capture --filter '*' --exporters json
 ```
 
 `partition-membership` compares existing sparse, hash and packed collection

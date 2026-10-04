@@ -15,6 +15,8 @@ internal static partial class QueryDetection2D
     private static bool TryRaycastCompound(
         Vector2d start,
         Vector2d end,
+        Vector2d segment,
+        Fixed64 segmentLength,
         LSCompoundCollider2D compound,
         out Physics2DHit hit)
     {
@@ -24,7 +26,7 @@ internal static partial class QueryDetection2D
         for (int i = 0; i < compound.PartCount; i++)
         {
             LSCollider2D part = compound.GetPartCollider(i);
-            if (!TryRaycast(start, end, part, out Physics2DHit candidate))
+            if (!TryRaycast(start, end, segment, segmentLength, part, out Physics2DHit candidate))
                 continue;
 
             TryKeepEarlierHit(candidate, ref found, ref best);
@@ -43,6 +45,8 @@ internal static partial class QueryDetection2D
     private static bool TrySweepCircleCompound(
         Vector2d start,
         Vector2d end,
+        Vector2d segment,
+        Fixed64 segmentLength,
         Fixed64 radius,
         LSCompoundCollider2D compound,
         out Physics2DHit hit)
@@ -53,7 +57,7 @@ internal static partial class QueryDetection2D
         for (int i = 0; i < compound.PartCount; i++)
         {
             LSCollider2D part = compound.GetPartCollider(i);
-            if (!TrySweepCircle(start, end, radius, part, out Physics2DHit candidate))
+            if (!TrySweepCircle(start, end, segment, segmentLength, radius, part, out Physics2DHit candidate))
                 continue;
 
             TryKeepEarlierHit(candidate, ref found, ref best);

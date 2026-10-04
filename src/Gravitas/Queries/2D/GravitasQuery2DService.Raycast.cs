@@ -29,6 +29,18 @@ public sealed partial class GravitasQuery2DService
     /// </summary>
     public bool Raycast(Vector2d start, Vector2d end, PhysicsLayerMask layerMask, out Physics2DHit hit)
     {
+        return RaycastCore(start, end, layerMask, out hit, groundingBody: null);
+    }
+
+    internal bool RaycastForGrounding(Vector2d start, Vector2d end, SolidBody2D body, out Physics2DHit hit)
+    {
+        return RaycastCore(start, end, _context.Settings.GroundCheckLayerMask, out hit, body);
+    }
+
+    private bool RaycastCore(
+        Vector2d start, Vector2d end, PhysicsLayerMask layerMask,
+        out Physics2DHit hit, SolidBody2D? groundingBody)
+    {
         if (!Vector2d.TrySubtract(end, start, out Vector2d segment)
             || !Vector2d.TryGetMagnitude(segment, out Fixed64 segmentLength)
             || segmentLength == Fixed64.Zero)
@@ -53,8 +65,11 @@ public sealed partial class GravitasQuery2DService
         Physics2DHit closest = default;
         for (int i = 0; i < _queryCandidates.Count; i++)
         {
-            if (!QueryDetection2D.TryRaycast(start, end, _queryCandidates[i], out Physics2DHit candidate)
-                || !PhysicsHitSelectionPolicy.ShouldReplace(candidate, found, closest))
+            // Only accepted witnesses enter closest. Ground policy is pure, so
+            // losing hits need no additional normal normalization or filtering.
+            if (!QueryDetection2D.TryRaycast(start, end, segment, segmentLength, _queryCandidates[i], out Physics2DHit candidate)
+                || !PhysicsHitSelectionPolicy.ShouldReplace(candidate, found, closest)
+                || (groundingBody is not null && !groundingBody.IsValidGroundHit(candidate)))
             {
                 continue;
             }
@@ -103,7 +118,7 @@ public sealed partial class GravitasQuery2DService
 
         LastQueryCandidateCount = _queryCandidates.Count;
         for (int i = 0; i < _queryCandidates.Count; i++)
-            if (QueryDetection2D.TryRaycast(start, end, _queryCandidates[i], out Physics2DHit hit))
+            if (QueryDetection2D.TryRaycast(start, end, segment, segmentLength, _queryCandidates[i], out Physics2DHit hit))
                 results.Add(hit);
 
         Physics2DHitSorter.SortByDistance(results);
