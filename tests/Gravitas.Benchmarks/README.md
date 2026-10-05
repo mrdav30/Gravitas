@@ -105,10 +105,12 @@ Do not treat short-run numbers as canonical measurements.
 
 ### Pure-2D circle contact simulation
 
-The `circle-contact-simulation` selection measures 64 and 1024 independent
+The `circle-contact-simulation` selection measures 64, 256 and 1024 independent
 dynamic/static circle pairs with axis-aligned, diagonal and rotated geometry.
-GridForge cells are 16 units in X/Z and one unit in Y, matching pair spacing
-to keep this a sustained-contact workload rather than a fine-voxel scaling test.
+`CellSize` selects one- or 16-unit X/Z cells with one-unit Y cells; pair spacing
+stays at 16 units. The full matrix has 36 rows across both measured methods.
+Use 16-unit cells for sustained contact controls and unit cells to expose
+coverage fanout. PairCount is half the total number of colliders.
 `ResetAndFullSimulationStep` runs both context `Simulate` and `LateSimulate`,
 including broad phase, contact generation, response and bookkeeping. Each
 invocation resets dynamic pose and all accumulated motion; sleep is disabled
@@ -122,7 +124,7 @@ useful attribution evidence, not an exact measurement of any single stage.
 The `circle-contact` selection remains the individual-query geometry baseline.
 
 ```powershell
-dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll circle-contact-simulation --filter '*' --exporters json
+dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll circle-contact-simulation --filter '*CellSize: 16)*' --launchCount 2 --warmupCount 5 --iterationCount 15 --iterationTime 500 --affinity 3 --exporters json --artifacts artifacts/circle-contact-coarse
 ```
 
 ### Pure-2D partition scaling
@@ -184,6 +186,15 @@ add/remove plus sorted copy after warmup, with no managed allocations. Hash
 membership avoids global-ID-sized storage and wins the one-ID row; sparse
 membership is faster in the denser microbenchmarks. Keep this tradeoff visible
 when interpreting integrated partition results.
+
+Publish geometry, cell size, pair/collider counts, coverage memberships and
+emitted/accepted candidates beside matched timing and allocation results.
+GRV-Benchmark-023 uses predictable scaling and published costs as its closure
+criterion, with no fixed-Hz target. Experiment history and uncertainty belong in the
+[benchmark backlog](../../docs/feature-work/benchmark-signal-hardening-backlog.md#grv-benchmark-023--circle-workload-partition-and-grounding-scaling)
+rather than these runner instructions. Use `UseLocalLsfStack=true` for the
+unreleased coordinated stack, and identical job settings with separate artifact
+roots for before, after and confirmation captures.
 
 ### 3D grounding and closest-query controls
 

@@ -18,11 +18,14 @@ public class CircleContactSimulationBenchmarks
     private Vector2d[] _positions;
     private Fixed64 _rotation;
 
-    [Params(64, 1024)]
+    [Params(64, 256, 1024)]
     public int PairCount { get; set; }
 
     [Params("Axis", "Diagonal", "Rotated")]
     public string Geometry { get; set; }
+
+    [Params(1, 16)]
+    public int CellSize { get; set; } = 16;
 
     [GlobalSetup]
     public void Setup()
@@ -54,12 +57,12 @@ public class CircleContactSimulationBenchmarks
         const int columns = 32;
         const int spacing = 16;
         int rows = (PairCount + columns - 1) / columns;
-        // Match cells to pair spacing: this isolates sustained contact work instead
-        // of measuring large radius-five voxel fanout in a unit-cell grid.
+        // Cell size changes partition fanout while pair spacing, contact
+        // geometry and the complete simulation workload remain identical.
         if (!_context.World.TryAddGrid(new GridConfiguration(
             new Vector3d(-16, 0, -16),
             new Vector3d(columns * spacing + 16, 0, rows * spacing + 16),
-            topologyMetrics: GridTopologyMetrics.Rectangular((Fixed64)16, Fixed64.One, (Fixed64)16)), out _))
+            topologyMetrics: GridTopologyMetrics.Rectangular((Fixed64)CellSize, Fixed64.One, (Fixed64)CellSize)), out _))
             throw new InvalidOperationException("Unable to create the circle contact benchmark grid.");
 
         _bodies = new SolidBody2D[PairCount];

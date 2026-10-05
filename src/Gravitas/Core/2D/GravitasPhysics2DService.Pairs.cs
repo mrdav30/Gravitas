@@ -23,8 +23,10 @@ public sealed partial class GravitasPhysics2DService
             return;
         }
 
-        if (!RequireCollisionPair(first!, second!)
-            || !CollisionDetection2D.BoundsOverlap(first!, second!)
+        // Shared coarse voxels can link separated shapes. Their cached bounds
+        // reject them before hierarchy, layer and constraint policy is needed.
+        if (!CollisionDetection2D.BoundsOverlap(first!, second!)
+            || !RequireCollisionPair(first!, second!)
             || !IsCanonicalSharedPartition(first!, second!, partitionIndex))
         {
             return;
@@ -33,7 +35,6 @@ public sealed partial class GravitasPhysics2DService
         ulong key = CreatePairKey(firstId, secondId);
         if (!_processedPairKeys.Add(key))
             return;
-
         LastBroadPhaseCandidateCount++;
         ProcessCandidate(first!, second!, _context.FrameCount);
     }

@@ -39,7 +39,6 @@ public sealed class GravitasCollision2DService
     private readonly SwiftList<int> _distributionDynamicIds = new();
     private readonly SwiftList<int> _distributionStaticIds = new();
     private readonly SwiftList<PhysicsPartition2D> _queryPartitions = new();
-    private readonly SwiftList<int> _queryColliderIds = new();
     private readonly Action<PhysicsPartition2D> _releaseRetainedPartition;
     private readonly SwiftSparseSet _deferredPartitionRefreshIds = new();
 
@@ -80,7 +79,6 @@ public sealed class GravitasCollision2DService
         _distributionDynamicIds.FastClear();
         _distributionStaticIds.FastClear();
         _queryPartitions.FastClear();
-        _queryColliderIds.FastClear();
         _deferredPartitionRefreshIds.Clear();
         _inactivePartitionPool.Clear();
         Version = 1;
@@ -292,36 +290,52 @@ public sealed class GravitasCollision2DService
         candidates.FastClear();
 
         CollectCoveredPartitions(min, max, _queryPartitions);
-        _queryPartitions.SortInPlace(PartitionOrderComparer);
 
+        // Gathering has no callbacks or geometry reduction. Canonicalize once
+        // after deduplication, before query workers observe any candidate order.
         for (int i = 0; i < _queryPartitions.Count; i++)
         {
             PhysicsPartition2D partition = _queryPartitions[i];
-            if (staticStyleOnly)
-                partition.CopyStaticStyleColliderIds(_queryColliderIds);
-            else
-                partition.CopyAllColliderIds(_queryColliderIds);
-
-            for (int j = 0; j < _queryColliderIds.Count; j++)
-            {
-                int colliderId = _queryColliderIds[j];
-                if (!_context.Physics2D.TryGetColliderById(colliderId, out LSCollider2D? collider)
-                    || !collider!.IsActive
-                    || IsDuplicateQueryCandidate(collider, queryVersion, raycastQuery)
-                    || !layerMask.Includes(collider.Layer)
-                    || collider.MaxX < min.X
-                    || collider.MinX > max.X
-                    || collider.MaxY < min.Y
-                    || collider.MinY > max.Y)
-                {
-                    continue;
-                }
-
-                candidates.Add(collider);
-            }
+            if (!staticStyleOnly)
+                CollectMembershipCandidates(partition.ContainedDynamicObjects,
+                    min, max, layerMask, queryVersion, raycastQuery, candidates);
+            CollectMembershipCandidates(partition.ContainedKinematicObjects,
+                min, max, layerMask, queryVersion, raycastQuery, candidates);
+            CollectMembershipCandidates(partition.ContainedStaticObjects,
+                min, max, layerMask, queryVersion, raycastQuery, candidates);
         }
 
         candidates.SortInPlace(ColliderIdComparer);
+    }
+
+    private void CollectMembershipCandidates(
+        SwiftHashSet<int>? membership,
+        Vector2d min,
+        Vector2d max,
+        PhysicsLayerMask layerMask,
+        uint queryVersion,
+        bool raycastQuery,
+        SwiftList<LSCollider2D> candidates)
+    {
+        if (membership == null)
+            return;
+
+        foreach (int colliderId in membership)
+        {
+            if (!_context.Physics2D.TryGetColliderById(colliderId, out LSCollider2D? collider)
+                || !collider!.IsActive
+                || IsDuplicateQueryCandidate(collider, queryVersion, raycastQuery)
+                || !layerMask.Includes(collider.Layer)
+                || collider.MaxX < min.X
+                || collider.MinX > max.X
+                || collider.MaxY < min.Y
+                || collider.MinY > max.Y)
+            {
+                continue;
+            }
+
+            candidates.Add(collider);
+        }
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

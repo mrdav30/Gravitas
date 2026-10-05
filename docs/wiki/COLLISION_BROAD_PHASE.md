@@ -154,6 +154,11 @@ Candidate generation must be deterministic:
 If every dynamic body in a partition is sleeping, pair generation is skipped
 until a deterministic wake reason changes a body or collider shape state.
 
+Pure 2D candidate routing rejects disjoint bounds before physical-pair admission
+and canonical shared-partition ownership. Bounds-accepted pairs still pass the
+full physical filters. Three-dimensional retained-pair culling has a different
+lifecycle boundary; do not assume the same rejection order applies there.
+
 ## Pair Filters
 
 Candidate pairs are rejected before exact shape work when any required filter

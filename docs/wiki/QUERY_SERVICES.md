@@ -24,6 +24,14 @@ guide. For the full query matrix, reducer policies, and per-family notes, read
   `Query2D.QuerySupport` intentionally does: it asks what can support a real collider.
 - Query services are same-thread and non-reentrant per context service.
 
+Pure 2D gathering visits partition memberships directly, deduplicates collider
+IDs and sorts the final candidate buffer by collider ID. Intermediate partition
+and member-copy sorts are unnecessary for that final order. Three-dimensional
+ray/sweep partition gathering already traverses memberships directly; the
+separate planar candidate-index rebuild still uses sorted member copies.
+Closest-hit reducers
+and all-hit output sorting retain their existing contracts in every dimension.
+
 ```mermaid
 flowchart LR
     Query3D["Query3D"] --> Hits3D["Physics3DHit"]

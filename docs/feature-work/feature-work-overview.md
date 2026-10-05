@@ -26,31 +26,28 @@ instead of burying it in notes.
     `SwiftCollections`, `GridForge`, then Gravitas. Package references are the
     default; use `UseLocalLsfStack=true` only for coordinated validation of
     unreleased sibling changes, then revalidate against released packages.
-  - GRV-Issue-083's circle-contact repair
-    and shared upstream optimization are complete. GRV-Benchmark-022 is closed
-    after the committed shared normalization improvement and documented decision
-    to retain the exact contact path. Larger-scene partition/grounding scaling
-    remains open as GRV-Benchmark-023. Its registration and refresh defects are
-    committed as `f23d836`. Shared radial endpoint evaluation and omitted unused
-    host yaw are committed as FixedMathSharp `6789c09` and Gravitas `ee613db`.
-    Prepared 2D segments and nearest-accepted automatic grounding are committed
-    as Gravitas `6c0c2f0`, retaining exact witnesses and the prior coverage gates.
-    Corrected-pose and paired selection controls preserve supported and
-    unsupported cases; isolated selection and full-step intervals overlap.
-    The next refinement retains FixedMathSharp's centered-transform fast path
-    and GridForge's locked typed-lookup improvement for review. Streamed 3D
-    grounding was rejected after repeated sparse ray probes regressed by 8-10%;
-    public characterization tests and the benchmark fixture remain for future
-    investigation. Matched measurements and coverage gates track each owner.
-    Remaining warmed full-step cost is still evidence-gated and no host frame
-    budget has been accepted.
-    GRV-Issue-089 separately tracks runtime mass mutation leaving inertia or
+  - GRV-Issue-089 remains active for runtime mass mutation leaving inertia or
     awake membership stale.
 - [`Benchmark Signal Hardening`](benchmark-signal-hardening-backlog.md)
   - Reproduce and close confirmed release-relevant signals alongside the owning
     library change. Do not broaden this into speculative optimization work.
 
 ## Recently Completed
+
+- [`Circle Workload Partition And Grounding Scaling`](benchmark-signal-hardening-backlog.md#grv-benchmark-023--circle-workload-partition-and-grounding-scaling)
+  - GRV-Benchmark-023 closed 2026-10-04 under the predictable-scaling and
+    published-cost criterion. Prior phases are committed, including Gravitas
+    `bf11409`, FixedMathSharp `5447b34` and GridForge `3f34f8b`; the latest lean
+    2D gathering and bounds-first rejection remain unstaged for review.
+  - Release/Lean pass 4473/4414 tests with 100% line/branch/method coverage;
+    both target frameworks build without warnings/errors. Final scaling,
+    contract/allocation smoke and all three DocFX gates pass. Repeated controls
+    do not establish a stable full-step gain from the latest bounds rejection.
+  - At 1024 diagonal pairs, 16-unit cells cost 30.0562 +/- 0.5735 ms and unit
+    cells 201.9929 +/- 4.3606 ms, both 0 B/op. Costs are not uniformly linear;
+    closure does not certify a fixed-Hz host budget. Detailed counts, rejected
+    experiments and history remain in the backlog. Released-package validation
+    remains a future release gate.
 
 - [`Exact 2D Circle Contacts`](issue-tracker.md#grv-issue-083---2d-circle-contacts-compare-saturated-squared-distances)
   - Completed 2026-09-30. Circle contacts retain wide classification, correctly
@@ -65,7 +62,8 @@ instead of burying it in notes.
     rescaling, preserves raw results and improves diagonal/rotated direct queries
     by 7.2%/3.7%. A sustained 64/1024-pair workload keeps the remaining exact
     premium visible without claiming a full-step speedup or accepting a frame
-    budget. Its larger partition/grounding costs are tracked in GRV-Benchmark-023.
+    budget. Its larger partition/grounding costs are documented in closed
+    GRV-Benchmark-023.
     Fresh Release/ReleaseLean builds and suites pass in both repositories with
     exact 100% reachable line/branch/method coverage and no review findings.
 
