@@ -83,11 +83,17 @@ instead of burying it in notes.
   - GRV-Benchmark-021 remains open alongside GRV-Benchmark-020. Their shared
     analytic materializer and distinct oblique root paths have coordinated
     profiles. [Retained-root refinement](2026-10-04-capsule-slab-cost-refinement.md)
-    improves four oblique stadium fixtures by 7.1-24.2% with 0 B/op; the
-    analytic-winner fixture remains about 2.90 ms and targets exact sign
-    refinement next. Fresh 2026-10-05 standard/Lean coverage remains exactly
-    100% line/branch/method in both repositories; Debug/resource and DocFX gates
-    pass. No single common CPU hotspot is proved for both signals.
+    improves four oblique stadium fixtures by 7.1-24.2% with 0 B/op. The
+    [certified-sign refinement](2026-10-05-capsule-slab-sign-refinement.md)
+    subsequently brings the analytic-winner fixture to about 1.39 ms with
+    0 B/op (49.9-51.3% mean reduction across repeated committed baselines),
+    reusing retained-cell and endpoint certificates with a measured
+    point-evaluation budget. Its final profile targets root acquisition
+    (55.6% inclusive sampled CPU). Both signals remain open; no single common
+    CPU hotspot is proved for them. Exact classification, rounding, chart
+    coverage and bounded scratch remain unchanged. Fresh 2026-10-05
+    standard/Lean coverage remains exactly 100% line/branch/method in both
+    repositories; focused Debug/resource checks and both DocFX gates pass.
 
 - [`Complete Capsule/Circle-Slab Contacts`](issue-tracker.md#grv-issue-085---mixed-capsulecircle-slab-contact-bypasses-the-complete-upstream-query)
   - Completed 2026-09-29. Mixed capsule contacts reuse FixedMathSharp's complete

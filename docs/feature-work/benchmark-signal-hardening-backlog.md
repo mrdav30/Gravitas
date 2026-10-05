@@ -65,13 +65,14 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 
 **Discovered:** 2026-09-30.  
 **Status:** Open performance follow-up; GRV-Issue-088 correctness repair and
-remaining cost accepted on 2026-09-30. Retained-root and positive-certificate
-refinement measured 2026-10-04; the remaining curved cost keeps this signal open.  
+remaining cost accepted on 2026-09-30. Retained-root/positive-certificate and
+certified-sign refinements measured 2026-10-04/05; the remaining curved cost
+keeps this signal open.  
 **Owner:** FixedMathSharp's complete capsule/stadium-slab feature selection,
 shared circular-rim algebra and signed value-root comparison.
 
-The complete query fixes false contacts and nonminimum penetration. Current
-matched, longer captures reduce the original oblique fixture from
+The complete query fixes false contacts and nonminimum penetration. The first
+matched, longer refinement captures reduce the original oblique fixture from
 **812.93 ± 13.251 to 755.13 ± 13.560 microseconds/query (7.1%)**. Added positive
 and irrational curved winners improve **24.2% / 22.2%**, to **881.33 / 981.46
 microseconds**. An analytic winner whose curved roots lose improves **13.7%**,
@@ -89,12 +90,21 @@ mixed circle-slab, paired 3D and triangle controls retain separate measurements.
 The [correctness repair history](done/2026-09-29-complete-capsule-slab-contact-plan.md#refined-matched-performance)
 retains the older complete and incorrect/incomplete baselines.
 
-**Next isolation step:** The analytic-winner fixture still costs about 2.90 ms.
-Its final profile attributes 55.3% inclusive sampled CPU to exact sign refinement,
-including 39.6% in the rejection comparison, and 29.9% to parameter-root
-acquisition. Reduce or reuse threshold-sign refinement, then investigate root
-isolation/count reuse only where chart equivalence is proved. Coordinate with
-GRV-Benchmark-020 using the
+**Next isolation step:** The analytic-winner fixture's first-phase profile
+motivated the subsequent
+[certified-sign refinement](2026-10-05-capsule-slab-sign-refinement.md), which
+reuses retained-cell certificates and crossing endpoint/hint evaluations, with
+a measured 128-bit point guard. The final fixed-count confirmation is about
+**1.39 ms**, at **0 B/op**, versus **2.78–2.85 ms** in bracketing committed
+baseline captures (49.9–51.3% mean reduction). The irrational winner also
+improves; the smaller original/positive-rim changes overlap the repeated
+baseline's intervals and are not claimed as firm gains. Exact fallback,
+root identity and every constrained chart remain intact. The final profile
+attributes **55.6%** inclusive sampled
+CPU to root acquisition and **23.1%** to sign queries; these overlapping shares
+are not an additive budget. Investigate root isolation/count reuse only where
+chart equivalence, endpoint inclusion and ordinal mapping are proved.
+Coordinate with GRV-Benchmark-020 using the
 [shared investigation context](#capsule-rim-cost-relationship-grv-benchmark-020-and-021).
 Prefer proved nonwinning-feature certificates or shared algebra reuse; retain
 strict raw-neighbor classification, whole-shape minimum depth, stable ties,
@@ -179,6 +189,10 @@ sampled CPU, while stadium constrained root acquisition, sign refinement and
 value mapping remain expensive. The [refinement evidence](2026-10-04-capsule-slab-cost-refinement.md)
 retains both profiles and mixed/3D/triangle controls. This does not establish a
 single shared dominant leaf or justify merging the specialized solvers.
+The 2026-10-05 [certified-sign refinement](2026-10-05-capsule-slab-sign-refinement.md)
+moves the stadium analytic-winner bottleneck toward root acquisition, while
+circle mixed/3D controls retain their distinct ellipse path. Both signals stay
+open; shared algebra does not imply shared root-selection policy.
 
 The fixture names describe different features:
 
