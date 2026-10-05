@@ -65,24 +65,36 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 
 **Discovered:** 2026-09-30.  
 **Status:** Open performance follow-up; GRV-Issue-088 correctness repair and
-remaining cost accepted on 2026-09-30. Acceptance closes the defect, not this signal.  
+remaining cost accepted on 2026-09-30. Retained-root and positive-certificate
+refinement measured 2026-10-04; the remaining curved cost keeps this signal open.  
 **Owner:** FixedMathSharp's complete capsule/stadium-slab feature selection,
 shared circular-rim algebra and signed value-root comparison.
 
-The complete query fixes false contacts and nonminimum penetration. Its refined
-oblique-interior rim costs **942.95 ± 20.152 microseconds/query** and straight
-rim **80.81 ± 1.157 microseconds/query**, both **0 B/op**. Error is the half-width
-of the 99.9% confidence interval. The first complete solver took 1326.22 and
-208.38 microseconds respectively; exact whole-shape certificates, removal of
-duplicate fan work and whole-chart admission reduced that cost by 29% and 61%.
-The old 62.86 / 51.27 microsecond results were incorrect and are not equivalent
-optimization targets. Ordinary cap/side/end rows are now 37-41% faster than the
-old path. Existing mixed circle-slab and 3D controls remain separate evidence
-under GRV-Benchmark-020.
+The complete query fixes false contacts and nonminimum penetration. Current
+matched, longer captures reduce the original oblique fixture from
+**812.93 ± 13.251 to 755.13 ± 13.560 microseconds/query (7.1%)**. Added positive
+and irrational curved winners improve **24.2% / 22.2%**, to **881.33 / 981.46
+microseconds**. An analytic winner whose curved roots lose improves **13.7%**,
+from **3358.56 to 2898.86 microseconds**. All rows report **0 B/op**. Error is the
+99.9% confidence half-width; source revisions, complete intervals, raw captures,
+rejected experiments and independent coverage-fixture proofs are in the
+[refinement evidence](2026-10-04-capsule-slab-cost-refinement.md).
 
-**Next isolation step:** Profile admitted oblique roots, squared-value mapping
-and exact winner comparisons in the existing `capsule-slab-contact` fixtures.
-Coordinate with GRV-Benchmark-020 using the
+The shared root comparison now retains certified refinement. Stadium winners
+retain parameter/value roots instead of rebuilding the winning parameter for
+normal rounding, and positive analytic gaps reuse the existing triangle/box
+nonwinning-root certificate before value mapping. Every constrained chart and
+exact classification/rounding contract remains present. Ordinary stadium,
+mixed circle-slab, paired 3D and triangle controls retain separate measurements.
+The [correctness repair history](done/2026-09-29-complete-capsule-slab-contact-plan.md#refined-matched-performance)
+retains the older complete and incorrect/incomplete baselines.
+
+**Next isolation step:** The analytic-winner fixture still costs about 2.90 ms.
+Its final profile attributes 55.3% inclusive sampled CPU to exact sign refinement,
+including 39.6% in the rejection comparison, and 29.9% to parameter-root
+acquisition. Reduce or reuse threshold-sign refinement, then investigate root
+isolation/count reuse only where chart equivalence is proved. Coordinate with
+GRV-Benchmark-020 using the
 [shared investigation context](#capsule-rim-cost-relationship-grv-benchmark-020-and-021).
 Prefer proved nonwinning-feature certificates or shared algebra reuse; retain
 strict raw-neighbor classification, whole-shape minimum depth, stable ties,
@@ -90,11 +102,9 @@ canonical anchors, bounded scratch and zero allocation. Do not restore a
 direction subset or combine constituent-cylinder depths.
 
 **Reproduce:** after a Release local-stack benchmark build, run
-`dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll capsule-slab-contact --launchCount 2 --warmupCount 5 --iterationCount 15 --iterationTime 250 --affinity 3 --exporters json --artifacts artifacts/grv088/refined`.
+`dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll --filter '*CapsuleSlabContactBenchmarks*Oblique*' --launchCount 2 --warmupCount 5 --iterationCount 15 --invocationCount 512 --affinity 3 --exporters json --artifacts artifacts/grv-benchmark-021/reproduce`.
 Use `DOTNET_PROCESSOR_COUNT=2`, BelowNormal priority and one heavy workload.
-The [completed repair plan](done/2026-09-29-complete-capsule-slab-contact-plan.md#refined-matched-performance)
-retains the source revisions, Windows/.NET environment, full matched table and
-control evidence; raw distributions are in `artifacts/grv088/refined/`.
+Set `UseLocalLsfStack=true` in MSBuild and the environment for child builds.
 
 ### GRV-Benchmark-020 — Complete Capsule/Circle-Slab Contact Cost
 
@@ -163,6 +173,13 @@ shared CPU hotspot. Keep both fixture families and their measured results
 distinct; investigate them together, starting with oblique contacts and then
 endpoint/straight-rim output materialization.
 
+The 2026-10-04 coordinated profiles now distinguish their expensive owners:
+circle/cylinder ellipse magnitude-to-raw comparison takes about 53-55% inclusive
+sampled CPU, while stadium constrained root acquisition, sign refinement and
+value mapping remain expensive. The [refinement evidence](2026-10-04-capsule-slab-cost-refinement.md)
+retains both profiles and mixed/3D/triangle controls. This does not establish a
+single shared dominant leaf or justify merging the specialized solvers.
+
 The fixture names describe different features:
 
 | Fixture | Capsule feature | Slab feature |
@@ -186,8 +203,8 @@ end-region roots and maps/compares their signed gaps through value roots, reusin
 circular-rim algebra also consumed by triangle contacts. Copying the cylinder's
 reflection/root-selection shortcut could discard a valid stadium contact.
 
-Profile these stages side by side before attributing cost to a shared leaf or
-merging solvers. Prefer demonstrated shared arithmetic/materialization wins or
+Continue profiling the affected stages before attributing cost to a shared leaf
+or merging solvers. Prefer demonstrated shared arithmetic/materialization wins or
 proved feature certificates; retain ordinary mixed/3D and affected triangle
 controls. Similar exact algebra does not yet prove the same dominant function,
 an unavoidable correctness cost, or an optimization that will benefit both.

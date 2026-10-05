@@ -13,7 +13,8 @@ public class CapsuleSlabContactBenchmarks
     private LSCapsuleCollider _capsule;
     private LSCapsuleCollider2D _slab;
 
-    [Params("Side", "Cap", "StraightRim", "SeparatedRim", "EndRegion", "Containment", "ObliqueInteriorRim")]
+    [Params("Side", "Cap", "StraightRim", "SeparatedRim", "EndRegion", "Containment", "ObliqueInteriorRim",
+        "ObliquePositiveRim", "ObliqueIrrationalRim", "ObliqueFanWins")]
     public string Geometry { get; set; }
 
     [GlobalSetup]
@@ -79,6 +80,33 @@ public class CapsuleSlabContactBenchmarks
                 // Negative-end rim p=(0,1,-2), core center q=p+5*n and n.Z<0
                 // certify a whole-slab closest pair with depth 21/4-5=1/4.
                 break;
+            case "ObliquePositiveRim":
+            case "ObliqueIrrationalRim":
+            case "ObliqueFanWins":
+                // Independent whole-shape fixtures from the upstream contact tests:
+                // positive stationary minimum, irrational winner, and two admitted
+                // roots that both lose to the earlier analytic boundary.
+                // Normalize the proportional frame as authored upstream so the host
+                // transform preserves the same exact reduced rotation columns.
+                Fixed64 authoredScale = Fixed64.One / FixedMath.Sqrt((Fixed64)(Geometry == "ObliqueFanWins" ? 10 : 25));
+                radius = Fixed64.FromFraction(1, 4);
+                if (Geometry == "ObliqueFanWins")
+                {
+                    rotation = new FixedQuaternion(authoredScale, -2 * authoredScale, -authoredScale, 2 * authoredScale);
+                    coreLength = (Fixed64)20000; slabRadius = (Fixed64)3125; halfThickness = (Fixed64)899;
+                    center = new Vector3d(-1024, 0, -1);
+                    expectedDepth = (Fixed64)2101 + radius;
+                }
+                else
+                {
+                    rotation = new FixedQuaternion(4 * authoredScale, -2 * authoredScale, authoredScale, 2 * authoredScale);
+                    coreLength = (Fixed64)2000; slabRadius = (Fixed64)625; halfThickness = (Fixed64)500;
+                    bool irrational = Geometry == "ObliqueIrrationalRim";
+                    center = irrational ? new Vector3d(0, 446, 273) : new Vector3d(0, 392, 545);
+                    // Irrational core gap=45*sqrt(21), independently integer-square bracketed.
+                    expectedDepth = (irrational ? Fixed64.FromRaw(885_690_573_358L) : (Fixed64)135) + radius;
+                }
+                break;
             default:
                 throw new InvalidOperationException("Unknown capsule/slab contact geometry.");
         }
@@ -99,7 +127,8 @@ public class CapsuleSlabContactBenchmarks
 
         bool hit = CollisionDetectionMixed.TryCollide(_capsule, _slab, out MixedContact contact);
         if (hit != expectedHit || contact.Depth != expectedDepth || contact.DepthIsClamped)
-            throw new InvalidOperationException($"Incorrect capsule/slab contact for {Geometry}.");
+            throw new InvalidOperationException($"Incorrect capsule/slab contact for {Geometry}: hit {hit}/{expectedHit}, " +
+                $"raw depth {contact.Depth.m_rawValue}/{expectedDepth.m_rawValue}, clamped {contact.DepthIsClamped}.");
     }
 
     [Benchmark]

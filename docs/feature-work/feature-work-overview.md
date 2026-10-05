@@ -41,7 +41,7 @@ instead of burying it in notes.
   - Same-value assignments preserve sleep; changed runtime assignments are
     allowed between complete steps. Recorded-state loads retain saved sleep.
     Release/Lean coverage, replay, and warmed allocation gates pass; the 3D
-    field-to-property migration is documented. Changes are unstaged for review.
+    field-to-property migration is documented. Gravitas phase committed in `942d80f`.
 
 - [`Circle Workload Partition And Grounding Scaling`](benchmark-signal-hardening-backlog.md#grv-benchmark-023--circle-workload-partition-and-grounding-scaling)
   - GRV-Benchmark-023 closed 2026-10-04 under the predictable-scaling and
@@ -81,8 +81,13 @@ instead of burying it in notes.
     Debug/resource checks and DocFX pass. Ordinary cap/side/end fixtures improve
     37-41%. The user accepted the remaining complete-query cost for now.
   - GRV-Benchmark-021 remains open alongside GRV-Benchmark-020. Their shared
-    analytic materializer and related but distinct oblique root paths are
-    documented for coordinated profiling; no common CPU hotspot is yet proved.
+    analytic materializer and distinct oblique root paths have coordinated
+    profiles. [Retained-root refinement](2026-10-04-capsule-slab-cost-refinement.md)
+    improves four oblique stadium fixtures by 7.1-24.2% with 0 B/op; the
+    analytic-winner fixture remains about 2.90 ms and targets exact sign
+    refinement next. Fresh 2026-10-05 standard/Lean coverage remains exactly
+    100% line/branch/method in both repositories; Debug/resource and DocFX gates
+    pass. No single common CPU hotspot is proved for both signals.
 
 - [`Complete Capsule/Circle-Slab Contacts`](issue-tracker.md#grv-issue-085---mixed-capsulecircle-slab-contact-bypasses-the-complete-upstream-query)
   - Completed 2026-09-29. Mixed capsule contacts reuse FixedMathSharp's complete
