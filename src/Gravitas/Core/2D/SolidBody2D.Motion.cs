@@ -253,17 +253,19 @@ public sealed partial class SolidBody2D
         if (!_centerOfMassOffsetExplicit)
             _localCenterOfMassOffset = Collider.CalculateLocalCenterOfMassOffset();
 
-        if (_mass <= Fixed64.Zero)
-        {
-            _momentOfInertia = Fixed64.Zero;
-            _inverseMomentOfInertia = Fixed64.Zero;
-            return;
-        }
+        RefreshMomentOfInertia(_mass);
+    }
 
-        _momentOfInertia = Collider.CalculateMomentOfInertia(_mass, _localCenterOfMassOffset);
-        _inverseMomentOfInertia = _momentOfInertia > Fixed64.Zero
-            ? Fixed64.One / _momentOfInertia
+    private void RefreshMomentOfInertia(Fixed64 mass)
+    {
+        Fixed64 inertia = mass > Fixed64.Zero
+            ? Collider.CalculateMomentOfInertia(mass, _localCenterOfMassOffset)
             : Fixed64.Zero;
+        Fixed64 inverseInertia = inertia > Fixed64.Zero
+            ? Fixed64.One / inertia
+            : Fixed64.Zero;
+        _momentOfInertia = inertia;
+        _inverseMomentOfInertia = inverseInertia;
     }
 
 }

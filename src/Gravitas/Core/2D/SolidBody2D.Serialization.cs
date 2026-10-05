@@ -92,7 +92,8 @@ public sealed partial class SolidBody2D
             ContinuousCollisionMode = continuousCollisionMode;
             _rotation = CanonicalizeRotation(_rotation);
             _freezeAxes = freezeAxes;
-            Mass = mass;
+            // Restore saved sleep/motion; the public setter is a waking host mutation.
+            _mass = mass;
             Gravity = gravity;
             GravityScale = gravityScale;
             SleepEnabled = sleepEnabled;
@@ -126,6 +127,11 @@ public sealed partial class SolidBody2D
             RefreshMassPropertiesFromColliderShape();
             ApplyLoadedFreezeConstraintsToMotion();
             ApplyLoadedState();
+            if (Active)
+            {
+                InvalidateMassDependentSolverState();
+                RefreshPartitionAwakeState();
+            }
             if (!active || Collider.Id < 0)
                 Deactivate();
             _groundingStateVersion++;

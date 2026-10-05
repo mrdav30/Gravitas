@@ -35,49 +35,53 @@
 
 ### Ordered Queue
 
-### GRV-Issue-089 - Runtime mass changes leave inertia or awake membership stale
-
-- **Status:** Open. Separate correctness scope discovered during
-  `GRV-Benchmark-023`; the partition hardening does not resolve runtime mass
-  mutation ownership.
-- **Confirmed:** 2026-10-02 through registered pure 2D/3D bodies, using the
-  existing .NET 8 Release binaries built with `UseLocalLsfStack=true`. The
-  reflection probe ran under PowerShell's .NET 10.0.11 host, reused test fixture
-  initialization, and applied public body mutations and impulses. No production
-  fields were fabricated. This is direct executable evidence, not a completed
-  full-step regression matrix or mixed-mode validation.
-- **3D reproduction:** Initialize a radius-`0.5` sphere at `(4,4,4)` with
-  `Mass=1`, then assign `Mass=2`. `InverseInertiaTensor` remains unchanged. A
-  Y-axis angular impulse of `0.25` produces angular velocity
-  `2.4999999976716936`, versus `1.2500000002328306` for an otherwise equivalent
-  sphere initialized with `Mass=2`. Assigning `Mass=0` then makes
-  `CanTranslate=false`, but leaves `CanRotate=true` and the old inverse inertia.
-  Another `0.25` angular impulse increases angular velocity to
-  `4.999999995343387` despite the zero mass.
-- **2D reproduction:** Initialize a radius-`0.5` circle with `Mass=1`, then set
-  `Mass=0`. `CanTranslate` and `CanRotate` become false, but its existing
-  `PhysicsPartition2D` membership remains awake. Conversely, initialize a
-  dynamic circle with `Mass=0`, then set `Mass=1`: both mobility properties
-  become true while its existing membership remains absent from the awake set.
-  Neither sequence changes bounds or the dynamic partition role.
-- **Cause and impact:** 3D `SolidBody.Mass` is a public field with no inertia
-  refresh on mutation. The 2D setter refreshes mass properties but does not
-  synchronize partition awake state. Immediate angular response can therefore
-  use stale mass, and a newly movable 2D body can remain excluded from collision
-  distribution until another operation refreshes its awake membership.
-- **Follow-up:** Define and harden the post-initialization mass mutation
-  contract in the body owners. Verify positive/zero mass transitions, angular
-  mass scaling, awake membership, and 2D/3D/mixed parity while preserving
-  deterministic ordering and allocation gates.
-- **Evidence:** The ignored probe and output are
-  `artifacts/grv-benchmark-023/mass-mutation-probe.ps1` and
-  `artifacts/grv-benchmark-023/mass-mutation-probe.json`. Run the script against
-  the local-stack Release test output; it does not rebuild or leave failing
-  tests.
+No active correctness issues.
 
 Remaining measured performance costs are tracked in the benchmark backlog.
 
 ## Resolved Issues
+
+### GRV-Issue-089 - Runtime mass changes leave inertia or awake membership stale
+
+- **Resolved:** 2026-10-04. Gravitas body owners now enforce one runtime mass
+  mutation contract for pure 2D, 3D, and mixed membership. No upstream change is
+  required; changes remain unstaged for review.
+- **Confirmed:** 2026-10-02 during `GRV-Benchmark-023`. A registered 3D sphere
+  changed from mass 1 to 2 retained its old inverse inertia and doubled the
+  expected angular impulse response. Changing it to zero left rotation enabled.
+  Pure 2D refreshed inertia but retained stale awake membership across zero.
+  Original executable evidence remains in the ignored
+  `artifacts/grv-benchmark-023/mass-mutation-probe.ps1` and `.json`.
+- **Fix:** Actual active changes calculate replacement inertia before publishing
+  mass, clear contact and connected-joint impulse caches and CCD state, wake,
+  and synchronize pure/mixed awake membership. Non-positive mass disables
+  applicable solver motion without changing role, freeze axes, registration,
+  coordinates, pose, velocities, or already accepted accelerations. Equal values
+  are no-ops. Inactive mass is configuration derived at initialization. Changed
+  runtime values reject during fixed-step transactions/callbacks or after a
+  registration reset. Recorded loads bypass the waking setter, refresh derived
+  state, and clear caches while retaining saved sleep and pair/joint identity.
+- **Compatibility:** `SolidBody.Mass` changes from a field to a property.
+  Ordinary assignment/object-initializer source use is preserved; rebuild
+  consumers and migrate ref/reflection access. The `"Mass"` record key and body
+  schemas are unchanged. See [the migration guide](../MIGRATION.md#runtime-mass-changes)
+  and [host contract](../wiki/HOST_INTEGRATION.md#runtime-mass-changes).
+- **Verification:** Local-stack Release and ReleaseLean suites pass with 100%
+  reachable line, branch, and method coverage in raw and rendered reports.
+  Focused cases cover angular scaling, non-positive transitions, sleep/no-op,
+  role/freeze preservation, custom math failure, stale registrations, callbacks,
+  contact/joint cache ownership, transport restores, replay, pure/mixed candidate
+  routing, prepared CCD trajectories/indexes/handoffs, and zero-allocation
+  warmed mutations. The impulse-kernel boundary fixture now uses its existing
+  explicit tensor helper instead of depending on stale sphere inertia after a
+  tiny-mass assignment. Dated logs, coverage, and mutation-cycle measurements
+  remain under ignored `artifacts/grv-issue-089`.
+- **Measured mutation cost:** On this i7-9700K host, the complete registered
+  `0 -> 2 -> 1` kilogram cycle costs `13.373 +/- 0.1671 us` for the 3D sphere
+  fixture and `4.897 +/- 0.0438 us` for the 2D circle fixture, both `0 B/op`.
+  Default-job measurements use two launches, five warmups, fifteen measured
+  250 ms iterations, and CPU affinity `3`; these are three-assignment fixture
+  costs, not a simulation-step budget. The API build and local-link checks pass.
 
 ### GRV-Issue-083 - 2D circle contacts compare saturated squared distances
 

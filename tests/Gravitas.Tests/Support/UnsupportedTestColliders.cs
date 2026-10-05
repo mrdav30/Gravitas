@@ -10,11 +10,24 @@ using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
 using Gravitas.Queries;
 using SwiftCollections;
+using System;
 
 namespace Gravitas.Tests.Support;
 
 internal sealed class UnsupportedTestCollider2D : LSCollider2D
 {
+    internal Fixed64 MomentOfInertia { get; set; } = Fixed64.Zero;
+
+    internal bool ThrowOnInertiaCalculation { get; set; }
+
+    public override Fixed64 CalculateMomentOfInertia(Fixed64 mass, Vector2d localReferencePoint)
+    {
+        if (ThrowOnInertiaCalculation)
+            throw new InvalidOperationException("Configured test moment calculation failure.");
+
+        return MomentOfInertia;
+    }
+
     public override ColliderType2D Shape => (ColliderType2D)byte.MaxValue;
 
     public override bool ContainsPoint(Vector2d point) => false;
@@ -46,6 +59,8 @@ internal sealed class UnsupportedTestCollider2D : LSCollider2D
 internal sealed class UnsupportedTestCollider3D : LSCollider
 {
     internal Fixed3x3 InertiaTensor { get; set; } = Fixed3x3.Zero;
+
+    internal bool ThrowOnInertiaCalculation { get; set; }
 
     internal ExactMassWeight MassPropertyWeight { get; set; } =
         ExactMassWeight.Zero;
@@ -80,8 +95,13 @@ internal sealed class UnsupportedTestCollider3D : LSCollider
         base.OnInitialize();
     }
 
-    public override Fixed3x3 CalculateInertiaTensor(Fixed64 mass, Vector3d localCenterOfMassOffset) =>
-        InertiaTensor;
+    public override Fixed3x3 CalculateInertiaTensor(Fixed64 mass, Vector3d localCenterOfMassOffset)
+    {
+        if (ThrowOnInertiaCalculation)
+            throw new InvalidOperationException("Configured test inertia calculation failure.");
+
+        return InertiaTensor;
+    }
 
     internal override Fixed3x3 CalculateCenterOfMassInertiaTensor(
         Fixed64 mass) =>

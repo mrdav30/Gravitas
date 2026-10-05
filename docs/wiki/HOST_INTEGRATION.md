@@ -313,6 +313,31 @@ deactivation or context reset, during an open fixed-step transaction, and from
 simulation callbacks. Ragdoll role changes use their atomic runtime operation
 rather than transitioning links individually.
 
+### Runtime mass changes
+
+Assign `SolidBody.Mass` or `SolidBody2D.Mass` between complete fixed steps. An
+actual change refreshes inertia from the committed collider shape and COM,
+clears contact and connected-joint impulse caches and CCD state, wakes the body,
+and immediately synchronizes awake membership in pure and mixed partitions. The
+body keeps its role, freeze axes, registration, pose, velocities, and already
+accepted accelerations. Queued force/torque inputs have already been converted
+to acceleration; changing mass does not retroactively rescale those inputs.
+
+Zero and negative mass disable applicable solver motion without converting a
+dynamic body into a static one. Restoring positive mass restores the unfrozen
+degrees of freedom and collision eligibility. Assigning the current value is a
+no-op, including for sleeping bodies and during a simulation callback.
+
+Changed values reject during an open fixed-step transaction, in simulation
+callbacks, or after a context registration reset. Inertia calculation completes
+before publishing the new mass, so a calculation failure preserves mass,
+inertia, sleep, and caches. Before initialization or after deactivation, mass is
+configuration only; initialization derives inertia from the committed shape.
+Recorded-state loading retains saved sleep and motion rather than applying the
+public setter's wake policy.
+
+### Explicit body pose changes
+
 Static bodies do not poll their host transforms. `SetPosition(...)`,
 `SetRotation(...)`, and 3D `UpdateRotation(...)` are the authoritative explicit
 repositioning surface; they refresh pure and mixed partition membership
@@ -359,11 +384,11 @@ ColliderReconfigurationStatus result = body.TryReconfigureCollider(
     publishSynchronizedState: null);
 ```
 
-`Applied` means the geometry and pose were published together. `Unchanged`
-means the requested authored and committed state already matched. `Blocked`
-returns the first physically eligible collider, in stable registration order,
-that the candidate would positively penetrate. Exact touching at a support or
-floor contact is accepted, and trigger volumes do not block reconfiguration.
+`Applied` means the geometry and pose were published together. `Unchanged` means
+the requested authored and committed state already matched. `Blocked` returns
+the first physically eligible collider, in stable registration order, that the
+candidate would positively penetrate. Exact touching at a support or floor
+contact is accepted, and trigger volumes do not block reconfiguration.
 
 The definition contributes geometry only. The existing collider keeps its
 material, filters, hierarchy, event subscriptions, rotation, service identity,
@@ -385,19 +410,20 @@ potential cross-dimensional blockers.
 
 Both 2D and 3D admission distinguish exact touching from positive penetration
 before contact-depth rounding. Even a penetration smaller than one raw
-fixed-point unit rejects the transaction; a rounded solver depth of zero is
-not evidence that a replacement fits. Classification uses committed geometry
-and authoritative rigid frames for direct colliders and each compound part,
-without generating contact manifolds. In 3D, a closed convex mesh also blocks
-enclosure; open and concave meshes test their authored surfaces, not an
-invented filled interior.
+fixed-point unit rejects the transaction; a rounded solver depth of zero is not
+evidence that a replacement fits. Classification uses committed geometry and
+authoritative rigid frames for direct colliders and each compound part, without
+generating contact manifolds. In 3D, a closed convex mesh also blocks enclosure;
+open and concave meshes test their authored surfaces, not an invented filled
+interior.
 
 Both transactions test the whole replacement shape against physically eligible
 registered colliders, including blockers outside physics grids. This rare
 explicit operation can scan the registry and allocate. Semantic validation is
-completed before publication; this is not a promise to recover from process-level
-allocation failure. Hosts must prepare their own fallible navigation/controller
-state before calling, then publish that prepared state through the callback.
+completed before publication; this is not a promise to recover from
+process-level allocation failure. Hosts must prepare their own fallible
+navigation/controller state before calling, then publish that prepared state
+through the callback.
 
 Pair-separation callbacks from an accepted reconfiguration run after the new
 geometry, root pose, mass properties, and partitions are coherent. A
@@ -515,8 +541,8 @@ context.Environment.Gravity = Fixed64.FromFraction(49, 5);
 ```
 
 Different contexts can run at different frame rates and settings in the same
-process. Timing values such as `DeltaTime`, `FrameCount`, and `ElapsedTime`
-are read through the context. Frame rates must stay between `1` and
+process. Timing values such as `DeltaTime`, `FrameCount`, and `ElapsedTime` are
+read through the context. Frame rates must stay between `1` and
 `PhysicsSettings.MaxResolvableFrameRate`; ordinary lockstep rates are far below
 that ceiling.
 

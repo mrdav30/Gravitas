@@ -57,7 +57,7 @@ public partial class SolidBody : IRecordable
             _freezeAxes = value;
             ApplyFreezeConstraintsToMotion();
             if (Active)
-                RefreshInertiaTensor();
+                RefreshInertiaTensor(Mass);
             RefreshPartitionMobility();
             RefreshPartitionAwakeState();
         }
@@ -143,7 +143,7 @@ public partial class SolidBody : IRecordable
         _sleepFrameCount = 0;
         InvalidateContinuousCollisionTrajectory();
         ApplyFreezeConstraintsToMotion();
-        RefreshInertiaTensor();
+        RefreshInertiaTensor(Mass);
         RefreshPartitionMobility();
     }
 
@@ -190,9 +190,7 @@ public partial class SolidBody : IRecordable
     private void ReconcileMotionTypeRegistration(BodyMotionType motionType)
     {
         BodyMotionType previousMotionType = _motionType;
-        Context.Physics.ClearWarmStartCachesForCollider(Collider);
-        Context.Constraints3D.ClearSolverCachesForBody(this);
-        Context.Physics.InvalidateContinuousCollisionStateForMotionTypeChange(this, DynamicId);
+        InvalidateMassDependentSolverState();
 
         _motionType = motionType;
         Context.Physics.RefreshBodyMotionTypeRegistration(this, previousMotionType);
@@ -405,75 +403,6 @@ public partial class SolidBody : IRecordable
     /// </summary>
     private Vector3d _deltaTorque;
 
-    private Fixed3x3 _inertiaTensor;
-    private Fixed3x3 _worldInertiaTensor;
-    private Fixed3x3 _inverseLocalInertiaTensor;
-    private Fixed3x3 _inverseInertiaTensor;
-    /// <summary>Gets the constrained world-space inverse inertia tensor.</summary>
-    public Fixed3x3 InverseInertiaTensor => _inverseInertiaTensor;
-
-    /// <summary>
-    /// Gets whether solver-side response may translate this body.
-    /// </summary>
-    public bool CanTranslate => Active && _dynamicId >= 0 && IsDynamic && !IsPositionFullyFrozen && InverseMass > Fixed64.Zero;
-
-    /// <summary>
-    /// Gets whether solver-side response may rotate this body.
-    /// </summary>
-    public bool CanRotate => Active
-        && _dynamicId >= 0
-        && IsDynamic
-        && !IsRotationFullyFrozen
-        && _inverseInertiaTensor != Fixed3x3.Zero;
-
-    internal bool HasSolverMobility => CanTranslate || CanRotate;
-
-    /// <summary>
-    /// Gets the inverse mass that should be used by collision response.
-    /// Translation-frozen, static, and kinematic bodies expose their raw mass
-    /// but contribute zero constrained inverse mass.
-    /// </summary>
-    public Fixed64 EffectiveInverseMass => CanTranslate ? InverseMass : Fixed64.Zero;
-
-    /// <summary>
-    /// Gets the inverse inertia tensor that should be used by collision response.
-    /// Bodies that cannot rotate expose a zero tensor even when raw inertia is available.
-    /// </summary>
-    public Fixed3x3 EffectiveInverseInertiaTensor => CanRotate ? _inverseInertiaTensor : Fixed3x3.Zero;
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal Vector3d ProjectLinearMotion(Vector3d value)
-    {
-        if (value == Vector3d.Zero || IsPositionFullyFrozen)
-            return Vector3d.Zero;
-
-        Fixed64 x = (_freezeAxes & BodyFreezeAxes3D.PositionX) == BodyFreezeAxes3D.PositionX ? Fixed64.Zero : value.X;
-        Fixed64 y = (_freezeAxes & BodyFreezeAxes3D.PositionY) == BodyFreezeAxes3D.PositionY ? Fixed64.Zero : value.Y;
-        Fixed64 z = (_freezeAxes & BodyFreezeAxes3D.PositionZ) == BodyFreezeAxes3D.PositionZ ? Fixed64.Zero : value.Z;
-        return new Vector3d(x, y, z);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private Vector3d ProjectLinearEndpoint(Vector3d start, Vector3d end)
-    {
-        Fixed64 x = (_freezeAxes & BodyFreezeAxes3D.PositionX) == BodyFreezeAxes3D.PositionX ? start.X : end.X;
-        Fixed64 y = (_freezeAxes & BodyFreezeAxes3D.PositionY) == BodyFreezeAxes3D.PositionY ? start.Y : end.Y;
-        Fixed64 z = (_freezeAxes & BodyFreezeAxes3D.PositionZ) == BodyFreezeAxes3D.PositionZ ? start.Z : end.Z;
-        return new Vector3d(x, y, z);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal Vector3d ProjectAngularMotion(Vector3d value)
-    {
-        if (value == Vector3d.Zero || IsRotationFullyFrozen)
-            return Vector3d.Zero;
-
-        Fixed64 x = (_freezeAxes & BodyFreezeAxes3D.RotationX) == BodyFreezeAxes3D.RotationX ? Fixed64.Zero : value.X;
-        Fixed64 y = (_freezeAxes & BodyFreezeAxes3D.RotationY) == BodyFreezeAxes3D.RotationY ? Fixed64.Zero : value.Y;
-        Fixed64 z = (_freezeAxes & BodyFreezeAxes3D.RotationZ) == BodyFreezeAxes3D.RotationZ ? Fixed64.Zero : value.Z;
-        return new Vector3d(x, y, z);
-    }
-
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal Fixed64 GetConstrainedInverseMass(Vector3d axis)
     {
@@ -647,20 +576,6 @@ public partial class SolidBody : IRecordable
     /// Can be updated to simulate changes in terrain or surface inclination.
     /// </summary>
     private Vector3d _normalForce;
-
-    //  Mass (in kilograms) is the measure of the amount of matter in a body
-    //  Divide the weight (in Newtons) by the acceleration of gravity to determine the mass of an object (measured in Kilograms).
-    //  On Earth, gravity accelerates at 9.8 meters per second squared (9.8 m/s^2)
-    //  ex: 150 Pounds x PhysicsEnvironment.PoundToNewton = 667 Newtons / 9.8 m/s^2 = 68 kilograms * PhysicsEnvironment.KilogramToPound = 150 Pounds
-    /// <summary>Mass used by integration and collision response.</summary>
-    public Fixed64 Mass;
-
-    // InverseMass is the reciprocal of mass, which is useful for performance reasons
-    // when mass is used in calculations.
-    /// <summary>Gets the reciprocal mass, or zero when <see cref="Mass"/> is zero.</summary>
-    public Fixed64 InverseMass => Mass != Fixed64.Zero
-        ? Fixed64.One / Mass
-        : Fixed64.Zero;
 
     // Weight is a measure of how the force of gravity acts upon the mass.
     // Weight (in Newtons) is mass (in Kilograms) multiplied by the acceleration of gravity (g).

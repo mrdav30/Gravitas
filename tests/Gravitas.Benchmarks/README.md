@@ -5,6 +5,11 @@ Its alias runner and deterministic fixtures cover context lifecycle,
 registration/partitioning, simulation, query services, replay hashing, and
 diagnostics.
 
+`body-motion-type-transition` also measures registered 2D/3D mass changes.
+Each `ChangeMass` invocation assigns `0`, `2`, then `1` kilogram, including
+inertia refresh, cache/CCD invalidation, and awake membership synchronization.
+These timings represent the complete three-assignment mutation cycle.
+
 ## Requirements
 
 - The SDK selected by the repository's `global.json`

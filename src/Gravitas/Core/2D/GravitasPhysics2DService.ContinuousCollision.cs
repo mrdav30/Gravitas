@@ -116,7 +116,7 @@ public sealed partial class GravitasPhysics2DService
         _dirtyMixedContinuousCollisionCandidates.Remove(dynamicId);
     }
 
-    internal void InvalidateContinuousCollisionStateForMotionTypeChange(
+    internal void InvalidateContinuousCollisionStateForBodyMutation(
         SolidBody2D body,
         int dynamicId)
     {

@@ -1,5 +1,27 @@
 # Gravitas Migration Guide
 
+## Runtime mass changes
+
+`SolidBody.Mass` is now a property instead of a public field. Rebuild consuming
+assemblies. Assignments and object initializers remain source-compatible;
+replace `ref`/`out` field access with a local value followed by an assignment,
+and update reflection consumers to use a property. The `"Mass"` serialization
+key and body schemas are unchanged.
+
+Both `SolidBody` and `SolidBody2D` now treat an actual active mass change as a
+mutation between fixed steps: refresh inertia, invalidate contact/joint caches
+and CCD state, wake, and synchronize pure/mixed awake membership. No-op
+assignments preserve sleep. Changed values reject during simulation callbacks,
+an open fixed step, or after a registration reset. Non-positive mass has zero
+applicable inverse mass/inertia and retains the explicit body role. Mass set
+before initialization or after deactivation is configuration; inertia is
+derived at initialization. Saved-state loading preserves recorded sleep.
+
+Existing velocities and accepted accelerations are preserved. Inputs already
+converted to acceleration are not rescaled. See
+[host integration](wiki/HOST_INTEGRATION.md#runtime-mass-changes) for the complete
+contract.
+
 ## Partition membership ownership
 
 `PhysicsPartition`, `PhysicsPartition2D` and `PhysicsMixedPartition` no longer

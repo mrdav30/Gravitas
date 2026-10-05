@@ -26,20 +26,28 @@ instead of burying it in notes.
     `SwiftCollections`, `GridForge`, then Gravitas. Package references are the
     default; use `UseLocalLsfStack=true` only for coordinated validation of
     unreleased sibling changes, then revalidate against released packages.
-  - GRV-Issue-089 remains active for runtime mass mutation leaving inertia or
-    awake membership stale.
+  - No active correctness issues; GRV-Issue-089 is resolved with body-owned mass
+    mutation and pure/mixed awake synchronization.
 - [`Benchmark Signal Hardening`](benchmark-signal-hardening-backlog.md)
   - Reproduce and close confirmed release-relevant signals alongside the owning
     library change. Do not broaden this into speculative optimization work.
 
 ## Recently Completed
 
+- [`Runtime Mass Mutation`](issue-tracker.md#grv-issue-089---runtime-mass-changes-leave-inertia-or-awake-membership-stale)
+  - GRV-Issue-089 resolved 2026-10-04. Both dimensional body owners derive
+    inertia atomically, invalidate contact/joint/CCD caches, and synchronize
+    pure/mixed awake membership while preserving roles and accepted motion.
+  - Same-value assignments preserve sleep; changed runtime assignments are
+    allowed between complete steps. Recorded-state loads retain saved sleep.
+    Release/Lean coverage, replay, and warmed allocation gates pass; the 3D
+    field-to-property migration is documented. Changes are unstaged for review.
+
 - [`Circle Workload Partition And Grounding Scaling`](benchmark-signal-hardening-backlog.md#grv-benchmark-023--circle-workload-partition-and-grounding-scaling)
   - GRV-Benchmark-023 closed 2026-10-04 under the predictable-scaling and
-    published-cost criterion. Prior phases are committed, including Gravitas
-    `bf11409`, FixedMathSharp `5447b34` and GridForge `3f34f8b`; the latest lean
-    2D gathering and bounds-first rejection remain unstaged for review.
-  - Release/Lean pass 4473/4414 tests with 100% line/branch/method coverage;
+    published-cost criterion. Gravitas changes are committed through `1c2ce4a`,
+    with coordinated FixedMathSharp `5447b34` and GridForge `3f34f8b` phases.
+  - Closure verification passed 4473/4414 Release/Lean tests with 100% line/branch/method coverage;
     both target frameworks build without warnings/errors. Final scaling,
     contract/allocation smoke and all three DocFX gates pass. Repeated controls
     do not establish a stable full-step gain from the latest bounds rejection.

@@ -94,7 +94,8 @@ public partial class SolidBody
         RecordValues.Look(chronicler, ref LinearDragCoefficient, "LinearDragCoefficient");
         RecordValues.Look(chronicler, ref AngularDragCoefficient, "AngularDragCoefficient");
         RecordValues.Look(chronicler, ref _normalForce, "NormalForce");
-        RecordValues.Look(chronicler, ref Mass, "Mass");
+        // Restore backing state without the public setter's host-mutation wake policy.
+        RecordValues.Look(chronicler, ref _mass, "Mass");
 
         if (chronicler.Mode == SerializationMode.Loading)
         {
@@ -144,7 +145,11 @@ public partial class SolidBody
         ApplyFreezeConstraintsToMotion();
 
         if (Active)
+        {
+            InvalidateMassDependentSolverState();
             Collider.Simulate();
+            RefreshPartitionAwakeState();
+        }
     }
 
 }

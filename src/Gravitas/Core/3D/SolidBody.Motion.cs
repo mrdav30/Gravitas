@@ -12,7 +12,38 @@ namespace Gravitas;
 
 public partial class SolidBody
 {
-    private bool CanUseAngularInertia => IsDynamic && !IsRotationFullyFrozen;
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal Vector3d ProjectLinearMotion(Vector3d value)
+    {
+        if (value == Vector3d.Zero || IsPositionFullyFrozen)
+            return Vector3d.Zero;
+
+        Fixed64 x = (_freezeAxes & BodyFreezeAxes3D.PositionX) == BodyFreezeAxes3D.PositionX ? Fixed64.Zero : value.X;
+        Fixed64 y = (_freezeAxes & BodyFreezeAxes3D.PositionY) == BodyFreezeAxes3D.PositionY ? Fixed64.Zero : value.Y;
+        Fixed64 z = (_freezeAxes & BodyFreezeAxes3D.PositionZ) == BodyFreezeAxes3D.PositionZ ? Fixed64.Zero : value.Z;
+        return new Vector3d(x, y, z);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private Vector3d ProjectLinearEndpoint(Vector3d start, Vector3d end)
+    {
+        Fixed64 x = (_freezeAxes & BodyFreezeAxes3D.PositionX) == BodyFreezeAxes3D.PositionX ? start.X : end.X;
+        Fixed64 y = (_freezeAxes & BodyFreezeAxes3D.PositionY) == BodyFreezeAxes3D.PositionY ? start.Y : end.Y;
+        Fixed64 z = (_freezeAxes & BodyFreezeAxes3D.PositionZ) == BodyFreezeAxes3D.PositionZ ? start.Z : end.Z;
+        return new Vector3d(x, y, z);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal Vector3d ProjectAngularMotion(Vector3d value)
+    {
+        if (value == Vector3d.Zero || IsRotationFullyFrozen)
+            return Vector3d.Zero;
+
+        Fixed64 x = (_freezeAxes & BodyFreezeAxes3D.RotationX) == BodyFreezeAxes3D.RotationX ? Fixed64.Zero : value.X;
+        Fixed64 y = (_freezeAxes & BodyFreezeAxes3D.RotationY) == BodyFreezeAxes3D.RotationY ? Fixed64.Zero : value.Y;
+        Fixed64 z = (_freezeAxes & BodyFreezeAxes3D.RotationZ) == BodyFreezeAxes3D.RotationZ ? Fixed64.Zero : value.Z;
+        return new Vector3d(x, y, z);
+    }
 
     private void UpdateSleepState()
     {
@@ -72,6 +103,7 @@ public partial class SolidBody
     {
         if (Collider.IsPartitioned)
             Context.Collisions.RefreshPartitionAwakeState(Collider);
+        Context.MixedCollisions.Refresh3DPartitionAwakeState(Collider);
     }
 
     private void RefreshPartitionMobility()
@@ -630,46 +662,6 @@ public partial class SolidBody
         Position3d = proposedPosition;
         Rotation = proposedRotation;
         Collider.RebuildRuntimeShapeOnly();
-    }
-
-    internal void RefreshMassPropertiesFromColliderShape()
-    {
-        if (!_centerOfMassOffsetExplicit)
-            _localCenterOfMassOffset = Collider.CalculateLocalCenterOfMassOffset();
-
-        RefreshInertiaTensor();
-    }
-
-    private void UpdateInertiaTensorOrientation()
-    {
-        if (_inertiaTensor == Fixed3x3.Zero || _inverseLocalInertiaTensor == Fixed3x3.Zero)
-        {
-            _worldInertiaTensor = Fixed3x3.Zero;
-            _inverseInertiaTensor = Fixed3x3.Zero;
-            return;
-        }
-
-        Fixed3x3 inverseOrientation = Rotation.Conjugate().ToMatrix3x3();
-        Fixed3x3 orientation = Rotation.ToMatrix3x3();
-
-        _worldInertiaTensor = orientation * _inertiaTensor * inverseOrientation;
-        _inverseInertiaTensor = orientation * _inverseLocalInertiaTensor * inverseOrientation;
-    }
-
-    private void RefreshInertiaTensor()
-    {
-        if (!CanUseAngularInertia)
-        {
-            _inertiaTensor = Fixed3x3.Zero;
-            _worldInertiaTensor = Fixed3x3.Zero;
-            _inverseLocalInertiaTensor = Fixed3x3.Zero;
-            _inverseInertiaTensor = Fixed3x3.Zero;
-            return;
-        }
-
-        _inertiaTensor = Collider.CalculateInertiaTensor(Mass, _localCenterOfMassOffset);
-        _inverseLocalInertiaTensor = InertiaTensorMath.InvertForSolver(_inertiaTensor);
-        UpdateInertiaTensorOrientation();
     }
 
     //  gyroscopic precession is a correction to the object's angular velocity based on its rotation

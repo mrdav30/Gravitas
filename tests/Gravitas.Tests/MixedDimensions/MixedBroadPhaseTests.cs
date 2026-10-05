@@ -12,7 +12,7 @@ using Xunit;
 
 namespace Gravitas.Tests.MixedDimensions;
 
-public sealed class MixedBroadPhaseTests
+public sealed partial class MixedBroadPhaseTests
 {
     [Fact]
     public void Simulate_WithSparseMixedOverlap_ShouldEmitStableCandidateKey()

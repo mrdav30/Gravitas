@@ -79,6 +79,232 @@ public sealed class SolidBody2DMassPropertiesTests
 
         body.MomentOfInertia.Should().Be((Fixed64)8);
         body.InverseMomentOfInertia.Should().Be(Fixed64.FromFraction(1, 8));
+        body.InverseMass.Should().Be(Fixed64.FromFraction(1, 4));
+        body.CanTranslate.Should().BeTrue();
+        body.CanRotate.Should().BeTrue();
+        body.IsAwakeForCollision.Should().BeTrue();
+        body.MotionType.Should().Be(BodyMotionType.Dynamic);
+    }
+
+    [Theory]
+    [InlineData(false, 0)]
+    [InlineData(true, 0)]
+    [InlineData(false, -2)]
+    [InlineData(true, -2)]
+    public void MassSetter_AcrossNonpositiveMass_ShouldPublishMobilityAndAwakeMembershipWithoutChangingDynamicRole(
+        bool initiallyNonpositive, int nonpositiveMass)
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        SolidBody2D body = CreateBody(context, new LSCircleCollider2D(Fixed64.One),
+            mass: initiallyNonpositive ? (Fixed64)nonpositiveMass : (Fixed64)2);
+        var coordinates = body.Collider.PartitionCoordinates!;
+        int coordinateCount = coordinates.Count;
+        int dynamicId = body.DynamicId;
+        coordinateCount.Should().BeGreaterThan(0);
+        body.IsAwakeForCollision.Should().Be(!initiallyNonpositive);
+
+        body.Mass = initiallyNonpositive ? (Fixed64)2 : (Fixed64)nonpositiveMass;
+
+        body.MotionType.Should().Be(BodyMotionType.Dynamic);
+        body.DynamicId.Should().Be(dynamicId);
+        body.Collider.PartitionCoordinates.Should().BeSameAs(coordinates);
+        coordinates.Count.Should().Be(coordinateCount);
+        body.CanTranslate.Should().Be(initiallyNonpositive);
+        body.CanRotate.Should().Be(initiallyNonpositive);
+        body.HasSolverMobility.Should().Be(initiallyNonpositive);
+        body.IsAwakeForCollision.Should().Be(initiallyNonpositive);
+        body.InverseMass.Should().Be(initiallyNonpositive ? Fixed64.Half : Fixed64.Zero);
+        body.MomentOfInertia.Should().Be(initiallyNonpositive ? Fixed64.One : Fixed64.Zero);
+        body.InverseMomentOfInertia.Should().Be(initiallyNonpositive ? Fixed64.One : Fixed64.Zero);
+        foreach (var coordinate in coordinates)
+        {
+            context.World.TryGetVoxel(coordinate, out var voxel).Should().BeTrue();
+            voxel!.TryGetPartition(out PhysicsPartition2D? partition).Should().BeTrue();
+            partition!.ContainedDynamicObjects!.Contains(body.Collider.Id).Should().BeTrue();
+            partition.DynamicObjectCount.Should().Be(1);
+            partition.KinematicObjectCount.Should().Be(0);
+            partition.StaticObjectCount.Should().Be(0);
+            partition.AwakeDynamicObjectCount.Should().Be(initiallyNonpositive ? 1 : 0);
+        }
+
+        body.AddLinearImpulse(Vector2d.Right);
+        body.LinearVelocity.Should().Be(initiallyNonpositive ? Vector2d.Right * Fixed64.Half : Vector2d.Zero);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-2)]
+    [InlineData(4)]
+    public void MassSetter_WhenSleeping_ShouldWakeOnlyForAnActualMassChange(int changedMass)
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        SolidBody2D body = CreateBody(context, new LSCircleCollider2D(Fixed64.One), (Fixed64)2);
+        body.Sleep();
+        body.IsSleeping.Should().BeTrue();
+
+        body.Mass = (Fixed64)2;
+
+        body.IsSleeping.Should().BeTrue();
+        body.MomentOfInertia.Should().Be(Fixed64.One);
+        foreach (var coordinate in body.Collider.PartitionCoordinates!)
+        {
+            context.World.TryGetVoxel(coordinate, out var voxel).Should().BeTrue();
+            voxel!.TryGetPartition(out PhysicsPartition2D? partition).Should().BeTrue();
+            partition!.AwakeDynamicObjectCount.Should().Be(0);
+        }
+
+        body.Mass = (Fixed64)changedMass;
+
+        body.IsSleeping.Should().BeFalse();
+        body.Mass.Should().Be((Fixed64)changedMass);
+        body.IsAwakeForCollision.Should().Be(changedMass > 0);
+        foreach (var coordinate in body.Collider.PartitionCoordinates!)
+        {
+            context.World.TryGetVoxel(coordinate, out var voxel).Should().BeTrue();
+            voxel!.TryGetPartition(out PhysicsPartition2D? partition).Should().BeTrue();
+            partition!.AwakeDynamicObjectCount.Should().Be(changedMass > 0 ? 1 : 0);
+        }
+    }
+
+    [Fact]
+    public void MassSetter_ShouldPreserveMotionAndQueuedAccelerationAcrossZeroMass()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        context.Environment.Gravity = Fixed64.Zero;
+        SolidBody2D body = CreateBody(context, new LSCircleCollider2D(Fixed64.One), (Fixed64)2);
+        body.AddLinearImpulse(Vector2d.Right * (Fixed64)2);
+        body.AddAngularImpulse((Fixed64)2);
+        body.AddForce(Vector2d.Right * (Fixed64)4);
+        body.AddTorque((Fixed64)3);
+
+        body.Mass = Fixed64.Zero;
+
+        body.LinearVelocity.Should().Be(Vector2d.Right);
+        body.AngularVelocity.Should().Be((Fixed64)2);
+        body.HasSolverMobility.Should().BeFalse();
+
+        body.Mass = (Fixed64)4;
+
+        body.LinearVelocity.Should().Be(Vector2d.Right);
+        body.AngularVelocity.Should().Be((Fixed64)2);
+        context.Simulate();
+        context.LateSimulate();
+
+        // Forces are converted to queued accelerations when applied. Changing
+        // mass must not clear or reinterpret those already accepted accelerations.
+        body.LinearVelocity.Should().Be(Vector2d.Right * Fixed64.FromFraction(3, 2));
+        body.AngularVelocity.Should().Be(Fixed64.FromFraction(11, 4));
+    }
+
+    [Fact]
+    public void MassSetter_WhenCustomInertiaCalculationThrows_ShouldKeepMassInertiaAndSleepState()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        var collider = new UnsupportedTestCollider2D { MomentOfInertia = (Fixed64)4 };
+        SolidBody2D body = CreateBody(context, collider, (Fixed64)2);
+        body.Sleep();
+        collider.ThrowOnInertiaCalculation = true;
+        Action changeMass = () => body.Mass = (Fixed64)4;
+
+        // A host collider's calculator may reject a proposed mass. The setter
+        // must publish neither the mass nor its wake transition before success.
+        changeMass.Should().Throw<InvalidOperationException>();
+
+        body.Mass.Should().Be((Fixed64)2);
+        body.InverseMass.Should().Be(Fixed64.Half);
+        body.MomentOfInertia.Should().Be((Fixed64)4);
+        body.InverseMomentOfInertia.Should().Be(Fixed64.FromFraction(1, 4));
+        body.IsSleeping.Should().BeTrue();
+        foreach (var coordinate in body.Collider.PartitionCoordinates!)
+        {
+            context.World.TryGetVoxel(coordinate, out var voxel).Should().BeTrue();
+            voxel!.TryGetPartition(out PhysicsPartition2D? partition).Should().BeTrue();
+            partition!.AwakeDynamicObjectCount.Should().Be(0);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void MassSetter_WhenUninitializedOrDeactivated_ShouldStoreConfigurationUntilInitialization(bool deactivated)
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        var collider = new UnsupportedTestCollider2D { MomentOfInertia = (Fixed64)4 };
+        var body = new SolidBody2D(new TestMatterAgent(context), collider) { Mass = (Fixed64)2 };
+        if (deactivated)
+        {
+            body.Initialize(Vector2d.Zero);
+            body.Deactivate();
+        }
+        collider.ThrowOnInertiaCalculation = true;
+
+        Action configureMass = () => body.Mass = (Fixed64)4;
+
+        configureMass.Should().NotThrow();
+        body.Mass.Should().Be((Fixed64)4);
+        body.Active.Should().BeFalse();
+        body.MomentOfInertia.Should().Be(deactivated ? (Fixed64)4 : Fixed64.Zero);
+        context.Physics2D.ColliderCount.Should().Be(0);
+        collider.ThrowOnInertiaCalculation = false;
+        collider.MomentOfInertia = (Fixed64)8;
+
+        body.Initialize(Vector2d.Zero);
+
+        body.MomentOfInertia.Should().Be((Fixed64)8);
+        body.InverseMomentOfInertia.Should().Be(Fixed64.FromFraction(1, 8));
+        body.Mass.Should().Be((Fixed64)4);
+    }
+
+    [Theory]
+    [InlineData(BodyMotionType.Static)]
+    [InlineData(BodyMotionType.Kinematic)]
+    public void MassSetter_ForNonDynamicBody_ShouldRefreshInertiaWithoutChangingPartitionRole(BodyMotionType motionType)
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        SolidBody2D body = CreateBody(context, new LSCircleCollider2D(Fixed64.One), (Fixed64)2,
+            motionType: motionType);
+        var coordinates = body.Collider.PartitionCoordinates!;
+        int colliderId = body.Collider.Id;
+
+        body.Mass = (Fixed64)4;
+
+        body.MotionType.Should().Be(motionType);
+        body.Collider.Id.Should().Be(colliderId);
+        body.CanTranslate.Should().BeFalse();
+        body.CanRotate.Should().BeFalse();
+        body.MomentOfInertia.Should().Be((Fixed64)2);
+        body.InverseMass.Should().Be(Fixed64.FromFraction(1, 4));
+        body.Collider.PartitionCoordinates.Should().BeSameAs(coordinates);
+        coordinates.Count.Should().BeGreaterThan(0);
+        foreach (var coordinate in coordinates)
+        {
+            context.World.TryGetVoxel(coordinate, out var voxel).Should().BeTrue();
+            voxel!.TryGetPartition(out PhysicsPartition2D? partition).Should().BeTrue();
+            partition!.DynamicObjectCount.Should().Be(0);
+            partition.AwakeDynamicObjectCount.Should().Be(0);
+            partition.StaticObjectCount.Should().Be(motionType == BodyMotionType.Static ? 1 : 0);
+            partition.KinematicObjectCount.Should().Be(motionType == BodyMotionType.Kinematic ? 1 : 0);
+        }
+    }
+
+    [Fact]
+    public void MassSetter_RepeatedRuntimeChanges_ShouldNotAllocateAfterWarmup()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        SolidBody2D body = CreateBody(context, new LSCircleCollider2D(Fixed64.One), (Fixed64)2);
+
+        long allocatedBytes = AllocationTestHelper.MeasureSteadyState(() =>
+        {
+            body.Mass = Fixed64.Zero;
+            body.Mass = (Fixed64)(-2);
+            body.Mass = (Fixed64)2;
+            body.Mass = (Fixed64)4;
+            body.Mass = (Fixed64)4;
+        });
+
+        allocatedBytes.Should().Be(0);
+        body.Mass.Should().Be((Fixed64)4);
+        body.IsAwakeForCollision.Should().BeTrue();
     }
 
     [Fact]

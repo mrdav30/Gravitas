@@ -108,7 +108,7 @@ public sealed partial class SolidBody2D : IRecordable
             // Frozen axes do not change the dynamic role or coverage, but can
             // change whether an existing membership participates in collisions.
             if (Active)
-                Context.Collisions2D.RefreshPartitionAwakeState(Collider);
+                RefreshPartitionAwakeState();
         }
     }
 
@@ -237,9 +237,7 @@ public sealed partial class SolidBody2D : IRecordable
     private void ReconcileMotionTypeRegistration(BodyMotionType motionType)
     {
         BodyMotionType previousMotionType = _motionType;
-        Context.Physics2D.ClearWarmStartCachesForCollider(Collider);
-        Context.Constraints2D.ClearSolverCachesForBody(this);
-        Context.Physics2D.InvalidateContinuousCollisionStateForMotionTypeChange(this, DynamicId);
+        InvalidateMassDependentSolverState();
 
         _motionType = motionType;
         Context.Physics2D.RefreshBodyMotionTypeRegistration(this, previousMotionType);
@@ -293,7 +291,12 @@ public sealed partial class SolidBody2D : IRecordable
         get => (_freezeAxes & BodyFreezeAxes2D.Rotation) == BodyFreezeAxes2D.Rotation;
     }
 
-    /// <summary>Gets or sets the body mass used to derive solver mass properties.</summary>
+    /// <summary>Gets or sets mass in kilograms. Non-positive mass disables solver motion.</summary>
+    /// <remarks>
+    /// A changed runtime value must be assigned between fixed steps. It refreshes inertia,
+    /// invalidates cached impulses and CCD state, and wakes the body without changing its
+    /// role, pose, velocities, or already accepted accelerations. Equal values are a no-op.
+    /// </remarks>
     public Fixed64 Mass
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -303,9 +306,38 @@ public sealed partial class SolidBody2D : IRecordable
             if (_mass == value)
                 return;
 
+            if (!Active)
+            {
+                _mass = value;
+                return;
+            }
+
+            ThrowIfRuntimeRegistrationMissing();
+            Context.ThrowIfFixedStepMutationNotAllowed();
+            Collider.ValidateCurrentRuntimeTransform();
+            // Calculate before publishing mass: custom collider math may throw.
+            RefreshMomentOfInertia(value);
             _mass = value;
-            RefreshMassPropertiesFromColliderShape();
+            InvalidateMassDependentSolverState();
+            InvalidateContinuousCollisionFrame();
+            _sleepFrameCount = 0;
+            _isSleeping = false;
+            // Wake alone cannot synchronize an already-awake zero-mass body.
+            RefreshPartitionAwakeState();
         }
+    }
+
+    private void InvalidateMassDependentSolverState()
+    {
+        Context.Physics2D.ClearWarmStartCachesForCollider(Collider);
+        Context.Constraints2D.ClearSolverCachesForBody(this);
+        Context.Physics2D.InvalidateContinuousCollisionStateForBodyMutation(this, DynamicId);
+    }
+
+    private void RefreshPartitionAwakeState()
+    {
+        Context.Collisions2D.RefreshPartitionAwakeState(Collider);
+        Context.MixedCollisions.Refresh2DPartitionAwakeState(Collider);
     }
 
     /// <summary>Gets the reciprocal mass, or zero when the mass is non-positive.</summary>
@@ -635,7 +667,7 @@ public sealed partial class SolidBody2D : IRecordable
         Collider.PublishPreparedExplicitBodyPose();
         RefreshStaticColliderAfterExplicitPoseChange();
         if (wasSleeping)
-            Context.Collisions2D.RefreshPartitionAwakeState(Collider);
+            RefreshPartitionAwakeState();
     }
 
     /// <summary>Puts an eligible body to sleep and clears its motion.</summary>
@@ -654,7 +686,7 @@ public sealed partial class SolidBody2D : IRecordable
         _angularAccelerationStore = Fixed64.Zero;
         _deltaAngularAcceleration = Fixed64.Zero;
         _angularSpeed = Fixed64.Zero;
-        Context.Collisions2D.RefreshPartitionAwakeState(Collider);
+        RefreshPartitionAwakeState();
     }
 
     /// <summary>Wakes the body and resumes collision participation.</summary>
@@ -665,7 +697,7 @@ public sealed partial class SolidBody2D : IRecordable
         _sleepFrameCount = 0;
         _isSleeping = false;
         if (Active && wasSleeping)
-            Context.Collisions2D.RefreshPartitionAwakeState(Collider);
+            RefreshPartitionAwakeState();
     }
 
     internal void WakeFromCollision()
@@ -675,7 +707,7 @@ public sealed partial class SolidBody2D : IRecordable
 
         _sleepFrameCount = 0;
         _isSleeping = false;
-        Context.Collisions2D.RefreshPartitionAwakeState(Collider);
+        RefreshPartitionAwakeState();
     }
 
     internal void LateSimulate() => LateSimulate(updateSleepState: true, updateColliderState: true);

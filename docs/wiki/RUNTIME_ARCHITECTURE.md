@@ -263,6 +263,12 @@ off-center contacts and joints, run rotational CCD, and publish visualization. A
 fully locked dynamic body remains in dynamic partition membership but does not
 seed awake solver work.
 
+Both dimensional body owners refresh inertia, cached solver state, and pure and
+mixed awake membership when mass changes between fixed steps. Mass alone does
+not change registration or partition role. See
+[runtime mass changes](HOST_INTEGRATION.md#runtime-mass-changes) for the mutation,
+sleep, queued-input, and non-positive-mass contract.
+
 Body movement happens in `SolidBody.LateSimulate()`, called by
 `GravitasPhysicsService.LateSimulate()`. Dynamic bodies with solver mobility
 process forces, update velocities, commit available position/rotation changes,

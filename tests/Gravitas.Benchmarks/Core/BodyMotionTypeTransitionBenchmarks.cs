@@ -36,6 +36,8 @@ public class BodyMotionTypeTransitionBenchmarks
 
         _ = Transition3D();
         _ = Transition2D();
+        _ = ChangeMass3D();
+        _ = ChangeMass2D();
     }
 
     [GlobalCleanup]
@@ -60,6 +62,24 @@ public class BodyMotionTypeTransitionBenchmarks
         _body2D.SetMotionType(BodyMotionType.Static);
         _body2D.SetMotionType(BodyMotionType.Kinematic);
         _body2D.SetMotionType(BodyMotionType.Dynamic);
+        return _body2D.DynamicId;
+    }
+
+    [Benchmark]
+    public int ChangeMass3D()
+    {
+        _body3D.Mass = Fixed64.Zero;
+        _body3D.Mass = Fixed64.Two;
+        _body3D.Mass = Fixed64.One;
+        return _body3D.DynamicId;
+    }
+
+    [Benchmark]
+    public int ChangeMass2D()
+    {
+        _body2D.Mass = Fixed64.Zero;
+        _body2D.Mass = Fixed64.Two;
+        _body2D.Mass = Fixed64.One;
         return _body2D.DynamicId;
     }
 }

@@ -34,7 +34,7 @@ public partial class SolidBody
                 return;
 
             Wake();
-            RefreshInertiaTensor();
+            RefreshInertiaTensor(Mass);
         }
     }
 

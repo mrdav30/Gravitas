@@ -69,6 +69,12 @@ and solver caches through the same atomic lifecycle invariants as a public role
 transition. Undefined roles or freeze bits fail without partially publishing the
 new state.
 
+Mass retains its existing `"Mass"` record key. Loading writes backing state and
+refreshes derived inertia and awake membership at the final load commit; it
+preserves recorded sleep and motion rather than invoking the public mass
+setter's wake policy. Restoring an active body clears contact and connected-joint
+impulse caches and prepared CCD state while retaining pair and joint identity.
+
 ## Recordable Types
 
 The 3D body record starts with `BodySchemaVersion = 1` and a signed 64-bit

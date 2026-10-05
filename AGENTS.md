@@ -206,6 +206,13 @@ eligibility. Reserve eligibility capacity during registration; simulation-time
 emptying must remain allocation-free. Payload reuse order is deterministic
 dense-list order, not chronological emptying order.
 
+Keep runtime mass mutation in the dimensional body owner: derive inertia before
+publishing changed mass, invalidate contact/joint/CCD caches, and synchronize
+pure and mixed awake membership without changing role or registration. Equal
+mass is a no-op. Populate-existing loads bypass the waking setter and refresh
+derived state and caches while retaining saved sleep. See the
+[mass mutation contract](docs/wiki/HOST_INTEGRATION.md#runtime-mass-changes).
+
 ## Lockstep Host Lifecycle
 
 The important contract is an engine-agnostic lockstep loop. Hosts own the outer

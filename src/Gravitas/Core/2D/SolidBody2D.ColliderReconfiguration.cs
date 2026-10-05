@@ -117,7 +117,7 @@ public sealed partial class SolidBody2D
         _momentOfInertia = moment;
         _inverseMomentOfInertia = inverseMoment;
         Context.Constraints2D.ClearSolverCachesForBody(this);
-        Context.Physics2D.InvalidateContinuousCollisionStateForMotionTypeChange(this, DynamicId);
+        Context.Physics2D.InvalidateContinuousCollisionStateForBodyMutation(this, DynamicId);
         InvalidateContinuousCollisionFrame();
         Context.Collisions2D.RefreshColliderPartitionAfterShapeChange(Collider);
         Wake();

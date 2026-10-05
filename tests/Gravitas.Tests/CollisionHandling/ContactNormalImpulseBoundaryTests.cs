@@ -135,10 +135,11 @@ public sealed class ContactNormalImpulseBoundaryTests
             Vector3d.Zero);
         ScenarioBody<LSSphereCollider> second = scenario.CreateSphere(
             Vector3d.Right);
-        ScenarioBody<LSSphereCollider> ordinary =
-            scenario.CreateSphere(Vector3d.Up);
-        ScenarioBody<LSSphereCollider> ordinarySecond =
-            scenario.CreateSphere(Vector3d.Forward);
+        // Keep angular response representable independently of the tiny mass.
+        // A sphere's derived inertia rounds to zero at MinIncrement mass; this
+        // arithmetic boundary fixture needs a nonzero effective angular term.
+        SolidBody ordinary = CreateBodyWithInertia(scenario, Fixed3x3.Identity);
+        SolidBody ordinarySecond = CreateBodyWithInertia(scenario, Fixed3x3.Identity);
         ExactLever3D exactParallel = CreateLever(
             new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero),
             Vector3d.Right * Fixed64.MinIncrement);
@@ -176,10 +177,12 @@ public sealed class ContactNormalImpulseBoundaryTests
             Vector3d.Right * Fixed64.Half);
         equalMass.AngularVelocityDeltaB.Should().Be(Vector3d.Zero);
 
-        ordinary.Body.Mass = Fixed64.MinIncrement;
-        ordinarySecond.Body.Mass = Fixed64.MinIncrement;
+        ordinary.Mass = Fixed64.MinIncrement;
+        ordinarySecond.Mass = Fixed64.MinIncrement;
+        ordinary.InverseInertiaTensor.Should().Be(Fixed3x3.Identity);
+        ordinarySecond.InverseInertiaTensor.Should().Be(Fixed3x3.Identity);
         ContactNormalImpulse3D.TryCalculateVelocityDeltasExact(
-                ordinary.Body,
+                ordinary,
                 Vector3d.Right,
                 Vector3d.Zero,
                 exactParallelWithUnitOffset,
@@ -203,7 +206,7 @@ public sealed class ContactNormalImpulseBoundaryTests
                 Vector3d.Right,
                 Vector3d.Zero,
                 zero,
-                ordinarySecond.Body,
+                ordinarySecond,
                 Vector3d.Zero,
                 Vector3d.Zero,
                 exactParallelWithUnitOffset,
@@ -218,7 +221,6 @@ public sealed class ContactNormalImpulseBoundaryTests
             .And.BeLessThan(Fixed64.One);
         bodyBOnly.AngularVelocityDeltaB.Z.Should()
             .BeLessThan(Fixed64.Zero);
-        ordinary.Body.Mass = Fixed64.One;
     }
 
     [Fact]

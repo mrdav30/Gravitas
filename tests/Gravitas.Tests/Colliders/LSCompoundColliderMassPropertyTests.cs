@@ -12,6 +12,19 @@ namespace Gravitas.Tests.Colliders;
 
 public sealed class LSCompoundColliderMassPropertyTests
 {
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void CalculateInertiaTensor_ForNonpositiveMass_ShouldReturnZeroBeforeGeometryEvaluation(int mass)
+    {
+        var collider = new LSCompoundCollider(
+            CompoundColliderPart.Sphere(Fixed64.Half, Vector3d.Right * Fixed64.Two))
+        {
+            LocalOffset = Vector3d.Right * Fixed64.MaxValue
+        };
+        collider.CalculateInertiaTensor((Fixed64)mass, Vector3d.Right).Should().Be(Fixed3x3.Zero);
+    }
+
     [Fact]
     public void DetachedCompound_ShouldAggregateAnUnrepresentableChildCenter()
     {
