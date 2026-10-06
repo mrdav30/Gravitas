@@ -61,128 +61,6 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 
 ## Active Signals
 
-### GRV-Benchmark-020 — Complete Capsule/Circle-Slab Contact Cost
-
-**Discovered:** 2026-09-29.  
-**Status:** In progress; the first exact output refinement is verified for review,
-with root acquisition and analytic output cost still under investigation.  
-**Owner:** FixedMathSharp's shared cylinder/capsule feature selection and exact
-output materialization; Gravitas consumes that owner for mixed circle slabs and 3D
-cylinders.
-
-The complete query rejects separated cap rims and selects minimum depth before
-rounding. The previous mixed direction subset could return a false contact or
-nonminimum depth; its cheaper wrong answers are not correctness-equivalent
-optimization targets. Ordinary cap, side and zero-core fixtures did return the
-correct answers before the repair, and their additional cost is real.
-
-Matched Windows 11/i7-9700K measurements use .NET 8.0.29, SDK 10.0.302, one
-launch, three warmups and ten measured iterations per row. The launcher is
-BelowNormal with affinity mask 3 and `DOTNET_PROCESSOR_COUNT=2`; only one heavy
-workload runs at a time. Values are **microseconds per dispatched query**, not
-batches or simulation frames. Every row reports **0 B/op**.
-
-| Geometry | Old mixed path | Complete mixed, first run | Complete mixed, confirmation | Equivalent 3D cylinder, confirmation |
-| --- | ---: | ---: | ---: | ---: |
-| Cap | 12.27 | 19.32 | 19.07 | 21.51 |
-| Side | 16.70 | 25.66 | 25.12 | 26.35 |
-| Zero capsule core | 16.67 | 25.78 | 24.75 | 26.01 |
-| Endpoint rim | 30.54 — nonminimum depth | 106.69 | 108.18 | 108.30 |
-| Separated endpoint rim | 30.62 — false contact | 25.78 | 25.54 | 25.90 |
-| Oblique interior rim | 36.70 — nonminimum depth | 1,224.40 | 1,191.51 | 1,196.17 |
-
-The mixed confirmation's standard deviations are 0.099 / 0.080 / 0.103 /
-1.051 / 0.159 / 8.028 microseconds in table order. Equivalent 3D controls show
-the same expensive curved-feature behavior. These are complete wrapper costs:
-3D also validates public inputs and updates a manifold, while mixed constructs
-its canonical contact. Their difference does not isolate adapter overhead, and
-there is no historical 3D baseline for these new fixtures.
-
-**2026-10-05 progress:** [Exact output refinement](2026-10-05-capsule-circle-cost-refinement.md)
-reuses rigorous magnitude-floor bounds and one jointly scaled depth-polynomial
-reduction. Fresh committed/retained mixed oblique means improve from
-1,186.47 to **745.01 microseconds**; equivalent 3D improves from 1,124.91 to
-**724.62 microseconds** (37.2% / 35.6%). All twelve rows remain 0 B/op and both
-repositories retain exact 100% standard/Lean line, branch and method coverage.
-The report records small, incompletely isolated ordinary-row shifts, targeted
-cap repeats, resource proofs and actual timed-child assembly verification;
-stale-cache captures are excluded. #020 remains open.
-
-**Next isolation step:** Investigate retained-positive root acquisition (about
-43% inclusive sampled CPU), remaining exact depth-sign work (about 40%) and
-endpoint analytic materialization (about 79-81%). Reuse existing certified point
-evaluation and exact rational-square output helpers where evidence supports it,
-retaining cap/side/zero-core and mixed/3D controls. Coordinate with GRV-Benchmark-021 using
-the [shared investigation context](#capsule-rim-cost-relationship-grv-benchmark-020-and-021).
-Prefer reuse or exact feature certificates within that owner; do not restore
-the incomplete direction subset, add a second
-mixed solver or approximate the result. Preserve full-domain classification,
-nearest-even depth, deterministic ties, canonical anchors and zero allocation.
-
-**Reproduce:** Build `Gravitas.slnx -c Release -p:UseLocalLsfStack=true`, then:
-
-```powershell
-dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll capsule-circle-contact --warmupCount 3 --iterationCount 10 --launchCount 1 --exporters json --artifacts artifacts/grv085/after-confirm
-```
-
-Baseline source: Gravitas `04805b8` and FixedMathSharp `9833123`. Fixture geometry
-and the measured mixed method were unchanged between captures; corrected-answer
-setup assertions and the paired 3D control were added after the legacy capture.
-Setup checks classification, known quarter-unit depths and cross-path depth
-agreement. Reports and raw measurements are under `artifacts/grv085/before`,
-`after` and `after-confirm`; retain the individual rows rather than an average
-that hides the curved-feature cost. Correctness evidence is retained in
-[GRV-Issue-085](issue-tracker.md#grv-issue-085---mixed-capsulecircle-slab-contact-bypasses-the-complete-upstream-query).
-
-#### Capsule Rim Cost Relationship (GRV-Benchmark-020 And 021)
-
-Source inspection on 2026-09-30 connects these signals without establishing a
-shared CPU hotspot. Keep both fixture families and their measured results
-distinct; investigate them together, starting with oblique contacts and then
-endpoint/straight-rim output materialization.
-
-The 2026-10-04 coordinated profiles now distinguish their expensive owners:
-circle/cylinder ellipse magnitude-to-raw comparison takes about 53-55% inclusive
-sampled CPU, while stadium constrained root acquisition, sign refinement and
-value mapping remain expensive. The [refinement evidence](2026-10-04-capsule-slab-cost-refinement.md)
-retains both profiles and mixed/3D/triangle controls. This does not establish a
-single shared dominant leaf or justify merging the specialized solvers.
-The 2026-10-05 [certified-sign refinement](2026-10-05-capsule-slab-sign-refinement.md)
-moves the stadium analytic-winner bottleneck toward root acquisition, while
-circle mixed/3D controls retain their distinct ellipse path. The subsequent
-[root-isolation refinement](2026-10-05-capsule-slab-root-isolation-refinement.md)
-closes #021 with reproduced gains, bounded resources and published remaining
-cost. #020 stays open; shared algebra does not imply shared root-selection policy.
-
-The fixture names describe different features:
-
-| Fixture | Capsule feature | Slab feature |
-| --- | --- | --- |
-| `EndpointRim` (020) | Core endpoint | Circular cap rim |
-| `StraightRim` (021) | Core endpoint | Straight cap edge |
-| Oblique interior rim (both) | Interior of tilted core | Curved cap rim |
-
-Both endpoint/straight-rim fixtures have analytic whole-shape closest-point
-certificates and reuse `MaterializeCylinderCapsulePenetration` for exact depth
-and normal rounding; neither needs the oblique polynomial solver. They are not
-matched geometry: the endpoint fixture has irrational depth/normal components,
-while the straight-rim fixture has rational results. Their timings alone cannot
-establish which solver is intrinsically cheaper.
-
-The oblique paths both require wide arithmetic, polynomial roots, exact
-comparisons and final rounding, but use different specialized root-selection
-paths. The cylinder ellipse solver selects a largest-positive parameter root
-under an unrestricted-domain proof. The stadium solver admits constrained
-end-region roots and maps/compares their signed gaps through value roots, reusing
-circular-rim algebra also consumed by triangle contacts. Copying the cylinder's
-reflection/root-selection shortcut could discard a valid stadium contact.
-
-Continue profiling the affected stages before attributing cost to a shared leaf
-or merging solvers. Prefer demonstrated shared arithmetic/materialization wins or
-proved feature certificates; retain ordinary mixed/3D and affected triangle
-controls. Similar exact algebra does not yet prove the same dominant function,
-an unavoidable correctness cost, or an optimization that will benefit both.
-
 ### GRV-Benchmark-019 — Complete Triangle/Cone Contact Cost
 
 **Discovered:** 2026-09-29.  
@@ -438,6 +316,7 @@ and
 
 | Signal                                                                                  | Status | Closed     | Resolution                                                                                                                                                                                                                                                                                      |
 | --------------------------------------------------------------------------------------- | ------ | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [GRV-Benchmark-020 — Complete capsule/circle-slab contact cost](#grv-benchmark-020--complete-capsulecircle-slab-contact-cost) | Closed | 2026-10-05 | Exact output bounds, invariant normal products and certified Sturm signs reduce endpoint output to 37–39 µs and representative oblique contacts to 0.70 ms, with shared-consumer gains, 0 B/op and 100% coverage. Remaining exact root cost is published without a host-rate guarantee. |
 | [GRV-Benchmark-021 — Complete capsule/stadium-slab curved contact cost](#grv-benchmark-021--complete-capsulestadium-slab-curved-contact-cost) | Closed | 2026-10-05 | Shared exact root isolation and negative global-minimum certificates improve four fixtures by 11.5-26.4%, at 0 B/op and 100% coverage. Committed in Gravitas `989c7f9` / FixedMathSharp `bd8f6a2`; remaining costs are published without a host-rate guarantee. |
 | [GRV-Benchmark-023 — Circle workload partition and grounding scaling](#grv-benchmark-023--circle-workload-partition-and-grounding-scaling) | Closed | 2026-10-04 | Ownership/storage/math repairs and lean 2D gathering retained; repeated controls, 100% coverage and published configuration costs support the no-further-change decision. Latest refinement remains unstaged for review; no fixed-Hz guarantee. |
 | GRV-Benchmark-022 — Exact pure-2D circle contact cost | Closed | 2026-10-02 | Shared normalization optimization committed; retain exact contact owner under documented no-further-change decision. Scene partition/grounding costs are documented separately in closed GRV-Benchmark-023. |
@@ -457,6 +336,150 @@ and
 | GRV-Benchmark-007 — 3D dynamic shape-exact BDN allocation signal                        | Closed | 2026-06-23 | Shared exact-sweep bounds prefilters removed the scaling allocation/time signal from 3D dynamic false-positive rows                                                                                                                                                                             |
 | GRV-Benchmark-003 — 3D full-runtime CCD allocation                                      | Closed | 2026-06-23 | GridForge allocation-free line tracing plus Gravitas 3D raycast adoption                                                                                                                                                                                                                        |
 | GRV-Benchmark-004 — Grounding raycast probe allocation                                  | Closed | 2026-06-23 | Same raycast trace fix removed automatic ray-grounding allocation                                                                                                                                                                                                                               |
+
+### GRV-Benchmark-020 — Complete Capsule/Circle-Slab Contact Cost
+
+**Discovered:** 2026-09-29.  
+**Status:** Closed 2026-10-05; coordinated refinements are verified for review.
+Remaining exact oblique-root cost is published under the judgment-based closure bar.  
+**Owner:** FixedMathSharp's shared cylinder/capsule feature selection and exact
+output materialization; Gravitas consumes that owner for mixed circle slabs and 3D
+cylinders.
+
+The complete query rejects separated cap rims and selects minimum depth before
+rounding. The previous mixed direction subset could return a false contact or
+nonminimum depth; its cheaper wrong answers are not correctness-equivalent
+optimization targets. Ordinary cap, side and zero-core fixtures did return the
+correct answers before the repair, and their additional cost is real.
+
+Matched Windows 11/i7-9700K measurements use .NET 8.0.29, SDK 10.0.302, one
+launch, three warmups and ten measured iterations per row. The launcher is
+BelowNormal with affinity mask 3 and `DOTNET_PROCESSOR_COUNT=2`; only one heavy
+workload runs at a time. Values are **microseconds per dispatched query**, not
+batches or simulation frames. Every row reports **0 B/op**.
+
+| Geometry | Old mixed path | Complete mixed, first run | Complete mixed, confirmation | Equivalent 3D cylinder, confirmation |
+| --- | ---: | ---: | ---: | ---: |
+| Cap | 12.27 | 19.32 | 19.07 | 21.51 |
+| Side | 16.70 | 25.66 | 25.12 | 26.35 |
+| Zero capsule core | 16.67 | 25.78 | 24.75 | 26.01 |
+| Endpoint rim | 30.54 — nonminimum depth | 106.69 | 108.18 | 108.30 |
+| Separated endpoint rim | 30.62 — false contact | 25.78 | 25.54 | 25.90 |
+| Oblique interior rim | 36.70 — nonminimum depth | 1,224.40 | 1,191.51 | 1,196.17 |
+
+The mixed confirmation's standard deviations are 0.099 / 0.080 / 0.103 /
+1.051 / 0.159 / 8.028 microseconds in table order. Equivalent 3D controls show
+the same expensive curved-feature behavior. These are complete wrapper costs:
+3D also validates public inputs and updates a manifold, while mixed constructs
+its canonical contact. Their difference does not isolate adapter overhead, and
+there is no historical 3D baseline for these new fixtures.
+
+**2026-10-05 progress:** [Exact output refinement](2026-10-05-capsule-circle-cost-refinement.md)
+reuses rigorous magnitude-floor bounds and one jointly scaled depth-polynomial
+reduction. Fresh committed/retained mixed oblique means improve from
+1,186.47 to **745.01 microseconds**; equivalent 3D improves from 1,124.91 to
+**724.62 microseconds** (37.2% / 35.6%). All twelve rows remain 0 B/op and both
+repositories retain exact 100% standard/Lean line, branch and method coverage.
+The report records small, incompletely isolated ordinary-row shifts, targeted
+cap repeats, resource proofs and actual timed-child assembly verification;
+stale-cache captures are excluded. The signal remained open after that phase.
+
+**2026-10-05 closure:** The same [refinement report](2026-10-05-capsule-circle-cost-refinement.md)
+now records certified Sturm point signs, hoisted invariant normal products and
+factored radical bounds, all in existing FixedMathSharp owners. The final mixed /
+3D endpoint means are **36.578 / 38.962 µs**, versus the fresh committed control's
+86.95 / 88.25 µs (about **57.9% / 55.9%** lower). Cap, side and zero-core output
+are roughly **10–11.5 µs**. Representative oblique means are **696.036 / 699.465
+µs**; across the full investigation they fall from the first phase's fresh
+1,186.47 / 1,124.91 µs control by about **41.3% / 37.8%**. These cumulative
+figures compare recorded captures across refinements, not one new paired run;
+the report retains the stage-specific confidence intervals and repeats.
+
+All twelve final circle/slab rows, all thirty-two before/after shared controls
+and the sixteen-row final-source shared recheck report **0 B/op**. The paired
+stadium ordinary output improves another 36–54%, and its straight-rim output
+improves 23%; the paired separated/oblique/triangle controls show small mean
+shifts with overlapping intervals. Final Release/Lean suites retain exact
+**100% reachable line, branch and method coverage**, exclusions unchanged;
+Debug stack/allocation checks, both target frameworks and both DocFX/local-link
+gates pass. Source reviews found no actionable correctness or simplicity issues.
+A measured retained-cell certificate was removed because it established no gain.
+
+**Closure decision:** Proven correctness, reproduced gains across mixed/3D and
+shared consumers, zero allocation and bounded resources meet the same bar used
+for #021. Remaining root acquisition and exact quartic signs are documented;
+no cheaper demonstrated refinement remains in this investigation. The roughly
+0.70-ms representative oblique query is a workload-budget consideration, not a
+fixed-rate host guarantee or proof of an unavoidable lower bound. Preserve
+full-domain classification, nearest-even depth, deterministic ties and canonical
+anchors. Further work should start from new measured workload evidence, without
+restoring incomplete directions or adding an approximate solver.
+
+**Original fixture capture:** Build `Gravitas.slnx -c Release -p:UseLocalLsfStack=true`, then:
+
+```powershell
+dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll capsule-circle-contact --warmupCount 3 --iterationCount 10 --launchCount 1 --exporters json --artifacts artifacts/grv085/after-confirm
+```
+
+Baseline source: Gravitas `04805b8` and FixedMathSharp `9833123`. Fixture geometry
+and the measured mixed method were unchanged between captures; corrected-answer
+setup assertions and the paired 3D control were added after the legacy capture.
+Setup checks classification, known quarter-unit depths and cross-path depth
+agreement. Reports and raw measurements are under `artifacts/grv085/before`,
+`after` and `after-confirm`; retain the individual rows rather than an average
+that hides the curved-feature cost. Correctness evidence is retained in
+[GRV-Issue-085](issue-tracker.md#grv-issue-085---mixed-capsulecircle-slab-contact-bypasses-the-complete-upstream-query).
+
+#### Capsule Rim Cost Relationship (GRV-Benchmark-020 And 021)
+
+Source inspection on 2026-09-30 connects these signals without establishing a
+shared CPU hotspot. Keep both fixture families and their measured results
+distinct; investigate them together, starting with oblique contacts and then
+endpoint/straight-rim output materialization.
+
+The 2026-10-04 coordinated profiles now distinguish their expensive owners:
+circle/cylinder ellipse magnitude-to-raw comparison takes about 53-55% inclusive
+sampled CPU, while stadium constrained root acquisition, sign refinement and
+value mapping remain expensive. The [refinement evidence](2026-10-04-capsule-slab-cost-refinement.md)
+retains both profiles and mixed/3D/triangle controls. This does not establish a
+single shared dominant leaf or justify merging the specialized solvers.
+The 2026-10-05 [certified-sign refinement](2026-10-05-capsule-slab-sign-refinement.md)
+moves the stadium analytic-winner bottleneck toward root acquisition, while
+circle mixed/3D controls retain their distinct ellipse path. The subsequent
+[root-isolation refinement](2026-10-05-capsule-slab-root-isolation-refinement.md)
+closes #021 with reproduced gains, bounded resources and published remaining
+cost. The subsequent circle/slab [output refinement](2026-10-05-capsule-circle-cost-refinement.md)
+closes #020 with both dimensional controls and measured shared-consumer gains.
+Both signals are closed; shared algebra does not imply shared root-selection policy.
+
+The fixture names describe different features:
+
+| Fixture | Capsule feature | Slab feature |
+| --- | --- | --- |
+| `EndpointRim` (020) | Core endpoint | Circular cap rim |
+| `StraightRim` (021) | Core endpoint | Straight cap edge |
+| Oblique interior rim (both) | Interior of tilted core | Curved cap rim |
+
+Both endpoint/straight-rim fixtures have analytic whole-shape closest-point
+certificates and reuse `MaterializeCylinderCapsulePenetration` for exact depth
+and normal rounding; neither needs the oblique polynomial solver. They are not
+matched geometry: the endpoint fixture has irrational depth/normal components,
+while the straight-rim fixture has rational results. Their timings alone cannot
+establish which solver is intrinsically cheaper.
+
+The oblique paths both require wide arithmetic, polynomial roots, exact
+comparisons and final rounding, but use different specialized root-selection
+paths. The cylinder ellipse solver selects a largest-positive parameter root
+under an unrestricted-domain proof. The stadium solver admits constrained
+end-region roots and maps/compares their signed gaps through value roots, reusing
+circular-rim algebra also consumed by triangle contacts. Copying the cylinder's
+reflection/root-selection shortcut could discard a valid stadium contact.
+
+Future profiling should identify the affected stages before attributing cost to a
+shared leaf or merging solvers. Prefer demonstrated shared arithmetic and
+materialization wins or proved feature certificates; retain ordinary mixed/3D and affected triangle
+controls. Similar exact algebra does not yet prove the same dominant function,
+an unavoidable correctness cost, or an optimization that will benefit both.
 
 ### GRV-Benchmark-021 — Complete Capsule/Stadium-Slab Curved Contact Cost
 
@@ -505,9 +528,10 @@ consume much of the sampled CPU. Dense curved-contact workloads require their
 own complete-step capacity measurements; these microbenchmarks do not establish
 MMO/strategy throughput or cross-platform replay. The focused investigation
 closes under the user's judgement-based performance bar. GRV-Benchmark-020
-remains open for its distinct ellipse-depth owner; related algebra alone does
-not establish one common dominant hotspot. Released-package validation remains
-a release gate after the coordinated FixedMathSharp release.
+is also closed after its distinct ellipse-depth and shared-output investigation;
+related algebra alone does not establish one common dominant hotspot.
+Released-package validation remains a release gate after the coordinated
+FixedMathSharp release.
 
 **Reproduce:** after a Release local-stack benchmark build, run
 `dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll --filter '*CapsuleSlabContactBenchmarks*Oblique*' --launchCount 2 --warmupCount 5 --iterationCount 15 --invocationCount 512 --affinity 3 --exporters json --artifacts artifacts/grv-benchmark-021/reproduce`.

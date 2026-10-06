@@ -200,6 +200,15 @@ output rounding. Proven value bounds narrow the rounding search, and shared
 numerator/denominator reduction avoids repeating the same polynomial work.
 Neither step changes nearest-even rounding, exact tangency, deterministic ties
 or the distinction between rounded depth and conceptual depth clamping.
+During root isolation, certified integer point signs can avoid full polynomial
+evaluation; uncertain signs still use exact derivative limits for root counting.
+Analytic normal rounding reuses scale-dependent products across its threshold
+comparisons, including scaled radial anchors, while preserving the same exact
+quadratic-sign and nearest-even decisions.
+Analytic depth and normal searches use conservative factored square-root bounds.
+Normal components share their norm bounds; a nonpositive denominator lower bound
+retains the full exact search. Cancellation, half-raw ties and conceptual depth
+clamping remain exact.
 
 Capsule contacts with a positive-core 2D capsule slab also use a complete
 FixedMathSharp query. The slab's flat caps, straight sides and rounded ends

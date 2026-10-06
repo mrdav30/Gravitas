@@ -81,7 +81,8 @@ instead of burying it in notes.
     Debug/resource checks and DocFX pass. Ordinary cap/side/end fixtures improve
     37-41%. The user accepted the remaining complete-query cost for now.
   - GRV-Benchmark-021 closed 2026-10-05; Gravitas `989c7f9` and coordinated
-    FixedMathSharp `bd8f6a2` are committed. GRV-Benchmark-020 remains open. Their shared
+    FixedMathSharp `bd8f6a2` are committed. GRV-Benchmark-020 also closes on
+    2026-10-05 after its separate investigation. Their shared
     analytic materializer and distinct oblique root paths have coordinated
     profiles. [Retained-root refinement](2026-10-04-capsule-slab-cost-refinement.md)
     improves four oblique stadium fixtures by 7.1-24.2% with 0 B/op. The
@@ -111,8 +112,17 @@ instead of burying it in notes.
     [exact output refinement](2026-10-05-capsule-circle-cost-refinement.md)
     improves the representative oblique query by 37.2% mixed / 35.6% 3D,
     to 0.72-0.75 ms at 0 B/op with exact 100% standard/Lean coverage across
-    both repositories. Root acquisition and analytic output costs remain
-    under investigation; the signal stays open.
+    both repositories. Subsequent certified point signs, invariant normal products
+    and factored radical bounds bring endpoint rim output to 37–39 µs, ordinary
+    output to roughly 10–11.5 µs and the oblique query to about 0.70 ms. Shared
+    stadium ordinary contacts improve another 36–54% and straight-rim output
+    improves 23%; oblique and triangle controls have small shifts with overlapping
+    intervals. GRV-Benchmark-020 closes 2026-10-05 with 0 B/op throughout and
+    fresh exact 100% reachable line/branch/method coverage in both configurations,
+    Debug resource/allocation checks, both target frameworks and DocFX/local-link
+    gates. The rejected cell-certificate experiment is removed. Remaining exact
+    oblique root cost is published under the same judgment-based closure bar as
+    #021; these query costs promise no host rate or universal multiplayer scale.
 
 - [`Canonical-Frame Cone-Volume Queries`](issue-tracker.md#grv-issue-087---cone-volume-queries-reject-an-intersecting-mesh-when-the-apex-cannot-enter-its-scalar-frame)
   - Completed 2026-09-29. Closest/all-hit and batch cone queries preserve the
