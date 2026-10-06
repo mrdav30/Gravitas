@@ -1,5 +1,8 @@
 # Capsule/Circle-Slab Output Refinement
 
+**Status:** Complete; GRV-Benchmark-020 closed 2026-10-05.  
+**Archived:** 2026-10-06. Earlier phase assessments below are historical.
+
 This records successive GRV-Benchmark-020 refinements after closing
 GRV-Benchmark-021. The starting committed revisions are Gravitas `989c7f9`
 and FixedMathSharp `bd8f6a2`. The complete shared cylinder/capsule query is
@@ -681,7 +684,7 @@ Future optimization should start from new representative workload/profile
 evidence. No new public API, configuration, cache, approximate contact decision,
 solver facade, public wide type or additional friendship is introduced.
 
-The coordinated changes remain **unstaged and uncommitted**. Release
+At the time of this capture, the coordinated changes were **unstaged and uncommitted**. Release
 FixedMathSharp first, then validate Gravitas against the released package
 before releasing Gravitas; local-source validation is not that release gate.
 Ignored captures, source/IL identities, stage backups and serial driver scripts

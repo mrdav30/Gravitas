@@ -1,5 +1,8 @@
 # Triangle/Cone Contact Cost Refinement
 
+**Status:** Complete; GRV-Benchmark-019 closed 2026-10-06.  
+**Archived:** 2026-10-06. Earlier phase assessments below are historical.
+
 This records the first GRV-Benchmark-019 refinement phase on 2026-10-06.
 Starting revisions are Gravitas `5d1406b` and FixedMathSharp `b8996ec`.
 The complete triangle/cone query remains the correctness baseline. The old
@@ -229,9 +232,9 @@ with raw reports, rendered reports, test logs and `result.json`. The confirmed
 cone/control captures match current source hashes and their actual private child
 IL bodies. Independent source and evidence reviews have no remaining findings.
 
-## Remaining Signal
+## Status At The End Of This Phase
 
-GRV-Benchmark-019 remains open for the measured complete-contact cost. Interior
+At the end of this phase, GRV-Benchmark-019 remained open for the measured complete-contact cost. Interior
 rim is still approximately 1.05 ms/query on this host; gap rejection is also
 substantially more expensive than the former correct gap fixture. The next
 investigation should measure exact witness searches and generator-fan work

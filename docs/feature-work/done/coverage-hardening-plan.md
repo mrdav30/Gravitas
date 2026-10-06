@@ -63,9 +63,9 @@ its exact payload.
 5. **Do not widen exclusions.** Existing generated and compiler-generated
    exclusions may remain; hand-authored runtime code stays accountable.
 6. **Record discoveries in the right place.** Correctness and parity defects
-   belong in [`issue-tracker.md`](issue-tracker.md). Measured performance risks
+   belong in [`issue-tracker.md`](../issue-tracker.md). Measured performance risks
    belong in
-   [`benchmark-signal-hardening-backlog.md`](benchmark-signal-hardening-backlog.md).
+   [`benchmark-signal-hardening-backlog.md`](../benchmark-signal-hardening-backlog.md).
 
 Classify every uncovered outcome before editing:
 

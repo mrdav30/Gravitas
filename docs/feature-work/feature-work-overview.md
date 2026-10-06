@@ -6,6 +6,12 @@ This document is a living overview of Gravitas feature work. It tracks the
 active scope, recently completed work, and deferred or evidence-gated plans. It
 is a curated view rather than a backlog of every possible feature.
 
+Keep active and deferred plans alongside the coordination trackers in this
+directory. Archive completed plans and finished investigation reports under
+`done/`, mark their completion status, and update incoming and relative links.
+Archived phase assessments describe the evidence at that time; current status
+belongs in the trackers and this overview.
+
 ## Coordination Trackers
 
 Keep these trackers empty when possible, and promote broad work into dated plans
@@ -31,16 +37,12 @@ instead of burying it in notes.
 - [`Benchmark Signal Hardening`](benchmark-signal-hardening-backlog.md)
   - Reproduce and close confirmed release-relevant signals alongside the owning
     library change. Do not broaden this into speculative optimization work.
-  - [Triangle/cone cost refinement](2026-10-06-triangle-cone-cost-refinement.md)
-    advances active GRV-Benchmark-019. Exact support/witness reuse and nonwinner
-    root rejection reduce apex/side costs by 52%/46% and the full-domain relative
-    center fixture by 68%, with zero allocations. Interior-rim and gap traversal
-    remain measured follow-ups before closure.
   - Experimental [GRV-Benchmark-024](benchmark-signal-hardening-backlog.md#grv-benchmark-024--curved-contact-workload-frequency-and-step-cost)
     tracks the unmeasured frequency and complete-step impact of expensive curved
     contacts in representative deterministic scenes. Count solver entries as
-    well as winning contacts before proposing further optimization; #020 and
-    #021 remain closed.
+    well as winning contacts before proposing further optimization; #019, #020
+    and #021 remain closed. Include cone/triangle and shared triangle/cylinder
+    candidates alongside capsule/slab configurations.
 
 ## Recently Completed
 
@@ -94,14 +96,14 @@ instead of burying it in notes.
     FixedMathSharp `bd8f6a2` are committed. GRV-Benchmark-020 also closes on
     2026-10-05 after its separate investigation. Their shared
     analytic materializer and distinct oblique root paths have coordinated
-    profiles. [Retained-root refinement](2026-10-04-capsule-slab-cost-refinement.md)
+    profiles. [Retained-root refinement](done/2026-10-04-capsule-slab-cost-refinement.md)
     improves four oblique stadium fixtures by 7.1-24.2% with 0 B/op. The
-    [certified-sign refinement](2026-10-05-capsule-slab-sign-refinement.md)
+    [certified-sign refinement](done/2026-10-05-capsule-slab-sign-refinement.md)
     subsequently brings the analytic-winner fixture to about 1.39 ms with
     0 B/op (49.9-51.3% mean reduction across repeated committed baselines),
     reusing retained-cell and endpoint certificates with a measured
     point-evaluation budget. The subsequent
-    [root-isolation refinement](2026-10-05-capsule-slab-root-isolation-refinement.md)
+    [root-isolation refinement](done/2026-10-05-capsule-slab-root-isolation-refinement.md)
     shares subdivision counts and reciprocal-chart chains and certifies negative
     global minima. Its four fixtures improve another 11.5-26.4% against fresh
     committed captures, to 0.53-1.05 ms/query, all 0 B/op. Closure uses verified
@@ -119,7 +121,7 @@ instead of burying it in notes.
     with the shared 3D contract. Nonzero-core capsule slabs were subsequently
     repaired as GRV-Issue-088. The measured complete-query cost, including
     equivalent 3D controls, is retained as GRV-Benchmark-020. Its first
-    [exact output refinement](2026-10-05-capsule-circle-cost-refinement.md)
+    [exact output refinement](done/2026-10-05-capsule-circle-cost-refinement.md)
     improves the representative oblique query by 37.2% mixed / 35.6% 3D,
     to 0.72-0.75 ms at 0 B/op with exact 100% standard/Lean coverage across
     both repositories. Subsequent certified point signs, invariant normal products
@@ -148,11 +150,17 @@ instead of burying it in notes.
   - Both repositories retain 100% reachable line, branch and method coverage in
     Release and ReleaseLean. Exact face certificates and shared depth reduction
     cut ordinary face costs by 67–89% from the first complete solver; measured
-    remaining costs are GRV-Benchmark-019. Fresh shared-owner controls detected
-    no material regression. The separate cone-volume query bug was resolved as
+    remaining costs are published in closed GRV-Benchmark-019. Fresh shared-owner
+    controls detected no material regression; frequency and complete-step capacity
+    remain GRV-Benchmark-024. The separate cone-volume query bug was resolved as
     GRV-Issue-087.
+  - [Final benchmark refinement](done/2026-10-06-triangle-cone-final-refinement.md)
+    closes GRV-Benchmark-019 after four measured passes through existing exact
+    owners. The last retained root-sign change lowers interior-rim cost by 4.1%
+    against its fresh baseline, with zero allocations and 100% coverage. Ordinary
+    faces cost about 23-29 us; remaining exact rim and gap costs are published.
 
-- [`Mixed Discrete Broad-Phase Signal Closure`](benchmark-signal-hardening-backlog.md#closed-signal-mixed-discrete-broad-phase-allocation-at-32-pairs)
+- [`Mixed Discrete Broad-Phase Signal Closure`](benchmark-signal-hardening-backlog.md#grv-benchmark-012--mixed-discrete-broad-phase-allocation-at-32-pairs)
   - Completed 2026-08-04. The original run-dependent 32-pair allocation no
     longer reproduces: two rotational confirmations and corrected sparse, dense,
     and churn broad-phase rows report `0 B/op` through 1,024 colliders.
@@ -334,7 +342,7 @@ instead of burying it in notes.
     ReleaseLean tests at 40,072/40,072 lines, 12,365/12,365 branches, and
     4,368/4,368 methods; replay, allocation, package, documentation, and
     independent-review gates are closed.
-- [`Canonical Collider Geometry And Exact Scale Admission`](issue-tracker.md#finite-axis-collider-geometry-uses-canonical-rigid-frames)
+- [`Canonical Collider Geometry And Exact Scale Admission`](issue-tracker.md#grv-issue-061--finite-axis-collider-geometry-uses-canonical-rigid-frames)
   - Completed 2026-07-27. FixedMathSharp owns strict transform composition,
     fused scaled dimensions, centered finite-axis relations, local convex
     boundaries, and `FixedOrientedBox`; Gravitas publishes collider geometry
@@ -346,7 +354,7 @@ instead of burying it in notes.
     allocation gates are green. The later exact relative-frame throughput pass
     closes the ordinary-domain signal with repeatable `30.9-64.0%` improvements
     across the affected direct and Gravitas families.
-- [`Full-Domain Conic Query And Triangle Arithmetic`](issue-tracker.md#cone-triangle-face-interiors-are-reduced-without-edge-crossings)
+- [`Full-Domain Conic Query And Triangle Arithmetic`](issue-tracker.md#grv-issue-054--cone-triangle-face-interiors-are-reduced-without-edge-crossings)
   - Completed 2026-07-22. FixedMathSharp now owns exact allocation-free
     finite-cone segment intervals for apex-authored and centered cones, while
     Gravitas consumes distance intervals for cone-collider raycasts and
@@ -371,7 +379,7 @@ instead of burying it in notes.
     observable mutation. The authoritative Release artifact passes 3,237 tests
     at 100% line, branch, and method coverage; warmed 3D/2D role transitions
     remain allocation-free.
-- [`Finite-Axis Full-Domain Projection Closure`](issue-tracker.md#finite-axis-capsule-cylinder-and-mesh-edge-projections-can-saturate-before-solving)
+- [`Finite-Axis Full-Domain Projection Closure`](issue-tracker.md#grv-issue-048--finite-axis-capsule-cylinder-and-mesh-edge-projections-can-saturate-before-solving)
   - Completed 2026-07-19. FixedMathSharp now owns exact bounded-ray and
     authored-segment physical-distance capsule/cylinder intervals, and Gravitas
     consumes them across 2D, 3D, mixed, raycast, sweep, and mesh-edge reducers.

@@ -61,100 +61,6 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 
 ## Active Signals
 
-### GRV-Benchmark-019 — Complete Triangle/Cone Contact Cost
-
-**Discovered:** 2026-09-29.  
-**Status:** Active; generator refinement measured 2026-10-06.  
-**Owners:** FixedMathSharp's triangle/cone support selection, rim roots and paired
-witnesses; Gravitas's mesh candidate traversal.
-
-Correctness, resource proofs and shared-owner control evidence are retained in
-the [completed contact plan](done/2026-09-28-complete-triangle-cone-contact-plan.md).
-
-The complete contact query replaces missed intersections and inconsistent
-normal/depth/anchor output. Its exact geometry is the correctness baseline.
-The bounded optimization pass reused the existing face-disk certificate and
-principal-axis depth reducer; it did not introduce an approximate fallback,
-new arithmetic engine, cache or allocation.
-
-Matched Windows/i7-9700K measurements use .NET 8.0.29, SDK 10.0.302, two launches,
-five warmups and fifteen measured iterations per launch. The launcher is
-BelowNormal with affinity mask 3 and `DOTNET_PROCESSOR_COUNT=2`; only one heavy
-workload runs at a time. Values below are **microseconds per dispatched query**,
-not batches or simulation frames. Every row reports zero managed allocation.
-
-| Geometry | Old incomplete path | Initial complete solver | September optimized mean | September standard deviation |
-| --- | ---: | ---: | ---: | ---: |
-| Base face | 19.983 | 152.1 | 33.89 | 0.676 |
-| Side face | 17.525 | 567.4 | 62.57 | 1.193 |
-| Apex face | 28.838 — wrong depth | 169.3 | 55.67 | 1.331 |
-| Side intrusion | 15.407 — missed contact | 301.5 | 283.08 | 6.321 |
-| Oblique rim | 17.403 — missed contact | 905.3 | 850.98 | 31.440 |
-| Interior stationary rim | Not captured | Not captured | 1,407.39 | 32.889 |
-| Rim touch | 17.932 — missed touch | 703.1 | 692.58 | 13.452 |
-| Rim gap | 17.652 | 122.0 | 120.78 | 2.479 |
-| Unrepresentable relative center | 6.069 — missed contact | 1,708.7 | 1,652.05 | 31.686 |
-
-September base/side/apex costs are about 78% / 89% / 67% lower than the initial
-complete implementation. The old base/side/gap rows had the correct answers
-for these fixtures and remain cheaper: the final costs are approximately
-1.70x / 3.57x / 6.84x theirs. Five other old rows returned the wrong result and
-are repair-cost comparisons, not equivalent-correctness speed regressions.
-The interior-rim row was added with its independent exact-depth oracle after
-the old baseline. General curved/full-domain work near 0.7–1.7 ms per query is
-still a meaningful cost; ordinary paths also merit further profiling.
-
-All eighteen final cone child launches passed their semantic setup checks.
-BenchmarkDotNet flags multimodal apex and oblique-rim distributions. Small
-curved-row differences are descriptive, not established gains: interior-rim,
-rim-touch and rim-gap intervals overlap the preceding certificate-only run.
-
-Reproduce from the repository root after a local-stack Release benchmark build:
-
-```powershell
-dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0 -p:UseLocalLsfStack=true -m:1 -p:BuildInParallel=false
-dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll mesh-cone-contact --launchCount 2 --warmupCount 5 --iterationCount 15 --affinity 3 --artifacts artifacts/grv086/cone-recheck
-```
-
-Apply the launcher limits above as well; the affinity option alone does not set
-process priority or the runtime's processor-count hint. Setup verifies expected
-classification and certified depths before measurement. Original and final
-reports are under `artifacts/grv086/baseline`, `initial-complete`, `final`
-(certificate-only) and `optimized-and-controls`.
-
-The [2026-10-06 refinement](2026-10-06-triangle-cone-cost-refinement.md) refreshes
-the baseline after shared-owner changes and removes duplicate horizontal-face
-axes, rational witness search, wholly inadmissible charts and nonwinning root
-mapping. It also canonicalizes zero-radius radical signs before accumulation.
-Matched two-launch base/apex/side means fall from 28.95/49.29/55.37 us to
-22.71/23.60/30.00 us; unrepresentable-center cost falls from 1,444.04 to
-463.18 us. Oblique/interior rim fall from 826.45/1,229.16 to 651.08/1,046.86 us.
-All nine rows retain zero managed allocation. The linked report records the
-complete matrix, uncertainty, private child IL identities, exact-bound proofs,
-shared controls, resource tests and coverage gates.
-
-The [generator refinement](2026-10-06-triangle-cone-generator-refinement.md)
-retains one local winner, transforms only final analytic normals, shares
-generator branch coefficients/denominators and directly squares quadratic gaps
-with canonical coefficient signs. A fresh two-launch comparison lowers gap
-rejection from 94.95 to 88.70 us/query, apex face from 24.91 to 22.81 us and
-side face from 31.10 to 28.32 us. All rows remain 0 B/op. Fresh cylinder/circle-slab
-controls differ by less than 2%; stationary interior-rim cost remains about
-1.09 ms/query. The linked report records the full matrix and verification.
-
-**Next useful action:** Investigate exact winner-witness searches; generator-fan
-work remains a measured cost rather than a reason to weaken admission. The
-first-phase gap profile
-spends 92.03% in analytic traversal, including 68.71% in the generator fan;
-it does not reach rim value mapping. Interior-rim
-materialization accounted for 32.24% of baseline CPU samples, but winning-root
-re-isolation only 0.49%; added retained storage needs evidence beyond avoiding
-that reconstruction. Reuse shared improvements where they also help
-[triangle/cylinder contacts](#grv-benchmark-018--complete-trianglecylinder-contact-cost).
-Preserve complete admission, exact ties, canonical paired witnesses, raw-neighbor
-classification, bounded stack use and zero allocations. This is separate from
-the cone-volume-query correctness defect, GRV-Issue-087.
-
 ### GRV-Benchmark-018 — Complete Triangle/Cylinder Contact Cost
 
 **Discovered:** 2026-09-27; final aggregate capture 2026-09-28.  
@@ -252,21 +158,27 @@ contact-correctness issue and the unrelated positive-core capsule-slab defect.
 ### GRV-Benchmark-024 — Curved-Contact Workload Frequency And Step Cost
 
 **Discovered:** 2026-10-06, during the workload-budget follow-up to #020.  
-**Source:** closed [GRV-Benchmark-020](#grv-benchmark-020--complete-capsulecircle-slab-contact-cost)
+**Source:** closed [GRV-Benchmark-019](#grv-benchmark-019--complete-trianglecone-contact-cost),
+[GRV-Benchmark-020](#grv-benchmark-020--complete-capsulecircle-slab-contact-cost)
 and [GRV-Benchmark-021](#grv-benchmark-021--complete-capsulestadium-slab-curved-contact-cost)
-timings and stage profiles.  
+timings and stage profiles, including shared triangle/cylinder controls.  
 **Status:** Experimental evidence gap; representative scene frequency and
-complete-step capacity have not been measured. This does not reopen either
-isolated-query investigation or establish a release-blocking regression.  
+complete-step capacity have not been measured. This does not reopen these
+isolated-query investigations or establish a release-blocking regression.  
 **Owner:** Gravitas benchmark workloads and stage attribution; FixedMathSharp
 only if workload evidence justifies further shared geometry optimization.
 
 The final #020 two-launch fixture costs **696.036 / 699.465 microseconds** per
 complete mixed / 3D oblique query, at **0 B/op**, while ordinary cap/side/zero-core
 contacts cost roughly 10–11.5 microseconds. #021 retains roughly 0.53–1.05 ms
-for its distinct curved fixtures. The [#020 refinement report](2026-10-05-capsule-circle-cost-refinement.md)
+for its distinct curved fixtures. The [#020 refinement report](done/2026-10-05-capsule-circle-cost-refinement.md)
 records the commands, confidence intervals, final-source checks and profiles.
-Its full matrix can be reproduced after a fresh local-stack Release build:
+The [#019 final refinement](done/2026-10-06-triangle-cone-final-refinement.md) publishes
+about 0.93/0.67/0.63 ms for interior/oblique/touch triangle-cone rim queries and
+89 us for near-rim gap rejection, at 0 B/op. Its shared triangle/cylinder and
+circle-slab controls retain about 0.64-0.65 ms oblique costs. These exact geometry
+consumers belong in the same frequency and complete-step investigation.
+The #020 full matrix can be reproduced after a fresh local-stack Release build:
 
 ```powershell
 $env:UseLocalLsfStack = 'true'
@@ -274,8 +186,9 @@ dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll --fi
 ```
 
 These fixtures establish cost when the configuration occurs, not its prevalence
-in games. An oblique interior-rim contact is a geometric configuration of ordinary
-capsules and cylinders or embedded slabs, rather than a separate collider type.
+in games. Oblique and interior-rim contacts arise from relative configurations
+of ordinary cones, capsules, cylinders, mesh facets or embedded slabs, rather
+than separate collider types.
 Tilt, relative position, dimensions and contact evolution determine the work.
 Counting only final rim contacts can miss expensive feature candidates evaluated
 before an ordinary feature wins or the query rejects contact. Neither rarity nor
@@ -290,6 +203,8 @@ support to characterize deterministic moving scenes before changing the solver:
    Then run explicit upright-agent, tilted/tumbling, rim-sliding and dense-contact
    scenarios across shape dimensions and local density. Synthetic sweep frequency
    must remain separate from observed host frequency; publish scene assumptions.
+   Include cone/triangle and cylinder/triangle mesh contacts, varying facet
+   orientation, cone tilt and relative position as well as slab/capsule poses.
 2. In benchmark-only support, distinguish dispatched pair queries, expensive
    root-path entries, admitted curved candidates and final winning features.
    Reuse existing hooks where sufficient. Count repeated work across frames as
@@ -299,7 +214,8 @@ support to characterize deterministic moving scenes before changing the solver:
    and expensive-path rate. Profile stages separately from clean timing runs;
    keep counters and wall-clock timing outside authoritative simulation state.
    Assess explicit host tick budgets with headroom for the rest of the host.
-4. Retain equivalent 3D cylinder and mixed circle/stadium-slab cases with their
+4. Retain cone/triangle and cylinder/triangle mesh cases as well as
+   capsule/cylinder and mixed circle/stadium-slab cases with their
    distinct root policies. Pure 2D workloads provide a dimensional control, not
    an assumed consumer of the 3D oblique solver. Use fixed initial state/input,
    repeatable seeds, contact preflight and replay checks; verify instrumentation
@@ -407,6 +323,7 @@ and
 
 | Signal                                                                                  | Status | Closed     | Resolution                                                                                                                                                                                                                                                                                      |
 | --------------------------------------------------------------------------------------- | ------ | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [GRV-Benchmark-019 — Complete triangle/cone contact cost](#grv-benchmark-019--complete-trianglecone-contact-cost) | Closed | 2026-10-06 | Four measured passes retain exact complete contact geometry at 0 B/op and 100% coverage. Final root-sign refinement lowers interior rim by 4.1%; remaining costs and workload-frequency gate are published in GRV-Benchmark-024. |
 | [GRV-Benchmark-020 — Complete capsule/circle-slab contact cost](#grv-benchmark-020--complete-capsulecircle-slab-contact-cost) | Closed | 2026-10-05 | Exact output bounds, invariant normal products and certified Sturm signs reduce endpoint output to 37–39 µs and representative oblique contacts to 0.70 ms, with shared-consumer gains, 0 B/op and 100% coverage. Remaining exact root cost is published without a host-rate guarantee. |
 | [GRV-Benchmark-021 — Complete capsule/stadium-slab curved contact cost](#grv-benchmark-021--complete-capsulestadium-slab-curved-contact-cost) | Closed | 2026-10-05 | Shared exact root isolation and negative global-minimum certificates improve four fixtures by 11.5-26.4%, at 0 B/op and 100% coverage. Committed in Gravitas `989c7f9` / FixedMathSharp `bd8f6a2`; remaining costs are published without a host-rate guarantee. |
 | [GRV-Benchmark-023 — Circle workload partition and grounding scaling](#grv-benchmark-023--circle-workload-partition-and-grounding-scaling) | Closed | 2026-10-04 | Ownership/storage/math repairs and lean 2D gathering retained; repeated controls, 100% coverage and published configuration costs support the no-further-change decision. Latest refinement remains unstaged for review; no fixed-Hz guarantee. |
@@ -427,6 +344,125 @@ and
 | GRV-Benchmark-007 — 3D dynamic shape-exact BDN allocation signal                        | Closed | 2026-06-23 | Shared exact-sweep bounds prefilters removed the scaling allocation/time signal from 3D dynamic false-positive rows                                                                                                                                                                             |
 | GRV-Benchmark-003 — 3D full-runtime CCD allocation                                      | Closed | 2026-06-23 | GridForge allocation-free line tracing plus Gravitas 3D raycast adoption                                                                                                                                                                                                                        |
 | GRV-Benchmark-004 — Grounding raycast probe allocation                                  | Closed | 2026-06-23 | Same raycast trace fix removed automatic ray-grounding allocation                                                                                                                                                                                                                               |
+
+### GRV-Benchmark-019 — Complete Triangle/Cone Contact Cost
+
+**Discovered:** 2026-09-29.  
+**Status:** Closed 2026-10-06 after four measured refinement passes.  
+**Owners:** FixedMathSharp's triangle/cone support selection, rim roots and paired
+witnesses; Gravitas's mesh candidate traversal.
+
+Correctness, resource proofs and shared-owner control evidence are retained in
+the [completed contact plan](done/2026-09-28-complete-triangle-cone-contact-plan.md).
+
+The complete contact query replaces missed intersections and inconsistent
+normal/depth/anchor output. Its exact geometry is the correctness baseline.
+The bounded optimization pass reused the existing face-disk certificate and
+principal-axis depth reducer; it did not introduce an approximate fallback,
+new arithmetic engine, cache or allocation.
+
+Matched Windows/i7-9700K measurements use .NET 8.0.29, SDK 10.0.302, two launches,
+five warmups and fifteen measured iterations per launch. The launcher is
+BelowNormal with affinity mask 3 and `DOTNET_PROCESSOR_COUNT=2`; only one heavy
+workload runs at a time. Values below are **microseconds per dispatched query**,
+not batches or simulation frames. Every row reports zero managed allocation.
+
+| Geometry | Old incomplete path | Initial complete solver | September optimized mean | September standard deviation |
+| --- | ---: | ---: | ---: | ---: |
+| Base face | 19.983 | 152.1 | 33.89 | 0.676 |
+| Side face | 17.525 | 567.4 | 62.57 | 1.193 |
+| Apex face | 28.838 — wrong depth | 169.3 | 55.67 | 1.331 |
+| Side intrusion | 15.407 — missed contact | 301.5 | 283.08 | 6.321 |
+| Oblique rim | 17.403 — missed contact | 905.3 | 850.98 | 31.440 |
+| Interior stationary rim | Not captured | Not captured | 1,407.39 | 32.889 |
+| Rim touch | 17.932 — missed touch | 703.1 | 692.58 | 13.452 |
+| Rim gap | 17.652 | 122.0 | 120.78 | 2.479 |
+| Unrepresentable relative center | 6.069 — missed contact | 1,708.7 | 1,652.05 | 31.686 |
+
+September base/side/apex costs are about 78% / 89% / 67% lower than the initial
+complete implementation. The old base/side/gap rows had the correct answers
+for these fixtures and remain cheaper: the final costs are approximately
+1.70x / 3.57x / 6.84x theirs. Five other old rows returned the wrong result and
+are repair-cost comparisons, not equivalent-correctness speed regressions.
+The interior-rim row was added with its independent exact-depth oracle after
+the old baseline. General curved/full-domain work near 0.7–1.7 ms per query is
+still a meaningful cost; ordinary paths also merit further profiling.
+
+All eighteen final cone child launches passed their semantic setup checks.
+BenchmarkDotNet flags multimodal apex and oblique-rim distributions. Small
+curved-row differences are descriptive, not established gains: interior-rim,
+rim-touch and rim-gap intervals overlap the preceding certificate-only run.
+
+Reproduce from the repository root after a local-stack Release benchmark build:
+
+```powershell
+dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0 -p:UseLocalLsfStack=true -m:1 -p:BuildInParallel=false
+dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll mesh-cone-contact --launchCount 2 --warmupCount 5 --iterationCount 15 --affinity 3 --artifacts artifacts/grv086/cone-recheck
+```
+
+Apply the launcher limits above as well; the affinity option alone does not set
+process priority or the runtime's processor-count hint. Setup verifies expected
+classification and certified depths before measurement. Original and final
+reports are under `artifacts/grv086/baseline`, `initial-complete`, `final`
+(certificate-only) and `optimized-and-controls`.
+
+The [2026-10-06 refinement](done/2026-10-06-triangle-cone-cost-refinement.md) refreshes
+the baseline after shared-owner changes and removes duplicate horizontal-face
+axes, rational witness search, wholly inadmissible charts and nonwinning root
+mapping. It also canonicalizes zero-radius radical signs before accumulation.
+Matched two-launch base/apex/side means fall from 28.95/49.29/55.37 us to
+22.71/23.60/30.00 us; unrepresentable-center cost falls from 1,444.04 to
+463.18 us. Oblique/interior rim fall from 826.45/1,229.16 to 651.08/1,046.86 us.
+All nine rows retain zero managed allocation. The linked report records the
+complete matrix, uncertainty, private child IL identities, exact-bound proofs,
+shared controls, resource tests and coverage gates.
+
+The [generator refinement](done/2026-10-06-triangle-cone-generator-refinement.md)
+retains one local winner, transforms only final analytic normals, shares
+generator branch coefficients/denominators and directly squares quadratic gaps
+with canonical coefficient signs. A fresh two-launch comparison lowers gap
+rejection from 94.95 to 88.70 us/query, apex face from 24.91 to 22.81 us and
+side face from 31.10 to 28.32 us. All rows remain 0 B/op. Fresh cylinder/circle-slab
+controls differ by less than 2%; stationary interior-rim cost remains about
+1.09 ms/query. The linked report records the full matrix and verification.
+
+The [shared root-normal refinement](done/2026-10-06-triangle-cone-normal-refinement.md)
+uses conservative compact Horner bounds to narrow the existing exact integer
+search while preserving exact half-raw rounding. A fresh two-launch interior-rim
+comparison falls from 1,052.85 to 918.32 us/query (12.8%); all nine cone rows
+remain 0 B/op. Two witness-search experiments failed repeatable timing and were
+removed. Paired cylinder/slab controls retain small visible differences without
+establishing a material regression. The linked report records the full matrices,
+proofs, profiles and validation.
+
+The [final root-sign refinement](done/2026-10-06-triangle-cone-final-refinement.md)
+strengthens the existing retained-cell certificate and defers unused defining
+height scans. A fresh matched two-launch interior-rim mean falls from 966.98 to
+927.41 us/query (4.1%), with separated 99.9% confidence intervals; other cone
+row intervals overlap baseline. All cone and shared-control rows remain 0 B/op.
+An additional witness-arithmetic experiment adds no established benefit and is
+removed. Both owners retain exact 100% reachable line, branch and method
+coverage in Release and ReleaseLean, with unchanged exclusions.
+
+**Closure decision:** The isolated complete-query investigation is complete
+under the user's judgement-based performance bar. Ordinary face fixtures cost
+about 23-29 us; interior/oblique/touch rim remain about 0.93/0.67/0.63 ms and
+fan-gap rejection about 89 us on this host. These costs remain material and
+published, without assuming feature rarity or a fixed host rate. The final
+actual-only profile attributes 50.64% inclusive interior CPU to the root-sign
+core and 18.82% to witness-coordinate search; gap rejection spends 82.02% in
+analytic traversal, including 59.93% in the generator fan. Inclusive owners
+overlap. Preserve complete admission, exact ties, paired witnesses, raw-neighbor
+classification, bounded stack use and zero allocations.
+
+Representative cone/triangle and shared triangle/cylinder candidate frequency
+and complete-step cost now belong explicitly to
+[GRV-Benchmark-024](#grv-benchmark-024--curved-contact-workload-frequency-and-step-cost).
+Deeper solver redesign or retained cross-frame state needs measured scene
+pressure. The separate
+[triangle/cylinder investigation](#grv-benchmark-018--complete-trianglecylinder-contact-cost)
+can continue to improve shared owners without automatically reopening this
+signal. The cone-volume-query correctness repair remains GRV-Issue-087.
 
 ### GRV-Benchmark-020 — Complete Capsule/Circle-Slab Contact Cost
 
@@ -465,7 +501,7 @@ the same expensive curved-feature behavior. These are complete wrapper costs:
 its canonical contact. Their difference does not isolate adapter overhead, and
 there is no historical 3D baseline for these new fixtures.
 
-**2026-10-05 progress:** [Exact output refinement](2026-10-05-capsule-circle-cost-refinement.md)
+**2026-10-05 progress:** [Exact output refinement](done/2026-10-05-capsule-circle-cost-refinement.md)
 reuses rigorous magnitude-floor bounds and one jointly scaled depth-polynomial
 reduction. Fresh committed/retained mixed oblique means improve from
 1,186.47 to **745.01 microseconds**; equivalent 3D improves from 1,124.91 to
@@ -475,7 +511,7 @@ The report records small, incompletely isolated ordinary-row shifts, targeted
 cap repeats, resource proofs and actual timed-child assembly verification;
 stale-cache captures are excluded. The signal remained open after that phase.
 
-**2026-10-05 closure:** The same [refinement report](2026-10-05-capsule-circle-cost-refinement.md)
+**2026-10-05 closure:** The same [refinement report](done/2026-10-05-capsule-circle-cost-refinement.md)
 now records certified Sturm point signs, hoisted invariant normal products and
 factored radical bounds, all in existing FixedMathSharp owners. The final mixed /
 3D endpoint means are **36.578 / 38.962 µs**, versus the fresh committed control's
@@ -531,15 +567,15 @@ endpoint/straight-rim output materialization.
 The 2026-10-04 coordinated profiles now distinguish their expensive owners:
 circle/cylinder ellipse magnitude-to-raw comparison takes about 53-55% inclusive
 sampled CPU, while stadium constrained root acquisition, sign refinement and
-value mapping remain expensive. The [refinement evidence](2026-10-04-capsule-slab-cost-refinement.md)
+value mapping remain expensive. The [refinement evidence](done/2026-10-04-capsule-slab-cost-refinement.md)
 retains both profiles and mixed/3D/triangle controls. This does not establish a
 single shared dominant leaf or justify merging the specialized solvers.
-The 2026-10-05 [certified-sign refinement](2026-10-05-capsule-slab-sign-refinement.md)
+The 2026-10-05 [certified-sign refinement](done/2026-10-05-capsule-slab-sign-refinement.md)
 moves the stadium analytic-winner bottleneck toward root acquisition, while
 circle mixed/3D controls retain their distinct ellipse path. The subsequent
-[root-isolation refinement](2026-10-05-capsule-slab-root-isolation-refinement.md)
+[root-isolation refinement](done/2026-10-05-capsule-slab-root-isolation-refinement.md)
 closes #021 with reproduced gains, bounded resources and published remaining
-cost. The subsequent circle/slab [output refinement](2026-10-05-capsule-circle-cost-refinement.md)
+cost. The subsequent circle/slab [output refinement](done/2026-10-05-capsule-circle-cost-refinement.md)
 closes #020 with both dimensional controls and measured shared-consumer gains.
 Both signals are closed; shared algebra does not imply shared root-selection policy.
 
@@ -583,9 +619,9 @@ remaining cost; it does not certify a fixed-rate host budget.
 shared circular-rim algebra and signed value-root comparison.
 
 The complete query fixes false contacts and nonminimum penetration. Subsequent
-[retained-root/positive-certificate](2026-10-04-capsule-slab-cost-refinement.md),
-[certified-sign](2026-10-05-capsule-slab-sign-refinement.md), and
-[root-isolation/global-minimum refinements](2026-10-05-capsule-slab-root-isolation-refinement.md)
+[retained-root/positive-certificate](done/2026-10-04-capsule-slab-cost-refinement.md),
+[certified-sign](done/2026-10-05-capsule-slab-sign-refinement.md), and
+[root-isolation/global-minimum refinements](done/2026-10-05-capsule-slab-root-isolation-refinement.md)
 retain every constrained chart and exact classification/rounding contract.
 The [correctness repair history](done/2026-09-29-complete-capsule-slab-contact-plan.md#refined-matched-performance)
 retains the older complete and incorrect/incomplete baselines.

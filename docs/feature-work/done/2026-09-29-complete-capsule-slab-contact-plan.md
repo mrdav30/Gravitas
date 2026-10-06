@@ -533,7 +533,8 @@ On 2026-09-30 the user accepted the complete-query repair and its remaining
 the old cheaper results were incorrect. With the recorded technical gates
 complete, GRV-Issue-088 is resolved and this plan moves to `done`.
 
-GRV-Benchmark-021 remains open alongside GRV-Benchmark-020. Their
+At the end of the correctness repair, GRV-Benchmark-021 remained open alongside
+GRV-Benchmark-020. Their
 [shared investigation context](../benchmark-signal-hardening-backlog.md#capsule-rim-cost-relationship-grv-benchmark-020-and-021)
 distinguishes capsule-endpoint versus slab-edge naming, confirmed analytic
 materializer reuse and related but distinct oblique root paths. Profile both
@@ -546,7 +547,9 @@ implementation changes are preserved and this documentation closeout is
 unstaged. Suggested Gravitas commit: `fix: use complete mixed capsule-slab contacts`.
 
 Subsequent status on 2026-10-05: the
-[root-isolation refinement](../2026-10-05-capsule-slab-root-isolation-refinement.md)
+[root-isolation refinement](2026-10-05-capsule-slab-root-isolation-refinement.md)
 closes GRV-Benchmark-021 with reproduced gains and published remaining cost.
-GRV-Benchmark-020 remains open. The measurements and original acceptance above
-remain the historical correctness-repair evidence.
+At that stage, GRV-Benchmark-020 remained open. The subsequent
+[circle/slab output refinement](2026-10-05-capsule-circle-cost-refinement.md)
+closes it on 2026-10-05. The measurements and original acceptance above remain
+the historical correctness-repair evidence.

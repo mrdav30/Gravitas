@@ -1,5 +1,8 @@
 # Triangle/Cone Generator Cost Refinement
 
+**Status:** Complete; GRV-Benchmark-019 closed 2026-10-06.  
+**Archived:** 2026-10-06. Earlier phase assessments below are historical.
+
 This is the second GRV-Benchmark-019 refinement phase. Starting revisions are
 Gravitas `6ccce9c` and FixedMathSharp `6dd97ca`. The complete exact contact
 query remains the correctness baseline.
@@ -178,9 +181,9 @@ profile manifests still match the final source. The fresh passing gate capture,
 including raw/rendered reports, test logs and `result.json`, is
 `artifacts/grv-benchmark-019/final-gates-20261006T152417563Z-5fd87fa9ff604ea7b4163f3a0b6d5bd7`.
 
-## Remaining Investigation
+## Status At The End Of This Phase
 
-GRV-Benchmark-019 remains active. This phase reduces generator work; exact
+At the end of this phase, GRV-Benchmark-019 remained active. This phase reduces generator work; exact
 stationary-root witness and normal materialization still dominate interior-rim
 queries. A useful next experiment is to narrow the existing witness-coordinate
 search using a certified shared edge-parameter interval, while retaining exact

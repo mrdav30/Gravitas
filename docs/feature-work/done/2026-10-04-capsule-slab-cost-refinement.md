@@ -1,7 +1,10 @@
 # Complete Capsule/Stadium-Slab Cost Refinement
 
+**Status:** Complete; GRV-Benchmark-021 closed 2026-10-05.  
+**Archived:** 2026-10-06. Earlier phase assessments below are historical.
+
 This records the 2026-10-04 investigation of GRV-Benchmark-021. The
-[complete-contact repair](done/2026-09-29-complete-capsule-slab-contact-plan.md)
+[complete-contact repair](2026-09-29-complete-capsule-slab-contact-plan.md)
 remains the correctness baseline. The cheaper, incomplete direction subset is
 not a valid performance target.
 
@@ -248,9 +251,9 @@ It retains raw XML, generated reports, test/build logs, source revisions and
 Release FixedMathSharp first, then validate Gravitas against that released
 package before releasing Gravitas; this evidence uses the unreleased local stack.
 
-## Remaining Signal
+## Status At The End Of This Phase
 
-GRV-Benchmark-021 remains open. The analytic-winner case still costs about
+At the end of this phase, GRV-Benchmark-021 remained open. The analytic-winner case still costs about
 2.90 ms per contact despite its improvement, so this phase does not establish
 a real-time contact budget for large workloads.
 

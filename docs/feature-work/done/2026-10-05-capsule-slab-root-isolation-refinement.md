@@ -1,5 +1,8 @@
 # Capsule/Stadium-Slab Root Isolation Refinement
 
+**Status:** Complete; GRV-Benchmark-021 closed 2026-10-05.  
+**Archived:** 2026-10-06. Earlier phase assessments below are historical.
+
 This records the next GRV-Benchmark-021 investigation after the
 [certified-sign refinement](2026-10-05-capsule-slab-sign-refinement.md).
 The starting revisions are Gravitas `62c9be8` and FixedMathSharp `9b1f173`.
@@ -346,7 +349,7 @@ Microbenchmark latency is not a simulation frame budget: many simultaneous
 oblique contacts need representative world-step measurements before selecting
 a host rate or capacity. This closes the focused optimization investigation,
 not a universal MMO/strategy throughput claim or a cross-platform replay gate.
-GRV-Benchmark-020 remains open for its distinct ellipse-depth owner. A future
+At the end of this phase, GRV-Benchmark-020 remained open for its distinct ellipse-depth owner. A future
 root-arithmetic or workload redesign should be justified by new measurements,
 retain these fixtures and preserve the full-domain contract. Released-package
 validation remains required after FixedMathSharp is released first.

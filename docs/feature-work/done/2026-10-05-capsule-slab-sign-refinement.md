@@ -1,6 +1,9 @@
 # Capsule/Stadium-Slab Certified Sign Refinement
 
-This continues [GRV-Benchmark-021](benchmark-signal-hardening-backlog.md#grv-benchmark-021--complete-capsulestadium-slab-curved-contact-cost)
+**Status:** Complete; GRV-Benchmark-021 closed 2026-10-05.  
+**Archived:** 2026-10-06. Earlier phase assessments below are historical.
+
+This continues [GRV-Benchmark-021](../benchmark-signal-hardening-backlog.md#grv-benchmark-021--complete-capsulestadium-slab-curved-contact-cost)
 after the [retained-root phase](2026-10-04-capsule-slab-cost-refinement.md).
 The committed baseline is Gravitas `b38373e` and FixedMathSharp `e3bdea3`.
 All development, child benchmark builds and validation use
@@ -216,9 +219,9 @@ separate. The first full Release run passed its tests but exposed the missing
 upper-endpoint borrow outcome; the independent rational bracket above restores that coverage
 without changing production or weakening the certificate.
 
-## Remaining Signal
+## Status At The End Of This Phase
 
-GRV-Benchmark-021 remains open. The slow fixture is substantially cheaper,
+At the end of this phase, GRV-Benchmark-021 remained open. The slow fixture is substantially cheaper,
 but about 1.39 ms per complete contact still warrants work before claiming a
 large-workload budget. GRV-Benchmark-020 retains its distinct ellipse owner.
 
