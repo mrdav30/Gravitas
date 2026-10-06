@@ -16,7 +16,7 @@ this backlog.
 ## Intake Rules
 
 - Signal IDs use `GRV-Benchmark-NNN`. The next available ID is
-  `GRV-Benchmark-024`.
+  `GRV-Benchmark-025`.
 - Assign an ID at intake and never reuse it, including after a signal closes or
   moves into a dated plan. Check this file's Git history before advancing or
   repairing the counter.
@@ -221,7 +221,73 @@ contact-correctness issue and the unrelated positive-core capsule-slab defect.
 
 | Signal                                                                                 | Status                                           | Revisit When                                                                                                            |
 | -------------------------------------------------------------------------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| [GRV-Benchmark-024 — Curved-contact workload frequency and step cost](#grv-benchmark-024--curved-contact-workload-frequency-and-step-cost) | Experimental; scene frequency and capacity unmeasured | Representative deterministic scenes or host traces can establish whether exact curved-feature work materially consumes the intended step budget |
 | GRV-Benchmark-014 — Exact triangle-pair contacts regress dense concave-mesh throughput | Capacity-sensitive; local optimization exhausted | A topology or exact classifier design can reduce complete triangle-pair SAT evaluations without a competing answer path |
+
+### GRV-Benchmark-024 — Curved-Contact Workload Frequency And Step Cost
+
+**Discovered:** 2026-10-06, during the workload-budget follow-up to #020.  
+**Source:** closed [GRV-Benchmark-020](#grv-benchmark-020--complete-capsulecircle-slab-contact-cost)
+and [GRV-Benchmark-021](#grv-benchmark-021--complete-capsulestadium-slab-curved-contact-cost)
+timings and stage profiles.  
+**Status:** Experimental evidence gap; representative scene frequency and
+complete-step capacity have not been measured. This does not reopen either
+isolated-query investigation or establish a release-blocking regression.  
+**Owner:** Gravitas benchmark workloads and stage attribution; FixedMathSharp
+only if workload evidence justifies further shared geometry optimization.
+
+The final #020 two-launch fixture costs **696.036 / 699.465 microseconds** per
+complete mixed / 3D oblique query, at **0 B/op**, while ordinary cap/side/zero-core
+contacts cost roughly 10–11.5 microseconds. #021 retains roughly 0.53–1.05 ms
+for its distinct curved fixtures. The [#020 refinement report](2026-10-05-capsule-circle-cost-refinement.md)
+records the commands, confidence intervals, final-source checks and profiles.
+Its full matrix can be reproduced after a fresh local-stack Release build:
+
+```powershell
+$env:UseLocalLsfStack = 'true'
+dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll --filter '*CapsuleCircleContactBenchmarks*' --launchCount 2 --warmupCount 5 --iterationCount 15 --iterationTime 250 --affinity 3 --keepFiles --exporters json --artifacts artifacts/grv-benchmark-024/query-controls
+```
+
+These fixtures establish cost when the configuration occurs, not its prevalence
+in games. An oblique interior-rim contact is a geometric configuration of ordinary
+capsules and cylinders or embedded slabs, rather than a separate collider type.
+Tilt, relative position, dimensions and contact evolution determine the work.
+Counting only final rim contacts can miss expensive feature candidates evaluated
+before an ordinary feature wins or the query rejects contact. Neither rarity nor
+common occurrence is established by the current evidence. Multiplying isolated
+query time by a hypothetical count is illustrative, not measured world capacity.
+
+**Next experiment:** Reuse the existing contact fixtures and world-step benchmark
+support to characterize deterministic moving scenes before changing the solver:
+
+1. Establish the geometric envelope with reproducible pose/orientation sweeps
+   around the rim, including ordinary contacts and separated near-rim candidates.
+   Then run explicit upright-agent, tilted/tumbling, rim-sliding and dense-contact
+   scenarios across shape dimensions and local density. Synthetic sweep frequency
+   must remain separate from observed host frequency; publish scene assumptions.
+2. In benchmark-only support, distinguish dispatched pair queries, expensive
+   root-path entries, admitted curved candidates and final winning features.
+   Reuse existing hooks where sufficient. Count repeated work across frames as
+   well as unique pairs; a final contact label alone is insufficient attribution.
+3. Measure complete `Simulate` plus `LateSimulate` steps over sustained frames:
+   mean, p95/p99 and maximum observed time, warmed allocations, candidate counts
+   and expensive-path rate. Profile stages separately from clean timing runs;
+   keep counters and wall-clock timing outside authoritative simulation state.
+   Assess explicit host tick budgets with headroom for the rest of the host.
+4. Retain equivalent 3D cylinder and mixed circle/stadium-slab cases with their
+   distinct root policies. Pure 2D workloads provide a dimensional control, not
+   an assumed consumer of the 3D oblique solver. Use fixed initial state/input,
+   repeatable seeds, contact preflight and replay checks; verify instrumentation
+   preserves answers. Use `UseLocalLsfStack=true` throughout coordinated runs.
+
+**Decision gate:** Publish a capacity characterization or written no-change
+decision if the expensive path has a small measured contribution in the target
+scenes. Promote a focused optimization or workload/API plan only when reproducible
+complete-step evidence shows material budget pressure. Preserve exact contacts,
+stable ordering, zero warmed allocations and 100% reachable line/branch/method
+coverage for any implementation changes. Do not add approximate collision,
+speculative caches, public instrumentation or merged root solvers merely because
+the isolated worst fixture is expensive. #020 and #021 remain closed.
 
 ### GRV-Benchmark-014 — Exact Triangle-Pair Contacts Regress Dense Concave-Mesh Throughput
 

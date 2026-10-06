@@ -31,6 +31,11 @@ instead of burying it in notes.
 - [`Benchmark Signal Hardening`](benchmark-signal-hardening-backlog.md)
   - Reproduce and close confirmed release-relevant signals alongside the owning
     library change. Do not broaden this into speculative optimization work.
+  - Experimental [GRV-Benchmark-024](benchmark-signal-hardening-backlog.md#grv-benchmark-024--curved-contact-workload-frequency-and-step-cost)
+    tracks the unmeasured frequency and complete-step impact of expensive curved
+    contacts in representative deterministic scenes. Count solver entries as
+    well as winning contacts before proposing further optimization; #020 and
+    #021 remain closed.
 
 ## Recently Completed
 
