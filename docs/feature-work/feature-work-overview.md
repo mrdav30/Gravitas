@@ -31,6 +31,11 @@ instead of burying it in notes.
 - [`Benchmark Signal Hardening`](benchmark-signal-hardening-backlog.md)
   - Reproduce and close confirmed release-relevant signals alongside the owning
     library change. Do not broaden this into speculative optimization work.
+  - [Triangle/cone cost refinement](2026-10-06-triangle-cone-cost-refinement.md)
+    advances active GRV-Benchmark-019. Exact support/witness reuse and nonwinner
+    root rejection reduce apex/side costs by 52%/46% and the full-domain relative
+    center fixture by 68%, with zero allocations. Interior-rim and gap traversal
+    remain measured follow-ups before closure.
   - Experimental [GRV-Benchmark-024](benchmark-signal-hardening-backlog.md#grv-benchmark-024--curved-contact-workload-frequency-and-step-cost)
     tracks the unmeasured frequency and complete-step impact of expensive curved
     contacts in representative deterministic scenes. Count solver entries as

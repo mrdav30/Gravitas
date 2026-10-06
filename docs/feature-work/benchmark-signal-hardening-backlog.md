@@ -64,7 +64,7 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 ### GRV-Benchmark-019 — Complete Triangle/Cone Contact Cost
 
 **Discovered:** 2026-09-29.  
-**Status:** Measured performance follow-up to the GRV-Issue-086 correctness repair.  
+**Status:** Active; first cost-refinement phase measured 2026-10-06.  
 **Owners:** FixedMathSharp's triangle/cone support selection, rim roots and paired
 witnesses; Gravitas's mesh candidate traversal.
 
@@ -83,7 +83,7 @@ BelowNormal with affinity mask 3 and `DOTNET_PROCESSOR_COUNT=2`; only one heavy
 workload runs at a time. Values below are **microseconds per dispatched query**,
 not batches or simulation frames. Every row reports zero managed allocation.
 
-| Geometry | Old incomplete path | Initial complete solver | Final mean | Final standard deviation |
+| Geometry | Old incomplete path | Initial complete solver | September optimized mean | September standard deviation |
 | --- | ---: | ---: | ---: | ---: |
 | Base face | 19.983 | 152.1 | 33.89 | 0.676 |
 | Side face | 17.525 | 567.4 | 62.57 | 1.193 |
@@ -95,7 +95,7 @@ not batches or simulation frames. Every row reports zero managed allocation.
 | Rim gap | 17.652 | 122.0 | 120.78 | 2.479 |
 | Unrepresentable relative center | 6.069 — missed contact | 1,708.7 | 1,652.05 | 31.686 |
 
-Final base/side/apex costs are about 78% / 89% / 67% lower than the initial
+September base/side/apex costs are about 78% / 89% / 67% lower than the initial
 complete implementation. The old base/side/gap rows had the correct answers
 for these fixtures and remain cheaper: the final costs are approximately
 1.70x / 3.57x / 6.84x theirs. Five other old rows returned the wrong result and
@@ -122,9 +122,24 @@ classification and certified depths before measurement. Original and final
 reports are under `artifacts/grv086/baseline`, `initial-complete`, `final`
 (certificate-only) and `optimized-and-controls`.
 
-**Next useful action:** Measure duplicate axial/face support preparation for
-horizontal faces, then profile nonwinning rim charts, root ranking and witness
-materialization. Reuse shared improvements where they also help
+The [2026-10-06 refinement](2026-10-06-triangle-cone-cost-refinement.md) refreshes
+the baseline after shared-owner changes and removes duplicate horizontal-face
+axes, rational witness search, wholly inadmissible charts and nonwinning root
+mapping. It also canonicalizes zero-radius radical signs before accumulation.
+Matched two-launch base/apex/side means fall from 28.95/49.29/55.37 us to
+22.71/23.60/30.00 us; unrepresentable-center cost falls from 1,444.04 to
+463.18 us. Oblique/interior rim fall from 826.45/1,229.16 to 651.08/1,046.86 us.
+All nine rows retain zero managed allocation. The linked report records the
+complete matrix, uncertainty, private child IL identities, exact-bound proofs,
+shared controls, resource tests and coverage gates.
+
+**Next useful action:** Investigate exact winner-witness searches and the rim-gap
+generator fan before selecting another bounded experiment. The final gap profile
+spends 92.03% in analytic traversal, including 68.71% in the generator fan;
+it does not reach rim value mapping. Interior-rim
+materialization accounted for 32.24% of baseline CPU samples, but winning-root
+re-isolation only 0.49%; added retained storage needs evidence beyond avoiding
+that reconstruction. Reuse shared improvements where they also help
 [triangle/cylinder contacts](#grv-benchmark-018--complete-trianglecylinder-contact-cost).
 Preserve complete admission, exact ties, canonical paired witnesses, raw-neighbor
 classification, bounded stack use and zero allocations. This is separate from
