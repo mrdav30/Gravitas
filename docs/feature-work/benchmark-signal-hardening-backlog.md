@@ -64,7 +64,7 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 ### GRV-Benchmark-019 — Complete Triangle/Cone Contact Cost
 
 **Discovered:** 2026-09-29.  
-**Status:** Active; first cost-refinement phase measured 2026-10-06.  
+**Status:** Active; generator refinement measured 2026-10-06.  
 **Owners:** FixedMathSharp's triangle/cone support selection, rim roots and paired
 witnesses; Gravitas's mesh candidate traversal.
 
@@ -133,8 +133,18 @@ All nine rows retain zero managed allocation. The linked report records the
 complete matrix, uncertainty, private child IL identities, exact-bound proofs,
 shared controls, resource tests and coverage gates.
 
-**Next useful action:** Investigate exact winner-witness searches and the rim-gap
-generator fan before selecting another bounded experiment. The final gap profile
+The [generator refinement](2026-10-06-triangle-cone-generator-refinement.md)
+retains one local winner, transforms only final analytic normals, shares
+generator branch coefficients/denominators and directly squares quadratic gaps
+with canonical coefficient signs. A fresh two-launch comparison lowers gap
+rejection from 94.95 to 88.70 us/query, apex face from 24.91 to 22.81 us and
+side face from 31.10 to 28.32 us. All rows remain 0 B/op. Fresh cylinder/circle-slab
+controls differ by less than 2%; stationary interior-rim cost remains about
+1.09 ms/query. The linked report records the full matrix and verification.
+
+**Next useful action:** Investigate exact winner-witness searches; generator-fan
+work remains a measured cost rather than a reason to weaken admission. The
+first-phase gap profile
 spends 92.03% in analytic traversal, including 68.71% in the generator fan;
 it does not reach rim value mapping. Interior-rim
 materialization accounted for 32.24% of baseline CPU samples, but winning-root
