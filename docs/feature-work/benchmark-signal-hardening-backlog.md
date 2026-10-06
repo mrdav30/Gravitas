@@ -64,57 +64,59 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 ### GRV-Benchmark-021 — Complete Capsule/Stadium-Slab Curved Contact Cost
 
 **Discovered:** 2026-09-30.  
-**Status:** Open performance follow-up; GRV-Issue-088 correctness repair and
-remaining cost accepted on 2026-09-30. Retained-root/positive-certificate and
-certified-sign refinements measured 2026-10-04/05; the remaining curved cost
-keeps this signal open.  
+**Status:** Closed 2026-10-05 in validated working changes, pending user commit.
+Closure uses reproduced gains, preserved full-domain behavior and published
+remaining cost; it does not certify a fixed-rate host budget.  
 **Owner:** FixedMathSharp's complete capsule/stadium-slab feature selection,
 shared circular-rim algebra and signed value-root comparison.
 
-The complete query fixes false contacts and nonminimum penetration. The first
-matched, longer refinement captures reduce the original oblique fixture from
-**812.93 ± 13.251 to 755.13 ± 13.560 microseconds/query (7.1%)**. Added positive
-and irrational curved winners improve **24.2% / 22.2%**, to **881.33 / 981.46
-microseconds**. An analytic winner whose curved roots lose improves **13.7%**,
-from **3358.56 to 2898.86 microseconds**. All rows report **0 B/op**. Error is the
-99.9% confidence half-width; source revisions, complete intervals, raw captures,
-rejected experiments and independent coverage-fixture proofs are in the
-[refinement evidence](2026-10-04-capsule-slab-cost-refinement.md).
-
-The shared root comparison now retains certified refinement. Stadium winners
-retain parameter/value roots instead of rebuilding the winning parameter for
-normal rounding, and positive analytic gaps reuse the existing triangle/box
-nonwinning-root certificate before value mapping. Every constrained chart and
-exact classification/rounding contract remains present. Ordinary stadium,
-mixed circle-slab, paired 3D and triangle controls retain separate measurements.
+The complete query fixes false contacts and nonminimum penetration. Subsequent
+[retained-root/positive-certificate](2026-10-04-capsule-slab-cost-refinement.md),
+[certified-sign](2026-10-05-capsule-slab-sign-refinement.md), and
+[root-isolation/global-minimum refinements](2026-10-05-capsule-slab-root-isolation-refinement.md)
+retain every constrained chart and exact classification/rounding contract.
 The [correctness repair history](done/2026-09-29-complete-capsule-slab-contact-plan.md#refined-matched-performance)
 retains the older complete and incorrect/incomplete baselines.
 
-**Next isolation step:** The analytic-winner fixture's first-phase profile
-motivated the subsequent
-[certified-sign refinement](2026-10-05-capsule-slab-sign-refinement.md), which
-reuses retained-cell certificates and crossing endpoint/hint evaluations, with
-a measured 128-bit point guard. The final fixed-count confirmation is about
-**1.39 ms**, at **0 B/op**, versus **2.78–2.85 ms** in bracketing committed
-baseline captures (49.9–51.3% mean reduction). The irrational winner also
-improves; the smaller original/positive-rim changes overlap the repeated
-baseline's intervals and are not claimed as firm gains. Exact fallback,
-root identity and every constrained chart remain intact. The final profile
-attributes **55.6%** inclusive sampled
-CPU to root acquisition and **23.1%** to sign queries; these overlapping shares
-are not an additive budget. Investigate root isolation/count reuse only where
-chart equivalence, endpoint inclusion and ordinal mapping are proved.
-Coordinate with GRV-Benchmark-020 using the
-[shared investigation context](#capsule-rim-cost-relationship-grv-benchmark-020-and-021).
-Prefer proved nonwinning-feature certificates or shared algebra reuse; retain
-strict raw-neighbor classification, whole-shape minimum depth, stable ties,
-canonical anchors, bounded scratch and zero allocation. Do not restore a
-direction subset or combine constituent-cylinder depths.
+The final phase borrows existing evaluation scratch for certified Sturm signs,
+shares batch subdivision counts and reciprocal-chart Sturm chains, and proves
+when a negative stationary gap is the complete shape's global minimum before
+ending traversal. No speculative cache, second solver or accuracy setting is
+added. The matched final confirmation against committed FixedMathSharp
+`9b1f173` gives the following microseconds per dispatched query:
+
+| Stadium fixture | Fresh committed baseline | Final | Mean reduction |
+| --- | ---: | ---: | ---: |
+| Oblique analytic winner | 1,407.0 ± 7.42 | 1,052.1 ± 11.54 | 25.2% |
+| Original oblique rim | 716.7 ± 5.16 | 527.3 ± 2.89 | 26.4% |
+| Irrational oblique rim | 897.0 ± 7.68 | 794.1 ± 5.06 | 11.5% |
+| Positive oblique rim | 841.9 ± 8.42 | 734.7 ± 6.39 | 12.7% |
+
+Error is the 99.9% confidence half-width. Both final accepted confirmations
+have intervals disjoint from both committed captures in every fixture. All
+four rows and all 28 separate ordinary stadium, mixed circle-slab, equivalent
+3D cylinder and triangle controls report **0 B/op** and pass behavior preflight.
+The final evidence records resource proofs, independent regression oracles,
+rejected experiments, profiles and raw capture locations. Both repositories
+pass full Release/ReleaseLean suites with exact **100% reachable line, branch
+and method coverage**, focused Debug/resource checks and both DocFX gates.
+
+**Closure boundary:** The residual roughly **0.53–1.05 ms/query** curved cost
+remains significant. Root isolation and exact sign/arithmetic work still
+consume much of the sampled CPU. Dense curved-contact workloads require their
+own complete-step capacity measurements; these microbenchmarks do not establish
+MMO/strategy throughput or cross-platform replay. The focused investigation
+closes under the user's judgement-based performance bar. GRV-Benchmark-020
+remains open for its distinct ellipse-depth owner; related algebra alone does
+not establish one common dominant hotspot. Released-package validation remains
+a release gate after the coordinated FixedMathSharp release.
 
 **Reproduce:** after a Release local-stack benchmark build, run
 `dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll --filter '*CapsuleSlabContactBenchmarks*Oblique*' --launchCount 2 --warmupCount 5 --iterationCount 15 --invocationCount 512 --affinity 3 --exporters json --artifacts artifacts/grv-benchmark-021/reproduce`.
 Use `DOTNET_PROCESSOR_COUNT=2`, BelowNormal priority and one heavy workload.
 Set `UseLocalLsfStack=true` in MSBuild and the environment for child builds.
+The command requests affinity 3; these exports display `Affinity=11`, so no
+claim of independently verified effective affinity is made.
 
 ### GRV-Benchmark-020 — Complete Capsule/Circle-Slab Contact Cost
 
@@ -191,8 +193,10 @@ retains both profiles and mixed/3D/triangle controls. This does not establish a
 single shared dominant leaf or justify merging the specialized solvers.
 The 2026-10-05 [certified-sign refinement](2026-10-05-capsule-slab-sign-refinement.md)
 moves the stadium analytic-winner bottleneck toward root acquisition, while
-circle mixed/3D controls retain their distinct ellipse path. Both signals stay
-open; shared algebra does not imply shared root-selection policy.
+circle mixed/3D controls retain their distinct ellipse path. The subsequent
+[root-isolation refinement](2026-10-05-capsule-slab-root-isolation-refinement.md)
+closes #021 with reproduced gains, bounded resources and published remaining
+cost. #020 stays open; shared algebra does not imply shared root-selection policy.
 
 The fixture names describe different features:
 

@@ -544,3 +544,9 @@ The user committed FixedMathSharp as `787afae` (`fix: compute complete
 capsule-slab penetration`). Gravitas remains for user commit; existing staged
 implementation changes are preserved and this documentation closeout is
 unstaged. Suggested Gravitas commit: `fix: use complete mixed capsule-slab contacts`.
+
+Subsequent status on 2026-10-05: the
+[root-isolation refinement](../2026-10-05-capsule-slab-root-isolation-refinement.md)
+closes GRV-Benchmark-021 with reproduced gains and published remaining cost.
+GRV-Benchmark-020 remains open. The measurements and original acceptance above
+remain the historical correctness-repair evidence.

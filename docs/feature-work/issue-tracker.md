@@ -208,9 +208,11 @@ Remaining measured performance costs are tracked in the benchmark backlog.
   [Complete Capsule/Slab Contact plan](done/2026-09-29-complete-capsule-slab-contact-plan.md)
   retains the proof, matched baseline, full verification and review evidence.
   The correctness defect no longer reproduces. The user accepted the remaining
-  curved-query cost for now on 2026-09-30. GRV-Benchmark-021 remains open and
-  cross-linked with GRV-Benchmark-020 for coordinated profiling; acceptance of
-  this correctness repair does not close either performance signal.
+  curved-query cost for now on 2026-09-30. The subsequent
+  [root-isolation refinement](2026-10-05-capsule-slab-root-isolation-refinement.md)
+  closes GRV-Benchmark-021 on 2026-10-05 with verified gains and published
+  remaining cost. GRV-Benchmark-020 remains open for its distinct ellipse-depth
+  owner; acceptance of this correctness repair did not itself close either signal.
 
 ### GRV-Issue-085 - Mixed capsule/circle-slab contact bypasses the complete upstream query
 

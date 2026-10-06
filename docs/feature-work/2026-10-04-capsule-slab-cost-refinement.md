@@ -282,3 +282,8 @@ remain in `artifacts/grv-benchmark-021/final-profile/`; summaries use the existi
 It counts recursive inclusive frames once and attributes exclusive samples to
 the real frame above EventPipe's synthetic `CPU_TIME` leaf. Profiled timings
 are not substituted for the unprofiled benchmark results.
+
+Subsequent status on 2026-10-05: the
+[root-isolation refinement](2026-10-05-capsule-slab-root-isolation-refinement.md)
+closes GRV-Benchmark-021 with further verified gains and published remaining
+cost. The measurements and open-status assessment above describe this earlier phase.

@@ -204,6 +204,15 @@ only an exactly zero core reduces to the circle-slab path. Capsule radius is
 included before separation and rounding, so exact touching remains contact
 and a positive sub-raw penetration can correctly return zero rounded depth.
 
+The exact curved solver reuses certified sign evaluation, shared root-count
+subdivision and reciprocal-chart isolation. A strictly winning negative
+stationary gap can finish traversal only after an exact finite-core projection
+certificate proves the complete shape's global closest point. Positive and
+zero gaps retain full traversal; this adds no accuracy setting or sampled
+direction shortcut. Exact curved contacts can cost substantially more than
+analytic contacts; measure representative complete simulation steps when
+selecting a host rate or workload capacity.
+
 For shape state, pair matrices, SAT invariants, mesh policy, and compound
 ownership details, read [Collider Shape Reference](COLLIDER_SHAPE_REFERENCE.md).
 

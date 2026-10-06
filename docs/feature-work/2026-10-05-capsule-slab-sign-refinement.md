@@ -247,3 +247,8 @@ ordinal mapping, repeated roots and constrained chart admission. Retain all
 charts and the same four oblique fixtures, ordinary contacts, mixed/3D circle
 controls and triangle controls; do not import the unrestricted ellipse
 largest-root shortcut. No speculative root cache or second solver is added.
+
+The subsequent [root-isolation refinement](2026-10-05-capsule-slab-root-isolation-refinement.md)
+implements and validates that reuse, adds an exact negative global-minimum
+certificate and closes #021 with further measured gains and published remaining
+cost. The captures above describe this earlier phase.

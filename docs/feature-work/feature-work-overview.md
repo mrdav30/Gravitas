@@ -80,7 +80,8 @@ instead of burying it in notes.
     100% measured line/branch/method coverage in Release/ReleaseLean; focused
     Debug/resource checks and DocFX pass. Ordinary cap/side/end fixtures improve
     37-41%. The user accepted the remaining complete-query cost for now.
-  - GRV-Benchmark-021 remains open alongside GRV-Benchmark-020. Their shared
+  - GRV-Benchmark-021 closed 2026-10-05 in validated working changes, pending
+    user commit; GRV-Benchmark-020 remains open. Their shared
     analytic materializer and distinct oblique root paths have coordinated
     profiles. [Retained-root refinement](2026-10-04-capsule-slab-cost-refinement.md)
     improves four oblique stadium fixtures by 7.1-24.2% with 0 B/op. The
@@ -88,9 +89,13 @@ instead of burying it in notes.
     subsequently brings the analytic-winner fixture to about 1.39 ms with
     0 B/op (49.9-51.3% mean reduction across repeated committed baselines),
     reusing retained-cell and endpoint certificates with a measured
-    point-evaluation budget. Its final profile targets root acquisition
-    (55.6% inclusive sampled CPU). Both signals remain open; no single common
-    CPU hotspot is proved for them. Exact classification, rounding, chart
+    point-evaluation budget. The subsequent
+    [root-isolation refinement](2026-10-05-capsule-slab-root-isolation-refinement.md)
+    shares subdivision counts and reciprocal-chart chains and certifies negative
+    global minima. Its four fixtures improve another 11.5-26.4% against fresh
+    committed captures, to 0.53-1.05 ms/query, all 0 B/op. Closure uses verified
+    gains and published remaining cost, not a fixed-rate workload budget.
+    No single common CPU hotspot is proved for #020 and #021. Exact classification, rounding, chart
     coverage and bounded scratch remain unchanged. Fresh 2026-10-05
     standard/Lean coverage remains exactly 100% line/branch/method in both
     repositories; focused Debug/resource checks and both DocFX gates pass.
