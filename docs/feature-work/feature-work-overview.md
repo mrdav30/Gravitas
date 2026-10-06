@@ -80,8 +80,8 @@ instead of burying it in notes.
     100% measured line/branch/method coverage in Release/ReleaseLean; focused
     Debug/resource checks and DocFX pass. Ordinary cap/side/end fixtures improve
     37-41%. The user accepted the remaining complete-query cost for now.
-  - GRV-Benchmark-021 closed 2026-10-05 in validated working changes, pending
-    user commit; GRV-Benchmark-020 remains open. Their shared
+  - GRV-Benchmark-021 closed 2026-10-05; Gravitas `989c7f9` and coordinated
+    FixedMathSharp `bd8f6a2` are committed. GRV-Benchmark-020 remains open. Their shared
     analytic materializer and distinct oblique root paths have coordinated
     profiles. [Retained-root refinement](2026-10-04-capsule-slab-cost-refinement.md)
     improves four oblique stadium fixtures by 7.1-24.2% with 0 B/op. The
@@ -107,7 +107,12 @@ instead of burying it in notes.
     and exact rim classification, minimum depth and canonical anchors agree
     with the shared 3D contract. Nonzero-core capsule slabs were subsequently
     repaired as GRV-Issue-088. The measured complete-query cost, including
-    equivalent 3D controls, is retained as GRV-Benchmark-020.
+    equivalent 3D controls, is retained as GRV-Benchmark-020. Its first
+    [exact output refinement](2026-10-05-capsule-circle-cost-refinement.md)
+    improves the representative oblique query by 37.2% mixed / 35.6% 3D,
+    to 0.72-0.75 ms at 0 B/op with exact 100% standard/Lean coverage across
+    both repositories. Root acquisition and analytic output costs remain
+    under investigation; the signal stays open.
 
 - [`Canonical-Frame Cone-Volume Queries`](issue-tracker.md#grv-issue-087---cone-volume-queries-reject-an-intersecting-mesh-when-the-apex-cannot-enter-its-scalar-frame)
   - Completed 2026-09-29. Closest/all-hit and batch cone queries preserve the

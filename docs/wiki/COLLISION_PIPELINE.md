@@ -195,6 +195,12 @@ retains the 3D-to-2D normal convention, canonical support anchors, material
 ownership, and constrained mixed response. This shared geometry path does not
 change the contact rules for other mixed shape families.
 
+Oblique capsule/circle contacts retain the exact algebraic minimum through
+output rounding. Proven value bounds narrow the rounding search, and shared
+numerator/denominator reduction avoids repeating the same polynomial work.
+Neither step changes nearest-even rounding, exact tangency, deterministic ties
+or the distinction between rounded depth and conceptual depth clamping.
+
 Capsule contacts with a positive-core 2D capsule slab also use a complete
 FixedMathSharp query. The slab's flat caps, straight sides and rounded ends
 participate in one minimum-penetration calculation. Treating its middle box and

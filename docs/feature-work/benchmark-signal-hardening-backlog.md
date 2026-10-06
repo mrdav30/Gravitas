@@ -61,69 +61,13 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 
 ## Active Signals
 
-### GRV-Benchmark-021 — Complete Capsule/Stadium-Slab Curved Contact Cost
-
-**Discovered:** 2026-09-30.  
-**Status:** Closed 2026-10-05 in validated working changes, pending user commit.
-Closure uses reproduced gains, preserved full-domain behavior and published
-remaining cost; it does not certify a fixed-rate host budget.  
-**Owner:** FixedMathSharp's complete capsule/stadium-slab feature selection,
-shared circular-rim algebra and signed value-root comparison.
-
-The complete query fixes false contacts and nonminimum penetration. Subsequent
-[retained-root/positive-certificate](2026-10-04-capsule-slab-cost-refinement.md),
-[certified-sign](2026-10-05-capsule-slab-sign-refinement.md), and
-[root-isolation/global-minimum refinements](2026-10-05-capsule-slab-root-isolation-refinement.md)
-retain every constrained chart and exact classification/rounding contract.
-The [correctness repair history](done/2026-09-29-complete-capsule-slab-contact-plan.md#refined-matched-performance)
-retains the older complete and incorrect/incomplete baselines.
-
-The final phase borrows existing evaluation scratch for certified Sturm signs,
-shares batch subdivision counts and reciprocal-chart Sturm chains, and proves
-when a negative stationary gap is the complete shape's global minimum before
-ending traversal. No speculative cache, second solver or accuracy setting is
-added. The matched final confirmation against committed FixedMathSharp
-`9b1f173` gives the following microseconds per dispatched query:
-
-| Stadium fixture | Fresh committed baseline | Final | Mean reduction |
-| --- | ---: | ---: | ---: |
-| Oblique analytic winner | 1,407.0 ± 7.42 | 1,052.1 ± 11.54 | 25.2% |
-| Original oblique rim | 716.7 ± 5.16 | 527.3 ± 2.89 | 26.4% |
-| Irrational oblique rim | 897.0 ± 7.68 | 794.1 ± 5.06 | 11.5% |
-| Positive oblique rim | 841.9 ± 8.42 | 734.7 ± 6.39 | 12.7% |
-
-Error is the 99.9% confidence half-width. Both final accepted confirmations
-have intervals disjoint from both committed captures in every fixture. All
-four rows and all 28 separate ordinary stadium, mixed circle-slab, equivalent
-3D cylinder and triangle controls report **0 B/op** and pass behavior preflight.
-The final evidence records resource proofs, independent regression oracles,
-rejected experiments, profiles and raw capture locations. Both repositories
-pass full Release/ReleaseLean suites with exact **100% reachable line, branch
-and method coverage**, focused Debug/resource checks and both DocFX gates.
-
-**Closure boundary:** The residual roughly **0.53–1.05 ms/query** curved cost
-remains significant. Root isolation and exact sign/arithmetic work still
-consume much of the sampled CPU. Dense curved-contact workloads require their
-own complete-step capacity measurements; these microbenchmarks do not establish
-MMO/strategy throughput or cross-platform replay. The focused investigation
-closes under the user's judgement-based performance bar. GRV-Benchmark-020
-remains open for its distinct ellipse-depth owner; related algebra alone does
-not establish one common dominant hotspot. Released-package validation remains
-a release gate after the coordinated FixedMathSharp release.
-
-**Reproduce:** after a Release local-stack benchmark build, run
-`dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll --filter '*CapsuleSlabContactBenchmarks*Oblique*' --launchCount 2 --warmupCount 5 --iterationCount 15 --invocationCount 512 --affinity 3 --exporters json --artifacts artifacts/grv-benchmark-021/reproduce`.
-Use `DOTNET_PROCESSOR_COUNT=2`, BelowNormal priority and one heavy workload.
-Set `UseLocalLsfStack=true` in MSBuild and the environment for child builds.
-The command requests affinity 3; these exports display `Affinity=11`, so no
-claim of independently verified effective affinity is made.
-
 ### GRV-Benchmark-020 — Complete Capsule/Circle-Slab Contact Cost
 
 **Discovered:** 2026-09-29.  
-**Status:** Measured performance follow-up to the GRV-Issue-085 correctness repair.  
+**Status:** In progress; the first exact output refinement is verified for review,
+with root acquisition and analytic output cost still under investigation.  
 **Owner:** FixedMathSharp's shared cylinder/capsule feature selection and exact
-depth reduction; Gravitas consumes that owner for mixed circle slabs and 3D
+output materialization; Gravitas consumes that owner for mixed circle slabs and 3D
 cylinders.
 
 The complete query rejects separated cap rims and selects minimum depth before
@@ -154,9 +98,21 @@ the same expensive curved-feature behavior. These are complete wrapper costs:
 its canonical contact. Their difference does not isolate adapter overhead, and
 there is no historical 3D baseline for these new fixtures.
 
-**Next isolation step:** Profile the shared cylinder/capsule candidate and
-ellipse-depth reducers on the oblique-interior and endpoint-rim fixtures,
-retaining cap/side/zero-core controls. Coordinate with GRV-Benchmark-021 using
+**2026-10-05 progress:** [Exact output refinement](2026-10-05-capsule-circle-cost-refinement.md)
+reuses rigorous magnitude-floor bounds and one jointly scaled depth-polynomial
+reduction. Fresh committed/retained mixed oblique means improve from
+1,186.47 to **745.01 microseconds**; equivalent 3D improves from 1,124.91 to
+**724.62 microseconds** (37.2% / 35.6%). All twelve rows remain 0 B/op and both
+repositories retain exact 100% standard/Lean line, branch and method coverage.
+The report records small, incompletely isolated ordinary-row shifts, targeted
+cap repeats, resource proofs and actual timed-child assembly verification;
+stale-cache captures are excluded. #020 remains open.
+
+**Next isolation step:** Investigate retained-positive root acquisition (about
+43% inclusive sampled CPU), remaining exact depth-sign work (about 40%) and
+endpoint analytic materialization (about 79-81%). Reuse existing certified point
+evaluation and exact rational-square output helpers where evidence supports it,
+retaining cap/side/zero-core and mixed/3D controls. Coordinate with GRV-Benchmark-021 using
 the [shared investigation context](#capsule-rim-cost-relationship-grv-benchmark-020-and-021).
 Prefer reuse or exact feature certificates within that owner; do not restore
 the incomplete direction subset, add a second
@@ -482,6 +438,7 @@ and
 
 | Signal                                                                                  | Status | Closed     | Resolution                                                                                                                                                                                                                                                                                      |
 | --------------------------------------------------------------------------------------- | ------ | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [GRV-Benchmark-021 — Complete capsule/stadium-slab curved contact cost](#grv-benchmark-021--complete-capsulestadium-slab-curved-contact-cost) | Closed | 2026-10-05 | Shared exact root isolation and negative global-minimum certificates improve four fixtures by 11.5-26.4%, at 0 B/op and 100% coverage. Committed in Gravitas `989c7f9` / FixedMathSharp `bd8f6a2`; remaining costs are published without a host-rate guarantee. |
 | [GRV-Benchmark-023 — Circle workload partition and grounding scaling](#grv-benchmark-023--circle-workload-partition-and-grounding-scaling) | Closed | 2026-10-04 | Ownership/storage/math repairs and lean 2D gathering retained; repeated controls, 100% coverage and published configuration costs support the no-further-change decision. Latest refinement remains unstaged for review; no fixed-Hz guarantee. |
 | GRV-Benchmark-022 — Exact pure-2D circle contact cost | Closed | 2026-10-02 | Shared normalization optimization committed; retain exact contact owner under documented no-further-change decision. Scene partition/grounding costs are documented separately in closed GRV-Benchmark-023. |
 | GRV-Benchmark-012 — Mixed discrete broad-phase allocation at 32 pairs                   | Closed | 2026-08-04 | Two independent rotational runs and corrected sparse, dense, and churn broad-phase rows reproduce `0 B/op`; the stale benchmark lifecycle and unrepresentative 4,096-collider monolithic-grid row were repaired without speculative runtime preallocation                                       |
@@ -500,6 +457,64 @@ and
 | GRV-Benchmark-007 — 3D dynamic shape-exact BDN allocation signal                        | Closed | 2026-06-23 | Shared exact-sweep bounds prefilters removed the scaling allocation/time signal from 3D dynamic false-positive rows                                                                                                                                                                             |
 | GRV-Benchmark-003 — 3D full-runtime CCD allocation                                      | Closed | 2026-06-23 | GridForge allocation-free line tracing plus Gravitas 3D raycast adoption                                                                                                                                                                                                                        |
 | GRV-Benchmark-004 — Grounding raycast probe allocation                                  | Closed | 2026-06-23 | Same raycast trace fix removed automatic ray-grounding allocation                                                                                                                                                                                                                               |
+
+### GRV-Benchmark-021 — Complete Capsule/Stadium-Slab Curved Contact Cost
+
+**Discovered:** 2026-09-30.  
+**Status:** Closed 2026-10-05; Gravitas `989c7f9` and coordinated
+FixedMathSharp `bd8f6a2` are committed.
+Closure uses reproduced gains, preserved full-domain behavior and published
+remaining cost; it does not certify a fixed-rate host budget.  
+**Owner:** FixedMathSharp's complete capsule/stadium-slab feature selection,
+shared circular-rim algebra and signed value-root comparison.
+
+The complete query fixes false contacts and nonminimum penetration. Subsequent
+[retained-root/positive-certificate](2026-10-04-capsule-slab-cost-refinement.md),
+[certified-sign](2026-10-05-capsule-slab-sign-refinement.md), and
+[root-isolation/global-minimum refinements](2026-10-05-capsule-slab-root-isolation-refinement.md)
+retain every constrained chart and exact classification/rounding contract.
+The [correctness repair history](done/2026-09-29-complete-capsule-slab-contact-plan.md#refined-matched-performance)
+retains the older complete and incorrect/incomplete baselines.
+
+The final phase borrows existing evaluation scratch for certified Sturm signs,
+shares batch subdivision counts and reciprocal-chart Sturm chains, and proves
+when a negative stationary gap is the complete shape's global minimum before
+ending traversal. No speculative cache, second solver or accuracy setting is
+added. The matched final confirmation against committed FixedMathSharp
+`9b1f173` gives the following microseconds per dispatched query:
+
+| Stadium fixture | Fresh committed baseline | Final | Mean reduction |
+| --- | ---: | ---: | ---: |
+| Oblique analytic winner | 1,407.0 ± 7.42 | 1,052.1 ± 11.54 | 25.2% |
+| Original oblique rim | 716.7 ± 5.16 | 527.3 ± 2.89 | 26.4% |
+| Irrational oblique rim | 897.0 ± 7.68 | 794.1 ± 5.06 | 11.5% |
+| Positive oblique rim | 841.9 ± 8.42 | 734.7 ± 6.39 | 12.7% |
+
+Error is the 99.9% confidence half-width. Both final accepted confirmations
+have intervals disjoint from both committed captures in every fixture. All
+four rows and all 28 separate ordinary stadium, mixed circle-slab, equivalent
+3D cylinder and triangle controls report **0 B/op** and pass behavior preflight.
+The final evidence records resource proofs, independent regression oracles,
+rejected experiments, profiles and raw capture locations. Both repositories
+pass full Release/ReleaseLean suites with exact **100% reachable line, branch
+and method coverage**, focused Debug/resource checks and both DocFX gates.
+
+**Closure boundary:** The residual roughly **0.53–1.05 ms/query** curved cost
+remains significant. Root isolation and exact sign/arithmetic work still
+consume much of the sampled CPU. Dense curved-contact workloads require their
+own complete-step capacity measurements; these microbenchmarks do not establish
+MMO/strategy throughput or cross-platform replay. The focused investigation
+closes under the user's judgement-based performance bar. GRV-Benchmark-020
+remains open for its distinct ellipse-depth owner; related algebra alone does
+not establish one common dominant hotspot. Released-package validation remains
+a release gate after the coordinated FixedMathSharp release.
+
+**Reproduce:** after a Release local-stack benchmark build, run
+`dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll --filter '*CapsuleSlabContactBenchmarks*Oblique*' --launchCount 2 --warmupCount 5 --iterationCount 15 --invocationCount 512 --affinity 3 --exporters json --artifacts artifacts/grv-benchmark-021/reproduce`.
+Use `DOTNET_PROCESSOR_COUNT=2`, BelowNormal priority and one heavy workload.
+Set `UseLocalLsfStack=true` in MSBuild and the environment for child builds.
+The command requests affinity 3; these exports display `Affinity=11`, so no
+claim of independently verified effective affinity is made.
 
 ### GRV-Benchmark-023 — Circle Workload Partition And Grounding Scaling
 
