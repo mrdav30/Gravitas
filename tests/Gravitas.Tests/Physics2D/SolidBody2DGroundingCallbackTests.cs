@@ -12,6 +12,81 @@ public sealed partial class SolidBody2DGroundingTests
     [Theory]
     [InlineData(GroundProbeMode2D.Ray)]
     [InlineData(GroundProbeMode2D.SweptCircle)]
+    public void QueryProbe_WhenCallbackMakesSupportTrigger_ShouldClearPublishedSupport(GroundProbeMode2D mode)
+    {
+        using GravitasWorldContext context = CreateContext();
+        SolidBody2D body = CreateSelectionProbe(context, mode, new Vector2d(0, 2));
+        LSAABBoxCollider2D support = CreateStaticFloor(context);
+        string events = string.Empty;
+        body.OnGrounded += grounded =>
+        {
+            events += grounded ? "true;" : "false;";
+            if (grounded)
+                support.IsTrigger = true;
+        };
+
+        body.CheckGround();
+
+        events.Should().Be("true;false;");
+        body.IsGrounded.Should().BeFalse();
+        body.HasGroundPoint.Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(GroundProbeMode2D.Ray)]
+    [InlineData(GroundProbeMode2D.SweptCircle)]
+    public void QueryProbe_WhenCallbackTightensPolicy_ShouldRejectPublishedSupport(GroundProbeMode2D mode)
+    {
+        using GravitasWorldContext context = CreateContext();
+        SolidBody2D body = CreateSelectionProbe(context, mode, new Vector2d(0, 2));
+        body.GroundMinNormalDot = Fixed64.Half;
+        body.GroundUpDirection = Vector2d.One;
+        CreateStaticFloor(context);
+        string events = string.Empty;
+        body.OnGrounded += grounded =>
+        {
+            events += grounded ? "true;" : "false;";
+            if (grounded)
+                body.GroundMinNormalDot = Fixed64.One;
+        };
+
+        body.CheckGround();
+
+        events.Should().Be("true;false;");
+        body.IsGrounded.Should().BeFalse();
+        body.HasGroundPoint.Should().BeFalse();
+    }
+
+    [Fact]
+    public void FullStep_WhenEarlierGroundedCallbackChangesLaterPolicy_ShouldDiscardCollectedContact()
+    {
+        using GravitasWorldContext context = CreateContext();
+        SolidBody2D first = CreateCircle(context, new Vector2d(Fixed64.Zero, Fixed64.FromFraction(3, 4)));
+        SolidBody2D later = CreateCircle(context, new Vector2d((Fixed64)4, Fixed64.FromFraction(3, 4)));
+        CreateStaticFloor(context, size: new Vector2d(16, 1));
+        int laterGroundedCallbacks = 0;
+        first.OnGrounded += grounded =>
+        {
+            if (grounded)
+                later.GroundUpDirection = Vector2d.Right;
+        };
+        later.OnGrounded += grounded =>
+        {
+            if (grounded)
+                laterGroundedCallbacks++;
+        };
+
+        Step(context);
+
+        first.IsGrounded.Should().BeTrue();
+        later.IsGrounded.Should().BeFalse();
+        later.HasGroundPoint.Should().BeFalse();
+        laterGroundedCallbacks.Should().Be(0);
+    }
+
+    [Theory]
+    [InlineData(GroundProbeMode2D.Ray)]
+    [InlineData(GroundProbeMode2D.SweptCircle)]
     public void QueryProbe_WhenSupportRebindsInGroundedCallback_ShouldRejectOldLifetime(GroundProbeMode2D mode)
     {
         using GravitasWorldContext context = CreateContext();

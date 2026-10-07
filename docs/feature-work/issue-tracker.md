@@ -2,7 +2,7 @@
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-092`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-094`.
 - Assign an ID when an issue enters this tracker, keep it through resolution,
   and never reuse an ID even if an entry is later removed. Check this file's Git
   history before advancing or repairing the counter.
@@ -63,9 +63,79 @@
   and `mesh-ceiling-diagnostic.log`. Its assertion describes the reproduced
   defect, not desired behavior; the temporary tracked diagnostic was removed.
 
+### GRV-Issue-093 - 2D initial-overlap ray fallback normals can classify a wall as sloped support
+
+- **Confirmed:** 2026-10-07 during the 2D grounding-policy fix. The public ray
+  path supplies a diagonal normal for a point on a flat wall, which can pass a
+  valid support-normal threshold. This predates the policy hardening.
+- **Reproduction:** Put a radius-half 2D circle at `(0, 1/2)` with a downward
+  ray probe of length 3. A static AABB centered at `(-1/2, 0)`, size `(1, 4)`,
+  contains the probe start on its right face. The zero-distance witness is the
+  start point with normal raw components `(3037000500, 3037000500)`, rather
+  than the face normal `(1, 0)`. Automatic grounding accepts that upward
+  component as sloped support at threshold zero; it also exceeds the default
+  one-half limit. A farther eligible floor is hidden by this accepted witness.
+- **Source:**
+  [`QueryDetection2D.TryRaycastPrepared`](../../src/Gravitas/Queries/2D/QueryDetection2D.cs)
+  short-circuits contained starts through `ResolveQueryFallbackNormal(start,
+  collider.Center)`. The radial fallback is not a surface-normal witness for a
+  box or polygon. This Gravitas branch runs before the FixedMathSharp convex
+  intersection helper; the investigation has not found an upstream math defect.
+- **Follow-up:** Define contained-start normals and anchors for 2D ray queries
+  and their automatic-support use. Cover boundary and interior starts, boxes,
+  polygons, round shapes and compounds; preserve explicit public query overlap
+  semantics and deterministic ordering. Coordinate with the separate 3D mesh
+  initial-overlap issue where useful, without copying a response fallback into
+  support policy.
+- **Evidence:** Ignored `artifacts/grv-issue-092/ray-normal.log` records the
+  exact diagonal components and unwanted support selection. The final normal
+  policy regression uses a wall centered at the probe's height so it exercises
+  the independent horizontal-normal rejection contract. The radial-witness
+  defect remains outside that fix.
+
 Remaining measured performance costs are tracked in the benchmark backlog.
 
 ## Resolved Issues
+
+### GRV-Issue-092 - 2D ground-normal policy admits non-support normals and retains stale probe eligibility
+
+- **Resolved:** 2026-10-07 as the focused 2D parity follow-up to GRV-Issue-090.
+  The existing body owner shares one support-normal predicate across query
+  probes, discrete contacts, motion projection and callback revalidation.
+- **Fix:** `GroundMinNormalDot` defaults to one half and accepts `[0, 1]`.
+  Support requires a strictly positive normalized dot with resolved planar up;
+  its slope boundary is inclusive. Threshold or effective-up changes invalidate
+  automatic probe timing and pending contact candidates and wake the body.
+  Equal assignments, unused fallback changes and same-direction gravity changes
+  preserve sleep. Manual support remains host-owned. Callback revalidation
+  prevents newly ineligible support from surviving publication, and motion
+  preparation ignores normals rejected by the current automatic policy.
+- **Recorded state:** Validate the threshold before publishing loaded body
+  state, restore gravity and policy backing fields without waking saved bodies,
+  and retain the existing transient support/ownership rebuild. Missing sparse
+  values restore one half. Recorded fields and replay-hash layout are unchanged;
+  no fixture hashes or schema versions changed.
+- **Reproduction and verification:** The initial regression run failed 14 of
+  15 cases before the fix, reproducing invalid threshold admission, non-support
+  normals at zero, stale motion projection and sleeping membership. Three
+  callback cases also failed before implementation. Final full local-stack
+  Release/ReleaseLean suites pass 4,609/4,544 tests with exact 100% reachable
+  line, branch and fully covered method coverage, including replay fixtures and
+  the warmed allocation regression. Cases cover ray/swept-circle selection,
+  contacts, inclusive boundaries, awake/sleeping changes, callbacks changing
+  the current or later body's policy, manual support and both record transports.
+  Raw OpenCover counts independently confirm complete sequence, branch and
+  method coverage. Logs and fresh reports are under ignored
+  `artifacts/grv-issue-092/`.
+- **Allocation and documentation gates:** Existing nearest-accepted-hit and
+  complete automatic-probe benchmarks pass their support/witness checks at
+  64 and 1,024 pairs, with warmed 0 B/op in all four cases. This short sample
+  verifies allocation and behavior, not a before/after speed claim. Both core
+  target frameworks build in Release and ReleaseLean; DocFX completes with
+  zero warnings/errors, and changed wiki pages have valid local links.
+- **Remaining witness defects:** GRV-Issue-091 covers the separate 3D overhead
+  mesh witness; GRV-Issue-093 records the separately reproduced 2D contained-start
+  ray fallback defect. Neither is hidden by this body-policy fix.
 
 ### GRV-Issue-090 - 3D automatic swept-ground probes accept vertical-wall contacts
 
@@ -97,6 +167,8 @@ Remaining measured performance costs are tracked in the benchmark backlog.
 - **Parity audit:** 2D already filters support normals against its resolved up
   direction and records planar support without the 3D height snap. Existing
   filtering, manual support and full-loop tests pass in both profiles. The
+  subsequent threshold and runtime-cache parity gaps are resolved in
+  [GRV-Issue-092](#grv-issue-092---2d-ground-normal-policy-admits-non-support-normals-and-retains-stale-probe-eligibility). The
   separate shared mesh initial-overlap normal defect is tracked as
   [GRV-Issue-091](#grv-issue-091---initially-overlapping-mesh-sphere-sweeps-can-classify-an-overhead-surface-as-support).
 - **Confirmed:** 2026-10-06 during full-lifecycle replay fixture review. A

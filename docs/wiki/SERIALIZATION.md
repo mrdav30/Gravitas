@@ -206,6 +206,11 @@ section is version 7 and includes the automatic support-normal threshold;
 `body.2d` remains version 4. Hashes from older schema versions are not comparable.
 Sparse transports that omit a default-valued `MotionType` deterministically
 resolve it to `Dynamic`.
+Both body recorders validate `GroundMinNormalDot` in `[0, 1]` before publishing
+loaded state and default missing values to one half. 2D restores gravity and
+support policy through backing state to preserve saved sleep, then rebuilds its
+transient support ownership and probe timing. Its recorded fields and replay
+hash layout remain unchanged.
 
 ```mermaid
 flowchart LR

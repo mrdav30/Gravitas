@@ -18,6 +18,7 @@ namespace Gravitas;
 /// <summary>
 /// Represents deterministic pure 2D body state owned by one world context.
 /// </summary>
+/// <content>Owns core body state, motion configuration, initialization and sleep/wake lifecycle.</content>
 public sealed partial class SolidBody2D : IRecordable
 {
     private Vector2d _position;
@@ -438,8 +439,22 @@ public sealed partial class SolidBody2D : IRecordable
     /// <summary>Gets the magnitude of <see cref="LinearVelocity"/>.</summary>
     public Fixed64 LinearSpeed => _linearSpeed;
 
+    private Vector2d _gravity = Vector2d.Zero;
+
     /// <summary>Gets or sets the planar gravity acceleration applied to this body.</summary>
-    public Vector2d Gravity { get; set; } = Vector2d.Zero;
+    public Vector2d Gravity
+    {
+        get => _gravity;
+        set
+        {
+            if (_gravity == value)
+                return;
+            Vector2d previousUp = ResolveGroundUpDirection();
+            _gravity = value;
+            if (previousUp != ResolveGroundUpDirection())
+                InvalidateAutomaticGroundSupport();
+        }
+    }
 
     private Fixed64 _gravityScale = Fixed64.One;
 

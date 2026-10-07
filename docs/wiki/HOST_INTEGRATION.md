@@ -711,7 +711,10 @@ Automatic 3D support requires an upward normal; `SolidBody.GroundMinNormalDot`
 sets the minimum normalized dot product with world up, defaulting to one half
 (slopes through 60 degrees). Horizontal and downward-facing candidate normals cannot ground a body. See the
 [grounding contracts](DIMENSIONS.md#3d-bodies-and-colliders) for probe selection and
-2D support policy.
+2D support policy. `SolidBody2D.GroundMinNormalDot` applies the same limit range
+against planar resolved up for both probes and contact support. Actual changes
+to its limit or effective up direction invalidate automatic support and wake
+the body; manual grounding remains host-owned.
 
 Read [Query Services](QUERY_SERVICES.md) for the full query surface.
 

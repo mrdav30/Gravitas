@@ -33,6 +33,9 @@ public sealed partial class SolidBody2D
         Fixed64 groundedDistanceRay = GroundedDistanceRay;
         Fixed64 groundDownDistanceOnAir = GroundDownDistanceOnAir;
         Fixed64 groundMinNormalDot = GroundMinNormalDot;
+        RecordValues.Look(chronicler, ref groundMinNormalDot, "GroundMinNormalDot", Fixed64.Half);
+        if (chronicler.Mode == SerializationMode.Loading)
+            ValidateGroundMinNormalDot(groundMinNormalDot);
         ContinuousCollisionMode continuousCollisionMode = ContinuousCollisionMode;
 
         RecordValues.Look(chronicler, ref active, "Active", false);
@@ -75,7 +78,6 @@ public sealed partial class SolidBody2D
         RecordValues.Look(chronicler, ref groundProbeRadius, "GroundProbeRadius");
         RecordValues.Look(chronicler, ref groundedDistanceRay, "GroundedDistanceRay", Fixed64.Half);
         RecordValues.Look(chronicler, ref groundDownDistanceOnAir, "GroundDownDistanceOnAir", Fixed64.Half);
-        RecordValues.Look(chronicler, ref groundMinNormalDot, "GroundMinNormalDot", Fixed64.Half);
         RecordValues.Look(chronicler, ref _isGrounded, "IsGrounded");
         RecordValues.Look(chronicler, ref _wasGrounded, "WasGrounded");
         RecordValues.Look(chronicler, ref _groundNormal, "GroundNormal");
@@ -94,7 +96,8 @@ public sealed partial class SolidBody2D
             _freezeAxes = freezeAxes;
             // Restore saved sleep/motion; the public setter is a waking host mutation.
             _mass = mass;
-            Gravity = gravity;
+            // Restore policy without the public setters' cache/wake mutations.
+            _gravity = gravity;
             GravityScale = gravityScale;
             SleepEnabled = sleepEnabled;
             SleepFrameThreshold = sleepFrameThreshold;
@@ -109,7 +112,7 @@ public sealed partial class SolidBody2D
             _groundProbeRadius = groundProbeRadius < Fixed64.Zero ? Fixed64.Zero : groundProbeRadius;
             GroundedDistanceRay = groundedDistanceRay;
             GroundDownDistanceOnAir = groundDownDistanceOnAir;
-            GroundMinNormalDot = groundMinNormalDot;
+            _groundMinNormalDot = groundMinNormalDot;
             _groundNormal = _groundNormal.MagnitudeSquared > Fixed64.Epsilon
                 ? _groundNormal.Normalized
                 : Vector2d.Zero;

@@ -52,8 +52,14 @@ instead of burying it in notes.
   - [GRV-Issue-090](issue-tracker.md#grv-issue-090---3d-automatic-swept-ground-probes-accept-vertical-wall-contacts)
     is resolved: 3D automatic support filters upward candidate normals through a
     configurable slope limit, with saved-state and runtime cache/wake coverage.
-    The parity audit reproduced a separate shared mesh query/CCD witness defect,
-    active [GRV-Issue-091](issue-tracker.md#grv-issue-091---initially-overlapping-mesh-sphere-sweeps-can-classify-an-overhead-surface-as-support).
+    Its [2D parity follow-up, GRV-Issue-092](issue-tracker.md#grv-issue-092---2d-ground-normal-policy-admits-non-support-normals-and-retains-stale-probe-eligibility),
+    is resolved with current-policy support checks, effective-up cache/wake
+    invalidation and saved-sleep coverage, without replay schema changes.
+    Separate initial-overlap witness defects remain active:
+    [GRV-Issue-091](issue-tracker.md#grv-issue-091---initially-overlapping-mesh-sphere-sweeps-can-classify-an-overhead-surface-as-support)
+    for 3D mesh sweeps and
+    [GRV-Issue-093](issue-tracker.md#grv-issue-093---2d-initial-overlap-ray-fallback-normals-can-classify-a-wall-as-sloped-support)
+    for 2D contained-start ray normals.
     GRV-Issue-089 remains resolved.
 - [`Benchmark Signal Hardening`](benchmark-signal-hardening-backlog.md)
   - Reproduce and close confirmed release-relevant signals alongside the owning

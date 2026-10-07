@@ -42,6 +42,69 @@ public sealed class SolidBody2DSerializationTests
     }
 
     [Theory]
+    [InlineData(-1)]
+    [InlineData(2)]
+    public void RecordData_InvalidGroundNormalThreshold_ShouldRejectBeforePublishingState(int value)
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        SolidBody2D body = CreateDynamicCircle(context);
+        var before = context.ComputeReplayHash();
+        var payload = new InvalidRecordPayloadChronicler(new Dictionary<string, object>
+        {
+            ["GroundMinNormalDot"] = (Fixed64)value,
+            ["Position"] = new Vector2d(7, 8)
+        });
+
+        Action load = () => body.RecordData(payload);
+
+        load.Should().Throw<ArgumentException>();
+        context.ComputeReplayHash().Should().Be(before);
+    }
+
+    [Theory]
+    [MemberData(nameof(Transports))]
+    public void Populate_GroundPolicy_ShouldPreserveSavedSleepAndAuthoritativeHash(GravitasSerializationTransport transport)
+    {
+        using GravitasWorldContext sourceContext = Physics2DTestWorld.CreateContext();
+        SolidBody2D source = CreateDynamicCircle(sourceContext);
+        source.Gravity = -Vector2d.Right;
+        source.GroundUpDirection = Vector2d.One;
+        source.UseGravityDerivedGroundUpDirection = false;
+        source.GroundMinNormalDot = Fixed64.FromFraction(3, 4);
+        source.CheckGround();
+        source.Sleep();
+        object payload = GravitasSerializationHarness.Serialize(source, transport);
+        using GravitasWorldContext targetContext = Physics2DTestWorld.CreateContext();
+        SolidBody2D target = CreateDynamicCircle(targetContext);
+
+        GravitasSerializationHarness.Populate(target, payload, transport);
+
+        target.IsSleeping.Should().BeTrue();
+        target.GroundMinNormalDot.Should().Be(source.GroundMinNormalDot);
+        target.Gravity.Should().Be(source.Gravity);
+        target.GroundUpDirection.Should().Be(source.GroundUpDirection);
+        target.UseGravityDerivedGroundUpDirection.Should().BeFalse();
+        targetContext.ComputeReplayHash().Should().Be(sourceContext.ComputeReplayHash());
+    }
+
+    [Theory]
+    [MemberData(nameof(Transports))]
+    public void Populate_OmittedGroundNormalThreshold_ShouldRestoreHalf(GravitasSerializationTransport transport)
+    {
+        using GravitasWorldContext sourceContext = Physics2DTestWorld.CreateContext();
+        object payload = GravitasSerializationHarness.Serialize(CreateDynamicCircle(sourceContext), transport);
+        if (transport == GravitasSerializationTransport.Json)
+            ((string)payload).Should().NotContain("GroundMinNormalDot");
+        using GravitasWorldContext targetContext = Physics2DTestWorld.CreateContext();
+        SolidBody2D target = CreateDynamicCircle(targetContext);
+        target.GroundMinNormalDot = Fixed64.One;
+
+        GravitasSerializationHarness.Populate(target, payload, transport);
+
+        target.GroundMinNormalDot.Should().Be(Fixed64.Half);
+    }
+
+    [Theory]
     [InlineData((byte)4)]
     [InlineData(byte.MaxValue)]
     public void RecordData_WithUndefinedContinuousCollisionMode_ShouldRejectWithoutPublishingValue(byte rawValue)

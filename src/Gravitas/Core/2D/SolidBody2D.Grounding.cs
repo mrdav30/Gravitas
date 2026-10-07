@@ -23,6 +23,7 @@ public sealed partial class SolidBody2D
     private bool _useGravityDerivedGroundUpDirection = true;
     private Vector2d _groundUpDirection = DefaultGroundUpDirection;
     private Fixed64 _groundProbeRadius;
+    private Fixed64 _groundMinNormalDot = Fixed64.Half;
     private long _lastGroundCheckFrame = -1;
     private const int GroundCheckFrameThreshold = 10;
     private readonly Fixed64 _groundCheckPositionThreshold = Fixed64.FromFraction(1, 100);
@@ -71,8 +72,15 @@ public sealed partial class SolidBody2D
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get => _useGravityDerivedGroundUpDirection;
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        set => _useGravityDerivedGroundUpDirection = value;
+        set
+        {
+            if (_useGravityDerivedGroundUpDirection == value)
+                return;
+            Vector2d previousUp = ResolveGroundUpDirection();
+            _useGravityDerivedGroundUpDirection = value;
+            if (previousUp != ResolveGroundUpDirection())
+                InvalidateAutomaticGroundSupport();
+        }
     }
 
     /// <summary>
@@ -88,7 +96,13 @@ public sealed partial class SolidBody2D
                 value.MagnitudeSquared <= Fixed64.Epsilon,
                 nameof(value),
                 "2D ground up direction must be non-zero.");
-            _groundUpDirection = value.Normalized;
+            Vector2d normalized = value.Normalized;
+            if (_groundUpDirection == normalized)
+                return;
+            Vector2d previousUp = ResolveGroundUpDirection();
+            _groundUpDirection = normalized;
+            if (previousUp != ResolveGroundUpDirection())
+                InvalidateAutomaticGroundSupport();
         }
     }
 
@@ -117,9 +131,22 @@ public sealed partial class SolidBody2D
     public Fixed64 GroundDownDistanceOnAir { get; set; } = Fixed64.Half;
 
     /// <summary>
-    /// Minimum dot product between a candidate support normal and resolved up direction.
+    /// Minimum normalized support-normal dot product with resolved up, in [0, 1].
+    /// Defaults to one half (slopes through 60 degrees). Zero permits any
+    /// positive up-dot; horizontal, downward-facing and zero normals never support.
     /// </summary>
-    public Fixed64 GroundMinNormalDot { get; set; } = Fixed64.Half;
+    public Fixed64 GroundMinNormalDot
+    {
+        get => _groundMinNormalDot;
+        set
+        {
+            ValidateGroundMinNormalDot(value);
+            if (_groundMinNormalDot == value)
+                return;
+            _groundMinNormalDot = value;
+            InvalidateAutomaticGroundSupport();
+        }
+    }
 
     /// <summary>
     /// Gets whether this body currently has planar support.
@@ -277,8 +304,7 @@ public sealed partial class SolidBody2D
             return;
 
         normal = normal.Normalized;
-        Fixed64 upDot = Vector2d.Dot(normal, ResolveGroundUpDirection());
-        if (upDot < GroundMinNormalDot)
+        if (!IsValidGroundNormal(normal, out Fixed64 upDot))
             return;
 
         Vector2d point;
@@ -351,6 +377,11 @@ public sealed partial class SolidBody2D
     {
         value = ProjectLinearMotion(value);
         if (!_isGrounded || _groundNormal.MagnitudeSquared <= Fixed64.Epsilon)
+            return value;
+
+        // Motion preparation precedes support refresh. A changed automatic
+        // policy must not suppress motion using the previous support normal.
+        if (_groundingMode == GroundingMode.Automatic && !IsValidGroundNormal(_groundNormal, out _))
             return value;
 
         Fixed64 intoGround = Vector2d.Dot(value, _groundNormal);
@@ -445,8 +476,7 @@ public sealed partial class SolidBody2D
         if (!IsValidGroundCollider(hitCollider))
             return false;
 
-        Vector2d up = ResolveGroundUpDirection();
-        return Vector2d.Dot(hit.Normal.Normalized, up) >= GroundMinNormalDot;
+        return IsValidGroundNormal(hit.Normal.Normalized, out _);
     }
 
     private bool IsValidGroundCollider(LSCollider2D collider)
@@ -488,6 +518,29 @@ public sealed partial class SolidBody2D
                 Collider.CanonicalGroundProbeRadius,
             _ => Fixed64.Zero
         };
+    }
+
+    private static void ValidateGroundMinNormalDot(Fixed64 value) =>
+        SwiftThrowHelper.ThrowIfArgument(value < Fixed64.Zero || value > Fixed64.One,
+            nameof(value), "2D ground support normal threshold must be between zero and one.");
+
+    private bool IsValidGroundNormal(Vector2d normalizedNormal, out Fixed64 upDot)
+    {
+        upDot = Vector2d.Dot(normalizedNormal, ResolveGroundUpDirection());
+        // Zero means any upward support, not walls or an absent normal. Both
+        // query and contact support apply the same inclusive slope boundary.
+        return upDot > Fixed64.Zero && upDot >= _groundMinNormalDot;
+    }
+
+    private void InvalidateAutomaticGroundSupport()
+    {
+        if (_groundingMode != GroundingMode.Automatic)
+            return;
+        _lastGroundCheckFrame = -1;
+        // A callback can change another body's policy after contacts have been
+        // collected but before that body's grounding refresh completes.
+        ClearGroundContactCandidate();
+        Wake();
     }
 
     private Vector2d ResolveGroundUpDirection()
@@ -581,7 +634,8 @@ public sealed partial class SolidBody2D
             && (!bodyRegistration.IsActive
                 || !CanUseAutomaticGrounding
                 || !supportRegistration.IsActive
-                || !IsValidGroundCollider(supportRegistration.Collider)))
+                || !IsValidGroundCollider(supportRegistration.Collider)
+                || !IsValidGroundNormal(_groundNormal, out _)))
         {
             ClearGrounding();
         }

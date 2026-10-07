@@ -179,6 +179,24 @@ This differs from explicit `Query2D.QuerySupport`, which filters support parts
 before reduction. Automatic ray probes accept positive representable travel
 lengths below `Epsilon`; swept-circle probes require travel longer than `Epsilon`.
 
+`SolidBody2D.GroundMinNormalDot` uses the same `[0, 1]` range and one-half
+(default 60-degree) slope limit as 3D, measured against resolved planar up.
+Both query probes and collision-contact support require a strictly positive
+normalized up-dot, including when the configured limit is zero. Invalid limits
+reject without changing state. Gravity supplies up when
+`UseGravityDerivedGroundUpDirection` is enabled and gravity is nonzero;
+`GroundUpDirection` supplies the normalized fallback.
+
+Changing the slope limit or effective up direction invalidates automatic probe
+and pending contact support and wakes the body. Equal assignments, changes to
+an unused fallback, and gravity magnitude changes that preserve up do not wake
+it. Motion projection and callback completion also check current eligibility,
+so obsolete support cannot suppress motion or survive a callback policy change.
+Manual grounding retains host-owned support and projection. Populate restores
+validated policy without waking saved bodies; transient 2D support ownership
+and probe timing are rebuilt through the existing load contract. Older sparse
+records that omit the limit retain the default of one half.
+
 Dynamic 2D bodies publish their authoritative planar position and yaw rotation
 back to the host `FixedTransform` during `Visualize()` whenever the runtime mode
 runs the 2D service (`TwoD`, `Both`, or `Mixed`). The host transform's
