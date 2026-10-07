@@ -18,7 +18,6 @@ public sealed class Constraint3DStressTests
         ReplayConformanceHarness.AssertRepeatedRunsMatch(
             () => CreateLongBallSocketChain(out _, out _),
             frameCount: 32,
-            beforeFrame: static (context, _) => context.Simulate(),
             mode: GravitasReplayHashMode.AuthoritativeWithSolverCaches);
 
         using GravitasWorldContext context = CreateLongBallSocketChain(out SolidBody[] bodies, out Joint3D[] joints);
@@ -37,7 +36,6 @@ public sealed class Constraint3DStressTests
         ReplayConformanceHarness.AssertRepeatedRunsMatch(
             () => CreateAlternatingHingeChain(out _, out _),
             frameCount: 32,
-            beforeFrame: static (context, _) => context.Simulate(),
             mode: GravitasReplayHashMode.AuthoritativeWithSolverCaches);
 
         using GravitasWorldContext context = CreateAlternatingHingeChain(out _, out Joint3D[] joints);

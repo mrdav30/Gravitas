@@ -46,7 +46,9 @@ internal static class ReplayConformanceHarness
         var trace = new ReplayHashTrace(frameCount);
         for (int frame = 0; frame < frameCount; frame++)
         {
+            // The callback applies host commands; the harness owns both fixed phases.
             beforeFrame?.Invoke(context, frame);
+            context.Simulate();
             context.LateSimulate();
             trace[frame] = context.ComputeReplayHash(mode);
         }
@@ -63,7 +65,9 @@ internal static class ReplayConformanceHarness
         first.ComputeReplayHash(mode).Should().Be(second.ComputeReplayHash(mode));
         for (int frame = 0; frame < frameCount; frame++)
         {
+            first.Simulate();
             first.LateSimulate();
+            second.Simulate();
             second.LateSimulate();
             second.ComputeReplayHash(mode)
                 .Should()

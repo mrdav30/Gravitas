@@ -28,15 +28,17 @@ instead of burying it in notes.
 ## Active Coordination
 
 - **Lockstep Conformance And Workload Guidance**
-  - Proposed follow-up sequence after the confirmed benchmark signals close:
+  - Approved follow-up sequence after the confirmed benchmark signals close:
     strengthen complete-loop replay evidence, characterize an evolving strategy
     scene, then publish long-duration physical quality versus configuration cost.
-    Implementation has not started; these plans define scope and evidence gates.
+    Replay Phase 1 is complete; shared fixtures and platform comparison remain
+    active. The workload and quality plans await their prerequisite evidence.
   - [`Full-Lifecycle Replay Conformance`](2026-10-06-full-lifecycle-replay-conformance-plan.md)
-    is first: fix the default trace/continuation stepping and audit callbacks
-    before comparing shared frame traces across OS, architecture and package
-    profile. This is a confirmed test-harness gap, not a demonstrated runtime
-    determinism failure. Native platform availability remains an explicit gate.
+    is first: default trace/continuation stepping and caller migration are
+    complete, with motion/contact regressions in all four runtime modes and
+    exact Release/Lean coverage. The [Phase 1 report](done/2026-10-06-replay-conformance-phase-1-report.md)
+    records the completed slice. Shared frame traces across OS, architecture
+    and package profile remain pending; native availability is an explicit gate.
   - [`Evolving Game Capacity And Soak`](2026-10-06-evolving-game-capacity-and-soak-plan.md)
     follows complete stepping and a shared trace format. One strategy scene
     supplies activity stages, a comparable 3D case, per-frame tails and churn
@@ -57,6 +59,10 @@ instead of burying it in notes.
 - [`Benchmark Signal Hardening`](benchmark-signal-hardening-backlog.md)
   - Reproduce and close confirmed release-relevant signals alongside the owning
     library change. Do not broaden this into speculative optimization work.
+  - Active [GRV-Benchmark-025](benchmark-signal-hardening-backlog.md#grv-benchmark-025--debug-ragdoll-steady-state-allocations)
+    records an independently reproduced Debug-only ragdoll allocation guard
+    failure. Attribute allocations before changing the solver or guard; the
+    same Release guard passes, and replay helper changes do not own this path.
   - Experimental [GRV-Benchmark-024](benchmark-signal-hardening-backlog.md#grv-benchmark-024--curved-contact-workload-frequency-and-step-cost)
     tracks the unmeasured frequency and complete-step impact of expensive curved
     contacts in representative deterministic scenes. Count solver entries as

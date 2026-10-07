@@ -139,14 +139,7 @@ public sealed class GravitasReplayHashContextTests
         ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
         body.Body.AddForce(new Vector3d((Fixed64)4, Fixed64.Zero, Fixed64.Zero));
 
-        var hashes = new ChronicleHash[8];
-        for (int frame = 0; frame < hashes.Length; frame++)
-        {
-            scenario.Context.LateSimulate();
-            hashes[frame] = scenario.Context.ComputeReplayHash();
-        }
-
-        return hashes;
+        return ReplayConformanceHarness.RunTrace(scenario.Context, 8).Hashes;
     }
 
     private static PhysicsScenarioBuilder Create3DScenario()

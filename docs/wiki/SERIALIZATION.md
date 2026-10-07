@@ -159,6 +159,18 @@ behavior.
 `GravitasWorldContext.ComputeReplayHash()` is the preferred compact conformance
 signal for replay and rollback tests.
 
+Apply ordered host commands before each fixed step, call `Simulate()` and then
+`LateSimulate()` exactly once, and compute the frame hash after both phases
+complete. `Simulate()` advances the clock, coroutines and simulate hooks;
+`LateSimulate()` completes physics and late hooks. A late-only trace omits part
+of the authoritative host lifecycle. Presentation phases may run between fixed
+steps and must leave the authoritative hash unchanged.
+
+Assert relevant host events and coroutine effects separately: a physics-state
+hash does not include arbitrary host state. Repeated runs on one platform show
+repeatability; cross-platform conformance requires comparing the same commands
+and expected frame results on each platform.
+
 After Chronicler populates existing runtime shells, the restored context should
 produce the same per-frame `ChronicleHash` sequence as the uninterrupted context
 when both receive the same subsequent inputs.

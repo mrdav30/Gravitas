@@ -199,6 +199,8 @@ public sealed class GravitasReplayConformanceTests
     [Fact]
     public void ComputeReplayHash_Authoritative_ShouldNotAllocateAfterWarmup()
     {
+        // Hashing must be allocation-free in front-phase dense-pair state and
+        // post-late state; these warmups intentionally do not replay full frames.
         using PhysicsScenarioBuilder scenario3D = Create3DScenario();
         scenario3D.CreateSphere(Vector3d.Zero);
         scenario3D.Context.LateSimulate();
@@ -395,7 +397,9 @@ public sealed class GravitasReplayConformanceTests
     {
         for (int frame = 0; frame < frameCount; frame++)
         {
+            first.Simulate();
             first.LateSimulate();
+            second.Simulate();
             second.LateSimulate();
         }
     }

@@ -16,7 +16,7 @@ this backlog.
 ## Intake Rules
 
 - Signal IDs use `GRV-Benchmark-NNN`. The next available ID is
-  `GRV-Benchmark-025`.
+  `GRV-Benchmark-026`.
 - Assign an ID at intake and never reuse it, including after a signal closes or
   moves into a dated plan. Check this file's Git history before advancing or
   repairing the counter.
@@ -61,7 +61,43 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 
 ## Active Signals
 
-None. Remaining evidence-gated investigations are listed below.
+### GRV-Benchmark-025 — Debug Ragdoll Steady-State Allocations
+
+**Discovered:** 2026-10-06, during full-lifecycle replay Phase 1 validation.  
+**Source:** `Constraint3DStressTests.ConstraintStressSolve_ShouldNotAllocateAfterWarmup`.  
+**Status:** Confirmed Debug-only allocation guard failure; allocation owner not
+yet attributed. This does not establish a Release performance regression.  
+**Owner:** Gravitas constraint/contact workload; involve lower-stack owners only
+after an allocation trace identifies their contribution.
+
+The unchanged guard warms a humanoid ragdoll, then measures 128 complete
+`Simulate()`/`LateSimulate()` frames. Debug measured **4,318,560 managed bytes**
+in the broader focused suite and again when run alone, against its 0-byte
+expectation. Release focused and full Release/Lean suites passed the same guard.
+The guard calls
+the context phases directly and does not use the modified replay helper; its
+body and setup were not changed by this work.
+
+Reproduce on Windows x64 with SDK 10.0.302 and the unreleased local stack:
+
+```powershell
+$env:UseLocalLsfStack = 'true'
+$env:DOTNET_PROCESSOR_COUNT = '2'
+dotnet build tests/Gravitas.Tests/Gravitas.Tests.csproj -c Debug -p:UseLocalLsfStack=true -m:1 -p:BuildInParallel=false -p:UseSharedCompilation=false -nr:false
+dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj -c Debug --no-build --no-restore -p:UseLocalLsfStack=true --filter 'FullyQualifiedName~ConstraintStressSolve_ShouldNotAllocateAfterWarmup' -- RunConfiguration.MaxCpuCount=1 xUnit.MaxParallelThreads=1
+```
+
+Evidence remains in the ignored
+`artifacts/replay-conformance-phase1/debug-allocation-repro.log` and its paired
+TRX, plus the initial Debug focused capture. Other Debug replay/lifecycle checks
+can proceed separately; the guard remains unchanged and runs in full Release
+and Lean validation.
+
+**Next isolation:** Capture allocation types and stacks for this exact warmed
+window in Debug and Release. Distinguish runtime allocation from optimization
+or instrumentation effects before changing solver code or its test contract.
+Do not relax the expectation or attribute the bytes to a dependency without
+evidence. Check a comparable planar workload only after identifying the owner.
 
 ## Experimental Signals
 
