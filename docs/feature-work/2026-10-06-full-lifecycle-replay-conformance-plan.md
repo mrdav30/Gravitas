@@ -1,7 +1,7 @@
 # Full-Lifecycle Replay Conformance Plan
 
 **Date:** 2026-10-06  
-**Status:** Phase 1 complete; shared fixtures and platform comparison pending.  
+**Status:** Phases 1 and 2 complete; Phase 3 native platform comparison pending.  
 **Owner:** Gravitas test harness and CI; lower-stack owners only for reproduced defects.
 
 ## Goal
@@ -53,29 +53,31 @@ not double-step. Existing lifecycle/CCD/constraint tests remain valid.
 Completed 2026-10-06. Both helpers, restore warmup and the separate repeated
 3D hash trace now follow the full loop; stress callbacks no longer double-step.
 Six regressions fail against the baseline helper and pass with the change.
-Full Release/Lean coverage remains exact 100%; no runtime or lower-stack source
-change was required. The [Phase 1 report](done/2026-10-06-replay-conformance-phase-1-report.md)
-records validation and the independently reproduced Debug-only allocation
-signal [GRV-Benchmark-025](benchmark-signal-hardening-backlog.md#grv-benchmark-025--debug-ragdoll-steady-state-allocations).
-Shared expected fixtures and native cross-platform comparisons remain pending.
+Release/Lean passed 4,543/4,482 tests with exact 100% line, branch and method
+coverage. Both target-framework builds and documentation checks passed using
+`UseLocalLsfStack=true`; no runtime or lower-stack source change was required.
+The Debug subset passed 123 tests, excluding the independently reproduced
+ragdoll allocation failure captured as
+[GRV-Benchmark-025](benchmark-signal-hardening-backlog.md#grv-benchmark-025--debug-ragdoll-steady-state-allocations).
+Detailed captures remain under ignored `artifacts/replay-conformance-phase1/`.
 
 ## Phase 2: Shared Command And Result Fixtures
 
-- [ ] Reuse current scenario builders and ChronicleHash. Define a small,
+- [x] Reuse current scenario builders and ChronicleHash. Define a small,
       versioned fixture manifest containing ordered commands, frame count,
       settings, stable host entity identity and expected per-frame hashes.
-- [ ] Cover sleep/wake, spawn/despawn and registration reuse, queries, CCD,
+- [x] Cover sleep/wake, spawn/despawn and registration reuse, queries, CCD,
       connected contacts/constraints and supported restore continuation with a
       few focused traces. Assert the named contact/CCD event actually occurs;
       a one-shot force and hash agreement alone may never reach the target.
       Reuse these fixtures in subsequent workload plans.
-- [ ] Check every frame against a reviewed shared expectation as well as a
+- [x] Check every frame against a reviewed shared expectation as well as a
       repeated run. Include semantic assertions for events and representative
       raw state so the hash producer is not the sole correctness oracle.
-- [ ] Use `Authoritative` as the mandatory portable comparison. Compare
+- [x] Use `Authoritative` as the mandatory portable comparison. Compare
       `AuthoritativeWithSolverCaches` separately under identical fixture/cache
       contracts; do not mix the two modes or compare unsupported restore caches.
-- [ ] Report the first divergent frame, preceding commands, raw body state and
+- [x] Report the first divergent frame, preceding commands, raw body state and
       relevant ordered events. Keep machine/runtime/dependency metadata outside
       the equality payload. Never regenerate expected values automatically on
       failure; investigate intentional changes and review fixture versions.
@@ -84,6 +86,24 @@ Body payloads do not restore the containing clock, object graph, coroutines or
 all solver caches. Restore fixtures must reconstruct supported shells and match
 the host timeline under the [serialization contract](../wiki/SERIALIZATION.md).
 This plan does not introduce a live-world rewind API.
+
+Completed 2026-10-06. Five version-1 fixtures cover 36 frames, all four modes,
+lifecycle/query/CCD behavior, connected constraints and supported free-body
+restore. Shared expectations, repeated runs and uninterrupted continuation agree;
+analytic stop/momentum assertions supplement raw state and ordered observations.
+Existing builders and Chronicler hashes are reused. Explicit layer-zero settings
+and manual 3D grounding isolate the fixture contract; a regression removed an
+introduced dependency on ambient layer names.
+
+Windows x64 local-stack validation passed 47 new tests, 4,590/4,529 full
+Release/Lean tests and 170 focused Debug tests. Exact 100% line, branch and method
+coverage, both target-framework builds, DocFX and link checks passed; Debug still
+excludes #025. No runtime or upstream source changed. The separate wall-support
+defect is captured as [GRV-Issue-090](issue-tracker.md#grv-issue-090---3d-automatic-swept-ground-probes-accept-vertical-wall-contacts).
+Baseline Gravitas `5be7224`, SDK 10.0.302, sibling identities, fixture fingerprints
+and detailed gates are recorded under ignored `artifacts/replay-conformance-phase2/`;
+the successful capture is `final-gates-20261007T024929080Z-743bdd00006b46008b6072d799376a3a`.
+Native cross-OS/architecture comparison remains Phase 3.
 
 ## Phase 3: Platform Comparison
 

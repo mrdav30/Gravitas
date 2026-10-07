@@ -2,7 +2,7 @@
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-090`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-091`.
 - Assign an ID when an issue enters this tracker, keep it through resolution,
   and never reuse an ID even if an entry is later removed. Check this file's Git
   history before advancing or repairing the counter.
@@ -35,7 +35,51 @@
 
 ### Ordered Queue
 
-No active correctness issues.
+### GRV-Issue-090 - 3D automatic swept-ground probes accept vertical-wall contacts
+
+- **Confirmed:** 2026-10-06 during full-lifecycle replay fixture review. A
+  focused local-stack Release diagnostic reproduced the same unwanted height
+  change at initial heights 0 and 4; both diagnostic cases passed assertions
+  describing the defect. No runtime fix is included in the replay work.
+- **Reproduction:** At 8 Hz with gravity, air density, damping and minimum speed
+  zero, create a mass-one radius-half dynamic sphere at `(-2, h, 4)` and a static
+  cuboid at `(1, h, 4)` with size `(1/8, 4, 4)`. Set maximum speed/fall speed to
+  64, enable continuous collision on the sphere, apply impulse `(32, 0, 0)`,
+  and call `Simulate()` then `LateSimulate()`. CCD correctly stops X at `7/16`.
+  Automatic grounding then marks the sphere grounded against the wall and
+  raises its body height from `h` to `h + 1/2`, despite zero vertical velocity.
+- **Exact witness:** For `h = 4`, the radius-half downward ground sweep starts
+  at `(7/16, 9/2, 4)` and ends at `(7/16, 4, 4)`. It accepts wall collider ID 1
+  at distance zero with point `(15/16, 9/2, 4)` and normal `(-1, 0, 0)`. The
+  final body pose is `(7/16, 9/2, 4)`. For `h = 0`, the same relative witness
+  is `(15/16, 1/2, 4)` and the final pose is `(7/16, 1/2, 4)`. The probe is
+  tangent to the vertical wall at its start; this is not upward support or an
+  implicit world-floor contract.
+- **Source chain:**
+  [`ResolveGroundProbeMode`](../../src/Gravitas/Core/3D/SolidBody.Grounding.cs)
+  selects a swept sphere for sphere bodies. `TryFindGroundHitWithSweptSphere`
+  accepts the first eligible hit; `IsValidGroundHit` checks self identity,
+  physical filtering and static/kinematic mobility, but does not reject a
+  horizontal support normal. `ApplyGroundedHeightOrReset` then publishes the
+  accepted witness Y as body height. The accepted query witness is valid wall
+  geometry; the incorrect support classification and height publication are
+  owned by 3D grounding.
+- **Follow-up:** Add a failing full-loop regression for both translated heights
+  before fixing support eligibility. Preserve legitimate floor and slope
+  support, explicit manual grounding, filtering, stable candidate selection,
+  and fixed-point behavior. Audit other automatic/explicit swept-ground shapes
+  and the 2D counterpart: `SolidBody2D.IsValidGroundHit` already compares the
+  normal against gravity-relative up through `GroundMinNormalDot`, but its
+  related witness/height semantics still need parity review. No 2D defect has
+  been reproduced by this investigation.
+- **Evidence:** The temporary diagnostic source is retained under ignored
+  `artifacts/replay-conformance-phase2/grounding-witness/GroundingWitnessScratchTests.cs`;
+  exact observed console excerpts and the invocation are in `diagnostic.log`
+  beside it. The diagnostic invocation used only the console logger and
+  produced no TRX file; unrelated replay TRX captures are not evidence for
+  this defect. The tracked temporary test was removed after the two-case run.
+  Shared replay fixtures use explicit manual grounding to isolate their CCD
+  expectations from this separately tracked runtime behavior.
 
 Remaining measured performance costs are tracked in the benchmark backlog.
 

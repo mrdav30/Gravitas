@@ -31,14 +31,15 @@ instead of burying it in notes.
   - Approved follow-up sequence after the confirmed benchmark signals close:
     strengthen complete-loop replay evidence, characterize an evolving strategy
     scene, then publish long-duration physical quality versus configuration cost.
-    Replay Phase 1 is complete; shared fixtures and platform comparison remain
+    Replay Phases 1 and 2 are complete; native platform comparison remains
     active. The workload and quality plans await their prerequisite evidence.
   - [`Full-Lifecycle Replay Conformance`](2026-10-06-full-lifecycle-replay-conformance-plan.md)
-    is first: default trace/continuation stepping and caller migration are
-    complete, with motion/contact regressions in all four runtime modes and
-    exact Release/Lean coverage. The [Phase 1 report](done/2026-10-06-replay-conformance-phase-1-report.md)
-    records the completed slice. Shared frame traces across OS, architecture
-    and package profile remain pending; native availability is an explicit gate.
+    is first: complete stepping and five reviewed shared fixtures now cover
+    all four runtime modes, lifecycle, CCD, queries, connected constraints and
+    supported body restore. Local Windows x64 Release/Lean results match the
+    same expectations with exact coverage; phase summaries live in the plan.
+    Native cross-OS/architecture trace comparison remains pending, with runner
+    availability an explicit gate.
   - [`Evolving Game Capacity And Soak`](2026-10-06-evolving-game-capacity-and-soak-plan.md)
     follows complete stepping and a shared trace format. One strategy scene
     supplies activity stages, a comparable 3D case, per-frame tails and churn
@@ -54,8 +55,11 @@ instead of burying it in notes.
     `SwiftCollections`, `GridForge`, then Gravitas. Package references are the
     default; use `UseLocalLsfStack=true` only for coordinated validation of
     unreleased sibling changes, then revalidate against released packages.
-  - No active correctness issues; GRV-Issue-089 is resolved with body-owned mass
-    mutation and pure/mixed awake synchronization.
+  - Active [GRV-Issue-090](issue-tracker.md#grv-issue-090---3d-automatic-swept-ground-probes-accept-vertical-wall-contacts)
+    records automatic 3D grounding accepting a horizontal wall normal and
+    snapping the body upward. Replay fixtures use explicit manual grounding to
+    isolate this independent defect; the 2D support filter needs a parity audit.
+    GRV-Issue-089 remains resolved.
 - [`Benchmark Signal Hardening`](benchmark-signal-hardening-backlog.md)
   - Reproduce and close confirmed release-relevant signals alongside the owning
     library change. Do not broaden this into speculative optimization work.
