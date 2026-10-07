@@ -157,7 +157,7 @@ behavior.
 ## Replay Hashes
 
 `GravitasWorldContext.ComputeReplayHash()` is the preferred compact conformance
-signal for replay and rollback tests.
+signal for checking replay and rollback continuation.
 
 Apply ordered host commands before each fixed step, call `Simulate()` and then
 `LateSimulate()` exactly once, and compute the frame hash after both phases
@@ -166,29 +166,15 @@ complete. `Simulate()` advances the clock, coroutines and simulate hooks;
 of the authoritative host lifecycle. Presentation phases may run between fixed
 steps and must leave the authoritative hash unchanged.
 
-Assert relevant host events and coroutine effects separately: a physics-state
-hash does not include arbitrary host state. Repeated runs on one platform show
-repeatability; cross-platform conformance requires comparing the same commands
-and expected frame results on each platform.
+Compare relevant host events and coroutine effects separately: a physics-state
+hash does not include arbitrary host state.
 
-The [shared test fixtures](../../tests/Gravitas.Tests/Determinism/Fixtures)
-contain versioned settings, stable host actor identities, ordered commands and
-reviewed results for every frame. Raw fixed-point integers, body state and
-ordered contact/query observations accompany the authoritative hash. The traces
-exercise `TwoD`, `ThreeD`, `Both` and `Mixed`; a separate connected-body trace
-compares solver-cache hashes without restoring body payloads. Zero-gravity 3D
-traces use explicit manual grounding to isolate rigid-body contacts and CCD.
-All actors use an explicit enabled layer-zero matrix; ambient layer display-name
-registrations do not influence the fixture configuration or its hashes.
-
-Run `SharedReplayFixtureTests` to compare the expected frames, repeated runs and
-supported free-body restore continuation. A mismatch reports the first divergent
-frame, preceding commands and expected/actual raw observations. Setting
-`GRAVITAS_REPLAY_CAPTURE_DIRECTORY` writes actual results to that directory for
-comparison or diagnosis; it never rewrites expectations or turns a mismatch into
-a pass. Review intentional behavior changes before updating fixture versions and
-expected results. Keep machine, runtime and dependency provenance outside the
-comparison payload.
+Compare peers using identical initial state, settings, ordered commands and
+replay-hash schema versions. Record OS/CPU architecture, runtime and dependency
+versions separately from authoritative state so differences can be diagnosed
+without changing the equality contract. Native execution provides evidence for
+the workloads and platforms exercised; repeated agreement on one machine does
+not establish agreement across all platforms.
 
 After Chronicler populates existing runtime shells, the restored context should
 produce the same per-frame `ChronicleHash` sequence as the uninterrupted context

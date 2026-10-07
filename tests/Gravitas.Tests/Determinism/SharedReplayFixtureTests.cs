@@ -51,10 +51,7 @@ public sealed class SharedReplayFixtureTests
         // It never writes fixture expectations or bypasses their comparison.
         string? captureDirectory = Environment.GetEnvironmentVariable("GRAVITAS_REPLAY_CAPTURE_DIRECTORY");
         if (captureDirectory != null)
-        {
-            Directory.CreateDirectory(captureDirectory);
-            File.WriteAllText(Path.Combine(captureDirectory, name + ".actual.json"), ReplayFixture.Serialize(actual));
-        }
+            ReplayCapture.Write(captureDirectory, fixture, actual);
         for (int frame = 0; frame < actual.Length; frame++)
             ReplayFixture.AssertFrame(fixture, frame, actual[frame]);
 

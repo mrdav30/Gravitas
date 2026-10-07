@@ -1,7 +1,7 @@
 # Full-Lifecycle Replay Conformance Plan
 
 **Date:** 2026-10-06  
-**Status:** Phases 1 and 2 complete; Phase 3 native platform comparison pending.  
+**Status:** Phases 1 and 2 complete; Phase 3 implemented and four native x64 lanes verified; hosted ARM64 comparison pending.  
 **Owner:** Gravitas test harness and CI; lower-stack owners only for reproduced defects.
 
 ## Goal
@@ -107,25 +107,77 @@ Native cross-OS/architecture comparison remains Phase 3.
 
 ## Phase 3: Platform Comparison
 
-- [ ] First publish and compare the same fixture results between existing
+- [x] First publish and compare the same fixture results between existing
       Windows/Linux Release/Lean lanes. Separate independently passing unit
       tests from an actual shared-result comparison.
-- [ ] Inventory native x64 and ARM64 runner availability and record OS, actual
+- [x] Inventory native x64 and ARM64 runner availability and record OS, actual
       architecture, SDK/runtime, source revision and dependency identity.
       Add native ARM64 lanes where hosting is approved and available. Emulation
       or compilation alone is not native execution evidence.
-- [ ] Require expected traces and direct cross-lane comparison to agree for
+- [x] Require expected traces and direct cross-lane comparison to agree for
       identical supported fixtures. Missing lanes remain visible evidence gaps,
       never passes. Add a tested comparator failure case using one altered frame.
-- [ ] Keep small conformance traces in normal CI; retain artifacts for diagnosis.
-      Build both library target frameworks without claiming that a
+- [x] Configure small conformance traces in normal CI; retain artifacts for
+      diagnosis. Build both library target frameworks without claiming that a
       `netstandard2.1` compile is another execution platform.
+- [ ] Confirm the first hosted eight-lane execution and artifact comparison.
+      Native ARM64 results remain pending until those jobs actually run.
 
 The complete native matrix is Windows/Linux x64/ARM64, each in Release/Lean.
 Runner availability can stage its rollout; closure must name the actually
 executed matrix and any remaining lanes rather than claim universal CPU proof.
 Fixture authoring for the next plan can begin once Phase 1 and the shared trace
 format are established; unavailable ARM hosting need not block that authoring.
+
+Native runner inventory was verified 2026-10-06 against GitHub's
+[standard public-repository runners](https://docs.github.com/en/actions/reference/runners/github-hosted-runners#standard-github-hosted-runners-for-public-repositories).
+The public repository can use `windows-2025`, `ubuntu-24.04`, `windows-11-arm`
+and `ubuntu-24.04-arm` for Windows/Linux x64/ARM64 respectively. Each runs both
+profiles with a native SDK. Captures record actual OS and process architecture;
+the comparator validates both against the lane rather than trusting its label.
+Develop pushes and PRs targeting `develop` check out identical immutable sibling
+revisions in all lanes with `UseLocalLsfStack=true`. Main and other branches use
+released packages with `UseLocalLsfStack=false` and no sibling checkouts. PRs
+select their target branch, so `develop` -> `main` validates packages; upstream
+publication must precede promotion. Captures record SDK/runtime, fixture
+fingerprints and the selected dependency mode. Source mode requires sibling
+commit IDs; package mode requires an empty source map and matching loaded
+assembly/informational versions. Mixed modes fail comparison.
+
+The tested comparator rejects missing lanes/files, incompatible provenance,
+ordered observation changes, lost integer precision and equally incorrect
+results. Direct lane comparison and shared expectations are separate required
+guards. An explicit local submatrix reports every omitted lane; default CI
+requires all eight. Observed results never overwrite reviewed fixtures.
+
+Validated 2026-10-07. Independently compiled Windows x64 and Ubuntu 24.04.1
+x64 under WSL2 agree directly and with all five version-1 fixtures' 36 frames
+in Release/Lean. The native captures record Windows SDK/runtime
+10.0.302/8.0.29 and Linux 10.0.203/8.0.26, Gravitas baseline `88a28c0` plus the
+reviewed batch, and full sibling identities. Source pins are FixedMathSharp
+`9774e649`, SwiftCollections `3668bb4d`, GridForge `2ccf9783` and Chronicler
+`5397348a`; the Linux snapshot verified 1,988 files across the five repositories.
+Actual native captures remain under ignored `artifacts/replay-conformance-phase3/`.
+
+Review removed the capture/comparator helper suites and the earlier fixture
+contract suite, retaining actual library lifecycle, physics, query, CCD and
+restore assertions. The comparator still validates real CI captures; controlled
+copies confirm that missing lanes, one altered raw unit and equally incorrect
+lanes fail. Capture instructions belong in [contributor guidance](../../AGENTS.md#replay-conformance-captures);
+the wiki describes host-facing contracts. Source/package selection now follows
+the target branch, including package validation for `develop` -> `main`.
+
+Cleanup validation passed 4,549/4,488 full Windows Release/Lean tests and 129
+focused Debug tests with the known #025 guard excluded. Exact production line,
+branch and method coverage remains 100% in both profiles; both target-framework
+builds, DocFX, links and workflow lint pass using `UseLocalLsfStack=true`.
+Fresh captures are under
+`artifacts/replay-conformance-phase3/final-gates-20261007T144355786Z-21016bb3baee499290cf0467988db06f/`.
+No runtime, upstream or reviewed fixture expectation changed. The hosted
+eight-lane run, including four ARM64 lanes, remains pending; local comparison
+explicitly names those omissions. Actual released-package execution also awaits
+upstream publication. Keep this plan active until hosted captures establish the
+remaining evidence.
 
 ## Validation And Completion
 
@@ -135,7 +187,7 @@ format are established; unavailable ARM hosting need not block that authoring.
 - [x] Use `UseLocalLsfStack=true` in MSBuild and the environment throughout
       coordinated unreleased-stack work; revalidate released packages before
       release. Preserve deterministic ordering and warmed allocation guarantees.
-- [ ] Publish the verified matrix, fixture/version provenance and limitations;
+- [x] Publish the verified matrix, fixture/version provenance and limitations;
       update evergreen replay guidance without linking it to this plan.
 - [ ] Archive this plan in `done/` only after the claimed execution/comparison
       gates pass, or explicitly split an unavailable platform rollout into a

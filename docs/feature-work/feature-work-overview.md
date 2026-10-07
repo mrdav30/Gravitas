@@ -36,10 +36,13 @@ instead of burying it in notes.
   - [`Full-Lifecycle Replay Conformance`](2026-10-06-full-lifecycle-replay-conformance-plan.md)
     is first: complete stepping and five reviewed shared fixtures now cover
     all four runtime modes, lifecycle, CCD, queries, connected constraints and
-    supported body restore. Local Windows x64 Release/Lean results match the
-    same expectations with exact coverage; phase summaries live in the plan.
-    Native cross-OS/architecture trace comparison remains pending, with runner
-    availability an explicit gate.
+    supported body restore. Phase 3 directly compares independently compiled
+    Windows/Linux x64 Release/Lean captures: all five fixtures and 36 frames
+    agree with each other and shared expectations. Exact coverage is preserved;
+    phase summaries live in the plan. The eight-lane native CI comparison is
+    implemented, with actual hosted ARM64 execution still pending. Develop
+    validates pinned sibling sources; main validates released packages, including
+    PRs from develop into main.
   - [`Evolving Game Capacity And Soak`](2026-10-06-evolving-game-capacity-and-soak-plan.md)
     follows complete stepping and a shared trace format. One strategy scene
     supplies activity stages, a comparable 3D case, per-frame tails and churn

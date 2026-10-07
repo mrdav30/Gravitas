@@ -655,8 +655,23 @@ Important notes:
   alongside behavior changes.
 - Building the library produces NuGet packages because `GeneratePackageOnBuild`
   is enabled.
-- [Build CI](.github/workflows/build-and-test.yml) tests `Release` and
-  `ReleaseLean` on Ubuntu and Windows.
+- [Build CI](.github/workflows/build-and-test.yml) builds both library targets
+  and runs `Release`/`ReleaseLean` on native Windows/Linux x64/ARM64. It selects
+  `UseLocalLsfStack=true` with immutable sibling source revisions on `develop`
+  pushes and PRs targeting `develop`. Main and other branches use released
+  packages with `UseLocalLsfStack=false` and no sibling checkouts. PR mode follows
+  the target branch, so `develop` -> `main` validates packages. Update source
+  pins deliberately as compatibility changes and release upstream packages
+  before promoting to `main`; never fall back to source when package validation
+  fails. Source/package NuGet caches are separated.
+- Every build lane retains the shared replay observations plus actual process,
+  SDK/runtime, source, dependency and fixture provenance. The final comparison
+  job requires all eight lanes, checks shared expectations and directly compares
+  raw frames and ordered observations. Missing, emulated or mixed source/package
+  lanes fail the gate. Source captures require sibling commit IDs; package
+  captures use an empty source map and compare loaded release identities.
+  An explicit local comparator submatrix reports omitted lanes; do not describe
+  it as completion of the full native matrix.
 - After a successful `main` push, the
   [coverage workflow](.github/workflows/coverage.yml) enforces 100% reachable
   line, branch, and method coverage, builds DocFX with warnings as errors,
@@ -664,6 +679,33 @@ Important notes:
   and the coverage report beneath `/coverage` as one GitHub Pages artifact.
 - [Wiki sync](.github/workflows/sync-wiki.yml) publishes `docs/wiki` after the
   same build gate and rewrites repository links for GitHub Wiki navigation.
+
+### Replay Conformance Captures
+
+[`SharedReplayFixtureTests`](tests/Gravitas.Tests/Determinism/SharedReplayFixtureTests.cs)
+executes the full host loop against reviewed, versioned fixtures, asserting
+library physics, ordered observations and supported restore continuation.
+Set `GRAVITAS_REPLAY_CAPTURE_DIRECTORY` to retain each fixture's observed frames
+and a separate `provenance.json` with actual process, runtime, loaded assembly
+and fixture identities. Capture never rewrites shared expectations.
+
+Supply `GRAVITAS_REPLAY_SOURCE_REVISION` and `GRAVITAS_REPLAY_SDK_VERSION` from
+the executing checkout and SDK. In source mode, set
+`GRAVITAS_REPLAY_DEPENDENCY_REVISIONS` to a JSON map of the full `FixedMathSharp`,
+`SwiftCollections`, `GridForge` and `Chronicler` commit IDs; package mode uses
+`{}`. Preserve uncommitted source snapshots separately from commit IDs.
+Place captures in lane directories such as `windows-x64-Release`, then run:
+
+```bash
+python .github/scripts/compare_replay_captures.py --captures captures --fixtures tests/Gravitas.Tests/Determinism/Fixtures
+```
+
+Default comparison requires all eight native lanes. An explicit `--lanes` list
+reports omitted lanes. Compare every frame against shared expectations and
+between lanes, retaining exact integers and ordered observations; JSON property
+order is irrelevant. Diagnose failures before changing reviewed expectations.
+When changing the comparator, validate actual captures and a copied capture
+with one altered frame that must return a nonzero exit code.
 
 ## Versioning And Release Workflow
 
@@ -718,6 +760,10 @@ results as canonical performance evidence.
 The test suite covers the main runtime shell, settings, collision, partition,
 query, serialization, shape-definition, CCD, 2D, and mixed-dimension paths. New
 tests should keep building the foundation for deterministic physics behavior.
+Exercise `src` code for coverage and meaningful library behavior. Avoid separate
+suites that only test fixture parsers, capture writers or assertion helpers.
+Conformance and lifecycle tests should assert observable runtime behavior;
+validate CI tooling with actual results and focused failure probes.
 
 Prioritize tests for:
 

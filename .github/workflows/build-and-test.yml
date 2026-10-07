@@ -12,26 +12,72 @@ on:
       - "main"
       - "develop"
 
+permissions:
+  contents: read
+
 jobs:
   validate-dotnet:
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.platform.runner }}
+    defaults:
+      run:
+        working-directory: Gravitas
+    env:
+      # PRs select their target branch: develop -> main must validate released packages.
+      UseLocalLsfStack: ${{ (github.base_ref == 'develop' || github.ref == 'refs/heads/develop') && 'true' || 'false' }}
+      GRAVITAS_REPLAY_CAPTURE_DIRECTORY: ${{ github.workspace }}/artifacts/replay/${{ matrix.platform.os }}-${{ matrix.platform.arch }}-${{ matrix.configuration }}
 
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        platform:
+          - { os: linux, arch: x64, runner: ubuntu-24.04 }
+          - { os: windows, arch: x64, runner: windows-2025 }
+          - { os: linux, arch: arm64, runner: ubuntu-24.04-arm }
+          - { os: windows, arch: arm64, runner: windows-11-arm }
         configuration: [Release, ReleaseLean]
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
+          path: Gravitas
           fetch-depth: 0
+          persist-credentials: false
+
+      # Develop uses immutable revisions; package lanes never check out sibling sources.
+      - if: env.UseLocalLsfStack == 'true'
+        uses: actions/checkout@v6
+        with:
+          repository: mrdav30/FixedMathSharp
+          ref: 9774e649645412cfe978c86cd581252f15134f3a
+          path: FixedMathSharp
+          persist-credentials: false
+      - if: env.UseLocalLsfStack == 'true'
+        uses: actions/checkout@v6
+        with:
+          repository: mrdav30/SwiftCollections
+          ref: 3668bb4db9e36875f9d3e63e3b0e7af776f5613e
+          path: SwiftCollections
+          persist-credentials: false
+      - if: env.UseLocalLsfStack == 'true'
+        uses: actions/checkout@v6
+        with:
+          repository: mrdav30/GridForge
+          ref: 2ccf97839d9b86dac5f9ddbe2a798a5c6a4a8acb
+          path: GridForge
+          persist-credentials: false
+      - if: env.UseLocalLsfStack == 'true'
+        uses: actions/checkout@v6
+        with:
+          repository: mrdav30/Chronicler
+          ref: 5397348a332a69a53eaf280985168841b26e75eb
+          path: Chronicler
           persist-credentials: false
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
         with:
+          architecture: ${{ matrix.platform.arch }}
           dotnet-version: |
             8.0.x
             10.0.x
@@ -44,27 +90,73 @@ jobs:
       - name: Execute GitVersion
         id: gitversion
         uses: gittools/actions/gitversion/execute@v4
+        with:
+          targetPath: Gravitas
 
       - name: Cache NuGet packages
         uses: actions/cache@v5
         with:
           path: ~/.nuget/packages
-          key: ${{ runner.os }}-${{ matrix.configuration }}-nuget-${{ hashFiles('**/*.csproj', '**/*.slnx') }}
+          key: ${{ runner.os }}-${{ runner.arch }}-${{ matrix.configuration }}-lsf-${{ env.UseLocalLsfStack }}-nuget-${{ hashFiles('**/*.csproj', '**/*.slnx') }}
           restore-keys: |
-            ${{ runner.os }}-${{ matrix.configuration }}-nuget-
-            ${{ runner.os }}-nuget-
+            ${{ runner.os }}-${{ runner.arch }}-${{ matrix.configuration }}-lsf-${{ env.UseLocalLsfStack }}-nuget-
+            ${{ runner.os }}-${{ runner.arch }}-lsf-${{ env.UseLocalLsfStack }}-nuget-
 
       - name: Restore dependencies
-        run: dotnet restore Gravitas.slnx --property:Configuration=${{ matrix.configuration }}
+        run: dotnet restore Gravitas.slnx --property:Configuration=${{ matrix.configuration }} -p:UseLocalLsfStack=${{ env.UseLocalLsfStack }}
 
       - name: Build Solution
-        run: |
-          echo "Version: ${{ steps.gitversion.outputs.fullSemVer }}"
-          echo "Assembly Version: ${{ steps.gitversion.outputs.assemblySemFileVer }}"
-          dotnet build Gravitas.slnx --configuration ${{ matrix.configuration }} --no-restore
+        run: dotnet build Gravitas.slnx --configuration ${{ matrix.configuration }} --no-restore -p:UseLocalLsfStack=${{ env.UseLocalLsfStack }}
 
-      - name: Run Tests
-        run: dotnet test Gravitas.slnx --configuration ${{ matrix.configuration }} --no-build --verbosity normal
+      - name: Record source and SDK provenance
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $revision = git rev-parse HEAD
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot identify Gravitas revision' }
+          $sdk = dotnet --version
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot identify SDK' }
+          $dependencies = [ordered]@{}
+          if ($env:UseLocalLsfStack -eq 'true') {
+            foreach ($repository in @('FixedMathSharp', 'SwiftCollections', 'GridForge', 'Chronicler')) {
+              $dependencies[$repository] = git -C "../$repository" rev-parse HEAD
+              if ($LASTEXITCODE -ne 0) { throw "Cannot identify $repository revision" }
+            }
+          }
+          "GRAVITAS_REPLAY_SOURCE_REVISION=$revision" >> $env:GITHUB_ENV
+          "GRAVITAS_REPLAY_SDK_VERSION=$sdk" >> $env:GITHUB_ENV
+          "GRAVITAS_REPLAY_DEPENDENCY_REVISIONS=$($dependencies | ConvertTo-Json -Compress)" >> $env:GITHUB_ENV
+
+      - name: Run Tests and capture replay observations
+        run: dotnet test Gravitas.slnx --configuration ${{ matrix.configuration }} --no-build --no-restore -p:UseLocalLsfStack=${{ env.UseLocalLsfStack }} --verbosity normal
+
+      - name: Retain replay observations and actual process provenance
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.platform.os }}-${{ matrix.platform.arch }}-${{ matrix.configuration }}
+          path: artifacts/replay/${{ matrix.platform.os }}-${{ matrix.platform.arch }}-${{ matrix.configuration }}
+          if-no-files-found: error
+          retention-days: 14
+
+  compare-replay:
+    needs: validate-dotnet
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Download native replay captures
+        uses: actions/download-artifact@v4
+        with:
+          pattern: "*-*-Release*"
+          path: artifacts/replay
+      - name: Compare all required native lanes
+        # Each artifact retains its lane directory instead of merging files.
+        run: |
+          python3 .github/scripts/compare_replay_captures.py --captures artifacts/replay --fixtures tests/Gravitas.Tests/Determinism/Fixtures
+
   validate-wiki-sync:
     runs-on: ubuntu-latest
 
