@@ -84,6 +84,14 @@ isolated-query investigations or establish a release-blocking regression.
 **Owner:** Gravitas benchmark workloads and stage attribution; FixedMathSharp
 only if workload evidence justifies further shared geometry optimization.
 
+**Planned execution scope:**
+[`Evolving Game Capacity And Soak`](2026-10-06-evolving-game-capacity-and-soak-plan.md)
+uses one evolving strategy scene, comparable 3D controls and shared frame/memory
+measurement support. It starts after complete replay stepping and a shared trace
+format. The plan owns implementation sequencing; this signal retains its measured
+cost context and decision gate. Neither scene capacity nor contact frequency is
+established merely by creating that plan.
+
 The final #020 two-launch fixture costs **696.036 / 699.465 microseconds** per
 complete mixed / 3D oblique query, at **0 B/op**, while ordinary cap/side/zero-core
 contacts cost roughly 10–11.5 microseconds. #021 retains roughly 0.53–1.05 ms

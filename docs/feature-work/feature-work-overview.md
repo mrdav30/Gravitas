@@ -27,6 +27,26 @@ instead of burying it in notes.
 
 ## Active Coordination
 
+- **Lockstep Conformance And Workload Guidance**
+  - Proposed follow-up sequence after the confirmed benchmark signals close:
+    strengthen complete-loop replay evidence, characterize an evolving strategy
+    scene, then publish long-duration physical quality versus configuration cost.
+    Implementation has not started; these plans define scope and evidence gates.
+  - [`Full-Lifecycle Replay Conformance`](2026-10-06-full-lifecycle-replay-conformance-plan.md)
+    is first: fix the default trace/continuation stepping and audit callbacks
+    before comparing shared frame traces across OS, architecture and package
+    profile. This is a confirmed test-harness gap, not a demonstrated runtime
+    determinism failure. Native platform availability remains an explicit gate.
+  - [`Evolving Game Capacity And Soak`](2026-10-06-evolving-game-capacity-and-soak-plan.md)
+    follows complete stepping and a shared trace format. One strategy scene
+    supplies activity stages, a comparable 3D case, per-frame tails and churn
+    memory evidence; an MMO-zone variant follows only when it adds distinct
+    actor-policy evidence. This is the execution scope for experimental #024.
+  - [`Long-Duration Physics Quality And Tuning`](2026-10-06-long-duration-physics-quality-and-tuning-plan.md)
+    follows initial workload evidence. Reuse existing stack/chain/ragdoll tests
+    and telemetry to measure drift, penetration, energy behavior, sleep/wake and
+    supported restore continuation alongside solver cost. Lasting configuration
+    guidance is a deliverable shared with the capacity plan.
 - [`Cross-Stack Issue Resolution`](issue-tracker.md)
   - Resolve cross-stack issues in dependency order: `FixedMathSharp`,
     `SwiftCollections`, `GridForge`, then Gravitas. Package references are the
@@ -42,7 +62,9 @@ instead of burying it in notes.
     contacts in representative deterministic scenes. Count solver entries as
     well as winning contacts before proposing further optimization; #018 through
     #021 remain closed. Include cone/triangle and shared triangle/cylinder
-    candidates alongside capsule/slab configurations.
+    candidates alongside capsule/slab configurations. The proposed
+    [capacity/soak plan](2026-10-06-evolving-game-capacity-and-soak-plan.md)
+    supplies representative workloads without creating a duplicate signal.
 
 ## Recently Completed
 
@@ -580,13 +602,18 @@ host-facing need appears.
 
 ## Recommended Execution Order
 
-1. Keep the benchmark backlog and issue tracker as intake buckets; promote new
-   measured risks into dated plans only when they are broader than a focused
-   patch.
-2. Resolve a cross-stack defect in the repository that owns the behavior.
-3. Validate downstream consumers with `UseLocalLsfStack=true` when coordinated
-   source changes are required.
-4. Release dependencies before their consumers, then restore package-based
-   validation at each layer.
-5. Run Gravitas `Release`, `ReleaseLean`, coverage, replay, allocation, and
-   relevant benchmark gates against the released package chain.
+1. Complete default replay stepping and migrate every helper caller; establish
+   shared trace expectations and Windows/Linux comparison, then extend native
+   architecture coverage with explicit availability/provenance gates.
+2. Build one evolving strategy workload using that replay contract. Measure
+   comparable 2D/3D capacity, then use the same scenes for latency and memory
+   soaks; evaluate #024 from observed work, not hypothetical query counts.
+3. Extend physical-quality fixtures over meaningful durations and publish
+   quality/time configuration guidance. A native platform lane still awaiting
+   hosting need not block local fixture authoring, but cannot be claimed verified.
+4. Keep trackers as intake buckets for reproduced defects and measured risks.
+   Resolve defects in their owning repository and validate coordinated consumers
+   with `UseLocalLsfStack=true`; preserve 100% reachable coverage.
+5. Release dependencies before consumers, then run Gravitas `Release`,
+   `ReleaseLean`, coverage, replay, allocation and relevant benchmark gates
+   against the released package chain.

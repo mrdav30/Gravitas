@@ -35,6 +35,13 @@ This plan is distinct from `benchmark-signal-hardening-backlog.md`: that
 document tracks measured runtime signals to investigate. This one tracks the
 evidence pipeline that makes future performance and CCD diagnostics trustworthy.
 
+The proposed [capacity/soak plan](2026-10-06-evolving-game-capacity-and-soak-plan.md)
+owns evolving scenes, per-frame distributions and retained-memory measurement.
+It can produce local evidence before this publication platform is implemented.
+Reuse its capture metadata and result format when pursuing publishing; do not
+create a competing workload runner. Public CCD diagnostics remain evidence-gated
+rather than becoming a prerequisite for benchmark-only attribution.
+
 ## Guiding Rules
 
 - Do not gate on raw wall-clock thresholds tied to one machine.
