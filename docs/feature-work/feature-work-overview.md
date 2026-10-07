@@ -49,10 +49,11 @@ instead of burying it in notes.
     `SwiftCollections`, `GridForge`, then Gravitas. Package references are the
     default; use `UseLocalLsfStack=true` only for coordinated validation of
     unreleased sibling changes, then revalidate against released packages.
-  - Active [GRV-Issue-090](issue-tracker.md#grv-issue-090---3d-automatic-swept-ground-probes-accept-vertical-wall-contacts)
-    records automatic 3D grounding accepting a horizontal wall normal and
-    snapping the body upward. Replay fixtures use explicit manual grounding to
-    isolate this independent defect; the 2D support filter needs a parity audit.
+  - [GRV-Issue-090](issue-tracker.md#grv-issue-090---3d-automatic-swept-ground-probes-accept-vertical-wall-contacts)
+    is resolved: 3D automatic support filters upward candidate normals through a
+    configurable slope limit, with saved-state and runtime cache/wake coverage.
+    The parity audit reproduced a separate shared mesh query/CCD witness defect,
+    active [GRV-Issue-091](issue-tracker.md#grv-issue-091---initially-overlapping-mesh-sphere-sweeps-can-classify-an-overhead-surface-as-support).
     GRV-Issue-089 remains resolved.
 - [`Benchmark Signal Hardening`](benchmark-signal-hardening-backlog.md)
   - Reproduce and close confirmed release-relevant signals alongside the owning

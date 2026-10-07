@@ -186,14 +186,108 @@ public sealed class SolidBodyGroundingQuerySelectionTests
     [Theory]
     [InlineData(GroundProbeMode.Ray)]
     [InlineData(GroundProbeMode.SweptSphere)]
-    public void CheckGround_WhenProbeStartsInsideSupport_ShouldKeepItsWitnessWithoutNormalThreshold(GroundProbeMode mode)
+    public void CheckGround_WhenProbeStartsInsideSupport_ShouldRejectNonUpwardWitness(GroundProbeMode mode)
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         SolidBody body = CreateProbe(scenario, mode);
         LSCuboidCollider support = AddBox(scenario, (Fixed64)4);
 
-        Physics3DHit selected = AssertSelectionMatchesAllHits(scenario, body, support, support, 1);
-        selected.Normal.Y.Should().BeLessThanOrEqualTo(Fixed64.Zero);
+        body.GroundMinNormalDot = Fixed64.Zero;
+        scenario.Context.Diagnostics.Enable();
+
+        body.CheckGround();
+
+        body.IsGrounded.Should().BeFalse();
+        body.HasHitPoint.Should().BeFalse();
+        scenario.Context.Diagnostics.Events[0].Hit.Should().BeTrue();
+        scenario.Context.Diagnostics.Events[0].Vector.Y.Should().BeLessThanOrEqualTo(Fixed64.Zero);
+        scenario.Context.Diagnostics.Events[1].Hit.Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(GroundProbeMode.Ray)]
+    [InlineData(GroundProbeMode.SweptSphere)]
+    public void CheckGround_WhenNearestWitnessHasNoUpwardSupport_ShouldSelectFartherFloor(GroundProbeMode mode)
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        SolidBody body = CreateProbe(scenario, mode);
+        LSCuboidCollider wall = AddBox(scenario, (Fixed64)4);
+        LSCuboidCollider floor = AddBox(scenario, Fixed64.Zero);
+
+        AssertSelectionMatchesAllHits(scenario, body, wall, floor, 2);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void GroundMinNormalDot_RuntimeChange_ShouldRefreshCachedSupportOnNextStep(bool sleeping)
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        scenario.Context.Environment.Gravity = Fixed64.Zero;
+        SolidBody body = CreateProbe(scenario, GroundProbeMode.Ray);
+        var slope = new LSCuboidCollider { Layer = new PhysicsLayer(1), Size = new Vector3d(8, 1, 8) };
+        scenario.CreateBody(slope, Vector3d.Zero,
+            FixedQuaternion.FromEulerAnglesInDegrees(Fixed64.Zero, Fixed64.Zero, (Fixed64)45), immovable: true);
+        body.CheckGround();
+        body.IsGrounded.Should().BeTrue();
+        if (sleeping)
+            body.Sleep();
+        var before = scenario.Context.ComputeReplayHash();
+        body.GroundMinNormalDot = Fixed64.Half;
+        scenario.Context.ComputeReplayHash().Should().Be(before);
+        body.IsSleeping.Should().Be(sleeping);
+
+        body.GroundMinNormalDot = Fixed64.One;
+
+        body.IsSleeping.Should().BeFalse();
+        scenario.Context.Simulate();
+        scenario.Context.LateSimulate();
+        body.IsGrounded.Should().BeFalse();
+        body.HasHitPoint.Should().BeFalse();
+    }
+
+    [Fact]
+    public void GroundMinNormalDot_RuntimeChange_ShouldPreserveSleepingManualSupport()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        SolidBody body = scenario.CreateSphere(Vector3d.Zero).Body;
+        body.SetManualGrounding(Vector3d.Zero, Vector3d.Right);
+        body.Sleep();
+
+        body.GroundMinNormalDot = Fixed64.One;
+        scenario.Context.Simulate();
+        scenario.Context.LateSimulate();
+
+        body.IsSleeping.Should().BeTrue();
+        body.IsGrounded.Should().BeTrue();
+        body.GroundNormal.Should().Be(Vector3d.Right);
+    }
+
+    [Theory]
+    [InlineData(GroundProbeMode.Ray)]
+    [InlineData(GroundProbeMode.SweptSphere)]
+    public void CheckGround_ShouldApplyInclusiveConfigurableSlopeThreshold(GroundProbeMode mode)
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        SolidBody body = CreateProbe(scenario, mode);
+        var slope = new LSCuboidCollider { Layer = new PhysicsLayer(1), Size = new Vector3d(8, 1, 8) };
+        FixedQuaternion rotation = FixedQuaternion.FromEulerAnglesInDegrees(Fixed64.Zero, Fixed64.Zero, (Fixed64)45);
+        scenario.CreateBody(slope, Vector3d.Zero, rotation, immovable: true);
+        Physics3DHit selected = AssertSelectionMatchesAllHits(scenario, body, slope, slope, 1);
+        Fixed64 upDot = selected.Normal.Normalized.Y;
+        upDot.Should().BeGreaterThan(Fixed64.Half).And.BeLessThan(Fixed64.One);
+        body.GroundMinNormalDot = upDot;
+        body.CheckGround();
+        body.IsGrounded.Should().BeTrue();
+        body.GroundMinNormalDot = upDot + Fixed64.FromRaw(1);
+        body.CheckGround();
+        body.IsGrounded.Should().BeFalse();
+        body.WasGrounded.Should().BeTrue();
+        body.HasHitPoint.Should().BeFalse();
+        body.HitPlatform.Should().BeNull();
+        body.GroundMinNormalDot = Fixed64.Zero;
+        body.CheckGround();
+        body.IsGrounded.Should().BeTrue();
     }
 
     [Theory]

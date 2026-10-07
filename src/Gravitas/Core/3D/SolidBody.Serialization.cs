@@ -31,6 +31,10 @@ public partial class SolidBody
         GroundingMode groundingMode = GroundingMode;
         GroundProbeMode groundProbeMode = GroundProbeMode;
         Fixed64 groundProbeRadius = GroundProbeRadius;
+        Fixed64 groundMinNormalDot = GroundMinNormalDot;
+        RecordValues.Look(chronicler, ref groundMinNormalDot, "GroundMinNormalDot", Fixed64.Half);
+        if (chronicler.Mode == SerializationMode.Loading)
+            ValidateGroundMinNormalDot(groundMinNormalDot);
         bool active = Active;
         BodyFreezeAxes3D freezeAxes = FreezeAxes;
         BodyMotionType motionType = MotionType;
@@ -107,6 +111,8 @@ public partial class SolidBody
             GroundingMode = groundingMode;
             GroundProbeMode = groundProbeMode;
             GroundProbeRadius = groundProbeRadius;
+            // Restore the validated policy without waking or invalidating saved probe timing.
+            _groundMinNormalDot = groundMinNormalDot;
             GravityScale = gravityScale;
             _hitPlatform = null;
         }

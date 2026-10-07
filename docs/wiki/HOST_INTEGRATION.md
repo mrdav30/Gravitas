@@ -707,6 +707,11 @@ explicitly for their layer model. `SolidBody.GroundingMode` and
 `SolidBody2D.GroundingMode` can stay automatic or switch to manual host-owned
 support through `UseManualGrounding(...)`, `SetManualGrounding(...)`,
 `ClearManualGrounding()`, and `UseAutomaticGrounding(...)`.
+Automatic 3D support requires an upward normal; `SolidBody.GroundMinNormalDot`
+sets the minimum normalized dot product with world up, defaulting to one half
+(slopes through 60 degrees). Horizontal and downward-facing candidate normals cannot ground a body. See the
+[grounding contracts](DIMENSIONS.md#3d-bodies-and-colliders) for probe selection and
+2D support policy.
 
 Read [Query Services](QUERY_SERVICES.md) for the full query surface.
 

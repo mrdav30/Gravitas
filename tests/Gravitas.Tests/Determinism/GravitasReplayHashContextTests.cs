@@ -11,6 +11,25 @@ namespace Gravitas.Tests.Determinism;
 
 public sealed class GravitasReplayHashContextTests
 {
+    [Theory]
+    [InlineData(GravitasReplayHashMode.Authoritative)]
+    [InlineData(GravitasReplayHashMode.AuthoritativeWithSolverCaches)]
+    public void ComputeReplayHash_ShouldInclude3DGroundSupportThreshold(GravitasReplayHashMode mode)
+    {
+        using PhysicsScenarioBuilder scenario = Create3DScenario();
+        SolidBody body = scenario.CreateSphere(Vector3d.Zero).Body;
+        // Manual ownership leaves probe timing unchanged, isolating the policy
+        // value itself from the automatic setter's cache invalidation.
+        body.UseManualGrounding();
+        ChronicleHash before = scenario.Context.ComputeReplayHash(mode);
+
+        body.GroundMinNormalDot = Fixed64.One;
+
+        scenario.Context.ComputeReplayHash(mode).Should().NotBe(before);
+        body.GroundMinNormalDot = Fixed64.Half;
+        scenario.Context.ComputeReplayHash(mode).Should().Be(before);
+    }
+
     [Fact]
     public void ComputeReplayHash_ShouldMatchForRepeatedEquivalent3DRuns()
     {

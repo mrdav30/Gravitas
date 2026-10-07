@@ -2,7 +2,7 @@
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-091`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-092`.
 - Assign an ID when an issue enters this tracker, keep it through resolution,
   and never reuse an ID even if an entry is later removed. Check this file's Git
   history before advancing or repairing the counter.
@@ -35,8 +35,70 @@
 
 ### Ordered Queue
 
+### GRV-Issue-091 - Initially overlapping mesh sphere sweeps can classify an overhead surface as support
+
+- **Confirmed:** 2026-10-07 during the 3D grounding parity audit. A local-stack
+  Release diagnostic reproduced an overhead mesh accepted as upward support
+  even with the new support-normal filter. This predates that filter.
+- **Reproduction:** Create a radius-half dynamic sphere at the origin and a
+  body-backed static concave quad at world Y `3/4`, rotated 180 degrees around X
+  so its face points down. A downward radius-half sweep from `(0, 1/2, 0)` to
+  the origin starts overlapping that surface. It returns one hit at distance
+  zero with point `(0, 3/4, 0)` and normal `(0, 1, 0)`. `CheckGround()` accepts
+  that upward query normal and stores the overhead point as ground.
+- **Source chain:**
+  [`ContinuousCollisionContactPolicy.TryResolveSweptSphereContact`](../../src/Gravitas/CollisionHandling/Continuous/ContinuousCollisionContactPolicy.cs)
+  finds the closest mesh anchor, then flips a normal aligned with sweep
+  direction. For initial overlap below an overhead face, this can replace the
+  downward normal with an upward response normal. The shared query/CCD witness
+  contract needs review; the grounding owner's upward-normal check cannot
+  distinguish that witness from genuine support.
+- **Follow-up:** Establish initial-overlap normal and anchor contracts for
+  two-sided mesh queries and CCD before changing the shared policy. Cover
+  overhead and floor faces, winding, convex/concave meshes, compound mesh parts,
+  deterministic ordering and legitimate CCD separation. Keep the body-level
+  wall fix independent; do not reject ordinary mesh floors globally.
+- **Evidence:** The isolated diagnostic source and detailed console output are
+  retained under ignored `artifacts/grv-issue-090/Issue090AuditScratchTests.cs`
+  and `mesh-ceiling-diagnostic.log`. Its assertion describes the reproduced
+  defect, not desired behavior; the temporary tracked diagnostic was removed.
+
+Remaining measured performance costs are tracked in the benchmark backlog.
+
+## Resolved Issues
+
 ### GRV-Issue-090 - 3D automatic swept-ground probes accept vertical-wall contacts
 
+- **Resolved:** 2026-10-07. The shared 3D body ground-hit validator now requires
+  an upward candidate normal for both ray and swept-sphere probes.
+- **Fix:** `GroundMinNormalDot` defaults to one half and accepts `[0, 1]`.
+  The normalized up-dot boundary is inclusive; horizontal, downward-facing and
+  zero normals are always rejected. Actual automatic policy changes invalidate
+  the cached probe and wake the body; equal assignments and host-owned manual
+  support are preserved. Populate validates before publishing state and restores
+  the backing policy without changing saved sleep or probe timing. Omitted
+  record values use one half. Raw query hits and diagnostics remain geometry
+  witnesses, and the sorted scan continues to a farther eligible support.
+- **Verification:** Local-stack Release and ReleaseLean full suites pass with
+  exact 100% reachable line, branch and method coverage. Regression tests first
+  reproduced the height jump at both translated heights, then passed without
+  changing CCD's `7/16` stop position. Tests cover automatic/explicit swept
+  shapes, inside-support ray/sweep witnesses, farther-floor selection, inclusive
+  slope thresholds, invalid values, awake/sleeping runtime changes, manual
+  support, both record transports and replay-hash inclusion. All shared replay
+  raw state, events and query expectations remain unchanged. The existing
+  64-body 3D ground-probe benchmark passed all eight ray/sweep, target-count and
+  supported/miss cases with warmed 0 B/op. Its short timing sample is an
+  allocation/behavior check, not a before/after speed claim. API documentation
+  builds with zero warnings and errors.
+- **Compatibility:** Additive body setting and record key; `body.3d` replay-hash
+  section advances from 6 to 7. Shared 3D-containing fixture hashes were refreshed
+  only after checking every non-hash field; the pure 2D fixture is unchanged.
+- **Parity audit:** 2D already filters support normals against its resolved up
+  direction and records planar support without the 3D height snap. Existing
+  filtering, manual support and full-loop tests pass in both profiles. The
+  separate shared mesh initial-overlap normal defect is tracked as
+  [GRV-Issue-091](#grv-issue-091---initially-overlapping-mesh-sphere-sweeps-can-classify-an-overhead-surface-as-support).
 - **Confirmed:** 2026-10-06 during full-lifecycle replay fixture review. A
   focused local-stack Release diagnostic reproduced the same unwanted height
   change at initial heights 0 and 4; both diagnostic cases passed assertions
@@ -56,23 +118,15 @@
   `(15/16, 1/2, 4)` and the final pose is `(7/16, 1/2, 4)`. The probe is tangent
   to the vertical wall at its start; this is not upward support or an implicit
   world-floor contract.
-- **Source chain:**
+- **Source chain at confirmation:**
   [`ResolveGroundProbeMode`](../../src/Gravitas/Core/3D/SolidBody.Grounding.cs)
   selects a swept sphere for sphere bodies. `TryFindGroundHitWithSweptSphere`
-  accepts the first eligible hit; `IsValidGroundHit` checks self identity,
-  physical filtering and static/kinematic mobility, but does not reject a
+  accepted the first eligible hit; `IsValidGroundHit` checked self identity,
+  physical filtering and static/kinematic mobility, but did not reject a
   horizontal support normal. `ApplyGroundedHeightOrReset` then publishes the
   accepted witness Y as body height. The accepted query witness is valid wall
   geometry; the incorrect support classification and height publication are
   owned by 3D grounding.
-- **Follow-up:** Add a failing full-loop regression for both translated heights
-  before fixing support eligibility. Preserve legitimate floor and slope
-  support, explicit manual grounding, filtering, stable candidate selection, and
-  fixed-point behavior. Audit other automatic/explicit swept-ground shapes and
-  the 2D counterpart: `SolidBody2D.IsValidGroundHit` already compares the normal
-  against gravity-relative up through `GroundMinNormalDot`, but its related
-  witness/height semantics still need parity review. No 2D defect has been
-  reproduced by this investigation.
 - **Evidence:** The temporary diagnostic source is retained under ignored
   `artifacts/replay-conformance-phase2/grounding-witness/GroundingWitnessScratchTests.cs`;
   exact observed console excerpts and the invocation are in `diagnostic.log`
@@ -81,10 +135,11 @@
   The tracked temporary test was removed after the two-case run. Shared replay
   fixtures use explicit manual grounding to isolate their CCD expectations from
   this separately tracked runtime behavior.
-
-Remaining measured performance costs are tracked in the benchmark backlog.
-
-## Resolved Issues
+- **Resolution evidence:** Serial owner gates and raw OpenCover/Cobertura
+  captures are retained under ignored `artifacts/grv-issue-090/`. `red.log`
+  records the two original failures; `cache-red.log` records stale awake and
+  sleeping support before cache invalidation was added. Temporary diagnostics
+  were removed from the tracked test suite.
 
 ### GRV-Issue-089 - Runtime mass changes leave inertia or awake membership stale
 

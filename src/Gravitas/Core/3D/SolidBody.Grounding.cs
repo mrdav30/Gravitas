@@ -48,6 +48,33 @@ public partial class SolidBody
     /// </summary>
     public Fixed64 GroundProbeRadius { get; set; }
 
+    private Fixed64 _groundMinNormalDot = Fixed64.Half;
+
+    /// <summary>
+    /// Minimum normalized support-normal dot product with world up, in [0, 1].
+    /// Defaults to one half (slopes through 60 degrees). Zero permits any
+    /// upward-facing normal; horizontal, downward-facing and zero normals never support.
+    /// </summary>
+    public Fixed64 GroundMinNormalDot
+    {
+        get => _groundMinNormalDot;
+        set
+        {
+            ValidateGroundMinNormalDot(value);
+            if (_groundMinNormalDot == value)
+                return;
+
+            _groundMinNormalDot = value;
+            if (GroundingMode == GroundingMode.Automatic)
+            {
+                // Cached support and sleeping motion were accepted under the old
+                // slope policy. Reconsider them on the next authoritative step.
+                _lastGroundCheckFrame = -1;
+                Wake();
+            }
+        }
+    }
+
     private long _lastGroundCheckFrame = -1;
     private const int _groundCheckFrameThreshold = 10;
     private readonly Fixed64 _groundCheckThreshold = (Fixed64)0.01f;
@@ -200,6 +227,10 @@ public partial class SolidBody
         CheckGround(force: true);
     }
 
+    private static void ValidateGroundMinNormalDot(Fixed64 value) =>
+        SwiftThrowHelper.ThrowIfArgument(value < Fixed64.Zero || value > Fixed64.One,
+            nameof(value), "Ground support normal threshold must be between zero and one.");
+
     private void CheckGroundForSimulation() => CheckGround(force: false);
 
     private void CaptureGroundedTransitionState()
@@ -339,7 +370,14 @@ public partial class SolidBody
             return false;
 
         SolidBody? hitBody = hitCollider.Body;
-        return hitCollider.IsStatic || hitBody!.IsKinematic;
+        if (!hitCollider.IsStatic && !hitBody!.IsKinematic)
+            return false;
+
+        // A sweep can start tangent to a wall or inside geometry. Its valid
+        // intersection witness is not necessarily upward support. Reject those
+        // normals before normalization, even with the most permissive slope limit.
+        return hit.Normal.Y > Fixed64.Zero
+            && hit.Normal.Normalized.Y >= GroundMinNormalDot;
     }
 
     private GroundProbeMode ResolveGroundProbeMode()

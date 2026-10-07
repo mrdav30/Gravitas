@@ -123,8 +123,20 @@ Automatic 3D grounding casts downward with the selected ray or swept-sphere
 probe and selects the nearest physically eligible static or kinematic support,
 with collider ID breaking equal-distance ties. Both colliders' ignored layers
 apply, and the source collider cannot support itself. Static and kinematic
-triggers remain eligible in 3D, which has no support-normal threshold; automatic
-2D grounding excludes triggers and applies its planar support-normal policy.
+triggers remain eligible in 3D. `SolidBody.GroundMinNormalDot` compares the
+normalized candidate normal with world up. Its default of one half accepts
+slopes through 60 degrees; values in `[0, 1]` configure the slope limit, with
+an inclusive boundary. Zero permits any upward-facing normal. Horizontal, downward-facing
+and zero normals never supply automatic 3D support, even for probes starting
+inside or tangent to geometry. Manual grounding retains the host's supplied
+normal. Automatic 2D grounding excludes triggers and applies its planar
+support-normal policy against its resolved up direction.
+
+Changing the 3D threshold invalidates the automatic probe cache and wakes the
+body so its next simulation step uses the new limit. Equal assignments are
+no-ops; manual grounding remains host-owned. Recorded loads restore the limit
+without waking the body or discarding its saved probe timing. Older records
+that omit the setting use one half.
 
 The existing 3D query worker collects and sorts raw hits into a retained
 per-body buffer before grounding checks body eligibility. Compound colliders

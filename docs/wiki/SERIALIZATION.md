@@ -202,8 +202,8 @@ The root `gravitas.replay` section is version 2: frame and late-phase stamps
 are signed 64-bit values, and elapsed time is ordered whole seconds (`long`)
 then fractional seconds (`uint`). Affected body, pair, manifold, and cache
 sections are versioned independently for their widened stamps. The `body.3d`
-section is version 6; `body.2d` remains version 4 because it does not record a
-ground-check stamp. Hashes from older schema versions are not comparable.
+section is version 7 and includes the automatic support-normal threshold;
+`body.2d` remains version 4. Hashes from older schema versions are not comparable.
 Sparse transports that omit a default-valued `MotionType` deterministically
 resolve it to `Dynamic`.
 

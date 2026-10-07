@@ -49,6 +49,64 @@ public sealed class SolidBodySerializationTests
     };
 
     [Theory]
+    [MemberData(nameof(Transports))]
+    public void Populate_GroundNormalThreshold_ShouldRetainSavedSleepAndProbeTiming(GravitasSerializationTransport transport)
+    {
+        using PhysicsScenarioBuilder sourceScenario = PhysicsScenarioBuilder.Create();
+        SolidBody source = sourceScenario.CreateSphere(Vector3d.Zero).Body;
+        source.GroundMinNormalDot = Fixed64.FromFraction(3, 4);
+        source.CheckGround();
+        source.Sleep();
+        object payload = GravitasSerializationHarness.Serialize(source, transport);
+        using PhysicsScenarioBuilder targetScenario = PhysicsScenarioBuilder.Create();
+        SolidBody target = targetScenario.CreateSphere(Vector3d.Zero).Body;
+
+        GravitasSerializationHarness.Populate(target, payload, transport);
+
+        target.IsSleeping.Should().BeTrue();
+        target.GroundMinNormalDot.Should().Be(source.GroundMinNormalDot);
+        targetScenario.Context.ComputeReplayHash().Should().Be(sourceScenario.Context.ComputeReplayHash());
+    }
+
+    [Theory]
+    [MemberData(nameof(Transports))]
+    public void Populate_OmittedDefaultGroundNormalThreshold_ShouldRestoreHalf(GravitasSerializationTransport transport)
+    {
+        using PhysicsScenarioBuilder sourceScenario = PhysicsScenarioBuilder.Create();
+        SolidBody source = sourceScenario.CreateSphere(Vector3d.Zero).Body;
+        object payload = GravitasSerializationHarness.Serialize(source, transport);
+        if (transport == GravitasSerializationTransport.Json)
+            ((string)payload).Should().NotContain("GroundMinNormalDot");
+        using PhysicsScenarioBuilder targetScenario = PhysicsScenarioBuilder.Create();
+        SolidBody target = targetScenario.CreateSphere(Vector3d.Zero).Body;
+        target.GroundMinNormalDot = Fixed64.One;
+
+        GravitasSerializationHarness.Populate(target, payload, transport);
+
+        target.GroundMinNormalDot.Should().Be(Fixed64.Half);
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(2)]
+    public void RecordData_InvalidGroundNormalThreshold_ShouldRejectBeforePublishingBodyState(int value)
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        SolidBody body = scenario.CreateSphere(Vector3d.Zero).Body;
+        var payload = new InvalidRecordPayloadChronicler(new Dictionary<string, object>
+        {
+            ["GroundMinNormalDot"] = (Fixed64)value,
+            ["HeightPos"] = (Fixed64)7
+        });
+        var before = scenario.Context.ComputeReplayHash();
+
+        Action load = () => body.RecordData(payload);
+
+        load.Should().Throw<ArgumentException>();
+        scenario.Context.ComputeReplayHash().Should().Be(before);
+    }
+
+    [Theory]
     [InlineData((byte)4)]
     [InlineData(byte.MaxValue)]
     public void RecordData_WithUndefinedContinuousCollisionMode_ShouldRejectWithoutPublishingValue(byte rawValue)
@@ -339,6 +397,7 @@ public sealed class SolidBodySerializationTests
             isKinematic: true);
         source.Body.GroundProbeMode = GroundProbeMode.SweptSphere;
         source.Body.GroundProbeRadius = Fixed64.FromFraction(1, 3);
+        source.Body.GroundMinNormalDot = Fixed64.FromFraction(3, 4);
         source.Body.FreezeAxes = BodyFreezeAxes3D.Position | BodyFreezeAxes3D.RotationY;
         source.Body.SleepEnabled = false;
         source.Body.SleepFrameThreshold = 9;
@@ -376,6 +435,7 @@ public sealed class SolidBodySerializationTests
         target.Body.IsKinematic.Should().BeTrue();
         target.Body.GroundProbeMode.Should().Be(GroundProbeMode.SweptSphere);
         target.Body.GroundProbeRadius.Should().Be(Fixed64.FromFraction(1, 3));
+        target.Body.GroundMinNormalDot.Should().Be(Fixed64.FromFraction(3, 4));
         target.Body.SleepEnabled.Should().BeFalse();
         target.Body.SleepFrameThreshold.Should().Be(9);
         target.Body.SleepLinearSpeedThreshold.Should().Be(Fixed64.FromFraction(1, 64));
