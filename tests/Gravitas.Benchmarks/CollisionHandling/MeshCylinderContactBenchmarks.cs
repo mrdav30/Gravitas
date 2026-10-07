@@ -14,7 +14,7 @@ public class MeshCylinderContactBenchmarks
     private LSMeshCollider _mesh;
     private LSCircleCollider2D _circle;
 
-    [Params("CapFace", "SideFace", "CapIntrusion", "ObliqueRim", "RimTouch", "RimGap")]
+    [Params("CapFace", "SideFace", "CapIntrusion", "InteriorRim", "ObliqueRim", "RimTouch", "RimGap")]
     public string Geometry { get; set; }
 
     [GlobalSetup]
@@ -44,6 +44,16 @@ public class MeshCylinderContactBenchmarks
                 break;
             case "CapIntrusion":
                 vertices = new[] { new Vector3d(0, 7, -5), new Vector3d(10, 1, -5), new Vector3d(5, 4, 5) };
+                break;
+            case "InteriorRim":
+                // The exact stationary rim root wins here, unlike the analytic
+                // winners in the original intrusion/oblique/touch fixtures.
+                vertices = new[]
+                {
+                    new Vector3d(Fixed64.FromFraction(1021, 256), Fixed64.FromFraction(309, 64), Fixed64.FromFraction(231, 64)),
+                    new Vector3d(Fixed64.FromFraction(509, 256), Fixed64.FromFraction(325, 64), Fixed64.FromFraction(279, 64)),
+                    new Vector3d(Fixed64.FromFraction(813, 256), Fixed64.FromFraction(365, 64), Fixed64.FromFraction(271, 64))
+                };
                 break;
             case "ObliqueRim":
             case "RimTouch":
@@ -79,6 +89,7 @@ public class MeshCylinderContactBenchmarks
         if (expected && Geometry != "CapIntrusion")
         {
             Fixed64 depth = Geometry == "RimTouch" ? Fixed64.Zero
+                : Geometry == "InteriorRim" ? Fixed64.FromFraction(13, 256)
                 : Geometry == "ObliqueRim" ? Fixed64.FromFraction(5, 16) : Fixed64.FromFraction(1, 4);
             if (_pair.Manifold.PrimaryContact.Depth != depth || mixed.Depth != depth)
                 throw new InvalidOperationException("Contact depth failed the benchmark preflight.");

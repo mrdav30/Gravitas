@@ -129,6 +129,10 @@ Gravitas may enrich a selected parallel cap/triangle-face contact with support
 samples while preserving the selected exact depth and clamp flag. A nearly
 parallel rim contact keeps its own selected witnesses instead.
 Mixed mesh/circle-slab contacts use the same triangle/cylinder geometry.
+The analytic search shares squared support terms across opposite directions;
+reciprocal edge charts reuse their exact normalized algebra after each chart
+finishes. Both views retain complete admission checks, the earlier feature on
+exact ties, and paired witnesses rounded only at final materialization.
 Mesh/cone contacts likewise select a complete triangle/cone relation, including
 the base disk, rim, apex and lateral generators. The selected normal, depth and
 both anchors describe one feature; the triangle point nearest the cone center

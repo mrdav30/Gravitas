@@ -40,8 +40,8 @@ instead of burying it in notes.
   - Experimental [GRV-Benchmark-024](benchmark-signal-hardening-backlog.md#grv-benchmark-024--curved-contact-workload-frequency-and-step-cost)
     tracks the unmeasured frequency and complete-step impact of expensive curved
     contacts in representative deterministic scenes. Count solver entries as
-    well as winning contacts before proposing further optimization; #019, #020
-    and #021 remain closed. Include cone/triangle and shared triangle/cylinder
+    well as winning contacts before proposing further optimization; #018 through
+    #021 remain closed. Include cone/triangle and shared triangle/cylinder
     candidates alongside capsule/slab configurations.
 
 ## Recently Completed
@@ -141,6 +141,19 @@ instead of burying it in notes.
     authored mesh frame through FixedMathSharp's shared minimum-axial query.
     Unrepresentable intermediate coordinates no longer reject genuine hits;
     deterministic candidate order and allocation-free warmed queries remain.
+
+- [`Complete Triangle/Cylinder Cost Refinement`](done/2026-10-06-triangle-cylinder-cost-refinement.md)
+  - GRV-Benchmark-018 closes 2026-10-06 after exact reciprocal-chart and
+    opposite-direction support reuse. Complete feature admission, canonical ties,
+    correctly rounded depth and paired witnesses remain shared by 3D cylinder
+    and mixed circle-slab contacts.
+  - Rim-heavy fixtures improve 9-20%; 64-pair mesh batches improve 6.5-8.1%,
+    all at 0 B/op. Positive-core triangle/slab controls preserve results and
+    allocations. Winning-root retention is reverted after its preliminary gain
+    fails the fresh controlled comparison.
+  - Fresh Release/Lean coverage, Debug/resource tests, both target frameworks
+    and API documentation gates are recorded in the report. Remaining exact
+    costs and scene capacity belong to GRV-Benchmark-024.
 
 - [`Complete Triangle/Cone Contact`](done/2026-09-28-complete-triangle-cone-contact-plan.md)
   - Completed 2026-09-29. FixedMathSharp now selects complete triangle/cone

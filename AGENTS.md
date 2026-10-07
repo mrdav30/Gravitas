@@ -98,6 +98,12 @@ Keep links within `docs/wiki` repository-friendly with their `.md` extensions.
 The wiki sync workflow rewrites wiki routes and repository source links for the
 published GitHub Wiki.
 
+Keep wiki pages and any complexity exception registers evergreen. Put dated
+validation summaries, capture paths and implementation history in feature-work
+records. Complexity registers must explain their rationale and invariants on
+their own, without artifact references or links to feature-work or other
+libraries' documentation.
+
 ## Repository Map
 
 | Path                                                               | Purpose                                                                                                            | Notes                                                                                                                                                          |
