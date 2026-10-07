@@ -1,7 +1,7 @@
 # Full-Lifecycle Replay Conformance Plan
 
 **Date:** 2026-10-06  
-**Status:** Phases 1 and 2 complete; Phase 3 implemented and four native x64 lanes verified; hosted ARM64 comparison pending.  
+**Status:** Completed 2026-10-07; all eight native platform/profile lanes and direct comparison verified.  
 **Owner:** Gravitas test harness and CI; lower-stack owners only for reproduced defects.
 
 ## Goal
@@ -13,16 +13,16 @@ changing physics merely to preserve existing test output.
 
 ## Verified Baseline Before Phase 1
 
-- [`ReplayConformanceHarness`](../../tests/Gravitas.Tests/Determinism/ReplayConformanceHarness.cs)
+- [`ReplayConformanceHarness`](../../../tests/Gravitas.Tests/Determinism/ReplayConformanceHarness.cs)
   advanced only `LateSimulate()` in both `RunTrace` and `AssertNextFramesMatch`.
   Commands precede the late phase, and hashes follow it.
-- [`GravitasReplayConformanceTests`](../../tests/Gravitas.Tests/Determinism/GravitasReplayConformanceTests.cs)
+- [`GravitasReplayConformanceTests`](../../../tests/Gravitas.Tests/Determinism/GravitasReplayConformanceTests.cs)
   already exercises both phases in its wide-clock test. Existing scenarios cover
   3D CCD, mesh/compound, pure 2D, mixed queries and body restore continuation.
-- [`Constraint3DStressTests`](../../tests/Gravitas.Tests/Constraints/Constraint3DStressTests.cs)
+- [`Constraint3DStressTests`](../../../tests/Gravitas.Tests/Constraints/Constraint3DStressTests.cs)
   supplied `Simulate()` through `beforeFrame`; changing the default without
   migrating these callers would have advanced twice.
-- [`build-and-test.yml`](../../.github/workflows/build-and-test.yml) runs
+- [`build-and-test.yml`](../../../.github/workflows/build-and-test.yml) runs
   Windows/Linux and Release/ReleaseLean suites, but has no explicit architecture
   matrix or shared cross-job trace comparison.
 
@@ -58,7 +58,7 @@ coverage. Both target-framework builds and documentation checks passed using
 `UseLocalLsfStack=true`; no runtime or lower-stack source change was required.
 The Debug subset passed 123 tests, excluding the independently reproduced
 ragdoll allocation failure captured as
-[GRV-Benchmark-025](benchmark-signal-hardening-backlog.md#grv-benchmark-025--debug-ragdoll-steady-state-allocations).
+[GRV-Benchmark-025](../benchmark-signal-hardening-backlog.md#grv-benchmark-025--debug-ragdoll-steady-state-allocations).
 Detailed captures remain under ignored `artifacts/replay-conformance-phase1/`.
 
 ## Phase 2: Shared Command And Result Fixtures
@@ -84,7 +84,7 @@ Detailed captures remain under ignored `artifacts/replay-conformance-phase1/`.
 
 Body payloads do not restore the containing clock, object graph, coroutines or
 all solver caches. Restore fixtures must reconstruct supported shells and match
-the host timeline under the [serialization contract](../wiki/SERIALIZATION.md).
+the host timeline under the [serialization contract](../../wiki/SERIALIZATION.md).
 This plan does not introduce a live-world rewind API.
 
 Completed 2026-10-06. Five version-1 fixtures cover 36 frames, all four modes,
@@ -99,7 +99,7 @@ Windows x64 local-stack validation passed 47 new tests, 4,590/4,529 full
 Release/Lean tests and 170 focused Debug tests. Exact 100% line, branch and method
 coverage, both target-framework builds, DocFX and link checks passed; Debug still
 excludes #025. No runtime or upstream source changed. The separate wall-support
-defect is captured as [GRV-Issue-090](issue-tracker.md#grv-issue-090---3d-automatic-swept-ground-probes-accept-vertical-wall-contacts).
+defect is captured as [GRV-Issue-090](../issue-tracker.md#grv-issue-090---3d-automatic-swept-ground-probes-accept-vertical-wall-contacts).
 Baseline Gravitas `5be7224`, SDK 10.0.302, sibling identities, fixture fingerprints
 and detailed gates are recorded under ignored `artifacts/replay-conformance-phase2/`;
 the successful capture is `final-gates-20261007T024929080Z-743bdd00006b46008b6072d799376a3a`.
@@ -120,8 +120,8 @@ Native cross-OS/architecture comparison remains Phase 3.
 - [x] Configure small conformance traces in normal CI; retain artifacts for
       diagnosis. Build both library target frameworks without claiming that a
       `netstandard2.1` compile is another execution platform.
-- [ ] Confirm the first hosted eight-lane execution and artifact comparison.
-      Native ARM64 results remain pending until those jobs actually run.
+- [x] Confirm the first hosted eight-lane execution and artifact comparison.
+      Native Windows/Linux x64/ARM64 Release/Lean results all passed.
 
 The complete native matrix is Windows/Linux x64/ARM64, each in Release/Lean.
 Runner availability can stage its rollout; closure must name the actually
@@ -163,7 +163,7 @@ Review removed the capture/comparator helper suites and the earlier fixture
 contract suite, retaining actual library lifecycle, physics, query, CCD and
 restore assertions. The comparator still validates real CI captures; controlled
 copies confirm that missing lanes, one altered raw unit and equally incorrect
-lanes fail. Capture instructions belong in [contributor guidance](../../AGENTS.md#replay-conformance-captures);
+lanes fail. Capture instructions belong in [contributor guidance](../../../AGENTS.md#replay-conformance-captures);
 the wiki describes host-facing contracts. Source/package selection now follows
 the target branch, including package validation for `develop` -> `main`.
 
@@ -173,11 +173,19 @@ branch and method coverage remains 100% in both profiles; both target-framework
 builds, DocFX, links and workflow lint pass using `UseLocalLsfStack=true`.
 Fresh captures are under
 `artifacts/replay-conformance-phase3/final-gates-20261007T144355786Z-21016bb3baee499290cf0467988db06f/`.
-No runtime, upstream or reviewed fixture expectation changed. The hosted
-eight-lane run, including four ARM64 lanes, remains pending; local comparison
-explicitly names those omissions. Actual released-package execution also awaits
-upstream publication. Keep this plan active until hosted captures establish the
-remaining evidence.
+No runtime, upstream or reviewed fixture expectation changed.
+
+Closed 2026-10-07 after [hosted run 37640701967](https://github.com/mrdav30/Gravitas/actions/runs/37640701967)
+on develop commit `23cd1380a3a37ed636ab448a2637ec8502c99056`. All eight native
+Windows/Linux x64/ARM64 Release/Lean suites, artifact uploads and direct replay
+comparison passed. Downloaded artifacts independently reproduce full-matrix
+agreement for all five fixtures and 36 frames, including the separate cache
+trace; no lanes are missing or emulated. Every lane records SDK 10.0.401,
+runtime 8.0.31, matching actual OS/process architecture and the pinned source
+graph. Local copies are retained under ignored
+`artifacts/replay-conformance-phase3/hosted-37640701967/`. This establishes the
+claimed source-stack conformance matrix; released-package validation remains a
+mandatory promotion/release gate after upstream publication.
 
 ## Validation And Completion
 
@@ -189,10 +197,10 @@ remaining evidence.
       release. Preserve deterministic ordering and warmed allocation guarantees.
 - [x] Publish the verified matrix, fixture/version provenance and limitations;
       update evergreen replay guidance without linking it to this plan.
-- [ ] Archive this plan in `done/` only after the claimed execution/comparison
+- [x] Archive this plan in `done/` only after the claimed execution/comparison
       gates pass, or explicitly split an unavailable platform rollout into a
       named deferred scope. Track any reproduced runtime defect separately.
 
 No physics redesign, network protocol, new hash algorithm or benchmark timing
-gate is implied. The completed [original replay plan](done/2026-06-26-deterministic-replay-hash-conformance-harness-plan.md)
+gate is implied. The completed [original replay plan](2026-06-26-deterministic-replay-hash-conformance-harness-plan.md)
 remains historical; this plan adds the lifecycle and portability evidence.

@@ -31,18 +31,9 @@ instead of burying it in notes.
   - Approved follow-up sequence after the confirmed benchmark signals close:
     strengthen complete-loop replay evidence, characterize an evolving strategy
     scene, then publish long-duration physical quality versus configuration cost.
-    Replay Phases 1 and 2 are complete; native platform comparison remains
-    active. The workload and quality plans await their prerequisite evidence.
-  - [`Full-Lifecycle Replay Conformance`](2026-10-06-full-lifecycle-replay-conformance-plan.md)
-    is first: complete stepping and five reviewed shared fixtures now cover
-    all four runtime modes, lifecycle, CCD, queries, connected constraints and
-    supported body restore. Phase 3 directly compares independently compiled
-    Windows/Linux x64 Release/Lean captures: all five fixtures and 36 frames
-    agree with each other and shared expectations. Exact coverage is preserved;
-    phase summaries live in the plan. The eight-lane native CI comparison is
-    implemented, with actual hosted ARM64 execution still pending. Develop
-    validates pinned sibling sources; main validates released packages, including
-    PRs from develop into main.
+    Full-lifecycle replay conformance is complete across the eight native
+    platform/profile lanes, and upstream develop CI alignment is complete.
+    The workload and quality plans follow.
   - [`Evolving Game Capacity And Soak`](2026-10-06-evolving-game-capacity-and-soak-plan.md)
     follows complete stepping and a shared trace format. One strategy scene
     supplies activity stages, a comparable 3D case, per-frame tails and churn
@@ -80,6 +71,26 @@ instead of burying it in notes.
     supplies representative workloads without creating a duplicate signal.
 
 ## Recently Completed
+
+- **Upstream Develop CI Alignment**
+  - Completed 2026-10-07. FixedMathSharp, SwiftCollections and GridForge retain
+    Windows/Linux Release/Lean matrices, with pinned sibling sources on develop
+    and released packages on main or PRs targeting main. Serial source builds
+    and separate dependency-mode caches preserve the selected graph. Hosted
+    [FixedMathSharp run 37644534163](https://github.com/mrdav30/FixedMathSharp/actions/runs/37644534163),
+    [SwiftCollections run 37654294859](https://github.com/mrdav30/SwiftCollections/actions/runs/37654294859)
+    and [GridForge run 37655373739](https://github.com/mrdav30/GridForge/actions/runs/37655373739)
+    pass. Chronicler already passed and needed no workflow change. The collection
+    RCA and finalizer coverage follow-up are owned by the
+    [SwiftCollections tracker](https://github.com/mrdav30/SwiftCollections/blob/develop/docs/feature-work/issue-tracker.md).
+
+- [`Full-Lifecycle Replay Conformance`](done/2026-10-06-full-lifecycle-replay-conformance-plan.md)
+  - Completed 2026-10-07. Full host-loop stepping, reviewed command/result
+    fixtures and native Windows/Linux x64/ARM64 Release/Lean CI now agree across
+    five fixtures and 36 frames. [Run 37640701967](https://github.com/mrdav30/Gravitas/actions/runs/37640701967)
+    passed every lane and direct comparison; downloaded artifacts independently
+    reproduce the result. Exact production coverage remains 100%. Develop
+    validates the source stack; main promotion still requires released packages.
 
 - [`Runtime Mass Mutation`](issue-tracker.md#grv-issue-089---runtime-mass-changes-leave-inertia-or-awake-membership-stale)
   - GRV-Issue-089 resolved 2026-10-04. Both dimensional body owners derive
@@ -615,18 +626,15 @@ host-facing need appears.
 
 ## Recommended Execution Order
 
-1. Complete default replay stepping and migrate every helper caller; establish
-   shared trace expectations and Windows/Linux comparison, then extend native
-   architecture coverage with explicit availability/provenance gates.
-2. Build one evolving strategy workload using that replay contract. Measure
+1. Build one evolving strategy workload using the completed replay contract.
+   Full-lifecycle replay and upstream develop CI alignment are verified. Measure
    comparable 2D/3D capacity, then use the same scenes for latency and memory
    soaks; evaluate #024 from observed work, not hypothetical query counts.
-3. Extend physical-quality fixtures over meaningful durations and publish
-   quality/time configuration guidance. A native platform lane still awaiting
-   hosting need not block local fixture authoring, but cannot be claimed verified.
-4. Keep trackers as intake buckets for reproduced defects and measured risks.
+2. Extend physical-quality fixtures over meaningful durations and publish
+   quality/time configuration guidance.
+3. Keep trackers as intake buckets for reproduced defects and measured risks.
    Resolve defects in their owning repository and validate coordinated consumers
    with `UseLocalLsfStack=true`; preserve 100% reachable coverage.
-5. Release dependencies before consumers, then run Gravitas `Release`,
+4. Release dependencies before consumers, then run Gravitas `Release`,
    `ReleaseLean`, coverage, replay, allocation and relevant benchmark gates
    against the released package chain.

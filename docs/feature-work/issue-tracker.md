@@ -42,19 +42,20 @@
   change at initial heights 0 and 4; both diagnostic cases passed assertions
   describing the defect. No runtime fix is included in the replay work.
 - **Reproduction:** At 8 Hz with gravity, air density, damping and minimum speed
-  zero, create a mass-one radius-half dynamic sphere at `(-2, h, 4)` and a static
-  cuboid at `(1, h, 4)` with size `(1/8, 4, 4)`. Set maximum speed/fall speed to
-  64, enable continuous collision on the sphere, apply impulse `(32, 0, 0)`,
-  and call `Simulate()` then `LateSimulate()`. CCD correctly stops X at `7/16`.
-  Automatic grounding then marks the sphere grounded against the wall and
-  raises its body height from `h` to `h + 1/2`, despite zero vertical velocity.
+  zero, create a mass-one radius-half dynamic sphere at `(-2, h, 4)` and a
+  static cuboid at `(1, h, 4)` with size `(1/8, 4, 4)`. Set maximum speed/fall
+  speed to 64, enable continuous collision on the sphere, apply impulse
+  `(32, 0, 0)`, and call `Simulate()` then `LateSimulate()`. CCD correctly stops
+  X at `7/16`. Automatic grounding then marks the sphere grounded against the
+  wall and raises its body height from `h` to `h + 1/2`, despite zero vertical
+  velocity.
 - **Exact witness:** For `h = 4`, the radius-half downward ground sweep starts
   at `(7/16, 9/2, 4)` and ends at `(7/16, 4, 4)`. It accepts wall collider ID 1
   at distance zero with point `(15/16, 9/2, 4)` and normal `(-1, 0, 0)`. The
-  final body pose is `(7/16, 9/2, 4)`. For `h = 0`, the same relative witness
-  is `(15/16, 1/2, 4)` and the final pose is `(7/16, 1/2, 4)`. The probe is
-  tangent to the vertical wall at its start; this is not upward support or an
-  implicit world-floor contract.
+  final body pose is `(7/16, 9/2, 4)`. For `h = 0`, the same relative witness is
+  `(15/16, 1/2, 4)` and the final pose is `(7/16, 1/2, 4)`. The probe is tangent
+  to the vertical wall at its start; this is not upward support or an implicit
+  world-floor contract.
 - **Source chain:**
   [`ResolveGroundProbeMode`](../../src/Gravitas/Core/3D/SolidBody.Grounding.cs)
   selects a swept sphere for sphere bodies. `TryFindGroundHitWithSweptSphere`
@@ -66,20 +67,20 @@
   owned by 3D grounding.
 - **Follow-up:** Add a failing full-loop regression for both translated heights
   before fixing support eligibility. Preserve legitimate floor and slope
-  support, explicit manual grounding, filtering, stable candidate selection,
-  and fixed-point behavior. Audit other automatic/explicit swept-ground shapes
-  and the 2D counterpart: `SolidBody2D.IsValidGroundHit` already compares the
-  normal against gravity-relative up through `GroundMinNormalDot`, but its
-  related witness/height semantics still need parity review. No 2D defect has
-  been reproduced by this investigation.
+  support, explicit manual grounding, filtering, stable candidate selection, and
+  fixed-point behavior. Audit other automatic/explicit swept-ground shapes and
+  the 2D counterpart: `SolidBody2D.IsValidGroundHit` already compares the normal
+  against gravity-relative up through `GroundMinNormalDot`, but its related
+  witness/height semantics still need parity review. No 2D defect has been
+  reproduced by this investigation.
 - **Evidence:** The temporary diagnostic source is retained under ignored
   `artifacts/replay-conformance-phase2/grounding-witness/GroundingWitnessScratchTests.cs`;
   exact observed console excerpts and the invocation are in `diagnostic.log`
-  beside it. The diagnostic invocation used only the console logger and
-  produced no TRX file; unrelated replay TRX captures are not evidence for
-  this defect. The tracked temporary test was removed after the two-case run.
-  Shared replay fixtures use explicit manual grounding to isolate their CCD
-  expectations from this separately tracked runtime behavior.
+  beside it. The diagnostic invocation used only the console logger and produced
+  no TRX file; unrelated replay TRX captures are not evidence for this defect.
+  The tracked temporary test was removed after the two-case run. Shared replay
+  fixtures use explicit manual grounding to isolate their CCD expectations from
+  this separately tracked runtime behavior.
 
 Remaining measured performance costs are tracked in the benchmark backlog.
 
@@ -108,24 +109,25 @@ Remaining measured performance costs are tracked in the benchmark backlog.
 - **Compatibility:** `SolidBody.Mass` changes from a field to a property.
   Ordinary assignment/object-initializer source use is preserved; rebuild
   consumers and migrate ref/reflection access. The `"Mass"` record key and body
-  schemas are unchanged. See [the migration guide](../MIGRATION.md#runtime-mass-changes)
-  and [host contract](../wiki/HOST_INTEGRATION.md#runtime-mass-changes).
+  schemas are unchanged. See
+  [the migration guide](../MIGRATION.md#runtime-mass-changes) and
+  [host contract](../wiki/HOST_INTEGRATION.md#runtime-mass-changes).
 - **Verification:** Local-stack Release and ReleaseLean suites pass with 100%
   reachable line, branch, and method coverage in raw and rendered reports.
   Focused cases cover angular scaling, non-positive transitions, sleep/no-op,
   role/freeze preservation, custom math failure, stale registrations, callbacks,
-  contact/joint cache ownership, transport restores, replay, pure/mixed candidate
-  routing, prepared CCD trajectories/indexes/handoffs, and zero-allocation
-  warmed mutations. The impulse-kernel boundary fixture now uses its existing
-  explicit tensor helper instead of depending on stale sphere inertia after a
-  tiny-mass assignment. Dated logs, coverage, and mutation-cycle measurements
-  remain under ignored `artifacts/grv-issue-089`.
+  contact/joint cache ownership, transport restores, replay, pure/mixed
+  candidate routing, prepared CCD trajectories/indexes/handoffs, and
+  zero-allocation warmed mutations. The impulse-kernel boundary fixture now uses
+  its existing explicit tensor helper instead of depending on stale sphere
+  inertia after a tiny-mass assignment. Dated logs, coverage, and mutation-cycle
+  measurements remain under ignored `artifacts/grv-issue-089`.
 - **Measured mutation cost:** On this i7-9700K host, the complete registered
   `0 -> 2 -> 1` kilogram cycle costs `13.373 +/- 0.1671 us` for the 3D sphere
   fixture and `4.897 +/- 0.0438 us` for the 2D circle fixture, both `0 B/op`.
-  Default-job measurements use two launches, five warmups, fifteen measured
-  250 ms iterations, and CPU affinity `3`; these are three-assignment fixture
-  costs, not a simulation-step budget. The API build and local-link checks pass.
+  Default-job measurements use two launches, five warmups, fifteen measured 250
+  ms iterations, and CPU affinity `3`; these are three-assignment fixture costs,
+  not a simulation-step budget. The API build and local-link checks pass.
 
 ### GRV-Issue-083 - 2D circle contacts compare saturated squared distances
 
