@@ -142,6 +142,24 @@ can therefore distinguish overhead surfaces from upward support. These mesh
 sweeps test triangle proximity, not solid-volume containment: a sphere wholly
 inside a closed mesh without touching its triangles is not an initial hit.
 
+Translational convex-source mesh sweeps also retain geometric normals for
+initial contacts, independently of travel and winding. They resolve the actual
+source leaf and target triangle or hull before reporting a compound owner.
+Separated contacts inside the query tolerance retain their closest-feature
+normal; overlapping triangle contacts can use a face witness when the source
+support projects onto that face. A touching edge or vertex keeps its separating
+axis. This prevents internal triangle seams from blocking tangent motion.
+Convex mesh targets retain solid-volume containment. For cylinder, cone and
+circle-slab sources, the initial normal selects the smallest exit
+projection among hull face axes; it does not promise a global minimum
+translation including edge axes. CCD rejects separating and tangent initial
+contacts before reducing triangle and compound hits, so a nonblocking first
+feature cannot hide a blocking sibling. Public equal-distance hits retain their
+existing authored feature order. When GJK reports an initial intersection, the
+mesh hit requires a normal resolved by complete contact geometry or certified
+by exact support intervals; a bounded GJK intersection alone cannot establish
+that contact.
+
 A 2D circle sweep that starts touching or overlapping a target reports zero
 travel distance but still retains the **target's surface witness**, not the
 probe's starting center. It preserves the anchor even when that point cannot

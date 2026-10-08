@@ -108,6 +108,15 @@ because another nearby object is rotating. Closing motion is still tested.
 Compounds and concave targets retain conservative handling: a non-closing
 contact on one child is not proof that another child is clear.
 
+For a non-compound source rotating solely around a cardinal supporting-plane
+axis, CCD can also certify tangential or separating motion against a stationary
+mesh or cuboid. Exact source support must start on or beyond the full target's
+supporting plane, and the source's quaternion and angular components must
+preserve that projection throughout the interval. Mesh targets include every
+vertex; compound targets include every mesh/cuboid leaf. A floor contact cannot
+hide another blocking part. General rotations, moving targets and curved target
+leaves retain the conservative interval search when this proof is unavailable.
+
 Moving-pair CCD uses immutable frame-start candidate indices plus bounded dirty
 overlays for bodies whose same-frame handoff changes their remaining swept
 bounds. A dirty body shadows its immutable entry; stale prepared bounds are not

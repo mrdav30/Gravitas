@@ -1,5 +1,5 @@
 //=======================================================================
-// ConvexSweepQueryWorker.ConvexShape.cs
+// ConvexShape.cs
 //=======================================================================
 // MIT License, Copyright (c) 2026-present David Oravsky (mrdav30)
 // See LICENSE file in the project root for full license information.
@@ -14,7 +14,9 @@ using System;
 
 namespace Gravitas.Queries;
 
-internal readonly struct ConvexShape
+/// <summary>Retains canonical convex geometry and exact support anchors for prepared sweeps.</summary>
+/// <content>Owns shape views, source bounds and support feature selection.</content>
+internal readonly partial struct ConvexShape
 {
     internal enum ConvexShapeKind
     {

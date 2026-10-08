@@ -807,7 +807,8 @@ public sealed partial class GravitasQuery3DService
             return false;
         }
 
-        bool found = _convexSweepWorker.TrySweepPreparedSource(current!, out hit);
+        bool found = _convexSweepWorker.TrySweepPreparedSource(current!, out hit,
+            requireClosingInitialContact: _currentStaticSweepTargetsOnly);
         LastMeshTriangleCandidateCount += _convexSweepWorker.LastMeshTriangleCandidateCount;
         return found;
     }

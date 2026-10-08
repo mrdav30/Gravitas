@@ -20,6 +20,7 @@ namespace Gravitas.Queries;
 /// Performs deterministic translational convex-source sweeps against 3D query
 /// targets using support-mapped conservative advancement.
 /// </summary>
+/// <content>Owns source preparation, conservative advancement and ordered target reduction.</content>
 internal sealed partial class ConvexSweepQueryWorker
 {
     private const int MaxGjkIterations = 32;
@@ -42,6 +43,7 @@ internal sealed partial class ConvexSweepQueryWorker
     private LSCollider? _source;
     private ConvexShape _sourceShape;
     private bool _hasSource;
+    private bool _requireClosingInitialContact;
     private Vector3d _displacement;
     private Vector3d _outputDirection;
     private Vector3d _sweptSourceBoundsMin;
@@ -100,8 +102,10 @@ internal sealed partial class ConvexSweepQueryWorker
         Prepare(ConvexShape.CreateSphere(center, radius), displacement);
     }
 
-    public bool TrySweepPreparedSource(LSCollider target, out Physics3DHit hit)
+    public bool TrySweepPreparedSource(LSCollider target, out Physics3DHit hit,
+        bool requireClosingInitialContact = false)
     {
+        _requireClosingInitialContact = requireClosingInitialContact;
         LastMeshTriangleCandidateCount = 0;
         hit = default;
         if (!_hasSource
@@ -535,7 +539,28 @@ internal sealed partial class ConvexSweepQueryWorker
                     result.Normal,
                     normal,
                     hasRefinedSurfaceNormal,
-                    hasMaterializedPoint);
+                    hasMaterializedPoint,
+                    preserveOrientation: travelNumerator == Fixed64.Zero
+                        && targetCollider is LSMeshCollider);
+
+                if (travelNumerator == Fixed64.Zero)
+                {
+                    if (targetCollider is LSMeshCollider)
+                    {
+                        if (!TryResolveInitialMeshContact(sourceShape, targetShape, result,
+                                ref anchor, ref hitNormal))
+                            return false;
+                    }
+                    else if (_requireClosingInitialContact && hasMaterializedPoint)
+                        hitNormal = targetCollider.GetNormalAtPoint(point);
+
+                    // Admit contacts while the selected source leaf and target
+                    // feature still exist. Reducing first can hide a closing
+                    // sibling behind an earlier separating zero-distance hit.
+                    if (_requireClosingInitialContact
+                        && Vector3d.Dot(_displacement, hitNormal) >= -Fixed64.Epsilon)
+                        return false;
+                }
 
                 hit = new Physics3DHit(
                     targetCollider,
@@ -770,7 +795,8 @@ internal sealed partial class ConvexSweepQueryWorker
         Vector3d resultNormal,
         Vector3d fallbackNormal,
         bool hasRefinedSurfaceNormal,
-        bool hasMaterializedPoint)
+        bool hasMaterializedPoint,
+        bool preserveOrientation = false)
     {
         Vector3d planarNormal = Vector3d.Zero;
         if (hasMaterializedPoint)
@@ -780,7 +806,7 @@ internal sealed partial class ConvexSweepQueryWorker
             point,
             resultNormal,
             fallbackNormal,
-            _displacement,
+            preserveOrientation ? Vector3d.Zero : _displacement,
             planarNormal,
             hasRefinedSurfaceNormal,
             hasMaterializedPoint);

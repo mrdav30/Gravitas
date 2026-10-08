@@ -174,7 +174,7 @@ public partial class SolidBody
                 refined = candidate;
 
             Vector3d closingNormal = hitsAreShapeExact
-                ? ResolveShapeExactContinuousClosingNormal(candidate)
+                ? candidate.Normal
                 : refined.Normal;
 
             if (!IsClosingContinuousCollisionHit(displacement, closingNormal))
@@ -564,13 +564,13 @@ public partial class SolidBody
                     foundExact = _shapeExactContinuousConvexSweepWorker
                         .TrySweepPreparedSource(
                             target.Collider,
-                            out Physics3DHit shapeExactConvexHit);
+                            out Physics3DHit shapeExactConvexHit,
+                            requireClosingInitialContact: true);
                     if (foundExact)
                     {
                         relativeHit = ApplyShapeExactContinuousContactSlop(
                             shapeExactConvexHit);
-                        closingNormal = ResolveShapeExactContinuousClosingNormal(
-                            shapeExactConvexHit);
+                        closingNormal = shapeExactConvexHit.Normal;
                     }
                 }
 

@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Queries;
@@ -208,7 +209,8 @@ public partial class SolidBody
             if (target == ignoredTarget
                 || !IsValidContinuousCollisionTarget(target)
                 || ColliderSettings.GetCollisionType(Collider.Shape, target.Shape) == CollisionType.None
-                || CanExcludeInvariantTangentialContact(hit, displacement)
+                || CanExcludeInvariantTangentialContact(hit, startPosition, displacement,
+                    startRotation, targetRotation, isKinematic)
                 || !TryFindEarliestRotationalContinuousCollisionAgainstTarget(
                     target,
                     startPosition,
@@ -307,19 +309,115 @@ public partial class SolidBody
         return true;
     }
 
-    private bool CanExcludeInvariantTangentialContact(Physics3DHit hit, Vector3d displacement)
+    internal bool CanExcludeInvariantTangentialContact(Physics3DHit hit,
+        Vector3d startPosition, Vector3d displacement, FixedQuaternion startRotation,
+        FixedQuaternion targetRotation, bool isKinematic)
     {
-        // A supporting plane certifies non-closing straight motion only for one
-        // convex shape. A compound/concave target may hide a later blocking part.
-        if (!HasRotationInvariantCollider
-            || hit.Collider is not (LSCuboidCollider or LSSphereCollider or LSCapsuleCollider
-                or LSCylinderCollider or LSConeCollider)
-            || hit.Normal == Vector3d.Zero)
+        if (hit.Normal == Vector3d.Zero)
             return false;
 
-        Vector3d normal = ResolveShapeExactContinuousClosingNormal(hit);
-        // These sealed primitives produce a nonzero outward normal at their
-        // surface anchor; an unrepresentable anchor retains the admitted normal.
-        return !IsClosingContinuousCollisionHit(displacement, normal);
+        // Keep the existing centered-sphere rule: these primitive normals are
+        // global convex supporting planes even for an initially overlapping cast.
+        if (HasRotationInvariantCollider
+            && hit.Collider is (LSCuboidCollider or LSSphereCollider or LSCapsuleCollider
+                or LSCylinderCollider or LSConeCollider))
+            return !IsClosingContinuousCollisionHit(displacement, ResolveShapeExactContinuousClosingNormal(hit));
+
+        if (Collider is LSCompoundCollider
+            || (hit.Collider!.Body is SolidBody targetBody && !targetBody.IsStatic))
+            return false;
+        Vector3d normal = hit.Normal;
+        int axis = normal.X != Fixed64.Zero ? 0 : normal.Y != Fixed64.Zero ? 1 : 2;
+        // This is a certificate for every rounded intermediate pose, rather
+        // than an approximate parallel-axis or endpoint-only check. Integration,
+        // Slerp and normalization preserve these literal zero components. General
+        // rotations still require the conservative interval search.
+        if (Vector3d.CompareProjection(displacement, Vector3d.Zero, normal) < 0)
+            return false;
+        for (int offset = 1; offset <= 2; offset++)
+        {
+            int transverse = (axis + offset) % 3;
+            bool preservesProjection = normal[transverse] == Fixed64.Zero
+                & startRotation[transverse] == Fixed64.Zero
+                & targetRotation[transverse] == Fixed64.Zero
+                & (isKinematic | _angularVelocity[transverse] == Fixed64.Zero);
+            if (!preservesProjection)
+                return false;
+        }
+
+        // Earlier candidate searches leave the source at their last sampled
+        // pose. The separating plane must be proved from this segment's start.
+        Position3d = startPosition;
+        Rotation = startRotation;
+        Collider.RebuildRuntimeShapeOnly(refreshMassProperties: false);
+        // Production collider types are closed; compound sources were excluded
+        // above. A global supporting plane is valid for every mesh vertex even
+        // when that source mesh uses concave triangle-surface collision policy.
+        System.Diagnostics.Debug.Assert(Collider is LSMeshCollider || ConvexColliderSupport.IsSupported(Collider));
+        FixedPointAnchor sourceMin = Collider is LSMeshCollider
+            ? GetExactMeshSupportAnchor((LSMeshCollider)Collider, -normal)
+            : new ConvexShape(Collider, Vector3d.Zero).GetSupportAnchor(-normal);
+        if (!TryGetFullColliderSupportAnchor(hit.Collider, normal, out FixedPointAnchor targetMax))
+            return false;
+        var zero = new FixedPointAnchor(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.Zero);
+        // Full-target support includes every concave vertex and compound leaf;
+        // a later wall cannot hide behind the initial floor hit. A nonnegative
+        // exact gap plus invariant support projection proves the entire path safe.
+        return WidePointAnchor3d.CompareProjectedOffsets(sourceMin, targetMax, zero, zero, normal) >= 0;
+    }
+
+    private static bool TryGetFullColliderSupportAnchor(LSCollider collider,
+        Vector3d direction, out FixedPointAnchor anchor)
+    {
+        if (collider is LSCompoundCollider compound)
+        {
+            if (!TryGetLeafColliderSupportAnchor(compound.GetPartCollider(0), direction, out anchor))
+                return false;
+            var zero = new FixedPointAnchor(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.Zero);
+            for (int index = 1; index < compound.PartCount; index++)
+            {
+                // Compound definitions contain leaves, so full support needs a
+                // single deterministic pass rather than recursive traversal.
+                if (!TryGetLeafColliderSupportAnchor(compound.GetPartCollider(index), direction,
+                        out FixedPointAnchor candidate))
+                    return false;
+                if (WidePointAnchor3d.CompareProjectedOffsets(candidate, anchor,
+                        zero, zero, direction) > 0)
+                    anchor = candidate;
+            }
+            return true;
+        }
+        return TryGetLeafColliderSupportAnchor(collider, direction, out anchor);
+    }
+
+    private static bool TryGetLeafColliderSupportAnchor(LSCollider collider,
+        Vector3d direction, out FixedPointAnchor anchor)
+    {
+        if (collider is LSMeshCollider mesh)
+        {
+            anchor = GetExactMeshSupportAnchor(mesh, direction);
+            return true;
+        }
+        if (collider is LSCuboidCollider)
+        {
+            anchor = new ConvexShape(collider, Vector3d.Zero).GetSupportAnchor(direction);
+            return true;
+        }
+        anchor = default;
+        return false;
+    }
+
+    private static FixedPointAnchor GetExactMeshSupportAnchor(LSMeshCollider mesh, Vector3d direction)
+    {
+        var vertices = mesh.Mesh.ScaledLocalVertices;
+        var anchor = new FixedPointAnchor(mesh.Mesh.Origin, mesh.Mesh.Rotation, vertices[0]);
+        var zero = new FixedPointAnchor(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.Zero);
+        for (int index = 1; index < vertices.Length; index++)
+        {
+            var candidate = new FixedPointAnchor(mesh.Mesh.Origin, mesh.Mesh.Rotation, vertices[index]);
+            if (WidePointAnchor3d.CompareProjectedOffsets(candidate, anchor, zero, zero, direction) > 0)
+                anchor = candidate;
+        }
+        return anchor;
     }
 }

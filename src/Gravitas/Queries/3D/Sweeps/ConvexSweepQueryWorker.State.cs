@@ -63,7 +63,7 @@ internal sealed partial class ConvexSweepQueryWorker
         }
     }
 
-    private readonly struct GjkResult
+    internal readonly struct GjkResult
     {
         public GjkResult(
             bool intersects,

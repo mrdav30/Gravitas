@@ -2,7 +2,7 @@
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-095`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-097`.
 - Assign an ID when an issue enters this tracker, keep it through resolution,
   and never reuse an ID even if an entry is later removed. Check this file's Git
   history before advancing or repairing the counter.
@@ -35,38 +35,113 @@
 
 ### Ordered Queue
 
-### GRV-Issue-094 - Non-sphere convex CCD can block separation from the back of a mesh face
+### GRV-Issue-096 - Extreme-scale capsule initial mesh sweep can miss a genuine overlap
 
-- **Confirmed:** 2026-10-07 in an isolated local-stack Release reproduction
-  during #091 review. This is an existing generic-convex path defect; its exact
-  sweep dispatch, hit-normal policy and closing helper are unchanged by #091.
-- **Reproduction:** An upward-wound static concave quad lies at Y zero. A unit
-  dynamic cuboid centered at `(0, -1/2, 0)` initially touches its underside.
-  Use a one-second step, zero gravity/air density, frictionless materials,
-  manual grounding and `ContinuousCollisionMode.Continuous`. Apply a downward
-  unit velocity, then call `Simulate` and `LateSimulate`. Expected center Y is
-  `-3/2`; the reproduced center remains `-1/2` because CCD admits a separating
-  initial contact as closing.
-- **Source chain:** The non-sphere exact sweep in
-  [`SolidBody.ContinuousCollision.Hits`](../../src/Gravitas/Core/3D/SolidBody.ContinuousCollision.Hits.cs)
-  uses [`ConvexSweepHitPolicy`](../../src/Gravitas/Queries/3D/Sweeps/ConvexSweepHitPolicy.cs).
-  Its initial planar normal retains authored upward winding. The
-  [`closing-normal helper`](../../src/Gravitas/Core/3D/SolidBody.ContinuousCollision.Helpers.cs)
-  re-queries the on-surface witness, where mesh geometry has lost the source's
-  side. Downward separation then passes the negative-dot closing predicate.
-- **Follow-up:** Establish initial-contact side selection for generic convex
-  sources independently of travel and mesh winding. Cover dynamic/kinematic
-  sources, convex/concave meshes, compound mesh parts, and approaching,
-  separating, tangent and rotational contacts. Preserve primitive contained
-  starts and legitimate mesh impacts; do not bypass the generic closing helper
-  using the sphere-specific witness contract.
-- **Evidence:** Ignored `artifacts/grv-issue-091/NonSphereMeshSeparationAudit.cs`
-  and `non-sphere-audit.log` retain the reproduction and failure. The temporary
-  diagnostic was removed from the maintained test suite.
+- **Status:** Supported geometry range decision; extreme-radius algorithm work
+  deferred. The intended workloads do not require billion-unit colliders.
+- **Confirmed:** 2026-10-07 in the isolated local-stack Release
+  `CapsuleInitialContact_WithUnavailableTriangleCharts_ShouldRetainGeometricFallback`
+  experiment. An ordinary-radius source control passes; the extreme
+  radius version returns false before initial-contact normal resolution.
+- **Reproduction:** Let `r = Fixed64.FromRaw(long.MaxValue / 2)` and `m` be
+  `Fixed64.MaxValue`. Initialize a capsule of radius `r`, full height `m`,
+  centered at `(m - 4, m - 4, 0)`. Initialize a concave triangle with local
+  vertices `(m, 0, -1)`, `(m, 0, 1)`, `(m, 5, 0)`, origin
+  `(-r - 3, m - 4, 0)` and identity rotation. Prepare a unit rightward source
+  sweep through `ConvexSweepQueryWorker`; `TrySweepPreparedSource` returns
+  false. Its plane is only `r - 1` from the capsule center, and all triangle
+  vertices lie strictly within the radial volume, proving initial overlap.
+- **Boundary:** Both collider centers and the proposed source center remain
+  representable. The capsule's core length is one raw unit. Its radius is
+  extreme, while the plane overlap is only one world unit; this is distinct
+  from #094's source-side and reduction defect. The generic candidate/GJK path
+  before that resolution is unchanged by #094.
+- **Follow-up:** Define a practical supported geometry range and consider hard
+  admission limits consistently across radii, extents, authored scale and
+  offsets. Do not infer a geometry-size promise from the full Fixed64 position
+  domain: ordinary-sized shapes at large coordinates remain a distinct useful
+  contract. If extreme geometry remains supported, attribute the miss to
+  candidate admission or bounded GJK scaling before changing contact policy.
+- **Evidence:** Ignored `artifacts/grv-issue-094/rotational-boundary-third.log`
+  retains the isolated failure. The experimental fixture was removed from the
+  maintained suite after recording this independent boundary.
+
+### GRV-Issue-095 - Discrete mesh-cone contacts can choose an artificial triangulation-seam exit
+
+- **Confirmed:** 2026-10-07 during #094 geometry review, in four isolated
+  local-stack Release cases: convex/concave flat quad targets and both windings.
+- **Reproduction:** A default cone centered at `(0, -1/4, 0)` overlaps a flat
+  quad at Y zero spanning `[-2, 2]` in X/Z. Its base is at Y `-3/4` and apex at
+  Y `1/4`. `CollisionDetection.DoCollisionCheck` selects an oblique normal near
+  `(-0.63246, -0.44721, +/-0.63246)` instead of the whole surface's downward
+  exit. Any translation shorter than `1/4` retains a plane crossing strictly
+  inside the quad; downward translation of `1/4` removes it. The diagonal is an
+  internal triangulation seam, not an exposed mesh edge.
+- **Root cause:** The existing discrete mesh-cone reducer compares individual
+  two-sided triangle contacts. A triangle's minimum exit need not leave the
+  union of adjacent faces, and its seam normal gives horizontal movement a
+  spurious normal component. This discrete path is unchanged by #094's sweep
+  contact fix.
+- **Follow-up:** Resolve whole-surface contact selection without suppressing
+  genuine exposed-edge contacts or treating concave meshes as convex solids.
+  Audit other curved primitive mesh reducers for the same union boundary.
+- **Evidence:** Ignored `artifacts/grv-issue-094/DiscreteConeSeamAudit.cs` and
+  `audit-scalar.log` retain the four failures. The temporary diagnostic was
+  removed from the maintained suite.
 
 Remaining measured performance costs are tracked in the benchmark backlog.
 
 ## Resolved Issues
+
+### GRV-Issue-094 - Non-sphere convex CCD can block separation from the back of a mesh face
+
+- **Resolved:** 2026-10-07. Generic convex mesh sweeps retain geometric initial
+  contact normals independently of travel and winding. CCD admits closing
+  features before triangle, source-part and target-part reduction, allowing
+  separation without hiding a blocking sibling.
+- **Original reproduction:** A unit dynamic cuboid centered at `(0, -1/2, 0)`
+  touches the underside of an upward-wound static concave quad at Y zero.
+  With a one-second step, zero gravity/air density, frictionless materials,
+  manual grounding and continuous CCD, downward unit velocity formerly left
+  its center at `-1/2`; the complete host loop now reaches the expected `-3/2`.
+- **Root cause and fix:** The initial generic query normal retained authored
+  winding, and CCD re-queried an on-surface witness that had lost the source
+  side. The prepared worker now resolves the selected leaf's complete triangle
+  or hull contact, retains exact edge/vertex separation, and prefers a
+  supporting face when its projection certifies one. An uncertain GJK
+  intersection requires complete contact geometry or an exact support
+  certificate; it cannot fabricate a fallback normal. CCD consumes this
+  geometric normal directly. Closed hulls retain solid-volume containment;
+  curved hull sources rank face exits without claiming a global edge-axis MTV.
+- **Rotational boundary:** The existing interval search can exclude a
+  tangential/separating contact only when a stationary target's full support
+  plane and literal cardinal quaternion/angular components certify the entire
+  interval. Full mesh and compound target support includes every relevant
+  vertex/leaf. General rotations, moving targets, compound sources and curved
+  target leaves retain conservative search. The centered-sphere primitive
+  rule remains intact.
+- **Upstream ownership:** FixedMathSharp owns exact anchor projection ranking
+  and inclusive triangle projection containment. Its existing closest-point
+  frame conversion now preserves independent translation and exact residual
+  metadata. Gravitas composes these internal math owners without copying limb
+  arithmetic or moving physics policy upstream.
+- **Validation:** Local-stack Release **4,794** and ReleaseLean **4,729**
+  Gravitas tests pass. Exact line/branch/fully covered method counts are
+  **56,591/56,591; 16,476/16,476; 5,436/5,436** and
+  **56,589/56,589; 16,476/16,476; 5,435/5,435**; raw OpenCover checks pass.
+  FixedMathSharp Release **4,464** and Lean **4,443** core tests plus **49**
+  Chronicler bridge tests per configuration pass, also with exact 100% line,
+  branch and fully covered method coverage. Regressions cover both windings,
+  contact sides, primitive/mesh/compound source and target leaves, relative
+  motion, rotational crossing/tangency, thin-cylinder rounded GJK admission,
+  one-raw feature gaps, unmaterializable witnesses and warmed allocation gates.
+- **Performance and follow-ups:** Ordinary impacts and dense concave sweep
+  controls remain near baseline with **0 B/op**. Complete initial-contact
+  resolution has a measured correctness cost tracked as **GRV-Benchmark-026**.
+  The unchanged discrete cone seam reducer is **#095**; the extreme-radius
+  admission boundary is **#096**, a supported-range decision. Ignored evidence
+  remains under `artifacts/grv-issue-094`. Release FixedMathSharp first, then
+  revalidate Gravitas against released packages before the Gravitas release.
 
 ### GRV-Issue-091 - Initially overlapping mesh sphere sweeps can classify an overhead surface as support
 
