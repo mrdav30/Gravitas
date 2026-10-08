@@ -2,7 +2,7 @@
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-099`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-100`.
 - Assign an ID when an issue enters this tracker, keep it through resolution,
   and never reuse an ID even if an entry is later removed. Check this file's Git
   history before advancing or repairing the counter.
@@ -68,8 +68,9 @@
 
 ### GRV-Issue-095 - Discrete mesh-cone contacts can choose an artificial triangulation-seam exit
 
-- **Status:** Active; convex coplanar patch resolution implemented, general
-  nonconvex surface reduction still requires a contact-policy decision.
+- **Status:** Active; convex geometry refinement implemented. A surface-manifold
+  architecture now specifies the recommended remaining runtime contract for
+  review.
 - **Confirmed:** 2026-10-07 during #094 geometry review, in four isolated
   local-stack Release cases: convex/concave flat quad targets and both windings.
 - **Reproduction:** A default cone centered at `(0, -1/4, 0)` overlaps a flat
@@ -101,11 +102,20 @@
   both sufficient proofs decline, and the triangle reducer still selects an
   artificial seam normal approximately `(-0.31405, -0.44721, -0.83748)`.
   This is the same unresolved union boundary, not a new issue.
-- **Decision:** Preserve the single minimum-exit contact contract and extend
-  exact reduction to nonconvex surface unions, or introduce multiple surface
-  constraints where a concave patch requires them. Convex corner charts cannot
-  be applied blindly to reentrant corners; they would admit false supports.
-  Keep this item active until that boundary is resolved and validated.
+- **Decision refinement (2026-10-08):** After the owner delegated the choice to
+  deterministic, accurate physical behavior, source and independent math/solver
+  review favor topology-aware surface manifolds. One global minimum escape
+  vector is a depenetration result and cannot preserve independent impulse and
+  torque constraints. The confirmed #099 wall control demonstrates the runtime
+  consequence. The [surface-contact design](2026-10-08-surface-contact-manifold-design.md)
+  specifies exact finite-domain admission, grouped contact storage, response and
+  compatibility boundaries. The existing convex minimum-exit helpers remain
+  valid geometric owners; their global-minimum witness proofs cannot simply be
+  reused after masking features. Finite clipping is needed even when neither
+  global face-support projection belongs to the patch and no perimeter touches
+  the cone. Do not apply convex corner charts to reentrant vertices or replace
+  the tab failure with an unconditional infinite-face override. Keep #095 active
+  through the corresponding geometry and full-loop implementation gates.
 - **Verified refinement (2026-10-08):** Local-stack Gravitas Release passes
   4,852 full-suite tests plus the subsequently added exposed-nonconvex-edge
   regression; ReleaseLean passes all 4,788 tests. Combined Release OpenCover
@@ -142,7 +152,7 @@
   convex fallback includes an intersecting-seed query and full perimeter feature
   ranking; reuse or defer that seed work only with exact witness admission and
   cross-feature ranking intact. Keep this refinement inside #095 while its
-  general contact contract is being decided. The nine original triangle-contact
+  surface-contact contract is being specified. The nine original triangle-contact
   controls remain within their preceding measured range, approximately 21–882
   microseconds, with zero bytes allocated.
   Evidence is retained under ignored `artifacts/grv-issue-095/`:
@@ -200,6 +210,35 @@
   boundary controls, then audit embedded AABB/polygon prisms separately. Keep
   the plane-constrained 2D response and 3D-to-2D normal convention explicit.
 - **Evidence:** The same ignored audit and log retain all four mixed failures.
+
+### GRV-Issue-099 - Cone mesh reduction omits independent wall constraints
+
+- **Confirmed:** 2026-10-08 against the committed #095 refinement, in four
+  failing local-stack Release diagnostic cases and two passing separate-wall
+  controls. Both windings are exercised.
+- **Reproduction:** Two finite quads meet at an ordinary concave crease, X=0
+  with Z in `[0,4]`, and Z=0 with X in `[0,4]`; both span Y `[-4,4]`. A
+  default height-1/radius-1/2 cone centered at `(3/10,0,3/10)` intersects both.
+  Combined in one concave mesh, detection retains only the Forward normal at
+  depth approximately `1/5`, omitting the Right normal. With explicit static
+  wall bodies, zero gravity/air density, frictionless materials, frozen cone
+  rotation, manual grounding and incoming velocity `(-1,0,-1)`, one complete
+  host step leaves velocity `(-1,0,0)`: approach into the X wall continues.
+  The same surfaces as separate static colliders pass both approach checks.
+- **Root cause:** `TryFindMeshConeTriangleContact` reduces all triangles and
+  patches to one shallowest contact; `DoMeshConeCheck` replaces the manifold
+  with that result. The single-contact reduction already existed before #095's
+  convex refinement, as verified in `f5ed8e4`. This independent noncoplanar
+  contact-loss boundary is not caused by the new coplanar topology.
+- **Follow-up:** Preserve independent geometric surface constraints and stable
+  finite witnesses. Address with the
+  [surface-contact design](2026-10-08-surface-contact-manifold-design.md),
+  including contact capacity, warm starts and response weighting. Do not count
+  arbitrary extra triangle samples as a solution.
+- **Evidence:** Ignored `artifacts/grv-issue-095/MeshConeSurfacePolicyAudit.cs`
+  and `surface-policy-audit.log`; the temporary diagnostic was removed from the
+  maintained suite. The two passing controls use the same geometry, materials,
+  motion and host loop, changing only whether the walls share a mesh collider.
 
 Remaining measured performance costs are tracked in the benchmark backlog.
 
