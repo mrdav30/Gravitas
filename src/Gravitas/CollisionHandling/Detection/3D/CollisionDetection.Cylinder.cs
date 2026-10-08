@@ -1,4 +1,4 @@
-﻿//=======================================================================
+//=======================================================================
 // CollisionDetection.Cylinder.cs
 //=======================================================================
 // MIT License, Copyright (c) 2026–present David Oravsky (mrdav30)
@@ -39,9 +39,9 @@ public static partial class CollisionDetection
         if (signedDistance > sphere.ScaledRadius)
             return false;
 
-        Vector3d normal = signedDistance < Fixed64.Zero
-            ? -outwardNormal
-            : outwardNormal;
+        // Containment increases penetration depth; the sphere still escapes
+        // along the solid surface's outward normal, not toward the cylinder center.
+        Vector3d normal = outwardNormal;
         ResolvePenetrationDepth(
             sphere.ScaledRadius,
             signedDistance,
@@ -153,7 +153,7 @@ public static partial class CollisionDetection
         var cylinder = (LSCylinderCollider)pair.ColliderB;
 
         Span<FixedContactLocalPoints> capFaceContacts =
-            stackalloc FixedContactLocalPoints[ContactManifold.MaxContactCount];
+            stackalloc FixedContactLocalPoints[ContactManifold.MaxContactsPerGroup];
         if (!cuboid.OrientedBox.TryGetCenteredCylinderContact(
                 cylinder.Center,
                 cylinder.Rotation,

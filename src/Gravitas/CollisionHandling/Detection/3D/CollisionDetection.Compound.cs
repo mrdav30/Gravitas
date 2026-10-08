@@ -111,34 +111,40 @@ public static partial class CollisionDetection
         bool addInPartOrder = ((LSCompoundCollider)ownerPair.ColliderA).ContainsPartCollider(partPair.ColliderA);
 
         ContactManifold scratch = partPair.Manifold;
-        for (int i = 0; i < scratch.Count; i++)
+        for (int groupIndex = 0; groupIndex < scratch.GroupCount; groupIndex++)
         {
-            ManifoldContact contact = scratch[i];
-            if (addInPartOrder)
+            ref ContactGroup group = ref scratch.GetGroup(groupIndex);
+            for (int i = 0; i < group.Count; i++)
             {
-                ownerPair.Manifold.AddContact(
-                    contact.AnchorA,
-                    contact.AnchorB,
-                    contact.Depth,
-                    contact.Normal,
-                    partPair.ColliderA.Material,
-                    partPair.ColliderB.Material,
-                    contact.DepthIsClamped,
-                    featureNamespaceA,
-                    featureNamespaceB);
-                continue;
-            }
+                ManifoldContact contact = group[i];
+                if (addInPartOrder)
+                {
+                    ownerPair.Manifold.AddContact(
+                        contact.AnchorA,
+                        contact.AnchorB,
+                        contact.Depth,
+                        contact.Normal,
+                        partPair.ColliderA.Material,
+                        partPair.ColliderB.Material,
+                        contact.DepthIsClamped,
+                        featureNamespaceA,
+                        featureNamespaceB,
+                        group.Key.Remap(featureNamespaceA, featureNamespaceB, reverse: false));
+                    continue;
+                }
 
-            ownerPair.Manifold.AddContact(
-                contact.AnchorB,
-                contact.AnchorA,
-                contact.Depth,
-                -contact.Normal,
-                partPair.ColliderB.Material,
-                partPair.ColliderA.Material,
-                contact.DepthIsClamped,
-                featureNamespaceB,
-                featureNamespaceA);
+                ownerPair.Manifold.AddContact(
+                    contact.AnchorB,
+                    contact.AnchorA,
+                    contact.Depth,
+                    -contact.Normal,
+                    partPair.ColliderB.Material,
+                    partPair.ColliderA.Material,
+                    contact.DepthIsClamped,
+                    featureNamespaceB,
+                    featureNamespaceA,
+                    group.Key.Remap(featureNamespaceB, featureNamespaceA, reverse: true));
+            }
         }
     }
 

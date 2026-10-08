@@ -164,8 +164,8 @@ public sealed partial class PhysicsSettings
 
     /// <summary>
     /// Gets or sets the bounded projected-impulse iteration count used for 3D discrete
-    /// contact and joint constraint islands. Contact-only single-pair scenes stay on
-    /// the direct one-pass response path.
+    /// contact and joint constraint islands. Multipoint 3D pairs use this budget
+    /// even when alone; a single contact row uses the direct one-pass path.
     /// </summary>
     public int DiscreteSolverIterations
     {

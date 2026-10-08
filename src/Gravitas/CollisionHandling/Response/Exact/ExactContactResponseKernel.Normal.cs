@@ -36,6 +36,7 @@ internal static partial class ExactContactResponseKernel
             positiveImpulseScale: Fixed64.One,
             negativeImpulseScale: Fixed64.One,
             includeAccumulator: false,
+            default,
             out response);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -48,7 +49,8 @@ internal static partial class ExactContactResponseKernel
         Fixed64 accumulatedImpulse,
         Fixed64 positiveImpulseScale,
         Fixed64 negativeImpulseScale,
-        out ExactNormalResponse3D response) =>
+        out ExactNormalResponse3D response,
+        in ContactResponseSnapshot impact = default) =>
         TryGetNormalResponseCore(
             first,
             second,
@@ -59,6 +61,7 @@ internal static partial class ExactContactResponseKernel
             positiveImpulseScale,
             negativeImpulseScale,
             includeAccumulator: true,
+            impact,
             out response);
 
     [MethodImpl(MethodImplOptions.NoInlining)]
@@ -72,6 +75,7 @@ internal static partial class ExactContactResponseKernel
         Fixed64 positiveImpulseScale,
         Fixed64 negativeImpulseScale,
         bool includeAccumulator,
+        in ContactResponseSnapshot impact,
         out ExactNormalResponse3D response)
     {
         response = default;
@@ -133,7 +137,7 @@ internal static partial class ExactContactResponseKernel
             return true;
         }
 
-        if (velocitySign == 0)
+        if (velocitySign == 0 && !impact.IsValid)
         {
             response = CreateZeroResponse(
                 isClosing: false,
@@ -154,16 +158,22 @@ internal static partial class ExactContactResponseKernel
             stackalloc ulong[MaxResponseWords];
         Span<ulong> impulseDenominator =
             stackalloc ulong[MaxResponseWords];
-        BuildImpulseRatio(
-            velocityNumerator,
-            velocityDenominator,
-            effectiveNumerator,
-            effectiveDenominator,
-            applyRestitution ? restitution : Fixed64.Zero,
-            impulseScale,
-            impulseNumerator,
-            impulseDenominator);
-        int impulseSign = -velocitySign;
+        int impulseSign;
+        if (impact.IsValid)
+        {
+            impulseSign = BuildImpactImpulseRatio(first, second, normal, impact,
+                restitution, restitutionVelocityThreshold, velocityNumerator,
+                velocityDenominator, effectiveNumerator, effectiveDenominator,
+                impulseNumerator, impulseDenominator);
+        }
+        else
+        {
+            BuildImpulseRatio(velocityNumerator, velocityDenominator,
+                effectiveNumerator, effectiveDenominator,
+                applyRestitution ? restitution : Fixed64.Zero, impulseScale,
+                impulseNumerator, impulseDenominator);
+            impulseSign = -velocitySign;
+        }
 
         Span<ulong> appliedNumerator =
             stackalloc ulong[MaxResponseWords];
@@ -356,6 +366,37 @@ internal static partial class ExactContactResponseKernel
             firstDenominatorMagnitude,
             temporary);
         WideArithmetic.AddMagnitudeInto(temporary, resultNumerator);
+    }
+
+    private static int BuildImpactImpulseRatio(
+        in ExactContactResponseOperand3D first, in ExactContactResponseOperand3D second,
+        Vector3d normal, in ContactResponseSnapshot impact, Fixed64 restitution,
+        Fixed64 threshold, Signed832 velocityNumerator, Signed832 velocityDenominator,
+        ReadOnlySpan<ulong> effectiveNumerator, ReadOnlySpan<ulong> effectiveDenominator,
+        Span<ulong> numerator, Span<ulong> denominator)
+    {
+        ExactLever3D.GetRelativePointVelocityRatio(impact.LinearA, impact.AngularA,
+            first.Lever, impact.LinearB, impact.AngularB, second.Lever, normal,
+            out Signed832 incoming, out Signed832 incomingDenominator);
+        bool representable = Fixed64.TryGetSignedRawRatio(incoming, incomingDenominator,
+            0, out Fixed64 incomingVelocity);
+        Fixed64 bounce = incoming.Sign * incomingDenominator.Sign < 0
+            && (!representable || incomingVelocity < -threshold) ? restitution : Fixed64.Zero;
+        Span<ulong> currentMagnitude = stackalloc ulong[MaxResponseWords];
+        Span<ulong> incomingMagnitude = stackalloc ulong[MaxResponseWords];
+        Span<ulong> error = stackalloc ulong[MaxCoulombWords + 2];
+        Span<ulong> velocityDenominatorMagnitude = stackalloc ulong[MaxResponseWords];
+        SetMagnitude(velocityNumerator, currentMagnitude);
+        SetMagnitude(incoming, incomingMagnitude);
+        // Both velocities use the same frozen levers, so their exact denominators
+        // are identical. Fuse v_current + e*v_incoming before effective-mass division.
+        // Its width is bounded by the existing restitution product plus one carry.
+        GetWeightedSignedSum(Fixed64.One, currentMagnitude, velocityNumerator.Sign,
+            bounce, incomingMagnitude, incoming.Sign, error, out int errorSign);
+        SetMagnitude(velocityDenominator, velocityDenominatorMagnitude);
+        WideArithmetic.MultiplyMagnitudes(error[..MaxResponseWords], effectiveDenominator, numerator);
+        WideArithmetic.MultiplyMagnitudes(velocityDenominatorMagnitude, effectiveNumerator, denominator);
+        return -errorSign * velocityDenominator.Sign;
     }
 
     private static void BuildImpulseRatio(

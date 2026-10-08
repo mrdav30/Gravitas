@@ -2,7 +2,7 @@
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-100`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-101`.
 - Assign an ID when an issue enters this tracker, keep it through resolution,
   and never reuse an ID even if an entry is later removed. Check this file's Git
   history before advancing or repairing the counter.
@@ -239,6 +239,39 @@
   and `surface-policy-audit.log`; the temporary diagnostic was removed from the
   maintained suite. The two passing controls use the same geometry, materials,
   motion and host loop, changing only whether the walls share a mesh collider.
+
+### GRV-Issue-100 - Contained cylinder and cone sphere sweeps invert outward surface normals
+
+- **Confirmed:** 2026-10-08 during the surface-manifold phase 1 producer audit.
+  Source and a maintained cylinder expectation establish the inward initial-
+  overlap normal; a dedicated full-loop regression remains follow-up work.
+- **Reproduction:** Resolve `ContinuousCollisionContactPolicy` for a sphere
+  center strictly inside an ordinary finite cylinder or cone. Both direct
+  primitive branches negate the nearest outward surface normal when signed
+  distance is negative. For a height-1/radius-1/2 cylinder and center `(1/10,0,0)`,
+  the emitted normal is Left instead of the nearest surface's Right. A cone of
+  the same dimensions with center `(1/100,-1/10,0)` similarly emits the inward
+  lateral normal. The sweep worker admits contained starts at distance zero.
+- **Root cause:** `ContinuousCollisionContactPolicy.TryResolveSweptSphereContact`
+  treats the signed-distance containment flag as a normal reversal. Cylinder
+  and cone outward normals remain escape directions for contained points.
+  Capsule and compound primitive contact paths retain outward normals instead.
+  Closing classification uses the hit normal, so the direct primitive policy
+  can classify escape motion as closing while permitting motion farther inward.
+- **Follow-up:** Align direct primitive initial-overlap contact orientation
+  with the solid-volume contract. Preserve admitted target anchors, including
+  conceptual surfaces outside the scalar domain. Add ordinary-size full-loop
+  entering/leaving tests, direct/compound parity and swept-query normal checks;
+  do not conflate solid containment with two-sided mesh surface contacts.
+- **Evidence:** Maintained
+  `FiniteAxisProjectionWorkerTests.SweptSphereCylinderContact_WithUnrepresentableCap_ShouldRetainTargetAnchor`
+  currently expects Down for a contained point whose nearest conceptual cap
+  has outward Up normal. The anchor-retention assertion remains useful; its
+  normal expectation codifies the inversion. The existing
+  `SweptSphereWorker_WithConeStartingOverlap_ShouldReturnZeroDistance` checks
+  distance and center only, leaving normal orientation unverified. Phase 1
+  fixes the discrete cone/sphere and cylinder/sphere producers; it does not
+  change this separate swept-contact policy.
 
 Remaining measured performance costs are tracked in the benchmark backlog.
 

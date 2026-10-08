@@ -50,33 +50,40 @@ public partial class CollisionPair
         ref ChronicleHashWriter writer,
         ContactManifold manifold)
     {
-        writer.WriteSection("manifold.3d", 7);
+        writer.WriteSection("manifold.3d", 8);
         writer.WriteInt64(manifold.LastUpdatedFrame);
         writer.WriteInt32(manifold.Count);
-        for (int i = 0; i < manifold.Count; i++)
+        writer.WriteInt32(manifold.GroupCount);
+        for (int groupIndex = 0; groupIndex < manifold.GroupCount; groupIndex++)
         {
-            ManifoldContact contact = manifold[i];
-            writer.WriteUInt64(contact.ContactId);
-            writer.WriteInt32(contact.FeatureNamespaceA);
-            writer.WriteVector3d(contact.AnchorA.Origin);
-            writer.WriteQuaternion(contact.AnchorA.Rotation);
-            writer.WriteVector3d(contact.AnchorA.LocalPoint);
-            writer.WriteVector3d(contact.AnchorA.LocalDisplacement);
-            writer.WriteUInt64(contact.AnchorA.GetLocalFeatureHash64());
-            writer.WriteInt32(contact.FeatureNamespaceB);
-            writer.WriteVector3d(contact.AnchorB.Origin);
-            writer.WriteQuaternion(contact.AnchorB.Rotation);
-            writer.WriteVector3d(contact.AnchorB.LocalPoint);
-            writer.WriteVector3d(contact.AnchorB.LocalDisplacement);
-            writer.WriteUInt64(contact.AnchorB.GetLocalFeatureHash64());
-            writer.WriteFixed64(contact.Depth);
-            writer.WriteBool(contact.DepthIsClamped);
-            writer.WriteVector3d(contact.Normal);
-            writer.WriteBool(contact.HasMaterialOverride);
-            if (contact.HasMaterialOverride)
+            ref ContactGroup group = ref manifold.GetGroup(groupIndex);
+            WriteGroupKey(ref writer, group.Key);
+            writer.WriteInt32(group.Count);
+            for (int i = 0; i < group.Count; i++)
             {
-                WriteMaterial(ref writer, contact.MaterialA);
-                WriteMaterial(ref writer, contact.MaterialB);
+                ManifoldContact contact = group[i];
+                writer.WriteUInt64(contact.ContactId);
+                writer.WriteInt32(contact.FeatureNamespaceA);
+                writer.WriteVector3d(contact.AnchorA.Origin);
+                writer.WriteQuaternion(contact.AnchorA.Rotation);
+                writer.WriteVector3d(contact.AnchorA.LocalPoint);
+                writer.WriteVector3d(contact.AnchorA.LocalDisplacement);
+                writer.WriteUInt64(contact.AnchorA.GetLocalFeatureHash64());
+                writer.WriteInt32(contact.FeatureNamespaceB);
+                writer.WriteVector3d(contact.AnchorB.Origin);
+                writer.WriteQuaternion(contact.AnchorB.Rotation);
+                writer.WriteVector3d(contact.AnchorB.LocalPoint);
+                writer.WriteVector3d(contact.AnchorB.LocalDisplacement);
+                writer.WriteUInt64(contact.AnchorB.GetLocalFeatureHash64());
+                writer.WriteFixed64(contact.Depth);
+                writer.WriteBool(contact.DepthIsClamped);
+                writer.WriteVector3d(contact.Normal);
+                writer.WriteBool(contact.HasMaterialOverride);
+                if (contact.HasMaterialOverride)
+                {
+                    WriteMaterial(ref writer, contact.MaterialA);
+                    WriteMaterial(ref writer, contact.MaterialB);
+                }
             }
         }
     }
@@ -94,16 +101,32 @@ public partial class CollisionPair
         ref ChronicleHashWriter writer,
         ContactWarmStartCache warmStart)
     {
-        writer.WriteSection("warm-start.3d", 1);
+        writer.WriteSection("warm-start.3d", 2);
         writer.WriteInt32(warmStart.Count);
-        for (int i = 0; i < warmStart.Count; i++)
+        writer.WriteInt32(warmStart.GroupCount);
+        for (int groupIndex = 0; groupIndex < warmStart.GroupCount; groupIndex++)
         {
-            writer.WriteUInt64(warmStart.GetContactIdForReplayHash(i));
-            ContactWarmStartImpulse impulse = warmStart.GetImpulseForReplayHash(i);
-            writer.WriteVector3d(impulse.Normal);
-            writer.WriteFixed64(impulse.NormalImpulse);
-            writer.WriteFixed64(impulse.TangentImpulse);
-            writer.WriteFixed64(impulse.SecondaryTangentImpulse);
+            ContactWarmStartGroup group = warmStart.GetGroup(groupIndex);
+            WriteGroupKey(ref writer, group.Key);
+            writer.WriteInt32(group.Count);
+            for (int i = 0; i < group.Count; i++)
+            {
+                writer.WriteUInt64(group.GetContactId(i));
+                ContactWarmStartImpulse impulse = group.GetImpulseUnchecked(i);
+                writer.WriteVector3d(impulse.Normal);
+                writer.WriteFixed64(impulse.NormalImpulse);
+                writer.WriteFixed64(impulse.TangentImpulse);
+                writer.WriteFixed64(impulse.SecondaryTangentImpulse);
+            }
         }
+    }
+
+    private static void WriteGroupKey(ref ChronicleHashWriter writer, in ContactGroupKey group)
+    {
+        writer.WriteInt32(group.NamespaceA);
+        writer.WriteInt32(group.NamespaceB);
+        writer.WriteInt32(group.SurfaceA);
+        writer.WriteInt32(group.SurfaceB);
+        writer.WriteInt32(group.Region);
     }
 }

@@ -18,8 +18,9 @@ SwiftCollections, GridForge, Chronicler.Hashing, xUnit v3, BenchmarkDotNet.
 
 **Spec:** [Approved surface-contact design](2026-10-08-surface-contact-manifold-design.md).
 
-**Status:** Implementation plan ready for review; production changes have not
-started. #097/#098 remain separate follow-ups, not closeout prerequisites.
+**Status:** Phase 1 is complete with full validation and independent review.
+Phases 2-4 remain planned. #095/#099 stay active; #097/#098 remain separate
+follow-ups.
 
 ## Global Constraints
 
@@ -114,31 +115,31 @@ contact)` and `ReserveGroups(int capacity)` internally. Existing contact
 overloads populate the default group. Match caches using full group provenance
 plus existing contact features, not a new public hash-only surface ID.
 
-- [ ] Add failing production-behavior regressions in `ContactManifoldTests.cs`:
+- [x] Add failing production-behavior regressions in focused `ContactGroup*Tests.cs`:
   nine independent groups survive; deep same-group samples cannot evict a
   shallower independent group; insertion permutations expose equal groups and
   points; group/flattened indexing and reset/reuse agree.
-- [ ] Run the focused tests and record the expected capacity failure before
+- [x] Run the focused tests and record the expected capacity failure before
   implementation. Tests needing the new API must compile before their red run;
   do not count a missing-member compiler error as the reproduction.
-- [ ] Move the existing four slots into an inline first group and retain a
+- [x] Move the existing four slots into an inline first group and retain a
   `SwiftList<ContactGroup>` only for overflow. Enumerate group-major, then
   canonical local features, without repeated linear flattened lookups. Keep
   reduction bounded within each group and collision-free group equality.
-- [ ] Retain the existing four-entry warm-start value within each cache group;
+- [x] Retain the existing four-entry warm-start value within each cache group;
   extend `StoreWarmStartImpulse`, `TryGetWarmStartImpulse` and
   `RemoveWarmStartImpulse` with `in ContactGroupKey`. Prune absent points/groups
   after regeneration. Clear logical caches on reset, pooling, mass mutation,
   population and reconfiguration while retaining reusable capacity.
-- [ ] Transfer groups through compound scratch, remapping A/B namespaces and
+- [x] Transfer groups through compound scratch, remapping A/B namespaces and
   reversing provenance with anchors/normals. Keep material regions distinct and
   notifications once per collider pair. Rename cylinder's local four-sample
   bound to `MaxContactsPerGroup`.
-- [ ] Version `manifold.3d` from 7 to 8 and `warm-start.3d` from 1 to 2; hash
+- [x] Version `manifold.3d` from 7 to 8 and `warm-start.3d` from 1 to 2; hash
   canonical group structure and point/cache order in the existing mandatory
   authoritative contributor. Update the pair section only if its direct
   serialized layout changes. Keep body saves free of contact caches.
-- [ ] Extend `CollisionWarmStartTests.cs`, `CompoundColliderCollisionTests.cs`
+- [x] Extend `CollisionWarmStartTests.cs`, `CompoundColliderCollisionTests.cs`
   and replay-hash tests for nine groups, disappearance, normal compatibility,
   reversed compounds/materials, lifecycle invalidation and all cached impulses.
   Run their focused suites, then full Release/Lean and exact coverage gates.
@@ -155,39 +156,102 @@ Consume task 1 groups and caches. `TryCreateContact(...)` consumes a group/local
 point rather than repeatedly scanning flattened indices. Remove the solver
 buffer and index-mask failure bookkeeping once all consumers stream rows.
 
-- [ ] Add red tests in `CollisionResponseInvariantTests.cs`,
-  `CollisionResponseExactLeverTests.cs` and `DiscreteIslandSolverTests.cs`:
+- [x] Add red tests in focused `ContactGroup*Tests.cs` and existing response/island
+  suites:
   orthogonal admitted normals stop both incoming components; duplicate
   same-normal samples with frozen rotation do not multiply linear response;
   disconnected supports retain torque; failure beyond contact index seven
   clears only that row; supplied normals survive misleading collider centers.
-- [ ] Apply compatible warm starts in a separate deterministic pass before
+- [x] Apply compatible warm starts in a separate deterministic pass before
   solving; a row must not read a cache already overwritten by another row.
   Preserve response-center/position snapshots for exact lever ownership.
-- [ ] Solve and apply each accumulated normal delta against current velocity,
+- [x] Solve and apply each accumulated normal delta against current velocity,
   using share one, then Coulomb friction against that row's accumulated normal
   impulse. Preserve normal nonnegativity, restitution threshold and exact
   representability preflights. A failed row clears its cache and skips its
   remaining response; other rows continue without a bitmask.
-- [ ] Correct position once per identical canonical correction direction,
+- [x] Correct position once per identical canonical correction direction,
   choosing its deepest admitted depth with deterministic ties. Preserve slop
   and the existing correction fraction; do not divide by unrelated point/group
   count. Keep separate same-normal lever arms for velocity solving. Test
   near-parallel/opposing directions and rotated inertia; this is a documented
   translation correction policy, not exact multi-contact depenetration.
-- [ ] Preserve admitted nonzero normals in `ResolveContactNormal`; collider
+- [x] Preserve admitted nonzero normals in `ResolveContactNormal`; collider
   centers are fallback only for genuinely zero legacy normals. Audit other
   producers before changing the shared consumer; correct inverted producer
   contracts at their source rather than retaining a concave-normal flip.
-- [ ] Change both queued-one-pair and single-contact-island shortcuts so
-  multi-group pairs receive configured `DiscreteSolverIterations`. Keep the
-  genuine one-surface shortcut. Verify iteration effects through physics state,
-  not test-only counters. Delete unused `SolverContactBuffer` and mask helpers.
-- [ ] Run response, exact-lever, warm-start, joint/island and existing 2D/mixed
+- [x] Make the public response wrapper apply configured
+  `DiscreteSolverIterations` to multi-point manifolds. Both queued-one-pair and
+  single-contact-island shortcuts reuse that wrapper, retaining isolated-pair
+  dispatch without bypassing the iteration budget. Keep the one-row shortcut
+  inside the wrapper. Verify iteration effects through physics state, not
+  test-only counters. Delete unused `SolverContactBuffer` and mask helpers.
+- [x] Run response, exact-lever, warm-start, joint/island and existing 2D/mixed
   parity controls, full suites/coverage and one-surface response benchmarks.
 
-**Phase 1 summary:** Append actual test, coverage, allocation and performance
-results here after implementation; #095/#099 remain active until integration.
+**Phase 1 summary - 2026-10-08:** Group storage and independent response are
+implemented; #095/#099 remain active until finite-surface admission and
+full-loop integration pass later phases.
+
+- Regressions retain nine groups/36 points, canonical insertion order, compound
+  reversal/materials, pair-level events, independent walls, disconnected torque,
+  rotated inertia and failed rows beyond index seven. Regeneration prunes vanished
+  caches even when response is skipped. Review caught and verified fixes for this
+  pruning boundary and the clamped-depth reduction tie; no actionable findings remain.
+- Frozen incoming restitution targets survive warm starts and later iterations
+  through compact/exact-lever paths and shared-body islands. Contained cone/sphere
+  and cylinder/sphere producers now supply outward normals.
+- Replay versions are `manifold.3d` 8 and `warm-start.3d` 2; `pair.3d` remains 3.
+  Four fixtures change hashes only; recorded body states, events and queries stay
+  unchanged, as do pure 2D expectations. Evidence is local Windows x64
+  Release/Lean; native CI lanes remain the cross-platform gate.
+
+| Configuration | Tests passed | Sequence points | Branch points | Fully covered methods |
+| --- | ---: | ---: | ---: | ---: |
+| Release | 4,916 | 45,174 / 45,174 | 13,716 / 13,716 | 4,664 / 4,664 |
+| ReleaseLean | 4,851 | 45,172 / 45,172 | 13,716 / 13,716 | 4,663 / 4,663 |
+
+Every warmed response and retained-storage benchmark reports 0 B/op. Matching
+Short runs (one launch, three warmups, five measurements) at 16 default-material
+pairs measure single contact 0.701 -> 0.696 ms, moving face 1.573 -> 1.638 ms and
+resting face 1.189 -> 2.297 ms, each at one sweep. Sequential corner impulses
+create intermediate angular motion and real friction work that the old batched
+resting case canceled before friction; first-sweep contact reconstruction also
+adds work. Later sweeps skip warm/correction traversal. An equivalent arithmetic
+reuse experiment measured about 5-8% slower and was removed.
+
+The invocation-count-one Short timings include JIT startup effects. A separate
+stable-JIT run disables tiered compilation (two launches, six warmups, ten
+measurements); these numbers are separate runtime conditions, not a direct
+comparison against the original Short baseline. At 64 default-material pairs:
+
+| Prepared response | One sweep | Configured six sweeps |
+| --- | ---: | ---: |
+| Single contact | 0.414 ms | 0.417 ms |
+| Moving four-point face | 1.015 ms | 6.013 ms |
+| Resting four-point face | 1.508 ms | 9.687 ms |
+
+Even one surface has coupled angular rows. The centered unit-cube/default-material
+fixture leaves angular component-sum residual 0.623 rad/s after one sweep,
+0.0186 after six and zero after 32. Every multi-point manifold therefore uses the
+configured budget; only a single row uses one sweep. Both service shortcuts reuse
+the budget-aware public wrapper without building an island for an isolated pair.
+The extra iterations are an explicit quality/cost tradeoff, not a speedup claim.
+
+Cold pair/group/cache storage allocates 2,672 B for one four-point group and
+18,864 B for nine. Retained reset/regeneration is 0 B/op at 0.637 / 8.861 us.
+A 256-pair probe with forced compacting GC estimates about 2.6 / 18.4 KiB live
+per pair before and after reset, including retained capacity; these are host heap
+deltas, not portable layout guarantees. Logs/results are under ignored
+`artifacts/grv-issue-095/phase1-*`, including `phase1-final-release-gate`,
+`phase1-final-lean-gate`, `phase1-response-baseline`, `phase1-response-after-valid`,
+`phase1-response-optimized` and `phase1-memory.log`.
+Release/Lean solution builds pass with zero warnings/errors, including both
+library target frameworks and benchmarks. DocFX passes warnings-as-errors;
+195 API pages, branding/resources, changed Markdown paths, wiki link rewriting
+and `git diff --check` pass. All changes remain unstaged/uncommitted.
+The producer audit captured separate CCD normal inversion as **GRV-Issue-100**;
+its swept-contact policy remains follow-up work.
 
 ## Phase 2 — Exact Finite Geometry And Admitted Connectivity
 

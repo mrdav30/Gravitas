@@ -95,7 +95,7 @@ public sealed class CollisionResponseInvariantTests
     }
 
     [Fact]
-    public void CalculateImpulse_WithOpposedContactNormal_ShouldFlipTowardSecondCollider()
+    public void CalculateImpulse_WithAdmittedOpposedNormal_ShouldIgnoreSeparatingMovement()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSSphereCollider> left = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
@@ -109,8 +109,8 @@ public sealed class CollisionResponseInvariantTests
 
         CollisionResponse.CalculateImpulse(pair);
 
-        left.Body.LinearVelocity.X.Should().BeLessThan(leftVelocityBefore);
-        right.Body.LinearVelocity.X.Should().BeGreaterThan(rightVelocityBefore);
+        left.Body.LinearVelocity.X.Should().Be(leftVelocityBefore);
+        right.Body.LinearVelocity.X.Should().Be(rightVelocityBefore);
     }
 
     [Fact]
@@ -480,7 +480,7 @@ public sealed class CollisionResponseInvariantTests
             new Vector3d((Fixed64)(-4), Fixed64.Zero, (Fixed64)2));
         Fixed64 tangentialSpeedBefore = moving.Body.LinearVelocity.Z.Abs();
         CollisionPair pair = scenario.CreatePair(angularOnly.Collider, moving.Collider);
-        pair.Manifold.SetContact(Vector3d.Right, Vector3d.Right, Fixed64.Zero, Vector3d.Right);
+        pair.Manifold.SetContact(Vector3d.Right, Vector3d.Right, Fixed64.Zero, pair.ColliderA == angularOnly.Collider ? Vector3d.Right : Vector3d.Left);
 
         CollisionResponse.CalculateImpulse(pair);
 
@@ -636,13 +636,15 @@ public sealed class CollisionResponseInvariantTests
             immovable: true);
         ScenarioBody<LSCuboidCollider> box = scenario.CreateCuboid(
             PhysicsScenarioBuilder.Vector(Fixed64.Zero, Fixed64.FromFraction(3, 4), Fixed64.Zero));
+        scenario.Context.Settings.DiscreteSolverIterations = 32;
         Push(box.Body, Vector3d.Down * (Fixed64)2);
         CollisionPair pair = CreateDetectedPair(scenario, floor.Collider, box.Collider);
-        pair.Manifold.Count.Should().Be(ContactManifold.MaxContactCount);
+        pair.Manifold.Count.Should().Be(ContactManifold.MaxContactsPerGroup);
 
         CollisionResponse.CalculateImpulse(pair);
 
-        box.Body.AngularVelocity.Should().Be(Vector3d.Zero);
+        box.Body.AngularVelocity.Magnitude.Should().BeLessThan(Fixed64.FromFraction(1, 1_000_000));
+        (box.Body.LinearVelocity.Y - Fixed64.One).Abs().Should().BeLessThan(Fixed64.FromFraction(1, 1_000_000));
     }
 
     [Fact]

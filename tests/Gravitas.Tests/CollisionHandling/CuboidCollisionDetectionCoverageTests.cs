@@ -49,7 +49,7 @@ public sealed class CuboidCollisionDetectionCoverageTests
         CollisionPair pair = scenario.CreatePair(first.Collider, second.Collider);
 
         CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
-        pair.Manifold.Count.Should().Be(ContactManifold.MaxContactCount);
+        pair.Manifold.Count.Should().Be(ContactManifold.MaxContactsPerGroup);
         for (int i = 0; i < pair.Manifold.Count; i++)
         {
             ManifoldContact contact = pair.Manifold[i];

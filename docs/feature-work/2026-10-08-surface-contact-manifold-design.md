@@ -1,6 +1,7 @@
 # Surface Contact Manifold Design
 
-**Status:** Approved architecture; runtime implementation has not started.
+**Status:** Approved architecture; phase 1 storage and response are implemented.
+Exact surface admission and integration remain planned.
 The [implementation plan](2026-10-08-surface-contact-manifold-plan.md) maps its
 dependencies and validation gates. **Date:** 2026-10-08. **Owning issues:**
 [#095](issue-tracker.md#grv-issue-095---discrete-mesh-cone-contacts-can-choose-an-artificial-triangulation-seam-exit),
@@ -187,7 +188,8 @@ scheduling must change together.
 Audit both one-pair shortcuts in `GravitasPhysicsService.Response`: the queued
 pair path and the single-contact island path currently solve only once. A pair
 with multiple independent surface groups must receive the intended solver
-iterations; preserve the genuine one-surface fast path. The probe demonstrates
+iterations. A single contact row keeps the one-sweep fast path; even one
+geometric group can contain coupled angular constraints that need iteration. The probe demonstrates
 an omitted constraint, not a standalone defect in `contactShare`.
 
 Use one explained correction policy for equivalent same-normal surface samples,
@@ -217,7 +219,8 @@ order is:
 1. Establish the contact-group/storage and response contract with the two-wall
    regression and redundant-sample controls. Cover all fixed-capacity consumers
    plus compound transfer, replay schemas, cache lifecycle and both solver
-   dispatch shortcuts; preserve the existing one-surface hot path.
+   dispatch shortcuts; retain the isolated-pair dispatch shortcut while applying
+   the configured budget to every multi-point manifold.
 2. Add exact finite cone/patch witness generation, starting with the tab blocker,
    holes and the long tilted interior. Keep face certificates as proven fast
    paths; complete clipping supplies cases where they decline.

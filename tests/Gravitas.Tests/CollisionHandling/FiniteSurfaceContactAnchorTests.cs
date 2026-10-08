@@ -83,7 +83,10 @@ public sealed class FiniteSurfaceContactAnchorTests
         contact.AnchorA.Origin.Should().Be(cylinder.Center);
         contact.AnchorB.Origin.Should().Be(sphere.Center);
         contact.TryGetPointA(out _).Should().BeFalse();
-        contact.TryGetPointB(out _).Should().BeFalse();
+        // The contained sphere's inward support is representable even when
+        // the solid's outward surface exceeds the world-coordinate boundary.
+        contact.TryGetPointB(out Vector3d spherePoint).Should().BeTrue();
+        spherePoint.X.Should().BeLessThan(sphere.Center.X);
     }
 
     [Fact]
@@ -100,7 +103,10 @@ public sealed class FiniteSurfaceContactAnchorTests
         contact.AnchorA.Origin.Should().Be(cone.Center);
         contact.AnchorB.Origin.Should().Be(sphere.Center);
         contact.TryGetPointA(out _).Should().BeFalse();
-        contact.TryGetPointB(out _).Should().BeFalse();
+        // The contained sphere's inward support is representable even when
+        // the solid's outward surface exceeds the world-coordinate boundary.
+        contact.TryGetPointB(out Vector3d spherePoint).Should().BeTrue();
+        spherePoint.X.Should().BeLessThan(sphere.Center.X);
     }
 
     [Theory]

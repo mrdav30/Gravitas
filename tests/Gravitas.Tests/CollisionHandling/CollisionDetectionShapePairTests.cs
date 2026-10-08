@@ -696,8 +696,8 @@ public sealed class CollisionDetectionShapePairTests
         CollisionPair forward = AssertCollision(scenario, first.Collider, second.Collider, CollisionType.Cuboid_Cuboid);
         CollisionPair reversed = AssertCollision(scenario, second.Collider, first.Collider, CollisionType.Cuboid_Cuboid);
 
-        forward.Manifold.Count.Should().Be(ContactManifold.MaxContactCount);
-        reversed.Manifold.Count.Should().Be(ContactManifold.MaxContactCount);
+        forward.Manifold.Count.Should().Be(ContactManifold.MaxContactsPerGroup);
+        reversed.Manifold.Count.Should().Be(ContactManifold.MaxContactsPerGroup);
         forward.Manifold.Select(contact => contact.ContactId).Should().Equal(reversed.Manifold.Select(contact => contact.ContactId));
         forward.Manifold.Select(contact => contact.ContactId).Should().BeInAscendingOrder();
 
@@ -741,7 +741,7 @@ public sealed class CollisionDetectionShapePairTests
 
         CollisionPair pair = AssertCollision(scenario, bottom.Collider, top.Collider, CollisionType.Cuboid_Cuboid);
 
-        pair.Manifold.Count.Should().Be(ContactManifold.MaxContactCount);
+        pair.Manifold.Count.Should().Be(ContactManifold.MaxContactsPerGroup);
         pair.Manifold.PrimaryContact.Depth.Should().Be(Fixed64.Zero);
         pair.Manifold.PrimaryContact.Normal.Should().Be(Vector3d.Up);
     }
@@ -758,7 +758,7 @@ public sealed class CollisionDetectionShapePairTests
 
         CollisionPair pair = AssertCollision(scenario, first.Collider, second.Collider, CollisionType.Cuboid_Cuboid);
 
-        pair.Manifold.Count.Should().Be(ContactManifold.MaxContactCount);
+        pair.Manifold.Count.Should().Be(ContactManifold.MaxContactsPerGroup);
         pair.Manifold.Select(contact => contact.ContactId).Should().BeInAscendingOrder();
         for (int i = 0; i < pair.Manifold.Count; i++)
         {
@@ -1038,7 +1038,7 @@ public sealed class CollisionDetectionShapePairTests
 
         CollisionPair pair = AssertCollision(scenario, bottom.Collider, top.Collider, CollisionType.Cylinder_Cylinder);
 
-        pair.Manifold.Count.Should().Be(ContactManifold.MaxContactCount);
+        pair.Manifold.Count.Should().Be(ContactManifold.MaxContactsPerGroup);
         pair.Manifold.Select(contact => contact.ContactId).Should().BeInAscendingOrder();
         for (int i = 0; i < pair.Manifold.Count; i++)
         {
@@ -1110,7 +1110,7 @@ public sealed class CollisionDetectionShapePairTests
 
         CollisionPair pair = AssertCollision(scenario, floor.Collider, cylinder.Collider, CollisionType.Cuboid_Cylinder);
 
-        pair.Manifold.Count.Should().Be(ContactManifold.MaxContactCount);
+        pair.Manifold.Count.Should().Be(ContactManifold.MaxContactsPerGroup);
         pair.Manifold.Select(contact => contact.ContactId).Should().BeInAscendingOrder();
         for (int i = 0; i < pair.Manifold.Count; i++)
         {
@@ -1157,7 +1157,7 @@ public sealed class CollisionDetectionShapePairTests
 
         CollisionPair pair = AssertCollision(scenario, floor.Collider, cylinder.Collider, CollisionType.Mesh_Cylinder);
 
-        pair.Manifold.Count.Should().Be(ContactManifold.MaxContactCount);
+        pair.Manifold.Count.Should().Be(ContactManifold.MaxContactsPerGroup);
         pair.Manifold.Select(contact => contact.ContactId).Should().BeInAscendingOrder();
         for (int i = 0; i < pair.Manifold.Count; i++)
         {
@@ -2096,8 +2096,8 @@ public sealed class CollisionDetectionShapePairTests
         CollisionPair forward = AssertCollision(scenario, floor.Collider, cuboid.Collider, CollisionType.Mesh_Cuboid);
         CollisionPair reversed = AssertCollision(scenario, cuboid.Collider, floor.Collider, CollisionType.Mesh_Cuboid);
 
-        forward.Manifold.Count.Should().Be(ContactManifold.MaxContactCount);
-        reversed.Manifold.Count.Should().Be(ContactManifold.MaxContactCount);
+        forward.Manifold.Count.Should().Be(ContactManifold.MaxContactsPerGroup);
+        reversed.Manifold.Count.Should().Be(ContactManifold.MaxContactsPerGroup);
         forward.Manifold.Select(contact => contact.ContactId).Should().Equal(reversed.Manifold.Select(contact => contact.ContactId));
         forward.Manifold.Select(contact => contact.ContactId).Should().BeInAscendingOrder();
 

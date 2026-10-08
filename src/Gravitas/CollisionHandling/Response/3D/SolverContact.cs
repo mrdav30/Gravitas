@@ -39,7 +39,8 @@ internal readonly struct ContactLever3D
 internal readonly struct SolverContact
 {
     public SolverContact(
-        int manifoldIndex,
+        int groupIndex,
+        int pointIndex,
         ulong contactId,
         ResponseBody bodyA,
         ResponseBody bodyB,
@@ -53,7 +54,8 @@ internal readonly struct SolverContact
         Fixed64 cachedTangentImpulse,
         Fixed64 cachedSecondaryTangentImpulse)
     {
-        ManifoldIndex = manifoldIndex;
+        GroupIndex = groupIndex;
+        PointIndex = pointIndex;
         ContactId = contactId;
         A = bodyA;
         B = bodyB;
@@ -74,7 +76,9 @@ internal readonly struct SolverContact
         CachedSecondaryTangentImpulse = cachedSecondaryTangentImpulse;
     }
 
-    public int ManifoldIndex { get; }
+    internal int GroupIndex { get; }
+
+    internal int PointIndex { get; }
 
     public ulong ContactId { get; }
 

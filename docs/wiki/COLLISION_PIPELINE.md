@@ -276,6 +276,10 @@ TOI ordering, and service counters:
 ## Response And Notifications
 
 Non-trigger contacts are solved through deterministic manifold response.
+3D manifolds retain independent surface groups with four point samples per group.
+Sequential rows read current velocities while restitution uses incoming motion
+captured before island warm starts. Multipoint pairs honor the configured solver
+budget even when they form the only pair in an island.
 Bodyless trigger volumes skip physical response and emit trigger notifications
 only when exactly one collider in the pair is a trigger and the other collider
 is body-owned. Both colliders in a valid trigger pair receive enter, stay, and

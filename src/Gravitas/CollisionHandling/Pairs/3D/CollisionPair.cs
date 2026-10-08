@@ -24,6 +24,7 @@ internal enum CollisionResponseDispatchMode
 /// <summary>
 /// Owns deterministic 3D pair lifecycle, culling, contact, and notification state.
 /// </summary>
+/// <content>Owns contact groups, cached impulses and discrete response lifecycle.</content>
 public partial class CollisionPair
 {
     /// <summary>Stores the host-controlled pair diagnostic flag.</summary>
@@ -92,6 +93,8 @@ public partial class CollisionPair
     public ContactManifold Manifold { get; } = new();
 
     private ContactWarmStartCache _warmStart;
+
+    internal ContactResponseSnapshot ResponseSnapshot;
 
     internal CollisionPair(LSCollider c1, LSCollider c2) => Initialize(c1, c2);
 
@@ -219,7 +222,7 @@ public partial class CollisionPair
             _isCollidingChanged = _isColliding;
             _isColliding = false;
             Manifold.Reset();
-            _warmStart.Clear();
+            ClearWarmStart();
             return;
         }
 
@@ -235,7 +238,7 @@ public partial class CollisionPair
 
         if (!result || !Manifold.HasContact)
         {
-            _warmStart.Clear();
+            ClearWarmStart();
             return;
         }
 
@@ -570,7 +573,7 @@ public partial class CollisionPair
     public void Reset()
     {
         Manifold.Reset();
-        _warmStart.Clear();
+        ClearWarmStart();
         _isColliding = false;
         _isCollidingChanged = false;
         _isPooledForDeactivation = false;
@@ -591,10 +594,24 @@ public partial class CollisionPair
     internal bool TryGetWarmStartImpulse(ulong contactId, out ContactWarmStartImpulse impulse) =>
         _warmStart.TryGet(contactId, out impulse);
 
-    internal void RemoveWarmStartImpulse(ulong contactId) =>
-        _warmStart.Remove(contactId);
+    internal void ClearWarmStart()
+    {
+        _warmStart.Clear();
+        ResponseSnapshot = default;
+    }
 
-    internal void ClearWarmStart() => _warmStart.Clear();
+    internal void StoreWarmStartImpulse(in ContactGroupKey group, ulong contactId,
+        Vector3d normal, Fixed64 normalImpulse, Fixed64 tangentImpulse,
+        Fixed64 secondaryTangentImpulse) =>
+        _warmStart.Set(group, contactId, normal, normalImpulse, tangentImpulse, secondaryTangentImpulse);
+
+    internal bool TryGetWarmStartImpulse(in ContactGroupKey group, ulong contactId,
+        out ContactWarmStartImpulse impulse) => _warmStart.TryGet(group, contactId, out impulse);
+
+    internal void RemoveWarmStartImpulse(in ContactGroupKey group, ulong contactId) =>
+        _warmStart.Remove(group, contactId);
+
+    internal void RetainWarmStarts() => _warmStart.Retain(Manifold);
 
     /// <summary>
     /// Deactivates the CollisionPair.
@@ -615,7 +632,7 @@ public partial class CollisionPair
         }
 
         Manifold.Reset();
-        _warmStart.Clear();
+        ClearWarmStart();
         _isPooledForDeactivation = false;
         Active = false;
 

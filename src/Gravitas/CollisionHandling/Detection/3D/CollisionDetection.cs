@@ -16,7 +16,12 @@ public static partial class CollisionDetection
     public static bool DoCollisionCheck(CollisionPair pair)
     {
         pair.Manifold.BeginUpdate(pair.Context.FrameCount);
-        return DoCollisionCheck(CollisionWorkItem.Create(pair));
+        bool collided = DoCollisionCheck(CollisionWorkItem.Create(pair));
+        // Regeneration retires vanished features even if sleeping/frozen bodies
+        // skip response. A later reappearing feature must not revive an old load.
+        pair.RetainWarmStarts();
+        pair.ResponseSnapshot = default;
+        return collided;
     }
 
     internal static bool DoCollisionCheck(CollisionWorkItem pair)

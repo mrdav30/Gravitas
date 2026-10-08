@@ -60,7 +60,7 @@ public sealed class CylinderContactGeometryCoverageTests
         Vector3d[] expectedFirstPoints,
         Vector3d[] expectedSecondPoints)
     {
-        manifold.Count.Should().Be(ContactManifold.MaxContactCount);
+        manifold.Count.Should().Be(ContactManifold.MaxContactsPerGroup);
         manifold.Select(contact => contact.ContactId).Should().BeInAscendingOrder();
         manifold.Select(contact => contact.PointA).Should().BeEquivalentTo(expectedFirstPoints);
         manifold.Select(contact => contact.PointB).Should().BeEquivalentTo(expectedSecondPoints);

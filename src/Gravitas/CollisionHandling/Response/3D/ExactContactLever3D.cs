@@ -66,7 +66,8 @@ internal static class ExactContactLever3D
         Fixed64 accumulatedImpulse,
         Fixed64 positiveImpulseScale,
         Fixed64 negativeImpulseScale,
-        out ExactNormalResponse3D response)
+        out ExactNormalResponse3D response,
+        in ContactResponseSnapshot impact = default)
     {
         ExactContactResponseOperand3D first = CreateResponseOperand(
             bodyA,
@@ -89,7 +90,7 @@ internal static class ExactContactLever3D
             accumulatedImpulse,
             positiveImpulseScale,
             negativeImpulseScale,
-            out response);
+            out response, impact);
     }
 
     internal static ExactContactResponseOperand3D CreateResponseOperand(

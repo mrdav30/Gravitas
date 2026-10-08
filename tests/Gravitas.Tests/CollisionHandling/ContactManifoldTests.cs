@@ -23,7 +23,7 @@ public sealed class ContactManifoldTests
         manifold.AddContact(new Vector3d(3, 0, 0), new Vector3d(3, 0, 1), Fixed64.FromFraction(4, 10), Vector3d.Right);
         manifold.AddContact(new Vector3d(4, 0, 0), new Vector3d(4, 0, 1), Fixed64.FromFraction(5, 10), Vector3d.Right);
 
-        manifold.Count.Should().Be(ContactManifold.MaxContactCount);
+        manifold.Count.Should().Be(ContactManifold.MaxContactsPerGroup);
         manifold.LastUpdatedFrame.Should().Be(7);
         manifold.PrimaryContact.Depth.Should().Be(Fixed64.FromFraction(5, 10));
         manifold.Select(contact => contact.Depth)

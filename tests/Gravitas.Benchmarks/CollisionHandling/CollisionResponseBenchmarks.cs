@@ -18,6 +18,9 @@ public class CollisionResponseBenchmarks
     [Params(16, 64)]
     public int PairCount { get; set; }
 
+    [Params(1, PhysicsSettings.DefaultDiscreteSolverIterations)]
+    public int SolverIterations { get; set; }
+
     [Params(
         ResponseContactShape.SingleContact,
         ResponseContactShape.FaceManifold,
@@ -36,6 +39,7 @@ public class CollisionResponseBenchmarks
         _context = BenchmarkPhysicsScene.CreateContext(
             BenchmarkPhysicsScene.GridExtentForGrid(PairCount * 2),
             clearAllPools: true);
+        _context.Settings.DiscreteSolverIterations = SolverIterations;
         _pairs = new CollisionPair[PairCount];
 
         for (int i = 0; i < _pairs.Length; i++)

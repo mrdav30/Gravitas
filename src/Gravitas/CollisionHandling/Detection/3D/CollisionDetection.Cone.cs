@@ -38,9 +38,9 @@ public static partial class CollisionDetection
         if (signedDistance > sphere.ScaledRadius)
             return false;
 
-        Vector3d normal = signedDistance < Fixed64.Zero
-            ? -outwardNormal
-            : outwardNormal;
+        // Containment increases penetration depth; the sphere still escapes
+        // along the solid surface's outward normal, not toward the cone center.
+        Vector3d normal = outwardNormal;
         ResolvePenetrationDepth(
             sphere.ScaledRadius,
             signedDistance,

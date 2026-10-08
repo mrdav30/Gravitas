@@ -55,12 +55,16 @@ public sealed class CollisionWarmStartTests
         ScenarioBody<LSCuboidCollider> box = scenario.CreateCuboid(
             PhysicsScenarioBuilder.Vector(0, 1, 0),
             preventAngularForces: true);
+        floor.Collider.Material = box.Collider.Material =
+            new Gravitas.Materials.PhysicsMaterial(Fixed64.One, Fixed64.One, Fixed64.Zero);
         CollisionPair pair = scenario.CreatePair(floor.Collider, box.Collider);
         CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
-        pair.Manifold.Count.Should().Be(ContactManifold.MaxContactCount);
-        box.Body.AddLinearImpulse(new Vector3d(Fixed64.Half, Fixed64.Zero, Fixed64.FromFraction(1, 4)));
+        pair.Manifold.Count.Should().Be(ContactManifold.MaxContactsPerGroup);
+        // A cached load represents sustained support only when a real incoming
+        // normal load replenishes it; stale impulses alone cannot grant friction.
+        box.Body.AddLinearImpulse(new Vector3d(Fixed64.Half, -Fixed64.One, Fixed64.FromFraction(1, 4)));
         Vector3d velocityBefore = box.Body.LinearVelocity;
-        StoreWarmStartNormalLoad(pair, Fixed64.One);
+        StoreWarmStartNormalLoad(pair, Fixed64.Quarter);
 
         CollisionResponse.CalculateImpulse(pair);
 
@@ -141,8 +145,8 @@ public sealed class CollisionWarmStartTests
         cache.Remove(22UL).Should().BeTrue();
 
         cache.Count.Should().Be(2);
-        cache.GetContactIdForReplayHash(0).Should().Be(11UL);
-        cache.GetContactIdForReplayHash(1).Should().Be(33UL);
+        cache.GetGroup(0).GetContactId(0).Should().Be(11UL);
+        cache.GetGroup(0).GetContactId(1).Should().Be(33UL);
         cache.TryGet(22UL, out _).Should().BeFalse();
         cache.Remove(44UL).Should().BeFalse();
 

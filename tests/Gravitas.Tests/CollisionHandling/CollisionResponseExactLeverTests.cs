@@ -1009,8 +1009,11 @@ public sealed class CollisionResponseExactLeverTests
                 out ContactWarmStartImpulse impulse)
             .Should()
             .BeTrue();
-        mover.Body.LinearVelocity.Should().Be(Vector3d.Forward);
-        impulse.TangentImpulse.Should().Be(Fixed64.Zero);
+        // Independent accumulated load retains the exact two-raw-unit friction
+        // response rather than discarding it through pair-wide pressure sharing.
+        mover.Body.LinearVelocity.Should().Be(new Vector3d(Fixed64.Zero, Fixed64.Zero,
+            Fixed64.One - Fixed64.MinIncrement * Fixed64.Two));
+        impulse.TangentImpulse.Should().Be(Fixed64.MinIncrement * Fixed64.Two);
     }
 
     [Fact]
@@ -1314,8 +1317,8 @@ public sealed class CollisionResponseExactLeverTests
             scenario.CreateSphere(Vector3d.Right, mass: Fixed64.Two);
         left.Body.FreezeAxes = BodyFreezeAxes3D.Rotation;
         right.Body.FreezeAxes = BodyFreezeAxes3D.Rotation;
-        left.Collider.Material = PhysicsMaterial.Default;
-        right.Collider.Material = PhysicsMaterial.Default;
+        left.Collider.Material = new PhysicsMaterial(Fixed64.One, Fixed64.One, Fixed64.Zero);
+        right.Collider.Material = new PhysicsMaterial(Fixed64.One, Fixed64.One, Fixed64.Zero);
         var expected = new Vector3d(
             (Fixed64)1073741824,
             Fixed64.Zero,

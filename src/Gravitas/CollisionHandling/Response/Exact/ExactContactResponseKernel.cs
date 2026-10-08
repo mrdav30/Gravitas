@@ -11,6 +11,7 @@ namespace Gravitas.CollisionHandling;
 /// Resolves allocation-free exact normal and Coulomb contact response while
 /// narrowing only completed body deltas and optional diagnostics.
 /// </summary>
+/// <content>Defines shared exact response width bounds and dimensional policy kernels.</content>
 internal static partial class ExactContactResponseKernel
 {
     // Valid point-anchor denominators are below 202 bits. The largest completed

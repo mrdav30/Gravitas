@@ -194,10 +194,20 @@ public sealed partial class GravitasPhysicsService
 
     private void SolveDiscreteIslandRange(int start, int end)
     {
-        if (end - start == 1 && _discreteIslandConstraints[start].Kind == DiscreteIslandConstraintKind.Contact)
+        if (end - start == 1
+            && _discreteIslandConstraints[start].Kind == DiscreteIslandConstraintKind.Contact)
         {
             CollisionResponse.CalculateImpulse(_discreteIslandConstraints[start].Pair);
             return;
+        }
+
+        // Restitution targets belong to the incoming island state. Capture all
+        // contacts before any contact or joint warm start changes shared bodies.
+        for (int i = start; i < end; i++)
+        {
+            DiscreteIslandConstraint constraint = _discreteIslandConstraints[i];
+            if (constraint.Kind == DiscreteIslandConstraintKind.Contact)
+                CollisionResponse.PrepareSolve(constraint.Pair);
         }
 
         int iterations = _context.Settings.DiscreteSolverIterations;
@@ -218,6 +228,15 @@ public sealed partial class GravitasPhysicsService
                 else
                     JointSolver3D.Solve(constraint.Joint!, applyCachedImpulse);
             }
+        }
+
+        // These pre-solve velocities and lever positions are phase-local scratch,
+        // not state carried into the next frame or a retained pair's replay hash.
+        for (int i = start; i < end; i++)
+        {
+            DiscreteIslandConstraint constraint = _discreteIslandConstraints[i];
+            if (constraint.Kind == DiscreteIslandConstraintKind.Contact)
+                constraint.Pair.ResponseSnapshot = default;
         }
     }
 

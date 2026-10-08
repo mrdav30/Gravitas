@@ -181,10 +181,10 @@ public sealed class BodyFreezeConstraintTests
         moving.Body.ApplyCollisionLinearVelocityDelta(-Vector3d.Up * (Fixed64)4);
         CollisionPair pair = scenario.CreatePair(frozen.Collider, moving.Collider);
         pair.Manifold.SetContact(
-            frozen.Collider.Center,
-            moving.Collider.Center,
+            pair.ColliderA.Center,
+            pair.ColliderB.Center,
             Fixed64.FromFraction(1, 10),
-            Vector3d.Up);
+            pair.ColliderA == frozen.Collider ? Vector3d.Up : -Vector3d.Up);
 
         CollisionResponse.CalculateImpulse(pair);
 
@@ -204,10 +204,10 @@ public sealed class BodyFreezeConstraintTests
         moving.Body.ApplyCollisionLinearVelocityDelta(-Vector3d.Right * (Fixed64)4);
         CollisionPair pair = scenario.CreatePair(frozen.Collider, moving.Collider);
         pair.Manifold.SetContact(
-            frozen.Collider.Center + Vector3d.Up,
-            moving.Collider.Center + Vector3d.Up,
+            pair.ColliderA.Center + Vector3d.Up,
+            pair.ColliderB.Center + Vector3d.Up,
             Fixed64.FromFraction(1, 10),
-            Vector3d.Right);
+            pair.ColliderA == frozen.Collider ? Vector3d.Right : -Vector3d.Right);
 
         CollisionResponse.CalculateImpulse(pair);
 

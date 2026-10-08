@@ -23,16 +23,31 @@ explicit.
 The 3D narrow phase writes a `ContactManifold` owned by the `CollisionPair`.
 `ManifoldContact` stores:
 
-- stable contact identity derived from the unordered pair of world-space contact
-  points.
+- stable contact identity derived from unordered canonical local anchor features
+  and compound namespaces; world pose is excluded.
 - point on collider A.
 - point on collider B.
 - penetration depth.
 - normal oriented from collider A toward collider B.
 
-3D manifolds store up to four contacts. When more candidates are offered, the
-manifold keeps the deepest four and breaks depth ties by lower stable contact
-identity. Exposed contact order is stable ascending contact identity.
+3D manifolds retain independent geometric groups, with up to
+`ContactManifold.MaxContactsPerGroup` (four) point samples per group. Within a
+group, the reducer keeps the deepest samples, prefers conceptually clamped
+depths on equal rounded depth, then breaks ties by lower contact identity.
+Groups use full structural provenance: A/B compound namespaces, A/B surface
+ordinals and region identity. Groups and their point identities have canonical
+order; a group or triangle count is never a pressure weight. Primitive contacts
+use the default group, and compound part contacts retain independent namespaces.
+Mesh contact producers determine which regions they admit.
+
+`Count`, the indexer and enumeration expose flattened group/point order;
+`GroupCount`, `GetGroupStartIndex` and `GetGroupContactCount` support inspection.
+The former pair-wide `MaxContactCount` constant is replaced by
+`MaxContactsPerGroup`. The common single group is inline; overflow storage grows
+on demand and remains with the pair after reset or pooling. First-ever capacity
+growth can allocate; regeneration at a retained high-water mark does not.
+Warm starts follow the same grouped ownership and are pruned after narrow-phase
+regeneration, including when response is skipped.
 
 2D narrow phase writes `ContactManifold2D` into `CollisionPair2D`. The 2D
 manifold is fixed at two contacts because supported convex 2D face contacts need
@@ -55,8 +70,10 @@ queued response pairs by stable pair key and combines them with enabled joints:
 
 Fully sleeping islands are skipped. If an island contains an awake participant,
 connected sleeping dynamic bodies are woken in deterministic order. Contact-only
-single-pair scenes stay on a low-overhead direct response path when no active
-joints exist.
+single-row 3D scenes stay on a direct response path when no active joints exist.
+A lone 3D pair with multiple points uses the configured iteration budget, as does
+the public `CollisionResponse.CalculateImpulse` entry point. The 2D owner keeps
+its own dimensional scheduling policy.
 
 Multi-constraint islands run a bounded number of iterations from
 `PhysicsSettings.DiscreteSolverIterations`. Cached warm-start impulses and
@@ -67,23 +84,35 @@ iterations refine velocity response.
 
 Non-trigger 3D response:
 
-1. builds solver contacts from the pair manifold, collider bodies, contact
-   points, relative COM arms, penetration depth, and pair-oriented normal.
-2. derives linear and angular solver mobility independently: translation freezes
-   zero constrained inverse mass, rotation freezes zero constrained inverse
-   inertia, and static or kinematic roles contribute neither.
-3. applies positional correction only for depth above
-   `CollisionResponse.PenetrationSlop`.
-4. shares correction across active manifold contacts.
-5. computes normal contact velocity from linear velocity plus angular velocity
-   at each relative contact arm.
-6. applies compatible cached normal/tangent impulses before the fresh solve.
-7. solves normal impulse deltas and clamps accumulated normal impulse at zero.
-8. resolves collider surface materials and combine policies.
-9. solves friction over a deterministic tangent frame derived from the contact
-   normal.
-10. stores solved normal/tangent impulses and contact normal in a fixed-size
-    warm-start cache.
+1. captures incoming motion and COM-relative lever frames before any island
+   warm start or joint solve.
+2. derives linear and angular mobility independently from mass, inertia,
+   role and frozen axes.
+3. corrects position once per identical admitted normal direction, using its
+   deepest depth above `PenetrationSlop` and the existing correction fraction.
+   Other directions do not dilute correction; separate lever samples remain
+   independent velocity constraints. This translation policy is not an exact
+   multi-contact depenetration solve.
+4. applies compatible grouped warm starts in canonical order.
+5. solves and immediately applies each accumulated normal delta against current
+   linear/angular point velocity, clamping accumulated normal impulse at zero.
+6. fixes restitution to incoming motion before warm starts, so later iterations
+   refine the same target instead of retracting bounce.
+7. resolves per-contact materials and solves the two-axis Coulomb disk against
+   that row's actual accumulated normal load.
+8. stores each row's normal/tangent impulses independently. A failed
+   representability preflight clears only that row's cache; other rows continue.
+
+Admitted nonzero normals are authoritative. Collider-center direction is a
+fallback only for a genuinely zero legacy normal. Contained sphere contacts with
+finite cones/cylinders retain the solid's outward escape normal and sphere's
+inward support. Exact kernels preserve frozen lever frames and incoming motion
+through completed impulse/body-delta rounding.
+
+Sequential multipoint response has a finite-iteration residual. More
+`DiscreteSolverIterations` improve convergence at additional cost, including for
+symmetric face contacts. Choose the budget using representative quality and
+frame-time measurements.
 
 3D response torque arms are measured from `SolidBody.WorldCenterOfMass`.
 Collider centers remain collision-geometry references for narrow phase, culling,
