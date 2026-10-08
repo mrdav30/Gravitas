@@ -9,6 +9,7 @@ using FixedMathSharp;
 using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
 using SwiftCollections.Query;
+using System;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas.CollisionHandling;
@@ -102,7 +103,7 @@ public static partial class CollisionDetection
         if (TryFindMeshConeTriangleContact(
                 mesh,
                 cone,
-                pair.Context.CollisionScratch.MeshTriangleCandidatesA,
+                pair.Context.CollisionScratch,
                 out ContactAnchor meshAnchor,
                 out ContactAnchor coneAnchor,
                 out Vector3d normalMeshToCone,
@@ -145,7 +146,7 @@ public static partial class CollisionDetection
     private static bool TryFindMeshConeTriangleContact(
         LSMeshCollider mesh,
         LSConeCollider cone,
-        SwiftCollections.SwiftList<int> triangleBuffer,
+        CollisionSatScratch scratch,
         out ContactAnchor meshAnchor,
         out ContactAnchor coneAnchor,
         out Vector3d normalMeshToCone,
@@ -158,7 +159,9 @@ public static partial class CollisionDetection
         depth = Fixed64.Zero;
         depthIsClamped = false;
 
+        var triangleBuffer = scratch.MeshTriangleCandidatesA;
         mesh.GetTrianglesInBounds(new FixedBoundVolume(cone.BoundsMin, cone.BoundsMax), triangleBuffer);
+        PrepareMeshConePatchContacts(mesh, cone, scratch);
         bool found = false;
         Fixed64 bestDepth = Fixed64.MaxValue;
 
@@ -173,10 +176,12 @@ public static partial class CollisionDetection
             var triangle = new FixedTriangle(first, second, third);
             // Admission and the complete contact must belong to the same
             // feature; a nearest-center sample can miss a side intersection.
-            if (!triangle.TryGetCenteredFiniteConeContact(
+            if (!scratch.MeshConePatchContacts.TryGetValue(
+                    mesh.Mesh.GetCoplanarPatchId(triangleIndex), out FixedContactAnchors contact)
+                && !triangle.TryGetCenteredFiniteConeContact(
                     mesh.Mesh.Origin, mesh.Mesh.Rotation,
                     cone.Center, cone.Rotation, cone.Height, cone.ScaledRadius,
-                    out FixedContactAnchors contact))
+                    out contact))
             {
                 continue;
             }
@@ -194,6 +199,58 @@ public static partial class CollisionDetection
         }
 
         return found;
+    }
+
+    private static void PrepareMeshConePatchContacts(
+        LSMeshCollider mesh, LSConeCollider cone, CollisionSatScratch scratch)
+    {
+        var contacts = scratch.MeshConePatchContacts;
+        contacts.Clear();
+        var candidates = scratch.MeshTriangleCandidatesA;
+        Span<Vector3d> witnessBounds = stackalloc Vector3d[2]
+        {
+            mesh.Mesh.ScaledLocalBounds.Min, mesh.Mesh.ScaledLocalBounds.Max
+        };
+        for (int i = 0; i < candidates.Count; i++)
+        {
+            int triangleIndex = candidates[i];
+            int patch = mesh.Mesh.GetCoplanarPatchId(triangleIndex);
+            if (patch < 0 || contacts.ContainsKey(patch))
+                continue;
+            mesh.Mesh.GetLocalTriangleVertices(triangleIndex,
+                out Vector3d first, out Vector3d second, out Vector3d third);
+            var triangle = new FixedTriangle(first, second, third);
+            // A later BVH triangle may contain the certified face witness.
+            // Certify first, then reduce in the original BVH order so an earlier
+            // internal-edge exit cannot defeat the whole patch's face exit.
+            if (TriangleConeContact.TryGetPatchFaceContact(
+                    triangle, mesh.Mesh.Origin, mesh.Mesh.Rotation,
+                    mesh.Mesh.ScaledLocalVertices, mesh.Mesh.GetCoplanarPatchBoundaryVertexPairs(triangleIndex),
+                    cone.Center, cone.Rotation, cone.Height, cone.ScaledRadius,
+                    out FixedContactAnchors contact, witnessBounds))
+            {
+                contacts.Add(patch, contact);
+                continue;
+            }
+
+            ReadOnlySpan<int> corners = mesh.Mesh.GetConvexCoplanarPatchCornerVertexIndices(triangleIndex);
+            // A convex patch's normal fan consists of its real perimeter
+            // edges and corners. An intersecting authored seed supplies a
+            // valid base-pole witness when no minimum-face proof applies.
+            if (!corners.IsEmpty
+                && triangle.TryGetCenteredFiniteConeContact(mesh.Mesh.Origin, mesh.Mesh.Rotation,
+                    cone.Center, cone.Rotation, cone.Height, cone.ScaledRadius, out _))
+            {
+                bool found = TriangleConeContact.TryGetConvexPatchContact(triangle, mesh.Mesh.Origin, mesh.Mesh.Rotation,
+                    mesh.Mesh.ScaledLocalVertices, corners,
+                    cone.Center, cone.Rotation, cone.Height, cone.ScaledRadius,
+                    out contact, witnessBounds);
+                // The admitted triangle is a subset of this exact filled
+                // convex patch, so the complete polygon cannot be separated.
+                System.Diagnostics.Debug.Assert(found);
+                contacts.Add(patch, contact);
+            }
+        }
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

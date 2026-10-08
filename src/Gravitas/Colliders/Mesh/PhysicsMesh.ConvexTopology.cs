@@ -7,24 +7,39 @@
 
 using FixedMathSharp;
 using FixedMathSharp.Geometry;
+using SwiftCollections;
 using System;
+using System.Collections.Generic;
 
 namespace Gravitas.Colliders;
 
 public partial class PhysicsMesh
 {
-    private static int[] CreateTopologyTriangles(Vector3d[] vertices, int[] triangles)
-    {
-        var vertexUses = new VertexUse[vertices.Length];
-        for (int i = 0; i < vertices.Length; i++)
-            vertexUses[i] = new VertexUse(vertices[i], i);
+    private readonly SwiftList<VertexUse> _topologyVertexUses = new();
+    private int[] _topologyRepresentativeIndices = Array.Empty<int>();
+    private int[] _topologyWeldedTriangles = Array.Empty<int>();
+    private readonly SwiftList<BoundaryVertex> _topologySortedBoundary = new();
+    private BoundaryVertex[] _topologyBoundaryHull = Array.Empty<BoundaryVertex>();
+    private BoundaryVertex[] _topologyStrictBoundary = Array.Empty<BoundaryVertex>();
+    private static readonly IComparer<BoundaryVertex> BoundaryVertexComparer =
+        Comparer<BoundaryVertex>.Create(CompareBoundaryVertices);
+    private static readonly IComparer<VertexUse> TopologyVertexUseComparer = Comparer<VertexUse>.Create(CompareVertexUses);
 
-        Array.Sort(vertexUses, CompareVertexUses);
-        var representativeIndices = new int[vertices.Length];
+    private int[] CreateTopologyTriangles(Vector3d[] vertices, int[] triangles)
+    {
+        _topologyVertexUses.FastClear();
+        _topologyVertexUses.EnsureCapacity(vertices.Length);
+        EnsureTopologyBuffer(ref _topologyRepresentativeIndices, vertices.Length);
+        int[] representativeIndices = _topologyRepresentativeIndices;
+        for (int i = 0; i < vertices.Length; i++)
+            _topologyVertexUses.Add(new VertexUse(vertices[i], i));
+
+        _topologyVertexUses.SortInPlace(TopologyVertexUseComparer);
+        ReadOnlySpan<VertexUse> vertexUses = _topologyVertexUses.AsReadOnlySpan();
         int representativeIndex = vertexUses[0].VertexIndex;
         representativeIndices[representativeIndex] = representativeIndex;
         bool hasExactPositionSeams = false;
-        for (int i = 1; i < vertexUses.Length; i++)
+        for (int i = 1; i < vertices.Length; i++)
         {
             VertexUse current = vertexUses[i];
             if (current.Position != vertexUses[i - 1].Position)
@@ -38,7 +53,8 @@ public partial class PhysicsMesh
         if (!hasExactPositionSeams)
             return triangles;
 
-        var topologyTriangles = new int[triangles.Length];
+        EnsureTopologyBuffer(ref _topologyWeldedTriangles, triangles.Length);
+        int[] topologyTriangles = _topologyWeldedTriangles;
         for (int i = 0; i < triangles.Length; i++)
             topologyTriangles[i] = representativeIndices[triangles[i]];
 
@@ -244,7 +260,7 @@ public partial class PhysicsMesh
             secondOpposite - start);
     }
 
-    private static void ValidateOpenConvexBoundary(
+    private void ValidateOpenConvexBoundary(
         Vector3d[] vertices,
         int[] triangles,
         int triangleCount,
@@ -311,53 +327,59 @@ public partial class PhysicsMesh
             _ => new Vector2d(vertex.X, vertex.Y),
         };
 
-    private static void ValidateBoundaryMatchesConvexHull(
+    private void ValidateBoundaryMatchesConvexHull(
         BoundaryVertex[] authoredBoundary,
         int[] triangles)
     {
-        var sorted = new BoundaryVertex[authoredBoundary.Length];
-        Array.Copy(authoredBoundary, sorted, authoredBoundary.Length);
-        Array.Sort(sorted, CompareBoundaryVertices);
+        SwiftThrowHelper.ThrowIfArgument(
+            !TryGetStrictConvexBoundary(authoredBoundary, authoredBoundary.Length, out _, out _),
+            nameof(triangles),
+            "Open convex mesh triangles must have a nondegenerate convex boundary.");
+    }
 
-        for (int i = 1; i < sorted.Length; i++)
-        {
-            SwiftThrowHelper.ThrowIfArgument(
-                sorted[i - 1].Position == sorted[i].Position,
-                nameof(triangles),
-                "Open convex mesh triangles must form one nondegenerate convex boundary loop.");
-        }
+    // Shared exact trust owner: local turn signs alone admit a star polygon.
+    // Match the entire cyclic order against its monotone convex hull instead.
+    private bool TryGetStrictConvexBoundary(BoundaryVertex[] authoredBoundary, int boundaryCount,
+        out BoundaryVertex[] strictAuthoredBoundary, out int strictAuthoredCount)
+    {
+        strictAuthoredBoundary = Array.Empty<BoundaryVertex>();
+        strictAuthoredCount = 0;
+        EnsureTopologyBuffer(ref _topologyBoundaryHull, boundaryCount * 2);
+        EnsureTopologyBuffer(ref _topologyStrictBoundary, boundaryCount);
+        _topologySortedBoundary.FastClear();
+        _topologySortedBoundary.AddRange(authoredBoundary.AsSpan(0, boundaryCount));
+        _topologySortedBoundary.SortInPlace(BoundaryVertexComparer);
+        ReadOnlySpan<BoundaryVertex> sorted = _topologySortedBoundary.AsReadOnlySpan();
 
-        var hull = new BoundaryVertex[sorted.Length * 2];
+        // Both callers walk distinct exactly welded vertices in one coplanar
+        // surface. Their projection drops a nonzero plane-normal component,
+        // so it is injective on that plane and cannot duplicate positions.
+        BoundaryVertex[] hull = _topologyBoundaryHull;
         int hullCount = 0;
-        for (int i = 0; i < sorted.Length; i++)
+        for (int i = 0; i < boundaryCount; i++)
             AppendConvexHullVertex(hull, ref hullCount, 2, sorted[i]);
 
         int upperStart = hullCount + 1;
-        for (int i = sorted.Length - 2; i >= 0; i--)
+        for (int i = boundaryCount - 2; i >= 0; i--)
             AppendConvexHullVertex(hull, ref hullCount, upperStart, sorted[i]);
 
         // The upper pass repeats the lexicographically first lower-hull point.
         hullCount--;
 
-        var strictAuthoredBoundary = new BoundaryVertex[authoredBoundary.Length];
-        int strictAuthoredCount = 0;
-        for (int i = 0; i < authoredBoundary.Length; i++)
+        strictAuthoredBoundary = _topologyStrictBoundary;
+        for (int i = 0; i < boundaryCount; i++)
         {
-            BoundaryVertex previous = authoredBoundary[(i + authoredBoundary.Length - 1) % authoredBoundary.Length];
+            BoundaryVertex previous = authoredBoundary[(i + boundaryCount - 1) % boundaryCount];
             BoundaryVertex current = authoredBoundary[i];
-            BoundaryVertex next = authoredBoundary[(i + 1) % authoredBoundary.Length];
+            BoundaryVertex next = authoredBoundary[(i + 1) % boundaryCount];
             if (Vector2d.OrientationSign(previous.Position, current.Position, next.Position) == 0)
                 continue;
 
             strictAuthoredBoundary[strictAuthoredCount++] = current;
         }
 
-        SwiftThrowHelper.ThrowIfArgument(
-            hullCount < 3
-            || strictAuthoredCount != hullCount
-            || !MatchesCyclicHull(strictAuthoredBoundary, strictAuthoredCount, hull),
-            nameof(triangles),
-            "Open convex mesh triangles must have a convex boundary.");
+        return hullCount >= 3 && strictAuthoredCount == hullCount
+            && MatchesCyclicHull(strictAuthoredBoundary, strictAuthoredCount, hull);
     }
 
     private static void ValidateProjectedTriangleFill(
@@ -574,7 +596,7 @@ public partial class PhysicsMesh
         return count;
     }
 
-    private static int FindEdgeUseGroupEnd(EdgeUse[] edgeUses, int start)
+    private static int FindEdgeUseGroupEnd(ReadOnlySpan<EdgeUse> edgeUses, int start)
     {
         long key = edgeUses[start].Key;
         int end = start + 1;

@@ -194,6 +194,16 @@ public partial class PhysicsMesh
                 (_preparedScaledFaceNormals, _scaledFaceNormals);
             (_triangleBVH, _preparedTriangleBVH) =
                 (_preparedTriangleBVH, _triangleBVH);
+            (_coplanarPatchIds, _preparedCoplanarPatchIds) =
+                (_preparedCoplanarPatchIds, _coplanarPatchIds);
+            (_coplanarPatchBoundaryOffsets, _preparedCoplanarPatchBoundaryOffsets) =
+                (_preparedCoplanarPatchBoundaryOffsets, _coplanarPatchBoundaryOffsets);
+            (_coplanarPatchBoundaryVertexPairs, _preparedCoplanarPatchBoundaryVertexPairs) =
+                (_preparedCoplanarPatchBoundaryVertexPairs, _coplanarPatchBoundaryVertexPairs);
+            (_convexCoplanarPatchCornerOffsets, _preparedConvexCoplanarPatchCornerOffsets) =
+                (_preparedConvexCoplanarPatchCornerOffsets, _convexCoplanarPatchCornerOffsets);
+            (_convexCoplanarPatchCornerVertexIndices, _preparedConvexCoplanarPatchCornerVertexIndices) =
+                (_preparedConvexCoplanarPatchCornerVertexIndices, _convexCoplanarPatchCornerVertexIndices);
             if (_supportVertexIndices != null)
             {
                 (_supportTreeNodes, _preparedSupportTreeNodes) =
@@ -345,6 +355,7 @@ public partial class PhysicsMesh
             out _preparedScaledTotalAreaWeight,
             out _preparedSurfaceMassProperties);
 
+        PrepareCoplanarPatches(_preparedScaledLocalVertices);
         BuildTriangleBVH(_preparedTriangleBVH, _preparedScaledLocalVertices);
         if (_supportVertexIndices != null)
         {

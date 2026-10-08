@@ -14,6 +14,37 @@ namespace Gravitas.Tests;
 
 public sealed class MeshConeContactTests
 {
+    [Theory]
+    [InlineData(MeshColliderMode.Concave, false)]
+    [InlineData(MeshColliderMode.Concave, true)]
+    [InlineData(MeshColliderMode.Convex, false)]
+    [InlineData(MeshColliderMode.Convex, true)]
+    public void ConeBelowCoplanarQuad_ShouldUseSurfaceExitInsteadOfInternalDiagonal(
+        MeshColliderMode mode, bool reverseWinding)
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSMeshCollider mesh = MeshTestFixtures.CreateConvexQuadFloor(mode);
+        FixedQuaternion rotation = reverseWinding
+            ? new FixedQuaternion(Fixed64.One, Fixed64.Zero, Fixed64.Zero, Fixed64.Zero)
+            : FixedQuaternion.Identity;
+        mesh.InitializeWithNoBody(new TestMatterAgent(scenario.Context,
+            new FixedTransform(Vector3d.Zero, rotation, Vector3d.One)));
+        var cone = new LSConeCollider();
+        scenario.InitializeStaticCollider(cone, Vector3d.Down * Fixed64.Quarter);
+        CollisionPair pair = scenario.CreatePair(mesh, cone);
+
+        // Base Y=-3/4 and apex Y=1/4. Any translation shorter than 1/4
+        // retains an axial crossing inside the quad; downward 1/4 removes it.
+        // Its triangulation diagonal cannot provide a shorter surface exit.
+        CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
+        ManifoldContact contact = pair.Manifold.PrimaryContact;
+        contact.Normal.Should().Be(Vector3d.Down);
+        contact.Depth.Should().Be(Fixed64.Quarter);
+        contact.PointA.Should().Be(Vector3d.Zero);
+        contact.PointB.Should().Be(Vector3d.Up * Fixed64.Quarter);
+        Vector3d.Dot(Vector3d.Right, contact.Normal).Should().Be(Fixed64.Zero);
+    }
+
     [Fact]
     public void UnrepresentableRelativeCenter_WithInteriorIntersection_RetainsCanonicalContact()
     {

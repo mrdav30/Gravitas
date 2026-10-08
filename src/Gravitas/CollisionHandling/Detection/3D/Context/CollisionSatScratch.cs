@@ -6,6 +6,7 @@
 //=======================================================================
 
 using SwiftCollections;
+using FixedMathSharp.Geometry;
 
 namespace Gravitas.CollisionHandling;
 
@@ -19,6 +20,8 @@ internal sealed class CollisionSatScratch
     public SwiftList<int> MeshTriangleCandidatesA { get; } = new(16);
 
     public SwiftList<int> MeshTriangleCandidatesB { get; } = new(16);
+
+    public SwiftDictionary<int, FixedContactAnchors> MeshConePatchContacts { get; } = new(8);
 
     public ContactManifold CompoundPartManifold { get; } = new();
 }

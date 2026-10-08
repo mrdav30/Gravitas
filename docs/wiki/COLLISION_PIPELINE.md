@@ -133,13 +133,31 @@ The analytic search shares squared support terms across opposite directions;
 reciprocal edge charts reuse their exact normalized algebra after each chart
 finishes. Both views retain complete admission checks, the earlier feature on
 exact ties, and paired witnesses rounded only at final materialization.
-Mesh/cone contacts likewise select a complete triangle/cone relation, including
-the base disk, rim, apex and lateral generators. The selected normal, depth and
-both anchors describe one feature; the triangle point nearest the cone center
-is not an intersection test. A genuine positive gap contributes no contact from
-that triangle, while exact touching remains a zero-depth contact. Closed-convex
-mesh containment still uses its separate convex fallback when no surface
-triangle intersects. This does not add a speculative margin or replace CCD.
+Mesh/cone contacts include the base disk, rim, apex and lateral generators.
+Prepared mesh geometry identifies connected coplanar patches by exact welded
+seams and retains their exposed perimeter, including holes and notches. A
+certified minimum face exit replaces the triangle-only exits over that patch;
+the covered triangulation edges do not become contact normals. Certification
+uses unrounded exact clearances, with a contained cone chord or the complete
+cone projection enlarged by the face depth. It does not fill holes or convexify
+the mesh. A trusted convex coplanar patch whose face proof declines instead
+uses its complete face, perimeter-edge and corner normal fan. Strict corners
+are prepared once, omitting collinear subdivisions. Analytic candidates and
+stationary rim roots are ranked exactly across corners before rounding the
+winning depth and paired anchors. Artificial corner-chart edges cannot admit
+contact or separation. Ambiguous topology and uncertified nonconvex patches
+retain the complete triangle/cone relation; that fallback does not establish
+a seam-free minimum exit for a nonconvex surface union.
+Patch contacts are prepared before reduction in stable BVH candidate order,
+retaining the first equal-depth feature. Pose-only changes reuse the prepared
+topology; scale changes publish it with the matching geometry. Retained scale
+scratch uses active counts and keeps unpublished metadata private.
+The selected normal, depth and both anchors describe one feature; the triangle
+point nearest the cone center is not an intersection test. A genuine positive
+gap contributes no contact, while exact touching remains a zero-depth contact.
+Closed-convex containment uses its separate convex fallback when no surface
+triangle intersects. Patch certification establishes one coplanar surface exit,
+not a minimum translation that clears every noncoplanar surface of a whole mesh.
 Mixed mesh/capsule-slab contacts similarly delegate to the complete planar
 capsule-slab query. Its flat caps, straight sides and rounded-end rims are
 distinct features; the shape is not a rounded 3D capsule or just two end
