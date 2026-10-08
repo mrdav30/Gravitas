@@ -68,9 +68,9 @@
 
 ### GRV-Issue-095 - Discrete mesh-cone contacts can choose an artificial triangulation-seam exit
 
-- **Status:** Active; convex geometry refinement implemented. A surface-manifold
-  architecture now specifies the recommended remaining runtime contract for
-  review.
+- **Status:** Active; convex geometry refinement implemented. The surface-manifold
+  architecture is approved; its [implementation plan](2026-10-08-surface-contact-manifold-plan.md)
+  specifies the remaining runtime work and joint #095/#099 validation gates.
 - **Confirmed:** 2026-10-07 during #094 geometry review, in four isolated
   local-stack Release cases: convex/concave flat quad targets and both windings.
 - **Reproduction:** A default cone centered at `(0, -1/4, 0)` overlaps a flat

@@ -1,7 +1,8 @@
 # Surface Contact Manifold Design
 
-**Status:** Proposed architecture for review; runtime implementation has not
-started. **Date:** 2026-10-08. **Owning issues:**
+**Status:** Approved architecture; runtime implementation has not started.
+The [implementation plan](2026-10-08-surface-contact-manifold-plan.md) maps its
+dependencies and validation gates. **Date:** 2026-10-08. **Owning issues:**
 [#095](issue-tracker.md#grv-issue-095---discrete-mesh-cone-contacts-can-choose-an-artificial-triangulation-seam-exit),
 #099; #097 and #098 are related follow-ups.
 
