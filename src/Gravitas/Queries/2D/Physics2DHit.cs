@@ -64,6 +64,10 @@ public readonly struct Physics2DHit
     /// <summary>
     /// Gets the materialized world-space query witness.
     /// </summary>
+    /// <remarks>
+    /// A contained-start ray reports its start point at zero distance. That point
+    /// may lie inside the target rather than on its surface.
+    /// </remarks>
     /// <exception cref="InvalidOperationException">
     /// The conceptual witness lies outside the representable coordinate range.
     /// </exception>
@@ -88,6 +92,10 @@ public readonly struct Physics2DHit
     /// <summary>
     /// Gets the world-space surface normal.
     /// </summary>
+    /// <remarks>
+    /// For a contained-start ray, this is the target's outward geometric
+    /// separation normal, independent of ray direction.
+    /// </remarks>
     public Vector2d Normal { get; }
 
     /// <summary>

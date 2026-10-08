@@ -137,6 +137,18 @@ world +X. When a circle probe lies on a capsule's centerline, the fallback is
 the capsule's local +X radial side, rotated with the capsule. The witness and
 outward normal describe the same side of the target.
 
+A 2D ray starting inside or on a supported shape reports zero travel distance
+and the ray start as its point. That point identifies the initial overlap and
+may lie inside the target. Its outward normal comes from point/shape separation
+geometry: box and polygon face normals, circle radial normals, and capsule
+normals from the nearest axis point. Travel direction does not change this
+normal. Equal convex separation depths retain geometric feature order;
+coincident circle centers use world +X, and capsule centerline starts use local
++X rotated with the capsule. Unsupported custom shapes produce no ray hit.
+Compounds retain their existing reduction: equal-distance part hits keep the
+first authored part and report the compound owner. Closest and all-hit query
+ordering across colliders still uses distance, then collider ID.
+
 ## Common Usage
 
 ```csharp

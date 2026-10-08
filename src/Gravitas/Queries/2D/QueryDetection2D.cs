@@ -16,6 +16,7 @@ namespace Gravitas.Queries;
 /// <summary>
 /// Deterministic pure 2D shape checks used by query services.
 /// </summary>
+/// <content>Owns overlap, raycast and circle-sweep detection for pure 2D shapes.</content>
 internal static partial class QueryDetection2D
 {
     internal static bool TryOverlapCircle(
@@ -212,10 +213,18 @@ internal static partial class QueryDetection2D
 
         if (ContainsPointExact(collider, start))
         {
+            // A contained ray has no entry normal. Reuse point/shape geometry
+            // to describe an actual separating surface without contact anchors,
+            // while retaining the ray's zero-distance/start-point contract.
+            if (!TryGetContainedRayNormal(start, collider, out Vector2d normal))
+            {
+                hit = default;
+                return false;
+            }
             hit = new Physics2DHit(
                 collider,
                 start,
-                ResolveQueryFallbackNormal(start, collider.Center),
+                normal,
                 Fixed64.Zero);
             return true;
         }

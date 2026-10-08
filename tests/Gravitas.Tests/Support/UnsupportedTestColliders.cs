@@ -16,6 +16,7 @@ namespace Gravitas.Tests.Support;
 
 internal sealed class UnsupportedTestCollider2D : LSCollider2D
 {
+    internal bool ContainsQueryPoint { get; set; }
     internal Fixed64 MomentOfInertia { get; set; } = Fixed64.Zero;
 
     internal bool ThrowOnInertiaCalculation { get; set; }
@@ -30,7 +31,7 @@ internal sealed class UnsupportedTestCollider2D : LSCollider2D
 
     public override ColliderType2D Shape => (ColliderType2D)byte.MaxValue;
 
-    public override bool ContainsPoint(Vector2d point) => false;
+    public override bool ContainsPoint(Vector2d point) => ContainsQueryPoint;
 
     public override Vector2d GetClosestPoint(Vector2d point) =>
         new(

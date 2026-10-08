@@ -178,6 +178,11 @@ automatic grounding then applies the body's support policy to that witness.
 This differs from explicit `Query2D.QuerySupport`, which filters support parts
 before reduction. Automatic ray probes accept positive representable travel
 lengths below `Epsilon`; swept-circle probes require travel longer than `Epsilon`.
+Contained-start ray probes use the target's geometric outward normal, so a
+point on or inside a flat wall cannot gain support from a diagonal center-based
+fallback. Their zero-distance point remains the probe start. See
+[hit witnesses](QUERY_SERVICES.md#hit-witnesses) for ambiguous-feature and
+compound reduction rules.
 
 `SolidBody2D.GroundMinNormalDot` uses the same `[0, 1]` range and one-half
 (default 60-degree) slope limit as 3D, measured against resolved planar up.
@@ -252,8 +257,11 @@ and bodyless trigger volumes to the same host contract. Bodyless 2D colliders
 participate in queries, triggers, layer filtering, cleanup, and static collision
 response.
 
-`LSPolygonCollider2D` validates convexity and rejects concave or collinear input
-instead of silently accepting ambiguous collision truth. A rotated box should
+`LSPolygonCollider2D` validates both authored and scaled runtime vertices and
+rejects concave or collinear boundaries. Positive scale can still collapse a
+small feature through fixed-point rounding; invalid scaled geometry is rejected
+before initialization or refresh publishes shape or partition state. Unchanged
+scaled vertices retain their existing validation. A rotated box should
 use a convex polygon; `LSAABBoxCollider2D` remains axis-aligned by design.
 Triangle authoring helpers materialize as three-vertex convex polygons.
 

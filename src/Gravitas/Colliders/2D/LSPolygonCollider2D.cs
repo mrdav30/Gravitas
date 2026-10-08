@@ -210,14 +210,22 @@ public sealed class LSPolygonCollider2D : LSCollider2D, IConvexVertexSource2D
 
     private protected override void PrepareShape(in ColliderShapeSnapshot2D snapshot)
     {
+        bool verticesChanged = !HasCommittedShape
+            || _scaledLocalVertices.Length != _localVertices.Length;
         for (int i = 0; i < _localVertices.Length; i++)
         {
             Vector2d scaledVertex = ColliderScalePolicy.Scale(
                 _localVertices[i],
                 snapshot.OwnerScale,
                 snapshot.PartScale);
+            verticesChanged = verticesChanged || scaledVertex != _scaledLocalVertices[i];
             _scaledLocalVerticesScratch[i] = scaledVertex;
         }
+
+        // Positive scaling can collapse a small edge through rounding. Validate
+        // before publication, but reuse admission when only the pose changes.
+        if (verticesChanged)
+            ValidateConvexPolygon(_scaledLocalVerticesScratch);
 
         SetPreparedBounds(FixedBoundArea.FromRotatedOffsetsClippedToDomain(
             snapshot.Center,
@@ -228,6 +236,8 @@ public sealed class LSPolygonCollider2D : LSCollider2D, IConvexVertexSource2D
     private protected override void PublishShape()
     {
         Vector2d[] offsets = _scaledLocalVertices;
+        if (offsets.Length != _scaledLocalVerticesScratch.Length)
+            offsets = new Vector2d[_scaledLocalVerticesScratch.Length];
         _scaledLocalVertices = _scaledLocalVerticesScratch;
         _scaledLocalVerticesScratch = offsets;
     }
@@ -250,7 +260,10 @@ public sealed class LSPolygonCollider2D : LSCollider2D, IConvexVertexSource2D
         if (_localVertices.Length != vertices.Length)
         {
             _localVertices = new Vector2d[vertices.Length];
-            _scaledLocalVertices = new Vector2d[vertices.Length];
+            // A load may change vertex count. Retain committed query geometry
+            // until the replacement has passed scaled admission and publishes.
+            if (!HasCommittedShape)
+                _scaledLocalVertices = new Vector2d[vertices.Length];
             _scaledLocalVerticesScratch = new Vector2d[vertices.Length];
         }
 

@@ -13,6 +13,51 @@ namespace Gravitas.Tests.Physics2D;
 public sealed partial class SolidBody2DGroundingTests
 {
     [Theory]
+    [InlineData(ColliderType2D.AABox, false, false)]
+    [InlineData(ColliderType2D.AABox, false, true)]
+    [InlineData(ColliderType2D.AABox, true, false)]
+    [InlineData(ColliderType2D.AABox, true, true)]
+    [InlineData(ColliderType2D.ConvexPolygon, false, false)]
+    [InlineData(ColliderType2D.ConvexPolygon, false, true)]
+    [InlineData(ColliderType2D.ConvexPolygon, true, false)]
+    [InlineData(ColliderType2D.ConvexPolygon, true, true)]
+    [InlineData(ColliderType2D.Compound, false, false)]
+    [InlineData(ColliderType2D.Compound, false, true)]
+    [InlineData(ColliderType2D.Compound, true, false)]
+    [InlineData(ColliderType2D.Compound, true, true)]
+    public void RayProbe_StartingInWall_ShouldRejectWallNormalAndSelectFartherFloor(
+        ColliderType2D wallShape, bool interior, bool defaultThreshold)
+    {
+        using GravitasWorldContext context = CreateContext();
+        Vector2d start = new(interior ? -Fixed64.Quarter : Fixed64.Zero, Fixed64.Half);
+        SolidBody2D body = CreateSelectionProbe(context, GroundProbeMode2D.Ray, start);
+        body.GroundMinNormalDot = defaultThreshold ? Fixed64.Half : Fixed64.Zero;
+        LSCollider2D wall = wallShape switch
+        {
+            ColliderType2D.AABox => new LSAABBoxCollider2D(new Vector2d(1, 4)),
+            ColliderType2D.ConvexPolygon => new LSPolygonCollider2D(new[]
+            {
+                new Vector2d(-Fixed64.Half, -Fixed64.Two),
+                new Vector2d(Fixed64.Half, -Fixed64.Two),
+                new Vector2d(Fixed64.Half, Fixed64.Two),
+                new Vector2d(-Fixed64.Half, Fixed64.Two)
+            }),
+            _ => new LSCompoundCollider2D(
+                CompoundColliderPart2D.AABBox(new Vector2d(1, 4), Vector2d.Zero))
+        };
+        wall.InitializeWithNoBody(new TestMatterAgent(context, new FixedTransform(
+            new Vector3d(-Fixed64.Half, Fixed64.Zero, Fixed64.Zero),
+            FixedQuaternion.Identity, Vector3d.One)));
+        LSAABBoxCollider2D floor = CreateStaticFloor(context, new Vector2d(Fixed64.Zero, -Fixed64.FromFraction(3, 2)));
+        context.Diagnostics.Enable();
+
+        body.CheckGround();
+
+        AssertSelectedProbe(context, body, floor, new Vector2d(start.X, -Fixed64.One),
+            Fixed64.FromFraction(3, 2));
+    }
+
+    [Theory]
     [InlineData(-1)]
     [InlineData(2)]
     public void GroundNormalThreshold_InvalidValue_ShouldRejectWithoutMutation(int value)

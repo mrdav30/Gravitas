@@ -2,15 +2,16 @@
 
 ## Purpose
 
-This document is a living overview of Gravitas feature work. It tracks the
+This document is an evergreen overview of Gravitas feature work. It tracks the
 active scope, recently completed work, and deferred or evidence-gated plans. It
 is a curated view rather than a backlog of every possible feature.
+Update it for significant feature-work milestones; keep individual issue and
+benchmark status in their coordination trackers.
 
 Keep active and deferred plans alongside the coordination trackers in this
 directory. Archive completed plans and finished investigation reports under
 `done/`, mark their completion status, and update incoming and relative links.
-Archived phase assessments describe the evidence at that time; current status
-belongs in the trackers and this overview.
+Archived phase assessments describe the evidence at that time.
 
 ## Coordination Trackers
 
@@ -49,33 +50,9 @@ instead of burying it in notes.
     `SwiftCollections`, `GridForge`, then Gravitas. Package references are the
     default; use `UseLocalLsfStack=true` only for coordinated validation of
     unreleased sibling changes, then revalidate against released packages.
-  - [GRV-Issue-090](issue-tracker.md#grv-issue-090---3d-automatic-swept-ground-probes-accept-vertical-wall-contacts)
-    is resolved: 3D automatic support filters upward candidate normals through a
-    configurable slope limit, with saved-state and runtime cache/wake coverage.
-    Its [2D parity follow-up, GRV-Issue-092](issue-tracker.md#grv-issue-092---2d-ground-normal-policy-admits-non-support-normals-and-retains-stale-probe-eligibility),
-    is resolved with current-policy support checks, effective-up cache/wake
-    invalidation and saved-sleep coverage, without replay schema changes.
-    Separate initial-overlap witness defects remain active:
-    [GRV-Issue-091](issue-tracker.md#grv-issue-091---initially-overlapping-mesh-sphere-sweeps-can-classify-an-overhead-surface-as-support)
-    for 3D mesh sweeps and
-    [GRV-Issue-093](issue-tracker.md#grv-issue-093---2d-initial-overlap-ray-fallback-normals-can-classify-a-wall-as-sloped-support)
-    for 2D contained-start ray normals.
-    GRV-Issue-089 remains resolved.
 - [`Benchmark Signal Hardening`](benchmark-signal-hardening-backlog.md)
   - Reproduce and close confirmed release-relevant signals alongside the owning
     library change. Do not broaden this into speculative optimization work.
-  - Active [GRV-Benchmark-025](benchmark-signal-hardening-backlog.md#grv-benchmark-025--debug-ragdoll-steady-state-allocations)
-    records an independently reproduced Debug-only ragdoll allocation guard
-    failure. Attribute allocations before changing the solver or guard; the
-    same Release guard passes, and replay helper changes do not own this path.
-  - Experimental [GRV-Benchmark-024](benchmark-signal-hardening-backlog.md#grv-benchmark-024--curved-contact-workload-frequency-and-step-cost)
-    tracks the unmeasured frequency and complete-step impact of expensive curved
-    contacts in representative deterministic scenes. Count solver entries as
-    well as winning contacts before proposing further optimization; #018 through
-    #021 remain closed. Include cone/triangle and shared triangle/cylinder
-    candidates alongside capsule/slab configurations. The proposed
-    [capacity/soak plan](2026-10-06-evolving-game-capacity-and-soak-plan.md)
-    supplies representative workloads without creating a duplicate signal.
 
 ## Recently Completed
 

@@ -13,6 +13,7 @@ using System.Runtime.CompilerServices;
 
 namespace Gravitas.Queries;
 
+/// <content>Owns shared shape containment, normals, convex frames and hit reduction helpers.</content>
 internal static partial class QueryDetection2D
 {
     private static bool TryOffsetPoint(
@@ -58,6 +59,36 @@ internal static partial class QueryDetection2D
             collider.Center,
             collider.ConvexRotation,
             vertexOffsets);
+    }
+
+    private static bool TryGetContainedRayNormal(Vector2d start, LSCollider2D collider, out Vector2d normal)
+    {
+        if (collider is LSCircleCollider2D circle)
+        {
+            normal = Vector2d.GetDirection(circle.Center, start);
+            if (normal == Vector2d.Zero)
+                normal = Vector2d.Right;
+            return true;
+        }
+        if (collider is LSCapsuleCollider2D capsule)
+        {
+            normal = capsule.GetNormalFromCenteredAxis(start);
+            return true;
+        }
+        if (collider is not IConvexVertexSource2D)
+        {
+            normal = default;
+            return false;
+        }
+
+        Span<Vector2d> scratch = stackalloc Vector2d[4];
+        bool found = WideCenteredCapsule2dRelations.TryGetPointMinimumTranslationNormal(
+            start,
+            collider.Center, collider.ConvexRotation, GetConvexVertexOffsets(collider, scratch),
+            out normal);
+        // Upstream contact normals point from the source point to the target.
+        normal = -normal;
+        return found;
     }
 
     private static ReadOnlySpan<Vector2d> GetConvexVertexOffsets(

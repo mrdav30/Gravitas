@@ -4,6 +4,7 @@ using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Tests.Support;
 using System;
+using System.Collections.Generic;
 using Xunit;
 
 namespace Gravitas.Tests.Physics2D;
@@ -222,6 +223,99 @@ public sealed class Collider2DShapeTests
         collider.GetWorldVertex(0).Should().Be(new Vector2d((Fixed64)5, (Fixed64)4));
         collider.GetWorldVertex(1).Should().Be(new Vector2d((Fixed64)5, (Fixed64)6));
         collider.GetWorldVertex(2).Should().Be(new Vector2d((Fixed64)3, (Fixed64)5));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PolygonCollider2D_WhenScaleCollapsesBoundary_ShouldRejectBeforeBinding(bool compoundPart)
+    {
+        using GravitasWorldContext context = Create2DContext();
+        Vector2d[] vertices = { Vector2d.Left, Vector2d.Right, new(Fixed64.Zero, Fixed64.FromRaw(1)) };
+        LSCollider2D collider = compoundPart
+            ? new LSCompoundCollider2D(
+                CompoundColliderPart2D.Circle(Fixed64.Half, Vector2d.Right * Fixed64.Two),
+                CompoundColliderPart2D.ConvexPolygon(vertices, Vector2d.Zero, Fixed64.Zero,
+                    new Vector2d(Fixed64.One, Fixed64.Half)))
+            : new LSPolygonCollider2D(vertices);
+        var transform = new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity,
+            new Vector3d(Fixed64.One, Fixed64.One, compoundPart ? Fixed64.One : Fixed64.Half));
+
+        Action initialize = () => collider.InitializeWithNoBody(new TestMatterAgent(context, transform));
+
+        initialize.Should().Throw<ArgumentException>().WithMessage("*convex*");
+        collider.Id.Should().Be(-1);
+        collider.HasHostBinding.Should().BeFalse();
+        context.Physics2D.ColliderCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void PolygonCollider2D_WhenRefreshCollapsesBoundary_ShouldRetainCommittedShapeAndRecover()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        var collider = new LSPolygonCollider2D(
+            Vector2d.Left, Vector2d.Right, new Vector2d(Fixed64.Zero, Fixed64.FromRaw(1)));
+        var transform = new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One);
+        collider.InitializeWithNoBody(new TestMatterAgent(context, transform));
+        int id = collider.Id;
+        var bounds = collider.Bounds;
+        Vector2d apex = collider.GetWorldVertex(2);
+        int membershipCount = collider.PartitionCoordinates!.Count;
+        transform.LocalScale = new Vector3d(Fixed64.One, Fixed64.One, Fixed64.Half);
+
+        Action refresh = () => collider.Simulate();
+
+        refresh.Should().Throw<ArgumentException>().WithMessage("*convex*");
+        collider.Id.Should().Be(id);
+        collider.Bounds.Should().Be(bounds);
+        collider.GetWorldVertex(2).Should().Be(apex);
+        collider.IsPartitioned.Should().BeTrue();
+        collider.PartitionCoordinates!.Count.Should().Be(membershipCount);
+        context.Physics2D.ColliderCount.Should().Be(1);
+        transform.LocalScale = new Vector3d(Fixed64.One, Fixed64.One, Fixed64.Two);
+        collider.Simulate();
+        collider.GetWorldVertex(2).Should().Be(new Vector2d(Fixed64.Zero, Fixed64.FromRaw(2)));
+        context.Query2D.Raycast(Vector2d.Zero, Vector2d.Right, out var hit).Should().BeTrue();
+        hit.Collider.Should().BeSameAs(collider);
+        hit.Normal.Should().Be(-Vector2d.Forward);
+    }
+
+    [Fact]
+    public void PolygonCollider2D_WhenLoadedVertexCountChanges_ShouldValidateCollapsedReplacement()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        var collider = new LSPolygonCollider2D(
+            new Vector2d(-1, -1), new Vector2d(1, -1), new Vector2d(1, 1), new Vector2d(-1, 1));
+        var transform = new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity,
+            new Vector3d(Fixed64.Half, Fixed64.One, Fixed64.Half));
+        collider.InitializeWithNoBody(new TestMatterAgent(context, transform));
+        var bounds = collider.Bounds;
+        Vector2d firstVertex = collider.GetWorldVertex(0);
+        var payload = new InvalidRecordPayloadChronicler(new Dictionary<string, object>
+        {
+            ["Vertices"] = new Vector2d[]
+            {
+                new(Fixed64.FromRaw(-1), Fixed64.Zero),
+                new(Fixed64.FromRaw(1), Fixed64.Zero),
+                new(Fixed64.Zero, Fixed64.FromRaw(1))
+            }
+        });
+
+        Action load = () => collider.RecordData(payload);
+
+        load.Should().Throw<ArgumentException>().WithMessage("*convex*");
+        collider.Count.Should().Be(4);
+        collider.Bounds.Should().Be(bounds);
+        collider.GetWorldVertex(0).Should().Be(firstVertex);
+        context.Physics2D.ColliderCount.Should().Be(1);
+
+        collider.RecordData(new InvalidRecordPayloadChronicler(new Dictionary<string, object>
+        {
+            ["Vertices"] = new[] { Vector2d.Left, Vector2d.Right, Vector2d.Forward }
+        }));
+        collider.Simulate();
+        collider.Count.Should().Be(3);
+        collider.GetWorldVertex(2).Should().Be(Vector2d.Forward * Fixed64.Half);
     }
 
     private static GravitasWorldContext Create2DContext()

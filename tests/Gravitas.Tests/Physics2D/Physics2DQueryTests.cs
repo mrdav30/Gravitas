@@ -631,7 +631,7 @@ public sealed class Physics2DQueryTests
     }
 
     [Fact]
-    public void CircleQueries_WithUnsupportedCustomCollider_ShouldRejectWithoutFabricatingAHit()
+    public void Queries_WithUnsupportedCustomCollider_ShouldRejectWithoutFabricatingAHit()
     {
         using GravitasWorldContext context = Create2DContext();
         var collider = new UnsupportedTestCollider2D();
@@ -659,6 +659,11 @@ public sealed class Physics2DQueryTests
             .Should()
             .BeFalse();
         sweepHit.Should().Be(default(Physics2DHit));
+
+        collider.ContainsQueryPoint = true;
+        QueryDetection2D.TryRaycast(Vector2d.Zero, Vector2d.Right, collider, out Physics2DHit rayHit)
+            .Should().BeFalse();
+        rayHit.Should().Be(default(Physics2DHit));
     }
 
     [Fact]

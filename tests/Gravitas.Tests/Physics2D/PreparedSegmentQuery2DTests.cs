@@ -11,6 +11,175 @@ namespace Gravitas.Tests.Physics2D;
 public sealed class PreparedSegmentQuery2DTests
 {
     [Theory]
+    [InlineData(ColliderType2D.AABox, 4, 2)]
+    [InlineData(ColliderType2D.AABox, 2, 1)]
+    [InlineData(ColliderType2D.ConvexPolygon, 4, 2)]
+    [InlineData(ColliderType2D.ConvexPolygon, 2, 1)]
+    [InlineData(ColliderType2D.Capsule, 4, 2)]
+    [InlineData(ColliderType2D.Capsule, 2, 1)]
+    [InlineData(ColliderType2D.Capsule, 0, 2)]
+    [InlineData(ColliderType2D.Circle, 4, 0)]
+    [InlineData(ColliderType2D.Circle, 2, 0)]
+    public void ContainedRay_ShouldKeepStartPointAndReportGeometricOutwardNormal(
+        ColliderType2D shape, int xEighths, int yEighths)
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        LSCollider2D collider = CreateCollider(context, shape);
+        Vector2d start = new(Fixed64.FromFraction(xEighths, 8), Fixed64.FromFraction(yEighths, 8));
+        var hits = new SwiftList<Physics2DHit>();
+
+        // The unique nearest surface is the right face/radial side, even when
+        // travel is parallel to it or points away. Containment is still a hit.
+        foreach (Vector2d travel in new[] { -Vector2d.Forward, Vector2d.Right })
+        {
+            Vector2d end = start + travel;
+            context.Query2D.Raycast(start, end, out Physics2DHit closest).Should().BeTrue();
+            closest.Collider.Should().BeSameAs(collider);
+            closest.Point.Should().Be(start);
+            closest.Distance.Should().Be(Fixed64.Zero);
+            closest.Normal.Should().Be(Vector2d.Right);
+            context.Query2D.RaycastAll(start, end, hits).Should().Be(1);
+            hits[0].Should().Be(closest);
+            QueryDetection2D.TryRaycast(start, end, collider, out Physics2DHit raw).Should().BeTrue();
+            raw.Should().Be(closest);
+        }
+    }
+
+    [Theory]
+    [InlineData(ColliderType2D.AABox)]
+    [InlineData(ColliderType2D.ConvexPolygon)]
+    public void ContainedRay_AtEquidistantFeatures_ShouldUseStableGeometricTie(ColliderType2D shape)
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        LSCollider2D collider = CreateCollider(context, shape);
+        foreach (Vector2d start in new[] { Vector2d.Zero, new Vector2d(Fixed64.Half, Fixed64.Half) })
+        {
+            // Both shapes author their bottom edge first. At the center its
+            // two opposing faces tie; at the upper-right corner its top face
+            // ties the right face. Existing geometric feature order resolves both.
+            Vector2d expected = start == Vector2d.Zero ? -Vector2d.Forward : Vector2d.Forward;
+            for (int repeat = 0; repeat < 3; repeat++)
+            {
+                QueryDetection2D.TryRaycast(start, start + Vector2d.Right, collider, out Physics2DHit hit)
+                    .Should().BeTrue();
+                hit.Normal.Should().Be(expected);
+                hit.Point.Should().Be(start);
+                hit.Distance.Should().Be(Fixed64.Zero);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ContainedRay_RotatedPolygon_ShouldReportSameSurfaceForEitherWinding(bool clockwise)
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        Vector2d[] vertices =
+        {
+            new(-Fixed64.Half, -Fixed64.Half), new(Fixed64.Half, -Fixed64.Half),
+            new(Fixed64.Half, Fixed64.Half), new(-Fixed64.Half, Fixed64.Half)
+        };
+        if (clockwise)
+            System.Array.Reverse(vertices);
+        var collider = new LSPolygonCollider2D(vertices);
+        var body = new SolidBody2D(new TestMatterAgent(context), collider);
+        body.Initialize(Vector2d.Zero, Fixed64.HalfPi, BodyMotionType.Static);
+        Vector2d start = new(-Fixed64.FromFraction(1, 8), Fixed64.Quarter);
+
+        context.Query2D.Raycast(start, start + Vector2d.Right, out Physics2DHit hit).Should().BeTrue();
+
+        hit.Normal.X.Should().BeInRange(-Fixed64.Epsilon, Fixed64.Epsilon);
+        hit.Normal.Y.Should().BeInRange(Fixed64.One - Fixed64.Epsilon, Fixed64.One + Fixed64.Epsilon);
+        hit.Point.Should().Be(start);
+        hit.Distance.Should().Be(Fixed64.Zero);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ContainedRay_NearScalarBoundary_ShouldPreserveGeometricNormalAndStart(bool nearMaximum)
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        Vector2d origin = new(nearMaximum ? Fixed64.MaxValue - (Fixed64)4 : Fixed64.MinValue + (Fixed64)4, Fixed64.Zero);
+        LSCollider2D collider = CreateCollider(context, ColliderType2D.ConvexPolygon, origin);
+        Vector2d start = origin + new Vector2d(Fixed64.Quarter, Fixed64.FromFraction(1, 8));
+
+        QueryDetection2D.TryRaycast(start, start - Vector2d.Forward, collider, out Physics2DHit hit)
+            .Should().BeTrue();
+
+        hit.Normal.Should().Be(Vector2d.Right);
+        hit.Point.Should().Be(start);
+        hit.Distance.Should().Be(Fixed64.Zero);
+    }
+
+    [Fact]
+    public void ContainedRay_OnRotatedCapsuleAxis_ShouldUseLocalRadialFallback()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        var collider = new LSCapsuleCollider2D(Fixed64.Half, Fixed64.Two);
+        var body = new SolidBody2D(new TestMatterAgent(context), collider);
+        body.Initialize(Vector2d.Zero, Fixed64.HalfPi, BodyMotionType.Static);
+
+        context.Query2D.Raycast(Vector2d.Zero, Vector2d.Right, out Physics2DHit hit).Should().BeTrue();
+
+        hit.Normal.X.Should().BeInRange(-Fixed64.Epsilon, Fixed64.Epsilon);
+        hit.Normal.Y.Should().BeInRange(Fixed64.One - Fixed64.Epsilon, Fixed64.One + Fixed64.Epsilon);
+        hit.Point.Should().Be(Vector2d.Zero);
+        hit.Distance.Should().Be(Fixed64.Zero);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ContainedRay_InMultipleCompoundParts_ShouldRetainFirstAuthoredWitness(bool floorFirst)
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        CompoundColliderPart2D wall = CompoundColliderPart2D.AABBox(new Vector2d(1, 4), Vector2d.Zero);
+        CompoundColliderPart2D floor = CompoundColliderPart2D.AABBox(new Vector2d(4, 1), Vector2d.Zero);
+        var compound = new LSCompoundCollider2D(floorFirst ? floor : wall, floorFirst ? wall : floor);
+        compound.InitializeWithNoBody(new TestMatterAgent(context));
+        Vector2d start = new(Fixed64.Quarter, Fixed64.FromFraction(1, 8));
+        var hits = new SwiftList<Physics2DHit>();
+
+        context.Query2D.Raycast(start, start + Vector2d.Right, out Physics2DHit closest).Should().BeTrue();
+        context.Query2D.RaycastAll(start, start + Vector2d.Right, hits).Should().Be(1);
+
+        closest.Collider.Should().BeSameAs(compound);
+        closest.Normal.Should().Be(floorFirst ? Vector2d.Forward : Vector2d.Right);
+        closest.Point.Should().Be(start);
+        closest.Distance.Should().Be(Fixed64.Zero);
+        hits[0].Should().Be(closest);
+    }
+
+    [Theory]
+    [InlineData(ColliderType2D.Circle)]
+    [InlineData(ColliderType2D.Capsule)]
+    [InlineData(ColliderType2D.AABox)]
+    [InlineData(ColliderType2D.ConvexPolygon)]
+    [InlineData(ColliderType2D.Compound)]
+    public void ContainedRay_ShouldNotAllocateAfterWarmup(ColliderType2D shape)
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        LSCollider2D collider = CreateCollider(context, shape);
+        Vector2d start = new(Fixed64.Quarter, Fixed64.FromFraction(1, 8));
+        var hits = new SwiftList<Physics2DHit>();
+        Physics2DHit closest = default;
+        System.Action cast = () =>
+        {
+            context.Query2D.Raycast(start, start + Vector2d.Right, out closest);
+            context.Query2D.RaycastAll(start, start + Vector2d.Right, hits);
+        };
+
+        AllocationTestHelper.MeasureSteadyState(cast).Should().Be(0);
+
+        closest.Collider.Should().BeSameAs(collider);
+        closest.Distance.Should().Be(Fixed64.Zero);
+        hits.Count.Should().Be(1);
+        hits[0].Should().Be(closest);
+    }
+
+    [Theory]
     [InlineData(ColliderType2D.Circle)]
     [InlineData(ColliderType2D.Capsule)]
     [InlineData(ColliderType2D.AABox)]
@@ -94,7 +263,7 @@ public sealed class PreparedSegmentQuery2DTests
             .Should().BeFalse();
     }
 
-    private static LSCollider2D CreateCollider(GravitasWorldContext context, ColliderType2D shape)
+    private static LSCollider2D CreateCollider(GravitasWorldContext context, ColliderType2D shape, Vector2d position = default)
     {
         LSCollider2D collider = shape switch
         {
@@ -114,7 +283,7 @@ public sealed class PreparedSegmentQuery2DTests
                 CompoundColliderPart2D.AABBox(Vector2d.One, new Vector2d(Fixed64.One, Fixed64.Zero)))
         };
         collider.InitializeWithNoBody(new TestMatterAgent(context,
-            new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)));
+            new FixedTransform(new Vector3d(position.X, Fixed64.Zero, position.Y), FixedQuaternion.Identity, Vector3d.One)));
         return collider;
     }
 }

@@ -63,39 +63,69 @@
   and `mesh-ceiling-diagnostic.log`. Its assertion describes the reproduced
   defect, not desired behavior; the temporary tracked diagnostic was removed.
 
-### GRV-Issue-093 - 2D initial-overlap ray fallback normals can classify a wall as sloped support
-
-- **Confirmed:** 2026-10-07 during the 2D grounding-policy fix. The public ray
-  path supplies a diagonal normal for a point on a flat wall, which can pass a
-  valid support-normal threshold. This predates the policy hardening.
-- **Reproduction:** Put a radius-half 2D circle at `(0, 1/2)` with a downward
-  ray probe of length 3. A static AABB centered at `(-1/2, 0)`, size `(1, 4)`,
-  contains the probe start on its right face. The zero-distance witness is the
-  start point with normal raw components `(3037000500, 3037000500)`, rather
-  than the face normal `(1, 0)`. Automatic grounding accepts that upward
-  component as sloped support at threshold zero; it also exceeds the default
-  one-half limit. A farther eligible floor is hidden by this accepted witness.
-- **Source:**
-  [`QueryDetection2D.TryRaycastPrepared`](../../src/Gravitas/Queries/2D/QueryDetection2D.cs)
-  short-circuits contained starts through `ResolveQueryFallbackNormal(start,
-  collider.Center)`. The radial fallback is not a surface-normal witness for a
-  box or polygon. This Gravitas branch runs before the FixedMathSharp convex
-  intersection helper; the investigation has not found an upstream math defect.
-- **Follow-up:** Define contained-start normals and anchors for 2D ray queries
-  and their automatic-support use. Cover boundary and interior starts, boxes,
-  polygons, round shapes and compounds; preserve explicit public query overlap
-  semantics and deterministic ordering. Coordinate with the separate 3D mesh
-  initial-overlap issue where useful, without copying a response fallback into
-  support policy.
-- **Evidence:** Ignored `artifacts/grv-issue-092/ray-normal.log` records the
-  exact diagonal components and unwanted support selection. The final normal
-  policy regression uses a wall centered at the probe's height so it exercises
-  the independent horizontal-normal rejection contract. The radial-witness
-  defect remains outside that fix.
-
 Remaining measured performance costs are tracked in the benchmark backlog.
 
 ## Resolved Issues
+
+### GRV-Issue-093 - 2D initial-overlap ray fallback normals can classify a wall as sloped support
+
+- **Resolved:** 2026-10-07. Contained-start 2D rays retain distance zero and the
+  start-point witness, with an outward geometric separation normal independent
+  of travel direction. Automatic grounding now rejects the wall and selects the
+  farther eligible floor at both zero and default support thresholds.
+- **Original reproduction:** A radius-half circle at `(0, 1/2)` casts downward
+  for length 3. A static AABB centered at `(-1/2, 0)`, size `(1, 4)`, contains
+  the start on its right face. Its old normal raw components were
+  `(3037000500, 3037000500)` instead of the geometric normal `(1, 0)`, admitting
+  the wall as sloped support. This query defect predated the body-policy hardening.
+- **Root cause:**
+  [`QueryDetection2D.TryRaycastPrepared`](../../src/Gravitas/Queries/2D/QueryDetection2D.cs)
+  used a center-radial fallback before reaching convex intersection geometry.
+  The defect belonged to Gravitas; existing upstream point-contact geometry
+  supplied correct normals.
+- **Fix and ordering:** Reuse circle radial and centered-capsule normal owners.
+  Convex leaves use a focused FixedMathSharp internal point-normal operation
+  that shares exact axis/depth ranking without materializing depth or anchors.
+  Validated nondegenerate points need only face axes; general contacts retain
+  vertex axes and their degenerate-boundary behavior. Equal convex features
+  retain geometric order, circle centers use world +X, and capsule centerlines
+  use rotated local +X. Compound ties retain the first authored part and public
+  collider ordering remains distance then ID. Unsupported custom geometry
+  cannot fabricate a contained-start normal.
+- **Scaled-boundary admission:** Review reproduced positive scaling that rounds
+  a valid thin polygon into a line, including compound parts and count-changing
+  recorded loads. The polygon owner now validates changed scaled vertices
+  before publication and retains committed geometry when replacement admission
+  fails. Successful count changes restore matching spare buffers; ordinary
+  pose changes reuse validation and remain allocation-free.
+- **Verification:** Initial query/grounding regressions failed 18 of 20 cases;
+  three scaled-boundary cases and the loaded replacement case also reproduced
+  their defects before the corresponding fixes. Final local-stack Release and
+  ReleaseLean full suites pass 4,648/4,583 Gravitas tests and 4,481/4,460
+  FixedMathSharp solution tests, with exact 100% reachable line, branch and
+  fully covered method coverage in both repositories. Combined raw OpenCover
+  counts independently confirm complete sequence, branch and method coverage.
+  Regressions cover boundary/interior starts, scalar limits, rotated geometry,
+  winding, feature/compound ties, rejected geometry and recovery, grounding and
+  warmed allocations. Shared replay expectations and schemas are unchanged;
+  both core target frameworks build in both profiles.
+- **Measured refinement:** Ten Release query cases on Windows x64 all retain
+  warmed 0 B/op. Against the first correct full-contact implementation,
+  contained box/polygon/compound means fall from 11.8–12.5 to 5.5–5.7 microseconds;
+  capsule/circle means fall from 4.592/2.757 to 1.120/1.056 microseconds. Outside
+  controls remain comparable across captures. The original roughly-one-
+  microsecond radial shortcut did less geometry work and returned incorrect
+  normals. These five-iteration samples assess the isolated path, not complete
+  gameplay-frame capacity.
+- **Documentation and review:** Both repositories' DocFX builds pass with zero
+  warnings/errors. Generated API local links and 127 wiki/tracker local links
+  pass validation. Independent final review has no actionable findings.
+- **Compatibility and evidence:** Public query signatures and hit layout remain
+  unchanged. The new FixedMathSharp internal consumer is a coordinated ABI
+  event: release FixedMathSharp first, then revalidate Gravitas against released
+  packages before release. Final coverage, benchmark and documentation logs are
+  under ignored `artifacts/grv-issue-093/`; the original diagnostic remains in
+  `artifacts/grv-issue-092/ray-normal.log`. GRV-Issue-091 remains independent.
 
 ### GRV-Issue-092 - 2D ground-normal policy admits non-support normals and retains stale probe eligibility
 
@@ -133,9 +163,9 @@ Remaining measured performance costs are tracked in the benchmark backlog.
   verifies allocation and behavior, not a before/after speed claim. Both core
   target frameworks build in Release and ReleaseLean; DocFX completes with
   zero warnings/errors, and changed wiki pages have valid local links.
-- **Remaining witness defects:** GRV-Issue-091 covers the separate 3D overhead
-  mesh witness; GRV-Issue-093 records the separately reproduced 2D contained-start
-  ray fallback defect. Neither is hidden by this body-policy fix.
+- **Witness follow-ups:** GRV-Issue-091 remains active for the separate 3D
+  overhead mesh witness. GRV-Issue-093 subsequently resolved the separately
+  reproduced 2D contained-start ray defect in the query owner.
 
 ### GRV-Issue-090 - 3D automatic swept-ground probes accept vertical-wall contacts
 
