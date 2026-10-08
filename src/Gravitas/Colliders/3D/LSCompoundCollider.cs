@@ -347,14 +347,21 @@ public sealed class LSCompoundCollider : LSCollider
 
     internal override FixedPointAnchor GetClosestSurfaceAnchor(
         Vector3d point,
-        out Vector3d normal)
+        out Vector3d normal) =>
+        GetClosestSurfaceAnchor(point, out normal, out _);
+
+    internal FixedPointAnchor GetClosestSurfaceAnchor(
+        Vector3d point,
+        out Vector3d normal,
+        out LSCollider surfaceOwner)
     {
         var reference = new FixedPointAnchor(
             point,
             FixedQuaternion.Identity,
             Vector3d.Zero);
+        surfaceOwner = _partColliders[0];
         FixedPointAnchor closest =
-            _partColliders[0].GetClosestSurfaceAnchor(
+            surfaceOwner.GetClosestSurfaceAnchor(
                 point,
                 out normal);
         for (int i = 1; i < _partColliders.Length; i++)
@@ -372,6 +379,7 @@ public sealed class LSCompoundCollider : LSCollider
 
             closest = candidate;
             normal = candidateNormal;
+            surfaceOwner = _partColliders[i];
         }
 
         return closest;

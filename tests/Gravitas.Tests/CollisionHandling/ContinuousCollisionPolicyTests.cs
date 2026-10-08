@@ -10,6 +10,25 @@ namespace Gravitas.Tests.CollisionHandlingTests;
 public sealed class ContinuousCollisionPolicyTests
 {
     [Fact]
+    public void MeshSphereContact_WithUnrepresentableCenterOffset_ShouldRetainGeometricSide()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSMeshCollider mesh = MeshTestFixtures.CreateConvexQuadFloor(MeshColliderMode.Concave);
+        Vector3d surface = new(Fixed64.Zero, Fixed64.MinValue + (Fixed64)4, Fixed64.Zero);
+        mesh.InitializeWithNoBody(new TestMatterAgent(
+            context, new FixedTransform(surface, FixedQuaternion.Identity, Vector3d.One)));
+        Vector3d center = new(Fixed64.Zero, Fixed64.MaxValue - (Fixed64)4, Fixed64.Zero);
+
+        ContinuousCollisionContactPolicy.TryResolveSweptSphereContact(
+            mesh, center, Vector3d.Up, out ContactAnchor anchor, out Vector3d normal)
+            .Should().BeTrue();
+
+        anchor.TryGetWorldPoint(out Vector3d point).Should().BeTrue();
+        point.Should().Be(surface);
+        normal.Should().Be(Vector3d.Up);
+    }
+
+    [Fact]
     public void ContinuousCollisionContactPolicy_ShouldResolveSweptSphereAnchorsAndNormals()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
@@ -150,6 +169,13 @@ public sealed class ContinuousCollisionPolicyTests
             NormalOverride = Vector3d.Zero,
         };
         scenario.InitializeStaticCollider(custom, Vector3d.Zero);
+
+        custom.NormalOverride = Vector3d.Up * (Fixed64)2;
+        ContinuousCollisionContactPolicy.TryResolveSweptSphereContact(
+            custom, Vector3d.Right, Vector3d.Up, out _, out Vector3d customNormal)
+            .Should().BeTrue();
+        customNormal.Should().Be(Vector3d.Up);
+        custom.NormalOverride = Vector3d.Zero;
 
         ContinuousCollisionContactPolicy.TryResolveSweptSphereContact(
             custom,

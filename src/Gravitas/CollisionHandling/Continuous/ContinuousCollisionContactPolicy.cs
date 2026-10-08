@@ -128,9 +128,21 @@ internal static class ContinuousCollisionContactPolicy
                 sphereCenterAtImpact,
                 out FixedPointAnchor meshPoint,
                 out normal);
-            if (Vector3d.Dot(normal, direction) > Fixed64.Zero)
-                normal = -normal;
+            normal = ResolveMeshSphereNormal(meshPoint, sphereCenterAtImpact, normal);
             targetAnchor = new ContactAnchor(meshPoint);
+            return true;
+        }
+
+        if (target is LSCompoundCollider compound)
+        {
+            FixedPointAnchor surfacePoint = compound.GetClosestSurfaceAnchor(
+                sphereCenterAtImpact, out normal, out LSCollider surfaceOwner);
+            if (surfaceOwner is LSMeshCollider)
+                normal = ResolveMeshSphereNormal(surfacePoint, sphereCenterAtImpact, normal);
+            // Keep the selected part's witness and outward primitive normal.
+            // Re-querying a materialized point can select another part at a
+            // shared boundary or lose an otherwise valid far-domain anchor.
+            targetAnchor = new ContactAnchor(surfacePoint);
             return true;
         }
 
@@ -155,6 +167,20 @@ internal static class ContinuousCollisionContactPolicy
         targetAnchor = default;
         normal = default;
         return false;
+    }
+
+    private static Vector3d ResolveMeshSphereNormal(
+        in FixedPointAnchor surfacePoint,
+        Vector3d sphereCenter,
+        Vector3d faceNormal)
+    {
+        // Mesh sweeps are two-sided surface queries. Use the closest feature's
+        // direction even at edges, vertices and sub-epsilon separations; travel
+        // cannot turn an overhead contact into support. Only exact coincidence
+        // retains the selected triangle's authored normal and stable tie order.
+        var center = new FixedPointAnchor(sphereCenter, FixedQuaternion.Identity, Vector3d.Zero);
+        Vector3d normal = WidePointAnchor3d.GetDirection(center, surfacePoint);
+        return normal == Vector3d.Zero ? faceNormal : normal;
     }
 
     private static Vector3d ResolveLegacyNormal(

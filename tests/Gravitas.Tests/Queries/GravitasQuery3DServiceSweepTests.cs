@@ -805,7 +805,34 @@ public sealed class GravitasQuery3DServiceSweepTests
     }
 
     [Fact]
-    public void SweepSphere_WhenResolvedContactCannotEnterCompoundFrame_ShouldRejectHit()
+    public void SweepSphere_WhenToleranceAdmitsUnrepresentableContactDistance_ShouldRejectHit()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        var cylinder = new LSCylinderCollider
+        {
+            Size = new Vector3d(Fixed64.One, Fixed64.MinIncrement, Fixed64.One)
+        };
+        scenario.InitializeStaticCollider(cylinder,
+            Vector3d.Left * (Fixed64.Half + Fixed64.FromFraction(1, 8192)));
+        Vector3d start = Vector3d.Right * Fixed64.MaxValue;
+        var worker = new SweptSphereQueryWorker();
+        worker.Prepare(start, start + Vector3d.Left, Fixed64.MaxValue);
+
+        // The admission tolerance can retain a zero-distance candidate whose
+        // geometric separation is just beyond the public scalar range. The
+        // contact resolver must still reject its unrepresentable distance.
+        worker.TrySweep(cylinder, out Vector3d center, out Fixed64 distance).Should().BeTrue();
+        distance.Should().Be(Fixed64.Zero);
+        ContinuousCollisionContactPolicy.TryResolveSweptSphereContact(
+            cylinder, center, Vector3d.Left, out _, out _).Should().BeFalse();
+        scenario.Context.Query3D.SweepSphere(start, Fixed64.MaxValue,
+            Vector3d.Left, Fixed64.One, out Physics3DHit hit, IncludeLayerZero).Should().BeFalse();
+        hit.Should().Be(default(Physics3DHit));
+        scenario.Context.Query3D.LastQueryCandidateCount.Should().Be(1);
+    }
+
+    [Fact]
+    public void SweepSphere_WhenWitnessCannotEnterCompoundFrame_ShouldRetainPartAnchor()
     {
         using GravitasWorldContext context =
             GravitasWorldContext.CreateOwned();
@@ -844,9 +871,12 @@ public sealed class GravitasQuery3DServiceSweepTests
                 compound,
                 sphereCenterAtImpact,
                 Vector3d.Right,
-                out _,
-                out _)
-            .Should().BeFalse();
+                out ContactAnchor anchor,
+                out Vector3d normal)
+            .Should().BeTrue();
+        anchor.TryGetWorldPoint(out Vector3d point).Should().BeTrue();
+        point.Should().Be(Vector3d.Right * (Fixed64.Half - Fixed64.FromRaw(1)));
+        normal.Should().Be(Vector3d.Right);
 
         bool hit = context.Query3D.SweepSphere(
             start,
@@ -856,8 +886,12 @@ public sealed class GravitasQuery3DServiceSweepTests
             out Physics3DHit result,
             IncludeLayerZero);
 
-        hit.Should().BeFalse();
-        result.Should().Be(default(Physics3DHit));
+        hit.Should().BeTrue();
+        result.Collider.Should().BeSameAs(compound);
+        result.Anchor.Should().Be(anchor);
+        result.Point.Should().Be(point);
+        result.Normal.Should().Be(normal);
+        result.Distance.Should().Be(Fixed64.Zero);
         context.Query3D.LastQueryCandidateCount.Should().Be(1);
     }
 

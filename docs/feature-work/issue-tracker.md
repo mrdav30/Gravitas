@@ -2,7 +2,7 @@
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-094`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-095`.
 - Assign an ID when an issue enters this tracker, keep it through resolution,
   and never reuse an ID even if an entry is later removed. Check this file's Git
   history before advancing or repairing the counter.
@@ -35,37 +35,82 @@
 
 ### Ordered Queue
 
-### GRV-Issue-091 - Initially overlapping mesh sphere sweeps can classify an overhead surface as support
+### GRV-Issue-094 - Non-sphere convex CCD can block separation from the back of a mesh face
 
-- **Confirmed:** 2026-10-07 during the 3D grounding parity audit. A local-stack
-  Release diagnostic reproduced an overhead mesh accepted as upward support
-  even with the new support-normal filter. This predates that filter.
-- **Reproduction:** Create a radius-half dynamic sphere at the origin and a
-  body-backed static concave quad at world Y `3/4`, rotated 180 degrees around X
-  so its face points down. A downward radius-half sweep from `(0, 1/2, 0)` to
-  the origin starts overlapping that surface. It returns one hit at distance
-  zero with point `(0, 3/4, 0)` and normal `(0, 1, 0)`. `CheckGround()` accepts
-  that upward query normal and stores the overhead point as ground.
-- **Source chain:**
-  [`ContinuousCollisionContactPolicy.TryResolveSweptSphereContact`](../../src/Gravitas/CollisionHandling/Continuous/ContinuousCollisionContactPolicy.cs)
-  finds the closest mesh anchor, then flips a normal aligned with sweep
-  direction. For initial overlap below an overhead face, this can replace the
-  downward normal with an upward response normal. The shared query/CCD witness
-  contract needs review; the grounding owner's upward-normal check cannot
-  distinguish that witness from genuine support.
-- **Follow-up:** Establish initial-overlap normal and anchor contracts for
-  two-sided mesh queries and CCD before changing the shared policy. Cover
-  overhead and floor faces, winding, convex/concave meshes, compound mesh parts,
-  deterministic ordering and legitimate CCD separation. Keep the body-level
-  wall fix independent; do not reject ordinary mesh floors globally.
-- **Evidence:** The isolated diagnostic source and detailed console output are
-  retained under ignored `artifacts/grv-issue-090/Issue090AuditScratchTests.cs`
-  and `mesh-ceiling-diagnostic.log`. Its assertion describes the reproduced
-  defect, not desired behavior; the temporary tracked diagnostic was removed.
+- **Confirmed:** 2026-10-07 in an isolated local-stack Release reproduction
+  during #091 review. This is an existing generic-convex path defect; its exact
+  sweep dispatch, hit-normal policy and closing helper are unchanged by #091.
+- **Reproduction:** An upward-wound static concave quad lies at Y zero. A unit
+  dynamic cuboid centered at `(0, -1/2, 0)` initially touches its underside.
+  Use a one-second step, zero gravity/air density, frictionless materials,
+  manual grounding and `ContinuousCollisionMode.Continuous`. Apply a downward
+  unit velocity, then call `Simulate` and `LateSimulate`. Expected center Y is
+  `-3/2`; the reproduced center remains `-1/2` because CCD admits a separating
+  initial contact as closing.
+- **Source chain:** The non-sphere exact sweep in
+  [`SolidBody.ContinuousCollision.Hits`](../../src/Gravitas/Core/3D/SolidBody.ContinuousCollision.Hits.cs)
+  uses [`ConvexSweepHitPolicy`](../../src/Gravitas/Queries/3D/Sweeps/ConvexSweepHitPolicy.cs).
+  Its initial planar normal retains authored upward winding. The
+  [`closing-normal helper`](../../src/Gravitas/Core/3D/SolidBody.ContinuousCollision.Helpers.cs)
+  re-queries the on-surface witness, where mesh geometry has lost the source's
+  side. Downward separation then passes the negative-dot closing predicate.
+- **Follow-up:** Establish initial-contact side selection for generic convex
+  sources independently of travel and mesh winding. Cover dynamic/kinematic
+  sources, convex/concave meshes, compound mesh parts, and approaching,
+  separating, tangent and rotational contacts. Preserve primitive contained
+  starts and legitimate mesh impacts; do not bypass the generic closing helper
+  using the sphere-specific witness contract.
+- **Evidence:** Ignored `artifacts/grv-issue-091/NonSphereMeshSeparationAudit.cs`
+  and `non-sphere-audit.log` retain the reproduction and failure. The temporary
+  diagnostic was removed from the maintained test suite.
 
 Remaining measured performance costs are tracked in the benchmark backlog.
 
 ## Resolved Issues
+
+### GRV-Issue-091 - Initially overlapping mesh sphere sweeps can classify an overhead surface as support
+
+- **Resolved:** 2026-10-07. Mesh sphere sweeps retain zero-distance initial
+  hits and target surface anchors, with a geometric anchor-to-sphere normal
+  independent of travel. Grounding rejects the original body-backed overhead
+  quad and can select a farther genuine floor.
+- **Original reproduction:** A radius-half sphere at the origin probed down
+  from Y `1/2` while already overlapping a downward-wound concave quad at Y
+  `3/4`. The old hit normal was upward despite its overhead surface witness.
+- **Root cause and fix:**
+  [`ContinuousCollisionContactPolicy`](../../src/Gravitas/CollisionHandling/Continuous/ContinuousCollisionContactPolicy.cs)
+  flipped mesh normals against travel. Reuse FixedMathSharp's exact anchor
+  direction operation instead: faces, edges, vertices, one-raw gaps and
+  full-domain offsets retain the sphere's geometric side. Only exact
+  coincidence uses the selected authored face normal. Both mesh modes remain
+  two-sided triangle-surface sweeps, including the interior side of a closed
+  convex mesh; solid-volume containment is not inferred.
+- **Compound ownership and ordering:** Reuse the existing nearest-surface
+  reducer and retain its selected part's exact anchor and outward primitive
+  normal. This avoids duplicate searches, re-selection at shared boundaries,
+  and rejection merely because a valid part witness cannot enter the parent
+  scalar frame. Mesh parts use the same sphere-side rule. Triangle-index,
+  authored-part and collider-ID ordering remain deterministic.
+- **Validation:** Local-stack Release **4,687** and ReleaseLean **4,622** tests
+  pass. Exact line/branch/fully covered method counts are respectively
+  **56,385/56,385; 16,370/16,370; 5,427/5,427** and
+  **56,383/56,383; 16,370/16,370; 5,426/5,426**; raw OpenCover checks also pass.
+  Regressions cover overhead rejection, floor selection, windings, travel,
+  tiny/coincident starts, edge/vertex normals, compound ties, far-domain
+  witnesses, allocation-free queries and complete-loop sphere CCD admission.
+  The public tolerance-boundary rejection guard remains covered by a coherent
+  finite-axis fixture. No upstream source changes were required.
+- **Benchmark evidence:** Five measured Release iterations on this host with
+  local dependencies and a two-triangle target: direct ordinary sweeps
+  **45.18 → 47.11 μs**, direct initial overlaps **16.39 → 19.87 μs**,
+  compound ordinary sweeps **48.69 → 47.32 μs**, and compound initial overlaps
+  **19.96 → 19.78 μs**. All remain **0 B/op** after warmup. Exact feature-side
+  resolution adds about 3.5 μs to the tiny direct initial-overlap fixture;
+  compound witness reuse keeps its costs near baseline. Captures are under
+  ignored `artifacts/grv-issue-091/{baseline,final-benchmark}`.
+- **Review boundary:** Sphere CCD already consumes these corrected witnesses
+  directly. Generic convex CCD retains its separate admission path; its
+  pre-existing mesh-side gap is recorded as #094.
 
 ### GRV-Issue-093 - 2D initial-overlap ray fallback normals can classify a wall as sloped support
 

@@ -129,6 +129,19 @@ absolute point to be representable. The familiar `Point`, `Point3D`, and
 when a query may approach a scalar face. Returning `false` from a witness
 materialization method does not invalidate the query hit.
 
+A sphere sweep against a 3D mesh treats its triangles as two-sided surfaces,
+including convex meshes and convex-mesh compound parts. An initially touching
+or overlapping triangle reports zero travel distance and retains the target's
+closest surface anchor. Its normal points from that anchor toward the sphere
+center, so face, edge, and vertex contacts keep their geometric side regardless
+of travel or triangle winding. Only an exactly coincident center and anchor
+uses the selected triangle's authored face normal. Equal nearest features keep
+triangle index order, and compound parts keep authored order. CCD preserves
+this normal when rejecting separating or tangent initial contacts; grounding
+can therefore distinguish overhead surfaces from upward support. These mesh
+sweeps test triangle proximity, not solid-volume containment: a sphere wholly
+inside a closed mesh without touching its triangles is not an initial hit.
+
 A 2D circle sweep that starts touching or overlapping a target reports zero
 travel distance but still retains the **target's surface witness**, not the
 probe's starting center. It preserves the anchor even when that point cannot
