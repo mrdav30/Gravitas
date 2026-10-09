@@ -7,6 +7,7 @@ using Gravitas.CollisionHandling;
 using Gravitas.Materials;
 using Gravitas.Tests.Support;
 using System;
+using System.Linq;
 using Xunit;
 
 namespace Gravitas.Tests;
@@ -38,7 +39,8 @@ public sealed class MeshConePatchContactTests
         CollisionPair pair = CreatePair(scenario, vertices, triangles, Vector3d.Down * Fixed64.Quarter);
 
         CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
-        pair.Manifold.Count.Should().Be(1);
+        pair.Manifold.GroupCount.Should().Be(1);
+        pair.Manifold.Count.Should().Be(ContactManifold.MaxContactsPerGroup);
         pair.Manifold.PrimaryContact.Normal.Should().Be(Vector3d.Down);
         pair.Manifold.PrimaryContact.Depth.Should().Be(Fixed64.Quarter);
         pair.Manifold.PrimaryContact.PointA.Should().Be(Vector3d.Zero);
@@ -122,7 +124,7 @@ public sealed class MeshConePatchContactTests
     [InlineData(false, true)]
     [InlineData(true, false)]
     [InlineData(true, true)]
-    public void SmallPatchExposedPerimeter_ShouldRetainShorterRealEdgeExit(bool alternateDiagonal, bool reverseWinding)
+    public void SmallPatchWithInteriorSection_ShouldExcludePerimeterAndCoveredSeams(bool alternateDiagonal, bool reverseWinding)
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         Fixed64 extent = Fixed64.FromFraction(3, 20);
@@ -135,28 +137,20 @@ public sealed class MeshConePatchContactTests
                 (triangles[i + 1], triangles[i + 2]) = (triangles[i + 2], triangles[i + 1]);
         CollisionPair pair = CreatePair(scenario, vertices, triangles, Vector3d.Down * Fixed64.Quarter);
 
-        // The real perimeter has a shorter exit than the 1/4 face depth:
-        // (3/20 + 1/8) / sqrt(1 + (1/2)^2). The diagonal's 0.1118
-        // exit is covered; always substituting the face would also be wrong.
+        // The section radius is 1/8, strictly smaller than the square's
+        // 3/20 extent. Its admitted local contact has no perimeter witness;
+        // an oblique global minimum translation is a different contract.
         CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
-        ManifoldContact contact = pair.Manifold.PrimaryContact;
-        contact.Depth.Should().BeApproximately(Fixed64.FromFraction(11, 40)
-            / FixedMath.Sqrt(Fixed64.FromFraction(5, 4)), Fixed64.FromRaw(6));
-        contact.Normal.Y.Should().BeLessThan(Fixed64.Zero);
-        (contact.Normal.X == Fixed64.Zero ^ contact.Normal.Z == Fixed64.Zero).Should().BeTrue();
-        bool onXEdge = FixedMath.Abs(contact.PointA.X) == extent;
-        bool onZEdge = FixedMath.Abs(contact.PointA.Z) == extent;
-        (onXEdge || onZEdge).Should().BeTrue();
-        contact.PointA.Y.Should().Be(Fixed64.Zero);
-
-        Vector3d center = Vector3d.Down * Fixed64.Quarter;
-        Fixed64 margin = Fixed64.FromRaw(64);
-        CollisionPair stillIntersecting = CreatePair(scenario, vertices, triangles,
-            center + contact.Normal * (contact.Depth - margin));
-        CollisionPair cleared = CreatePair(scenario, vertices, triangles,
-            center + contact.Normal * (contact.Depth + margin));
-        CollisionDetection.DoCollisionCheck(stillIntersecting).Should().BeTrue();
-        CollisionDetection.DoCollisionCheck(cleared).Should().BeFalse();
+        pair.Manifold.GroupCount.Should().Be(1);
+        pair.Manifold.Count.Should().Be(ContactManifold.MaxContactsPerGroup);
+        pair.Manifold.Should().OnlyContain(c => c.Normal == Vector3d.Down && c.PointA.Y == Fixed64.Zero);
+        pair.Manifold.PrimaryContact.Depth.Should().Be(Fixed64.Quarter);
+        pair.Manifold.PrimaryContact.PointA.Should().Be(Vector3d.Zero);
+        foreach (ManifoldContact contact in pair.Manifold)
+        {
+            FixedMath.Abs(contact.PointA.X).Should().BeLessThan(extent);
+            FixedMath.Abs(contact.PointA.Z).Should().BeLessThan(extent);
+        }
     }
 
     [Theory]
@@ -173,8 +167,8 @@ public sealed class MeshConePatchContactTests
         var rotation = reverseWinding
             ? new FixedQuaternion(Fixed64.One, Fixed64.Zero, Fixed64.Zero, Fixed64.Zero)
             : FixedQuaternion.Identity;
-        mesh.InitializeWithNoBody(new TestMatterAgent(scenario.Context,
-            new FixedTransform(Vector3d.Zero, rotation, Vector3d.One)));
+        // Explicit static bodies participate in the real pair/response flow.
+        scenario.CreateBody(mesh, Vector3d.Zero, rotation, immovable: true);
         SolidBody body = scenario.CreateCone(Vector3d.Down * Fixed64.Quarter,
             preventAngularForces: true).Body;
         body.Collider.Material = PhysicsMaterial.Frictionless;
@@ -193,7 +187,7 @@ public sealed class MeshConePatchContactTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void SubdividedSurface_ShouldRetainOneWholePatchContact(bool tilted)
+    public void SubdividedSurface_ShouldRetainOneWholeSurfaceGroup(bool tilted)
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         const int subdivision = 8, width = subdivision + 1;
@@ -215,23 +209,25 @@ public sealed class MeshConePatchContactTests
         var rotation = tilted ? new FixedQuaternion(Fixed64.Zero, Fixed64.Zero,
             Fixed64.FromFraction(3, 5), Fixed64.FromFraction(4, 5)) : FixedQuaternion.Identity;
         // For the tilted cone, its projected X extent is 31/50 around -28/25.
-        // Enlarging the whole footprint by the 9/100 face exit still fits
-        // strictly inside the quad. A cell seam therefore cannot clear it.
+        // The restricted paired-ray face depth is 15/176 (the remote global
+        // top support projects outside the finite cone base). The whole section
+        // fits strictly inside the quad; cell seams add no boundary constraints.
         Vector3d center = new(tilted ? -Fixed64.FromFraction(28, 25) : Fixed64.Zero,
             -Fixed64.Quarter, Fixed64.Zero);
         CollisionPair pair = CreatePair(scenario, vertices, triangles, center, rotation);
 
         CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
-        pair.Manifold.Count.Should().Be(1);
+        pair.Manifold.GroupCount.Should().Be(1);
+        pair.Manifold.Count.Should().Be(ContactManifold.MaxContactsPerGroup);
         pair.Manifold.PrimaryContact.Normal.Should().Be(Vector3d.Down);
         pair.Manifold.PrimaryContact.Depth.Should().BeApproximately(
-            tilted ? Fixed64.FromFraction(9, 100) : Fixed64.Quarter, Fixed64.FromRaw(4));
+            tilted ? Fixed64.FromFraction(15, 176) : Fixed64.Quarter, Fixed64.FromRaw(4));
     }
 
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void ExposedEdge_ShouldRetainShorterObliqueExit(bool singleTriangle)
+    public void ExposedEdge_ShouldRetainIndependentFaceAndObliqueBoundaryRows(bool singleTriangle)
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         var vertices = new[] { new Vector3d(-2, 0, -2), new Vector3d(2, 0, -2),
@@ -242,13 +238,24 @@ public sealed class MeshConePatchContactTests
             singleTriangle ? new[] { 0, 2, 1 } : new[] { 0, 2, 1, 1, 2, 3 },
             new Vector3d(singleTriangle ? Fixed64.Zero : Fixed64.Two, -Fixed64.Quarter, Fixed64.Zero));
 
-        // Sliding toward the uncovered side clears this edge before moving
-        // the apex below the plane; it remains a real curved-feature contact.
+        // The face's regional maximum and the exposed edge are independent
+        // constraints. PrimaryContact selects depth, so inspect the edge row
+        // directly instead of treating the pair as a minimum-translation query.
         CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
-        ManifoldContact contact = pair.Manifold.PrimaryContact;
-        contact.Depth.Should().BeGreaterThan(Fixed64.Zero).And.BeLessThan(Fixed64.Quarter);
-        contact.Normal.Should().NotBe(Vector3d.Down);
-        contact.PointA.Y.Should().Be(Fixed64.Zero);
+        pair.Manifold.GroupCount.Should().BeGreaterThan(1);
+        pair.Manifold.Any(c => c.Normal == Vector3d.Down && c.Depth == Fixed64.Quarter).Should().BeTrue();
+        ManifoldContact[] edgeRows = pair.Manifold.Where(c => c.Normal != Vector3d.Down).ToArray();
+        edgeRows.Should().NotBeEmpty();
+        foreach (ManifoldContact contact in edgeRows)
+        {
+            contact.Depth.Should().BeGreaterThan(Fixed64.Zero).And.BeLessThan(Fixed64.Quarter);
+            contact.PointA.Y.Should().Be(Fixed64.Zero);
+            if (singleTriangle)
+                (contact.PointA.X + contact.PointA.Z).Should().Be(Fixed64.Zero);
+            else
+                contact.PointA.X.Should().Be(Fixed64.Two);
+            contact.PointB.Y.Should().BeInRange(-Fixed64.FromFraction(3, 4), Fixed64.Quarter);
+        }
     }
 
     [Fact]
@@ -267,7 +274,7 @@ public sealed class MeshConePatchContactTests
     }
 
     [Fact]
-    public void NonconvexPatchExposedEdge_ShouldRetainCompleteTriangleContact()
+    public void NonconvexPatchExposedEdge_ShouldRetainFaceAndActualBoundaryConstraints()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         var vertices = new[] { new Vector3d(0, 0, 0), new Vector3d(4, 0, 0),
@@ -276,18 +283,20 @@ public sealed class MeshConePatchContactTests
         Vector3d center = new((Fixed64)3, -Fixed64.Quarter, Fixed64.One);
         CollisionPair pair = CreatePair(scenario, vertices, triangles, center);
 
-        // The notch makes this patch nonconvex. At the distant exposed edge,
-        // its real triangle exit still clears the complete L-shaped surface.
+        // The notch makes this patch nonconvex. Its local face and distant
+        // exposed edge remain separate constraints; neither suppresses the other.
         CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
-        ManifoldContact contact = pair.Manifold.PrimaryContact;
-        contact.Depth.Should().BeGreaterThan(Fixed64.Zero).And.BeLessThan(Fixed64.Quarter);
-        contact.PointA.Z.Should().Be(Fixed64.One);
-        contact.PointA.Y.Should().Be(Fixed64.Zero);
-        Fixed64 margin = Fixed64.FromRaw(64);
-        CollisionDetection.DoCollisionCheck(CreatePair(scenario, vertices, triangles,
-            center + contact.Normal * (contact.Depth - margin))).Should().BeTrue();
-        CollisionDetection.DoCollisionCheck(CreatePair(scenario, vertices, triangles,
-            center + contact.Normal * (contact.Depth + margin))).Should().BeFalse();
+        pair.Manifold.Any(c => c.Normal == Vector3d.Down && c.Depth == Fixed64.Quarter).Should().BeTrue();
+        ManifoldContact[] edgeRows = pair.Manifold.Where(c => c.Normal != Vector3d.Down).ToArray();
+        edgeRows.Should().NotBeEmpty();
+        foreach (ManifoldContact contact in edgeRows)
+        {
+            contact.Depth.Should().BeGreaterThan(Fixed64.Zero).And.BeLessThan(Fixed64.Quarter);
+            contact.PointA.Z.Should().Be(Fixed64.One);
+            contact.PointA.Y.Should().Be(Fixed64.Zero);
+            contact.PointA.X.Should().BeInRange(Fixed64.One, (Fixed64)4);
+            contact.Normal.Z.Should().BeGreaterThan(Fixed64.Zero);
+        }
     }
 
     [Fact]
@@ -312,7 +321,10 @@ public sealed class MeshConePatchContactTests
         var mesh = MeshTestFixtures.CreateConvexQuadFloor(MeshColliderMode.Concave);
         scenario.InitializeStaticCollider(mesh, Vector3d.Zero);
         // sin(half-angle)=3/5, cos(half-angle)=4/5: axis Y=7/25 and
-        // radial Y extent=12/25. Base rim reaches Y=-1/4-7/50+12/25=9/100.
+        // radial Y extent=12/25. Global top support reaches Y=9/100, but
+        // its projection lies outside the base and is not a paired face ray.
+        // Base admission gives p.X <= -1/160; the lateral support line
+        // q.Y <= (2/11)*p.X + 19/220 then gives the sharp depth 15/176.
         var rotation = new FixedQuaternion(Fixed64.Zero, Fixed64.Zero,
             Fixed64.FromFraction(3, 5), Fixed64.FromFraction(4, 5));
         var cone = new LSConeCollider();
@@ -324,8 +336,12 @@ public sealed class MeshConePatchContactTests
         CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
         ManifoldContact contact = pair.Manifold.PrimaryContact;
         contact.Normal.Should().Be(Vector3d.Down);
-        contact.Depth.Should().BeApproximately(Fixed64.FromFraction(9, 100), Fixed64.FromRaw(4));
+        contact.Depth.Should().BeApproximately(Fixed64.FromFraction(15, 176), Fixed64.FromRaw(4));
+        contact.PointA.X.Should().BeApproximately(-Fixed64.FromFraction(1, 160), Fixed64.FromRaw(4));
         contact.PointA.Y.Should().Be(Fixed64.Zero);
+        contact.PointA.Z.Should().Be(Fixed64.Zero);
+        contact.PointB.X.Should().Be(contact.PointA.X);
+        contact.PointB.Y.Should().BeApproximately(Fixed64.FromFraction(15, 176), Fixed64.FromRaw(4));
     }
 
     [Theory]
@@ -374,15 +390,21 @@ public sealed class MeshConePatchContactTests
             new Vector3d(exposedEdge ? Fixed64.Two : Fixed64.Zero, -Fixed64.Quarter, Fixed64.Zero));
         CollisionPair pair = scenario.CreatePair(mesh, cone);
         CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
-        ManifoldContact expected = pair.Manifold.PrimaryContact;
+        ManifoldContact[] expected = pair.Manifold.ToArray();
+        int groups = pair.Manifold.GroupCount;
         long allocated = AllocationTestHelper.MeasureSteadyState(() =>
         {
-            if (!CollisionDetection.DoCollisionCheck(pair))
+            if (!CollisionDetection.DoCollisionCheck(pair) || pair.Manifold.GroupCount != groups
+                || pair.Manifold.Count != expected.Length)
                 throw new InvalidOperationException("Repeated patch contact changed.");
-            ManifoldContact actual = pair.Manifold.PrimaryContact;
-            if (actual.ContactId != expected.ContactId || actual.Depth != expected.Depth
-                || actual.Normal != expected.Normal || actual.DepthIsClamped != expected.DepthIsClamped)
-                throw new InvalidOperationException("Repeated patch contact changed.");
+            int index = 0;
+            foreach (ManifoldContact actual in pair.Manifold)
+            {
+                ManifoldContact prior = expected[index++];
+                if (actual.ContactId != prior.ContactId || actual.Depth != prior.Depth
+                    || actual.Normal != prior.Normal || actual.DepthIsClamped != prior.DepthIsClamped)
+                    throw new InvalidOperationException("Repeated patch contact changed.");
+            }
         }, warmupIterations: 8, stabilizationIterations: 2, measurementIterations: 4);
         allocated.Should().Be(0);
     }

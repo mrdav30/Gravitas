@@ -9,6 +9,33 @@ namespace Gravitas.Tests;
 
 public sealed class MeshConeFaceRegionsTests
 {
+    [Fact]
+    public void AxialSection_ContainedAndBoundaryTouchingDomainsKeepTheSameFiniteSamples()
+    {
+        var contained = new MeshConeFaceRegions();
+        var touching = new MeshConeFaceRegions();
+        var connectivity = new MeshConeSurfaceConnectivity();
+        // H=4,R=2 cuts a unit-radius circle at y=0. The smaller square
+        // touches all four cardinal points; the larger square contains it.
+        // Closed boundary admission and whole-section admission must retain
+        // the same finite witnesses, including the center's maximum exit.
+        Build(contained, connectivity, Quad(false, false, 2), Vector3d.Zero,
+            FixedQuaternion.Identity, (Fixed64)4, Fixed64.Two, new[] { 0, 1 });
+        Build(touching, connectivity, Quad(true, true, 1), Vector3d.Zero,
+            FixedQuaternion.Identity, (Fixed64)4, Fixed64.Two, new[] { 1, 0 });
+        Vector3d[] expected = { Vector3d.Zero, -Vector3d.Right, -Vector3d.Forward, Vector3d.Forward };
+        Assert.Equal(expected.Length, contained.GetSampleCount(0));
+        Assert.Equal(expected.Length, touching.GetSampleCount(0));
+        for (int sample = 0; sample < expected.Length; sample++)
+        {
+            Assert.True(contained.TryGetSample(0, sample, out Vector3d p, out Vector3d q, out Fixed64 depth));
+            Assert.True(touching.TryGetSample(0, sample, out Vector3d tp, out Vector3d tq, out Fixed64 td));
+            Assert.Equal(expected[sample], p);
+            Assert.Equal(sample == 0 ? Fixed64.Two : Fixed64.Zero, depth);
+            Assert.Equal(p, tp); Assert.Equal(q, tq); Assert.Equal(depth, td);
+        }
+    }
+
     [Theory]
     [InlineData(false, false)]
     [InlineData(false, true)]
@@ -104,6 +131,38 @@ public sealed class MeshConeFaceRegionsTests
             }
             Assert.Equal(!partial, hasLeft);
             if (partial) Assert.True(hasRight);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void BoundaryClippedConvexFan_PartialOwnerPreservesItsFiniteDomain(bool reverse)
+    {
+        int[] triangles = { 4,0,1, 4,1,2, 4,2,3, 4,3,0 };
+        if (reverse)
+            for (int index = 0; index < triangles.Length; index += 3)
+                (triangles[index + 1], triangles[index + 2]) = (triangles[index + 2], triangles[index + 1]);
+        var mesh = Create(new[] { new Vector3d(-4,0,-4), new Vector3d(4,0,-4),
+            new Vector3d(4,0,4), new Vector3d(-4,0,4), Vector3d.Zero }, triangles);
+        var regions = new MeshConeFaceRegions();
+        var connectivity = new MeshConeSurfaceConnectivity();
+        // The y=0 section has radius five, crossing all four exposed sides.
+        // The supplied three-triangle domain omits x < -abs(z); its smaller
+        // two-triangle canonical fan would incorrectly fill that missing wedge.
+        Build(regions, connectivity, mesh, Vector3d.Zero, FixedQuaternion.Identity,
+            (Fixed64)4, (Fixed64)10, reverse ? new[] { 2, 1, 0 } : new[] { 0, 1, 2 });
+        Assert.Equal(1, regions.RegionCount);
+        Assert.Equal(4, regions.GetSampleCount(0));
+        Assert.True(regions.TryGetSelectedRay(0, out Vector3d maximum, out _, out Fixed64 depth));
+        Assert.Equal(Vector3d.Zero, maximum);
+        Assert.Equal(Fixed64.Two, depth);
+        for (int sample = 0; sample < regions.GetSampleCount(0); sample++)
+        {
+            Assert.True(regions.TryGetSample(0, sample, out Vector3d p, out _, out _));
+            Assert.Equal(Fixed64.Zero, p.Y);
+            Assert.True(p.X >= -FixedMath.Abs(p.Z));
+            Assert.True(FixedMath.Abs(p.X) <= (Fixed64)4 && FixedMath.Abs(p.Z) <= (Fixed64)4);
         }
     }
 

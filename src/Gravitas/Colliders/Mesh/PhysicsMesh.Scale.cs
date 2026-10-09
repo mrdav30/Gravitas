@@ -195,8 +195,6 @@ public partial class PhysicsMesh
                 (_preparedScaledFaceNormals, _scaledFaceNormals);
             (_triangleBVH, _preparedTriangleBVH) =
                 (_preparedTriangleBVH, _triangleBVH);
-            (_coplanarPatchIds, _preparedCoplanarPatchIds) =
-                (_preparedCoplanarPatchIds, _coplanarPatchIds);
             (_coplanarPatchBoundaryOffsets, _preparedCoplanarPatchBoundaryOffsets) =
                 (_preparedCoplanarPatchBoundaryOffsets, _coplanarPatchBoundaryOffsets);
             (_coplanarPatchBoundaryVertexPairs, _preparedCoplanarPatchBoundaryVertexPairs) =

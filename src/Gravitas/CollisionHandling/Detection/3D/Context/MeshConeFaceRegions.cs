@@ -20,11 +20,22 @@ internal sealed partial class MeshConeFaceRegions
     private int[] _triangles = Array.Empty<int>();
     private Region[] _regions = Array.Empty<Region>();
     private ConePlaneRayFrame _frame;
+    private Vector3d _worldNormal;
     private ulong[] _selectionValues = Array.Empty<ulong>();
     private int[] _selectionSigns = Array.Empty<int>();
     private Winner[] _winners = Array.Empty<Winner>();
+    private readonly ConePlaneRayEventVisitor _eventVisitor;
+    private PhysicsMesh? _gatherMesh;
+    private MeshConeSurfaceConnectivity? _gatherConnectivity;
+    private int _gatherSurfaceTriangle;
+    private bool _gatherUsesConvexFan;
+    private bool _gatherContainsSection;
+    private bool _wholeConeWorldRangeRepresentable;
+
+    internal MeshConeFaceRegions() => _eventVisitor = AdmitEvaluatedPoint;
 
     internal int RegionCount { get; private set; }
+    internal bool HasBoundaryIntersection { get; private set; }
 
     /// <remarks>
     /// Connectivity must have been built from this same mesh, surface, cone
@@ -38,6 +49,7 @@ internal sealed partial class MeshConeFaceRegions
         MeshConeSurfaceConnectivity connectivity, ReadOnlySpan<int> admittedTriangles)
     {
         RegionCount = connectivity.RegionCount;
+        HasBoundaryIntersection = false;
         if (RegionCount == 0) return;
         if (_offsets.Length < RegionCount + 1)
         {
@@ -57,6 +69,8 @@ internal sealed partial class MeshConeFaceRegions
         mesh.GetLocalTriangleVertices(surfaceTriangle, out Vector3d a, out Vector3d b, out Vector3d c);
         _frame = new ConePlaneRayFrame(new FixedTriangle(a, b, c), mesh.Origin, mesh.Rotation,
             coneCenter, coneRotation, height, radius);
+        _wholeConeWorldRangeRepresentable = ConePlaneRayPointMaterialization.IsWorldRangeRepresentable(_frame);
+        _worldNormal = _frame.GetWorldNormal(mesh.Rotation);
         var metrics = new WidePlaneMetrics(new FixedTriangle(a, b, c), mesh.Rotation);
         Array.Clear(_winners, 0, 2 * RegionCount);
         _poolEvents.FastClear();
@@ -93,43 +107,70 @@ internal sealed partial class MeshConeFaceRegions
 
     private void GatherEvents(PhysicsMesh mesh, int surfaceTriangle, MeshConeSurfaceConnectivity connectivity)
     {
-        ReadOnlySpan<int> corners = GetCompleteConvexFan(mesh, surfaceTriangle, connectivity);
-        Span<ConePlaneRayEvent> events = stackalloc ConePlaneRayEvent[ConePlaneRayEvents.IntrinsicCapacity];
-        int count = ConePlaneRayEvents.GetIntrinsicEvents(_frame, events);
-        foreach (ConePlaneRayEvent descriptor in events[..count])
-            AdmitEvent(mesh, connectivity, corners, ConePlaneRayEventSource.Plane, descriptor);
-        ReadOnlySpan<int> boundary = mesh.GetCanonicalSurfaceBoundaryVertexPairs(surfaceTriangle);
-        ReadOnlySpan<Vector3d> vertices = mesh.ScaledLocalVertices;
-        count = ConePlaneRayEvents.GetBoundaryEvents(events);
-        for (int edge = 0; edge < boundary.Length; edge += 2)
+        _gatherSurfaceTriangle = surfaceTriangle;
+        _gatherMesh = mesh;
+        _gatherConnectivity = connectivity;
+        try
         {
-            var segment = new FixedSegment(vertices[boundary[edge]], vertices[boundary[edge + 1]]);
-            if (!_frame.IntersectsSegment(segment)) continue;
-            var source = new ConePlaneRayEventSource(segment);
-            foreach (ConePlaneRayEvent descriptor in events[..count])
-                AdmitEvent(mesh, connectivity, corners, source, descriptor);
+            ReadOnlySpan<int> boundary = mesh.GetCanonicalSurfaceBoundaryVertexPairs(surfaceTriangle);
+            ReadOnlySpan<Vector3d> vertices = mesh.ScaledLocalVertices;
+            int firstIntersectingEdge = 0;
+            for (; firstIntersectingEdge < boundary.Length; firstIntersectingEdge += 2)
+                if (_frame.IntersectsSegment(new FixedSegment(vertices[boundary[firstIntersectingEdge]],
+                    vertices[boundary[firstIntersectingEdge + 1]]))) break;
+            HasBoundaryIntersection = firstIntersectingEdge < boundary.Length;
+            // The finite cone section is connected and at least one triangle
+            // is admitted. A complete owner with a disjoint true boundary
+            // contains that whole section. Neighbor closure also preserves
+            // callers' deliberately partial admitted domains; hole boundaries
+            // and closed touch prevent the containment certificate.
+            if (RegionCount == 1 && firstIntersectingEdge == boundary.Length)
+            {
+                _gatherContainsSection = IsCompleteSurface(mesh, connectivity);
+                // A complete section needs no fan, and an incomplete owner
+                // cannot use one. Do not repeat the same closure check.
+                _gatherUsesConvexFan = false;
+            }
+            else
+            {
+                _gatherContainsSection = false;
+                _gatherUsesConvexFan = !GetCompleteConvexFan(mesh, surfaceTriangle, connectivity).IsEmpty;
+            }
+            // Synchronous visitation borrows each exact construction directly,
+            // avoiding chart reconstruction per descriptor. Only compact pool
+            // metadata and the two owned winner banks survive the callback.
+            ConePlaneRayEvents.VisitEvents(ConePlaneRayEventSource.Plane, _frame, _eventVisitor);
+            for (int edge = firstIntersectingEdge; edge < boundary.Length; edge += 2)
+            {
+                var segment = new FixedSegment(vertices[boundary[edge]], vertices[boundary[edge + 1]]);
+                if (edge != firstIntersectingEdge && !_frame.IntersectsSegment(segment)) continue;
+                var source = new ConePlaneRayEventSource(segment);
+                ConePlaneRayEvents.VisitEvents(source, _frame, _eventVisitor);
+            }
+        }
+        finally
+        {
+            // Context scratch must not retain the last queried mesh, including
+            // when exact geometry or materialization rejects the operation.
+            _gatherMesh = null;
+            _gatherConnectivity = null;
+            _gatherUsesConvexFan = false;
+            _gatherContainsSection = false;
         }
     }
 
-    private void AdmitEvent(PhysicsMesh mesh, MeshConeSurfaceConnectivity connectivity, ReadOnlySpan<int> corners,
-        ConePlaneRayEventSource source, ConePlaneRayEvent descriptor)
+    private void AdmitEvaluatedPoint(in ConePlaneRayEventSource source, in ConePlaneRayFrame frame,
+        ConePlaneRayEvent descriptor, scoped ConePlaneRayPoint point, scoped ReadOnlySpan<ulong> root,
+        scoped in ConePlaneRaySelection positive, scoped in ConePlaneRaySelection negative)
     {
-        Span<ulong> pv = stackalloc ulong[ConePlaneRaySelection.StorageWords];
-        Span<ulong> nv = stackalloc ulong[ConePlaneRaySelection.StorageWords];
-        Span<int> ps = stackalloc int[ConePlaneRaySelection.SignCount];
-        Span<int> ns = stackalloc int[ConePlaneRaySelection.SignCount];
-        var positive = new ConePlaneRaySelection(pv, ps);
-        var negative = new ConePlaneRaySelection(nv, ns);
-        Span<ulong> pointValues = stackalloc ulong[ConePlaneRayPoint.StorageWords];
-        Span<int> pointSigns = stackalloc int[ConePlaneRayPoint.SignCount];
-        var point = new ConePlaneRayPoint(pointValues, pointSigns);
-        Span<ulong> root = stackalloc ulong[ConePlaneRaySelection.RootWords];
-        if (!ConePlaneRayEvents.TryEvaluateEvent(source, _frame, descriptor, point, root, ref positive, ref negative)) return;
-        int region = FindPointRegion(mesh, connectivity, corners, point, root);
+        PhysicsMesh mesh = _gatherMesh!;
+        ReadOnlySpan<int> corners = _gatherUsesConvexFan
+            ? mesh.GetConvexCoplanarPatchCornerVertexIndices(_gatherSurfaceTriangle) : ReadOnlySpan<int>.Empty;
+        int region = FindPointRegion(mesh, _gatherConnectivity!, corners, point, root);
         if (region < 0) return;
         KeepWinner(2 * region, positive);
         KeepWinner(2 * region + 1, negative);
-        bool pointRepresentable = ConePlaneRayPointMaterialization.TryGetWorldPoint(_frame, point, root, out Vector3d meshPoint);
+        bool pointRepresentable = ConePlaneRayPointMaterialization.TryGetWorldPoint(frame, point, root, out Vector3d meshPoint);
         // Distinct constructions can certify the same exact point. Merge
         // their available directions before duplicate range checks; each
         // direction retains its own certificate for final materialization.
@@ -137,7 +178,7 @@ internal sealed partial class MeshConeFaceRegions
         {
             PoolEvent retained = _poolEvents[index];
             if (retained.Region != region || retained.MeshPoint != meshPoint || ConePlaneRayEvents.CompareEventAnchors(
-                source, descriptor, retained.Source, retained.Event, _frame, includeCoincidentProvenance: false) != 0) continue;
+                source, descriptor, retained.Source, retained.Event, frame, includeCoincidentProvenance: false) != 0) continue;
             _poolEvents[index] = new PoolEvent(retained.Source, retained.Event, region, meshPoint,
                 retained.Positive.HasValue ? retained.Positive : CheckRay(positive, 1, pointRepresentable),
                 retained.Negative.HasValue ? retained.Negative : CheckRay(negative, -1, pointRepresentable));
@@ -152,19 +193,24 @@ internal sealed partial class MeshConeFaceRegions
         if (RegionCount != 1) return ReadOnlySpan<int>.Empty;
         ReadOnlySpan<int> corners = mesh.GetConvexCoplanarPatchCornerVertexIndices(surfaceTriangle);
         if (corners.IsEmpty || corners.Length - 2 >= _offsets[1]) return ReadOnlySpan<int>.Empty;
+        return IsCompleteSurface(mesh, connectivity) ? corners : ReadOnlySpan<int>.Empty;
+    }
+
+    private bool IsCompleteSurface(PhysicsMesh mesh, MeshConeSurfaceConnectivity connectivity)
+    {
         // Every prepared patch union also records its shared-edge neighbors.
         // A nonempty subset closed under those neighbors is the whole connected
-        // owner. Check that once before replacing its authored triangles with
-        // the strict convex ring's fan, and only when that fan is smaller.
+        // owner. A singleton owner has no such neighbors and is complete.
         foreach (int triangle in _triangles.AsSpan(0, _offsets[1]))
             foreach (int neighbor in mesh.GetCoplanarTriangleNeighbors(triangle))
-                if (connectivity.GetRegionOrdinal(neighbor) != 0) return ReadOnlySpan<int>.Empty;
-        return corners;
+                if (connectivity.GetRegionOrdinal(neighbor) != 0) return false;
+        return true;
     }
 
     private int FindPointRegion(PhysicsMesh mesh, MeshConeSurfaceConnectivity connectivity, ReadOnlySpan<int> corners,
         scoped ConePlaneRayPoint point, scoped ReadOnlySpan<ulong> root)
     {
+        if (_gatherContainsSection) return 0;
         if (!corners.IsEmpty)
         {
             ReadOnlySpan<Vector3d> vertices = mesh.ScaledLocalVertices;
@@ -220,6 +266,10 @@ internal sealed partial class MeshConeFaceRegions
         int orientation = comparison <= 0 ? 1 : -1;
         _regions[region] = new Region(orientation);
     }
+
+    // The cone witness lies along the exit ray from the mesh. Response moves
+    // the cone in the opposite direction, including at exact zero-depth touch.
+    internal Vector3d GetNormal(int region) => -_worldNormal * GetOrientation(region);
 
     internal int GetOrientation(int region) => _regions[ValidateRegion(region)].Orientation;
 

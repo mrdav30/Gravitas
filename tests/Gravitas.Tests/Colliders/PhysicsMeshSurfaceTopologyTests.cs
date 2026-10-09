@@ -103,7 +103,9 @@ public sealed class PhysicsMeshSurfaceTopologyTests
     {
         PhysicsMesh mesh = Create(new[] { Vector3d.Zero, Vector3d.Right, Vector3d.Forward,
             -Vector3d.Forward }, new[] { 0, 1, 2, 0, 1, 3 });
-        mesh.GetCoplanarPatchId(0).Should().Be(-1);
+        mesh.GetManifoldSurfaceOwner(0).Should().NotBe(mesh.GetManifoldSurfaceOwner(1));
+        mesh.GetManifoldSurfaceBoundaryVertexPairs(0).IsEmpty.Should().BeTrue();
+        mesh.GetConvexCoplanarPatchCornerVertexIndices(0).IsEmpty.Should().BeTrue();
         mesh.GetCanonicalSurfaceOrdinal(0).Should().NotBe(mesh.GetCanonicalSurfaceOrdinal(1));
         mesh.GetCoplanarTriangleNeighbors(0).IsEmpty.Should().BeTrue();
         mesh.GetWeldedVertexTriangleIndices(0).ToArray().Should().Equal(0, 1);
@@ -148,7 +150,9 @@ public sealed class PhysicsMeshSurfaceTopologyTests
             new[] { 0, 1, 2, 2, 1, 0 });
         mesh.GetCanonicalSurfaceOrdinal(0).Should().Be(0);
         mesh.GetCanonicalSurfaceOrdinal(1).Should().Be(0);
-        mesh.GetCoplanarPatchId(0).Should().Be(-1);
+        mesh.GetManifoldSurfaceOwner(0).Should().NotBe(mesh.GetManifoldSurfaceOwner(1));
+        mesh.GetManifoldSurfaceBoundaryVertexPairs(0).IsEmpty.Should().BeTrue();
+        mesh.GetManifoldSurfaceBoundaryVertexPairs(1).IsEmpty.Should().BeTrue();
         mesh.GetCoplanarTriangleNeighbors(0).IsEmpty.Should().BeTrue();
         mesh.GetWeldedVertexTriangleIndices(1).ToArray().Should().Equal(0, 1);
     }
@@ -169,7 +173,6 @@ public sealed class PhysicsMeshSurfaceTopologyTests
             mesh.GetCoplanarTriangleNeighbors(triangle).IsEmpty.Should().BeTrue();
             mesh.GetManifoldSurfaceBoundaryVertexPairs(triangle).IsEmpty.Should().BeTrue();
         }
-        mesh.GetCoplanarPatchId(0).Should().Be(0);
     }
 
     [Fact]
@@ -207,8 +210,7 @@ public sealed class PhysicsMeshSurfaceTopologyTests
         // The trust/key certificate reduces corners, while runtime perimeter
         // access preserves all real segments and both oriented boundary cycles.
         mesh.GetManifoldSurfaceBoundaryVertexPairs(0).Length.Should().Be(sideSegments * 16);
-        mesh.GetManifoldSurfaceBoundaryVertexPairs(0).ToArray().Should()
-            .Equal(mesh.GetCoplanarPatchBoundaryVertexPairs(0).ToArray());
+        mesh.GetCanonicalSurfaceBoundaryVertexPairs(0).Length.Should().Be(16);
     }
 
     [Fact]
@@ -245,11 +247,12 @@ public sealed class PhysicsMeshSurfaceTopologyTests
         if (reverse)
             for (int i = 0; i < faces.Length; i += 3) (faces[i + 1], faces[i + 2]) = (faces[i + 2], faces[i + 1]);
         PhysicsMesh mesh = Create(vertices, faces);
-        mesh.GetCoplanarPatchId(0).Should().Be(0);
         for (int i = 0; i < mesh.TriangleCount; i++)
         {
             mesh.GetManifoldSurfaceOwner(i).Should().Be(i);
             mesh.GetCoplanarTriangleNeighbors(i).IsEmpty.Should().BeTrue();
+            mesh.GetManifoldSurfaceBoundaryVertexPairs(i).IsEmpty.Should().BeTrue();
+            mesh.GetConvexCoplanarPatchCornerVertexIndices(i).IsEmpty.Should().BeTrue();
         }
     }
 

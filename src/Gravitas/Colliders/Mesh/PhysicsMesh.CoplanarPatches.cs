@@ -15,7 +15,6 @@ namespace Gravitas.Colliders;
 /// <content>Retains exact coplanar seam ownership with each committed scaled mesh.</content>
 public partial class PhysicsMesh
 {
-    private int[] _coplanarPatchIds = Array.Empty<int>();
     private int[] _coplanarPatchBoundaryOffsets = Array.Empty<int>();
     private int[] _coplanarPatchBoundaryVertexPairs = Array.Empty<int>();
     private int[] _convexCoplanarPatchCornerOffsets = Array.Empty<int>();
@@ -37,28 +36,13 @@ public partial class PhysicsMesh
     private static readonly IComparer<PatchBoundaryVertexUse> PatchBoundaryVertexUseComparer =
         Comparer<PatchBoundaryVertexUse>.Create(ComparePatchBoundaryVertexUses);
 
-    // The minimum authored triangle index identifies each connected patch.
-    // Singletons and ambiguous topology do not authorize seam suppression.
-    internal int GetCoplanarPatchId(int triangleIndex)
-    {
-        SwiftThrowHelper.ThrowIfArrayIndexInvalid(triangleIndex, _triangleCount, nameof(triangleIndex));
-        return _coplanarPatchIds[triangleIndex];
-    }
-
-    internal ReadOnlySpan<int> GetCoplanarPatchBoundaryVertexPairs(int triangleIndex)
-    {
-        int patch = GetCoplanarPatchId(triangleIndex);
-        return patch < 0 ? ReadOnlySpan<int>.Empty
-            : _coplanarPatchBoundaryVertexPairs.AsSpan(_coplanarPatchBoundaryOffsets[patch],
-                _coplanarPatchBoundaryOffsets[patch + 1] - _coplanarPatchBoundaryOffsets[patch]);
-    }
-
     // An oriented strict-corner ring, starting at its minimum welded index.
     // Empty means that convex fill is untrusted, not that the patch is empty.
     // The borrower obtains neighboring corner triplets by cyclic indexing.
     internal ReadOnlySpan<int> GetConvexCoplanarPatchCornerVertexIndices(int triangleIndex)
     {
-        int patch = GetCoplanarPatchId(triangleIndex);
+        SwiftThrowHelper.ThrowIfArrayIndexInvalid(triangleIndex, _triangleCount, nameof(triangleIndex));
+        int patch = _manifoldPatchIds[triangleIndex];
         return patch < 0 ? ReadOnlySpan<int>.Empty
             : _convexCoplanarPatchCornerVertexIndices.AsSpan(_convexCoplanarPatchCornerOffsets[patch],
                 _convexCoplanarPatchCornerOffsets[patch + 1] - _convexCoplanarPatchCornerOffsets[patch]);

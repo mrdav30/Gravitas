@@ -22,7 +22,7 @@ SwiftCollections, GridForge, Chronicler.Hashing, xUnit v3, BenchmarkDotNet.
 implementation decisions and validation stay in this single document.
 
 **Status:** Phase 1 is complete with full validation and independent review.
-Phase 2 is complete with full validation and independent review; phases 3-4 remain planned. #095/#099 stay active; #097/#098 remain separate
+Phase 2 is complete with full validation and independent review. Phase 3 integration is in progress; phase 4 remains planned. #095/#099 stay active; #097/#098 remain separate
 follow-ups.
 
 ## Design Contracts And Rationale
@@ -114,6 +114,16 @@ depths, not a certificate of a global union exit. The implementation plan must
 prove the extrema construction and include a tilted crossing with varying chord
 midpoints. Exact symmetric ties follow the stated convention; do not promise
 equivariance under every rigid symmetry when geometry supplies no unique side.
+
+For each actual exposed edge or corner, its supported cone branches are
+alternative exits of that one feature. After exact incident-fan and selected-face
+hemisphere admission, retain the minimum unrounded feature depth and all exact
+ties, including continuous families. Reduce only that co-minimal finite sample
+pool. Different exposed features and face regions remain independent constraints;
+do not minimize across the mesh. Promoting every alternate exit would turn a
+generator tangency into a deep correction toward the distant apex and would
+remain discontinuous at a one-raw inward neighbor. Phase 3 physical regressions
+cover both cases and stationary full-loop touch.
 
 Exact clipping and finite witness admission belong in FixedMathSharp. Surface
 ownership, grouping, reduction and response policy belong in Gravitas. Preserve
@@ -790,16 +800,16 @@ LSConeCollider cone, CollisionSatScratch scratch, ContactManifold manifold)`
 returning `bool`. Consume exact admitted components and geometric group keys;
 retain separately justified closed-convex containment behavior.
 
-- [ ] Promote the diagnostic into maintained `MeshConeSurfaceManifoldTests.cs`
+- [x] Promote the diagnostic into maintained `MeshConeSurfaceManifoldTests.cs`
   using `PhysicsScenarioBuilder`. Unit cone at `(3/10,0,3/10)`, joined X/Z walls
   spanning Y `[-4,4]` and positive tangential coordinates `[0,4]`: require both
   `Right`/`Forward` contacts and full-loop blocking of impulse `(-1,0,-1)`.
   Use explicit static wall bodies and frictionless materials; retain separate
   wall controls and both windings. Record the actual red failures.
-- [ ] Add tab, ring/hole, U-notch, disconnected supports, long tilted interior,
+- [x] Add tab, ring/hole, U-notch, disconnected supports, long tilted interior,
   exposed edge and cap/rim/generator cases. Include seam sliding, support torque,
   centroid changes, raw-neighbor gaps, rigid transforms and scale refresh.
-- [ ] Generate all admitted groups through tasks 3–5, reserve required overflow
+- [x] Generate all admitted groups through tasks 3–5, reserve required overflow
   before publishing the manifold, and preserve existing BVH candidate gathering.
   Use checked geometry budgets as safety bounds, not a reason to allocate a
   full mesh–mesh product per pair. Reserve context scratch from prepared geometry;
@@ -809,7 +819,7 @@ retain separately justified closed-convex containment behavior.
   ordinary contacts where that proof holds; convexity alone does not establish
   compatible surface semantics. Measure each accepted shortcut against the
   complete sampler and the original runtime controls.
-- [ ] Retire the replaced runtime path in the same integration change:
+- [x] Retire the replaced runtime path in the same integration change:
   `TryFindMeshConeTriangleContact`, `PrepareMeshConePatchContacts`, and
   `CollisionSatScratch.MeshConePatchContacts`. After tracing all remaining
   callers, remove FMS `TriangleConeContact.Patch.cs` and
@@ -818,18 +828,94 @@ retain separately justified closed-convex containment behavior.
   sweep contracts, shared perimeter data and certificates still consumed by
   surface trust. Add context-owned mesh/cone scratch only with its production
   consumer; retain continuous-family descriptors only when admission uses them.
-- [ ] Update runtime tests/benchmark assertions that currently equate physical
+- [x] Update runtime tests/benchmark assertions that currently equate physical
   contact with global minimum exit; replace them with actual surface witness,
   sliding/support/torque assertions. Keep standalone math-MTD expectations.
-- [ ] Audit rotational CCD `PrimaryContact` selection for the relevant closing
+- [x] Audit rotational CCD `PrimaryContact` selection for the relevant closing
   impact witness. Test direction reversal and earliest impact; do not replace
   CCD with deepest-group depenetration. Verify grounding, sleep/wake and events.
 - [ ] Run integrated pure-3D, compound, full-loop replay, CCD, grounding and
   lifecycle suites plus pure-2D/mixed parity controls. #097/#098 migrations stay
   in their own tracker entries; #096 extreme-range work stays deferred.
 
-**Phase 3 summary:** Append actual #095 geometry and #099 full-loop evidence
-here. Neither issue closes merely because the old probe passes in isolation.
+**Phase 3 progress:** The maintained joined-wall regression reproduced four
+failures while both separate-wall controls passed. Integration now emits
+independent face, edge and corner groups, preserves local identities through
+compound staging, and selects rotational CCD response by exact closing point
+velocity. Physical regressions cover tabs, holes, disconnected supports, sliding,
+torque, rigid transforms, scale publication, raw-neighbor gaps, earliest impact,
+grounding, sleep/wake, events and full-loop replay. A generator-touch defect in
+the first boundary integration was fixed here: alternative exits use the exact
+per-feature minimum and its ties, preventing false depenetration at touch.
+
+The replaced patch runtime, its exclusive upstream geometry helpers/tests and
+unused mesh patch IDs are retired. This phase adds no production files. Refinement
+reuses primitive plane normals, bounded exact rounding, active-width complete
+products, scoped identity materialization, a synchronous ordered event cohort,
+closed-boundary admission reuse and conservative whole-cone range certificates.
+Fourteen upstream fixtures independently compare streamed descriptors, points,
+both directional certificates and final materialization with targeted reconstruction.
+Global identity-basis normalization was rejected after stalling an existing
+cylinder rounding test and was removed. Common whole-zero limb cancellation was
+narrowed to the immutable-span ratio entry after typed controls exposed shared
+core overhead; inputs remain unchanged and typed paths retain their original core.
+The final ordinary controls are 42.27/52.55/50.25/27.05/54.63 ns at 0 B/op;
+the two-word controls vary across captures, so these do not establish universal
+performance neutrality.
+
+The final Windows x64 capture covers 20 warmed runtime fixtures, all at 0 B/op:
+
+| Control | Committed single-contact baseline (µs) | First integration (µs) | Current (µs) |
+| --- | ---: | ---: | ---: |
+| Apex face | 22.86 | 851.95 | 181.87 |
+| Base face | 21.89 | 872.51 | 162.43 |
+| Side face | 27.85 | 1,969.38 | 726.38 |
+| Interior rim | 905.84 | 4,299.23 | 1,398.12 |
+| Oblique rim | 668.97 | 3,051.91 | 1,593.67 |
+| Subdivided tilted surface | 244.90 | 3,704 | 1,522.0 |
+
+Joined walls, disconnected supports, ring and thin-tab controls take
+2.446/3.108/2.779/3.535 ms. The richer constraints change the work performed, but
+ordinary controls remain roughly 7–26 times their committed costs. **Performance
+acceptance remains open; introduced costs stay in phase 3.** Profile the remaining
+admission/materialization work and benchmark any scoped inverse-basis or collapsed
+axial-event simplification before accepting it.
+
+With `UseLocalLsfStack=true`, final full FixedMathSharp suites pass 4,876 Release
+and 4,855 ReleaseLean cases. Gravitas passes 5,065 Release and 5,000 ReleaseLean
+cases **with the four-case scalar-anchor theory excluded**. All four raw reports
+show exact 100% sequence/line, branch and fully-covered-method totals. The
+serialization adapter passes 49 cases in each configuration at exact 100% raw
+coverage; both multi-target solution builds and DocFX sites have zero warnings or
+errors, and local links pass. Independent ponytail/math/physics source review
+found no additional blocker or actionable bloat cut. Evidence is retained under
+ignored `artifacts/grv-issue-095/phase3-span-final-*`; this host evidence does not
+replace native cross-platform replay gates.
+
+**Remaining compatibility regression:** The two failing cone cases use radius 1
+and height 4, positioned one unit inside `Fixed64.MinValue`/`MaxValue`. Their
+contact endpoints cross the absolute coordinate limit while their shape-relative
+anchors remain valid. These are arithmetic boundary regressions, not a request
+for billion-unit geometry or a realistic workload target. The two passing
+cylinder cases share the same theory and are included in the four-case exclusion.
+
+The phase-2 absolute-world sampling restriction was an implementation assumption;
+it must not silently narrow the existing relative-anchor contract. Revise it by
+reusing existing anchor/materialization owners and ranking in a common translated
+frame with exact world-rounding parity. Keep this a focused compatibility repair,
+without a separate extreme-scale pipeline or expanded geometry-size promise.
+Practical supported radii/extents remain the separate #096 range-policy work.
+Plan approval does not freeze an assumption contradicted by integration evidence.
+
+Phase 2 tested the new sampler independently while runtime contacts still used
+the legacy producer. Its new overflow tests enforced the restricted assumption;
+the existing public-anchor regressions exercised the legacy path and passed.
+Producer-level coverage should have carried those compatibility fixtures forward
+before closeout. Phase 3 must restore them and complete the full unfiltered suites.
+Performance acceptance remains open in this phase; additional constraints alone
+do not justify an unusable ordinary-contact cost. Phase 3 and #095/#099 remain
+open. The separately confirmed conservative rotational CCD frontier for concave
+aggregate bounds is captured as #101.
 
 ## Phase 4 — Coverage, Performance, Documentation And Closeout
 

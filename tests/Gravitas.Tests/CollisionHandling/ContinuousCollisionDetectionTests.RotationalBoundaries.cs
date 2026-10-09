@@ -13,6 +13,181 @@ namespace Gravitas.Tests.CollisionHandlingTests;
 
 public sealed partial class ContinuousCollisionDetectionTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void FullLoop_RotatingConeAgainstMeshGroups_ShouldClampAtTheEarlierFace(bool includeLaterPlane)
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        scenario.Context.Environment.DampingFactor = Fixed64.Zero;
+        Fixed64 upperY = Fixed64.FromFraction(1,10);
+        Vector3d[] vertices = { new((Fixed64)(-2),upperY,(Fixed64)(-2)), new((Fixed64)2,upperY,(Fixed64)(-2)),
+            new((Fixed64)2,upperY,(Fixed64)2), new((Fixed64)(-2),upperY,(Fixed64)2),
+            new(-2,0,-2), new(2,0,-2), new(2,0,2), new(-2,0,2) };
+        int[] triangles = { 0,3,1, 1,3,2, 4,7,5, 5,7,6 };
+        if (!includeLaterPlane)
+        {
+            Array.Resize(ref vertices, 4);
+            Array.Resize(ref triangles, 6);
+        }
+        var mesh = new LSMeshCollider(vertices, triangles, MeshColliderMode.Concave,
+            MeshInertiaPolicy.SurfaceApproximation) { Material = PhysicsMaterial.Frictionless };
+        scenario.CreateBody(mesh, Vector3d.Zero, FixedQuaternion.Identity, immovable: true);
+        ScenarioBody<LSConeCollider> source = scenario.CreateBody(new LSConeCollider(),
+            new Vector3d(Fixed64.Zero, Fixed64.FromFraction(13,20), Fixed64.Zero),
+            FixedQuaternion.Identity, isKinematic: true);
+        source.Collider.Material = PhysicsMaterial.Frictionless;
+        source.Body.UseManualGrounding();
+        source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        CollisionPair pair = scenario.CreatePair(mesh, source.Collider);
+        Assert.False(CollisionDetection.DoCollisionCheck(pair));
+        // Clockwise tilt gives the unit cone's lowest X/Y support
+        // -1/2*(cos(theta)+sin(theta)). The upper plane, 0.55 below the
+        // center, is hit between 5 and 8 degrees; the lower plane is later.
+        // Their aggregate bounds also certify the initially separated interval.
+        source.Body.SetRotation(FixedQuaternion.FromAxisAngle(Vector3d.Forward,
+            -FixedMath.DegToRad((Fixed64)8)));
+        Assert.True(CollisionDetection.DoCollisionCheck(pair));
+        Assert.Equal(1, pair.Manifold.GroupCount);
+        Assert.All(pair.Manifold, contact => Assert.Equal(Vector3d.Up, contact.Normal));
+        source.Body.SetRotation(FixedQuaternion.FromAxisAngle(Vector3d.Forward, -Fixed64.Pi / 4));
+        Assert.True(CollisionDetection.DoCollisionCheck(pair));
+        Assert.Contains(pair.Manifold, contact => contact.Normal == Vector3d.Up);
+        if (includeLaterPlane)
+        {
+            Assert.True(pair.Manifold.GroupCount >= 2);
+            Assert.Contains(pair.Manifold, contact => contact.PointA.Y == Fixed64.Zero);
+            Assert.Contains(pair.Manifold, contact => contact.PointA.Y == upperY);
+        }
+        source.Body.SetRotation(FixedQuaternion.Identity);
+        Assert.False(CollisionDetection.DoCollisionCheck(pair));
+        Vector3d initialPosition = source.Body.Position3d;
+        source.Body.Agent.Transform.LocalRotation = FixedQuaternion.FromAxisAngle(Vector3d.Forward, -Fixed64.Pi / 2);
+
+        scenario.Context.Simulate();
+        scenario.Context.LateSimulate();
+
+        Assert.True(source.Body.LastContinuousCollisionToiIterationCount > 0);
+        Fixed64 angle = FixedQuaternion.Angle(FixedQuaternion.Identity, source.Body.Rotation);
+        Assert.InRange(angle.m_rawValue, ((Fixed64)5).m_rawValue, ((Fixed64)8).m_rawValue);
+        Assert.Equal(initialPosition, source.Body.Position3d);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void RotationalClosingWitness_CompetingGroups_ShouldIgnoreDepthAndFollowMotion(
+        bool sourceIsA, bool reverseMotion)
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        SolidBody source = sourceIsA
+            ? scenario.CreateCuboid(Vector3d.Zero).Body
+            : scenario.CreateSphere(Vector3d.Zero).Body;
+        SolidBody target = sourceIsA
+            ? scenario.CreateSphere(Vector3d.Zero, immovable: true).Body
+            : scenario.CreateCuboid(Vector3d.Zero, immovable: true).Body;
+        source.ApplyCollisionLinearVelocityDelta(
+            (Vector3d.Right - Vector3d.Forward) * (reverseMotion ? -Fixed64.One : Fixed64.One));
+        Fixed64 orderSign = sourceIsA ? Fixed64.One : -Fixed64.One;
+        var manifold = new ContactManifold();
+        var deep = new ManifoldContact(1, Vector3d.Zero, Vector3d.Zero,
+            Fixed64.Two, Vector3d.Forward * orderSign);
+        var shallow = new ManifoldContact(2, Vector3d.Zero, Vector3d.Zero,
+            Fixed64.One, Vector3d.Right * orderSign);
+        manifold.AddContact(new ContactGroupKey(0, 0, region: 1), deep);
+        manifold.AddContact(new ContactGroupKey(0, 0, region: 2), shallow);
+
+        source.TrySelectRotationalClosingContact(target.Collider, manifold,
+            Fixed64.Half, out ManifoldContact selected).Should().BeTrue();
+
+        selected.ContactId.Should().Be(reverseMotion ? deep.ContactId : shallow.ContactId);
+        manifold.PrimaryContact.ContactId.Should().Be(deep.ContactId);
+        manifold[0].Normal.Should().Be(deep.Normal);
+        manifold[1].Normal.Should().Be(shallow.Normal);
+    }
+
+    [Fact]
+    public void RotationalClosingWitness_TinyClosingSample_ShouldNotHideClosingGroup()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        SolidBody source = scenario.CreateSphere(Vector3d.Zero).Body;
+        LSSphereCollider target = scenario.CreateStaticSphere(Vector3d.Zero);
+        source.ApplyCollisionLinearVelocityDelta(
+            Vector3d.Right * Fixed64.Epsilon + Vector3d.Forward);
+        var manifold = new ContactManifold();
+        manifold.AddContact(new ContactGroupKey(0, 0, region: 1),
+            new ManifoldContact(1, Vector3d.Zero, Vector3d.Zero, Fixed64.Two, Vector3d.Right));
+        manifold.AddContact(new ContactGroupKey(0, 0, region: 2),
+            new ManifoldContact(2, Vector3d.Zero, Vector3d.Zero, Fixed64.Zero, Vector3d.Forward));
+
+        source.TrySelectRotationalClosingContact(target, manifold,
+            Fixed64.Half, out ManifoldContact selected).Should().BeTrue();
+        selected.ContactId.Should().Be(2);
+        manifold.BeginUpdate(0);
+        manifold.AddContact(Vector3d.Zero, Vector3d.Zero, Fixed64.One, Vector3d.Right);
+        source.TrySelectRotationalClosingContact(target, manifold,
+            Fixed64.Half, out selected).Should().BeFalse();
+        selected.Should().Be(default(ManifoldContact));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RotationalClosingWitness_AngularPointSpeed_ShouldRemainExactWhenUnrepresentable(
+        bool reverseMotion)
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        SolidBody source = scenario.CreateSphere(Vector3d.Zero).Body;
+        LSSphereCollider target = scenario.CreateStaticSphere(Vector3d.Zero);
+        source.ApplyCollisionAngularVelocityDelta(reverseMotion ? Vector3d.Forward : -Vector3d.Forward);
+        var manifold = new ContactManifold();
+        var farAnchor = new ContactAnchor(Vector3d.Up * Fixed64.MaxValue,
+            Vector3d.Up * Fixed64.MaxValue);
+        manifold.AddContact(new ContactGroupKey(0, 0), new ManifoldContact(1,
+            ContactAnchor.FromWorldPoint(Vector3d.Zero),
+            ContactAnchor.FromWorldPoint(Vector3d.Zero), Fixed64.Two, Vector3d.Right));
+        manifold.AddContact(new ContactGroupKey(0, 0), new ManifoldContact(2,
+            farAnchor, ContactAnchor.FromWorldPoint(Vector3d.Zero), Fixed64.One, Vector3d.Right));
+
+        source.TrySelectRotationalClosingContact(target, manifold, Fixed64.Half,
+            out ManifoldContact selected).Should().Be(!reverseMotion);
+        selected.ContactId.Should().Be(reverseMotion ? 0UL : 2UL);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void RotationalClosingWitness_ShouldUsePreparedKinematicSourceAndTargetMotion(
+        bool sourceIsKinematic)
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        SolidBody source = scenario.CreateSphere(Vector3d.Zero,
+            isKinematic: sourceIsKinematic).Body;
+        SolidBody target = scenario.CreateSphere(Vector3d.Zero, isKinematic: true).Body;
+        source.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        target.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        if (sourceIsKinematic)
+            source.Agent.Transform.LocalPosition = Vector3d.Right;
+        else
+            source.ApplyCollisionLinearVelocityDelta(Vector3d.Right);
+        target.Agent.Transform.LocalPosition = Vector3d.Right * Fixed64.Two;
+        scenario.Context.AdvanceLateSimulateToken();
+        scenario.Context.Physics.PrepareContinuousCollisionFrame();
+        var manifold = new ContactManifold();
+        manifold.AddContact(Vector3d.Zero, Vector3d.Zero, Fixed64.One, Vector3d.Right);
+
+        // Source-only velocity would classify this contact as closing. The
+        // faster authored target is separating at the same sampled frame time.
+        source.TrySelectRotationalClosingContact(target.Collider, manifold,
+            Fixed64.Half, out _).Should().BeFalse();
+        manifold.SetContact(Vector3d.Zero, Vector3d.Zero, Fixed64.One, Vector3d.Left);
+        source.TrySelectRotationalClosingContact(target.Collider, manifold,
+            Fixed64.Half, out ManifoldContact selected).Should().BeTrue();
+        selected.Normal.Should().Be(Vector3d.Left);
+    }
+
     [Fact]
     public void RotationalDynamicResponse_WithUnrepresentableParallelLeverComponent_ShouldPreserveResponse3D()
     {

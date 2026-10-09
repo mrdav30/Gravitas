@@ -129,7 +129,8 @@ public static partial class CollisionDetection
                         contact.DepthIsClamped,
                         featureNamespaceA,
                         featureNamespaceB,
-                        group.Key.Remap(featureNamespaceA, featureNamespaceB, reverse: false));
+                        group.Key.Remap(featureNamespaceA, featureNamespaceB, reverse: false),
+                        contactIdentity: ContactManifold.RemapContactIdentity(contact.ContactId, featureNamespaceA, featureNamespaceB));
                     continue;
                 }
 
@@ -143,7 +144,8 @@ public static partial class CollisionDetection
                     contact.DepthIsClamped,
                     featureNamespaceB,
                     featureNamespaceA,
-                    group.Key.Remap(featureNamespaceB, featureNamespaceA, reverse: true));
+                    group.Key.Remap(featureNamespaceB, featureNamespaceA, reverse: true),
+                    contactIdentity: ContactManifold.RemapContactIdentity(contact.ContactId, featureNamespaceA, featureNamespaceB));
             }
         }
     }

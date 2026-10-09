@@ -134,30 +134,34 @@ reciprocal edge charts reuse their exact normalized algebra after each chart
 finishes. Both views retain complete admission checks, the earlier feature on
 exact ties, and paired witnesses rounded only at final materialization.
 Mesh/cone contacts include the base disk, rim, apex and lateral generators.
-Prepared mesh geometry identifies connected coplanar patches by exact welded
-seams and retains their exposed perimeter, including holes and notches. A
-certified minimum face exit replaces the triangle-only exits over that patch;
-the covered triangulation edges do not become contact normals. Certification
-uses unrounded exact clearances, with a contained cone chord or the complete
-cone projection enlarged by the face depth. It does not fill holes or convexify
-the mesh. A trusted convex coplanar patch whose face proof declines instead
-uses its complete face, perimeter-edge and corner normal fan. Strict corners
-are prepared once, omitting collinear subdivisions. Analytic candidates and
-stationary rim roots are ranked exactly across corners before rounding the
-winning depth and paired anchors. Artificial corner-chart edges cannot admit
-contact or separation. Ambiguous topology and uncertified nonconvex patches
-retain the complete triangle/cone relation; that fallback does not establish
-a seam-free minimum exit for a nonconvex surface union.
-Patch contacts are prepared before reduction in stable BVH candidate order,
-retaining the first equal-depth feature. Pose-only changes reuse the prepared
-topology; scale changes publish it with the matching geometry. Retained scale
-scratch uses active counts and keeps unpublished metadata private.
-The selected normal, depth and both anchors describe one feature; the triangle
-point nearest the cone center is not an intersection test. A genuine positive
-gap contributes no contact, while exact touching remains a zero-depth contact.
-Closed-convex containment uses its separate convex fallback when no surface
-triangle intersects. Patch certification establishes one coplanar surface exit,
-not a minimum translation that clears every noncoplanar surface of a whole mesh.
+Prepared mesh geometry certifies coplanar surface domains from exact welded
+seams and their true boundary, including holes and notches. Ambiguous topology
+retains separate triangle domains. Covered triangulation edges never become
+surface constraints. Pose changes reuse this topology; scale changes publish
+geometry and topology together after validation.
+
+Exact triangle/cone admission precedes grouping. Triangles join only through a
+shared edge or vertex that actually meets the cone, so a connected authored
+surface can yield several independent contact regions. Each face region chooses
+the smaller of its two exact maximum normal-ray exits. A ray starts at a point
+inside both the finite cone and the filled surface domain; its paired cone point
+is the first exit in that direction. This depth can differ from a global
+minimum translation or a remote support-point separation. Face sampling retains
+the exact regional maximum and spreads up to four samples over the finite pool.
+
+True edges and corners have separate groups. Their support normals satisfy the
+actual incident surface fan and the face region's selected exit hemisphere.
+The supported cone branches are alternative exits of that feature: only the
+minimum exact feature depth and its ties become constraints. Continuous support
+families are clipped exactly before finite sampling; final
+rounded anchor metrics rank the samples. Redundant final solver rows are merged,
+while distinct touch normals remain independent. Group provenance and local
+contact identities determine stable order, independent of triangle discovery.
+Final world anchors and depths are rounded only at materialization; exact
+admission distinguishes a positive gap from a zero-depth touch. Geometry or
+range failure leaves the pair's manifold unpublished. Closed convex meshes
+retain a separate solid-containment fallback when no surface triangle meets the
+cone; open sheets have no solid interior.
 Mixed mesh/capsule-slab contacts similarly delegate to the complete planar
 capsule-slab query. Its flat caps, straight sides and rounded-end rims are
 distinct features; the shape is not a rounded 3D capsule or just two end

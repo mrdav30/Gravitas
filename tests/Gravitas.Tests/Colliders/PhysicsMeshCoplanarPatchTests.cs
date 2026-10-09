@@ -16,12 +16,12 @@ public sealed class PhysicsMeshCoplanarPatchTests
         int[] triangles = reversed ? new[] { 2, 1, 0, 3, 2, 0 } : new[] { 0, 1, 2, 0, 2, 3 };
         PhysicsMesh mesh = Create(Quad(), triangles);
 
-        mesh.GetCoplanarPatchId(0).Should().Be(0);
-        mesh.GetCoplanarPatchId(1).Should().Be(0);
-        mesh.GetCoplanarPatchBoundaryVertexPairs(0).ToArray().Should().Equal(
+        mesh.GetManifoldSurfaceOwner(0).Should().Be(0);
+        mesh.GetManifoldSurfaceOwner(1).Should().Be(0);
+        mesh.GetManifoldSurfaceBoundaryVertexPairs(0).ToArray().Should().Equal(
             reversed ? new[] { 1, 0, 0, 3, 2, 1, 3, 2 } : new[] { 0, 1, 3, 0, 1, 2, 2, 3 });
-        mesh.GetCoplanarPatchBoundaryVertexPairs(1).ToArray().Should()
-            .Equal(mesh.GetCoplanarPatchBoundaryVertexPairs(0).ToArray());
+        mesh.GetManifoldSurfaceBoundaryVertexPairs(1).ToArray().Should()
+            .Equal(mesh.GetManifoldSurfaceBoundaryVertexPairs(0).ToArray());
         mesh.GetConvexCoplanarPatchCornerVertexIndices(0).ToArray().Should().Equal(
             reversed ? new[] { 0, 3, 2, 1 } : new[] { 0, 1, 2, 3 });
         mesh.GetConvexCoplanarPatchCornerVertexIndices(1).ToArray().Should()
@@ -35,8 +35,8 @@ public sealed class PhysicsMeshCoplanarPatchTests
         PhysicsMesh mesh = Create(new[] { quad[0], quad[1], quad[2], quad[0], quad[2], quad[3] },
             new[] { 0, 1, 2, 3, 4, 5 });
 
-        mesh.GetCoplanarPatchId(1).Should().Be(0);
-        mesh.GetCoplanarPatchBoundaryVertexPairs(0).ToArray().Should().Equal(0, 1, 5, 0, 1, 2, 2, 5);
+        mesh.GetManifoldSurfaceOwner(1).Should().Be(0);
+        mesh.GetManifoldSurfaceBoundaryVertexPairs(0).ToArray().Should().Equal(0, 1, 5, 0, 1, 2, 2, 5);
         mesh.Triangles.ToArray().Should().Equal(0, 1, 2, 3, 4, 5);
         mesh.GetConvexCoplanarPatchCornerVertexIndices(0).ToArray().Should().Equal(0, 1, 2, 5);
     }
@@ -49,8 +49,8 @@ public sealed class PhysicsMeshCoplanarPatchTests
         PhysicsMesh mesh = Create(vertices, new[] { 0, 1, 3, 1, 2, 3, 0, 3, 5, 3, 4, 5 });
 
         for (int i = 0; i < 4; i++)
-            mesh.GetCoplanarPatchId(i).Should().Be(0);
-        mesh.GetCoplanarPatchBoundaryVertexPairs(0).ToArray().Should().Equal(
+            mesh.GetManifoldSurfaceOwner(i).Should().Be(0);
+        mesh.GetManifoldSurfaceBoundaryVertexPairs(0).ToArray().Should().Equal(
             0, 1, 5, 0, 1, 2, 2, 3, 3, 4, 4, 5);
         mesh.GetConvexCoplanarPatchCornerVertexIndices(0).IsEmpty.Should().BeTrue();
     }
@@ -64,8 +64,8 @@ public sealed class PhysicsMeshCoplanarPatchTests
             2, 3, 7, 2, 7, 6, 3, 0, 4, 3, 4, 7 });
 
         for (int i = 0; i < 8; i++)
-            mesh.GetCoplanarPatchId(i).Should().Be(0);
-        mesh.GetCoplanarPatchBoundaryVertexPairs(0).ToArray().Should().Equal(
+            mesh.GetManifoldSurfaceOwner(i).Should().Be(0);
+        mesh.GetManifoldSurfaceBoundaryVertexPairs(0).ToArray().Should().Equal(
             0, 1, 3, 0, 1, 2, 2, 3, 5, 4, 4, 7, 6, 5, 7, 6);
         mesh.GetConvexCoplanarPatchCornerVertexIndices(0).IsEmpty.Should().BeTrue();
     }
@@ -80,8 +80,8 @@ public sealed class PhysicsMeshCoplanarPatchTests
 
         for (int i = 0; i < mesh.TriangleCount; i++)
         {
-            mesh.GetCoplanarPatchId(i).Should().Be(-1);
-            mesh.GetCoplanarPatchBoundaryVertexPairs(i).IsEmpty.Should().BeTrue();
+            mesh.GetManifoldSurfaceOwner(i).Should().Be(i);
+            mesh.GetManifoldSurfaceBoundaryVertexPairs(i).IsEmpty.Should().BeTrue();
             mesh.GetConvexCoplanarPatchCornerVertexIndices(i).IsEmpty.Should().BeTrue();
         }
     }
@@ -96,11 +96,11 @@ public sealed class PhysicsMeshCoplanarPatchTests
             vertices[i] += Vector3d.Right * (Fixed64)4;
         PhysicsMesh mesh = Create(vertices, new[] { 0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7 });
 
-        mesh.GetCoplanarPatchId(0).Should().Be(0);
-        mesh.GetCoplanarPatchId(1).Should().Be(0);
-        mesh.GetCoplanarPatchId(2).Should().Be(2);
-        mesh.GetCoplanarPatchId(3).Should().Be(2);
-        mesh.GetCoplanarPatchBoundaryVertexPairs(2).ToArray().Should().Equal(4, 5, 7, 4, 5, 6, 6, 7);
+        mesh.GetManifoldSurfaceOwner(0).Should().Be(0);
+        mesh.GetManifoldSurfaceOwner(1).Should().Be(0);
+        mesh.GetManifoldSurfaceOwner(2).Should().Be(2);
+        mesh.GetManifoldSurfaceOwner(3).Should().Be(2);
+        mesh.GetManifoldSurfaceBoundaryVertexPairs(2).ToArray().Should().Equal(4, 5, 7, 4, 5, 6, 6, 7);
         mesh.GetConvexCoplanarPatchCornerVertexIndices(0).ToArray().Should().Equal(0, 1, 2, 3);
         mesh.GetConvexCoplanarPatchCornerVertexIndices(3).ToArray().Should().Equal(4, 5, 6, 7);
     }
@@ -113,9 +113,10 @@ public sealed class PhysicsMeshCoplanarPatchTests
         vertices[4] = new Vector3d(-1, 1, -1);
         PhysicsMesh mesh = Create(vertices, new[] { 0, 1, 2, 0, 2, 3, 1, 0, 4 });
 
-        mesh.GetCoplanarPatchId(1).Should().Be(0);
-        mesh.GetCoplanarPatchId(2).Should().Be(-1);
-        mesh.GetCoplanarPatchBoundaryVertexPairs(0).ToArray().Should().Equal(0, 1, 3, 0, 1, 2, 2, 3);
+        mesh.GetManifoldSurfaceOwner(1).Should().Be(0);
+        mesh.GetManifoldSurfaceOwner(2).Should().Be(2);
+        mesh.GetManifoldSurfaceBoundaryVertexPairs(2).IsEmpty.Should().BeTrue();
+        mesh.GetManifoldSurfaceBoundaryVertexPairs(0).ToArray().Should().Equal(0, 1, 3, 0, 1, 2, 2, 3);
         mesh.GetConvexCoplanarPatchCornerVertexIndices(0).ToArray().Should().Equal(0, 1, 2, 3);
         mesh.GetConvexCoplanarPatchCornerVertexIndices(2).IsEmpty.Should().BeTrue();
     }
@@ -130,7 +131,12 @@ public sealed class PhysicsMeshCoplanarPatchTests
         PhysicsMesh mesh = Create(vertices, new[] { 0, 1, 2, 0, 2, 3, 1, 0, 4, 1, 0, 5 });
 
         for (int i = 0; i < mesh.TriangleCount; i++)
-            mesh.GetCoplanarPatchId(i).Should().Be(-1);
+        {
+            mesh.GetManifoldSurfaceOwner(i).Should().Be(i);
+            mesh.GetManifoldSurfaceBoundaryVertexPairs(i).IsEmpty.Should().BeTrue();
+            mesh.GetCoplanarTriangleNeighbors(i).IsEmpty.Should().BeTrue();
+            mesh.GetConvexCoplanarPatchCornerVertexIndices(i).IsEmpty.Should().BeTrue();
+        }
     }
 
     [Theory]
@@ -165,8 +171,8 @@ public sealed class PhysicsMeshCoplanarPatchTests
 
         for (int i = 0; i < mesh.TriangleCount; i++)
         {
-            mesh.GetCoplanarPatchId(i).Should().Be(-1);
-            mesh.GetCoplanarPatchBoundaryVertexPairs(i).IsEmpty.Should().BeTrue();
+            mesh.GetManifoldSurfaceOwner(i).Should().Be(i);
+            mesh.GetManifoldSurfaceBoundaryVertexPairs(i).IsEmpty.Should().BeTrue();
             mesh.GetConvexCoplanarPatchCornerVertexIndices(i).IsEmpty.Should().BeTrue();
         }
     }
@@ -186,8 +192,9 @@ public sealed class PhysicsMeshCoplanarPatchTests
 
         // These valid faces need a wider difference carrier than this optional
         // topology certificate. Declining must preserve their authored geometry.
-        mesh.GetCoplanarPatchId(0).Should().Be(-1);
-        mesh.GetCoplanarPatchId(1).Should().Be(-1);
+        mesh.GetManifoldSurfaceOwner(0).Should().NotBe(mesh.GetManifoldSurfaceOwner(1));
+        mesh.GetManifoldSurfaceBoundaryVertexPairs(0).IsEmpty.Should().BeTrue();
+        mesh.GetManifoldSurfaceBoundaryVertexPairs(1).IsEmpty.Should().BeTrue();
         mesh.VertexCount.Should().Be(4);
         mesh.TriangleCount.Should().Be(2);
     }
@@ -196,19 +203,19 @@ public sealed class PhysicsMeshCoplanarPatchTests
     public void FailedScale_ShouldKeepCommittedPatchAndSubsequentPoseUpdate()
     {
         PhysicsMesh mesh = Create(Quad(), new[] { 0, 1, 2, 0, 2, 3 });
-        int[] boundary = mesh.GetCoplanarPatchBoundaryVertexPairs(0).ToArray();
+        int[] boundary = mesh.GetManifoldSurfaceBoundaryVertexPairs(0).ToArray();
         int[] corners = mesh.GetConvexCoplanarPatchCornerVertexIndices(0).ToArray();
         Vector3d[] vertices = mesh.ScaledLocalVertices.ToArray();
         Action update = () => mesh.UpdateTransform(Vector3d.One, FixedQuaternion.Identity,
             new Vector3d(Fixed64.MinIncrement, Fixed64.One, Fixed64.MinIncrement));
 
         update.Should().Throw<ArgumentException>();
-        mesh.GetCoplanarPatchId(1).Should().Be(0);
-        mesh.GetCoplanarPatchBoundaryVertexPairs(0).ToArray().Should().Equal(boundary);
+        mesh.GetManifoldSurfaceOwner(1).Should().Be(0);
+        mesh.GetManifoldSurfaceBoundaryVertexPairs(0).ToArray().Should().Equal(boundary);
         mesh.GetConvexCoplanarPatchCornerVertexIndices(0).ToArray().Should().Equal(corners);
         mesh.ScaledLocalVertices.ToArray().Should().Equal(vertices);
         mesh.UpdatePosition(Vector3d.One, FixedQuaternion.Identity);
-        mesh.GetCoplanarPatchBoundaryVertexPairs(1).ToArray().Should().Equal(boundary);
+        mesh.GetManifoldSurfaceBoundaryVertexPairs(1).ToArray().Should().Equal(boundary);
         mesh.GetConvexCoplanarPatchCornerVertexIndices(1).ToArray().Should().Equal(corners);
         mesh.ScaledLocalVertices.ToArray().Should().Equal(vertices);
     }
@@ -221,19 +228,18 @@ public sealed class PhysicsMeshCoplanarPatchTests
         Vector3d[] vertices = { new(0, 0, 0), new(Fixed64.One, Fixed64.Quarter, Fixed64.Zero),
             new((Fixed64)3, Fixed64.FromFraction(3, 4), Fixed64.One), new(0, 0, 1) };
         PhysicsMesh mesh = Create(vertices, new[] { 0, 1, 2, 0, 2, 3 });
-        mesh.GetCoplanarPatchId(0).Should().Be(0);
+        mesh.GetManifoldSurfaceOwner(0).Should().Be(0);
         mesh.GetConvexCoplanarPatchCornerVertexIndices(0).ToArray().Should().Equal(0, 1, 2, 3);
         mesh.PrepareTransformation(Vector3d.Zero, FixedQuaternion.Identity,
             new Vector3d(Fixed64.FromFraction(1, 3), Fixed64.One, Fixed64.One), Vector3d.One, null);
-        mesh.GetCoplanarPatchId(0).Should().Be(0);
+        mesh.GetManifoldSurfaceOwner(0).Should().Be(0);
         mesh.GetConvexCoplanarPatchCornerVertexIndices(0).ToArray().Should().Equal(0, 1, 2, 3);
         mesh.PublishPreparedTransformation();
-        mesh.GetCoplanarPatchId(0).Should().Be(-1);
-        mesh.GetCoplanarPatchId(1).Should().Be(-1);
-        mesh.GetCoplanarPatchBoundaryVertexPairs(0).IsEmpty.Should().BeTrue();
+        mesh.GetManifoldSurfaceOwner(0).Should().NotBe(mesh.GetManifoldSurfaceOwner(1));
+        mesh.GetManifoldSurfaceBoundaryVertexPairs(0).IsEmpty.Should().BeTrue();
         mesh.GetConvexCoplanarPatchCornerVertexIndices(0).IsEmpty.Should().BeTrue();
         mesh.UpdateTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One);
-        mesh.GetCoplanarPatchId(0).Should().Be(0);
+        mesh.GetManifoldSurfaceOwner(0).Should().Be(0);
         mesh.GetConvexCoplanarPatchCornerVertexIndices(0).ToArray().Should().Equal(0, 1, 2, 3);
     }
 
@@ -243,7 +249,7 @@ public sealed class PhysicsMeshCoplanarPatchTests
         Vector3d[] vertices = { new(0, 0, 0), new(Fixed64.One, Fixed64.Quarter, Fixed64.Zero),
             new((Fixed64)3, Fixed64.FromFraction(3, 4), Fixed64.One), new(0, 0, 1) };
         PhysicsMesh mesh = Create(vertices, new[] { 0, 1, 2, 0, 2, 3 });
-        int[] boundary = mesh.GetCoplanarPatchBoundaryVertexPairs(0).ToArray();
+        int[] boundary = mesh.GetManifoldSurfaceBoundaryVertexPairs(0).ToArray();
         int[] corners = mesh.GetConvexCoplanarPatchCornerVertexIndices(0).ToArray();
         Action prepare = () => mesh.PrepareTransformation(Vector3d.One, FixedQuaternion.Identity,
             new Vector3d(Fixed64.FromFraction(1, 3), Fixed64.One, (Fixed64)1000000),
@@ -252,12 +258,12 @@ public sealed class PhysicsMeshCoplanarPatchTests
         // The geometry candidate loses coplanarity, then its million-unit
         // thin-shell moments fail the existing representability contract.
         prepare.Should().Throw<ArgumentException>().WithMessage("*surface mass properties*");
-        mesh.GetCoplanarPatchId(0).Should().Be(0);
-        mesh.GetCoplanarPatchBoundaryVertexPairs(0).ToArray().Should().Equal(boundary);
+        mesh.GetManifoldSurfaceOwner(0).Should().Be(0);
+        mesh.GetManifoldSurfaceBoundaryVertexPairs(0).ToArray().Should().Equal(boundary);
         mesh.GetConvexCoplanarPatchCornerVertexIndices(0).ToArray().Should().Equal(corners);
         mesh.OwnerScale.Should().Be(Vector3d.One);
         mesh.UpdatePosition(Vector3d.One, FixedQuaternion.Identity);
-        mesh.GetCoplanarPatchId(1).Should().Be(0);
+        mesh.GetManifoldSurfaceOwner(1).Should().Be(0);
         mesh.GetConvexCoplanarPatchCornerVertexIndices(1).ToArray().Should().Equal(corners);
     }
 
@@ -272,10 +278,10 @@ public sealed class PhysicsMeshCoplanarPatchTests
             vertices[i] = plane == 0 ? new Vector3d(Fixed64.Zero, vertices[i].X, vertices[i].Z)
                 : plane == 1 ? vertices[i] : new Vector3d(vertices[i].X, vertices[i].Z, Fixed64.Zero);
         PhysicsMesh mesh = Create(vertices, new[] { 0, 1, 2, 0, 2, 3 });
-        int[] boundary = mesh.GetCoplanarPatchBoundaryVertexPairs(0).ToArray();
+        int[] boundary = mesh.GetManifoldSurfaceBoundaryVertexPairs(0).ToArray();
         mesh.UpdateTransform(Vector3d.One, FixedQuaternion.Identity, new Vector3d(2, 3, 4));
-        mesh.GetCoplanarPatchId(1).Should().Be(0);
-        mesh.GetCoplanarPatchBoundaryVertexPairs(0).ToArray().Should().Equal(boundary);
+        mesh.GetManifoldSurfaceOwner(1).Should().Be(0);
+        mesh.GetManifoldSurfaceBoundaryVertexPairs(0).ToArray().Should().Equal(boundary);
         mesh.GetConvexCoplanarPatchCornerVertexIndices(0).ToArray().Should().Equal(0, 1, 2, 3);
     }
 
@@ -295,24 +301,29 @@ public sealed class PhysicsMeshCoplanarPatchTests
                 (triangles[i + 1], triangles[i + 2]) = (triangles[i + 2], triangles[i + 1]);
         PhysicsMesh mesh = Create(vertices, triangles);
 
-        mesh.GetCoplanarPatchBoundaryVertexPairs(0).Length.Should().Be(10);
+        mesh.GetManifoldSurfaceBoundaryVertexPairs(0).Length.Should().Be(10);
         mesh.GetConvexCoplanarPatchCornerVertexIndices(0).ToArray().Should().Equal(
             reversed ? new[] { 1, 2, 3, 4 } : new[] { 1, 4, 3, 2 });
     }
 
     [Fact]
-    public void SameTurnStarBoundary_ShouldDeclineConvexTrustWithoutLosingPatchEdges()
+    public void SameTurnStarBoundary_ShouldDeclineSharedOwnershipWithoutLosingAuthoredTriangles()
     {
         // Each origin-centered triangle has positive projected orientation,
         // and every shared radial seam has opposite sides. The boundary is
         // nevertheless a twice-wound star, not its convex polygon's fill.
         Vector3d[] vertices = { new(0, 0, 3), new(-3, 0, 1), new(-2, 0, -3),
             new(2, 0, -3), new(3, 0, 1), Vector3d.Zero };
-        PhysicsMesh mesh = Create(vertices, new[] { 5, 0, 2, 5, 2, 4, 5, 4, 1, 5, 1, 3, 5, 3, 0 });
+        int[] triangles = { 5, 0, 2, 5, 2, 4, 5, 4, 1, 5, 1, 3, 5, 3, 0 };
+        PhysicsMesh mesh = Create(vertices, triangles);
 
-        mesh.GetCoplanarPatchId(0).Should().Be(0);
-        mesh.GetCoplanarPatchBoundaryVertexPairs(0).Length.Should().Be(10);
-        mesh.GetConvexCoplanarPatchCornerVertexIndices(0).IsEmpty.Should().BeTrue();
+        for (int i = 0; i < mesh.TriangleCount; i++)
+        {
+            mesh.GetManifoldSurfaceOwner(i).Should().Be(i);
+            mesh.GetManifoldSurfaceBoundaryVertexPairs(i).IsEmpty.Should().BeTrue();
+            mesh.GetConvexCoplanarPatchCornerVertexIndices(i).IsEmpty.Should().BeTrue();
+        }
+        mesh.Triangles.ToArray().Should().Equal(triangles);
     }
 
     [Fact]
@@ -345,7 +356,7 @@ public sealed class PhysicsMeshCoplanarPatchTests
         }
         long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
         allocated.Should().Be(0);
-        mesh.GetCoplanarPatchBoundaryVertexPairs(0).Length.Should().Be(10);
+        mesh.GetManifoldSurfaceBoundaryVertexPairs(0).Length.Should().Be(10);
     }
 
     private static Vector3d[] Quad() => new[]

@@ -249,7 +249,9 @@ public sealed class ContactManifold : IEnumerable<ManifoldContact>
         bool depthIsClamped = false,
         int featureNamespaceA = 0,
         int featureNamespaceB = 0,
-        ContactGroupKey group = default)
+        ContactGroupKey group = default,
+        int sampleIdentity = 0,
+        ulong? contactIdentity = null)
     {
         AddContactCore(
             anchorA,
@@ -262,7 +264,7 @@ public sealed class ContactManifold : IEnumerable<ManifoldContact>
             depthIsClamped,
             featureNamespaceA,
             featureNamespaceB,
-            group);
+            group, sampleIdentity, contactIdentity);
     }
 
     private void AddContactCore(
@@ -276,13 +278,18 @@ public sealed class ContactManifold : IEnumerable<ManifoldContact>
         bool depthIsClamped,
         int featureNamespaceA,
         int featureNamespaceB,
-        ContactGroupKey group = default)
+        ContactGroupKey group = default,
+        int sampleIdentity = 0,
+        ulong? contactIdentity = null)
     {
-        ulong contactId = CreateContactId(
+        ulong contactId = contactIdentity ?? CreateContactId(
             anchorA,
             featureNamespaceA,
             anchorB,
             featureNamespaceB);
+        // A continuous normal family can share paired anchors at zero depth.
+        // Keep its reduced directions as distinct rows inside one feature group.
+        if (sampleIdentity != 0) Mix(ref contactId, sampleIdentity);
         var contact = new ManifoldContact(
             contactId,
             anchorA,
@@ -332,7 +339,16 @@ public sealed class ContactManifold : IEnumerable<ManifoldContact>
     IEnumerator<ManifoldContact> IEnumerable<ManifoldContact>.GetEnumerator() => GetEnumerator();
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
-    private static ulong CreateContactId(
+    internal static ulong RemapContactIdentity(ulong contactId, int namespaceA, int namespaceB)
+    {
+        // Group provenance carries the ordered owners. Identity remains
+        // invariant when compound dispatch reverses the paired anchors.
+        Mix(ref contactId, System.Math.Min(namespaceA, namespaceB));
+        Mix(ref contactId, System.Math.Max(namespaceA, namespaceB));
+        return contactId;
+    }
+
+    internal static ulong CreateContactId(
         ContactAnchor anchorA,
         int featureNamespaceA,
         ContactAnchor anchorB,

@@ -36,6 +36,12 @@ internal sealed partial class MeshConeFaceRegions
         return true;
     }
 
+    internal ulong GetSampleIdentity(int region, int index)
+    {
+        SwiftThrowHelper.ThrowIfListIndexInvalid(index, GetSampleCount(region));
+        return _samples[region * ContactManifold.MaxContactsPerGroup + index].Identity;
+    }
+
     private void ReduceSamples(int region, WidePlaneMetrics metrics)
     {
         _samplePool.FastClear();
@@ -46,7 +52,7 @@ internal sealed partial class MeshConeFaceRegions
         { _sampleCounts[region] = -1; return; }
         // Keep the exact regional maximum first. The rest of this finite pool
         // uses intrinsic and true-boundary constructions, independent of seams.
-        _samplePool.Add(new Sample(selected.MaximumSource, selected.MaximumEvent, maximumPoint, maximumExit, maximumDepth));
+        _samplePool.Add(new Sample(selected.MaximumSource, selected.MaximumEvent, maximumPoint, maximumExit, maximumDepth, GetLocalIdentity(selected, orientation)));
         foreach (PoolEvent descriptor in _poolEvents.AsReadOnlySpan())
             if (descriptor.Region == region && !KeepSample(descriptor, orientation))
             { _sampleCounts[region] = -1; return; }
@@ -104,10 +110,12 @@ internal sealed partial class MeshConeFaceRegions
     private Ray CheckRay(scoped in ConePlaneRaySelection selection, int orientation, bool pointRepresentable)
     {
         if (!selection.HasValue) return default;
-        bool representable = pointRepresentable && ConePlaneRayPointMaterialization.IsExitWorldPointRepresentable(
+        // A positive whole-cone certificate covers every admitted finite exit.
+        // An inconclusive bound retains the original exact per-ray range test.
+        bool representable = pointRepresentable && (_wholeConeWorldRangeRepresentable || ConePlaneRayPointMaterialization.IsExitWorldPointRepresentable(
             _frame, selection.Point, selection.Root,
             ContactQuadratic.At(selection.Values, selection.Signs, 0, ConePlaneRaySelection.FieldWords),
-            ContactQuadratic.At(selection.Values, selection.Signs, 1, ConePlaneRaySelection.FieldWords), orientation);
+            ContactQuadratic.At(selection.Values, selection.Signs, 1, ConePlaneRaySelection.FieldWords), orientation));
         return new Ray(selection.MaximumSource, selection.MaximumEvent, representable);
     }
 
@@ -132,7 +140,21 @@ internal sealed partial class MeshConeFaceRegions
         // The source/frame is unchanged, exit range was checked exactly, and
         // nearest-even rounding is monotone below the representable maximum.
         System.Diagnostics.Debug.Assert(represented && anchored);
-        return new Sample(sample.Source, sample.Event, sample.MeshPoint, exit, depth);
+        return new Sample(sample.Source, sample.Event, sample.MeshPoint, exit, depth, GetLocalIdentity(selected, orientation));
+    }
+
+    private ulong GetLocalIdentity(scoped in ConePlaneRaySelection selection, int orientation)
+    {
+        bool meshLocal = ConePlaneRayPointMaterialization.TryGetAuthoredPoint(_frame, selection.Point, selection.Root,
+            out Vector3d p);
+        bool coneLocal = ConePlaneRayPointMaterialization.TryGetExitConeLocalPoint(_frame, selection.Point, selection.Root,
+            ContactQuadratic.At(selection.Values, selection.Signs, 0, ConePlaneRaySelection.FieldWords),
+            ContactQuadratic.At(selection.Values, selection.Signs, 1, ConePlaneRaySelection.FieldWords), orientation, out Vector3d q);
+        // Closed authored triangles and a finite cone bound both local points
+        // by their representable vertices/dimensions. These are independent
+        // final local rounds for identity, never inverse-rounded world anchors.
+        System.Diagnostics.Debug.Assert(meshLocal && coneLocal);
+        return ContactManifold.CreateContactId(ContactAnchor.FromWorldPoint(p), 0, ContactAnchor.FromWorldPoint(q), 0);
     }
 
     // Availability and exact output range are retained separately. Opposite
@@ -163,7 +185,8 @@ internal sealed partial class MeshConeFaceRegions
         internal readonly ConePlaneRayEvent Event;
         internal readonly Vector3d MeshPoint, ConePoint;
         internal readonly Fixed64 Depth;
-        internal Sample(ConePlaneRayEventSource source, ConePlaneRayEvent descriptor, Vector3d p, Vector3d q, Fixed64 depth)
-        { Source = source; Event = descriptor; MeshPoint = p; ConePoint = q; Depth = depth; }
+        internal readonly ulong Identity;
+        internal Sample(ConePlaneRayEventSource source, ConePlaneRayEvent descriptor, Vector3d p, Vector3d q, Fixed64 depth, ulong identity = 0)
+        { Source = source; Event = descriptor; MeshPoint = p; ConePoint = q; Depth = depth; Identity = identity; }
     }
 }

@@ -2,7 +2,7 @@
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-101`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-102`.
 - Assign an ID when an issue enters this tracker, keep it through resolution,
   and never reuse an ID even if an entry is later removed. Check this file's Git
   history before advancing or repairing the counter.
@@ -272,6 +272,47 @@
   distance and center only, leaving normal orientation unverified. Phase 1
   fixes the discrete cone/sphere and cylinder/sphere producers; it does not
   change this separate swept-contact policy.
+
+### GRV-Issue-101 - Rotational CCD can freeze separated motion inside a concave mesh's aggregate bounds
+
+- **Confirmed:** 2026-10-09 during phase 3 surface-manifold physical validation.
+  The actual initial narrow phase is separated, but the full host loop clamps
+  the proposed rotation at zero rather than reaching the first real impact.
+- **Reproduction:** One concave mesh has vertices `(0,0,-2)`, `(2,0,-2)`,
+  `(2,0,2)`, `(0,0,2)`, `(0,2,-2)`, `(0,2,2)` and indices
+  `0,3,1, 1,3,2, 0,4,3, 3,4,5`: a finite floor and perpendicular wall.
+  Use an explicit static mesh body, frictionless materials and a kinematic
+  height-1/radius-1/2 cone at `(3/5,11/20,0)`, identity rotation, with
+  continuous collision enabled. Disable gravity/damping, use frame rate 1,
+  author a clockwise 90-degree rotation about Z, and run `Simulate` followed
+  by `LateSimulate`. The initial `DoCollisionCheck` returns false; an 8-degree
+  probe intersects only the floor and a 45-degree probe emits both face groups.
+  The full loop nevertheless retains identity rotation with a TOI clamp.
+- **Control/proof:** Removing the wall (first four vertices and first six
+  indices) passes the same full-loop first-impact bracket of 5–8 degrees.
+  Clockwise rotation gives the cone's lowest X/Y support
+  `-1/2*(cos(theta)+sin(theta))`. The floor is initially 0.55 below its center
+  and is reached near 6 degrees; the wall is 0.6 away and is reached later.
+  Both scalar coordinates and ordinary shape dimensions are representable.
+- **Root cause:** `SolidBody.IsRotationalIntervalSeparated` uses aggregate
+  collider AABBs for non-sphere pairs. The joined mesh's bounds contain the
+  initially separated cone, so no earlier interval can be certified empty.
+  The bounded search terminates at its unresolved zero-time frontier instead
+  of advancing to its retained later geometric witness. This is conservative
+  freezing, not a false geometric contact or the normal inversion in #100.
+  The separator method is unchanged verbatim from committed `767a713`;
+  baseline source inspection establishes pre-existing ownership, without
+  claiming a separate baseline execution.
+- **Follow-up:** Add a conservative finite-mesh interval separation certificate
+  or another explained refinement that can discard empty concave-bounds space.
+  Preserve certified lower/upper bracket and earliest-impact semantics, moving
+  targets, deterministic budgets and failure handling; do not advance across
+  an unproven interval merely because one sample is separated.
+- **Evidence:** Ignored `artifacts/grv-issue-095/phase3-physical-rational-focused.log`
+  records 481 passing cases and this single failed joined-wall case, whose
+  final angle is zero. The full fixture is retained above; the maintained
+  integration test uses two plane levels whose bounds support the existing
+  certificate, rather than codifying the freeze as intended behavior.
 
 Remaining measured performance costs are tracked in the benchmark backlog.
 

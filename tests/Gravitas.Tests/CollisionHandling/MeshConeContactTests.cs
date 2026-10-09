@@ -5,15 +5,50 @@ using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Materials;
 using Gravitas.Tests.Support;
-using SwiftCollections;
-using SwiftCollections.Query;
 using System;
+using System.Linq;
 using Xunit;
 
 namespace Gravitas.Tests;
 
 public sealed class MeshConeContactTests
 {
+    [Fact]
+    public void ClosedConvexVolume_WithOverlappingBoundsButRadialGap_ShouldRemainSeparated()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSMeshCollider mesh = MeshTestFixtures.CreateConvexCube();
+        scenario.InitializeStaticCollider(mesh, Vector3d.Zero);
+        var cone = new LSConeCollider { Radius = Fixed64.One / 3, Size = Vector3d.One };
+        scenario.InitializeStaticCollider(cone, Vector3d.One * ((Fixed64)3 / 4));
+        // The cube ends at x=z=1/2. Its nearest radial point is therefore
+        // squared distance 1/8 from the cone axis, beyond R^2=1/9. Bounds
+        // still overlap on all axes, so a closed volume cannot imply a hit.
+        mesh.IsClosedSurface.Should().BeTrue();
+        mesh.Bounds.Intersects(cone.Bounds).Should().BeTrue();
+        CollisionPair pair = scenario.CreatePair(mesh, cone);
+        CollisionDetection.DoCollisionCheck(pair).Should().BeFalse();
+        pair.Manifold.HasContact.Should().BeFalse();
+    }
+
+    [Fact]
+    public void OpenConvexSheet_WithOverlappingBoundsButRadialGap_ShouldRemainSeparated()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSMeshCollider mesh = MeshTestFixtures.CreateConvexQuadFloor();
+        scenario.InitializeStaticCollider(mesh, Vector3d.Zero);
+        var cone = new LSConeCollider { Radius = Fixed64.One / 3, Size = Vector3d.One };
+        scenario.InitializeStaticCollider(cone, new Vector3d((Fixed64)9 / 4, Fixed64.Quarter, (Fixed64)9 / 4));
+        // The sheet ends at x=z=2 and lies between the cone's axial caps.
+        // Bounds overlap, but the nearest radial point still has squared
+        // distance 1/8 > R^2=1/9. Convex mode adds no solid containment.
+        mesh.IsClosedSurface.Should().BeFalse();
+        mesh.Bounds.Intersects(cone.Bounds).Should().BeTrue();
+        CollisionPair pair = scenario.CreatePair(mesh, cone);
+        CollisionDetection.DoCollisionCheck(pair).Should().BeFalse();
+        pair.Manifold.HasContact.Should().BeFalse();
+    }
+
     [Theory]
     [InlineData(MeshColliderMode.Concave, false)]
     [InlineData(MeshColliderMode.Concave, true)]
@@ -61,8 +96,17 @@ public sealed class MeshConeContactTests
         // Rejecting the unrepresentable center would discard that real overlap.
         CollisionPair pair = scenario.CreatePair(mesh, cone);
         CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
-        pair.Manifold.PrimaryContact.AnchorA.Origin.Should().Be(mesh.Mesh.Origin);
-        pair.Manifold.PrimaryContact.AnchorB.Origin.Should().Be(cone.Center);
+        // Surface samples publish once-rounded world anchors. Their provenance
+        // is the admitted finite domain, rather than a particular anchor frame.
+        foreach (ManifoldContact sample in pair.Manifold)
+        {
+            sample.TryGetPointA(out Vector3d point).Should().BeTrue();
+            point.Z.Should().Be(Fixed64.Zero);
+            point.Y.Should().BeInRange(-Fixed64.Half, Fixed64.Half);
+            point.X.Should().BeInRange(Fixed64.Zero, (Fixed64)6);
+            cone.ContainsWorldPoint(point, Fixed64.FromRaw(64)).Should().BeTrue();
+            sample.TryGetPointB(out _).Should().BeTrue();
+        }
         pair.Manifold.PrimaryContact.Normal.IsNormalized().Should().BeTrue();
     }
 
@@ -128,7 +172,19 @@ public sealed class MeshConeContactTests
         pair.ColliderA.Should().BeSameAs(compound);
         pair.CollisionType.Should().Be(CollisionType.Compound);
         CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
-        pair.Manifold.Count.Should().Be(1);
+        pair.Manifold.GroupCount.Should().Be(direct.Manifold.GroupCount);
+        pair.Manifold.Count.Should().Be(direct.Manifold.Count);
+        foreach (ManifoldContact row in pair.Manifold)
+        {
+            ManifoldContact original = direct.Manifold.Single(c => c.AnchorA.Equals(row.AnchorB) && c.AnchorB.Equals(row.AnchorA));
+            row.Depth.Should().Be(original.Depth);
+            row.Normal.Should().Be(-original.Normal);
+            row.HasMaterialOverride.Should().BeTrue();
+            row.MaterialA.Should().Be(conePart.Material);
+            row.MaterialB.Should().Be(mesh.Material);
+            row.FeatureNamespaceA.Should().Be(1);
+            row.FeatureNamespaceB.Should().Be(0);
+        }
         ManifoldContact contact = pair.Manifold.PrimaryContact;
         contact.Depth.Should().Be(Fixed64.One);
         contact.DepthIsClamped.Should().Be(meshFirst.DepthIsClamped);
@@ -146,53 +202,61 @@ public sealed class MeshConeContactTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void MultipleTriangles_SelectMinimumDepthRegardlessOfAuthoredOrder(bool reverse)
+    public void MultipleTriangles_ShouldRetainBothIndependentSurfaceConstraints(bool reverse)
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         CollisionPair pair = CreateHorizontalPair(scenario, Fixed64.FromFraction(7, 8), reverse);
 
-        // The lower plane needs 1/4 upward translation; the upper plane
-        // needs only 1/8 downward translation past the apex. Both triangles
-        // contain the axial crossings for every smaller displacement.
+        // Independent planes retain their own constraints. The lower surface
+        // supplies upward support; the upper supplies downward support.
         CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
-        pair.Manifold.Count.Should().Be(1);
-        ManifoldContact contact = pair.Manifold.PrimaryContact;
-        contact.Depth.Should().Be(Fixed64.FromFraction(1, 8));
-        contact.DepthIsClamped.Should().BeFalse();
-        contact.Normal.Should().Be(Vector3d.Down);
-        contact.PointA.Should().Be(new Vector3d(Fixed64.Zero, Fixed64.FromFraction(7, 8), Fixed64.Zero));
-        contact.PointB.Should().Be(Vector3d.Up);
+        pair.Manifold.GroupCount.Should().Be(2);
+        pair.Manifold.Count.Should().Be(8);
+        ManifoldContact[] lower = pair.Manifold.Where(c => c.PointA.Y < Fixed64.Zero).ToArray();
+        ManifoldContact[] upper = pair.Manifold.Where(c => c.PointA.Y > Fixed64.Zero).ToArray();
+        lower.Length.Should().Be(ContactManifold.MaxContactsPerGroup);
+        upper.Length.Should().Be(ContactManifold.MaxContactsPerGroup);
+        lower.Max(c => c.Depth).Should().Be(Fixed64.Quarter);
+        upper.Max(c => c.Depth).Should().Be(Fixed64.FromFraction(1, 8));
+        foreach (ManifoldContact contact in lower)
+        {
+            contact.Normal.Should().Be(Vector3d.Up);
+            contact.PointA.Y.Should().Be(Fixed64.FromFraction(-3, 4));
+            contact.PointB.Y.Should().Be(-Fixed64.One);
+            contact.DepthIsClamped.Should().BeFalse();
+        }
+        foreach (ManifoldContact contact in upper)
+        {
+            contact.Normal.Should().Be(Vector3d.Down);
+            contact.PointA.Y.Should().Be(Fixed64.FromFraction(7, 8));
+            contact.PointB.Y.Should().BeInRange(contact.PointA.Y, Fixed64.One);
+            contact.DepthIsClamped.Should().BeFalse();
+        }
     }
 
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void EqualDepthTriangles_RetainFirstBvhCandidateAndStableContact(bool reverse)
+    public void EqualDepthTriangles_ShouldRetainGeometricGroupsRegardlessOfAuthoredOrder(bool reverse)
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         CollisionPair pair = CreateHorizontalPair(scenario, Fixed64.FromFraction(3, 4), reverse);
-        var mesh = (LSMeshCollider)pair.ColliderA;
-        var candidates = new SwiftList<int>();
-        mesh.GetTrianglesInBounds(new FixedBoundVolume(pair.ColliderB.BoundsMin, pair.ColliderB.BoundsMax), candidates);
-        candidates.Count.Should().Be(2);
-        mesh.Mesh.GetLocalTriangleVertices(candidates[0], out Vector3d first, out _, out _);
-        mesh.Mesh.CreatePointAnchor(first).TryGetPoint(out Vector3d firstWorld).Should().BeTrue();
-        Vector3d expectedNormal = firstWorld.Y < Fixed64.Zero ? Vector3d.Up : Vector3d.Down;
-
-        // Both exits are exactly 1/4. The reducer promises first candidate,
-        // not triangle-index ordering independent of the existing BVH.
+        CollisionPair baseline = CreateHorizontalPair(scenario, Fixed64.FromFraction(3, 4), !reverse);
         CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
-        pair.Manifold.Count.Should().Be(1);
-        ManifoldContact contact = pair.Manifold.PrimaryContact;
-        contact.Depth.Should().Be(Fixed64.FromFraction(1, 4));
-        contact.Normal.Should().Be(expectedNormal);
-        contact.PointA.Y.Should().Be(firstWorld.Y);
-        contact.PointB.Y.Should().Be(-expectedNormal.Y);
+        CollisionDetection.DoCollisionCheck(baseline).Should().BeTrue();
+        pair.Manifold.GroupCount.Should().Be(2);
+        pair.Manifold.Count.Should().Be(8);
+        ManifoldContact[] expected = baseline.Manifold.ToArray();
         for (int iteration = 0; iteration < 3; iteration++)
         {
             CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
-            AssertSameContact(contact, pair.Manifold.PrimaryContact);
+            pair.Manifold.GroupCount.Should().Be(2);
+            pair.Manifold.Count.Should().Be(expected.Length);
+            for (int index = 0; index < expected.Length; index++)
+                AssertSameContact(expected[index], pair.Manifold[index]);
         }
+        pair.Manifold.Any(c => c.Normal == Vector3d.Up && c.Depth == Fixed64.Quarter).Should().BeTrue();
+        pair.Manifold.Any(c => c.Normal == Vector3d.Down && c.Depth == Fixed64.Quarter).Should().BeTrue();
     }
 
     [Fact]

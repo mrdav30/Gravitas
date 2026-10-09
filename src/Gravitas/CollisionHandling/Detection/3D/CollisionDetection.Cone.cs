@@ -100,29 +100,16 @@ public static partial class CollisionDetection
         var mesh = (LSMeshCollider)pair.ColliderA;
         var cone = (LSConeCollider)pair.ColliderB;
 
-        if (TryFindMeshConeTriangleContact(
-                mesh,
-                cone,
-                pair.Context.CollisionScratch,
-                out ContactAnchor meshAnchor,
-                out ContactAnchor coneAnchor,
-                out Vector3d normalMeshToCone,
-                out Fixed64 depth,
-                out bool depthIsClamped))
-        {
-            pair.Manifold.SetContact(
-                meshAnchor,
-                coneAnchor,
-                depth,
-                normalMeshToCone,
-                depthIsClamped);
+        if (BuildMeshConeSurfaceContacts(mesh, cone, pair.Context.CollisionScratch, pair.Manifold))
             return true;
-        }
 
-        if (mesh.Mode == MeshColliderMode.Concave || !ConvexColliderSupport.Intersects(mesh, cone))
+        // An open sheet has no solid interior, even when its bounds were
+        // authored in convex mode. Only a closed convex volume owns containment.
+        if (mesh.Mode == MeshColliderMode.Concave || !mesh.IsClosedSurface
+            || !ConvexColliderSupport.Intersects(mesh, cone))
             return false;
 
-        normalMeshToCone = ResolveNormal(cone.Center - mesh.Center);
+        Vector3d normalMeshToCone = ResolveNormal(cone.Center - mesh.Center);
         FixedPointAnchor pointOnMesh = ConvexColliderSupport.GetSupportAnchor(
             mesh,
             normalMeshToCone,
@@ -131,7 +118,7 @@ public static partial class CollisionDetection
             cone,
             -normalMeshToCone,
             Vector3d.Zero);
-        depth = pointOnMesh.ProjectNonNegativeOffsetFrom(
+        Fixed64 depth = pointOnMesh.ProjectNonNegativeOffsetFrom(
             pointOnCone,
             normalMeshToCone);
 
@@ -143,114 +130,72 @@ public static partial class CollisionDetection
         return true;
     }
 
-    private static bool TryFindMeshConeTriangleContact(
-        LSMeshCollider mesh,
-        LSConeCollider cone,
-        CollisionSatScratch scratch,
-        out ContactAnchor meshAnchor,
-        out ContactAnchor coneAnchor,
-        out Vector3d normalMeshToCone,
-        out Fixed64 depth,
-        out bool depthIsClamped)
+    private static bool BuildMeshConeSurfaceContacts(
+        LSMeshCollider meshCollider, LSConeCollider cone, CollisionSatScratch scratch, ContactManifold manifold)
     {
-        meshAnchor = default;
-        coneAnchor = default;
-        normalMeshToCone = Vector3d.Zero;
-        depth = Fixed64.Zero;
-        depthIsClamped = false;
-
-        var triangleBuffer = scratch.MeshTriangleCandidatesA;
-        mesh.GetTrianglesInBounds(new FixedBoundVolume(cone.BoundsMin, cone.BoundsMax), triangleBuffer);
-        PrepareMeshConePatchContacts(mesh, cone, scratch);
-        bool found = false;
-        Fixed64 bestDepth = Fixed64.MaxValue;
-
-        for (int i = 0; i < triangleBuffer.Count; i++)
-        {
-            int triangleIndex = triangleBuffer[i];
-            mesh.Mesh.GetLocalTriangleVertices(
-                triangleIndex,
-                out Vector3d first,
-                out Vector3d second,
-                out Vector3d third);
-            var triangle = new FixedTriangle(first, second, third);
-            // Admission and the complete contact must belong to the same
-            // feature; a nearest-center sample can miss a side intersection.
-            if (!scratch.MeshConePatchContacts.TryGetValue(
-                    mesh.Mesh.GetCoplanarPatchId(triangleIndex), out FixedContactAnchors contact)
-                && !triangle.TryGetCenteredFiniteConeContact(
-                    mesh.Mesh.Origin, mesh.Mesh.Rotation,
-                    cone.Center, cone.Rotation, cone.Height, cone.ScaledRadius,
-                    out contact))
-            {
-                continue;
-            }
-
-            if (found && contact.Depth >= bestDepth)
-                continue;
-
-            found = true;
-            bestDepth = contact.Depth;
-            meshAnchor = new ContactAnchor(contact.FirstAnchor);
-            coneAnchor = new ContactAnchor(contact.SecondAnchor);
-            normalMeshToCone = contact.Normal;
-            depth = contact.Depth;
-            depthIsClamped = contact.DepthIsClamped;
-        }
-
-        return found;
-    }
-
-    private static void PrepareMeshConePatchContacts(
-        LSMeshCollider mesh, LSConeCollider cone, CollisionSatScratch scratch)
-    {
-        var contacts = scratch.MeshConePatchContacts;
-        contacts.Clear();
+        PhysicsMesh mesh = meshCollider.Mesh;
         var candidates = scratch.MeshTriangleCandidatesA;
-        Span<Vector3d> witnessBounds = stackalloc Vector3d[2]
+        var admitted = scratch.MeshTriangleCandidatesB;
+        meshCollider.GetTrianglesInBounds(new FixedBoundVolume(cone.BoundsMin, cone.BoundsMax), candidates);
+        scratch.MeshConeSurfaces.Clear();
+        ContactManifold staged = scratch.MeshConeManifold;
+        staged.Reset();
+        foreach (int triangleIndex in candidates.AsReadOnlySpan())
         {
-            mesh.Mesh.ScaledLocalBounds.Min, mesh.Mesh.ScaledLocalBounds.Max
-        };
-        for (int i = 0; i < candidates.Count; i++)
-        {
-            int triangleIndex = candidates[i];
-            int patch = mesh.Mesh.GetCoplanarPatchId(triangleIndex);
-            if (patch < 0 || contacts.ContainsKey(patch))
-                continue;
-            mesh.Mesh.GetLocalTriangleVertices(triangleIndex,
-                out Vector3d first, out Vector3d second, out Vector3d third);
-            var triangle = new FixedTriangle(first, second, third);
-            // A later BVH triangle may contain the certified face witness.
-            // Certify first, then reduce in the original BVH order so an earlier
-            // internal-edge exit cannot defeat the whole patch's face exit.
-            if (TriangleConeContact.TryGetPatchFaceContact(
-                    triangle, mesh.Mesh.Origin, mesh.Mesh.Rotation,
-                    mesh.Mesh.ScaledLocalVertices, mesh.Mesh.GetCoplanarPatchBoundaryVertexPairs(triangleIndex),
-                    cone.Center, cone.Rotation, cone.Height, cone.ScaledRadius,
-                    out FixedContactAnchors contact, witnessBounds))
+            int owner = mesh.GetManifoldSurfaceOwner(triangleIndex);
+            if (!scratch.MeshConeSurfaces.Add(owner)) continue;
+            mesh.GetLocalTriangleVertices(triangleIndex, out Vector3d a, out Vector3d b, out Vector3d c);
+            var frame = new ConePlaneRayFrame(new FixedTriangle(a, b, c), mesh.Origin, mesh.Rotation,
+                cone.Center, cone.Rotation, cone.Height, cone.ScaledRadius);
+            admitted.FastClear();
+            // Reuse one exact plane frame per surface rather than rebuilding
+            // its reduced normal and rigid basis for each subdivided triangle.
+            // ponytail: O(candidate count * surface count) owner comparisons;
+            // bucket candidates if many distinct planes become a measured cost.
+            foreach (int candidate in candidates.AsReadOnlySpan())
             {
-                contacts.Add(patch, contact);
-                continue;
+                if (mesh.GetManifoldSurfaceOwner(candidate) != owner) continue;
+                mesh.GetLocalTriangleVertices(candidate, out a, out b, out c);
+                if (ConePlaneRayEvents.IntersectsTriangle(frame, new FixedTriangle(a, b, c))) admitted.Add(candidate);
             }
-
-            ReadOnlySpan<int> corners = mesh.Mesh.GetConvexCoplanarPatchCornerVertexIndices(triangleIndex);
-            // A convex patch's normal fan consists of its real perimeter
-            // edges and corners. An intersecting authored seed supplies a
-            // valid base-pole witness when no minimum-face proof applies.
-            if (!corners.IsEmpty
-                && triangle.TryGetCenteredFiniteConeContact(mesh.Mesh.Origin, mesh.Mesh.Rotation,
-                    cone.Center, cone.Rotation, cone.Height, cone.ScaledRadius, out _))
+            if (admitted.Count == 0) continue;
+            var connectivity = scratch.MeshConeConnectivity;
+            connectivity.Build(mesh, triangleIndex, cone.Center, cone.Rotation,
+                cone.Height, cone.ScaledRadius, admitted.AsReadOnlySpan());
+            var faces = scratch.MeshConeFaces;
+            faces.Build(mesh, triangleIndex, cone.Center, cone.Rotation,
+                cone.Height, cone.ScaledRadius, connectivity, admitted.AsReadOnlySpan());
+            int surface = mesh.GetCanonicalSurfaceOrdinal(triangleIndex);
+            for (int region = 0; region < faces.RegionCount; region++)
             {
-                bool found = TriangleConeContact.TryGetConvexPatchContact(triangle, mesh.Mesh.Origin, mesh.Mesh.Rotation,
-                    mesh.Mesh.ScaledLocalVertices, corners,
-                    cone.Center, cone.Rotation, cone.Height, cone.ScaledRadius,
-                    out contact, witnessBounds);
-                // The admitted triangle is a subset of this exact filled
-                // convex patch, so the complete polygon cannot be separated.
-                System.Diagnostics.Debug.Assert(found);
-                contacts.Add(patch, contact);
+                var key = new ContactGroupKey(0, 0, surface, 0, region);
+                Vector3d normal = faces.GetNormal(region);
+                int count = faces.GetSampleCount(region);
+                for (int sample = 0; sample < count; sample++)
+                {
+                    bool found = faces.TryGetSample(region, sample, out Vector3d p, out Vector3d q, out Fixed64 depth);
+                    System.Diagnostics.Debug.Assert(found);
+                    staged.AddContact(ContactAnchor.FromWorldPoint(p), ContactAnchor.FromWorldPoint(q),
+                        depth, normal, meshCollider.Material, cone.Material, group: key,
+                        contactIdentity: faces.GetSampleIdentity(region, sample));
+                }
             }
+            // Finite exposed-feature witnesses lie in the cone. Reuse the
+            // face owner's exact boundary admission rather than constructing
+            // support candidates for an entirely disjoint perimeter.
+            if (faces.HasBoundaryIntersection)
+                scratch.MeshConeBoundary.BuildSurfaceContacts(meshCollider, cone, triangleIndex, connectivity, faces, staged);
         }
+        // Geometry/range failures leave the pair unpublished. Reserve the
+        // actual grouped result before copying; both owners retain high water.
+        manifold.ReserveGroups(staged.GroupCount);
+        for (int group = 0; group < staged.GroupCount; group++)
+        {
+            ref ContactGroup source = ref staged.GetGroup(group);
+            for (int sample = 0; sample < source.Count; sample++)
+                manifold.AddContact(source.Key, source[sample]);
+        }
+        return staged.HasContact;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

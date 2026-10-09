@@ -151,7 +151,7 @@ public sealed class MeshConeSurfaceConnectivityTests
     {
         // The radius-1/8 section is strictly inside overlapping triangles 2
         // and 4, away from their common vertex and every retained perimeter.
-        // Legacy seam cancellation is not a planar embedding certificate.
+        // Seam cancellation alone is not a planar embedding certificate.
         PhysicsMesh mesh = Create(new[]
         {
             new Vector3d(0,0,3), new Vector3d(-3,0,1), new Vector3d(-2,0,-3),
@@ -165,8 +165,10 @@ public sealed class MeshConeSurfaceConnectivityTests
         Assert.Equal(-1, connectivity.GetRegionOrdinal(4));
         Assert.True(mesh.GetCoplanarTriangleNeighbors(2).IsEmpty);
         Assert.NotEqual(mesh.GetCanonicalSurfaceOrdinal(2), mesh.GetCanonicalSurfaceOrdinal(4));
-        Assert.Equal(0, mesh.GetCoplanarPatchId(2));
-        Assert.Equal(10, mesh.GetCoplanarPatchBoundaryVertexPairs(2).Length);
+        Assert.Equal(2, mesh.GetManifoldSurfaceOwner(2));
+        Assert.Equal(4, mesh.GetManifoldSurfaceOwner(4));
+        Assert.True(mesh.GetManifoldSurfaceBoundaryVertexPairs(2).IsEmpty);
+        Assert.True(mesh.GetManifoldSurfaceBoundaryVertexPairs(4).IsEmpty);
     }
 
     [Theory]

@@ -38,7 +38,12 @@ Groups use full structural provenance: A/B compound namespaces, A/B surface
 ordinals and region identity. Groups and their point identities have canonical
 order; a group or triangle count is never a pressure weight. Primitive contacts
 use the default group, and compound part contacts retain independent namespaces.
-Mesh contact producers determine which regions they admit.
+Mesh contact producers determine which regions they admit. Mesh/cone face
+regions and real boundary features retain independent constraints. Their finite
+samples cover the admitted geometry; coincident anchors can still carry distinct
+normals at exact touch. Rotational CCD selects a closing impact row using the
+sampled bodies' contact-point velocities, rather than assuming the deepest row
+is the impact witness.
 
 `Count`, the indexer and enumeration expose flattened group/point order;
 `GroupCount`, `GetGroupStartIndex` and `GetGroupContactCount` support inspection.

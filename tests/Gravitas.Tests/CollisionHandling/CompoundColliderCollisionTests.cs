@@ -106,7 +106,10 @@ public sealed class CompoundColliderCollisionTests
             .Should()
             .Equal(firstContactIds);
         firstContactIds.Should().OnlyHaveUniqueItems();
-        pair.Manifold.Select(contact => contact.ContactId).Should().BeInAscendingOrder();
+        // Groups follow authored part provenance. Hashed contact IDs provide
+        // stable identity; their numeric values do not order distinct groups.
+        pair.Manifold.Select(contact => contact.FeatureNamespaceA).Should().Equal(1, 2);
+        pair.Manifold.Select(contact => contact.FeatureNamespaceB).Should().OnlyContain(value => value == 0);
     }
 
     [Fact]

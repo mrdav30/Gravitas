@@ -99,19 +99,27 @@ public class MeshConeContactBenchmarks
         bool hit = CollisionDetection.DoCollisionCheck(_pair);
         if (hit != (Geometry != "RimGap"))
             throw new InvalidOperationException("Cone contact classification failed the benchmark preflight.");
-        if (hit && Geometry != "UnrepresentableCenter")
+        if (hit)
         {
-            Fixed64 depth = Geometry switch
+            for (int group = 0; group < _pair.Manifold.GroupCount; group++)
+                if (_pair.Manifold.GetGroupContactCount(group) is < 1 or > ContactManifold.MaxContactsPerGroup)
+                    throw new InvalidOperationException("A surface constraint lost its finite sample bound.");
+            foreach (ManifoldContact contact in _pair.Manifold)
+                if (contact.Depth < Fixed64.Zero)
+                    throw new InvalidOperationException("A surface sample failed materialization.");
+            // These broad, axis-aligned faces retain an analytic regional depth.
+            // Curved boundary fixtures have independent constraints; the runtime
+            // no longer substitutes their old global minimum-translation witness.
+            if (Geometry is "BaseFace" or "ApexFace" or "SideFace")
             {
-                "RimTouch" => Fixed64.Zero,
-                "ObliqueRim" => Fixed64.FromFraction(5, 16),
-                "InteriorRim" => Fixed64.FromFraction(13, 256),
-                "ApexFace" => Fixed64.FromFraction(1, 8),
-                "SideIntrusion" => Fixed64.One - Fixed64.FromFraction(4, 5),
-                _ => Fixed64.FromFraction(1, 4)
-            };
-            if (_pair.Manifold.PrimaryContact.Depth != depth)
-                throw new InvalidOperationException("Cone contact depth failed the benchmark preflight.");
+                Fixed64 expected = Geometry == "ApexFace" ? Fixed64.FromFraction(1, 8) : Fixed64.Quarter;
+                if (_pair.Manifold.PrimaryContact.Depth != expected)
+                    throw new InvalidOperationException("Face regional depth failed the benchmark preflight.");
+            }
+            if (Geometry == "RimTouch")
+                foreach (ManifoldContact contact in _pair.Manifold)
+                    if (contact.Depth != Fixed64.Zero)
+                        throw new InvalidOperationException("A tangent surface acquired penetration.");
         }
     }
 

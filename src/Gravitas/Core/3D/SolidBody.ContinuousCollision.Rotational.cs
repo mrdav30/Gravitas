@@ -577,6 +577,7 @@ public partial class SolidBody
         int intervalCount = 1;
         int processedNodeCount = 0;
         bool hasKnownContact = false;
+        bool knownContactIsClosing = false;
         Fixed64 knownContactTime = Fixed64.One;
         ManifoldContact knownContact = default;
         intervals[0] = new ContinuousCollisionMath.RotationalInterval(
@@ -650,13 +651,16 @@ public partial class SolidBody
             }
             bool sampleHasContact = TrySampleRotationalContinuousCollision(
                 target,
-                out ManifoldContact sampleContact);
+                midpointFrameFraction,
+                out ManifoldContact sampleContact,
+                out bool sampleContactIsClosing);
             if (sampleHasContact
                 && (!hasKnownContact || midpoint < knownContactTime))
             {
                 hasKnownContact = true;
                 knownContactTime = midpoint;
                 knownContact = sampleContact;
+                knownContactIsClosing = sampleContactIsClosing;
             }
 
             if (!sampleHasContact
@@ -675,6 +679,10 @@ public partial class SolidBody
                     out contactTime,
                     out hasContact))
             {
+                // Geometric overlap remains the interval's certified upper
+                // bound. Only its closing witness can authorize a response;
+                // absence of one does not prove the intervening path separated.
+                hasContact &= knownContactIsClosing;
                 contact = knownContact;
                 return true;
             }
@@ -835,9 +843,12 @@ public partial class SolidBody
 
     private bool TrySampleRotationalContinuousCollision(
         LSCollider target,
-        out ManifoldContact contact)
+        Fixed64 frameFraction,
+        out ManifoldContact contact,
+        out bool contactIsClosing)
     {
         contact = default;
+        contactIsClosing = false;
         OrderRotationalContinuousCollisionPair(
             target,
             out LSCollider colliderA,
@@ -857,8 +868,57 @@ public partial class SolidBody
             return false;
         }
 
-        contact = _rotationalContinuousCollisionManifold.PrimaryContact;
+        contactIsClosing = TrySelectRotationalClosingContact(target,
+            _rotationalContinuousCollisionManifold, frameFraction, out contact);
         return true;
+    }
+
+    internal bool TrySelectRotationalClosingContact(LSCollider target,
+        ContactManifold manifold, Fixed64 frameFraction, out ManifoldContact contact)
+    {
+        contact = default;
+        OrderRotationalContinuousCollisionPair(target, out _, out _, out bool sourceIsA);
+        Vector3d sourceLinear = IsKinematic
+            ? SampleContinuousCollisionLinearVelocity(frameFraction) : _linearVelocity;
+        Vector3d sourceAngular = IsKinematic
+            ? SampleContinuousCollisionAngularVelocity(frameFraction) : _angularVelocity;
+        var sourceCenter = new ContactAnchor(Position3d, Rotation, _localCenterOfMassOffset);
+        SolidBody? targetBody = target.Body;
+        var targetCenter = targetBody == null
+            ? ContactAnchor.FromWorldPoint(Vector3d.Zero)
+            : new ContactAnchor(targetBody.Position3d, targetBody.Rotation,
+                targetBody._localCenterOfMassOffset);
+        Vector3d targetLinear = Vector3d.Zero;
+        Vector3d targetAngular = Vector3d.Zero;
+        if (targetBody != null && !targetBody.IsStatic)
+        {
+            targetLinear = targetBody.SampleContinuousCollisionLinearVelocity(frameFraction);
+            targetAngular = targetBody.SampleContinuousCollisionAngularVelocity(frameFraction);
+        }
+
+        foreach (ManifoldContact candidate in manifold)
+        {
+            ExactLever3D leverA = candidate.AnchorA.GetLeverFrom(
+                sourceIsA ? sourceCenter : targetCenter);
+            ExactLever3D leverB = candidate.AnchorB.GetLeverFrom(
+                sourceIsA ? targetCenter : sourceCenter);
+            ExactLever3D.GetRelativePointVelocityRatio(
+                sourceIsA ? sourceLinear : targetLinear,
+                sourceIsA ? sourceAngular : targetAngular, leverA,
+                sourceIsA ? targetLinear : sourceLinear,
+                sourceIsA ? targetAngular : sourceAngular, leverB, candidate.Normal,
+                out Signed832 numerator, out Signed832 denominator);
+            // Anchor lever denominators are positive. Exact sign preserves
+            // closing speeds outside Q32.32; representable speeds use the same
+            // deadband as the rotational handoff. Depth cannot rank an impact.
+            if (numerator.Sign >= 0
+                || (Fixed64.TryGetSignedRawRatio(numerator, denominator, 0,
+                    out Fixed64 speed) && speed >= -Fixed64.Epsilon))
+                continue;
+            contact = candidate;
+            return true;
+        }
+        return false;
     }
 
     private Vector3d ResolveSourceOutwardContactNormal(
