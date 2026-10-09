@@ -13,6 +13,7 @@ using static Gravitas.Colliders.MeshCheckedMath;
 
 namespace Gravitas.Colliders;
 
+/// <content>Prepares and atomically publishes scaled geometry and its derived topology.</content>
 public partial class PhysicsMesh
 {
     private Vector3d _position;
@@ -204,6 +205,7 @@ public partial class PhysicsMesh
                 (_preparedConvexCoplanarPatchCornerOffsets, _convexCoplanarPatchCornerOffsets);
             (_convexCoplanarPatchCornerVertexIndices, _preparedConvexCoplanarPatchCornerVertexIndices) =
                 (_preparedConvexCoplanarPatchCornerVertexIndices, _convexCoplanarPatchCornerVertexIndices);
+            PublishPreparedSurfaceTopology();
             if (_supportVertexIndices != null)
             {
                 (_supportTreeNodes, _preparedSupportTreeNodes) =

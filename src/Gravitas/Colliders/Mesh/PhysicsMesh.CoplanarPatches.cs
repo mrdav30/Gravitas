@@ -75,6 +75,9 @@ public partial class PhysicsMesh
         // Scaling can round distinct positions together or destroy coplanarity.
         // Weld and classify the candidate geometry, never the prior snapshot.
         int[] triangles = CreateTopologyTriangles(vertices, _triangles);
+        PrepareWeldedSurfaceIncidence(triangles);
+        _surfaceNeighborPairs.FastClear();
+        _surfaceNeighborPairs.EnsureCapacity(triangles.Length / 2);
         _patchEdgeUses.FastClear();
         _patchEdgeUses.EnsureCapacity(triangles.Length);
         EnsureTopologyBuffer(ref _patchParents, _triangleCount);
@@ -106,7 +109,10 @@ public partial class PhysicsMesh
                 EdgeUse first = edgeUses[start], second = edgeUses[start + 1];
                 int seam = ClassifyCoplanarSeam(vertices, triangles, first, second);
                 if (seam > 0)
+                {
                     Union(parents, first.TriangleIndex, second.TriangleIndex);
+                    _surfaceNeighborPairs.Add((first.TriangleIndex, second.TriangleIndex));
+                }
                 else if (seam < 0)
                     rejected[first.TriangleIndex] = rejected[second.TriangleIndex] = true;
             }
@@ -175,6 +181,7 @@ public partial class PhysicsMesh
             counts[edge.TriangleIndex] += 2;
         }
         PrepareConvexCoplanarPatchCorners(vertices, triangles, ids, offsets, boundaries);
+        PrepareSurfaceTopology(vertices, triangles, ids, offsets, boundaries);
     }
 
     private void PrepareConvexCoplanarPatchCorners(Vector3d[] vertices, int[] triangles,

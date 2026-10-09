@@ -2,6 +2,8 @@
 
 > **For agentic workers:** Use `superpowers:executing-plans` for implementation
 > in this checkout, with independent subagent reviews at the phase boundaries.
+> Include a dedicated ponytail reviewer of the complete unstaged change in each
+> handoff, covering new files and coordinated sibling changes.
 > Steps use checkboxes. Leave every change unstaged and uncommitted for owner
 > review; do not create another checkout or commit a phase automatically.
 
@@ -16,11 +18,222 @@ Gravitas owns prepared topology, contact-region grouping and physical policy.
 **Tech stack:** C# 11, `netstandard2.1`/`net8.0`, FixedMathSharp,
 SwiftCollections, GridForge, Chronicler.Hashing, xUnit v3, BenchmarkDotNet.
 
-**Spec:** [Approved surface-contact design](2026-10-08-surface-contact-manifold-design.md).
+**Design authority:** The contracts and rationale below are part of this plan;
+implementation decisions and validation stay in this single document.
 
 **Status:** Phase 1 is complete with full validation and independent review.
-Phases 2-4 remain planned. #095/#099 stay active; #097/#098 remain separate
+Phase 2 is in progress; phases 3-4 remain planned. #095/#099 stay active; #097/#098 remain separate
 follow-ups.
+
+## Design Contracts And Rationale
+
+### Evidence And Alternatives
+
+The square-plus-tab reproduction in #095 still selects a covered seam. Exact
+convex-subset certificates could resolve this particular fixture, but they are
+sufficient proofs, not complete nonconvex contact generation.
+
+A local-stack Release probe also places a unit-height, radius-1/2 cone at
+`(3/10, 0, 3/10)` against two finite orthogonal walls. With both walls in one
+concave mesh, detection retains one wall normal and full-loop response leaves
+the other incoming velocity component unchanged. Separate static wall colliders
+stop both components. Both windings are exercised. The probe uses explicit
+static bodies for response; bodyless colliders are not response participants.
+The ignored source and log are `artifacts/grv-issue-095/MeshConeSurfacePolicyAudit.cs`
+and `surface-policy-audit.log`; the temporary test is removed after execution.
+
+A complete global minimum exit would instead solve the boundary of a union of
+configuration obstacles. The closest exposed point can occur where component
+boundaries intersect, rather than at any independently minimized triangle or
+perimeter feature. A complete solution would need joint feature events, exposure
+tests, exact ranking and new width/root-degree proofs. That is a useful possible
+depenetration query, but it does not retain the independent locations and normals
+needed by rigid-body response. Do not build that arrangement solver merely to
+preserve the current cone reducer.
+
+Dropping final seam winners is also insufficient: the discarded triangle can
+still have a genuine face or perimeter intersection. Its replacement must be
+generated from admitted geometry, rather than fabricated by changing the normal.
+
+The distinction is consistent with primary references: PhysX separates minimum
+translation queries from contact generation, and Catto explains why adjacent
+feature context is needed to eliminate ghost contacts. Their algorithms are
+reference material, not implementations to copy. In particular, Box2D's
+one-sided ghost-vertex rules cannot establish our two-sided surface contract.
+
+- [PhysX geometry queries](https://nvidia-omniverse.github.io/PhysX/physx/5.4.0/docs/GeometryQueries.html)
+- [Box2D ghost collisions](https://box2d.org/posts/2020/06/ghost-collisions/)
+
+### Geometry Contract
+
+1. A committed coplanar patch represents its exact filled authored domain,
+   including exposed perimeter, holes and notches. Reuse `PhysicsMesh` welding,
+   seam classification and atomic scale preparation. Ambiguous topology does
+   not authorize deleting a feature.
+2. Contact admission operates on exact geometry. Rounded coordinates and
+   normals cannot be fed back into predicates to establish membership or reject
+   a candidate. Materialize anchors, normal and directional depth only after
+   selecting the admitted feature.
+3. A face witness must lie on the actual finite domain. Global cone support
+   projections are fast cases, not a complete face generator. A long tilted cone
+   can intersect wholly inside a patch while its projected apex and base extrema
+   are outside the patch and no perimeter edge intersects the cone.
+4. The proposed general face path clips the triangle union against the cone's plane
+   section and derives matched cone-boundary rays through admitted face points.
+   Reuse the exact finite-intersection predicates and relative-frame owners.
+   `WideTriangleConeIntersection`'s existing rounded axial minimum is a separate
+   query contract; it cannot establish a complete plane-ray maximum.
+   Face sampling must include the finite side, base and rim regions. Reduce
+   over the geometric contact region, not over authored triangle count. This
+   is an algorithm to establish, not an existing complete sampler: prove its
+   finite admission, sample coverage and complexity before calling it complete.
+5. Exposed edges require independent finite-feature admission: exact segment
+   parameters, true boundary ownership and matched cone support-region terms.
+   Existing generator slices and stationary rim charts provide arithmetic to
+   reuse. A support gap alone does not prove that its affine witness lies on
+   the finite edge.
+6. Corner ownership follows the actual local domain. Strict convex corner fans
+   are not valid at reflex vertices. Preserve the real incident edge/face
+   constraints of notches and holes without inventing a convex ear.
+7. Normals remain two-sided and geometrically selected, independent of motion
+   direction and authored winding. Each emitted contact retains its own paired
+   canonical anchors, normal, directional depth and clamp state.
+8. Contact geometry and minimum-exit geometry have distinct tests. A shorter
+   possible future escape through an edge is not, by itself, proof of a current
+   edge constraint. Existing minimum-exit regressions must stay meaningful in
+   the math owner; runtime behavior changes require explicit physical tests.
+
+Choose one side for a continuous coplanar face-contact region before reducing
+its samples. For each orientation of the canonical plane normal, compare the
+maximum cone-boundary ray distance over that exact admitted region; choose the
+orientation with the smaller maximum. Compare unrounded values, and resolve an
+exact tie with a documented canonical plane-normal convention. Do not choose
+the shorter ray independently at each point: that can produce opposing positive-
+depth corrections on the same crossing region. These are local directional
+depths, not a certificate of a global union exit. The implementation plan must
+prove the extrema construction and include a tilted crossing with varying chord
+midpoints. Exact symmetric ties follow the stated convention; do not promise
+equivariance under every rigid symmetry when geometry supplies no unique side.
+
+Exact clipping and finite witness admission belong in FixedMathSharp. Surface
+ownership, grouping, reduction and response policy belong in Gravitas. Preserve
+the existing one-way internal friendship boundary and coordinated release order;
+do not expose wide types publicly or add a downstream wide-arithmetic facade.
+
+### Contact Storage And Reduction
+
+Represent independent geometric surfaces/contact regions separately from the
+small point set that samples one surface. Reuse the existing four-point storage
+where it remains appropriate for an individual group. Four total points for an
+entire pair are not a sufficient contract for arbitrary simultaneously contacted
+mesh surfaces.
+
+- Retain independent normals and contact regions across the pair. Reduce
+  redundant samples within their owning group; do not allow four deep duplicate
+  samples to evict a shallower independent wall constraint.
+- Derive groups from actual admitted regions and surface/part provenance,
+  including material boundaries. Disconnected same-normal regions need their
+  own spatial coverage. Connectivity or a tiny connecting tab must not change
+  response weighting solely by changing the number of groups. Define grouping
+  and weighting together; neither triangle count nor group count is pressure.
+- Within a group, use deterministic geometric coverage to preserve spatial
+  extent and angular leverage. A bounded point set is an explicit solver
+  approximation; it does not claim exact preservation of a continuous pressure
+  distribution or every point of an arbitrary intersection curve.
+- Order groups and points by canonical geometric provenance and admitted local
+  features. Preserve deterministic ties. Authored triangle indices can identify
+  preparation work, but must not make equivalent triangulation produce different
+  physical constraints or weighting.
+- Keep pair-owned contacts and warm starts retained and pooled. Reserve scratch
+  and contact capacity from registered/prepared geometry; avoid a new collection
+  allocation per feature or frame. Measure registration cost and retained memory
+  as well as warmed bytes per operation.
+- Migrate `SolverContactBuffer`, warm-start storage and fixed-width response
+  failure masks together. Allowing a larger manifold while those owners still
+  overwrite the fourth slot or use a byte bitmask is not a valid intermediate
+  implementation.
+- Preserve group provenance, material overrides and reversed anchor/normal
+  ownership through compound scratch manifolds and contact transfer. Retire or
+  rebuild grouped caches on reconfiguration, scale preparation, mass mutation,
+  population, pair pooling and context reset. Enter/stay/exit notifications
+  remain once per collider pair.
+
+`ContactManifold.MaxContactCount` formerly described pair-wide capacity.
+Phase 1 replaces it with
+`MaxContactsPerGroup`; preserve explicit naming and the documented group/point
+inspection contract. Do not add
+a legacy mode that keeps known missing constraints merely for compatibility.
+
+### Response Contract
+
+Independent surfaces are independent constraints. Their impulses and correction
+must not shrink automatically because another surface was added to the pair.
+Equivalent triangulation and duplicate samples must not multiply response either.
+
+Keep solving order explicit. Evaluate each independent constraint against the
+current authoritative velocity, apply its admitted impulse, then continue in
+stable order; preserve accumulated nonnegative normal impulses and the existing
+Coulomb bound. Audit warm-start application and position correction separately.
+Blindly removing `contactShare` from the present batch calculation would permit
+duplicate samples to over-apply impulses, so geometry reduction and response
+scheduling must change together.
+
+Both one-pair shortcuts in `GravitasPhysicsService.Response` reuse the
+budget-aware public response wrapper established in phase 1. A pair
+with multiple independent surface groups must receive the intended solver
+iterations. A single contact row keeps the one-sweep fast path; even one
+geometric group can contain coupled angular constraints that need iteration. The probe demonstrates
+an omitted constraint, not a standalone defect in `contactShare`.
+
+Use one explained correction policy for equivalent same-normal surface samples,
+while preserving correction against independent normals. Keep contact slop,
+mobility constraints, mass/inertia ownership, representability preflights and
+failure handling explicit. Do not use a position tweak to hide omitted contacts.
+
+Grounding consumes actual upward support normals and admitted witnesses. CCD
+retains its closing-contact and earliest-impact contract; minimum depenetration
+and initial-contact classification must not be conflated with time of impact.
+Normal generation must remain geometry-based when velocities change sign.
+Audit singular consumers such as rotational CCD's `PrimaryContact` selection
+against their own impact/closing-contact purpose rather than passing an arbitrary
+deepest group witness into that calculation.
+
+Manifold and warm-start data participate in the mandatory authoritative replay
+hash, not only its optional cache mode. Version the affected hash sections and
+include group ownership, ordering and authoritative weighting state. Body saves
+continue excluding runtime contact caches; populate-existing tests must show
+stale impulses clear for every group without implying cache restoration.
+
+### Implementation Boundaries
+
+Implementation proceeds in this dependency order:
+
+1. Establish the contact-group/storage and response contract with the two-wall
+   regression and redundant-sample controls. Cover all fixed-capacity consumers
+   plus compound transfer, replay schemas, cache lifecycle and both solver
+   dispatch shortcuts; retain the isolated-pair dispatch shortcut while applying
+   the configured budget to every multi-point manifold.
+2. Add exact finite cone/patch witness generation, starting with the tab blocker,
+   holes and the long tilted interior. Keep face certificates as proven fast
+   paths; complete clipping supplies cases where they decline.
+3. Integrate cone mesh surface groups, update runtime contact semantics and
+   validate full-loop support, sliding and torque. Close #095 and #099 only after
+   their geometry and response boundaries pass.
+4. Reuse proven topology/admission principles for #097 sphere/capsule contacts
+   and #098 mixed curved slabs. Preserve explicit pure-2D and mixed response
+   constraints; do not turn either into accidental 3D projection.
+
+Pure 2D keeps its existing API unless shared scheduling changes require a
+deliberate migration; verify that boundary. Mixed currently stores one
+`MixedContact` and has separate response and replay owners. Its follow-up needs
+an explicit storage/response migration, not an implicit reuse of the 3D buffer.
+Preserve planar 2D impulses, 3D-only vertical response, zero planar coupling for
+vertical normals, slab thickness, part materials and pair-level events.
+
+The following are outside this design: a general exact nonconvex minimum-
+translation API, extreme-size support decisions in #096, a replacement broad
+phase, new engine adapters, and unrelated global solver/quality refactors.
+
 
 ## Global Constraints
 
@@ -268,19 +481,33 @@ by compact committed spans. Retain welded-vertex incidence for vertex-touch
 connectivity. Scratch owns admitted triangles, component parents and geometric
 region ordering, never public or body-serialized state.
 
-- [ ] Add red mesh/topology tests for alternate diagonals, winding, welded
+Manifold consumers use `GetManifoldSurfaceOwner` and
+`GetManifoldSurfaceBoundaryVertexPairs` together. A legacy patch can have a
+twice-wound or overlapping planar cover despite balanced seams. The new owner
+therefore requires an embedded triangle complex: distinct faces intersect only
+in their shared welded simplex. A certified single strict convex ring supplies
+the existing unit-winding proof; other patches retain directed boundary cycles,
+collapse monotone collinear subdivisions and require simple disjoint cycles
+with nested winding zero or one. This certifies the oriented triangle chain
+without comparing every pair of triangles. Declined owners retain individual
+triangle domains.
+Canonical provenance, trusted neighbors, exposed boundaries and query grouping
+consume this same certificate, published atomically with scaled geometry.
+This preserves the separate legacy minimum-exit patch contract.
+
+- [x] Add red mesh/topology tests for alternate diagonals, winding, welded
   duplicates, collinear subdivisions, rejected ambiguous topology and failed
   scale preparation. Compare canonical geometric surface provenance rather
   than authored triangle or welded-array indices.
-- [ ] Extend existing welded preparation to retain adjacency/incidence and
+- [x] Extend existing welded preparation to retain adjacency/incidence and
   canonical surface ordinals from actual local plane/domain geometry, ignoring
   removable collinear subdivisions. Preserve atomic candidate-scale publication
   and leave current geometry untouched on failure.
-- [ ] Derive query components only through exact admitted shared-edge or
+- [x] Derive query components only through exact admitted shared-edge or
   shared-vertex intersections supplied by task 4. Include zero-depth tangency
   explicitly. Each clipped triangle section is convex, but one patch can have
   multiple admitted components; do not equate patch IDs with region IDs.
-- [ ] Order components by exact geometric region extrema/features, independent
+- [x] Order components by exact geometric region extrema/features, independent
   of triangle discovery order. Test hole/notch intersections, point-touching
   sections and disconnected regions that share the same plane normal.
 
@@ -292,40 +519,61 @@ existing `TriangleConeWitnesses`, `TriangleConeGeneratorFeatures`,
 `TriangleConeRimContacts`, `ContactQuadratic` and `FiniteAxisValueRoot` owners.
 Add focused plane-ray selection/certificate files under that geometry area.
 
-**Interfaces:** Add internal `AccumulatePlaneSectionRayCandidates(
-FixedTriangle triangle, Vector3d origin, FixedQuaternion rotation,
-Vector3d coneCenter, FixedQuaternion coneRotation, Fixed64 height,
-Fixed64 radius, scoped ref ConePlaneRaySelection positive,
+**Interfaces:** Construct one internal `ConePlaneRayFrame` per geometric
+surface, using a canonical exact plane normal and the authoritative relative
+rigid frame. Use internal `ConePlaneRayEvents.Accumulate(
+FixedTriangle triangle, in ConePlaneRayFrame frame, scoped ref ConePlaneRaySelection positive,
 scoped ref ConePlaneRaySelection negative)` returning whether the finite
 section is nonempty. Selection borrows caller-owned resources and retains
 unrounded candidates/admission until component reduction. Exact shared-edge
 and vertex admission uses the same finite-cone polynomial predicates. Preserve
 `TryGetMinimumAxialPoint` and existing minimum-exit contracts separately.
 
-- [ ] Establish a candidate-coverage proof in this phase's notes and source
+For an apex-centered cone, write `F(p) = H²(px²+pz²)-R²py²`, with
+`0 <= py <= H`, and a plane `N·p=c`. A ray uses `q=p+tN`. On the upper
+rim, `q=(R cos(theta), H, R sin(theta))` and `t=(N·q-c)/(N·N)`.
+Factoring `F(q-tN)` using `F(q)=0` reduces lower-side admission to a linear
+circle predicate for nonzero `t`; zero depth is handled separately. Triangle
+walls perpendicular to `N` can test `q` directly because their projection is
+unchanged along the ray. On a lower-side generator `g`, `p=c*g/(N·g)`;
+the nonzero upper-side root is fractional-linear in the circle parameter.
+These charts keep regular face events quadratic. Candidate coverage must also
+include finite edge stationary points, cap switches, apex/base sections and
+degenerate intervals; the circle argument alone is not a completeness proof.
+
+The reviewed full-domain face ledger bounds compressed event coefficients below
+1,248 bits and discriminants below 2,498 bits; rational axis/generator point rays
+have coefficients below 1,302 bits and discriminants below 2,485 bits. Forty
+words retain the root, and 64-word fields retain evaluated point/depth values.
+Admission and paired-anchor products use bounded larger transient fields.
+Retained descriptors reconstruct only requested events; they preserve exact
+geometry even when final coordinate rounding reports overflow. The per-triangle
+descriptor bound is 60, within caller-owned capacity 64.
+
+- [x] Establish a candidate-coverage proof in this phase's notes and source
   invariants before choosing fixed-width carriers or claiming completeness.
   Cover admitted projected global support; stationary extrema on finite clipped
   edges; lateral section extrema; base-section intervals; side/base branch
   switches; rim/apex tangencies and degenerate generators. Axial endpoints
   alone cannot maximize the minimum of side and cap ray exits.
-- [ ] Derive root degrees, sign/rounding rules and intermediate width bounds;
+- [x] Derive root degrees, sign/rounding rules and intermediate width bounds;
   reuse existing exact comparisons and root resources where their proven
   contracts fit. If those contracts do not fit, establish focused neutral math
   changes upstream before integrating a caller; never substitute rounded tests.
-- [ ] Add red FMS tests in a focused `FixedTriangle.FiniteCone.PlaneSection.Tests.cs`
+- [x] Add red FMS tests in a focused `FixedTriangle.FiniteCone.PlaneSection.Tests.cs`
   beside the existing finite-cone tests. Include H=1000/R=1, rotation
   `(0,0,3/5,4/5)`, Y=0 quad `[-2,2]`: the section is interior while global
   projected apex/base support lies outside. Include side/base switch extrema,
   exact touch and one-raw-unit gaps, rigid frames and final nearest-even rounding.
-- [ ] Implement unrounded finite admission and maximum ray distance in each
+- [x] Implement unrounded finite admission and maximum ray distance in each
   canonical plane-normal orientation. Reduce across each actual component,
   choose the smaller maximum before point sampling, and resolve exact symmetric
   ties by canonical plane orientation. Test varying chord midpoints never emit
   opposite positive-depth face corrections within one continuous region.
-- [ ] Retain admitted candidate geometry for bounded spatial sampling and final
+- [x] Retain admitted candidate geometry for bounded spatial sampling and final
   paired anchors. Do not re-test membership using a rounded intermediate or
   reuse a complete minimum-exit gap proof after masking features.
-- [ ] Run FMS Release/Lean suites and exact reachable coverage, then local-stack
+- [x] Run FMS Release/Lean suites and exact reachable coverage, then local-stack
   Gravitas controls and allocation gates. Review arithmetic proofs independently.
 
 ### Task 5: Admit exposed edges/reflex vertices and reduce geometric samples
@@ -342,7 +590,7 @@ caller-owned exact resources; retain finite parameter/provenance and materialize
 `FixedContactAnchors` only after admission. Gravitas consumes true exposed
 boundary ownership; no physics policy or prepared-mesh IDs enter the math API.
 
-- [ ] Add red edge/generator/rim tests where a support gap's affine foot lies
+- [x] Add red edge/generator/rim tests where a support gap's affine foot lies
   outside the segment, plus genuine edge/vertex touches and reflex notch/hole
   corners. A convex ear with `requiredMask` must not authorize reflex contact.
 - [ ] Reuse existing generator slices and stationary rim arithmetic with
@@ -361,9 +609,87 @@ boundary ownership; no physics policy or prepared-mesh IDs enter the math API.
 - [ ] Run focused geometry/mesh tests, full owner suites, coverage and the nine
   original triangle-contact performance/allocation controls.
 
-**Phase 2 summary:** Append the proofs, measured resource bounds and actual
-validation here. The ray-candidate construction is proposed until these gates
-pass; do not describe the existing axial helper as a complete clipped sampler.
+**Phase 2 progress summary — 2026-10-08:** Canonical prepared surfaces,
+exact clipped connectivity, finite plane-ray geometry and per-component
+orientation are implemented. Face selection compares both unrounded maxima
+and uses canonical positive orientation only on exact equality. Isolated
+boundary certificates are admitted against every actual same-owner incident
+ray, including reflex/hole fans; internal seams produce no boundary contacts.
+The 26 mesh face/boundary regressions pass, including sub-raw depth differences,
+disconnected opposite directions, declined owners and warmed zero allocation.
+Continuous normal/point families retain implicit cone domains; their mesh-fan
+feasibility and final sampling are still unfinished.
+
+Focused simplification removes 145 net source lines and one forwarding file.
+Normal families now have one authored-wide normal contract; rotational radial
+parameters remain a distinct domain. Rim charts, magnitude sizing and side
+anchors reuse existing neutral helpers. Unused frame fields and the
+unattributed-event mode are removed. Context scratch construction is deferred
+until runtime integration, and Gravitas counts continuous families without
+retaining unused descriptors. Important geometry regressions remain; only the
+synthetic missing-provenance test was removed. Fresh independent ponytail
+review found no further material cuts that preserve the approved finite cases.
+The phase 3 checklist explicitly retires the old patch producer and its
+exclusive helpers with their replacement.
+
+Refined concave fan preparation takes 0.233 / 0.939 / 4.075 ms for 64 / 256 /
+1,024 faces, versus 0.557 / 6.448 / 83.713 ms for the initial triangle-pair
+certificate. Warmed connectivity takes 7.15 / 11.98 / 31.50 us, versus
+267.56 / 1,062 / 4,217 us, at 0 B/op. Reduced-boundary certification remains
+quadratic in surviving corners, while subdivision is linear. Each committed/
+prepared metadata bank uses `48*T + 8*V + 8` bytes before headers/capacity;
+exact region extrema use 809 bytes per observed multi-region high-water slot.
+Single connected regions skip extrema and stop after sufficient exact joins.
+
+The original nine minimum-exit controls remain at 0 B/op. After simplification,
+their short-run means vary -0.2% to +5.5% against the preceding capture.
+Complete plane-event/winner-anchor fixtures now measure 1.185 ms (interior),
+1.051 ms (side/base switch) and 2.563 ms (1,000:1 tilted interior over two
+triangles), versus 1.145 / 1.037 / 2.513 ms previously, each at 0 B/op.
+Both captures use one launch, three warmups and five measured iterations;
+the simplification makes no speedup claim. These are geometry costs; runtime
+integration and its fast-path/physical validation remain in phases 3/4.
+All full gates below use `UseLocalLsfStack=true` on this Windows
+x64 host; they do not substitute for cross-platform replay evidence.
+
+| Owner/configuration | Tests passed | Sequence points | Branches | Fully covered methods |
+| --- | ---: | ---: | ---: | ---: |
+| Gravitas Release | 4,988 | 45,664/45,664 | 14,030/14,030 | 4,718/4,718 |
+| Gravitas ReleaseLean | 4,923 | 45,662/45,662 | 14,030/14,030 | 4,717/4,717 |
+| FixedMathSharp core/helper Release | 4,739 | 55,703/55,703 | 13,782/13,782 | 4,178/4,178 |
+| FixedMathSharp core/helper ReleaseLean | 4,718 | 55,796/55,796 | 13,782/13,782 | 4,174/4,174 |
+| FixedMathSharp.Chronicler Release | 49 | 85/85 | 12/12 | 18/18 |
+| FixedMathSharp.Chronicler ReleaseLean | 49 | 85/85 | 12/12 | 18/18 |
+
+Both solutions build Release and ReleaseLean for `netstandard2.1`/`net8.0`
+with zero warnings/errors. The final Gravitas gates include the portable
+`IndexOf` span membership checks; generic span `Contains` was unavailable on
+`netstandard2.1` and was removed before completion. Both API sites pass DocFX
+warnings-as-errors; current local links, logos and repository actions resolve
+without dependencies on stale generated output. Independent source,
+mathematical and design-merge reviews found no blocking issue. Both indexes
+remain empty and `git diff --check` is clean; all changes are unstaged/uncommitted.
+Recommended commits: FixedMathSharp — `Add exact finite-cone surface geometry
+certificates`; Gravitas — `Prepare canonical mesh contact regions and face
+orientation`. The coordinated FixedMathSharp release/package-validation
+obligation remains before a Gravitas release.
+
+Independent review found that fully unrounded four-sample coverage can combine
+five quadratic fields, reaching degree 32. Depth events also do not supply all
+extrema of a later spatial metric over a continuous section. The recommended
+refinement keeps admission, connectivity, depth and provenance exact, then
+ranks a finite admitted sample pool using final Q32.32 anchors with geometric
+ties. For once-rounded representable coordinates, let `u = 2^-32` world units:
+each anchor has Euclidean error at most `sqrt(3)*u/2`, and a two-anchor span has
+error at most `e = sqrt(3)*u`; exact orthogonal plane projection cannot
+increase it. Let `d`, `a` and `b` be the exact pre-rounding projected edge
+vectors. Squared length differs by at most `2*|d|*e + e^2`; triangle area differs
+by at most `((|a|+|b|)*e + e^2)/2`. The metrics must be evaluated exactly on the
+rounded anchors: additional arithmetic rounding or overflow is outside these
+bounds. These bounds concern finite sample ranking, not complete coverage of
+a continuous section or contact admission. Owner review is pending; no sampling contract change or approximate
+admission has been implemented. Phase 2 remains
+in progress, and #095/#099 remain active.
 
 ## Phase 3 — Mesh/Cone Integration And Physical Regressions
 
@@ -392,6 +718,15 @@ retain separately justified closed-convex containment behavior.
   Use checked geometry budgets as safety bounds, not a reason to allocate a
   full mesh–mesh product per pair. Reserve context scratch from prepared geometry;
   retain pair capacity at its observed high-water mark and measure growth.
+- [ ] Retire the replaced runtime path in the same integration change:
+  `TryFindMeshConeTriangleContact`, `PrepareMeshConePatchContacts`, and
+  `CollisionSatScratch.MeshConePatchContacts`. After tracing all remaining
+  callers, remove FMS `TriangleConeContact.Patch.cs` and
+  `TriangleConeContact.ConvexPatch.cs`, their exclusive polygon helpers, and
+  unused legacy mesh patch IDs/corner banks. Keep the public triangle MTD and
+  sweep contracts, shared perimeter data and certificates still consumed by
+  surface trust. Add context-owned mesh/cone scratch only with its production
+  consumer; retain continuous-family descriptors only when admission uses them.
 - [ ] Update runtime tests/benchmark assertions that currently equate physical
   contact with global minimum exit; replace them with actual surface witness,
   sliding/support/torque assertions. Keep standalone math-MTD expectations.

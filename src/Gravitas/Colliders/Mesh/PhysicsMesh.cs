@@ -17,6 +17,7 @@ namespace Gravitas.Colliders
     /// <summary>
     /// Owns immutable authored triangle topology and committed deterministic runtime mesh geometry.
     /// </summary>
+    /// <content>Construction, geometry inspection, and shared state for mesh transformation, topology and queries.</content>
     public partial class PhysicsMesh
     {
         private const int SupportTreeVertexThreshold = 32;

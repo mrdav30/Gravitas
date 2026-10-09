@@ -107,7 +107,7 @@
   review favor topology-aware surface manifolds. One global minimum escape
   vector is a depenetration result and cannot preserve independent impulse and
   torque constraints. The confirmed #099 wall control demonstrates the runtime
-  consequence. The [surface-contact design](2026-10-08-surface-contact-manifold-design.md)
+  consequence. The [surface-contact plan](2026-10-08-surface-contact-manifold-plan.md#design-contracts-and-rationale)
   specifies exact finite-domain admission, grouped contact storage, response and
   compatibility boundaries. The existing convex minimum-exit helpers remain
   valid geometric owners; their global-minimum witness proofs cannot simply be
@@ -232,7 +232,7 @@
   contact-loss boundary is not caused by the new coplanar topology.
 - **Follow-up:** Preserve independent geometric surface constraints and stable
   finite witnesses. Address with the
-  [surface-contact design](2026-10-08-surface-contact-manifold-design.md),
+  [surface-contact plan](2026-10-08-surface-contact-manifold-plan.md#design-contracts-and-rationale),
   including contact capacity, warm starts and response weighting. Do not count
   arbitrary extra triangle samples as a solution.
 - **Evidence:** Ignored `artifacts/grv-issue-095/MeshConeSurfacePolicyAudit.cs`

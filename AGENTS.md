@@ -659,19 +659,19 @@ Important notes:
   and runs `Release`/`ReleaseLean` on native Windows/Linux x64/ARM64. It selects
   `UseLocalLsfStack=true` with immutable sibling source revisions on `develop`
   pushes and PRs targeting `develop`. Main and other branches use released
-  packages with `UseLocalLsfStack=false` and no sibling checkouts. PR mode follows
-  the target branch, so `develop` -> `main` validates packages. Update source
-  pins deliberately as compatibility changes and release upstream packages
-  before promoting to `main`; never fall back to source when package validation
-  fails. Source/package NuGet caches are separated.
+  packages with `UseLocalLsfStack=false` and no sibling checkouts. PR mode
+  follows the target branch, so `develop` -> `main` validates packages. Update
+  source pins deliberately as compatibility changes and release upstream
+  packages before promoting to `main`; never fall back to source when package
+  validation fails. Source/package NuGet caches are separated.
 - Every build lane retains the shared replay observations plus actual process,
   SDK/runtime, source, dependency and fixture provenance. The final comparison
   job requires all eight lanes, checks shared expectations and directly compares
   raw frames and ordered observations. Missing, emulated or mixed source/package
   lanes fail the gate. Source captures require sibling commit IDs; package
-  captures use an empty source map and compare loaded release identities.
-  An explicit local comparator submatrix reports omitted lanes; do not describe
-  it as completion of the full native matrix.
+  captures use an empty source map and compare loaded release identities. An
+  explicit local comparator submatrix reports omitted lanes; do not describe it
+  as completion of the full native matrix.
 - After a successful `main` push, the
   [coverage workflow](.github/workflows/coverage.yml) enforces 100% reachable
   line, branch, and method coverage, builds DocFX with warnings as errors,
@@ -684,17 +684,18 @@ Important notes:
 
 [`SharedReplayFixtureTests`](tests/Gravitas.Tests/Determinism/SharedReplayFixtureTests.cs)
 executes the full host loop against reviewed, versioned fixtures, asserting
-library physics, ordered observations and supported restore continuation.
-Set `GRAVITAS_REPLAY_CAPTURE_DIRECTORY` to retain each fixture's observed frames
-and a separate `provenance.json` with actual process, runtime, loaded assembly
-and fixture identities. Capture never rewrites shared expectations.
+library physics, ordered observations and supported restore continuation. Set
+`GRAVITAS_REPLAY_CAPTURE_DIRECTORY` to retain each fixture's observed frames and
+a separate `provenance.json` with actual process, runtime, loaded assembly and
+fixture identities. Capture never rewrites shared expectations.
 
 Supply `GRAVITAS_REPLAY_SOURCE_REVISION` and `GRAVITAS_REPLAY_SDK_VERSION` from
 the executing checkout and SDK. In source mode, set
-`GRAVITAS_REPLAY_DEPENDENCY_REVISIONS` to a JSON map of the full `FixedMathSharp`,
-`SwiftCollections`, `GridForge` and `Chronicler` commit IDs; package mode uses
-`{}`. Preserve uncommitted source snapshots separately from commit IDs.
-Place captures in lane directories such as `windows-x64-Release`, then run:
+`GRAVITAS_REPLAY_DEPENDENCY_REVISIONS` to a JSON map of the full
+`FixedMathSharp`, `SwiftCollections`, `GridForge` and `Chronicler` commit IDs;
+package mode uses `{}`. Preserve uncommitted source snapshots separately from
+commit IDs. Place captures in lane directories such as `windows-x64-Release`,
+then run:
 
 ```bash
 python .github/scripts/compare_replay_captures.py --captures captures --fixtures tests/Gravitas.Tests/Determinism/Fixtures
@@ -704,8 +705,8 @@ Default comparison requires all eight native lanes. An explicit `--lanes` list
 reports omitted lanes. Compare every frame against shared expectations and
 between lanes, retaining exact integers and ordered observations; JSON property
 order is irrelevant. Diagnose failures before changing reviewed expectations.
-When changing the comparator, validate actual captures and a copied capture
-with one altered frame that must return a nonzero exit code.
+When changing the comparator, validate actual captures and a copied capture with
+one altered frame that must return a nonzero exit code.
 
 ## Versioning And Release Workflow
 
@@ -833,6 +834,10 @@ If you are an automated coding agent working in this repository:
 - Do not blindly agree with a feature-work plan or prior note. If evidence,
   benchmarks, or API shape point to a better design, explain the tradeoff and
   adjust the plan with the user.
+- Use an independent subagent before every code-change handoff to the owner.
+  Review the complete unstaged change, including new files and coordinated
+  sibling changes, for duplication, speculative code and retirement
+  opportunities; verify findings against actual callers before simplifying.
 - Call out scope-adjacent issues, missing 2D/3D/mixed counterparts, and future
   hardening risks when you notice them. If they are not fixed immediately,
   capture them in the appropriate feature-work plan, benchmark backlog, or issue
