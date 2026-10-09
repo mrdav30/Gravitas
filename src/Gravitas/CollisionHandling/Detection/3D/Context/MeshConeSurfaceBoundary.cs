@@ -45,10 +45,7 @@ internal sealed class MeshConeSurfaceBoundary
         MeshConeSurfaceConnectivity connectivity, MeshConeFaceRegions faces, ContactManifold manifold)
     {
         PhysicsMesh mesh = meshCollider.Mesh;
-        mesh.GetLocalTriangleVertices(surfaceTriangle, out Vector3d a, out Vector3d b, out Vector3d c);
-        var triangle = new FixedTriangle(a, b, c);
-        var frame = new ConePlaneRayFrame(triangle, mesh.Origin, mesh.Rotation,
-            cone.Center, cone.Rotation, cone.Height, cone.ScaledRadius);
+        ref readonly ConePlaneRayFrame frame = ref faces.Frame;
         WideAxis3 normal = frame.AuthoredNormal;
         int owner = mesh.GetManifoldSurfaceOwner(surfaceTriangle), surface = mesh.GetCanonicalSurfaceOrdinal(surfaceTriangle);
         ReadOnlySpan<int> boundary = mesh.GetCanonicalSurfaceBoundaryVertexPairs(surfaceTriangle);
@@ -84,7 +81,7 @@ internal sealed class MeshConeSurfaceBoundary
             Span<SegmentConeSurfaceCandidate> featureStorage = stackalloc SegmentConeSurfaceCandidate[SegmentConeSurfaceCandidates.MaximumCandidates];
             Accumulate(mesh, owner, first, second, mesh.ScaledLocalVertices, cone.Center, cone.Rotation,
                 cone.Height, cone.ScaledRadius, featureStorage, interiorOnly: !pointOnly, pointOnly, selectedExit);
-            ReduceSurfaceFeature(meshCollider, cone, surface, feature, manifold);
+            ReduceSurfaceFeature(meshCollider, cone, surface, feature, faces.SamplingOrigin, manifold);
         }
     }
 
@@ -122,7 +119,8 @@ internal sealed class MeshConeSurfaceBoundary
         return -1;
     }
 
-    private void ReduceSurfaceFeature(LSMeshCollider mesh, LSConeCollider cone, int surface, int feature, ContactManifold manifold)
+    private void ReduceSurfaceFeature(LSMeshCollider mesh, LSConeCollider cone, int surface, int feature,
+        Vector3d samplingOrigin, ContactManifold manifold)
     {
         _surfacePool.FastClear();
         if (_isolated.Count == 0 && _families.Count == 0) return;
@@ -183,8 +181,9 @@ internal sealed class MeshConeSurfaceBoundary
 
         void Keep(FixedContactAnchors contact)
         {
-            if (!contact.FirstAnchor.TryGetPoint(out Vector3d p) || !contact.SecondAnchor.TryGetPoint(out Vector3d q))
-                throw new OverflowException("An admitted boundary sample is outside the Fixed64 world range.");
+            if (!contact.FirstAnchor.TryGetPointInFrame(samplingOrigin, out Vector3d p)
+                || !contact.SecondAnchor.TryGetPointInFrame(samplingOrigin, out Vector3d q))
+                throw new OverflowException("An admitted boundary sample is outside the Fixed64 sampling range.");
             // Distinct exact constructions can round to the same solver row.
             // Collapse that final redundancy after admission; different normals
             // at coincident touch anchors remain independent samples.

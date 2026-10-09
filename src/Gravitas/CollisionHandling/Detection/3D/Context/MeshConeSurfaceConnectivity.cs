@@ -31,13 +31,21 @@ internal sealed class MeshConeSurfaceConnectivity
 
     internal MeshConeSurfaceConnectivity() => _regionComparer = Comparer<int>.Create(CompareRegions);
 
+    internal void Build(PhysicsMesh mesh, int surfaceTriangle, Vector3d coneCenter,
+        FixedQuaternion coneRotation, Fixed64 height, Fixed64 radius, ReadOnlySpan<int> admittedTriangles)
+    {
+        mesh.GetLocalTriangleVertices(surfaceTriangle, out Vector3d a, out Vector3d b, out Vector3d c);
+        var frame = new ConePlaneRayFrame(new FixedTriangle(a, b, c), mesh.Origin, mesh.Rotation,
+            coneCenter, coneRotation, height, radius);
+        Build(mesh, surfaceTriangle, frame, admittedTriangles);
+    }
+
     /// <remarks>
     /// The input contains every exactly admitted triangle, without duplicates.
     /// Only the seed's prepared surface owner is consumed. Preparation alone
     /// never establishes connectivity: every join needs finite cone admission.
     /// </remarks>
-    internal void Build(PhysicsMesh mesh, int surfaceTriangle, Vector3d coneCenter,
-        FixedQuaternion coneRotation, Fixed64 height, Fixed64 radius, ReadOnlySpan<int> admittedTriangles)
+    internal void Build(PhysicsMesh mesh, int surfaceTriangle, in ConePlaneRayFrame frame, ReadOnlySpan<int> admittedTriangles)
     {
         _nodeByTriangle.Clear(); _triangles.FastClear(); _parents.FastClear();
         _regionByRoot.FastClear(); _roots.FastClear();
@@ -58,9 +66,6 @@ internal sealed class MeshConeSurfaceConnectivity
             _parents.Add(node); _regionByRoot.Add(-1);
         }
         if (_triangles.Count == 0) return;
-        mesh.GetLocalTriangleVertices(surfaceTriangle, out Vector3d a, out Vector3d b, out Vector3d c);
-        var frame = new ConePlaneRayFrame(new FixedTriangle(a, b, c), mesh.Origin, mesh.Rotation,
-            coneCenter, coneRotation, height, radius);
         JoinAdmittedFeatures(mesh, frame);
         for (int node = 0; node < _triangles.Count; node++)
         {

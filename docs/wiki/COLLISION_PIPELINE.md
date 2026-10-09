@@ -157,7 +157,11 @@ families are clipped exactly before finite sampling; final
 rounded anchor metrics rank the samples. Redundant final solver rows are merged,
 while distinct touch normals remain independent. Group provenance and local
 contact identities determine stable order, independent of triangle discovery.
-Final world anchors and depths are rounded only at materialization; exact
+Sampling rounds on the world lattice in one common translated frame, preserving
+nearest-even ties even when that frame's origin has odd raw coordinates. Coverage
+metrics use these offsets; published contact anchors retain their collider
+origins. A conceptual endpoint outside the absolute scalar range can therefore
+remain a valid relative contact. Depth is rounded only at materialization; exact
 admission distinguishes a positive gap from a zero-depth touch. Geometry or
 range failure leaves the pair's manifold unpublished. Closed convex meshes
 retain a separate solid-containment fallback when no surface triangle meets the

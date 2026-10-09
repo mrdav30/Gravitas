@@ -2,7 +2,7 @@
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-102`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-103`.
 - Assign an ID when an issue enters this tracker, keep it through resolution,
   and never reuse an ID even if an entry is later removed. Check this file's Git
   history before advancing or repairing the counter.
@@ -34,6 +34,25 @@
   verification records rather than this active section.
 
 ### Ordered Queue
+
+### GRV-Issue-102 - Collision position correction silently saturates at scalar coordinate limits
+
+- **Status:** Numeric-boundary policy and regression investigation required;
+  separate from mesh/cone translated sampling and host-defined world bounds.
+- **Observed:** 2026-10-09 source audit of committed 3D and 2D response owners.
+  `SolidBody.ApplyCollisionPositionCorrection` adds the projected correction to
+  `Position3d`; `SolidBody2D.ApplyCollisionPositionCorrection` does the same to
+  `_position`. `Fixed64` addition saturates on overflow, so neither path can
+  distinguish an exact boundary position from a truncated correction.
+- **Risk:** Near `MinValue`/`MaxValue`, contact response can publish less movement
+  than the solver requested without an explicit failure or boundary decision.
+  Saturation prevents numeric wrap but does not preserve physical correction or
+  enforce a host's playable-world limits. The source behavior predates the
+  surface-manifold integration; this audit is not an executed end-to-end repro.
+- **Follow-up:** Reproduce in pure 3D, pure 2D and mixed response, then define
+  an explicit policy for unrepresentable final body positions. Audit integration
+  and CCD position publication for the same invariant. Keep host/grid boundary
+  policy separate; do not introduce silent clamps or automatic world rebasing.
 
 ### GRV-Issue-096 - Extreme-scale capsule initial mesh sweep can miss a genuine overlap
 

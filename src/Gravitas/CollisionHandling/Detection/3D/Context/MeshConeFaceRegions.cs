@@ -21,6 +21,7 @@ internal sealed partial class MeshConeFaceRegions
     private Region[] _regions = Array.Empty<Region>();
     private ConePlaneRayFrame _frame;
     private Vector3d _worldNormal;
+    private Vector3d _samplingOrigin;
     private ulong[] _selectionValues = Array.Empty<ulong>();
     private int[] _selectionSigns = Array.Empty<int>();
     private Winner[] _winners = Array.Empty<Winner>();
@@ -30,12 +31,24 @@ internal sealed partial class MeshConeFaceRegions
     private int _gatherSurfaceTriangle;
     private bool _gatherUsesConvexFan;
     private bool _gatherContainsSection;
-    private bool _wholeConeWorldRangeRepresentable;
+    private bool _wholeConeSamplingRangeRepresentable;
 
     internal MeshConeFaceRegions() => _eventVisitor = AdmitEvaluatedPoint;
 
     internal int RegionCount { get; private set; }
     internal bool HasBoundaryIntersection { get; private set; }
+    internal ref readonly ConePlaneRayFrame Frame => ref _frame;
+    internal Vector3d SamplingOrigin => _samplingOrigin;
+
+    internal void Build(PhysicsMesh mesh, int surfaceTriangle, Vector3d coneCenter,
+        FixedQuaternion coneRotation, Fixed64 height, Fixed64 radius,
+        MeshConeSurfaceConnectivity connectivity, ReadOnlySpan<int> admittedTriangles, Vector3d samplingOrigin = default)
+    {
+        mesh.GetLocalTriangleVertices(surfaceTriangle, out Vector3d a, out Vector3d b, out Vector3d c);
+        var frame = new ConePlaneRayFrame(new FixedTriangle(a, b, c), mesh.Origin, mesh.Rotation,
+            coneCenter, coneRotation, height, radius);
+        Build(mesh, surfaceTriangle, frame, connectivity, admittedTriangles, samplingOrigin);
+    }
 
     /// <remarks>
     /// Connectivity must have been built from this same mesh, surface, cone
@@ -44,9 +57,8 @@ internal sealed partial class MeshConeFaceRegions
     /// This selects an orientation and its extremal ray, before sample coverage
     /// or rigid-body response policy is applied.
     /// </remarks>
-    internal void Build(PhysicsMesh mesh, int surfaceTriangle, Vector3d coneCenter,
-        FixedQuaternion coneRotation, Fixed64 height, Fixed64 radius,
-        MeshConeSurfaceConnectivity connectivity, ReadOnlySpan<int> admittedTriangles)
+    internal void Build(PhysicsMesh mesh, int surfaceTriangle, in ConePlaneRayFrame frame,
+        MeshConeSurfaceConnectivity connectivity, ReadOnlySpan<int> admittedTriangles, Vector3d samplingOrigin = default)
     {
         RegionCount = connectivity.RegionCount;
         HasBoundaryIntersection = false;
@@ -67,9 +79,9 @@ internal sealed partial class MeshConeFaceRegions
             Array.Resize(ref _triangles, Math.Max(admittedTriangles.Length, _triangles.Length * 2));
         GroupTriangles(connectivity, admittedTriangles);
         mesh.GetLocalTriangleVertices(surfaceTriangle, out Vector3d a, out Vector3d b, out Vector3d c);
-        _frame = new ConePlaneRayFrame(new FixedTriangle(a, b, c), mesh.Origin, mesh.Rotation,
-            coneCenter, coneRotation, height, radius);
-        _wholeConeWorldRangeRepresentable = ConePlaneRayPointMaterialization.IsWorldRangeRepresentable(_frame);
+        _frame = frame;
+        _samplingOrigin = samplingOrigin;
+        _wholeConeSamplingRangeRepresentable = ConePlaneRayPointMaterialization.IsRangeRepresentable(_frame, samplingOrigin);
         _worldNormal = _frame.GetWorldNormal(mesh.Rotation);
         var metrics = new WidePlaneMetrics(new FixedTriangle(a, b, c), mesh.Rotation);
         Array.Clear(_winners, 0, 2 * RegionCount);
@@ -170,7 +182,7 @@ internal sealed partial class MeshConeFaceRegions
         if (region < 0) return;
         KeepWinner(2 * region, positive);
         KeepWinner(2 * region + 1, negative);
-        bool pointRepresentable = ConePlaneRayPointMaterialization.TryGetWorldPoint(frame, point, root, out Vector3d meshPoint);
+        bool pointRepresentable = ConePlaneRayPointMaterialization.TryGetPointInFrame(frame, point, root, _samplingOrigin, out Vector3d meshPoint);
         // Distinct constructions can certify the same exact point. Merge
         // their available directions before duplicate range checks; each
         // direction retains its own certificate for final materialization.
@@ -291,7 +303,7 @@ internal sealed partial class MeshConeFaceRegions
         }
         int orientation = _regions[region].Orientation;
         var selected = BorrowWinner(2 * region + (orientation > 0 ? 0 : 1));
-        return selected.TryMaterialize(_frame, orientation, out meshPoint, out conePoint, out depth);
+        return selected.TryMaterialize(_frame, orientation, _samplingOrigin, out meshPoint, out conePoint, out depth);
     }
 
     private int ValidateRegion(int region)

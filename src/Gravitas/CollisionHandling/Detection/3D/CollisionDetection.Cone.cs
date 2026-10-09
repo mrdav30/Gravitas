@@ -160,11 +160,14 @@ public static partial class CollisionDetection
             }
             if (admitted.Count == 0) continue;
             var connectivity = scratch.MeshConeConnectivity;
-            connectivity.Build(mesh, triangleIndex, cone.Center, cone.Rotation,
-                cone.Height, cone.ScaledRadius, admitted.AsReadOnlySpan());
+            connectivity.Build(mesh, triangleIndex, frame, admitted.AsReadOnlySpan());
             var faces = scratch.MeshConeFaces;
-            faces.Build(mesh, triangleIndex, cone.Center, cone.Rotation,
-                cone.Height, cone.ScaledRadius, connectivity, admitted.AsReadOnlySpan());
+            // Ordinary cones fit around their center even at a scalar face.
+            // If that conservative size certificate is inconclusive, retain
+            // the world frame rather than narrow an existing finite sample.
+            Vector3d samplingOrigin = ConePlaneRayPointMaterialization.IsRangeRepresentable(frame, cone.Center)
+                ? cone.Center : Vector3d.Zero;
+            faces.Build(mesh, triangleIndex, frame, connectivity, admitted.AsReadOnlySpan(), samplingOrigin);
             int surface = mesh.GetCanonicalSurfaceOrdinal(triangleIndex);
             for (int region = 0; region < faces.RegionCount; region++)
             {
@@ -175,7 +178,12 @@ public static partial class CollisionDetection
                 {
                     bool found = faces.TryGetSample(region, sample, out Vector3d p, out Vector3d q, out Fixed64 depth);
                     System.Diagnostics.Debug.Assert(found);
-                    staged.AddContact(ContactAnchor.FromWorldPoint(p), ContactAnchor.FromWorldPoint(q),
+                    // Preserve the sampled world-lattice point without narrowing
+                    // its offset from a collider origin. Existing additive anchor
+                    // terms retain any large cancellation exactly.
+                    var meshAnchor = new ContactAnchor(FixedPointAnchor.FromTranslatedPoint(meshCollider.Center, samplingOrigin, p));
+                    var coneAnchor = new ContactAnchor(FixedPointAnchor.FromTranslatedPoint(cone.Center, samplingOrigin, q));
+                    staged.AddContact(meshAnchor, coneAnchor,
                         depth, normal, meshCollider.Material, cone.Material, group: key,
                         contactIdentity: faces.GetSampleIdentity(region, sample));
                 }

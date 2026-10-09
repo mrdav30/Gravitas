@@ -12,6 +12,51 @@ namespace Gravitas.Tests;
 public sealed class MeshConeSurfaceBoundaryTests
 {
     [Theory]
+    [InlineData(1)]
+    [InlineData(3)]
+    public void NearScalarFace_OddHalfHeightCapKeepsItsRelativeBoundaryContact(int heightRaws)
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        Vector3d corner = Vector3d.Down * Fixed64.Half;
+        var mesh = new LSMeshCollider(new[] { corner, corner + Vector3d.Forward * Fixed64.Quarter,
+            corner + Vector3d.Down * (Fixed64.One / 8) + Vector3d.Forward * Fixed64.Quarter },
+            new[] { 0, 1, 2 }, MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation);
+        Vector3d center = new(Fixed64.Zero,
+            Fixed64.MinValue + (Fixed64)3 / 4 + Fixed64.FromRaw(1), Fixed64.Zero);
+        scenario.InitializeStaticCollider(mesh, center);
+        var cone = new LSConeCollider
+        {
+            Radius = Fixed64.One,
+            Size = new(Fixed64.Two, Fixed64.Two + Fixed64.FromRaw(heightRaws), Fixed64.Two)
+        };
+        scenario.InitializeStaticCollider(cone, center);
+        CollisionPair pair = scenario.CreatePair(mesh, cone);
+
+        Assert.True(CollisionDetection.DoCollisionCheck(pair));
+        bool foundBoundary = false;
+        for (int group = 0; group < pair.Manifold.GroupCount; group++)
+        {
+            ref ContactGroup contacts = ref pair.Manifold.GetGroup(group);
+            if (contacts.Key.Region >= 0) continue;
+            for (int sample = 0; sample < contacts.Count; sample++)
+            {
+                ManifoldContact contact = contacts[sample];
+                if (contact.Normal != Vector3d.Up) continue;
+                foundBoundary = true;
+                Assert.Equal(mesh.Center, contact.AnchorA.Origin);
+                Assert.Equal(cone.Center, contact.AnchorB.Origin);
+                Assert.True(contact.TryGetPointA(out _));
+                // The chosen half-raw base endpoint crosses MinValue, but
+                // its exact anchor and the local boundary coverage remain valid.
+                Assert.False(contact.TryGetPointB(out _));
+                Assert.True(contact.AnchorB.TryGetOffsetFrom(center, out Vector3d exit));
+                Assert.Equal(-Fixed64.One.m_rawValue - (heightRaws == 1 ? 0 : 2), exit.Y.m_rawValue);
+            }
+        }
+        Assert.True(foundBoundary);
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public void NearBaseAxisCorner_ShouldChooseItsCapExitOverTheLongerSideCircle(bool reverse)

@@ -223,6 +223,70 @@ public sealed class MeshConeFaceRegionsTests
         Assert.Throws<OverflowException>(() => regions.GetSampleCount(0));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void TranslatedSamplingFrame_PreservesSamplesBeyondAbsoluteScalarFaces(bool positive)
+    {
+        var mesh = Quad(false, false);
+        var baseline = new MeshConeFaceRegions();
+        var translated = new MeshConeFaceRegions();
+        var connectivity = new MeshConeSurfaceConnectivity();
+        Vector3d planeOffset = positive ? Vector3d.Zero : Vector3d.Down * Fixed64.Half;
+        mesh.UpdatePosition(planeOffset, FixedQuaternion.Identity);
+        Build(baseline, connectivity, mesh, Vector3d.Zero, FixedQuaternion.Identity,
+            (Fixed64)4, Fixed64.Two, new[] { 0, 1 });
+
+        Vector3d center = new(Fixed64.Zero,
+            positive ? Fixed64.MaxValue : Fixed64.MinValue + Fixed64.Half, Fixed64.Zero);
+        mesh.UpdatePosition(center + planeOffset, FixedQuaternion.Identity);
+        Build(translated, connectivity, mesh, center, FixedQuaternion.Identity,
+            (Fixed64)4, Fixed64.Two, new[] { 0, 1 }, center);
+
+        Assert.Equal(4, translated.GetSampleCount(0));
+        Assert.Equal(baseline.GetOrientation(0), translated.GetOrientation(0));
+        for (int index = 0; index < baseline.GetSampleCount(0); index++)
+        {
+            Assert.True(baseline.TryGetSample(0, index, out Vector3d p, out Vector3d q, out Fixed64 depth));
+            Assert.True(translated.TryGetSample(0, index, out Vector3d tp, out Vector3d tq, out Fixed64 td));
+            Assert.Equal(p, tp); Assert.Equal(q, tq); Assert.Equal(depth, td);
+            Assert.Equal(baseline.GetSampleIdentity(0, index), translated.GetSampleIdentity(0, index));
+        }
+        Assert.True(translated.TryGetSample(0, 0, out _, out Vector3d exit, out _));
+        Assert.False(new ContactAnchor(center, exit).TryGetWorldPoint(out _));
+    }
+
+    [Theory]
+    [InlineData(1, 1)]
+    [InlineData(3, 1)]
+    public void OddRawSamplingOrigin_PreservesGlobalNearestEvenExitRounding(int heightRaws, int expectedExitRaws)
+    {
+        var mesh = Quad(false, false);
+        var world = new MeshConeFaceRegions();
+        var relative = new MeshConeFaceRegions();
+        var connectivity = new MeshConeSurfaceConnectivity();
+        Vector3d center = new(Fixed64.Zero, Fixed64.FromRaw(1), Fixed64.Zero);
+        mesh.UpdatePosition(center, FixedQuaternion.Identity);
+        Fixed64 height = (Fixed64)4 + Fixed64.FromRaw(heightRaws);
+        Build(world, connectivity, mesh, center, FixedQuaternion.Identity,
+            height, Fixed64.Two, new[] { 0, 1 });
+        Build(relative, connectivity, mesh, center, FixedQuaternion.Identity,
+            height, Fixed64.Two, new[] { 0, 1 }, center);
+
+        // The exact apex is center.Y + height/2. Rounding relative to an
+        // odd raw origin must retain the absolute world's even-half-tie rule.
+        Assert.True(relative.TryGetSample(0, 0, out _, out Vector3d exit, out _));
+        Assert.Equal(Fixed64.Two.m_rawValue + expectedExitRaws, exit.Y.m_rawValue);
+        Assert.Equal(world.GetSampleCount(0), relative.GetSampleCount(0));
+        for (int index = 0; index < world.GetSampleCount(0); index++)
+        {
+            Assert.True(world.TryGetSample(0, index, out Vector3d p, out Vector3d q, out Fixed64 depth));
+            Assert.True(relative.TryGetSample(0, index, out Vector3d rp, out Vector3d rq, out Fixed64 rd));
+            Assert.Equal(p - center, rp); Assert.Equal(q - center, rq); Assert.Equal(depth, rd);
+            Assert.Equal(world.GetSampleIdentity(0, index), relative.GetSampleIdentity(0, index));
+        }
+    }
+
     [Fact]
     public void UnrepresentableAdmittedMeshAnchor_FailsTheRegionExplicitly()
     {
@@ -587,10 +651,11 @@ public sealed class MeshConeFaceRegionsTests
     }
 
     private static void Build(MeshConeFaceRegions regions, MeshConeSurfaceConnectivity connectivity, PhysicsMesh mesh,
-        Vector3d center, FixedQuaternion rotation, Fixed64 height, Fixed64 radius, ReadOnlySpan<int> admitted)
+        Vector3d center, FixedQuaternion rotation, Fixed64 height, Fixed64 radius, ReadOnlySpan<int> admitted,
+        Vector3d samplingOrigin = default)
     {
         connectivity.Build(mesh, 0, center, rotation, height, radius, admitted);
-        regions.Build(mesh, 0, center, rotation, height, radius, connectivity, admitted);
+        regions.Build(mesh, 0, center, rotation, height, radius, connectivity, admitted, samplingOrigin);
     }
 
     private static FixedQuaternion Tilt() =>

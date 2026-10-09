@@ -11,7 +11,7 @@ using System;
 
 namespace Gravitas.CollisionHandling;
 
-/// <content>Finite admitted sampling and exact coverage metrics on final once-rounded world anchors.</content>
+/// <content>Finite admitted sampling and exact coverage metrics on once-rounded world anchors in one translated frame.</content>
 internal sealed partial class MeshConeFaceRegions
 {
     private readonly SwiftList<PoolEvent> _poolEvents = new();
@@ -23,7 +23,7 @@ internal sealed partial class MeshConeFaceRegions
     internal int GetSampleCount(int region)
     {
         int count = _sampleCounts[ValidateRegion(region)];
-        if (count < 0) throw new OverflowException("An admitted face sample is outside the Fixed64 world range.");
+        if (count < 0) throw new OverflowException("An admitted face sample is outside the Fixed64 sampling range.");
         return count;
     }
 
@@ -48,7 +48,7 @@ internal sealed partial class MeshConeFaceRegions
         _sampleCounts[region] = 0;
         int orientation = _regions[region].Orientation;
         var selected = BorrowWinner(2 * region + (orientation > 0 ? 0 : 1));
-        if (!selected.TryMaterialize(_frame, orientation, out Vector3d maximumPoint, out Vector3d maximumExit, out Fixed64 maximumDepth))
+        if (!selected.TryMaterialize(_frame, orientation, _samplingOrigin, out Vector3d maximumPoint, out Vector3d maximumExit, out Fixed64 maximumDepth))
         { _sampleCounts[region] = -1; return; }
         // Keep the exact regional maximum first. The rest of this finite pool
         // uses intrinsic and true-boundary constructions, independent of seams.
@@ -103,19 +103,30 @@ internal sealed partial class MeshConeFaceRegions
         return true;
     }
 
-    private int ComparePoints(Sample first, Sample second) => ConePlaneRayEvents.CompareEventAnchors(
-        first.Source, first.Event, second.Source, second.Event,
-        _frame, includeCoincidentProvenance: false);
+    private int ComparePoints(Sample first, Sample second)
+    {
+        // With identity cone rotation, world X is a positive affine image of
+        // exact cone-frame X. Distinct rounded X values therefore certify its
+        // order. Equal X or a rotated cone still needs exact reconstruction;
+        // rounded Y/Z cannot decide before a potentially distinct exact X.
+        if (_frame.ConeRotation == FixedQuaternion.Identity)
+        {
+            int order = first.MeshPoint.X.CompareTo(second.MeshPoint.X);
+            if (order != 0) return order;
+        }
+        return ConePlaneRayEvents.CompareEventAnchors(first.Source, first.Event, second.Source, second.Event,
+            _frame, includeCoincidentProvenance: false);
+    }
 
     private Ray CheckRay(scoped in ConePlaneRaySelection selection, int orientation, bool pointRepresentable)
     {
         if (!selection.HasValue) return default;
         // A positive whole-cone certificate covers every admitted finite exit.
         // An inconclusive bound retains the original exact per-ray range test.
-        bool representable = pointRepresentable && (_wholeConeWorldRangeRepresentable || ConePlaneRayPointMaterialization.IsExitWorldPointRepresentable(
+        bool representable = pointRepresentable && (_wholeConeSamplingRangeRepresentable || ConePlaneRayPointMaterialization.IsExitPointRepresentable(
             _frame, selection.Point, selection.Root,
             ContactQuadratic.At(selection.Values, selection.Signs, 0, ConePlaneRaySelection.FieldWords),
-            ContactQuadratic.At(selection.Values, selection.Signs, 1, ConePlaneRaySelection.FieldWords), orientation));
+            ContactQuadratic.At(selection.Values, selection.Signs, 1, ConePlaneRaySelection.FieldWords), orientation, _samplingOrigin));
         return new Ray(selection.MaximumSource, selection.MaximumEvent, representable);
     }
 
@@ -130,13 +141,14 @@ internal sealed partial class MeshConeFaceRegions
         Span<int> pointSigns = stackalloc int[ConePlaneRayPoint.SignCount];
         var point = new ConePlaneRayPoint(pointValues, pointSigns);
         Span<ulong> root = stackalloc ulong[ConePlaneRaySelection.RootWords];
-        bool exists = ConePlaneRayEvents.TryEvaluateEvent(sample.Source, _frame, sample.Event, point, root, ref positive, ref negative);
+        bool exists = ConePlaneRayEvents.TryEvaluateEvent(sample.Source, _frame, sample.Event, point, root,
+            ref positive, ref negative, requestedOrientation: orientation);
         ConePlaneRaySelection selected = orientation > 0 ? positive : negative;
         System.Diagnostics.Debug.Assert(exists && selected.HasValue);
         bool represented = selected.TryGetRoundedMaximumDepth(out Fixed64 depth);
-        bool anchored = ConePlaneRayPointMaterialization.TryGetExitWorldPoint(_frame, selected.Point, selected.Root,
+        bool anchored = ConePlaneRayPointMaterialization.TryGetExitPointInFrame(_frame, selected.Point, selected.Root,
             ContactQuadratic.At(selected.Values, selected.Signs, 0, ConePlaneRaySelection.FieldWords),
-            ContactQuadratic.At(selected.Values, selected.Signs, 1, ConePlaneRaySelection.FieldWords), orientation, out Vector3d exit);
+            ContactQuadratic.At(selected.Values, selected.Signs, 1, ConePlaneRaySelection.FieldWords), orientation, _samplingOrigin, out Vector3d exit);
         // The source/frame is unchanged, exit range was checked exactly, and
         // nearest-even rounding is monotone below the representable maximum.
         System.Diagnostics.Debug.Assert(represented && anchored);

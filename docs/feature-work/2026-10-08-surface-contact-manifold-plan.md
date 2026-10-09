@@ -834,9 +834,10 @@ retain separately justified closed-convex containment behavior.
 - [x] Audit rotational CCD `PrimaryContact` selection for the relevant closing
   impact witness. Test direction reversal and earliest impact; do not replace
   CCD with deepest-group depenetration. Verify grounding, sleep/wake and events.
-- [ ] Run integrated pure-3D, compound, full-loop replay, CCD, grounding and
+- [x] Run integrated pure-3D, compound, full-loop replay, CCD, grounding and
   lifecycle suites plus pure-2D/mixed parity controls. #097/#098 migrations stay
-  in their own tracker entries; #096 extreme-range work stays deferred.
+  in their own tracker entries. #096 practical geometry-size policy stays
+  separate; supported relative-anchor compatibility is repaired in this phase.
 
 **Phase 3 progress:** The maintained joined-wall regression reproduced four
 failures while both separate-wall controls passed. Integration now emits
@@ -853,69 +854,119 @@ unused mesh patch IDs are retired. This phase adds no production files. Refineme
 reuses primitive plane normals, bounded exact rounding, active-width complete
 products, scoped identity materialization, a synchronous ordered event cohort,
 closed-boundary admission reuse and conservative whole-cone range certificates.
+The same exact frame is reused across connectivity, faces and boundaries. A
+scoped trace certificate cancels the inverse identity basis, and collapsed apex
+sections reuse the axis event instead of duplicating cardinal events. Rational
+comparisons use two signed cross products; scaling skips mathematically zero
+coefficient banks. Selected-sample replay omits the unused opposite rational or
+side exit, while admission and streaming retain both directions.
 Fourteen upstream fixtures independently compare streamed descriptors, points,
 both directional certificates and final materialization with targeted reconstruction.
+For axial plane cardinals, the existing dispatcher proves a primitive normal
+of `(0, ±1, 0)`. The producer checks the closed cone-height interval before
+construction; its exact point then satisfies both the plane and cone side
+polynomial by construction. Reusing that certificate avoids redundant generic
+admission and exit work. Eight upstream cases cover both normal signs,
+out-of-height rejection, collapsed axis/radius events, requested-direction replay
+and odd-origin nearest-even endpoint rounding. Targeted replay still reconstructs
+collapsed descriptors omitted from the streaming inventory.
 Global identity-basis normalization was rejected after stalling an existing
 cylinder rounding test and was removed. Common whole-zero limb cancellation was
 narrowed to the immutable-span ratio entry after typed controls exposed shared
-core overhead; inputs remain unchanged and typed paths retain their original core.
-The final ordinary controls are 42.27/52.55/50.25/27.05/54.63 ns at 0 B/op;
-the two-word controls vary across captures, so these do not establish universal
-performance neutrality.
+core overhead; inputs remain unchanged and typed division mechanics remain
+shared. Global nearest-even parity is explicitly carried into translated
+rounding. A separate common whole-limb cancellation experiment in homogeneous
+points was also removed: its 20-fixture capture showed mostly marginal or mixed
+changes, insufficient to justify scanning and mutating every admitted point.
+Two further experiments were removed after complete captures: extending the
+rounded-coordinate ordering shortcut to vertical planes, and reducing the
+shared affine frame's denominator, basis and translation by their joint gcd.
+Both preserved exact geometry but showed no useful overall gain. The retained
+identity-cone X-order certificate skips reconstruction only when distinct rounded
+X values already prove the exact order; ties retain the original exact comparison.
+A direct fixed-width replacement for the quadratic normal products was also
+removed: small rim gains did not offset mixed small-contact and group regressions.
 
 The final Windows x64 capture covers 20 warmed runtime fixtures, all at 0 B/op:
 
 | Control | Committed single-contact baseline (µs) | First integration (µs) | Current (µs) |
 | --- | ---: | ---: | ---: |
-| Apex face | 22.86 | 851.95 | 181.87 |
-| Base face | 21.89 | 872.51 | 162.43 |
-| Side face | 27.85 | 1,969.38 | 726.38 |
-| Interior rim | 905.84 | 4,299.23 | 1,398.12 |
-| Oblique rim | 668.97 | 3,051.91 | 1,593.67 |
-| Subdivided tilted surface | 244.90 | 3,704 | 1,522.0 |
+| Apex face | 22.86 | 851.95 | 104.57 |
+| Base face | 21.89 | 872.51 | 111.21 |
+| Side face | 27.85 | 1,969.38 | 574.56 |
+| Interior rim | 905.84 | 4,299.23 | 1,308.13 |
+| Oblique rim | 668.97 | 3,051.91 | 1,493.91 |
+| Subdivided tilted surface | 244.90 | 3,704 | 1,282.56 |
 
 Joined walls, disconnected supports, ring and thin-tab controls take
-2.446/3.108/2.779/3.535 ms. The richer constraints change the work performed, but
-ordinary controls remain roughly 7–26 times their committed costs. **Performance
-acceptance remains open; introduced costs stay in phase 3.** Profile the remaining
-admission/materialization work and benchmark any scoped inverse-basis or collapsed
-axial-event simplification before accepting it.
+2.056/2.606/2.430/2.896 ms. Against the previous committed refinement,
+apex/base/side improve 43%/32%/21%, and the subdivided tilted control improves
+16%. The axial-cardinal certificate adds 10–12% improvement to the apex/base
+and three small axial controls against the preceding accepted refinement.
+Both final captures retain 0 B/op in all 20 fixtures. The richer constraints change the work
+performed, but ordinary controls remain roughly 5–21 times their original
+single-contact costs. **Performance acceptance remains open; introduced costs
+stay in phase 3.** Profile remaining admission/materialization work before
+choosing the next refinement. The thin-tab capture has greater variation; do not
+treat every small difference between short captures as an established gain.
+Fresh EventPipe profiles of apex, side and interior-rim controls identify the
+remaining general circle-parameter path at 46.7% and 42.3% inclusive managed CPU
+samples in the side and interior-rim fixtures; these overlapping call-tree
+percentages are not additive. Generic point admission accounts for 15.2% and
+10.3% respectively, including callers that already carry a side certificate;
+only part of that cost is potentially redundant. The next experiment should reuse exact construction
+certificates within those existing owners, measuring the complete controls
+before retaining a shortcut. Lower-circle and zero-orientation upper-rim events
+already skip cone-polynomial admission; only a proved projected upper-rim
+side-equality stratum could remove that check. Finite-segment and other projected
+rim strata retain general admission. No proposed certificate is implemented or
+claimed as a gain in this capture.
 
-With `UseLocalLsfStack=true`, final full FixedMathSharp suites pass 4,876 Release
-and 4,855 ReleaseLean cases. Gravitas passes 5,065 Release and 5,000 ReleaseLean
-cases **with the four-case scalar-anchor theory excluded**. All four raw reports
-show exact 100% sequence/line, branch and fully-covered-method totals. The
-serialization adapter passes 49 cases in each configuration at exact 100% raw
-coverage; both multi-target solution builds and DocFX sites have zero warnings or
-errors, and local links pass. Independent ponytail/math/physics source review
-found no additional blocker or actionable bloat cut. Evidence is retained under
-ignored `artifacts/grv-issue-095/phase3-span-final-*`; this host evidence does not
+With `UseLocalLsfStack=true`, full **unfiltered** FixedMathSharp suites pass
+4,909 Release and 4,888 ReleaseLean cases; Gravitas passes 5,077 Release and
+5,012 ReleaseLean cases. Raw sequence/line, branch and fully-covered-method
+totals are exact 100% in all four reports:
+
+| Repository / configuration | Lines | Branches | Fully covered methods |
+| --- | ---: | ---: | ---: |
+| FixedMathSharp Release | 56,010/56,010 | 14,218/14,218 | 4,209/4,209 |
+| FixedMathSharp ReleaseLean | 56,103/56,103 | 14,218/14,218 | 4,205/4,205 |
+| Gravitas Release | 46,043/46,043 | 14,348/14,348 | 4,759/4,759 |
+| Gravitas ReleaseLean | 46,041/46,041 | 14,348/14,348 | 4,758/4,758 |
+
+Both multi-target solution builds have zero warnings or errors. Independent
+ponytail/math/physics source review found no additional blocker or actionable
+bloat cut. The 49-case FixedMathSharp.Chronicler adapter suites also pass in
+both configurations with exact 85/85 lines, 12/12 branches and 18/18 fully
+covered methods. Both API sites pass DocFX warnings-as-errors and local-link
+validation. The five upstream typed ratio controls take
+40.89/50.66/45.73/27.81/52.69 ns; three plane-section controls take
+292.1/667.7/1,221.3 us, all at 0 B/op. Small differences in these short captures
+are not universal speedup or regression claims. Evidence is retained under ignored
+`artifacts/grv-issue-095/phase3-axial-final-*`; this host evidence does not
 replace native cross-platform replay gates.
 
-**Remaining compatibility regression:** The two failing cone cases use radius 1
-and height 4, positioned one unit inside `Fixed64.MinValue`/`MaxValue`. Their
-contact endpoints cross the absolute coordinate limit while their shape-relative
-anchors remain valid. These are arithmetic boundary regressions, not a request
-for billion-unit geometry or a realistic workload target. The two passing
-cylinder cases share the same theory and are included in the four-case exclusion.
+**Compatibility repair complete:** Radius-1, height-4 cones near both scalar
+limits now retain valid relative contacts even when conceptual endpoints cross
+the absolute coordinate limit. Sampling reuses existing anchor/materialization
+owners in one common translated frame, preserves global nearest-even parity and
+publishes the original collider origins without narrowing large cancelling
+offsets. Tests cover both limits, odd-origin half ties, exact additive anchor
+terms, contact identities and response parity; the original four-case
+cone/cylinder theory is restored to the unfiltered suites.
 
-The phase-2 absolute-world sampling restriction was an implementation assumption;
-it must not silently narrow the existing relative-anchor contract. Revise it by
-reusing existing anchor/materialization owners and ranking in a common translated
-frame with exact world-rounding parity. Keep this a focused compatibility repair,
-without a separate extreme-scale pipeline or expanded geometry-size promise.
-Practical supported radii/extents remain the separate #096 range-policy work.
-Plan approval does not freeze an assumption contradicted by integration evidence.
+The phase-2 absolute-world restriction was an implementation assumption. Its
+isolated sampler tests enforced that assumption while public-anchor regressions
+still exercised the legacy producer. Integration exposed the mismatch; the
+producer now preserves the existing relative-anchor contract. This does not
+expand supported geometry sizes or alter final body-position policy. Practical
+radii/extents remain #096; source-observed saturation in existing 3D/2D collision
+position correction is separately captured as #102.
 
-Phase 2 tested the new sampler independently while runtime contacts still used
-the legacy producer. Its new overflow tests enforced the restricted assumption;
-the existing public-anchor regressions exercised the legacy path and passed.
-Producer-level coverage should have carried those compatibility fixtures forward
-before closeout. Phase 3 must restore them and complete the full unfiltered suites.
 Performance acceptance remains open in this phase; additional constraints alone
 do not justify an unusable ordinary-contact cost. Phase 3 and #095/#099 remain
 open. The separately confirmed conservative rotational CCD frontier for concave
-aggregate bounds is captured as #101.
+aggregate bounds remains #101.
 
 ## Phase 4 — Coverage, Performance, Documentation And Closeout
 
