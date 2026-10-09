@@ -22,7 +22,7 @@ SwiftCollections, GridForge, Chronicler.Hashing, xUnit v3, BenchmarkDotNet.
 implementation decisions and validation stay in this single document.
 
 **Status:** Phase 1 is complete with full validation and independent review.
-Phase 2 is in progress; phases 3-4 remain planned. #095/#099 stay active; #097/#098 remain separate
+Phase 2 is complete with full validation and independent review; phases 3-4 remain planned. #095/#099 stay active; #097/#098 remain separate
 follow-ups.
 
 ## Design Contracts And Rationale
@@ -482,7 +482,8 @@ connectivity. Scratch owns admitted triangles, component parents and geometric
 region ordering, never public or body-serialized state.
 
 Manifold consumers use `GetManifoldSurfaceOwner` and
-`GetManifoldSurfaceBoundaryVertexPairs` together. A legacy patch can have a
+`GetCanonicalSurfaceBoundaryVertexPairs` together; canonical segments remove
+monotone collinear subdivisions. A legacy patch can have a
 twice-wound or overlapping planar cover despite balanced seams. The new owner
 therefore requires an embedded triangle complex: distinct faces intersect only
 in their shared welded simplex. A certified single strict convex ring supplies
@@ -513,20 +514,21 @@ This preserves the separate legacy minimum-exit patch contract.
 
 ### Task 4: Establish exact plane-section ray candidates in FixedMathSharp
 
-**Owners:** sibling
-`src/FixedMathSharp/Geometry/Wide/FiniteAxis/WideTriangleConeIntersection.cs`,
-existing `TriangleConeWitnesses`, `TriangleConeGeneratorFeatures`,
-`TriangleConeRimContacts`, `ContactQuadratic` and `FiniteAxisValueRoot` owners.
-Add focused plane-ray selection/certificate files under that geometry area.
+**Owners:** sibling `src/FixedMathSharp/Geometry/Wide/FiniteAxis/`
+`ConePlaneRayEvents`, `ConePlaneRayFrame`, `ConePlaneRaySelection`,
+`ConePlaneRayPoint`, `ConePlaneRayPointExits` and
+`ConePlaneRayPointMaterialization`, reusing `ContactQuadratic` and existing
+finite-cone arithmetic. Gravitas `MeshConeFaceRegions` owns component reduction.
 
 **Interfaces:** Construct one internal `ConePlaneRayFrame` per geometric
 surface, using a canonical exact plane normal and the authoritative relative
-rigid frame. Use internal `ConePlaneRayEvents.Accumulate(
-FixedTriangle triangle, in ConePlaneRayFrame frame, scoped ref ConePlaneRaySelection positive,
-scoped ref ConePlaneRaySelection negative)` returning whether the finite
-section is nonempty. Selection borrows caller-owned resources and retains
-unrounded candidates/admission until component reduction. Exact shared-edge
-and vertex admission uses the same finite-cone polynomial predicates. Preserve
+rigid frame. `ConePlaneRayEvents.GetIntrinsicEvents(frame, events)` supplies shared-plane
+descriptors; `GetBoundaryEvents` supplies finite-segment descriptors.
+`TryEvaluateEvent` consumes a `ConePlaneRayEventSource` (`Plane` or `Segment`)
+and caller-owned point, root and two directional selection resources. Gravitas
+tests each exact point against filled triangle walls before assigning its
+component, retaining two unrounded winning certificates per region. Exact
+shared-edge and vertex admission uses the same finite-cone predicates. Preserve
 `TryGetMinimumAxialPoint` and existing minimum-exit contracts separately.
 
 For an apex-centered cone, write `F(p) = H²(px²+pz²)-R²py²`, with
@@ -547,8 +549,17 @@ have coefficients below 1,302 bits and discriminants below 2,485 bits. Forty
 words retain the root, and 64-word fields retain evaluated point/depth values.
 Admission and paired-anchor products use bounded larger transient fields.
 Retained descriptors reconstruct only requested events; they preserve exact
-geometry even when final coordinate rounding reports overflow. The per-triangle
-descriptor bound is 60, within caller-owned capacity 64.
+geometry even when final coordinate rounding reports overflow. The shared-plane
+cohort has at most 102 possible constructions and each finite boundary segment
+has 14; these bounds count descriptors before admission, not admitted points.
+For an exact nonzero axial plane normal, the intrinsic cohort retains just 12
+descriptors in the original order: eight seams, three axis events and the apex.
+The other 90 constructions cannot be admitted: non-seam circle restrictions
+reduce to `C*(1+u*u)` (no real root, or an already-rejected zero polynomial),
+`Ny*FullHeight*(d*d+n*n)` cannot vanish for a generator, and zero radial normal
+rejects base stationarity. This holds for either axial direction and zero radius;
+degenerate zero-normal planes retain the general cohort. Explicit descriptor
+replay and all finite-boundary constructions remain available.
 
 - [x] Establish a candidate-coverage proof in this phase's notes and source
   invariants before choosing fixed-width carriers or claiming completeness.
@@ -589,94 +600,63 @@ Fixed64 radius, scoped ref ConeSurfaceSelection selection)`. Selection borrows
 caller-owned exact resources; retain finite parameter/provenance and materialize
 `FixedContactAnchors` only after admission. Gravitas consumes true exposed
 boundary ownership; no physics policy or prepared-mesh IDs enter the math API.
+For continuous families, `SegmentConeSurfaceCandidate.AccumulateFamilyEvents`
+accepts authored halfspaces, point location and a caller-owned
+`ConeSurfaceFamilySelection`. Gravitas derives the incident-fan constraints;
+FMS clips the exact family and retains event descriptors for admitted
+representatives before materialization.
 
 - [x] Add red edge/generator/rim tests where a support gap's affine foot lies
   outside the segment, plus genuine edge/vertex touches and reflex notch/hole
   corners. A convex ear with `requiredMask` must not authorize reflex contact.
-- [ ] Reuse existing generator slices and stationary rim arithmetic with
+- [x] Reuse existing generator slices and stationary rim arithmetic with
   independent exact finite-parameter admission. Preserve real incident face/
   boundary constraints and use internal seams solely for clipping/connectivity.
-- [ ] Select at most four samples per region by exact geometric coverage:
-  maximum directional depth, then widest tangential span, largest remaining
-  covered triangle area, then largest uncovered planar distance; resolve every
-  tie by canonical local feature order. Collapse coincident admitted samples.
-  Document angular reduction as approximation and test equivalent triangulation,
-  mirrored winding and connectivity changes rather than pressure exactness.
-- [ ] Verify valid certified fast paths against this surface contract. Reuse
-  them only when their witnesses/region coverage satisfy it; convexity alone
-  must not choose incompatible runtime semantics. Retain old geometric
-  minimum-exit tests in FMS rather than deleting useful regression evidence.
-- [ ] Run focused geometry/mesh tests, full owner suites, coverage and the nine
+- [x] Select at most four samples per face region from its finite admitted
+  selected-orientation pool: exact maximum directional depth first, then widest
+  projected span, largest triangle area and largest distance from the filled
+  selected triangle. Evaluate these coverage metrics exactly on once-rounded
+  Q32.32 anchors; resolve ties by exact geometric point order and collapse
+  exact-coincident points. This does not establish continuous spatial extrema.
+  Test equivalent triangulation, mirrored winding and connectivity changes.
+- [x] Preserve standalone minimum-exit and certified-fast-path regressions in
+  FMS while verifying scoped surface constructors independently. Convexity
+  alone cannot authorize old MTD shortcut semantics in a surface sampler;
+  approve runtime reuse only with witness/region coverage during phase 3.
+- [x] Run focused geometry/mesh tests, full owner suites, coverage and the nine
   original triangle-contact performance/allocation controls.
 
-**Phase 2 progress summary — 2026-10-08:** Canonical prepared surfaces,
-exact clipped connectivity, finite plane-ray geometry and per-component
-orientation are implemented. Face selection compares both unrounded maxima
-and uses canonical positive orientation only on exact equality. Isolated
-boundary certificates are admitted against every actual same-owner incident
-ray, including reflex/hole fans; internal seams produce no boundary contacts.
-The 26 mesh face/boundary regressions pass, including sub-raw depth differences,
-disconnected opposite directions, declined owners and warmed zero allocation.
-Continuous normal/point families retain implicit cone domains; their mesh-fan
-feasibility and final sampling are still unfinished.
+**Phase 2 summary — 2026-10-09:** Canonical prepared surfaces,
+exact clipped connectivity and per-component face orientation are implemented.
+The face path evaluates shared-plane and canonical finite-boundary events,
+admits exact points through filled triangle walls, and compares both unrounded
+regional maxima, using canonical positive orientation on exact equality.
+Compact once-rounded mesh anchors support finite-pool reduction; exact winner
+storage and per-direction source descriptors retain depth and geometric ties.
+All eligible selected-direction exits receive an exact world-range preflight;
+only the chosen four outputs incur exit/depth rounding. Nearest-even rounding
+is monotone, so a representable exact regional maximum bounds every eligible
+pool depth. Isolated
+boundary certificates and continuous families obey the actual same-owner
+incident fan, including reflex/hole corners. Family halfspaces and admitted
+event descriptors support materializable representatives; internal seams
+produce no boundary contacts. All Task 5 geometry, sampling, performance and
+coverage gates pass. Runtime integration remains in phase 3.
 
-Focused simplification removes 145 net source lines and one forwarding file.
-Normal families now have one authored-wide normal contract; rotational radial
-parameters remain a distinct domain. Rim charts, magnitude sizing and side
-anchors reuse existing neutral helpers. Unused frame fields and the
-unattributed-event mode are removed. Context scratch construction is deferred
-until runtime integration, and Gravitas counts continuous families without
-retaining unused descriptors. Important geometry regressions remain; only the
-synthetic missing-provenance test was removed. Fresh independent ponytail
-review found no further material cuts that preserve the approved finite cases.
-The phase 3 checklist explicitly retires the old patch producer and its
-exclusive helpers with their replacement.
-
-Refined concave fan preparation takes 0.233 / 0.939 / 4.075 ms for 64 / 256 /
-1,024 faces, versus 0.557 / 6.448 / 83.713 ms for the initial triangle-pair
-certificate. Warmed connectivity takes 7.15 / 11.98 / 31.50 us, versus
-267.56 / 1,062 / 4,217 us, at 0 B/op. Reduced-boundary certification remains
-quadratic in surviving corners, while subdivision is linear. Each committed/
-prepared metadata bank uses `48*T + 8*V + 8` bytes before headers/capacity;
-exact region extrema use 809 bytes per observed multi-region high-water slot.
-Single connected regions skip extrema and stop after sufficient exact joins.
-
-The original nine minimum-exit controls remain at 0 B/op. After simplification,
-their short-run means vary -0.2% to +5.5% against the preceding capture.
-Complete plane-event/winner-anchor fixtures now measure 1.185 ms (interior),
-1.051 ms (side/base switch) and 2.563 ms (1,000:1 tilted interior over two
-triangles), versus 1.145 / 1.037 / 2.513 ms previously, each at 0 B/op.
-Both captures use one launch, three warmups and five measured iterations;
-the simplification makes no speedup claim. These are geometry costs; runtime
-integration and its fast-path/physical validation remain in phases 3/4.
-All full gates below use `UseLocalLsfStack=true` on this Windows
-x64 host; they do not substitute for cross-platform replay evidence.
-
-| Owner/configuration | Tests passed | Sequence points | Branches | Fully covered methods |
-| --- | ---: | ---: | ---: | ---: |
-| Gravitas Release | 4,988 | 45,664/45,664 | 14,030/14,030 | 4,718/4,718 |
-| Gravitas ReleaseLean | 4,923 | 45,662/45,662 | 14,030/14,030 | 4,717/4,717 |
-| FixedMathSharp core/helper Release | 4,739 | 55,703/55,703 | 13,782/13,782 | 4,178/4,178 |
-| FixedMathSharp core/helper ReleaseLean | 4,718 | 55,796/55,796 | 13,782/13,782 | 4,174/4,174 |
-| FixedMathSharp.Chronicler Release | 49 | 85/85 | 12/12 | 18/18 |
-| FixedMathSharp.Chronicler ReleaseLean | 49 | 85/85 | 12/12 | 18/18 |
-
-Both solutions build Release and ReleaseLean for `netstandard2.1`/`net8.0`
-with zero warnings/errors. The final Gravitas gates include the portable
-`IndexOf` span membership checks; generic span `Contains` was unavailable on
-`netstandard2.1` and was removed before completion. Both API sites pass DocFX
-warnings-as-errors; current local links, logos and repository actions resolve
-without dependencies on stale generated output. Independent source,
-mathematical and design-merge reviews found no blocking issue. Both indexes
-remain empty and `git diff --check` is clean; all changes are unstaged/uncommitted.
-Recommended commits: FixedMathSharp — `Add exact finite-cone surface geometry
-certificates`; Gravitas — `Prepare canonical mesh contact regions and face
-orientation`. The coordinated FixedMathSharp release/package-validation
-obligation remains before a Gravitas release.
+**Foundation measurements — 2026-10-08:** Canonical concave preparation
+measures 0.233 / 0.939 / 4.075 ms for 64 / 256 / 1,024 faces, versus
+0.557 / 6.448 / 83.713 ms for the original triangle-pair certificate. Warmed
+connectivity takes 7.15 / 11.98 / 31.50 us, versus 267.56 / 1,062 / 4,217 us,
+at 0 B/op. Surviving-corner certification remains quadratic; collinear
+subdivision is linear. Each prepared/committed metadata bank uses
+`52*T + 8*V + 8*B + 12` bytes before headers/capacity (`B` counts canonical
+boundary segments). Connectivity extrema add 809 bytes per observed
+multi-region high-water slot; single connected regions skip them. The current
+full validation below supersedes the earlier coverage snapshots.
 
 Independent review found that fully unrounded four-sample coverage can combine
 five quadratic fields, reaching degree 32. Depth events also do not supply all
-extrema of a later spatial metric over a continuous section. The recommended
+extrema of a later spatial metric over a continuous section. The accepted
 refinement keeps admission, connectivity, depth and provenance exact, then
 ranks a finite admitted sample pool using final Q32.32 anchors with geometric
 ties. For once-rounded representable coordinates, let `u = 2^-32` world units:
@@ -687,9 +667,115 @@ vectors. Squared length differs by at most `2*|d|*e + e^2`; triangle area differ
 by at most `((|a|+|b|)*e + e^2)/2`. The metrics must be evaluated exactly on the
 rounded anchors: additional arithmetic rounding or overflow is outside these
 bounds. These bounds concern finite sample ranking, not complete coverage of
-a continuous section or contact admission. Owner review is pending; no sampling contract change or approximate
-admission has been implemented. Phase 2 remains
-in progress, and #095/#099 remain active.
+a continuous section or contact admission. Owner review accepted this finite-pool contract. Admission, connectivity,
+depth and provenance remain exact; only coverage ranking uses the final
+once-rounded Q32.32 anchors, with exact projected metrics. The finite pool contains the exact regional maximum and available
+paired-ray certificates in its selected orientation, using intrinsic cone/plane
+features and canonical exposed boundary segments. It excludes internal
+triangulation sampling events; a source with only the opposite exit certificate
+is outside this selected-orientation pool. Exact-coincident points collapse;
+distinct exact points that round to the same coordinate retain geometric ties. This does not establish continuous spatial
+extrema. Phase 2 implementation and validation are complete; #095/#099 remain
+active until runtime integration and physical validation.
+
+
+Phase 2 closeout includes refinement of costs introduced by this phase.
+Profiling identified repeated intrinsic construction per triangle,
+full synthetic-triangle construction per exposed edge, and exit reconstruction
+for point membership/ties. The refined path evaluates one shared-plane cohort
+and true finite-segment cohorts, assigns exact points through filled triangle
+walls, and retains only two winning wide certificates per region. Compact
+once-rounded mesh anchors and per-direction source/range records avoid rounding
+the entire candidate pool. Exact exit preflight preserves whole-pool failures;
+only the selected outputs replay their certificate for final exit/depth rounding.
+Unavailable certificates and output-range failures remain distinct for each direction.
+The two exact winner banks retain 13,024 bytes of coefficients/signs per
+allocated region slot, plus descriptors and array overhead; candidate-pool
+entries retain compact mesh anchors and source/range records, not wide banks.
+Superseded internal triangle accumulation/emitter APIs are retired with their
+consumer. These introduced performance costs are optimized and validated here,
+rather than deferred to runtime integration. The comparable refined capture completed every fixture at 0 B/op:
+
+| Face sampling fixture | Initial Phase 2 | Refined Phase 2 | Reduction |
+| --- | ---: | ---: | ---: |
+| Interior | 4.020 ms | 0.721 ms | 82.1% |
+| Boundary | 16.951 ms | 2.644 ms | 84.4% |
+| Tilted interior | 3.244 ms | 1.020 ms | 68.6% |
+| Subdivided tilted | 44.813 ms | 1.029 ms | 97.7% |
+
+The added 32-triangle subdivided boundary fixture takes 2.623 ms, versus
+2.644 ms for its two-triangle counterpart; canonical boundaries retain four
+segments in both. Exact membership can reuse a strict convex corner fan only
+for one region, when that fan is smaller and the grouped triangles are closed
+under every committed owner neighbor. Prepared patch unions record those same
+neighbors, so this nonempty closed subset is the whole connected owner. One
+`O(T)` check replaces repeated authored-triangle membership with `O(K*(B-2))`
+fan membership, using the existing exact closed-triangle predicate. No new
+math predicate, persistent metadata or cache is needed. Partial, nonconvex and
+multiple-region owners retain the original exact assignment. Full → subset →
+full regressions under both windings verify that the shortcut cannot widen
+admission or retain stale results. This last refinement cuts subdivided boundary
+from 3.865 to 2.623 ms (32.1%) and subdivided tilted from 1.384 to 1.029 ms
+(25.6%); two-triangle controls remain steady within their confidence intervals.
+Exposed-boundary admission takes 0.957 ms for the boundary
+fixture and 14.17–15.69 us for the interior fixtures, all at 0 B/op. These are
+prepared geometry operations, not complete gameplay frames. Face sampling
+includes connectivity, exact orientation and four materialized outputs;
+boundary sampling measures admitted descriptors. Both compared captures use
+one launch, three warmups and five measured iterations on this Windows x64
+host. An earlier boundary benchmark process exited with native code
+`0xC0000005` without an attributable managed frame. A fresh pre-refinement
+capture, the subsequent refined ten-fixture captures and the 256-iteration warmed
+allocation regression complete successfully; the failed capture remains under
+`artifacts/grv-issue-095/phase2-wrap-face-sampling-benchmarks`. This is unreproduced evidence,
+not an identified or claimed-fixed source defect. Final face-sampling evidence is under
+`artifacts/grv-issue-095/phase2-fan-face-benchmarks`; the comparable initial
+Phase 2 capture is `phase2-wrap-face-sampling-repeat`. These timings compare
+the new multi-sample geometry operation before and after refinement, not the
+existing single-contact runtime path.
+
+Final validation after the sampling refinements follows. All captures use
+`UseLocalLsfStack=true`:
+
+| Owner/configuration | Tests passed | Sequence points | Branches | Fully covered methods |
+| --- | ---: | ---: | ---: | ---: |
+| Gravitas Release | 5,018 | 45,915/45,915 | 14,180/14,180 | 4,747/4,747 |
+| Gravitas ReleaseLean | 4,953 | 45,913/45,913 | 14,180/14,180 | 4,746/4,746 |
+| FixedMathSharp core/helper Release | 4,821 | 55,855/55,855 | 13,942/13,942 | 4,198/4,198 |
+| FixedMathSharp core/helper ReleaseLean | 4,800 | 55,948/55,948 | 13,942/13,942 | 4,194/4,194 |
+| FixedMathSharp.Chronicler Release | 49 | 85/85 | 12/12 | 18/18 |
+| FixedMathSharp.Chronicler ReleaseLean | 49 | 85/85 | 12/12 | 18/18 |
+
+Both solutions build Release/ReleaseLean for `netstandard2.1`/`net8.0` with
+zero warnings/errors; both API sites pass DocFX warnings-as-errors. Independent
+mathematical and ponytail reviews found no remaining blocker. Exact overflow
+regressions include opposite-direction overflow, coincident complementary
+certificates, admitted mesh-anchor overflow, and an unchosen eligible boundary
+exit overflow that fails the entire selected-orientation pool. Warmed sampling
+remains allocation-free over 256 iterations. The nine original runtime contact controls remain at 0 B/op; short-run means
+vary -1.1% to +3.8%, with overlapping 99.9% confidence intervals in each fixture.
+Those unchanged minimum-exit consumers do not call the plane-ray exit
+materializer. Its exact-zero shortcut adds about 7–8% improvement to the three
+interior sampling fixtures after the main scoped-event refinement, with no
+material boundary regression in these short captures. The additional exact
+axial pruning reduces the interior fixture from 1.023 to 0.718 ms (29.8%) and
+the boundary fixture from 3.069 to 2.643 ms (13.9%); every omitted descriptor
+is checked against explicit full-inventory replay. Both point and exit
+range decisions still use the same parity-aware nearest-even thresholds;
+invalid denominators are rejected before the zero shortcut. The final upstream plane-section controls take 0.645 / 0.998 / 1.707 ms for
+interior / side-base switch / tilted 1000:1, versus the initial 1.185 / 1.051 /
+2.563 ms, all at 0 B/op. Full upstream Release/Lean coverage is complete;
+Gravitas whole-owner refinement validation is complete. Final coverage artifacts
+are `phase2-axial-final-FixedMathSharp-*` and `phase2-fan-final-Gravitas-*` under
+`artifacts/grv-issue-095`; upstream plane controls are
+`phase2-axial-final-plane-controls`. These Windows x64 gates do not replace cross-platform replay
+conformance or released-package validation after the coordinated FixedMathSharp
+release.
+
+**Recommended phase commits:** FixedMathSharp: `feat: add clipped cone families and scoped plane-ray geometry`;
+Gravitas: `feat: complete exact mesh-cone surface sampling`. All changes remain
+unstaged and uncommitted for owner review. No phase 3 runtime integration is
+included in this closeout.
 
 ## Phase 3 — Mesh/Cone Integration And Physical Regressions
 
@@ -718,6 +804,11 @@ retain separately justified closed-convex containment behavior.
   Use checked geometry budgets as safety bounds, not a reason to allocate a
   full mesh–mesh product per pair. Reserve context scratch from prepared geometry;
   retain pair capacity at its observed high-water mark and measure growth.
+- [ ] Admit existing certified fast paths only when their actual finite
+  witnesses and region coverage satisfy this surface contract. Preserve cheap
+  ordinary contacts where that proof holds; convexity alone does not establish
+  compatible surface semantics. Measure each accepted shortcut against the
+  complete sampler and the original runtime controls.
 - [ ] Retire the replaced runtime path in the same integration change:
   `TryFindMeshConeTriangleContact`, `PrepareMeshConePatchContacts`, and
   `CollisionSatScratch.MeshConePatchContacts`. After tracing all remaining

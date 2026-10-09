@@ -29,6 +29,10 @@ public partial class PhysicsMesh
     private int[] _preparedWeldedVertexTriangleOffsets = Array.Empty<int>();
     private int[] _weldedVertexTriangles = Array.Empty<int>();
     private int[] _preparedWeldedVertexTriangles = Array.Empty<int>();
+    private int[] _canonicalBoundaryOffsets = Array.Empty<int>();
+    private int[] _preparedCanonicalBoundaryOffsets = Array.Empty<int>();
+    private int[] _canonicalBoundaryVertices = Array.Empty<int>();
+    private int[] _preparedCanonicalBoundaryVertices = Array.Empty<int>();
 
     private readonly SwiftList<(int First, int Second)> _surfaceNeighborPairs = new();
     private readonly SwiftList<SurfaceBoundaryEdge> _surfaceBoundaryEdges = new();
@@ -51,6 +55,14 @@ public partial class PhysicsMesh
     {
         SwiftThrowHelper.ThrowIfArrayIndexInvalid(triangleIndex, _triangleCount, nameof(triangleIndex));
         return _canonicalSurfaceOrdinals[triangleIndex];
+    }
+
+    /// <summary>Gets sorted true boundary segments with monotone collinear subdivisions removed.</summary>
+    internal ReadOnlySpan<int> GetCanonicalSurfaceBoundaryVertexPairs(int triangleIndex)
+    {
+        int owner = GetManifoldSurfaceOwner(triangleIndex);
+        return _canonicalBoundaryVertices.AsSpan(_canonicalBoundaryOffsets[owner],
+            _canonicalBoundaryOffsets[owner + 1] - _canonicalBoundaryOffsets[owner]);
     }
 
     /// <summary>Gets trusted coplanar shared-edge neighbors in authored triangle order.</summary>
@@ -146,6 +158,18 @@ public partial class PhysicsMesh
             _surfaceKeyOffsets[edges[i].Surface + 1]++;
         for (int i = 1; i <= _triangleCount; i++)
             _surfaceKeyOffsets[i] += _surfaceKeyOffsets[i - 1];
+        // The ordering key already contains exactly the reduced exposed
+        // segments needed for sampling. Snapshot it in the existing atomic
+        // preparation/publication transaction; scratch is not committed data.
+        EnsureTopologyBuffer(ref _preparedCanonicalBoundaryOffsets, _triangleCount + 1);
+        EnsureTopologyBuffer(ref _preparedCanonicalBoundaryVertices, edges.Length * 2);
+        for (int i = 0; i <= _triangleCount; i++)
+            _preparedCanonicalBoundaryOffsets[i] = _surfaceKeyOffsets[i] * 2;
+        for (int i = 0; i < edges.Length; i++)
+        {
+            _preparedCanonicalBoundaryVertices[i * 2] = edges[i].Start;
+            _preparedCanonicalBoundaryVertices[i * 2 + 1] = edges[i].End;
+        }
         _surfaceOrder.SortInPlace(_surfaceOrderComparer);
         int ordinal = 0;
         for (int i = 0; i < _surfaceOrder.Count; i++)
@@ -297,6 +321,10 @@ public partial class PhysicsMesh
 
     private void PublishPreparedSurfaceTopology()
     {
+        (_canonicalBoundaryOffsets, _preparedCanonicalBoundaryOffsets) =
+            (_preparedCanonicalBoundaryOffsets, _canonicalBoundaryOffsets);
+        (_canonicalBoundaryVertices, _preparedCanonicalBoundaryVertices) =
+            (_preparedCanonicalBoundaryVertices, _canonicalBoundaryVertices);
         (_manifoldPatchIds, _preparedManifoldPatchIds) = (_preparedManifoldPatchIds, _manifoldPatchIds);
         (_canonicalSurfaceOrdinals, _preparedCanonicalSurfaceOrdinals) =
             (_preparedCanonicalSurfaceOrdinals, _canonicalSurfaceOrdinals);

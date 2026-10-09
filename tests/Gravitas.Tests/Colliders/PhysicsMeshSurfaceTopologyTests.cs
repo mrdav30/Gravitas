@@ -51,6 +51,14 @@ public sealed class PhysicsMeshSurfaceTopologyTests
             equivalent.GetCanonicalSurfaceOrdinal(i + equivalent.TriangleCount / 2).Should()
                 .Be(baseline.GetCanonicalSurfaceOrdinal(0));
         }
+        ReadOnlySpan<int> canonical = equivalent.GetCanonicalSurfaceBoundaryVertexPairs(0);
+        canonical.Length.Should().Be(8);
+        for (int edge = 0; edge < canonical.Length; edge += 2)
+        {
+            Vector3d a = equivalent.ScaledLocalVertices[canonical[edge]];
+            Vector3d b = equivalent.ScaledLocalVertices[canonical[edge + 1]];
+            (a - b).MagnitudeSquared.Should().Be((Fixed64)4);
+        }
     }
 
     [Fact]
@@ -113,6 +121,8 @@ public sealed class PhysicsMeshSurfaceTopologyTests
         int owner = mesh.GetManifoldSurfaceOwner(1);
         ReadOnlySpan<int> boundary = mesh.GetManifoldSurfaceBoundaryVertexPairs(1);
         int[] boundaryBefore = boundary.ToArray();
+        ReadOnlySpan<int> canonical = mesh.GetCanonicalSurfaceBoundaryVertexPairs(1);
+        int[] canonicalBefore = canonical.ToArray();
         Action prepare = () => mesh.PrepareTransformation(Vector3d.One, FixedQuaternion.Identity,
             new Vector3d(Fixed64.FromFraction(1, 3), Fixed64.One, (Fixed64)1000000),
             Vector3d.One, MeshInertiaPolicy.SurfaceApproximation);
@@ -125,6 +135,8 @@ public sealed class PhysicsMeshSurfaceTopologyTests
         mesh.GetManifoldSurfaceOwner(1).Should().Be(owner);
         boundary.ToArray().Should().Equal(boundaryBefore);
         mesh.GetManifoldSurfaceBoundaryVertexPairs(1).ToArray().Should().Equal(boundaryBefore);
+        canonical.ToArray().Should().Equal(canonicalBefore);
+        mesh.GetCanonicalSurfaceBoundaryVertexPairs(1).ToArray().Should().Equal(canonicalBefore);
         mesh.UpdatePosition(Vector3d.One, FixedQuaternion.Identity);
         mesh.GetWeldedVertexTriangleIndices(0).ToArray().Should().Equal(0, 1);
     }
