@@ -1,0 +1,592 @@
+{
+  "Version": 1,
+  "Name": "three-d-surface-contacts-v1",
+  "RuntimeMode": "ThreeD",
+  "FrameCount": 3,
+  "FrameRate": 8,
+  "SolverIterations": 6,
+  "MaxSpeedRaw": 274877906944,
+  "Actors": [
+    {
+      "Id": 80,
+      "Dimension": "3D",
+      "Shape": "Mesh",
+      "PositionRaw": [
+        0,
+        0,
+        0
+      ],
+      "SizeRaw": [],
+      "MassRaw": 4294967296,
+      "MotionType": "Static",
+      "Continuous": false,
+      "StartActive": true,
+      "Frictionless": true,
+      "PreventAngularForces": false,
+      "VerticesRaw": [
+        [
+          0,
+          -17179869184,
+          0
+        ],
+        [
+          0,
+          17179869184,
+          0
+        ],
+        [
+          0,
+          17179869184,
+          17179869184
+        ],
+        [
+          0,
+          -17179869184,
+          17179869184
+        ],
+        [
+          17179869184,
+          -17179869184,
+          0
+        ],
+        [
+          17179869184,
+          17179869184,
+          0
+        ]
+      ],
+      "Triangles": [
+        0,
+        1,
+        2,
+        0,
+        2,
+        3,
+        0,
+        4,
+        5,
+        0,
+        5,
+        1
+      ]
+    },
+    {
+      "Id": 81,
+      "Dimension": "3D",
+      "Shape": "Cone",
+      "PositionRaw": [
+        1288490189,
+        0,
+        1288490189
+      ],
+      "SizeRaw": [],
+      "MassRaw": 4294967296,
+      "MotionType": "Dynamic",
+      "Continuous": false,
+      "StartActive": true,
+      "Frictionless": true,
+      "PreventAngularForces": true
+    },
+    {
+      "Id": 90,
+      "Dimension": "3D",
+      "Shape": "Mesh",
+      "PositionRaw": [
+        34359738368,
+        0,
+        0
+      ],
+      "SizeRaw": [],
+      "MassRaw": 4294967296,
+      "MotionType": "Static",
+      "Continuous": false,
+      "StartActive": true,
+      "Frictionless": true,
+      "PreventAngularForces": false,
+      "VerticesRaw": [
+        [
+          -858993459,
+          0,
+          -858993459
+        ],
+        [
+          858993459,
+          0,
+          -858993459
+        ],
+        [
+          858993459,
+          0,
+          -214748365
+        ],
+        [
+          1073741824,
+          0,
+          -214748365
+        ],
+        [
+          1073741824,
+          0,
+          214748365
+        ],
+        [
+          858993459,
+          0,
+          214748365
+        ],
+        [
+          858993459,
+          0,
+          858993459
+        ],
+        [
+          -858993459,
+          0,
+          858993459
+        ]
+      ],
+      "Triangles": [
+        0,
+        1,
+        2,
+        0,
+        2,
+        5,
+        0,
+        5,
+        6,
+        0,
+        6,
+        7,
+        2,
+        3,
+        4,
+        2,
+        4,
+        5
+      ]
+    },
+    {
+      "Id": 91,
+      "Dimension": "3D",
+      "Shape": "Cone",
+      "PositionRaw": [
+        34359738368,
+        -1073741824,
+        0
+      ],
+      "SizeRaw": [],
+      "MassRaw": 4294967296,
+      "MotionType": "Dynamic",
+      "Continuous": false,
+      "StartActive": true,
+      "Frictionless": true,
+      "PreventAngularForces": true
+    }
+  ],
+  "Commands": [
+    {
+      "Frame": 0,
+      "Operation": "Impulse",
+      "Actor": 81,
+      "ValueRaw": [
+        -4294967296,
+        0,
+        -4294967296
+      ]
+    },
+    {
+      "Frame": 0,
+      "Operation": "Impulse",
+      "Actor": 91,
+      "ValueRaw": [
+        0,
+        4294967296,
+        0
+      ]
+    },
+    {
+      "Frame": 1,
+      "Operation": "Impulse",
+      "Actor": 81,
+      "ValueRaw": [
+        -4294967296,
+        0,
+        -4294967296
+      ]
+    },
+    {
+      "Frame": 1,
+      "Operation": "Impulse",
+      "Actor": 91,
+      "ValueRaw": [
+        0,
+        4294967296,
+        0
+      ]
+    }
+  ],
+  "Expected": [
+    {
+      "FrameCount": 1,
+      "LateToken": 1,
+      "Authoritative": "6fd337da9ddc551bef719993fde9831d",
+      "SolverCaches": "b77a491aea04605cd8cc89f551d08baf",
+      "Bodies": [
+        {
+          "Actor": 80,
+          "PositionRaw": [
+            0,
+            0,
+            0
+          ],
+          "RotationRaw": [
+            0,
+            0,
+            0,
+            4294967296
+          ],
+          "VelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 81,
+          "PositionRaw": [
+            1833951052,
+            0,
+            1833951052
+          ],
+          "RotationRaw": [
+            0,
+            0,
+            0,
+            4294967296
+          ],
+          "VelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 90,
+          "PositionRaw": [
+            34359738368,
+            0,
+            0
+          ],
+          "RotationRaw": [
+            0,
+            0,
+            0,
+            4294967296
+          ],
+          "VelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 91,
+          "PositionRaw": [
+            34359738368,
+            -1791001382,
+            0
+          ],
+          "RotationRaw": [
+            0,
+            0,
+            0,
+            4294967296
+          ],
+          "VelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        }
+      ],
+      "Events": [
+        "enter:80:81",
+        "contact:80:81",
+        "enter:81:80",
+        "contact:81:80",
+        "enter:90:91",
+        "contact:90:91",
+        "enter:91:90",
+        "contact:91:90"
+      ],
+      "Queries": []
+    },
+    {
+      "FrameCount": 2,
+      "LateToken": 2,
+      "Authoritative": "eac607905ff6bed59b90f9e3a8f54578",
+      "SolverCaches": "930bbf3cac0e1b74d032c465b06e4f98",
+      "Bodies": [
+        {
+          "Actor": 80,
+          "PositionRaw": [
+            0,
+            0,
+            0
+          ],
+          "RotationRaw": [
+            0,
+            0,
+            0,
+            4294967296
+          ],
+          "VelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 81,
+          "PositionRaw": [
+            1943043218,
+            0,
+            1943043218
+          ],
+          "RotationRaw": [
+            0,
+            0,
+            0,
+            4294967296
+          ],
+          "VelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 90,
+          "PositionRaw": [
+            34359738368,
+            0,
+            0
+          ],
+          "RotationRaw": [
+            0,
+            0,
+            0,
+            4294967296
+          ],
+          "VelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 91,
+          "PositionRaw": [
+            34359738368,
+            -1934453285,
+            0
+          ],
+          "RotationRaw": [
+            0,
+            0,
+            0,
+            4294967296
+          ],
+          "VelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        }
+      ],
+      "Events": [
+        "contact:80:81",
+        "contact:81:80",
+        "contact:90:91",
+        "contact:91:90"
+      ],
+      "Queries": []
+    },
+    {
+      "FrameCount": 3,
+      "LateToken": 3,
+      "Authoritative": "9e1674c05f7700fde13d4f698c12ce0c",
+      "SolverCaches": "4ae52d62a4a7054e65f8acc8afc92445",
+      "Bodies": [
+        {
+          "Actor": 80,
+          "PositionRaw": [
+            0,
+            0,
+            0
+          ],
+          "RotationRaw": [
+            0,
+            0,
+            0,
+            4294967296
+          ],
+          "VelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 81,
+          "PositionRaw": [
+            2072235826,
+            0,
+            2072235826
+          ],
+          "RotationRaw": [
+            0,
+            0,
+            0,
+            4294967296
+          ],
+          "VelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 90,
+          "PositionRaw": [
+            34359738368,
+            0,
+            0
+          ],
+          "RotationRaw": [
+            0,
+            0,
+            0,
+            4294967296
+          ],
+          "VelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 91,
+          "PositionRaw": [
+            34359738368,
+            -2070517840,
+            0
+          ],
+          "RotationRaw": [
+            0,
+            0,
+            0,
+            4294967296
+          ],
+          "VelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        }
+      ],
+      "Events": [
+        "contact:80:81",
+        "contact:81:80",
+        "contact:90:91",
+        "contact:91:90"
+      ],
+      "Queries": []
+    }
+  ]
+}

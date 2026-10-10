@@ -2,6 +2,8 @@ using Chronicler;
 using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.Constraints;
+using Gravitas.CollisionHandling;
+using Gravitas.Materials;
 using Gravitas.Support;
 using Gravitas.Tests.Serialization;
 using Gravitas.Tests.Support;
@@ -66,6 +68,8 @@ internal sealed class ReplayFixtureRunner : IDisposable
             Context.Simulate();
             Context.LateSimulate();
             frames[frame] = Snapshot();
+            if (frame == 0 && _fixture.Name == "three-d-surface-contacts-v1")
+                AssertSurfaceConstraints();
         }
         return frames;
     }
@@ -145,12 +149,19 @@ internal sealed class ReplayFixtureRunner : IDisposable
         Fixed64 mass = Fixed64.FromRaw(actor.MassRaw);
         if (actor.Dimension == "3D")
         {
-            LSCollider collider = actor.Shape == "Sphere"
-                ? new LSSphereCollider()
-                : new LSCuboidCollider { Size = Vector(actor.SizeRaw) };
+            LSCollider collider = actor.Shape switch
+            {
+                "Sphere" => new LSSphereCollider(),
+                "Cone" => new LSConeCollider(),
+                "Mesh" => new LSMeshCollider(Array.ConvertAll(actor.VerticesRaw, Vector), actor.Triangles,
+                    MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation),
+                _ => new LSCuboidCollider { Size = Vector(actor.SizeRaw) }
+            };
+            if (actor.Frictionless) collider.Material = PhysicsMaterial.Frictionless;
             SolidBody body = _scenario.CreateBody(collider, position, FixedQuaternion.Identity,
                 mass: mass, immovable: actor.MotionType == BodyMotionType.Static,
-                isKinematic: actor.MotionType == BodyMotionType.Kinematic).Body;
+                isKinematic: actor.MotionType == BodyMotionType.Kinematic,
+                preventAngularForces: actor.PreventAngularForces).Body;
             // These zero-gravity fixtures exercise rigid-body contacts and CCD;
             // host-owned grounding keeps automatic support snaps out of the trace.
             body.UseManualGrounding();
@@ -200,6 +211,37 @@ internal sealed class ReplayFixtureRunner : IDisposable
     {
         _hostIds.Add(body, id);
         _hostIds.Add(collider, id);
+    }
+
+    private void AssertSurfaceConstraints()
+    {
+        // Inspect the first generated manifold, before later separation can retire
+        // it. Hash equality alone must not bless the original missing-wall/seam bugs.
+        CollisionPair walls = Context.Physics.GetCollisionPair(_bodies3D[80].Collider.Id, _bodies3D[81].Collider.Id)!;
+        Assert.NotNull(walls);
+        Assert.Contains(walls.Manifold, contact => contact.Normal == Vector3d.Right);
+        Assert.Contains(walls.Manifold, contact => contact.Normal == Vector3d.Forward);
+        Assert.True(walls.Manifold.GroupCount >= 2);
+        CollisionPair tab = Context.Physics.GetCollisionPair(_bodies3D[90].Collider.Id, _bodies3D[91].Collider.Id)!;
+        Assert.NotNull(tab);
+        Assert.Contains(tab.Manifold, contact => contact.Normal == Vector3d.Down && contact.Depth > Fixed64.Zero);
+        // Match the original reported square-plus-tab domain exactly.
+        Fixed64 side = Fixed64.FromFraction(1, 5), halfTab = Fixed64.FromFraction(1, 20);
+        for (int index = 0; index < tab.Manifold.GroupCount; index++)
+        {
+            ContactGroup group = tab.Manifold.GetGroup(index);
+            for (int sample = 0; sample < group.Count; sample++)
+            {
+                if (group.Key.Region >= 0)
+                    Assert.Equal(Vector3d.Down, group[sample].Normal);
+                else
+                {
+                    Vector3d point = group[sample].PointA - Vector3d.Right * (Fixed64)8;
+                    Assert.False(point.X == side && FixedMath.Abs(point.Z) < halfTab,
+                        "The square/tab join is covered and cannot become an exposed boundary row.");
+                }
+            }
+        }
     }
 
     private void Contact(string kind, int actor, object other) =>

@@ -401,6 +401,28 @@ dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll coll
 
 ## CI Guidance
 
+Grouped 3D contacts have focused response and storage controls:
+
+```bash
+dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll --filter "*CollisionResponseBenchmarks*Group*" "*ContactGroupStorageBenchmarks*" --job short --warmupCount 3 --iterationCount 5
+```
+
+`GroupSingle`, `GroupRedundant` and `GroupIndependent` prepare one normal row,
+four same-normal samples, and two independent normal groups. Frozen rotation
+isolates linear constraints under the same material and solver settings. Each
+iteration starts with fresh motion and zero cached impulses; detection and setup
+are outside the response measurement. Results are batches of `PairCount` solves,
+not per-pair times. The single row uses one solver sweep; multipoint controls use
+the configured iteration budget.
+
+Storage controls cover one, nine and 64 groups of four samples. Cold pair
+allocation is measured separately from retained regeneration and alternating
+empty/small/full churn. Setup also reports the live managed-heap change after
+512 complete churn cycles following warmup and full collections. That whole-heap
+diagnostic is subject to runtime noise; `MemoryDiagnoser` measures warmed bytes
+per operation. These prepared inputs isolate grouped storage and response;
+mesh/cone detection remains in the surface-contact benchmarks.
+
 CI should at minimum compile the benchmark project in `Release`. The normal
 `Gravitas.slnx` build already includes `tests/Gravitas.Benchmarks`; use this
 direct command when isolating benchmark compilation locally:

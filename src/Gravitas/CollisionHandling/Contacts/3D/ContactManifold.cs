@@ -14,8 +14,15 @@ using System.Runtime.CompilerServices;
 namespace Gravitas.CollisionHandling;
 
 /// <summary>
-/// Grouped deterministic contact manifold owned by one collision pair.
+/// Pair-owned deterministic contact manifold with up to four samples per
+/// geometric surface group and no fixed pair-wide group or contact limit.
 /// </summary>
+/// <remarks>
+/// Inspection flattens canonical structural group order, then ascending contact
+/// identity within each group. Index zero is not necessarily the deepest contact;
+/// use <see cref="PrimaryContact"/> for that purpose. Overflow capacity is retained
+/// across updates and resets; reaching a new high-water mark can allocate.
+/// </remarks>
 public sealed class ContactManifold : IEnumerable<ManifoldContact>
 {
     /// <summary>Maximum number of point samples retained per geometric surface group.</summary>
@@ -26,10 +33,10 @@ public sealed class ContactManifold : IEnumerable<ManifoldContact>
     private int _count;
     private long _lastUpdatedFrame = -1;
 
-    /// <summary>Number of independent surface regions currently retained.</summary>
+    /// <summary>Number of independent surface regions currently retained; this has no fixed pair-wide cap.</summary>
     public int GroupCount { get; private set; }
 
-    /// <summary>Gets the first flattened point index of a surface group.</summary>
+    /// <summary>Gets the first flattened point index of a group in canonical structural order.</summary>
     public int GetGroupStartIndex(int groupIndex)
     {
         SwiftThrowHelper.ThrowIfListIndexInvalid(groupIndex, GroupCount);
@@ -39,7 +46,7 @@ public sealed class ContactManifold : IEnumerable<ManifoldContact>
         return start;
     }
 
-    /// <summary>Gets the number of point samples retained for a surface group.</summary>
+    /// <summary>Gets the number of retained samples in a group, from one through <see cref="MaxContactsPerGroup"/>.</summary>
     public int GetGroupContactCount(int groupIndex)
     {
         SwiftThrowHelper.ThrowIfListIndexInvalid(groupIndex, GroupCount);
@@ -75,7 +82,7 @@ public sealed class ContactManifold : IEnumerable<ManifoldContact>
     }
 
     /// <summary>
-    /// Number of active contacts in this manifold.
+    /// Total number of active samples across all groups, without a fixed pair-wide cap.
     /// </summary>
     public int Count
     {
@@ -124,7 +131,7 @@ public sealed class ContactManifold : IEnumerable<ManifoldContact>
         }
     }
 
-    /// <summary>Gets the contact at the specified deterministic order index.</summary>
+    /// <summary>Gets a contact in flattened structural-group/ascending-contact-identity order.</summary>
     public ManifoldContact this[int index]
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

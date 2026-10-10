@@ -85,10 +85,23 @@ internal sealed class ReplayFixture
             Require(actor.Dimension is "3D" or "2D", $"Actor {actor.Id} Dimension must be 3D or 2D.");
             Require(actor.Dimension == "3D" ? RuntimeMode != PhysicsRuntimeMode.TwoD : RuntimeMode != PhysicsRuntimeMode.ThreeD,
                 $"Actor {actor.Id} Dimension is unsupported by RuntimeMode.");
-            Require(actor.Shape is "Sphere" or "Box", $"Actor {actor.Id} Shape must be Sphere or Box.");
+            Require(actor.Shape is "Sphere" or "Box" or "Cone" or "Mesh", $"Actor {actor.Id} Shape is unsupported.");
+            Require(actor.Dimension == "3D" || actor.Shape is "Sphere" or "Box", $"Actor {actor.Id} Cone/Mesh requires 3D.");
             Require(actor.PositionRaw is { Length: 3 }, $"Actor {actor.Id} PositionRaw must contain X/Y/Z.");
             Require(actor.SizeRaw != null && actor.SizeRaw.Length == (actor.Shape == "Box" ? 3 : 0),
-                $"Actor {actor.Id} SizeRaw must have three entries for Box and none for Sphere.");
+                $"Actor {actor.Id} SizeRaw must have three entries for Box and none for other shapes.");
+            Require(actor.VerticesRaw != null && actor.Triangles != null, $"Actor {actor.Id} mesh arrays cannot be null.");
+            if (actor.Shape == "Mesh")
+            {
+                Require(actor.VerticesRaw.Length >= 3 && actor.Triangles.Length > 0 && actor.Triangles.Length % 3 == 0,
+                    $"Actor {actor.Id} Mesh requires vertices and complete triangles.");
+                foreach (long[] vertex in actor.VerticesRaw)
+                    Require(vertex is { Length: 3 }, $"Actor {actor.Id} mesh vertices must contain X/Y/Z.");
+                foreach (int vertex in actor.Triangles)
+                    Require(vertex >= 0 && vertex < actor.VerticesRaw.Length, $"Actor {actor.Id} triangle index is invalid.");
+            }
+            else
+                Require(actor.VerticesRaw.Length == 0 && actor.Triangles.Length == 0, $"Actor {actor.Id} mesh arrays require Mesh.");
             foreach (long size in actor.SizeRaw)
                 Require(size > 0, $"Actor {actor.Id} SizeRaw entries must be positive.");
             // Pure 2D boxes use X/Z size; Y is a canonical unused placeholder, not mixed thickness.
@@ -183,6 +196,10 @@ internal sealed class ReplayActor
     public BodyMotionType MotionType { get; set; }
     public bool Continuous { get; set; }
     public bool StartActive { get; set; } = true;
+    public bool Frictionless { get; set; }
+    public bool PreventAngularForces { get; set; }
+    public long[][] VerticesRaw { get; set; } = Array.Empty<long[]>();
+    public int[] Triangles { get; set; } = Array.Empty<int>();
 }
 
 internal sealed class ReplayCommand

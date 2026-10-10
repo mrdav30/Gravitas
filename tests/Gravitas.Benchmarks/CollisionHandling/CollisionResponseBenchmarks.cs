@@ -27,7 +27,10 @@ public class CollisionResponseBenchmarks
         ResponseContactShape.RestingFaceManifold,
         ResponseContactShape.CylinderContact,
         ResponseContactShape.MeshContact,
-        ResponseContactShape.CompoundPartContact)]
+        ResponseContactShape.CompoundPartContact,
+        ResponseContactShape.GroupSingle,
+        ResponseContactShape.GroupRedundant,
+        ResponseContactShape.GroupIndependent)]
     public ResponseContactShape ContactShape { get; set; }
 
     [Params(ResponseMaterialMode.Default, ResponseMaterialMode.Distinct)]
@@ -47,7 +50,9 @@ public class CollisionResponseBenchmarks
             Vector3d origin = PositionForPair(i);
             _pairs[i] = CreateResponsePair(origin);
             ApplyMaterialMode(_pairs[i]);
-            if (!CollisionDetection.DoCollisionCheck(_pairs[i]))
+            // Group controls author prepared solver rows directly, separating
+            // response cost from exact mesh/cone detection.
+            if (!_pairs[i].Manifold.HasContact && !CollisionDetection.DoCollisionCheck(_pairs[i]))
                 throw new InvalidOperationException("Unable to prepare a 3D response contact pair.");
         }
     }
@@ -78,8 +83,39 @@ public class CollisionResponseBenchmarks
             ResponseContactShape.RestingFaceManifold => CreateRestingCuboidStackPair(origin),
             ResponseContactShape.CylinderContact => CreateCylinderSpherePair(origin),
             ResponseContactShape.MeshContact => CreateMeshCuboidPair(origin),
+            ResponseContactShape.GroupSingle or ResponseContactShape.GroupRedundant or ResponseContactShape.GroupIndependent
+                => CreateGroupedPair(origin),
             _ => CreateCompoundPartSpherePair(origin),
         };
+    }
+
+    private CollisionPair CreateGroupedPair(Vector3d origin)
+    {
+        var wall = CreateBody(new LSCuboidCollider(), origin, immovable: true);
+        var actor = CreateBody(new LSCuboidCollider(), origin + Vector3d.Right,
+            preventAngularForces: true);
+        var pair = new CollisionPair(wall.Collider, actor.Collider);
+        int groups = ContactShape == ResponseContactShape.GroupIndependent ? 2 : 1;
+        int points = ContactShape == ResponseContactShape.GroupRedundant ? ContactManifold.MaxContactsPerGroup : 1;
+        for (int group = 0; group < groups; group++)
+        {
+            var key = new ContactGroupKey(0, 0, surfaceA: group);
+            Vector3d normal = group == 0 ? Vector3d.Right : Vector3d.Forward;
+            for (int point = 0; point < points; point++)
+            {
+                Vector3d anchor = origin + Vector3d.Right * Fixed64.Half
+                    + Vector3d.Up * Fixed64.FromFraction(point, 4);
+                ulong id = (ulong)(point + 1);
+                pair.Manifold.AddContact(key, new ManifoldContact(id, anchor, anchor, Fixed64.Zero, normal));
+                // Retain storage before measurement; every measured solve still
+                // starts with zero impulses and fresh incoming body motion.
+                pair.StoreWarmStartImpulse(key, id, normal, Fixed64.Zero, Fixed64.Zero, Fixed64.Zero);
+            }
+        }
+        actor.Body.AddLinearImpulse(-(Vector3d.Right + Vector3d.Forward) * StandardSpeed);
+        if (pair.Manifold.GroupCount != groups || pair.Manifold.Count != groups * points)
+            throw new InvalidOperationException("Prepared response lost a surface constraint.");
+        return pair;
     }
 
     private CollisionPair CreateMovingCuboidSpherePair(Vector3d origin)
@@ -247,7 +283,10 @@ public class CollisionResponseBenchmarks
         RestingFaceManifold,
         CylinderContact,
         MeshContact,
-        CompoundPartContact
+        CompoundPartContact,
+        GroupSingle,
+        GroupRedundant,
+        GroupIndependent
     }
 
     public enum ResponseMaterialMode

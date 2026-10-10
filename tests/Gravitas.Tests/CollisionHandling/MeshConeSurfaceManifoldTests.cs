@@ -308,17 +308,23 @@ public sealed class MeshConeSurfaceManifoldTests
         Assert.Equal(witnesses, pair.Manifold.Select(c => c.PointA));
     }
 
-    [Fact]
-    public void ThinTab_FullLoopShouldBlockTheFaceWithoutInventingACoveredSeamConstraint()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ThinTab_FullLoopShouldBlockTheFaceWithoutInventingACoveredSeamConstraint(bool originalReproduction)
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         scenario.Context.Environment.Gravity = Fixed64.Zero;
         scenario.Context.Environment.AirDensity = Fixed64.Zero;
         scenario.Context.Environment.MinSpeed = Fixed64.Zero;
-        Fixed64 side = Fixed64.FromFraction(1,10), tab = Fixed64.FromFraction(1,32);
+        // Keep the original issue's exact dimensions alongside the longer-tab
+        // control: both unions must suppress their covered square/tab seam.
+        Fixed64 side = Fixed64.FromFraction(1, originalReproduction ? 5 : 10);
+        Fixed64 tab = Fixed64.FromFraction(1, originalReproduction ? 20 : 32);
+        Fixed64 extensionEnd = originalReproduction ? Fixed64.Quarter : Fixed64.Half;
         Vector3d[] vertices = { new(-side,Fixed64.Zero,-side), new(side,Fixed64.Zero,-side),
-            new(side,Fixed64.Zero,-tab), new(Fixed64.Half,Fixed64.Zero,-tab),
-            new(Fixed64.Half,Fixed64.Zero,tab), new(side,Fixed64.Zero,tab),
+            new(side,Fixed64.Zero,-tab), new(extensionEnd,Fixed64.Zero,-tab),
+            new(extensionEnd,Fixed64.Zero,tab), new(side,Fixed64.Zero,tab),
             new(side,Fixed64.Zero,side), new(-side,Fixed64.Zero,side) };
         var mesh = new LSMeshCollider(vertices, new[] { 0,1,2, 0,2,5, 0,5,6, 0,6,7, 2,3,4, 2,4,5 },
             MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation) { Material = PhysicsMaterial.Frictionless };
@@ -344,13 +350,17 @@ public sealed class MeshConeSurfaceManifoldTests
                 bool square = (point.X == -side && FixedMath.Abs(point.Z) <= side)
                     || (FixedMath.Abs(point.Z) == side && FixedMath.Abs(point.X) <= side)
                     || (point.X == side && FixedMath.Abs(point.Z) >= tab && FixedMath.Abs(point.Z) <= side);
-                bool extension = (FixedMath.Abs(point.Z) == tab && point.X >= side && point.X <= Fixed64.Half)
-                    || (point.X == Fixed64.Half && FixedMath.Abs(point.Z) <= tab);
+                bool extension = (FixedMath.Abs(point.Z) == tab && point.X >= side && point.X <= extensionEnd)
+                    || (point.X == extensionEnd && FixedMath.Abs(point.Z) <= tab);
                 Assert.True(square || extension);
                 boundaryRows++;
             }
         }
-        Assert.True(boundaryRows > 0);
+        // The original square covers the entire cone section; its covered
+        // triangulation seam must yield only the face group. The longer-tab
+        // control intersects its actual perimeter and requires boundary rows.
+        if (originalReproduction) Assert.Equal(0, boundaryRows);
+        else Assert.True(boundaryRows > 0);
         body.AddLinearImpulse(Vector3d.Up * body.Mass);
         scenario.Context.Simulate();
         scenario.Context.LateSimulate();

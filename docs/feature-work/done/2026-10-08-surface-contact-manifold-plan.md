@@ -21,10 +21,11 @@ SwiftCollections, GridForge, Chronicler.Hashing, xUnit v3, BenchmarkDotNet.
 **Design authority:** The contracts and rationale below are part of this plan;
 implementation decisions and validation stay in this single document.
 
-**Status:** Phase 1 is complete with full validation and independent review.
-Phases 2 and 3 are complete with full validation and independent review. Phase 4
-remains planned. #095/#099 stay active until its closeout gates pass; #097/#098
-remain separate follow-ups.
+**Status:** Completed 2026-10-10. All four phases pass their local implementation,
+coverage, allocation, performance and independent-review gates; #095/#099 are
+resolved. The new shared replay fixture still requires the other six native CI
+lanes after owner push, and released-package validation remains a release gate.
+#097/#098 remain separate follow-ups.
 
 ## Design Contracts And Rationale
 
@@ -979,16 +980,16 @@ Phase 3 is complete; #095/#099 remain active for phase 4.
 
 - [x] Extend `MeshConeSurfaceContactBenchmarks` with tab/hole, connected walls
   and subdivision cases; detection controls are implemented and measured in phase 3.
-- [ ] Add direct grouped-response and cold/retained-memory measurements alongside
+- [x] Add direct grouped-response and cold/retained-memory measurements alongside
   existing response benchmarks; measure one-surface,
   redundant samples and multiple independent groups under the same settings.
-- [ ] Compare response, memory and any subsequent runtime changes before/after
+- [x] Compare response, memory and any subsequent runtime changes before/after
   on the same host, stack, build and fixture. Reuse phase 3's completed detection
   evidence unless changes invalidate it. Require warmed zero allocation and
   explain every material ordinary-contact regression;
   investigate regressions before accepting them as the cost of correctness.
   Do not silently loosen allocation/performance gates.
-- [ ] Run full Release and ReleaseLean coverage in changed repositories,
+- [x] Run full Release and ReleaseLean coverage in changed repositories,
   verifying raw OpenCover sequence/branch points and fully covered methods,
   rather than rounded percentage summaries. Re-run only when changes/failures
   justify it. Gravitas collection command for each configuration:
@@ -997,20 +998,91 @@ Phase 3 is complete; #095/#099 remain active for phase 4.
   dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj -c Release -p:UseLocalLsfStack=true -p:BuildInParallel=false -m:1 --collect:'XPlat Code Coverage' --settings tests/Gravitas.Tests/coverlet.runsettings --results-directory artifacts/surface-manifold/Release
   ```
 
-- [ ] Version authoritative replay expectations only for reviewed semantic/schema
+- [x] Version authoritative replay expectations only for reviewed semantic/schema
   changes. Run repeated full host traces and existing cross-platform conformance;
   distinguish local evidence from CI platforms not executed on this host.
-- [ ] Update evergreen `COLLISION_PIPELINE.md`, `COLLISION_RESPONSE.md` and API
+- [x] Update evergreen `COLLISION_PIPELINE.md`, `COLLISION_RESPONSE.md` and API
   XML docs with group limits, inspection order, local surface contacts, reduction
   approximation and response semantics. Document the intentional public constant/
   ordering compatibility change; do not add a legacy missing-constraint mode.
-- [ ] Build both API sites with DocFX warnings as errors when their owners
+- [x] Build both API sites with DocFX warnings as errors when their owners
   change, validate local links, and run `git diff --check`. Independent final
   review covers mathematical admission, solver behavior and unnecessary code.
-- [ ] Close #095 and #099 in `issue-tracker.md` with concise dated evidence after
+- [x] Close #095 and #099 in `issue-tracker.md` with concise dated evidence after
   all gates pass. Keep #097/#098 and confirmed unrelated findings separately
   tracked. Preserve coordinated upstream release/package-validation obligations.
 
-**Phase 4 summary:** Append final validation, measured costs/limitations and
-recommended commit messages here. Leave source, tests and docs unstaged and
-uncommitted for owner review.
+### Phase 4 Summary — 2026-10-10
+
+Both original defects are resolved. #095's exact small square-plus-tab fixture
+(`+/-1/5` square, `1/20` tab half-width, tab X `[1/5,1/4]`) now retains the genuine
+downward face constraint at depth `1/4`, excludes the covered join, and blocks
+upward approach in the complete host loop. Its cone section lies entirely inside
+the square, so no perimeter row is appropriate; the longer-tab control still
+requires real perimeter contacts. Existing winding, subdivision, seam sliding,
+pose, scale, torque, sleep/wake and CCD controls remain passing. #099 retains
+both independent wall normals and blocks both incoming components, with both
+windings and separate-wall controls.
+
+The shared `three-d-surface-contacts-v1` trace adds three full host frames with
+ordered approach impulses, geometric group assertions, collision events, and
+authoritative/solver-cache hashes. Expected results were installed after a
+deliberate failing capture and explicit physical review. The five existing
+fixtures and hash schema are unchanged. Native Windows x64 Release and Lean
+captures agree directly and with the reviewed expectations: six fixtures,
+39 frames. Windows ARM64 and Linux x64/ARM64 Release/Lean are configured in CI
+but were not executed on this host; their six lanes remain a merge/release
+validation obligation after owner push.
+
+Fresh unfiltered Gravitas suites pass with exact raw coverage:
+
+| Configuration | Tests | Lines | Branches | Fully covered methods |
+| --- | ---: | ---: | ---: | ---: |
+| Release | 5,079 | 46,047/46,047 | 14,352/14,352 | 4,759/4,759 |
+| ReleaseLean | 5,014 | 46,045/46,045 | 14,352/14,352 | 4,758/4,758 |
+
+Both multi-target builds have zero warnings/errors. FixedMathSharp is unchanged
+from phase 3's fully validated `76ecbb0`; its core/adapter coverage and API-site
+evidence above remain applicable. Gravitas DocFX passes warnings as errors;
+generated-site and edited Markdown local links pass. No executable production
+code or additional runtime owner is introduced in phase 4. Evergreen guides and
+manifold XML clarify four points per group, retained capacity, canonical flattened
+inspection order, `PrimaryContact`, and the finite-anchor reduction approximation.
+
+All 48 prepared response cases allocate **0 B/op**. With tiered compilation
+disabled, two launches, six warmups and ten measurements, the 64-pair default-
+material controls cost:
+
+| Prepared constraint layout | One sweep, batch µs | Six-sweep setting, batch µs | Six-sweep setting, µs/pair |
+| --- | ---: | ---: | ---: |
+| One group / one row | 214.10 | 217.28 | 3.395 |
+| One group / four redundant rows | 485.16 | 1,802.31 | 28.161 |
+| Two independent groups / one row each | 403.81 | 1,850.73 | 28.918 |
+
+The single-row path intentionally completes in one sweep. Existing single,
+moving-face and resting-face controls show no material regression against phase
+1's matched stable-JIT measurements. These are prepared response costs, excluding
+detection and setup; they do not establish a gameplay frame budget.
+
+Cold 1/9/64-group storage allocates 2,672/18,864/243,916 bytes; retained
+regeneration and verified empty/small/full churn allocate **0 B/op**. The
+whole-heap diagnostic reports zero growth after 512 complete churn cycles at
+each capacity; it is a plateau observation, not an exact per-pair live-memory
+measurement. The corrected churn benchmark verifies all three states before
+measurement. Phase 3's detection evidence remains applicable, including its
+roughly 2.4-2.7 ms ring/tab/disconnected fixtures; the owner accepted revisiting
+those costs with representative workload evidence rather than delaying closeout.
+
+Evidence is retained under ignored `artifacts/grv-issue-095/` in
+`phase4-response-stable`, `phase4-storage-final`, `phase4-final-*-coverage`,
+`phase4-final-replay` and `phase4-final-gates.log`. All builds and benchmark child
+builds use `UseLocalLsfStack=true`. Independent correctness and ponytail review
+find no remaining closeout defects or unnecessary runtime expansion.
+
+Develop CI pins the tested committed sibling revisions. FixedMathSharp
+`76ecbb0` must be pushed before Gravitas because it is not yet on the remote.
+Release FixedMathSharp first and validate Gravitas against released packages
+before release; main continues to use package dependencies. #095/#099 are moved
+to resolved entries, this plan is archived, and unrelated #096/#097/#098/#100/
+#101/#102 remain separately tracked. Changes are unstaged/uncommitted for owner
+review. Recommended Gravitas commit: `test: close mesh-cone surface manifold validation`.

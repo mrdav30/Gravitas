@@ -56,6 +56,13 @@ instead of burying it in notes.
 
 ## Recently Completed
 
+- [`Surface Contact Manifolds`](done/2026-10-08-surface-contact-manifold-plan.md)
+  - Independent 3D surface groups preserve finite mesh/cone contacts through
+    deterministic sequential response, resolving #095/#099. Exact admission and
+    provenance precede bounded anchor sampling; four points per group replace
+    the pair-wide ceiling. Canonical inspection order and retained capacity are
+    documented in the collision guides.
+
 - **Upstream Develop CI Alignment**
   - Completed 2026-10-07. FixedMathSharp, SwiftCollections and GridForge retain
     Windows/Linux Release/Lean matrices, with pinned sibling sources on develop

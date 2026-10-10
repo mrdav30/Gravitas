@@ -19,8 +19,9 @@ public class ContactGroupStorageBenchmarks
     private CollisionPair _retainedPair;
     private ContactGroupKey[] _groups;
     private ManifoldContact[] _contacts;
+    private int _churnPhase;
 
-    [Params(1, 9)]
+    [Params(1, 9, 64)]
     public int GroupCount { get; set; }
 
     [GlobalSetup]
@@ -51,6 +52,19 @@ public class ContactGroupStorageBenchmarks
                 if (!_retainedPair.TryGetWarmStartImpulse(_groups[group], contact.ContactId, out var impulse)
                     || impulse.NormalImpulse != Fixed64.One)
                     throw new InvalidOperationException("Prepared storage lost a grouped warm-start impulse.");
+
+        // Complete cycles end at the same full state. Warm JIT and all capacity
+        // paths before comparing live managed heap after repeated empty/small/full
+        // churn. GC totals are diagnostic host measurements, not exact gates;
+        // MemoryDiagnoser separately verifies allocation per warmed operation.
+        if (ChurnRetainedGroups() != 0 || ChurnRetainedGroups() != _contacts.Length
+            || ChurnRetainedGroups() != GroupCount * _contacts.Length)
+            throw new InvalidOperationException("Storage churn must visit empty, single-group and full states.");
+        for (int cycle = 0; cycle < 48; cycle++) ChurnRetainedGroups();
+        long before = GC.GetTotalMemory(forceFullCollection: true);
+        for (int cycle = 0; cycle < 1536; cycle++) ChurnRetainedGroups();
+        long after = GC.GetTotalMemory(forceFullCollection: true);
+        Console.WriteLine($"Retained group storage: groups={GroupCount}, cycles=512, live-heap delta={after - before} B");
     }
 
     [GlobalCleanup]
@@ -80,10 +94,19 @@ public class ContactGroupStorageBenchmarks
         return _retainedPair.Manifold.Count;
     }
 
-    private void PopulateGroups(CollisionPair pair)
+    [Benchmark]
+    public int ChurnRetainedGroups()
+    {
+        _retainedPair.Reset();
+        int groups = (_churnPhase++ % 3) switch { 0 => 0, 1 => 1, _ => GroupCount };
+        PopulateGroups(_retainedPair, groups);
+        return _retainedPair.Manifold.Count;
+    }
+
+    private void PopulateGroups(CollisionPair pair, int groups = -1)
     {
         pair.Manifold.BeginUpdate(0);
-        for (int group = 0; group < _groups.Length; group++)
+        for (int group = 0; group < (groups < 0 ? _groups.Length : groups); group++)
             foreach (ManifoldContact contact in _contacts)
             {
                 pair.Manifold.AddContact(_groups[group], contact);

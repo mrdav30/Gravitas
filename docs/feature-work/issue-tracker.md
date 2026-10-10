@@ -85,113 +85,6 @@
   retains the isolated failure. The experimental fixture was removed from the
   maintained suite after recording this independent boundary.
 
-### GRV-Issue-095 - Discrete mesh-cone contacts can choose an artificial triangulation-seam exit
-
-- **Status:** Active; phase 3 surface integration and performance refinement are
-  complete. The [implementation plan](2026-10-08-surface-contact-manifold-plan.md)
-  retains phase 4 grouped-response, memory, replay and documentation closeout gates
-  for #095/#099.
-- **Confirmed:** 2026-10-07 during #094 geometry review, in four isolated
-  local-stack Release cases: convex/concave flat quad targets and both windings.
-- **Reproduction:** A default cone centered at `(0, -1/4, 0)` overlaps a flat
-  quad at Y zero spanning `[-2, 2]` in X/Z. Its base is at Y `-3/4` and apex at
-  Y `1/4`. `CollisionDetection.DoCollisionCheck` selects an oblique normal near
-  `(-0.63246, -0.44721, +/-0.63246)` instead of the whole surface's downward
-  exit. Any translation shorter than `1/4` retains a plane crossing strictly
-  inside the quad; downward translation of `1/4` removes it. The diagonal is an
-  internal triangulation seam, not an exposed mesh edge.
-- **Root cause:** The existing discrete mesh-cone reducer compares individual
-  two-sided triangle contacts. A triangle's minimum exit need not leave the
-  union of adjacent faces, and its seam normal gives horizontal movement a
-  spurious normal component. This discrete path is unchanged by #094's sweep
-  contact fix.
-- **Follow-up:** Resolve whole-surface contact selection without suppressing
-  genuine exposed-edge contacts or treating concave meshes as convex solids.
-  Audit other curved primitive mesh reducers for the same union boundary.
-- **Refinement:** Prepared scaled geometry retains exact welded patches and
-  complete exposed boundaries. Sufficient minimum-face proofs cover ordinary
-  and tilted interiors. A trusted filled convex patch also uses its complete
-  face, perimeter-edge and corner normal fan, retaining exact cross-feature
-  ranking and paired witnesses. Small-square regressions distinguish a real
-  perimeter exit from both a covered diagonal and an incorrect face override.
-- **Remaining reproduction:** On 2026-10-08, an isolated local-stack Release
-  diagnostic adds a thin coplanar tab to the X/Z square `[-1/5, 1/5]`.
-  The tab spans X `[1/5, 1/4]` and Z `[-1/20, 1/20]`. The original square is
-  a subset and proves that no translation shorter than `1/4` clears the union;
-  the downward `1/4` exit still clears all Y-zero faces. The patch is nonconvex,
-  both sufficient proofs decline, and the triangle reducer still selects an
-  artificial seam normal approximately `(-0.31405, -0.44721, -0.83748)`.
-  This is the same unresolved union boundary, not a new issue.
-- **Decision refinement (2026-10-08):** After the owner delegated the choice to
-  deterministic, accurate physical behavior, source and independent math/solver
-  review favor topology-aware surface manifolds. One global minimum escape
-  vector is a depenetration result and cannot preserve independent impulse and
-  torque constraints. The confirmed #099 wall control demonstrates the runtime
-  consequence. The [surface-contact plan](2026-10-08-surface-contact-manifold-plan.md#design-contracts-and-rationale)
-  specifies exact finite-domain admission, grouped contact storage, response and
-  compatibility boundaries. The existing convex minimum-exit helpers remain
-  valid geometric owners; their global-minimum witness proofs cannot simply be
-  reused after masking features. Finite clipping is needed even when neither
-  global face-support projection belongs to the patch and no perimeter touches
-  the cone. Do not apply convex corner charts to reentrant vertices or replace
-  the tab failure with an unconditional infinite-face override. Keep #095 active
-  through the corresponding geometry and full-loop implementation gates.
-- **Verified refinement (2026-10-08):** Local-stack Gravitas Release passes
-  4,852 full-suite tests plus the subsequently added exposed-nonconvex-edge
-  regression; ReleaseLean passes all 4,788 tests. Combined Release OpenCover
-  evidence covers 56,874/56,874 lines, 16,608/16,608 branches and 5,454/5,454
-  fully covered methods; ReleaseLean covers 56,872/56,872, 16,608/16,608 and
-  5,453/5,453 respectively. Raw sequence, branch and method points are all
-  covered. FixedMathSharp also retains exact 100% in both configurations:
-  Release combines its full suite and focused final rim-gap regression;
-  ReleaseLean passes 4,491 core and 49 Chronicler bridge tests. Focused cases
-  exercise both windings, triangulation changes, exact touch/one-raw gaps,
-  small real edges/corners, rigid poses, full-loop frictionless seam motion,
-  failed scale preparation and repeated scale quantization. Existing scale
-  allocation guards and warmed dispatch pass at zero managed bytes. Topology
-  preparation reuses retained SwiftCollections sorting buffers and publishes
-  candidate metadata atomically with geometry.
-- **Measured refinement (2026-10-08):** Windows x64, i7-9700K, .NET 8 Release,
-  local stack; BenchmarkDotNet short job with three warmups and five measured
-  iterations. The old Gravitas reducer at `f5ed8e4` and the current reducer both
-  consume the same current FixedMathSharp source. Surface means in microseconds:
-
-  | Fixture | Old triangle reduction | Current patch reduction |
-  | --- | ---: | ---: |
-  | Quad interior | 333.6 | 30.85 |
-  | Subdivided interior | 1,261.2 | 84.75 |
-  | Subdivided tilted | 6,266.1 | 243.46 |
-  | Quad exposed edge | 142.1 | 501.45 |
-  | Small interior | 345.1 | 549.00 |
-  | Small exposed edge | 345.0 | 676.54 |
-  | Single triangle control | 162.8 | 157.67 |
-
-  All rows allocate zero managed bytes. The old interior/small-patch outputs
-  select covered seams, so their lower times do not establish equivalent
-  correctness. The real quad-edge control does expose a cost increase. Complete
-  convex fallback includes an intersecting-seed query and full perimeter feature
-  ranking; reuse or defer that seed work only with exact witness admission and
-  cross-feature ranking intact. Keep this refinement inside #095 while its
-  surface-contact contract is being specified. The nine original triangle-contact
-  controls remain within their preceding measured range, approximately 21–882
-  microseconds, with zero bytes allocated.
-  Evidence is retained under ignored `artifacts/grv-issue-095/`:
-  `baseline-common-stack/results`, `after-final/results`,
-  `grv-release-verified-opencover-report` and `grv-lean-final-gates.log`.
-  Reproduce by building the benchmark project in local-stack Release, then
-  running its DLL with `--filter '*MeshConeContactBenchmarks*'
-  '*MeshConeSurfaceContactBenchmarks*' --job short --warmupCount 3
-  --iterationCount 5`; the baseline capture needs only the surface filter.
-  Both repositories' API documentation builds with warnings as errors; local
-  links pass in 195 Gravitas and 116 FixedMathSharp generated API pages and all
-  edited Markdown documents. Independent topology and exact-contact reviews
-  found no remaining convex correctness or retained-buffer ownership defects.
-- **Evidence:** Ignored `artifacts/grv-issue-094/DiscreteConeSeamAudit.cs` and
-  `audit-scalar.log` retain the four failures. The temporary diagnostic was
-  removed from the maintained suite.
-  Current ignored `artifacts/grv-issue-095/ConcavePatchTabAudit.cs` and
-  `concave-tab-audit.log` retain the nonconvex closeout blocker.
-
 ### GRV-Issue-097 - Sphere and capsule mesh manifolds retain internal-seam constraints
 
 - **Confirmed:** 2026-10-08 against the unchanged #095 baseline, with both
@@ -230,38 +123,6 @@
   boundary controls, then audit embedded AABB/polygon prisms separately. Keep
   the plane-constrained 2D response and 3D-to-2D normal convention explicit.
 - **Evidence:** The same ignored audit and log retain all four mixed failures.
-
-### GRV-Issue-099 - Cone mesh reduction omits independent wall constraints
-
-- **Status:** Active; phase 3 implements independent surface constraints and
-  physical regressions. Joint #095/#099 closeout awaits phase 4 in the
-  [implementation plan](2026-10-08-surface-contact-manifold-plan.md).
-- **Confirmed:** 2026-10-08 against the committed #095 refinement, in four
-  failing local-stack Release diagnostic cases and two passing separate-wall
-  controls. Both windings are exercised.
-- **Reproduction:** Two finite quads meet at an ordinary concave crease, X=0
-  with Z in `[0,4]`, and Z=0 with X in `[0,4]`; both span Y `[-4,4]`. A
-  default height-1/radius-1/2 cone centered at `(3/10,0,3/10)` intersects both.
-  Combined in one concave mesh, detection retains only the Forward normal at
-  depth approximately `1/5`, omitting the Right normal. With explicit static
-  wall bodies, zero gravity/air density, frictionless materials, frozen cone
-  rotation, manual grounding and incoming velocity `(-1,0,-1)`, one complete
-  host step leaves velocity `(-1,0,0)`: approach into the X wall continues.
-  The same surfaces as separate static colliders pass both approach checks.
-- **Root cause:** `TryFindMeshConeTriangleContact` reduces all triangles and
-  patches to one shallowest contact; `DoMeshConeCheck` replaces the manifold
-  with that result. The single-contact reduction already existed before #095's
-  convex refinement, as verified in `f5ed8e4`. This independent noncoplanar
-  contact-loss boundary is not caused by the new coplanar topology.
-- **Follow-up:** Preserve independent geometric surface constraints and stable
-  finite witnesses. Address with the
-  [surface-contact plan](2026-10-08-surface-contact-manifold-plan.md#design-contracts-and-rationale),
-  including contact capacity, warm starts and response weighting. Do not count
-  arbitrary extra triangle samples as a solution.
-- **Evidence:** Ignored `artifacts/grv-issue-095/MeshConeSurfacePolicyAudit.cs`
-  and `surface-policy-audit.log`; the temporary diagnostic was removed from the
-  maintained suite. The two passing controls use the same geometry, materials,
-  motion and host loop, changing only whether the walls share a mesh collider.
 
 ### GRV-Issue-100 - Contained cylinder and cone sphere sweeps invert outward surface normals
 
@@ -340,6 +201,64 @@
 Remaining measured performance costs are tracked in the benchmark backlog.
 
 ## Resolved Issues
+
+### GRV-Issue-099 - Cone mesh reduction omits independent wall constraints
+
+- **Resolved:** 2026-10-10 by the completed
+  [surface-contact manifold plan](done/2026-10-08-surface-contact-manifold-plan.md).
+- **Original reproduction:** A height-1/radius-1/2 cone at `(3/10,0,3/10)`
+  intersects two finite orthogonal walls in one concave mesh. The former
+  shallowest-contact reducer retained only Forward, omitting Right; a full
+  frictionless host step left velocity `(-1,0,0)` from approach `(-1,0,-1)`.
+  The same geometry as separate static wall colliders blocked both components.
+- **Resolution:** Preserve independent finite surface groups, canonical
+  provenance and per-group samples through sequential impulse response,
+  compatible warm starts and positional correction. Additional triangles do
+  not receive automatic weighting. Retained overflow removes the pair-wide
+  four-contact ceiling while keeping four points per group.
+- **Verification:** Both wall normals and both blocked approach components pass
+  joined/separate controls and both windings. The shared three-frame replay
+  fixture repeatedly applies the approach and retains zero linear/angular
+  velocity after every full host frame. Release/Lean captures agree directly
+  and with reviewed authoritative and solver-cache expectations. All 48
+  prepared response measurements and warmed 1/9/64-group regeneration/churn
+  allocate 0 B/op; cold growth costs remain explicit in the archived plan.
+- **Closeout evidence:** Fresh unfiltered Gravitas Release/ReleaseLean pass
+  5,079/5,014 tests with exact 100% line, branch and fully-covered-method
+  coverage. DocFX and independent correctness/ponytail review pass. Other
+  native replay lanes and released-package validation remain CI/release gates;
+  the original omitted-wall defect is resolved.
+
+### GRV-Issue-095 - Discrete mesh-cone contacts can choose an artificial triangulation-seam exit
+
+- **Resolved:** 2026-10-10 by the completed
+  [surface-contact manifold plan](done/2026-10-08-surface-contact-manifold-plan.md).
+- **Original reproduction:** A default cone at `(0,-1/4,0)` crosses a Y-zero
+  quad strictly inside its perimeter, but individual triangle reduction selected
+  a covered diagonal's oblique normal. The nonconvex square-plus-tab extension
+  (`+/-1/5` square, `1/20` tab half-width, tab X `[1/5,1/4]`) exposed the same
+  failure after the earlier convex refinement.
+- **Resolution:** Generate admitted finite face and true-boundary contacts over
+  the prepared surface domain, with exact connectivity, orientation, regional
+  maximum depth and provenance. Covered joins never become physical boundary
+  constraints. Final Q32.32 anchor ranking bounds each group to four samples;
+  these local surface contacts are not a global minimum-exit query.
+- **Verification:** The exact original tab fixture retains the downward face
+  at depth `1/4`, excludes its covered join and blocks upward motion in the
+  complete host loop. Its cone section is entirely covered by the square;
+  the longer-tab control separately verifies genuine perimeter contacts.
+  Winding/subdivision, holes, disconnected regions, frictionless seam sliding,
+  pose/scale, torque, sleep/wake and supported CCD controls pass. The shared
+  replay fixture preserves the original tab constraint across repeated approach
+  impulses, ordered events and reviewed authoritative/solver-cache hashes.
+- **Closeout evidence:** Fresh unfiltered Gravitas Release/ReleaseLean pass
+  5,079/5,014 tests with exact 100% line, branch and fully-covered-method
+  coverage. Windows x64 captures agree across both profiles. Phase 3's unchanged
+  FixedMathSharp coverage and detection measurements remain applicable; phase
+  4 response/storage allocation gates, DocFX and independent review pass.
+  Detailed costs and remaining CI/package release obligations are in the
+  archived plan. Sphere/capsule #097 and mixed curved-slab #098 retain their
+  separate producers and remain active.
 
 ### GRV-Issue-094 - Non-sphere convex CCD can block separation from the back of a mesh face
 

@@ -16,7 +16,7 @@ FULL_MATRIX = tuple(
 )
 FIXTURE_NAMES = (
     "both-lifecycle-v1", "mixed-lifecycle-v1", "three-d-caches-v1",
-    "three-d-lifecycle-v1", "two-d-lifecycle-v1",
+    "three-d-lifecycle-v1", "three-d-surface-contacts-v1", "two-d-lifecycle-v1",
 )
 SOURCE_DEPENDENCIES = {"FixedMathSharp", "SwiftCollections", "GridForge", "Chronicler"}
 DEPENDENCIES = {

@@ -47,6 +47,10 @@ is the impact witness.
 
 `Count`, the indexer and enumeration expose flattened group/point order;
 `GroupCount`, `GetGroupStartIndex` and `GetGroupContactCount` support inspection.
+There is no fixed pair-wide group or sample cap. Flattened order follows full
+structural group provenance, then ascending contact identity; index zero is not
+necessarily the deepest sample. Use `PrimaryContact` for deepest-contact
+inspection, and inspect all groups when independent constraints matter.
 The former pair-wide `MaxContactCount` constant is replaced by
 `MaxContactsPerGroup`. The common single group is inline; overflow storage grows
 on demand and remains with the pair after reset or pooling. First-ever capacity

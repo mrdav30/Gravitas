@@ -147,7 +147,11 @@ the smaller of its two exact maximum normal-ray exits. A ray starts at a point
 inside both the finite cone and the filled surface domain; its paired cone point
 is the first exit in that direction. This depth can differ from a global
 minimum translation or a remote support-point separation. Face sampling retains
-the exact regional maximum and spreads up to four samples over the finite pool.
+the exact regional maximum, then greedily selects span, area and distance from
+the selected triangle using exact metrics on final Q32.32 anchors, up to four
+samples per group. This finite reduction preserves useful coverage and torque
+arms; it does not reproduce a continuous pressure distribution exactly. Rounding
+does not decide admission, connectivity, orientation, depth selection or provenance.
 
 True edges and corners have separate groups. Their support normals satisfy the
 actual incident surface fan and the face region's selected exit hemisphere.

@@ -42,13 +42,15 @@ public sealed class SharedReplayFixtureTests
     [InlineData("both-lifecycle-v1")]
     [InlineData("mixed-lifecycle-v1")]
     [InlineData("three-d-caches-v1")]
+    [InlineData("three-d-surface-contacts-v1")]
     public void OrderedCommands_MatchSharedExpectedFramesAndRepeatedRuns(string name)
     {
         ReplayFixture fixture = ReplayFixture.Read(Path.Combine(AppContext.BaseDirectory, "Determinism", "Fixtures", name + ".json"));
         using var first = new ReplayFixtureRunner(fixture);
         ReplayFrame[] actual = first.Run();
-        // An explicit capture writes observations only, including on divergence.
-        // It never writes fixture expectations or bypasses their comparison.
+        // Capture before comparison so a deliberately failing new fixture still
+        // leaves observations for review. It never writes expected values or
+        // bypasses their comparison; installing expectations is a separate review.
         string? captureDirectory = Environment.GetEnvironmentVariable("GRAVITAS_REPLAY_CAPTURE_DIRECTORY");
         if (captureDirectory != null)
             ReplayCapture.Write(captureDirectory, fixture, actual);
@@ -77,6 +79,17 @@ public sealed class SharedReplayFixtureTests
 
     private static void AssertScenarioSemantics(ReplayFixture fixture, ReplayFrame[] frames, ReplayFixtureRunner runner)
     {
+        if (fixture.Name == "three-d-surface-contacts-v1")
+        {
+            ReplayBodyState walls = Body(frames[0], 81);
+            Assert.True(walls.VelocityRaw[0] >= 0 && walls.VelocityRaw[2] >= 0,
+                "The combined mesh must block approach into both independent walls.");
+            ReplayBodyState tab = Body(frames[0], 91);
+            Assert.True(tab.VelocityRaw[1] <= 0,
+                "The nonconvex square/tab face must stop upward approach.");
+            Assert.Contains(frames[0].Events, value => value == "enter:81:80" || value == "enter:80:81");
+            Assert.Contains(frames[0].Events, value => value == "enter:91:90" || value == "enter:90:91");
+        }
         foreach (ReplayActor actor in fixture.Actors.Where(actor => actor.Continuous))
         {
             ReplayBodyState impact = Body(frames[0], actor.Id);
