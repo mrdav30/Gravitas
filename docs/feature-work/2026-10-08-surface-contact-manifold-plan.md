@@ -886,51 +886,67 @@ identity-cone X-order certificate skips reconstruction only when distinct rounde
 X values already prove the exact order; ties retain the original exact comparison.
 A direct fixed-width replacement for the quadratic normal products was also
 removed: small rim gains did not offset mixed small-contact and group regressions.
+A mixed rational/quadratic multiplication shortcut was likewise removed after
+its complete capture showed no useful overall gain.
 
 The final Windows x64 capture covers 20 warmed runtime fixtures, all at 0 B/op:
 
 | Control | Committed single-contact baseline (µs) | First integration (µs) | Current (µs) |
 | --- | ---: | ---: | ---: |
-| Apex face | 22.86 | 851.95 | 104.57 |
-| Base face | 21.89 | 872.51 | 111.21 |
-| Side face | 27.85 | 1,969.38 | 574.56 |
-| Interior rim | 905.84 | 4,299.23 | 1,308.13 |
-| Oblique rim | 668.97 | 3,051.91 | 1,493.91 |
-| Subdivided tilted surface | 244.90 | 3,704 | 1,282.56 |
+| Apex face | 22.86 | 851.95 | 105.63 |
+| Base face | 21.89 | 872.51 | 110.11 |
+| Side face | 27.85 | 1,969.38 | 467.96 |
+| Interior rim | 905.84 | 4,299.23 | 1,271.55 |
+| Oblique rim | 668.97 | 3,051.91 | 1,470.35 |
+| Subdivided tilted surface | 244.90 | 3,704 | 1,245.14 |
 
 Joined walls, disconnected supports, ring and thin-tab controls take
-2.056/2.606/2.430/2.896 ms. Against the previous committed refinement,
-apex/base/side improve 43%/32%/21%, and the subdivided tilted control improves
-16%. The axial-cardinal certificate adds 10–12% improvement to the apex/base
-and three small axial controls against the preceding accepted refinement.
-Both final captures retain 0 B/op in all 20 fixtures. The richer constraints change the work
-performed, but ordinary controls remain roughly 5–21 times their original
-single-contact costs. **Performance acceptance remains open; introduced costs
-stay in phase 3.** Profile remaining admission/materialization work before
-choosing the next refinement. The thin-tab capture has greater variation; do not
-treat every small difference between short captures as an established gain.
-Fresh EventPipe profiles of apex, side and interior-rim controls identify the
-remaining general circle-parameter path at 46.7% and 42.3% inclusive managed CPU
-samples in the side and interior-rim fixtures; these overlapping call-tree
-percentages are not additive. Generic point admission accounts for 15.2% and
-10.3% respectively, including callers that already carry a side certificate;
-only part of that cost is potentially redundant. The next experiment should reuse exact construction
-certificates within those existing owners, measuring the complete controls
-before retaining a shortcut. Lower-circle and zero-orientation upper-rim events
-already skip cone-polynomial admission; only a proved projected upper-rim
-side-equality stratum could remove that check. Finite-segment and other projected
-rim strata retain general admission. No proposed certificate is implemented or
-claimed as a gain in this capture.
+1.844/2.627/2.391/2.812 ms. A fresh same-session committed-source capture measures
+side contacts at 576.66 us and joined walls at 2,044.04 us, versus 467.96 us and
+1,843.54 us after refinement: improvements of 18.8% and 9.8%. Both complete
+candidate captures retain 0 B/op across all 20 fixtures. Small differences in
+short captures are not universal speedup or regression claims. A longer paired
+check (five warmups, ten measurements) puts QuadInterior at 99.23 us committed
+versus 100.61 us candidate, and SmallInterior at 99.83 versus 98.25 us, all 0 B/op.
+The overlapping confidence intervals do not establish a small-control regression.
+Ordinary controls remain roughly 5–17 times their original single-contact costs.
+**Performance acceptance remains open; introduced costs stay in phase 3.**
+
+For cone side form `F(X)=H²*(Xx²+Xz²)-R²*Xy²`, let `A=F(N)`,
+`B(G)=H²*(Nx*Gx+Nz*Gz)-R²*Ny*Gy`, and `T=N·G-c*gd`, with plane normal
+`N`, plane constant `c`, and homogeneous base-rim point `(G,gd)`. Its projected
+homogeneous point `(P,|N|²*gd)`, with `P=|N|²*G-T*N`, satisfies
+`F(P) = T * (A*T - 2*|N|²*B(G))`; valid plane-scope line-6 roots with branch ±1
+make the second factor zero. Reusing this proof omits only the redundant side
+polynomial; closed plane/height/source admission, exit signs and all other strata
+retain their existing checks. Six BigInteger-oracle cases cover valid roots,
+rejected/malformed branches and a forged nonseam branch that lies strictly inside
+the base disk and must retain general admission. Duplicate merging also borrows the
+incoming exact point from the existing synchronous callback and reconstructs only
+the retained event. Classic descriptor ordering, provenance and failure behavior
+are unchanged. The existing fourteen streamed-event fixtures independently check
+this comparator against reconstruction. Neither refinement adds production files,
+retained point storage or a new cache.
+
+Fresh EventPipe profiles put finite sample reduction at 40.8% and 38.2% of managed
+benchmark CPU samples in the apex and side fixtures; general circle-parameter
+construction remains 40.4% and 41.9% in side and interior-rim cases. These
+inclusive call-tree percentages overlap and are not additive. The next measured
+refinement should examine repeated reconstruction/materialization and exact
+coverage-metric work within the existing reduction owners. Early region filtering
+would require producer/exit plumbing and cannot help ordinary face fixtures that
+already certify whole-section containment; measure rejected-event work before
+expanding that contract.
 
 With `UseLocalLsfStack=true`, full **unfiltered** FixedMathSharp suites pass
-4,909 Release and 4,888 ReleaseLean cases; Gravitas passes 5,077 Release and
+4,915 Release and 4,894 ReleaseLean cases; Gravitas passes 5,077 Release and
 5,012 ReleaseLean cases. Raw sequence/line, branch and fully-covered-method
 totals are exact 100% in all four reports:
 
 | Repository / configuration | Lines | Branches | Fully covered methods |
 | --- | ---: | ---: | ---: |
-| FixedMathSharp Release | 56,010/56,010 | 14,218/14,218 | 4,209/4,209 |
-| FixedMathSharp ReleaseLean | 56,103/56,103 | 14,218/14,218 | 4,205/4,205 |
+| FixedMathSharp Release | 56,014/56,014 | 14,224/14,224 | 4,210/4,210 |
+| FixedMathSharp ReleaseLean | 56,107/56,107 | 14,224/14,224 | 4,206/4,206 |
 | Gravitas Release | 46,043/46,043 | 14,348/14,348 | 4,759/4,759 |
 | Gravitas ReleaseLean | 46,041/46,041 | 14,348/14,348 | 4,758/4,758 |
 
@@ -939,12 +955,13 @@ ponytail/math/physics source review found no additional blocker or actionable
 bloat cut. The 49-case FixedMathSharp.Chronicler adapter suites also pass in
 both configurations with exact 85/85 lines, 12/12 branches and 18/18 fully
 covered methods. Both API sites pass DocFX warnings-as-errors and local-link
-validation. The five upstream typed ratio controls take
-40.89/50.66/45.73/27.81/52.69 ns; three plane-section controls take
-292.1/667.7/1,221.3 us, all at 0 B/op. Small differences in these short captures
+validation. Three upstream plane-section controls take
+288.9/642.8/1,207.0 us, all at 0 B/op. Small differences in these short captures
 are not universal speedup or regression claims. Evidence is retained under ignored
-`artifacts/grv-issue-095/phase3-axial-final-*`; this host evidence does not
-replace native cross-platform replay gates.
+`artifacts/grv-issue-095/phase3-circle-final-*`, with paired committed-source
+and longer small-control captures under `phase3-circle-head-baseline` and
+`phase3-circle-small-*`. This host evidence does not replace native
+cross-platform replay gates.
 
 **Compatibility repair complete:** Radius-1, height-4 cones near both scalar
 limits now retain valid relative contacts even when conceptual endpoints cross

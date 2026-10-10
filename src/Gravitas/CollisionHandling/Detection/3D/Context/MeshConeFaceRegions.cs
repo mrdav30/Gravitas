@@ -186,11 +186,13 @@ internal sealed partial class MeshConeFaceRegions
         // Distinct constructions can certify the same exact point. Merge
         // their available directions before duplicate range checks; each
         // direction retains its own certificate for final materialization.
+        // The callback already owns the incoming exact point; reconstruct
+        // only the retained event when checking coordinate equality.
         for (int index = 0; index < _poolEvents.Count; index++)
         {
             PoolEvent retained = _poolEvents[index];
             if (retained.Region != region || retained.MeshPoint != meshPoint || ConePlaneRayEvents.CompareEventAnchors(
-                source, descriptor, retained.Source, retained.Event, frame, includeCoincidentProvenance: false) != 0) continue;
+                point, root, retained.Source, retained.Event, frame) != 0) continue;
             _poolEvents[index] = new PoolEvent(retained.Source, retained.Event, region, meshPoint,
                 retained.Positive.HasValue ? retained.Positive : CheckRay(positive, 1, pointRepresentable),
                 retained.Negative.HasValue ? retained.Negative : CheckRay(negative, -1, pointRepresentable));
