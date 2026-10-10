@@ -2,7 +2,7 @@
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-103`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-104`.
 - Assign an ID when an issue enters this tracker, keep it through resolution,
   and never reuse an ID even if an entry is later removed. Check this file's Git
   history before advancing or repairing the counter.
@@ -34,6 +34,112 @@
   verification records rather than this active section.
 
 ### Ordered Queue
+
+### GRV-Issue-097 - Sphere and capsule mesh manifolds retain internal-seam constraints
+
+- **Confirmed:** 2026-10-08 against the unchanged #095 baseline, with both
+  windings of a concave Y-zero quad spanning `[-2, 2]` in X/Z and diagonal
+  `X+Z=0`. A radius-`1/2` sphere or vertical capsule centered at
+  `(3/10, -1/4, 3/10)` overlaps both triangles strictly inside the surface.
+- **Reproduction:** Both manifolds retain a face contact and a second contact
+  against the covered diagonal. The sphere's second normal is approximately
+  `(0.60921, -0.50767, 0.60921)`; the capsule's is approximately
+  `(0.70711, 0, 0.70711)`. Inspecting only the primary contact hides this defect.
+- **Root cause:** Per-triangle curved contacts are individually valid but the
+  manifold also retains a triangle-only escape into its neighbor. The solver
+  processes every retained contact, so a covered seam becomes a lateral
+  constraint. The tested finite-cylinder controls retained only face normals;
+  that result does not establish cylinder conformance for other geometry.
+- **Follow-up:** Reduce curved contacts over the actual surface, preserving
+  exposed edges, holes and noncoplanar faces. Verify every manifold contact and
+  frictionless full-loop movement, including winding and triangulation parity.
+- **Evidence:** Ignored `artifacts/grv-issue-095/CurvedMeshSeamParityAudit.cs`
+  and `parity-baseline.log` retain the four failures and cylinder controls.
+
+### GRV-Issue-098 - Mixed curved slab mesh contacts can select a covered seam
+
+- **Confirmed:** 2026-10-08 against the unchanged #095 baseline, with both
+  windings of the same concave quad. A radius-`1/2` circle slab or positive-core
+  stadium slab centered at `(3/10, -1/4, 3/10)`, with mixed half-thickness
+  `1/2`, intersects the surface strictly inside its perimeter.
+- **Reproduction:** `CollisionDetectionMixed.TryCollide` selects the planar
+  normal approximately `(0.70711, 0, 0.70711)` and depths approximately
+  `0.07574` (circle) or `0.16412` (stadium with total height `5/4`). The complete
+  flat surface requires a downward `1/4` exit; its covered diagonal cannot
+  provide a planar escape.
+- **Root cause:** The mixed mesh reducer selects the shallowest individual
+  triangle/slab exit without proving that it leaves the adjacent surface.
+- **Follow-up:** Establish mixed surface reduction for curved slabs with genuine
+  boundary controls, then audit embedded AABB/polygon prisms separately. Keep
+  the plane-constrained 2D response and 3D-to-2D normal convention explicit.
+- **Evidence:** The same ignored audit and log retain all four mixed failures.
+
+### GRV-Issue-103 - Contained mixed circle sweeps can report inward solid-target normals
+
+- **Confirmed:** 2026-10-10 in two local-stack Release query probes during
+  #100's dimension-parity audit. The mixed hit builder is unchanged by #100
+  and does not call its corrected 3D sphere contact policy.
+- **Reproduction:** A static height-1/radius-1/2 cylinder at the origin contains
+  a circle slab centered at X/Z `(1/10,0)`, radius `1/20`, slab Y zero and
+  half-thickness `1/10`. Sweep one unit Right or Left through
+  `QueryMixed.SweepCircleAgainst3D`. Both queries return distance zero and the
+  nearest target point `(1/2,0,0)`, but `Normal3DTo2D` is Left and
+  `NormalFor2DSource` is `(-1,0)` instead of the outward Right normal.
+- **Root cause:** `GravitasQueryMixedService.BuildCircleAgainst3DHit` derives
+  the normal from the target witness toward the source center. For a contained
+  solid-volume source, that direction is inward. A geometric surface-separation
+  normal needs the target's volume/containment contract.
+- **Risk and follow-up:** Verify the complete mixed CCD host loop before
+  attributing a runtime motion failure. Source closing classification can treat
+  outward Right motion as closing and deeper Left motion as separating. Repair
+  solid-target containment in the mixed owner; preserve two-sided mesh semantics,
+  slab anchors and constrained 2D response. Audit cone, capsule and compound
+  counterparts with genuine entering/leaving controls.
+- **Evidence:** Ignored `artifacts/grv-issue-100/MixedContainedSweepAudit.cs`,
+  `mixed-probe.log` and paired TRX retain both failures and exact returned data.
+  The temporary probe is removed from the maintained suite. This is separate
+  from #098's covered-mesh-seam reduction and the 3D normal reversal in #100.
+
+### GRV-Issue-101 - Rotational CCD can freeze separated motion inside a concave mesh's aggregate bounds
+
+- **Confirmed:** 2026-10-09 during phase 3 surface-manifold physical validation.
+  The actual initial narrow phase is separated, but the full host loop clamps
+  the proposed rotation at zero rather than reaching the first real impact.
+- **Reproduction:** One concave mesh has vertices `(0,0,-2)`, `(2,0,-2)`,
+  `(2,0,2)`, `(0,0,2)`, `(0,2,-2)`, `(0,2,2)` and indices
+  `0,3,1, 1,3,2, 0,4,3, 3,4,5`: a finite floor and perpendicular wall.
+  Use an explicit static mesh body, frictionless materials and a kinematic
+  height-1/radius-1/2 cone at `(3/5,11/20,0)`, identity rotation, with
+  continuous collision enabled. Disable gravity/damping, use frame rate 1,
+  author a clockwise 90-degree rotation about Z, and run `Simulate` followed
+  by `LateSimulate`. The initial `DoCollisionCheck` returns false; an 8-degree
+  probe intersects only the floor and a 45-degree probe emits both face groups.
+  The full loop nevertheless retains identity rotation with a TOI clamp.
+- **Control/proof:** Removing the wall (first four vertices and first six
+  indices) passes the same full-loop first-impact bracket of 5–8 degrees.
+  Clockwise rotation gives the cone's lowest X/Y support
+  `-1/2*(cos(theta)+sin(theta))`. The floor is initially 0.55 below its center
+  and is reached near 6 degrees; the wall is 0.6 away and is reached later.
+  Both scalar coordinates and ordinary shape dimensions are representable.
+- **Root cause:** `SolidBody.IsRotationalIntervalSeparated` uses aggregate
+  collider AABBs for non-sphere pairs. The joined mesh's bounds contain the
+  initially separated cone, so no earlier interval can be certified empty.
+  The bounded search terminates at its unresolved zero-time frontier instead
+  of advancing to its retained later geometric witness. This is conservative
+  freezing, not a false geometric contact or the normal inversion in #100.
+  The separator method is unchanged verbatim from committed `767a713`;
+  baseline source inspection establishes pre-existing ownership, without
+  claiming a separate baseline execution.
+- **Follow-up:** Add a conservative finite-mesh interval separation certificate
+  or another explained refinement that can discard empty concave-bounds space.
+  Preserve certified lower/upper bracket and earliest-impact semantics, moving
+  targets, deterministic budgets and failure handling; do not advance across
+  an unproven interval merely because one sample is separated.
+- **Evidence:** Ignored `artifacts/grv-issue-095/phase3-physical-rational-focused.log`
+  records 481 passing cases and this single failed joined-wall case, whose
+  final angle is zero. The full fixture is retained above; the maintained
+  integration test uses two plane levels whose bounds support the existing
+  certificate, rather than codifying the freeze as intended behavior.
 
 ### GRV-Issue-102 - Collision position correction silently saturates at scalar coordinate limits
 
@@ -85,122 +191,40 @@
   retains the isolated failure. The experimental fixture was removed from the
   maintained suite after recording this independent boundary.
 
-### GRV-Issue-097 - Sphere and capsule mesh manifolds retain internal-seam constraints
-
-- **Confirmed:** 2026-10-08 against the unchanged #095 baseline, with both
-  windings of a concave Y-zero quad spanning `[-2, 2]` in X/Z and diagonal
-  `X+Z=0`. A radius-`1/2` sphere or vertical capsule centered at
-  `(3/10, -1/4, 3/10)` overlaps both triangles strictly inside the surface.
-- **Reproduction:** Both manifolds retain a face contact and a second contact
-  against the covered diagonal. The sphere's second normal is approximately
-  `(0.60921, -0.50767, 0.60921)`; the capsule's is approximately
-  `(0.70711, 0, 0.70711)`. Inspecting only the primary contact hides this defect.
-- **Root cause:** Per-triangle curved contacts are individually valid but the
-  manifold also retains a triangle-only escape into its neighbor. The solver
-  processes every retained contact, so a covered seam becomes a lateral
-  constraint. The tested finite-cylinder controls retained only face normals;
-  that result does not establish cylinder conformance for other geometry.
-- **Follow-up:** Reduce curved contacts over the actual surface, preserving
-  exposed edges, holes and noncoplanar faces. Verify every manifold contact and
-  frictionless full-loop movement, including winding and triangulation parity.
-- **Evidence:** Ignored `artifacts/grv-issue-095/CurvedMeshSeamParityAudit.cs`
-  and `parity-baseline.log` retain the four failures and cylinder controls.
-
-### GRV-Issue-098 - Mixed curved slab mesh contacts can select a covered seam
-
-- **Confirmed:** 2026-10-08 against the unchanged #095 baseline, with both
-  windings of the same concave quad. A radius-`1/2` circle slab or positive-core
-  stadium slab centered at `(3/10, -1/4, 3/10)`, with mixed half-thickness
-  `1/2`, intersects the surface strictly inside its perimeter.
-- **Reproduction:** `CollisionDetectionMixed.TryCollide` selects the planar
-  normal approximately `(0.70711, 0, 0.70711)` and depths approximately
-  `0.07574` (circle) or `0.16412` (stadium with total height `5/4`). The complete
-  flat surface requires a downward `1/4` exit; its covered diagonal cannot
-  provide a planar escape.
-- **Root cause:** The mixed mesh reducer selects the shallowest individual
-  triangle/slab exit without proving that it leaves the adjacent surface.
-- **Follow-up:** Establish mixed surface reduction for curved slabs with genuine
-  boundary controls, then audit embedded AABB/polygon prisms separately. Keep
-  the plane-constrained 2D response and 3D-to-2D normal convention explicit.
-- **Evidence:** The same ignored audit and log retain all four mixed failures.
-
-### GRV-Issue-100 - Contained cylinder and cone sphere sweeps invert outward surface normals
-
-- **Confirmed:** 2026-10-08 during the surface-manifold phase 1 producer audit.
-  Source and a maintained cylinder expectation establish the inward initial-
-  overlap normal; a dedicated full-loop regression remains follow-up work.
-- **Reproduction:** Resolve `ContinuousCollisionContactPolicy` for a sphere
-  center strictly inside an ordinary finite cylinder or cone. Both direct
-  primitive branches negate the nearest outward surface normal when signed
-  distance is negative. For a height-1/radius-1/2 cylinder and center `(1/10,0,0)`,
-  the emitted normal is Left instead of the nearest surface's Right. A cone of
-  the same dimensions with center `(1/100,-1/10,0)` similarly emits the inward
-  lateral normal. The sweep worker admits contained starts at distance zero.
-- **Root cause:** `ContinuousCollisionContactPolicy.TryResolveSweptSphereContact`
-  treats the signed-distance containment flag as a normal reversal. Cylinder
-  and cone outward normals remain escape directions for contained points.
-  Capsule and compound primitive contact paths retain outward normals instead.
-  Closing classification uses the hit normal, so the direct primitive policy
-  can classify escape motion as closing while permitting motion farther inward.
-- **Follow-up:** Align direct primitive initial-overlap contact orientation
-  with the solid-volume contract. Preserve admitted target anchors, including
-  conceptual surfaces outside the scalar domain. Add ordinary-size full-loop
-  entering/leaving tests, direct/compound parity and swept-query normal checks;
-  do not conflate solid containment with two-sided mesh surface contacts.
-- **Evidence:** Maintained
-  `FiniteAxisProjectionWorkerTests.SweptSphereCylinderContact_WithUnrepresentableCap_ShouldRetainTargetAnchor`
-  currently expects Down for a contained point whose nearest conceptual cap
-  has outward Up normal. The anchor-retention assertion remains useful; its
-  normal expectation codifies the inversion. The existing
-  `SweptSphereWorker_WithConeStartingOverlap_ShouldReturnZeroDistance` checks
-  distance and center only, leaving normal orientation unverified. Phase 1
-  fixes the discrete cone/sphere and cylinder/sphere producers; it does not
-  change this separate swept-contact policy.
-
-### GRV-Issue-101 - Rotational CCD can freeze separated motion inside a concave mesh's aggregate bounds
-
-- **Confirmed:** 2026-10-09 during phase 3 surface-manifold physical validation.
-  The actual initial narrow phase is separated, but the full host loop clamps
-  the proposed rotation at zero rather than reaching the first real impact.
-- **Reproduction:** One concave mesh has vertices `(0,0,-2)`, `(2,0,-2)`,
-  `(2,0,2)`, `(0,0,2)`, `(0,2,-2)`, `(0,2,2)` and indices
-  `0,3,1, 1,3,2, 0,4,3, 3,4,5`: a finite floor and perpendicular wall.
-  Use an explicit static mesh body, frictionless materials and a kinematic
-  height-1/radius-1/2 cone at `(3/5,11/20,0)`, identity rotation, with
-  continuous collision enabled. Disable gravity/damping, use frame rate 1,
-  author a clockwise 90-degree rotation about Z, and run `Simulate` followed
-  by `LateSimulate`. The initial `DoCollisionCheck` returns false; an 8-degree
-  probe intersects only the floor and a 45-degree probe emits both face groups.
-  The full loop nevertheless retains identity rotation with a TOI clamp.
-- **Control/proof:** Removing the wall (first four vertices and first six
-  indices) passes the same full-loop first-impact bracket of 5–8 degrees.
-  Clockwise rotation gives the cone's lowest X/Y support
-  `-1/2*(cos(theta)+sin(theta))`. The floor is initially 0.55 below its center
-  and is reached near 6 degrees; the wall is 0.6 away and is reached later.
-  Both scalar coordinates and ordinary shape dimensions are representable.
-- **Root cause:** `SolidBody.IsRotationalIntervalSeparated` uses aggregate
-  collider AABBs for non-sphere pairs. The joined mesh's bounds contain the
-  initially separated cone, so no earlier interval can be certified empty.
-  The bounded search terminates at its unresolved zero-time frontier instead
-  of advancing to its retained later geometric witness. This is conservative
-  freezing, not a false geometric contact or the normal inversion in #100.
-  The separator method is unchanged verbatim from committed `767a713`;
-  baseline source inspection establishes pre-existing ownership, without
-  claiming a separate baseline execution.
-- **Follow-up:** Add a conservative finite-mesh interval separation certificate
-  or another explained refinement that can discard empty concave-bounds space.
-  Preserve certified lower/upper bracket and earliest-impact semantics, moving
-  targets, deterministic budgets and failure handling; do not advance across
-  an unproven interval merely because one sample is separated.
-- **Evidence:** Ignored `artifacts/grv-issue-095/phase3-physical-rational-focused.log`
-  records 481 passing cases and this single failed joined-wall case, whose
-  final angle is zero. The full fixture is retained above; the maintained
-  integration test uses two plane levels whose bounds support the existing
-  certificate, rather than codifying the freeze as intended behavior.
-
 Remaining measured performance costs are tracked in the benchmark backlog.
 
 ## Resolved Issues
+
+### GRV-Issue-100 - Contained cylinder and cone sphere sweeps invert outward surface normals
+
+- **Resolved:** 2026-10-10. The shared 3D sphere contact policy retains the
+  geometry owner's outward cylinder/cone normal for contained starts, matching
+  compound primitive behavior. Both signed-distance normal reversals are removed;
+  selected anchors and failure handling remain intact. No upstream change or
+  new runtime owner is required.
+- **Regression reproduction:** A sphere center inside a height-1/radius-1/2
+  cylinder at `(1/10,0,0)` received Left instead of Right. A cone center at
+  `(1/10,-1/10,0)` likewise received the inward lateral normal. Full host-loop
+  reproductions formerly blocked outward escape while admitting deeper motion.
+- **Verification:** The focused RED run failed nine direct-primitive/scalar-cap
+  cases while eight compound controls passed; all 17 checks pass after the fix.
+  Maintained regressions cover translated/exactly rotated public queries in
+  both travel directions, direct/compound parity, complete `Simulate` plus
+  `LateSimulate` escape/blocking behavior, and zero allocations after warmup.
+  The scalar-edge cap test now expects Up while retaining its unrepresentable
+  world-point anchor assertion.
+- **Closeout evidence:** Fresh local-stack Release/ReleaseLean pass all
+  5,095/5,030 tests. Raw line/sequence, branch and fully-covered-method coverage
+  is exact 100% in both profiles; both multi-target builds have zero warnings
+  or errors. Six existing shared replay fixtures agree directly across native
+  Windows x64 Release/Lean and with unchanged expectations. DocFX, local links
+  and independent correctness/ponytail review pass. Evidence is retained under
+  ignored `artifacts/grv-issue-100/` in `red.log`, `green.log`,
+  `final-*-coverage`, `final-replay` and `final-gates.log`.
+- **Parity boundary:** Pure 2D has no matching cylinder/cone branch. The separate
+  mixed query builder has a reproduced containment-normal defect recorded as
+  #103; its full-loop motion consequence remains to be verified. Other native
+  CI lanes and released-package validation remain release gates.
 
 ### GRV-Issue-099 - Cone mesh reduction omits independent wall constraints
 

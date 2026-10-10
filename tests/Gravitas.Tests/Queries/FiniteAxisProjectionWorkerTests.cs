@@ -364,7 +364,7 @@ public sealed class FiniteAxisProjectionWorkerTests
 
         anchor.Origin.Should().Be(cylinder.Center);
         anchor.TryGetWorldPoint(out _).Should().BeFalse();
-        normal.Should().Be(Vector3d.Down);
+        normal.Should().Be(Vector3d.Up);
     }
 
     [Fact]

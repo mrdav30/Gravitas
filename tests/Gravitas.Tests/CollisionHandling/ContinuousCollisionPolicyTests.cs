@@ -2,13 +2,114 @@ using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
+using Gravitas.Materials;
+using Gravitas.Queries;
+using Gravitas.Support;
 using Gravitas.Tests.Support;
+using System;
 using Xunit;
 
 namespace Gravitas.Tests.CollisionHandlingTests;
 
 public sealed class ContinuousCollisionPolicyTests
 {
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(false, false, true)]
+    [InlineData(false, true, false)]
+    [InlineData(false, true, true)]
+    [InlineData(true, false, false)]
+    [InlineData(true, false, true)]
+    [InlineData(true, true, false)]
+    [InlineData(true, true, true)]
+    public void ContainedFiniteAxisSweep_ShouldKeepOutwardNormalIndependentOfTravel(
+        bool cone, bool compound, bool rotated)
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        // This exact unit quaternion permutes axes without changing the shape
+        // through rounded trigonometry. Test a translated target as well.
+        FixedQuaternion rotation = rotated
+            ? new(Fixed64.Half, Fixed64.Half, Fixed64.Half, Fixed64.Half)
+            : FixedQuaternion.Identity;
+        Vector3d origin = new(3, -2, 1);
+        LSCollider target = CreateFiniteAxisTarget(cone, compound);
+        scenario.CreateBody(target, origin, rotation, immovable: true);
+        Vector3d localCenter = new(Fixed64.FromFraction(1, 10),
+            cone ? -Fixed64.FromFraction(1, 10) : Fixed64.Zero, Fixed64.Zero);
+        Vector3d center = origin + rotation.Rotate(localCenter);
+        // The cylinder side points Right; the cone side 2*x+y=1/2 has
+        // outward gradient (2,1,0), even for a center inside the solid.
+        Vector3d expected = rotation.Rotate(cone ? new Vector3d(2, 1, 0).Normalized : Vector3d.Right);
+        foreach (Vector3d direction in new[] { expected, -expected })
+        {
+            scenario.Context.Query3D.SweepSphere(center, Fixed64.FromFraction(1, 32),
+                direction, Fixed64.One, out Physics3DHit hit, PhysicsLayerMask.FromLayer(0)).Should().BeTrue();
+            hit.Collider.Should().BeSameAs(target);
+            hit.Distance.Should().Be(Fixed64.Zero);
+            Vector3d.Dot(hit.Normal, expected).Should().BeGreaterThan(Fixed64.FromFraction(99999, 100000));
+            Vector3d.Dot(hit.Point - center, expected).Should().BeGreaterThan(Fixed64.Zero);
+        }
+
+        for (int i = 0; i < 32; i++)
+            scenario.Context.Query3D.SweepSphere(center, Fixed64.FromFraction(1, 32),
+                expected, Fixed64.One, out _, PhysicsLayerMask.FromLayer(0));
+        long before = GC.GetAllocatedBytesForCurrentThread();
+        int hits = 0;
+        for (int i = 0; i < 128; i++)
+            if (scenario.Context.Query3D.SweepSphere(center, Fixed64.FromFraction(1, 32),
+                    expected, Fixed64.One, out _, PhysicsLayerMask.FromLayer(0))) hits++;
+        long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+        hits.Should().Be(128);
+        allocated.Should().Be(0);
+    }
+
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(false, false, true)]
+    [InlineData(false, true, false)]
+    [InlineData(false, true, true)]
+    [InlineData(true, false, false)]
+    [InlineData(true, false, true)]
+    [InlineData(true, true, false)]
+    [InlineData(true, true, true)]
+    public void ContainedFiniteAxisCcd_FullLoopShouldAllowEscapeAndBlockDeeperMotion(
+        bool cone, bool compound, bool escaping)
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        scenario.Context.SetFrameRate(1);
+        scenario.Context.Environment.Gravity = Fixed64.Zero;
+        scenario.Context.Environment.AirDensity = Fixed64.Zero;
+        scenario.Context.Environment.DampingFactor = Fixed64.Zero;
+        LSCollider target = CreateFiniteAxisTarget(cone, compound);
+        target.Material = PhysicsMaterial.Frictionless;
+        scenario.CreateBody(target, Vector3d.Zero, FixedQuaternion.Identity, immovable: true);
+        Vector3d start = new(Fixed64.FromFraction(1, 10),
+            cone ? -Fixed64.FromFraction(1, 10) : Fixed64.Zero, Fixed64.Zero);
+        SolidBody source = scenario.CreateBody(new LSSphereCollider { Radius = Fixed64.FromFraction(1, 32) },
+            start, FixedQuaternion.Identity, preventAngularForces: true).Body;
+        source.Collider.Material = PhysicsMaterial.Frictionless;
+        source.UseManualGrounding();
+        source.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        Vector3d outward = cone ? new Vector3d(2, 1, 0).Normalized : Vector3d.Right;
+        Vector3d velocity = escaping ? Vector3d.Right * 4 : -outward;
+        source.AddLinearImpulse(velocity);
+        scenario.Context.Simulate();
+        scenario.Context.LateSimulate();
+
+        if (escaping)
+        {
+            source.Position3d.Should().Be(start + velocity);
+            source.LinearVelocity.Should().Be(velocity);
+            source.LastContinuousCollisionToiIterationCount.Should().Be(0);
+        }
+        else
+        {
+            source.LastContinuousCollisionToiIterationCount.Should().BeGreaterThan(0);
+            Vector3d.Dot(source.LinearVelocity, outward).Should().BeGreaterThanOrEqualTo(-Fixed64.Epsilon);
+            Vector3d.Dot(source.Position3d - start, outward).Should().BeGreaterThanOrEqualTo(-Fixed64.Epsilon);
+        }
+    }
+
     [Fact]
     public void MeshSphereContact_WithUnrepresentableCenterOffset_ShouldRetainGeometricSide()
     {
@@ -357,4 +458,10 @@ public sealed class ContinuousCollisionPolicyTests
         overflow2D.Should().Be(default);
         overflow3D.Should().Be(default);
     }
+
+    private static LSCollider CreateFiniteAxisTarget(bool cone, bool compound) => compound
+        ? new LSCompoundCollider(cone
+            ? CompoundColliderPart.Cone(Fixed64.Half, Fixed64.One, Vector3d.Zero)
+            : CompoundColliderPart.Cylinder(Fixed64.Half, Fixed64.One, Vector3d.Zero))
+        : cone ? new LSConeCollider() : new LSCylinderCollider();
 }

@@ -56,6 +56,8 @@ internal static class ContinuousCollisionContactPolicy
             return true;
         }
 
+        // Solid-volume normals remain outward for contained starts: CCD must
+        // permit escape and block deeper motion. Signed distance is not a flip.
         if (target is LSCylinderCollider cylinder)
         {
             if (!FixedSegment.TryGetClosestCenteredFiniteCylinderSurfaceAnchor(
@@ -67,8 +69,8 @@ internal static class ContinuousCollisionContactPolicy
                     cylinder.ScaledRadius,
                     Vector3d.Right,
                     out FixedPointAnchor targetPoint,
-                    out Vector3d outwardNormal,
-                    out Fixed64 signedDistance))
+                    out normal,
+                    out _))
             {
                 targetAnchor = default;
                 normal = default;
@@ -76,7 +78,6 @@ internal static class ContinuousCollisionContactPolicy
             }
 
             targetAnchor = new ContactAnchor(targetPoint);
-            normal = signedDistance < Fixed64.Zero ? -outwardNormal : outwardNormal;
             return true;
         }
 
@@ -91,8 +92,8 @@ internal static class ContinuousCollisionContactPolicy
                     cone.ScaledRadius,
                     Vector3d.Right,
                     out FixedPointAnchor targetPoint,
-                    out Vector3d outwardNormal,
-                    out Fixed64 signedDistance))
+                    out normal,
+                    out _))
             {
                 targetAnchor = default;
                 normal = default;
@@ -100,7 +101,6 @@ internal static class ContinuousCollisionContactPolicy
             }
 
             targetAnchor = new ContactAnchor(targetPoint);
-            normal = signedDistance < Fixed64.Zero ? -outwardNormal : outwardNormal;
             return true;
         }
 

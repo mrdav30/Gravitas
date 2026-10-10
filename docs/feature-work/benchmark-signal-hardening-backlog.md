@@ -61,38 +61,6 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 
 ## Active Signals
 
-### GRV-Benchmark-026 — Initial Generic Convex Mesh Contact Resolution Cost
-
-**Discovered:** 2026-10-07 during GRV-Issue-094 correctness validation.  
-**Status:** Measured correctness cost; ordinary impacts unchanged.  
-**Owner:** Gravitas prepared convex sweep initial-contact resolution and its
-FixedMathSharp complete contact/projection operations.
-
-The warmed public `ConvexMeshInitialContactBenchmarks.SweepCuboidAll` compares
-ordinary impacts with initially overlapping, separating cuboids. On this
-Windows x64 i7-9700K host (.NET 8.0.29), the corrected geometric initial normal
-costs **59.01 us** for a convex quad, **151.38 us** for a concave quad, and
-**59.59 us** for a compound convex mesh leaf, versus the incorrect baseline's
-**16.51 / 39.42 / 16.21 us**. Ordinary impacts remain **27.56 / 83.36 / 27.30 us**
-versus **26.89 / 82.57 / 27.09 us**. All six cases allocate **0 B/op**.
-
-```powershell
-$env:UseLocalLsfStack = 'true'
-$env:DOTNET_PROCESSOR_COUNT = '2'
-dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -p:UseLocalLsfStack=true -m:1 -p:BuildInParallel=false -p:UseSharedCompilation=false -nr:false
-dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll --filter '*ConvexMeshInitialContactBenchmarks*' --job short --warmupCount 3 --iterationCount 5 --artifacts artifacts/grv-issue-094/final-confirmation
-```
-
-Ignored baseline/final captures under `artifacts/grv-issue-094` retain the
-measurements. The baseline answered a different, incorrect geometric contract;
-restoring travel-facing normals or suppressing real edge contacts is not an
-optimization. **Next isolation:** profile complete initial contacts and exact
-support/projection comparisons, then measure touching, overlap, containment,
-curved sources and dense concave initial-contact workloads. Prefer reusable
-exact certificates or reduced duplicated work, with the same geometric normals,
-leaf ordering, full-domain witnesses and allocation gates. Measure scene
-frequency before assigning a host capacity budget.
-
 ### GRV-Benchmark-025 — Debug Ragdoll Steady-State Allocations
 
 **Discovered:** 2026-10-06, during full-lifecycle replay Phase 1 validation.  
@@ -130,6 +98,38 @@ window in Debug and Release. Distinguish runtime allocation from optimization
 or instrumentation effects before changing solver code or its test contract.
 Do not relax the expectation or attribute the bytes to a dependency without
 evidence. Check a comparable planar workload only after identifying the owner.
+
+### GRV-Benchmark-026 — Initial Generic Convex Mesh Contact Resolution Cost
+
+**Discovered:** 2026-10-07 during GRV-Issue-094 correctness validation.  
+**Status:** Measured correctness cost; ordinary impacts unchanged.  
+**Owner:** Gravitas prepared convex sweep initial-contact resolution and its
+FixedMathSharp complete contact/projection operations.
+
+The warmed public `ConvexMeshInitialContactBenchmarks.SweepCuboidAll` compares
+ordinary impacts with initially overlapping, separating cuboids. On this
+Windows x64 i7-9700K host (.NET 8.0.29), the corrected geometric initial normal
+costs **59.01 us** for a convex quad, **151.38 us** for a concave quad, and
+**59.59 us** for a compound convex mesh leaf, versus the incorrect baseline's
+**16.51 / 39.42 / 16.21 us**. Ordinary impacts remain **27.56 / 83.36 / 27.30 us**
+versus **26.89 / 82.57 / 27.09 us**. All six cases allocate **0 B/op**.
+
+```powershell
+$env:UseLocalLsfStack = 'true'
+$env:DOTNET_PROCESSOR_COUNT = '2'
+dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -p:UseLocalLsfStack=true -m:1 -p:BuildInParallel=false -p:UseSharedCompilation=false -nr:false
+dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll --filter '*ConvexMeshInitialContactBenchmarks*' --job short --warmupCount 3 --iterationCount 5 --artifacts artifacts/grv-issue-094/final-confirmation
+```
+
+Ignored baseline/final captures under `artifacts/grv-issue-094` retain the
+measurements. The baseline answered a different, incorrect geometric contract;
+restoring travel-facing normals or suppressing real edge contacts is not an
+optimization. **Next isolation:** profile complete initial contacts and exact
+support/projection comparisons, then measure touching, overlap, containment,
+curved sources and dense concave initial-contact workloads. Prefer reusable
+exact certificates or reduced duplicated work, with the same geometric normals,
+leaf ordering, full-domain witnesses and allocation gates. Measure scene
+frequency before assigning a host capacity budget.
 
 ## Experimental Signals
 

@@ -81,6 +81,13 @@ query filters. Final CCD target admission uses the owning collision service's
 physical-pair gate, including collider lifecycle, authored filters, hierarchy
 rules, and linked-joint collision suppression.
 
+3D sphere sweeps against solid cylinders and cones retain the target's outward
+surface normal even when the source center is contained. Starting overlaps have
+zero sweep distance, and the selected surface anchor is retained independently
+of world-point representability. Direct primitives and compound parts follow
+the same rule. Queries report the geometric hit for either travel direction;
+CCD uses its normal to permit escape and block motion deeper into the solid.
+
 For kinematic active-source CCD, hosts write deterministic target transforms
 before `context.LateSimulate()`. Gravitas captures the frame-start pose, reads
 the host transform as the requested target pose, sweeps between those poses, and
