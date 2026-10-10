@@ -22,8 +22,9 @@ SwiftCollections, GridForge, Chronicler.Hashing, xUnit v3, BenchmarkDotNet.
 implementation decisions and validation stay in this single document.
 
 **Status:** Phase 1 is complete with full validation and independent review.
-Phase 2 is complete with full validation and independent review. Phase 3 integration is in progress; phase 4 remains planned. #095/#099 stay active; #097/#098 remain separate
-follow-ups.
+Phases 2 and 3 are complete with full validation and independent review. Phase 4
+remains planned. #095/#099 stay active until its closeout gates pass; #097/#098
+remain separate follow-ups.
 
 ## Design Contracts And Rationale
 
@@ -814,7 +815,7 @@ retain separately justified closed-convex containment behavior.
   Use checked geometry budgets as safety bounds, not a reason to allocate a
   full mesh–mesh product per pair. Reserve context scratch from prepared geometry;
   retain pair capacity at its observed high-water mark and measure growth.
-- [ ] Admit existing certified fast paths only when their actual finite
+- [x] Admit existing certified fast paths only when their actual finite
   witnesses and region coverage satisfy this surface contract. Preserve cheap
   ordinary contacts where that proof holds; convexity alone does not establish
   compatible surface semantics. Measure each accepted shortcut against the
@@ -839,160 +840,152 @@ retain separately justified closed-convex containment behavior.
   in their own tracker entries. #096 practical geometry-size policy stays
   separate; supported relative-anchor compatibility is repaired in this phase.
 
-**Phase 3 progress:** The maintained joined-wall regression reproduced four
-failures while both separate-wall controls passed. Integration now emits
-independent face, edge and corner groups, preserves local identities through
-compound staging, and selects rotational CCD response by exact closing point
-velocity. Physical regressions cover tabs, holes, disconnected supports, sliding,
-torque, rigid transforms, scale publication, raw-neighbor gaps, earliest impact,
-grounding, sleep/wake, events and full-loop replay. A generator-touch defect in
-the first boundary integration was fixed here: alternative exits use the exact
-per-feature minimum and its ties, preventing false depenetration at touch.
+**Phase 3 complete (2026-10-10):** The maintained joined-wall regression
+reproduced four failures while both separate-wall controls passed. Integration
+now emits independent face, edge and corner groups, preserves local identities
+through compound staging, and selects rotational CCD response by exact closing
+point velocity. Regressions cover tabs, holes, disconnected supports, sliding,
+torque, transforms, scale refresh, raw-neighbor gaps, earliest impact, grounding,
+sleep/wake, events and full-loop replay. A generator-touch defect introduced by
+boundary integration was fixed here: alternative exits use the exact per-feature
+minimum and its ties, preventing false depenetration at touch. The replaced patch
+runtime, exclusive upstream helpers/tests and unused patch IDs are retired.
+No production files, cache owners or dependencies were added in this phase.
 
-The replaced patch runtime, its exclusive upstream geometry helpers/tests and
-unused mesh patch IDs are retired. This phase adds no production files. Refinement
-reuses primitive plane normals, bounded exact rounding, active-width complete
-products, scoped identity materialization, a synchronous ordered event cohort,
-closed-boundary admission reuse and conservative whole-cone range certificates.
-The same exact frame is reused across connectivity, faces and boundaries. A
-scoped trace certificate cancels the inverse identity basis, and collapsed apex
-sections reuse the axis event instead of duplicating cardinal events. Rational
-comparisons use two signed cross products; scaling skips mathematically zero
-coefficient banks. Selected-sample replay omits the unused opposite rational or
-side exit, while admission and streaming retain both directions.
-Fourteen upstream fixtures independently compare streamed descriptors, points,
-both directional certificates and final materialization with targeted reconstruction.
-For axial plane cardinals, the existing dispatcher proves a primitive normal
-of `(0, ±1, 0)`. The producer checks the closed cone-height interval before
-construction; its exact point then satisfies both the plane and cone side
-polynomial by construction. Reusing that certificate avoids redundant generic
-admission and exit work. Eight upstream cases cover both normal signs,
-out-of-height rejection, collapsed axis/radius events, requested-direction replay
-and odd-origin nearest-even endpoint rounding. Targeted replay still reconstructs
-collapsed descriptors omitted from the streaming inventory.
-Global identity-basis normalization was rejected after stalling an existing
-cylinder rounding test and was removed. Common whole-zero limb cancellation was
-narrowed to the immutable-span ratio entry after typed controls exposed shared
-core overhead; inputs remain unchanged and typed division mechanics remain
-shared. Global nearest-even parity is explicitly carried into translated
-rounding. A separate common whole-limb cancellation experiment in homogeneous
-points was also removed: its 20-fixture capture showed mostly marginal or mixed
-changes, insufficient to justify scanning and mutating every admitted point.
-Two further experiments were removed after complete captures: extending the
-rounded-coordinate ordering shortcut to vertical planes, and reducing the
-shared affine frame's denominator, basis and translation by their joint gcd.
-Both preserved exact geometry but showed no useful overall gain. The retained
-identity-cone X-order certificate skips reconstruction only when distinct rounded
-X values already prove the exact order; ties retain the original exact comparison.
-A direct fixed-width replacement for the quadratic normal products was also
-removed: small rim gains did not offset mixed small-contact and group regressions.
-A mixed rational/quadratic multiplication shortcut was likewise removed after
-its complete capture showed no useful overall gain.
+Refinement reuses the existing exact frame, primitive plane normals, bounded
+rounding, active-width products, scoped materialization and synchronous ordered
+event cohort. Closed-boundary admission and whole-cone range certificates avoid
+rechecking already-proved conditions; requested-direction replay omits only the
+unused opposite exit. Axial cardinals prove the closed height interval and zero
+side polynomial before dispatch. Collapsed apex sections reuse the axis event.
+For projected base-rim points, the exact identity
+`F(P) = T * (A*T - 2*|N|²*B(G))`, with
+`F(X)=H²*(Xx²+Xz²)-R²*Xy²`, `A=F(N)`,
+`B(G)=H²*(Nx*Gx+Nz*Gz)-R²*Ny*Gy`, `T=N·G-c*gd` and
+`P=|N|²*G-T*N`, proves the side polynomial for valid line-6 roots.
+Other admission checks remain intact; other strata and malformed branches retain general
+admission. Duplicate merging borrows the incoming exact point from the callback.
 
-The final Windows x64 capture covers 20 warmed runtime fixtures, all at 0 B/op:
+The final refinement computes a defining circle line once per cohort and reuses
+its conjugate root. Exact line/circle intersections replace repeated parameter
+expansion; a single strict unit-interval check leaves endpoints to cardinal
+cohorts. Coefficient bounds justify a 20-word bank for circle coefficients and
+chart sums, while larger discriminant, point and exit banks retain their widths.
+Empty charts and exact aliases are omitted only where surviving earlier events
+cover their points and both directional certificates. Streaming inventory changes
+intentionally; surviving order and canonical provenance remain stable, and targeted
+replay still reconstructs omitted descriptors. Eighteen streamed-event fixtures
+compare descriptors, exact points, both exits and materialization independently
+with targeted reconstruction. Additional oracle cases cover both circle roots,
+alias provenance, degenerate/axis cases, extreme widths and strict interval edges.
+The shared root-multiplication owner now clears reused destination tails when
+coefficient widths differ, backed by an exact mixed-width arithmetic regression.
 
-| Control | Committed single-contact baseline (µs) | First integration (µs) | Current (µs) |
+Selected samples share one exact exit construction while independently rounding
+common-frame and cone-local anchors; mesh-local identity uses authored coordinates
+directly. Odd-origin ties and translated cancellation retain global nearest-even
+parity. The selected regional minimum of the two maximum exits is bounded by half
+the cone's projection width, hence by `max(H,R)`; every pool depth is no larger.
+This proves representable depth for supported dimensions without a redundant
+recoverable-failure branch. Existing throwing invariant checks remain.
+
+Experiments were removed when complete captures showed no useful overall gain:
+whole-point limb cancellation, vertical rounded-coordinate ordering, joint affine
+gcd reduction, direct fixed-width normal products, mixed rational/quadratic
+multiplication, integer-only coverage ranking, metric-normal gcd reduction and
+rounding-enclosure reuse. Global identity-basis normalization also stalled an
+existing cylinder rounding test and was removed. Whole-limb cancellation remains
+narrowly scoped to immutable-span ratio entry; shared typed division is unchanged.
+A global two-root dispatch rewrite was declined after profiles attributed only
+1.8–2.9% of managed samples to parameter construction; it would require additional
+quadrant, ordering and provenance machinery. These experiments leave no runtime
+switches, alternate owners or new abstractions.
+
+Final Windows x64 Release captures cover all 20 warmed runtime fixtures twice,
+each with three warmups and five measurements, all at **0 B/op**:
+
+| Control | Original single-witness path (µs) | First integration (µs) | Final repeat (µs) |
 | --- | ---: | ---: | ---: |
-| Apex face | 22.86 | 851.95 | 105.63 |
-| Base face | 21.89 | 872.51 | 110.11 |
-| Side face | 27.85 | 1,969.38 | 467.96 |
-| Interior rim | 905.84 | 4,299.23 | 1,271.55 |
-| Oblique rim | 668.97 | 3,051.91 | 1,470.35 |
-| Subdivided tilted surface | 244.90 | 3,704 | 1,245.14 |
+| Apex face | 22.86 | 851.95 | 107.20 |
+| Base face | 21.89 | 872.51 | 106.01 |
+| Side face | 27.85 | 1,969.38 | 231.70 |
+| Interior rim | 905.84 | 4,299.23 | 980.67 |
+| Oblique rim | 668.97 | 3,051.91 | 1,360.29 |
+| Subdivided tilted surface | 244.90 | 3,704 | 1,033.20 |
 
-Joined walls, disconnected supports, ring and thin-tab controls take
-1.844/2.627/2.391/2.812 ms. A fresh same-session committed-source capture measures
-side contacts at 576.66 us and joined walls at 2,044.04 us, versus 467.96 us and
-1,843.54 us after refinement: improvements of 18.8% and 9.8%. Both complete
-candidate captures retain 0 B/op across all 20 fixtures. Small differences in
-short captures are not universal speedup or regression claims. A longer paired
-check (five warmups, ten measurements) puts QuadInterior at 99.23 us committed
-versus 100.61 us candidate, and SmallInterior at 99.83 versus 98.25 us, all 0 B/op.
-The overlapping confidence intervals do not establish a small-control regression.
-Ordinary controls remain roughly 5–17 times their original single-contact costs.
-**Performance acceptance remains open; introduced costs stay in phase 3.**
+Against the fresh same-session committed-source capture, side contacts improve
+from 484.70 to 231.70 µs (52.2%), joined walls from 1,880.9 to 1,120.36 µs (40.4%),
+interior rim from 1,326.23 to 980.67 µs (26.1%), oblique rim from 1,527.60 to
+1,360.29 µs (11.0%) and tilted subdivision from 1,332.8 to 1,033.20 µs (22.5%).
+Disconnected supports, ring and thin-tab controls take 2.571/2.378/2.726 ms.
+The second capture confirms the main improvements; small differences elsewhere
+do not establish universal speedups or regressions. Upstream plane-section
+controls take 255.5/568.0/1,156.0 µs, all at 0 B/op.
 
-For cone side form `F(X)=H²*(Xx²+Xz²)-R²*Xy²`, let `A=F(N)`,
-`B(G)=H²*(Nx*Gx+Nz*Gz)-R²*Ny*Gy`, and `T=N·G-c*gd`, with plane normal
-`N`, plane constant `c`, and homogeneous base-rim point `(G,gd)`. Its projected
-homogeneous point `(P,|N|²*gd)`, with `P=|N|²*G-T*N`, satisfies
-`F(P) = T * (A*T - 2*|N|²*B(G))`; valid plane-scope line-6 roots with branch ±1
-make the second factor zero. Reusing this proof omits only the redundant side
-polynomial; closed plane/height/source admission, exit signs and all other strata
-retain their existing checks. Six BigInteger-oracle cases cover valid roots,
-rejected/malformed branches and a forged nonseam branch that lies strictly inside
-the base disk and must retain general admission. Duplicate merging also borrows the
-incoming exact point from the existing synchronous callback and reconstructs only
-the retained event. Classic descriptor ordering, provenance and failure behavior
-are unchanged. The existing fourteen streamed-event fixtures independently check
-this comparator against reconstruction. Neither refinement adds production files,
-retained point storage or a new cache.
+**Phase 3 performance acceptance is closed:** ordinary face costs remain roughly
+4.7–8.3 times the original single-witness path, but that path discarded the finite
+surface sampling and independent constraints required by the reviewed contract.
+The new path retains up to four coverage samples per group, exact finite-domain
+admission, depth and provenance. The introduced work was refined in this phase;
+it was not moved to a backlog. The absolute costs above remain workload limits:
+the heavier fixtures take about 1–2.7 ms per detection on this host. Phase 4 must
+measure grouped response and capacity/memory behavior before issue closeout.
 
-Fresh EventPipe profiles put finite sample reduction at 40.8% and 38.2% of managed
-benchmark CPU samples in the apex and side fixtures; general circle-parameter
-construction remains 40.4% and 41.9% in side and interior-rim cases. These
-inclusive call-tree percentages overlap and are not additive. The next measured
-refinement should examine repeated reconstruction/materialization and exact
-coverage-metric work within the existing reduction owners. Early region filtering
-would require producer/exit plumbing and cannot help ordinary face fixtures that
-already certify whole-section containment; measure rejected-event work before
-expanding that contract.
+Fresh EventPipe profiles put sample reduction at 38.6%/38.6%/16.7% of managed
+benchmark CPU samples for apex/side/interior rim; circle-parameter admission is
+46.9%/33.6% for side/interior rim, with existing boundary rim roots at 20.1% in
+the latter. Inclusive percentages overlap and are not additive. The remaining
+cost is distributed across exact admission, sampling and true-boundary work;
+independent math/physics and ponytail review found no blocking regression or
+justified additional cache/dispatch abstraction.
 
-With `UseLocalLsfStack=true`, full **unfiltered** FixedMathSharp suites pass
-4,915 Release and 4,894 ReleaseLean cases; Gravitas passes 5,077 Release and
-5,012 ReleaseLean cases. Raw sequence/line, branch and fully-covered-method
-totals are exact 100% in all four reports:
+**Compatibility repair complete:** Radius-1, height-4 cones near both scalar
+limits retain relative contacts even when conceptual endpoints cross the
+absolute coordinate limit. Existing materialization owners use one translated
+frame and publish original collider origins without narrowing large cancelling
+offsets. Tests cover both limits, odd-origin half ties, exact additive anchors,
+identities and response parity; the original four-case cone/cylinder theory is
+restored to unfiltered suites. Phase 2's absolute-world restriction was an
+implementation assumption missed by isolated sampler tests while public-anchor
+tests still used the legacy producer. Integration repaired the existing contract;
+geometry-size policy remains #096, conservative rotational CCD aggregate bounds
+remain #101, and existing collision-position saturation remains #102.
+
+Fresh **unfiltered** local-stack suites pass 4,944/4,923 FixedMathSharp cases and
+5,077/5,012 Gravitas cases in Release/ReleaseLean. Raw sequence/line, branch and
+fully-covered-method totals are exact **100%** in all four reports:
 
 | Repository / configuration | Lines | Branches | Fully covered methods |
 | --- | ---: | ---: | ---: |
-| FixedMathSharp Release | 56,014/56,014 | 14,224/14,224 | 4,210/4,210 |
-| FixedMathSharp ReleaseLean | 56,107/56,107 | 14,224/14,224 | 4,206/4,206 |
-| Gravitas Release | 46,043/46,043 | 14,348/14,348 | 4,759/4,759 |
-| Gravitas ReleaseLean | 46,041/46,041 | 14,348/14,348 | 4,758/4,758 |
+| FixedMathSharp Release | 56,055/56,055 | 14,296/14,296 | 4,212/4,212 |
+| FixedMathSharp ReleaseLean | 56,148/56,148 | 14,296/14,296 | 4,208/4,208 |
+| Gravitas Release | 46,047/46,047 | 14,352/14,352 | 4,759/4,759 |
+| Gravitas ReleaseLean | 46,045/46,045 | 14,352/14,352 | 4,758/4,758 |
 
-Both multi-target solution builds have zero warnings or errors. Independent
-ponytail/math/physics source review found no additional blocker or actionable
-bloat cut. The 49-case FixedMathSharp.Chronicler adapter suites also pass in
-both configurations with exact 85/85 lines, 12/12 branches and 18/18 fully
-covered methods. Both API sites pass DocFX warnings-as-errors and local-link
-validation. Three upstream plane-section controls take
-288.9/642.8/1,207.0 us, all at 0 B/op. Small differences in these short captures
-are not universal speedup or regression claims. Evidence is retained under ignored
-`artifacts/grv-issue-095/phase3-circle-final-*`, with paired committed-source
-and longer small-control captures under `phase3-circle-head-baseline` and
-`phase3-circle-small-*`. This host evidence does not replace native
-cross-platform replay gates.
-
-**Compatibility repair complete:** Radius-1, height-4 cones near both scalar
-limits now retain valid relative contacts even when conceptual endpoints cross
-the absolute coordinate limit. Sampling reuses existing anchor/materialization
-owners in one common translated frame, preserves global nearest-even parity and
-publishes the original collider origins without narrowing large cancelling
-offsets. Tests cover both limits, odd-origin half ties, exact additive anchor
-terms, contact identities and response parity; the original four-case
-cone/cylinder theory is restored to the unfiltered suites.
-
-The phase-2 absolute-world restriction was an implementation assumption. Its
-isolated sampler tests enforced that assumption while public-anchor regressions
-still exercised the legacy producer. Integration exposed the mismatch; the
-producer now preserves the existing relative-anchor contract. This does not
-expand supported geometry sizes or alter final body-position policy. Practical
-radii/extents remain #096; source-observed saturation in existing 3D/2D collision
-position correction is separately captured as #102.
-
-Performance acceptance remains open in this phase; additional constraints alone
-do not justify an unusable ordinary-contact cost. Phase 3 and #095/#099 remain
-open. The separately confirmed conservative rotational CCD frontier for concave
-aggregate bounds remains #101.
+Both multi-target solutions build with zero warnings/errors. The 49-case
+FixedMathSharp.Chronicler adapter suites pass both configurations with exact
+85/85 lines, 12/12 branches and 18/18 fully covered methods. Both API sites pass
+DocFX warnings-as-errors and local-link checks. Independent phase-boundary,
+math/physics and ponytail reviews cover the coordinated source and final evidence.
+Evidence is retained under ignored `artifacts/grv-issue-095/`:
+`phase3-exit-head-baseline`, `phase3-open-charts-contact`,
+`phase3-oct09-canonical-final-*` and `phase3-oct09-canonical-r3-*`.
+All development, builds, tests and benchmark child builds use
+`UseLocalLsfStack=true`. This Windows x64 evidence does not replace native
+cross-platform replay or released-package validation after the upstream release.
+Phase 3 is complete; #095/#099 remain active for phase 4.
 
 ## Phase 4 — Coverage, Performance, Documentation And Closeout
 
-- [ ] Extend `MeshConeSurfaceContactBenchmarks` with tab/hole, connected walls
-  and subdivision cases. Add direct grouped-response and cold/retained-memory
-  measurements alongside existing response benchmarks; measure one-surface,
+- [x] Extend `MeshConeSurfaceContactBenchmarks` with tab/hole, connected walls
+  and subdivision cases; detection controls are implemented and measured in phase 3.
+- [ ] Add direct grouped-response and cold/retained-memory measurements alongside
+  existing response benchmarks; measure one-surface,
   redundant samples and multiple independent groups under the same settings.
-- [ ] Compare before/after on the same host, stack, build and fixture. Require
-  warmed zero allocation and explain every material ordinary-contact regression;
+- [ ] Compare response, memory and any subsequent runtime changes before/after
+  on the same host, stack, build and fixture. Reuse phase 3's completed detection
+  evidence unless changes invalidate it. Require warmed zero allocation and
+  explain every material ordinary-contact regression;
   investigate regressions before accepting them as the cost of correctness.
   Do not silently loosen allocation/performance gates.
 - [ ] Run full Release and ReleaseLean coverage in changed repositories,

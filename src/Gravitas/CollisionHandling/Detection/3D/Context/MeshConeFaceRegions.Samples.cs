@@ -48,11 +48,13 @@ internal sealed partial class MeshConeFaceRegions
         _sampleCounts[region] = 0;
         int orientation = _regions[region].Orientation;
         var selected = BorrowWinner(2 * region + (orientation > 0 ? 0 : 1));
-        if (!selected.TryMaterialize(_frame, orientation, _samplingOrigin, out Vector3d maximumPoint, out Vector3d maximumExit, out Fixed64 maximumDepth))
+        if (!ConePlaneRayPointMaterialization.TryGetPointInFrame(_frame, selected.Point, selected.Root,
+            _samplingOrigin, out Vector3d maximumPoint)
+            || !TryMaterializeSample(selected, orientation, maximumPoint, out Sample maximum))
         { _sampleCounts[region] = -1; return; }
         // Keep the exact regional maximum first. The rest of this finite pool
         // uses intrinsic and true-boundary constructions, independent of seams.
-        _samplePool.Add(new Sample(selected.MaximumSource, selected.MaximumEvent, maximumPoint, maximumExit, maximumDepth, GetLocalIdentity(selected, orientation)));
+        _samplePool.Add(maximum);
         foreach (PoolEvent descriptor in _poolEvents.AsReadOnlySpan())
             if (descriptor.Region == region && !KeepSample(descriptor, orientation))
             { _sampleCounts[region] = -1; return; }
@@ -145,28 +147,34 @@ internal sealed partial class MeshConeFaceRegions
             ref positive, ref negative, requestedOrientation: orientation);
         ConePlaneRaySelection selected = orientation > 0 ? positive : negative;
         System.Diagnostics.Debug.Assert(exists && selected.HasValue);
-        bool represented = selected.TryGetRoundedMaximumDepth(out Fixed64 depth);
-        bool anchored = ConePlaneRayPointMaterialization.TryGetExitPointInFrame(_frame, selected.Point, selected.Root,
-            ContactQuadratic.At(selected.Values, selected.Signs, 0, ConePlaneRaySelection.FieldWords),
-            ContactQuadratic.At(selected.Values, selected.Signs, 1, ConePlaneRaySelection.FieldWords), orientation, _samplingOrigin, out Vector3d exit);
-        // The source/frame is unchanged, exit range was checked exactly, and
-        // nearest-even rounding is monotone below the representable maximum.
-        System.Diagnostics.Debug.Assert(represented && anchored);
-        return new Sample(sample.Source, sample.Event, sample.MeshPoint, exit, depth, GetLocalIdentity(selected, orientation));
+        bool represented = TryMaterializeSample(selected, orientation, sample.MeshPoint, out Sample result);
+        // The source/frame is unchanged and every eligible exit range was
+        // checked exactly before reduction; replay preserves that certificate.
+        System.Diagnostics.Debug.Assert(represented);
+        return result;
     }
 
-    private ulong GetLocalIdentity(scoped in ConePlaneRaySelection selection, int orientation)
+    private bool TryMaterializeSample(scoped in ConePlaneRaySelection selection, int orientation,
+        Vector3d meshPoint, out Sample sample)
     {
+        sample = default;
+        // The chosen regional minimum is at most half the cone's projection
+        // width. Its enclosing sphere has radius <= max(height,radius), so
+        // every selected depth fits Fixed64; the shared getter guards defects.
+        Fixed64 depth = selection.GetRoundedMaximumDepth();
+        if (!ConePlaneRayPointMaterialization.TryGetExitPointsInFrame(_frame, selection.Point, selection.Root,
+                ContactQuadratic.At(selection.Values, selection.Signs, 0, ConePlaneRaySelection.FieldWords),
+                ContactQuadratic.At(selection.Values, selection.Signs, 1, ConePlaneRaySelection.FieldWords),
+                orientation, _samplingOrigin, out Vector3d exit, out Vector3d coneLocal)) return false;
         bool meshLocal = ConePlaneRayPointMaterialization.TryGetAuthoredPoint(_frame, selection.Point, selection.Root,
             out Vector3d p);
-        bool coneLocal = ConePlaneRayPointMaterialization.TryGetExitConeLocalPoint(_frame, selection.Point, selection.Root,
-            ContactQuadratic.At(selection.Values, selection.Signs, 0, ConePlaneRaySelection.FieldWords),
-            ContactQuadratic.At(selection.Values, selection.Signs, 1, ConePlaneRaySelection.FieldWords), orientation, out Vector3d q);
-        // Closed authored triangles and a finite cone bound both local points
-        // by their representable vertices/dimensions. These are independent
-        // final local rounds for identity, never inverse-rounded world anchors.
-        System.Diagnostics.Debug.Assert(meshLocal && coneLocal);
-        return ContactManifold.CreateContactId(ContactAnchor.FromWorldPoint(p), 0, ContactAnchor.FromWorldPoint(q), 0);
+        // Round authored identity directly from the exact point. The paired
+        // exit owner independently rounds its cone-local anchor; neither is
+        // recovered by inverting the once-rounded common-frame outputs.
+        System.Diagnostics.Debug.Assert(meshLocal);
+        ulong identity = ContactManifold.CreateContactId(ContactAnchor.FromWorldPoint(p), 0, ContactAnchor.FromWorldPoint(coneLocal), 0);
+        sample = new Sample(selection.MaximumSource, selection.MaximumEvent, meshPoint, exit, depth, identity);
+        return true;
     }
 
     // Availability and exact output range are retained separately. Opposite

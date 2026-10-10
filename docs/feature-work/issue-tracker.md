@@ -87,9 +87,10 @@
 
 ### GRV-Issue-095 - Discrete mesh-cone contacts can choose an artificial triangulation-seam exit
 
-- **Status:** Active; convex geometry refinement implemented. The surface-manifold
-  architecture is approved; its [implementation plan](2026-10-08-surface-contact-manifold-plan.md)
-  specifies the remaining runtime work and joint #095/#099 validation gates.
+- **Status:** Active; phase 3 surface integration and performance refinement are
+  complete. The [implementation plan](2026-10-08-surface-contact-manifold-plan.md)
+  retains phase 4 grouped-response, memory, replay and documentation closeout gates
+  for #095/#099.
 - **Confirmed:** 2026-10-07 during #094 geometry review, in four isolated
   local-stack Release cases: convex/concave flat quad targets and both windings.
 - **Reproduction:** A default cone centered at `(0, -1/4, 0)` overlaps a flat
@@ -232,6 +233,9 @@
 
 ### GRV-Issue-099 - Cone mesh reduction omits independent wall constraints
 
+- **Status:** Active; phase 3 implements independent surface constraints and
+  physical regressions. Joint #095/#099 closeout awaits phase 4 in the
+  [implementation plan](2026-10-08-surface-contact-manifold-plan.md).
 - **Confirmed:** 2026-10-08 against the committed #095 refinement, in four
   failing local-stack Release diagnostic cases and two passing separate-wall
   controls. Both windings are exercised.
