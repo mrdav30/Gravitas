@@ -112,14 +112,18 @@ containment semantics. Closed convex mesh versus sphere checks use the same
 whole-hull relation as zero-core capsules. Convex mesh versus capsule checks
 reduce the whole capsule against the hull's faces, edges and vertices, retaining
 one minimum-exit contact with finite support anchors for exterior overlap,
-touching and containment. For nonzero capsule cores, clipping a hull anchor to
-a finite support face can leave the two anchors tangentially misaligned.
+touching and containment. Cuboid and convex mesh side contacts pair both
+anchors against the finite capsule core and the selected support footprint.
+Exact clipping chooses the admitted core point nearest its midpoint; endpoint
+and radial terms remain separate, with rounding deferred to the final witnesses.
 Open convex meshes and concave meshes retain surface semantics for spheres.
 Exact interior and finite support-face certificates avoid unnecessary sphere
 radial searches. Otherwise the nearest finite edge or vertex supplies the
 radial axis; exact feature ranking precedes final anchor rounding. Sphere and
 capsule support-face anchors use the first authored triangle containing the
 exact projection, rather than ranking differences from final anchor rounding.
+When a capsule midpoint projects outside that footprint, exact core parameters
+are ranked across its support triangles, retaining authored order for ties.
 Other mesh paths use the same
 deterministic BVH candidate ownership;
 candidate order follows the stable built tree rather than authored triangle

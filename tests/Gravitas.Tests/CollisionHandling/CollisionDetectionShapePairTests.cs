@@ -514,20 +514,12 @@ public sealed class CollisionDetectionShapePairTests
         contact.Normal.Y.Should().BeGreaterThan(Fixed64.Zero);
         Vector3d.Dot(contact.Normal, capsule.Collider.WorldAxis)
             .Abs().Should().BeLessThanOrEqualTo(Fixed64.Epsilon);
-        Vector3d localNormal =
-            (capsule.Collider.Rotation.Inverse() * -contact.Normal).Normalized;
-        FixedPointAnchor expectedCapsuleAnchor =
-            FixedSegment.GetSurfaceAnchorOnCenteredCapsule(
-                cuboid.Collider.Center,
-                capsule.Collider.Center,
-                capsule.Collider.Rotation,
-                Vector3d.Up,
-                capsule.Collider.AxisLength,
-                capsule.Collider.ScaledRadius,
-                localNormal);
-        expectedCapsuleAnchor.TryGetPoint(out Vector3d expectedPointB)
-            .Should().BeTrue();
+        // The core endpoint at the corner owns the paired radial witness;
+        // independently projecting the box centre can select the other endpoint.
+        Vector3d expectedPointB = touchingEndpoint - contact.Normal * capsule.Collider.ScaledRadius;
         Vector3d.Distance(contact.PointB, expectedPointB)
+            .Should().BeLessThanOrEqualTo(Fixed64.Epsilon);
+        Vector3d.Cross(contact.PointA - contact.PointB, contact.Normal).Magnitude
             .Should().BeLessThanOrEqualTo(Fixed64.Epsilon);
         (contact.Depth - capsule.Collider.ScaledRadius).Abs().Should().BeLessThanOrEqualTo(Fixed64.Epsilon);
         (Vector3d.Dot(contact.PointA - contact.PointB, contact.Normal) - contact.Depth)

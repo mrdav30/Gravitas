@@ -273,6 +273,42 @@ Remaining measured performance costs are tracked in the benchmark backlog.
   upstream as `FMS-Issue-028`; it does not affect the zero-core sphere fix.
   Pure 2D has no triangle-mesh counterpart; mixed reduction remains separately
   tracked. Released-package and other native-platform validation remain gates.
+- **Upstream witness follow-up (`FMS-Issue-028`, 2026-10-11):** The original
+  crossing-core cube query paired finite support points with a two-unit
+  tangential gap. Full `Simulate` plus `LateSimulate` tests confirmed a
+  `0.5714285704` angular-momentum error for two dynamic bodies and missing
+  off-centre spin against a static wall; equivalent cuboid controls passed.
+  FixedMathSharp now matches the finite capsule core and selected support
+  footprint before final witness rounding. The same owner repairs oblique
+  cuboid face, edge and corner variants, including a rotated benchmark fixture
+  with a previously hidden tangential mismatch. Existing valid cuboid witness
+  choices, minimum exit depth, authored ties and exact endpoint terms remain.
+  Gravitas needs no production change. Maintained regressions inspect both
+  anchors, reverse pair ownership, equivalent box/hull geometry, whole-shape
+  exit, full-domain frames and complete-host angular/linear momentum.
+  Fresh local-stack Release/ReleaseLean pass FixedMathSharp core `5,067/5,046`
+  and Gravitas `5,168/5,103` tests, with exact 100% raw line/sequence, branch
+  and fully-covered-method coverage in all four lanes. Chronicler integration
+  passes 49 tests in each configuration; six shared replay fixtures agree
+  across native Windows x64 Release/Lean with unchanged expected hashes.
+  Multi-target builds, DocFX warnings-as-errors, local links and independent
+  ponytail review pass. The fix reuses five existing math files, removes an
+  unused projection overload and adds 196 net runtime lines; no public API or
+  Gravitas runtime file is added.
+  Native out-of-process .NET 8 controls on the Windows x64 i7-9700K host measure
+  crossing hull/capsule `356.97 -> 326.08` microseconds, ordinary hull/capsule
+  `309.43 -> 303.79` and box/box `25.54 -> 18.92`. Repaired oblique box/capsule
+  fixtures retain a correctness cost over their mismatched-anchor baseline:
+  rotated edge `94.28 -> 110.54`, thin face `64.59 -> 80.38`, asymmetric corner
+  `71.57 -> 78.74` and clipped edge `73.93 -> 80.55`. Aligned side and strict
+  controls are `55.44 -> 52.13` and `46.28 -> 46.03`. All 13 upstream controls
+  allocate 0 B/op. Final Gravitas sphere containment/face/edge/separation costs
+  are `33.83/44.87/123.04/10.91` microseconds and zero-core capsule controls
+  `33.39/44.57/115.24/11.21`, also 0 B/op; these remain in the prior measured
+  cost range. Ignored `artifacts/fms-issue-028/` holds coverage, replay, profile
+  and benchmark evidence. The upstream tracker entry is closed. Release
+  FixedMathSharp first, then revalidate Gravitas against its released package;
+  Linux and ARM native replay lanes remain release gates.
 
 ### GRV-Issue-097 - Sphere and capsule mesh manifolds retain internal-seam constraints
 
