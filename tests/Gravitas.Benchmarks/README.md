@@ -234,6 +234,14 @@ Historical selected-axis results include false contacts and nonminimum depths;
 their timings are implementation costs, not equivalent-correctness targets.
 These are individual narrow-phase queries, not complete simulation frames.
 
+### Sphere/capsule mesh contacts
+
+The `curved-mesh-surface-contact` selection measures sphere and capsule contacts
+against a two-triangle concave quad, with interior and exposed-edge poses. Each
+row includes direct narrow-phase dispatch, exact contact admission, covered-seam
+filtering and manifold construction. It measures one contact query rather than
+a complete simulation frame; compare the same shape and pose across revisions.
+
 ### Mesh/cone contacts
 
 The `mesh-cone-contact` selection measures base, side, apex, oblique-rim,

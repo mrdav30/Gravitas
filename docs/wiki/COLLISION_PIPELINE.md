@@ -108,18 +108,26 @@ Convex SAT paths use stable axis generation and pair-oriented normals. Cuboid
 versus capsule checks first solve exact segment-to-oriented-box distance for
 rounded features, then use ordered SAT only when the capsule core reaches the
 box; inclusive projections and directional exit depths preserve touching and
-containment semantics. Convex mesh versus capsule checks use the closest
-capsule-segment point to the mesh center for their exterior representative
-manifold and fall back to deterministic BVH traversal with stable contact-ID
-reduction when contact exists away from it. Closed-convex containment instead
-orients face planes from the scaled world-space center of mass and reduces the
-whole capsule over face and edge-cross axes to a matched support-feature exit
-manifold. Other mesh paths use the same deterministic BVH candidate ownership;
+containment semantics. Convex mesh versus capsule checks reduce the whole
+capsule against the hull's faces, edges and vertices, retaining matched support
+anchors for exterior overlap and containment. Other mesh paths use the same
+deterministic BVH candidate ownership;
 candidate order follows the stable built tree rather than authored triangle
 indices. Concave mesh/mesh pairs canonicalize relation direction by stable
 collider ID and delegate each BVH-admitted triangle pair to FixedMathSharp's
 full-domain rigid-frame contact relation. Compound paths scan parts in stable
 declaration order and return the owner collider as the public identity.
+
+Mesh/sphere and concave mesh/capsule contacts retain exact closest-feature
+certificates before normal and anchor rounding. Within each trusted prepared
+planar domain, a boundary witness is discarded when its separation points into
+an incident filled triangle. This removes covered seam constraints while
+preserving exposed edges, holes and plane-normal tangency. A sphere uses the
+zero-length capsule core relation; parallel cores test face projections before
+perimeter features. Independent surface owners retain separate four-sample
+groups; disconnected contact regions on one prepared surface share that cap.
+Inconsistent winding and other ambiguous topology keep independent triangle
+domains.
 
 Mesh/cylinder contacts delegate each admitted triangle to FixedMathSharp's
 finite-cylinder contact query. That query selects across triangle faces,

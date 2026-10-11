@@ -2,7 +2,7 @@
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-104`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-108`.
 - Assign an ID when an issue enters this tracker, keep it through resolution,
   and never reuse an ID even if an entry is later removed. Check this file's Git
   history before advancing or repairing the counter.
@@ -35,26 +35,84 @@
 
 ### Ordered Queue
 
-### GRV-Issue-097 - Sphere and capsule mesh manifolds retain internal-seam constraints
+### GRV-Issue-107 - Contained spheres miss closed convex mesh volume contacts
 
-- **Confirmed:** 2026-10-08 against the unchanged #095 baseline, with both
-  windings of a concave Y-zero quad spanning `[-2, 2]` in X/Z and diagonal
-  `X+Z=0`. A radius-`1/2` sphere or vertical capsule centered at
-  `(3/10, -1/4, 3/10)` overlaps both triangles strictly inside the surface.
-- **Reproduction:** Both manifolds retain a face contact and a second contact
-  against the covered diagonal. The sphere's second normal is approximately
-  `(0.60921, -0.50767, 0.60921)`; the capsule's is approximately
-  `(0.70711, 0, 0.70711)`. Inspecting only the primary contact hides this defect.
-- **Root cause:** Per-triangle curved contacts are individually valid but the
-  manifold also retains a triangle-only escape into its neighbor. The solver
-  processes every retained contact, so a covered seam becomes a lateral
-  constraint. The tested finite-cylinder controls retained only face normals;
-  that result does not establish cylinder conformance for other geometry.
-- **Follow-up:** Reduce curved contacts over the actual surface, preserving
-  exposed edges, holes and noncoplanar faces. Verify every manifold contact and
-  frictionless full-loop movement, including winding and triangulation parity.
-- **Evidence:** Ignored `artifacts/grv-issue-095/CurvedMeshSeamParityAudit.cs`
-  and `parity-baseline.log` retain the four failures and cylinder controls.
+- **Confirmed:** 2026-10-10 in the final #097 audit. A radius-`1/10` sphere at
+  the center of a closed convex cube spanning `[-1/2,1/2]` on each axis reports
+  no collision. An equivalent zero-core capsule reports a nearest-exit contact
+  with depth `3/5`. Both input orders reproduce the discrepancy; concave mode
+  correctly reports no contact for either shape wholly away from its surface.
+- **Root cause:** Discrete sphere dispatch always gathers nearby mesh triangles,
+  without the whole-hull volume relation used by convex capsule dispatch. The
+  contained sphere cannot reach any face, so there is no triangle contact.
+  This dispatch and candidate policy predate #097; its seam filtering does not
+  introduce the miss. Existing capsule and reconfiguration tests require convex
+  meshes to fill their volume, unlike concave surface meshes.
+- **Follow-up:** Reuse the convex hull's zero-core relation for discrete
+  sphere/convex-mesh contacts; verify containment, exterior overlap, touching,
+  separation, compound remapping, matched anchors and full-loop response.
+  Preserve concave surface semantics and the explicitly two-sided mesh sphere
+  sweep contract; do not silently change queries alongside the discrete fix.
+- **Evidence:** Ignored `artifacts/grv-issue-097/contained-probe/` and
+  `contained-probe.log` retain the four convex/concave, forward/reversed controls.
+
+### GRV-Issue-104 - Crossing capsule cores understate concave mesh exit depth
+
+- **Confirmed:** 2026-10-10 while reproducing #097; this predates its seam
+  filtering change. The radius-`1/2`, full-height-2 capsule centered at
+  `(3/10, -1/4, 3/10)` across a flat Y-zero quad retains a downward face contact
+  with depth `1/2`. Clearing the complete capsule downward requires `3/4`.
+- **Root cause:** The triangle relation computes `radius - distance(core,
+  triangle)`. When the core crosses the face, that distance is zero; the
+  expression omits the core's directional extent. Removing false seam normals
+  does not correct the independent depth contract.
+- **Follow-up:** Retain exact finite-face admission, derive matched whole-capsule
+  directional exit anchors and depth, and test angled cores, exposed edges,
+  touching, winding, subdivision and full-loop depenetration. Preserve the
+  separate convex hull path; do not substitute an unbounded-plane support when
+  the finite surface cannot admit it. Audit public FixedMathSharp triangle
+  contact semantics and mixed consumers before choosing the shared owner.
+- **Evidence:** Ignored `artifacts/grv-issue-097/Issue097DiscoveryProbe.cs` and
+  `refinement-focused-audit.log` record expected `3/4` versus actual `1/2`.
+
+### GRV-Issue-106 - Accepted mixed-winding coplanar meshes retain covered seam contacts
+
+- **Confirmed:** 2026-10-10 in the #097 audit. Reverse only the second triangle
+  of the Y-zero quad: indices `0,2,1, 3,2,1` with vertices
+  `(-2,0,-2)`, `(2,0,-2)`, `(-2,0,2)`, `(2,0,2)`. A radius-`1/2` sphere at
+  `(3/10,-1/4,3/10)` still retains the diagonal normal approximately
+  `(0.60921,-0.50767,0.60921)` alongside the genuine downward face.
+- **Root cause:** Concave admission accepts both triangle windings, but prepared
+  seam trust deliberately declines equal directed uses of the shared edge. The
+  triangles remain separate owners, so trusted-domain filtering cannot remove
+  their seam. This behavior and the topology policy predate #097.
+- **Follow-up:** Decide whether to certify orientation-neutral two-sided planar
+  domains or reject/document inconsistent winding at the authoring boundary.
+  Preserve rejection of overlapping or otherwise ambiguous domains; test sphere,
+  capsule, cone and mixed contacts plus frictionless motion.
+- **Evidence:** Ignored `artifacts/grv-issue-097/Issue097DiscoveryProbe.cs` and
+  `refinement-focused-audit.log` retain the failing all-contact proof.
+
+### GRV-Issue-105 - Curved contacts share a sample cap across disconnected planar overlap regions
+
+- **Confirmed:** 2026-10-10 in the #097 audit. A connected five-tab comb has one
+  trusted planar owner but five disconnected intersections with a radius-1
+  sphere centered at `(0,1/4,0)`. Only four genuine rim contacts survive.
+- **Reproduction:** Use X coordinates `[-13,-11,-7,-5,-1,1,5,7,11,13]/16`.
+  A backbone spans Z `[2,9/4]`; five tabs on alternating adjacent X intervals
+  extend to Z `3/8`. The backbone is outside the sphere footprint, so the five
+  admitted regions are independent despite sharing one authored surface.
+- **Root cause:** The earlier mesh-wide four-sample cap already dropped a region;
+  the per-surface cap introduced with #097 preserves independent planes but
+  retains this pre-existing limit within one connected planar owner.
+- **Follow-up:** Group sphere/capsule contacts by admitted connectivity before
+  applying the four-sample reduction, reusing the prepared welded incidence.
+  Preserve all real region constraints and deterministic provenance under
+  subdivision, triangle order, holes, compound remapping and warm starts. Audit
+  other per-triangle curved paths for the same limit.
+- **Evidence:** Ignored `artifacts/grv-issue-097/Issue097DiscoveryProbe.cs` and
+  `refinement-focused-audit.log` record expected at least five contacts versus
+  actual four.
 
 ### GRV-Issue-098 - Mixed curved slab mesh contacts can select a covered seam
 
@@ -194,6 +252,43 @@
 Remaining measured performance costs are tracked in the benchmark backlog.
 
 ## Resolved Issues
+
+### GRV-Issue-097 - Sphere and capsule mesh manifolds retain internal-seam constraints
+
+- **Resolved:** 2026-10-10. Sphere and concave-capsule contacts share the existing
+  exact triangle/core relation, retaining closest-feature incidence and
+  separation before rounding. Gravitas rejects witnesses directed into an
+  incident filled triangle within the same trusted prepared planar domain.
+  Exposed edges, holes and independent surface constraints remain; the convex
+  capsule hull path is preserved. No new runtime file or public API is required.
+- **Original reproduction:** A radius-`1/2` sphere or vertical capsule centered
+  at `(3/10,-1/4,3/10)` below a two-triangle Y-zero quad retained a covered
+  diagonal constraint alongside its genuine face contact. Both coherent
+  windings reproduced lateral normals, which the solver treated as real walls.
+- **Verification:** Maintained regressions inspect every contact, winding and
+  subdivision parity, exposed edges/corners and holes, compound remapping,
+  rotated crossing cores, full-domain charts, independent planes, frictionless
+  `Simulate` plus `LateSimulate` motion and warmed zero allocations. Fresh
+  local-stack Release/ReleaseLean pass Gravitas `5,129/5,064` and FixedMathSharp
+  core `4,983/4,962` tests, with exact 100% raw line/sequence, branch and
+  fully-covered-method coverage in both configurations. Upstream Chronicler
+  integration passes 49 tests in each lane; six shared replay fixtures agree
+  across native Windows x64 Release/Lean with unchanged expected hashes.
+- **Measured cost:** Matched four-row narrow-phase measurements are
+  `13.11/10.84` microseconds for sphere interior/exposed-edge poses versus
+  `10.506/8.313` before exact admission and seam certification. Capsule rows
+  improve from `34.055/27.812` to `24.49/22.33` microseconds. All allocate 0 B.
+  Reusing public triangle feature selection preserves its measured cost
+  (`156.2` versus `155.0` nanoseconds, 0 B). These are single queries, not frames.
+- **Closeout:** Independent geometry, performance and ponytail review found no
+  blockers. Multi-target builds, DocFX warnings-as-errors and local links pass.
+  Ignored `artifacts/grv-issue-097/` retains RED proofs, `final-*-coverage`,
+  `final2-FMS-*-coverage`, `final-replay`, `final-measure` and public comparison
+  results. Released-package and other native-platform validation remain gates.
+- **Scope:** Separate pre-existing crossing-core depth, disconnected-region cap,
+  mixed-winding topology and solid-volume sphere defects are recorded as
+  #104–#107. Mixed slab reduction remains #098; pure 2D has no triangle-mesh
+  counterpart. These are separate contracts, not extensions of the seam fix.
 
 ### GRV-Issue-100 - Contained cylinder and cone sphere sweeps invert outward surface normals
 

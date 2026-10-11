@@ -29,7 +29,8 @@ internal static class MeshTriangleContactGenerator
     {
         mesh.GetTrianglesInBounds(CreateBounds(sphere.BoundsMin, sphere.BoundsMax), triangleBuffer);
         for (int i = 0; i < triangleBuffer.Count; i++)
-            TryAddSphereTriangleContact(pair, mesh, triangleBuffer[i], sphere);
+            TryAddRoundedAxisTriangleContact(pair, mesh, triangleBuffer[i], sphere.Center,
+                sphere.Rotation, Fixed64.Zero, sphere.ScaledRadius);
 
         return pair.Manifold.HasContact;
     }
@@ -44,7 +45,8 @@ internal static class MeshTriangleContactGenerator
 
         bool overlaps = false;
         for (int i = 0; i < triangleBuffer.Count; i++)
-            overlaps |= TryAddCapsuleTriangleContact(pair, mesh, triangleBuffer[i], capsule);
+            overlaps |= TryAddRoundedAxisTriangleContact(pair, mesh, triangleBuffer[i], capsule.Center,
+                capsule.Rotation, capsule.AxisLength, capsule.ScaledRadius);
 
         return overlaps;
     }
@@ -159,42 +161,14 @@ internal static class MeshTriangleContactGenerator
         return pair.Manifold.HasContact;
     }
 
-    private static void TryAddSphereTriangleContact(
+    private static bool TryAddRoundedAxisTriangleContact(
         CollisionWorkItem pair,
         LSMeshCollider mesh,
         int triangleIndex,
-        LSSphereCollider sphere)
-    {
-        mesh.Mesh.GetLocalTriangleVertices(
-            triangleIndex,
-            out Vector3d first,
-            out Vector3d second,
-            out Vector3d third);
-        if (!new FixedTriangle(first, second, third).TryGetSphereContact(
-                mesh.Mesh.Origin,
-                mesh.Mesh.Rotation,
-                sphere.Center,
-                sphere.Rotation,
-                sphere.ScaledRadius,
-                out FixedContactAnchors contact))
-        {
-            return;
-        }
-
-        AddContact(
-            pair,
-            new ContactAnchor(contact.FirstAnchor),
-            new ContactAnchor(contact.SecondAnchor),
-            contact.Depth,
-            contact.Normal,
-            contact.DepthIsClamped);
-    }
-
-    private static bool TryAddCapsuleTriangleContact(
-        CollisionWorkItem pair,
-        LSMeshCollider mesh,
-        int triangleIndex,
-        LSCapsuleCollider capsule)
+        Vector3d center,
+        FixedQuaternion rotation,
+        Fixed64 axisLength,
+        Fixed64 radius)
     {
         mesh.Mesh.GetLocalTriangleVertices(
             triangleIndex,
@@ -202,33 +176,81 @@ internal static class MeshTriangleContactGenerator
             out Vector3d second,
             out Vector3d third);
         var triangle = new FixedTriangle(first, second, third);
-        Vector3d fallbackNormal = OrientNormal(
-            mesh.Mesh.CreatePointAnchor(triangle.Centroid),
-            new FixedPointAnchor(
-                capsule.Center,
-                FixedQuaternion.Identity,
-                Vector3d.Zero),
-            mesh.Mesh.GetFaceNormalWorld(triangleIndex));
+        Vector3d fallbackNormal = mesh.Mesh.GetFaceNormalWorld(triangleIndex).Normalized;
         if (!triangle.TryGetCenteredCapsuleContact(
                 mesh.Mesh.Origin,
                 mesh.Mesh.Rotation,
-                capsule.Center,
-                capsule.Rotation,
-                capsule.AxisLength,
-                capsule.ScaledRadius,
+                center,
+                rotation,
+                axisLength,
+                radius,
                 fallbackNormal,
-                out FixedContactAnchors contact))
+                out FixedContactAnchors contact,
+                out AxisTriangleContactFeature feature,
+                out bool chartIsTriangleLocal)
+            || !SupportsFilledSurface(mesh.Mesh, triangleIndex, feature, chartIsTriangleLocal))
         {
             return false;
         }
 
-        AddContact(
-            pair,
+        // Only coincident witnesses use the fallback. Defer its exact side
+        // projection until then; ordinary radial contacts need no orientation.
+        if (feature.IsZeroSeparation
+            && mesh.Mesh.CreatePointAnchor(triangle.Centroid).ProjectNonNegativeOffsetFrom(
+                new FixedPointAnchor(center, FixedQuaternion.Identity, Vector3d.Zero), fallbackNormal) > Fixed64.Zero)
+        {
+            Vector3d normal = -contact.Normal;
+            // Recompute the radial displacement after reversing the normal:
+            // negating an already saturated component can differ by one raw unit.
+            contact = new FixedContactAnchors(contact.FirstAnchor,
+                new FixedPointAnchor(center, rotation, contact.SecondAnchor.LocalPoint,
+                    -rotation.Inverse().Rotate(normal) * radius),
+                normal, contact.Depth, contact.DepthIsClamped);
+        }
+
+        // Independent planes retain independent four-sample groups. A single
+        // mesh-wide cap can otherwise discard real walls after removing seams.
+        pair.Manifold.AddContact(
             new ContactAnchor(contact.FirstAnchor),
             new ContactAnchor(contact.SecondAnchor),
             contact.Depth,
             contact.Normal,
-            contact.DepthIsClamped);
+            mesh.Material,
+            pair.ColliderB.Material,
+            contact.DepthIsClamped,
+            group: new ContactGroupKey(0, 0, mesh.Mesh.GetCanonicalSurfaceOrdinal(triangleIndex)));
+        return true;
+    }
+
+    private static bool SupportsFilledSurface(PhysicsMesh mesh, int triangleIndex,
+        in AxisTriangleContactFeature feature, bool chartIsTriangleLocal)
+    {
+        int mask = feature.EdgeMask;
+        if (mask == 0) return true;
+        ReadOnlySpan<int> triangle = mesh.GetWeldedTriangleVertexIndices(triangleIndex);
+        int first = mask == 2 || mask == 3 ? 1 : mask == 4 || mask == 6 ? 2 : 0;
+        int second = mask == 1 ? triangle[1] : mask == 2 ? triangle[2] : mask == 4 ? triangle[0] : -1;
+        int origin = triangle[first];
+        int owner = mesh.GetManifoldSurfaceOwner(triangleIndex);
+        ReadOnlySpan<Vector3d> vertices = mesh.ScaledLocalVertices;
+        Vector3d p = vertices[origin];
+        // The selected world chart already materialized this triangle vertex.
+        if (!chartIsTriangleLocal) _ = mesh.CreatePointAnchor(p).TryGetPoint(out p);
+        foreach (int incident in mesh.GetWeldedVertexTriangleIndices(origin))
+        {
+            if (incident == triangleIndex || mesh.GetManifoldSurfaceOwner(incident) != owner) continue;
+            ReadOnlySpan<int> neighbor = mesh.GetWeldedTriangleVertexIndices(incident);
+            if (second >= 0 && neighbor.IndexOf(second) < 0) continue;
+            // Exact closest-feature rays cover the incident filled sectors.
+            // Positive inward projection is a triangle-only escape into the
+            // surface; zero preserves genuine plane normals and tangency.
+            foreach (int vertex in neighbor)
+            {
+                Vector3d q = vertices[vertex];
+                if (!chartIsTriangleLocal && !mesh.CreatePointAnchor(q).TryGetPoint(out q)) continue;
+                if (feature.CompareSeparationProjection(p, q) > 0) return false;
+            }
+        }
         return true;
     }
 
@@ -423,19 +445,6 @@ internal static class MeshTriangleContactGenerator
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static FixedBoundVolume CreateBounds(Vector3d min, Vector3d max) =>
         new(min, max);
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Vector3d OrientNormal(
-        in FixedPointAnchor source,
-        in FixedPointAnchor target,
-        Vector3d normal)
-    {
-        Vector3d resolved = normal.Normalized;
-        return source.ProjectNonNegativeOffsetFrom(target, resolved)
-                > Fixed64.Zero
-            ? -resolved
-            : resolved;
-    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void AddContact(
