@@ -236,6 +236,12 @@ These are individual narrow-phase queries, not complete simulation frames.
 
 ### Sphere/capsule mesh contacts
 
+The `convex-mesh-sphere-contact` selection compares spheres with equivalent
+zero-core capsules against a closed convex cube: containment, exterior face
+and edge overlap, and separation. Setup verifies the single volume contact and
+known cardinal depths. These fixtures measure complete whole-shape contacts;
+concave surface contacts remain a separate workload.
+
 The `curved-mesh-surface-contact` selection measures sphere and capsule contacts
 against a two-triangle concave quad, with interior and exposed-edge poses. Each
 row includes direct narrow-phase dispatch, exact contact admission, covered-seam

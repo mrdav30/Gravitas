@@ -108,9 +108,19 @@ Convex SAT paths use stable axis generation and pair-oriented normals. Cuboid
 versus capsule checks first solve exact segment-to-oriented-box distance for
 rounded features, then use ordered SAT only when the capsule core reaches the
 box; inclusive projections and directional exit depths preserve touching and
-containment semantics. Convex mesh versus capsule checks reduce the whole
-capsule against the hull's faces, edges and vertices, retaining matched support
-anchors for exterior overlap and containment. Other mesh paths use the same
+containment semantics. Closed convex mesh versus sphere checks use the same
+whole-hull relation as zero-core capsules. Convex mesh versus capsule checks
+reduce the whole capsule against the hull's faces, edges and vertices, retaining
+one minimum-exit contact with finite support anchors for exterior overlap,
+touching and containment. For nonzero capsule cores, clipping a hull anchor to
+a finite support face can leave the two anchors tangentially misaligned.
+Open convex meshes and concave meshes retain surface semantics for spheres.
+Exact interior and finite support-face certificates avoid unnecessary sphere
+radial searches. Otherwise the nearest finite edge or vertex supplies the
+radial axis; exact feature ranking precedes final anchor rounding. Sphere and
+capsule support-face anchors use the first authored triangle containing the
+exact projection, rather than ranking differences from final anchor rounding.
+Other mesh paths use the same
 deterministic BVH candidate ownership;
 candidate order follows the stable built tree rather than authored triangle
 indices. Concave mesh/mesh pairs canonicalize relation direction by stable
@@ -118,7 +128,7 @@ collider ID and delegate each BVH-admitted triangle pair to FixedMathSharp's
 full-domain rigid-frame contact relation. Compound paths scan parts in stable
 declaration order and return the owner collider as the public identity.
 
-Mesh/sphere and concave mesh/capsule contacts retain exact closest-feature
+Surface mesh/sphere and concave mesh/capsule contacts retain exact closest-feature
 certificates before normal and anchor rounding. Within each trusted prepared
 planar domain, a boundary witness is discarded when its separation points into
 an incident filled triangle. This removes covered seam constraints while

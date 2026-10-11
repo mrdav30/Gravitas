@@ -11,6 +11,7 @@ using Gravitas.Colliders;
 
 namespace Gravitas.CollisionHandling;
 
+/// <content>Dispatches whole-hull volume and finite-surface mesh contacts.</content>
 public static partial class CollisionDetection
 {
     #region Mesh
@@ -19,6 +20,11 @@ public static partial class CollisionDetection
     {
         var meshCollider = (LSMeshCollider)pair.ColliderA;
         var sphere = (LSSphereCollider)pair.ColliderB;
+
+        // Only closed convex meshes fill their volume; open meshes stay surfaces.
+        if (meshCollider.Mode == MeshColliderMode.Convex && meshCollider.Mesh.IsClosedSurface)
+            return TrySetConvexMeshRoundedContact(pair, meshCollider.Mesh, sphere.Center,
+                sphere.Rotation, Fixed64.Zero, sphere.ScaledRadius);
 
         return MeshTriangleContactGenerator.TryBuildMeshSphereManifold(
             pair,
@@ -33,38 +39,26 @@ public static partial class CollisionDetection
         var capsule = (LSCapsuleCollider)pair.ColliderB;
 
         if (mesh.Mode == MeshColliderMode.Convex)
-        {
-            PhysicsMesh physicsMesh = mesh.Mesh;
-            bool hasContact =
-                FixedConvexHullRelations
-                    .TryGetCenteredCapsuleContact(
-                        physicsMesh.Origin,
-                        physicsMesh.Rotation,
-                        physicsMesh.ScaledLocalVertices,
-                        physicsMesh.Triangles,
-                        physicsMesh.ConvexSatEdgeVertexPairs,
-                        capsule.Center,
-                        capsule.Rotation,
-                        Vector3d.Up,
-                        capsule.AxisLength,
-                        capsule.ScaledRadius,
-                        out FixedContactAnchors contact);
-            if (!hasContact)
-                return false;
-            pair.Manifold.SetContact(
-                new ContactAnchor(contact.FirstAnchor),
-                new ContactAnchor(contact.SecondAnchor),
-                contact.Depth,
-                contact.Normal,
-                contact.DepthIsClamped);
-            return true;
-        }
+            return TrySetConvexMeshRoundedContact(pair, mesh.Mesh, capsule.Center,
+                capsule.Rotation, capsule.AxisLength, capsule.ScaledRadius);
 
         return MeshTriangleContactGenerator.TryBuildMeshCapsuleManifold(
             pair,
             mesh,
             capsule,
             pair.Context.CollisionScratch.MeshTriangleCandidatesA);
+    }
+
+    private static bool TrySetConvexMeshRoundedContact(CollisionWorkItem pair, PhysicsMesh mesh,
+        Vector3d center, FixedQuaternion rotation, Fixed64 axisLength, Fixed64 radius)
+    {
+        if (!FixedConvexHullRelations.TryGetCenteredCapsuleContact(mesh.Origin, mesh.Rotation,
+            mesh.ScaledLocalVertices, mesh.Triangles, mesh.ConvexSatEdgeVertexPairs,
+            center, rotation, Vector3d.Up, axisLength, radius, out FixedContactAnchors contact))
+            return false;
+        pair.Manifold.SetContact(new ContactAnchor(contact.FirstAnchor), new ContactAnchor(contact.SecondAnchor),
+            contact.Depth, contact.Normal, contact.DepthIsClamped);
+        return true;
     }
 
     private static bool DoMeshCuboidCheck(CollisionWorkItem pair)

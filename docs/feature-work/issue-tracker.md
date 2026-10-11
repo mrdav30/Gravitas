@@ -35,27 +35,6 @@
 
 ### Ordered Queue
 
-### GRV-Issue-107 - Contained spheres miss closed convex mesh volume contacts
-
-- **Confirmed:** 2026-10-10 in the final #097 audit. A radius-`1/10` sphere at
-  the center of a closed convex cube spanning `[-1/2,1/2]` on each axis reports
-  no collision. An equivalent zero-core capsule reports a nearest-exit contact
-  with depth `3/5`. Both input orders reproduce the discrepancy; concave mode
-  correctly reports no contact for either shape wholly away from its surface.
-- **Root cause:** Discrete sphere dispatch always gathers nearby mesh triangles,
-  without the whole-hull volume relation used by convex capsule dispatch. The
-  contained sphere cannot reach any face, so there is no triangle contact.
-  This dispatch and candidate policy predate #097; its seam filtering does not
-  introduce the miss. Existing capsule and reconfiguration tests require convex
-  meshes to fill their volume, unlike concave surface meshes.
-- **Follow-up:** Reuse the convex hull's zero-core relation for discrete
-  sphere/convex-mesh contacts; verify containment, exterior overlap, touching,
-  separation, compound remapping, matched anchors and full-loop response.
-  Preserve concave surface semantics and the explicitly two-sided mesh sphere
-  sweep contract; do not silently change queries alongside the discrete fix.
-- **Evidence:** Ignored `artifacts/grv-issue-097/contained-probe/` and
-  `contained-probe.log` retain the four convex/concave, forward/reversed controls.
-
 ### GRV-Issue-104 - Crossing capsule cores understate concave mesh exit depth
 
 - **Confirmed:** 2026-10-10 while reproducing #097; this predates its seam
@@ -252,6 +231,48 @@
 Remaining measured performance costs are tracked in the benchmark backlog.
 
 ## Resolved Issues
+
+### GRV-Issue-107 - Contained spheres miss closed convex mesh volume contacts
+
+- **Resolved:** 2026-10-11. Closed convex mesh/sphere dispatch now shares the
+  whole-hull relation with zero-core capsules. Open convex and concave meshes
+  retain sphere surface semantics; mesh sweeps retain their two-sided contract.
+  Gravitas reuses the existing contact owner without new runtime files or APIs.
+- **Original reproduction:** A radius-`1/10` sphere at the center of a closed
+  convex cube spanning `[-1/2,1/2]` missed its filled volume, while an equivalent
+  zero-core capsule returned depth `3/5`. The sphere's nearby-triangle dispatch
+  predated #097 and could not reach any surface from this interior position.
+- **Refinement:** FixedMathSharp reuses exact normalized metrics and projection
+  products, avoids repeated parallel face axes and padded wide work, and uses
+  exact interior/support-face certificates or nearest finite sphere features.
+  Existing exact depth rounding and finite-anchor ownership remain shared.
+- **Verification:** Maintained tests cover all-contact sphere/capsule parity in
+  both orders, whole-shape exit, touching and separation, authored transforms,
+  reversed coherent winding, compound remapping, full host-loop response,
+  extreme translated frames and warmed zero allocations. Equivalent-shape and
+  whole-shape checks are now standard in both repositories' contributor guides.
+  Fresh local-stack Release/ReleaseLean pass Gravitas `5,156/5,091` and
+  FixedMathSharp core `5,011/4,990` tests, with exact 100% raw line/sequence,
+  branch and fully-covered-method coverage. Chronicler integration passes 49
+  tests in each lane; six shared replay fixtures agree across native Windows
+  x64 Release/Lean and with unchanged expected hashes. Multi-target builds,
+  DocFX warnings-as-errors, local links and independent ponytail review pass.
+- **Measured cost:** Final out-of-process .NET 8 measurements on the Windows
+  x64 i7-9700K host are `36.05/48.26/120.56/11.38` microseconds for sphere
+  containment/face/edge/separation and `35.92/48.54/119.01/11.51` for equivalent
+  zero-core capsules, all 0 B/op. The original correct capsule relation took
+  about `1.29–1.33` milliseconds for contact in exploratory in-process runs;
+  differing toolchains make this directional evidence, not an exact percentage.
+  Exterior sphere face/edge/separation cost increases from the old surface
+  dispatch's `13.42/18.53/3.71` microseconds. That dispatch answered a different
+  manifold contract; its missing contained contact is not a valid speed baseline.
+  These are query costs, not a gameplay-frame capacity guarantee.
+- **Closeout:** Ignored `artifacts/grv-issue-107/` retains RED proofs, final
+  coverage, replay, profile and benchmark captures. Coverage validation also
+  exposed a pre-existing positive-core capsule paired-anchor defect, recorded
+  upstream as `FMS-Issue-028`; it does not affect the zero-core sphere fix.
+  Pure 2D has no triangle-mesh counterpart; mixed reduction remains separately
+  tracked. Released-package and other native-platform validation remain gates.
 
 ### GRV-Issue-097 - Sphere and capsule mesh manifolds retain internal-seam constraints
 

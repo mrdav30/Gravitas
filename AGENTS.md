@@ -796,6 +796,20 @@ Prioritize tests for:
 Use fixed-point expected values. Avoid fuzzy assertions unless the tolerance is
 itself deterministic, documented, and justified by the algorithm.
 
+For collision changes, make equivalent-shape and whole-shape checks standard:
+
+- Compare equivalent representations where supported, such as a sphere and a
+  zero-core capsule, including classification, every retained contact, matched
+  anchors, depth, normal and reversed input order.
+- Verify that the reported exit moves the complete shape to touching, with
+  separation just beyond it; anchor distance alone does not prove clearance.
+- Exercise containment, exterior overlap, real boundaries, coherent winding
+  reversal, transformed/scaled geometry and disconnected overlap regions when
+  relevant. Preserve explicit volume-versus-surface and dimensional contracts.
+- Check observable response through `Simulate` plus `LateSimulate`, not only
+  direct narrow-phase results. Execution coverage complements these physical
+  invariants; it does not replace them.
+
 ## Recommended Change Workflow
 
 For both humans and AI agents, use this order:
