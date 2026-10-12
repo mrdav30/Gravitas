@@ -113,8 +113,9 @@ public partial class PhysicsMesh
                 rejected[parents[i]] = true;
         }
 
-        // Compact the remaining edges in place. Every removed edge has two
-        // consistently wound coplanar faces on opposite geometric sides.
+        // Opposite geometric interiors establish a two-sided seam regardless
+        // of authored winding. Orient its surviving boundary to the root face
+        // so the existing directed-chain coverage proof remains valid.
         int boundaryCount = 0;
         for (int start = 0; start < edgeUses.Length;)
         {
@@ -127,9 +128,7 @@ public partial class PhysicsMesh
                     EdgeUse edge = edgeUses[i];
                     int patch = parents[edge.TriangleIndex];
                     if (counts[patch] > 1 && !rejected[patch])
-                        edgeUses[boundaryCount++] = EdgeUse.Create(
-                            edge.Direction > 0 ? edge.StartVertexIndex : edge.EndVertexIndex,
-                            edge.Direction > 0 ? edge.EndVertexIndex : edge.StartVertexIndex, patch);
+                        edgeUses[boundaryCount++] = CreateOrientedPatchBoundaryEdge(vertices, triangles, edge, patch);
                 }
             }
             start = end;
@@ -212,7 +211,7 @@ public partial class PhysicsMesh
                 || !TryGetStrictConvexBoundary(boundary, edgeCount, out BoundaryVertex[] strict, out int count))
                 continue;
 
-            // Every triangle is coplanar and consistently oriented, and each
+            // The root-oriented coplanar triangle chain is consistent, and each
             // canceled seam has exactly two opposite-side interiors. A single
             // boundary matching its convex hull has winding multiplicity one
             // inside and zero outside. It therefore proves exact filled
@@ -229,8 +228,6 @@ public partial class PhysicsMesh
 
     private static int ClassifyCoplanarSeam(Vector3d[] vertices, int[] triangles, EdgeUse first, EdgeUse second)
     {
-        if (first.Direction + second.Direction != 0)
-            return -1;
         Vector3d start = vertices[first.StartVertexIndex], end = vertices[first.EndVertexIndex];
         Vector3d firstOpposite = vertices[FindOppositeVertexIndex(triangles, first.TriangleIndex,
             first.StartVertexIndex, first.EndVertexIndex)];
@@ -251,6 +248,20 @@ public partial class PhysicsMesh
         int secondSide = Vector2d.OrientationSign(projectedStart, projectedEnd,
             ProjectToBoundaryPlane(secondOpposite, droppedAxis));
         return firstSide == -secondSide ? 1 : -1;
+    }
+
+    private static EdgeUse CreateOrientedPatchBoundaryEdge(Vector3d[] vertices, int[] triangles, EdgeUse edge, int patch)
+    {
+        int root = patch * 3, face = edge.TriangleIndex * 3;
+        Vector3d a = vertices[triangles[root]], b = vertices[triangles[root + 1]], c = vertices[triangles[root + 2]];
+        int axis = GetPatchProjectionAxis(a, b, c);
+        int rootOrientation = Vector2d.OrientationSign(ProjectToBoundaryPlane(a, axis),
+            ProjectToBoundaryPlane(b, axis), ProjectToBoundaryPlane(c, axis));
+        int faceOrientation = Vector2d.OrientationSign(ProjectToBoundaryPlane(vertices[triangles[face]], axis),
+            ProjectToBoundaryPlane(vertices[triangles[face + 1]], axis), ProjectToBoundaryPlane(vertices[triangles[face + 2]], axis));
+        int direction = edge.Direction * rootOrientation * faceOrientation;
+        return EdgeUse.Create(direction > 0 ? edge.StartVertexIndex : edge.EndVertexIndex,
+            direction > 0 ? edge.EndVertexIndex : edge.StartVertexIndex, patch);
     }
 
     private static int GetPatchProjectionAxis(Vector3d first, Vector3d second, Vector3d third)

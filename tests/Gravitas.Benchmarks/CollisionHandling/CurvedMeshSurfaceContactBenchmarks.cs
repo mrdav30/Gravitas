@@ -18,12 +18,16 @@ public class CurvedMeshSurfaceContactBenchmarks
     [Params(false, true)]
     public bool ExposedEdge { get; set; }
 
+    [Params(false, true)]
+    public bool MixedWinding { get; set; }
+
     [GlobalSetup]
     public void Setup()
     {
         _context = GravitasWorldContext.CreateOwned();
         var mesh = new LSMeshCollider(new[] { new Vector3d(-2, 0, -2), new Vector3d(2, 0, -2),
-            new Vector3d(-2, 0, 2), new Vector3d(2, 0, 2) }, new[] { 0, 2, 1, 1, 2, 3 }, MeshColliderMode.Concave);
+            new Vector3d(-2, 0, 2), new Vector3d(2, 0, 2) },
+            MixedWinding ? new[] { 0, 2, 1, 3, 2, 1 } : new[] { 0, 2, 1, 1, 2, 3 }, MeshColliderMode.Concave);
         mesh.InitializeWithNoBody(new BenchmarkMatterAgent(_context, Vector3d.Zero));
         LSCollider curved = Capsule ? new LSCapsuleCollider { Radius = Fixed64.Half, Size = new(1, 2, 1) }
             : new LSSphereCollider { Radius = Fixed64.Half };

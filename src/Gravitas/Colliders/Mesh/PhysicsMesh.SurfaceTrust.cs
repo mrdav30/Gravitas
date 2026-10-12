@@ -73,7 +73,8 @@ public partial class PhysicsMesh
     internal static bool IsEmbeddedSurfaceBoundary(ReadOnlySpan<Vector3d> vertices, ReadOnlySpan<int> corners,
         ReadOnlySpan<int> offsets, int axis, int orientation)
     {
-        // Full opposite welded seams cancel in the oriented triangle chain.
+        // Preparation orients the two-sided triangle chain to its root face;
+        // full opposite-side welded seams then cancel regardless of authored winding.
         // Every remaining open cell's positive triangle multiplicity equals
         // boundary winding. Simple disjoint cycles with winding 0/1 therefore
         // exclude interior overlaps. An unshared touch on a canceled seam would

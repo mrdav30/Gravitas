@@ -102,7 +102,7 @@ public sealed class PhysicsMeshSurfaceTopologyTests
     public void DeclinedAmbiguousPatch_ShouldKeepIndividualProvenanceWithoutTrustedNeighbors()
     {
         PhysicsMesh mesh = Create(new[] { Vector3d.Zero, Vector3d.Right, Vector3d.Forward,
-            -Vector3d.Forward }, new[] { 0, 1, 2, 0, 1, 3 });
+            new Vector3d(1, 0, 1) }, new[] { 0, 1, 2, 0, 1, 3 });
         mesh.GetManifoldSurfaceOwner(0).Should().NotBe(mesh.GetManifoldSurfaceOwner(1));
         mesh.GetManifoldSurfaceBoundaryVertexPairs(0).IsEmpty.Should().BeTrue();
         mesh.GetConvexCoplanarPatchCornerVertexIndices(0).IsEmpty.Should().BeTrue();

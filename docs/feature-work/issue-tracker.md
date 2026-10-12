@@ -37,24 +37,6 @@
 
 ### Ordered Queue
 
-### GRV-Issue-106 - Accepted mixed-winding coplanar meshes retain covered seam contacts
-
-- **Confirmed:** 2026-10-10 in the #097 audit. Reverse only the second triangle
-  of the Y-zero quad: indices `0,2,1, 3,2,1` with vertices
-  `(-2,0,-2)`, `(2,0,-2)`, `(-2,0,2)`, `(2,0,2)`. A radius-`1/2` sphere at
-  `(3/10,-1/4,3/10)` still retains the diagonal normal approximately
-  `(0.60921,-0.50767,0.60921)` alongside the genuine downward face.
-- **Root cause:** Concave admission accepts both triangle windings, but prepared
-  seam trust deliberately declines equal directed uses of the shared edge. The
-  triangles remain separate owners, so trusted-domain filtering cannot remove
-  their seam. This behavior and the topology policy predate #097.
-- **Follow-up:** Decide whether to certify orientation-neutral two-sided planar
-  domains or reject/document inconsistent winding at the authoring boundary.
-  Preserve rejection of overlapping or otherwise ambiguous domains; test sphere,
-  capsule, cone and mixed contacts plus frictionless motion.
-- **Evidence:** Ignored `artifacts/grv-issue-097/Issue097DiscoveryProbe.cs` and
-  `refinement-focused-audit.log` retain the failing all-contact proof.
-
 ### GRV-Issue-108 - Initial capsule sweeps can select a covered coplanar mesh seam
 
 - **Confirmed:** 2026-10-11 during #104/#105 query parity validation. On the
@@ -224,6 +206,49 @@
 Remaining measured performance costs are tracked in the benchmark backlog.
 
 ## Resolved Issues
+
+### GRV-Issue-106 - Accepted mixed-winding coplanar meshes retain covered seam contacts
+
+- **Resolved:** 2026-10-11. Two-sided planar seam classification now uses exact
+  coplanarity and opposite geometric interiors. Preparation orients surviving
+  boundary edges to the minimum-authored root face before the existing directed
+  chain and embedding certificates. Authored triangles, face normals, coherent
+  boundary order and convex-volume winding validation remain unchanged.
+  Overlap, duplicate, nonmanifold, pinch and hole checks still apply; either
+  winding of a noncoplanar crease remains independent without poisoning a
+  neighboring valid patch. The fix adds 12 net production lines in existing
+  preparation owners, with no additional state or runtime normalization.
+- **Original defect:** Confirmed 2026-10-10 before #097's seam filtering.
+  Quad vertices `(-2,0,-2)`, `(2,0,-2)`, `(-2,0,2)`, `(2,0,2)` and indices
+  `0,2,1, 3,2,1` retain a covered diagonal normal approximately
+  `(0.60921,-0.50767,0.60921)` for a radius-`1/2` sphere at
+  `(3/10,-1/4,3/10)`. Equal directed edge uses previously declined an otherwise
+  valid filled domain, leaving the seam exposed as independent triangle edges.
+- **Verification:** Eight new topology regressions fail on committed code and
+  pass with the fix. The 192 focused controls include all projection axes,
+  either root winding, holes, ambiguity rejection, exact sphere/capsule/cone
+  manifold and contact-ID parity, genuine perimeter constraints, and complete
+  frictionless host-loop motion. Full local-stack Release/ReleaseLean suites
+  pass 5,285/5,220 tests with raw line counts 46,289/46,289 and 46,287/46,287,
+  branches 14,524/14,524 in both, and fully covered methods 4,808/4,808 and
+  4,807/4,807. Both multi-target builds and the six shared Windows x64 replay
+  fixtures pass; expected hashes and Release/Lean captures agree. Independent
+  ponytail review finds no blockers. Full suites retain pure 2D/mixed controls;
+  #098 and #108 remain separate because their coherent-surface failures belong
+  to reducers that do not consume this prepared manifold ownership.
+- **Performance:** Native .NET 8 runs use three warmups, five measurements and
+  `UseLocalLsfStack=true`. Nonuniform-scale means at subdivisions 1/8/16 are
+  44.55/2,355.52/9,531.75 us before and 45.19/2,354.94/9,472.97 us after.
+  Coherent/mixed contact means are 36.86/38.64 us for sphere interiors,
+  53.51/58.00 us for capsule interiors, and 220.68/222.43 and 276.31/279.80 us
+  at their respective exposed edges. All scale/contact rows report `0 B/op`;
+  these short-run means are not gameplay frame-tail guarantees. Existing mesh
+  scalar benchmarks now return raw integer checksums so the generated local-stack
+  host does not need their dependency return types; measured math is unchanged.
+- **Evidence:** Original ignored `artifacts/grv-issue-097/Issue097DiscoveryProbe.cs`
+  and `refinement-focused-audit.log`; final tests, raw coverage, replay captures
+  and benchmark reports under `artifacts/grv-issue-106`, including
+  `preparation-baseline`, `final-cost` and `winding-parity-cost`.
 
 ### GRV-Issue-104 - Crossing capsule cores understate concave mesh exit depth
 

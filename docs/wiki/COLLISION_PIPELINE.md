@@ -159,8 +159,11 @@ the actual incident filled fan and the region's selected exit hemisphere.
 Covered triangulation edges in trusted coplanar domains never become constraints.
 A sphere follows the same
 path with a zero-length capsule core. Body rotation does not change sphere or
-zero-core capsule contact geometry. Inconsistent winding and other ambiguous
-topology retain independent triangle domains.
+zero-core capsule contact geometry. Two-sided coplanar domains can contain mixed
+authored winding: preparation certifies opposite geometric interiors and orients
+their boundary chain consistently without changing the authored triangles.
+Overlapping, nonmanifold or otherwise ambiguous topology retains independent
+triangle domains. Convex-volume admission still requires consistent winding.
 
 Mesh/cylinder contacts delegate each admitted triangle to FixedMathSharp's
 finite-cylinder contact query. That query selects across triangle faces,

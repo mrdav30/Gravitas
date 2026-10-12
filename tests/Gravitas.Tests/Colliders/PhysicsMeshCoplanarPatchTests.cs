@@ -9,6 +9,58 @@ namespace Gravitas.Tests.Colliders;
 public sealed class PhysicsMeshCoplanarPatchTests
 {
     [Theory]
+    [InlineData(0, false)]
+    [InlineData(0, true)]
+    [InlineData(1, false)]
+    [InlineData(1, true)]
+    [InlineData(2, false)]
+    [InlineData(2, true)]
+    public void MixedWindingQuad_ShouldCertifyItsFilledDomainWithoutChangingAuthoredFaces(int plane, bool reverseRoot)
+    {
+        Vector3d[] vertices = Quad();
+        for (int i = 0; i < vertices.Length; i++)
+        {
+            Vector3d p = vertices[i];
+            vertices[i] = plane == 0 ? new Vector3d(p.X, p.Z, Fixed64.Zero)
+                : plane == 1 ? p : new Vector3d(Fixed64.Zero, p.X, p.Z);
+        }
+        int[] triangles = reverseRoot ? new[] { 2, 1, 0, 0, 2, 3 } : new[] { 0, 1, 2, 3, 2, 0 };
+        PhysicsMesh mesh = Create(vertices, triangles);
+
+        mesh.GetManifoldSurfaceOwner(1).Should().Be(0);
+        mesh.GetManifoldSurfaceBoundaryVertexPairs(0).ToArray().Should().Equal(
+            reverseRoot ? new[] { 1, 0, 0, 3, 2, 1, 3, 2 } : new[] { 0, 1, 3, 0, 1, 2, 2, 3 });
+        mesh.GetConvexCoplanarPatchCornerVertexIndices(0).ToArray().Should().Equal(
+            reverseRoot ? new[] { 0, 3, 2, 1 } : new[] { 0, 1, 2, 3 });
+        mesh.GetCoplanarTriangleNeighbors(0).ToArray().Should().Equal(1);
+        mesh.GetCoplanarTriangleNeighbors(1).ToArray().Should().Equal(0);
+        mesh.Triangles.ToArray().Should().Equal(triangles);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void MixedWindingRing_ShouldPreserveTheHoleAndCanonicalBoundary(bool reverseRoot)
+    {
+        Vector3d[] vertices = { new(-2, 0, -2), new(2, 0, -2), new(2, 0, 2), new(-2, 0, 2),
+            new(-1, 0, -1), new(1, 0, -1), new(1, 0, 1), new(-1, 0, 1) };
+        int[] triangles = { 0, 1, 5, 0, 5, 4, 1, 2, 6, 1, 6, 5,
+            2, 3, 7, 2, 7, 6, 3, 0, 4, 3, 4, 7 };
+        PhysicsMesh coherent = Create(vertices, triangles);
+        for (int i = reverseRoot ? 0 : 3; i < triangles.Length; i += 6)
+            (triangles[i], triangles[i + 2]) = (triangles[i + 2], triangles[i]);
+        PhysicsMesh mixed = Create(vertices, triangles);
+
+        for (int i = 0; i < mixed.TriangleCount; i++)
+            mixed.GetManifoldSurfaceOwner(i).Should().Be(0);
+        mixed.GetManifoldSurfaceBoundaryVertexPairs(0).Length.Should().Be(16);
+        mixed.GetConvexCoplanarPatchCornerVertexIndices(0).IsEmpty.Should().BeTrue();
+        mixed.GetCanonicalSurfaceBoundaryVertexPairs(0).ToArray().Should()
+            .Equal(coherent.GetCanonicalSurfaceBoundaryVertexPairs(0).ToArray());
+        mixed.Triangles.ToArray().Should().Equal(triangles);
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public void Quad_ShouldRetainOnlyOrientedExposedEdges(bool reversed)
@@ -105,13 +157,16 @@ public sealed class PhysicsMeshCoplanarPatchTests
         mesh.GetConvexCoplanarPatchCornerVertexIndices(3).ToArray().Should().Equal(4, 5, 6, 7);
     }
 
-    [Fact]
-    public void CreaseBesideValidPatch_ShouldRemainAnExposedPatchEdge()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CreaseBesideValidPatch_ShouldRemainAnExposedPatchEdge(bool reverseCrease)
     {
         Vector3d[] vertices = new Vector3d[5];
         Quad().CopyTo(vertices, 0);
         vertices[4] = new Vector3d(-1, 1, -1);
-        PhysicsMesh mesh = Create(vertices, new[] { 0, 1, 2, 0, 2, 3, 1, 0, 4 });
+        PhysicsMesh mesh = Create(vertices, reverseCrease
+            ? new[] { 0, 1, 2, 0, 2, 3, 4, 0, 1 } : new[] { 0, 1, 2, 0, 2, 3, 1, 0, 4 });
 
         mesh.GetManifoldSurfaceOwner(1).Should().Be(0);
         mesh.GetManifoldSurfaceOwner(2).Should().Be(2);
@@ -119,6 +174,25 @@ public sealed class PhysicsMeshCoplanarPatchTests
         mesh.GetManifoldSurfaceBoundaryVertexPairs(0).ToArray().Should().Equal(0, 1, 3, 0, 1, 2, 2, 3);
         mesh.GetConvexCoplanarPatchCornerVertexIndices(0).ToArray().Should().Equal(0, 1, 2, 3);
         mesh.GetConvexCoplanarPatchCornerVertexIndices(2).IsEmpty.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SameSideOverlap_ShouldDeclineEitherAuthoredWinding(bool reverseSecond)
+    {
+        Vector3d[] vertices = { Vector3d.Zero, Vector3d.Right, Vector3d.Forward,
+            new(Fixed64.Half, Fixed64.Zero, Fixed64.Half) };
+        PhysicsMesh mesh = Create(vertices, reverseSecond
+            ? new[] { 0, 1, 2, 3, 1, 0 } : new[] { 0, 1, 2, 0, 1, 3 });
+
+        mesh.GetManifoldSurfaceOwner(0).Should().NotBe(mesh.GetManifoldSurfaceOwner(1));
+        for (int i = 0; i < 2; i++)
+        {
+            mesh.GetManifoldSurfaceBoundaryVertexPairs(i).IsEmpty.Should().BeTrue();
+            mesh.GetCoplanarTriangleNeighbors(i).IsEmpty.Should().BeTrue();
+            mesh.GetConvexCoplanarPatchCornerVertexIndices(i).IsEmpty.Should().BeTrue();
+        }
     }
 
     [Fact]
@@ -143,7 +217,6 @@ public sealed class PhysicsMeshCoplanarPatchTests
     [InlineData(0)] // A single face has no seam to suppress.
     [InlineData(1)] // The two faces meet at a crease.
     [InlineData(2)] // Opposite edge winding but both interiors occupy the same side.
-    [InlineData(3)] // Geometrically opposite sides with inconsistent winding.
     [InlineData(4)] // Three incident faces make the edge nonmanifold.
     public void UnsupportedOwnership_ShouldDeclineThePatch(int kind)
     {
@@ -164,7 +237,7 @@ public sealed class PhysicsMeshCoplanarPatchTests
             else
             {
                 Array.Resize(ref vertices, 4);
-                triangles = kind == 3 ? new[] { 0, 1, 2, 0, 1, 3 } : new[] { 0, 1, 2, 1, 0, 3 };
+                triangles = new[] { 0, 1, 2, 1, 0, 3 };
             }
         }
         PhysicsMesh mesh = Create(vertices, triangles);

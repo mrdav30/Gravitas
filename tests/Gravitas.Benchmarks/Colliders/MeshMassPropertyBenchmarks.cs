@@ -40,37 +40,38 @@ public class MeshMassPropertyBenchmarks
     }
 
     [Benchmark]
-    public Fixed64 CalculateCachedClosedVolumeInertiaTensor()
+    public long CalculateCachedClosedVolumeInertiaTensor()
     {
         Fixed3x3 tensor = _mesh.CalculateInertiaTensor(Fixed64.One);
-        return tensor.M11 + tensor.M22 + tensor.M33;
+        return (tensor.M11 + tensor.M22 + tensor.M33).m_rawValue;
     }
 
     [Benchmark]
-    public Fixed64 CalculateSurfaceApproximationInertiaTensor()
+    public long CalculateSurfaceApproximationInertiaTensor()
     {
         Fixed3x3 tensor = _mesh.CalculateInertiaTensor(Fixed64.One, MeshInertiaPolicy.SurfaceApproximation);
-        return tensor.M11 + tensor.M22 + tensor.M33;
+        return (tensor.M11 + tensor.M22 + tensor.M33).m_rawValue;
     }
 
     [Benchmark]
-    public Fixed64 UpdateNonUniformMeshScale()
+    // Raw checksums keep dependency types out of BenchmarkDotNet's generated host.
+    public long UpdateNonUniformMeshScale()
     {
         Vector3d scale = (_scaleTick++ & 1) == 0
             ? new Vector3d((Fixed64)2, (Fixed64)3, (Fixed64)4)
             : new Vector3d((Fixed64)3, (Fixed64)2, (Fixed64)5);
         _mesh.UpdateTransform(Vector3d.Zero, FixedQuaternion.Identity, scale);
-        return _mesh.TotalArea;
+        return _mesh.TotalArea.m_rawValue;
     }
 
     [Benchmark]
-    public Fixed64 UpdateNonUniformMeshScaleAndCalculateSurfaceInertia()
+    public long UpdateNonUniformMeshScaleAndCalculateSurfaceInertia()
     {
         Vector3d scale = (_scaleTick++ & 1) == 0
             ? new Vector3d((Fixed64)2, (Fixed64)3, (Fixed64)4)
             : new Vector3d((Fixed64)3, (Fixed64)2, (Fixed64)5);
         _mesh.UpdateTransform(Vector3d.Zero, FixedQuaternion.Identity, scale);
         Fixed3x3 tensor = _mesh.CalculateInertiaTensor(Fixed64.One, MeshInertiaPolicy.SurfaceApproximation);
-        return tensor.M11 + tensor.M22 + tensor.M33;
+        return (tensor.M11 + tensor.M22 + tensor.M33).m_rawValue;
     }
 }
