@@ -37,25 +37,6 @@
 
 ### Ordered Queue
 
-### GRV-Issue-102 - Collision position correction silently saturates at scalar coordinate limits
-
-- **Status:** Numeric-boundary policy and regression investigation required;
-  separate from mesh/cone translated sampling and host-defined world bounds.
-- **Observed:** 2026-10-09 source audit of committed 3D and 2D response owners.
-  `SolidBody.ApplyCollisionPositionCorrection` adds the projected correction to
-  `Position3d`; `SolidBody2D.ApplyCollisionPositionCorrection` does the same to
-  `_position`. `Fixed64` addition saturates on overflow, so neither path can
-  distinguish an exact boundary position from a truncated correction.
-- **Risk:** Near `MinValue`/`MaxValue`, contact response can publish less movement
-  than the solver requested without an explicit failure or boundary decision.
-  Saturation prevents numeric wrap but does not preserve physical correction or
-  enforce a host's playable-world limits. The source behavior predates the
-  surface-manifold integration; this audit is not an executed end-to-end repro.
-- **Follow-up:** Reproduce in pure 3D, pure 2D and mixed response, then define
-  an explicit policy for unrepresentable final body positions. Audit integration
-  and CCD position publication for the same invariant. Keep host/grid boundary
-  policy separate; do not introduce silent clamps or automatic world rebasing.
-
 ### GRV-Issue-110 - Mixed curved-target sweeps can miss contained starts near scalar limits
 
 - **Confirmed:** 2026-10-12 during #103's conceptual-witness review. An isolated
@@ -146,6 +127,78 @@
 Remaining measured performance costs are tracked in the benchmark backlog.
 
 ## Resolved Issues
+
+### GRV-Issue-102 - Collision position correction silently saturates at scalar coordinate limits
+
+- **Resolved:** 2026-10-12. Integration, contact correction and CCD reject an
+  unrepresentable authoritative body position with `OverflowException` instead
+  of silently shortening movement. Project frozen axes before validation;
+  positions exactly at either scalar limit remain valid. Host/grid bounds and
+  explicit coordinate-frame changes remain separate policies.
+- **Confirmed:** The 2026-10-09 source finding is reproduced at both scalar
+  limits through actual narrow-phase contacts in pure 3D, pure 2D and mixed
+  response. All six paired regressions fail against the saved pre-fix engine
+  because no exception is thrown, then pass against the candidate. Complete
+  `Simulate`/`LateSimulate` regressions reproduce the same integration defect.
+- **Root cause:** Body correction, integration and trajectory publication used
+  saturating addition, losing the distinction between an exact endpoint and an
+  unrepresentable request. Shared position-correction arithmetic also overflowed
+  for very large masses or sums of tiny-mass inverses. In pure 2D, a rounded
+  common scale could multiply back beyond the scalar range even when the final
+  weighted correction was representable.
+- **Resolution:** Prepare both correction endpoints before moving either body.
+  CCD responses validate both actual outgoing endpoints before authoritative
+  body/trajectory publication or candidate-refresh reservation; append validates
+  before truncating an existing trajectory. Preflight mirrors velocity limits,
+  unchanged-velocity semantics, small-speed suppression and the exact remaining
+  duration used by publication. Valid integration retains multiply-then-add
+  rounding. Compact correction keeps its existing rounding; unsafe scales,
+  inverse-mass sums or rounded products use FixedMathSharp's existing exact
+  weighted-ratio helper. No upstream source or API changes were required.
+- **Failure boundary:** This is operation-local validation, not whole-step
+  rollback. Earlier bodies, solver rows, clock advances or force integration may
+  already have run. Hosts must stop a failed step and restore known state before
+  continuing; scalar exhaustion is not a physical wall.
+- **Validation:** With `UseLocalLsfStack=true`, Release passes `5,757` tests and
+  raw coverage `47,174/47,174` sequence points, `15,426/15,426` branches and
+  `4,922/4,922` methods. ReleaseLean passes `5,692` with `47,172/47,172`,
+  `15,426/15,426` and `4,921/4,921`. Every report has zero uncovered points or
+  methods, without new coverage exclusions. The `59` new cases cover both
+  limits, dimensional parity, paired failure, mass extremes, bodyless ordering,
+  frozen axes, unchanged authoritative/cache hashes, actual velocity policies
+  and half-even integration rounding; the domain/freeze focus passes `80` cases.
+  Both solution configurations and both core target frameworks build with zero
+  warnings/errors. Windows x64 Release/Lean replay matches all six shared
+  fixtures and each other. DocFX also passes with warnings treated as errors.
+- **Performance:** Two quiet paired runs of unchanged maintained methods use
+  fixed JIT configuration, fresh response setup outside measurement, 16 warmups
+  and seven rounds of eight invocations. Prepared-response overhead is roughly
+  1-2%; larger complete-step controls show no material change. All 17 workloads
+  retain `0 B/op` and agree on observable outputs. Representative median ranges:
+
+  | Workload | Before (ms) | After (ms) |
+  | --- | ---: | ---: |
+  | 64 single-contact 3D pairs, one iteration | 0.4059-0.4065 | 0.4124-0.4129 |
+  | 64 face-manifold 3D pairs, one iteration | 1.0072-1.0115 | 1.0189-1.0202 |
+  | 64 mixed pairs, one resolve | 0.5259-0.5381 | 0.5383-0.5470 |
+  | 1,024 axis-aligned 2D contacts, complete step | 28.9899-29.9321 | 28.6937-29.0402 |
+  | Joined floor/wall rotational CCD, complete step | 6.7789-6.9367 | 6.8869-6.9085 |
+
+  These are paired timing controls, not BenchmarkDotNet confidence estimates or
+  speedup claims. A separate out-of-process BenchmarkDotNet mixed-response run
+  executes all four selected cases and reports `0 B/op`; short-iteration
+  warnings and concurrent documentation work limit its timing interpretation.
+- **Review and integration:** Independent ponytail review found no remaining
+  correctness or bloat blockers. Develop's FixedMathSharp pin advances from
+  `88999af91ed513dc513b331a953fc9c70f890cc9` to the existing committed
+  `819dbde6569ccb63f03243b789826c3ac07cb162`; origin/develop still points to the
+  former, so push the latter before Gravitas CI needs to fetch it. Main retains
+  package-based validation. Native Linux/ARM replay and released-package
+  validation remain CI/release gates. Ignored `artifacts/grv-issue-102/` retains
+  red fixtures, `release-closeout`/`lean-closeout` raw coverage, replay captures,
+  build/DocFX logs and benchmark controls. `timing-provenance.json` records
+  dependency revisions, both engine hashes and the unstaged candidate on
+  Gravitas `75145037a301cf6e4ffcf20d0ac35b0061f4013d`.
 
 ### GRV-Issue-101 - Rotational CCD can freeze separated motion inside a concave mesh's aggregate bounds
 

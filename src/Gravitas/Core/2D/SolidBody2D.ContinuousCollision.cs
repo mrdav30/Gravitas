@@ -195,7 +195,7 @@ public sealed partial class SolidBody2D
         {
             PrepareMovableContinuousCollisionMotion();
             displacement = ProjectLinearMotion(_linearVelocity) * Context.DeltaTime;
-            endPosition = startPosition + displacement;
+            endPosition = AddPositionDisplacement(startPosition, displacement);
             angularVelocity = _angularVelocity;
             angularDelta = angularVelocity * Context.DeltaTime;
         }
@@ -280,6 +280,7 @@ public sealed partial class SolidBody2D
         Fixed64 startFraction = FixedMath.Clamp01(elapsedTime / deltaTime);
         Fixed64 remainingTime = FixedMath.Max(Fixed64.Zero, deltaTime - elapsedTime);
         Vector2d displacement = ProjectLinearMotion(velocity) * remainingTime;
+        Vector2d endPosition = AddPositionDisplacement(positionAtElapsedTime, displacement);
         _continuousCollisionFrameToken = Context.LateSimulateToken;
         RemoveSupersededContinuousCollisionFrameSegments(
             startFraction,
@@ -291,11 +292,20 @@ public sealed partial class SolidBody2D
             startFraction,
             Fixed64.One,
             positionAtElapsedTime,
-            positionAtElapsedTime + displacement,
+            endPosition,
             displacement,
             rotationAtElapsedTime,
             angularVelocity * remainingTime,
             angularVelocity));
+    }
+
+    // Step durations are at most one; keep the existing product rounding before checking the final coordinate.
+    internal void ValidateContinuousCollisionPosition(Vector2d position, Vector2d velocity, Fixed64 remainingTime)
+    {
+        velocity = ProjectLinearMotion(velocity);
+        if (velocity != _linearVelocity && velocity.Magnitude <= Fixed64.Epsilon)
+            velocity = Vector2d.Zero;
+        _ = AddPositionDisplacement(position, velocity * remainingTime);
     }
 
     internal bool CanAppendContinuousCollisionFrameSegment(Fixed64 elapsedTime)

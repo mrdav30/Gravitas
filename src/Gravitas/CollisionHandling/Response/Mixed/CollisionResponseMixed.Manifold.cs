@@ -115,7 +115,7 @@ public static partial class CollisionResponseMixed
         if (correctPosition)
         {
             Fixed64 mass = GetConstrainedInverseMass(first, normal) + GetConstrainedPlanarInverseMass(second, normal);
-            if (mass > Fixed64.Zero) ApplyPositionCorrection(first, second, normal, row.Depth, mass);
+            if (mass > Fixed64.Zero) ApplyPositionCorrection(first, second, normal, row.Depth);
         }
         ApplyNormalVelocityDeltas(first, second, result);
         if (exact != null) SetExactImpulse(ref pair.ExactSolveImpulses, stateIndex, exact);

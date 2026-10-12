@@ -154,6 +154,15 @@ public partial class SolidBody2D
 
         if (sourceResponseBody != null)
         {
+            // Velocity admission above proved this addition before endpoint preflight.
+            Vector2d.TryAdd(_linearVelocity, ProjectLinearMotion(response.LinearVelocityDeltaA), out Vector2d postSourceVelocity);
+            ValidateContinuousCollisionPosition(sourcePositionAtImpact, postSourceVelocity, Context.DeltaTime - impactElapsedTime);
+        }
+        if (targetResponseBody != null)
+            target.ValidateContinuousCollisionHandoffPosition(targetResolvedPosition, targetPostLinearVelocity, targetPostAngularVelocity, remainingAfterImpact);
+
+        if (sourceResponseBody != null)
+        {
             // The admission check above is immediately followed by this
             // reservation in the single-threaded arbiter, so failure is not a
             // runtime state. Reserve the already-proven body set once.

@@ -51,6 +51,7 @@ public partial class SolidBody
                 out Vector3d resolvedPosition))
             return false;
 
+        ValidateContinuousCollisionHandoffPosition(resolvedPosition, postLinearVelocity, postAngularVelocity, remainingTime);
         _ = Context.Physics.TryReserveContinuousCollisionCandidateRefresh(this);
 
         ApplyContinuousCollisionHandoffReserved(
@@ -79,9 +80,7 @@ public partial class SolidBody
         Collider.PublishPreparedBodyPose();
         UpdateInertiaTensorOrientation();
         ApplyCollisionVelocityState(postLinearVelocity, postAngularVelocity);
-        bool hasRemainingMotion = remainingTime > Fixed64.Epsilon
-            && (_linearVelocity.MagnitudeSquared > Fixed64.Epsilon
-                || _angularVelocity.MagnitudeSquared > Fixed64.Epsilon);
+        bool hasRemainingMotion = HasRemainingHandoffMotion(_linearVelocity, _angularVelocity, remainingTime);
         AppendContinuousCollisionSegment(
             resolvedPosition,
             Rotation,
@@ -102,6 +101,21 @@ public partial class SolidBody
         _continuousCollisionHandoffPending = true;
         Context.Physics.QueueContinuousCollisionHandoff(this);
     }
+
+    internal void ValidateContinuousCollisionHandoffPosition(
+        Vector3d position, Vector3d linearVelocity, Vector3d angularVelocity, Fixed64 remainingTime)
+    {
+        linearVelocity = ResolveCommittedLinearVelocity(linearVelocity);
+        angularVelocity = ProjectAngularMotion(angularVelocity);
+        if (angularVelocity != _angularVelocity)
+            angularVelocity = ResolveLimitedVelocity(angularVelocity, angularVelocity.Magnitude, out _);
+        if (HasRemainingHandoffMotion(linearVelocity, angularVelocity, remainingTime))
+            _ = AddPositionDisplacement(position, linearVelocity * remainingTime);
+    }
+
+    private static bool HasRemainingHandoffMotion(Vector3d linearVelocity, Vector3d angularVelocity, Fixed64 remainingTime) =>
+        remainingTime > Fixed64.Epsilon
+        && (linearVelocity.MagnitudeSquared > Fixed64.Epsilon || angularVelocity.MagnitudeSquared > Fixed64.Epsilon);
 
     internal bool CanApplyContinuousCollisionHandoff(
         Vector3d positionAtImpact,
@@ -174,7 +188,8 @@ public partial class SolidBody
         }
 
         Vector3d startPosition = Position3d;
-        Vector3d proposedPosition = startPosition + _linearVelocity * remainingTime;
+        Vector3d proposedPosition = AddPositionDisplacement(
+            startPosition, ProjectLinearMotion(_linearVelocity) * remainingTime);
         FixedQuaternion startRotation = Rotation;
         FixedQuaternion proposedRotation = IntegrateAngularRotation(
             startRotation,
@@ -294,8 +309,8 @@ public partial class SolidBody
         {
             while (LastContinuousCollisionToiIterationCount < maxToiIterations)
             {
-                Vector3d requestedSegmentDisplacement = _linearVelocity * remainingTime;
-                Vector3d requestedSegmentEnd = currentPosition + requestedSegmentDisplacement;
+                Vector3d requestedSegmentDisplacement = ProjectLinearMotion(_linearVelocity) * remainingTime;
+                Vector3d requestedSegmentEnd = AddPositionDisplacement(currentPosition, requestedSegmentDisplacement);
                 Vector3d segmentDisplacement = ContinuousCollisionSweepRange.ValidateEndpoint(
                     currentPosition,
                     requestedSegmentEnd,
@@ -581,6 +596,10 @@ public partial class SolidBody
             return false;
         }
 
+        ValidateContinuousCollisionPosition(sourcePositionAtImpact, sourcePostLinearVelocity, Context.DeltaTime - hitElapsedTime);
+        if (target.CanTranslate)
+            target.ValidateContinuousCollisionHandoffPosition(targetResolvedPosition, targetPostLinearVelocity, targetAngularVelocity, remainingTime);
+
         _ = target.CanTranslate
             ? Context.Physics.TryReserveContinuousCollisionCandidateRefresh(this, target)
             : Context.Physics.TryReserveContinuousCollisionCandidateRefresh(this);
@@ -709,6 +728,10 @@ public partial class SolidBody
         {
             return false;
         }
+
+        ValidateContinuousCollisionPosition(sourcePositionAtImpact, sourcePostLinearVelocity, Context.DeltaTime - hitElapsedTime);
+        if (targetParticipates)
+            target.ValidateContinuousCollisionHandoffPosition(targetResolvedPosition, targetPostLinearVelocity, targetAngularVelocity, remainingTime);
 
         _ = Context.Physics.TryReserveContinuousCollisionCandidateRefresh(this);
         if (targetParticipates)

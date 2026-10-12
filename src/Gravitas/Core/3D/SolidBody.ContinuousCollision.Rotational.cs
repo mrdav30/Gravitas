@@ -102,8 +102,8 @@ public partial class SolidBody
             {
                 Fixed64 segmentEndElapsedTime = elapsedTime + remainingTime;
                 Fixed64 segmentElapsedTime = segmentEndElapsedTime - motionSegmentStartElapsedTime;
-                Vector3d segmentEnd = motionSegmentStartPosition
-                    + motionSegmentLinearVelocity * segmentElapsedTime;
+                Vector3d segmentEnd = AddPositionDisplacement(
+                    motionSegmentStartPosition, ProjectLinearMotion(motionSegmentLinearVelocity) * segmentElapsedTime);
                 Vector3d displacement = segmentEnd - currentPosition;
                 FixedQuaternion targetRotation = IntegrateAngularRotation(
                     motionSegmentStartRotation,

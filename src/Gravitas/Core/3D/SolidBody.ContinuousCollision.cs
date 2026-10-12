@@ -220,7 +220,7 @@ public partial class SolidBody
             }
 
             displacement = ProjectLinearMotion(_linearVelocity) * Context.DeltaTime;
-            endPosition = startPosition + displacement;
+            endPosition = AddPositionDisplacement(startPosition, displacement);
             angularVelocity = _angularVelocity;
             targetRotation = IntegrateAngularRotation(
                 startRotation,
@@ -288,6 +288,7 @@ public partial class SolidBody
             rotationAtElapsedTime,
             angularVelocity,
             remainingTime);
+        Vector3d endPosition = AddPositionDisplacement(positionAtElapsedTime, displacement);
         _continuousCollisionFrameToken = Context.LateSimulateToken;
         RemoveSupersededContinuousCollisionSegments(
             startFraction,
@@ -300,13 +301,26 @@ public partial class SolidBody
             startFraction,
             Fixed64.One,
             positionAtElapsedTime,
-            positionAtElapsedTime + displacement,
+            endPosition,
             displacement,
             rotationAtElapsedTime,
             angularVelocity,
             targetRotation,
             angularVelocity.Magnitude * remainingTime,
             ContinuousCollisionRotationPath3D.IntegratedAngularVelocity));
+    }
+
+    // Step durations are at most one; keep the existing product rounding before checking the final coordinate.
+    internal void ValidateContinuousCollisionPosition(Vector3d position, Vector3d velocity, Fixed64 remainingTime) =>
+        _ = AddPositionDisplacement(position, ResolveCommittedLinearVelocity(velocity) * remainingTime);
+
+    private Vector3d ResolveCommittedLinearVelocity(Vector3d velocity)
+    {
+        velocity = ProjectLinearMotion(velocity);
+        // An unchanged collision velocity skips refresh, including newly changed environment limits.
+        return velocity == _linearVelocity
+            ? velocity
+            : ResolveLimitedVelocity(velocity, velocity.Magnitude, out _);
     }
 
     internal bool CanAppendContinuousCollisionSegment(Fixed64 elapsedTime)

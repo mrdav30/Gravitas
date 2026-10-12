@@ -89,6 +89,7 @@ public sealed partial class SolidBody2D
             return false;
         }
 
+        ValidateContinuousCollisionHandoffPosition(resolvedPosition, postLinearVelocity, postAngularVelocity, remainingTime);
         _ = Context.Physics2D.TryReserveContinuousCollisionCandidateRefresh(this);
 
         ApplyContinuousCollisionHandoffStateReserved(
@@ -122,9 +123,7 @@ public sealed partial class SolidBody2D
         _angularVelocity = postAngularVelocity;
         RefreshLinearSpeed();
         RefreshAngularSpeed();
-        bool hasRemainingMotion = remainingTime > Fixed64.Epsilon
-            && (_linearVelocity.MagnitudeSquared > Fixed64.Epsilon
-                || _angularVelocity.Abs() > Fixed64.Epsilon);
+        bool hasRemainingMotion = HasRemainingHandoffMotion(_linearVelocity, _angularVelocity, remainingTime);
         AppendContinuousCollisionFrameSegment(
             resolvedPosition,
             _rotation,
@@ -145,6 +144,21 @@ public sealed partial class SolidBody2D
         _continuousCollisionHandoffPending = true;
         Context.Physics2D.QueueContinuousCollisionHandoff(this);
     }
+
+    internal void ValidateContinuousCollisionHandoffPosition(
+        Vector2d position, Vector2d linearVelocity, Fixed64 angularVelocity, Fixed64 remainingTime)
+    {
+        linearVelocity = ProjectLinearMotion(linearVelocity);
+        if (linearVelocity.Magnitude <= Fixed64.Epsilon)
+            linearVelocity = Vector2d.Zero;
+        angularVelocity = CanRotate && angularVelocity.Abs() > Fixed64.Epsilon ? angularVelocity : Fixed64.Zero;
+        if (HasRemainingHandoffMotion(linearVelocity, angularVelocity, remainingTime))
+            _ = AddPositionDisplacement(position, linearVelocity * remainingTime);
+    }
+
+    private static bool HasRemainingHandoffMotion(Vector2d linearVelocity, Fixed64 angularVelocity, Fixed64 remainingTime) =>
+        remainingTime > Fixed64.Epsilon
+        && (linearVelocity.MagnitudeSquared > Fixed64.Epsilon || angularVelocity.Abs() > Fixed64.Epsilon);
 
     internal bool CanApplyContinuousCollisionHandoffState(
         Vector2d positionAtImpact,
@@ -199,7 +213,7 @@ public sealed partial class SolidBody2D
 
         Vector2d startPosition = _position;
         Vector2d proposedPosition = hasLinearMotion
-            ? startPosition + _linearVelocity * remainingTime
+            ? AddPositionDisplacement(startPosition, ProjectLinearMotion(_linearVelocity) * remainingTime)
             : startPosition;
         Fixed64 startRotation = _rotation;
         Fixed64 proposedRotation = hasAngularMotion
@@ -313,8 +327,8 @@ public sealed partial class SolidBody2D
         {
             while (LastContinuousCollisionToiIterationCount < maxToiIterations)
             {
-                Vector2d requestedSegmentDisplacement = _linearVelocity * remainingTime;
-                Vector2d requestedSegmentEnd = currentPosition + requestedSegmentDisplacement;
+                Vector2d requestedSegmentDisplacement = ProjectLinearMotion(_linearVelocity) * remainingTime;
+                Vector2d requestedSegmentEnd = AddPositionDisplacement(currentPosition, requestedSegmentDisplacement);
                 Vector2d segmentDisplacement = ContinuousCollisionSweepRange.ValidateEndpoint(
                     currentPosition,
                     requestedSegmentEnd,
@@ -600,6 +614,10 @@ public sealed partial class SolidBody2D
             return false;
         }
 
+        ValidateContinuousCollisionPosition(sourcePositionAtImpact, sourcePostLinearVelocity, Context.DeltaTime - hitElapsedTime);
+        if (target.CanTranslate)
+            target.ValidateContinuousCollisionHandoffPosition(targetResolvedPosition, targetPostLinearVelocity, targetAngularVelocity, remainingTime);
+
         _ = target.CanTranslate
             ? Context.Physics2D.TryReserveContinuousCollisionCandidateRefresh(this, target)
             : Context.Physics2D.TryReserveContinuousCollisionCandidateRefresh(this);
@@ -719,6 +737,10 @@ public sealed partial class SolidBody2D
         {
             return false;
         }
+
+        ValidateContinuousCollisionPosition(sourcePositionAtImpact, sourcePostLinearVelocity, Context.DeltaTime - hitElapsedTime);
+        if (target.CanTranslate)
+            target.ValidateContinuousCollisionHandoffPosition(targetResolvedPosition, targetPostLinearVelocity, targetAngularVelocity, remainingTime);
 
         _ = Context.Physics2D.TryReserveContinuousCollisionCandidateRefresh(this);
         if (target.CanTranslate)

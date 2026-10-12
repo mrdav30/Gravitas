@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using System;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas;
@@ -273,13 +274,24 @@ public partial class SolidBody
         }
     }
 
-    internal void ApplyCollisionPositionCorrection(Vector3d positionCorrection)
-    {
-        positionCorrection = ProjectLinearMotion(positionCorrection);
-        if (!CanTranslate || positionCorrection == Vector3d.Zero)
-            return;
+    internal Vector3d PrepareCollisionPositionCorrection(Vector3d positionCorrection) =>
+        CanTranslate
+            ? AddPositionDisplacement(Position3d, ProjectLinearMotion(positionCorrection))
+            : Position3d;
 
-        Position3d += positionCorrection;
+    internal void ApplyCollisionPositionState(Vector3d position)
+    {
+        if (Position3d == position)
+            return;
+        Position3d = position;
+    }
+
+    // Callers project frozen axes first; numeric exhaustion is not a physical wall.
+    private static Vector3d AddPositionDisplacement(Vector3d start, Vector3d displacement)
+    {
+        if (!Vector3d.TryAdd(start, displacement, out Vector3d position))
+            throw new OverflowException("The requested body position is outside the representable coordinate domain.");
+        return position;
     }
 
 
@@ -466,23 +478,7 @@ public partial class SolidBody
 
     private void RefreshLinearMotionState(Vector3d lastVelocity)
     {
-        PhysicsEnvironment environment = Context.Environment;
-        Fixed64 desiredSpeed = _linearVelocity.Magnitude;
-        if (desiredSpeed > environment.MinSpeed)
-        {
-            if (desiredSpeed > environment.MaxSpeed)
-            {
-                _linearVelocity = _linearVelocity.Normalized * environment.MaxSpeed;
-                _linearSpeed = environment.MaxSpeed;
-            }
-            else
-                _linearSpeed = desiredSpeed;
-        }
-        else
-        {
-            _linearVelocity = Vector3d.Zero;
-            _linearSpeed = Fixed64.Zero;
-        }
+        _linearVelocity = ResolveLimitedVelocity(_linearVelocity, _linearVelocity.Magnitude, out _linearSpeed);
 
         // Update the direction of the linear velocity, if we're not moving maintain previous direction
         _linearDirection = _linearSpeed > Fixed64.Zero
@@ -557,30 +553,31 @@ public partial class SolidBody
 
     private void RefreshAngularMotionState(Vector3d lastVelocity)
     {
-        PhysicsEnvironment environment = Context.Environment;
         Fixed64 desiredSpeed = _angularVelocity.Magnitude;
-        if (desiredSpeed > environment.MinSpeed)
-        {
-            if (desiredSpeed > environment.MaxSpeed)
-            {
-                _angularVelocity = _angularVelocity.Normalized * environment.MaxSpeed;
-                _angularSpeed = environment.MaxSpeed;
-
-            }
-            else
-                _angularSpeed = desiredSpeed;
-
+        _angularVelocity = ResolveLimitedVelocity(_angularVelocity, desiredSpeed, out _angularSpeed);
+        if (desiredSpeed > Context.Environment.MinSpeed)
             _angularDirection = _angularVelocity.Normalized;
-        }
-        else
-        {
-            _angularVelocity = Vector3d.Zero;
-            _angularSpeed = Fixed64.Zero;
-        }
 
         _angularAcceleration = _angularSpeed > Fixed64.Zero
             ? (_angularVelocity - lastVelocity) / Context.DeltaTime
             : Vector3d.Zero;
+    }
+
+    private Vector3d ResolveLimitedVelocity(Vector3d velocity, Fixed64 desiredSpeed, out Fixed64 speed)
+    {
+        PhysicsEnvironment environment = Context.Environment;
+        if (desiredSpeed <= environment.MinSpeed)
+        {
+            speed = Fixed64.Zero;
+            return Vector3d.Zero;
+        }
+        if (desiredSpeed > environment.MaxSpeed)
+        {
+            speed = environment.MaxSpeed;
+            return velocity.Normalized * speed;
+        }
+        speed = desiredSpeed;
+        return velocity;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -590,8 +587,8 @@ public partial class SolidBody
     private void NonKinematicUpdate(Vector3d angularVelocityStateStart)
     {
         Vector3d rotationalCcdStartPosition = Position3d;
-        Vector3d rotationalCcdProposedPosition = rotationalCcdStartPosition
-            + _linearVelocity * Context.DeltaTime;
+        Vector3d rotationalCcdProposedPosition = AddPositionDisplacement(
+            rotationalCcdStartPosition, ProjectLinearMotion(_linearVelocity) * Context.DeltaTime);
         FixedQuaternion rotationalCcdStartRotation = Rotation;
         FixedQuaternion rotationalCcdProposedRotation = IntegrateAngularRotation(
             rotationalCcdStartRotation,
@@ -628,14 +625,15 @@ public partial class SolidBody
     private void PositionBasedOnForce()
     {
         Vector3d startPosition = Position3d;
-        Vector3d velocityVector = startPosition + (_linearVelocity * Context.DeltaTime);
+        Vector3d velocityVector = AddPositionDisplacement(
+            startPosition, ProjectLinearMotion(_linearVelocity) * Context.DeltaTime);
         TryResolveContinuousCollision(startPosition, ref velocityVector);
         ApplyResolvedPosition(startPosition, velocityVector);
     }
 
     private void ApplyResolvedPosition(Vector3d startPosition, Vector3d velocityVector)
     {
-        velocityVector = startPosition + ProjectLinearMotion(velocityVector - startPosition);
+        velocityVector = ProjectLinearEndpoint(startPosition, velocityVector);
 
         Vector2d velocityAxis = velocityVector.ToVector2d();
 

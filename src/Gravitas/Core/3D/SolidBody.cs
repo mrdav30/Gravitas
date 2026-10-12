@@ -18,6 +18,7 @@ using System.Runtime.CompilerServices;
 namespace Gravitas;
 
 /// <summary>Represents deterministic 3D rigid-body state owned by one world context.</summary>
+/// <content>Owns motion, mass properties, grounding, CCD and recorded body state.</content>
 public partial class SolidBody : IRecordable
 {
     /// <summary>Stores the host-controlled body diagnostic flag.</summary>
@@ -682,6 +683,7 @@ public partial class SolidBody : IRecordable
 
 
     /// <summary>Completes deferred body integration and post-step bookkeeping.</summary>
+    /// <exception cref="OverflowException">An integrated or corrected body position cannot be represented.</exception>
     public void LateSimulate()
     {
         Context.EnterSimulationPhase();

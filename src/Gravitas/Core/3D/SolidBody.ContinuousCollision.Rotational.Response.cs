@@ -210,6 +210,11 @@ public partial class SolidBody
             return false;
         }
 
+        if (sourceNeedsRefresh)
+            ValidateContinuousCollisionPosition(sourcePosition, postSourceLinearVelocity, Context.DeltaTime - impactElapsedTime);
+        if (targetNeedsRefresh)
+            target.ValidateContinuousCollisionHandoffPosition(resolvedTargetPosition, resolvedTargetLinearVelocity, resolvedTargetAngularVelocity, remainingAfterImpact);
+
         if (sourceNeedsRefresh && targetNeedsRefresh)
             _ = Context.Physics.TryReserveContinuousCollisionCandidateRefresh(this, target);
         else if (sourceNeedsRefresh)

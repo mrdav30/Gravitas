@@ -37,6 +37,7 @@ public static partial class CollisionResponse
     /// Applies positional correction, normal impulses, and Coulomb friction for
     /// the collision pair's current deterministic contact manifold.
     /// </summary>
+    /// <exception cref="System.OverflowException">A corrected body position cannot be represented.</exception>
     public static void CalculateImpulse(CollisionPair pair)
     {
         PrepareSolve(pair);
@@ -279,10 +280,27 @@ public static partial class CollisionResponse
         if (totalInverseMass <= Fixed64.Zero)
             return;
 
-        Vector3d correction = contact.Normal
-            * (correctionDepth * PenetrationCorrectionPercent * contactShare / totalInverseMass);
-        contact.A.Body.ApplyCollisionPositionCorrection(-correction * inverseMassA);
-        contact.B.Body.ApplyCollisionPositionCorrection(correction * inverseMassB);
+        Fixed64 weightedDepth = correctionDepth * PenetrationCorrectionPercent * contactShare;
+        Vector3d correctionA, correctionB;
+        if (CollisionPositionCorrection.TryGetCompactScale(
+                weightedDepth, inverseMassA, inverseMassB, out Fixed64 scale))
+        {
+            Vector3d correction = contact.Normal * scale;
+            correctionA = -correction * inverseMassA;
+            correctionB = correction * inverseMassB;
+        }
+        else
+        {
+            correctionA = -contact.Normal * CollisionPositionCorrection.GetWeightedDistance(
+                weightedDepth, inverseMassA, inverseMassA, inverseMassB);
+            correctionB = contact.Normal * CollisionPositionCorrection.GetWeightedDistance(
+                weightedDepth, inverseMassB, inverseMassA, inverseMassB);
+        }
+        // Prepare both endpoints before publishing either participant's correction.
+        Vector3d positionA = contact.A.Body.PrepareCollisionPositionCorrection(correctionA);
+        Vector3d positionB = contact.B.Body.PrepareCollisionPositionCorrection(correctionB);
+        contact.A.Body.ApplyCollisionPositionState(positionA);
+        contact.B.Body.ApplyCollisionPositionState(positionB);
     }
 
     private static bool TryApplyCachedImpulse(

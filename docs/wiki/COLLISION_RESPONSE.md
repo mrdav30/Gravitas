@@ -89,6 +89,21 @@ Multi-constraint islands run a bounded number of iterations from
 positional correction are applied on the first island iteration; later
 iterations refine velocity response.
 
+## Position Correction Limits
+
+Pure 3D, pure 2D and mixed correction preserve the existing correction fraction,
+mass weighting and ordinary rounding. If the common inverse-mass scale, sum
+or rounded multiplication cannot fit, response computes the representable
+per-body weighted distance with an exact ratio before applying the normal.
+Large or small masses do not justify truncating otherwise valid movement.
+
+Each correction projects frozen axes and checks both final positions before
+publishing either participant. An unrepresentable position raises
+`OverflowException`; it is not a physical wall or a partial correction. Earlier
+constraints may already have been solved. Hosts must stop and restore a failed
+step rather than continue from its partially advanced state. See
+[representable body positions](HOST_INTEGRATION.md#representable-body-positions).
+
 ## 3D Response
 
 Non-trigger 3D response:
@@ -109,7 +124,7 @@ Non-trigger 3D response:
    refine the same target instead of retracting bounce.
 7. resolves per-contact materials and solves the two-axis Coulomb disk against
    that row's actual accumulated normal load.
-8. stores each row's normal/tangent impulses independently. A failed
+8. stores each row's normal/tangent impulses independently. A failed velocity
    representability preflight clears only that row's cache; other rows continue.
 
 Admitted nonzero normals are authoritative. Collider-center direction is a

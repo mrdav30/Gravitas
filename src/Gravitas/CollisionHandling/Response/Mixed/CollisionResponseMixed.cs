@@ -106,7 +106,7 @@ public static partial class CollisionResponseMixed
         }
 
         if (applyPositionCorrection && correctionInverseMass > Fixed64.Zero)
-            ApplyPositionCorrection(body3D, body2D, normal, contact.Depth, correctionInverseMass);
+            ApplyPositionCorrection(body3D, body2D, normal, contact.Depth);
 
         bool appliedImpulse = HasVelocityDelta(normalResult);
         if (appliedImpulse)
@@ -165,24 +165,36 @@ public static partial class CollisionResponseMixed
         SolidBody? body3D,
         SolidBody2D? body2D,
         Vector3d normal,
-        Fixed64 depth,
-        Fixed64 effectiveInverseMass)
+        Fixed64 depth)
     {
         Fixed64 correctionDepth = depth - PenetrationSlop;
         if (correctionDepth <= Fixed64.Zero)
             return;
 
-        Fixed64 correctionScalar = correctionDepth * PenetrationCorrectionPercent / effectiveInverseMass;
+        Fixed64 weightedDepth = correctionDepth * PenetrationCorrectionPercent;
         Fixed64 constrainedInverseMass3D = GetConstrainedInverseMass(body3D, normal);
-        if (constrainedInverseMass3D > Fixed64.Zero)
-            body3D!.ApplyCollisionPositionCorrection(-normal * (correctionScalar * constrainedInverseMass3D));
-
         Fixed64 constrainedInverseMass2D = GetConstrainedPlanarInverseMass(body2D, normal);
-        if (constrainedInverseMass2D <= Fixed64.Zero)
-            return;
-
         Vector2d planarNormal = normal.ToVector2d();
-        body2D!.ApplyCollisionPositionCorrection(planarNormal * (correctionScalar * constrainedInverseMass2D));
+        Vector3d correction3D;
+        Vector2d correction2D;
+        if (CollisionPositionCorrection.TryGetCompactScale(
+                weightedDepth, constrainedInverseMass3D, constrainedInverseMass2D, out Fixed64 scale))
+        {
+            correction3D = -normal * (scale * constrainedInverseMass3D);
+            correction2D = planarNormal * (scale * constrainedInverseMass2D);
+        }
+        else
+        {
+            correction3D = -normal * CollisionPositionCorrection.GetWeightedDistance(
+                weightedDepth, constrainedInverseMass3D, constrainedInverseMass3D, constrainedInverseMass2D);
+            correction2D = planarNormal * CollisionPositionCorrection.GetWeightedDistance(
+                weightedDepth, constrainedInverseMass2D, constrainedInverseMass3D, constrainedInverseMass2D);
+        }
+        // Prepare both endpoints before publishing either participant's correction.
+        Vector3d position3D = body3D?.PrepareCollisionPositionCorrection(correction3D) ?? default;
+        Vector2d position2D = body2D?.PrepareCollisionPositionCorrection(correction2D) ?? default;
+        body3D?.ApplyCollisionPositionState(position3D);
+        body2D?.ApplyCollisionPositionState(position2D);
     }
 
     private static bool TryGetNormalImpulse(

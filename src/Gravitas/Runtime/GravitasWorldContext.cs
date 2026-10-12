@@ -393,6 +393,10 @@ public sealed partial class GravitasWorldContext : IDisposable
     /// The independent late-simulation phase counter is exhausted. Rejection occurs
     /// before this call changes world state.
     /// </exception>
+    /// <exception cref="OverflowException">
+    /// A body position cannot be represented. Earlier step work may already have advanced;
+    /// stop and restore a known state before continuing.
+    /// </exception>
     public void LateSimulate()
     {
         ThrowIfDisposed();

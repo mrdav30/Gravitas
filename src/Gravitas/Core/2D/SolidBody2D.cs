@@ -762,7 +762,8 @@ public sealed partial class SolidBody2D : IRecordable
             Fixed64 proposedRotation = startRotation + _angularVelocity * Context.DeltaTime;
 
             Vector2d startPosition = _position;
-            Vector2d proposedPosition = startPosition + _linearVelocity * Context.DeltaTime;
+            Vector2d proposedPosition = AddPositionDisplacement(
+                startPosition, ProjectLinearMotion(_linearVelocity) * Context.DeltaTime);
             if (ShouldUseRotationalContinuousCollisionArbiter(
                     startPosition,
                     proposedPosition,

@@ -33,7 +33,7 @@ public sealed class BodyFreezeConstraintTests
         body.Body.AddForce(new Vector3d((Fixed64)8, (Fixed64)8, (Fixed64)8));
         scenario.Context.LateSimulate();
         body.Body.ApplyCollisionLinearVelocityDelta(new Vector3d(Fixed64.One, Fixed64.One, Fixed64.One));
-        body.Body.ApplyCollisionPositionCorrection(new Vector3d(Fixed64.One, Fixed64.One, Fixed64.One));
+        body.Body.ApplyCollisionPositionState(body.Body.PrepareCollisionPositionCorrection(new Vector3d(Fixed64.One, Fixed64.One, Fixed64.One)));
 
         body.Body.LinearVelocity.X.Should().BeGreaterThan(Fixed64.Zero);
         body.Body.LinearVelocity.Y.Should().Be(Fixed64.Zero);
@@ -117,7 +117,7 @@ public sealed class BodyFreezeConstraintTests
         body.Body.AddAngularImpulse(new Vector3d(Fixed64.One, (Fixed64)2, (Fixed64)3));
         body.Body.ApplyCollisionLinearVelocityDelta(Vector3d.Right);
         body.Body.ApplyCollisionAngularVelocityDelta(Vector3d.Up);
-        body.Body.ApplyCollisionPositionCorrection(Vector3d.Forward);
+        body.Body.ApplyCollisionPositionState(body.Body.PrepareCollisionPositionCorrection(Vector3d.Forward));
 
         body.Body.LinearVelocity.Should().Be(Vector3d.Zero);
         body.Body.AngularVelocity.Should().Be(Vector3d.Zero);
@@ -266,7 +266,7 @@ public sealed class BodyFreezeConstraintTests
         body.AddTorque(Fixed64.One);
         body.ApplyCollisionLinearVelocityDelta(Vector2d.Right);
         body.ApplyCollisionAngularVelocityDelta(Fixed64.One);
-        body.ApplyCollisionPositionCorrection(Vector2d.Forward);
+        body.ApplyCollisionPositionState(body.PrepareCollisionPositionCorrection(Vector2d.Forward));
 
         body.LinearVelocity.Should().Be(Vector2d.Zero);
         body.AngularVelocity.Should().Be(Fixed64.Zero);
@@ -283,7 +283,7 @@ public sealed class BodyFreezeConstraintTests
         body.AddForce(new Vector2d((Fixed64)8, (Fixed64)8));
         context.LateSimulate();
         body.ApplyCollisionLinearVelocityDelta(new Vector2d(Fixed64.One, Fixed64.One));
-        body.ApplyCollisionPositionCorrection(new Vector2d(Fixed64.One, Fixed64.One));
+        body.ApplyCollisionPositionState(body.PrepareCollisionPositionCorrection(new Vector2d(Fixed64.One, Fixed64.One)));
 
         body.LinearVelocity.X.Should().BeGreaterThan(Fixed64.Zero);
         body.LinearVelocity.Y.Should().Be(Fixed64.Zero);

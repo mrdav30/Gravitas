@@ -201,8 +201,8 @@ public sealed partial class SolidBody2D
                 Fixed64 segmentEndElapsedTime = elapsedTime + remainingTime;
                 Fixed64 segmentElapsedTime = segmentEndElapsedTime
                     - motionSegmentStartElapsedTime;
-                Vector2d segmentEnd = motionSegmentStartPosition
-                    + motionSegmentLinearVelocity * segmentElapsedTime;
+                Vector2d segmentEnd = AddPositionDisplacement(
+                    motionSegmentStartPosition, ProjectLinearMotion(motionSegmentLinearVelocity) * segmentElapsedTime);
                 Fixed64 segmentEndRotation = CanonicalizeRotation(
                     motionSegmentStartRotation
                     + motionSegmentAngularVelocity * segmentElapsedTime);

@@ -372,10 +372,27 @@ public static class CollisionResponse2D
         if (totalInverseMass <= Fixed64.Zero)
             return;
 
-        Vector2d correction = contact.Normal
-            * (correctionDepth * PenetrationCorrectionPercent * contactShare / totalInverseMass);
-        ApplyPositionCorrection(contact.A, -correction * inverseMassA);
-        ApplyPositionCorrection(contact.B, correction * inverseMassB);
+        Fixed64 weightedDepth = correctionDepth * PenetrationCorrectionPercent * contactShare;
+        Vector2d correctionA, correctionB;
+        if (CollisionPositionCorrection.TryGetCompactScale(
+                weightedDepth, inverseMassA, inverseMassB, out Fixed64 scale))
+        {
+            Vector2d correction = contact.Normal * scale;
+            correctionA = -correction * inverseMassA;
+            correctionB = correction * inverseMassB;
+        }
+        else
+        {
+            correctionA = -contact.Normal * CollisionPositionCorrection.GetWeightedDistance(
+                weightedDepth, inverseMassA, inverseMassA, inverseMassB);
+            correctionB = contact.Normal * CollisionPositionCorrection.GetWeightedDistance(
+                weightedDepth, inverseMassB, inverseMassA, inverseMassB);
+        }
+        // Prepare both endpoints before publishing either participant's correction.
+        Vector2d positionA = contact.A.Body?.PrepareCollisionPositionCorrection(correctionA) ?? default;
+        Vector2d positionB = contact.B.Body?.PrepareCollisionPositionCorrection(correctionB) ?? default;
+        contact.A.Body?.ApplyCollisionPositionState(positionA);
+        contact.B.Body?.ApplyCollisionPositionState(positionB);
     }
 
     private static bool TryApplyCachedImpulse(
@@ -704,14 +721,6 @@ public static class CollisionResponse2D
             ResolveAngularVelocity(contact.B.Body),
             contact.RelativeB.Vector,
             axis);
-
-    private static void ApplyPositionCorrection(ResponseBody2D body, Vector2d correction)
-    {
-        if (!body.CanTranslate || correction == Vector2d.Zero)
-            return;
-
-        body.Body!.ApplyCollisionPositionCorrection(correction);
-    }
 
     private static bool TryApplyContactImpulseCombination(
         CollisionPair2D pair,

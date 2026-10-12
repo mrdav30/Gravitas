@@ -806,6 +806,11 @@ public sealed partial class SolidBody2D
                 remainingAfterImpact, out targetResolvedPosition);
         if (!(sourceStateAvailable & targetStateAvailable)) return false;
         if (sourceResponseBody != null)
+            ValidateContinuousCollisionPosition(sourcePosition, postSourceLinearVelocity, Context.DeltaTime - impactElapsedTime);
+        if (targetResponseBody != null)
+            targetResponseBody.ValidateContinuousCollisionHandoffPosition(targetResolvedPosition, postTargetLinearVelocity, postTargetAngularVelocity, remainingAfterImpact);
+
+        if (sourceResponseBody != null)
             _ = Context.Physics2D.TryReserveContinuousCollisionCandidateRefresh(this);
 
         if (targetResponseBody != null)

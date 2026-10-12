@@ -480,6 +480,26 @@ the visual pose to the engine transform, and disable native rigid-body
 simulation or interpolation that would apply a second motion source or
 double-interpolate the Gravitas result.
 
+### Representable Body Positions
+
+Gravitas rejects an unrepresentable authoritative position with
+`OverflowException` during integration, contact correction, or CCD trajectory
+publication. Frozen axes are projected before validation. A position exactly at
+`Fixed64.MinValue` or `Fixed64.MaxValue` is valid; movement beyond it is not
+silently shortened.
+
+Contact corrections prepare both participants' endpoints before moving either.
+CCD response also checks the outgoing trajectories before publishing body state
+or reserving candidate refresh. These checks protect the individual operation;
+a simulation step is not a rollback transaction. Earlier bodies, solver rows,
+clock advances, and force integration may already have run when an exception
+escapes. Stop the failed step and restore a known state before continuing.
+
+The scalar coordinate limits do not define playable-world boundaries or grid
+walls. Hosts remain responsible for their own world limits and explicit
+coordinate-frame changes. Valid ordinary integration keeps multiply-then-add
+rounding.
+
 ## Common Configuration
 
 ### Surface Materials

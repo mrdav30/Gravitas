@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using System;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas;
@@ -179,14 +180,25 @@ public sealed partial class SolidBody2D
             & (!CanRotate | angularVelocityFits);
     }
 
-    internal void ApplyCollisionPositionCorrection(Vector2d positionCorrection)
-    {
-        positionCorrection = ProjectLinearMotion(positionCorrection);
-        if (!CanTranslate || positionCorrection == Vector2d.Zero)
-            return;
+    internal Vector2d PrepareCollisionPositionCorrection(Vector2d positionCorrection) =>
+        CanTranslate
+            ? AddPositionDisplacement(_position, ProjectLinearMotion(positionCorrection))
+            : _position;
 
-        _position += positionCorrection;
+    internal void ApplyCollisionPositionState(Vector2d position)
+    {
+        if (_position == position)
+            return;
+        _position = position;
         Collider.Rebuild();
+    }
+
+    // Callers project frozen axes first; numeric exhaustion is not a physical wall.
+    private static Vector2d AddPositionDisplacement(Vector2d start, Vector2d displacement)
+    {
+        if (!Vector2d.TryAdd(start, displacement, out Vector2d position))
+            throw new OverflowException("The requested body position is outside the representable coordinate domain.");
+        return position;
     }
 
     private bool CanSleep => SleepEnabled && HasSolverMobility;
