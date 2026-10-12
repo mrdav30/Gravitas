@@ -66,7 +66,7 @@ public sealed partial class MixedQueryCcdTests
                 out Vector3d surfaceOffset)
             .Should().BeTrue();
         surfaceOffset.Should().Be(Vector3d.Right * Fixed64.Half);
-        hit.Normal3DTo2D.Should().Be(Vector3d.Left);
+        hit.Normal3DTo2D.Should().Be(Vector3d.Right);
     }
 
     private static PhysicsMixedHit SweepCircleAgainstRotatedCuboid(

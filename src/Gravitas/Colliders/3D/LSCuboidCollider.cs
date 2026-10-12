@@ -162,10 +162,19 @@ public sealed class LSCuboidCollider : LSCollider
 
     internal override FixedPointAnchor GetClosestSurfaceAnchor(
         Vector3d point,
-        out Vector3d normal)
+        out Vector3d normal) =>
+        GetClosestSurfaceAnchor(point, out normal, out _);
+
+    internal override FixedPointAnchor GetClosestSurfaceAnchor(
+        Vector3d point, out Vector3d normal, out bool contained)
     {
-        normal = _orientedBox.GetNearestFaceNormal(point);
-        return _orientedBox.GetClosestPointAnchor(point);
+        contained = _orientedBox.Contains(point);
+        FixedPointAnchor surface = _orientedBox.GetClosestPointAnchor(point);
+        // A contained start exits through its face; an exterior corner uses the closest-feature direction.
+        normal = contained ? _orientedBox.GetNearestFaceNormal(point)
+            : WidePointAnchor3d.GetDirection(
+                new FixedPointAnchor(point, FixedQuaternion.Identity, Vector3d.Zero), surface);
+        return surface;
     }
 
     internal override bool TryGetPlanarSurfaceNormal(Vector3d point, out Vector3d normal)

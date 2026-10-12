@@ -128,6 +128,10 @@ public sealed class LSSphereCollider : LSCollider
     internal override FixedPointAnchor GetClosestSurfaceAnchor(
         Vector3d point,
         out Vector3d normal) =>
+        GetClosestSurfaceAnchor(point, out normal, out _);
+
+    internal override FixedPointAnchor GetClosestSurfaceAnchor(
+        Vector3d point, out Vector3d normal, out bool contained) =>
         WideFiniteAxisIntersection
             .GetClosestCenteredCapsuleSurfaceAnchor(
                 point,
@@ -138,7 +142,7 @@ public sealed class LSSphereCollider : LSCollider
                 ScaledRadius,
                 Vector3d.Right,
                 out normal,
-                out _);
+                out contained);
 
     /// <inheritdoc/>
     public override bool ColliderOverlapsRay(RaycastSegmentWorker worker, ref SwiftList<Vector3d> outputIntersectionPoints) =>

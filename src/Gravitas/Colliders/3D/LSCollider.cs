@@ -805,6 +805,17 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
         out Vector3d normal);
 
     /// <summary>
+    /// Retains exact primitive-solid containment alongside the selected feature.
+    /// The default preserves surface-only query semantics.
+    /// </summary>
+    internal virtual FixedPointAnchor GetClosestSurfaceAnchor(
+        Vector3d point, out Vector3d normal, out bool contained)
+    {
+        contained = false;
+        return GetClosestSurfaceAnchor(point, out normal);
+    }
+
+    /// <summary>
     /// Tries to resolve a normal that is invariant across the planar surface
     /// feature containing <paramref name="point"/>. A successful result must
     /// be a nonzero outward normal.

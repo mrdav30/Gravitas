@@ -134,7 +134,8 @@ public readonly struct PhysicsMixedHit
     public bool TryGetPoint2D(out Vector3d point) => Anchor2D.TryGetWorldPoint(out point);
 
     /// <summary>
-    /// Normal pointing from the 3D collider or swept 3D source toward the embedded 2D volume.
+    /// Gets the separation normal oriented from the 3D participant toward the 2D participant.
+    /// Contained starts follow the target's outward surface rather than center-to-center displacement.
     /// </summary>
     public Vector3d Normal3DTo2D { get; }
 

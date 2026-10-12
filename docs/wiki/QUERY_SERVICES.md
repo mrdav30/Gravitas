@@ -129,6 +129,17 @@ absolute point to be representable. The familiar `Point`, `Point3D`, and
 when a query may approach a scalar face. Returning `false` from a witness
 materialization method does not invalidate the query hit.
 
+A sphere sweep against a solid 3D primitive, or a mixed circle-slab sweep
+against that primitive, retains the actual target boundary for a contained
+start. The normal uses the target's outward surface direction, independently
+of travel, so CCD permits escape and rejects motion deeper into the target.
+Equal nearest features keep the primitive's geometric order; coincident sphere
+centers use world +X; capsule centerline ties use rotated local +X. Exterior
+edge and apex contacts retain the separating direction
+from the closest feature toward the source center. Mixed slab witnesses clamp
+their vertical offset to the slab's caps without requiring the target witness's
+other coordinates to be representable.
+
 A sphere sweep against a 3D mesh treats its triangles as two-sided surfaces,
 including convex meshes and convex-mesh compound parts. An initially touching
 or overlapping triangle reports zero travel distance and retains the target's

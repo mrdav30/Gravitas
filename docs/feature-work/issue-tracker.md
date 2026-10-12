@@ -2,7 +2,7 @@
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-110`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-111`.
 - Assign an ID when an issue enters this tracker, keep it through resolution,
   and never reuse an ID even if an entry is later removed. Check this file's Git
   history before advancing or repairing the counter.
@@ -36,32 +36,6 @@
   verification records rather than this active section.
 
 ### Ordered Queue
-
-### GRV-Issue-103 - Contained mixed circle sweeps can report inward solid-target normals
-
-- **Confirmed:** 2026-10-10 in two local-stack Release query probes during
-  #100's dimension-parity audit. The mixed hit builder is unchanged by #100
-  and does not call its corrected 3D sphere contact policy.
-- **Reproduction:** A static height-1/radius-1/2 cylinder at the origin contains
-  a circle slab centered at X/Z `(1/10,0)`, radius `1/20`, slab Y zero and
-  half-thickness `1/10`. Sweep one unit Right or Left through
-  `QueryMixed.SweepCircleAgainst3D`. Both queries return distance zero and the
-  nearest target point `(1/2,0,0)`, but `Normal3DTo2D` is Left and
-  `NormalFor2DSource` is `(-1,0)` instead of the outward Right normal.
-- **Root cause:** `GravitasQueryMixedService.BuildCircleAgainst3DHit` derives
-  the normal from the target witness toward the source center. For a contained
-  solid-volume source, that direction is inward. A geometric surface-separation
-  normal needs the target's volume/containment contract.
-- **Risk and follow-up:** Verify the complete mixed CCD host loop before
-  attributing a runtime motion failure. Source closing classification can treat
-  outward Right motion as closing and deeper Left motion as separating. Repair
-  solid-target containment in the mixed owner; preserve two-sided mesh semantics,
-  slab anchors and constrained 2D response. Audit cone, capsule and compound
-  counterparts with genuine entering/leaving controls.
-- **Evidence:** Ignored `artifacts/grv-issue-100/MixedContainedSweepAudit.cs`,
-  `mixed-probe.log` and paired TRX retain both failures and exact returned data.
-  The temporary probe is removed from the maintained suite. This is separate
-  from #098's covered-mesh-seam reduction and the 3D normal reversal in #100.
 
 ### GRV-Issue-109 - Mixed circle segment sweeps can turn exact grazing into closing contact
 
@@ -154,6 +128,39 @@
   and CCD position publication for the same invariant. Keep host/grid boundary
   policy separate; do not introduce silent clamps or automatic world rebasing.
 
+### GRV-Issue-110 - Mixed curved-target sweeps can miss contained starts near scalar limits
+
+- **Confirmed:** 2026-10-12 during #103's conceptual-witness review. An isolated
+  Release probe verifies exact source-center containment, then fails reducer
+  admission before the corrected contact builder runs. The projected-support
+  admission owner is unchanged by #103.
+- **Reproduction:** Let `m = Fixed64.MaxValue`. Initialize a cylinder of radius
+  `1/4`, full height `1/10`, center `(m - 1/100,0,0)` and normalized rotation
+  `(0,0,-1,2)`. Sweep a circle slab from X/Z `(m - 1/20,0)` left by `1/1000`,
+  with radius `1/100`, slab Y zero and half-thickness `1/4`, through the mixed
+  circle/3D reducer. The target's exact closest-surface owner confirms that the
+  source center is inside, but `TrySweepCircleAgainst3DCollider` returns false.
+  Source centers and expanded X bounds remain representable.
+- **Root cause:** `FiniteSlabProjectionSweep.TrySweepCircle` requires an initial
+  absolute right support. `FixedSlabProjection` legitimately rejects a support
+  that cannot materialize; the admission gate interprets that failure as a miss.
+  Here the cylinder's right support is approximately `(m + 0.18,-0.17,0)`:
+  its Y lies inside the source slab but its X exceeds the scalar range.
+- **Follow-up:** Preserve conceptual or translated support through projected
+  admission instead of equating unavailable absolute support with separation.
+  Check cylinder, capsule and cone parity, both coordinate limits, entering and
+  leaving controls, and the production query/CCD paths. Keep host/grid bounds
+  and final body-position policy separate from geometric admission.
+- **Boundary:** A second, extreme-size cylinder probe also fails this gate.
+  That result complements #096's geometry-range decision, but the ordinary
+  dimensions above require an independent fix; a radius cap cannot repair it.
+- **Evidence:** Ignored `artifacts/grv-issue-103/OrdinaryCylinderBoundaryProbe.cs`,
+  `boundary-probe/boundary-probe.trx` and
+  `artifacts/grv-issue-103-boundary-probe.log`
+  retain the failed direct-owner fixture. `review-red/review-red.trx` retains
+  the earlier extreme-size admission miss. These are diagnostic probes, not
+  passing regressions or an executed full-host reproduction.
+
 ### GRV-Issue-096 - Extreme-scale capsule initial mesh sweep can miss a genuine overlap
 
 - **Status:** Supported geometry range decision; extreme-radius algorithm work
@@ -188,6 +195,68 @@
 Remaining measured performance costs are tracked in the benchmark backlog.
 
 ## Resolved Issues
+
+### GRV-Issue-103 - Contained mixed circle sweeps can report inward solid-target normals
+
+- **Resolved:** 2026-10-12. Mixed sphere, capsule, cylinder, cone and cuboid
+  targets retain their actual boundary anchors and outward containment normals.
+  Closest/all-hit queries agree; full `Simulate`/`LateSimulate` CCD permits
+  outward escape and blocks deeper travel without moving 2D bodies vertically.
+- **Original reproduction:** #100's 2026-10-10 parity audit found that a static
+  height-1/radius-1/2 cylinder at the origin contains a circle slab centered at
+  X/Z `(1/10,0)`, radius `1/20`, slab Y zero and half-thickness `1/10`. Sweeping
+  one unit Right or Left returned distance zero and target point `(1/2,0,0)`,
+  but an inward Left normal. Maintained red regressions reproduced the same
+  defect for all five solid primitive families.
+- **Root cause and fix:** The mixed builder derived its normal from boundary
+  toward source center, which points inward for a contained source. Primitive
+  surface reducers now expose their existing exact containment result. Mixed
+  queries reuse the selected primitive's geometric normal; exterior cone
+  apices/rims and two-sided meshes retain exact closest-feature directions.
+  Centered travel-dependent fabricated witnesses and duplicate mesh-normal
+  logic are removed. Equal features retain their existing geometric tie order.
+- **Related parity fixes:** 3D cuboid containment now follows the same contract.
+  Centered sphere sweeps use world +X instead of opposing travel, matching an
+  identity-rotated zero-core capsule. Sphere/capsule CCD keeps the geometry
+  owner's existing anchor rather than rebuilding it through an inverse-normal
+  round trip. Both cuboid overloads resolve the same exterior corner normal,
+  including compound leaves; a `(3/5,0,3/5)` corner probe no longer substitutes
+  a face normal and loses the closing component of travel along negative Z.
+- **Witness boundary:** Mixed slab Y uses the compact relative offset when
+  representable, otherwise an independent projection. Unavailable X/Z offsets
+  cannot erase a valid Y, and Y overflow selects the correct signed slab cap.
+  Actual target witnesses remain conceptual when absolute materialization is
+  unavailable. This does not broaden projected admission or body bounds.
+- **Validation:** Local-stack Release passes `5,583` tests with raw coverage
+  `46,941/46,941` sequence points, `15,204/15,204` branches and `4,903/4,903`
+  methods. ReleaseLean passes `5,518` with `46,939/46,939`, `15,204/15,204`
+  and `4,902/4,902`. Regressions cover full-loop escape/deeper motion, compound
+  identity, sphere/zero-core-capsule parity including rotated unique features,
+  exterior corners/rims/apices, one-raw boundaries, both coordinate limits,
+  independent component overflow and two-sided mesh controls. All five warmed
+  contained-query families allocate zero bytes. Both native Windows x64 replay
+  lanes match all six shared fixtures and each other; Linux/ARM lanes remain CI
+  gates. Fresh raw reports and captures live under ignored
+  `artifacts/grv-issue-103/closeout` and `artifacts/grv-issue-103/replay`.
+- **Timing controls:** The existing five dense `MixedQueryBenchmarks` sweeps
+  retain all `64`/`1,024` hits and `0 B/op`. A fixed warmed runner measured the
+  retained pre-change Gravitas binary against the final binary with identical
+  dependency DLL hashes, in both execution orders. At `1,024` hits, paired mean
+  baseline/final milliseconds are sphere `16.565/17.387`, cuboid `64.422/68.059`,
+  capsule `22.820/23.929`, cylinder `21.974/22.902`, rotated cone
+  `174.808/181.198`. These smoke controls show approximately `4–6%` overhead
+  for the corrected normals and conceptual witnesses, not a throughput gain
+  or BenchmarkDotNet confidence intervals. Redundant normal evaluation and
+  capsule witness reconstruction were removed before closeout. Ignored
+  `artifacts/grv-issue-103/performance-provenance.json`, `timing/Program.cs`
+  and root `artifacts/grv-issue-103-timing-*.log` retain the binary hashes,
+  runner and observations.
+- **Integration:** Develop CI now pins committed FixedMathSharp
+  `88999af91ed513dc513b331a953fc9c70f890cc9`, required by the preceding slab
+  manifold change. Main still validates released packages. Independent ponytail
+  review found no remaining blockers; production source shrinks by 19 lines
+  with no new production files or upstream edits. The unrelated ordinary-sized
+  near-limit projected-support admission miss is recorded as #110.
 
 ### GRV-Issue-098 - Mixed curved slab mesh contacts can select a covered seam
 

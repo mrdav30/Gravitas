@@ -19,7 +19,7 @@ namespace Gravitas.Queries;
 /// </summary>
 public sealed partial class GravitasQueryMixedService
 {
-    private bool TrySweepCircleAgainst3DCollider(
+    internal bool TrySweepCircleAgainst3DCollider(
         LSCollider collider, Vector2d start, Vector2d end, Vector2d direction2D,
         Fixed64 length, Fixed64 radius, Fixed64 slabCenterY, Fixed64 halfThickness,
         Vector3d direction3D, LSCollider2D? sourceCollider, out PhysicsMixedHit hit,

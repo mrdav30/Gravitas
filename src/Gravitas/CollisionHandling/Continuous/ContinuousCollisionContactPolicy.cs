@@ -20,39 +20,12 @@ internal static class ContinuousCollisionContactPolicy
         out ContactAnchor targetAnchor,
         out Vector3d normal)
     {
-        Vector3d fallbackNormal = direction.MagnitudeSquared > Fixed64.Epsilon
-            ? -direction.Normalized
-            : Vector3d.Right;
-
-        if (target is LSCapsuleCollider capsule)
+        if (target is LSSphereCollider or LSCapsuleCollider)
         {
-            normal = capsule.GetNormalAtPoint(sphereCenterAtImpact);
-            Vector3d localNormal =
-                capsule.Rotation.Inverse().Rotate(normal).Normalized;
-            targetAnchor = new ContactAnchor(
-                FixedSegment.GetSurfaceAnchorOnCenteredCapsule(
-                    sphereCenterAtImpact,
-                    capsule.Center,
-                    capsule.Rotation,
-                    Vector3d.Up,
-                    capsule.AxisLength,
-                    capsule.ScaledRadius,
-                    localNormal));
-            return true;
-        }
-
-        if (target is LSSphereCollider sphere)
-        {
-            normal = Vector3d.GetDirection(sphere.Center, sphereCenterAtImpact);
-            if (normal == Vector3d.Zero)
-                normal = fallbackNormal;
-            targetAnchor = new ContactAnchor(
-                FixedSegment.GetCenteredCapsuleSupportAnchor(
-                    sphere.Center,
-                    sphere.Rotation,
-                    Fixed64.Zero,
-                    sphere.ScaledRadius,
-                    normal));
+            // Keep the same reducer's witness; an inverse-normal round trip can shift it.
+            FixedPointAnchor surface = target.GetClosestSurfaceAnchor(
+                sphereCenterAtImpact, out normal);
+            targetAnchor = new ContactAnchor(surface);
             return true;
         }
 
@@ -106,18 +79,8 @@ internal static class ContinuousCollisionContactPolicy
 
         if (target is LSCuboidCollider cuboid)
         {
-            FixedPointAnchor targetPoint =
-                cuboid.OrientedBox.GetClosestPointAnchor(sphereCenterAtImpact);
-            var sphereCenter = new FixedPointAnchor(
-                sphereCenterAtImpact,
-                FixedQuaternion.Identity,
-                Vector3d.Zero);
-            normal = sphereCenter.TryGetOffsetFrom(
-                    targetPoint,
-                    out Vector3d fromSurface)
-                && fromSurface.MagnitudeSquared > Fixed64.Epsilon
-                    ? fromSurface.Normalized
-                    : cuboid.GetNormalAtPoint(sphereCenterAtImpact);
+            FixedPointAnchor targetPoint = cuboid.GetClosestSurfaceAnchor(
+                sphereCenterAtImpact, out normal, out _);
             targetAnchor = new ContactAnchor(targetPoint);
             return true;
         }
@@ -128,7 +91,7 @@ internal static class ContinuousCollisionContactPolicy
                 sphereCenterAtImpact,
                 out FixedPointAnchor meshPoint,
                 out normal);
-            normal = ResolveMeshSphereNormal(meshPoint, sphereCenterAtImpact, normal);
+            normal = ResolveSurfaceNormal(meshPoint, sphereCenterAtImpact, normal);
             targetAnchor = new ContactAnchor(meshPoint);
             return true;
         }
@@ -138,7 +101,7 @@ internal static class ContinuousCollisionContactPolicy
             FixedPointAnchor surfacePoint = compound.GetClosestSurfaceAnchor(
                 sphereCenterAtImpact, out normal, out LSCollider surfaceOwner);
             if (surfaceOwner is LSMeshCollider)
-                normal = ResolveMeshSphereNormal(surfacePoint, sphereCenterAtImpact, normal);
+                normal = ResolveSurfaceNormal(surfacePoint, sphereCenterAtImpact, normal);
             // Keep the selected part's witness and outward primitive normal.
             // Re-querying a materialized point can select another part at a
             // shared boundary or lose an otherwise valid far-domain anchor.
@@ -169,18 +132,14 @@ internal static class ContinuousCollisionContactPolicy
         return false;
     }
 
-    private static Vector3d ResolveMeshSphereNormal(
-        in FixedPointAnchor surfacePoint,
-        Vector3d sphereCenter,
-        Vector3d faceNormal)
+    internal static Vector3d ResolveSurfaceNormal(
+        in FixedPointAnchor surfacePoint, Vector3d sourceCenter, Vector3d outwardNormal)
     {
-        // Mesh sweeps are two-sided surface queries. Use the closest feature's
-        // direction even at edges, vertices and sub-epsilon separations; travel
-        // cannot turn an overhead contact into support. Only exact coincidence
-        // retains the selected triangle's authored normal and stable tie order.
-        var center = new FixedPointAnchor(sphereCenter, FixedQuaternion.Identity, Vector3d.Zero);
+        // Exterior apices and two-sided meshes need the exact closest-feature
+        // direction; only coincidence retains the selected feature's normal.
+        var center = new FixedPointAnchor(sourceCenter, FixedQuaternion.Identity, Vector3d.Zero);
         Vector3d normal = WidePointAnchor3d.GetDirection(center, surfacePoint);
-        return normal == Vector3d.Zero ? faceNormal : normal;
+        return normal == Vector3d.Zero ? outwardNormal : normal;
     }
 
     private static Vector3d ResolveLegacyNormal(

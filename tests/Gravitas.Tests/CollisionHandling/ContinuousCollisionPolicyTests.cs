@@ -144,8 +144,8 @@ public sealed class ContinuousCollisionPolicyTests
                 out Vector3d coincidentNormal)
             .Should().BeTrue();
         coincidentAnchor.TryGetWorldPoint(out Vector3d coincidentPoint).Should().BeTrue();
-        coincidentPoint.Should().Be(sphere.Center - Vector3d.Right * sphere.ScaledRadius);
-        coincidentNormal.Should().Be(Vector3d.Left);
+        coincidentPoint.Should().Be(sphere.Center + Vector3d.Right * sphere.ScaledRadius);
+        coincidentNormal.Should().Be(Vector3d.Right);
 
         ContinuousCollisionContactPolicy.TryResolveSweptSphereContact(
                 sphere,
@@ -174,7 +174,7 @@ public sealed class ContinuousCollisionPolicyTests
                 out _,
                 out Vector3d upwardFallback)
             .Should().BeTrue();
-        upwardFallback.Should().Be(Vector3d.Up);
+        upwardFallback.Should().Be(Vector3d.Right);
 
         ContinuousCollisionContactPolicy.TryResolveSweptSphereContact(
                 sphere,

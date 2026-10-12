@@ -125,6 +125,10 @@ public sealed class LSCylinderCollider : LSCollider
     internal override FixedPointAnchor GetClosestSurfaceAnchor(
         Vector3d point,
         out Vector3d normal) =>
+        GetClosestSurfaceAnchor(point, out normal, out _);
+
+    internal override FixedPointAnchor GetClosestSurfaceAnchor(
+        Vector3d point, out Vector3d normal, out bool contained) =>
         WideFiniteAxisIntersection
             .GetClosestCenteredFiniteCylinderSurfaceAnchor(
                 point,
@@ -135,7 +139,7 @@ public sealed class LSCylinderCollider : LSCollider
                 ScaledRadius,
                 Vector3d.Right,
                 out normal,
-                out _);
+                out contained);
 
     private protected override void PrepareShape(in ColliderShapeSnapshot snapshot)
     {

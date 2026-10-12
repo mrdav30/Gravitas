@@ -79,12 +79,17 @@ public sealed partial class GravitasQueryMixedService
         Fixed64 distance,
         LSCollider2D? sourceCollider)
     {
+        FixedPointAnchor surface = collider.GetClosestSurfaceAnchor(
+            sweepCenter, out Vector3d outwardNormal, out bool contained);
+        // These owners already resolve radial, cap and corner separation. The
+        // cone's exterior apex/rim needs the direction from its selected witness.
+        Vector3d normal = contained
+            || collider is LSSphereCollider or LSCapsuleCollider or LSCylinderCollider or LSCuboidCollider
+            ? outwardNormal
+            : ContinuousCollisionContactPolicy.ResolveSurfaceNormal(surface, sweepCenter, outwardNormal);
         return BuildCircleAgainst3DHit(
             collider,
-            GetSweepSurfaceAnchor(
-                collider,
-                sweepCenter,
-                direction),
+            surface,
             sweepCenter,
             direction,
             radius,
@@ -92,7 +97,8 @@ public sealed partial class GravitasQueryMixedService
             halfThickness,
             reducerKind,
             distance,
-            sourceCollider);
+            sourceCollider,
+            normal);
     }
 
     private static PhysicsMixedHit BuildCircleAgainst3DHit(
@@ -105,28 +111,30 @@ public sealed partial class GravitasQueryMixedService
         Fixed64 halfThickness,
         PhysicsQueryReducerKind reducerKind,
         Fixed64 distance,
-        LSCollider2D? sourceCollider)
+        LSCollider2D? sourceCollider,
+        Vector3d featureNormal = default)
     {
         var anchor3D = new ContactAnchor(point3D);
-        // Every accepted reducer bounds the target witness by the source
-        // circle radius and slab half-thickness.
-        _ = anchor3D.TryGetOffsetFrom(
-            sweepCenter,
-            out Vector3d fromSweepCenter);
-        Vector3d to2D = -fromSweepCenter;
-        Vector3d normal3DTo2D = to2D.MagnitudeSquared > Fixed64.Epsilon
-            ? to2D.Normalized
-            : -direction;
+        // Contained starts retain the solid's actual boundary, which can lie
+        // beyond the small source slab; clamp only the slab's vertical witness.
+        var center = new FixedPointAnchor(sweepCenter, FixedQuaternion.Identity, Vector3d.Zero);
+        Vector3d normal3DTo2D = featureNormal != Vector3d.Zero ? featureNormal
+            : ContinuousCollisionContactPolicy.ResolveSurfaceNormal(point3D, sweepCenter, -direction);
         Vector2d planarNormal = new(
             normal3DTo2D.X,
             normal3DTo2D.Z);
         Vector2d planarOffset = planarNormal.MagnitudeSquared > Fixed64.Epsilon
             ? -planarNormal.Normalized * radius
             : Vector2d.Zero;
-        Fixed64 verticalOffset = FixedMath.Clamp(
-            fromSweepCenter.Y,
-            -halfThickness,
-            halfThickness);
+        // Use the compact relative offset when available. Otherwise project Y
+        // independently so X/Z overflow cannot erase it; Y overflow clamps its cap.
+        bool hasY = point3D.TryGetOffsetFrom(center, out Vector3d offset);
+        Fixed64 y = offset.Y;
+        if (!hasY) hasY = point3D.TryGetProjectedOffsetFrom(center, Vector3d.Up, out y);
+        Fixed64 verticalOffset = hasY
+            ? FixedMath.Clamp(y, -halfThickness, halfThickness)
+            : point3D.ProjectNonNegativeOffsetFrom(center, Vector3d.Up) > Fixed64.Zero
+                ? halfThickness : -halfThickness;
         var anchor2D = new ContactAnchor(
             sweepCenter,
             new Vector3d(
@@ -142,29 +150,6 @@ public sealed partial class GravitasQueryMixedService
             reducerKind,
             distance,
             direction);
-    }
-
-    private static FixedPointAnchor GetSweepSurfaceAnchor(
-        LSCollider collider,
-        Vector3d sweepCenter,
-        Vector3d direction)
-    {
-        if (collider is LSCuboidCollider cuboid)
-            return cuboid.OrientedBox.GetClosestPointAnchor(sweepCenter);
-
-        Vector3d centerDelta = sweepCenter - collider.Center;
-        if (centerDelta.MagnitudeSquared <= Fixed64.Epsilon)
-        {
-            return new FixedPointAnchor(
-                collider.Center,
-                FixedQuaternion.Identity,
-                -direction * collider.ScaledRadius);
-        }
-
-        return new FixedPointAnchor(
-            collider.ClosestPointOnSurface(sweepCenter),
-            FixedQuaternion.Identity,
-            Vector3d.Zero);
     }
 
     private static Vector3d Resolve3DTo2DFallback(LSCollider2D collider, Vector3d sweepCenter, Vector3d direction)
