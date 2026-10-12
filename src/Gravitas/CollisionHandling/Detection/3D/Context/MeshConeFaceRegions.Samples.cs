@@ -8,6 +8,7 @@ using FixedMathSharp;
 using FixedMathSharp.Geometry;
 using SwiftCollections;
 using System;
+using System.Collections.Generic;
 
 namespace Gravitas.CollisionHandling;
 
@@ -16,6 +17,7 @@ internal sealed partial class MeshConeFaceRegions
 {
     private readonly SwiftList<PoolEvent> _poolEvents = new();
     private readonly SwiftList<Sample> _samplePool = new();
+    private readonly IComparer<Sample> _sampleComparer;
     private Sample[] _samples = Array.Empty<Sample>();
     private int[] _sampleCounts = Array.Empty<int>();
 
@@ -65,21 +67,7 @@ internal sealed partial class MeshConeFaceRegions
         Span<int> chosen = stackalloc int[ContactManifold.MaxContactsPerGroup]; chosen[0] = 0;
         for (int slot = 1; slot < count; slot++)
         {
-            int best = -1;
-            Signed832 bestN = default, bestD = default;
-            for (int candidate = 1; candidate < _samplePool.Count; candidate++)
-            {
-                if (chosen[..slot].IndexOf(candidate) >= 0) continue;
-                Vector3d p = _samplePool[candidate].MeshPoint;
-                Signed832 n, d = Signed832.ExtendValue(Signed192.Signed(1));
-                if (slot == 1) n = metrics.GetSpanSquared(_samples[offset].MeshPoint, p);
-                else if (slot == 2) n = metrics.GetAreaSquared(_samples[offset].MeshPoint, _samples[offset + 1].MeshPoint, p);
-                else metrics.GetTriangleDistanceSquared(p, _samples[offset].MeshPoint,
-                    _samples[offset + 1].MeshPoint, _samples[offset + 2].MeshPoint, out n, out d);
-                int comparison = best < 0 ? 1 : WidePlaneMetrics.CompareRatios(n, d, bestN, bestD);
-                if (comparison > 0 || comparison == 0 && ComparePoints(_samplePool[candidate], _samplePool[best]) < 0)
-                { best = candidate; bestN = n; bestD = d; }
-            }
+            int best = MeshPlaneSampleReduction.ChooseNext(_samplePool.AsReadOnlySpan(), chosen[..slot], metrics, _sampleComparer);
             chosen[slot] = best; _samples[offset + slot] = _samplePool[best];
         }
         // Greedy coverage needs only the once-rounded mesh anchors. Round
@@ -199,8 +187,9 @@ internal sealed partial class MeshConeFaceRegions
         { Source = source; Event = descriptor; Region = region; MeshPoint = meshPoint; Positive = positive; Negative = negative; }
     }
 
-    private readonly struct Sample
+    private readonly struct Sample : IPlaneContactSample
     {
+        public Vector3d Point => MeshPoint;
         internal readonly ConePlaneRayEventSource Source;
         internal readonly ConePlaneRayEvent Event;
         internal readonly Vector3d MeshPoint, ConePoint;

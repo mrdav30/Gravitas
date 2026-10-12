@@ -42,7 +42,7 @@ internal sealed class MeshConeSurfaceBoundary
 
     /// <summary>Adds independently reduced true-edge and corner constraints to the unpublished manifold.</summary>
     internal void BuildSurfaceContacts(LSMeshCollider meshCollider, LSConeCollider cone, int surfaceTriangle,
-        MeshConeSurfaceConnectivity connectivity, MeshConeFaceRegions faces, ContactManifold manifold)
+        MeshSurfaceConnectivity connectivity, MeshConeFaceRegions faces, ContactManifold manifold)
     {
         PhysicsMesh mesh = meshCollider.Mesh;
         ref readonly ConePlaneRayFrame frame = ref faces.Frame;
@@ -55,7 +55,7 @@ internal sealed class MeshConeSurfaceBoundary
         {
             int first = boundary[edge], second = boundary[edge + 1];
             int feature = checked(3 * (edge / 2));
-            int region = FindEdgeRegion(mesh, owner, first, second, connectivity, frame, vertices);
+            int region = MeshSurfaceBoundaryTopology.FindEdgeRegion(mesh, owner, first, second, connectivity, frame);
             if (region >= 0) KeepSurfaceFeature(first, second, feature, region, pointOnly: false);
             if (_visitedCorners.Add(first) && frame.ContainsPoint(vertices[first]))
             {
@@ -83,40 +83,6 @@ internal sealed class MeshConeSurfaceBoundary
                 cone.Height, cone.ScaledRadius, featureStorage, interiorOnly: !pointOnly, pointOnly, selectedExit);
             ReduceSurfaceFeature(meshCollider, cone, surface, feature, faces.SamplingOrigin, manifold);
         }
-    }
-
-    private static int FindEdgeRegion(PhysicsMesh mesh, int owner, int first, int second,
-        MeshConeSurfaceConnectivity connectivity, in ConePlaneRayFrame frame, ReadOnlySpan<Vector3d> vertices)
-    {
-        // Reduced edges can span many authored subedges. Their first corner's
-        // triangle need not touch the cone; locate an actually admitted piece.
-        ReadOnlySpan<int> perimeter = mesh.GetManifoldSurfaceBoundaryVertexPairs(owner);
-        if (perimeter.IsEmpty) return connectivity.GetRegionOrdinal(owner);
-        mesh.GetLocalTriangleVertices(owner, out Vector3d a, out Vector3d b, out Vector3d c);
-        new FixedTriangle(a, b, c).GetExactNormal(out Signed192 nx, out Signed192 ny, out _, out _);
-        int axis = !nx.IsZero ? 0 : !ny.IsZero ? 1 : 2;
-        Vector2d p = Project(vertices[first], axis), q = Project(vertices[second], axis);
-        bool useX = p.X != q.X;
-        Fixed64 low = FixedMath.Min(useX ? p.X : p.Y, useX ? q.X : q.Y);
-        Fixed64 high = FixedMath.Max(useX ? p.X : p.Y, useX ? q.X : q.Y);
-        for (int edge = 0; edge < perimeter.Length; edge += 2)
-        {
-            int start = perimeter[edge], end = perimeter[edge + 1];
-            Vector2d s = Project(vertices[start], axis), t = Project(vertices[end], axis);
-            if (Vector2d.OrientationSign(p, q, s) != 0 || Vector2d.OrientationSign(p, q, t) != 0
-                || (useX ? s.X : s.Y) < low || (useX ? s.X : s.Y) > high
-                || !frame.IntersectsSegment(new FixedSegment(vertices[start], vertices[end]))) continue;
-            // A trusted exposed subedge with its start in this canonical span
-            // cannot leave it: reduction merges monotone collinear chains,
-            // while the embedding certificate rejects overlap/backtracking.
-            foreach (int incident in mesh.GetWeldedVertexTriangleIndices(start))
-            {
-                if (mesh.GetWeldedTriangleVertexIndices(incident).IndexOf(end) < 0) continue;
-                int region = connectivity.GetRegionOrdinal(incident);
-                if (region >= 0) return region;
-            }
-        }
-        return -1;
     }
 
     private void ReduceSurfaceFeature(LSMeshCollider mesh, LSConeCollider cone, int surface, int feature,
@@ -270,7 +236,10 @@ internal sealed class MeshConeSurfaceBoundary
         ReadOnlySpan<Vector3d> vertices, ConeSurfacePointLocation location, WideAxis3? selectedExit = null)
     {
         Span<WideAxis3> fan = stackalloc WideAxis3[5];
-        int count = GetIncidentFan(mesh, owner, candidate, vertices, location, fan);
+        int count = MeshSurfaceBoundaryTopology.GetIncidentFan(mesh, owner,
+            location == ConeSurfacePointLocation.End ? candidate.Second : candidate.First,
+            location == ConeSurfacePointLocation.End ? candidate.First : candidate.Second,
+            location == ConeSurfacePointLocation.Interior, fan);
         if (selectedExit.HasValue) fan[count++] = selectedExit.Value;
         int capacity = candidate.Certificate.GetMaximumFamilyEventCount(count);
         if (_familyStorage.Length < capacity) Array.Resize(ref _familyStorage, capacity);
@@ -287,7 +256,10 @@ internal sealed class MeshConeSurfaceBoundary
         ReadOnlySpan<Vector3d> vertices, WideAxis3? selectedExit = null)
     {
         Span<WideAxis3> fan = stackalloc WideAxis3[5];
-        int count = GetIncidentFan(mesh, owner, candidate, vertices, candidate.Certificate.PointLocation, fan);
+        int count = MeshSurfaceBoundaryTopology.GetIncidentFan(mesh, owner,
+            candidate.Certificate.PointLocation == ConeSurfacePointLocation.End ? candidate.Second : candidate.First,
+            candidate.Certificate.PointLocation == ConeSurfacePointLocation.End ? candidate.First : candidate.Second,
+            candidate.Certificate.PointLocation == ConeSurfacePointLocation.Interior, fan);
         if (selectedExit.HasValue) fan[count++] = selectedExit.Value;
         foreach (WideAxis3 ray in fan[..count])
         {
@@ -298,88 +270,8 @@ internal sealed class MeshConeSurfaceBoundary
         return true;
     }
 
-    private static int GetIncidentFan(PhysicsMesh mesh, int owner, BoundaryCandidate candidate,
-        ReadOnlySpan<Vector3d> vertices, ConeSurfacePointLocation location, Span<WideAxis3> fan)
-    {
-        int origin = location == ConeSurfacePointLocation.End ? candidate.Second : candidate.First;
-        int opposite = origin == candidate.First ? candidate.Second : candidate.First;
-        Vector3d p = vertices[origin], q = vertices[opposite];
-        mesh.GetLocalTriangleVertices(owner, out Vector3d a, out Vector3d b, out Vector3d c);
-        new FixedTriangle(a, b, c).GetExactNormal(out Signed192 nx, out Signed192 ny, out _, out _);
-        int axis = !nx.IsZero ? 0 : !ny.IsZero ? 1 : 2;
-        Vector2d projectedOrigin = Project(p, axis), projectedOpposite = Project(q, axis);
-        fan[0] = Ray(p, q);
-        if (location == ConeSurfacePointLocation.Interior)
-        {
-            fan[1] = Negate(fan[0]);
-            int inward = -1;
-            bool useX = projectedOpposite.X != projectedOrigin.X;
-            int direction = useX ? projectedOpposite.X.CompareTo(projectedOrigin.X)
-                : projectedOpposite.Y.CompareTo(projectedOrigin.Y);
-            foreach (int incident in mesh.GetWeldedVertexTriangleIndices(origin))
-            {
-                if (mesh.GetManifoldSurfaceOwner(incident) != owner) continue;
-                ReadOnlySpan<int> triangle = mesh.GetWeldedTriangleVertexIndices(incident);
-                bool onEdge = false;
-                foreach (int vertex in triangle)
-                {
-                    Vector2d v = Project(vertices[vertex], axis);
-                    // Only the local ray direction matters. A positive
-                    // collinear incident edge supplies the same boundary
-                    // half-neighborhood after ±edge enforces tangency.
-                    if (v != projectedOrigin && Vector2d.OrientationSign(projectedOrigin, projectedOpposite, v) == 0
-                        && (useX ? v.X.CompareTo(projectedOrigin.X) : v.Y.CompareTo(projectedOrigin.Y)) == direction) onEdge = true;
-                }
-                if (!onEdge) continue;
-                foreach (int vertex in triangle)
-                    if (Vector2d.OrientationSign(projectedOrigin, projectedOpposite, Project(vertices[vertex], axis)) != 0)
-                        inward = vertex;
-                break;
-            }
-            System.Diagnostics.Debug.Assert(inward >= 0);
-            fan[2] = Ray(p, vertices[inward]);
-            return 3;
-        }
-        int neighbor = -1;
-        ReadOnlySpan<int> boundary = mesh.GetCanonicalSurfaceBoundaryVertexPairs(owner);
-        for (int edge = 0; edge < boundary.Length; edge += 2)
-        {
-            int first = boundary[edge], second = boundary[edge + 1];
-            if (first == origin && second != opposite) neighbor = second;
-            else if (second == origin && first != opposite) neighbor = first;
-        }
-        System.Diagnostics.Debug.Assert(neighbor >= 0);
-        fan[1] = Ray(p, vertices[neighbor]);
-        Vector2d projectedNeighbor = Project(vertices[neighbor], axis);
-        int orientation = Vector2d.OrientationSign(projectedOrigin, projectedOpposite, projectedNeighbor);
-        // A certified simple planar boundary has exactly two noncollinear
-        // corner rays. Check the actual incident sectors before choosing their
-        // minor positive hull: a reflex fan has only plane-normal support.
-        foreach (int incident in mesh.GetWeldedVertexTriangleIndices(origin))
-        {
-            if (mesh.GetManifoldSurfaceOwner(incident) != owner) continue;
-            foreach (int vertex in mesh.GetWeldedTriangleVertexIndices(incident))
-            {
-                Vector2d v = Project(vertices[vertex], axis);
-                if (orientation * Vector2d.OrientationSign(projectedOrigin, projectedOpposite, v) >= 0
-                    && orientation * Vector2d.OrientationSign(projectedOrigin, v, projectedNeighbor) >= 0) continue;
-                fan[2] = Negate(fan[0]); fan[3] = Negate(fan[1]);
-                return 4;
-            }
-        }
-        return 2;
-    }
-
-    private static Vector2d Project(Vector3d value, int axis) => axis == 0
-        ? new Vector2d(value.Y, value.Z) : axis == 1 ? new Vector2d(value.X, value.Z) : new Vector2d(value.X, value.Y);
-
     private static WideAxis3 Negate(WideAxis3 value) => new(
         WideArithmetic.Negate(value.X), WideArithmetic.Negate(value.Y), WideArithmetic.Negate(value.Z));
-
-    private static WideAxis3 Ray(Vector3d first, Vector3d second) => new(
-        Signed320.ExtendValue(WideArithmetic.SubtractSigned192(Signed192.Raw(second.X), Signed192.Raw(first.X))),
-        Signed320.ExtendValue(WideArithmetic.SubtractSigned192(Signed192.Raw(second.Y), Signed192.Raw(first.Y))),
-        Signed320.ExtendValue(WideArithmetic.SubtractSigned192(Signed192.Raw(second.Z), Signed192.Raw(first.Z))));
 
     private readonly struct FamilyCandidate
     {

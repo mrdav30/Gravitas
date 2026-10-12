@@ -103,7 +103,7 @@ public sealed class MeshConeSurfaceBoundaryTests
         scenario.InitializeStaticCollider(mesh, new(Fixed64.Half + Fixed64.FromRaw(offsetRaw), Fixed64.Zero, Fixed64.Zero));
         var cone = new LSConeCollider { Radius = Fixed64.One, Size = new(2, 2, 2) };
         scenario.InitializeStaticCollider(cone, Vector3d.Zero);
-        var connectivity = new MeshConeSurfaceConnectivity();
+        var connectivity = new MeshSurfaceConnectivity();
         connectivity.Build(mesh.Mesh, 0, cone.Center, cone.Rotation, cone.Height, cone.ScaledRadius, new[] { 0, 1 });
         var faces = new MeshConeFaceRegions();
         faces.Build(mesh.Mesh, 0, cone.Center, cone.Rotation, cone.Height, cone.ScaledRadius, connectivity, new[] { 0, 1 });
@@ -154,7 +154,7 @@ public sealed class MeshConeSurfaceBoundaryTests
         collider.Mesh.GetLocalTriangleVertices(0, out Vector3d corner, out _, out _);
         Assert.True(new FixedPointAnchor(collider.Mesh.Origin, collider.Mesh.Rotation, corner).TryGetPoint(out Vector3d worldCorner));
         Assert.Equal(cone.Center + cone.WorldAxis * (cone.Height / Fixed64.Two), worldCorner);
-        var connectivity = new MeshConeSurfaceConnectivity();
+        var connectivity = new MeshSurfaceConnectivity();
         connectivity.Build(collider.Mesh, 0, cone.Center, cone.Rotation, cone.Height, cone.ScaledRadius, new[] { 0 });
         var faces = new MeshConeFaceRegions();
         faces.Build(collider.Mesh, 0, cone.Center, cone.Rotation, cone.Height, cone.ScaledRadius, connectivity, new[] { 0 });

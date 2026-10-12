@@ -132,16 +132,35 @@ collider ID and delegate each BVH-admitted triangle pair to FixedMathSharp's
 full-domain rigid-frame contact relation. Compound paths scan parts in stable
 declaration order and return the owner collider as the public identity.
 
-Surface mesh/sphere and concave mesh/capsule contacts retain exact closest-feature
-certificates before normal and anchor rounding. Within each trusted prepared
-planar domain, a boundary witness is discarded when its separation points into
-an incident filled triangle. This removes covered seam constraints while
-preserving exposed edges, holes and plane-normal tangency. A sphere uses the
-zero-length capsule core relation; parallel cores test face projections before
-perimeter features. Independent surface owners retain separate four-sample
-groups; disconnected contact regions on one prepared surface share that cap.
-Inconsistent winding and other ambiguous topology keep independent triangle
-domains.
+Surface mesh/sphere and concave mesh/capsule contacts admit the complete finite
+shape before grouping. Triangles join only through a shared edge or vertex that
+actually meets the shape. Each connected overlap region has its own face group
+capped at four samples, even when several regions share one connected authored
+surface.
+The face direction selects the smaller of the two exact maximum normal-ray exits
+from points inside both the shape and the filled surface. Each face group
+retains its regional maximum; every additional coverage sample retains its own
+matched boundary ray and depth. A crossing capsule core therefore contributes
+its finite directional extent, rather than only its radius. This local surface
+contract can differ from a whole-mesh minimum translation.
+
+With positive shape radius, a sphere or a capsule whose axis is exactly parallel
+to the face normal retains one contact when its entire plane section lies inside
+the surface without meeting a genuine perimeter. Its unique smooth support point
+attains the regional maximum; lower-depth rim points are not additional support
+contacts. Clipped sections, multiple regions and nonunique support retain the
+general finite coverage reduction and independent boundary constraints.
+
+Coverage ranks once-rounded authored mesh points using exact span, area and
+filled-triangle distance metrics. Exact authored-point order breaks ties; admission,
+connectivity, direction and depth are decided before rounding. True perimeter
+edges and corners have separate groups, with support directions admitted by
+the actual incident filled fan and the region's selected exit hemisphere.
+Covered triangulation edges in trusted coplanar domains never become constraints.
+A sphere follows the same
+path with a zero-length capsule core. Body rotation does not change sphere or
+zero-core capsule contact geometry. Inconsistent winding and other ambiguous
+topology retain independent triangle domains.
 
 Mesh/cylinder contacts delegate each admitted triangle to FixedMathSharp's
 finite-cylinder contact query. That query selects across triangle faces,
@@ -158,9 +177,9 @@ exact ties, and paired witnesses rounded only at final materialization.
 Mesh/cone contacts include the base disk, rim, apex and lateral generators.
 Prepared mesh geometry certifies coplanar surface domains from exact welded
 seams and their true boundary, including holes and notches. Ambiguous topology
-retains separate triangle domains. Covered triangulation edges never become
-surface constraints. Pose changes reuse this topology; scale changes publish
-geometry and topology together after validation.
+retains separate triangle domains. Covered triangulation edges in trusted
+coplanar domains never become surface constraints. Pose changes reuse this
+topology; scale changes publish geometry and topology together after validation.
 
 Exact triangle/cone admission precedes grouping. Triangles join only through a
 shared edge or vertex that actually meets the cone, so a connected authored
@@ -310,7 +329,7 @@ TOI ordering, and service counters:
 ## Response And Notifications
 
 Non-trigger contacts are solved through deterministic manifold response.
-3D manifolds retain independent surface groups with four point samples per group.
+3D manifolds retain independent surface groups capped at four point samples each.
 Sequential rows read current velocities while restitution uses incoming motion
 captured before island warm starts. Multipoint pairs honor the configured solver
 budget even when they form the only pair in an island.

@@ -6,8 +6,99 @@ using Xunit;
 
 namespace Gravitas.Tests;
 
-public sealed class MeshConeSurfaceConnectivityTests
+public sealed class MeshSurfaceConnectivityTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CapsuleSectionAcrossHole_RetainsGeometricRegionOrder(bool reverseDiscovery)
+    {
+        PhysicsMesh mesh = Ring();
+        var horizontal = new FixedQuaternion(Fixed64.Zero, Fixed64.Zero, Fixed64.One, Fixed64.One).Normalized;
+        var connectivity = new MeshSurfaceConnectivity();
+        connectivity.BuildCapsule(mesh, 0, Vector3d.Zero, horizontal, (Fixed64)8, Fixed64.Quarter,
+            reverseDiscovery ? new[] { 7, 2, 6, 3 } : new[] { 2, 3, 6, 7 });
+        Assert.Equal(2, connectivity.RegionCount);
+        Assert.False(connectivity.IsCompleteSingleRegion(mesh));
+        Assert.Equal(0, connectivity.GetRegionOrdinal(6));
+        Assert.Equal(0, connectivity.GetRegionOrdinal(7));
+        Assert.Equal(1, connectivity.GetRegionOrdinal(2));
+        Assert.Equal(1, connectivity.GetRegionOrdinal(3));
+    }
+
+    [Theory]
+    [InlineData(0, false)]
+    [InlineData(0, true)]
+    [InlineData(2, false)]
+    [InlineData(2, true)]
+    public void SharedEdgeOutsideCapsuleSection_DoesNotJoinAdmittedLobes(int coreLength, bool reverseDiscovery)
+    {
+        PhysicsMesh mesh = Create(new[]
+        {
+            new Vector3d(1,0,2), new Vector3d(3,0,2),
+            new Vector3d(-2,0,1), new Vector3d(-2,0,3)
+        }, new[] { 0, 1, 2, 1, 0, 3 });
+        var connectivity = new MeshSurfaceConnectivity();
+        // Both tips meet the radius-5/4 section. Their prepared shared edge
+        // lies to its right, so authored adjacency cannot merge the sections.
+        connectivity.BuildCapsule(mesh, 0, new Vector3d(-(Fixed64)5 / 2, Fixed64.Zero, Fixed64.Zero),
+            FixedQuaternion.Identity, (Fixed64)coreLength, (Fixed64)5 / 4,
+            reverseDiscovery ? new[] { 1, 0 } : new[] { 0, 1 });
+        Assert.Equal(2, connectivity.RegionCount);
+        Assert.Equal(0, connectivity.GetRegionOrdinal(0));
+        Assert.Equal(1, connectivity.GetRegionOrdinal(1));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(2)]
+    public void CapsuleEndpointTouch_ConnectsClosedVertexStarAndClearsOnReuse(int coreLength)
+    {
+        PhysicsMesh mesh = Create(new[]
+        {
+            Vector3d.Zero, new Vector3d(-1,0,-1), new Vector3d(1,0,-1),
+            new Vector3d(1,0,1), new Vector3d(-1,0,1)
+        }, new[] { 0,1,2, 0,2,3, 0,3,4, 0,4,1 });
+        var connectivity = new MeshSurfaceConnectivity();
+        Vector3d center = Vector3d.Up * (Fixed64.One + (Fixed64)coreLength / 2);
+        connectivity.BuildCapsule(mesh, 0, center, FixedQuaternion.Identity, (Fixed64)coreLength,
+            Fixed64.One, new[] { 3, 1, 2, 0 });
+        Assert.Equal(1, connectivity.RegionCount);
+        Assert.True(connectivity.IsCompleteSingleRegion(mesh));
+        for (int i = 0; i < mesh.TriangleCount; i++) Assert.Equal(0, connectivity.GetRegionOrdinal(i));
+        connectivity.BuildCapsule(mesh, 0, center, FixedQuaternion.Identity, (Fixed64)coreLength,
+            Fixed64.One, ReadOnlySpan<int>.Empty);
+        Assert.Equal(0, connectivity.RegionCount);
+        Assert.False(connectivity.IsCompleteSingleRegion(mesh));
+        Assert.Equal(-1, connectivity.GetRegionOrdinal(0));
+    }
+
+    [Fact]
+    public void CapsuleRegionBuilds_ReuseCapacityAcrossOneAndMultipleRegions()
+    {
+        PhysicsMesh mesh = Ring();
+        var horizontal = new FixedQuaternion(Fixed64.Zero, Fixed64.Zero, Fixed64.One, Fixed64.One).Normalized;
+        var connectivity = new MeshSurfaceConnectivity();
+        int[] bars = { 7, 2, 6, 3 }, whole = { 7, 6, 5, 4, 3, 2, 1, 0 };
+        for (int i = 0; i < 8; i++)
+        {
+            connectivity.BuildCapsule(mesh, 0, Vector3d.Zero, FixedQuaternion.Identity, Fixed64.Zero, (Fixed64)10, whole);
+            Assert.Equal(1, connectivity.RegionCount);
+            connectivity.BuildCapsule(mesh, 0, Vector3d.Zero, horizontal, (Fixed64)8, Fixed64.Quarter, bars);
+            Assert.Equal(2, connectivity.RegionCount);
+        }
+        long before = GC.GetAllocatedBytesForCurrentThread();
+        for (int i = 0; i < 32; i++)
+        {
+            connectivity.BuildCapsule(mesh, 0, Vector3d.Zero, FixedQuaternion.Identity, Fixed64.Zero, (Fixed64)10, whole);
+            connectivity.BuildCapsule(mesh, 0, Vector3d.Zero, horizontal, (Fixed64)8, Fixed64.Quarter, bars);
+        }
+        Assert.Equal(0, GC.GetAllocatedBytesForCurrentThread() - before);
+        Assert.Equal(2, connectivity.RegionCount);
+        Assert.Equal(0, connectivity.GetRegionOrdinal(6));
+        Assert.Equal(1, connectivity.GetRegionOrdinal(2));
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -15,7 +106,7 @@ public sealed class MeshConeSurfaceConnectivityTests
     {
         PhysicsMesh mesh = Ring();
         var tilt = new FixedQuaternion(Fixed64.Zero, Fixed64.Zero, (Fixed64)3 / 5, (Fixed64)4 / 5);
-        var connectivity = new MeshConeSurfaceConnectivity();
+        var connectivity = new MeshSurfaceConnectivity();
         // The thin horizontal cone section crosses the ring's left/right
         // bars. Its transverse radius <1/2 excludes the top/bottom bars.
         int[] admitted = reverseDiscovery ? new[] { 7, 2, 6, 3 } : new[] { 2, 3, 6, 7 };
@@ -38,7 +129,7 @@ public sealed class MeshConeSurfaceConnectivityTests
             : new[] { new Vector3d(-1, 0, -1), new Vector3d(1, 0, -1), new Vector3d(1, 0, 1), new Vector3d(-1, 0, 1) };
         int[] triangles = vertexTouch ? new[] { 0, 1, 2, 0, 2, 3, 0, 3, 4, 0, 4, 1 } : new[] { 0, 1, 2, 0, 2, 3 };
         PhysicsMesh mesh = Create(vertices, triangles);
-        var connectivity = new MeshConeSurfaceConnectivity();
+        var connectivity = new MeshSurfaceConnectivity();
         connectivity.Build(mesh, 0, new Vector3d(0, -2, 0), FixedQuaternion.Identity, (Fixed64)4, (Fixed64)2,
             vertexTouch ? new[] { 3, 1, 2, 0 } : new[] { 1, 0 });
         Assert.Equal(1, connectivity.RegionCount);
@@ -53,7 +144,7 @@ public sealed class MeshConeSurfaceConnectivityTests
     {
         Vector3d[] vertices = { new(-1, 0, -1), new(1, 0, -1), new(0, 0, 1) };
         PhysicsMesh mesh = Create(vertices, new[] { 0, 1, 2, 0, 1, 2 });
-        var connectivity = new MeshConeSurfaceConnectivity();
+        var connectivity = new MeshSurfaceConnectivity();
         connectivity.Build(mesh, 0, Vector3d.Zero, FixedQuaternion.Identity, (Fixed64)4, (Fixed64)2, new[] { 1, 0 });
         Assert.Equal(1, connectivity.RegionCount);
         Assert.Equal(0, connectivity.GetRegionOrdinal(0));
@@ -71,7 +162,7 @@ public sealed class MeshConeSurfaceConnectivityTests
             new Vector3d(-1, 0, -1), new Vector3d(1, 0, -1), new Vector3d(1, 0, 1), new Vector3d(-1, 0, 1),
             new Vector3d(-1, 1, -1), new Vector3d(1, 1, -1), new Vector3d(0, 1, 1)
         }, new[] { 0, 1, 2, 0, 2, 3, 4, 5, 6 });
-        var connectivity = new MeshConeSurfaceConnectivity();
+        var connectivity = new MeshSurfaceConnectivity();
         connectivity.Build(mesh, 0, Vector3d.Zero, FixedQuaternion.Identity, (Fixed64)4, (Fixed64)2, new[] { 2, 1, 0 });
         Assert.Equal(1, connectivity.RegionCount);
         Assert.Equal(0, connectivity.GetRegionOrdinal(0));
@@ -86,7 +177,7 @@ public sealed class MeshConeSurfaceConnectivityTests
     {
         PhysicsMesh mesh = Ring();
         var tilt = new FixedQuaternion(Fixed64.Zero, Fixed64.Zero, (Fixed64)3 / 5, (Fixed64)4 / 5);
-        var connectivity = new MeshConeSurfaceConnectivity();
+        var connectivity = new MeshSurfaceConnectivity();
         int[] admitted = { 7, 2, 6, 3 };
         int[] wholeRing = { 7, 6, 5, 4, 3, 2, 1, 0 };
         for (int i = 0; i < 8; i++)
@@ -112,8 +203,8 @@ public sealed class MeshConeSurfaceConnectivityTests
     [Fact]
     public void IndependentOwners_RetainSeparateConnectivity()
     {
-        var connectivityA = new MeshConeSurfaceConnectivity();
-        var connectivityB = new MeshConeSurfaceConnectivity();
+        var connectivityA = new MeshSurfaceConnectivity();
+        var connectivityB = new MeshSurfaceConnectivity();
         PhysicsMesh mesh = Ring();
         var tilt = new FixedQuaternion(Fixed64.Zero, Fixed64.Zero, (Fixed64)3 / 5, (Fixed64)4 / 5);
         connectivityA.Build(mesh, 0, Vector3d.Zero, tilt, (Fixed64)1000, Fixed64.Half, new[] { 2, 3, 6, 7 });
@@ -138,7 +229,7 @@ public sealed class MeshConeSurfaceConnectivityTests
             new Vector3d(1,0,2), new Vector3d(3,0,2),
             new Vector3d(-2,0,1), new Vector3d(-2,0,3)
         }, new[] { 0, 1, 2, 1, 0, 3 });
-        var connectivity = new MeshConeSurfaceConnectivity();
+        var connectivity = new MeshSurfaceConnectivity();
         connectivity.Build(mesh, 0, new Vector3d(-(Fixed64)5 / 2, Fixed64.Zero, Fixed64.Zero), FixedQuaternion.Identity,
             (Fixed64)4, (Fixed64)5 / 2, reverseDiscovery ? new[] { 1, 0 } : new[] { 0, 1 });
         Assert.Equal(2, connectivity.RegionCount);
@@ -157,7 +248,7 @@ public sealed class MeshConeSurfaceConnectivityTests
             new Vector3d(0,0,3), new Vector3d(-3,0,1), new Vector3d(-2,0,-3),
             new Vector3d(2,0,-3), new Vector3d(3,0,1), Vector3d.Zero
         }, new[] { 5,0,2, 5,2,4, 5,4,1, 5,1,3, 5,3,0 });
-        var connectivity = new MeshConeSurfaceConnectivity();
+        var connectivity = new MeshSurfaceConnectivity();
         connectivity.Build(mesh, 2, new Vector3d(Fixed64.Quarter, Fixed64.Zero, (Fixed64)3 / 4),
             FixedQuaternion.Identity, (Fixed64)4, Fixed64.Quarter, new[] { 2, 4 });
         Assert.Equal(1, connectivity.RegionCount);
@@ -197,7 +288,7 @@ public sealed class MeshConeSurfaceConnectivityTests
             admitted[i] = count - i - 1;
         }
         PhysicsMesh mesh = Create(vertices, triangles);
-        var connectivity = new MeshConeSurfaceConnectivity();
+        var connectivity = new MeshSurfaceConnectivity();
         var center = new Vector3d(0, -2, 0);
         for (int i = 0; i < 8; i++)
             connectivity.Build(mesh, 0, center, FixedQuaternion.Identity, (Fixed64)4, (Fixed64)2, admitted);

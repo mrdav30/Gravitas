@@ -1,5 +1,5 @@
 //=======================================================================
-// MeshConeSurfaceConnectivity.cs
+// MeshSurfaceConnectivity.cs
 //=======================================================================
 // MIT License, Copyright (c) 2026-present David Oravsky (mrdav30)
 // See LICENSE file in the project root for full license information.
@@ -14,7 +14,7 @@ using System.Collections.Generic;
 namespace Gravitas.CollisionHandling;
 
 /// <summary>Retains exact admitted connectivity for one prepared mesh surface.</summary>
-internal sealed class MeshConeSurfaceConnectivity
+internal sealed class MeshSurfaceConnectivity
 {
     private readonly SwiftDictionary<int, int> _nodeByTriangle = new();
     private readonly SwiftList<int> _triangles = new();
@@ -29,7 +29,20 @@ internal sealed class MeshConeSurfaceConnectivity
 
     internal int RegionCount => _roots.Count;
 
-    internal MeshConeSurfaceConnectivity() => _regionComparer = Comparer<int>.Create(CompareRegions);
+    internal ReadOnlySpan<int> TriangleIndices => _triangles.AsReadOnlySpan();
+
+    internal bool IsCompleteSingleRegion(PhysicsMesh mesh)
+    {
+        if (RegionCount != 1) return false;
+        // Prepared connected owners record every shared-edge neighbor. A
+        // nonempty admitted subset closed under them contains the whole owner.
+        foreach (int triangle in TriangleIndices)
+            foreach (int neighbor in mesh.GetCoplanarTriangleNeighbors(triangle))
+                if (GetRegionOrdinal(neighbor) != 0) return false;
+        return true;
+    }
+
+    internal MeshSurfaceConnectivity() => _regionComparer = Comparer<int>.Create(CompareRegions);
 
     internal void Build(PhysicsMesh mesh, int surfaceTriangle, Vector3d coneCenter,
         FixedQuaternion coneRotation, Fixed64 height, Fixed64 radius, ReadOnlySpan<int> admittedTriangles)
@@ -40,12 +53,26 @@ internal sealed class MeshConeSurfaceConnectivity
         Build(mesh, surfaceTriangle, frame, admittedTriangles);
     }
 
+    internal void BuildCapsule(PhysicsMesh mesh, int surfaceTriangle, Vector3d capsuleCenter,
+        FixedQuaternion capsuleRotation, Fixed64 coreLength, Fixed64 radius, ReadOnlySpan<int> admittedTriangles)
+    {
+        var frame = new CapsuleFiniteSectionFrame(mesh.Origin, mesh.Rotation, capsuleCenter, capsuleRotation, coreLength, radius);
+        Build(mesh, surfaceTriangle, new CapsuleSection(frame), admittedTriangles);
+    }
+
+    internal void BuildCapsule(PhysicsMesh mesh, int surfaceTriangle, in CapsuleFiniteSectionFrame frame,
+        ReadOnlySpan<int> admittedTriangles) => Build(mesh, surfaceTriangle, new CapsuleSection(frame), admittedTriangles);
+
+    internal void Build(PhysicsMesh mesh, int surfaceTriangle, in ConePlaneRayFrame frame, ReadOnlySpan<int> admittedTriangles) =>
+        Build(mesh, surfaceTriangle, new ConeSection(frame), admittedTriangles);
+
     /// <remarks>
     /// The input contains every exactly admitted triangle, without duplicates.
     /// Only the seed's prepared surface owner is consumed. Preparation alone
-    /// never establishes connectivity: every join needs finite cone admission.
+    /// never establishes connectivity: every join needs finite shape admission.
     /// </remarks>
-    internal void Build(PhysicsMesh mesh, int surfaceTriangle, in ConePlaneRayFrame frame, ReadOnlySpan<int> admittedTriangles)
+    private void Build<TSection>(PhysicsMesh mesh, int surfaceTriangle, in TSection section, ReadOnlySpan<int> admittedTriangles)
+        where TSection : struct, ISection
     {
         _nodeByTriangle.Clear(); _triangles.FastClear(); _parents.FastClear();
         _regionByRoot.FastClear(); _roots.FastClear();
@@ -66,7 +93,7 @@ internal sealed class MeshConeSurfaceConnectivity
             _parents.Add(node); _regionByRoot.Add(-1);
         }
         if (_triangles.Count == 0) return;
-        JoinAdmittedFeatures(mesh, frame);
+        JoinAdmittedFeatures(mesh, section);
         for (int node = 0; node < _triangles.Count; node++)
         {
             int root = Find(node);
@@ -77,21 +104,21 @@ internal sealed class MeshConeSurfaceConnectivity
             }
         }
         // If a connected section misses the true domain boundary it is the
-        // whole convex cone section, hence the only region. Otherwise exact
+        // whole convex shape section, hence the only region. Otherwise exact
         // minima on exposed segments order regions independently of authored
         // diagonals, discovery order and collinear perimeter subdivision.
         if (_roots.Count > 1)
         {
             // One region always has ordinal zero. Its exact boundary extrema
             // cannot affect ordering, so neither retain nor evaluate them.
-            if (_minimumValues.Length < _roots.Count * ConeSectionPoint.StorageWords)
+            if (_minimumValues.Length < _roots.Count * FiniteSectionPoint.StorageWords)
             {
-                Array.Resize(ref _minimumValues, _roots.Count * ConeSectionPoint.StorageWords);
-                Array.Resize(ref _minimumSigns, _roots.Count * ConeSectionPoint.SignCount);
+                Array.Resize(ref _minimumValues, _roots.Count * FiniteSectionPoint.StorageWords);
+                Array.Resize(ref _minimumSigns, _roots.Count * FiniteSectionPoint.SignCount);
                 Array.Resize(ref _hasMinimum, _roots.Count);
             }
             Array.Clear(_hasMinimum, 0, _roots.Count);
-            FindBoundaryMinima(mesh, surfaceTriangle, frame);
+            FindBoundaryMinima(mesh, surfaceTriangle, section);
 #if DEBUG
             for (int region = 0; region < _roots.Count; region++)
                 System.Diagnostics.Debug.Assert(_hasMinimum[region]);
@@ -105,7 +132,7 @@ internal sealed class MeshConeSurfaceConnectivity
     internal int GetRegionOrdinal(int triangleIndex) => _nodeByTriangle.TryGetValue(triangleIndex, out int node)
         ? _regionByRoot[Find(node)] : -1;
 
-    private void JoinAdmittedFeatures(PhysicsMesh mesh, in ConePlaneRayFrame frame)
+    private void JoinAdmittedFeatures<TSection>(PhysicsMesh mesh, in TSection section) where TSection : struct, ISection
     {
         int components = _triangles.Count;
         if (components == 1) return;
@@ -128,14 +155,14 @@ internal sealed class MeshConeSurfaceConnectivity
                         else second = vertex;
                     }
                 System.Diagnostics.Debug.Assert(first >= 0 && second >= 0);
-                if (frame.IntersectsSegment(new FixedSegment(vertices[first], vertices[second]))
+                if (section.IntersectsSegment(new FixedSegment(vertices[first], vertices[second]))
                     && Union(node, other) && --components == 1) return;
             }
             foreach (int vertex in welded)
             {
                 // Each welded star is traversed once, even when an admitted
                 // center belongs to every face of a large planar fan.
-                if (!_visitedVertices.Add(vertex) || !frame.ContainsPoint(vertices[vertex])) continue;
+                if (!_visitedVertices.Add(vertex) || !section.ContainsPoint(vertices[vertex])) continue;
                 foreach (int incident in mesh.GetWeldedVertexTriangleIndices(vertex))
                     if (_nodeByTriangle.TryGetValue(incident, out int other)
                         && Union(node, other) && --components == 1) return;
@@ -143,30 +170,30 @@ internal sealed class MeshConeSurfaceConnectivity
         }
     }
 
-    private void FindBoundaryMinima(PhysicsMesh mesh, int surfaceTriangle, in ConePlaneRayFrame frame)
+    private void FindBoundaryMinima<TSection>(PhysicsMesh mesh, int surfaceTriangle, in TSection section) where TSection : struct, ISection
     {
-        Span<ulong> values = stackalloc ulong[ConeSectionPoint.StorageWords];
-        Span<int> signs = stackalloc int[ConeSectionPoint.SignCount];
-        var point = new ConeSectionPoint(values, signs);
+        Span<ulong> values = stackalloc ulong[FiniteSectionPoint.StorageWords];
+        Span<int> signs = stackalloc int[FiniteSectionPoint.SignCount];
+        var point = new FiniteSectionPoint(values, signs);
         ReadOnlySpan<int> pairs = mesh.GetManifoldSurfaceBoundaryVertexPairs(surfaceTriangle);
         ReadOnlySpan<Vector3d> vertices = mesh.ScaledLocalVertices;
         // Multiple regions require a certified patch with a true perimeter.
         // A declined owner contains only its single convex triangle section.
         System.Diagnostics.Debug.Assert(!pairs.IsEmpty);
-        for (int edge = 0; edge < pairs.Length; edge += 2) KeepBoundaryPoint(mesh, pairs[edge], pairs[edge + 1], frame, point, vertices);
+        for (int edge = 0; edge < pairs.Length; edge += 2) KeepBoundaryPoint(mesh, pairs[edge], pairs[edge + 1], section, point, vertices);
     }
 
-    private void KeepBoundaryPoint(PhysicsMesh mesh, int first, int second, in ConePlaneRayFrame frame,
-        ConeSectionPoint point, ReadOnlySpan<Vector3d> vertices)
+    private void KeepBoundaryPoint<TSection>(PhysicsMesh mesh, int first, int second, in TSection section,
+        FiniteSectionPoint point, ReadOnlySpan<Vector3d> vertices) where TSection : struct, ISection
     {
-        if (!ConeSectionPoint.TryGetFirstSegmentPoint(new FixedSegment(vertices[first], vertices[second]), frame.Finite, point)) return;
+        if (!section.TryGetFirstSegmentPoint(new FixedSegment(vertices[first], vertices[second]), point)) return;
         foreach (int triangle in mesh.GetWeldedVertexTriangleIndices(first))
         {
             if (!_nodeByTriangle.TryGetValue(triangle, out int node)
                 || mesh.GetWeldedTriangleVertexIndices(triangle).IndexOf(second) < 0) continue;
             int region = _regionByRoot[Find(node)];
-            ConeSectionPoint minimum = Minimum(region);
-            if (!_hasMinimum[region] || ConeSectionPoint.CompareLexicographic(point, minimum) < 0)
+            FiniteSectionPoint minimum = Minimum(region);
+            if (!_hasMinimum[region] || FiniteSectionPoint.CompareLexicographic(point, minimum) < 0)
             {
                 point.CopyTo(minimum); _hasMinimum[region] = true;
             }
@@ -174,11 +201,11 @@ internal sealed class MeshConeSurfaceConnectivity
         }
     }
 
-    private int CompareRegions(int first, int second) => ConeSectionPoint.CompareLexicographic(
+    private int CompareRegions(int first, int second) => FiniteSectionPoint.CompareLexicographic(
         Minimum(_regionByRoot[first]), Minimum(_regionByRoot[second]));
 
-    private ConeSectionPoint Minimum(int region) => new(_minimumValues.AsSpan(region * ConeSectionPoint.StorageWords, ConeSectionPoint.StorageWords),
-        _minimumSigns.AsSpan(region * ConeSectionPoint.SignCount, ConeSectionPoint.SignCount));
+    private FiniteSectionPoint Minimum(int region) => new(_minimumValues.AsSpan(region * FiniteSectionPoint.StorageWords, FiniteSectionPoint.StorageWords),
+        _minimumSigns.AsSpan(region * FiniteSectionPoint.SignCount, FiniteSectionPoint.SignCount));
 
     private int Find(int node)
     {
@@ -197,5 +224,34 @@ internal sealed class MeshConeSurfaceConnectivity
         if (first == second) return false;
         _parents[Math.Max(first, second)] = Math.Min(first, second);
         return true;
+    }
+
+    // Constrained value-type calls share the graph without delegates, boxing,
+    // or storing both shape frames in every operation.
+    private interface ISection
+    {
+        bool ContainsPoint(Vector3d point);
+        bool IntersectsSegment(FixedSegment segment);
+        bool TryGetFirstSegmentPoint(FixedSegment segment, FiniteSectionPoint point);
+    }
+
+    private readonly struct ConeSection : ISection
+    {
+        private readonly ConePlaneRayFrame frame;
+        internal ConeSection(ConePlaneRayFrame frame) => this.frame = frame;
+        public bool ContainsPoint(Vector3d point) => frame.ContainsPoint(point);
+        public bool IntersectsSegment(FixedSegment segment) => frame.IntersectsSegment(segment);
+        public bool TryGetFirstSegmentPoint(FixedSegment segment, FiniteSectionPoint point) =>
+            FiniteSectionPoint.TryGetFirstSegmentPoint(segment, frame.Finite, point);
+    }
+
+    private readonly struct CapsuleSection : ISection
+    {
+        private readonly CapsuleFiniteSectionFrame frame;
+        internal CapsuleSection(CapsuleFiniteSectionFrame frame) => this.frame = frame;
+        public bool ContainsPoint(Vector3d point) => frame.ContainsPoint(point);
+        public bool IntersectsSegment(FixedSegment segment) => frame.IntersectsSegment(segment);
+        public bool TryGetFirstSegmentPoint(FixedSegment segment, FiniteSectionPoint point) =>
+            FiniteSectionPoint.TryGetFirstSegmentPoint(segment, frame, point);
     }
 }

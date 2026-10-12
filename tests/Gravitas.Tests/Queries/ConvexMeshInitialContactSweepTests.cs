@@ -14,6 +14,33 @@ public sealed class ConvexMeshInitialContactSweepTests
     private static readonly PhysicsLayerMask LayerZero = PhysicsLayerMask.FromLayer(0);
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CapsuleCoreCrossingMeshPlane_ShouldKeepItsInitialExitNormalIndependentlyOfTravel(bool reverseWinding)
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        // One finite filled face isolates the corrected boundary ray from
+        // the separately tracked initial-sweep triangulation seam defect.
+        var target = new LSMeshCollider(new[]
+            { new Vector3d(-4,0,-4), new Vector3d(0,0,4), new Vector3d(4,0,-4) },
+            reverseWinding ? new[] { 2,1,0 } : new[] { 0,1,2 }, MeshColliderMode.Concave,
+            MeshInertiaPolicy.SurfaceApproximation);
+        scenario.InitializeStaticCollider(target, Vector3d.Zero);
+        var source = new LSCapsuleCollider { Radius = Fixed64.Half, Size = new Vector3d(1, 2, 1) };
+        Vector3d center = Vector3d.Down * Fixed64.Quarter;
+        scenario.CreateBody(source, center, FixedQuaternion.Identity);
+        // Both core endpoints straddle the plane. The smaller full capsule
+        // exit is downward even though its nearest core witness lies on it.
+        foreach (Vector3d travel in new[] { Vector3d.Down, Vector3d.Up, Vector3d.Right })
+        {
+            scenario.Context.Query3D.SweepCapsule(source, travel, LayerZero, out Physics3DHit hit)
+                .Should().BeTrue();
+            AssertInitialNormal(hit, target, Vector3d.Down);
+            hit.Point.Should().Be(Vector3d.Zero);
+        }
+    }
+
+    [Theory]
     [InlineData(ColliderType.Capsule, false)]
     [InlineData(ColliderType.Capsule, true)]
     [InlineData(ColliderType.Cylinder, false)]

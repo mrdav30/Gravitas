@@ -14,7 +14,7 @@ public sealed class MeshConeFaceRegionsTests
     {
         var contained = new MeshConeFaceRegions();
         var touching = new MeshConeFaceRegions();
-        var connectivity = new MeshConeSurfaceConnectivity();
+        var connectivity = new MeshSurfaceConnectivity();
         // H=4,R=2 cuts a unit-radius circle at y=0. The smaller square
         // touches all four cardinal points; the larger square contains it.
         // Closed boundary admission and whole-section admission must retain
@@ -45,7 +45,7 @@ public sealed class MeshConeFaceRegionsTests
     {
         var mesh = Quad(diagonal, winding);
         var regions = new MeshConeFaceRegions();
-        var connectivity = new MeshConeSurfaceConnectivity();
+        var connectivity = new MeshSurfaceConnectivity();
         Build(regions, connectivity, mesh, Vector3d.Zero, FixedQuaternion.Identity,
             (Fixed64)4, Fixed64.Two, new[] { 1, 0 });
         Assert.Equal(4, regions.GetSampleCount(0));
@@ -70,7 +70,7 @@ public sealed class MeshConeFaceRegionsTests
             new Vector3d(4,0,-4), new Vector3d(4,0,4), new Vector3d(-4,0,4), Vector3d.Zero },
             new[] { 5,0,1, 5,1,2, 5,2,3, 5,3,4, 5,4,0 });
         var a = new MeshConeFaceRegions(); var b = new MeshConeFaceRegions();
-        var connectivity = new MeshConeSurfaceConnectivity();
+        var connectivity = new MeshSurfaceConnectivity();
         Build(a, connectivity, baseline, Vector3d.Zero, Tilt(), (Fixed64)1000, Fixed64.One, new[] { 0,1 });
         Build(b, connectivity, subdivided, Vector3d.Zero, Tilt(), (Fixed64)1000, Fixed64.One, new[] { 4,3,2,1,0 });
         Assert.Equal(a.GetSampleCount(0), b.GetSampleCount(0));
@@ -93,7 +93,7 @@ public sealed class MeshConeFaceRegionsTests
                 (triangles[index + 1], triangles[index + 2]) = (triangles[index + 2], triangles[index + 1]);
         var mesh = Create(new[] { new Vector3d(-4,0,-4), new Vector3d(4,0,-4),
             new Vector3d(4,0,4), new Vector3d(-4,0,4), Vector3d.Zero }, triangles);
-        var regions = new MeshConeFaceRegions(); var connectivity = new MeshConeSurfaceConnectivity();
+        var regions = new MeshConeFaceRegions(); var connectivity = new MeshSurfaceConnectivity();
         int[] full = reverse ? new[] { 3,2,1,0 } : new[] { 0,1,2,3 };
         int[] subset = reverse ? new[] { 2,1,0 } : new[] { 0,1,2 };
         var fullPoints = new Vector3d[4]; var fullExits = new Vector3d[4]; var fullDepths = new Fixed64[4];
@@ -105,7 +105,7 @@ public sealed class MeshConeFaceRegionsTests
             Build(regions, connectivity, mesh, Vector3d.Zero, FixedQuaternion.Identity,
                 (Fixed64)4, Fixed64.Two, partial ? subset : full);
             Assert.Equal(1, regions.RegionCount);
-            Assert.Equal(partial ? 3 : 4, regions.GetTriangleIndices(0).Length);
+            Assert.Equal(partial ? 3 : 4, connectivity.TriangleIndices.Length);
             Assert.Equal(4, regions.GetSampleCount(0));
             bool hasLeft = false, hasRight = false;
             for (int index = 0; index < 4; index++)
@@ -146,7 +146,7 @@ public sealed class MeshConeFaceRegionsTests
         var mesh = Create(new[] { new Vector3d(-4,0,-4), new Vector3d(4,0,-4),
             new Vector3d(4,0,4), new Vector3d(-4,0,4), Vector3d.Zero }, triangles);
         var regions = new MeshConeFaceRegions();
-        var connectivity = new MeshConeSurfaceConnectivity();
+        var connectivity = new MeshSurfaceConnectivity();
         // The y=0 section has radius five, crossing all four exposed sides.
         // The supplied three-triangle domain omits x < -abs(z); its smaller
         // two-triangle canonical fan would incorrectly fill that missing wedge.
@@ -174,7 +174,7 @@ public sealed class MeshConeFaceRegionsTests
         var mesh = Create(new[] { new Vector3d(0,-2,-2), new Vector3d(0,2,-2),
             new Vector3d(0,2,2), new Vector3d(0,-2,2) }, new[] { 0,1,2, 0,2,3 });
         var a = new MeshConeFaceRegions(); var b = new MeshConeFaceRegions();
-        var connectivity = new MeshConeSurfaceConnectivity();
+        var connectivity = new MeshSurfaceConnectivity();
         Build(a, connectivity, mesh, Vector3d.Zero, FixedQuaternion.Identity,
             Fixed64.Two, Fixed64.One, reverse ? new[] { 1,0 } : new[] { 0,1 });
         Build(b, connectivity, mesh, Vector3d.Zero, FixedQuaternion.Identity,
@@ -197,7 +197,7 @@ public sealed class MeshConeFaceRegionsTests
         var mesh = Create(new[] { -Vector3d.Forward * Fixed64.Half, Vector3d.Forward * Fixed64.Half,
             Vector3d.Up * Fixed64.Half }, reverseWinding ? new[] { 2,1,0 } : new[] { 0,1,2 });
         mesh.UpdatePosition(Vector3d.Up * (Fixed64.One / 4), FixedQuaternion.Identity);
-        var regions = new MeshConeFaceRegions(); var connectivity = new MeshConeSurfaceConnectivity();
+        var regions = new MeshConeFaceRegions(); var connectivity = new MeshSurfaceConnectivity();
         Build(regions, connectivity, mesh, Vector3d.Zero, FixedQuaternion.Identity, (Fixed64)4, Fixed64.Two, new[] { 0 });
         // The exposed horizontal edge has two stationary certificates at its
         // center, one for each exit. Their exact common point merges once.
@@ -215,7 +215,7 @@ public sealed class MeshConeFaceRegionsTests
         Vector3d position = new(Fixed64.Zero, Fixed64.MaxValue, Fixed64.Zero);
         mesh.UpdatePosition(position, FixedQuaternion.Identity);
         var regions = new MeshConeFaceRegions();
-        var connectivity = new MeshConeSurfaceConnectivity();
+        var connectivity = new MeshSurfaceConnectivity();
         Build(regions, connectivity, mesh, position, FixedQuaternion.Identity, (Fixed64)4, Fixed64.Two, new[] { 0,1 });
         Assert.Equal(1, regions.RegionCount);
         Assert.False(regions.TryGetSelectedRay(0, out _, out _, out _));
@@ -231,7 +231,7 @@ public sealed class MeshConeFaceRegionsTests
         var mesh = Quad(false, false);
         var baseline = new MeshConeFaceRegions();
         var translated = new MeshConeFaceRegions();
-        var connectivity = new MeshConeSurfaceConnectivity();
+        var connectivity = new MeshSurfaceConnectivity();
         Vector3d planeOffset = positive ? Vector3d.Zero : Vector3d.Down * Fixed64.Half;
         mesh.UpdatePosition(planeOffset, FixedQuaternion.Identity);
         Build(baseline, connectivity, mesh, Vector3d.Zero, FixedQuaternion.Identity,
@@ -264,7 +264,7 @@ public sealed class MeshConeFaceRegionsTests
         var mesh = Quad(false, false);
         var world = new MeshConeFaceRegions();
         var relative = new MeshConeFaceRegions();
-        var connectivity = new MeshConeSurfaceConnectivity();
+        var connectivity = new MeshSurfaceConnectivity();
         Vector3d center = new(Fixed64.Zero, Fixed64.FromRaw(1), Fixed64.Zero);
         mesh.UpdatePosition(center, FixedQuaternion.Identity);
         Fixed64 height = (Fixed64)4 + Fixed64.FromRaw(heightRaws);
@@ -294,7 +294,7 @@ public sealed class MeshConeFaceRegionsTests
             new Vector3d(2,-2,2), new Vector3d(-2,2,2) }, new[] { 0,1,2, 0,2,3 });
         Vector3d center = new(Fixed64.Zero, Fixed64.MaxValue, Fixed64.Zero);
         mesh.UpdatePosition(center, FixedQuaternion.Identity);
-        var regions = new MeshConeFaceRegions(); var connectivity = new MeshConeSurfaceConnectivity();
+        var regions = new MeshConeFaceRegions(); var connectivity = new MeshSurfaceConnectivity();
         Build(regions, connectivity, mesh, center, FixedQuaternion.Identity, (Fixed64)4, Fixed64.Two, new[] { 0,1 });
         Assert.False(regions.TryGetSelectedRay(0, out _, out _, out _));
         Assert.Throws<OverflowException>(() => regions.GetSampleCount(0));
@@ -308,7 +308,7 @@ public sealed class MeshConeFaceRegionsTests
         Vector3d center = new(Fixed64.Zero, Fixed64.MaxValue - Fixed64.One, Fixed64.Zero);
         mesh.UpdatePosition(center - Vector3d.Up, FixedQuaternion.Identity);
         var regions = new MeshConeFaceRegions();
-        var connectivity = new MeshConeSurfaceConnectivity();
+        var connectivity = new MeshSurfaceConnectivity();
         Build(regions, connectivity, mesh, center, FixedQuaternion.Identity, (Fixed64)4, Fixed64.Two, new[] { 0,1 });
         Assert.True(regions.TryGetSelectedRay(0, out Vector3d point, out Vector3d exit, out Fixed64 depth));
         Assert.Equal(center.Y - Fixed64.One, point.Y);
@@ -326,7 +326,7 @@ public sealed class MeshConeFaceRegionsTests
     {
         var mesh = Create(new[] { new Vector3d(-4,1,-4), new Vector3d(4,-1,-4),
             new Vector3d(4,-1,4), new Vector3d(-4,1,4) }, new[] { 0,1,2, 0,2,3 });
-        var regions = new MeshConeFaceRegions(); var connectivity = new MeshConeSurfaceConnectivity();
+        var regions = new MeshConeFaceRegions(); var connectivity = new MeshSurfaceConnectivity();
         Fixed64 margin = (Fixed64)33 / 8;
         Build(regions, connectivity, mesh, Vector3d.Zero, FixedQuaternion.Identity, (Fixed64)4, (Fixed64)8, new[] { 0,1 });
         Assert.Equal(4, regions.GetSampleCount(0));
@@ -351,7 +351,7 @@ public sealed class MeshConeFaceRegionsTests
         Fixed64 extent = Fixed64.MaxValue / 2, width = Fixed64.MaxValue / 4;
         var mesh = Create(new[] { new Vector3d(-extent,extent,-width), new Vector3d(extent,-extent,-width),
             new Vector3d(extent,-extent,width), new Vector3d(-extent,extent,width) }, new[] { 0,1,2, 0,2,3 });
-        var regions = new MeshConeFaceRegions(); var connectivity = new MeshConeSurfaceConnectivity();
+        var regions = new MeshConeFaceRegions(); var connectivity = new MeshSurfaceConnectivity();
         Build(regions, connectivity, mesh, Vector3d.Zero, FixedQuaternion.Identity,
             Fixed64.MaxValue, Fixed64.MaxValue, new[] { 0,1 });
         Assert.True(regions.TryGetSelectedRay(0, out _, out _, out Fixed64 depth));
@@ -369,7 +369,7 @@ public sealed class MeshConeFaceRegionsTests
             new Vector3d(Fixed64.Zero,Fixed64.Half,-Fixed64.Two),
             new Vector3d(Fixed64.Zero,Fixed64.Half,Fixed64.Two),
             new Vector3d(Fixed64.Zero,-Fixed64.Half,Fixed64.Two) }, new[] { 0,1,2, 0,2,3 });
-        var regions = new MeshConeFaceRegions(); var connectivity = new MeshConeSurfaceConnectivity();
+        var regions = new MeshConeFaceRegions(); var connectivity = new MeshSurfaceConnectivity();
         Build(regions, connectivity, mesh, Vector3d.Zero, FixedQuaternion.Identity,
             Fixed64.Two, Fixed64.One, reverse ? new[] { 1,0 } : new[] { 0,1 });
         Assert.Equal(4, regions.GetSampleCount(0));
@@ -387,7 +387,7 @@ public sealed class MeshConeFaceRegionsTests
     public void TiltedFiniteCone_RetainsTheSelectedOrientationCertificates()
     {
         var mesh = Quad(false, false);
-        var regions = new MeshConeFaceRegions(); var connectivity = new MeshConeSurfaceConnectivity();
+        var regions = new MeshConeFaceRegions(); var connectivity = new MeshSurfaceConnectivity();
         Build(regions, connectivity, mesh, Vector3d.Zero, Tilt(), (Fixed64)4, Fixed64.Two, new[] { 0,1 });
         Assert.Equal(4, regions.GetSampleCount(0));
         Assert.True(regions.TryGetSelectedRay(0, out Vector3d winner, out Vector3d exit, out Fixed64 maximum));
@@ -410,7 +410,7 @@ public sealed class MeshConeFaceRegionsTests
             new Vector3d(-Fixed64.One / 4,Fixed64.Half,Fixed64.One),
             new Vector3d(Fixed64.One / 4,-Fixed64.Half,Fixed64.One) }, new[] { 0,1,2, 0,2,3 });
         mesh.UpdatePosition(new Vector3d(Fixed64.Half, Fixed64.Zero, Fixed64.Zero), FixedQuaternion.Identity);
-        var regions = new MeshConeFaceRegions(); var connectivity = new MeshConeSurfaceConnectivity();
+        var regions = new MeshConeFaceRegions(); var connectivity = new MeshSurfaceConnectivity();
         Build(regions, connectivity, mesh, Vector3d.Zero, FixedQuaternion.Identity,
             Fixed64.Two, Fixed64.One, new[] { 0,1 });
         Assert.Equal(2, regions.GetSampleCount(0));
@@ -433,7 +433,7 @@ public sealed class MeshConeFaceRegionsTests
             new Vector3d(Fixed64.Half,Fixed64.Zero,Fixed64.Half),
             new Vector3d(-Fixed64.Half,Fixed64.Zero,Fixed64.Half), Vector3d.Zero },
             new[] { 4,0,1, 4,1,2, 4,2,3, 4,3,0 });
-        var regions = new MeshConeFaceRegions(); var connectivity = new MeshConeSurfaceConnectivity();
+        var regions = new MeshConeFaceRegions(); var connectivity = new MeshSurfaceConnectivity();
         // Four authored triangles use the smaller complete convex fan while
         // the warmed build and exact sample materialization stay allocation-free.
         int[] admitted = { 0,1,2,3 };
@@ -465,7 +465,7 @@ public sealed class MeshConeFaceRegionsTests
             new Vector3d(4, 0, 4), new Vector3d(-4, 0, 4) }, new[] { 0, 1, 2, 0, 2, 3 },
             Vector3d.Zero, rotation, MeshColliderMode.Concave);
         var regions = new MeshConeFaceRegions();
-        var connectivity = new MeshConeSurfaceConnectivity();
+        var connectivity = new MeshSurfaceConnectivity();
         // The shared rotation makes the plane perpendicular to the cone axis.
         // One raw X translation projects only about 2^-31 of a raw unit onto
         // that axis: exact directional maxima differ, but both round to two.
@@ -483,7 +483,7 @@ public sealed class MeshConeFaceRegionsTests
     public void NonConvexRing_RejectsThePlaneIntrinsicMaximumInsideItsHole(bool reverse)
     {
         var mesh = Ring();
-        var regions = new MeshConeFaceRegions(); var connectivity = new MeshConeSurfaceConnectivity();
+        var regions = new MeshConeFaceRegions(); var connectivity = new MeshSurfaceConnectivity();
         int[] admitted = reverse ? new[] { 7,6,5,4,3,2,1,0 } : new[] { 0,1,2,3,4,5,6,7 };
         Build(regions, connectivity, mesh, Vector3d.Zero, FixedQuaternion.Identity,
             (Fixed64)4, Fixed64.Two, admitted);
@@ -509,11 +509,11 @@ public sealed class MeshConeFaceRegionsTests
             new Vector3d(-1,1,-1), new Vector3d(1,1,-1), new Vector3d(0,1,1)
         }, new[] { 0,1,2, 0,2,3, 4,5,6 });
         var regions = new MeshConeFaceRegions();
-        var connectivity = new MeshConeSurfaceConnectivity();
+        var connectivity = new MeshSurfaceConnectivity();
         Build(regions, connectivity, mesh, Vector3d.Zero, FixedQuaternion.Identity, (Fixed64)4, Fixed64.Two, new[] { 2,1,0 });
         Assert.Equal(1, regions.RegionCount);
-        Assert.Equal(2, regions.GetTriangleIndices(0).Length);
-        Assert.False(regions.GetTriangleIndices(0).Contains(2));
+        Assert.Equal(2, connectivity.TriangleIndices.Length);
+        Assert.False(connectivity.TriangleIndices.Contains(2));
     }
 
     [Theory]
@@ -529,12 +529,12 @@ public sealed class MeshConeFaceRegionsTests
     {
         PhysicsMesh mesh = Quad(diagonal, winding);
         var regions = new MeshConeFaceRegions();
-        var connectivity = new MeshConeSurfaceConnectivity();
+        var connectivity = new MeshSurfaceConnectivity();
         int[] admitted = discovery ? new[] { 1, 0 } : new[] { 0, 1 };
         Build(regions, connectivity, mesh, Vector3d.Zero, FixedQuaternion.Identity, (Fixed64)4, Fixed64.Two, admitted);
         Assert.Equal(1, regions.RegionCount);
         Assert.Equal(1, regions.GetOrientation(0));
-        Assert.Equal(2, regions.GetTriangleIndices(0).Length);
+        Assert.Equal(2, connectivity.TriangleIndices.Length);
         Assert.True(regions.TryGetSelectedRay(0, out Vector3d lower, out Vector3d upper, out Fixed64 depth));
         Assert.Equal(Fixed64.Two, depth);
         Assert.Equal(Vector3d.Zero, lower);
@@ -550,7 +550,7 @@ public sealed class MeshConeFaceRegionsTests
     {
         PhysicsMesh mesh = Quad(diagonal, winding);
         var regions = new MeshConeFaceRegions();
-        var connectivity = new MeshConeSurfaceConnectivity();
+        var connectivity = new MeshSurfaceConnectivity();
         Build(regions, connectivity, mesh, new Vector3d(Fixed64.Zero, Fixed64.Half, Fixed64.Zero),
             FixedQuaternion.Identity, (Fixed64)4, Fixed64.Two, new[] { 1, 0 });
         Assert.Equal(1, regions.RegionCount);
@@ -566,7 +566,7 @@ public sealed class MeshConeFaceRegionsTests
     {
         PhysicsMesh mesh = Quad(false, false, 2);
         var regions = new MeshConeFaceRegions();
-        var connectivity = new MeshConeSurfaceConnectivity();
+        var connectivity = new MeshSurfaceConnectivity();
         Build(regions, connectivity, mesh, Vector3d.Zero, Tilt(), (Fixed64)1000, Fixed64.One, new[] { 0, 1 });
         Assert.Equal(1, regions.RegionCount);
         Assert.Equal(1, regions.GetOrientation(0));
@@ -588,7 +588,7 @@ public sealed class MeshConeFaceRegionsTests
     {
         PhysicsMesh mesh = Ring();
         var regions = new MeshConeFaceRegions();
-        var connectivity = new MeshConeSurfaceConnectivity();
+        var connectivity = new MeshSurfaceConnectivity();
         int[] admitted = reverse ? new[] { 7, 2, 6, 3 } : new[] { 2, 3, 6, 7 };
         Build(regions, connectivity, mesh, Vector3d.Zero, Tilt(), (Fixed64)1000, Fixed64.Half, admitted);
         Assert.Equal(2, regions.RegionCount);
@@ -597,8 +597,9 @@ public sealed class MeshConeFaceRegionsTests
         // the nearby exit is downward. The right component is the converse.
         Assert.Equal(-1, regions.GetOrientation(0));
         Assert.Equal(1, regions.GetOrientation(1));
-        Assert.Equal(2, regions.GetTriangleIndices(0).Length);
-        Assert.Equal(2, regions.GetTriangleIndices(1).Length);
+        Assert.Equal(4, connectivity.TriangleIndices.Length);
+        Assert.Equal(0, connectivity.GetRegionOrdinal(6));
+        Assert.Equal(1, connectivity.GetRegionOrdinal(2));
         Assert.True(regions.TryGetSelectedRay(0, out Vector3d left, out Vector3d leftExit, out Fixed64 leftDepth));
         Assert.True(regions.TryGetSelectedRay(1, out Vector3d right, out Vector3d rightExit, out Fixed64 rightDepth));
         Assert.Equal(new Vector3d(-Fixed64.Half, Fixed64.Zero, Fixed64.Zero), left);
@@ -618,7 +619,7 @@ public sealed class MeshConeFaceRegionsTests
     {
         PhysicsMesh mesh = Quad(false, false);
         var regions = new MeshConeFaceRegions();
-        var connectivity = new MeshConeSurfaceConnectivity();
+        var connectivity = new MeshSurfaceConnectivity();
         Build(regions, connectivity, mesh, Vector3d.Zero, FixedQuaternion.Identity, (Fixed64)4, Fixed64.Two, new[] { 0, 1 });
         Assert.Equal(1, regions.RegionCount);
         Build(regions, connectivity, mesh, Vector3d.Zero, FixedQuaternion.Identity, (Fixed64)4, Fixed64.Two, ReadOnlySpan<int>.Empty);
@@ -626,7 +627,6 @@ public sealed class MeshConeFaceRegionsTests
         Assert.False(regions.TryGetSelectedRay(0, out _, out _, out _));
         Assert.False(regions.TryGetSelectedRay(-1, out _, out _, out _));
         Assert.Throws<ArgumentOutOfRangeException>(() => regions.GetOrientation(0));
-        Assert.Throws<ArgumentOutOfRangeException>(() => { regions.GetTriangleIndices(0); });
         Build(regions, connectivity, mesh, Vector3d.Zero, FixedQuaternion.Identity, (Fixed64)4, Fixed64.Two, new[] { 1, 0 });
         Assert.Equal(1, regions.RegionCount);
         Assert.Equal(1, regions.GetOrientation(0));
@@ -637,7 +637,7 @@ public sealed class MeshConeFaceRegionsTests
     {
         PhysicsMesh mesh = Ring();
         var regions = new MeshConeFaceRegions();
-        var connectivity = new MeshConeSurfaceConnectivity();
+        var connectivity = new MeshSurfaceConnectivity();
         int[] admitted = { 7, 2, 6, 3 };
         bool valid = true;
         long bytes = AllocationTestHelper.MeasureSteadyState(() =>
@@ -650,7 +650,7 @@ public sealed class MeshConeFaceRegionsTests
         Assert.Equal(0, bytes);
     }
 
-    private static void Build(MeshConeFaceRegions regions, MeshConeSurfaceConnectivity connectivity, PhysicsMesh mesh,
+    private static void Build(MeshConeFaceRegions regions, MeshSurfaceConnectivity connectivity, PhysicsMesh mesh,
         Vector3d center, FixedQuaternion rotation, Fixed64 height, Fixed64 radius, ReadOnlySpan<int> admitted,
         Vector3d samplingOrigin = default)
     {

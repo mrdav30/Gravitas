@@ -6,13 +6,13 @@ using Gravitas.CollisionHandling;
 namespace Gravitas.Benchmarks;
 
 [MemoryDiagnoser]
-public class MeshConeSurfaceConnectivityBenchmarks
+public class MeshSurfaceConnectivityBenchmarks
 {
     private Vector3d[] _vertices;
     private int[] _triangles;
     private int[] _admitted;
     private PhysicsMesh _mesh;
-    private readonly MeshConeSurfaceConnectivity _connectivity = new();
+    private readonly MeshSurfaceConnectivity _connectivity = new();
 
     [Params(16, 64, 256)]
     public int SideSegments { get; set; }

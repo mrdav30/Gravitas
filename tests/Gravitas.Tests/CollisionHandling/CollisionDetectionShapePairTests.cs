@@ -1545,7 +1545,7 @@ public sealed class CollisionDetectionShapePairTests
     }
 
     [Fact]
-    public void MeshSphere_WithSphereCenterOnConvexSurface_ShouldUseFaceNormalAndPositiveDepth()
+    public void MeshSphere_WithSphereCenterOnOpenConvexSurface_ShouldUseCanonicalTiedDirection()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSMeshCollider> floor = scenario.CreateBody(
@@ -1557,7 +1557,8 @@ public sealed class CollisionDetectionShapePairTests
         CollisionPair pair = AssertCollision(scenario, floor.Collider, sphere.Collider, CollisionType.Mesh_Sphere);
 
         pair.Manifold.PrimaryContact.Depth.Should().Be(Fixed64.Half);
-        pair.Manifold.PrimaryContact.Normal.Should().Be(Vector3d.Up);
+        pair.Manifold.PrimaryContact.Normal.Should().Be(Vector3d.Down,
+            "equal signed face maxima use the canonical plane direction, independently of winding");
     }
 
     [Fact]
@@ -1625,7 +1626,7 @@ public sealed class CollisionDetectionShapePairTests
     }
 
     [Fact]
-    public void MeshSphere_WithSphereCenterOnConcaveTriangle_ShouldUseFaceNormalFallback()
+    public void MeshSphere_WithSphereCenterOnConcaveTriangle_ShouldUseCanonicalTiedDirection()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSMeshCollider> mesh = scenario.CreateBody(
@@ -1644,7 +1645,8 @@ public sealed class CollisionDetectionShapePairTests
         CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
         pair.Manifold.HasContact.Should().BeTrue();
         pair.Manifold.PrimaryContact.Depth.Should().Be(Fixed64.Half);
-        pair.Manifold.PrimaryContact.Normal.Should().Be(Vector3d.Up);
+        pair.Manifold.PrimaryContact.Normal.Should().Be(Vector3d.Down,
+            "equal signed face maxima use the canonical plane direction, independently of winding");
         pair.Manifold.PrimaryContact.PointA.Should().Be(sphere.Collider.Center);
     }
 

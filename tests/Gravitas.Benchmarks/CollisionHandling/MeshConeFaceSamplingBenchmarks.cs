@@ -19,7 +19,7 @@ public class MeshConeFaceSamplingBenchmarks
     private int[] _admitted;
     private FixedQuaternion _rotation;
     private Fixed64 _height, _radius;
-    private readonly MeshConeSurfaceConnectivity _connectivity = new();
+    private readonly MeshSurfaceConnectivity _connectivity = new();
     private readonly MeshConeFaceRegions _regions = new();
     private readonly MeshConeSurfaceBoundary _boundary = new();
 

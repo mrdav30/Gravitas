@@ -137,13 +137,13 @@ public static partial class CollisionDetection
         var candidates = scratch.MeshTriangleCandidatesA;
         var admitted = scratch.MeshTriangleCandidatesB;
         meshCollider.GetTrianglesInBounds(new FixedBoundVolume(cone.BoundsMin, cone.BoundsMax), candidates);
-        scratch.MeshConeSurfaces.Clear();
-        ContactManifold staged = scratch.MeshConeManifold;
+        scratch.MeshSurfaces.Clear();
+        ContactManifold staged = scratch.MeshSurfaceManifold;
         staged.Reset();
         foreach (int triangleIndex in candidates.AsReadOnlySpan())
         {
             int owner = mesh.GetManifoldSurfaceOwner(triangleIndex);
-            if (!scratch.MeshConeSurfaces.Add(owner)) continue;
+            if (!scratch.MeshSurfaces.Add(owner)) continue;
             mesh.GetLocalTriangleVertices(triangleIndex, out Vector3d a, out Vector3d b, out Vector3d c);
             var frame = new ConePlaneRayFrame(new FixedTriangle(a, b, c), mesh.Origin, mesh.Rotation,
                 cone.Center, cone.Rotation, cone.Height, cone.ScaledRadius);
@@ -159,7 +159,7 @@ public static partial class CollisionDetection
                 if (ConePlaneRayEvents.IntersectsTriangle(frame, new FixedTriangle(a, b, c))) admitted.Add(candidate);
             }
             if (admitted.Count == 0) continue;
-            var connectivity = scratch.MeshConeConnectivity;
+            var connectivity = scratch.MeshConnectivity;
             connectivity.Build(mesh, triangleIndex, frame, admitted.AsReadOnlySpan());
             var faces = scratch.MeshConeFaces;
             // Ordinary cones fit around their center even at a scalar face.

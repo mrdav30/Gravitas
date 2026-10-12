@@ -2,13 +2,15 @@
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-108`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-109`.
 - Assign an ID when an issue enters this tracker, keep it through resolution,
   and never reuse an ID even if an entry is later removed. Check this file's Git
   history before advancing or repairing the counter.
 - Add new items when feature work uncovers a suspected bug, stale doc, test
   smell, performance anomaly, or correctness risk.
 - Keep each item scoped tightly enough to fix and verify independently.
+- Resolve related issues together when they share a domain or owning change;
+  retain each ID and its own regression evidence.
 - Record the date on the item, not in this filename.
 - Move an item to `Resolved Issues` only after the fix has tests or documented
   verification evidence.
@@ -35,25 +37,6 @@
 
 ### Ordered Queue
 
-### GRV-Issue-104 - Crossing capsule cores understate concave mesh exit depth
-
-- **Confirmed:** 2026-10-10 while reproducing #097; this predates its seam
-  filtering change. The radius-`1/2`, full-height-2 capsule centered at
-  `(3/10, -1/4, 3/10)` across a flat Y-zero quad retains a downward face contact
-  with depth `1/2`. Clearing the complete capsule downward requires `3/4`.
-- **Root cause:** The triangle relation computes `radius - distance(core,
-  triangle)`. When the core crosses the face, that distance is zero; the
-  expression omits the core's directional extent. Removing false seam normals
-  does not correct the independent depth contract.
-- **Follow-up:** Retain exact finite-face admission, derive matched whole-capsule
-  directional exit anchors and depth, and test angled cores, exposed edges,
-  touching, winding, subdivision and full-loop depenetration. Preserve the
-  separate convex hull path; do not substitute an unbounded-plane support when
-  the finite surface cannot admit it. Audit public FixedMathSharp triangle
-  contact semantics and mixed consumers before choosing the shared owner.
-- **Evidence:** Ignored `artifacts/grv-issue-097/Issue097DiscoveryProbe.cs` and
-  `refinement-focused-audit.log` record expected `3/4` versus actual `1/2`.
-
 ### GRV-Issue-106 - Accepted mixed-winding coplanar meshes retain covered seam contacts
 
 - **Confirmed:** 2026-10-10 in the #097 audit. Reverse only the second triangle
@@ -72,26 +55,36 @@
 - **Evidence:** Ignored `artifacts/grv-issue-097/Issue097DiscoveryProbe.cs` and
   `refinement-focused-audit.log` retain the failing all-contact proof.
 
-### GRV-Issue-105 - Curved contacts share a sample cap across disconnected planar overlap regions
+### GRV-Issue-108 - Initial capsule sweeps can select a covered coplanar mesh seam
 
-- **Confirmed:** 2026-10-10 in the #097 audit. A connected five-tab comb has one
-  trusted planar owner but five disconnected intersections with a radius-1
-  sphere centered at `(0,1/4,0)`. Only four genuine rim contacts survive.
-- **Reproduction:** Use X coordinates `[-13,-11,-7,-5,-1,1,5,7,11,13]/16`.
-  A backbone spans Z `[2,9/4]`; five tabs on alternating adjacent X intervals
-  extend to Z `3/8`. The backbone is outside the sphere footprint, so the five
-  admitted regions are independent despite sharing one authored surface.
-- **Root cause:** The earlier mesh-wide four-sample cap already dropped a region;
-  the per-surface cap introduced with #097 preserves independent planes but
-  retains this pre-existing limit within one connected planar owner.
-- **Follow-up:** Group sphere/capsule contacts by admitted connectivity before
-  applying the four-sample reduction, reusing the prepared welded incidence.
-  Preserve all real region constraints and deterministic provenance under
-  subdivision, triangle order, holes, compound remapping and warm starts. Audit
-  other per-triangle curved paths for the same limit.
-- **Evidence:** Ignored `artifacts/grv-issue-097/Issue097DiscoveryProbe.cs` and
-  `refinement-focused-audit.log` record expected at least five contacts versus
-  actual four.
+- **Confirmed:** 2026-10-11 during #104/#105 query parity validation. On the
+  coherently wound Y-zero quad with vertices `(-2,0,-2)`, `(2,0,-2)`,
+  `(-2,0,2)`, `(2,0,2)` and triangles `0,2,1, 1,2,3`, a core-length-1,
+  radius-`1/2` capsule centered at `(3/10,-1/4,3/10)` crosses the filled plane.
+  Its initial `SweepCapsule` hit is at distance zero but selects the covered
+  diagonal normal approximately `(0.707107,0,0.707107)` instead of the genuine
+  downward exit. Outward, inward and tangential travel must not choose a
+  triangulation seam as the initial physical constraint.
+- **Root cause:** Initial concave mesh sweeps resolve and reduce individual
+  triangles. The face-promotion certificate requires the source support's
+  projection inside the selected triangle; it can lie in the neighboring
+  triangle of the same trusted filled surface. The first triangle then keeps
+  its nonzero radial diagonal witness. The query resolution code is unchanged
+  by #104/#105, and this fixture does not enter its new coincident capsule-ray
+  branch or parallel closest-family branch; the geometric defect predates them.
+- **Follow-up:** Resolve initial contacts against the actual finite trusted
+  surface domain before reducing triangle hits. Preserve genuine perimeter
+  witnesses, finite admission, initial distance-zero reporting and host CCD's
+  separate escape/closing policy. Test coherent winding reversal, triangle
+  order/subdivision, capsule core crossing and related sphere/convex sources;
+  audit compound remapping and full-loop CCD behavior without substituting an
+  infinite plane at a real exposed boundary.
+- **Evidence:** Ignored
+  `artifacts/grv-issue-104/runtime-analytic-refined-gate.log` records the actual
+  diagonal hit; `ccd-covered-seam-regression.patch` preserves the failing
+  regression and `ccd-covered-seam-provenance.md` records the source audit.
+  Full-loop severity remains unmeasured. This is separate from #106's declined
+  mixed-winding topology: this reproduction uses one trusted coherent surface.
 
 ### GRV-Issue-098 - Mixed curved slab mesh contacts can select a covered seam
 
@@ -231,6 +224,51 @@
 Remaining measured performance costs are tracked in the benchmark backlog.
 
 ## Resolved Issues
+
+### GRV-Issue-104 - Crossing capsule cores understate concave mesh exit depth
+
+- **Resolved:** 2026-10-11 together with #105. Each admitted connected face
+  region now chooses its exact signed capsule-boundary ray maximum before
+  constructing matched anchors and depth. Genuine perimeter constraints remain
+  independent. A wholly contained sphere or exactly normal-axis capsule retains
+  its unique smooth support without artificial normal-impulse levers.
+- **Original defect:** Confirmed 2026-10-10 before #097's seam filtering. A
+  radius-`1/2`, full-height-2 capsule centered at `(3/10,-1/4,3/10)` across a
+  Y-zero quad reported depth `1/2` instead of the required downward `3/4` exit.
+  The closest-core radial expression omitted the crossing core's directional
+  extent; reversing a normal afterward could not repair its boundary anchor.
+- **Verification:** Maintained regressions cover vertical and angled cores,
+  finite clipping, touching, exposed features, winding, subdivision, compounds,
+  matched boundary anchors and complete-host-loop response. FixedMathSharp's
+  public coincident triangle query now uses the actual boundary ray through its
+  selected witness while retaining its separate closest-feature contract.
+  Both libraries pass complete Release/ReleaseLean tests and 100% raw reachable
+  line, branch and method coverage, with replay, allocation and parity gates.
+- **Evidence:** Original ignored `artifacts/grv-issue-097/Issue097DiscoveryProbe.cs`
+  and `refinement-focused-audit.log`; final evidence and measured costs are in
+  the archived [combined plan](done/2026-10-11-capsule-surface-contact-hardening-plan.md).
+
+### GRV-Issue-105 - Curved contacts share a sample cap across disconnected planar overlap regions
+
+- **Resolved:** 2026-10-11 together with #104. Sphere/capsule contacts now own
+  independent sample capacities and hemisphere selection per admitted connected
+  face region, reusing welded incidence and the shared cone connectivity owner.
+  Every region survives reduction; genuine edges and corners retain their own
+  groups and deterministic provenance.
+- **Original defect:** Confirmed 2026-10-10 in the #097 audit. A connected
+  five-tab comb has one planar owner but five disconnected intersections with a
+  radius-1 sphere centered at `(0,1/4,0)`; the shared four-sample cap dropped one.
+  X coordinates are `[-13,-11,-7,-5,-1,1,5,7,11,13]/16`, the backbone spans
+  Z `[2,9/4]`, and alternating tabs extend to Z `3/8` below that footprint.
+  Both the earlier mesh-wide cap and its later per-surface form had this limit.
+- **Verification:** Maintained sphere/capsule controls cover all five tabs,
+  holes, triangle order/subdivision, independent surfaces, compounds, owner
+  reuse and host response. Native 1/4/8-region measurements and cone parity
+  controls retain warmed zero allocation. Complete tests, raw 100% coverage and
+  final benchmark evidence are recorded in the archived
+  [combined plan](done/2026-10-11-capsule-surface-contact-hardening-plan.md).
+- **Evidence:** Original ignored `artifacts/grv-issue-097/Issue097DiscoveryProbe.cs`
+  and `refinement-focused-audit.log` record expected at least five versus four.
 
 ### GRV-Issue-107 - Contained spheres miss closed convex mesh volume contacts
 

@@ -1,4 +1,4 @@
-﻿//=======================================================================
+//=======================================================================
 // CollisionSatScratch.cs
 //=======================================================================
 // MIT License, Copyright (c) 2026–present David Oravsky (mrdav30)
@@ -20,15 +20,19 @@ internal sealed class CollisionSatScratch
 
     public SwiftList<int> MeshTriangleCandidatesB { get; } = new(16);
 
-    public SwiftHashSet<int> MeshConeSurfaces { get; } = new(8);
+    public SwiftHashSet<int> MeshSurfaces { get; } = new(8);
 
-    public MeshConeSurfaceConnectivity MeshConeConnectivity { get; } = new();
+    public MeshSurfaceConnectivity MeshConnectivity { get; } = new();
 
     public MeshConeFaceRegions MeshConeFaces { get; } = new();
 
+    public MeshCapsuleFaceRegions MeshCapsuleFaces { get; } = new();
+
+    public MeshCapsuleSurfaceBoundary MeshCapsuleBoundary { get; } = new();
+
     public MeshConeSurfaceBoundary MeshConeBoundary { get; } = new();
 
-    public ContactManifold MeshConeManifold { get; } = new();
+    public ContactManifold MeshSurfaceManifold { get; } = new();
 
     public ContactManifold CompoundPartManifold { get; } = new();
 }
