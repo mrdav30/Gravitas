@@ -16,7 +16,7 @@ this backlog.
 ## Intake Rules
 
 - Signal IDs use `GRV-Benchmark-NNN`. The next available ID is
-  `GRV-Benchmark-027`.
+  `GRV-Benchmark-028`.
 - Assign an ID at intake and never reuse it, including after a signal closes or
   moves into a dated plan. Check this file's Git history before advancing or
   repairing the counter.
@@ -171,6 +171,85 @@ dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Rel
 Ignored `artifacts/grv-issue-108/isolated-baseline` and `final-confirmation`
 retain the matched measurements. The preliminary unisolated source capture
 and the pre-pruning correctness capture are not the retained comparison.
+
+### GRV-Benchmark-027 — Nonconvex Rotational CCD Step Cost
+
+**Discovered:** 2026-10-12 during GRV-Issue-101 validation.  
+**Status:** Correct first-impact timing retained; demanding angular fixtures
+remain expensive after the measured local refinements.  
+**Owner:** Gravitas bounded rotational interval search and exact finite-contact
+admission; FixedMathSharp only where profiles identify reusable geometry work.
+
+`NonconvexRotationalCcdBenchmarks` runs complete `Simulate`/`LateSimulate`
+steps with an authored 90-degree rotation at frame rate 1, disabled forces and
+frictionless geometry. These are deliberately demanding fixtures, not a
+representative game-capacity measurement. The original implementation freezes
+inside empty aggregate bounds; its faster zero-angle answer is not an
+acceptable optimization baseline.
+
+The first corrected mixed triangle/prism fixture cost **125.916 ms** per step.
+Exact Boolean mesh/slab admission, one retained-witness manifold build, and
+omitting impulse rows for rotating kinematic/immovable pairs reduce it to
+**12.31 ms**. Reusing candidates across exact-zero-displacement conservative
+restarts then lowers it to **7.007 ms**, with a **0.2803 ms** half-width 99.9%
+confidence interval over two launches: approximately **94% below the first
+correct implementation**. Dynamic stopping, movable-target response and
+translational fallback still build the complete matched manifold.
+FixedMathSharp also removes duplicate point seeds from the existing planar
+contact reducer; required-manifold smoke measurements improved from 29.59 to
+25.57 ms before the immovable-pair refinement. That intermediate comparison is
+an isolated timing smoke, not the final BDN job.
+
+Final Release results on Windows x64, i7-9700K, .NET 8.0.29 / SDK 10.0.302:
+
+| Complete host-step fixture | Mean | Allocated |
+| -------------------------- | ---: | --------: |
+| Joined floor/wall mesh, cone first impact | 7.153 ms | 0 B/op |
+| Floor-only cone first-impact control | 5.707 ms | 0 B/op |
+| Empty finite triangle corner, rotating 3D cuboid | 212.18 us | 0 B/op |
+| Compound-wall first impact, pure 2D | 726.29 us | 0 B/op |
+| Empty compound bounds, pure 2D | 32.37 us | 0 B/op |
+| Finite triangle first impact, moving 3D mesh against a 2D prism | 7.007 ms | 0 B/op |
+| Empty finite triangle corner, rotating 2D prism against a mesh | 190.0 us | 0 B/op |
+
+Both mixed rows use longer two-launch confirmations; other rows use three
+warmups and five measurements. The empty-corner confirmation uses 1,024
+invocations per iteration after the short job reported insufficient iteration
+time; its 9.07 us confidence half-width contains the prior 188.09 us result. Matched smoke controls at 1/32 ordinary unresolved
+candidates retain their poses and 0 B/op without a material 32-candidate slowdown.
+Those control methods' out-of-process BDN build defect is recorded separately as
+GRV-Issue-111; do not present reflection timings as BDN results.
+
+```powershell
+$env:UseLocalLsfStack = 'true'
+dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -p:UseLocalLsfStack=true
+dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll --filter '*NonconvexRotationalCcdBenchmarks*' --job short --warmupCount 3 --iterationCount 5 --launchCount 1 --iterationTime 250 --affinity 3 --exporters json --artifacts artifacts/grv-issue-101/bench-final
+dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll --filter '*NonconvexRotationalCcdBenchmarks.MixedFiniteTriangleFirstImpact3D*' --job short --warmupCount 5 --iterationCount 7 --launchCount 2 --invocationCount 32 --unrollFactor 1 --affinity 3 --exporters json --artifacts artifacts/grv-issue-101/bench-final-mixed-confirmation
+dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll --filter '*NonconvexRotationalCcdBenchmarks.MixedEmptyFiniteTriangleCorner2D*' --job short --warmupCount 5 --iterationCount 7 --launchCount 2 --invocationCount 1024 --unrollFactor 1 --affinity 3 --exporters json --artifacts artifacts/grv-issue-101/bench-final-empty-confirmation
+```
+
+Ignored `artifacts/grv-issue-101/bench-confirmation`, `bench-final`,
+`bench-mixed-confirmation`, `bench-final-mixed-confirmation`,
+`bench-final-empty-confirmation`, `timing-complete.log`, `timing-reuse.log` and paired baseline captures
+retain the evidence. The initial mixed profile attributes 87% to repeated full
+manifold construction and less than 1% to the new separation certificate; the
+retained refinement removes that repetition. The next mixed profile puts 30%
+in candidate gathering / typed GridForge partition lookup. That capture includes
+19% setup samples, so those percentages guide isolation rather than establish
+a steady-step cost share. Exact-zero-displacement conservative restarts reuse
+their existing body-owned candidate lists. Translation and response still regather, since a
+rounded shortened chord does not guarantee identical query bounds. The cone
+profile attributes 62%
+to complete mesh/cone contact construction, including 53% in cone-plane ray
+events; its exact curved-contact frequency also belongs to GRV-Benchmark-024.
+
+**Next isolation:** Measure smaller per-frame angular changes, dynamic/movable
+counterparts, moving-target trajectories and increasing facet counts before
+assigning a host step budget. Profile exact Boolean finite-prism admission and
+outer conservative refinements separately from required response contacts.
+Preserve whole-shape separation, earliest frontiers, closing admission, matched
+anchors, authored ties and 0 B/op; never replace an unresolved interval with a
+sample-only miss or weaken the manifold to one support pair.
 
 ## Experimental Signals
 

@@ -2,7 +2,7 @@
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-111`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-112`.
 - Assign an ID when an issue enters this tracker, keep it through resolution,
   and never reuse an ID even if an entry is later removed. Check this file's Git
   history before advancing or repairing the counter.
@@ -36,47 +36,6 @@
   verification records rather than this active section.
 
 ### Ordered Queue
-
-### GRV-Issue-101 - Rotational CCD can freeze separated motion inside a concave mesh's aggregate bounds
-
-- **Confirmed:** 2026-10-09 during phase 3 surface-manifold physical validation.
-  The actual initial narrow phase is separated, but the full host loop clamps
-  the proposed rotation at zero rather than reaching the first real impact.
-- **Reproduction:** One concave mesh has vertices `(0,0,-2)`, `(2,0,-2)`,
-  `(2,0,2)`, `(0,0,2)`, `(0,2,-2)`, `(0,2,2)` and indices
-  `0,3,1, 1,3,2, 0,4,3, 3,4,5`: a finite floor and perpendicular wall.
-  Use an explicit static mesh body, frictionless materials and a kinematic
-  height-1/radius-1/2 cone at `(3/5,11/20,0)`, identity rotation, with
-  continuous collision enabled. Disable gravity/damping, use frame rate 1,
-  author a clockwise 90-degree rotation about Z, and run `Simulate` followed
-  by `LateSimulate`. The initial `DoCollisionCheck` returns false; an 8-degree
-  probe intersects only the floor and a 45-degree probe emits both face groups.
-  The full loop nevertheless retains identity rotation with a TOI clamp.
-- **Control/proof:** Removing the wall (first four vertices and first six
-  indices) passes the same full-loop first-impact bracket of 5–8 degrees.
-  Clockwise rotation gives the cone's lowest X/Y support
-  `-1/2*(cos(theta)+sin(theta))`. The floor is initially 0.55 below its center
-  and is reached near 6 degrees; the wall is 0.6 away and is reached later.
-  Both scalar coordinates and ordinary shape dimensions are representable.
-- **Root cause:** `SolidBody.IsRotationalIntervalSeparated` uses aggregate
-  collider AABBs for non-sphere pairs. The joined mesh's bounds contain the
-  initially separated cone, so no earlier interval can be certified empty.
-  The bounded search terminates at its unresolved zero-time frontier instead
-  of advancing to its retained later geometric witness. This is conservative
-  freezing, not a false geometric contact or the normal inversion in #100.
-  The separator method is unchanged verbatim from committed `767a713`;
-  baseline source inspection establishes pre-existing ownership, without
-  claiming a separate baseline execution.
-- **Follow-up:** Add a conservative finite-mesh interval separation certificate
-  or another explained refinement that can discard empty concave-bounds space.
-  Preserve certified lower/upper bracket and earliest-impact semantics, moving
-  targets, deterministic budgets and failure handling; do not advance across
-  an unproven interval merely because one sample is separated.
-- **Evidence:** Ignored `artifacts/grv-issue-095/phase3-physical-rational-focused.log`
-  records 481 passing cases and this single failed joined-wall case, whose
-  final angle is zero. The full fixture is retained above; the maintained
-  integration test uses two plane levels whose bounds support the existing
-  certificate, rather than codifying the freeze as intended behavior.
 
 ### GRV-Issue-102 - Collision position correction silently saturates at scalar coordinate limits
 
@@ -161,9 +120,113 @@
   retains the isolated failure. The experimental fixture was removed from the
   maintained suite after recording this independent boundary.
 
+### GRV-Issue-111 - Local-stack benchmark hosts can omit FixedMathSharp compile references
+
+- **Confirmed:** 2026-10-12 during #101's unchanged rotational interval control.
+  `RotationalCcdIntervalBenchmarks` builds in the ordinary benchmark project,
+  but its generated out-of-process host fails `CS0246` for `FixedMathSharp` and
+  executes zero benchmarks with `UseLocalLsfStack=true`.
+- **Root cause:** The host references the benchmark assembly with
+  `DisableTransitiveProjectReferences=true`, preserving the coordinated source
+  graph, but its generated delegates mention public `Fixed64` and
+  `FixedQuaternion` return types without a direct compile reference to their
+  assembly. This is an existing benchmark-host defect, not a physics failure.
+  New #101 rows return observable raw `long` values and complete successfully.
+- **Reproduction:** After a local-stack Release benchmark build, run
+  `dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll --filter '*RotationalCcdIntervalBenchmarks*' --job Dry --artifacts artifacts/grv-issue-101/existing-interval-bdn`.
+  Ignored `existing-interval-bdn.log` retains the compiler failures and zero
+  executed rows. Matched reflection timings of those unchanged methods do run;
+  they are smoke measurements, not BenchmarkDotNet results.
+- **Follow-up:** Audit generated-host compile inputs and dependency-bearing
+  benchmark signatures. Preserve coordinated assembly identities and source
+  selection; do not globally restore transitive project references without
+  verifying the complete graph. Cover representative parameters and return
+  types, then rerun affected out-of-process jobs in source and package modes.
+
 Remaining measured performance costs are tracked in the benchmark backlog.
 
 ## Resolved Issues
+
+### GRV-Issue-101 - Rotational CCD can freeze separated motion inside a concave mesh's aggregate bounds
+
+- **Resolved:** 2026-10-12. Finite mesh and compound interval certificates
+  let separated motion reach the first real impact in pure 3D, pure 2D and
+  both mixed source directions. The original cone reaches its 5�8 degree
+  floor-impact bracket instead of freezing at identity.
+- **Confirmed:** 2026-10-09 during phase 3 surface-manifold physical validation.
+  The actual initial narrow phase is separated, but the full host loop clamps
+  the proposed rotation at zero rather than reaching the first real impact.
+- **Reproduction:** One concave mesh has vertices `(0,0,-2)`, `(2,0,-2)`,
+  `(2,0,2)`, `(0,0,2)`, `(0,2,-2)`, `(0,2,2)` and indices
+  `0,3,1, 1,3,2, 0,4,3, 3,4,5`: a finite floor and perpendicular wall.
+  Use an explicit static mesh body, frictionless materials and a kinematic
+  height-1/radius-1/2 cone at `(3/5,11/20,0)`, identity rotation, with
+  continuous collision enabled. Disable gravity/damping, use frame rate 1,
+  author a clockwise 90-degree rotation about Z, and run `Simulate` followed
+  by `LateSimulate`. The initial `DoCollisionCheck` returns false; an 8-degree
+  probe intersects only the floor and a 45-degree probe emits both face groups.
+  The full loop nevertheless retains identity rotation with a TOI clamp.
+- **Control/proof:** Removing the wall (first four vertices and first six
+  indices) passes the same full-loop first-impact bracket of 5–8 degrees.
+  Clockwise rotation gives the cone's lowest X/Y support
+  `-1/2*(cos(theta)+sin(theta))`. The floor is initially 0.55 below its center
+  and is reached near 6 degrees; the wall is 0.6 away and is reached later.
+  Both scalar coordinates and ordinary shape dimensions are representable.
+- **Root cause:** `SolidBody.IsRotationalIntervalSeparated` uses aggregate
+  collider AABBs for non-sphere pairs. The joined mesh's bounds contain the
+  initially separated cone, so no earlier interval can be certified empty.
+  The bounded search terminates at its unresolved zero-time frontier instead
+  of advancing to its retained later geometric witness. This is conservative
+  freezing, not a false geometric contact or the normal inversion in #100.
+  The separator method is unchanged verbatim from committed `767a713`;
+  baseline source inspection establishes pre-existing ownership, without
+  claiming a separate baseline execution.
+- **Resolution:** Reuse canonical translated bounds and the existing mesh BVH,
+  then certify every admitted triangle with exact finite box/triangle SAT.
+  Compound leaf pairs must all prove separated. Oriented enclosures preserve
+  empty finite-triangle corners for long cuboids and embedded prisms. Closed
+  solid interiors, degenerate triangles, clipped local extents and unavailable
+  expansion widths retain the conservative unresolved result. No sampled miss
+  alone permits advancement.
+- **Cost refinement:** Mixed mesh/slab probes reuse exact Boolean admission;
+  the ordinary full manifold is built at the retained geometric witness when
+  response or translational hit reporting needs it. Kinematic clamps against
+  targets without solver mobility need geometry/time only. Pure-rotation
+  conservative restarts reuse body-owned candidate buffers while their proxy
+  bounds are identical; translation or response regathers. Target filtering,
+  trajectory sampling and deterministic earliest-hit selection run every time.
+  FixedMathSharp's existing planar contact reducer also omits identical point
+  seeds while preserving the first tie and all nonzero-segment candidates.
+- **Validation:** `UseLocalLsfStack=true` Gravitas Release passes `5,698` tests
+  with raw coverage `47,075/47,075` sequence points, `15,364/15,364` branches and
+  `4,909/4,909` methods. ReleaseLean passes `5,633` with `47,073/47,073`,
+  `15,364/15,364` and `4,908/4,908`. FixedMathSharp Release passes `5,720` with
+  `59,783/59,783`, `16,964/16,964` and `4,534/4,534`; ReleaseLean passes `5,699`
+  with `59,876/59,876`, `16,964/16,964` and `4,530/4,530`. Every raw report has
+  zero uncovered line/branch points or methods; the Chronicler bridge passes
+  its `49` tests in each configuration. Regressions cover whole-shape and
+  dimensional parity, finite corners, moving targets, compound source/target
+  order, numeric-limit refusal and complete host-loop advancement. The local
+  Windows x64 replay lanes match all six shared fixtures and each other;
+  both core target frameworks build with zero warnings/errors in both modes.
+- **Measured follow-up:** Seven maintained complete-step benchmarks retain
+  `0 B/op`; final timings and accepted refinement history live in
+  GRV-Benchmark-027. The faster old zero-angle answer is not a valid optimized
+  baseline. The unchanged interval benchmark's generated-host compile failure
+  is tracked independently as GRV-Issue-111.
+- **Review and integration:** Independent geometry/parity and ponytail reviews
+  found no remaining correctness or bloat blockers. Commit/release
+  FixedMathSharp before downstream package validation, and update develop's
+  dependency pin to the actual upstream commit after it exists. Native
+  Linux/ARM replay and released-package validation remain CI/release gates.
+  Ignored `artifacts/grv-issue-101/` retains red fixtures, final raw coverage,
+  replay provenance, benchmark captures and paired timing controls.
+- **Original evidence:** Ignored
+  `artifacts/grv-issue-095/phase3-physical-rational-focused.log` records 481
+  passing cases and this single failed joined-wall case, whose final angle is
+  zero. At confirmation, the existing integration test used two plane levels
+  whose bounds supported the old certificate. The joined-wall fixture above
+  is now a maintained full-loop regression.
 
 ### GRV-Issue-109 - Mixed circle segment sweeps can turn exact grazing into closing contact
 

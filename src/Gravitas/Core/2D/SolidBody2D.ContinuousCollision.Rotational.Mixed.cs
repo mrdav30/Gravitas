@@ -94,16 +94,18 @@ public sealed partial class SolidBody2D
         Fixed64 pivotRadius,
         Fixed64 elapsedTime,
         Fixed64 remainingTime,
+        bool reuseCandidates,
         out RotationalMixed3DHit hit)
     {
         hit = default;
         if (!Context.Settings.RuntimeMode.RunsMixedContacts())
             return false;
 
-        GatherMixedRotationalContinuousCollisionCandidates(
-            startPosition,
-            displacement,
-            pivotRadius);
+        if (!reuseCandidates)
+            GatherMixedRotationalContinuousCollisionCandidates(
+                startPosition,
+                displacement,
+                pivotRadius);
 
         bool found = false;
         Fixed64 earliestTime = Fixed64.One;
@@ -253,6 +255,8 @@ public sealed partial class SolidBody2D
         ref Fixed64 earliestContactTime,
         ref LSCollider? earliestTarget)
     {
+        // Kinematic clamps against immovable targets consume geometry/time only;
+        // dynamic stopping and movable-target response still require full contacts.
         if (!IsValidMixedRotationalContinuousCollisionTarget(target)
             || !TryFindEarliestMixedRotationalContinuousCollisionAgainstTarget(
                 target,
@@ -266,6 +270,7 @@ public sealed partial class SolidBody2D
                 remainingTime,
                 Fixed64.Zero,
                 Fixed64.One,
+                needsResponseContact: !IsKinematic || target.Body?.HasSolverMobility == true,
                 out Fixed64 candidateTime,
                 out MixedContact candidateContact,
                 out bool candidateHasContact,
@@ -303,6 +308,7 @@ public sealed partial class SolidBody2D
         Fixed64 remainingTime,
         Fixed64 searchStart,
         Fixed64 searchEnd,
+        bool needsResponseContact,
         out Fixed64 safeTime,
         out MixedContact contact,
         out bool hasContact,
@@ -332,7 +338,6 @@ public sealed partial class SolidBody2D
             int processedNodeCount = 0;
             bool hasKnownContact = false;
             Fixed64 knownContactTime = Fixed64.One;
-            MixedContact knownContact = default;
             intervals[0] = new ContinuousCollisionMath.RotationalInterval(
                 searchStart,
                 searchEnd,
@@ -386,17 +391,12 @@ public sealed partial class SolidBody2D
                     hasMotionBound = targetBoundResolved & combinedBoundResolved;
                 }
 
-                bool sampleHasContact = TrySampleMixedRotationalContinuousContact(target,
-                    ResolveRotationalFrameFraction(elapsedTime, remainingTime, midpoint),
-                    out MixedContact sampleContact, out bool sampleContactIsClosing);
+                bool sampleHasContact = CollisionDetectionMixed.IntersectsForContinuousCollision(target, Collider);
                 if (sampleHasContact
                     && (!hasKnownContact || midpoint < knownContactTime))
                 {
                     hasKnownContact = true;
                     knownContactTime = midpoint;
-                    knownContact = sampleContact;
-                    _rotationalMixedKnownManifold.CopyFrom(Context.CollisionScratch.MixedManifold, Context.FrameCount);
-                    _rotationalMixedKnownContactIsClosing = sampleContactIsClosing;
                 }
 
                 bool hasShapeGap = CollisionDetectionMixed.TryGetRotationalSeparationGap(
@@ -414,11 +414,8 @@ public sealed partial class SolidBody2D
                         characteristicScale,
                         out Fixed64 conservativeShapeGap)
                     && conservativeShapeGap > motionBound;
-                bool fallbackBoundsCertifySeparation = !shapeGapSupported
-                    && ContinuousCollisionMath.AreBoundsSeparatedByMoreThan(
-                        target.Bounds,
-                        Collider.MixedBounds3D,
-                        motionBound);
+                bool fallbackBoundsCertifySeparation = !sampleHasContact && hasMotionBound && !shapeGapSupported
+                    && ContinuousCollisionBounds.AreSeparated(target, Collider, motionBound);
                 if (!sampleHasContact
                     && hasMotionBound
                     && (shapeGapCertifiesSeparation || fallbackBoundsCertifySeparation))
@@ -435,7 +432,17 @@ public sealed partial class SolidBody2D
                         out contactTime,
                         out hasContact))
                 {
-                    contact = knownContact;
+                    if (hasContact && needsResponseContact)
+                    {
+                        // A budget-limited safe frontier can precede the retained witness.
+                        // Rebuild at contactTime, preserving its complete matched manifold.
+                        SampleMixedRotationalContinuousPairPose(startPosition, displacement, startRotation, angularDelta, contactTime,
+                            elapsedTime, remainingTime, targetBody, samplesTargetMotion);
+                        BuildMixedRotationalContinuousContact(target,
+                            ResolveRotationalFrameFraction(elapsedTime, remainingTime, contactTime),
+                            out contact, out _rotationalMixedKnownContactIsClosing);
+                        _rotationalMixedKnownManifold.CopyFrom(Context.CollisionScratch.MixedManifold, Context.FrameCount);
+                    }
                     return true;
                 }
 
@@ -462,11 +469,7 @@ public sealed partial class SolidBody2D
                         childDepth);
             }
 
-            safeTime = knownContactTime;
-            contact = knownContact;
-            hasContact = hasKnownContact;
-            contactTime = knownContactTime;
-            return hasKnownContact;
+            return false;
         }
         finally
         {
@@ -650,13 +653,14 @@ public sealed partial class SolidBody2D
         }
     }
 
-    private bool TrySampleMixedRotationalContinuousContact(LSCollider target,
+    private void BuildMixedRotationalContinuousContact(LSCollider target,
         Fixed64 frameFraction, out MixedContact contact, out bool contactIsClosing)
     {
         ContactManifold manifold = Context.CollisionScratch.MixedManifold;
         contact = default;
         contactIsClosing = false;
-        if (!CollisionDetectionMixed.TryBuildManifold(target, Collider, manifold)) return false;
+        // Admission already retained this geometric witness; closing rows only authorize response.
+        CollisionDetectionMixed.TryBuildManifold(target, Collider, manifold);
         SolidBody? other = target.Body;
         ContactAnchor center3D = other?.GetCenterOfMassAnchor() ?? ContactAnchor.FromWorldPoint(target.Center);
         var center2D = new ContactAnchor(new Vector3d(_position.X, Collider.MixedSlabCenterY, _position.Y),
@@ -667,7 +671,6 @@ public sealed partial class SolidBody2D
             other?.SampleContinuousCollisionAngularVelocity(frameFraction) ?? Vector3d.Zero,
             center2D, IsKinematic ? SampleContinuousCollisionLinearVelocity(frameFraction) : _linearVelocity,
             IsKinematic ? SampleContinuousCollisionAngularVelocity(frameFraction) : _angularVelocity, out contact, Collider);
-        return true;
     }
 
     private bool IsValidMixedRotationalContinuousCollisionTarget(LSCollider target)

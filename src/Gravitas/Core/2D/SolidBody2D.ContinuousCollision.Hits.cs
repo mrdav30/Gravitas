@@ -761,6 +761,7 @@ public sealed partial class SolidBody2D
                     intervalDuration,
                     entryTime,
                     exitTime,
+                    needsResponseContact: true,
                     out Fixed64 safeTime,
                     out MixedContact contact,
                     out bool hasContact,

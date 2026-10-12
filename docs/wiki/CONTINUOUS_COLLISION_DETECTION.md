@@ -208,6 +208,32 @@ interval only when its gap exceeds an outward-rounded bound on both
 participants' linear and pivot-centered angular travel. The bound also scales
 fixed-point pose uncertainty by pivot radius.
 
+When aggregate bounds overlap, compound pairs must prove separation for every
+leaf pair. Concave meshes query their local triangle BVH with the other shape's
+midpoint enclosure expanded by the combined motion bound. An empty query proves
+separation; candidate triangles use exact finite box/triangle SAT. Cuboids and
+embedded 2D shapes retain an oriented enclosure, so a long rotating shape does
+not stop merely because its axis-aligned bounds cover an empty triangle corner.
+Pure 2D compounds and both mixed source directions use the same leaf-pair rule.
+
+These certificates preserve conceptual mesh-local geometry when absolute world
+vertices are unavailable. Closed convex hull interiors, degenerate triangles,
+unrepresentable enclosure widths and capsule local extents that would clip
+before translation retain the unresolved result. An overlapping enclosure is
+not a contact witness and may still require conservative bounded refinement.
+
+Mixed mesh/slab interval probes reuse exact finite-triangle admission without
+constructing contact rows. The retained witness is resampled at its own time
+before building the ordinary complete manifold and selecting closing contacts;
+an earlier unresolved safe frontier does not replace that witness pose.
+Rotating kinematic sources against targets without solver mobility clamp from
+exact geometry and time alone. Dynamic response and translational fallback hit
+reporting retain complete contact rows.
+Conservative pure-rotation restarts reuse body-owned candidate buffers while
+the pivot and proxy bounds stay unchanged. Any translation or response gathers
+fresh candidates; target validity, prepared trajectories and earliest-hit ordering
+are checked again on every restart.
+
 An unresolved interval is subdivided until a fixed depth or per-candidate work
 budget. A witnessed earliest contact can apply the contact-point response and
 bounded handoffs atomically. A later contact is not a response at an earlier

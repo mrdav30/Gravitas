@@ -362,6 +362,29 @@ public sealed partial class MixedQueryCcdTests
         target.Center.Should().Be(targetPosition);
     }
 
+    [Fact]
+    public void RotationalMixedResponse_KinematicSourceAndLockedTarget_ShouldRejectImpulseWithoutMutation()
+    {
+        using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
+        ScenarioBody<LSSphereCollider> source = CreateBody3D(context, new LSSphereCollider(),
+            -Vector3d.Right, isKinematic: true);
+        SolidBody2D target = CreateCircle2D(context, Vector2d.Zero);
+        target.FreezeAxes = BodyFreezeAxes2D.All;
+        source.Body.Agent.Transform.LocalPosition = Vector3d.Right;
+        PrepareMixedContinuousCollisionFrame(context);
+        source.Body.HasSolverMobility.Should().BeFalse();
+        target.HasSolverMobility.Should().BeFalse();
+        ChronicleHash before = context.ComputeReplayHash(GravitasReplayHashMode.AuthoritativeWithSolverCaches);
+
+        bool applied = source.Body.TryApplyMixedRotationalContinuousCollisionResponse(target.Collider,
+            CreateMixedContact(Vector3d.Right), Fixed64.Half, source.Body.Position3d,
+            Vector3d.Right * Fixed64.Two, source.Body.Rotation, source.Body.Rotation,
+            Fixed64.Zero, context.DeltaTime, sourceIsKinematic: true);
+
+        applied.Should().BeFalse();
+        context.ComputeReplayHash(GravitasReplayHashMode.AuthoritativeWithSolverCaches).Should().Be(before);
+    }
+
     private static void PrepareMixedContinuousCollisionFrame(GravitasWorldContext context)
     {
         context.AdvanceLateSimulateToken();

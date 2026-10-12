@@ -16,6 +16,64 @@ namespace Gravitas.Colliders;
 /// </summary>
 internal static class ColliderCanonicalBounds2D
 {
+    // The caller supplies a compound leaf. Retain its authored local box until
+    // the final mesh-relative transform; clipped world bounds lose boundary geometry.
+    internal static bool TryGetMixedRelativeBounds(LSCollider2D collider,
+        Vector3d referenceOrigin, FixedQuaternion referenceRotation, out FixedBoundBox relativeBounds,
+        out FixedOrientedBox orientedBounds)
+    {
+        orientedBounds = default;
+        Vector2d minimum, maximum;
+        Fixed64 rotation = collider.Rotation;
+        if (collider is LSCircleCollider2D circle)
+        {
+            minimum = -Vector2d.One * circle.ScaledRadius;
+            maximum = -minimum;
+        }
+        else if (collider is LSCapsuleCollider2D capsule)
+        {
+            // Preserve half-raw-unit extents; dividing the axis first can round down.
+            if (Fixed64.CompareProducts(capsule.AxisLength, Fixed64.Half,
+                    Fixed64.MaxValue - capsule.ScaledRadius, Fixed64.One) > 0)
+            {
+                relativeBounds = default;
+                return false;
+            }
+            FixedBoundArea bounds = FixedBoundArea.FromCenteredRotatedCapsuleClippedToDomain(
+                Vector2d.Zero, Fixed64.Zero, capsule.AxisLength, capsule.ScaledRadius);
+            minimum = bounds.Min;
+            maximum = bounds.Max;
+        }
+        else
+        {
+            rotation = collider.ConvexRotation;
+            minimum = maximum = collider.GetScaledLocalVertexUnchecked(0);
+            for (int i = 1; i < collider.VertexCount; i++)
+            {
+                Vector2d vertex = collider.GetScaledLocalVertexUnchecked(i);
+                minimum = new Vector2d(FixedMath.Min(minimum.X, vertex.X), FixedMath.Min(minimum.Y, vertex.Y));
+                maximum = new Vector2d(FixedMath.Max(maximum.X, vertex.X), FixedMath.Max(maximum.Y, vertex.Y));
+            }
+        }
+        // Keep the enclosure centered on the canonical origin, avoiding another
+        // rounded world-center transform for asymmetric authored polygons.
+        if (!Vector2d.TrySubtract(Vector2d.Zero, minimum, out Vector2d negativeMinimum))
+        {
+            relativeBounds = default;
+            return false;
+        }
+        Vector3d origin = new(collider.Center.X, collider.MixedSlabCenterY, collider.Center.Y);
+        FixedQuaternion orientation = FixedQuaternion.FromAxisAngle(Vector3d.Up, -rotation);
+        orientedBounds = new FixedOrientedBox(origin, orientation, new Vector3d(
+            FixedMath.Max(negativeMinimum.X, maximum.X), collider.MixedHalfThickness,
+            FixedMath.Max(negativeMinimum.Y, maximum.Y)));
+        relativeBounds = FixedBoundBox.FromRelativeRotatedBoundsClippedToDomain(
+            origin, orientation,
+            new Vector3d(minimum.X, -collider.MixedHalfThickness, minimum.Y),
+            new Vector3d(maximum.X, collider.MixedHalfThickness, maximum.Y), referenceOrigin, referenceRotation);
+        return true;
+    }
+
     internal static Fixed64 GetCurrentCenteredProxyRadius(
         LSCollider2D collider)
     {

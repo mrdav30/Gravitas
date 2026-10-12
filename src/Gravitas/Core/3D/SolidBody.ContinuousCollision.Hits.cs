@@ -1006,6 +1006,7 @@ public partial class SolidBody
                     IsKinematic,
                     entryTime,
                     exitTime,
+                    needsResponseContact: true,
                     out Fixed64 safeTime,
                     out MixedContact contact,
                     out bool hasContact,

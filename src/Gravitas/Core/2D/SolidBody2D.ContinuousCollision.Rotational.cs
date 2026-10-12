@@ -192,6 +192,8 @@ public sealed partial class SolidBody2D
             : _angularVelocity;
         int maxToiIterations = Context.Settings.ContinuousCollisionMaxToiIterations;
         int conservativeRefinementCount = 0;
+        bool reuseCandidates = false;
+        int hitCount = 0;
         try
         {
             while (remainingTime > Fixed64.Epsilon)
@@ -215,11 +217,12 @@ public sealed partial class SolidBody2D
                 }
                 if (HasRotationInvariantCollider)
                     angularDistance = Fixed64.Zero;
-                int hitCount = GatherRotationalContinuousCollisionCandidates(
-                    currentPosition,
-                    segmentEnd,
-                    displacement,
-                    pivotRadius);
+                if (!reuseCandidates)
+                    hitCount = GatherRotationalContinuousCollisionCandidates(
+                        currentPosition,
+                        segmentEnd,
+                        displacement,
+                        pivotRadius);
                 Fixed64 safeTime = Fixed64.Zero;
                 Contact2D contact = default;
                 bool hasContact = false;
@@ -249,7 +252,9 @@ public sealed partial class SolidBody2D
                     pivotRadius,
                     elapsedTime,
                     remainingTime,
+                    reuseCandidates,
                     out RotationalMixed3DHit mixedHit);
+                reuseCandidates = false;
                 // 2D targets precede 3D targets at equal normalized time.
                 bool useMixed = foundMixed
                     && (!foundSameDimension || mixedHit.SafeTime < safeTime);
@@ -320,6 +325,8 @@ public sealed partial class SolidBody2D
                 if (deferUnresolvedWitness)
                 {
                     conservativeRefinementCount++;
+                    // Pure rotation keeps the candidate proxy unchanged; responses regather.
+                    reuseCandidates = displacement == Vector2d.Zero;
                     remainingTime = remainingAfterImpact;
                     elapsedTime = impactElapsedTime;
                     continue;
@@ -797,10 +804,7 @@ public sealed partial class SolidBody2D
         if (TryGetCirclePairSeparationGap(target, out Fixed64 closestPointGap))
             return closestPointGap > motionBound;
 
-        return ContinuousCollisionMath.AreBoundsSeparatedByMoreThan(
-            Collider.Bounds,
-            target.Bounds,
-            motionBound);
+        return ContinuousCollisionBounds.AreSeparated(Collider, target, motionBound);
     }
 
     private bool TryGetCirclePairSeparationGap(LSCollider2D target, out Fixed64 separationGap)

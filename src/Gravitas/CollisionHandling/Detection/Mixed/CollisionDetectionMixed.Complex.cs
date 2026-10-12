@@ -17,6 +17,33 @@ namespace Gravitas.CollisionHandling;
 /// <content>Builds independent finite mesh/slab regions without treating authored seams as physical features.</content>
 public static partial class CollisionDetectionMixed
 {
+    // Interval probes need exact admission; depth, anchors and closing rows are
+    // materialized once at the retained witness using the ordinary manifold path.
+    internal static bool IntersectsForContinuousCollision(LSCollider collider3D, LSCollider2D embedded)
+    {
+        if (collider3D is not LSMeshCollider mesh
+            || embedded is not (LSCircleCollider2D or LSCapsuleCollider2D or LSAABBoxCollider2D or LSPolygonCollider2D))
+            return TryBuildManifold(collider3D, embedded, collider3D.Context.CollisionScratch.MixedManifold);
+        if (!mesh.Bounds.Intersects(embedded.MixedBounds3D)) return false;
+        SwiftList<int> candidates = mesh.Context.CollisionScratch.MeshTriangleCandidatesA;
+        mesh.GetTrianglesInBounds(new FixedBoundVolume(embedded.MixedBounds3D.Min, embedded.MixedBounds3D.Max), candidates);
+        Fixed64 length = embedded is LSCapsuleCollider2D capsule ? capsule.AxisLength : Fixed64.Zero;
+        Fixed64 radius = embedded is LSCircleCollider2D circle ? circle.ScaledRadius
+            : embedded is LSCapsuleCollider2D stadium ? stadium.ScaledRadius : Fixed64.Zero;
+        Fixed64 yaw = embedded is LSAABBoxCollider2D ? Fixed64.Zero : embedded.Rotation;
+        var section = new FiniteSlabSectionFrame(mesh.Mesh.Origin, mesh.Mesh.Rotation,
+            GetEmbeddedCenter3D(embedded), FixedQuaternion.FromAxisAngle(Vector3d.Up, -yaw),
+            length, radius, embedded.MixedHalfThickness);
+        Span<Vector2d> box = stackalloc Vector2d[4];
+        ReadOnlySpan<Vector2d> offsets = GetConvexPrismOffsets(embedded, box);
+        foreach (int triangle in candidates.AsReadOnlySpan())
+        {
+            mesh.Mesh.GetLocalTriangleVertices(triangle, out Vector3d first, out Vector3d second, out Vector3d third);
+            if (section.IntersectsTriangle(new FixedTriangle(first, second, third), offsets)) return true;
+        }
+        return false;
+    }
+
     private static void AppendMeshEmbedded2D(LSMeshCollider mesh, LSCollider2D embedded,
         ContactManifold manifold, int namespace3D, int namespace2D)
     {

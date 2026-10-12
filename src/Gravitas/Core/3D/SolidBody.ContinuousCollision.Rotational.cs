@@ -95,6 +95,7 @@ public partial class SolidBody
             LSCollider? ignoredTarget = _continuousCollisionHandoffIgnoredCollider3D;
             int maxIterations = Context.Settings.ContinuousCollisionMaxToiIterations;
             int conservativeRefinementCount = 0;
+            bool reuseCandidates = false;
             int arbiterIterationLimit = maxIterations
                 + ContinuousCollisionMath.RotationalIntervalMaxDepth;
             for (int iteration = 0; iteration < arbiterIterationLimit; iteration++)
@@ -111,11 +112,12 @@ public partial class SolidBody
                 angularDistance = HasRotationInvariantCollider
                     ? Fixed64.Zero
                     : motionSegmentAngularVelocity.Magnitude * remainingTime;
-                GatherRotationalContinuousCollisionCandidates(
-                    currentPosition,
-                    segmentEnd,
-                    displacement,
-                    pivotRadius);
+                if (!reuseCandidates)
+                    GatherRotationalContinuousCollisionCandidates(
+                        currentPosition,
+                        segmentEnd,
+                        displacement,
+                        pivotRadius);
                 bool foundSameDimension = TryFindEarliestRotationalContinuousCollision(
                         currentPosition,
                         displacement,
@@ -142,7 +144,9 @@ public partial class SolidBody
                     elapsedTime,
                     remainingTime,
                     sourceIsKinematic: false,
+                    reuseCandidates,
                     out RotationalMixed2DHit mixedHit);
+                reuseCandidates = false;
                 // Both searches initialize their hit structures, so evaluating
                 // the tie policy eagerly avoids encoding an artificial
                 // short-circuit state in this deterministic arbitration rule.
@@ -250,6 +254,8 @@ public partial class SolidBody
                 if (deferUnresolvedWitness)
                 {
                     conservativeRefinementCount++;
+                    // Pure rotation keeps the candidate proxy unchanged; responses regather.
+                    reuseCandidates = displacement == Vector3d.Zero;
                     elapsedTime = impactElapsedTime;
                     remainingTime -= consumedTime;
                     continue;
@@ -363,6 +369,7 @@ public partial class SolidBody
             LSCollider? ignoredTarget = null;
             int maxIterations = Context.Settings.ContinuousCollisionMaxToiIterations;
             int conservativeRefinementCount = 0;
+            bool reuseCandidates = false;
             int arbiterIterationLimit = maxIterations
                 + ContinuousCollisionMath.RotationalIntervalMaxDepth;
             for (int iteration = 0; iteration < arbiterIterationLimit; iteration++)
@@ -372,11 +379,12 @@ public partial class SolidBody
                 angularDistance = HasRotationInvariantCollider
                     ? Fixed64.Zero
                     : ResolveKinematicAngularDistanceRadians(currentRotation, segmentTargetRotation);
-                GatherRotationalContinuousCollisionCandidates(
-                    currentPosition,
-                    proposedPosition,
-                    segmentDisplacement,
-                    pivotRadius);
+                if (!reuseCandidates)
+                    GatherRotationalContinuousCollisionCandidates(
+                        currentPosition,
+                        proposedPosition,
+                        segmentDisplacement,
+                        pivotRadius);
                 bool foundSameDimension = TryFindEarliestRotationalContinuousCollision(
                         currentPosition,
                         segmentDisplacement,
@@ -403,7 +411,9 @@ public partial class SolidBody
                     elapsedTime,
                     remainingTime,
                     sourceIsKinematic: true,
+                    reuseCandidates,
                     out RotationalMixed2DHit mixedHit);
+                reuseCandidates = false;
                 bool useMixed = foundMixed
                     && (!foundSameDimension || mixedHit.SafeTime <= safeTime);
                 if (!foundSameDimension && !foundMixed)
@@ -494,6 +504,8 @@ public partial class SolidBody
                 if (deferUnresolvedWitness)
                 {
                     conservativeRefinementCount++;
+                    // Pure rotation keeps the candidate proxy unchanged; responses regather.
+                    reuseCandidates = segmentDisplacement == Vector3d.Zero;
                     elapsedTime = impactElapsedTime;
                     remainingTime -= conservativeConsumedTime;
                     continue;
@@ -731,10 +743,7 @@ public partial class SolidBody
         if (TryGetSpherePairSeparationGap(target, out Fixed64 closestPointGap))
             return closestPointGap > motionBound;
 
-        return ContinuousCollisionMath.AreBoundsSeparatedByMoreThan(
-            Collider.Bounds,
-            target.Bounds,
-            motionBound);
+        return ContinuousCollisionBounds.AreSeparated(Collider, target, motionBound);
     }
 
     private bool TryGetSpherePairSeparationGap(LSCollider target, out Fixed64 separationGap)
