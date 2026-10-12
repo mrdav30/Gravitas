@@ -65,7 +65,6 @@ public sealed partial class GravitasQueryMixedService
             return TrySweepCircleAgainstCuboid(
                 start,
                 end,
-                direction2D,
                 length,
                 radius,
                 slabCenterY,
@@ -108,7 +107,7 @@ public sealed partial class GravitasQueryMixedService
             return TrySweepCircleAgainstCone(start, end, direction2D, length, radius, slabCenterY, halfThickness, direction3D, cone, sourceCollider, out hit);
 
         if (collider is LSMeshCollider mesh)
-            return TrySweepCircleAgainstMesh(start, end, direction2D, length, radius, slabCenterY, halfThickness, direction3D, mesh, sourceCollider, requireClosingContact, out hit);
+            return TrySweepCircleAgainstMesh(start, end, length, radius, slabCenterY, halfThickness, direction3D, mesh, sourceCollider, requireClosingContact, out hit);
 
         if (collider is LSCompoundCollider compound)
             return TrySweepCircleAgainstCompound3D(start, end, direction2D, length, radius, slabCenterY, halfThickness, direction3D, compound, sourceCollider, requireClosingContact, out hit);
@@ -120,7 +119,6 @@ public sealed partial class GravitasQueryMixedService
     private static bool TrySweepCircleAgainstCuboid(
         Vector2d start,
         Vector2d end,
-        Vector2d direction,
         Fixed64 length,
         Fixed64 radius,
         Fixed64 slabCenterY,
@@ -131,12 +129,12 @@ public sealed partial class GravitasQueryMixedService
         out PhysicsMixedHit hit)
     {
         if (!cuboid.OrientedBox.TryGetCircleSlabSweepDistance(
-                new Vector3d(start.X, slabCenterY, start.Y),
-                direction,
-                length,
-                halfThickness,
-                radius,
-                out Fixed64 distance))
+            new FixedSegment2d(start, end),
+            length,
+            slabCenterY,
+            halfThickness,
+            radius,
+            out Fixed64 distance))
         {
             hit = default;
             return false;
@@ -318,7 +316,6 @@ public sealed partial class GravitasQueryMixedService
     private bool TrySweepCircleAgainstMesh(
         Vector2d start,
         Vector2d end,
-        Vector2d direction,
         Fixed64 length,
         Fixed64 radius,
         Fixed64 slabCenterY,
@@ -386,9 +383,8 @@ public sealed partial class GravitasQueryMixedService
             if (!triangle.TryGetFiniteSlabProjectedCircleSweep(
                 mesh.Mesh.Origin,
                 mesh.Mesh.Rotation,
-                start,
-                direction,
-                maximumDistance: length,
+                new FixedSegment2d(start, end),
+                length,
                 radius,
                 slabCenterY,
                 halfThickness,

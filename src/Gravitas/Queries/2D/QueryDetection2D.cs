@@ -240,8 +240,7 @@ internal static partial class QueryDetection2D
             return false;
         }
 
-        Vector2d direction = segment.Normalized;
-        return TryRaycastConvex(start, direction, segmentLength, collider, out hit);
+        return TryRaycastConvex(start, segment, segmentLength, collider, out hit);
     }
 
     internal static bool TrySweepCircle(
@@ -312,8 +311,8 @@ internal static partial class QueryDetection2D
             return false;
         }
 
-        Vector2d direction = segment.Normalized;
-        return TrySweepCircleConvex(start, direction, segmentLength, radius, collider, out hit);
+        return TrySweepCircleConvex(start, segment, segmentLength, radius, collider, out hit,
+            authoredDisplacement: true);
     }
 
     internal static bool TrySweepMoverShape(
@@ -827,8 +826,11 @@ internal static partial class QueryDetection2D
         Span<Vector2d> scratch = stackalloc Vector2d[4];
         ReadOnlySpan<Vector2d> vertexOffsets =
             GetConvexVertexOffsets(collider, scratch);
-        if (!FixedConvex2dRelations.TryGetSegmentFirstIntersectionDistance(
+        if (!FixedConvex2dRelations.TryGetSweptCenteredCapsuleFirstDistanceCore(
                 start,
+                Vector2d.Right,
+                Fixed64.Zero,
+                Fixed64.Zero,
                 direction,
                 segmentLength,
                 collider.Center,
@@ -836,7 +838,8 @@ internal static partial class QueryDetection2D
                 vertexOffsets,
                 out Fixed64 distance,
                 out Vector2d normal,
-                out FixedPointAnchor2d contactAnchor))
+                out Vector2d contactOffset,
+                authoredDisplacement: true))
         {
             hit = default;
             return false;
@@ -844,7 +847,7 @@ internal static partial class QueryDetection2D
 
         hit = new Physics2DHit(
             collider,
-            new ContactAnchor2D(contactAnchor),
+            new ContactAnchor2D(new FixedPointAnchor2d(collider.Center, collider.ConvexRotation, contactOffset)),
             normal,
             distance);
         return true;
@@ -856,13 +859,16 @@ internal static partial class QueryDetection2D
         Fixed64 segmentLength,
         Fixed64 radius,
         LSCollider2D collider,
-        out Physics2DHit hit)
+        out Physics2DHit hit,
+        bool authoredDisplacement = false)
     {
         Span<Vector2d> scratch = stackalloc Vector2d[4];
         ReadOnlySpan<Vector2d> vertexOffsets =
             GetConvexVertexOffsets(collider, scratch);
-        if (!FixedConvex2dRelations.TryGetSweptCircleFirstDistance(
+        if (!FixedConvex2dRelations.TryGetSweptCenteredCapsuleFirstDistanceCore(
                 start,
+                Vector2d.Right,
+                Fixed64.Zero,
                 radius,
                 direction,
                 segmentLength,
@@ -871,7 +877,8 @@ internal static partial class QueryDetection2D
                 vertexOffsets,
                 out Fixed64 distance,
                 out Vector2d normal,
-                out FixedPointAnchor2d contactAnchor))
+                out Vector2d contactOffset,
+                authoredDisplacement))
         {
             hit = default;
             return false;
@@ -879,7 +886,7 @@ internal static partial class QueryDetection2D
 
         hit = new Physics2DHit(
             collider,
-            new ContactAnchor2D(contactAnchor),
+            new ContactAnchor2D(new FixedPointAnchor2d(collider.Center, collider.ConvexRotation, contactOffset)),
             normal,
             distance);
         return true;

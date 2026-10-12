@@ -117,6 +117,12 @@ not change FixedMathSharp's separate `FixedRay` and `FixedRay2d` contracts:
 those primitives continue to return ordinary ray parameters, which are physical
 distances only when their direction is normalized.
 
+The normalized `Direction` on a hit describes travel; segment detection and CCD
+advancement retain the original endpoints. Finite box and triangle features are
+admitted before rounding the reported distance, and triangle surface witnesses
+round directly from the geometric intersection. Exact grazing remains a query
+hit without becoming a closing constraint that blocks CCD.
+
 ## Hit Witnesses
 
 `Physics3DHit`, `Physics2DHit`, and `PhysicsMixedHit` retain surface witnesses

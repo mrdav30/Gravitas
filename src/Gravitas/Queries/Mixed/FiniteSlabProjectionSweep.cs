@@ -18,6 +18,7 @@ namespace Gravitas.Queries;
 /// Sweeps an X/Z circle against the projection of curved 3D targets clipped to
 /// a finite Y slab.
 /// </summary>
+/// <content>Owns conservative advancement and projected support simplex reduction for curved targets.</content>
 internal static partial class FiniteSlabProjectionSweep
 {
     private const int MaxGjkIterations = 32;
@@ -129,9 +130,11 @@ internal static partial class FiniteSlabProjectionSweep
         }
 
         Fixed64 travelDistance = Fixed64.Zero;
+        var segment = new FixedSegment2d(start, end);
+        Vector2d displacement = end - start;
         for (int i = 0; i < maxConservativeAdvancementIterations; i++)
         {
-            Vector2d point = GetSweepPoint(start, direction, travelDistance);
+            Vector2d point = segment.GetPointAtDistance(travelDistance, length);
             if (!TryComputeDistance(point, radius, target, out PlanarGjkResult result))
             {
                 return false;
@@ -144,15 +147,22 @@ internal static partial class FiniteSlabProjectionSweep
             }
 
             Vector2d normal = result.Normal;
-            Fixed64 closingSpeed = -Vector2d.Dot(direction, normal);
-            if (closingSpeed <= Fixed64.Epsilon)
+            // Keep the authored chord over its distance denominator. A rounded
+            // unit ray can enter a shape that the original segment only grazes.
+            Signed320 closing = WideArithmetic.SubtractSigned320(default,
+                WideArithmetic.AddSigned320(
+                    WideArithmetic.MultiplySigned192(Signed192.Raw(displacement.X), Signed192.Raw(normal.X)),
+                    WideArithmetic.MultiplySigned192(Signed192.Raw(displacement.Y), Signed192.Raw(normal.Y))));
+            if (WideArithmetic.SubtractSigned320(closing,
+                    WideArithmetic.MultiplySigned192(Signed192.Raw(Fixed64.Epsilon), Signed192.Raw(length))).Sign <= 0)
                 return false;
 
             Fixed64 remainingDistance = length - travelDistance;
-            bool reachedEndpoint = !Fixed64.TryMultiplyDivide(
-                    result.Distance,
-                    Fixed64.One,
-                    closingSpeed,
+            bool reachedEndpoint = !Fixed64.TryGetSignedRawRatio(
+                    Signed832.ExtendValue(Signed576.ExtendValue(WideArithmetic.MultiplySigned192(
+                        Signed192.Raw(result.Distance), Signed192.Raw(length)))),
+                    Signed832.ExtendValue(Signed576.ExtendValue(closing)),
+                    32,
                     out Fixed64 stepDistance)
                 || stepDistance > remainingDistance;
             if (reachedEndpoint)
@@ -277,15 +287,6 @@ internal static partial class FiniteSlabProjectionSweep
             GjkSimplexScale.CreateWorkingDifference(point, targetSupport, expansion, workingShift));
         return true;
     }
-
-    // The authored endpoint bounds every monotonic intermediate component.
-    private static Vector2d GetSweepPoint(
-        Vector2d start,
-        Vector2d direction,
-        Fixed64 distance) =>
-        new(
-            Fixed64.MultiplyAdd(direction.X, distance, start.X),
-            Fixed64.MultiplyAdd(direction.Y, distance, start.Y));
 
     private static ClosestPlanarSimplexResult SolveClosestSimplex(
         Span<PlanarSupportPoint> simplex,

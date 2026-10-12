@@ -26,11 +26,9 @@ public sealed class SweptSphereQueryWorker
 
     private Vector3d _start;
     private Vector3d _end;
-    private Vector3d _direction;
     private Vector3d _sweptBoundsMin;
     private Vector3d _sweptBoundsMax;
     private Fixed64 _length;
-    private Fixed64 _lengthSqr;
     private Fixed64 _radius;
     private int _sweepDepth;
 
@@ -49,13 +47,9 @@ public sealed class SweptSphereQueryWorker
             || !Vector3d.TryGetMagnitude(segment, out _length))
         {
             _length = Fixed64.Zero;
-            _lengthSqr = Fixed64.Zero;
-            _direction = Vector3d.Zero;
             return;
         }
 
-        _lengthSqr = segment.MagnitudeSquared;
-        _direction = _length <= Fixed64.Epsilon ? Vector3d.Zero : segment.Normalized;
         SweepBoundsUtility.CreateSweptSphereBounds(
             start,
             end,
@@ -287,8 +281,6 @@ public sealed class SweptSphereQueryWorker
             return false;
         }
 
-        Vector3d localDirection =
-            mesh.Mesh.Rotation.Inverse().Rotate(_direction);
         bool found = false;
         for (int i = 0; i < _meshTriangleBuffer.Count; i++)
         {
@@ -307,7 +299,6 @@ public sealed class SweptSphereQueryWorker
                     normal,
                     localStart,
                     localEnd,
-                    localDirection,
                     out Vector3d triangleHit,
                     out Fixed64 triangleDistance),
                 triangleHit,
@@ -356,7 +347,6 @@ public sealed class SweptSphereQueryWorker
         Vector3d normal,
         Vector3d start,
         Vector3d end,
-        Vector3d direction,
         out Vector3d sphereCenterAtImpact,
         out Fixed64 impactDistance)
     {
@@ -374,13 +364,13 @@ public sealed class SweptSphereQueryWorker
 
         bool found = false;
         found |= TryKeepEarlierSweep(
-            TrySweepTriangleFace(triangle, normal, _radius, start, direction, out Vector3d frontHit, out Fixed64 frontDistance),
+            TrySweepTriangleFace(triangle, normal, _radius, start, end, out Vector3d frontHit, out Fixed64 frontDistance),
             frontHit,
             frontDistance,
             ref sphereCenterAtImpact,
             ref impactDistance);
         found |= TryKeepEarlierSweep(
-            TrySweepTriangleFace(triangle, normal, -_radius, start, direction, out Vector3d backHit, out Fixed64 backDistance),
+            TrySweepTriangleFace(triangle, normal, -_radius, start, end, out Vector3d backHit, out Fixed64 backDistance),
             backHit,
             backDistance,
             ref sphereCenterAtImpact,
@@ -430,23 +420,26 @@ public sealed class SweptSphereQueryWorker
         Vector3d normal,
         Fixed64 signedRadius,
         Vector3d start,
-        Vector3d direction,
+        Vector3d end,
         out Vector3d sphereCenterAtImpact,
         out Fixed64 impactDistance)
     {
         sphereCenterAtImpact = Vector3d.Zero;
         impactDistance = Fixed64.Zero;
 
-        Fixed64 denominator = Vector3d.Dot(direction, normal);
-        if (denominator.Abs() <= Fixed64.Epsilon)
+        Fixed64 denominator = Vector3d.Dot(end - start, normal);
+        if (denominator == Fixed64.Zero)
             return false;
 
         Fixed64 signedStartDistance = Vector3d.Dot(start - triangle.A, normal);
-        Fixed64 distance = (signedRadius - signedStartDistance) / denominator;
-        if (distance < Fixed64.Zero || distance > _length)
+        // Keep plane entry and the final center on the same authored chord;
+        // a rounded unit direction can move a grazing trajectory across a face.
+        if (!Fixed64.TryMultiplyDivide(signedRadius - signedStartDistance, _length,
+                denominator, out Fixed64 distance)
+            || distance < Fixed64.Zero || distance > _length)
             return false;
 
-        Vector3d center = start + direction * distance;
+        Vector3d center = new FixedSegment(start, end).GetPointAtDistance(distance, _length);
         Vector3d pointOnPlane = center - normal * signedRadius;
         if (!triangle.ContainsProjection(pointOnPlane))
             return false;

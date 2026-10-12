@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using FixedMathSharp.Geometry;
 using Gravitas.CollisionHandling;
 using Gravitas.Queries;
 using Gravitas.Support;
@@ -59,7 +60,8 @@ public sealed partial class SolidBody2D
 
         LastContinuousCollisionToiIterationCount++;
         if (foundStatic)
-            proposedPosition = startPosition + displacement.Normalized * staticHitDistance;
+            proposedPosition = new FixedSegment2d(startPosition, proposedPosition)
+                .GetPointAtDistance(staticHitDistance, sourceLength);
 
         return true;
     }

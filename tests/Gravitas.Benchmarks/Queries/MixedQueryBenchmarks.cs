@@ -375,6 +375,12 @@ public class MixedQueryBenchmarks
     }
 
     [Benchmark]
+    public int SweepCircleAgainst3DAll_DenseMeshTargets_ObliqueSegment()
+    {
+        return SweepCircleAgainst3D(_denseMeshContext, _denseEnd + Vector2d.Forward);
+    }
+
+    [Benchmark]
     public int SweepCircleAgainst3DAll_DenseMeshTargets_CandidateCount()
     {
         _ = SweepCircleAgainst3D(_denseMeshContext, _denseEnd);

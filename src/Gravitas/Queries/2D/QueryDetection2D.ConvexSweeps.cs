@@ -28,24 +28,24 @@ internal static partial class QueryDetection2D
             return true;
         }
 
-        Vector2d direction = displacement.Normalized;
-
         if (target is LSCircleCollider2D circle)
         {
-            bool found = FixedSegment2d.TryGetSweptCenteredCapsuleSegmentFirstDistance(
+            bool found = WideFiniteAxisIntersection.TryGetSweptCenteredCapsuleSegmentFirstDistance(
                 mover.Center,
-                mover.Rotation,
+                mover.WorldAxis,
                 mover.AxisLength,
                 mover.ScaledRadius,
-                direction,
+                displacement,
                 length,
                 new FixedSegment2d(circle.Center, circle.Center),
                 circle.ScaledRadius,
                 out Fixed64 distance,
-                out Vector2d normal);
+                out Vector2d normal,
+                authoredDisplacement: true);
             return TryBuildCapsuleTargetSweepHit(
                 mover,
-                direction,
+                displacement,
+                length,
                 target,
                 circle.Center,
                 circle.Rotation,
@@ -59,22 +59,24 @@ internal static partial class QueryDetection2D
 
         if (target is LSCapsuleCollider2D targetCapsule)
         {
-            bool found = FixedSegment2d.TryGetSweptCenteredCapsulesFirstDistance(
+            bool found = WideFiniteAxisIntersection.TryGetSweptCenteredCapsulesFirstDistance(
                 mover.Center,
-                mover.Rotation,
+                mover.WorldAxis,
                 mover.AxisLength,
                 mover.ScaledRadius,
-                direction,
+                displacement,
                 length,
                 targetCapsule.Center,
-                targetCapsule.Rotation,
+                targetCapsule.WorldAxis,
                 targetCapsule.AxisLength,
                 targetCapsule.ScaledRadius,
                 out Fixed64 distance,
-                out Vector2d normal);
+                out Vector2d normal,
+                authoredDisplacement: true);
             return TryBuildCapsuleTargetSweepHit(
                 mover,
-                direction,
+                displacement,
+                length,
                 target,
                 targetCapsule.Center,
                 targetCapsule.Rotation,
@@ -89,19 +91,20 @@ internal static partial class QueryDetection2D
         Span<Vector2d> scratch = stackalloc Vector2d[4];
         ReadOnlySpan<Vector2d> targetOffsets =
             GetConvexVertexOffsets(target, scratch);
-        if (!FixedConvex2dRelations.TryGetSweptCenteredCapsuleFirstDistance(
+        if (!FixedConvex2dRelations.TryGetSweptCenteredCapsuleFirstDistanceCore(
                 mover.Center,
-                mover.Rotation,
+                mover.WorldAxis,
                 mover.AxisLength,
                 mover.ScaledRadius,
-                direction,
+                displacement,
                 length,
                 target.Center,
                 target.ConvexRotation,
                 targetOffsets,
                 out Fixed64 convexDistance,
                 out Vector2d convexNormal,
-                out FixedPointAnchor2d targetContact))
+                out Vector2d targetContactOffset,
+                authoredDisplacement: true))
         {
             hit = default;
             return false;
@@ -109,7 +112,7 @@ internal static partial class QueryDetection2D
 
         hit = new Physics2DHit(
             target,
-            new ContactAnchor2D(targetContact),
+            new ContactAnchor2D(new FixedPointAnchor2d(target.Center, target.ConvexRotation, targetContactOffset)),
             convexNormal,
             convexDistance);
         return true;
@@ -139,14 +142,11 @@ internal static partial class QueryDetection2D
             return false;
         }
 
-        Vector2d reverseDirection = -displacement / displacementLength;
         // A reported first hit lies between the admitted start center and the
         // in-domain target feature, so the impact center is representable.
-        _ = TryOffsetPoint(
-            target.Center,
-            reverseDirection,
-            reverseHit.Distance,
-            out Vector2d movedCapsuleCenter);
+        Vector2d reverseOffset = new FixedSegment2d(Vector2d.Zero, -displacement)
+            .GetPointAtDistance(reverseHit.Distance, displacementLength);
+        _ = Vector2d.TryAdd(target.Center, reverseOffset, out Vector2d movedCapsuleCenter);
 
         Span<Vector2d> moverScratch = stackalloc Vector2d[4];
         ReadOnlySpan<Vector2d> moverOffsets =
@@ -196,25 +196,25 @@ internal static partial class QueryDetection2D
             return true;
         }
 
-        Vector2d direction = displacement.Normalized;
         Span<Vector2d> moverScratch = stackalloc Vector2d[4];
         Span<Vector2d> targetScratch = stackalloc Vector2d[4];
         ReadOnlySpan<Vector2d> moverOffsets =
             GetConvexVertexOffsets(mover, moverScratch);
         ReadOnlySpan<Vector2d> targetOffsets =
             GetConvexVertexOffsets(target, targetScratch);
-        if (!FixedConvex2dRelations.TryGetSweptConvexFirstDistance(
+        if (!FixedConvex2dRelations.TryGetSweptConvexFirstDistanceCore(
                 mover.Center,
                 mover.ConvexRotation,
                 moverOffsets,
-                direction,
+                displacement,
                 segmentLength,
                 target.Center,
                 target.ConvexRotation,
                 targetOffsets,
                 out Fixed64 distance,
                 out Vector2d normal,
-                out FixedPointAnchor2d targetContact))
+                out Vector2d targetContactOffset,
+                authoredDisplacement: true))
         {
             hit = default;
             return false;
@@ -222,7 +222,7 @@ internal static partial class QueryDetection2D
 
         hit = new Physics2DHit(
             target,
-            new ContactAnchor2D(targetContact),
+            new ContactAnchor2D(new FixedPointAnchor2d(target.Center, target.ConvexRotation, targetContactOffset)),
             normal,
             distance);
         return true;
@@ -230,7 +230,8 @@ internal static partial class QueryDetection2D
 
     private static bool TryBuildCapsuleTargetSweepHit(
         LSCapsuleCollider2D mover,
-        Vector2d direction,
+        Vector2d displacement,
+        Fixed64 length,
         LSCollider2D target,
         Vector2d targetCenter,
         Fixed64 targetRotation,
@@ -249,11 +250,9 @@ internal static partial class QueryDetection2D
 
         // The swept-capsule solver only reports a first distance whose impact
         // center and exact contact are representable in the admitted frames.
-        _ = TryOffsetPoint(
-            mover.Center,
-            direction,
-            distance,
-            out Vector2d movedCenter);
+        Vector2d movedOffset = new FixedSegment2d(Vector2d.Zero, displacement)
+            .GetPointAtDistance(distance, length);
+        _ = Vector2d.TryAdd(mover.Center, movedOffset, out Vector2d movedCenter);
         _ = FixedSegment2d.TryGetCenteredCapsulesContact(
             movedCenter,
             mover.Rotation,

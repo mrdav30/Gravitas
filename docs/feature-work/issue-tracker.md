@@ -37,37 +37,6 @@
 
 ### Ordered Queue
 
-### GRV-Issue-109 - Mixed circle segment sweeps can turn exact grazing into closing contact
-
-- **Confirmed:** 2026-10-12 during #098's finite-corner parity checks. The
-  direction-based mathematics reproduces the result using a pre-refinement
-  assembly; the mixed query's segment normalization and the upstream projected
-  sweep owners are unchanged by this work.
-- **Reproduction:** A static concave mesh has vertices `(0,-2,0)`, `(0,2,0)`,
-  `(0,-2,-100)`, `(0,2,-100)` and indices `0,1,2, 1,3,2`. At slab Y zero and
-  half-thickness `1/2`, use `(a,b,r)=(3,4,5)`, `(5,12,13)` or `(7,24,25)`.
-  Set tangent center `t=(-b,a)`, travel `v=(a,b)`, and sweep a circle of radius
-  `r` from `t-v` to `t+v`. This segment only grazes the finite corner at its
-  midpoint. `SweepCircleAgainstStatic3DAll(requireClosingContact: true)`
-  reports a closing hit for the first and third forward sweeps and the second
-  reversed sweep; the opposite directions return none.
-- **Root cause:** `SweepCircle3D` supplies `segment.Normalized` and its rounded
-  magnitude to direction-based geometry, then reconstructs the contact center
-  from the original endpoints. A Q32.32 normalized direction can change the
-  exact segment line. The upstream point solver retains its actual direction
-  squared, so this is not an omitted unit-length correction in that solver.
-  The resulting early entry distances are approximately `4.99995175`,
-  `12.99984439` and `24.99978421` instead of the tangent distances `5`, `13`
-  and `25`; the reconstructed normals acquire a negative closing projection.
-- **Follow-up:** Preserve the authored segment through mixed projected sweep
-  geometry and final interpolation. Check reversal, true entering/leaving and
-  full-loop CCD, then audit the 3D/2D counterparts that normalize segment input.
-  Do not discard real shallow intersections using a velocity tolerance.
-- **Evidence:** Ignored `artifacts/grv-issue-098/PythagoreanTangentProbe.cs`
-  retains the failed runtime fixture; `tangent-probe/result.txt` records the
-  independent direction-based reproduction. This issue is independent of the
-  initial-overlap surface reduction corrected by #098.
-
 ### GRV-Issue-101 - Rotational CCD can freeze separated motion inside a concave mesh's aggregate bounds
 
 - **Confirmed:** 2026-10-09 during phase 3 surface-manifold physical validation.
@@ -195,6 +164,65 @@
 Remaining measured performance costs are tracked in the benchmark backlog.
 
 ## Resolved Issues
+
+### GRV-Issue-109 - Mixed circle segment sweeps can turn exact grazing into closing contact
+
+- **Resolved:** 2026-10-12. Segment queries and translational CCD retain the
+  authored chord through detection and final movement. Exact grazing remains
+  a query hit without becoming a closing constraint; real shallow entries are
+  retained. The same owning change covers pure 2D, mixed sphere/slab and 3D
+  mesh-face counterparts, plus dynamic and kinematic body advancement.
+- **Original reproduction:** #098's parity checks found that a static concave
+  mesh with vertices `(0,-2,0)`, `(0,2,0)`, `(0,-2,-100)`, `(0,2,-100)` and
+  indices `0,1,2, 1,3,2` falsely blocks corner tangency. At slab Y zero and
+  half-thickness `1/2`, use `(a,b,r)=(3,4,5)`, `(5,12,13)` or `(7,24,25)`,
+  tangent center `t=(-b,a)` and travel `v=(a,b)`. Sweeping radius `r` from
+  `t-v` to `t+v` only touches the corner at its midpoint. The old closing-only
+  mixed query reported entries near `4.99995175`, `12.99984439` and
+  `24.99978421`, depending on direction, instead of `5`, `13` and `25`.
+- **Root cause and fix:** Normalizing a Q32.32 displacement changes its exact
+  line. FixedMathSharp's existing slab, point and capsule sweep owners now
+  retain authored displacement over the supplied physical-distance denominator;
+  two segment overloads expose the box/triangle paths. Finite-edge admission
+  is certified at the geometric root before output rounding, and triangle
+  witnesses round from that root. Gravitas reuses those owners, fuses face
+  distance ratios and interpolates CCD positions through existing segments.
+  Obsolete rounded-foot admission, direction reconstruction and unused state
+  are removed; no new production files or arithmetic facade were added.
+- **Related admission correction:** Mixed sphere/convex-slab initial overlap
+  uses exact conceptual squared-distance comparison. The vector magnitude
+  unit-length shortcut had hidden a positive one-raw gap. Face entry rejects
+  exactly parallel travel rather than applying a unit-direction tolerance to
+  authored displacement. Neither correction suppresses shallow intersections.
+- **Validation:** Local-stack Gravitas Release passes `5,645` tests with raw
+  coverage `46,941/46,941` sequence points, `15,202/15,202` branches and
+  `4,902/4,902` methods; ReleaseLean passes `5,580` with `46,939/46,939`,
+  `15,202/15,202` and `4,901/4,901`. FixedMathSharp Release passes `5,712`
+  with `59,781/59,781`, `16,960/16,960` and `4,534/4,534`; ReleaseLean passes
+  `5,691` with `59,874/59,874`, `16,960/16,960` and `4,530/4,530`. Every raw
+  report has zero uncovered line/branch points. Regressions cover reversal,
+  one-raw miss/graze/entry, exact finite feet, nearest-even ties, full-domain
+  endpoints, nonzero capsule cores, whole-shape parity and complete host loops.
+  Both solutions build in both configurations and both API sites build with
+  warnings as errors; the Chronicler bridge passes its `49` tests in each.
+  Both native Windows x64 replay lanes match all six
+  shared fixtures and each other. Ignored `artifacts/grv-issue-109/` retains
+  raw coverage, replay captures and logs.
+- **Timing controls:** Identical warmed fixtures compare retained pre-change
+  Gravitas/FixedMathSharp binaries with final binaries in both execution orders;
+  other dependency DLL hashes match. All `22` workloads retain their hit counts
+  and `0 B/op`. At `1,024` targets, paired mean baseline/final milliseconds are
+  cuboid `66.7528/62.7667`, mesh `294.2080/278.8456`, oblique mesh
+  `308.5104/294.6898`, and oblique 2D `8.9732/8.6214`. Curved controls vary by
+  roughly `0–4%` across sizes, with noticeable individual-run variation. These
+  are smoke measurements, not BenchmarkDotNet confidence intervals. The runner,
+  observations, paired summary and binary hashes remain under ignored
+  `artifacts/grv-issue-109/timing/` and `performance-provenance.json`.
+- **Integration:** Independent ponytail review found no remaining correctness,
+  bloat or material performance blockers. Commit/push FixedMathSharp first,
+  then advance Gravitas's develop CI dependency pin to that actual commit.
+  Main retains package validation. Native Linux/ARM replay and released-package
+  validation remain CI/release gates; no additional issue IDs were opened.
 
 ### GRV-Issue-103 - Contained mixed circle sweeps can report inward solid-target normals
 

@@ -471,6 +471,13 @@ public class Physics2DBenchmarks
             _queryHits);
     }
 
+    [Benchmark]
+    public int SweepCircleAll_DenseHit_ObliqueSegment()
+    {
+        return _queryContext.Query2D.SweepCircleAll(
+            new Vector2d(-8, 12), new Vector2d(64, 16), (Fixed64)18, _queryHits);
+    }
+
     private static void Configure2DContext(GravitasWorldContext context, int bodyCount)
     {
         context.Settings.RuntimeMode = PhysicsRuntimeMode.TwoD;

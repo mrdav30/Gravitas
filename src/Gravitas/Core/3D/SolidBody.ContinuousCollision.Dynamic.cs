@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Materials;
@@ -319,7 +320,8 @@ public partial class SolidBody
                 }
 
                 Fixed64 hitTime = FixedMath.Clamp01(hitDistance / segmentLength);
-                currentPosition += segmentDisplacement.Normalized * hitDistance;
+                currentPosition = new FixedSegment(currentPosition, segmentEnd)
+                    .GetPointAtDistance(hitDistance, segmentLength);
                 Vector3d previousVelocity = _linearVelocity;
                 Fixed64 consumedTime = remainingTime * hitTime;
                 Fixed64 remainingAfterHit = remainingTime - consumedTime;

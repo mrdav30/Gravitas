@@ -270,18 +270,15 @@ public sealed partial class GravitasQueryMixedService
         if (TryGetConvexSlabLocalSweep(
                 start,
                 end,
-                direction,
                 collider,
                 out Vector3d localStart,
-                out Vector3d localEnd,
-                out Vector3d localDirection))
+                out Vector3d localEnd))
         {
             Fixed64 localSlabMinY = -collider.MixedHalfThickness;
             Fixed64 localSlabMaxY = collider.MixedHalfThickness;
             TrySweepConvexSlabSideFaces(
                 localStart,
                 localEnd,
-                localDirection,
                 length,
                 radius,
                 collider,
@@ -344,7 +341,6 @@ public sealed partial class GravitasQueryMixedService
     private static void TrySweepConvexSlabSideFaces(
         Vector3d start,
         Vector3d end,
-        Vector3d direction,
         Fixed64 length,
         Fixed64 radius,
         LSCollider2D collider,
@@ -353,7 +349,7 @@ public sealed partial class GravitasQueryMixedService
         ref SweepCandidate best)
     {
         Vector2d planarStart = new(start.X, start.Z);
-        Vector2d planarDirection = new(direction.X, direction.Z);
+        Vector2d planarDisplacement = new(end.X - start.X, end.Z - start.Z);
         Vector2d polygonCenter = Vector2d.Zero;
         int vertexCount = collider.VertexCount;
 
@@ -369,12 +365,15 @@ public sealed partial class GravitasQueryMixedService
                 outward = -outward;
             outward /= outward.Magnitude;
             Fixed64 signedStart = Vector2d.Dot(planarStart - first, outward);
-            Fixed64 signedDirection = Vector2d.Dot(planarDirection, outward);
-            if (signedStart <= radius || signedDirection >= -Fixed64.Epsilon)
+            Fixed64 signedDirection = Vector2d.Dot(planarDisplacement, outward);
+            if (signedStart <= radius || signedDirection >= Fixed64.Zero)
                 continue;
 
-            Fixed64 distance = (radius - signedStart) / signedDirection;
-            if (distance > length)
+            // One fused ratio retains physical-distance precision without
+            // changing the authored segment through direction normalization.
+            if (!Fixed64.TryMultiplyDivide(radius - signedStart, length,
+                    signedDirection, out Fixed64 distance)
+                || distance > length)
                 continue;
 
             Vector3d sweepCenter = new FixedSegment(start, end).GetPointAtDistance(distance, length);
@@ -631,21 +630,24 @@ public sealed partial class GravitasQueryMixedService
         if (collider.ContainsPoint(planarPoint))
             return true;
 
-        return collider.TryGetClosestBoundaryAnchor(
-                planarPoint,
-                out _,
-                out Fixed64 planarDistance)
-            && planarDistance <= planarRadius;
+        // The convex reducer admits boxes and polygons, which always provide a conceptual boundary.
+        bool hasBoundary = collider.TryGetClosestBoundaryAnchor(planarPoint, out FixedPointAnchor2d boundary);
+        System.Diagnostics.Debug.Assert(hasBoundary);
+
+        // Admission is a geometric comparison; vector magnitude's unit-vector
+        // shortcut must not turn a positive separation into an initial overlap.
+        var queryCenter = new FixedPointAnchor2d(planarPoint, Fixed64.Zero, Vector2d.Zero);
+        var radiusPoint = new FixedPointAnchor2d(planarPoint, Fixed64.Zero,
+            new Vector2d(planarRadius, Fixed64.Zero));
+        return WidePointAnchor2d.CompareSquaredDistances(queryCenter, boundary, radiusPoint) <= 0;
     }
 
     private static bool TryGetConvexSlabLocalSweep(
         Vector3d start,
         Vector3d end,
-        Vector3d direction,
         LSCollider2D collider,
         out Vector3d localStart,
-        out Vector3d localEnd,
-        out Vector3d localDirection)
+        out Vector3d localEnd)
     {
         var frameOrigin = new Vector3d(
             collider.Center.X,
@@ -671,9 +673,6 @@ public sealed partial class GravitasQueryMixedService
                 frameOrigin,
                 frameRotation,
                 out localEnd);
-        localDirection = representable
-            ? frameRotation.Inverse().Rotate(direction)
-            : default;
         return representable;
     }
 
