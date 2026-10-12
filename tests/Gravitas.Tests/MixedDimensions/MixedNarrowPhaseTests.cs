@@ -706,10 +706,16 @@ public sealed partial class MixedNarrowPhaseTests
             embedded.Collider,
             out MixedContact contact).Should().BeTrue();
 
-        contact.Normal3DTo2D.Should().Be(-Vector3d.Up);
-        contact.Point3D.Should().Be(new Vector3d(Fixed64.Zero, -Fixed64.Half, Fixed64.Zero));
+        // For containment, A moves opposite the normal through the selected lower boundary.
+        contact.Normal3DTo2D.Should().Be(Vector3d.Up);
+        contact.Point3D.Should().Be(new Vector3d(Fixed64.Zero, Fixed64.Half, Fixed64.Zero));
         contact.Point2D.Should().Be(new Vector3d(Fixed64.Zero, -Fixed64.Half, Fixed64.Zero));
         contact.Depth.Should().Be(Fixed64.One);
+        (contact.Point3D - contact.Point2D).Should().Be(contact.Normal3DTo2D * contact.Depth);
+        sphere.Collider.LocalOffset = -contact.Normal3DTo2D *
+            (contact.Depth + Fixed64.FromFraction(1, 4096));
+        sphere.Collider.RebuildRuntimeShapeOnly().Should().BeTrue();
+        CollisionDetectionMixed.TryCollide(sphere.Collider, embedded.Collider, out _).Should().BeFalse();
     }
 
     [Fact]
@@ -1546,7 +1552,7 @@ public sealed partial class MixedNarrowPhaseTests
     }
 
     [Fact]
-    public void CompoundCircleSlab_WithShallowerFirstOverlaps_ShouldRetainFirstPartContact()
+    public void CompoundCircleSlab_WithShallowerFirstOverlaps_ShouldRetainBothAndReportDeepestContact()
     {
         using GravitasWorldContext context = CreateMixedContext();
         var compoundCollider = new LSCompoundCollider(
@@ -1581,9 +1587,18 @@ public sealed partial class MixedNarrowPhaseTests
             circle.Collider,
             out MixedContact contact).Should().BeTrue();
 
-        contact.Depth.Should().Be(shallow.Depth);
-        contact.Normal3DTo2D.Should().Be(shallow.Normal3DTo2D);
-        contact.Point3D.Should().Be(shallow.Point3D);
+        contact.Depth.Should().Be(deep.Depth);
+        contact.Normal3DTo2D.Should().Be(deep.Normal3DTo2D);
+        contact.Point3D.Should().Be(deep.Point3D);
+
+        var manifold = new ContactManifold();
+        CollisionDetectionMixed.TryBuildManifold(compound.Collider, circle.Collider, manifold).Should().BeTrue();
+        manifold.Count.Should().Be(2);
+        manifold.GroupCount.Should().Be(2);
+        manifold[0].Depth.Should().Be(shallow.Depth);
+        manifold[1].Depth.Should().Be(deep.Depth);
+        manifold[0].FeatureNamespaceA.Should().Be(1);
+        manifold[1].FeatureNamespaceA.Should().Be(2);
     }
 
     [Fact]
@@ -1654,7 +1669,7 @@ public sealed partial class MixedNarrowPhaseTests
     }
 
     [Fact]
-    public void SphereCompound2DSlab_WithMultipleOverlaps_ShouldUseShallowestPartContact()
+    public void SphereCompound2DSlab_WithMultipleOverlaps_ShouldRetainBothAndReportDeepestContact()
     {
         using GravitasWorldContext context = CreateMixedContext();
         ScenarioBody<LSSphereCollider> sphere = CreateSphere3D(
@@ -1669,13 +1684,22 @@ public sealed partial class MixedNarrowPhaseTests
 
         collided.Should().BeTrue();
         contact.HasContact.Should().BeTrue();
-        contact.Depth.Should().Be(Fixed64.FromFraction(1, 10));
+        contact.Depth.Should().Be(Fixed64.FromFraction(2, 5));
         contact.Normal3DTo2D.Should().Be(-Vector3d.Right);
-        contact.Point2D.X.Should().Be(Fixed64.Half);
+        contact.Point2D.X.Should().Be(Fixed64.FromFraction(4, 5));
+
+        var manifold = new ContactManifold();
+        CollisionDetectionMixed.TryBuildManifold(sphere.Collider, body2D.Collider, manifold).Should().BeTrue();
+        manifold.Count.Should().Be(2);
+        manifold.GroupCount.Should().Be(2);
+        manifold[0].Depth.Should().Be(Fixed64.FromFraction(1, 10));
+        manifold[1].Depth.Should().Be(Fixed64.FromFraction(2, 5));
+        manifold[0].FeatureNamespaceB.Should().Be(-2);
+        manifold[1].FeatureNamespaceB.Should().Be(-1);
     }
 
     [Fact]
-    public void SphereCompound2DSlab_WithShallowerFirstOverlaps_ShouldRetainFirstPartContact()
+    public void SphereCompound2DSlab_WithShallowerFirstOverlaps_ShouldRetainBothAndReportDeepestContact()
     {
         using GravitasWorldContext context = CreateMixedContext();
         ScenarioBody<LSSphereCollider> sphere = CreateSphere3D(
@@ -1706,9 +1730,18 @@ public sealed partial class MixedNarrowPhaseTests
             body2D.Collider,
             out MixedContact contact).Should().BeTrue();
 
-        contact.Depth.Should().Be(shallow.Depth);
-        contact.Normal3DTo2D.Should().Be(shallow.Normal3DTo2D);
-        contact.Point2D.Should().Be(shallow.Point2D);
+        contact.Depth.Should().Be(deep.Depth);
+        contact.Normal3DTo2D.Should().Be(deep.Normal3DTo2D);
+        contact.Point2D.Should().Be(deep.Point2D);
+
+        var manifold = new ContactManifold();
+        CollisionDetectionMixed.TryBuildManifold(sphere.Collider, body2D.Collider, manifold).Should().BeTrue();
+        manifold.Count.Should().Be(2);
+        manifold.GroupCount.Should().Be(2);
+        manifold[0].Depth.Should().Be(deep.Depth);
+        manifold[1].Depth.Should().Be(shallow.Depth);
+        manifold[0].FeatureNamespaceB.Should().Be(-2);
+        manifold[1].FeatureNamespaceB.Should().Be(-1);
     }
 
     [Fact]

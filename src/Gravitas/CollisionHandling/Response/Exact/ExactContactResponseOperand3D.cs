@@ -20,7 +20,8 @@ internal readonly struct ExactContactResponseOperand3D
         Vector3d angularVelocity,
         Vector3d linearImpulseAxis,
         Fixed64 inverseMass,
-        Fixed3x3 inverseInertia)
+        Fixed3x3 inverseInertia,
+        Fixed64? planarAngularVelocity = null)
     {
         Lever = lever;
         LinearVelocity = linearVelocity;
@@ -28,6 +29,7 @@ internal readonly struct ExactContactResponseOperand3D
         LinearImpulseAxis = linearImpulseAxis;
         InverseMass = inverseMass;
         InverseInertia = inverseInertia;
+        PlanarAngularVelocity = planarAngularVelocity;
     }
 
     internal ExactLever3D Lever { get; }
@@ -35,6 +37,17 @@ internal readonly struct ExactContactResponseOperand3D
     internal Vector3d LinearVelocity { get; }
 
     internal Vector3d AngularVelocity { get; }
+
+    // The spatial sign conversion of minimum planar yaw does not fit Fixed64.
+    internal Fixed64? PlanarAngularVelocity { get; }
+
+    // Positive 2^31 yaw delta cannot be represented by the planar delta API.
+    internal bool CanRepresentAngularDelta(Vector3d delta) =>
+        !PlanarAngularVelocity.HasValue || delta.Y != Fixed64.MinValue;
+
+    internal bool CanApplyAngularDelta(Vector3d delta) => PlanarAngularVelocity.HasValue
+        ? CanRepresentAngularDelta(delta) && Fixed64.TrySubtract(PlanarAngularVelocity.Value, delta.Y, out _)
+        : Vector3d.TryAdd(AngularVelocity, delta, out _);
 
     internal Vector3d LinearImpulseAxis { get; }
 

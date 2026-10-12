@@ -105,36 +105,6 @@ public static partial class CollisionDetectionMixed
         return true;
     }
 
-    private static bool TryGetTriangleConvexPrismContact(
-        LSMeshCollider mesh,
-        int triangleIndex,
-        LSCollider2D embedded,
-        out MixedContact contact)
-    {
-        mesh.Mesh.GetLocalTriangleVertices(
-            triangleIndex,
-            out Vector3d first,
-            out Vector3d second,
-            out Vector3d third);
-        Span<Vector2d> boxOffsets = stackalloc Vector2d[4];
-        ReadOnlySpan<Vector2d> prismOffsets = GetConvexPrismOffsets(
-            embedded,
-            boxOffsets);
-        bool collided = FixedConvexPrismRelations.TryGetTriangleContact(
-            mesh.Mesh.Origin,
-            mesh.Mesh.Rotation,
-            new FixedTriangle(first, second, third),
-            GetEmbeddedCenter3D(embedded),
-            embedded.ConvexRotation,
-            prismOffsets,
-            embedded.MixedHalfThickness,
-            out FixedContactAnchors relation);
-        return TryBuildFinitePrismContact(
-            collided,
-            relation,
-            out contact);
-    }
-
     private static bool TryGetSphereConvexPrismContact(
         LSSphereCollider sphere,
         LSCollider2D embedded,
@@ -239,10 +209,12 @@ public static partial class CollisionDetectionMixed
             out contact);
     }
 
-    private static ReadOnlySpan<Vector2d> GetConvexPrismOffsets(
-        LSCollider2D embedded,
+    internal static ReadOnlySpan<Vector2d> GetConvexPrismOffsets(
+        LSCollider2D? embedded,
         Span<Vector2d> boxOffsets)
     {
+        if (embedded is null or LSCircleCollider2D or LSCapsuleCollider2D)
+            return ReadOnlySpan<Vector2d>.Empty;
         if (embedded is LSPolygonCollider2D polygon)
             return polygon.ScaledLocalVertices;
 

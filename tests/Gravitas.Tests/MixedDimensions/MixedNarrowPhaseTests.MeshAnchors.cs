@@ -45,10 +45,16 @@ public sealed partial class MixedNarrowPhaseTests
         contact.Anchor3D.TryGetWorldPoint(out Vector3d meshPoint)
             .Should()
             .BeTrue();
-        meshPoint.Should().Be(new Vector3d(
-            circleCenter.X,
-            Fixed64.Zero,
-            circleCenter.Y));
+        meshPoint.Y.Should().Be(Fixed64.Zero);
+        // A finite face family may select a cardinal disk sample rather than
+        // its center. Verify its actual footprint and matched ray gap instead.
+        Fixed64 dx = meshPoint.X - circleCenter.X, dz = meshPoint.Z - circleCenter.Y;
+        (dx * dx + dz * dz).Should().BeLessThanOrEqualTo(Fixed64.Quarter + Fixed64.FromRaw(4));
+        meshPoint.X.Should().BeInRange((Fixed64)(-4), (Fixed64)4);
+        meshPoint.Z.Should().BeInRange((Fixed64)(-4), (Fixed64)4);
+        contact.Depth.Should().Be(Fixed64.Half);
+        contact.Normal3DTo2D.Should().Be(Vector3d.Down);
+        (contact.Point2D - meshPoint).Should().Be(Vector3d.Up * Fixed64.Half);
         meshPoint.Should().NotBe(new Vector3d(
             (Fixed64)(-4),
             Fixed64.Zero,

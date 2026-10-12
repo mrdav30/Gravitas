@@ -25,19 +25,13 @@ internal static partial class ExactContactResponseKernel
         Vector3d normal,
         Fixed64 restitution,
         Fixed64 restitutionVelocityThreshold,
-        out ExactNormalResponse3D response) =>
-        TryGetNormalResponseCore(
-            first,
-            second,
-            normal,
-            restitution,
-            restitutionVelocityThreshold,
-            accumulatedImpulse: Fixed64.Zero,
-            positiveImpulseScale: Fixed64.One,
-            negativeImpulseScale: Fixed64.One,
-            includeAccumulator: false,
-            default,
-            out response);
+        out ExactNormalResponse3D response)
+    {
+        ExactContactImpulseState? unused = null;
+        return TryGetNormalResponseCore(first, second, normal, restitution,
+            restitutionVelocityThreshold, Fixed64.Zero, Fixed64.One, Fixed64.One,
+            includeAccumulator: false, default, out response, ref unused, retainOversized: false);
+    }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static bool TryGetAccumulatedNormalResponse(
@@ -50,19 +44,32 @@ internal static partial class ExactContactResponseKernel
         Fixed64 positiveImpulseScale,
         Fixed64 negativeImpulseScale,
         out ExactNormalResponse3D response,
-        in ContactResponseSnapshot impact = default) =>
-        TryGetNormalResponseCore(
-            first,
-            second,
-            normal,
-            restitution,
-            restitutionVelocityThreshold,
-            accumulatedImpulse,
-            positiveImpulseScale,
-            negativeImpulseScale,
-            includeAccumulator: true,
-            impact,
-            out response);
+        in ContactResponseSnapshot impact = default)
+    {
+        ExactContactImpulseState? unused = null;
+        return TryGetNormalResponseCore(first, second, normal, restitution,
+            restitutionVelocityThreshold, accumulatedImpulse, positiveImpulseScale,
+            negativeImpulseScale, includeAccumulator: true, impact, out response,
+            ref unused, retainOversized: false);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static bool TryGetAccumulatedNormalResponse(
+        in ExactContactResponseOperand3D first,
+        in ExactContactResponseOperand3D second,
+        Vector3d normal,
+        Fixed64 restitution,
+        Fixed64 restitutionVelocityThreshold,
+        Fixed64 accumulatedImpulse,
+        Fixed64 positiveImpulseScale,
+        Fixed64 negativeImpulseScale,
+        out ExactNormalResponse3D response,
+        in ContactResponseSnapshot impact,
+        ref ExactContactImpulseState? exactImpulse) =>
+        TryGetNormalResponseCore(first, second, normal, restitution,
+            restitutionVelocityThreshold, accumulatedImpulse, positiveImpulseScale,
+            negativeImpulseScale, includeAccumulator: true, impact, out response,
+            ref exactImpulse, retainOversized: true);
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static bool TryGetNormalResponseCore(
@@ -76,7 +83,9 @@ internal static partial class ExactContactResponseKernel
         Fixed64 negativeImpulseScale,
         bool includeAccumulator,
         in ContactResponseSnapshot impact,
-        out ExactNormalResponse3D response)
+        out ExactNormalResponse3D response,
+        ref ExactContactImpulseState? exactImpulse,
+        bool retainOversized)
     {
         response = default;
         if (first.Lever.Denominator.Sign == 0
@@ -102,7 +111,7 @@ internal static partial class ExactContactResponseKernel
             second.Lever,
             normal,
             out Signed832 velocityNumerator,
-            out Signed832 velocityDenominator);
+            out Signed832 velocityDenominator, first.PlanarAngularVelocity, second.PlanarAngularVelocity);
         int velocitySign =
             velocityNumerator.Sign * velocityDenominator.Sign;
         bool hasNormalVelocity = Fixed64.TryGetSignedRawRatio(
@@ -133,7 +142,7 @@ internal static partial class ExactContactResponseKernel
                 hasNormalVelocity,
                 normalVelocity,
                 includeAccumulator,
-                accumulatedImpulse);
+                accumulatedImpulse, exactImpulse);
             return true;
         }
 
@@ -144,7 +153,7 @@ internal static partial class ExactContactResponseKernel
                 hasNormalVelocity,
                 normalVelocity,
                 includeAccumulator,
-                accumulatedImpulse);
+                accumulatedImpulse, exactImpulse);
             return true;
         }
 
@@ -181,6 +190,8 @@ internal static partial class ExactContactResponseKernel
             stackalloc ulong[MaxResponseWords];
         appliedNumerator.Clear();
         appliedDenominator.Clear();
+        Span<ulong> completedAccumulator = stackalloc ulong[MaxResponseWords];
+        completedAccumulator.Clear();
         ResolveUnilateralImpulse(
             impulseNumerator,
             impulseDenominator,
@@ -192,7 +203,7 @@ internal static partial class ExactContactResponseKernel
             out int appliedSign,
             out bool useImpulseRatio,
             out bool hasAccumulatedProjection,
-            out Fixed64 accumulatedProjection);
+            out Fixed64 accumulatedProjection, completedAccumulator, exactImpulse);
 
         ReadOnlySpan<ulong> resolvedImpulseNumerator =
             useImpulseRatio ? impulseNumerator : appliedNumerator;
@@ -235,8 +246,20 @@ internal static partial class ExactContactResponseKernel
             resolvedImpulseDenominator,
             appliedSign,
             out Vector3d secondAngular);
+        resolved &= first.CanRepresentAngularDelta(firstAngular);
+        resolved &= second.CanRepresentAngularDelta(secondAngular);
         if (!resolved)
             return false;
+        if (retainOversized && (!hasAccumulatedProjection || exactImpulse?.HasNormal == true))
+        {
+            // Retained state must describe an applied delta. The oversized lane
+            // verifies final motion before committing its accumulator.
+            if (!Vector3d.TryAdd(first.LinearVelocity, firstLinear, out _)
+                || !first.CanApplyAngularDelta(firstAngular)
+                || !Vector3d.TryAdd(second.LinearVelocity, secondLinear, out _)
+                || !second.CanApplyAngularDelta(secondAngular)) return false;
+            (exactImpulse ??= new ExactContactImpulseState()).SetNormal(completedAccumulator, impulseDenominator);
+        }
 
         response = new ExactNormalResponse3D(
             velocitySign < 0,
@@ -259,8 +282,14 @@ internal static partial class ExactContactResponseKernel
         bool hasNormalVelocity,
         Fixed64 normalVelocity,
         bool includeAccumulator,
-        Fixed64 accumulatedImpulse) =>
-        new(
+        Fixed64 accumulatedImpulse,
+        ExactContactImpulseState? exactImpulse = null)
+    {
+        bool hasAccumulator = includeAccumulator;
+        if (includeAccumulator && exactImpulse?.HasNormal == true)
+            hasAccumulator = Fixed64.TryGetSignedRawRatio(exactImpulse.NormalNumerator,
+                exactImpulse.NormalDenominator, negative: false, out accumulatedImpulse);
+        return new(
             isClosing,
             hasAppliedImpulse: false,
             Vector3d.Zero,
@@ -271,8 +300,9 @@ internal static partial class ExactContactResponseKernel
             normalVelocity,
             hasAppliedImpulseProjection: true,
             Fixed64.Zero,
-            includeAccumulator,
+            hasAccumulator,
             accumulatedImpulse);
+    }
 
     private static void GetEffectiveMassRatio(
         in ExactContactResponseOperand3D first,
@@ -377,7 +407,8 @@ internal static partial class ExactContactResponseKernel
     {
         ExactLever3D.GetRelativePointVelocityRatio(impact.LinearA, impact.AngularA,
             first.Lever, impact.LinearB, impact.AngularB, second.Lever, normal,
-            out Signed832 incoming, out Signed832 incomingDenominator);
+            out Signed832 incoming, out Signed832 incomingDenominator,
+            secondPlanarAngularVelocity: second.PlanarAngularVelocity.HasValue ? impact.PlanarAngularB : null);
         bool representable = Fixed64.TryGetSignedRawRatio(incoming, incomingDenominator,
             0, out Fixed64 incomingVelocity);
         Fixed64 bounce = incoming.Sign * incomingDenominator.Sign < 0
@@ -453,7 +484,9 @@ internal static partial class ExactContactResponseKernel
         out int appliedSign,
         out bool useImpulseRatio,
         out bool hasAccumulatedProjection,
-        out Fixed64 accumulatedProjection)
+        out Fixed64 accumulatedProjection,
+        Span<ulong> completedAccumulator,
+        ExactContactImpulseState? exactImpulse = null)
     {
         appliedNumerator.Clear();
         appliedDenominator.Clear();
@@ -479,19 +512,41 @@ internal static partial class ExactContactResponseKernel
         Span<ulong> accumulatedAtImpulseDenominator =
             stackalloc ulong[MaxResponseWords];
         SetMagnitude(accumulatedImpulse, accumulatorMagnitude);
-        WideArithmetic.MultiplyMagnitudes(
-            accumulatorMagnitude,
-            impulseDenominator,
-            accumulatedAtImpulseDenominator);
+        if (exactImpulse?.HasNormal == true)
+        {
+            // Frozen anchors, inertia and axes give every iteration the same
+            // denominator. Adding numerators therefore adds only carry bits,
+            // rather than multiplying denominators on every solver iteration.
+#if DEBUG
+            System.Diagnostics.Debug.Assert(WideArithmetic.CompareMagnitudeEqualLength(
+                exactImpulse.NormalDenominator, impulseDenominator) == 0);
+#endif
+            exactImpulse.NormalNumerator.CopyTo(accumulatedAtImpulseDenominator);
+        }
+        else
+        {
+            WideArithmetic.MultiplyMagnitudes(
+                accumulatorMagnitude,
+                impulseDenominator,
+                accumulatedAtImpulseDenominator);
+        }
         if (impulseSign < 0
             && WideArithmetic.CompareMagnitudeEqualLength(
                 impulseNumerator,
                 accumulatedAtImpulseDenominator) >= 0)
         {
-            accumulatorMagnitude.CopyTo(appliedNumerator);
-            appliedDenominator[0] = 1UL;
+            if (exactImpulse?.HasNormal == true)
+            {
+                accumulatedAtImpulseDenominator.CopyTo(appliedNumerator);
+                impulseDenominator.CopyTo(appliedDenominator);
+            }
+            else
+            {
+                accumulatorMagnitude.CopyTo(appliedNumerator);
+                appliedDenominator[0] = 1UL;
+            }
             appliedSign = WideArithmetic.IsZeroMagnitude(
-                accumulatorMagnitude)
+                appliedNumerator)
                 ? 0
                 : -1;
             hasAccumulatedProjection = true;
@@ -499,8 +554,6 @@ internal static partial class ExactContactResponseKernel
             return;
         }
 
-        Span<ulong> completedAccumulator =
-            stackalloc ulong[MaxResponseWords];
         if (impulseSign > 0)
         {
             accumulatedAtImpulseDenominator.CopyTo(completedAccumulator);

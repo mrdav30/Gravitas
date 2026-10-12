@@ -7,6 +7,7 @@
 
 using FixedMathSharp;
 using Gravitas.Colliders;
+using Gravitas.CollisionHandling;
 using Gravitas.Diagnostics;
 
 namespace Gravitas.Queries;
@@ -53,7 +54,7 @@ public sealed partial class GravitasQueryMixedService
                 reducerCounters.RejectedConservativeCandidates);
     }
 
-    private static bool TrySweepSphereAgainst2DCandidate(
+    private bool TrySweepSphereAgainst2DCandidate(
         Vector3d start,
         Vector3d end,
         Vector3d direction,
@@ -65,7 +66,8 @@ public sealed partial class GravitasQueryMixedService
         bool staticTargetsOnly,
         bool captureReducerDiagnostics,
         ref QueryReducerCounters reducerCounters,
-        out PhysicsMixedHit candidate)
+        out PhysicsMixedHit candidate,
+        bool requireClosingContact = false)
     {
         if (!IsEligible2DTarget(collider, excludedCollider, includeTriggers, staticTargetsOnly))
         {
@@ -80,7 +82,11 @@ public sealed partial class GravitasQueryMixedService
             reducerCounters.RecordAttempt(reducerKind);
         }
 
-        if (!TrySweepSphereAgainst2D(start, end, direction, length, radius, collider, out candidate))
+        candidate = default;
+        bool initialClosing = requireClosingContact && excludedCollider != null
+            && TryGetInitialMixedCcdHit(excludedCollider, collider, direction, source3D: true, out candidate);
+        if (!initialClosing && !TrySweepSphereAgainst2D(start, end, direction, length, radius, collider,
+                out candidate, requireClosingContact))
         {
             if (captureReducerDiagnostics)
                 reducerCounters.RecordRejected(reducerKind);
@@ -107,7 +113,8 @@ public sealed partial class GravitasQueryMixedService
         bool staticTargetsOnly,
         bool captureReducerDiagnostics,
         ref QueryReducerCounters reducerCounters,
-        out PhysicsMixedHit candidate)
+        out PhysicsMixedHit candidate,
+        bool requireClosingContact = false)
     {
         if (!IsEligible3DTarget(collider, excludedCollider, includeTriggers, staticTargetsOnly))
         {
@@ -122,7 +129,10 @@ public sealed partial class GravitasQueryMixedService
             reducerCounters.RecordAttempt(reducerKind);
         }
 
-        if (!TrySweepCircleAgainst3DCollider(
+        candidate = default;
+        bool initialClosing = requireClosingContact && excludedCollider != null
+            && TryGetInitialMixedCcdHit(collider, excludedCollider, direction3D, source3D: false, out candidate);
+        if (!initialClosing && !TrySweepCircleAgainst3DCollider(
             collider,
             start,
             end,
@@ -133,7 +143,8 @@ public sealed partial class GravitasQueryMixedService
             halfThickness,
             direction3D,
             excludedCollider,
-            out candidate))
+            out candidate,
+            requireClosingContact))
         {
             if (captureReducerDiagnostics)
                 reducerCounters.RecordRejected(reducerKind);
@@ -142,6 +153,29 @@ public sealed partial class GravitasQueryMixedService
 
         if (captureReducerDiagnostics)
             reducerCounters.RecordAccepted();
+        return true;
+    }
+
+    private bool TryGetInitialMixedCcdHit(LSCollider collider3D, LSCollider2D collider2D,
+        Vector3d direction, bool source3D, out PhysicsMixedHit hit)
+    {
+        hit = default;
+        // A proxy's representative may hide an independent closing leaf. Keep
+        // primitive analytic paths cheap; complex owners must inspect real rows.
+        if (collider3D is not (LSCompoundCollider or LSMeshCollider)
+            && collider2D is not LSCompoundCollider2D)
+            return false;
+        ContactManifold manifold = _context.CollisionScratch.MixedManifold;
+        if (!CollisionDetectionMixed.TryBuildManifold(collider3D, collider2D, manifold))
+            return false;
+        ContactAnchor center = ContactAnchor.FromWorldPoint(Vector3d.Zero);
+        if (!MixedContact.TrySelectClosingContact(manifold, center,
+                source3D ? direction : Vector3d.Zero, Vector3d.Zero,
+                center, source3D ? Vector2d.Zero : direction.ToVector2d(), Fixed64.Zero,
+                out MixedContact contact))
+            return false;
+        hit = new PhysicsMixedHit(collider3D, collider2D, contact.Anchor3D, contact.Anchor2D,
+            contact.Normal3DTo2D, PhysicsQueryReducerKind.Exact, Fixed64.Zero, direction);
         return true;
     }
 

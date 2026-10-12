@@ -25,7 +25,9 @@ internal readonly partial struct ExactLever3D
         in ExactLever3D secondLever,
         Vector3d projectionAxis,
         out Signed832 numerator,
-        out Signed832 denominator)
+        out Signed832 denominator,
+        Fixed64? firstPlanarAngularVelocity = null,
+        Fixed64? secondPlanarAngularVelocity = null)
     {
         // Normalized anchors bound each lever denominator below the Signed320 width.
         Signed320 firstDenominator =
@@ -36,12 +38,12 @@ internal readonly partial struct ExactLever3D
             GetCrossProductProjectionNumerator(
                 firstLever,
                 projectionAxis,
-                firstAngularVelocity);
+                firstAngularVelocity, firstPlanarAngularVelocity);
         Signed704 secondAngular =
             GetCrossProductProjectionNumerator(
                 secondLever,
                 projectionAxis,
-                secondAngularVelocity);
+                secondAngularVelocity, secondPlanarAngularVelocity);
         Signed192 linear = WideGeometry.GetDifferenceDotProduct3D(
             secondLinearVelocity.X,
             firstLinearVelocity.X,
@@ -344,14 +346,21 @@ internal readonly partial struct ExactLever3D
     private static Signed704 GetCrossProductProjectionNumerator(
         in ExactLever3D lever,
         Vector3d crossVector,
-        Vector3d projectionVector)
+        Vector3d projectionVector,
+        Fixed64? planarAngularVelocity)
     {
-        GetRawCrossProduct(
-            crossVector,
-            projectionVector,
-            out Signed320 coefficientX,
-            out Signed320 coefficientY,
-            out Signed320 coefficientZ);
+        Signed320 coefficientX, coefficientY, coefficientZ;
+        if (planarAngularVelocity.HasValue)
+        {
+            // Project signed yaw before narrowing its negated spatial Y value.
+            Signed192 yaw = Signed192.Raw(planarAngularVelocity.Value);
+            coefficientX = WideArithmetic.MultiplySigned192(Signed192.Raw(crossVector.Z), yaw);
+            coefficientY = default;
+            coefficientZ = WideArithmetic.MultiplySigned192(Signed192.Raw(crossVector.X),
+                WideArithmetic.SubtractSigned192(default, yaw));
+        }
+        else GetRawCrossProduct(crossVector, projectionVector,
+            out coefficientX, out coefficientY, out coefficientZ);
         return WideArithmetic.AddSigned704(
             WideArithmetic.AddSigned704(
                 WideArithmetic.MultiplySigned576ToSigned704(

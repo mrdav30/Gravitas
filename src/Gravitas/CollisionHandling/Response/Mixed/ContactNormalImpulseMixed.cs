@@ -403,59 +403,6 @@ internal static class ContactNormalImpulseMixed
         return true;
     }
 
-    internal static bool TryCalculateVelocityDeltasExact(
-        SolidBody? body3D,
-        Vector3d linearVelocity3D,
-        Vector3d angularVelocity3D,
-        in ExactLever3D relativeContactPoint3D,
-        SolidBody2D? body2D,
-        Vector2d linearVelocity2D,
-        Fixed64 angularVelocity2D,
-        in ExactLever3D relativeContactPoint2D,
-        Vector3d normal,
-        Fixed64 restitution,
-        Fixed64 restitutionVelocityThreshold,
-        out ContactNormalVelocityDeltaResultMixed result)
-    {
-        result = default;
-        ExactContactResponseOperand3D first =
-            ExactContactLever3D.CreateResponseOperand(
-                body3D,
-                linearVelocity3D,
-                angularVelocity3D,
-                relativeContactPoint3D,
-                -normal);
-        ExactContactResponseOperand3D second =
-            ExactContactLever2D.CreateResponseOperand(
-                body2D,
-                linearVelocity2D,
-                angularVelocity2D,
-                relativeContactPoint2D,
-                normal);
-        if (!ExactContactResponseKernel.TryGetNormalResponse(
-                first,
-                second,
-                normal,
-                restitution,
-                restitutionVelocityThreshold,
-                out ExactNormalResponse3D response))
-        {
-            return false;
-        }
-
-        bool hasNormalVelocity =
-            response.TryGetNormalVelocity(out Fixed64 normalVelocity);
-        result = new ContactNormalVelocityDeltaResultMixed(
-            normalVelocity,
-            response.FirstLinearVelocityDelta,
-            response.FirstAngularVelocityDelta,
-            ExactContactLever2D.ToPlanar(response.SecondLinearVelocityDelta),
-            ExactContactLever2D.ToPlanarAngular(response.SecondAngularVelocityDelta),
-            response.IsClosing,
-            hasNormalVelocity);
-        return true;
-    }
-
     internal static bool TryCalculateAccumulatedDeltaExact(
         SolidBody? body3D,
         Vector3d linearVelocity3D,
@@ -471,7 +418,9 @@ internal static class ContactNormalImpulseMixed
         Fixed64 accumulatedImpulse,
         Fixed64 positiveImpulseScale,
         Fixed64 negativeImpulseScale,
-        out ContactNormalImpulseResultMixed result)
+        ref ExactContactImpulseState? exactImpulse,
+        out ContactNormalImpulseResultMixed result,
+        in ContactResponseSnapshot impact = default)
     {
         result = default;
         ExactContactResponseOperand3D first =
@@ -488,7 +437,9 @@ internal static class ContactNormalImpulseMixed
                 angularVelocity2D,
                 relativeContactPoint2D,
                 normal);
-        if (!ExactContactResponseKernel.TryGetAccumulatedNormalResponse(
+        ExactNormalResponse3D response;
+        bool resolved = impact.IsValid
+            ? ExactContactResponseKernel.TryGetAccumulatedNormalResponse(
                 first,
                 second,
                 normal,
@@ -497,7 +448,11 @@ internal static class ContactNormalImpulseMixed
                 accumulatedImpulse,
                 positiveImpulseScale,
                 negativeImpulseScale,
-                out ExactNormalResponse3D response))
+                out response, impact, ref exactImpulse)
+            : ExactContactResponseKernel.TryGetAccumulatedNormalResponse(first, second, normal,
+                restitution, restitutionVelocityThreshold, accumulatedImpulse, positiveImpulseScale,
+                negativeImpulseScale, out response);
+        if (!resolved)
         {
             return false;
         }

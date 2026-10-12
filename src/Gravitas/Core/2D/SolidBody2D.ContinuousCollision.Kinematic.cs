@@ -95,7 +95,8 @@ public sealed partial class SolidBody2D
                     _continuousMixedCollisionHits,
                     Collider,
                     includeTriggers: false,
-                    cacheTargetPartitions: true)
+                    cacheTargetPartitions: true,
+                    requireClosingContact: true)
                 : 0;
 
             bool found2D = TryGetFirstValidContinuousCollisionHit(startPosition, proposedPosition, hitCount, out Physics2DHit hit2D);

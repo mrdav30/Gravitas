@@ -7,6 +7,7 @@
 
 using FixedMathSharp;
 using FixedMathSharp.Geometry;
+using Gravitas.Colliders;
 using Gravitas.Materials;
 using System;
 using System.Runtime.CompilerServices;
@@ -16,6 +17,7 @@ namespace Gravitas.CollisionHandling;
 /// <summary>
 /// Contact generated between one 3D collider and one embedded 2D collider.
 /// </summary>
+/// <remarks>A single contact may represent one row of a larger manifold. Its depth does not guarantee escape from a nonconvex collider.</remarks>
 public readonly struct MixedContact
 {
     /// <summary>Creates a mixed contact from world-space witness points.</summary>
@@ -220,6 +222,54 @@ public readonly struct MixedContact
 
     internal MixedContact WithFallbackMaterials(PhysicsMaterial material3D, PhysicsMaterial material2D) =>
         HasMaterialOverride ? this : WithMaterialOverride(material3D, material2D);
+
+    internal static MixedContact FromManifoldContact(in ManifoldContact contact) =>
+        new(contact.AnchorA, contact.AnchorB, contact.Normal, contact.Depth,
+            contact.DepthIsClamped, contact.HasMaterialOverride, contact.MaterialA, contact.MaterialB);
+
+    internal ManifoldContact ToManifoldContact(int namespace3D = 0, int namespace2D = 0) =>
+        new(ContactManifold.CreateContactId(Anchor3D, namespace3D, Anchor2D, namespace2D),
+            Anchor3D, Anchor2D, Depth, Normal3DTo2D, HasMaterialOverride,
+            Material3D, Material2D, DepthIsClamped, namespace3D, namespace2D);
+
+    internal static bool TrySelectClosingContact(ContactManifold manifold,
+        ContactAnchor center3D, Vector3d linear3D, Vector3d angular3D,
+        ContactAnchor center2D, Vector2d linear2D, Fixed64 angular2D, out MixedContact contact,
+        LSCollider2D? owner2D = null)
+    {
+        // Preserve a geometric witness for conservative stopping even when every row separates.
+        contact = manifold.HasContact ? FromManifoldContact(manifold.PrimaryContact) : default;
+        Vector3d spatialLinear2D = ExactContactLever2D.ToSpatial(linear2D);
+        Vector3d spatialAngular2D = new(Fixed64.Zero, -angular2D, Fixed64.Zero);
+        foreach (ManifoldContact row in manifold)
+        {
+            ContactAnchor normalAnchor2D = owner2D == null ? row.AnchorB
+                : ExactContactLever2D.GetDetectedNormalAnchor(owner2D, row.FeatureNamespaceB, center2D, row.AnchorB);
+            ExactLever3D.GetRelativePointVelocityRatio(linear3D, angular3D,
+                row.AnchorA.GetLeverFrom(center3D), spatialLinear2D, spatialAngular2D,
+                normalAnchor2D.GetLeverFrom(center2D), row.Normal,
+                out Signed832 numerator, out Signed832 denominator, secondPlanarAngularVelocity: angular2D);
+            // A is always 3D and B is always 2D. Negative relative normal speed closes the row.
+            if (numerator.Sign >= 0 || (Fixed64.TryGetSignedRawRatio(numerator, denominator, 0,
+                    out Fixed64 speed) && speed >= -Fixed64.Epsilon)) continue;
+            contact = FromManifoldContact(row);
+            return true;
+        }
+        return false;
+    }
+
+    internal static bool IsClosingProjection(Vector3d displacement, Vector3d outwardNormal)
+    {
+        if (Vector3d.TryDot(displacement, outwardNormal, out Fixed64 speed))
+            return speed < -Fixed64.Epsilon;
+
+        // A rounded unit normal can push a full-range projection beyond Q32.32.
+        // Its exact sign still exists, and overflow already proves that its
+        // magnitude exceeds the ordinary rounded closing-speed deadband.
+        return WideGeometry.GetDifferenceDotProduct3D(
+            displacement.X, Fixed64.Zero, displacement.Y, Fixed64.Zero, displacement.Z, Fixed64.Zero,
+            outwardNormal.X, Fixed64.Zero, outwardNormal.Y, Fixed64.Zero, outwardNormal.Z, Fixed64.Zero).Sign < 0;
+    }
 
     private ContactAnchor CreatePlanarReference(
         Vector2d origin,

@@ -12,6 +12,36 @@ namespace Gravitas.Tests.CollisionHandlingTests;
 public sealed class ContactManifoldTests
 {
     [Fact]
+    public void CopyFrom_ShouldPreserveOrderedGroupsWithoutSharingTheirLifetime()
+    {
+        var source = new ContactManifold();
+        var target = new ContactManifold();
+        for (int group = 2; group >= 0; group--)
+            for (int point = 0; point < 2; point++)
+                source.AddContact(new ContactGroupKey(group + 1, 0),
+                    new MixedContact(new Vector3d(group, 0, point), new Vector3d(group, 1, point),
+                        Vector3d.Down, Fixed64.One).ToManifoldContact());
+
+        target.CopyFrom(source, 17);
+
+        target.GroupCount.Should().Be(3);
+        target.Count.Should().Be(6);
+        target.LastUpdatedFrame.Should().Be(17);
+        target.Select(row => row.ContactId).Should().Equal(source.Select(row => row.ContactId));
+        for (int group = 0; group < source.GroupCount; group++)
+            target.GetGroup(group).Key.Should().Be(source.GetGroup(group).Key);
+        source.Reset();
+        target.Count.Should().Be(6);
+        target.CopyFrom(target, 99);
+        target.LastUpdatedFrame.Should().Be(17);
+        target.Count.Should().Be(6);
+        target.CopyFrom(source, 18);
+        target.GroupCount.Should().Be(0);
+        target.Count.Should().Be(0);
+        target.LastUpdatedFrame.Should().Be(18);
+    }
+
+    [Fact]
     public void AddContact_ShouldKeepDeepestFourContactsAndExposeStableOrder()
     {
         var manifold = new ContactManifold();

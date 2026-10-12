@@ -333,6 +333,20 @@ public sealed class ContactManifold : IEnumerable<ManifoldContact>
         _count += GetGroup(group).Add(contact);
     }
 
+    internal void CopyFrom(ContactManifold source, long frame)
+    {
+        if (ReferenceEquals(this, source)) return;
+        BeginUpdate(frame);
+        ReserveGroups(source.GroupCount);
+        for (int i = 0; i < source.GroupCount; i++)
+        {
+            if (i == 0) _firstGroup = source.GetGroup(i);
+            else _additionalGroups!.Add(source.GetGroup(i));
+        }
+        GroupCount = source.GroupCount;
+        _count = source._count;
+    }
+
     private void ClearContacts()
     {
         _count = GroupCount = 0;

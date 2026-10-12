@@ -395,7 +395,7 @@ public partial class SolidBody
                     _continuousCollisionHandoffIgnoredCollider3D = target3D;
                     _continuousCollisionHandoffIgnoredCollider2D = null;
                 }
-                else
+                else if (targetKind == ContinuousCollisionTargetKind.Dynamic2D)
                 {
                     _continuousCollisionHandoffIgnoredCollider3D = null;
                     _continuousCollisionHandoffIgnoredCollider2D = target2D;
@@ -438,6 +438,10 @@ public partial class SolidBody
         Fixed64 hitElapsedTime,
         Fixed64 remainingTime)
     {
+        if (targetKind == ContinuousCollisionTargetKind.Static2D)
+            return TryApplyStaticMixedContinuousCollisionResponse(target2D!, sourcePositionAtImpact,
+                hitElapsedTime, remainingTime);
+
         if (targetKind == ContinuousCollisionTargetKind.Dynamic3D)
         {
             SolidBody targetBody = target3D!.Body!;
@@ -604,6 +608,9 @@ public partial class SolidBody
         Fixed64 hitElapsedTime,
         Fixed64 remainingTime)
     {
+        if (Collider is LSCompoundCollider or LSMeshCollider || target.Collider is LSCompoundCollider2D)
+            return TryApplyMixedTranslationalManifoldResponse(target, sourcePositionAtImpact,
+                targetPositionAtImpact, hitElapsedTime, remainingTime);
         bool normalResolved = ContinuousCollisionImpulsePolicy.TryResolveImpactNormal(
             normalForSource,
             out Vector3d normal);

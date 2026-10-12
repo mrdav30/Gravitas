@@ -2,6 +2,7 @@ using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
+using System.Linq;
 using Xunit;
 
 namespace Gravitas.Tests.MixedDimensions;
@@ -33,7 +34,7 @@ public sealed partial class MixedNarrowPhaseTests
     }
 
     [Fact]
-    public void CapsuleSlabTriangle_InteriorRimRoot_ShouldPreserveUpstreamDepthAndAnchors()
+    public void CapsuleSlabTriangle_InteriorRimRoot_ShouldRetainUpstreamConstraintAlongsideRegionalFace()
     {
         using GravitasWorldContext context = CreateMixedContext();
         var mesh = CreateMesh3D(context, CreateTriangleMesh(
@@ -46,7 +47,16 @@ public sealed partial class MixedNarrowPhaseTests
         };
         CreateBody2D(context, capsule, Vector2d.Zero);
 
-        CollisionDetectionMixed.TryCollide(mesh.Collider, capsule, out MixedContact contact).Should().BeTrue();
+        var manifold = new ContactManifold();
+        CollisionDetectionMixed.TryBuildManifold(mesh.Collider, capsule, manifold).Should().BeTrue();
+        // The rim is an independent constraint, while the compatibility summary
+        // reports the deepest retained region rather than the old single MTV.
+        manifold.Should().Contain(row => row.Depth == Fixed64.FromFraction(13, 256));
+        MixedContact contact = MixedContact.FromManifoldContact(manifold.First(row => row.Depth == Fixed64.FromFraction(13, 256)));
+        CollisionDetectionMixed.TryCollide(mesh.Collider, capsule, out MixedContact representative).Should().BeTrue();
+        representative.Depth.Should().Be(manifold.PrimaryContact.Depth);
+        representative.Anchor3D.Should().Be(manifold.PrimaryContact.AnchorA);
+        representative.Anchor2D.Should().Be(manifold.PrimaryContact.AnchorB);
         contact.Depth.Should().Be(Fixed64.FromFraction(13, 256));
         contact.DepthIsClamped.Should().BeFalse();
         contact.Normal3DTo2D.Should().Be(new Vector3d(-Fixed64.FromFraction(4, 13),

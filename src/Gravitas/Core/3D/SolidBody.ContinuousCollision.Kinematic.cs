@@ -91,7 +91,8 @@ public partial class SolidBody
                     _continuousMixedCollisionHits,
                     Collider,
                     includeTriggers: false,
-                    cacheTargetPartitions: true)
+                    cacheTargetPartitions: true,
+                    requireClosingContact: true)
                 : 0;
 
             bool found3D = TryGetFirstValidContinuousCollisionHit(

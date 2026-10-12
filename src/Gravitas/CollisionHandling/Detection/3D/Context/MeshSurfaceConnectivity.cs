@@ -26,6 +26,8 @@ internal sealed class MeshSurfaceConnectivity
     private ulong[] _minimumValues = Array.Empty<ulong>();
     private int[] _minimumSigns = Array.Empty<int>();
     private bool[] _hasMinimum = Array.Empty<bool>();
+    private int[] _boundaryRanks = Array.Empty<int>();
+    private bool _ordersSupport;
 
     internal int RegionCount => _roots.Count;
 
@@ -63,6 +65,10 @@ internal sealed class MeshSurfaceConnectivity
     internal void BuildCapsule(PhysicsMesh mesh, int surfaceTriangle, in CapsuleFiniteSectionFrame frame,
         ReadOnlySpan<int> admittedTriangles) => Build(mesh, surfaceTriangle, new CapsuleSection(frame), admittedTriangles);
 
+    internal void BuildSlab(PhysicsMesh mesh, int surfaceTriangle, in FiniteSlabSectionFrame frame,
+        LSCollider2D? embedded, ReadOnlySpan<int> admittedTriangles) =>
+        Build(mesh, surfaceTriangle, new SlabSection(frame, embedded), admittedTriangles);
+
     internal void Build(PhysicsMesh mesh, int surfaceTriangle, in ConePlaneRayFrame frame, ReadOnlySpan<int> admittedTriangles) =>
         Build(mesh, surfaceTriangle, new ConeSection(frame), admittedTriangles);
 
@@ -73,6 +79,14 @@ internal sealed class MeshSurfaceConnectivity
     /// </remarks>
     private void Build<TSection>(PhysicsMesh mesh, int surfaceTriangle, in TSection section, ReadOnlySpan<int> admittedTriangles)
         where TSection : struct, ISection
+    {
+        BuildGraph(mesh, surfaceTriangle, section, admittedTriangles);
+        _ordersSupport = false;
+        OrderRegions(mesh, surfaceTriangle, section);
+    }
+
+    private void BuildGraph<TSection>(PhysicsMesh mesh, int surfaceTriangle, in TSection section, ReadOnlySpan<int> admittedTriangles)
+        where TSection : struct, IAdmission
     {
         _nodeByTriangle.Clear(); _triangles.FastClear(); _parents.FastClear();
         _regionByRoot.FastClear(); _roots.FastClear();
@@ -103,6 +117,11 @@ internal sealed class MeshSurfaceConnectivity
                 _roots.Add(root);
             }
         }
+    }
+
+    private void OrderRegions<TSection>(PhysicsMesh mesh, int surfaceTriangle, in TSection section)
+        where TSection : struct, ISection
+    {
         // If a connected section misses the true domain boundary it is the
         // whole convex shape section, hence the only region. Otherwise exact
         // minima on exposed segments order regions independently of authored
@@ -129,10 +148,37 @@ internal sealed class MeshSurfaceConnectivity
             _regionByRoot[_roots[region]] = region;
     }
 
+    internal void BuildSlabSupport(PhysicsMesh mesh, int surfaceTriangle, MeshSlabFaceRegions faces,
+        LSCollider2D? embedded, ReadOnlySpan<int> admittedTriangles)
+    {
+        BuildGraph(mesh, surfaceTriangle, new SlabSupport(faces, embedded), admittedTriangles);
+        _ordersSupport = true;
+        if (_roots.Count > 1)
+        {
+            if (_boundaryRanks.Length < _parents.Count) Array.Resize(ref _boundaryRanks, _parents.Count);
+            Array.Fill(_boundaryRanks, int.MaxValue, 0, _parents.Count);
+            ReadOnlySpan<int> edges = mesh.GetCanonicalSurfaceBoundaryVertexPairs(surfaceTriangle);
+            int owner = mesh.GetManifoldSurfaceOwner(surfaceTriangle);
+            for (int edge = 0; edge < edges.Length; edge += 2)
+            {
+                int region = MeshSurfaceBoundaryTopology.FindSupportEdgeRegion(mesh, owner, edges[edge], edges[edge + 1],
+                    this, faces, embedded);
+                if (region >= 0) _boundaryRanks[_roots[region]] = Math.Min(_boundaryRanks[_roots[region]], edge / 2);
+            }
+            // A convex support footprint meets a straight boundary span in one
+            // interval: distinct connected regions have distinct boundary ranks.
+#if DEBUG
+            foreach (int root in _roots.AsReadOnlySpan()) System.Diagnostics.Debug.Assert(_boundaryRanks[root] != int.MaxValue);
+#endif
+            _roots.SortInPlace(_regionComparer);
+        }
+        for (int region = 0; region < _roots.Count; region++) _regionByRoot[_roots[region]] = region;
+    }
+
     internal int GetRegionOrdinal(int triangleIndex) => _nodeByTriangle.TryGetValue(triangleIndex, out int node)
         ? _regionByRoot[Find(node)] : -1;
 
-    private void JoinAdmittedFeatures<TSection>(PhysicsMesh mesh, in TSection section) where TSection : struct, ISection
+    private void JoinAdmittedFeatures<TSection>(PhysicsMesh mesh, in TSection section) where TSection : struct, IAdmission
     {
         int components = _triangles.Count;
         if (components == 1) return;
@@ -201,8 +247,8 @@ internal sealed class MeshSurfaceConnectivity
         }
     }
 
-    private int CompareRegions(int first, int second) => FiniteSectionPoint.CompareLexicographic(
-        Minimum(_regionByRoot[first]), Minimum(_regionByRoot[second]));
+    private int CompareRegions(int first, int second) => _ordersSupport ? _boundaryRanks[first].CompareTo(_boundaryRanks[second])
+        : FiniteSectionPoint.CompareLexicographic(Minimum(_regionByRoot[first]), Minimum(_regionByRoot[second]));
 
     private FiniteSectionPoint Minimum(int region) => new(_minimumValues.AsSpan(region * FiniteSectionPoint.StorageWords, FiniteSectionPoint.StorageWords),
         _minimumSigns.AsSpan(region * FiniteSectionPoint.SignCount, FiniteSectionPoint.SignCount));
@@ -228,11 +274,29 @@ internal sealed class MeshSurfaceConnectivity
 
     // Constrained value-type calls share the graph without delegates, boxing,
     // or storing both shape frames in every operation.
-    private interface ISection
+    private interface IAdmission
     {
         bool ContainsPoint(Vector3d point);
         bool IntersectsSegment(FixedSegment segment);
+    }
+
+    private interface ISection : IAdmission
+    {
         bool TryGetFirstSegmentPoint(FixedSegment segment, FiniteSectionPoint point);
+    }
+
+    private readonly struct SlabSupport : IAdmission
+    {
+        private readonly MeshSlabFaceRegions faces;
+        private readonly LSCollider2D? embedded;
+        internal SlabSupport(MeshSlabFaceRegions faces, LSCollider2D? embedded)
+        { this.faces = faces; this.embedded = embedded; }
+        public bool ContainsPoint(Vector3d point) => IntersectsSegment(new FixedSegment(point, point));
+        public bool IntersectsSegment(FixedSegment segment)
+        {
+            Span<Vector2d> box = stackalloc Vector2d[4];
+            return faces.IntersectsSupport(segment, CollisionDetectionMixed.GetConvexPrismOffsets(embedded, box));
+        }
     }
 
     private readonly struct ConeSection : ISection
@@ -253,5 +317,29 @@ internal sealed class MeshSurfaceConnectivity
         public bool IntersectsSegment(FixedSegment segment) => frame.IntersectsSegment(segment);
         public bool TryGetFirstSegmentPoint(FixedSegment segment, FiniteSectionPoint point) =>
             FiniteSectionPoint.TryGetFirstSegmentPoint(segment, frame, point);
+    }
+
+    private readonly struct SlabSection : ISection
+    {
+        private readonly FiniteSlabSectionFrame frame;
+        private readonly LSCollider2D? embedded;
+        internal SlabSection(in FiniteSlabSectionFrame frame, LSCollider2D? embedded)
+        { this.frame = frame; this.embedded = embedded; }
+        public bool ContainsPoint(Vector3d point)
+        {
+            Span<Vector2d> box = stackalloc Vector2d[4];
+            return frame.ContainsPoint(point, CollisionDetectionMixed.GetConvexPrismOffsets(embedded, box));
+        }
+        public bool IntersectsSegment(FixedSegment segment)
+        {
+            Span<Vector2d> box = stackalloc Vector2d[4];
+            return frame.IntersectsSegment(segment, CollisionDetectionMixed.GetConvexPrismOffsets(embedded, box));
+        }
+        public bool TryGetFirstSegmentPoint(FixedSegment segment, FiniteSectionPoint point)
+        {
+            Span<Vector2d> box = stackalloc Vector2d[4];
+            return FiniteSectionPoint.TryGetFirstSegmentPoint(segment, frame,
+                CollisionDetectionMixed.GetConvexPrismOffsets(embedded, box), point);
+        }
     }
 }

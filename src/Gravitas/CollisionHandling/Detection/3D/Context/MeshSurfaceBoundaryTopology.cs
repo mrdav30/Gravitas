@@ -22,6 +22,14 @@ internal static class MeshSurfaceBoundaryTopology
         MeshSurfaceConnectivity connectivity, in CapsuleFiniteSectionFrame frame) =>
         FindEdgeRegion(mesh, owner, first, second, connectivity, new CapsuleSection(frame));
 
+    internal static int FindEdgeRegion(PhysicsMesh mesh, int owner, int first, int second,
+        MeshSurfaceConnectivity connectivity, in FiniteSlabSectionFrame frame, LSCollider2D? embedded) =>
+        FindEdgeRegion(mesh, owner, first, second, connectivity, new SlabSection(frame, embedded));
+
+    internal static int FindSupportEdgeRegion(PhysicsMesh mesh, int owner, int first, int second,
+        MeshSurfaceConnectivity connectivity, MeshSlabFaceRegions faces, LSCollider2D? embedded) =>
+        FindEdgeRegion(mesh, owner, first, second, connectivity, new SlabSupport(faces, embedded));
+
     private static int FindEdgeRegion<TSection>(PhysicsMesh mesh, int owner, int first, int second,
         MeshSurfaceConnectivity connectivity, in TSection frame) where TSection : struct, ISection
     {
@@ -134,7 +142,7 @@ internal static class MeshSurfaceBoundaryTopology
     private static WideAxis3 Negate(WideAxis3 value) => new(
         WideArithmetic.Negate(value.X), WideArithmetic.Negate(value.Y), WideArithmetic.Negate(value.Z));
 
-    private static WideAxis3 Ray(Vector3d first, Vector3d second) => new(
+    internal static WideAxis3 Ray(Vector3d first, Vector3d second) => new(
         Signed320.ExtendValue(WideArithmetic.SubtractSigned192(Signed192.Raw(second.X), Signed192.Raw(first.X))),
         Signed320.ExtendValue(WideArithmetic.SubtractSigned192(Signed192.Raw(second.Y), Signed192.Raw(first.Y))),
         Signed320.ExtendValue(WideArithmetic.SubtractSigned192(Signed192.Raw(second.Z), Signed192.Raw(first.Z))));
@@ -153,5 +161,31 @@ internal static class MeshSurfaceBoundaryTopology
         private readonly CapsuleFiniteSectionFrame _frame;
         internal CapsuleSection(in CapsuleFiniteSectionFrame frame) => _frame = frame;
         public bool IntersectsSegment(FixedSegment segment) => _frame.IntersectsSegment(segment);
+    }
+
+    private readonly struct SlabSection : ISection
+    {
+        private readonly FiniteSlabSectionFrame frame;
+        private readonly LSCollider2D? embedded;
+        internal SlabSection(in FiniteSlabSectionFrame frame, LSCollider2D? embedded)
+        { this.frame = frame; this.embedded = embedded; }
+        public bool IntersectsSegment(FixedSegment segment)
+        {
+            Span<Vector2d> box = stackalloc Vector2d[4];
+            return frame.IntersectsSegment(segment, CollisionDetectionMixed.GetConvexPrismOffsets(embedded, box));
+        }
+    }
+
+    private readonly struct SlabSupport : ISection
+    {
+        private readonly MeshSlabFaceRegions faces;
+        private readonly LSCollider2D? embedded;
+        internal SlabSupport(MeshSlabFaceRegions faces, LSCollider2D? embedded)
+        { this.faces = faces; this.embedded = embedded; }
+        public bool IntersectsSegment(FixedSegment segment)
+        {
+            Span<Vector2d> box = stackalloc Vector2d[4];
+            return faces.IntersectsSupport(segment, CollisionDetectionMixed.GetConvexPrismOffsets(embedded, box));
+        }
     }
 }

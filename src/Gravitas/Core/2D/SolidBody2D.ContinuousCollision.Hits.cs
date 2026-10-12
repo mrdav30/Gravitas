@@ -53,7 +53,8 @@ public sealed partial class SolidBody2D
                     _continuousMixedCollisionHits,
                     Collider,
                     includeTriggers: false,
-                    cacheTargetPartitions: true)
+                    cacheTargetPartitions: true,
+                    requireClosingContact: true)
                 : 0;
 
             bool found2D = TryGetFirstValidContinuousCollisionHit(startPosition, proposedPosition, hitCount, out Physics2DHit hit2D);
@@ -183,8 +184,27 @@ public sealed partial class SolidBody2D
         for (int i = 0; i < hitCount; i++)
         {
             PhysicsMixedHit candidate = _continuousMixedCollisionHits[i];
-            if (!IsValidMixedContinuousCollisionHit(candidate.Collider3D!)
-                || !IsClosingContinuousCollisionHit(displacement, candidate.NormalFor2DSource))
+            if (!IsValidMixedContinuousCollisionHit(candidate.Collider3D!))
+                continue;
+
+            if (UsesMixedStaticManifold(candidate.Collider3D!))
+            {
+                Vector2d position = new FixedSegment2d(startPosition, proposedPosition)
+                    .GetPointAtDistance(candidate.Distance, displacement.Magnitude);
+                if (TryBuildStaticMixedContinuousCollisionManifold(candidate.Collider3D!, position, Rotation))
+                {
+                    ContactAnchor center = ContactAnchor.FromWorldPoint(Vector3d.Zero);
+                    if (!MixedContact.TrySelectClosingContact(_rotationalMixedEarliestManifold,
+                            center, Vector3d.Zero, Vector3d.Zero, center, displacement, Fixed64.Zero,
+                            out MixedContact closing))
+                        continue;
+                    candidate = new PhysicsMixedHit(candidate.Collider3D, Collider, closing.Anchor3D,
+                        closing.Anchor2D, closing.Normal3DTo2D, candidate.ReducerKind,
+                        candidate.Distance, candidate.Direction3D);
+                }
+            }
+            // A proxy hit without a real witness retains the conservative stop.
+            if (!IsClosingContinuousCollisionHit(displacement, candidate.NormalFor2DSource))
                 continue;
 
             hit = candidate;
@@ -193,6 +213,43 @@ public sealed partial class SolidBody2D
 
         hit = default;
         return false;
+    }
+
+    private bool UsesMixedStaticManifold(LSCollider target)
+        => target is LSCompoundCollider or LSMeshCollider || Collider is LSCompoundCollider2D;
+
+    private bool TryBuildStaticMixedContinuousCollisionManifold(LSCollider target,
+        Vector2d position, Fixed64 rotation)
+    {
+        Vector2d originalPosition = Position;
+        Fixed64 originalRotation = Rotation;
+        try
+        {
+            SetMixedContinuousCollisionSamplePose(position, rotation);
+            // Translational moving-target searches overwrite Known only; the
+            // mutually exclusive rotational path owns this same accepted buffer.
+            return CollisionDetectionMixed.TryBuildManifold(target, Collider, _rotationalMixedEarliestManifold);
+        }
+        finally
+        {
+            SetMixedContinuousCollisionSamplePose(originalPosition, originalRotation);
+        }
+    }
+
+    private bool TryApplyStaticMixedContinuousCollisionResponse(LSCollider target,
+        Vector2d position, Fixed64 elapsedTime, Fixed64 remainingTime)
+    {
+        if (!UsesMixedStaticManifold(target)
+            || !_rotationalMixedEarliestManifold.HasContact)
+            return false;
+        if (!TryApplyMixedRotationalContinuousCollisionResponse(target,
+                MixedContact.FromManifoldContact(_rotationalMixedEarliestManifold.PrimaryContact),
+                Fixed64.Zero, position, Vector2d.Zero, Rotation, Fixed64.Zero, elapsedTime, remainingTime,
+                _rotationalMixedEarliestManifold))
+            return false;
+        UpdateContinuousCollisionFrameTrajectory(position, _linearVelocity, elapsedTime);
+        Context.Physics2D.RefreshContinuousCollisionCandidate(this);
+        return true;
     }
 
     private bool TryGetFirstDynamicContinuousCollisionHit(

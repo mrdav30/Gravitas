@@ -28,6 +28,10 @@ internal sealed class CollisionSatScratch
 
     public MeshCapsuleFaceRegions MeshCapsuleFaces { get; } = new();
 
+    public MeshSlabFaceRegions MeshSlabFaces { get; } = new();
+
+    public MeshSlabSurfaceBoundary MeshSlabBoundary { get; } = new();
+
     public MeshCapsuleSurfaceBoundary MeshCapsuleBoundary { get; } = new();
 
     public MeshConeSurfaceBoundary MeshConeBoundary { get; } = new();
@@ -35,4 +39,6 @@ internal sealed class CollisionSatScratch
     public ContactManifold MeshSurfaceManifold { get; } = new();
 
     public ContactManifold CompoundPartManifold { get; } = new();
+
+    public ContactManifold MixedManifold { get; } = new();
 }

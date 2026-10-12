@@ -7,6 +7,7 @@
 
 using FixedMathSharp;
 using FixedMathSharp.Geometry;
+using Gravitas.Colliders;
 
 namespace Gravitas.CollisionHandling;
 
@@ -16,6 +17,30 @@ namespace Gravitas.CollisionHandling;
 /// </summary>
 internal static class ExactContactLever2D
 {
+    internal static ContactAnchor GetDetectedNormalAnchor(LSCollider2D owner, int featureNamespace,
+        ContactAnchor bodyCenter, ContactAnchor surfaceAnchor)
+    {
+        if (owner.Body == null) return surfaceAnchor;
+        LSCollider2D leaf = owner is LSCompoundCollider2D compound && featureNamespace < 0
+            ? compound.GetPartCollider(-featureNamespace - 1) : owner;
+        if (leaf is not LSCircleCollider2D
+            && !(leaf is LSCapsuleCollider2D capsule && capsule.AxisLength == Fixed64.Zero))
+            return surfaceAnchor;
+
+        // A circular slab's normal line passes through its shape center. Its
+        // rounded radial surface offset must not create a spurious yaw Jacobian:
+        // with translation locked, even one raw lever unit can stop all spin.
+        // Retain center-to-COM torque for offset circles and compound leaves;
+        // friction continues to use the original finite surface anchor.
+        if (leaf.TransformRelativeMassPropertyPointExact(Vector2d.Zero).TryGetPoint(out Vector2d localCenter))
+            return new ContactAnchor(bodyCenter.Origin, bodyCenter.Rotation, ToSpatial(localCenter));
+
+        // A compound-local center may exceed Q32.32 while its world center is
+        // finite. Detected circular side/support anchors retain that frozen
+        // center as their origin. Cap normals have no planar yaw coupling.
+        return ContactAnchor.FromWorldPoint(surfaceAnchor.Origin);
+    }
+
     internal static bool CanUseCompactResponse(
         SolidBody2D? bodyA,
         Vector2d linearVelocityA,
@@ -71,7 +96,7 @@ internal static class ExactContactLever2D
                 ? Vector3d.Zero
                 : ToSpatial(body.ProjectLinearMotion(ToPlanar(signedAxis))),
             body?.EffectiveInverseMass ?? Fixed64.Zero,
-            CreateInverseInertia(body));
+            CreateInverseInertia(body), angularVelocity);
 
     internal static bool TryGetNormalResponse(
         SolidBody2D? bodyA,
@@ -157,8 +182,12 @@ internal static class ExactContactLever2D
     internal static Vector2d ToPlanar(Vector3d vector) =>
         new(vector.X, vector.Z);
 
-    internal static Fixed64 ToPlanarAngular(Vector3d vector) =>
-        -vector.Y;
+    internal static Fixed64 ToPlanarAngular(Vector3d vector)
+    {
+        // Exact response operands preflight the planar delta before publication.
+        System.Diagnostics.Debug.Assert(vector.Y != Fixed64.MinValue);
+        return -vector.Y;
+    }
 
     internal static bool TryGetImpulseVelocityDeltas(
         SolidBody2D? bodyA,
@@ -236,8 +265,8 @@ internal static class ExactContactLever2D
                 CreateInverseInertia(body),
                 out spatialAngular);
         linearVelocityDelta = ToPlanar(spatialLinear);
-        angularVelocityDelta = ToPlanarAngular(spatialAngular);
-        return linearResolved & angularResolved;
+        bool planarResolved = Fixed64.TrySubtract(Fixed64.Zero, spatialAngular.Y, out angularVelocityDelta);
+        return linearResolved & angularResolved & planarResolved;
     }
 
     internal static Fixed3x3 CreateInverseInertia(SolidBody2D? body) =>

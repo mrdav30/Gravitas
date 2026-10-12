@@ -160,7 +160,7 @@ public partial class SolidBody
                 bool responseWitnessIsEarliest = witnessedTime == conservativeTime;
                 Fixed64 witnessedConsumedTime = remainingTime * witnessedTime;
                 bool appliedResponse = responseWitnessIsEarliest && (useMixed
-                    ? mixedHit.HasContact
+                    ? mixedHit.HasClosingContact
                         && TryApplyMixedRotationalContinuousCollisionResponse(
                             mixedHit.Target,
                             mixedHit.Contact,
@@ -171,7 +171,8 @@ public partial class SolidBody
                             targetRotation,
                             elapsedTime,
                             remainingTime,
-                            sourceIsKinematic: false)
+                            sourceIsKinematic: false,
+                            manifold: mixedHit.Manifold)
                     : hasContact
                         && target!.Body is SolidBody targetBody
                         && IsMovingRotationalContinuousCollisionTarget(targetBody)
@@ -416,7 +417,7 @@ public partial class SolidBody
                 Fixed64 witnessedTime = useMixed ? mixedHit.ContactTime : contactTime;
                 bool responseWitnessIsEarliest = witnessedTime == conservativeTime;
                 bool appliedResponse = responseWitnessIsEarliest && (useMixed
-                    ? mixedHit.HasContact
+                    ? mixedHit.HasClosingContact
                         && TryApplyMixedRotationalContinuousCollisionResponse(
                             mixedHit.Target,
                             mixedHit.Contact,
@@ -427,7 +428,8 @@ public partial class SolidBody
                             segmentTargetRotation,
                             elapsedTime,
                             remainingTime,
-                            sourceIsKinematic: true)
+                            sourceIsKinematic: true,
+                            manifold: mixedHit.Manifold)
                     : hasContact
                         && target!.Body is SolidBody targetBody
                         && !targetBody.IsKinematic

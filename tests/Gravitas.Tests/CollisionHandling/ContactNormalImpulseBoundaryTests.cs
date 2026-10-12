@@ -504,6 +504,7 @@ public sealed class ContactNormalImpulseBoundaryTests
                 out _)
             .Should()
             .BeFalse();
+        ExactContactImpulseState? mixedExactState = null;
         ContactNormalImpulseMixed.TryCalculateAccumulatedDeltaExact(
                 body.Body,
                 Vector3d.Right * Fixed64.MaxValue,
@@ -519,6 +520,7 @@ public sealed class ContactNormalImpulseBoundaryTests
                 Fixed64.Zero,
                 Fixed64.MaxValue,
                 Fixed64.One,
+                ref mixedExactState,
                 out _)
             .Should()
             .BeFalse();
@@ -702,6 +704,7 @@ public sealed class ContactNormalImpulseBoundaryTests
                 out _)
             .Should()
             .BeFalse();
+        ExactContactImpulseState? mixedExactState = null;
         ContactNormalImpulseMixed.TryCalculateAccumulatedDeltaExact(
                 body.Body,
                 Vector3d.Right,
@@ -717,6 +720,7 @@ public sealed class ContactNormalImpulseBoundaryTests
                 Fixed64.MaxValue,
                 Fixed64.One,
                 Fixed64.One,
+                ref mixedExactState,
                 out ContactNormalImpulseResultMixed exactMixed)
             .Should()
             .BeTrue();
@@ -1809,6 +1813,7 @@ public sealed class ContactNormalImpulseBoundaryTests
 
         ExactLever3D zero =
             CreateLever(Vector3d.Zero, Vector3d.Zero);
+        ExactContactImpulseState? mixedExactState = null;
         ContactNormalImpulseMixed.TryCalculateAccumulatedDeltaExact(
                 body.Body,
                 Vector3d.Left * Fixed64.Two,
@@ -1824,6 +1829,7 @@ public sealed class ContactNormalImpulseBoundaryTests
                 Fixed64.One,
                 Fixed64.One,
                 Fixed64.One,
+                ref mixedExactState,
                 out ContactNormalImpulseResultMixed result)
             .Should()
             .BeTrue();
@@ -1895,6 +1901,26 @@ public sealed class ContactNormalImpulseBoundaryTests
                 out _)
             .Should()
             .BeFalse();
+    }
+
+    [Fact]
+    public void ExactPlanarParticipant_ShouldRejectPositiveYawDeltaBeyondItsScalarRange()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        SolidBody2D body = CreateBody2D(scenario.Context, Fixed64.One, Fixed64.One);
+        body.FreezeAxes = BodyFreezeAxes2D.Position;
+        body.EffectiveInverseMomentOfInertia.Should().Be(Fixed64.Two);
+        ExactLever3D lever = CreateLever(Vector3d.Zero, Vector3d.Right);
+        Fixed64 impulse = (Fixed64)1_073_741_824;
+
+        ExactContactLever2D.TryGetParticipantVelocityDeltas(body, lever,
+            Vector3d.Forward, impulse, Vector3d.Zero, Fixed64.Zero, out _, out _).Should().BeFalse();
+        ExactContactLever2D.TryGetParticipantVelocityDeltas(body, lever,
+            Vector3d.Forward, impulse - Fixed64.MinIncrement, Vector3d.Zero, Fixed64.Zero,
+            out Vector2d linear, out Fixed64 angular).Should().BeTrue();
+        linear.Should().Be(Vector2d.Zero);
+        angular.Should().Be(Fixed64.FromRaw(long.MaxValue - 1));
+        body.AngularVelocity.Should().Be(Fixed64.Zero, "the helper only materializes a delta");
     }
 
     [Fact]

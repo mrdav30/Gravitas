@@ -56,6 +56,12 @@ instead of burying it in notes.
 
 ## Recently Completed
 
+- [`Mixed Surface Contacts`](done/2026-10-12-mixed-surface-contact-plan.md)
+  - Finite circle, stadium and polygonal slabs share grouped mesh-surface
+    response and all-row CCD. Exact physical supports and true boundaries
+    preserve concavity, geometric yaw symmetry and compound provenance;
+    single-contact inspection reports a representative constraint.
+
 - [`Surface Contact Manifolds`](done/2026-10-08-surface-contact-manifold-plan.md)
   - Independent 3D surface groups preserve finite mesh/cone contacts through
     deterministic sequential response, resolving #095/#099. Exact admission and

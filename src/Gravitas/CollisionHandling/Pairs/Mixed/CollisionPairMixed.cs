@@ -15,6 +15,7 @@ namespace Gravitas.CollisionHandling;
 /// <summary>
 /// Owns one stable mixed 3D/2D collision pair identity and contact lifecycle.
 /// </summary>
+/// <content>Owns retained mixed manifold rows, per-step impulses, notifications and replay state.</content>
 internal sealed partial class CollisionPairMixed
 {
     private bool _isColliding;
@@ -48,6 +49,15 @@ internal sealed partial class CollisionPairMixed
 
     public MixedContact Contact { get; private set; }
 
+    public ContactManifold Manifold { get; } = new();
+
+    // Accumulation belongs to one solve pass; mixed pairs do not warm-start across frames.
+    internal ContactWarmStartCache SolveImpulses;
+
+    internal ExactContactImpulseState?[]? ExactSolveImpulses;
+
+    internal ContactResponseSnapshot ResponseSnapshot { get; set; }
+
     internal long LifetimeVersion => _lifetimeVersion;
 
     internal bool IsNotificationInProgress => _notificationInProgress;
@@ -71,17 +81,30 @@ internal sealed partial class CollisionPairMixed
         _collider3DNotified = false;
         _collider2DNotified = false;
         Contact = default;
+        Manifold.Reset();
+        ClearSolveState();
     }
 
     public void MarkColliding(long frame, MixedContact contact)
     {
+        PublishContact(frame, contact);
+        NotifyCollision(frame);
+    }
+
+    public void MarkColliding(long frame, ContactManifold manifold)
+    {
+        PublishManifold(frame, manifold);
+        NotifyCollision(frame);
+    }
+
+    private void NotifyCollision(long frame)
+    {
         bool changed = !_isColliding;
         _isColliding = true;
         _isTriggerPair = Collider3D.IsTrigger || Collider2D.IsTrigger;
-        Contact = contact;
         LastFrame = frame;
 
-        Context.Diagnostics.EmitMixedContact(this, contact);
+        Context.Diagnostics.EmitMixedContact(this, Contact);
 
         var registration3D = new ColliderLifetimeToken(Collider3D);
         var registration2D = new ColliderLifetimeToken2D(Collider2D);
@@ -139,22 +162,49 @@ internal sealed partial class CollisionPairMixed
     public void MarkResting(long frame)
     {
         LastFrame = frame;
+        ClearSolveState();
     }
 
-    public void MarkResting(long frame, MixedContact contact)
+    public void MarkResting(long frame, ContactManifold manifold)
     {
-        Contact = contact;
+        PublishManifold(frame, manifold);
         LastFrame = frame;
     }
 
+    private void PublishContact(long frame, MixedContact contact)
+    {
+        Manifold.BeginUpdate(frame);
+        if (contact.HasContact)
+            Manifold.AddContact(default, contact.ToManifoldContact());
+        Contact = contact;
+        ClearSolveState();
+    }
+
+    private void PublishManifold(long frame, ContactManifold source)
+    {
+        SwiftThrowHelper.ThrowIfNull(source, nameof(source));
+        Manifold.CopyFrom(source, frame);
+        Contact = Manifold.HasContact ? MixedContact.FromManifoldContact(Manifold.PrimaryContact) : default;
+        ClearSolveState();
+    }
+
+    private void ClearSolveState()
+    {
+        SolveImpulses.Clear();
+        if (ExactSolveImpulses != null)
+            foreach (ExactContactImpulseState? state in ExactSolveImpulses) state?.Clear();
+        ResponseSnapshot = default;
+    }
     public void MarkSeparated()
     {
+        Manifold.Reset();
+        ClearSolveState();
+        Contact = default;
         // The 2D side is admitted only after the 3D side, so it cannot be the sole notified side.
         if (!_isColliding && !_collider3DNotified)
             return;
 
         _isColliding = false;
-        Contact = default;
         if (_notificationInProgress)
         {
             _separationPending = true;

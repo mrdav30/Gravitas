@@ -455,8 +455,10 @@ public sealed partial class MixedNarrowPhaseTests
             new Vector3d(center, Fixed64.Zero, Fixed64.Zero),
             out Vector3d embeddedOffset).Should().BeTrue();
         embeddedOffset.Should().Be(Vector3d.Right * Fixed64.Half);
-        contact.Normal3DTo2D.Should().Be(Vector3d.Right);
+        contact.Normal3DTo2D.Should().Be(Vector3d.Left);
         contact.Depth.Should().Be(Fixed64.One);
+        contact.Anchor3D.TryGetOffsetFrom(contact.Anchor2D, out Vector3d anchorGap).Should().BeTrue();
+        anchorGap.Should().Be(contact.Normal3DTo2D * contact.Depth);
     }
 
     [Fact]

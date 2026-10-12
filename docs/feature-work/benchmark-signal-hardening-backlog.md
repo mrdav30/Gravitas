@@ -2039,6 +2039,15 @@ allocation:
 - False-positive mixed target: `136.6 us` at `128` triangles, `520.8 us` at
   `512` triangles, and `2.089 ms` at `2048` triangles.
 
+**Follow-up 2026-10-12:** Fresh exact-geometry controls measure roughly
+13/52/206 ms at those triangle counts, all 0 B/op. Direct calls to the unchanged
+FixedMathSharp projected-circle/triangle sweep reproduce the dominant cost
+without a Gravitas manifold, BVH or response. The owning
+[FixedMathSharp throughput signal](../../../FixedMathSharp/docs/feature-work/benchmark-signal-hardening-backlog.md#finite-slab-projected-circletriangle-sweep-throughput)
+records the literal fixture, independent math probe and next profiling step.
+This instrumentation signal remains closed; the newly isolated math throughput
+work belongs upstream.
+
 Re-running
 `mesh-query3-d-triangle-scaling --filter "*TriangleMeshTarget*" -j Short -i`
 after the pure 3D carryover optimization reported:

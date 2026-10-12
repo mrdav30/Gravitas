@@ -14,135 +14,78 @@ using System;
 
 namespace Gravitas.CollisionHandling;
 
+/// <content>Builds independent finite mesh/slab regions without treating authored seams as physical features.</content>
 public static partial class CollisionDetectionMixed
 {
-    private static bool TryCompoundEmbedded2D(LSCompoundCollider compound, LSCollider2D embedded, out MixedContact contact)
+    private static void AppendMeshEmbedded2D(LSMeshCollider mesh, LSCollider2D embedded,
+        ContactManifold manifold, int namespace3D, int namespace2D)
     {
-        bool found = false;
-        MixedContact best = default;
-
-        for (int i = 0; i < compound.PartCount; i++)
-        {
-            LSCollider part = compound.GetPartCollider(i);
-            if (!part.Bounds.Intersects(embedded.MixedBounds3D)
-                || !TryCollide(part, embedded, out MixedContact candidate))
-            {
-                continue;
-            }
-
-            candidate = candidate.WithFallbackMaterials(part.Material, embedded.Material);
-
-            if (ContactSelectionPolicy.ShouldReplaceWithShallower(candidate, found, best))
-            {
-                best = candidate;
-                found = true;
-            }
-        }
-
-        if (!found)
-            return NoContact(out contact);
-
-        contact = best;
-        return true;
-    }
-
-    private static bool TryMeshEmbedded2D(LSMeshCollider mesh, LSCollider2D embedded, out MixedContact contact)
-    {
+        if (embedded is not (LSCircleCollider2D or LSCapsuleCollider2D or LSAABBoxCollider2D or LSPolygonCollider2D))
+            return;
         SwiftList<int> triangleBuffer = mesh.Context.CollisionScratch.MeshTriangleCandidatesA;
         FixedBoundVolume embeddedBounds = new(embedded.MixedBounds3D.Min, embedded.MixedBounds3D.Max);
         mesh.GetTrianglesInBounds(embeddedBounds, triangleBuffer);
-
-        bool found = false;
-        MixedContact best = default;
-        for (int i = 0; i < triangleBuffer.Count; i++)
-        {
-            int triangleIndex = triangleBuffer[i];
-            MixedContact candidate;
-            if (embedded is LSAABBoxCollider2D or LSPolygonCollider2D)
-            {
-                if (!TryGetTriangleConvexPrismContact(
-                        mesh,
-                        triangleIndex,
-                        embedded,
-                        out candidate))
-                {
-                    continue;
-                }
-            }
-            else
-            {
-                if (!TryGetTriangleFiniteSurfaceContact(
-                        mesh,
-                        triangleIndex,
-                        embedded,
-                        out candidate))
-                {
-                    continue;
-                }
-            }
-
-            if (ContactSelectionPolicy.ShouldReplaceWithShallower(candidate, found, best))
-            {
-                best = candidate;
-                found = true;
-            }
-        }
-
-        if (!found)
-            return NoContact(out contact);
-
-        contact = best;
-        return true;
+        Vector3d center = GetEmbeddedCenter3D(embedded);
+        Fixed64 length = embedded is LSCapsuleCollider2D capsule ? capsule.AxisLength : Fixed64.Zero;
+        Fixed64 radius = embedded is LSCircleCollider2D circle ? circle.ScaledRadius
+            : embedded is LSCapsuleCollider2D stadium ? stadium.ScaledRadius : Fixed64.Zero;
+        Fixed64 yaw = embedded is LSAABBoxCollider2D ? Fixed64.Zero : embedded.Rotation;
+        Span<Vector2d> box = stackalloc Vector2d[4];
+        AppendMeshSlabContacts(mesh, embedded, center, FixedQuaternion.FromAxisAngle(Vector3d.Up, -yaw),
+            length, radius, embedded.MixedHalfThickness, GetConvexPrismOffsets(embedded, box),
+            triangleBuffer.AsReadOnlySpan(), manifold, namespace3D, namespace2D);
     }
 
-    private static bool TryGetTriangleFiniteSurfaceContact(
-        LSMeshCollider mesh,
-        int triangleIndex,
-        LSCollider2D embedded,
-        out MixedContact contact)
+    internal static bool AppendMeshCircleSlabContacts(LSMeshCollider mesh, Vector3d center,
+        Fixed64 radius, Fixed64 halfThickness, ReadOnlySpan<int> candidates, ContactManifold manifold)
     {
-        mesh.Mesh.GetLocalTriangleVertices(
-            triangleIndex,
-            out Vector3d first,
-            out Vector3d second,
-            out Vector3d third);
-        var triangle = new FixedTriangle(first, second, third);
-        Vector3d slabCenter = GetEmbeddedCenter3D(embedded);
-
-        bool collided;
-        FixedContactAnchors relation;
-        if (embedded is LSCircleCollider2D circle)
-        {
-            collided = triangle.TryGetCircleSlabContact(
-                mesh.Mesh.Origin,
-                mesh.Mesh.Rotation,
-                slabCenter,
-                circle.Rotation,
-                circle.MixedHalfThickness,
-                circle.ScaledRadius,
-                out relation);
-        }
-        else if (embedded is LSCapsuleCollider2D capsule)
-        {
-            collided = triangle.TryGetCenteredCapsuleSlabContact(
-                mesh.Mesh.Origin,
-                mesh.Mesh.Rotation,
-                slabCenter,
-                capsule.Rotation,
-                Vector2d.Forward,
-                capsule.AxisLength,
-                capsule.ScaledRadius,
-                capsule.MixedHalfThickness,
-                out relation);
-        }
-        else
-        {
-            return NoContact(out contact);
-        }
-
-        return TryBuildFinitePrismContact(
-            collided,
-            relation,
-            out contact);
+        AppendMeshSlabContacts(mesh, null, center, FixedQuaternion.Identity, Fixed64.Zero, radius,
+            halfThickness, ReadOnlySpan<Vector2d>.Empty, candidates, manifold, 0, 0);
+        return manifold.HasContact;
     }
+
+    private static void AppendMeshSlabContacts(LSMeshCollider collider, LSCollider2D? embedded,
+        Vector3d center, FixedQuaternion rotation, Fixed64 length, Fixed64 radius, Fixed64 halfThickness,
+        ReadOnlySpan<Vector2d> prismOffsets, ReadOnlySpan<int> candidates, ContactManifold manifold,
+        int namespace3D, int namespace2D)
+    {
+        PhysicsMesh mesh = collider.Mesh;
+        CollisionSatScratch scratch = collider.Context.CollisionScratch;
+        SwiftList<int> admitted = scratch.MeshTriangleCandidatesB;
+        scratch.MeshSurfaces.Clear();
+        var section = new FiniteSlabSectionFrame(mesh.Origin, mesh.Rotation, center, rotation,
+            length, radius, halfThickness);
+        Span<int> singleton = stackalloc int[1];
+        foreach (int triangle in candidates)
+        {
+            int owner = mesh.GetManifoldSurfaceOwner(triangle);
+            if (!scratch.MeshSurfaces.Add(owner)) continue;
+            admitted.FastClear();
+            singleton[0] = triangle;
+            ReadOnlySpan<int> domain = mesh.GetCoplanarTriangleNeighbors(triangle).IsEmpty ? singleton : candidates;
+            foreach (int candidate in domain)
+            {
+                if (mesh.GetManifoldSurfaceOwner(candidate) != owner) continue;
+                mesh.GetLocalTriangleVertices(candidate, out Vector3d first, out Vector3d second, out Vector3d third);
+                if (section.IntersectsTriangle(new FixedTriangle(first, second, third), prismOffsets)) admitted.Add(candidate);
+            }
+            if (admitted.Count == 0) continue;
+            MeshSurfaceConnectivity connectivity = scratch.MeshConnectivity;
+            connectivity.BuildSlab(mesh, triangle, section, embedded, admitted.AsReadOnlySpan());
+            mesh.GetLocalTriangleVertices(triangle, out Vector3d a, out Vector3d b, out Vector3d c);
+            var frame = new FiniteSlabRayFrame(new FixedTriangle(a, b, c), mesh.Origin, mesh.Rotation,
+                center, rotation, length, radius, halfThickness);
+            MeshSlabFaceRegions faces = scratch.MeshSlabFaces;
+            faces.Prepare(frame, prismOffsets);
+            int contactCount = manifold.Count;
+            scratch.MeshSlabBoundary.BuildSurfaceContacts(collider, embedded, triangle,
+                connectivity, faces, manifold, namespace3D, namespace2D);
+            faces.Build(mesh, triangle, connectivity, prismOffsets, embedded);
+            faces.AppendContacts(collider, embedded, triangle, manifold, namespace3D, namespace2D);
+            if (manifold.Count == contactCount)
+                scratch.MeshSlabBoundary.AppendSupportFallback(collider, embedded, triangle, faces,
+                    manifold, namespace3D, namespace2D);
+        }
+    }
+
 }

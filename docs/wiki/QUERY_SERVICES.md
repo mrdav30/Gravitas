@@ -355,6 +355,12 @@ Static/bodyless hits can have a collider with a null body.
 from the 3D side toward the embedded 2D volume. Source-oriented normals are
 provided so CCD helpers do not need to reinterpret that invariant.
 
+An initially overlapping mixed circle/mesh sweep reports distance zero and a
+finite representative contact from the same surface geometry as discrete mixed
+collision. Its normal is independent of the requested sweep direction. A
+single hit describes one retained constraint; its normal does not
+establish a whole-mesh escape for a nonconvex surface.
+
 ## Reentrancy
 
 Query services keep mutable buffers on the service instance. Do not run multiple

@@ -19,6 +19,12 @@ namespace Gravitas;
 
 public sealed partial class SolidBody2D
 {
+    private readonly ContactManifold _rotationalMixedKnownManifold = new();
+    private readonly ContactManifold _rotationalMixedEarliestManifold = new();
+    private bool _rotationalMixedKnownContactIsClosing;
+    private bool _rotationalMixedEarliestContactIsClosing;
+    private ContactWarmStartCache _mixedContinuousCollisionImpulses;
+    private ExactContactImpulseState?[]? _mixedContinuousCollisionExactImpulses;
     private readonly SwiftList<LSCollider> _rotationalMixedStatic3DCandidates = new();
     private readonly SwiftList<int> _rotationalMixedMoving3DCandidateIds = new();
 
@@ -52,14 +58,18 @@ public sealed partial class SolidBody2D
             Fixed64 safeTime,
             MixedContact contact,
             bool hasContact,
+            bool hasClosingContact,
             Fixed64 contactTime,
-            LSCollider target)
+            LSCollider target,
+            ContactManifold manifold)
         {
             SafeTime = safeTime;
             Contact = contact;
             HasContact = hasContact;
+            HasClosingContact = hasClosingContact;
             ContactTime = contactTime;
             Target = target;
+            Manifold = manifold;
         }
 
         public Fixed64 SafeTime { get; }
@@ -67,10 +77,12 @@ public sealed partial class SolidBody2D
         public MixedContact Contact { get; }
 
         public bool HasContact { get; }
+        public bool HasClosingContact { get; }
 
         public Fixed64 ContactTime { get; }
 
         public LSCollider Target { get; }
+        public ContactManifold Manifold { get; }
     }
 
     private bool TryFindEarliestMixedRotationalContinuousCollision(
@@ -158,8 +170,10 @@ public sealed partial class SolidBody2D
             earliestTime,
             earliestContact,
             earliestHasContact,
+            _rotationalMixedEarliestContactIsClosing,
             earliestContactTime,
-            earliestTarget!);
+            earliestTarget!,
+            _rotationalMixedEarliestManifold);
         return true;
     }
 
@@ -273,6 +287,8 @@ public sealed partial class SolidBody2D
         earliestHasContact = candidateHasContact;
         earliestContactTime = candidateContactTime;
         earliestTarget = target;
+        _rotationalMixedEarliestManifold.CopyFrom(_rotationalMixedKnownManifold, Context.FrameCount);
+        _rotationalMixedEarliestContactIsClosing = _rotationalMixedKnownContactIsClosing;
     }
 
     private bool TryFindEarliestMixedRotationalContinuousCollisionAgainstTarget(
@@ -296,6 +312,8 @@ public sealed partial class SolidBody2D
         contact = default;
         hasContact = false;
         contactTime = Fixed64.Zero;
+        _rotationalMixedKnownManifold.BeginUpdate(Context.FrameCount);
+        _rotationalMixedKnownContactIsClosing = false;
         SolidBody? targetBody = target.Body;
         bool samplesTargetMotion = targetBody != null
             && IsMovingMixedRotationalContinuousCollisionTarget(targetBody);
@@ -368,16 +386,17 @@ public sealed partial class SolidBody2D
                     hasMotionBound = targetBoundResolved & combinedBoundResolved;
                 }
 
-                bool sampleHasContact = CollisionDetectionMixed.TryCollide(
-                    target,
-                    Collider,
-                    out MixedContact sampleContact);
+                bool sampleHasContact = TrySampleMixedRotationalContinuousContact(target,
+                    ResolveRotationalFrameFraction(elapsedTime, remainingTime, midpoint),
+                    out MixedContact sampleContact, out bool sampleContactIsClosing);
                 if (sampleHasContact
                     && (!hasKnownContact || midpoint < knownContactTime))
                 {
                     hasKnownContact = true;
                     knownContactTime = midpoint;
                     knownContact = sampleContact;
+                    _rotationalMixedKnownManifold.CopyFrom(Context.CollisionScratch.MixedManifold, Context.FrameCount);
+                    _rotationalMixedKnownContactIsClosing = sampleContactIsClosing;
                 }
 
                 bool hasShapeGap = CollisionDetectionMixed.TryGetRotationalSeparationGap(
@@ -585,11 +604,11 @@ public sealed partial class SolidBody2D
                         targetContactDistance,
                         targetTravelDistance),
                     targetSegment.StartRotation);
-                if (CollisionDetectionMixed.TryCollide(
-                    target.Collider,
-                    Collider,
-                    out contact))
+                ContactManifold manifold = Context.CollisionScratch.MixedManifold;
+                if (CollisionDetectionMixed.TryBuildManifold(target.Collider, Collider, manifold))
                 {
+                    // Relative displacement is sphere-minus-circle even when the source is 2D.
+                    contact = MixedContact.FromManifoldContact(manifold.PrimaryContact);
                     bool closingResolved = Vector3d.TryDot(
                             relativeDisplacement,
                             contact.Normal3DTo2D,
@@ -631,6 +650,26 @@ public sealed partial class SolidBody2D
         }
     }
 
+    private bool TrySampleMixedRotationalContinuousContact(LSCollider target,
+        Fixed64 frameFraction, out MixedContact contact, out bool contactIsClosing)
+    {
+        ContactManifold manifold = Context.CollisionScratch.MixedManifold;
+        contact = default;
+        contactIsClosing = false;
+        if (!CollisionDetectionMixed.TryBuildManifold(target, Collider, manifold)) return false;
+        SolidBody? other = target.Body;
+        ContactAnchor center3D = other?.GetCenterOfMassAnchor() ?? ContactAnchor.FromWorldPoint(target.Center);
+        var center2D = new ContactAnchor(new Vector3d(_position.X, Collider.MixedSlabCenterY, _position.Y),
+            FixedQuaternion.FromAxisAngle(Vector3d.Up, -_rotation),
+            ExactContactLever2D.ToSpatial(LocalCenterOfMassOffset));
+        contactIsClosing = MixedContact.TrySelectClosingContact(manifold, center3D,
+            other?.SampleContinuousCollisionLinearVelocity(frameFraction) ?? Vector3d.Zero,
+            other?.SampleContinuousCollisionAngularVelocity(frameFraction) ?? Vector3d.Zero,
+            center2D, IsKinematic ? SampleContinuousCollisionLinearVelocity(frameFraction) : _linearVelocity,
+            IsKinematic ? SampleContinuousCollisionAngularVelocity(frameFraction) : _angularVelocity, out contact, Collider);
+        return true;
+    }
+
     private bool IsValidMixedRotationalContinuousCollisionTarget(LSCollider target)
     {
         return target.IsActive
@@ -654,6 +693,41 @@ public sealed partial class SolidBody2D
                 : target.IsDynamic);
     }
 
+    private bool TryApplyMixedTranslationalManifoldResponse(SolidBody target,
+        Vector2d sourcePosition, Vector3d targetPosition, Fixed64 elapsedTime, Fixed64 remainingTime)
+    {
+        Fixed64 fraction = ResolveContinuousCollisionFrameFraction(elapsedTime);
+        Fixed64 sourceRotation = SampleContinuousCollisionRotation(fraction);
+        FixedQuaternion targetRotation = target.SampleContinuousCollisionRotation(fraction);
+        Vector2d originalSourcePosition = Position;
+        Fixed64 originalSourceRotation = Rotation;
+        Vector3d originalTargetPosition = target.Position3d;
+        FixedQuaternion originalTargetRotation = target.Rotation;
+        try
+        {
+            SetMixedContinuousCollisionSamplePose(sourcePosition, sourceRotation);
+            target.SetMixedContinuousCollisionSamplePose(targetPosition, targetRotation);
+            if (!CollisionDetectionMixed.TryBuildManifold(target.Collider, Collider, _rotationalMixedKnownManifold))
+                return false;
+        }
+        finally
+        {
+            SetMixedContinuousCollisionSamplePose(originalSourcePosition, originalSourceRotation);
+            target.SetMixedContinuousCollisionSamplePose(originalTargetPosition, originalTargetRotation);
+        }
+        if (!TryApplyMixedRotationalContinuousCollisionResponse(target.Collider,
+                MixedContact.FromManifoldContact(_rotationalMixedKnownManifold.PrimaryContact), Fixed64.Zero,
+                sourcePosition, Vector2d.Zero, sourceRotation, Fixed64.Zero, elapsedTime, remainingTime,
+                _rotationalMixedKnownManifold)) return false;
+        // The rotational outer loop appends this segment itself; the translational owner needs it here.
+        if (HasSolverMobility)
+        {
+            UpdateContinuousCollisionFrameTrajectory(sourcePosition, _linearVelocity, elapsedTime);
+            Context.Physics2D.RefreshContinuousCollisionCandidate(this);
+        }
+        return true;
+    }
+
     internal bool TryApplyMixedRotationalContinuousCollisionResponse(
         LSCollider targetCollider,
         MixedContact contact,
@@ -663,7 +737,8 @@ public sealed partial class SolidBody2D
         Fixed64 sourceSegmentStartRotation,
         Fixed64 sourceAngularDelta,
         Fixed64 elapsedTime,
-        Fixed64 remainingTime)
+        Fixed64 remainingTime,
+        ContactManifold? manifold = null)
     {
         Fixed64 frameFraction = ResolveRotationalFrameFraction(
             elapsedTime,
@@ -694,118 +769,39 @@ public sealed partial class SolidBody2D
             ?? Vector3d.Zero;
         SolidBody? targetResponseBody = target?.HasSolverMobility == true ? target : null;
         SolidBody2D? sourceResponseBody = HasSolverMobility ? this : null;
-        Fixed64 restitution = PhysicsMaterial.CombineRestitution(
-            targetCollider.Material,
-            Collider.Material);
-        ContactAnchor targetCenter = target == null
-            ? ContactAnchor.FromWorldPoint(targetPosition)
-            : new ContactAnchor(
-                targetPosition,
-                targetRotation,
-                target.LocalCenterOfMassOffset);
-        bool targetContactArmResolved = target == null
-            ? contact.Anchor3D.TryGetOffsetFrom(
-                targetPosition,
-                out Vector3d targetContactArm)
-            : contact.Anchor3D.TryGetOffsetFrom(
-                targetCenter,
-                out targetContactArm);
-        bool sourceContactArmResolved =
-            contact.TryGetPlanarOffset2DFrom(
-            sourcePosition,
-            sourceRotation,
-            LocalCenterOfMassOffset,
-            out Vector2d sourceContactArm);
-        ContactNormalVelocityDeltaResultMixed response = default;
-        bool responseResolved = targetContactArmResolved
-            && sourceContactArmResolved
-            && ContactNormalImpulseMixed.CanUseCompactResponse(
-                targetResponseBody,
-                targetLinearVelocity,
-                targetAngularVelocity,
-                targetContactArm,
-                sourceResponseBody,
-                sourceLinearVelocity,
-                sourceAngularVelocity,
-                sourceContactArm,
-                contact.Normal3DTo2D)
-            && ContactNormalImpulseMixed.TryCalculateVelocityDeltas(
-                targetResponseBody,
-                targetLinearVelocity,
-                targetAngularVelocity,
-                targetContactArm,
-                sourceResponseBody,
-                sourceLinearVelocity,
-                sourceAngularVelocity,
-                sourceContactArm,
-                contact.Normal3DTo2D,
-                restitution,
-                Context.Settings.RestitutionVelocityThreshold,
-                out response);
-        if (!responseResolved)
+        ContactAnchor targetCenter = new(targetPosition, targetRotation,
+            target?.LocalCenterOfMassOffset ?? Vector3d.Zero);
+        Vector3d sourcePosition3D = new(sourcePosition.X, Collider.MixedSlabCenterY, sourcePosition.Y);
+        var sourceCenter = new ContactAnchor(sourcePosition3D,
+            FixedQuaternion.FromAxisAngle(Vector3d.Up, -sourceRotation),
+            ExactContactLever2D.ToSpatial(LocalCenterOfMassOffset));
+        if (manifold == null)
         {
-            responseResolved =
-                ContactNormalImpulseMixed.TryCalculateVelocityDeltasExact(
-                    targetResponseBody,
-                    targetLinearVelocity,
-                    targetAngularVelocity,
-                    contact.Anchor3D.GetLeverFrom(targetCenter),
-                    sourceResponseBody,
-                    sourceLinearVelocity,
-                    sourceAngularVelocity,
-                    contact.GetPlanarXZLeverFrom(
-                        sourcePosition,
-                        sourceRotation,
-                        LocalCenterOfMassOffset),
-                    contact.Normal3DTo2D,
-                    restitution,
-                    Context.Settings.RestitutionVelocityThreshold,
-                    out response);
+            _rotationalMixedKnownManifold.BeginUpdate(Context.FrameCount);
+            _rotationalMixedKnownManifold.AddContact(default, contact.ToManifoldContact());
+            manifold = _rotationalMixedKnownManifold;
         }
-        if (!responseResolved
-            || !response.IsClosing
-            || (response.HasRepresentableNormalVelocity
-                && response.NormalVelocity >= -Fixed64.Epsilon))
-        {
+        if (!MixedContact.TrySelectClosingContact(manifold, targetCenter, targetLinearVelocity,
+                targetAngularVelocity, sourceCenter, sourceLinearVelocity, sourceAngularVelocity, out _, Collider))
             return false;
-        }
-
-        Vector3d postTargetLinearVelocity = targetLinearVelocity;
-        Vector3d postTargetAngularVelocity = targetAngularVelocity;
+        var impact = new ContactResponseSnapshot(targetPosition, sourcePosition3D, targetCenter, sourceCenter,
+            targetLinearVelocity, targetAngularVelocity, ExactContactLever2D.ToSpatial(sourceLinearVelocity),
+            new Vector3d(Fixed64.Zero, -sourceAngularVelocity, Fixed64.Zero), sourceAngularVelocity);
+        if (!CollisionResponseMixed.TrySolveManifoldVelocity(targetCollider, Collider, manifold, impact,
+                ref _mixedContinuousCollisionImpulses, ref _mixedContinuousCollisionExactImpulses,
+                out ContactResponseSnapshot solved)) return false;
+        Vector3d postTargetLinearVelocity = solved.LinearA;
+        Vector3d postTargetAngularVelocity = solved.AngularA;
+        Vector2d postSourceLinearVelocity = solved.LinearB.ToVector2d();
+        Fixed64 postSourceAngularVelocity = solved.PlanarAngularB;
         Vector3d targetResolvedPosition = default;
-        if (sourceResponseBody != null
-            && !(CanApplyCollisionVelocityDeltas(
-                    response.LinearVelocityDelta2D,
-                    response.AngularVelocityDelta2D)
-                & CanAppendContinuousCollisionFrameSegment(impactElapsedTime)
-                & Context.Physics2D.CanAdmitContinuousCollisionCandidateRefresh(this)))
-        {
-            return false;
-        }
-
-        if (targetResponseBody != null)
-        {
-            bool targetLinearVelocityResolved = Vector3d.TryAdd(
-                targetLinearVelocity,
-                response.LinearVelocityDelta3D,
-                out postTargetLinearVelocity);
-            bool targetAngularVelocityResolved = Vector3d.TryAdd(
-                targetAngularVelocity,
-                response.AngularVelocityDelta3D,
-                out postTargetAngularVelocity);
-            bool targetHandoffAdmissible = targetResponseBody.CanApplyContinuousCollisionHandoff(
-                targetPosition,
-                targetRotation,
-                remainingAfterImpact,
-                out targetResolvedPosition);
-            if (!(targetLinearVelocityResolved
-                    & targetAngularVelocityResolved
-                    & targetHandoffAdmissible))
-            {
-                return false;
-            }
-        }
-
+        bool sourceStateAvailable = sourceResponseBody == null
+            || CanAppendContinuousCollisionFrameSegment(impactElapsedTime)
+                && Context.Physics2D.CanAdmitContinuousCollisionCandidateRefresh(this);
+        bool targetStateAvailable = targetResponseBody == null
+            || targetResponseBody.CanApplyContinuousCollisionHandoff(targetPosition, targetRotation,
+                remainingAfterImpact, out targetResolvedPosition);
+        if (!(sourceStateAvailable & targetStateAvailable)) return false;
         if (sourceResponseBody != null)
             _ = Context.Physics2D.TryReserveContinuousCollisionCandidateRefresh(this);
 
@@ -826,8 +822,11 @@ public sealed partial class SolidBody2D
 
         if (sourceResponseBody != null)
         {
-            ApplyCollisionLinearVelocityDelta(response.LinearVelocityDelta2D);
-            ApplyCollisionAngularVelocityDelta(response.AngularVelocityDelta2D);
+            WakeFromCollision();
+            _linearVelocity = postSourceLinearVelocity;
+            _angularVelocity = postSourceAngularVelocity;
+            RefreshLinearSpeed();
+            RefreshAngularSpeed();
         }
 
         return true;

@@ -19,16 +19,28 @@ namespace Gravitas.Queries;
 public sealed partial class GravitasQueryMixedService
 {
     private static bool TrySweepSphereAgainst2D(
+        Vector3d start, Vector3d end, Vector3d direction, Fixed64 length,
+        Fixed64 radius, LSCollider2D collider, out PhysicsMixedHit hit,
+        bool requireClosingContact = false)
+    {
+        return TrySweepSphereAgainst2DCore(start, end, direction, length, radius, collider,
+                requireClosingContact, out hit)
+            && (!requireClosingContact
+                || MixedContact.IsClosingProjection(end - start, hit.NormalFor3DSource));
+    }
+
+    private static bool TrySweepSphereAgainst2DCore(
         Vector3d start,
         Vector3d end,
         Vector3d direction,
         Fixed64 length,
         Fixed64 radius,
         LSCollider2D collider,
+        bool requireClosingContact,
         out PhysicsMixedHit hit)
     {
         if (collider is LSCompoundCollider2D compound)
-            return TrySweepSphereAgainstCompound2D(start, end, direction, length, radius, compound, out hit);
+            return TrySweepSphereAgainstCompound2D(start, end, direction, length, radius, compound, requireClosingContact, out hit);
 
         if (collider is LSCircleCollider2D circle)
             return TrySweepSphereAgainstCircleSlab(start, end, direction, length, radius, circle, out hit);
@@ -50,6 +62,7 @@ public sealed partial class GravitasQueryMixedService
         Fixed64 length,
         Fixed64 radius,
         LSCompoundCollider2D compound,
+        bool requireClosingContact,
         out PhysicsMixedHit hit)
     {
         bool found = false;
@@ -59,7 +72,7 @@ public sealed partial class GravitasQueryMixedService
         for (int i = 0; i < compound.PartCount; i++)
         {
             LSCollider2D part = compound.GetPartCollider(i);
-            if (!TrySweepSphereAgainst2D(start, end, direction, length, radius, part, out PhysicsMixedHit candidate))
+            if (!TrySweepSphereAgainst2D(start, end, direction, length, radius, part, out PhysicsMixedHit candidate, requireClosingContact))
                 continue;
 
             if (!PhysicsHitSelectionPolicy.ShouldReplaceDistance(candidate.Distance, found, bestDistance))

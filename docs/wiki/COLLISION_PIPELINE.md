@@ -332,7 +332,7 @@ TOI ordering, and service counters:
 ## Response And Notifications
 
 Non-trigger contacts are solved through deterministic manifold response.
-3D manifolds retain independent surface groups capped at four point samples each.
+3D and mixed manifolds retain independent surface groups capped at four point samples each.
 Sequential rows read current velocities while restitution uses incoming motion
 captured before island warm starts. Multipoint pairs honor the configured solver
 budget even when they form the only pair in an island.

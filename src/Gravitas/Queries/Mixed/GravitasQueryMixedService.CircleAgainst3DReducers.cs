@@ -8,6 +8,7 @@
 using FixedMathSharp;
 using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
+using Gravitas.CollisionHandling;
 using SwiftCollections.Query;
 using System;
 
@@ -19,6 +20,18 @@ namespace Gravitas.Queries;
 public sealed partial class GravitasQueryMixedService
 {
     private bool TrySweepCircleAgainst3DCollider(
+        LSCollider collider, Vector2d start, Vector2d end, Vector2d direction2D,
+        Fixed64 length, Fixed64 radius, Fixed64 slabCenterY, Fixed64 halfThickness,
+        Vector3d direction3D, LSCollider2D? sourceCollider, out PhysicsMixedHit hit,
+        bool requireClosingContact = false)
+    {
+        return TrySweepCircleAgainst3DColliderCore(collider, start, end, direction2D, length,
+                radius, slabCenterY, halfThickness, direction3D, sourceCollider, requireClosingContact, out hit)
+            && (!requireClosingContact
+                || MixedContact.IsClosingProjection(ExactContactLever2D.ToSpatial(end - start), hit.Normal3DTo2D));
+    }
+
+    private bool TrySweepCircleAgainst3DColliderCore(
         LSCollider collider,
         Vector2d start,
         Vector2d end,
@@ -29,6 +42,7 @@ public sealed partial class GravitasQueryMixedService
         Fixed64 halfThickness,
         Vector3d direction3D,
         LSCollider2D? sourceCollider,
+        bool requireClosingContact,
         out PhysicsMixedHit hit)
     {
         if (collider is LSSphereCollider sphere)
@@ -94,10 +108,10 @@ public sealed partial class GravitasQueryMixedService
             return TrySweepCircleAgainstCone(start, end, direction2D, length, radius, slabCenterY, halfThickness, direction3D, cone, sourceCollider, out hit);
 
         if (collider is LSMeshCollider mesh)
-            return TrySweepCircleAgainstMesh(start, end, direction2D, length, radius, slabCenterY, halfThickness, direction3D, mesh, sourceCollider, out hit);
+            return TrySweepCircleAgainstMesh(start, end, direction2D, length, radius, slabCenterY, halfThickness, direction3D, mesh, sourceCollider, requireClosingContact, out hit);
 
         if (collider is LSCompoundCollider compound)
-            return TrySweepCircleAgainstCompound3D(start, end, direction2D, length, radius, slabCenterY, halfThickness, direction3D, compound, sourceCollider, out hit);
+            return TrySweepCircleAgainstCompound3D(start, end, direction2D, length, radius, slabCenterY, halfThickness, direction3D, compound, sourceCollider, requireClosingContact, out hit);
 
         hit = default;
         return false;
@@ -312,6 +326,7 @@ public sealed partial class GravitasQueryMixedService
         Vector3d direction3D,
         LSMeshCollider mesh,
         LSCollider2D? sourceCollider,
+        bool requireClosingContact,
         out PhysicsMixedHit hit)
     {
         CreateCircleSlabSweepBounds(
@@ -324,6 +339,32 @@ public sealed partial class GravitasQueryMixedService
             out Vector3d max);
         mesh.GetTrianglesInBounds(new FixedBoundVolume(min, max), _meshTriangleCandidates);
         LastMeshTriangleCandidateCount += _meshTriangleCandidates.Count;
+
+        ContactManifold initial = _context.CollisionScratch.MeshSurfaceManifold;
+        initial.BeginUpdate(_context.FrameCount);
+        // Initial admission should not pay exact section tests for triangles
+        // reached only later in the sweep. Keep the full list for impact search.
+        CreateCircleSlabSweepBounds(start, start, radius, slabCenterY, halfThickness, out min, out max);
+        var initialTriangles = _context.CollisionScratch.MeshTriangleCandidatesA;
+        mesh.GetTrianglesInBounds(new FixedBoundVolume(min, max), initialTriangles);
+        bool initiallyOverlapping = CollisionDetectionMixed.AppendMeshCircleSlabContacts(mesh,
+            new Vector3d(start.X, slabCenterY, start.Y), radius, halfThickness,
+            initialTriangles.AsReadOnlySpan(), initial);
+        if (initiallyOverlapping)
+        {
+            // Initial overlap is geometric, so motion cannot turn a filled face into an authored seam.
+            ManifoldContact row = initial.PrimaryContact;
+            ContactAnchor center = ContactAnchor.FromWorldPoint(Vector3d.Zero);
+            MixedContact closing = default;
+            if (!requireClosingContact || MixedContact.TrySelectClosingContact(initial, center,
+                    Vector3d.Zero, Vector3d.Zero, center, end - start, Fixed64.Zero, out closing))
+            {
+                if (requireClosingContact) row = closing.ToManifoldContact();
+                hit = new PhysicsMixedHit(mesh, sourceCollider, row.AnchorA, row.AnchorB, row.Normal,
+                    PhysicsQueryReducerKind.Exact, Fixed64.Zero, direction3D);
+                return true;
+            }
+        }
 
         bool found = false;
         Fixed64 bestDistance = Fixed64.MaxValue;
@@ -364,20 +405,47 @@ public sealed partial class GravitasQueryMixedService
                 continue;
             }
 
+            // Every genuine initial region was inspected above. An overlapping
+            // triangle's arbitrary point normal must not fabricate a closing
+            // seam or prevent a later independent wall from being considered.
+            if (requireClosingContact && initiallyOverlapping && distance == Fixed64.Zero)
+                continue;
+
             Vector2d center2D = new FixedSegment2d(start, end)
                 .GetPointAtDistance(distance, length);
             Vector3d sweepCenter = new(center2D.X, slabCenterY, center2D.Y);
-            best = BuildCircleAgainst3DHit(
-                mesh,
-                triangleContact,
-                sweepCenter,
-                direction3D,
-                radius,
-                slabCenterY,
-                halfThickness,
-                PhysicsQueryReducerKind.Exact,
-                distance,
-                sourceCollider);
+            PhysicsMixedHit candidate = default;
+            bool filledHit = false;
+            if (requireClosingContact)
+            {
+                // A triangle can be first reached through an authored diagonal.
+                // Certify its candidate against the filled local region before
+                // reducing distance, so a nonclosing seam cannot hide a later wall.
+                CreateCircleSlabSweepBounds(center2D, center2D, radius, slabCenterY, halfThickness,
+                    out Vector3d localMin, out Vector3d localMax);
+                var localTriangles = _context.CollisionScratch.MeshTriangleCandidatesA;
+                mesh.GetTrianglesInBounds(new FixedBoundVolume(localMin, localMax), localTriangles);
+                initial.BeginUpdate(_context.FrameCount);
+                if (CollisionDetectionMixed.AppendMeshCircleSlabContacts(mesh, sweepCenter, radius,
+                        halfThickness, localTriangles.AsReadOnlySpan(), initial))
+                {
+                    ContactAnchor center = ContactAnchor.FromWorldPoint(Vector3d.Zero);
+                    if (!MixedContact.TrySelectClosingContact(initial, center, Vector3d.Zero,
+                            Vector3d.Zero, center, end - start, Fixed64.Zero, out MixedContact closing))
+                        continue;
+                    candidate = new PhysicsMixedHit(mesh, sourceCollider, closing.Anchor3D,
+                        closing.Anchor2D, closing.Normal3DTo2D, PhysicsQueryReducerKind.Exact,
+                        distance, direction3D);
+                    filledHit = true;
+                }
+            }
+            if (!filledHit)
+                candidate = BuildCircleAgainst3DHit(mesh, triangleContact, sweepCenter, direction3D,
+                    radius, slabCenterY, halfThickness, PhysicsQueryReducerKind.Exact, distance, sourceCollider);
+            if (requireClosingContact
+                && !MixedContact.IsClosingProjection(ExactContactLever2D.ToSpatial(end - start), candidate.Normal3DTo2D))
+                continue;
+            best = candidate;
             bestDistance = distance;
             bestTriangleIndex = triangleIndex;
             found = true;
@@ -398,6 +466,7 @@ public sealed partial class GravitasQueryMixedService
         Vector3d direction3D,
         LSCompoundCollider compound,
         LSCollider2D? sourceCollider,
+        bool requireClosingContact,
         out PhysicsMixedHit hit)
     {
         bool found = false;
@@ -418,7 +487,8 @@ public sealed partial class GravitasQueryMixedService
                 halfThickness,
                 direction3D,
                 sourceCollider,
-                out PhysicsMixedHit candidate))
+                out PhysicsMixedHit candidate,
+                requireClosingContact))
             {
                 continue;
             }

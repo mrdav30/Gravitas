@@ -264,7 +264,7 @@ public sealed partial class SolidBody2D
                 Fixed64 witnessedTime = useMixed ? mixedHit.ContactTime : contactTime;
                 bool responseWitnessIsEarliest = witnessedTime == conservativeTime;
                 bool canResolveMovingPair = responseWitnessIsEarliest && (useMixed
-                    ? mixedHit.HasContact
+                    ? mixedHit.HasClosingContact
                         && TryApplyMixedRotationalContinuousCollisionResponse(
                             mixedHit.Target,
                             mixedHit.Contact,
@@ -274,7 +274,8 @@ public sealed partial class SolidBody2D
                             currentRotation,
                             angularDelta,
                             elapsedTime,
-                            remainingTime)
+                            remainingTime,
+                            manifold: mixedHit.Manifold)
                     : hasContact
                         && target!.Body is SolidBody2D targetBody
                         && TryApplyRotationalContinuousCollisionResponse(

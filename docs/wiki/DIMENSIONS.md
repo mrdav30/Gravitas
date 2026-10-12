@@ -386,6 +386,29 @@ host transform's Y position. `CollisionPairMixed` owns stable mixed pair
 identity, wake propagation, resting-pair retention, pooled pair reuse, mixed
 contact events, and trigger-only mixed events.
 
+`CollisionDetectionMixed.TryBuildManifold(...)` fills a caller-owned
+`ContactManifold`: A identifies the 3D collider and B the embedded 2D collider.
+Compound parts retain their materials and separate provenance. Finite mesh
+surfaces retain physical shape supports clipped to the filled face and genuine
+perimeter constraints; authored triangulation seams are not physical features.
+Flat support regions remain distinct across holes. Curved supports retain one
+point, and support lines retain their actual endpoints. Circular normal response
+uses the geometric center's planar lever, preserving zero yaw torque about that
+center; friction still uses the surface lever.
+
+Deep finite penetration can overlap a face without reaching those ordinary
+support or perimeter witnesses. Its fallback requires exact filled-domain
+admission and a true finite-feature contact that supplies a separating support
+plane for the whole owner. This clearance can be conservative for concave
+surfaces; it does not promise their shortest escape. Holes remain absent material.
+
+`CollisionDetectionMixed.TryCollide(...)` and `CollisionPairMixed.Contact`
+expose the deepest retained representative. Its depth describes that constraint,
+not a translation guaranteed to escape a nonconvex owner. Inspect
+`CollisionPairMixed.Manifold` when the complete contact set matters. Response,
+awake coupling and CCD use all retained constraints; enter/stay/exit events
+remain once per pair.
+
 `CollisionResponseMixed` applies the constrained response model:
 
 - planar correction and impulses can move 2D bodies in X/Z.
@@ -395,6 +418,12 @@ contact events, and trigger-only mixed events.
   constrained mass.
 - material-resolved restitution and friction follow the mixed contact normal
   policy.
+
+Multipoint mixed pairs use `DiscreteSolverIterations`. Rows retain independent
+impulse accumulation and the incoming motion used for restitution. Equal-normal
+rows share the deepest positional correction, while their contact arms remain
+independent velocity constraints. Accumulation is per step; mixed pairs do not
+apply cross-frame warm starts.
 
 Mixed contact processing runs during `LateSimulate()` after both dimension-local
 services have integrated bodies and refreshed their own collider partitions.

@@ -12,6 +12,7 @@ using System.Runtime.CompilerServices;
 
 namespace Gravitas;
 
+/// <content>Builds mixed islands and solves every retained contact constraint.</content>
 internal sealed partial class GravitasMixedCollisionService
 {
     private void SolveMixedResponsePairs()
@@ -22,13 +23,13 @@ internal sealed partial class GravitasMixedCollisionService
         if (_mixedResponsePairs.Count == 1)
         {
             CollisionPairMixed pair = _mixedResponsePairs[0];
-            bool hasPlanarResponseCoupling = CollisionResponseMixed.HasPlanarResponseCoupling(pair, pair.Contact);
+            bool hasPlanarResponseCoupling = CollisionResponseMixed.HasPlanarResponseCoupling(pair);
             if (!ShouldSolveSingleMixedPair(pair, hasPlanarResponseCoupling))
                 return;
 
             if (hasPlanarResponseCoupling)
                 pair.WakeSleepingBodiesForCollision();
-            CollisionResponseMixed.Resolve(pair, pair.Contact);
+            CollisionResponseMixed.ResolveManifold(pair);
             return;
         }
 
@@ -78,7 +79,7 @@ internal sealed partial class GravitasMixedCollisionService
             CollisionPairMixed pair = _mixedResponsePairs[i];
             int node3D = FindMixedIslandNode(pair.Collider3D.Body);
             int node2D = FindMixedIslandNode(pair.Collider2D.Body);
-            if (CollisionResponseMixed.HasPlanarResponseCoupling(pair, pair.Contact)
+            if (CollisionResponseMixed.HasPlanarResponseCoupling(pair)
                 && node3D >= 0
                 && node2D >= 0)
                 UnionMixedIslandNodes(node3D, node2D);
@@ -154,10 +155,13 @@ internal sealed partial class GravitasMixedCollisionService
         if (end - start == 1)
         {
             CollisionPairMixed pair = _mixedIslandConstraints[start].Pair;
-            CollisionResponseMixed.Resolve(pair, pair.Contact);
+            CollisionResponseMixed.ResolveManifold(pair);
             return;
         }
 
+        // Snapshot every pair before the first row changes an island participant.
+        for (int i = start; i < end; i++)
+            CollisionResponseMixed.PrepareSolve(_mixedIslandConstraints[i].Pair);
         int iterationLimit = _context.Settings.DiscreteSolverIterations;
         int iterationsUsed = 0;
         for (int iteration = 0; iteration < iterationLimit; iteration++)
@@ -166,9 +170,8 @@ internal sealed partial class GravitasMixedCollisionService
             for (int i = start; i < end; i++)
             {
                 CollisionPairMixed pair = _mixedIslandConstraints[i].Pair;
-                CollisionResponseMixed.Resolve(
+                CollisionResponseMixed.ResolveManifold(
                     pair,
-                    pair.Contact,
                     iteration,
                     iterationLimit,
                     applyPositionCorrection);
@@ -176,6 +179,8 @@ internal sealed partial class GravitasMixedCollisionService
 
             iterationsUsed = iteration + 1;
         }
+        for (int i = start; i < end; i++)
+            _mixedIslandConstraints[i].Pair.ResponseSnapshot = default;
 
         _context.Diagnostics.EmitMixedResponseIsland(
             rootKey,

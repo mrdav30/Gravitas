@@ -2,7 +2,7 @@
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-109`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-110`.
 - Assign an ID when an issue enters this tracker, keep it through resolution,
   and never reuse an ID even if an entry is later removed. Check this file's Git
   history before advancing or repairing the counter.
@@ -37,24 +37,6 @@
 
 ### Ordered Queue
 
-### GRV-Issue-098 - Mixed curved slab mesh contacts can select a covered seam
-
-- **Confirmed:** 2026-10-08 against the unchanged #095 baseline, with both
-  windings of the same concave quad. A radius-`1/2` circle slab or positive-core
-  stadium slab centered at `(3/10, -1/4, 3/10)`, with mixed half-thickness
-  `1/2`, intersects the surface strictly inside its perimeter.
-- **Reproduction:** `CollisionDetectionMixed.TryCollide` selects the planar
-  normal approximately `(0.70711, 0, 0.70711)` and depths approximately
-  `0.07574` (circle) or `0.16412` (stadium with total height `5/4`). The complete
-  flat surface requires a downward `1/4` exit; its covered diagonal cannot
-  provide a planar escape.
-- **Root cause:** The mixed mesh reducer selects the shallowest individual
-  triangle/slab exit without proving that it leaves the adjacent surface.
-- **Follow-up:** Establish mixed surface reduction for curved slabs with genuine
-  boundary controls, then audit embedded AABB/polygon prisms separately. Keep
-  the plane-constrained 2D response and 3D-to-2D normal convention explicit.
-- **Evidence:** The same ignored audit and log retain all four mixed failures.
-
 ### GRV-Issue-103 - Contained mixed circle sweeps can report inward solid-target normals
 
 - **Confirmed:** 2026-10-10 in two local-stack Release query probes during
@@ -80,6 +62,37 @@
   `mixed-probe.log` and paired TRX retain both failures and exact returned data.
   The temporary probe is removed from the maintained suite. This is separate
   from #098's covered-mesh-seam reduction and the 3D normal reversal in #100.
+
+### GRV-Issue-109 - Mixed circle segment sweeps can turn exact grazing into closing contact
+
+- **Confirmed:** 2026-10-12 during #098's finite-corner parity checks. The
+  direction-based mathematics reproduces the result using a pre-refinement
+  assembly; the mixed query's segment normalization and the upstream projected
+  sweep owners are unchanged by this work.
+- **Reproduction:** A static concave mesh has vertices `(0,-2,0)`, `(0,2,0)`,
+  `(0,-2,-100)`, `(0,2,-100)` and indices `0,1,2, 1,3,2`. At slab Y zero and
+  half-thickness `1/2`, use `(a,b,r)=(3,4,5)`, `(5,12,13)` or `(7,24,25)`.
+  Set tangent center `t=(-b,a)`, travel `v=(a,b)`, and sweep a circle of radius
+  `r` from `t-v` to `t+v`. This segment only grazes the finite corner at its
+  midpoint. `SweepCircleAgainstStatic3DAll(requireClosingContact: true)`
+  reports a closing hit for the first and third forward sweeps and the second
+  reversed sweep; the opposite directions return none.
+- **Root cause:** `SweepCircle3D` supplies `segment.Normalized` and its rounded
+  magnitude to direction-based geometry, then reconstructs the contact center
+  from the original endpoints. A Q32.32 normalized direction can change the
+  exact segment line. The upstream point solver retains its actual direction
+  squared, so this is not an omitted unit-length correction in that solver.
+  The resulting early entry distances are approximately `4.99995175`,
+  `12.99984439` and `24.99978421` instead of the tangent distances `5`, `13`
+  and `25`; the reconstructed normals acquire a negative closing projection.
+- **Follow-up:** Preserve the authored segment through mixed projected sweep
+  geometry and final interpolation. Check reversal, true entering/leaving and
+  full-loop CCD, then audit the 3D/2D counterparts that normalize segment input.
+  Do not discard real shallow intersections using a velocity tolerance.
+- **Evidence:** Ignored `artifacts/grv-issue-098/PythagoreanTangentProbe.cs`
+  retains the failed runtime fixture; `tangent-probe/result.txt` records the
+  independent direction-based reproduction. This issue is independent of the
+  initial-overlap surface reduction corrected by #098.
 
 ### GRV-Issue-101 - Rotational CCD can freeze separated motion inside a concave mesh's aggregate bounds
 
@@ -175,6 +188,39 @@
 Remaining measured performance costs are tracked in the benchmark backlog.
 
 ## Resolved Issues
+
+### GRV-Issue-098 - Mixed curved slab mesh contacts can select a covered seam
+
+- **Resolved:** 2026-10-12. Mixed mesh contacts now retain the existing grouped
+  manifold for finite circle, stadium, AABB and polygon slabs. Exact triangle
+  admission and actual shared-feature connectivity precede physical plane-support
+  and true-perimeter constraints; holes and disconnected regions stay separate.
+  Deep finite penetration without an ordinary constraint has a certified
+  whole-owner clearance fallback. Single-contact inspection is representative,
+  rather than a global minimum-exit promise.
+- **Original defect:** Confirmed 2026-10-08 against unchanged #095 source. The
+  two-triangle quad selected its covered diagonal for circle/stadium slabs at
+  depths about 0.07574/0.16412 instead of the actual 1/4 vertical exit. AABB and
+  polygon counterparts, initial mixed circle queries and full-loop lateral
+  corrections reproduce the same policy defect. A stadium spanning two annulus
+  strips still overlaps after an individual triangle's reported exit.
+- **Runtime:** Discrete response, awake coupling, diagnostics, replay hashing,
+  and translational/rotational CCD consume all retained rows. Equivalent normal
+  position correction has one owner, 2D Y remains constrained, compound material
+  and leaf identity survive publication, and circular normal Jacobians preserve
+  geometric yaw symmetry without removing offset torque or friction.
+- **Verification:** All four slab families retain winding, subdivision, finite
+  rims, concavity, whole-owner fallback, full-loop and allocation controls.
+  Both repositories pass complete Release/Lean suites with raw 100% reachable
+  line/branch/method coverage; builds, DocFX, Windows x64 cross-profile replay
+  and warmed 0 B/op gates pass. Independent geometry/ponytail review approved
+  the implementation. Introduced cost was refined within the phase.
+- **Record:** [Mixed Surface Contacts](done/2026-10-12-mixed-surface-contact-plan.md)
+  contains the design, width/rounding contracts, final measurements, artifact
+  paths and pending native CI/released-package integration gates. #103 remains
+  a separate solid-target containment policy; #109 records pre-existing segment
+  normalization tangency, and the existing projected-sweep throughput signal
+  belongs to FixedMathSharp.
 
 ### GRV-Issue-108 - Initial capsule sweeps can select a covered coplanar mesh seam
 

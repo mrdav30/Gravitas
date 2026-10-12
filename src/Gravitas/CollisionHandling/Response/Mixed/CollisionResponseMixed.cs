@@ -16,7 +16,8 @@ namespace Gravitas.CollisionHandling;
 /// <summary>
 /// Solves deterministic mixed 3D/2D contact response with the 2D body constrained to its X/Z plane.
 /// </summary>
-public static class CollisionResponseMixed
+/// <content>Owns single contacts and grouped mixed normal, friction and correction constraints.</content>
+public static partial class CollisionResponseMixed
 {
     /// <summary>Penetration tolerated before positional correction is applied.</summary>
     public static readonly Fixed64 PenetrationSlop = (Fixed64)0.01f;
@@ -32,14 +33,15 @@ public static class CollisionResponseMixed
         MixedContact contact,
         int iteration,
         int iterationLimit,
-        bool applyPositionCorrection)
+        bool applyPositionCorrection,
+        bool authoritativeNormal = false)
     {
         if (!contact.HasContact || pair.Collider3D.IsTrigger || pair.Collider2D.IsTrigger)
             return false;
 
         SolidBody? body3D = pair.Collider3D.Body;
         SolidBody2D? body2D = pair.Collider2D.Body;
-        Vector3d normal = ResolveNormal(pair, contact);
+        Vector3d normal = authoritativeNormal ? contact.Normal3DTo2D.Normalized : ResolveNormal(pair, contact);
         bool hasPlanarResponseCoupling = normal.ToVector2d() != Vector2d.Zero;
 
         Fixed64 correctionInverseMass = GetConstrainedInverseMass(body3D, normal)
@@ -74,8 +76,9 @@ public static class CollisionResponseMixed
                 ? Fixed64.Zero
                 : ResolveAngularVelocity(body2D);
 
+        ExactContactImpulseState? exactImpulse = null;
         bool normalResolved = TryGetNormalImpulse(
-            pair,
+            pair.Collider3D, pair.Collider2D,
             contact,
             body3D,
             body2D,
@@ -88,7 +91,10 @@ public static class CollisionResponseMixed
             normalAngularVelocity3D,
             normalLinearVelocity2D,
             normalAngularVelocity2D,
-            out ContactNormalImpulseResultMixed normalResult);
+            ref exactImpulse,
+            out ContactNormalImpulseResultMixed normalResult,
+            featureNamespace2D: authoritativeNormal ? pair.Manifold.PrimaryContact.FeatureNamespaceB : 0,
+            detected: authoritativeNormal);
         if (!normalResolved
             || !CanApplyNormalVelocityDeltas(body3D, body2D, normalResult))
         {
@@ -155,10 +161,6 @@ public static class CollisionResponseMixed
         return appliedImpulse | frictionApplied;
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static bool HasPlanarResponseCoupling(CollisionPairMixed pair, MixedContact contact) =>
-        ResolveNormal(pair, contact).ToVector2d() != Vector2d.Zero;
-
     private static void ApplyPositionCorrection(
         SolidBody? body3D,
         SolidBody2D? body2D,
@@ -184,7 +186,8 @@ public static class CollisionResponseMixed
     }
 
     private static bool TryGetNormalImpulse(
-        CollisionPairMixed pair,
+        LSCollider collider3D,
+        LSCollider2D collider2D,
         MixedContact contact,
         SolidBody? body3D,
         SolidBody2D? body2D,
@@ -197,20 +200,41 @@ public static class CollisionResponseMixed
         Vector3d angularVelocity3D,
         Vector2d linearVelocity2D,
         Fixed64 angularVelocity2D,
-        out ContactNormalImpulseResultMixed result)
+        ref ExactContactImpulseState? exactImpulse,
+        out ContactNormalImpulseResultMixed result,
+        Fixed64 accumulatedImpulse = default,
+        in ContactResponseSnapshot impact = default,
+        int featureNamespace2D = 0,
+        bool detected = false)
     {
+        ContactAnchor normalAnchor2D = contact.Anchor2D;
+        ContactAnchor center2D = default;
+        if (detected)
+        {
+            center2D = impact.IsValid ? impact.CenterB : body2D == null
+                ? ContactAnchor.FromWorldPoint(MixedEmbedded2DGeometry.GetCenter3D(collider2D))
+                : new ContactAnchor(new Vector3d(body2D.Position.X, collider2D.MixedSlabCenterY, body2D.Position.Y),
+                    FixedQuaternion.FromAxisAngle(Vector3d.Up, -body2D.Rotation),
+                    ExactContactLever2D.ToSpatial(body2D.LocalCenterOfMassOffset));
+            normalAnchor2D = ExactContactLever2D.GetDetectedNormalAnchor(collider2D,
+                featureNamespace2D, center2D, contact.Anchor2D);
+            hasCompact2D = normalAnchor2D.TryGetOffsetFrom(center2D, out Vector3d normalLever2D);
+            relative2D = normalLever2D.ToVector2d();
+        }
         PhysicsMaterial material3D = contact.HasMaterialOverride
             ? contact.Material3D
-            : pair.Collider3D.Material;
+            : collider3D.Material;
         PhysicsMaterial material2D = contact.HasMaterialOverride
             ? contact.Material2D
-            : pair.Collider2D.Material;
+            : collider2D.Material;
         Fixed64 restitution =
             PhysicsMaterial.CombineRestitution(material3D, material2D);
         Fixed64 restitutionVelocityThreshold =
-            pair.Context.Settings.RestitutionVelocityThreshold;
+            collider3D.Context.Settings.RestitutionVelocityThreshold;
         if (hasCompact3D
             && hasCompact2D
+            && exactImpulse?.HasNormal != true
+            && (!impact.IsValid || restitution == Fixed64.Zero)
             && ContactNormalImpulseMixed.CanUseCompactResponse(
                 body3D,
                 linearVelocity3D,
@@ -233,7 +257,7 @@ public static class CollisionResponseMixed
                 normal,
                 restitution,
                 restitutionVelocityThreshold,
-                Fixed64.Zero,
+                accumulatedImpulse,
                 Fixed64.One,
                 Fixed64.One,
                 out result))
@@ -241,13 +265,20 @@ public static class CollisionResponseMixed
             return true;
         }
 
-        GetExactLevers(
-            pair,
-            contact,
-            body3D,
-            body2D,
-            out ExactLever3D exact3D,
-            out ExactLever3D exact2D);
+        ExactLever3D exact3D, exact2D;
+        if (impact.IsValid)
+        {
+            exact3D = contact.Anchor3D.GetLeverFrom(impact.CenterA);
+            exact2D = normalAnchor2D.GetLeverFrom(impact.CenterB);
+        }
+        else
+        {
+            exact3D = contact.Anchor3D.GetLeverFrom(body3D?.GetCenterOfMassAnchor()
+                ?? ContactAnchor.FromWorldPoint(collider3D.Center));
+            exact2D = detected ? normalAnchor2D.GetLeverFrom(center2D) : body2D == null
+                ? contact.GetPlanarXZLeverFrom(collider2D.Center, Fixed64.Zero, Vector2d.Zero)
+                : contact.GetPlanarXZLeverFrom(body2D.Position, body2D.Rotation, body2D.LocalCenterOfMassOffset);
+        }
         return ContactNormalImpulseMixed.TryCalculateAccumulatedDeltaExact(
             body3D,
             linearVelocity3D,
@@ -260,10 +291,10 @@ public static class CollisionResponseMixed
             normal,
             restitution,
             restitutionVelocityThreshold,
-            Fixed64.Zero,
+            accumulatedImpulse,
             Fixed64.One,
             Fixed64.One,
-            out result);
+            ref exactImpulse, out result, impact);
     }
 
     private static bool CanApplyNormalVelocityDeltas(

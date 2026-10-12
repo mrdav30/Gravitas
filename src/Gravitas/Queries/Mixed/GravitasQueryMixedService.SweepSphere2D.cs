@@ -73,7 +73,8 @@ public sealed partial class GravitasQueryMixedService
         SwiftList<PhysicsMixedHit> results,
         LSCollider? excludedCollider = null,
         bool includeTriggers = true,
-        bool cacheTargetPartitions = false)
+        bool cacheTargetPartitions = false,
+        bool requireClosingContact = false)
     {
         return SweepSphereAgainst2DAllCore(
             start,
@@ -84,7 +85,8 @@ public sealed partial class GravitasQueryMixedService
             excludedCollider,
             includeTriggers,
             staticTargetsOnly: true,
-            cacheTargetPartitions);
+            cacheTargetPartitions,
+            requireClosingContact);
     }
 
     private bool SweepSphereAgainst2DClosestCore(
@@ -176,7 +178,8 @@ public sealed partial class GravitasQueryMixedService
         LSCollider? excludedCollider,
         bool includeTriggers,
         bool staticTargetsOnly,
-        bool cacheTargetPartitions = false)
+        bool cacheTargetPartitions = false,
+        bool requireClosingContact = false)
     {
         SwiftThrowHelper.ThrowIfNull(results, nameof(results));
         SwiftThrowHelper.ThrowIfArgument(radius <= Fixed64.Zero, nameof(radius), "Mixed swept sphere radius must be greater than zero.");
@@ -218,7 +221,8 @@ public sealed partial class GravitasQueryMixedService
                 staticTargetsOnly,
                 captureReducerDiagnostics,
                 ref reducerCounters,
-                out PhysicsMixedHit candidate))
+                out PhysicsMixedHit candidate,
+                requireClosingContact))
             {
                 results.Add(candidate);
             }

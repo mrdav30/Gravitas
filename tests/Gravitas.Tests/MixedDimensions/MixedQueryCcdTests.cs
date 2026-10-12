@@ -3573,7 +3573,7 @@ public sealed partial class MixedQueryCcdTests
     }
 
     [Fact]
-    public void SweepCircleAgainst3D_WithMeshPointAtSweepCenter_ShouldUseOppositeDirectionFallback()
+    public void SweepCircleAgainst3D_WithMeshPointAtSweepCenter_ShouldUseMotionIndependentFiniteFace()
     {
         using GravitasWorldContext context = CreateMixedContext();
         ScenarioBody<LSMeshCollider> mesh = CreateMesh3D(
@@ -3582,25 +3582,40 @@ public sealed partial class MixedQueryCcdTests
             Vector3d.Zero,
             immovable: true);
 
-        bool mixedHit = context.QueryMixed.SweepCircleAgainst3D(
-            Vector2d.Zero,
-            new Vector2d((Fixed64)3, Fixed64.Zero),
-            Fixed64.Half,
-            Fixed64.One,
-            Fixed64.Half,
-            IncludeLayerZero,
-            out PhysicsMixedHit hit);
+        ContactAnchor firstMeshAnchor = default, firstSlabAnchor = default;
+        foreach (int direction in new[] { 1, -1 })
+        {
+            Vector2d travel = Vector2d.Right * (Fixed64)direction;
+            bool mixedHit = context.QueryMixed.SweepCircleAgainst3D(
+                Vector2d.Zero, travel * (Fixed64)3, Fixed64.Half,
+                Fixed64.One, Fixed64.Half, IncludeLayerZero, out PhysicsMixedHit hit);
 
-        mixedHit.Should().BeTrue();
-        hit.Collider3D.Should().BeSameAs(mesh.Collider);
-        hit.Body3D.Should().BeSameAs(mesh.Body);
-        hit.Collider2D.Should().BeNull();
-        hit.Distance.Should().Be(Fixed64.Zero);
-        hit.Point3D.Should().Be(new Vector3d(Fixed64.Zero, Fixed64.One, Fixed64.Zero));
-        hit.Point2D.Should().Be(new Vector3d(Fixed64.Half, Fixed64.One, Fixed64.Zero));
-        hit.Normal3DTo2D.Should().Be(-Vector3d.Right);
-        hit.Direction3D.Should().Be(Vector3d.Right);
-        hit.ReducerKind.Should().Be(PhysicsQueryReducerKind.Exact);
+            mixedHit.Should().BeTrue();
+            hit.Collider3D.Should().BeSameAs(mesh.Collider);
+            hit.Body3D.Should().BeSameAs(mesh.Body);
+            hit.Collider2D.Should().BeNull();
+            hit.Distance.Should().Be(Fixed64.Zero);
+            // The triangle lies on Y-Z=1. Its vertex meets the finite slab,
+            // whose paired cap/rim exit is (0,3/2,-1/2), independent of travel.
+            hit.Point3D.Should().Be(new Vector3d(Fixed64.Zero, Fixed64.One, Fixed64.Zero));
+            hit.Point2D.Should().Be(new Vector3d(Fixed64.Zero, Fixed64.FromFraction(3, 2), -Fixed64.Half));
+            Fixed64 component = FixedMath.Sqrt(Fixed64.Half);
+            hit.Normal3DTo2D.X.Should().Be(Fixed64.Zero);
+            (hit.Normal3DTo2D.Y + component).Abs().Should().BeLessThanOrEqualTo(Fixed64.FromRaw(2));
+            (hit.Normal3DTo2D.Z - component).Abs().Should().BeLessThanOrEqualTo(Fixed64.FromRaw(2));
+            hit.Direction3D.Should().Be(Vector3d.Right * (Fixed64)direction);
+            hit.ReducerKind.Should().Be(PhysicsQueryReducerKind.Exact);
+            if (direction == 1)
+            {
+                firstMeshAnchor = hit.Anchor3D;
+                firstSlabAnchor = hit.Anchor2D;
+            }
+            else
+            {
+                hit.Anchor3D.Should().Be(firstMeshAnchor);
+                hit.Anchor2D.Should().Be(firstSlabAnchor);
+            }
+        }
     }
 
     [Fact]

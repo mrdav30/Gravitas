@@ -16,68 +16,75 @@ namespace Gravitas.CollisionHandling;
 /// <summary>
 /// Deterministic mixed 2D/3D narrow-phase collision checks.
 /// </summary>
+/// <content>Builds caller-owned mixed manifolds and provides representative contact inspection.</content>
 public static partial class CollisionDetectionMixed
 {
-    /// <summary>Tests a 3D collider against an embedded 2D collider.</summary>
+    /// <summary>Tests a 3D collider against an embedded 2D collider and returns a representative contact.</summary>
+    /// <remarks>The representative is the deepest retained row, not a whole-owner escape. Use <see cref="TryBuildManifold"/> to inspect every constraint.</remarks>
     public static bool TryCollide(LSCollider collider3D, LSCollider2D collider2D, out MixedContact contact)
     {
         SwiftThrowHelper.ThrowIfNull(collider3D, nameof(collider3D));
         SwiftThrowHelper.ThrowIfNull(collider2D, nameof(collider2D));
+        ContactManifold manifold = collider3D.Context.CollisionScratch.MixedManifold;
+        bool found = TryBuildManifold(collider3D, collider2D, manifold);
+        contact = found ? MixedContact.FromManifoldContact(manifold.PrimaryContact) : default;
+        return found;
+    }
 
+    /// <summary>Rebuilds all mixed contacts in a caller-owned manifold, with A identifying the 3D participant and B the embedded 2D participant.</summary>
+    /// <remarks>Compound leaves retain separate provenance and materials. The buffer is cleared even when the pair is separated.</remarks>
+    public static bool TryBuildManifold(LSCollider collider3D, LSCollider2D collider2D, ContactManifold manifold)
+    {
+        SwiftThrowHelper.ThrowIfNull(collider3D, nameof(collider3D));
+        SwiftThrowHelper.ThrowIfNull(collider2D, nameof(collider2D));
+        SwiftThrowHelper.ThrowIfNull(manifold, nameof(manifold));
+        manifold.BeginUpdate(collider3D.Context.FrameCount);
+        AppendManifold(collider3D, collider2D, manifold, 0, 0);
+        return manifold.HasContact;
+    }
+
+    private static void AppendManifold(LSCollider collider3D, LSCollider2D collider2D,
+        ContactManifold manifold, int namespace3D, int namespace2D)
+    {
         if (!collider3D.Bounds.Intersects(collider2D.MixedBounds3D))
+            return;
+
+        if (collider3D is LSCompoundCollider compound3D)
         {
-            contact = default;
-            return false;
+            for (int i = 0; i < compound3D.PartCount; i++)
+                AppendManifold(compound3D.GetPartCollider(i), collider2D, manifold, i + 1, namespace2D);
+            return;
         }
-
         if (collider2D is LSCompoundCollider2D compound2D)
-            return TryEmbeddedCompound2D(collider3D, compound2D, out contact);
+        {
+            for (int i = 0; i < compound2D.PartCount; i++)
+                AppendManifold(collider3D, compound2D.GetPartCollider(i), manifold, namespace3D, -(i + 1));
+            return;
+        }
+        if (collider3D is LSMeshCollider mesh)
+        {
+            AppendMeshEmbedded2D(mesh, collider2D, manifold, namespace3D, namespace2D);
+            return;
+        }
+        if (!TryPrimitiveContact(collider3D, collider2D, out MixedContact contact))
+            return;
 
-        return collider3D.Shape switch
+        if (namespace3D != 0 || namespace2D != 0)
+            contact = contact.WithFallbackMaterials(collider3D.Material, collider2D.Material);
+        ManifoldContact row = contact.ToManifoldContact(namespace3D, namespace2D);
+        manifold.AddContact(new ContactGroupKey(namespace3D, namespace2D), row);
+    }
+
+    private static bool TryPrimitiveContact(LSCollider collider3D, LSCollider2D collider2D, out MixedContact contact) =>
+        collider3D.Shape switch
         {
             ColliderType.Sphere => TrySphereEmbedded2D((LSSphereCollider)collider3D, collider2D, out contact),
             ColliderType.AABox or ColliderType.OBBox => TryCuboidEmbedded2D((LSCuboidCollider)collider3D, collider2D, out contact),
             ColliderType.Capsule => TryCapsuleEmbedded2D((LSCapsuleCollider)collider3D, collider2D, out contact),
             ColliderType.Cylinder => TryCylinderEmbedded2D((LSCylinderCollider)collider3D, collider2D, out contact),
             ColliderType.Cone => TryConeEmbedded2D((LSConeCollider)collider3D, collider2D, out contact),
-            ColliderType.Mesh => TryMeshEmbedded2D((LSMeshCollider)collider3D, collider2D, out contact),
-            ColliderType.Compound => TryCompoundEmbedded2D((LSCompoundCollider)collider3D, collider2D, out contact),
             _ => NoContact(out contact)
         };
-    }
-
-    private static bool TryEmbeddedCompound2D(
-        LSCollider collider3D,
-        LSCompoundCollider2D compound2D,
-        out MixedContact contact)
-    {
-        bool found = false;
-        MixedContact best = default;
-
-        for (int i = 0; i < compound2D.PartCount; i++)
-        {
-            LSCollider2D part = compound2D.GetPartCollider(i);
-            if (!collider3D.Bounds.Intersects(part.MixedBounds3D)
-                || !TryCollide(collider3D, part, out MixedContact candidate))
-            {
-                continue;
-            }
-
-            candidate = candidate.WithFallbackMaterials(collider3D.Material, part.Material);
-
-            if (ContactSelectionPolicy.ShouldReplaceWithShallower(candidate, found, best))
-            {
-                best = candidate;
-                found = true;
-            }
-        }
-
-        if (!found)
-            return NoContact(out contact);
-
-        contact = best;
-        return true;
-    }
 
     private static bool TrySphereEmbedded2D(LSSphereCollider sphere, LSCollider2D embedded, out MixedContact contact)
     {
@@ -108,7 +115,7 @@ public static partial class CollisionDetectionMixed
         }
 
         Vector3d normal = distance > Fixed64.Zero
-            ? delta / distance
+            ? WideNormalization.GetNormalized(inside ? -delta : delta)
             : ResolveFallbackNormal(sphereCenter, embedded);
         bool exactDepth = inside
             ? Fixed64.TryAdd(

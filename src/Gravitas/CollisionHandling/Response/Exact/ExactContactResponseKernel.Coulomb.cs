@@ -173,6 +173,8 @@ internal static partial class ExactContactResponseKernel
             appliedDenominator,
             appliedSign,
             out Vector3d secondAngular);
+        resolved &= firstTangent.CanRepresentAngularDelta(firstAngular);
+        resolved &= secondTangent.CanRepresentAngularDelta(secondAngular);
         if (!resolved)
             return false;
 
@@ -194,7 +196,7 @@ internal static partial class ExactContactResponseKernel
         return true;
     }
 
-    [MethodImpl(MethodImplOptions.NoInlining)]
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static bool TryGetCoulombDiskResponse(
         Vector3d normal,
         Fixed64 completedNormalImpulse,
@@ -209,6 +211,53 @@ internal static partial class ExactContactResponseKernel
         Fixed64 staticFriction,
         Fixed64 dynamicFriction,
         out ExactCoulombResponse3D response)
+    {
+        ExactContactImpulseState? unused = null;
+        return TryGetCoulombDiskResponseRetained(normal, completedNormalImpulse, primaryFirst, primarySecond, primaryTangent,
+            accumulatedPrimaryTangentImpulse, secondaryFirst, secondarySecond, secondaryTangent,
+            accumulatedSecondaryTangentImpulse, staticFriction, dynamicFriction, out response,
+            ref unused, retainOversized: false);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static bool TryGetCoulombDiskResponse(
+        Vector3d normal,
+        Fixed64 completedNormalImpulse,
+        in ExactContactResponseOperand3D primaryFirst,
+        in ExactContactResponseOperand3D primarySecond,
+        Vector3d primaryTangent,
+        Fixed64 accumulatedPrimaryTangentImpulse,
+        in ExactContactResponseOperand3D secondaryFirst,
+        in ExactContactResponseOperand3D secondarySecond,
+        Vector3d secondaryTangent,
+        Fixed64 accumulatedSecondaryTangentImpulse,
+        Fixed64 staticFriction,
+        Fixed64 dynamicFriction,
+        out ExactCoulombResponse3D response,
+        ref ExactContactImpulseState? exactImpulse) =>
+        TryGetCoulombDiskResponseRetained(normal, completedNormalImpulse, primaryFirst, primarySecond, primaryTangent,
+            accumulatedPrimaryTangentImpulse, secondaryFirst, secondarySecond, secondaryTangent,
+            accumulatedSecondaryTangentImpulse, staticFriction, dynamicFriction, out response,
+            ref exactImpulse, retainOversized: true);
+
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static bool TryGetCoulombDiskResponseRetained(
+        Vector3d normal,
+        Fixed64 completedNormalImpulse,
+        in ExactContactResponseOperand3D primaryFirst,
+        in ExactContactResponseOperand3D primarySecond,
+        Vector3d primaryTangent,
+        Fixed64 accumulatedPrimaryTangentImpulse,
+        in ExactContactResponseOperand3D secondaryFirst,
+        in ExactContactResponseOperand3D secondarySecond,
+        Vector3d secondaryTangent,
+        Fixed64 accumulatedSecondaryTangentImpulse,
+        Fixed64 staticFriction,
+        Fixed64 dynamicFriction,
+        out ExactCoulombResponse3D response,
+        ref ExactContactImpulseState? exactImpulse,
+        bool retainOversized)
     {
         response = default;
         if (completedNormalImpulse < Fixed64.Zero
@@ -228,9 +277,17 @@ internal static partial class ExactContactResponseKernel
 
         Span<ulong> normalNumerator = stackalloc ulong[MaxResponseWords];
         Span<ulong> normalDenominator = stackalloc ulong[MaxResponseWords];
-        SetMagnitude(completedNormalImpulse, normalNumerator);
-        normalDenominator.Clear();
-        normalDenominator[0] = 1UL;
+        if (exactImpulse?.HasNormal == true)
+        {
+            exactImpulse.NormalNumerator.CopyTo(normalNumerator);
+            exactImpulse.NormalDenominator.CopyTo(normalDenominator);
+        }
+        else
+        {
+            SetMagnitude(completedNormalImpulse, normalNumerator);
+            normalDenominator.Clear();
+            normalDenominator[0] = 1UL;
+        }
         return TryGetCoulombDiskResponseCore(
             normalNumerator,
             normalDenominator,
@@ -245,7 +302,7 @@ internal static partial class ExactContactResponseKernel
             staticFriction,
             dynamicFriction,
             Fixed64.Epsilon,
-            out response);
+            out response, ref exactImpulse, retainOversized);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
@@ -293,6 +350,7 @@ internal static partial class ExactContactResponseKernel
                 normalDenominator))
             return false;
 
+        ExactContactImpulseState? unused = null;
         return TryGetCoulombDiskResponseCore(
             normalNumerator,
             normalDenominator,
@@ -307,7 +365,7 @@ internal static partial class ExactContactResponseKernel
             staticFriction,
             dynamicFriction,
             Fixed64.Zero,
-            out response);
+            out response, ref unused, retainOversized: false);
     }
 
     private static bool TryGetCoulombDiskResponseCore(
@@ -324,9 +382,13 @@ internal static partial class ExactContactResponseKernel
         Fixed64 staticFriction,
         Fixed64 dynamicFriction,
         Fixed64 velocityDeadzone,
-        out ExactCoulombResponse3D response)
+        out ExactCoulombResponse3D response,
+        ref ExactContactImpulseState? exactImpulse,
+        bool retainOversized)
     {
         response = default;
+        bool wideTangents = exactImpulse?.HasTangents == true;
+        int desiredWords = wideTangents ? MaxCoulombWords : MaxResponseWords;
         Span<ulong> primaryNumerator = stackalloc ulong[MaxResponseWords];
         Span<ulong> primaryDenominator = stackalloc ulong[MaxResponseWords];
         Span<ulong> secondaryNumerator = stackalloc ulong[MaxResponseWords];
@@ -349,21 +411,21 @@ internal static partial class ExactContactResponseKernel
             out int secondarySign);
 
         Span<ulong> desiredPrimaryNumerator =
-            stackalloc ulong[MaxResponseWords];
+            stackalloc ulong[desiredWords];
         Span<ulong> desiredSecondaryNumerator =
-            stackalloc ulong[MaxResponseWords];
-        AddFixedToRatio(
+            stackalloc ulong[desiredWords];
+        AddCachedTangentToRatio(
             primaryNumerator,
             primaryDenominator,
             primarySign,
-            accumulatedPrimaryTangentImpulse,
+            accumulatedPrimaryTangentImpulse, exactImpulse, primary: true,
             desiredPrimaryNumerator,
             out int desiredPrimarySign);
-        AddFixedToRatio(
+        AddCachedTangentToRatio(
             secondaryNumerator,
             secondaryDenominator,
             secondarySign,
-            accumulatedSecondaryTangentImpulse,
+            accumulatedSecondaryTangentImpulse, exactImpulse, primary: false,
             desiredSecondaryNumerator,
             out int desiredSecondarySign);
 
@@ -440,14 +502,14 @@ internal static partial class ExactContactResponseKernel
                     dynamicNumerator,
                     dynamicDenominator,
                     magnitudeSquared,
-                    accumulatedPrimaryTangentImpulse)
+                    accumulatedPrimaryTangentImpulse, exactImpulse, primary: true)
                 || !IsRadialProjectionEqualToFixed(
                     secondaryAtCommon,
                     desiredSecondarySign,
                     dynamicNumerator,
                     dynamicDenominator,
                     magnitudeSquared,
-                    accumulatedSecondaryTangentImpulse);
+                    accumulatedSecondaryTangentImpulse, exactImpulse, primary: false);
             resolved = TryGetDiskVelocityDeltas(
                 primaryFirst,
                 primarySecond,
@@ -469,7 +531,7 @@ internal static partial class ExactContactResponseKernel
                 out firstLinear,
                 out firstAngular,
                 out secondLinear,
-                out secondAngular);
+                out secondAngular, exactImpulse);
         }
         else
         {
@@ -481,19 +543,19 @@ internal static partial class ExactContactResponseKernel
             Span<ulong> appliedSecondaryNumerator =
                 stackalloc ulong[MaxCoulombWords];
             zero.Clear();
-            SubtractFixedFromRatio(
+            SubtractCachedTangentFromRatio(
                 withinStaticLimit ? primaryAtCommon : zero,
                 commonDenominator,
                 withinStaticLimit ? desiredPrimarySign : 0,
-                accumulatedPrimaryTangentImpulse,
+                accumulatedPrimaryTangentImpulse, exactImpulse, primary: true,
                 appliedPrimaryNumerator,
                 appliedDenominator,
                 out int appliedPrimarySign);
-            SubtractFixedFromRatio(
+            SubtractCachedTangentFromRatio(
                 withinStaticLimit ? secondaryAtCommon : zero,
                 commonDenominator,
                 withinStaticLimit ? desiredSecondarySign : 0,
-                accumulatedSecondaryTangentImpulse,
+                accumulatedSecondaryTangentImpulse, exactImpulse, primary: false,
                 appliedSecondaryNumerator,
                 appliedDenominator,
                 out int appliedSecondarySign);
@@ -521,8 +583,10 @@ internal static partial class ExactContactResponseKernel
                 out firstLinear,
                 out firstAngular,
                 out secondLinear,
-                out secondAngular);
+                out secondAngular, exactImpulse);
         }
+        resolved &= primaryFirst.CanRepresentAngularDelta(firstAngular);
+        resolved &= primarySecond.CanRepresentAngularDelta(secondAngular);
         if (!resolved)
             return false;
 
@@ -574,6 +638,37 @@ internal static partial class ExactContactResponseKernel
             hasSecondaryProjection = true;
             primaryProjection = Fixed64.Zero;
             secondaryProjection = Fixed64.Zero;
+        }
+
+        if (retainOversized
+            && (!hasPrimaryProjection || !hasSecondaryProjection || wideTangents))
+        {
+            if (!Vector3d.TryAdd(primaryFirst.LinearVelocity, firstLinear, out _)
+                || !primaryFirst.CanApplyAngularDelta(firstAngular)
+                || !Vector3d.TryAdd(primarySecond.LinearVelocity, secondLinear, out _)
+                || !primarySecond.CanApplyAngularDelta(secondAngular)) return false;
+            Span<ulong> widePrimary = stackalloc ulong[MaxResponseWords];
+            Span<ulong> wideSecondary = stackalloc ulong[MaxResponseWords];
+            if (withinStaticLimit)
+            {
+                RoundCachedRatio(primaryAtCommon, commonDenominator, widePrimary);
+                RoundCachedRatio(secondaryAtCommon, commonDenominator, wideSecondary);
+            }
+            else if (useDynamicProjection)
+            {
+                Span<ulong> projected = stackalloc ulong[MaxCoulombWords + MaxResponseWords];
+                WideArithmetic.MultiplyMagnitudes(primaryAtCommon, dynamicNumerator, projected);
+                RoundCachedRadialRatio(projected, dynamicDenominator, magnitudeSquared, widePrimary);
+                WideArithmetic.MultiplyMagnitudes(secondaryAtCommon, dynamicNumerator, projected);
+                RoundCachedRadialRatio(projected, dynamicDenominator, magnitudeSquared, wideSecondary);
+            }
+            else
+            {
+                widePrimary.Clear();
+                wideSecondary.Clear();
+            }
+            (exactImpulse ??= new ExactContactImpulseState()).SetTangents(
+                widePrimary, desiredPrimarySign, wideSecondary, desiredSecondarySign);
         }
 
         response = new ExactCoulombResponse3D(
@@ -652,7 +747,7 @@ internal static partial class ExactContactResponseKernel
             second.Lever,
             constraint.Normal,
             out Signed832 velocityNumerator,
-            out Signed832 velocityDenominator);
+            out Signed832 velocityDenominator, first.PlanarAngularVelocity, second.PlanarAngularVelocity);
 
         Span<ulong> effectiveNumerator = stackalloc ulong[MaxResponseWords];
         Span<ulong> effectiveDenominator = stackalloc ulong[MaxResponseWords];
@@ -748,7 +843,7 @@ internal static partial class ExactContactResponseKernel
             second.Lever,
             tangent,
             out Signed832 velocityNumerator,
-            out Signed832 velocityDenominator);
+            out Signed832 velocityDenominator, first.PlanarAngularVelocity, second.PlanarAngularVelocity);
 
         Span<ulong> effectiveNumerator = stackalloc ulong[MaxResponseWords];
         Span<ulong> effectiveDenominator = stackalloc ulong[MaxResponseWords];
@@ -932,15 +1027,17 @@ internal static partial class ExactContactResponseKernel
         result.Clear();
         resultSign = 0;
         if (firstSign != 0 & !WideArithmetic.IsZeroMagnitude(first))
-            WideArithmetic.AddSignedMagnitude(
+            WideArithmetic.AddShiftedSignedMagnitude(
                 first,
                 firstSign,
+                0,
                 result,
                 ref resultSign);
         if (secondSign != 0 & !WideArithmetic.IsZeroMagnitude(second))
-            WideArithmetic.AddSignedMagnitude(
+            WideArithmetic.AddShiftedSignedMagnitude(
                 second,
                 secondSign,
+                0,
                 result,
                 ref resultSign);
     }

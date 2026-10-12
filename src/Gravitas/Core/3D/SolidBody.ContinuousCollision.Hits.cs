@@ -49,7 +49,8 @@ public partial class SolidBody
                     _continuousMixedCollisionHits,
                     Collider,
                     includeTriggers: false,
-                    cacheTargetPartitions: true)
+                    cacheTargetPartitions: true,
+                    requireClosingContact: true)
                 : 0;
 
             bool found3D = TryGetFirstValidContinuousCollisionHit(
@@ -231,8 +232,26 @@ public partial class SolidBody
         for (int i = 0; i < hitCount; i++)
         {
             PhysicsMixedHit candidate = _continuousMixedCollisionHits[i];
-            if (!IsValidMixedContinuousCollisionHit(candidate.Collider2D!)
-                || !IsClosingContinuousCollisionHit(displacement, candidate.NormalFor3DSource))
+            if (!IsValidMixedContinuousCollisionHit(candidate.Collider2D!))
+                continue;
+
+            if (UsesMixedStaticManifold(candidate.Collider2D!))
+            {
+                Vector3d position = new FixedSegment(startPosition, proposedPosition)
+                    .GetPointAtDistance(candidate.Distance, displacement.Magnitude);
+                if (TryBuildStaticMixedContinuousCollisionManifold(candidate.Collider2D!, position, Rotation))
+                {
+                    ContactAnchor center = ContactAnchor.FromWorldPoint(Vector3d.Zero);
+                    if (!MixedContact.TrySelectClosingContact(_rotationalMixedEarliestManifold,
+                            center, displacement, Vector3d.Zero, center, Vector2d.Zero, Fixed64.Zero,
+                            out MixedContact closing))
+                        continue;
+                    candidate = new PhysicsMixedHit(Collider, candidate.Collider2D, closing.Anchor3D,
+                        closing.Anchor2D, closing.Normal3DTo2D, candidate.ReducerKind,
+                        candidate.Distance, candidate.Direction3D);
+                }
+            }
+            if (!IsClosingContinuousCollisionHit(displacement, candidate.NormalFor3DSource))
                 continue;
 
             hit = candidate;
@@ -241,6 +260,39 @@ public partial class SolidBody
 
         hit = default;
         return false;
+    }
+
+    private bool UsesMixedStaticManifold(LSCollider2D target)
+        => target is LSCompoundCollider2D || Collider is LSCompoundCollider or LSMeshCollider;
+
+    private bool TryBuildStaticMixedContinuousCollisionManifold(LSCollider2D target,
+        Vector3d position, FixedQuaternion rotation)
+    {
+        Vector3d originalPosition = Position3d;
+        FixedQuaternion originalRotation = Rotation;
+        try
+        {
+            SetMixedContinuousCollisionSamplePose(position, rotation);
+            // Translational moving-target searches overwrite Known only; the
+            // mutually exclusive rotational path owns this same accepted buffer.
+            return CollisionDetectionMixed.TryBuildManifold(Collider, target, _rotationalMixedEarliestManifold);
+        }
+        finally
+        {
+            SetMixedContinuousCollisionSamplePose(originalPosition, originalRotation);
+        }
+    }
+
+    private bool TryApplyStaticMixedContinuousCollisionResponse(LSCollider2D target,
+        Vector3d position, Fixed64 elapsedTime, Fixed64 remainingTime)
+    {
+        if (!UsesMixedStaticManifold(target)
+            || !_rotationalMixedEarliestManifold.HasContact)
+            return false;
+        return TryApplyMixedRotationalContinuousCollisionResponse(target,
+            MixedContact.FromManifoldContact(_rotationalMixedEarliestManifold.PrimaryContact),
+            Fixed64.Zero, position, Vector3d.Zero, Rotation, Rotation, elapsedTime, remainingTime,
+            IsKinematic, _rotationalMixedEarliestManifold);
     }
 
     private bool TryRefineShapeExactContinuousCollisionHit(

@@ -46,11 +46,12 @@ public partial class CollisionPair
         writer.WriteBool(_isPooledForDeactivation);
     }
 
-    private static void ContributeManifoldReplayHash(
+    internal static void ContributeManifoldReplayHash(
         ref ChronicleHashWriter writer,
-        ContactManifold manifold)
+        ContactManifold manifold,
+        string sectionName = "manifold.3d")
     {
-        writer.WriteSection("manifold.3d", 8);
+        writer.WriteSection(sectionName, 8);
         writer.WriteInt64(manifold.LastUpdatedFrame);
         writer.WriteInt32(manifold.Count);
         writer.WriteInt32(manifold.GroupCount);

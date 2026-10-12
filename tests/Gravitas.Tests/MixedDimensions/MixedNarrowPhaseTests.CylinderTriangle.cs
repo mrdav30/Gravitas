@@ -2,6 +2,7 @@ using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
+using System.Linq;
 using Xunit;
 
 namespace Gravitas.Tests.MixedDimensions;
@@ -27,7 +28,7 @@ public sealed partial class MixedNarrowPhaseTests
     [Theory]
     [InlineData(0)]
     [InlineData(1)]
-    public void CircleSlabTriangle_ObliqueRim_ShouldUseTheSameGeometricContact(int yaw)
+    public void CircleSlabTriangle_ObliqueRim_ShouldRetainTheSameGeometricConstraint(int yaw)
     {
         using GravitasWorldContext context = CreateMixedContext();
         var mesh = CreateMesh3D(context, CreateTriangleMesh(
@@ -37,7 +38,14 @@ public sealed partial class MixedNarrowPhaseTests
         var circle = new LSCircleCollider2D((Fixed64)5) { MixedHalfThicknessOverride = (Fixed64)5 };
         CreateBody2D(context, circle, Vector2d.Zero, (Fixed64)yaw);
 
-        CollisionDetectionMixed.TryCollide(mesh.Collider, circle, out MixedContact contact).Should().BeTrue();
+        var manifold = new ContactManifold();
+        CollisionDetectionMixed.TryBuildManifold(mesh.Collider, circle, manifold).Should().BeTrue();
+        manifold.Should().Contain(row => row.Depth == Fixed64.FromFraction(5, 16));
+        MixedContact contact = MixedContact.FromManifoldContact(manifold.First(row => row.Depth == Fixed64.FromFraction(5, 16)));
+        CollisionDetectionMixed.TryCollide(mesh.Collider, circle, out MixedContact representative).Should().BeTrue();
+        representative.Depth.Should().Be(manifold.PrimaryContact.Depth);
+        representative.Anchor3D.Should().Be(manifold.PrimaryContact.AnchorA);
+        representative.Anchor2D.Should().Be(manifold.PrimaryContact.AnchorB);
         contact.Depth.Should().Be(Fixed64.FromFraction(5, 16));
         contact.DepthIsClamped.Should().BeFalse();
         contact.Anchor3D.Origin.Should().Be(mesh.Collider.Mesh.Origin);

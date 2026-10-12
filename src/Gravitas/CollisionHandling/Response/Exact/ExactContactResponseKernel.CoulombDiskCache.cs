@@ -16,27 +16,135 @@ namespace Gravitas.CollisionHandling;
 /// </content>
 internal static partial class ExactContactResponseKernel
 {
+    // With anchor denominators <202 bits, an angular effective-mass denominator
+    // is <532 bits; effective mass is <1432/<1130 bits and point-velocity D <468.
+    // A normal impulse is therefore <2088/<1932 bits even with maximum scales.
+    // Int32 iterations add at most 31 carry bits. Multiplying by maximum friction
+    // bounds cached tangent raw magnitudes below 2150 bits. A desired tangent
+    // at the common denominator is <6014 bits, within the existing 96 words.
+    // Disk squares and radial comparisons remain below the existing 320 words.
+    private static void AddCachedTangentToRatio(ReadOnlySpan<ulong> numerator,
+        ReadOnlySpan<ulong> denominator, int sign, Fixed64 scalar,
+        ExactContactImpulseState? state, bool primary, Span<ulong> result, out int resultSign)
+    {
+        if (state?.HasTangents != true)
+        {
+            AddFixedToRatio(numerator, denominator, sign, scalar, result, out resultSign);
+            return;
+        }
+        Span<ulong> cached = stackalloc ulong[MaxCoulombWords];
+        WideArithmetic.MultiplyMagnitudes(primary ? state.PrimaryMagnitude : state.SecondaryMagnitude,
+            denominator, cached);
+        AddSignedMagnitudes(numerator, sign, cached,
+            primary ? state.PrimarySign : state.SecondarySign, result, out resultSign);
+    }
+
+    private static void SubtractCachedTangentFromRatio(ReadOnlySpan<ulong> numerator,
+        ReadOnlySpan<ulong> denominator, int sign, Fixed64 scalar,
+        ExactContactImpulseState? state, bool primary, Span<ulong> result,
+        Span<ulong> resultDenominator, out int resultSign)
+    {
+        if (state?.HasTangents != true)
+        {
+            SubtractFixedFromRatio(numerator, denominator, sign, scalar,
+                result, resultDenominator, out resultSign);
+            return;
+        }
+        Span<ulong> cached = stackalloc ulong[MaxCoulombWords];
+        WideArithmetic.MultiplyMagnitudes(primary ? state.PrimaryMagnitude : state.SecondaryMagnitude,
+            denominator, cached);
+        AddSignedMagnitudes(numerator, sign, cached,
+            -(primary ? state.PrimarySign : state.SecondarySign), result, out resultSign);
+        resultDenominator.Clear();
+        denominator.CopyTo(resultDenominator);
+    }
+
+    private static void RoundCachedRatio(ReadOnlySpan<ulong> numerator,
+        ReadOnlySpan<ulong> denominator, Span<ulong> result)
+    {
+        Span<ulong> quotient = stackalloc ulong[numerator.Length];
+        Span<ulong> remainder = stackalloc ulong[denominator.Length];
+        Span<ulong> division = stackalloc ulong[numerator.Length + denominator.Length + 1];
+        WideArithmetic.DivideMagnitudes(numerator, denominator, quotient, remainder, division);
+        // Compare r with D-r to decide the midpoint without overflowing 2*r.
+        Span<ulong> distance = stackalloc ulong[denominator.Length];
+        WideArithmetic.SubtractEqualMagnitudes(denominator, remainder, distance);
+        int midpoint = WideArithmetic.CompareMagnitudeEqualLength(remainder, distance);
+        if (midpoint > 0 || midpoint == 0 && (quotient[0] & 1UL) != 0)
+        {
+            Span<ulong> one = stackalloc ulong[1];
+            one[0] = 1;
+            WideArithmetic.AddMagnitudeInto(one, quotient);
+        }
+#if DEBUG
+        // The retained tangent bound is <2150 bits, below the 3072-bit cache.
+        System.Diagnostics.Debug.Assert(WideArithmetic.IsZeroMagnitude(quotient[result.Length..]));
+#endif
+        quotient[..result.Length].CopyTo(result);
+    }
+
+    private static void RoundCachedRadialRatio(ReadOnlySpan<ulong> numerator,
+        ReadOnlySpan<ulong> denominator, ReadOnlySpan<ulong> radicand, Span<ulong> result)
+    {
+        result.Clear();
+        if (WideArithmetic.IsZeroMagnitude(numerator)) return;
+        // The bit enclosure only bounds the integer search. Every admitted bit
+        // and the final midpoint are compared against the exact radical.
+        int bits = Math.Max(0, WideArithmetic.GetMagnitudeBitLength(numerator)
+            - WideArithmetic.GetMagnitudeBitLength(denominator)
+            - (WideArithmetic.GetMagnitudeBitLength(radicand) - 1) / 2 + 2);
+#if DEBUG
+        // The enclosure adds at most two bits to the <2150-bit tangent bound.
+        System.Diagnostics.Debug.Assert(bits <= result.Length * 64);
+#endif
+        for (int bit = bits - 1; bit >= 0; bit--)
+        {
+            ulong mask = 1UL << (bit & 63);
+            result[bit >> 6] |= mask;
+            if (CompareRatioOverSquareRoot(numerator, denominator, radicand, result,
+                    numeratorMultiplier: 1) < 0) result[bit >> 6] &= ~mask;
+        }
+        Span<ulong> midpoint = stackalloc ulong[result.Length];
+        Span<ulong> two = stackalloc ulong[1];
+        two[0] = 2;
+        WideArithmetic.MultiplyMagnitudes(result, two, midpoint);
+        midpoint[0] |= 1UL;
+        int comparison = CompareRatioOverSquareRoot(numerator, denominator, radicand, midpoint,
+            numeratorMultiplier: 2);
+        if (comparison > 0 || comparison == 0 && (result[0] & 1UL) != 0)
+        {
+            two[0] = 1;
+            WideArithmetic.AddMagnitudeInto(two, result);
+        }
+    }
+
     private static bool IsRadialProjectionEqualToFixed(
         ReadOnlySpan<ulong> directionNumerator,
         int directionSign,
         ReadOnlySpan<ulong> radialNumerator,
         ReadOnlySpan<ulong> radialDenominator,
         ReadOnlySpan<ulong> radicand,
-        Fixed64 value)
+        Fixed64 value,
+        ExactContactImpulseState? state = null,
+        bool primary = true)
     {
         Span<ulong> projectedNumerator =
             stackalloc ulong[MaxCoulombComparisonWords / 2];
-        Span<ulong> valueMagnitude = stackalloc ulong[3];
+        Span<ulong> valueMagnitude = stackalloc ulong[state?.HasTangents == true ? MaxResponseWords : 3];
         Span<ulong> fixedDenominator = stackalloc ulong[1];
         WideArithmetic.MultiplyMagnitudes(
             directionNumerator,
             radialNumerator,
             projectedNumerator);
-        SetMagnitude(value, valueMagnitude);
+        if (state?.HasTangents == true)
+            (primary ? state.PrimaryMagnitude : state.SecondaryMagnitude).CopyTo(valueMagnitude);
+        else
+            SetMagnitude(value, valueMagnitude);
         fixedDenominator.Clear();
         fixedDenominator[0] = 1UL;
         int valueSign =
-            value == Fixed64.Zero ? 0 : value < Fixed64.Zero ? -1 : 1;
+            state?.HasTangents == true ? primary ? state.PrimarySign : state.SecondarySign
+                : value == Fixed64.Zero ? 0 : value < Fixed64.Zero ? -1 : 1;
         return CompareSignedRadicalAndRationalSumToMagnitude(
                 projectedNumerator,
                 radialDenominator,
@@ -244,8 +352,15 @@ internal static partial class ExactContactResponseKernel
         Fixed64 secondFactor,
         Fixed64 secondValue,
         Span<ulong> result,
-        out int resultSign)
+        out int resultSign,
+        ExactContactImpulseState? state = null)
     {
+        if (state?.HasTangents == true)
+        {
+            GetWeightedSignedSum(firstFactor, state.PrimaryMagnitude, state.PrimarySign,
+                secondFactor, state.SecondaryMagnitude, state.SecondarySign, result, out resultSign);
+            return;
+        }
         Span<ulong> factorMagnitude = stackalloc ulong[3];
         Span<ulong> valueMagnitude = stackalloc ulong[3];
         Span<ulong> first = stackalloc ulong[3];
@@ -277,8 +392,23 @@ internal static partial class ExactContactResponseKernel
         Signed832 secondFactor,
         Fixed64 secondValue,
         Span<ulong> result,
-        out int resultSign)
+        out int resultSign,
+        ExactContactImpulseState? state = null)
     {
+        if (state?.HasTangents == true)
+        {
+            Span<ulong> firstMagnitude = stackalloc ulong[13];
+            Span<ulong> secondMagnitude = stackalloc ulong[13];
+            Span<ulong> firstProduct = stackalloc ulong[64];
+            Span<ulong> secondProduct = stackalloc ulong[64];
+            SetMagnitude(firstFactor, firstMagnitude);
+            SetMagnitude(secondFactor, secondMagnitude);
+            WideArithmetic.MultiplyMagnitudes(firstMagnitude, state.PrimaryMagnitude, firstProduct);
+            WideArithmetic.MultiplyMagnitudes(secondMagnitude, state.SecondaryMagnitude, secondProduct);
+            AddSignedMagnitudes(firstProduct, firstFactor.Sign * state.PrimarySign,
+                secondProduct, secondFactor.Sign * state.SecondarySign, result, out resultSign);
+            return;
+        }
         Span<ulong> factorMagnitude = stackalloc ulong[13];
         Span<ulong> valueMagnitude = stackalloc ulong[3];
         Span<ulong> first = stackalloc ulong[15];
@@ -337,7 +467,8 @@ internal static partial class ExactContactResponseKernel
         out Vector3d firstLinear,
         out Vector3d firstAngular,
         out Vector3d secondLinear,
-        out Vector3d secondAngular)
+        out Vector3d secondAngular,
+        ExactContactImpulseState? state = null)
     {
         bool resolved = TryGetDiskLinearVelocityDelta(
             primaryFirst.LinearImpulseAxis,
@@ -354,7 +485,7 @@ internal static partial class ExactContactResponseKernel
             radicand,
             accumulatedPrimaryTangentImpulse,
             accumulatedSecondaryTangentImpulse,
-            out firstLinear);
+            out firstLinear, state);
         resolved &= TryGetDiskAngularVelocityDelta(
             primaryFirst.Lever,
             -primaryTangent,
@@ -371,7 +502,7 @@ internal static partial class ExactContactResponseKernel
             radicand,
             accumulatedPrimaryTangentImpulse,
             accumulatedSecondaryTangentImpulse,
-            out firstAngular);
+            out firstAngular, state);
         resolved &= TryGetDiskLinearVelocityDelta(
             primarySecond.LinearImpulseAxis,
             secondarySecond.LinearImpulseAxis,
@@ -387,7 +518,7 @@ internal static partial class ExactContactResponseKernel
             radicand,
             accumulatedPrimaryTangentImpulse,
             accumulatedSecondaryTangentImpulse,
-            out secondLinear);
+            out secondLinear, state);
         resolved &= TryGetDiskAngularVelocityDelta(
             primarySecond.Lever,
             primaryTangent,
@@ -404,7 +535,7 @@ internal static partial class ExactContactResponseKernel
             radicand,
             accumulatedPrimaryTangentImpulse,
             accumulatedSecondaryTangentImpulse,
-            out secondAngular);
+            out secondAngular, state);
         return resolved;
     }
 
@@ -423,7 +554,8 @@ internal static partial class ExactContactResponseKernel
         ReadOnlySpan<ulong> radicand,
         Fixed64 accumulatedPrimaryTangentImpulse,
         Fixed64 accumulatedSecondaryTangentImpulse,
-        out Vector3d result)
+        out Vector3d result,
+        ExactContactImpulseState? state = null)
     {
         bool xResolved = TryGetDiskLinearComponent(
             primaryAxis.X,
@@ -440,7 +572,7 @@ internal static partial class ExactContactResponseKernel
             radicand,
             accumulatedPrimaryTangentImpulse,
             accumulatedSecondaryTangentImpulse,
-            out Fixed64 x);
+            out Fixed64 x, state);
         bool yResolved = TryGetDiskLinearComponent(
             primaryAxis.Y,
             secondaryAxis.Y,
@@ -456,7 +588,7 @@ internal static partial class ExactContactResponseKernel
             radicand,
             accumulatedPrimaryTangentImpulse,
             accumulatedSecondaryTangentImpulse,
-            out Fixed64 y);
+            out Fixed64 y, state);
         bool zResolved = TryGetDiskLinearComponent(
             primaryAxis.Z,
             secondaryAxis.Z,
@@ -472,7 +604,7 @@ internal static partial class ExactContactResponseKernel
             radicand,
             accumulatedPrimaryTangentImpulse,
             accumulatedSecondaryTangentImpulse,
-            out Fixed64 z);
+            out Fixed64 z, state);
         result = xResolved & yResolved & zResolved
             ? new Vector3d(x, y, z)
             : default;
@@ -494,7 +626,8 @@ internal static partial class ExactContactResponseKernel
         ReadOnlySpan<ulong> radicand,
         Fixed64 accumulatedPrimaryTangentImpulse,
         Fixed64 accumulatedSecondaryTangentImpulse,
-        out Fixed64 result)
+        out Fixed64 result,
+        ExactContactImpulseState? state = null)
     {
         Span<ulong> combined = stackalloc ulong[MaxCoulombWords + 2];
         GetWeightedSignedSum(
@@ -549,8 +682,8 @@ internal static partial class ExactContactResponseKernel
             stackalloc ulong[MaxCoulombComparisonWords / 2];
         Span<ulong> radicalDenominator =
             stackalloc ulong[MaxCoulombComparisonWords / 2];
-        Span<ulong> cachedCombined = stackalloc ulong[3];
-        Span<ulong> cachedNumerator = stackalloc ulong[4];
+        Span<ulong> cachedCombined = stackalloc ulong[state?.HasTangents == true ? 64 : 3];
+        Span<ulong> cachedNumerator = stackalloc ulong[state?.HasTangents == true ? 65 : 4];
         Span<ulong> cachedDenominator = stackalloc ulong[2];
         WideArithmetic.MultiplyMagnitudes(
             combined,
@@ -574,7 +707,7 @@ internal static partial class ExactContactResponseKernel
             secondaryAxis,
             accumulatedSecondaryTangentImpulse,
             cachedCombined,
-            out int cachedSign);
+            out int cachedSign, state);
         WideArithmetic.MultiplyMagnitudes(
             cachedCombined,
             inverseMassMagnitude,
@@ -610,7 +743,8 @@ internal static partial class ExactContactResponseKernel
         ReadOnlySpan<ulong> radicand,
         Fixed64 accumulatedPrimaryTangentImpulse,
         Fixed64 accumulatedSecondaryTangentImpulse,
-        out Vector3d result)
+        out Vector3d result,
+        ExactContactImpulseState? state = null)
     {
         ExactLever3D.GetTransformedCrossProduct(
             lever,
@@ -649,7 +783,7 @@ internal static partial class ExactContactResponseKernel
             radicand,
             accumulatedPrimaryTangentImpulse,
             accumulatedSecondaryTangentImpulse,
-            out Fixed64 x);
+            out Fixed64 x, state);
         bool yResolved = TryGetDiskAngularComponent(
             primaryY,
             secondaryY,
@@ -665,7 +799,7 @@ internal static partial class ExactContactResponseKernel
             radicand,
             accumulatedPrimaryTangentImpulse,
             accumulatedSecondaryTangentImpulse,
-            out Fixed64 y);
+            out Fixed64 y, state);
         bool zResolved = TryGetDiskAngularComponent(
             primaryZ,
             secondaryZ,
@@ -681,7 +815,7 @@ internal static partial class ExactContactResponseKernel
             radicand,
             accumulatedPrimaryTangentImpulse,
             accumulatedSecondaryTangentImpulse,
-            out Fixed64 z);
+            out Fixed64 z, state);
         result = xResolved & yResolved & zResolved
             ? new Vector3d(x, y, z)
             : default;
@@ -703,7 +837,8 @@ internal static partial class ExactContactResponseKernel
         ReadOnlySpan<ulong> radicand,
         Fixed64 accumulatedPrimaryTangentImpulse,
         Fixed64 accumulatedSecondaryTangentImpulse,
-        out Fixed64 result)
+        out Fixed64 result,
+        ExactContactImpulseState? state = null)
     {
         Span<ulong> primaryMagnitude = stackalloc ulong[13];
         Span<ulong> secondaryMagnitude = stackalloc ulong[13];
@@ -763,7 +898,7 @@ internal static partial class ExactContactResponseKernel
             stackalloc ulong[MaxCoulombComparisonWords / 2];
         Span<ulong> radicalDenominator =
             stackalloc ulong[MaxCoulombComparisonWords / 2];
-        Span<ulong> cachedCombined = stackalloc ulong[15];
+        Span<ulong> cachedCombined = stackalloc ulong[state?.HasTangents == true ? 64 : 15];
         Span<ulong> cachedDenominator = stackalloc ulong[12];
         WideArithmetic.MultiplyMagnitudes(
             combined,
@@ -783,7 +918,7 @@ internal static partial class ExactContactResponseKernel
             secondary,
             accumulatedSecondaryTangentImpulse,
             cachedCombined,
-            out int cachedSign);
+            out int cachedSign, state);
         WideArithmetic.MultiplyMagnitudes(
             transformedDenominatorMagnitude,
             fixedScale,

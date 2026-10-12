@@ -115,12 +115,13 @@ internal sealed partial class GravitasMixedCollisionService
         if (!hasPair && !triggerPair && !hasAwakeMovableParticipant)
             return;
 
-        if (!CollisionDetectionMixed.TryCollide(resolved3D, resolved2D, out MixedContact contact))
+        ContactManifold manifold = _context.CollisionScratch.MixedManifold;
+        if (!CollisionDetectionMixed.TryBuildManifold(resolved3D, resolved2D, manifold))
             return;
 
         if (!triggerPair && !hasAwakeMovableParticipant)
         {
-            pair!.MarkResting(frame, contact);
+            pair!.MarkResting(frame, manifold);
             _mixedResponsePairs.Add(pair);
             return;
         }
@@ -131,7 +132,7 @@ internal sealed partial class GravitasMixedCollisionService
             _pairs.Add(candidate.Key, pair);
         }
 
-        pair!.MarkColliding(frame, contact);
+        pair!.MarkColliding(frame, manifold);
         if (!triggerPair)
             _mixedResponsePairs.Add(pair);
     }
@@ -173,21 +174,22 @@ internal sealed partial class GravitasMixedCollisionService
         LSCollider collider3D = pair.Collider3D;
         LSCollider2D collider2D = pair.Collider2D;
         bool triggerPair = collider3D.IsTrigger || collider2D.IsTrigger;
+        ContactManifold manifold = _context.CollisionScratch.MixedManifold;
         if ((!triggerPair && HasAwakeMovableParticipant(collider3D, collider2D))
             || !RequireCollisionPair(collider3D, collider2D)
             || !MixedBoundsOverlap(collider3D, collider2D)
-            || !CollisionDetectionMixed.TryCollide(collider3D, collider2D, out MixedContact contact))
+            || !CollisionDetectionMixed.TryBuildManifold(collider3D, collider2D, manifold))
         {
             return false;
         }
 
         if (triggerPair)
         {
-            pair.MarkColliding(frame, contact);
+            pair.MarkColliding(frame, manifold);
             return true;
         }
 
-        pair.MarkResting(frame);
+        pair.MarkResting(frame, manifold);
         return true;
     }
 
