@@ -146,9 +146,13 @@ Translational convex-source mesh sweeps also retain geometric normals for
 initial contacts, independently of travel and winding. They resolve the actual
 source leaf and target triangle or hull before reporting a compound owner.
 Separated contacts inside the query tolerance retain their closest-feature
-normal; overlapping triangle contacts can use a face witness when the source
-support projects onto that face. A touching edge or vertex keeps its separating
-axis. This prevents internal triangle seams from blocking tangent motion.
+normal unless exact geometry certifies an actual filled face contact. A face
+witness requires both a source support projected onto the finite trusted
+surface domain and contact with the triangle that admits that projection.
+Trusted domains include mixed winding, subdivision and nonconvex patches;
+holes and notches retain their empty geometry. A touching exposed edge or vertex
+keeps its separating axis. This prevents covered triangle seams from blocking
+tangent motion without substituting an infinite plane at the real perimeter.
 Convex mesh targets retain solid-volume containment. For cylinder, cone and
 circle-slab sources, the initial normal selects the smallest exit
 projection among hull face axes; it does not promise a global minimum

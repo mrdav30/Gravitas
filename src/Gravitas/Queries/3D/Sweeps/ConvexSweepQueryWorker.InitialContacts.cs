@@ -20,6 +20,14 @@ internal sealed partial class ConvexSweepQueryWorker
     {
         if (!result.Intersects)
         {
+            // A tolerant seam witness must yield to an exact contact on the neighboring filled face.
+            if (targetShape.TryGetInitialMeshFaceContactNormal(sourceShape,
+                    out FixedPointAnchor faceAnchor, out Vector3d faceNormal))
+            {
+                anchor = new ContactAnchor(faceAnchor);
+                normal = faceNormal;
+                return true;
+            }
             // Disjoint contacts inside the query tolerance retain the actual
             // closest-feature separation axis, including edges and vertices.
             normal = result.Normal;

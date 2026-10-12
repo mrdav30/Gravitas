@@ -27,31 +27,12 @@ internal readonly partial struct ConvexShape
         FixedContactAnchors contact;
         if (_kind == ConvexShapeKind.Triangle)
         {
-            bool found = TryGetInitialTriangleContact(source, out contact);
+            if (TryGetInitialMeshFaceContactNormal(source, out targetAnchor, out normal))
+                return true;
+            bool found = TryGetInitialTriangleContact(source,
+                new FixedTriangle(_triangleA, _triangleB, _triangleC), out contact);
             targetAnchor = contact.FirstAnchor;
             normal = contact.Normal;
-            if (found)
-            {
-                PhysicsMesh target = _triangleOwner!.Mesh;
-                FixedPointAnchor selectedTargetSupport = GetSupportAnchor(normal);
-                FixedPointAnchor selectedSourceSupport = source.GetSupportAnchor(-normal);
-                Vector3d planeNormal = GetInitialExitNormal(source,
-                    target.GetFaceNormalWorld(_triangleIndex));
-                FixedPointAnchor support = source.GetSupportAnchor(-planeNormal);
-                var triangle = new FixedTriangle(_triangleA, _triangleB, _triangleC);
-                if (WidePointAnchor3d.CompareProjectedOffsets(selectedTargetSupport,
-                        selectedSourceSupport, selectedTargetSupport, selectedTargetSupport, normal) > 0
-                    && WideTriangleRelations.ContainsProjection(triangle,
-                        target.Origin, target.Rotation, support))
-                {
-                    // A source support projecting onto this face certifies a
-                    // face contact. Prefer it to an internal triangulation
-                    // seam's oblique escape axis when the source overlaps.
-                    normal = planeNormal;
-                    targetAnchor = triangle.GetClosestPointAnchor(
-                        target.Origin, target.Rotation, support);
-                }
-            }
             return found;
         }
 
@@ -99,9 +80,73 @@ internal readonly partial struct ConvexShape
         return hasContact;
     }
 
-    private bool TryGetInitialTriangleContact(in ConvexShape source, out FixedContactAnchors contact)
+    /// <summary>Certifies a positive finite face contact before reducing covered triangle witnesses.</summary>
+    internal bool TryGetInitialMeshFaceContactNormal(in ConvexShape source,
+        out FixedPointAnchor targetAnchor, out Vector3d normal)
     {
+        targetAnchor = default;
+        normal = default;
+        if (_kind != ConvexShapeKind.Triangle) return false;
+        PhysicsMesh mesh = _triangleOwner!.Mesh;
+        Vector3d planeNormal = GetInitialExitNormal(source, mesh.GetFaceNormalWorld(_triangleIndex));
+        FixedPointAnchor support = source.GetSupportAnchor(-planeNormal);
         var triangle = new FixedTriangle(_triangleA, _triangleB, _triangleC);
+        if (!TryGetInitialSurfaceProjectionTriangle(mesh, support, ref triangle)
+            || !TryGetInitialTriangleContact(source, triangle, out FixedContactAnchors contact))
+            return false;
+
+        // A finite neighboring face must actually contact the source; projection
+        // alone is insufficient for tilted shapes, and a perimeter touch stays radial.
+        var matched = new ConvexShape(_triangleOwner!, _triangleIndex, triangle.A, triangle.B, triangle.C);
+        FixedPointAnchor targetSupport = matched.GetSupportAnchor(contact.Normal);
+        FixedPointAnchor sourceSupport = source.GetSupportAnchor(-contact.Normal);
+        if (WidePointAnchor3d.CompareProjectedOffsets(targetSupport, sourceSupport,
+                targetSupport, targetSupport, contact.Normal) <= 0)
+            return false;
+        targetAnchor = triangle.GetClosestPointAnchor(mesh.Origin, mesh.Rotation, support);
+        normal = planeNormal;
+        return true;
+    }
+
+    private bool TryGetInitialSurfaceProjectionTriangle(
+        PhysicsMesh mesh, in FixedPointAnchor support, ref FixedTriangle triangle)
+    {
+        if (WideTriangleRelations.ContainsProjection(triangle, mesh.Origin, mesh.Rotation, support))
+            return true;
+        if (mesh.GetCoplanarTriangleNeighbors(_triangleIndex).IsEmpty)
+            return false;
+
+        ReadOnlySpan<int> corners = mesh.GetConvexCoplanarPatchCornerVertexIndices(_triangleIndex);
+        if (!corners.IsEmpty)
+        {
+            // The prepared convex fill removes subdivision cost without filling holes or notches.
+            ReadOnlySpan<Vector3d> vertices = mesh.ScaledLocalVertices;
+            for (int corner = 1; corner < corners.Length - 1; corner++)
+            {
+                triangle = new FixedTriangle(vertices[corners[0]], vertices[corners[corner]],
+                    vertices[corners[corner + 1]]);
+                if (WideTriangleRelations.ContainsProjection(triangle, mesh.Origin, mesh.Rotation, support))
+                    return true;
+            }
+            return false;
+        }
+
+        int owner = mesh.GetManifoldSurfaceOwner(_triangleIndex);
+        for (int index = 0; index < mesh.TriangleCount; index++)
+        {
+            if (index == _triangleIndex || mesh.GetManifoldSurfaceOwner(index) != owner)
+                continue;
+            mesh.GetLocalTriangleVertices(index, out Vector3d a, out Vector3d b, out Vector3d c);
+            triangle = new FixedTriangle(a, b, c);
+            if (WideTriangleRelations.ContainsProjection(triangle, mesh.Origin, mesh.Rotation, support))
+                return true;
+        }
+        return false;
+    }
+
+    private bool TryGetInitialTriangleContact(in ConvexShape source, FixedTriangle triangle,
+        out FixedContactAnchors contact)
+    {
         PhysicsMesh targetMesh = _triangleOwner!.Mesh;
         if (source._kind == ConvexShapeKind.Sphere)
             return triangle.TryGetSphereContact(targetMesh.Origin, targetMesh.Rotation,
@@ -137,7 +182,7 @@ internal readonly partial struct ConvexShape
                 var mesh = (LSMeshCollider)source._collider!;
                 PhysicsMesh sourceHull = mesh.Mesh;
                 ReadOnlySpan<Vector3d> vertices = stackalloc Vector3d[3]
-                    { _triangleA, _triangleB, _triangleC };
+                    { triangle.A, triangle.B, triangle.C };
                 ReadOnlySpan<int> triangles = stackalloc int[3] { 0, 1, 2 };
                 ReadOnlySpan<int> edges = stackalloc int[6] { 0, 1, 1, 2, 2, 0 };
                 return FixedConvexHullRelations.TryGetContact(

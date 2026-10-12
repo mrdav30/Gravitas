@@ -313,6 +313,10 @@ internal sealed partial class ConvexSweepQueryWorker
             }
 
             int triangleIndex = sweepCandidate.TriangleIndex;
+            // Zero is the best possible distance; skip triangles that cannot win even then.
+            if (!ComesBeforeReducerCandidate(Fixed64.Zero, triangleIndex,
+                    found, closestNumerator, closestTriangleIndex))
+                continue;
             ConvexShape triangle = CreateTriangleShape(mesh, triangleIndex);
             if (!TrySweepConvexTarget(
                     sourceShape,

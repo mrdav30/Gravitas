@@ -131,6 +131,47 @@ exact certificates or reduced duplicated work, with the same geometric normals,
 leaf ordering, full-domain witnesses and allocation gates. Measure scene
 frequency before assigning a host capacity budget.
 
+**2026-10-11 refinement during GRV-Issue-108:** Initial triangle sweeps now
+certify contact against the finite trusted filled surface, including nonconvex
+patches, before accepting a covered seam witness. The existing distance/authored
+index comparator also rejects candidates that could not win even at distance
+zero. This removes repeated GJK and face-admission work after an admitted initial
+hit, without caches or a different geometric answer path.
+
+The isolated before/after fixtures use the same benchmark source and exclude
+the cuboid and capsule query sources from each other's target layer. Native
+Release means on the same host, with three warmups and five measurements, are:
+
+| Public query workload | Before | After |
+| --------------------- | -----: | ----: |
+| Concave quad, initially overlapping cuboid | 128.79 us | 75.53 us |
+| Concave quad, initially overlapping capsule | 230.27 us | 129.49 us |
+| Capsule, filled quad at subdivision 2 | 1.551 ms | 0.701 ms |
+| Capsule, notched patch at subdivision 2 | 1.184 ms | 0.693 ms |
+| Capsule, filled quad at subdivision 8 | 10.590 ms | 4.953 ms |
+| Capsule, notched patch at subdivision 8 | 6.387 ms | 4.973 ms |
+
+All 16 ordinary/initial, convex/concave/compound and dense-patch rows report
+`0 B/op`. Ordinary concave cuboid/capsule controls are 74.29/583.60 us before
+and 76.02/587.35 us after; convex and compound controls remain within about 2%
+of their isolated baselines. These short-run means are not gameplay-frame
+latency or capacity guarantees. Dense initial capsule sweeps still approach
+5 ms, so this existing signal remains active. Profile candidate ordering, GJK
+and finite-contact work separately before another optimization; keep nonconvex
+holes, exposed rims, initial closing admission and authored tie ordering intact.
+
+Reproduce both maintained benchmark classes with `UseLocalLsfStack=true`:
+
+```powershell
+$env:UseLocalLsfStack = 'true'
+$env:DOTNET_PROCESSOR_COUNT = '2'
+dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -p:UseLocalLsfStack=true -p:BuildInParallel=false -p:UseSharedCompilation=false -- --filter '*ConvexMeshInitialContactBenchmarks*' '*CoplanarPatchInitialSweepBenchmarks*' --warmupCount 3 --iterationCount 5 --artifacts artifacts/grv-issue-108/final-confirmation
+```
+
+Ignored `artifacts/grv-issue-108/isolated-baseline` and `final-confirmation`
+retain the matched measurements. The preliminary unisolated source capture
+and the pre-pruning correctness capture are not the retained comparison.
+
 ## Experimental Signals
 
 | Signal                                                                                 | Status                                           | Revisit When                                                                                                            |

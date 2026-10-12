@@ -37,37 +37,6 @@
 
 ### Ordered Queue
 
-### GRV-Issue-108 - Initial capsule sweeps can select a covered coplanar mesh seam
-
-- **Confirmed:** 2026-10-11 during #104/#105 query parity validation. On the
-  coherently wound Y-zero quad with vertices `(-2,0,-2)`, `(2,0,-2)`,
-  `(-2,0,2)`, `(2,0,2)` and triangles `0,2,1, 1,2,3`, a core-length-1,
-  radius-`1/2` capsule centered at `(3/10,-1/4,3/10)` crosses the filled plane.
-  Its initial `SweepCapsule` hit is at distance zero but selects the covered
-  diagonal normal approximately `(0.707107,0,0.707107)` instead of the genuine
-  downward exit. Outward, inward and tangential travel must not choose a
-  triangulation seam as the initial physical constraint.
-- **Root cause:** Initial concave mesh sweeps resolve and reduce individual
-  triangles. The face-promotion certificate requires the source support's
-  projection inside the selected triangle; it can lie in the neighboring
-  triangle of the same trusted filled surface. The first triangle then keeps
-  its nonzero radial diagonal witness. The query resolution code is unchanged
-  by #104/#105, and this fixture does not enter its new coincident capsule-ray
-  branch or parallel closest-family branch; the geometric defect predates them.
-- **Follow-up:** Resolve initial contacts against the actual finite trusted
-  surface domain before reducing triangle hits. Preserve genuine perimeter
-  witnesses, finite admission, initial distance-zero reporting and host CCD's
-  separate escape/closing policy. Test coherent winding reversal, triangle
-  order/subdivision, capsule core crossing and related sphere/convex sources;
-  audit compound remapping and full-loop CCD behavior without substituting an
-  infinite plane at a real exposed boundary.
-- **Evidence:** Ignored
-  `artifacts/grv-issue-104/runtime-analytic-refined-gate.log` records the actual
-  diagonal hit; `ccd-covered-seam-regression.patch` preserves the failing
-  regression and `ccd-covered-seam-provenance.md` records the source audit.
-  Full-loop severity remains unmeasured. This is separate from #106's declined
-  mixed-winding topology: this reproduction uses one trusted coherent surface.
-
 ### GRV-Issue-098 - Mixed curved slab mesh contacts can select a covered seam
 
 - **Confirmed:** 2026-10-08 against the unchanged #095 baseline, with both
@@ -206,6 +175,57 @@
 Remaining measured performance costs are tracked in the benchmark backlog.
 
 ## Resolved Issues
+
+### GRV-Issue-108 - Initial capsule sweeps can select a covered coplanar mesh seam
+
+- **Resolved:** 2026-10-11. Initial triangle sweeps now certify the actual finite
+  trusted surface before retaining a covered seam witness. Convex patches reuse
+  their prepared corner fan; nonconvex patches admit only actual triangles with
+  the same trusted manifold owner. Projection alone is insufficient: the source
+  must contact the admitting triangle with positive geometric support overlap.
+  This preserves genuine perimeter touches/overlaps, holes, notches and separate
+  coplanar owners, including tilted sources whose support projects inside a face
+  while their actual plane section misses it. Tolerant GJK witnesses can use this
+  same exact certificate; otherwise their closest-feature normal is retained.
+- **Original defect:** Confirmed 2026-10-11 during #104/#105 query parity
+  validation. A core-length-1, radius-`1/2` capsule at `(3/10,-1/4,3/10)` crosses
+  the Y-zero quad with vertices `(-2,0,-2)`, `(2,0,-2)`, `(-2,0,2)`, `(2,0,2)`
+  and indices `0,2,1, 1,2,3`. Its zero-distance hit selected the covered diagonal
+  normal approximately `(0.707107,0,0.707107)` instead of the downward exit.
+  Initial resolution required the support projection inside the selected
+  triangle, overlooking the neighboring filled face. This owner was unchanged
+  by #104/#105; the defect predates their capsule-boundary corrections.
+- **Scope:** The existing reducer comparison skips a triangle when even a
+  zero-distance hit could not beat the admitted distance/authored-index order.
+  It continues rather than terminating, preserving eligibility of a later
+  smaller index. The fix adds 57 net production lines across three existing
+  owners, without new state, caches, arithmetic facades or public APIs. #098
+  remains separate because its mixed rigid-contact reducer does not consume
+  this swept-query certificate; #096 and #101 retain their own admission and
+  rotational-interval boundaries. No new issue or benchmark IDs were added.
+- **Verification:** The original coherent regression fails on committed source
+  and passes with the fix. Maintained cases cover authored winding, triangle
+  order, alternate diagonals, subdivision, convex/nonconvex fill, real rims,
+  sphere/zero-core capsule, cuboid, cylinder, cone, convex mesh and embedded
+  circle-slab sources, tolerant hull contacts, compound remapping, whole-shape
+  exit and complete dynamic/kinematic CCD stepping with both tangent directions.
+  Full local-stack Release/ReleaseLean suites pass 5,324/5,259 tests. Raw covered
+  lines are 46,323/46,323 and 46,321/46,321; branches are 14,550/14,550 in both;
+  fully covered methods are 4,810/4,810 and 4,809/4,809. Both multi-target builds,
+  six shared Windows x64 replay fixtures and expected/cross-lane hashes pass.
+  DocFX passes with warnings as errors, local links and partial-file content
+  checks pass, and independent ponytail review finds no blockers.
+- **Performance:** Matched native Release captures with three warmups and five
+  measurements use `UseLocalLsfStack=true`. Concave initial cuboid/capsule means
+  fall from 128.79/230.27 to 75.53/129.49 us. At subdivision 8, filled/notched
+  initial capsule sweeps fall from 10.590/6.387 to 4.953/4.973 ms. All 16 rows
+  report `0 B/op`; ordinary controls remain comparable. Dense initial-query
+  cost remains in existing `GRV-Benchmark-026`, rather than reopening this
+  correctness issue or assigning a gameplay capacity from isolated timings.
+- **Evidence:** Original ignored `artifacts/grv-issue-104` query audit and
+  regression patch; failing/passing regressions, final full coverage/replay,
+  `isolated-baseline`, `final-confirmation` and documentation logs under
+  `artifacts/grv-issue-108`.
 
 ### GRV-Issue-106 - Accepted mixed-winding coplanar meshes retain covered seam contacts
 

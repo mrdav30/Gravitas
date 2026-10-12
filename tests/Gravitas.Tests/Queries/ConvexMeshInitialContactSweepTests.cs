@@ -16,6 +16,27 @@ public sealed class ConvexMeshInitialContactSweepTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public void CapsuleCrossingFilledPatch_ShouldNotSelectCoveredDiagonal(bool reverseWinding)
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSCollider target = AddTarget(scenario, MeshColliderMode.Concave, reverseWinding, false);
+        var source = new LSCapsuleCollider { Radius = Fixed64.Half, Size = new Vector3d(1, 2, 1) };
+        Vector3d center = new(Fixed64.FromFraction(3, 10), -Fixed64.Quarter, Fixed64.FromFraction(3, 10));
+        scenario.CreateBody(source, center, FixedQuaternion.Identity);
+        foreach (Vector3d travel in new[] { Vector3d.Down, Vector3d.Up, Vector3d.Right })
+        {
+            scenario.Context.Query3D.SweepCapsule(source, travel, LayerZero, out Physics3DHit hit)
+                .Should().BeTrue();
+            AssertInitialNormal(hit, target, Vector3d.Down);
+            // Final barycentric materialization can round each component by one raw unit.
+            (hit.Point.X - center.X).Abs().Should().BeLessThanOrEqualTo(Fixed64.Epsilon);
+            (hit.Point.Z - center.Z).Abs().Should().BeLessThanOrEqualTo(Fixed64.Epsilon);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public void CapsuleCoreCrossingMeshPlane_ShouldKeepItsInitialExitNormalIndependentlyOfTravel(bool reverseWinding)
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();

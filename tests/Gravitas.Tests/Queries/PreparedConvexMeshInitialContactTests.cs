@@ -13,6 +13,78 @@ namespace Gravitas.Tests.Queries;
 
 public sealed class PreparedConvexMeshInitialContactTests
 {
+    [Fact]
+    public void SeparatedConvexHullWithinTolerance_ShouldKeepClosestFeatureNormal()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSMeshCollider target = MeshTestFixtures.CreateConvexCube();
+        scenario.InitializeStaticCollider(target, Vector3d.Zero);
+        var source = new LSCuboidCollider();
+        scenario.InitializeStaticCollider(source,
+            Vector3d.Up * (Fixed64.One + ConvexSweepQueryWorker.ContactTolerance / 2));
+        var worker = new ConvexSweepQueryWorker();
+        foreach (Vector3d travel in new[] { Vector3d.Right, Vector3d.Down })
+        {
+            worker.PreparePrimitiveSource(source, travel);
+            worker.TrySweepPreparedSource(target, out Physics3DHit hit).Should().BeTrue();
+            hit.Distance.Should().Be(Fixed64.Zero);
+            hit.Normal.Should().Be(Vector3d.Up);
+        }
+    }
+
+    [Fact]
+    public void ProjectedTiltedSupportInsideFace_ShouldNotInventFiniteContact()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        var target = new LSMeshCollider(new[]
+            { new Vector3d(Fixed64.FromFraction(1, 5), Fixed64.Zero, -Fixed64.FromFraction(1, 10)),
+                new Vector3d(Fixed64.Half, Fixed64.Zero, -Fixed64.FromFraction(1, 10)),
+                new Vector3d(Fixed64.FromFraction(1, 5), Fixed64.Zero, Fixed64.FromFraction(1, 5)) },
+            new[] { 0, 2, 1 }, MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation);
+        scenario.InitializeStaticCollider(target, Vector3d.Zero);
+        var source = new LSCapsuleCollider { Radius = Fixed64.FromFraction(1, 10),
+            Size = new Vector3d(Fixed64.FromFraction(1, 5), Fixed64.FromFraction(11, 5), Fixed64.FromFraction(1, 5)) };
+        source.InitializeWithNoBody(new TestMatterAgent(scenario.Context, new FixedTransform(Vector3d.Right + Vector3d.Up * Fixed64.FromFraction(1, 10),
+            FixedQuaternion.FromAxisAngle(Vector3d.Forward, -Fixed64.PiOver4), Vector3d.One)));
+        target.Mesh.GetLocalTriangleVertices(0, out Vector3d a, out Vector3d b, out Vector3d c);
+        var sourceShape = new ConvexShape(source, Vector3d.Zero);
+        var triangle = new ConvexShape(target, 0, a, b, c);
+        // The lower support projects near X=.293 into the small triangle, but
+        // the tilted capsule crosses Y=0 near X=.9, outside its finite extent.
+        Vector3d planeNormal = triangle.GetInitialExitNormal(sourceShape, target.Mesh.GetFaceNormalWorld(0));
+        sourceShape.GetSupportAnchor(-planeNormal).TryGetLocalPointIn(target.Mesh.Origin,
+            target.Mesh.Rotation, out Vector3d support).Should().BeTrue();
+        new FixedTriangle(a, b, c).ContainsProjection(support).Should().BeTrue(
+            "support {0} on exit {1}, core {2}, radius {3} must project inside the finite control", support, planeNormal, source.AxisLength, source.ScaledRadius);
+        triangle.TryGetInitialMeshFaceContactNormal(sourceShape, out _, out _).Should().BeFalse();
+        var worker = new ConvexSweepQueryWorker();
+        worker.PreparePrimitiveSource(source, Vector3d.Right);
+        worker.TrySweepPreparedSource(target, out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public void TolerantCoveredTriangleWitness_ShouldYieldToActualFilledFaceContact()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSMeshCollider target = MeshTestFixtures.CreateConvexQuadFloor(MeshColliderMode.Concave);
+        scenario.InitializeStaticCollider(target, Vector3d.Zero);
+        var source = new LSCapsuleCollider { Radius = Fixed64.Half, Size = new Vector3d(1, 2, 1) };
+        scenario.InitializeStaticCollider(source,
+            new Vector3d(Fixed64.FromFraction(3, 10), -Fixed64.Quarter, Fixed64.FromFraction(3, 10)));
+        target.Mesh.GetLocalTriangleVertices(0, out Vector3d a, out Vector3d b, out Vector3d c);
+        var triangle = new ConvexShape(target, 0, a, b, c);
+        var witness = new FixedPointAnchor(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.Zero);
+        var result = new ConvexSweepQueryWorker.GjkResult(false, ConvexSweepQueryWorker.ContactTolerance,
+            witness, witness, Vector3d.Right);
+        var anchor = new ContactAnchor(witness);
+        Vector3d normal = Vector3d.Right;
+        ConvexSweepQueryWorker.TryResolveInitialMeshContact(new ConvexShape(source, Vector3d.Zero),
+            triangle, result, ref anchor, ref normal).Should().BeTrue();
+        normal.Should().Be(Vector3d.Down);
+        anchor.TryGetWorldPoint(out Vector3d point).Should().BeTrue();
+        point.Y.Should().Be(Fixed64.Zero);
+    }
+
     public static TheoryData<ColliderType, bool, bool> SourceCases
     {
         get
