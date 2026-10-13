@@ -9,6 +9,9 @@ namespace Gravitas.Benchmarks;
 [MemoryDiagnoser]
 public class ColliderShapeBenchmarks
 {
+    private static readonly FixedQuaternion QuarterTurn = FixedQuaternion.FromEulerAnglesInDegrees(
+        Fixed64.Zero, (Fixed64)90, Fixed64.Zero);
+
     private GravitasWorldContext _context;
     private LSCapsuleCollider[] _capsules;
     private SolidBody[] _bodies;
@@ -222,6 +225,32 @@ public class ColliderShapeBenchmarks
 
         _tick++;
         return (_compoundCollider.PartitionCoordinates?.Count ?? 0) + (int)_compoundCollider.RuntimeShapeVersion;
+    }
+
+    [Benchmark]
+    public long RotateMeshRuntimeShapeState()
+    {
+        FixedQuaternion rotation = (_tick++ & 1) == 0
+            ? FixedQuaternion.Identity
+            : QuarterTurn;
+        _meshBody.SetRotation(rotation);
+        _meshCollider.Simulate();
+        return _meshCollider.Mesh.Rotation.Y.m_rawValue
+            ^ _meshCollider.Mesh.Origin.Z.m_rawValue
+            ^ _meshCollider.Mesh.TriangleBvhBuildCount;
+    }
+
+    [Benchmark]
+    public long RotateCompoundRuntimeShapeStateAcrossPartitions()
+    {
+        FixedQuaternion rotation = (_tick++ & 1) == 0
+            ? FixedQuaternion.Identity
+            : QuarterTurn;
+        _compoundBody.SetRotation(rotation);
+        _compoundCollider.Simulate();
+        return _compoundCollider.Rotation.Y.m_rawValue
+            ^ _compoundCollider.Bounds.Min.X.m_rawValue
+            ^ _compoundCollider.Bounds.Max.Z.m_rawValue;
     }
 
     private static Vector3d[] CreateUChannelVertices()

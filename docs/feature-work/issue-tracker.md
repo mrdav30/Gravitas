@@ -2,7 +2,7 @@
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-113`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-117`.
 - Assign an ID when an issue enters this tracker, keep it through resolution,
   and never reuse an ID even if an entry is later removed. Check this file's Git
   history before advancing or repairing the counter.
@@ -37,12 +37,104 @@
 
 ### Ordered Queue
 
+Phase 1 of the supported-geometry plan confirmed in-range numerical defects on
+the original binaries. Resolve #113/#114, then #115 and #116 before locking
+#096's safety contract; combine integral fixes where their ownership permits.
+#111 remains an independent validation-tooling issue.
+
+### GRV-Issue-113 - Authored closed-mesh integrals saturate before normalization
+
+- **Confirmed:** 2026-10-12 during supported-geometry phase 1, against committed
+  Release core `9752c9f` and local FixedMathSharp `819dbde`.
+- **Reproduction:** Construct the closed cube topology directly with side `128`.
+  `PhysicsMesh.TryGetClosedVolumeMassProperties` reports `Valid` and unit `Ixx`
+  `1,024` (raw `4398046511104`), instead of `2,730 + 2/3` (nearest raw
+  `11728124029611`). Reach is about `110.851`, below the proposed ceiling.
+  The equivalent unit cube scaled by `128` gives `2,730.666656494140625`; its
+  small source-rounding error is distinct from authored integral saturation.
+- **Boundary:** Direct side-`2,048` construction reports `Valid` with volume
+  `Fixed64.MaxValue` and unit inertia `1`, although true volume is `8,589,934,592`.
+  The unit-cube scaling route rejects that volume as `NonRepresentableVolume`.
+- **Root cause:** Scalar source tetrahedral volume/second-integral accumulation
+  in `PhysicsMesh.MassProperties.cs` saturates before normalization. Cached-property
+  scale validation does not guard the source integration route.
+- **Follow-up:** Harden source integration, final rounding and rejection using
+  existing exact arithmetic. Cover authored/scaled and translated/rotated
+  equivalents, both mesh policies, representative masses and compound use;
+  preserve warm cached-property performance.
+- **Evidence:** Ignored `artifacts/geometry-range/phase1/numerics/results.log`,
+  `repeat.log`, `provenance.log` and `Program.cs` retain exact expectations,
+  production calls, original DLL hashes and byte-identical repeated results.
+
+### GRV-Issue-114 - Polygon moment integrals saturate before normalization
+
+- **Confirmed:** 2026-10-12 on the same original phase 1 Release binaries.
+- **Reproduction:** Initialize a square `LSPolygonCollider2D` of side `256` and
+  calculate its unit-mass center-of-mass moment. Actual is `2,730 + 2/3` (raw
+  `11728124029611`); expected is `10,922 + 2/3` (raw `46912496118443`). Reach is
+  about `181.019`. Equivalent AABB differs from expectation by one raw increment;
+  the side-`128` polygon matches the analytical expectation exactly.
+- **Root cause:** Scalar fourth-order products in
+  `LSPolygonCollider2D.CalculateCenterOfMassMoment` saturate before density and
+  final division. Larger supported polygons are affected more severely.
+- **Follow-up:** Retain the final ratio until representability is known. Cover
+  centered/off-center and authored/scaled polygons, winding, body/compound
+  consumers, mass mutation and parity with equivalent AABBs.
+- **Evidence:** Phase 1 numerics artifacts under #113 retain actual and exact
+  raw results. No admission implementation was present in these runs.
+
+### GRV-Issue-115 - Cone volume saturates before final division
+
+- **Confirmed:** 2026-10-12 on the same original phase 1 Release binaries.
+- **Reproduction:** Initialize a cone with radius and height `1,024`; its
+  conservative centered reach is exactly `1,536`. Published `Volume`/`Area` is
+  `715,827,882.6666666665` (raw `3074457345618258602`), while final fixed-Pi
+  volume fits and is `1,124,419,808.6666666667` (raw `4829346305197910699`).
+  Radius/height `512` is a passing control.
+- **Root cause:** `LSConeCollider.PrepareShape` saturates the intermediate
+  `Pi * radius * radius * height` before division by three. Exact compound mass
+  weighting is separate and does not repair the published scalar volume.
+- **Follow-up:** Preserve the complete product/ratio and checked final narrowing;
+  define coherent behavior for genuinely unrepresentable derived volume. Check
+  other primitive volume/area paths, direct/compound use and compensated scales.
+- **Evidence:** Phase 1 numerics artifacts under #113 retain exact fixed-Pi,
+  nearest-even expected arithmetic and repeatable original-binary output.
+
+### GRV-Issue-116 - Cone overlap GJK loses scale and rotation invariance
+
+- **Confirmed:** 2026-10-12 through `OverlapCone` and `OverlapConeAll` on original
+  phase 1 Release binaries, with one target and one candidate per query.
+- **Reproduction:** Cone apex `(0,0,0)`, axis `Up`, length `4*S`, end radius
+  `2*S`; target sphere radius `S/4`. At `S=1` and `256` results are correct.
+  At `S=1,024`, center `(2*S,2*S,0)` falsely overlaps, while center
+  `(S,3*S,S)`, strictly inside the cone, falsely misses. Rotate both shapes by
+  Euler degrees `(19,31,7)` and center `(2*S,3*S,2*S)` falsely overlaps as well.
+  Both variants agree on the incorrect results. The query cone's conservative
+  centered reach is about `3,547.24`, below `4,096`.
+- **Boundary:** The first separated center is about `.894*S` from the cone side,
+  exceeding radius `.25*S`; the contained center has radial distance
+  `sqrt(2)*S < 1.5*S`. These are broad contacts/gaps, not raw-quantum tangencies.
+  Probe grid uses physical cell edge `S`, bounds `[-8*S,8*S]`, scan size eight.
+- **Cause under investigation:** `ConvexColliderSupport.IntersectsConeVolume`
+  feeds unscaled higher-order cross/dot products to `GjkSimplexPolicy`; bounded
+  iteration exhaustion returns overlap. The probe localizes classification
+  failures to this predicate; exact first failing arithmetic needs RCA.
+  Contact `Intersects` shares that policy and needs parity checks, but its failure
+  is not inferred solely from this query reproduction.
+- **Follow-up:** Reuse existing product conditioning/exact predicate ownership
+  without a second GJK engine. Test public closest/all variants, contact callers,
+  scale covariance, oblique poses, separated/contained/tangent cases and costs.
+- **Evidence:** Ignored `artifacts/geometry-range/phase1/root-probe/Program.cs`
+  and `root-probe.log` retain #096 controls, 72 internal GJK classifications and
+  18 public closest/all comparisons against preserved original DLLs.
+
 ### GRV-Issue-096 - Extreme-scale capsule initial mesh sweep can miss a genuine overlap
 
 - **Status:** Approved bounded effective-geometry direction; implementation
   planned in the [Supported Geometry Range Plan](2026-10-12-supported-geometry-range-plan.md).
   The candidate `4,096`-unit reach remains provisional until phase 1 validation;
-  this issue stays open until the complete admission contract is implemented.
+  confirmed in-range prerequisites #113-#116 must be repaired first. This issue
+  stays open until the complete admission contract is implemented.
 - **Confirmed:** 2026-10-07 in the isolated local-stack Release
   `CapsuleInitialContact_WithUnavailableTriangleCharts_ShouldRetainGeometricFallback`
   experiment. An ordinary-radius source control passes; the extreme
@@ -251,7 +343,7 @@ Remaining measured performance costs are tracked in the benchmark backlog.
 
 - **Resolved:** 2026-10-12. Finite mesh and compound interval certificates
   let separated motion reach the first real impact in pure 3D, pure 2D and
-  both mixed source directions. The original cone reaches its 5–8 degree
+  both mixed source directions. The original cone reaches its 5â€“8 degree
   floor-impact bracket instead of freezing at identity.
 - **Confirmed:** 2026-10-09 during phase 3 surface-manifold physical validation.
   The actual initial narrow phase is separated, but the full host loop clamps

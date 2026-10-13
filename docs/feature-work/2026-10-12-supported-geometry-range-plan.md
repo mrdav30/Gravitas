@@ -8,9 +8,11 @@
 > design document or phase report.
 
 **Date:** 2026-10-12  
-**Status:** Planned; the bounded effective-geometry direction is approved.
-The numerical ceiling remains subject to phase 1 evidence. Implementation has
-not started.  
+**Status:** Phase 1 evidence collected; ceiling locking pending numerical
+prerequisites. Admission implementation has not started. The bounded
+effective-geometry direction is approved. The proposed
+ceiling remains provisional while confirmed in-range numerical defects are
+resolved; admission alone cannot establish the intended safety guarantee.  
 **Owner:** Gravitas geometry admission and lifecycle transactions.
 
 **Goal:** Close `GRV-Issue-096` with explicit, consistent admission of supported
@@ -75,12 +77,17 @@ coordinate measurement execution with that issue if it blocks an existing row.
    coordinates are not independent size-limit tests. Collider-owned authored
    mesh construction must not acquire a unit-scale size check before its actual
    host/part scale is available. Public standalone `PhysicsMesh` construction
-   commits runtime geometry and must enforce the budget at its supplied scale.
+   commits unit-scale runtime geometry and must enforce that budget immediately.
+   Its current public constructors have no scale parameter. Preserve compensated
+   collider authoring through a narrow internal deferred-commit path; do not add a
+   public bypass or an unnecessary construction overload.
 5. **Use candidate-local geometry, not clipped world bounds.** Reuse the existing
    conservative centered proxy formulas and ceiling-magnitude arithmetic;
    document their conservatism. Rotating a rigid shape must not change admission.
    A compact mesh translated in its authored vertex frame retains the existing
    recentering behavior and must not become huge merely because of that origin.
+   This preserves intrinsic reach; if the authored center becomes a real
+   body-local attachment offset, that physical lever still counts under rule 6.
 6. **Account for the owning object's complete reach.** A standalone body-owned
    shape includes its effective body-local attachment offset; a bodyless shape
    uses its physical collider origin. A compound includes every effective part
@@ -94,7 +101,9 @@ coordinate measurement execution with that issue if it blocks an existing row.
    3D envelope. Pure 2D admission must not depend on unused physical Y thickness.
 8. **Cover query geometry.** Public overlap and swept-source shapes share the
    applicable reach budget. A finite cone query includes its length and end
-   radius in its physical envelope. Ray length and the travel of a bounded swept
+   radius in its physical envelope. Measure it about the apex/base midpoint with
+   the centered cone collider's conservative formula; the public apex anchor does
+   not consume attachment budget. Ray length and travel of a bounded swept
    source remain separate from source size and retain their existing contracts.
 9. **Reject before publication.** Unsupported geometry produces a descriptive
    argument/validation failure using existing API conventions. It cannot become
@@ -168,6 +177,88 @@ queries and mixed thickness outside collider preparation; and rejected live or
 recorded mutations after derived caches have been prepared. Their tests belong
 to phases 1, 2 and 3 below, not to a separate test framework.
 
+### Phase 1 Admission Inventory And Measurement Decisions
+
+The shared preparation seam covers initialization, detached/live rebuild, body
+pose and reconfiguration in both dimensions. Validate prepared fields there,
+before publication. Reconfiguration already uses detached candidates. Primitive
+owners supply prepared dimensions; mesh preparation already caches the maximum
+ceiling vertex norm and reuses it for unchanged geometry. Polygon vertex-change
+preparation and compound part traversal can supply reach without a second scan.
+
+| Family | Conservative intrinsic reach, rounded outward |
+| --- | --- |
+| Sphere/circle | Effective radius. |
+| Capsule/stadium | Half core length plus radius, retaining an odd raw half-length. |
+| Cuboid/AABB | Ceiling norm of final half-extents. |
+| Cone/cylinder | Ceiling norm of `[radius, outward-rounded height/2, radius]`; intentionally the bounding-box diagonal, not the tight support radius. |
+| Mesh | Maximum ceiling norm of final scaled vertices in the existing recentered local frame. |
+| Polygon | Maximum ceiling norm of final scaled local vertices about the actual collider origin. |
+| Compound | Maximum of ceiling part-offset norm plus that leaf's intrinsic reach. |
+| Mixed slab | Ceiling norm of planar reach and physical half-thickness. |
+
+Add effective owner attachment reach once, in the body's local frame, for a
+body-owned collider. A bodyless collider uses its physical origin. Use existing
+ceiling-magnitude and checked-sum arithmetic; an unrepresentable envelope rejects.
+These formulas are the reviewed measurement direction; `4,096` is still a
+candidate ceiling, not a claim of safe higher-order scalar arithmetic.
+
+Four lifecycle details need more than a check at the common preparation seam:
+
+- `LSMeshCollider` currently constructs and commits a unit-scale `PhysicsMesh`
+  before host scale is available, and computes a scalar size diagonal. Reuse
+  topology/authoring validation through an internal deferred runtime preparation
+  path; do not reject compensated authored geometry at the wrong scale.
+- Bound dimension/offset and mixed-thickness setters currently assign authored
+  fields and wake the body before preparation. Preflight the proposed effective
+  candidate before assignment/waking to satisfy synchronous rejection; later
+  transaction failure alone cannot preserve the old awake state.
+- Mutable, contextless settings currently allow pure-2D admission to acquire a
+  mixed slab later. Mode/thickness/settings replacement require an owning-context
+  preflight before publishing the changed configuration.
+- Recorded fields are written before rebuilding. Preserve the supported runtime
+  transaction boundary without claiming globally atomic arbitrary payload loads.
+
+Public 2D AABB and world-vertex polygon queries also need admission. Measure a
+query polygon about a derived local midpoint, not absolute world coordinates.
+Unknown internal collider fallbacks currently expose a `MaxValue` conservative
+proxy; reject unsupported runtime shape admission explicitly rather than treat
+the sentinel as a valid prepared envelope.
+
+Retain ordinary-shape/extreme-position, authored-origin translation, compensated
+owner/part scale and long-travel regressions. Reframe actual giant dimensions,
+standalone mesh spans and excessive compound spacing as rejection tests in
+phase 2. Keep useful upstream arithmetic tests independent of runtime workload
+policy; the ceiling does not remove translated-anchor defenses.
+
+### In-Range Numerical Prerequisites
+
+Phase 1 reproduced existing failures on the original committed binaries, below
+the candidate ceiling. Repair and rerun their controls before locking the
+supported safety claim or implementing around an assumed safe range:
+
+| Tracker | Confirmed boundary | Required outcome |
+| --- | --- | --- |
+| [#113](issue-tracker.md#grv-issue-113---authored-closed-mesh-integrals-saturate-before-normalization) | Side-128 authored cube publishes unit inertia `1,024` instead of `2,730⅔`; side-2,048 cube accepts an unrepresentable volume as `Valid`. | Exact/checked source integration and coherent failure; retain the existing scaled-property guard. |
+| [#114](issue-tracker.md#grv-issue-114---polygon-moment-integrals-saturate-before-normalization) | Side-256 square publishes moment `2,730⅔` instead of `10,922⅔`; equivalent AABB remains correct. | Correct final moment or explicit representability failure. |
+| [#115](issue-tracker.md#grv-issue-115---cone-volume-saturates-before-final-division) | Radius/height `1,024`, reach `1,536`: representable cone volume is reduced from about `1.124B` to `715.8M`. | Preserve final division and distinguish genuinely unrepresentable volume. |
+| [#116](issue-tracker.md#grv-issue-116---cone-overlap-gjk-loses-scale-and-rotation-invariance) | Length `4,096`, end radius `2,048`: public cone overlaps produce both false positives and false negatives. | Preserve bounded overlap classification, both query variants and corresponding contact callers. |
+
+These are prerequisites, not optimizations and not bugs introduced by admission.
+Do not reduce the candidate ceiling to hide failures at ordinary useful sizes.
+Resolve coherent numerical domains together where ownership permits, retaining
+each regression. Recheck representative mass/shape ratios independently of size;
+even an admitted sphere can have unrepresentable inertia at excessive mass.
+
+The oblique host-scale probe also confirmed FixedMathSharp's existing strict
+decomposition limitation, recorded as `FMS-Issue-029` in its own tracker. Uniform
+scale `2,048` amplifies quaternion reconstruction rounding beyond the fixed
+absolute matrix tolerance although the source matrix is representable and its
+normalized basis passes. This follows the current round-trip contract; do not
+claim a new geometry miss or silently loosen shear checks here. Preserve this
+boundary in subsequent compensated-scale tests and coordinate any upstream
+contract revision separately.
+
 ## Phase 1: Validate And Lock The Supported Range
 
 **Files:** This plan, `issue-tracker.md`, existing
@@ -175,31 +266,31 @@ to phases 1, 2 and 3 below, not to a separate test framework.
 and mixed query tests; reuse `MeshMassPropertyBenchmarks`,
 `RotationalCcdIntervalBenchmarks` and maintained curved-contact benchmarks.
 
-- [ ] Inventory every runtime geometry-admission route and classify existing
+- [x] Inventory every runtime geometry-admission route and classify existing
       enormous-geometry tests separately from ordinary-shape/extreme-position
       and upstream arithmetic regressions. Include detached collider rebuilds,
       standalone `PhysicsMesh`, custom/internal collider fallback semantics,
       bodyless geometry, reconfiguration, settings and recording paths.
-- [ ] Trace `LSMeshCollider` construction: its current `PhysicsMesh` constructor
+- [x] Trace `LSMeshCollider` construction: its current `PhysicsMesh` constructor
       prepares and publishes unit-scale geometry before collider binding. Specify
       the narrow internal authored-data construction/preparation path needed to
       preserve compensated mesh scale while keeping public standalone runtime
       construction validated. Preserve existing authoring validity checks.
-- [ ] Restore #096's original failure as a controlled baseline experiment and
+- [x] Restore #096's original failure as a controlled baseline experiment and
       its ordinary-radius control. Record the failing layer without adding a
       new full-domain contact algorithm. Keep the final maintained test focused
       on production rejection of unsupported effective geometry.
-- [ ] Exercise the candidate reach across all shape families, compounds and
+- [x] Exercise the candidate reach across all shape families, compounds and
       mixed slabs: separated/tangent/penetrating contacts, initial and entering
       sweeps, oblique rotations, nonuniform scale, thin finite features and both
       pair orders. Record exact feature sizes/tolerances; do not infer arbitrary
       one-raw-feature support from passing ordinary geometry.
-- [ ] Check primitive area/inertia and existing mesh mass-property admission at
+- [x] Check primitive area/inertia and existing mesh mass-property admission at
       the candidate size with representative masses and mass ratios. Record
       independent mass, triangle multiplicity and cell-size limits; repair any
       newly introduced failures within the phase. The geometry ceiling cannot
       stand in for existing representability validation.
-- [ ] Measure ordinary controls and candidate-boundary controls separately, with
+- [x] Measure ordinary controls and candidate-boundary controls separately, with
       explicit cell sizes, active-grid coverage, warmup and allocation counts.
       Retain the original binaries/source revisions, settings and observable
       result checksums for matched before/after comparisons. Include pose-only
@@ -218,7 +309,60 @@ and mixed query tests; reuse `MeshMassPropertyBenchmarks`,
 evidence. `4,096` remains provisional until this exit; no supported-safety claim
 is based solely on its proximity to Q32.32 square limits.
 
-**Phase summary:** Pending.
+**Phase summary (2026-10-12):** Evidence collection is complete; independent
+geometry/ponytail review agrees that ceiling locking remains pending #113-#116.
+No production admission, optimization or dependency-pin changes were made.
+
+- #096 reproduces on the original binaries; its radius-1,024 control with a
+  one-raw-unit core reports initial contact at distance zero.
+- **726** ignored family-probe assertions pass across seven 3D/five 2D families,
+  compounds and five mixed slab families, reaching `4,096`. Penetrating/separated
+  truth, pair-order parity and entering/initial sweeps retain normalized
+  depth/distance within `1e-4`. Selected `1/64`-unit features and billion-unit
+  compensated authoring controls pass. Oblique tangencies are observed with
+  materialization uncertainty, not universally asserted. Probes use no active
+  grid and establish no partition-capacity promise.
+- Primitive inertia controls at representative reaches with masses `1/16/64`
+  are positive/unsaturated; largest coefficient/mass-share error is about `0.172`
+  on `320.6M`. Sphere reach `4,096`, mass `512` independently exceeds scalar
+  inertia representation and saturates. The mesh/polygon/cone failures above
+  prevent a blanket numerical guarantee; public cone tests confirm #116 with
+  72 internal classifications and 18 closest/all comparisons.
+- **16** maintained native BDN rows complete, all raw **0 B/op**. The two new
+  rotation rows reuse existing fixtures and precomputed poses; independent
+  review corrected the compound checksum to observe a changing minimum bound.
+
+| Original production baseline | Mean |
+| --- | ---: |
+| Move mesh / concave mesh / compound | `27.29 / 49.26 / 66.93 µs` |
+| Rotate unchanged mesh / compound | `26.73 / 68.71 µs` |
+| Full `Simulate` + `LateSimulate`, 64 spheres | `461.61 µs` |
+| 64 non-SAT / cone primitive contacts | `2.215 / 1.197 ms` |
+| Cone overlap / sphere sweep, 64 targets | `2.5808 ms / 781.6 µs` |
+| Nonuniform mesh rebuild, subdivision `1/8/16` | `46.65 µs / 2.445 ms / 9.645 ms` |
+| Cached mesh inertia, subdivision `1/8/16` | `48.26 / 48.32 / 48.84 ns` |
+
+Native Windows x64, .NET `8.0.29`, SDK `10.0.302`, BDN `0.15.8` ShortRun uses
+three warmups/measurements. Later ambiguous differences require matched longer
+runs, each row an independent gate. Pose/world-step grid: one-unit dense cells,
+scan eight, bounds `[-4,-4,-4]` to `[20,4,20]`. Separate sphere boundary diagnostics
+at reach `1/4,096` use one dense grid, scan eight, extent `4*reach`, cells `reach/4`.
+After 16,384 warm calls, seven 2,000-operation batches allocate zero bytes;
+contact medians `8.51/3.34 µs`, public sweep `38.10/39.64 µs`. These are diagnostic
+timings, not BDN comparisons or improvement claims.
+
+Release/Lean solution builds pass with zero warnings/errors. Full local-stack
+suites pass **5,799 / 5,734**, no skips/failures. Raw reachable line/branch/method
+coverage is **100%**: zero unvisited among Release `47,203 / 15,464 / 4,925` and
+Lean `47,201 / 15,464 / 4,924` sequence points/branches/methods.
+
+Ignored `artifacts/geometry-range/phase1/` retains original `baseline-bench`
+binaries, source/DLL provenance, production probes, native reports, exact
+commands/settings, deviations/checksums, boundary diagnostics and coverage.
+Source: Gravitas `9752c9f`, FixedMathSharp `819dbde`; original/measurement core
+SHA256 `71DA140C72B047918EEEA531C26796C79274263CADD7B8E8641BE9B357E92539`.
+No native ARM64 or package-release conformance claim follows. Keep phase 1 open;
+repair its numerical prerequisites before approving the ceiling/enforcement.
 
 ## Phase 2: Enforce Complete Collider Admission
 
