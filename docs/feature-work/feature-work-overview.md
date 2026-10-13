@@ -53,6 +53,10 @@ instead of burying it in notes.
 - [`Benchmark Signal Hardening`](benchmark-signal-hardening-backlog.md)
   - Reproduce and close confirmed release-relevant signals alongside the owning
     library change. Do not broaden this into speculative optimization work.
+- [`Supported Geometry Range`](2026-10-12-supported-geometry-range-plan.md)
+  - Define and enforce a validated effective-geometry budget across collider,
+    query and restored-state admission. Preserve ordinary shapes at large world
+    coordinates and keep generic mathematics in FixedMathSharp.
 
 ## Recently Completed
 

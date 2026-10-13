@@ -39,8 +39,10 @@
 
 ### GRV-Issue-096 - Extreme-scale capsule initial mesh sweep can miss a genuine overlap
 
-- **Status:** Supported geometry range decision; extreme-radius algorithm work
-  deferred. The intended workloads do not require billion-unit colliders.
+- **Status:** Approved bounded effective-geometry direction; implementation
+  planned in the [Supported Geometry Range Plan](2026-10-12-supported-geometry-range-plan.md).
+  The candidate `4,096`-unit reach remains provisional until phase 1 validation;
+  this issue stays open until the complete admission contract is implemented.
 - **Confirmed:** 2026-10-07 in the isolated local-stack Release
   `CapsuleInitialContact_WithUnavailableTriangleCharts_ShouldRetainGeometricFallback`
   experiment. An ordinary-radius source control passes; the extreme
