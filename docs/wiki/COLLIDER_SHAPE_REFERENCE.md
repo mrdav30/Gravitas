@@ -196,6 +196,11 @@ cross a `Fixed64` scalar face without deforming the polygon.
 `LSPolygonCollider2D` rejects concave and collinear input up front. Concave 2D
 runtime collision should be authored as stable convex compound parts.
 
+Polygon area, centroid and centered moment integrals are cached per effective
+geometry. Pose-only updates reuse them. The requested mass is applied before
+final moment normalization, preserving representable inertia even when scalar
+area would overflow or an intermediate density would round to zero.
+
 ## 2D Shape-Pair Matrix
 
 | A / B          | Circle    | Capsule   | AABB      | Convex Polygon | Compound  |
@@ -321,8 +326,13 @@ rotation of the inverse-transpose-scaled local normal and are normalized before
 projection. Frontal area is the positive projected physical triangle area and is
 invariant to direction magnitude.
 
-Closed-volume mass properties transform analytic covariance under diagonal
-scale. `SurfaceApproximation` performs stable two-pass thin-shell integration:
+Closed-volume integration retains signed tetrahedron weights and moment products
+until final volume, centered COM and unit tensor normalization. Source properties
+are cached in the recentered geometry frame. Diagonal scaling reuses analytic
+covariance when representable; if source properties or an intermediate cached
+scale cannot represent otherwise valid final geometry, the final scaled vertices
+are integrated and cached instead. `SurfaceApproximation` performs stable
+two-pass thin-shell integration:
 area-weighted COM relative to scaled bounds, then authored-order triangle
 central tensors plus parallel-axis shifts. Checked fixed-point arithmetic
 rejects volume collapse, saturation, and nonrepresentable COM/tensors rather

@@ -565,18 +565,18 @@ public sealed class ExactMassPropertiesTests
             new(extent, Fixed64.Zero)
         };
 
-        Assert.True(PolygonMassProperties2D.TryGetWeightAndCentroid(
-            square,
-            out ExactMassWeight weight,
-            out Vector2d centroid));
+        PolygonMassProperties2D properties = PolygonMassProperties2D.Create(square);
+        ExactMassWeight weight = properties.Weight;
+        Vector2d centroid = properties.Centroid;
+        Assert.False(weight.IsZero);
         Assert.False(weight.TryGetMeasure(out _));
         Assert.Equal(
             new Vector2d(extent * Fixed64.Half, extent * Fixed64.Half),
             centroid);
-        Assert.True(PolygonMassProperties2D.TryGetWeightAndCentroid(
-            clockwise,
-            out ExactMassWeight clockwiseWeight,
-            out Vector2d clockwiseCentroid));
+        PolygonMassProperties2D clockwiseProperties = PolygonMassProperties2D.Create(clockwise);
+        ExactMassWeight clockwiseWeight = clockwiseProperties.Weight;
+        Vector2d clockwiseCentroid = clockwiseProperties.Centroid;
+        Assert.False(clockwiseWeight.IsZero);
         ExactMassWeight totalWeight = weight.Add(clockwiseWeight);
         Assert.True(weight.TryGetProportionalShare(
             Fixed64.Two,
@@ -584,12 +584,17 @@ public sealed class ExactMassPropertiesTests
             out Fixed64 share));
         Assert.Equal(Fixed64.One, share);
         Assert.Equal(centroid, clockwiseCentroid);
-        Assert.False(PolygonMassProperties2D.TryGetWeightAndCentroid(
-            line,
-            out ExactMassWeight zeroWeight,
-            out Vector2d zeroCentroid));
+        // A one-raw-unit mass cancels Q scaling: round 1000000000^2 / 6 once.
+        Fixed64 smallMassMoment = Fixed64.FromRaw(166_666_666_666_666_667);
+        Assert.Equal(smallMassMoment, properties.CalculateMoment(Fixed64.FromRaw(1)));
+        Assert.Equal(smallMassMoment, clockwiseProperties.CalculateMoment(Fixed64.FromRaw(1)));
+        Assert.Equal(Fixed64.MaxValue, properties.CalculateMoment(Fixed64.One));
+        PolygonMassProperties2D zeroProperties = PolygonMassProperties2D.Create(line);
+        ExactMassWeight zeroWeight = zeroProperties.Weight;
+        Vector2d zeroCentroid = zeroProperties.Centroid;
         Assert.True(zeroWeight.IsZero);
         Assert.Equal(Vector2d.Zero, zeroCentroid);
+        Assert.Equal(Fixed64.Zero, zeroProperties.CalculateMoment(Fixed64.One));
     }
 
     private static void AssertRawNear(

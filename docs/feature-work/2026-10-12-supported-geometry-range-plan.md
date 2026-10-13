@@ -9,7 +9,8 @@
 
 **Date:** 2026-10-12  
 **Status:** Phase 1 evidence collected; ceiling locking pending numerical
-prerequisites. Admission implementation has not started. The bounded
+prerequisites #115/#116; #113/#114 are resolved. Admission implementation has
+not started. The bounded
 effective-geometry direction is approved. The proposed
 ceiling remains provisional while confirmed in-range numerical defects are
 resolved; admission alone cannot establish the intended safety guarantee.  
@@ -239,8 +240,8 @@ supported safety claim or implementing around an assumed safe range:
 
 | Tracker | Confirmed boundary | Required outcome |
 | --- | --- | --- |
-| [#113](issue-tracker.md#grv-issue-113---authored-closed-mesh-integrals-saturate-before-normalization) | Side-128 authored cube publishes unit inertia `1,024` instead of `2,730⅔`; side-2,048 cube accepts an unrepresentable volume as `Valid`. | Exact/checked source integration and coherent failure; retain the existing scaled-property guard. |
-| [#114](issue-tracker.md#grv-issue-114---polygon-moment-integrals-saturate-before-normalization) | Side-256 square publishes moment `2,730⅔` instead of `10,922⅔`; equivalent AABB remains correct. | Correct final moment or explicit representability failure. |
+| [#113](issue-tracker.md#grv-issue-113---authored-closed-mesh-integrals-saturate-before-normalization) | Side-128 authored cube publishes unit inertia `1,024` instead of `2,730⅔`; side-2,048 cube accepts an unrepresentable volume as `Valid`. | Resolved: exact/checked integration, centered cache and numeric fallback; retain the existing scaled-property guard. |
+| [#114](issue-tracker.md#grv-issue-114---polygon-moment-integrals-saturate-before-normalization) | Side-256 square publishes moment `2,730⅔` instead of `10,922⅔`; equivalent AABB remains correct. | Resolved: exact mass-applied normalization with geometry caching; retain the existing final-overflow policy. |
 | [#115](issue-tracker.md#grv-issue-115---cone-volume-saturates-before-final-division) | Radius/height `1,024`, reach `1,536`: representable cone volume is reduced from about `1.124B` to `715.8M`. | Preserve final division and distinguish genuinely unrepresentable volume. |
 | [#116](issue-tracker.md#grv-issue-116---cone-overlap-gjk-loses-scale-and-rotation-invariance) | Length `4,096`, end radius `2,048`: public cone overlaps produce both false positives and false negatives. | Preserve bounded overlap classification, both query variants and corresponding contact callers. |
 
@@ -363,6 +364,42 @@ Source: Gravitas `9752c9f`, FixedMathSharp `819dbde`; original/measurement core
 SHA256 `71DA140C72B047918EEEA531C26796C79274263CADD7B8E8641BE9B357E92539`.
 No native ARM64 or package-release conformance claim follows. Keep phase 1 open;
 repair its numerical prerequisites before approving the ceiling/enforcement.
+
+**Integral refinement (2026-10-13):** #113/#114 are resolved. Full correctness,
+coverage, replay and paired warm-performance gates pass.
+Mesh determinant/first/second integrals now stay wide until final normalization,
+reusing the existing triangle polynomials. The centered source cache also fixes
+an authored-translation half-tie discrepancy and removes obsolete absolute
+source scaling/recentering. Source volume/tensor or cached scaling failures
+retry the actual final geometry, preserving compensated admission. Polygon
+area/centroid/moment ratios refresh with effective geometry and reuse committed
+values for pose changes; mass is applied before final moment rounding.
+
+No new source files, dependencies, numeric owners or upstream edits are needed;
+the production diff is two net added lines. New production regressions cover
+analytic cubes/asymmetric tetrahedra, both windings, large translations/raw ties,
+tiny/large compensated source geometry, true final overflow, small polygon mass,
+compound/AABB parity, changed scale/mass, rollback and warm allocation behavior.
+Release/Lean solution builds pass with zero warnings/errors; suites pass
+**5,821 / 5,756**. Raw coverage remains **100%**: Release
+`47,175 / 15,464 / 4,929`, Lean `47,173 / 15,464 / 4,928` sequence points,
+branches and reachable methods, all visited. Six shared replay captures agree
+with reviewed expectations and directly across native Windows x64 Release/Lean.
+Evidence is under ignored `artifacts/grv-issues-113-114/`; paired performance
+artifacts are under `artifacts/grv-113-114/perf/`. Original source is `a5fff89`,
+fixed DLL SHA256 `CED874321E77CA5005BE9B5FC13E515CE739662AD260410724067FD8B0CA7BF9`.
+Paired native Windows x64/.NET 8.0.29 measurements execute 18 rows per snapshot,
+all **0 B/op**. Two-launch repeats clear ambiguous pose/world/scale rows within
+measurement uncertainty; none shows a repeatable slowdown. The largest mesh
+rebuild row uses five warmups/six measurements with 128 operations per iteration:
+`9.6335 -> 9.5950 ms`. This supersedes an underwarmed adaptive run with only four
+operations per iteration, which was inconclusive rather than regression evidence.
+Polygon pure-2D/mixed cached moments measure `2.97 -> 1.01/0.99 us`, pose changes
+`18.99/19.03 -> 11.29/11.07 us`, scale changes `11.83/12.18 -> 7.87/7.95 us`.
+These incidental gains come from reusing the integrals needed by the fix.
+Independent numerical/ponytail review has no outstanding findings. No native
+Linux/ARM64 or released-package validation is claimed by this local run.
+The candidate ceiling and #096 remain open; #115/#116 still require resolution.
 
 ## Phase 2: Enforce Complete Collider Admission
 

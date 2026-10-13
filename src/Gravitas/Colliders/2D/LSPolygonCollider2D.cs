@@ -21,6 +21,8 @@ public sealed class LSPolygonCollider2D : LSCollider2D, IConvexVertexSource2D
     private Vector2d[] _localVertices;
     private Vector2d[] _scaledLocalVertices;
     private Vector2d[] _scaledLocalVerticesScratch;
+    private PolygonMassProperties2D _massProperties;
+    private PolygonMassProperties2D _preparedMassProperties;
 
     /// <summary>Creates a pure 2D convex polygon from authored local vertices.</summary>
     public LSPolygonCollider2D(params Vector2d[] vertices)
@@ -145,67 +147,28 @@ public sealed class LSPolygonCollider2D : LSCollider2D, IConvexVertexSource2D
 
     internal override ExactMassPoint2D CalculateLocalMassPoint()
     {
-        _ = TryCalculateIntrinsicSignedAreaAndCentroid(
-            out _,
-            out Vector2d intrinsicCentroid);
-        return TransformRelativeMassPropertyPointExact(intrinsicCentroid);
+        return TransformRelativeMassPropertyPointExact(GetMassProperties().Centroid);
     }
 
     internal override ExactMassPoint2D CalculatePreparedLocalMassPoint()
     {
-        _ = PolygonMassProperties2D.TryGetWeightAndCentroid(
-            _scaledLocalVerticesScratch,
-            out _,
-            out Vector2d intrinsicCentroid);
         return TransformPreparedRelativeMassPropertyPointExact(
-            intrinsicCentroid);
+            _preparedMassProperties.Centroid);
     }
 
     internal override ExactMassWeight CalculateAreaForMassProperties()
     {
-        ReadOnlySpan<Vector2d> vertices = GetMassPropertyVertices();
-        _ = PolygonMassProperties2D.TryGetWeightAndCentroid(
-            vertices,
-            out ExactMassWeight weight,
-            out _);
-        return weight;
+        return GetMassProperties().Weight;
     }
 
     internal override ExactMassWeight CalculatePreparedAreaForMassProperties()
     {
-        _ = PolygonMassProperties2D.TryGetWeightAndCentroid(
-            _scaledLocalVerticesScratch,
-            out ExactMassWeight weight,
-            out _);
-        return weight;
+        return _preparedMassProperties.Weight;
     }
 
     internal override Fixed64 CalculateCenterOfMassMoment(Fixed64 mass)
     {
-        ReadOnlySpan<Vector2d> vertices = GetMassPropertyVertices();
-        _ = FixedConvex2dRelations.TryGetAreaAndCentroid(
-            vertices,
-            out Fixed64 area,
-            out Vector2d intrinsicCenterOfMass);
-        if (area <= Fixed64.Zero)
-            return Fixed64.Zero;
-
-        Fixed64 density = mass / area;
-        Fixed64 centeredIntegral = Fixed64.Zero;
-        for (int i = 0; i < vertices.Length; i++)
-        {
-            Vector2d a = vertices[i] - intrinsicCenterOfMass;
-            Vector2d b =
-                vertices[(i + 1) % vertices.Length] - intrinsicCenterOfMass;
-            Fixed64 cross = Vector2d.CrossProduct(a, b);
-            Fixed64 term =
-                a.MagnitudeSquared +
-                Vector2d.Dot(a, b) +
-                b.MagnitudeSquared;
-            centeredIntegral += cross * term;
-        }
-
-        return (density * centeredIntegral).Abs() / (Fixed64)12;
+        return GetMassProperties().CalculateMoment(mass);
     }
 
     private protected override void PrepareShape(in ColliderShapeSnapshot2D snapshot)
@@ -225,7 +188,15 @@ public sealed class LSPolygonCollider2D : LSCollider2D, IConvexVertexSource2D
         // Positive scaling can collapse a small edge through rounding. Validate
         // before publication, but reuse admission when only the pose changes.
         if (verticesChanged)
+        {
             ValidateConvexPolygon(_scaledLocalVerticesScratch);
+            _preparedMassProperties = PolygonMassProperties2D.Create(_scaledLocalVerticesScratch);
+        }
+        else
+        {
+            // Intrinsic integrals depend on effective geometry, not world pose.
+            _preparedMassProperties = _massProperties;
+        }
 
         SetPreparedBounds(FixedBoundArea.FromRotatedOffsetsClippedToDomain(
             snapshot.Center,
@@ -240,6 +211,7 @@ public sealed class LSPolygonCollider2D : LSCollider2D, IConvexVertexSource2D
             offsets = new Vector2d[_scaledLocalVerticesScratch.Length];
         _scaledLocalVertices = _scaledLocalVerticesScratch;
         _scaledLocalVerticesScratch = offsets;
+        _massProperties = _preparedMassProperties;
     }
 
     /// <inheritdoc/>
@@ -281,21 +253,12 @@ public sealed class LSPolygonCollider2D : LSCollider2D, IConvexVertexSource2D
             "2D polygon vertices must form a strictly convex boundary.");
     }
 
-    private bool TryCalculateIntrinsicSignedAreaAndCentroid(
-        out Fixed64 signedDoubleArea,
-        out Vector2d centroid)
-    {
-        return FixedConvex2dRelations.TryGetAreaAndCentroid(
-            GetMassPropertyVertices(),
-            out signedDoubleArea,
-            out centroid);
-    }
+    private PolygonMassProperties2D GetMassProperties() => HasCommittedShape
+        ? _massProperties
+        : PolygonMassProperties2D.Create(GetMassPropertyVertices());
 
     private ReadOnlySpan<Vector2d> GetMassPropertyVertices()
     {
-        if (HasCommittedShape)
-            return _scaledLocalVertices;
-
         GetCurrentScaleFactors(
             out Vector2d ownerScale,
             out Vector2d partScale);

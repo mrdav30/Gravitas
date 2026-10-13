@@ -13,6 +13,68 @@ namespace Gravitas.Tests.Colliders;
 
 public sealed class PhysicsMeshScaleTests
 {
+    [Theory]
+    [InlineData(16)]
+    [InlineData(128)]
+    [InlineData(256)]
+    [InlineData(1024)]
+    public void AuthoredClosedCube_ShouldNormalizeExactIntegralsBeforeNarrowing(int side)
+    {
+        CreateSubdividedClosedCubeTopology(1, out Vector3d[] vertices, out int[] triangles);
+        for (int i = 0; i < vertices.Length; i++)
+            vertices[i] *= (Fixed64)side;
+        var mesh = new PhysicsMesh(vertices, triangles, Vector3d.Zero, FixedQuaternion.Identity);
+
+        mesh.TryGetClosedVolumeMassProperties(out MeshMassProperties properties, out MeshVolumeValidationResult result)
+            .Should().BeTrue();
+        result.Should().Be(MeshVolumeValidationResult.Valid);
+        properties.Volume.Should().Be((Fixed64)((long)side * side * side));
+        properties.CenterOfMass.Should().Be(Vector3d.Zero);
+        Fixed64 diagonal = Fixed64.FromFraction((long)side * side, 6);
+        properties.UnitMassInertiaTensor.Should().Be(new Fixed3x3(
+            diagonal, Fixed64.Zero, Fixed64.Zero,
+            Fixed64.Zero, diagonal, Fixed64.Zero,
+            Fixed64.Zero, Fixed64.Zero, diagonal));
+        mesh.CalculateInertiaTensor((Fixed64)16).M11.Should().Be(diagonal * 16);
+    }
+
+    [Fact]
+    public void AuthoredClosedCube_WithUnrepresentableVolume_ShouldRejectInsteadOfSaturating()
+    {
+        CreateSubdividedClosedCubeTopology(1, out Vector3d[] vertices, out int[] triangles);
+        for (int i = 0; i < vertices.Length; i++)
+            vertices[i] *= (Fixed64)2048;
+        var mesh = new PhysicsMesh(vertices, triangles, Vector3d.Zero, FixedQuaternion.Identity);
+
+        mesh.TryGetClosedVolumeMassProperties(out MeshMassProperties properties, out MeshVolumeValidationResult result)
+            .Should().BeFalse();
+        result.Should().Be(MeshVolumeValidationResult.NonRepresentableVolume);
+        properties.Should().Be(default(MeshMassProperties));
+        Action calculate = () => mesh.CalculateInertiaTensor(Fixed64.One);
+        calculate.Should().Throw<InvalidOperationException>().WithMessage("*NonRepresentableVolume*");
+    }
+
+    [Theory]
+    [InlineData(2048, 2048)]
+    [InlineData(1, 256)]
+    public void AuthoredClosedCube_WithUnusableSourceProperties_ShouldAdmitRepresentableScaledGeometry(
+        int side, int denominator)
+    {
+        CreateSubdividedClosedCubeTopology(1, out Vector3d[] vertices, out int[] triangles);
+        for (int i = 0; i < vertices.Length; i++)
+            vertices[i] *= side == 1 ? Fixed64.FromFraction(1, denominator) : (Fixed64)side;
+        var mesh = new PhysicsMesh(vertices, triangles, Vector3d.Zero, FixedQuaternion.Identity);
+        // The second row grows a below-epsilon volume; the first shrinks a true source overflow.
+        Fixed64 scale = side == 1 ? (Fixed64)denominator : Fixed64.FromFraction(1, denominator);
+        mesh.UpdateTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One * scale);
+
+        mesh.TryGetClosedVolumeMassProperties(out MeshMassProperties properties, out MeshVolumeValidationResult result)
+            .Should().BeTrue();
+        result.Should().Be(MeshVolumeValidationResult.Valid);
+        properties.Volume.Should().Be(Fixed64.One);
+        properties.UnitMassInertiaTensor.M11.Should().Be(Fixed64.FromFraction(1, 6));
+    }
+
     [Fact]
     public void AreaAdmittedMicroTriangle_ShouldRetainAUsableFaceNormal()
     {
@@ -29,6 +91,97 @@ public sealed class PhysicsMeshScaleTests
 
         mesh.TotalArea.Should().Be(Fixed64.FromFraction(1, 262144));
         mesh.GetFaceNormalWorld(0).Should().Be(Vector3d.Forward);
+    }
+
+    [Fact]
+    public void ClosedTetrahedron_WithCentroidHalfTie_ShouldRoundInTheCommittedCenteredFrame()
+    {
+        Vector3d[] vertices = { Vector3d.Zero,
+            new(Fixed64.One + Fixed64.FromRaw(2), Fixed64.Zero, Fixed64.Zero),
+            Vector3d.Up, Vector3d.Forward };
+        var first = new PhysicsMesh(vertices, TetrahedronTriangles(), Vector3d.Zero, FixedQuaternion.Identity);
+        for (int i = 0; i < vertices.Length; i++)
+            vertices[i].X += Fixed64.FromRaw(1);
+        var translated = new PhysicsMesh(vertices, TetrahedronTriangles(), Vector3d.Zero, FixedQuaternion.Identity);
+
+        first.TryGetClosedVolumeMassProperties(out MeshMassProperties original, out _).Should().BeTrue();
+        translated.TryGetClosedVolumeMassProperties(out MeshMassProperties shifted, out _).Should().BeTrue();
+        original.CenterOfMass.X.Should().Be(-Fixed64.Quarter);
+        shifted.CenterOfMass.Should().Be(original.CenterOfMass);
+        shifted.UnitMassInertiaTensor.Should().Be(original.UnitMassInertiaTensor);
+    }
+
+    [Fact]
+    public void ClosedCube_WithOverflowingCachedVolumeProduct_ShouldAdmitRepresentableFinalBox()
+    {
+        CreateSubdividedClosedCubeTopology(1, out Vector3d[] vertices, out int[] triangles);
+        for (int i = 0; i < vertices.Length; i++)
+            vertices[i] *= (Fixed64)1000;
+        var mesh = new PhysicsMesh(vertices, triangles, Vector3d.Zero, FixedQuaternion.Identity);
+        mesh.UpdateTransform(Vector3d.Zero, FixedQuaternion.Identity,
+            new Vector3d((Fixed64)4, Fixed64.Quarter, Fixed64.Quarter));
+
+        mesh.TryGetClosedVolumeMassProperties(out MeshMassProperties properties, out _).Should().BeTrue();
+        properties.Volume.Should().Be((Fixed64)250_000_000);
+        properties.UnitMassInertiaTensor.M11.Should().Be(Fixed64.FromFraction(125_000, 12));
+        properties.UnitMassInertiaTensor.M22.Should().Be(Fixed64.FromFraction(16_062_500, 12));
+        properties.UnitMassInertiaTensor.M33.Should().Be(properties.UnitMassInertiaTensor.M22);
+    }
+
+    [Theory]
+    [InlineData(131072, MeshVolumeValidationResult.Valid)]
+    [InlineData(262144, MeshVolumeValidationResult.NonRepresentableMassProperties)]
+    public void ClosedMesh_WithUnusableSourceTensorOrCachedCovariance_ShouldIntegrateFinalGeometry(
+        int length, MeshVolumeValidationResult sourceResult)
+    {
+        CreateSubdividedClosedCubeTopology(1, out Vector3d[] vertices, out int[] triangles);
+        Vector3d dimensions = new((Fixed64)length, Fixed64.One, Fixed64.One);
+        for (int i = 0; i < vertices.Length; i++)
+            vertices[i] *= dimensions;
+        var mesh = new PhysicsMesh(vertices, triangles, Vector3d.Zero, FixedQuaternion.Identity);
+        mesh.TryGetClosedVolumeMassProperties(out _, out MeshVolumeValidationResult originalResult);
+        originalResult.Should().Be(sourceResult);
+
+        mesh.UpdateTransform(Vector3d.Zero, FixedQuaternion.Identity,
+            new Vector3d(Fixed64.FromFraction(1, length), Fixed64.One, Fixed64.One));
+
+        mesh.TryGetClosedVolumeMassProperties(out MeshMassProperties properties, out _).Should().BeTrue();
+        properties.Volume.Should().Be(Fixed64.One);
+        properties.UnitMassInertiaTensor.M11.Should().Be(Fixed64.FromFraction(1, 6));
+        properties.UnitMassInertiaTensor.M22.Should().Be(properties.UnitMassInertiaTensor.M11);
+        properties.UnitMassInertiaTensor.M33.Should().Be(properties.UnitMassInertiaTensor.M11);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void LargeClosedTetrahedron_ShouldRetainCentroidAndProductMomentsAcrossAuthoringFrames(
+        bool reverseWinding, bool translated)
+    {
+        Fixed64 length = (Fixed64)128;
+        Vector3d[] vertices = { Vector3d.Zero, Vector3d.Right * length,
+            Vector3d.Up * length, Vector3d.Forward * length };
+        if (translated)
+            for (int i = 0; i < vertices.Length; i++)
+                vertices[i] += new Vector3d(1_600_000_000, -1_600_000_000, 30_000);
+        int[] triangles = TetrahedronTriangles();
+        if (reverseWinding)
+            for (int i = 0; i < triangles.Length; i += 3)
+                (triangles[i + 1], triangles[i + 2]) = (triangles[i + 2], triangles[i + 1]);
+        var mesh = new PhysicsMesh(vertices, triangles, new Vector3d(3, 7, -5),
+            FixedQuaternion.FromEulerAnglesInDegrees((Fixed64)19, (Fixed64)31, (Fixed64)11));
+
+        mesh.TryGetClosedVolumeMassProperties(out MeshMassProperties properties, out _).Should().BeTrue();
+        properties.Volume.Should().Be(Fixed64.FromFraction(128L * 128 * 128, 6));
+        properties.CenterOfMass.Should().Be(Vector3d.One * (Fixed64)(-32));
+        Fixed64 offDiagonal = -Fixed64.FromFraction(128L * 128, 20);
+        properties.UnitMassInertiaTensor.M12.Should().Be(offDiagonal);
+        properties.UnitMassInertiaTensor.M13.Should().Be(offDiagonal);
+        properties.UnitMassInertiaTensor.M23.Should().Be(offDiagonal);
+        Fixed3x3 tensor = mesh.CalculateInertiaTensor(Fixed64.One);
+        (tensor.M11 - Fixed64.FromFraction(3L * 128 * 128, 40)).Abs().m_rawValue.Should().BeLessThanOrEqualTo(1);
     }
 
     [Fact]

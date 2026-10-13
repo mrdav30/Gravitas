@@ -38,50 +38,9 @@
 ### Ordered Queue
 
 Phase 1 of the supported-geometry plan confirmed in-range numerical defects on
-the original binaries. Resolve #113/#114, then #115 and #116 before locking
-#096's safety contract; combine integral fixes where their ownership permits.
+the original binaries. Integral fixes #113/#114 are resolved. Resolve #115, then
+#116 before locking #096's safety contract.
 #111 remains an independent validation-tooling issue.
-
-### GRV-Issue-113 - Authored closed-mesh integrals saturate before normalization
-
-- **Confirmed:** 2026-10-12 during supported-geometry phase 1, against committed
-  Release core `9752c9f` and local FixedMathSharp `819dbde`.
-- **Reproduction:** Construct the closed cube topology directly with side `128`.
-  `PhysicsMesh.TryGetClosedVolumeMassProperties` reports `Valid` and unit `Ixx`
-  `1,024` (raw `4398046511104`), instead of `2,730 + 2/3` (nearest raw
-  `11728124029611`). Reach is about `110.851`, below the proposed ceiling.
-  The equivalent unit cube scaled by `128` gives `2,730.666656494140625`; its
-  small source-rounding error is distinct from authored integral saturation.
-- **Boundary:** Direct side-`2,048` construction reports `Valid` with volume
-  `Fixed64.MaxValue` and unit inertia `1`, although true volume is `8,589,934,592`.
-  The unit-cube scaling route rejects that volume as `NonRepresentableVolume`.
-- **Root cause:** Scalar source tetrahedral volume/second-integral accumulation
-  in `PhysicsMesh.MassProperties.cs` saturates before normalization. Cached-property
-  scale validation does not guard the source integration route.
-- **Follow-up:** Harden source integration, final rounding and rejection using
-  existing exact arithmetic. Cover authored/scaled and translated/rotated
-  equivalents, both mesh policies, representative masses and compound use;
-  preserve warm cached-property performance.
-- **Evidence:** Ignored `artifacts/geometry-range/phase1/numerics/results.log`,
-  `repeat.log`, `provenance.log` and `Program.cs` retain exact expectations,
-  production calls, original DLL hashes and byte-identical repeated results.
-
-### GRV-Issue-114 - Polygon moment integrals saturate before normalization
-
-- **Confirmed:** 2026-10-12 on the same original phase 1 Release binaries.
-- **Reproduction:** Initialize a square `LSPolygonCollider2D` of side `256` and
-  calculate its unit-mass center-of-mass moment. Actual is `2,730 + 2/3` (raw
-  `11728124029611`); expected is `10,922 + 2/3` (raw `46912496118443`). Reach is
-  about `181.019`. Equivalent AABB differs from expectation by one raw increment;
-  the side-`128` polygon matches the analytical expectation exactly.
-- **Root cause:** Scalar fourth-order products in
-  `LSPolygonCollider2D.CalculateCenterOfMassMoment` saturate before density and
-  final division. Larger supported polygons are affected more severely.
-- **Follow-up:** Retain the final ratio until representability is known. Cover
-  centered/off-center and authored/scaled polygons, winding, body/compound
-  consumers, mass mutation and parity with equivalent AABBs.
-- **Evidence:** Phase 1 numerics artifacts under #113 retain actual and exact
-  raw results. No admission implementation was present in these runs.
 
 ### GRV-Issue-115 - Cone volume saturates before final division
 
@@ -133,7 +92,7 @@ the original binaries. Resolve #113/#114, then #115 and #116 before locking
 - **Status:** Approved bounded effective-geometry direction; implementation
   planned in the [Supported Geometry Range Plan](2026-10-12-supported-geometry-range-plan.md).
   The candidate `4,096`-unit reach remains provisional until phase 1 validation;
-  confirmed in-range prerequisites #113-#116 must be repaired first. This issue
+  remaining in-range prerequisites #115/#116 must be repaired first. This issue
   stays open until the complete admission contract is implemented.
 - **Confirmed:** 2026-10-07 in the isolated local-stack Release
   `CapsuleInitialContact_WithUnavailableTriangleCharts_ShouldRetainGeometricFallback`
@@ -188,6 +147,67 @@ the original binaries. Resolve #113/#114, then #115 and #116 before locking
 Remaining measured performance costs are tracked in the benchmark backlog.
 
 ## Resolved Issues
+
+### GRV-Issue-113 - Authored closed-mesh integrals saturate before normalization
+
+- **Resolved:** 2026-10-13. Exact production regressions, full Release/Lean
+  raw coverage, replay comparison and paired warm-performance gates pass.
+- **Implementation:** Signed determinant/first/second integrals normalize only
+  at final materialization. Source properties are cached in the centered frame;
+  invalid source or cached-scale numeric results retry final scaled geometry.
+  Identity retains the rounded integrated tensor. Existing triangle polynomial
+  helpers are shared; obsolete absolute-source scaling/recentering is removed.
+  Authored-frame half ties now round consistently in the committed frame.
+- **Confirmed:** 2026-10-12 during supported-geometry phase 1, against committed
+  Release core `9752c9f` and local FixedMathSharp `819dbde`.
+- **Reproduction:** Construct the closed cube topology directly with side `128`.
+  `PhysicsMesh.TryGetClosedVolumeMassProperties` reports `Valid` and unit `Ixx`
+  `1,024` (raw `4398046511104`), instead of `2,730 + 2/3` (nearest raw
+  `11728124029611`). Reach is about `110.851`, below the proposed ceiling.
+  The equivalent unit cube scaled by `128` gives `2,730.666656494140625`; its
+  small source-rounding error is distinct from authored integral saturation.
+- **Boundary:** Direct side-`2,048` construction reports `Valid` with volume
+  `Fixed64.MaxValue` and unit inertia `1`, although true volume is `8,589,934,592`.
+  The unit-cube scaling route rejects that volume as `NonRepresentableVolume`.
+- **Root cause:** Scalar source tetrahedral volume/second-integral accumulation
+  in `PhysicsMesh.MassProperties.cs` saturates before normalization. Cached-property
+  scale validation does not guard the source integration route.
+- **Regression coverage:** Analytic authored/scaled cube and asymmetric tetrahedron
+  properties; winding, extreme translations and centroid half ties; source
+  volume/tensor and intermediate scale overflow with valid final geometry; true
+  final rejection; existing surface/compound and failed-transaction controls.
+- **Evidence:** Ignored `artifacts/geometry-range/phase1/numerics/results.log`,
+  `repeat.log`, `provenance.log` and `Program.cs` retain exact expectations,
+  production calls, original DLL hashes and byte-identical repeated results.
+
+### GRV-Issue-114 - Polygon moment integrals saturate before normalization
+
+- **Resolved:** 2026-10-13. Exact production regressions, full Release/Lean
+  raw coverage, replay comparison and paired warm-performance gates pass.
+- **Implementation:** Cache exact area, centroid and centered integral ratio in
+  prepared/committed geometry state. Apply requested mass before final moment
+  rounding; pose-only changes reuse the committed cache. Effective scale/vertex
+  changes refresh it. Preserve the existing final-overflow saturation policy.
+- **Confirmed:** 2026-10-12 on the same original phase 1 Release binaries.
+- **Reproduction:** Initialize a square `LSPolygonCollider2D` of side `256` and
+  calculate its unit-mass center-of-mass moment. Actual is `2,730 + 2/3` (raw
+  `11728124029611`); expected is `10,922 + 2/3` (raw `46912496118443`). Reach is
+  about `181.019`. Equivalent AABB differs from expectation by one raw increment;
+  the side-`128` polygon matches the analytical expectation exactly.
+- **Root cause:** Scalar fourth-order products in
+  `LSPolygonCollider2D.CalculateCenterOfMassMoment` saturate before density and
+  final division. Larger supported polygons are affected more severely.
+- **Regression coverage:** Centered/off-center and scaled polygons, winding,
+  one-raw-unit mass, unrepresentable area with representable moment, body/compound
+  consumers, mass mutation, cache invalidation, rollback and equivalent AABBs.
+- **Evidence:** Phase 1 numerics artifacts under #113 retain actual and exact
+  raw results. No admission implementation was present in these runs.
+
+Validation for both issues is recorded in the supported-geometry plan phase 1
+integral refinement; ignored `artifacts/grv-issues-113-114/` and
+`artifacts/grv-113-114/perf/` retain raw tests, coverage, replay and paired
+benchmark reports. Existing warmed controls show no repeatable slowdown beyond
+measurement uncertainty and no added allocations.
 
 ### GRV-Issue-112 - ARM64 mesh discovery crashes on a packed vertex index
 

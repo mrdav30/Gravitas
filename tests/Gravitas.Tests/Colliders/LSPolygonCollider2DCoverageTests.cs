@@ -10,6 +10,111 @@ namespace Gravitas.Tests.Colliders;
 public sealed class LSPolygonCollider2DCoverageTests
 {
     [Theory]
+    [InlineData(false, 1)]
+    [InlineData(true, 1)]
+    [InlineData(false, 3)]
+    [InlineData(true, 3)]
+    public void LargeSquare_ShouldRetainRepresentableCenteredMoment(bool clockwise, int massValue)
+    {
+        Fixed64 half = (Fixed64)128;
+        Vector2d translation = new((Fixed64)30_000, (Fixed64)(-40_000));
+        Vector2d[] vertices =
+        {
+            translation + new Vector2d(-half, -half),
+            translation + new Vector2d(half, -half),
+            translation + new Vector2d(half, half),
+            translation + new Vector2d(-half, half)
+        };
+        if (clockwise)
+            System.Array.Reverse(vertices);
+        var polygon = new LSPolygonCollider2D(vertices);
+        Fixed64 mass = (Fixed64)massValue;
+        Fixed64 expected = Fixed64.FromFraction(65_536L * massValue, 6);
+
+        polygon.CalculateLocalCenterOfMassOffset().Should().Be(translation);
+        polygon.CalculateMomentOfInertia(mass, translation).Should().Be(expected);
+        polygon.CalculateMomentOfInertia(mass, translation + Vector2d.Right).Should().Be(expected + mass);
+    }
+
+    [Fact]
+    public void LargeSquare_WithSmallMass_ShouldNotRoundDensityToZero()
+    {
+        Fixed64 half = (Fixed64)128;
+        var polygon = new LSPolygonCollider2D(
+            new Vector2d(-half, -half),
+            new Vector2d(half, -half),
+            new Vector2d(half, half),
+            new Vector2d(-half, half));
+
+        polygon.CalculateMomentOfInertia(Fixed64.FromRaw(1), Vector2d.Zero)
+            .Should().Be(Fixed64.FromRaw(10_923));
+    }
+
+    [Fact]
+    public void LargeSquare_WithUnrepresentableArea_ShouldStillRetainRepresentableMoment()
+    {
+        Fixed64 half = (Fixed64)50_000;
+        var polygon = new LSPolygonCollider2D(
+            new Vector2d(-half, -half),
+            new Vector2d(half, -half),
+            new Vector2d(half, half),
+            new Vector2d(-half, half));
+
+        // Round (100000^2 / 6) * 2^32 once; FromFraction converts through double.
+        polygon.CalculateMomentOfInertia(Fixed64.One, Vector2d.Zero)
+            .Should().Be(Fixed64.FromRaw(7_158_278_826_666_666_667));
+        polygon.CalculateMomentOfInertia((Fixed64)2, Vector2d.Zero)
+            .Should().Be(Fixed64.MaxValue);
+    }
+
+    [Fact]
+    public void ScaledCompoundPolygon_ShouldMatchEquivalentAabbAndRetainMomentAcrossPoses()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        Vector2d[] vertices =
+        {
+            new(-Fixed64.One, -Fixed64.One),
+            new(Fixed64.One, -Fixed64.One),
+            new(Fixed64.One, Fixed64.One),
+            new(-Fixed64.One, Fixed64.One)
+        };
+        Vector2d offset = new((Fixed64)5, (Fixed64)(-7));
+        var compound = new LSCompoundCollider2D(
+            CompoundColliderPart2D.ConvexPolygon(vertices, offset, Fixed64.Zero,
+                new Vector2d((Fixed64)128, (Fixed64)64)));
+        var body = new SolidBody2D(new TestMatterAgent(context), compound) { Mass = Fixed64.One };
+        body.Initialize(Vector2d.Zero);
+        var aabb = new LSAABBoxCollider2D(new Vector2d((Fixed64)256, (Fixed64)128));
+        Fixed64 expected = aabb.CalculateMomentOfInertia(Fixed64.One, Vector2d.Zero);
+
+        body.LocalCenterOfMassOffset.Should().Be(offset);
+        (body.MomentOfInertia - expected).Abs().m_rawValue.Should().BeLessThanOrEqualTo(1);
+        long allocated = AllocationTestHelper.MeasureSteadyState(() =>
+        {
+            body.SetPosition(Vector2d.Right);
+            body.SetRotation(Fixed64.PiOver4 * Fixed64.Two);
+            body.SetPosition(Vector2d.Zero);
+            body.SetRotation(Fixed64.Zero);
+        });
+        allocated.Should().Be(0);
+        (body.MomentOfInertia - expected).Abs().m_rawValue.Should().BeLessThanOrEqualTo(1);
+
+        body.Mass = (Fixed64)3;
+        body.MomentOfInertia.Should().Be((Fixed64)20_480);
+
+        body.Agent.Transform.LocalScale = Vector3d.One * Fixed64.Two;
+        compound.Simulate();
+        body.LocalCenterOfMassOffset.Should().Be(offset * Fixed64.Two);
+        body.MomentOfInertia.Should().Be((Fixed64)81_920);
+        var committedBounds = compound.Bounds;
+        body.Agent.Transform.LocalScale = Vector3d.Zero;
+        System.Action rejectScale = () => compound.Simulate();
+        rejectScale.Should().Throw<System.ArgumentException>();
+        compound.Bounds.Should().Be(committedBounds);
+        body.MomentOfInertia.Should().Be((Fixed64)81_920);
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public void LargeTranslation_ShouldPreservePolygonCentroidAndInertia(bool clockwise)
@@ -83,7 +188,7 @@ public sealed class LSPolygonCollider2DCoverageTests
         Fixed64 inertia = collider.CalculateMomentOfInertia((Fixed64)100, centroid);
 
         centroid.Should().Be(expectedCentroid);
-        inertia.m_rawValue.Should().Be(47721858817L);
+        inertia.Should().Be(Fixed64.FromFraction(100, 9));
     }
 
     [Fact]

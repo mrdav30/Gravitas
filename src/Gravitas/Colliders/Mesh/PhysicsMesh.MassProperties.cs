@@ -13,6 +13,9 @@ namespace Gravitas.Colliders;
 
 public partial class PhysicsMesh
 {
+    private static readonly Signed576 ClosedVolumeRawDenominator =
+        WideArithmetic.MultiplySigned576(Signed576.ExtendValue(Signed320.ExtendValue(Signed192.One)), Signed192.One, Signed192.Signed(6));
+
     private bool _closedVolumeMassPropertiesEvaluated;
     private MeshMassProperties _closedVolumeMassProperties;
     private MeshVolumeValidationResult _closedVolumeValidationResult;
@@ -163,53 +166,26 @@ public partial class PhysicsMesh
                 ownerScale.Z,
                 partScale.Z,
                 Fixed64.One,
-                out z)
-            && TryScalePoint(
-                _localBounds.Center,
-                ownerScale,
-                partScale,
-                out Vector3d scaledSourceCenter))
+                out z))
         {
             EnsureClosedVolumeMassProperties();
-            if (_closedVolumeValidationResult != MeshVolumeValidationResult.Valid)
+            properties = _closedVolumeMassProperties;
+            Vector3d scale = new(x, y, z);
+            // Identity preserves the integrated rounded tensor; recovering its
+            // covariance would round halves again without changing geometry.
+            if (_closedVolumeValidationResult == MeshVolumeValidationResult.Valid
+                && (scale == Vector3d.One
+                    || _closedVolumeMassProperties.TryScale(scale, out properties) == MeshMassScaleResult.Valid))
             {
-                properties = default;
-                result = _closedVolumeValidationResult;
-                return false;
-            }
-
-            MeshMassScaleResult scaleResult = _closedVolumeMassProperties.TryScale(
-                new Vector3d(x, y, z),
-                out properties);
-            if (scaleResult == MeshMassScaleResult.Valid)
-            {
-                // Both differences lie inside the admitted centered vertex
-                // bounds, so candidate scaling guarantees representability.
-                _ = Vector3d.TrySubtract(
-                    properties.CenterOfMass,
-                    scaledSourceCenter,
-                    out Vector3d centeredMass);
-                _ = Vector3d.TrySubtract(
-                    properties.InertiaReferencePoint,
-                    scaledSourceCenter,
-                    out Vector3d centeredReference);
-
-                properties = new MeshMassProperties(
-                    properties.Volume,
-                    centeredMass,
-                    centeredReference,
-                    properties.UnitMassInertiaTensor);
                 result = properties.Volume > Fixed64.Epsilon
                     ? MeshVolumeValidationResult.Valid
                     : MeshVolumeValidationResult.ZeroVolume;
                 return result == MeshVolumeValidationResult.Valid;
             }
 
-            properties = default;
-            result = scaleResult == MeshMassScaleResult.NonRepresentableVolume
-                ? MeshVolumeValidationResult.NonRepresentableVolume
-                : MeshVolumeValidationResult.NonRepresentableMassProperties;
-            return false;
+            // A source/cache ratio can fail although the already prepared final
+            // geometry is representable (compensated scales or a tiny source).
+            // Retain the fast cache path; evaluate final vertices only on failure.
         }
 
         if (usePreparedVertices)
@@ -226,39 +202,6 @@ public partial class PhysicsMesh
             _scaledLocalBounds,
             out properties,
             out result);
-    }
-
-    private static bool TryScalePoint(
-        Vector3d point,
-        Vector3d ownerScale,
-        Vector3d partScale,
-        out Vector3d result)
-    {
-        result = default;
-        if (!Fixed64.TryMultiplyDivide(
-                point.X,
-                ownerScale.X,
-                partScale.X,
-                Fixed64.One,
-                out Fixed64 x)
-            || !Fixed64.TryMultiplyDivide(
-                point.Y,
-                ownerScale.Y,
-                partScale.Y,
-                Fixed64.One,
-                out Fixed64 y)
-            || !Fixed64.TryMultiplyDivide(
-                point.Z,
-                ownerScale.Z,
-                partScale.Z,
-                Fixed64.One,
-                out Fixed64 z))
-        {
-            return false;
-        }
-
-        result = new Vector3d(x, y, z);
-        return true;
     }
 
     private void PublishPreparedClosedVolumeMassProperties()
@@ -298,7 +241,8 @@ public partial class PhysicsMesh
             _localVertices,
             _localBounds,
             out _closedVolumeMassProperties,
-            out _closedVolumeValidationResult);
+            out _closedVolumeValidationResult,
+            recenter: true);
     }
 
     private bool EvaluateClosedVolumeTopology(int[] triangles, out MeshVolumeValidationResult result)
@@ -385,65 +329,107 @@ public partial class PhysicsMesh
         ReadOnlySpan<Vector3d> vertices,
         FixedBoundBox bounds,
         out MeshMassProperties properties,
-        out MeshVolumeValidationResult result)
+        out MeshVolumeValidationResult result,
+        bool recenter = false)
     {
         Vector3d reference = bounds.Center;
-        Fixed64 signedVolume = Fixed64.Zero;
-        Vector3d firstMoment = Vector3d.Zero;
-        Fixed64 integralX2 = Fixed64.Zero;
-        Fixed64 integralY2 = Fixed64.Zero;
-        Fixed64 integralZ2 = Fixed64.Zero;
-        Fixed64 integralXY = Fixed64.Zero;
-        Fixed64 integralXZ = Fixed64.Zero;
-        Fixed64 integralYZ = Fixed64.Zero;
+        Signed576 signedVolume = default;
+        Signed576 firstX = default, firstY = default, firstZ = default;
+        Signed576 integralX2 = default, integralY2 = default, integralZ2 = default;
+        Signed576 integralXY = default, integralXZ = default, integralYZ = default;
 
+        // Raw determinant weights retain all tetrahedra until normalization.
+        // Degree-five products plus int-bounded triangle accumulation fit 576 bits.
         for (int i = 0; i < _triangleCount; i++)
         {
             int triangleIndex = i * 3;
-            Vector3d a = vertices[_triangles[triangleIndex]] - reference;
-            Vector3d b = vertices[_triangles[triangleIndex + 1]] - reference;
-            Vector3d c = vertices[_triangles[triangleIndex + 2]] - reference;
+            // The bounds midpoint keeps each coordinate difference representable,
+            // including the full signed raw span; subsequent products stay wide.
+            var triangle = new FixedTriangle(
+                vertices[_triangles[triangleIndex]] - reference,
+                vertices[_triangles[triangleIndex + 1]] - reference,
+                vertices[_triangles[triangleIndex + 2]] - reference);
+            Signed320 weight = GetTetrahedronDeterminant(triangle);
+            signedVolume = WideArithmetic.AddSigned576(signedVolume, Signed576.ExtendValue(weight));
+            firstX = TriangleShellMassProperties.AddWeightedVertexSum(firstX, triangle.A.X, triangle.B.X, triangle.C.X, weight);
+            firstY = TriangleShellMassProperties.AddWeightedVertexSum(firstY, triangle.A.Y, triangle.B.Y, triangle.C.Y, weight);
+            firstZ = TriangleShellMassProperties.AddWeightedVertexSum(firstZ, triangle.A.Z, triangle.B.Z, triangle.C.Z, weight);
 
-            Fixed64 volume = Vector3d.Dot(a, Vector3d.Cross(b, c)) / TetrahedronVolumeDivisor;
-            signedVolume += volume;
-            firstMoment += (a + b + c) * (volume / TetrahedronCentroidDivisor);
-
-            Fixed3x3 productSums = Fixed3x3.CreateBarycentricProductSums(a, b, c);
-            integralX2 += volume * productSums.M11 / SecondMomentIntegralDivisor;
-            integralY2 += volume * productSums.M22 / SecondMomentIntegralDivisor;
-            integralZ2 += volume * productSums.M33 / SecondMomentIntegralDivisor;
-            integralXY += volume * productSums.M12 / ProductMomentIntegralDivisor;
-            integralXZ += volume * productSums.M13 / ProductMomentIntegralDivisor;
-            integralYZ += volume * productSums.M23 / ProductMomentIntegralDivisor;
+            TriangleShellMassProperties.GetProductSums(triangle,
+                out Signed320 x2, out Signed320 y2, out Signed320 z2,
+                out Signed320 xy, out Signed320 xz, out Signed320 yz);
+            integralX2 = WideArithmetic.AddSigned576(integralX2, WideArithmetic.MultiplySigned320(weight, x2));
+            integralY2 = WideArithmetic.AddSigned576(integralY2, WideArithmetic.MultiplySigned320(weight, y2));
+            integralZ2 = WideArithmetic.AddSigned576(integralZ2, WideArithmetic.MultiplySigned320(weight, z2));
+            integralXY = WideArithmetic.AddSigned576(integralXY, WideArithmetic.MultiplySigned320(weight, xy));
+            integralXZ = WideArithmetic.AddSigned576(integralXZ, WideArithmetic.MultiplySigned320(weight, xz));
+            integralYZ = WideArithmetic.AddSigned576(integralYZ, WideArithmetic.MultiplySigned320(weight, yz));
         }
 
-        Fixed64 absoluteVolume = signedVolume.Abs();
+        Signed576 absoluteWeight = signedVolume.Sign < 0
+            ? WideArithmetic.SubtractSigned576(default, signedVolume) : signedVolume;
+        properties = default;
+        if (!Fixed64.TryGetSignedRawRatio(absoluteWeight, ClosedVolumeRawDenominator, out Fixed64 absoluteVolume))
+        {
+            result = MeshVolumeValidationResult.NonRepresentableVolume;
+            return false;
+        }
         if (absoluteVolume <= Fixed64.Epsilon)
         {
-            properties = default;
             result = MeshVolumeValidationResult.ZeroVolume;
             return false;
         }
 
-        Fixed64 orientationSign = signedVolume < Fixed64.Zero ? -Fixed64.One : Fixed64.One;
-        Vector3d centerOfMass = reference + firstMoment / signedVolume;
-        Fixed64 ixx = orientationSign * (integralY2 + integralZ2) / absoluteVolume;
-        Fixed64 iyy = orientationSign * (integralX2 + integralZ2) / absoluteVolume;
-        Fixed64 izz = orientationSign * (integralX2 + integralY2) / absoluteVolume;
-        Fixed64 ixy = -orientationSign * integralXY / absoluteVolume;
-        Fixed64 ixz = -orientationSign * integralXZ / absoluteVolume;
-        Fixed64 iyz = -orientationSign * integralYZ / absoluteVolume;
+        // Source properties are cached in the same centered frame as final
+        // vertices. Rounding an authored centroid then subtracting its origin
+        // loses half-even parity and makes equivalent authoring frames disagree.
+        Vector3d outputReference = recenter ? Vector3d.Zero : reference;
+        Signed576 centerDenominator = WideArithmetic.MultiplySigned576(signedVolume, Signed192.Signed(4));
+        Signed576 diagonalDenominator = WideArithmetic.MultiplySigned576(signedVolume, Signed192.Signed(10), Signed192.One);
+        Signed576 productDenominator = WideArithmetic.MultiplySigned576(signedVolume, Signed192.Signed(20), Signed192.One);
+        // Signed ratios cancel winding. Add the reference before rounding so
+        // half-even centroid ties depend on the final coordinate's raw parity.
+        bool representable = TryGetIntegratedCenter(firstX, centerDenominator, outputReference.X, out Fixed64 centerX)
+            & TryGetIntegratedCenter(firstY, centerDenominator, outputReference.Y, out Fixed64 centerY)
+            & TryGetIntegratedCenter(firstZ, centerDenominator, outputReference.Z, out Fixed64 centerZ)
+            & Fixed64.TryGetSignedRawRatio(WideArithmetic.AddSigned576(integralY2, integralZ2), diagonalDenominator, out Fixed64 ixx)
+            & Fixed64.TryGetSignedRawRatio(WideArithmetic.AddSigned576(integralX2, integralZ2), diagonalDenominator, out Fixed64 iyy)
+            & Fixed64.TryGetSignedRawRatio(WideArithmetic.AddSigned576(integralX2, integralY2), diagonalDenominator, out Fixed64 izz)
+            & Fixed64.TryGetSignedRawRatio(WideArithmetic.SubtractSigned576(default, integralXY), productDenominator, out Fixed64 ixy)
+            & Fixed64.TryGetSignedRawRatio(WideArithmetic.SubtractSigned576(default, integralXZ), productDenominator, out Fixed64 ixz)
+            & Fixed64.TryGetSignedRawRatio(WideArithmetic.SubtractSigned576(default, integralYZ), productDenominator, out Fixed64 iyz);
+        if (!representable)
+        {
+            result = MeshVolumeValidationResult.NonRepresentableMassProperties;
+            return false;
+        }
 
         properties = new MeshMassProperties(
             absoluteVolume,
-            centerOfMass,
-            reference,
+            new Vector3d(centerX, centerY, centerZ),
+            outputReference,
             new Fixed3x3(
                 ixx, ixy, ixz,
                 ixy, iyy, iyz,
                 ixz, iyz, izz));
         result = MeshVolumeValidationResult.Valid;
         return true;
+    }
+
+    private static bool TryGetIntegratedCenter(Signed576 firstMoment, Signed576 denominator, Fixed64 reference, out Fixed64 center) =>
+        Fixed64.TryGetSignedRawRatio(WideArithmetic.AddSigned576(firstMoment,
+            WideArithmetic.MultiplySigned576(denominator, Signed192.Raw(reference))), denominator, out center);
+
+    private static Signed320 GetTetrahedronDeterminant(in FixedTriangle triangle)
+    {
+        Vector3d a = triangle.A, b = triangle.B, c = triangle.C;
+        Signed192 x = WideGeometry.GetDifferenceCrossProduct2D(b.Y, Fixed64.Zero, b.Z, Fixed64.Zero, c.Y, Fixed64.Zero, c.Z, Fixed64.Zero);
+        Signed192 y = WideGeometry.GetDifferenceCrossProduct2D(b.Z, Fixed64.Zero, b.X, Fixed64.Zero, c.Z, Fixed64.Zero, c.X, Fixed64.Zero);
+        Signed192 z = WideGeometry.GetDifferenceCrossProduct2D(b.X, Fixed64.Zero, b.Y, Fixed64.Zero, c.X, Fixed64.Zero, c.Y, Fixed64.Zero);
+        return WideArithmetic.AddSigned320(WideArithmetic.AddSigned320(
+            WideArithmetic.MultiplySigned192(Signed192.Raw(a.X), x),
+            WideArithmetic.MultiplySigned192(Signed192.Raw(a.Y), y)),
+            WideArithmetic.MultiplySigned192(Signed192.Raw(a.Z), z));
     }
 
     private static bool ContainsDuplicateTriangle(TriangleUse[] triangleUses)

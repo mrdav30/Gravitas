@@ -34,10 +34,6 @@ namespace Gravitas.Colliders
         /// </summary>
         public const int MaxTriangleCount = 131072;
 
-        private static readonly Fixed64 TetrahedronVolumeDivisor = (Fixed64)6;
-        private static readonly Fixed64 TetrahedronCentroidDivisor = (Fixed64)4;
-        private static readonly Fixed64 SecondMomentIntegralDivisor = (Fixed64)10;
-        private static readonly Fixed64 ProductMomentIntegralDivisor = (Fixed64)20;
 
         private readonly Vector3d[] _localVertices;
 

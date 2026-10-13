@@ -239,7 +239,7 @@ internal static class TriangleShellMassProperties
         return true;
     }
 
-    private static Signed576 AddWeightedVertexSum(
+    internal static Signed576 AddWeightedVertexSum(
         Signed576 total,
         Fixed64 first,
         Fixed64 second,
@@ -264,7 +264,7 @@ internal static class TriangleShellMassProperties
                 value,
                 weight));
 
-    private static void GetProductSums(
+    internal static void GetProductSums(
         FixedTriangle triangle,
         out Signed320 x2,
         out Signed320 y2,
