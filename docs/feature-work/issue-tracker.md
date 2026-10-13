@@ -2,7 +2,7 @@
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-112`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-113`.
 - Assign an ID when an issue enters this tracker, keep it through resolution,
   and never reuse an ID even if an entry is later removed. Check this file's Git
   history before advancing or repairing the counter.
@@ -94,6 +94,33 @@
 Remaining measured performance costs are tracked in the benchmark backlog.
 
 ## Resolved Issues
+
+### GRV-Issue-112 - ARM64 mesh discovery crashes on a packed vertex index
+
+- **Resolved:** 2026-10-12. All four ARM64 lanes in CI run
+  [38306450650](https://github.com/mrdav30/Gravitas/actions/runs/38306450650)
+  crash during cube construction in xUnit theory discovery. The successful x64
+  lanes are unaffected; missing ARM captures then fail replay artifact upload
+  and comparison. This is independent of #110's mixed sweep change.
+- **Root cause:** On .NET 8.0.31 ARM64 Tier0, the narrowing `EdgeUse.EndVertexIndex`
+  getter retains upper packed-key bits. For edge key `0x100000002`, generated
+  code checks the low 32-bit index `2`, then uses the full 64-bit register for
+  the vertex array address. Instruction-level debugging reproduces the invalid
+  access; a direct triple-product math control passes.
+- **Resolution:** Mask the shared packed-key getter with `uint.MaxValue` before
+  narrowing. Preserve vertex-index semantics without changing geometry math,
+  upstream libraries, public APIs or global JIT settings. Add VSTest's native
+  `RunConfiguration.TreatNoTestsAsError=true` setting so discovery failures
+  cannot silently produce a successful zero-test step.
+- **Validation:** With `UseLocalLsfStack=true`, Release passes `5,799` tests and
+  ReleaseLean passes `5,734`. Raw line/branch/method coverage remains `100%`
+  in both configurations, with no new exclusions. The original cube crashes
+  under ARM64 .NET 8.0.31 CPU emulation; the masked cube and full assembly
+  discovery pass with normal tiering. Existing mesh/topology/query tests pass
+  under that runtime. A no-match VSTest control returns exit `0` before the
+  workflow setting and exit `1` after it. Ignored `artifacts/ci-arm` retains
+  the disassembly, fault registers, controls and validation logs. Native ARM64
+  CI must still be rerun after commit; emulation is not native conformance.
 
 ### GRV-Issue-110 - Mixed curved-target sweeps can miss contained starts near scalar limits
 

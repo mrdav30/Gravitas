@@ -128,7 +128,8 @@ jobs:
           "GRAVITAS_REPLAY_DEPENDENCY_REVISIONS=$($dependencies | ConvertTo-Json -Compress)" >> $env:GITHUB_ENV
 
       - name: Run Tests and capture replay observations
-        run: dotnet test Gravitas.slnx --configuration ${{ matrix.configuration }} --no-build --no-restore -p:UseLocalLsfStack=${{ env.UseLocalLsfStack }} --verbosity normal
+        # A discovery crash must fail this step even when VSTest reports no tests.
+        run: dotnet test Gravitas.slnx --configuration ${{ matrix.configuration }} --no-build --no-restore -p:UseLocalLsfStack=${{ env.UseLocalLsfStack }} --verbosity normal -- RunConfiguration.TreatNoTestsAsError=true
 
       - name: Retain replay observations and actual process provenance
         if: always()

@@ -856,7 +856,8 @@ namespace Gravitas.Colliders
 
             public int StartVertexIndex => (int)(Key >> 32);
 
-            public int EndVertexIndex => (int)(uint)Key;
+            // Mask explicitly: ARM64 Tier0 can retain upper key bits in a narrowed getter return.
+            public int EndVertexIndex => (int)(Key & uint.MaxValue);
 
             public int Direction { get; }
 
