@@ -2,7 +2,7 @@
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-117`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-119`.
 - Assign an ID when an issue enters this tracker, keep it through resolution,
   and never reuse an ID even if an entry is later removed. Check this file's Git
   history before advancing or repairing the counter.
@@ -38,26 +38,11 @@
 ### Ordered Queue
 
 Phase 1 of the supported-geometry plan confirmed in-range numerical defects on
-the original binaries. Integral fixes #113/#114 are resolved. Resolve #115, then
-#116 before locking #096's safety contract.
+the original binaries. Integral/volume fixes #113/#114/#115 are resolved.
+Resolve #116 before locking #096's safety contract.
+Resolve mass-property parity #117/#118 together after #116, before admission
+implementation.
 #111 remains an independent validation-tooling issue.
-
-### GRV-Issue-115 - Cone volume saturates before final division
-
-- **Confirmed:** 2026-10-12 on the same original phase 1 Release binaries.
-- **Reproduction:** Initialize a cone with radius and height `1,024`; its
-  conservative centered reach is exactly `1,536`. Published `Volume`/`Area` is
-  `715,827,882.6666666665` (raw `3074457345618258602`), while final fixed-Pi
-  volume fits and is `1,124,419,808.6666666667` (raw `4829346305197910699`).
-  Radius/height `512` is a passing control.
-- **Root cause:** `LSConeCollider.PrepareShape` saturates the intermediate
-  `Pi * radius * radius * height` before division by three. Exact compound mass
-  weighting is separate and does not repair the published scalar volume.
-- **Follow-up:** Preserve the complete product/ratio and checked final narrowing;
-  define coherent behavior for genuinely unrepresentable derived volume. Check
-  other primitive volume/area paths, direct/compound use and compensated scales.
-- **Evidence:** Phase 1 numerics artifacts under #113 retain exact fixed-Pi,
-  nearest-even expected arithmetic and repeatable original-binary output.
 
 ### GRV-Issue-116 - Cone overlap GJK loses scale and rotation invariance
 
@@ -87,12 +72,68 @@ the original binaries. Integral fixes #113/#114 are resolved. Resolve #115, then
   and `root-probe.log` retain #096 controls, 72 internal GJK classifications and
   18 public closest/all comparisons against preserved original DLLs.
 
+### GRV-Issue-117 - Detached compound cone mass weights disagree with committed geometry
+
+- **Confirmed:** 2026-10-13 during #115 caller/parity review, on both the original
+  committed binary and the volume-corrected binary. This is pre-existing and
+  independent of final volume normalization.
+- **Reproduction:** Create two cone parts with radius `1`. The first has authored
+  height `4`, part scale `(1,4,1)` and zero offset; the second has height `16`,
+  unit scale and offset `(10,0,0)`. Both have effective radius `1`, height `16`
+  and equal physical volume. Before initialization, the public compound
+  `CalculateLocalCenterOfMassOffset()` returns X raw `2526451351` (about `10/17`);
+  after initialization it correctly returns X raw `21474836480` (`5`). Both
+  return Y `-4`, Z `0`. No large dimensions or saturation are involved.
+- **Root cause:** The uncommitted cone weight uses the base
+  `GetCurrentScaledRadius()`, which takes the maximum X/Y/Z scale. Cone
+  preparation uses only X/Z radial scale. A Y-only height scale therefore
+  increases the detached radial weight and biases the aggregate COM.
+- **Follow-up:** Derive detached mass weights from the same effective shape
+  dimensions as prepared/committed geometry. Add the equivalent-cone public COM
+  regression and audit detached/prepared parity for other primitive families;
+  this reproduction does not establish defects in those families.
+- **Evidence:** Ignored `artifacts/grv-115/parity-probe/` retains the public probe,
+  frozen references and original/candidate raw results with loaded DLL hashes.
+  The original Gravitas SHA256 is
+  `CED874321E77CA5005BE9B5FC13E515CE739662AD260410724067FD8B0CA7BF9`.
+
+### GRV-Issue-118 - Sphere inertia rounds small mass before radius squared
+
+- **Confirmed:** 2026-10-13 during #115's primitive/parity audit, on both the
+  original committed binary and final volume-corrected binary. This is
+  pre-existing; #115 does not change sphere inertia.
+- **Reproduction:** Initialize a bodyless sphere with radius `1,024`, centered
+  reach `1,024`, then call public
+  `CalculateInertiaTensor(Fixed64.FromRaw(3), Vector3d.Zero)`. All three diagonal
+  entries are raw `1048576` instead of raw `1258291`, about `16.7%` too small.
+  Final inertia and inverse mass both fit: inverse mass is raw
+  `6148914691236517205`. No large world coordinate or final saturation is involved.
+  With one-raw-unit mass, the diagonal becomes zero instead of raw `419430`;
+  unit mass is a passing control at raw `1801439850528768`.
+- **Root cause:** `LSSphereCollider.CalculateCenterOfMassInertiaTensor` rounds
+  `(2/5) * mass` before multiplying by `ScaledRadiusSqr`. Large radius squared
+  amplifies that early error even when the final tensor coefficient fits.
+- **Expected contract:** An independent integer oracle rounds the final fixed
+  coefficient product `1717986918 * massRaw * radiusRaw * radiusRaw / 2^96`
+  once. The two tiny-mass expected values also agree with the exact rational
+  `2/5` result; the unit-mass control retains the fixed coefficient's quantization.
+- **Follow-up:** Preserve mass and geometry products until final normalization,
+  reusing existing FixedMathSharp arithmetic. Verify public inertia, body mass
+  refresh, compound shares, ordinary-mass controls and warm costs. Audit other
+  curved primitive inertia paths for the same pattern; this reproduction does
+  not establish defects in those families.
+- **Evidence:** Ignored `artifacts/grv-115/inertia-probe/` retains public probes,
+  a BigInteger oracle, frozen reference projects and original/final results.
+  Original Gravitas SHA256 is
+  `CED874321E77CA5005BE9B5FC13E515CE739662AD260410724067FD8B0CA7BF9`;
+  final SHA256 is `51DF2FA669DECB63C859C841EA902FBFBCA889F390E28B7B647AC24B3B4DE9C1`.
+
 ### GRV-Issue-096 - Extreme-scale capsule initial mesh sweep can miss a genuine overlap
 
 - **Status:** Approved bounded effective-geometry direction; implementation
   planned in the [Supported Geometry Range Plan](2026-10-12-supported-geometry-range-plan.md).
   The candidate `4,096`-unit reach remains provisional until phase 1 validation;
-  remaining in-range prerequisites #115/#116 must be repaired first. This issue
+  remaining in-range prerequisite #116 must be repaired first. This issue
   stays open until the complete admission contract is implemented.
 - **Confirmed:** 2026-10-07 in the isolated local-stack Release
   `CapsuleInitialContact_WithUnavailableTriangleCharts_ShouldRetainGeometricFallback`
@@ -147,6 +188,43 @@ the original binaries. Integral fixes #113/#114 are resolved. Resolve #115, then
 Remaining measured performance costs are tracked in the benchmark backlog.
 
 ## Resolved Issues
+
+### GRV-Issue-115 - Cone volume saturates before final division
+
+- **Confirmed:** 2026-10-12 on the original phase 1 Release binaries.
+- **Resolved:** 2026-10-13.
+- **Reproduction:** A cone with radius/height `1,024`, centered reach `1,536`,
+  published `Volume`/`Area` raw `3074457345618258602` (about `715.8M`) instead
+  of representable final fixed-Pi raw `4829346305197910699` (about `1.124B`).
+  Radius/height `512` was a passing control.
+- **Root cause:** Cone preparation saturated the product before division by
+  three; separate exact compound mass weighting did not repair that scalar.
+- **Fix:** Reuse FixedMathSharp's four-factor product/ratio API and round once
+  after final division. Only genuine final overflow saturates to
+  `Fixed64.MaxValue`, without rejecting valid geometry or narrowing mass weights.
+  Reuse committed volume/axis for unchanged effective dimensions/rotation and
+  let the shared body transaction perform its mass-point check once. Bodyless
+  and compound checks remain. FixedMathSharp reuses its binary normalization
+  through an isolated private leaf, retaining the existing typed fallback.
+- **Regression coverage:** Exact raw integer oracles, positive half-way ties,
+  tiny/thin dimensions, true final overflow, compensated owner/part scales,
+  pose/radius/height changes, bodyless/body-bound failed preparation and recovery,
+  compound weighting and public signed helper/zero/MinValue controls. Other
+  primitive measure owners retain their existing formulas; the detached cone
+  mass-weight mismatch independently reproduced on original binaries is #117.
+- **Verification:** Full local-stack Release/Lean builds, suites and raw
+  100% reachable line/branch/method coverage pass in both repositories and the
+  validated FixedMathSharp adapters. Six native Windows x64 replay fixtures
+  agree with shared expectations and directly across profiles. Final warm
+  physics/arithmetic rows allocate `0 B/op`; fresh matched cone scale updates
+  improve about `5%` in 3D/mixed, with no repeatable regression on the unrelated
+  arithmetic control. Independent numerical/ponytail review has no outstanding
+  findings in this change.
+- **Evidence:** The dated phase 1 closeout in the
+  [Supported Geometry Range Plan](2026-10-12-supported-geometry-range-plan.md)
+  records counts and measured costs. Ignored `artifacts/grv-115/` retains red
+  failures, final coverage/replay, immutable binaries and rejected experiments.
+  Native Linux/ARM64 and released-package validation remain pending.
 
 ### GRV-Issue-113 - Authored closed-mesh integrals saturate before normalization
 

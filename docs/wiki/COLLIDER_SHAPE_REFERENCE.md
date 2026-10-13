@@ -119,6 +119,14 @@ runtime triangle fan. Mesh colliders use cached closed-volume mass properties by
 default when angular dynamics are enabled and keep an explicit uniform
 thin-shell mass policy for open meshes.
 
+Cone `Volume` (also published through its shape-specific `Area` property) rounds
+the complete fixed-Pi `Pi*r*r*h/3` expression once. Only an unrepresentable final
+volume saturates to `Fixed64.MaxValue`; this diagnostic scalar does not reject
+otherwise valid geometry or narrow compound mass weights. Compound weighting
+retains the existing fixed-point `Pi/3` coefficient and unnarrowed dimension
+products. Pose changes reuse the committed volume when effective radius and
+height are unchanged; geometry changes prepare a new value before publication.
+
 For a 3D capsule with normalized motion direction `n`, world-space axis
 `Rotation * Vector3d.Up`, radius `r`, and cylindrical height `h`, the projected
 frontal area is `pi*r^2 + 2*r*h*sqrt(max(0, 1 - dot(n, axis)^2))`. A near-zero

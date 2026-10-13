@@ -58,7 +58,9 @@ public sealed class LSConeCollider : LSCollider
     public Fixed64 Height { get; private set; }
 
     /// <summary>
-    /// Gets the solid cone volume used for mass weighting and diagnostics.
+    /// Gets the solid cone volume, rounded once after final division and
+    /// saturated to <see cref="Fixed64.MaxValue"/> when unrepresentable.
+    /// Compound mass weighting retains its separate unnarrowed measure.
     /// </summary>
     public Fixed64 Volume { get; private set; }
 
@@ -83,15 +85,34 @@ public sealed class LSConeCollider : LSCollider
             snapshot.Radius,
             snapshot.OwnerScale.Z,
             snapshot.PartScale.Z);
-        _preparedRadius = FixedMath.Max(radiusX, radiusZ);
-        _preparedHeight = ColliderScalePolicy.ScalePositive(
+        Fixed64 radius = FixedMath.Max(radiusX, radiusZ);
+        Fixed64 height = ColliderScalePolicy.ScalePositive(
             snapshot.Size.Y,
             snapshot.OwnerScale.Y,
             snapshot.PartScale.Y);
-        _preparedAxis = (snapshot.Rotation * Vector3d.Up).Normalized;
-        _preparedVolume = Fixed64.Pi * _preparedRadius * _preparedRadius
-            * _preparedHeight / (Fixed64)3;
+        Fixed64 volume;
+        if (HasCommittedShape && radius == ScaledRadius && height == Height)
+        {
+            volume = Volume;
+        }
+        else if (!Fixed64.TryMultiplyDivideBySum(
+            Fixed64.Pi, radius, radius, height,
+            (Fixed64)3, Fixed64.Zero, Fixed64.Zero, Fixed64.Zero,
+            out volume))
+        {
+            // Saturate only the final diagnostic measure; valid geometry and
+            // exact compound mass weights need not fit a scalar volume.
+            volume = Fixed64.MaxValue;
+        }
+        _preparedRadius = radius;
+        _preparedHeight = height;
+        _preparedVolume = volume;
+        _preparedAxis = HasCommittedShape && snapshot.Rotation == CanonicalRotation
+            ? WorldAxis
+            : (snapshot.Rotation * Vector3d.Up).Normalized;
+        // Body-bound shapes are checked by the shared shape transaction.
         if (CompoundOwner == null
+            && Body == null
             && !CalculatePreparedLocalMassPoint().TryGetPoint(out _))
         {
             throw new InvalidOperationException(

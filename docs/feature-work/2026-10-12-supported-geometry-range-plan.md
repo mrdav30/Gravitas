@@ -9,8 +9,8 @@
 
 **Date:** 2026-10-12  
 **Status:** Phase 1 evidence collected; ceiling locking pending numerical
-prerequisites #115/#116; #113/#114 are resolved. Admission implementation has
-not started. The bounded
+prerequisite #116; #113/#114/#115 are resolved. Mass-property parity #117/#118
+is queued before admission implementation, which has not started. The bounded
 effective-geometry direction is approved. The proposed
 ceiling remains provisional while confirmed in-range numerical defects are
 resolved; admission alone cannot establish the intended safety guarantee.  
@@ -242,7 +242,7 @@ supported safety claim or implementing around an assumed safe range:
 | --- | --- | --- |
 | [#113](issue-tracker.md#grv-issue-113---authored-closed-mesh-integrals-saturate-before-normalization) | Side-128 authored cube publishes unit inertia `1,024` instead of `2,730⅔`; side-2,048 cube accepts an unrepresentable volume as `Valid`. | Resolved: exact/checked integration, centered cache and numeric fallback; retain the existing scaled-property guard. |
 | [#114](issue-tracker.md#grv-issue-114---polygon-moment-integrals-saturate-before-normalization) | Side-256 square publishes moment `2,730⅔` instead of `10,922⅔`; equivalent AABB remains correct. | Resolved: exact mass-applied normalization with geometry caching; retain the existing final-overflow policy. |
-| [#115](issue-tracker.md#grv-issue-115---cone-volume-saturates-before-final-division) | Radius/height `1,024`, reach `1,536`: representable cone volume is reduced from about `1.124B` to `715.8M`. | Preserve final division and distinguish genuinely unrepresentable volume. |
+| [#115](issue-tracker.md#grv-issue-115---cone-volume-saturates-before-final-division) | Radius/height `1,024`, reach `1,536`: representable cone volume was reduced from about `1.124B` to `715.8M`. | Resolved: round the complete fixed-Pi product/ratio once; saturate only genuinely unrepresentable final volume. |
 | [#116](issue-tracker.md#grv-issue-116---cone-overlap-gjk-loses-scale-and-rotation-invariance) | Length `4,096`, end radius `2,048`: public cone overlaps produce both false positives and false negatives. | Preserve bounded overlap classification, both query variants and corresponding contact callers. |
 
 These are prerequisites, not optimizations and not bugs introduced by admission.
@@ -399,7 +399,50 @@ Polygon pure-2D/mixed cached moments measure `2.97 -> 1.01/0.99 us`, pose change
 These incidental gains come from reusing the integrals needed by the fix.
 Independent numerical/ponytail review has no outstanding findings. No native
 Linux/ARM64 or released-package validation is claimed by this local run.
-The candidate ceiling and #096 remain open; #115/#116 still require resolution.
+The candidate ceiling and #096 remained open at this checkpoint; cone
+prerequisites are refined below.
+
+**Cone-volume refinement (2026-10-13):** #115 is resolved. Cone `Volume`/`Area`
+uses the existing four-factor product/ratio API with one final nearest-even
+rounding. Genuine final overflow saturates the diagnostic scalar, preserving
+valid geometry and separate unnarrowed compound mass weighting. Effective
+radius/height and exact committed rotation reuse existing volume/axis state.
+Body-owned mass-point validation runs once in the shared transaction; bodyless
+and compound validation remains intact. No production files, types or fields
+are added; the coordinated production diff is **39 net lines**.
+
+FixedMathSharp's public helper now reuses existing common-binary-factor
+normalization only when a nonzero numerator shares a cancellable low limb.
+The typed fallback and rounding core are unchanged. A private non-inlined leaf
+isolates normalization scratch; unconditional or inlined span dispatch was
+rejected after slowing the noncancellable control. Final matched means are
+`361.57 -> 197.23 ns` for the cancellable case and `401.51 -> 403.59 ns` for
+the control, whose confidence intervals overlap. Fresh matched cone scale
+updates measure `42.68 -> 40.50 us` in 3D and `42.55 -> 40.43 us` in mixed mode.
+All **10** final physics rows and both arithmetic controls allocate **0 B/op**
+and preserve the warm gate. Broader physics timing gains may reflect host drift;
+they are not attributed to this change.
+
+Release/Lean solution builds pass with zero warnings/errors using
+`UseLocalLsfStack=true`. Full Gravitas suites pass **5,835 / 5,770**;
+FixedMathSharp passes **5,726 / 5,705**, plus **49** Chronicler tests per lane.
+Raw reachable line/branch/method coverage remains **100%** in Gravitas,
+FixedMathSharp, its Chronicler adapter and FluentAssertions helper in both lanes.
+Gravitas counters are `47,186 / 15,478 / 4,929` and
+`47,184 / 15,478 / 4,928`; FixedMathSharp counters are
+`59,523 / 16,902 / 4,472` and `59,515 / 16,902 / 4,468`, all visited.
+Six shared replay fixtures agree with expectations and directly across native
+Windows x64 Release/Lean. Independent numerical/ponytail review has no unresolved
+findings in this change.
+Ignored `artifacts/grv-115/` retains red regressions, final coverage/replay,
+source snapshots and rejected experiments; `perf/` retains native reports and
+immutable runtime hashes. The final Gravitas DLL SHA256 is
+`51DF2FA669DECB63C859C841EA902FBFBCA889F390E28B7B647AC24B3B4DE9C1`.
+No native Linux/ARM64 or released-package validation is claimed. Caller/parity
+review also confirmed pre-existing detached cone mass-weight mismatch #117 and
+sphere inertia's early tiny-mass rounding #118 on original binaries; both are
+recorded separately. #116, the candidate ceiling and #096 remain open; resolve
+#117/#118 together before admission implementation.
 
 ## Phase 2: Enforce Complete Collider Admission
 
