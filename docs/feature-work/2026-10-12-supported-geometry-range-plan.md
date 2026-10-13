@@ -8,9 +8,9 @@
 > design document or phase report.
 
 **Date:** 2026-10-12  
-**Status:** Phase 1 evidence collected; ceiling locking pending numerical
-prerequisite #116; #113/#114/#115 are resolved. Mass-property parity #117/#118
-is queued before admission implementation, which has not started. The bounded
+**Status:** Phase 1 evidence collected; numerical prerequisites #113-#116 are
+resolved. Mass-property parity #117/#118 is queued before ceiling locking and
+admission implementation, which has not started. The bounded
 effective-geometry direction is approved. The proposed
 ceiling remains provisional while confirmed in-range numerical defects are
 resolved; admission alone cannot establish the intended safety guarantee.  
@@ -243,7 +243,7 @@ supported safety claim or implementing around an assumed safe range:
 | [#113](issue-tracker.md#grv-issue-113---authored-closed-mesh-integrals-saturate-before-normalization) | Side-128 authored cube publishes unit inertia `1,024` instead of `2,730⅔`; side-2,048 cube accepts an unrepresentable volume as `Valid`. | Resolved: exact/checked integration, centered cache and numeric fallback; retain the existing scaled-property guard. |
 | [#114](issue-tracker.md#grv-issue-114---polygon-moment-integrals-saturate-before-normalization) | Side-256 square publishes moment `2,730⅔` instead of `10,922⅔`; equivalent AABB remains correct. | Resolved: exact mass-applied normalization with geometry caching; retain the existing final-overflow policy. |
 | [#115](issue-tracker.md#grv-issue-115---cone-volume-saturates-before-final-division) | Radius/height `1,024`, reach `1,536`: representable cone volume was reduced from about `1.124B` to `715.8M`. | Resolved: round the complete fixed-Pi product/ratio once; saturate only genuinely unrepresentable final volume. |
-| [#116](issue-tracker.md#grv-issue-116---cone-overlap-gjk-loses-scale-and-rotation-invariance) | Length `4,096`, end radius `2,048`: public cone overlaps produce both false positives and false negatives. | Preserve bounded overlap classification, both query variants and corresponding contact callers. |
+| [#116](issue-tracker.md#grv-issue-116---cone-overlap-gjk-loses-scale-and-rotation-invariance) | Length `4,096`, end radius `2,048`: public cone overlaps produce both false positives and false negatives. | Resolved: bounded scalar crosses and exact dot signs; wide simplex predicates where needed. Closest/all queries and shared contact callers pass. |
 
 These are prerequisites, not optimizations and not bugs introduced by admission.
 Do not reduce the candidate ceiling to hide failures at ordinary useful sizes.
@@ -441,8 +441,85 @@ immutable runtime hashes. The final Gravitas DLL SHA256 is
 No native Linux/ARM64 or released-package validation is claimed. Caller/parity
 review also confirmed pre-existing detached cone mass-weight mismatch #117 and
 sphere inertia's early tiny-mass rounding #118 on original binaries; both are
-recorded separately. #116, the candidate ceiling and #096 remain open; resolve
+recorded separately. #116, the candidate ceiling and #096 remained open at this checkpoint; resolve
 #117/#118 together before admission implementation.
+
+**GJK refinement (2026-10-13):** #116 is resolved. Its original failures begin at iteration
+zero: the second cross in `(ab x ao) x ab` saturates, distorting the search
+direction before any budget exhaustion. Original public cone/cuboid and
+cone/closed-convex-mesh contacts also fail the separated controls. The analytic
+cone/sphere contact dispatcher remains correct; its shared internal GJK predicate
+does not. Pure 2D and mixed contacts use separate algorithms.
+
+The existing simplex policy now uses exact side/orientation dot signs and retains
+scalar cross directions when every vertex component is at most `256` in
+magnitude. This bounds cubic components by `536,870,912`. Larger simplices use
+exact projection-region signs and face numerators, normalizing only final
+directions. Support separation has its own point/direction bounds:
+`3 * 64 * 2^23 < 2^31`; candidates outside those bounds compare the exact dot
+against the existing strict epsilon. On the wide path, edge/face membership never
+narrows the numerator. Exact face normalization follows edge rejection, avoiding
+unnecessary work. The stable collinear fallback and conservative budget result are retained.
+
+The exact edge test directly evaluates
+`dot(second,second)*dot(first,ao) - dot(first,second)*dot(second,ao)` using existing
+Signed192 dots and Signed320 products. Its full-range raw magnitude is below
+`18*2^252`, so no intermediate narrowing is needed. Line directions reuse the
+existing public normalized plane projection; face directions reuse existing
+exact cross/normalization helpers. No upstream edits, internal ABI changes,
+arithmetic owners, types, source files or public APIs are added.
+
+The focused suite passes **116** tests: closest/all queries at scales
+`1/256/1,024`, upright/oblique contacts across all six supported convex families
+in both pair orders, complete-target separation beyond the reported exit,
+cap tangency/thin axial gaps, scalar/exact cutover, scaled simplex regions,
+collinear fallback and exact support-dot cancellation. Original public query
+regressions fail before the fix. Independent source/test ponytail review has no
+blocking findings.
+
+Release/Lean solution builds pass with zero warnings/errors using
+`UseLocalLsfStack=true`. Full Gravitas suites pass **5,873 / 5,808**;
+FixedMathSharp passes **5,726 / 5,705**, plus **49** Chronicler tests per lane.
+Raw reachable line/branch/method coverage remains **100%** in Gravitas,
+FixedMathSharp and its validated Chronicler/FluentAssertions adapters. Gravitas
+counters are `47,247 / 15,518 / 4,934` and `47,245 / 15,518 / 4,933`;
+FixedMathSharp counters are `59,523 / 16,902 / 4,472` and
+`59,515 / 16,902 / 4,468`, all visited. Six shared replay fixtures match
+expectations and directly agree across native Windows x64 Release/Lean; no
+expectations changed. Independent numerical/ponytail review approves the selected
+source and its correctness, coverage and replay evidence.
+
+Final native Windows x64/.NET `8.0.29`, SDK `10.0.302`, BDN `0.15.8` comparisons
+use two launches, six warmups/six measurements and `500 ms` iterations. The ten
+correct original controls and sixteen final rows all allocate **0 B/op**; every
+affected row's `99.9%` confidence intervals overlap. Public closest/all groups
+measure upright `203.35 -> 203.40 us`, oblique `302.98 -> 305.67 us`; 64 cone
+pairs `1.1162 -> 1.0979 ms`, 64-target overlap-all `2.0574 -> 2.0362 ms`.
+The latter uses the maintained `130`-unit cone, not the short diagnostic fixture.
+An order-reversed repeat with three launches/eight measurements settles the
+small nominal predicate increase: original `60.26 us`, fixed `59.05 us`; the
+unchanged world-step control also reverses and overlaps. No repeatable warm
+regression remains; do not attribute broad timing gains to this fix.
+
+At `S=1,024`, current upright/oblique groups cost predicate `38.40 / 56.19 us`,
+public closest/all `162.38 / 265.51 us`, contact predicate/dispatcher
+`106.99 / 130.55 us`. Each group evaluates three placements: three predicates,
+six public queries, or three predicates plus three collision dispatches. These
+are group costs, not per-query latency. Old large-scale results are wrong and
+cannot establish a correctness-preserving speed baseline.
+
+The selected production delta is **97 net lines in two existing Gravitas files**.
+A shared upstream numerator extraction and layout hints were rejected after
+small repeated positive arithmetic-control signals; the direct quartic identity
+removes that extraction entirely. FixedMathSharp is unchanged. Its relevant
+normalized projection IL/flags/locals match the original. Informational revision
+metadata differs between snapshots; no projection code change is retained.
+Ignored `artifacts/grv-116/` retains red regressions, rejected patches, fresh
+closeout coverage/replay, source provenance and immutable native snapshots.
+Final core SHA256 is `457D3EC9752F80484421C88B5C954C8E8220DE306E0EB14EC924D31AC246CAE1`.
+No native Linux/ARM64 or released-package validation is claimed. #117/#118,
+the provisional ceiling and #096 remain open; close the mass-property pair
+before locking or enforcing admission.
 
 ## Phase 2: Enforce Complete Collider Admission
 

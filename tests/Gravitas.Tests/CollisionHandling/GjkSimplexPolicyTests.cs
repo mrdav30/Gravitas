@@ -7,6 +7,80 @@ namespace Gravitas.Tests.CollisionHandlingTests;
 
 public sealed class GjkSimplexPolicyTests
 {
+    [Theory]
+    [InlineData(128)]
+    [InlineData(129)]
+    public void TriangleAndTetrahedron_ShouldRetainTheSameRegionAcrossTheScalarCrossCutover(int scale)
+    {
+        // The largest vertex component is exactly 256, then just beyond it.
+        Vector3d a = new Vector3d(-2, 0, 0) * (Fixed64)scale;
+        Vector3d b = new Vector3d(0, 1, 0) * (Fixed64)scale;
+        Vector3d c = new Vector3d(0, 0, 1) * (Fixed64)scale;
+        Vector3d d = new Vector3d(-1, 1, 0) * (Fixed64)scale;
+        Vector3d[] simplex = { a, b, c, d };
+        int count = 3;
+        Vector3d direction = Vector3d.Zero;
+        Vector3d expected = new Vector3d(1, -2, -2).Normalized;
+
+        GjkSimplexPolicy.UpdateTriangle(simplex, ref count, ref direction).Should().BeFalse();
+        count.Should().Be(3);
+        simplex[0].Should().Be(a);
+        simplex[1].Should().Be(b);
+        simplex[2].Should().Be(c);
+        direction.Normalized.Should().Be(expected);
+        count = 4;
+        GjkSimplexPolicy.UpdateTetrahedron(simplex, ref count, ref direction).Should().BeFalse();
+        count.Should().Be(3);
+        simplex[0].Should().Be(a);
+        simplex[1].Should().Be(b);
+        simplex[2].Should().Be(c);
+        direction.Normalized.Should().Be(expected);
+    }
+
+    [Fact]
+    public void LargeCollinearLine_ShouldRetainItsStablePerpendicularFallback()
+    {
+        Vector3d[] simplex = { Vector3d.Up * (Fixed64)1024, -Vector3d.Up * (Fixed64)1024 };
+        int count = 2;
+        Vector3d direction = Vector3d.Zero;
+        GjkSimplexPolicy.UpdateLine(simplex, ref count, ref direction).Should().BeFalse();
+        count.Should().Be(2);
+        direction.Y.Should().Be(Fixed64.Zero);
+        direction.Z.Abs().Should().BeGreaterThan(Fixed64.Zero);
+    }
+
+    [Theory]
+    [InlineData(0, -1)]
+    [InlineData(0, 1)]
+    [InlineData(1, -1)]
+    [InlineData(1, 1)]
+    [InlineData(2, -1)]
+    [InlineData(2, 1)]
+    public void SeparatingSupport_ShouldPreserveSignsBeyondEitherProductBound(int axis, int sign)
+    {
+        Vector3d normal = axis switch { 0 => Vector3d.Right, 1 => Vector3d.Up, _ => Vector3d.Forward };
+        normal *= (Fixed64)sign;
+        GjkSimplexPolicy.HasSeparatingSupport(normal * (Fixed64)65, -normal).Should().BeTrue();
+        GjkSimplexPolicy.HasSeparatingSupport(normal * (Fixed64)65, normal).Should().BeFalse();
+        GjkSimplexPolicy.HasSeparatingSupport(normal, -normal * (Fixed64)((1L << 23) + 1)).Should().BeTrue();
+        GjkSimplexPolicy.HasSeparatingSupport(normal, normal * (Fixed64)((1L << 23) + 1)).Should().BeFalse();
+    }
+
+    [Fact]
+    public void SeparatingSupport_ShouldRetainCancellationAndTheStrictToleranceBoundary()
+    {
+        Vector3d point = Vector3d.One * Fixed64.MaxValue;
+        var direction = new Vector3d(-Fixed64.MaxValue, -Fixed64.MaxValue, Fixed64.MaxValue);
+        // The exact dot is -MaxValue^2; saturating each product loses this sign.
+        GjkSimplexPolicy.HasSeparatingSupport(point, direction).Should().BeTrue();
+        GjkSimplexPolicy.HasSeparatingSupport(point, -direction).Should().BeFalse();
+        GjkSimplexPolicy.HasSeparatingSupport(Vector3d.Zero, direction).Should().BeFalse();
+        GjkSimplexPolicy.HasSeparatingSupport(-Vector3d.Right * Fixed64.Epsilon, Vector3d.Right)
+            .Should().BeFalse();
+        GjkSimplexPolicy.HasSeparatingSupport(-Vector3d.Right * (Fixed64.Epsilon + Fixed64.MinIncrement), Vector3d.Right)
+            .Should().BeTrue();
+    }
+
     [Fact]
     public void AddPoint_WithFullSimplex_ShouldKeepFourNewestPoints()
     {
@@ -159,6 +233,22 @@ public sealed class GjkSimplexPolicyTests
         if (expectedCount > 2)
             simplex[2].Should().Be(expectedThird);
         direction.Should().Be(expectedDirection);
+        // Preserve the same simplex regions when cubic/quartic products exceed Fixed64.
+        Fixed64 scale = (Fixed64)1024;
+        simplex = new[] { a * scale, b * scale, c * scale, Vector3d.Zero };
+        count = 3;
+        direction = Vector3d.Zero;
+        GjkSimplexPolicy.UpdateTriangle(simplex, ref count, ref direction).Should().BeFalse();
+        count.Should().Be(expectedCount);
+        simplex[0].Should().Be(expectedFirst * scale);
+        if (expectedCount > 1)
+            simplex[1].Should().Be(expectedSecond * scale);
+        if (expectedCount > 2)
+            simplex[2].Should().Be(expectedThird * scale);
+        Vector3d directionError = direction.Normalized - expectedDirection.Normalized;
+        directionError.X.Abs().Should().BeLessThanOrEqualTo(Fixed64.MinIncrement * Fixed64.Two);
+        directionError.Y.Abs().Should().BeLessThanOrEqualTo(Fixed64.MinIncrement * Fixed64.Two);
+        directionError.Z.Abs().Should().BeLessThanOrEqualTo(Fixed64.MinIncrement * Fixed64.Two);
     }
 
     public static TheoryData<Vector3d, Vector3d, Vector3d, int, Vector3d, Vector3d, Vector3d, Vector3d> TriangleRegionData()
@@ -246,6 +336,23 @@ public sealed class GjkSimplexPolicyTests
             simplex[1].Should().Be(expectedSecond);
             simplex[2].Should().Be(expectedThird);
             direction.Should().Be(expectedDirection);
+        }
+        Fixed64 scale = (Fixed64)1024;
+        simplex = new[] { a * scale, b * scale, c * scale, d * scale };
+        count = 4;
+        direction = Vector3d.Zero;
+        GjkSimplexPolicy.UpdateTetrahedron(simplex, ref count, ref direction)
+            .Should().Be(expectedContainsOrigin);
+        count.Should().Be(expectedCount);
+        simplex[0].Should().Be(expectedFirst * scale);
+        if (!expectedContainsOrigin)
+        {
+            simplex[1].Should().Be(expectedSecond * scale);
+            simplex[2].Should().Be(expectedThird * scale);
+            Vector3d directionError = direction.Normalized - expectedDirection.Normalized;
+            directionError.X.Abs().Should().BeLessThanOrEqualTo(Fixed64.MinIncrement * Fixed64.Two);
+            directionError.Y.Abs().Should().BeLessThanOrEqualTo(Fixed64.MinIncrement * Fixed64.Two);
+            directionError.Z.Abs().Should().BeLessThanOrEqualTo(Fixed64.MinIncrement * Fixed64.Two);
         }
     }
 

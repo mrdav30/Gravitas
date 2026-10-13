@@ -11,6 +11,83 @@ namespace Gravitas.Tests.CollisionHandlingTests;
 
 public sealed class ConvexColliderSupportTests
 {
+    [Theory]
+    [InlineData(1, false)]
+    [InlineData(1, true)]
+    [InlineData(256, false)]
+    [InlineData(256, true)]
+    [InlineData(1024, false)]
+    [InlineData(1024, true)]
+    public void ConeConvexContacts_ShouldPreserveClassificationAcrossScaleAndRigidRotation(
+        int scale, bool oblique)
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        FixedQuaternion rotation = oblique
+            ? FixedQuaternion.FromEulerAnglesInDegrees((Fixed64)19, (Fixed64)31, (Fixed64)7)
+            : FixedQuaternion.Identity;
+        var cone = new LSConeCollider(ColliderShapeDefinition.Cone((Fixed64)(2 * scale), (Fixed64)(4 * scale)));
+        // Collider axes run base-to-apex, opposite the apex-origin query axis.
+        cone.InitializeWithNoBody(new TestMatterAgent(context, new FixedTransform(
+            rotation * new Vector3d(0, 2 * scale, 0),
+            rotation * new FixedQuaternion(Fixed64.One, Fixed64.Zero, Fixed64.Zero, Fixed64.Zero),
+            Vector3d.One)));
+
+        foreach ((Vector3d center, bool expected) in new[]
+        {
+            (new Vector3d(2, 2, 0), false),
+            (new Vector3d(1, 3, 1), true),
+            (new Vector3d(2, 3, 2), false),
+            (new Vector3d(0, 2, 0), true)
+        })
+        {
+            Vector3d position = rotation * (center * (Fixed64)scale);
+            var box = new LSCuboidCollider { Size = Vector3d.One * (Fixed64)scale * Fixed64.Half };
+            box.InitializeWithNoBody(new TestMatterAgent(context,
+                new FixedTransform(position, rotation, Vector3d.One)));
+            LSMeshCollider sourceMesh = MeshTestFixtures.CreateConvexCube();
+            Vector3d[] vertices = sourceMesh.Mesh.LocalVertices.ToArray();
+            for (int i = 0; i < vertices.Length; i++)
+                vertices[i] *= (Fixed64)scale * Fixed64.Half;
+            var mesh = new LSMeshCollider(vertices, sourceMesh.Mesh.Triangles.ToArray(), MeshColliderMode.Convex);
+            mesh.InitializeWithNoBody(new TestMatterAgent(context, new FixedTransform(
+                position, rotation, Vector3d.One)));
+
+            var sphere = new LSSphereCollider { Radius = Fixed64.Quarter * scale };
+            var capsule = new LSCapsuleCollider(ColliderShapeDefinition.Capsule(
+                Fixed64.FromFraction(1, 8) * scale, Fixed64.Half * scale));
+            var cylinder = new LSCylinderCollider(ColliderShapeDefinition.Cylinder(
+                Fixed64.Quarter * scale, Fixed64.Half * scale));
+            var smallCone = new LSConeCollider(ColliderShapeDefinition.Cone(
+                Fixed64.Quarter * scale, Fixed64.Half * scale));
+            foreach (LSCollider target in new LSCollider[] { sphere, capsule, cylinder, smallCone })
+                target.InitializeWithNoBody(new TestMatterAgent(context, new FixedTransform(position, rotation, Vector3d.One)));
+
+            foreach (LSCollider target in new LSCollider[] { box, mesh, sphere, capsule, cylinder, smallCone })
+            {
+                ConvexColliderSupport.Intersects(cone, target).Should().Be(expected,
+                    "the placement {0} has an analytical containment or separation margin", center);
+                ConvexColliderSupport.Intersects(target, cone).Should().Be(expected);
+                foreach (CollisionPair pair in new[] { new CollisionPair(cone, target), new CollisionPair(target, cone) })
+                {
+                    CollisionDetection.DoCollisionCheck(pair).Should().Be(expected);
+                    pair.Manifold.HasContact.Should().Be(expected);
+                    if (expected)
+                    {
+                        Vector3d normal = pair.ColliderA == cone
+                            ? pair.Manifold.PrimaryContact.Normal
+                            : -pair.Manifold.PrimaryContact.Normal;
+                        Vector3d originalPosition = target.Position;
+                        target.Position += normal * (pair.Manifold.PrimaryContact.Depth + Fixed64.FromFraction(1, 64));
+                        ConvexColliderSupport.Intersects(cone, target).Should().BeFalse(
+                            "the complete target should leave the cone after its reported exit depth");
+                        CollisionDetection.DoCollisionCheck(new CollisionPair(cone, target)).Should().BeFalse();
+                        target.Position = originalPosition;
+                    }
+                }
+            }
+        }
+    }
+
     [Fact]
     public void IsSupported_ShouldRejectUnsupportedColliderTypes()
     {

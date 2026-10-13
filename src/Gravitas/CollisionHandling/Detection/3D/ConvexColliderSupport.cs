@@ -115,7 +115,7 @@ internal static class ConvexColliderSupport
         {
             if (!TrySupportMinkowski(first, second, direction, out Vector3d point))
                 return false;
-            if (Vector3d.Dot(point, direction) < -Fixed64.Epsilon)
+            if (GjkSimplexPolicy.HasSeparatingSupport(point, direction))
                 return false;
 
             GjkSimplexPolicy.AddPoint(simplex, ref count, point);
@@ -177,7 +177,7 @@ internal static class ConvexColliderSupport
             {
                 return false;
             }
-            if (Vector3d.Dot(point, direction) < -Fixed64.Epsilon)
+            if (GjkSimplexPolicy.HasSeparatingSupport(point, direction))
                 return false;
 
             GjkSimplexPolicy.AddPoint(simplex, ref count, point);

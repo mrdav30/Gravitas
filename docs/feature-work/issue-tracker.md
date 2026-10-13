@@ -38,39 +38,10 @@
 ### Ordered Queue
 
 Phase 1 of the supported-geometry plan confirmed in-range numerical defects on
-the original binaries. Integral/volume fixes #113/#114/#115 are resolved.
-Resolve #116 before locking #096's safety contract.
-Resolve mass-property parity #117/#118 together after #116, before admission
-implementation.
+the original binaries. Integral, volume and overlap fixes #113-#116 are resolved.
+Resolve mass-property parity #117/#118 together before locking #096's safety
+contract and implementing admission.
 #111 remains an independent validation-tooling issue.
-
-### GRV-Issue-116 - Cone overlap GJK loses scale and rotation invariance
-
-- **Confirmed:** 2026-10-12 through `OverlapCone` and `OverlapConeAll` on original
-  phase 1 Release binaries, with one target and one candidate per query.
-- **Reproduction:** Cone apex `(0,0,0)`, axis `Up`, length `4*S`, end radius
-  `2*S`; target sphere radius `S/4`. At `S=1` and `256` results are correct.
-  At `S=1,024`, center `(2*S,2*S,0)` falsely overlaps, while center
-  `(S,3*S,S)`, strictly inside the cone, falsely misses. Rotate both shapes by
-  Euler degrees `(19,31,7)` and center `(2*S,3*S,2*S)` falsely overlaps as well.
-  Both variants agree on the incorrect results. The query cone's conservative
-  centered reach is about `3,547.24`, below `4,096`.
-- **Boundary:** The first separated center is about `.894*S` from the cone side,
-  exceeding radius `.25*S`; the contained center has radial distance
-  `sqrt(2)*S < 1.5*S`. These are broad contacts/gaps, not raw-quantum tangencies.
-  Probe grid uses physical cell edge `S`, bounds `[-8*S,8*S]`, scan size eight.
-- **Cause under investigation:** `ConvexColliderSupport.IntersectsConeVolume`
-  feeds unscaled higher-order cross/dot products to `GjkSimplexPolicy`; bounded
-  iteration exhaustion returns overlap. The probe localizes classification
-  failures to this predicate; exact first failing arithmetic needs RCA.
-  Contact `Intersects` shares that policy and needs parity checks, but its failure
-  is not inferred solely from this query reproduction.
-- **Follow-up:** Reuse existing product conditioning/exact predicate ownership
-  without a second GJK engine. Test public closest/all variants, contact callers,
-  scale covariance, oblique poses, separated/contained/tangent cases and costs.
-- **Evidence:** Ignored `artifacts/geometry-range/phase1/root-probe/Program.cs`
-  and `root-probe.log` retain #096 controls, 72 internal GJK classifications and
-  18 public closest/all comparisons against preserved original DLLs.
 
 ### GRV-Issue-117 - Detached compound cone mass weights disagree with committed geometry
 
@@ -188,6 +159,48 @@ implementation.
 Remaining measured performance costs are tracked in the benchmark backlog.
 
 ## Resolved Issues
+
+### GRV-Issue-116 - Cone overlap GJK loses scale and rotation invariance
+
+- **Confirmed:** 2026-10-12 through public `OverlapCone`/`OverlapConeAll` on
+  original phase 1 binaries; contact parity confirmed during RCA.
+- **Resolved:** 2026-10-13.
+- **Reproduction:** Query apex `(0,0,0)`, axis `Up`, length `4*S`, radius `2*S`;
+  target sphere radius `S/4`. Scales `1/256` pass. At `S=1,024`, center
+  `(2*S,2*S,0)` falsely overlaps and center `(S,3*S,S)` falsely misses. Rotating
+  both shapes by Euler `(19,31,7)` makes `(2*S,3*S,2*S)` falsely overlap too.
+  Centered reach is about `3,547.24`, below the provisional `4,096` ceiling.
+  These placements have analytical separation/intersection margins. Original
+  public cone/cuboid and cone/closed-convex-mesh contacts also falsely overlap.
+  The analytic cone/sphere dispatcher is correct; its internal GJK predicate
+  shares the defect.
+- **Root cause:** The second cross in `(ab x ao) x ab` saturates on iteration
+  zero, distorting direction before any budget exhaustion. Subsequent scalar
+  region/orientation dots can lose signs through intermediate saturation.
+- **Fix:** Harden the existing shared simplex policy with exact dot signs,
+  exact quartic edge-region identities, exact face orientation and normalized
+  final directions outside a proven scalar-cross component bound. Separating
+  support retains its independent bounded fast path and existing strict epsilon.
+  Reuse existing FixedMathSharp arithmetic; no upstream edits, numeric owners,
+  types, source files, public APIs or internal ABI changes are needed. Stable
+  collinear fallback and conservative iteration-budget behavior are retained.
+- **Regression coverage:** Closest/all query variants, scales `1/256/1,024`,
+  upright/oblique poses, cap tangency and thin axial gaps; all six supported
+  convex families in both pair orders, whole-target separation beyond reported
+  exit depth, scalar/exact cutover, simplex regions and support-dot cancellation.
+  Pure 2D and mixed contacts use separate algorithms and have no shared caller.
+- **Verification:** Full local-stack Release/Lean builds, suites and raw
+  100% reachable line/branch/method coverage pass. Six native Windows x64 shared
+  replay fixtures match expectations and directly agree across profiles.
+  Final native comparisons and stronger reversed repeats detect no repeatable
+  affected warm regression; all rows/guards allocate `0 B/op`. Independent
+  numerical/ponytail review has no outstanding source findings.
+- **Evidence:** The dated phase 1 summary in the
+  [Supported Geometry Range Plan](2026-10-12-supported-geometry-range-plan.md)
+  records counts, bounds and costs. Ignored `artifacts/grv-116/` retains original
+  failures, rejected experiments, final coverage/replay and immutable native
+  snapshots. Wrong original large-scale classifications are excluded from speed
+  claims. Native Linux/ARM64 and released-package validation remain pending.
 
 ### GRV-Issue-115 - Cone volume saturates before final division
 

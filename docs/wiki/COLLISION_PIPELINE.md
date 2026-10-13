@@ -104,6 +104,15 @@ Narrow phase owns shape truth. Supported shape coverage includes:
 | 2D     | circle, capsule, AABB, convex polygon, compound                                    |
 | Mixed  | supported 3D shapes against embedded 2D circle/capsule/AABB/polygon/compound slabs |
 
+Convex support predicates share one GJK simplex policy for 3D contacts and finite
+cone overlap queries. Region and face-orientation dot signs use exact products.
+Cross-product directions retain the scalar path within a proven component bound;
+larger simplices use exact plane-projection and face numerators before final
+direction normalization. This avoids intermediate saturation changing overlap
+classification as geometry grows or rotates. The existing strict separation
+tolerance, stable collinear fallback and conservative iteration-budget result
+remain part of the predicate contract.
+
 Convex SAT paths use stable axis generation and pair-oriented normals. Cuboid
 versus capsule checks first solve exact segment-to-oriented-box distance for
 rounded features, then use ordered SAT only when the capsule core reaches the

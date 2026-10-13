@@ -6,6 +6,7 @@ using Gravitas.Support;
 using Gravitas.Tests.Support;
 using GridForge.Configuration;
 using GridForge.Grids;
+using GridForge.Grids.Topology;
 using SwiftCollections;
 using System;
 using Xunit;
@@ -15,6 +16,98 @@ namespace Gravitas.Tests.Queries;
 public sealed class GravitasQuery3DServiceConeTests
 {
     private static readonly PhysicsLayerMask IncludeLayerZero = PhysicsLayerMask.FromLayer(0);
+
+    [Theory]
+    [InlineData(1, false)]
+    [InlineData(1, true)]
+    [InlineData(1024, false)]
+    [InlineData(1024, true)]
+    public void OverlapConeQueries_ShouldRetainCapTangencyAndRejectThinAxialGaps(int scale, bool oblique)
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        Fixed64 extent = (Fixed64)(8 * scale);
+        context.World.TryAddGrid(new GridConfiguration(
+            -Vector3d.One * extent, Vector3d.One * extent,
+            topologyMetrics: GridTopologyMetrics.Rectangular((Fixed64)scale)), out _)
+            .Should().BeTrue();
+        FixedQuaternion rotation = oblique
+            ? FixedQuaternion.FromEulerAnglesInDegrees((Fixed64)19, (Fixed64)31, (Fixed64)7)
+            : FixedQuaternion.Identity;
+        Fixed64 radius = Fixed64.Quarter * scale;
+        var target = new LSSphereCollider { Radius = radius };
+        var transform = new FixedTransform(Vector3d.Zero, rotation, Vector3d.One);
+        target.InitializeWithNoBody(new TestMatterAgent(context, transform));
+        var hits = new SwiftList<Physics3DHit>();
+
+        foreach (bool baseCap in new[] { false, true })
+        foreach (Fixed64 gap in new[] { Fixed64.Zero, Fixed64.FromFraction(1, 64) })
+        {
+            Fixed64 axial = baseCap ? (Fixed64)(4 * scale) + radius + gap : -radius - gap;
+            transform.LocalPosition = rotation * (Vector3d.Up * axial);
+            target.Simulate();
+            bool found = context.Query3D.OverlapCone(Vector3d.Zero, rotation * Vector3d.Up,
+                (Fixed64)(4 * scale), (Fixed64)(2 * scale), out _, IncludeLayerZero);
+            int count = context.Query3D.OverlapConeAll(Vector3d.Zero, rotation * Vector3d.Up,
+                (Fixed64)(4 * scale), (Fixed64)(2 * scale), IncludeLayerZero, hits);
+
+            found.Should().Be(gap == Fixed64.Zero, "the cap has axial gap {0} at scale {1}", gap, scale);
+            count.Should().Be(gap == Fixed64.Zero ? 1 : 0);
+        }
+    }
+
+    [Theory]
+    [InlineData(1, false, 2, 2, 0, false)]
+    [InlineData(1, false, 1, 3, 1, true)]
+    [InlineData(1, false, 2, 3, 2, false)]
+    [InlineData(1, true, 2, 2, 0, false)]
+    [InlineData(1, true, 1, 3, 1, true)]
+    [InlineData(1, true, 2, 3, 2, false)]
+    [InlineData(256, false, 2, 2, 0, false)]
+    [InlineData(256, false, 1, 3, 1, true)]
+    [InlineData(256, false, 2, 3, 2, false)]
+    [InlineData(256, true, 2, 2, 0, false)]
+    [InlineData(256, true, 1, 3, 1, true)]
+    [InlineData(256, true, 2, 3, 2, false)]
+    [InlineData(1024, false, 2, 2, 0, false)]
+    [InlineData(1024, false, 1, 3, 1, true)]
+    [InlineData(1024, false, 2, 3, 2, false)]
+    [InlineData(1024, true, 2, 2, 0, false)]
+    [InlineData(1024, true, 1, 3, 1, true)]
+    [InlineData(1024, true, 2, 3, 2, false)]
+    public void OverlapConeQueries_ShouldPreserveClassificationAcrossScaleAndRigidRotation(
+        int scale, bool oblique, int x, int y, int z, bool expected)
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        Fixed64 extent = (Fixed64)(8 * scale);
+        context.World.TryAddGrid(new GridConfiguration(
+            -Vector3d.One * extent, Vector3d.One * extent,
+            topologyMetrics: GridTopologyMetrics.Rectangular((Fixed64)scale)), out _)
+            .Should().BeTrue();
+        FixedQuaternion rotation = oblique
+            ? FixedQuaternion.FromEulerAnglesInDegrees((Fixed64)19, (Fixed64)31, (Fixed64)7)
+            : FixedQuaternion.Identity;
+        var target = new LSSphereCollider { Radius = Fixed64.Quarter * scale };
+        target.InitializeWithNoBody(new TestMatterAgent(context, new FixedTransform(
+            rotation * new Vector3d(x * scale, y * scale, z * scale),
+            rotation, Vector3d.One)));
+        var hits = new SwiftList<Physics3DHit>();
+
+        // At y=3 the cone radius is 1.5: (1,3,1) is strictly contained.
+        // The other centers have gaps greater than the sphere's .25 radius.
+        bool found = context.Query3D.OverlapCone(Vector3d.Zero, rotation * Vector3d.Up,
+            (Fixed64)(4 * scale), (Fixed64)(2 * scale), out Physics3DHit closest, IncludeLayerZero);
+        int count = context.Query3D.OverlapConeAll(Vector3d.Zero, rotation * Vector3d.Up,
+            (Fixed64)(4 * scale), (Fixed64)(2 * scale), IncludeLayerZero, hits);
+
+        found.Should().Be(expected);
+        count.Should().Be(expected ? 1 : 0);
+        context.Query3D.LastQueryCandidateCount.Should().Be(1);
+        if (expected)
+        {
+            closest.Collider.Should().BeSameAs(target);
+            hits[0].Collider.Should().BeSameAs(target);
+        }
+    }
 
     [Fact]
     public void OverlapCone_ShouldHitPrimitiveTargetsAndOrderAllHitsByAxialDistance()
