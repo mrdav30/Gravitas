@@ -18,6 +18,11 @@ namespace Gravitas.Colliders;
 /// </summary>
 public sealed class LSCapsuleCollider2D : LSCollider2D
 {
+    // Retain the fixed coefficient's rounding before bringing the cap moment
+    // to the rectangle's common divisor of twelve.
+    private static readonly Fixed64 CapCrossFactor =
+        ((Fixed64)4 / ((Fixed64)3 * Fixed64.Pi)) * (Fixed64)12;
+
     private Fixed64 _radius;
     private Fixed64 _height;
     private Fixed64 _scaledRadius;
@@ -380,35 +385,29 @@ public sealed class LSCapsuleCollider2D : LSCollider2D
     private static Fixed64 CalculateCenteredMoment(Fixed64 mass, Fixed64 radius, Fixed64 cylinderLength)
     {
         if (cylinderLength <= Fixed64.Epsilon)
-            return mass * radius * radius * Fixed64.Half;
+            return ExactMassProperties.InertiaMoment(mass,
+                ExactMassProperties.InertiaGeometryTerm(Fixed64.Half, radius, radius));
 
-        ExactMassWeight rectangleWeight =
-            GetRectangleWeight(radius, cylinderLength);
-        ExactMassWeight circleWeight = GetCircleWeight(radius);
-        ExactMassWeight totalWeight =
-            rectangleWeight.Add(circleWeight);
-        if (totalWeight.IsZero)
-            return mass * cylinderLength * cylinderLength / (Fixed64)12;
+        if (radius == Fixed64.Zero)
+            return Fixed64.TryMultiplyDivide(mass, cylinderLength, cylinderLength, (Fixed64)12, out Fixed64 rodMoment)
+                ? rodMoment : Fixed64.MaxValue;
 
-        _ = rectangleWeight.TryGetProportionalShare(
-            mass,
-            totalWeight,
-            out Fixed64 rectangleMass);
-        Fixed64 capMass = (mass - rectangleMass) * Fixed64.Half;
-        Fixed64 rectangleMoment =
-            rectangleMass * ((radius * (Fixed64)2 * radius * (Fixed64)2) + (cylinderLength * cylinderLength)) / (Fixed64)12;
+        // Cancelling the common radius leaves exact linear area weights.
+        Signed192 rectangleWeight = Fixed64.GetExactRawProduct(Fixed64.Two, cylinderLength);
+        Signed192 capWeight = Fixed64.GetExactRawProduct(Fixed64.Pi, radius);
+        Signed192 rectangleGeometry = WideArithmetic.AddSigned192(
+            ExactMassProperties.InertiaGeometryTerm((Fixed64)4, radius, radius),
+            ExactMassProperties.InertiaGeometryTerm(Fixed64.One, cylinderLength, cylinderLength));
 
-        // Semicircle centroid distance from its flat edge is 4r / (3pi).
-        Fixed64 capCentroidOffset = (Fixed64)4 * radius / ((Fixed64)3 * Fixed64.Pi);
-        Fixed64 capCenterDistance = cylinderLength * Fixed64.Half + capCentroidOffset;
-        Fixed64 capCenteredFactor =
-            Fixed64.One / (Fixed64)4
-            - (Fixed64)16 / ((Fixed64)9 * Fixed64.Pi * Fixed64.Pi);
-        Fixed64 capMomentAboutOwnCentroid = capMass * radius * radius * capCenteredFactor;
-        Fixed64 capMomentAboutCapsuleCenter =
-            capMomentAboutOwnCentroid + capMass * capCenterDistance * capCenterDistance;
-
-        return rectangleMoment + capMomentAboutCapsuleCenter * (Fixed64)2;
+        // Combining both caps cancels their centroid-square terms and retains
+        // odd raw mass: Ic = mc*(r^2/2 + L^2/4 + 4Lr/(3*pi)).
+        Signed192 capGeometry = WideArithmetic.AddSigned192(
+            ExactMassProperties.InertiaGeometryTerm((Fixed64)6, radius, radius),
+            WideArithmetic.AddSigned192(
+                ExactMassProperties.InertiaGeometryTerm((Fixed64)3, cylinderLength, cylinderLength),
+                ExactMassProperties.InertiaGeometryTerm(CapCrossFactor, cylinderLength, radius)));
+        return ExactMassProperties.InertiaWeightedMoment(
+            mass, rectangleGeometry, rectangleWeight, capGeometry, capWeight, divisor: 12);
     }
 
     private static ExactMassWeight GetRectangleWeight(

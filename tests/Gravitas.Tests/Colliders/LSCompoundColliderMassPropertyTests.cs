@@ -13,6 +13,169 @@ namespace Gravitas.Tests.Colliders;
 public sealed class LSCompoundColliderMassPropertyTests
 {
     [Theory]
+    [InlineData(0, 1443109012, 1443109012)]
+    [InlineData(1, 7217632882, 1803886265)]
+    [InlineData(2, 3383226276, 1082331759)]
+    [InlineData(3, 5648436632, 1681068476)]
+    public void FractionalCurvedInertia_ShouldRetainNonbinaryProducts(int family, long transverseRaw, long axialRaw)
+    {
+        Fixed64 radius = Fixed64.FromFraction(3, 5);
+        Fixed64 height = Fixed64.FromFraction(11, 4);
+        LSCollider collider = family switch
+        {
+            0 => new LSSphereCollider(ColliderShapeDefinition.Sphere(radius)),
+            1 => new LSCylinderCollider(ColliderShapeDefinition.Cylinder(radius, height)),
+            2 => new LSConeCollider(ColliderShapeDefinition.Cone(radius, height)),
+            _ => new LSCapsuleCollider(ColliderShapeDefinition.Capsule(radius, height))
+        };
+
+        Fixed3x3 tensor = collider.CalculateInertiaTensor(Fixed64.FromFraction(7, 3), collider.CalculateLocalCenterOfMassOffset());
+        tensor.M11.Should().Be(Fixed64.FromRaw(transverseRaw));
+        tensor.M22.Should().Be(Fixed64.FromRaw(axialRaw));
+        tensor.M33.Should().Be(Fixed64.FromRaw(transverseRaw));
+    }
+
+    [Fact]
+    public void TinyCompoundMass_ShouldPreserveSharesAndParallelAxisTerms()
+    {
+        var compound = new LSCompoundCollider(
+            CompoundColliderPart.Sphere((Fixed64)1024, Vector3d.Right),
+            CompoundColliderPart.Sphere((Fixed64)1024, -Vector3d.Right));
+
+        Fixed3x3 tensor = compound.CalculateInertiaTensor(Fixed64.FromRaw(3), Vector3d.Zero);
+
+        tensor.Should().Be(new Fixed3x3(
+            Fixed64.FromRaw(1258291), Fixed64.Zero, Fixed64.Zero,
+            Fixed64.Zero, Fixed64.FromRaw(1258294), Fixed64.Zero,
+            Fixed64.Zero, Fixed64.Zero, Fixed64.FromRaw(1258294)));
+    }
+
+    [Theory]
+    [InlineData(1, 1844674406941458432)]
+    [InlineData(4294967296, long.MaxValue)]
+    public void SphereInertia_ShouldSaturateOnlyTheFinalMoment(long massRaw, long expectedRaw)
+    {
+        var sphere = new LSSphereCollider { Radius = Fixed64.MaxValue };
+        sphere.CalculateInertiaTensor(Fixed64.FromRaw(massRaw), Vector3d.Zero).M11
+            .Should().Be(Fixed64.FromRaw(expectedRaw));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    public void UnequalDetachedParts_ShouldUseScaledVolumesBeforeInitialization(int family)
+    {
+        ColliderShapeDefinition shape = family switch
+        {
+            0 => ColliderShapeDefinition.Sphere(Fixed64.One),
+            1 => ColliderShapeDefinition.Cylinder(Fixed64.One, Fixed64.Two),
+            2 => ColliderShapeDefinition.Capsule(Fixed64.One, (Fixed64)4),
+            3 => ColliderShapeDefinition.Cone(Fixed64.One, (Fixed64)4),
+            _ => ColliderShapeDefinition.Cuboid(Vector3d.One * Fixed64.Two)
+        };
+        var compound = new LSCompoundCollider(
+            new CompoundColliderPart(shape, Vector3d.Zero),
+            new CompoundColliderPart(shape, Vector3d.Right * (Fixed64)9,
+                FixedQuaternion.Identity, Vector3d.One * Fixed64.Two));
+
+        // Doubling every dimension gives the second solid eight times the mass.
+        Vector3d expected = new((Fixed64)8,
+            family == 3 ? Fixed64.FromFraction(-17, 9) : Fixed64.Zero,
+            Fixed64.Zero);
+        Vector3d detached = compound.CalculateLocalCenterOfMassOffset();
+        detached.Should().Be(expected);
+        using var context = GravitasWorldContext.CreateOwned();
+        compound.InitializeWithNoBody(new TestMatterAgent(context));
+
+        compound.CalculateLocalCenterOfMassOffset().Should().Be(detached);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    public void EquivalentDetachedParts_ShouldRetainMassPropertiesAfterInitialization(int family)
+    {
+        Vector3d scale = new(Fixed64.One, (Fixed64)4, Fixed64.One);
+        Vector3d offset = Vector3d.Right * (Fixed64)10;
+        CompoundColliderPart first;
+        CompoundColliderPart second;
+        switch (family)
+        {
+            case 0:
+                scale.Y = (Fixed64)2;
+                first = CompoundColliderPart.Sphere(Fixed64.One, Vector3d.Zero, FixedQuaternion.Identity, scale);
+                second = CompoundColliderPart.Sphere((Fixed64)2, offset);
+                break;
+            case 1:
+                first = CompoundColliderPart.Cylinder(Fixed64.One, Fixed64.Two, Vector3d.Zero, FixedQuaternion.Identity, scale);
+                second = CompoundColliderPart.Cylinder(Fixed64.One, (Fixed64)8, offset);
+                break;
+            case 2:
+                first = CompoundColliderPart.Capsule(Fixed64.One, (Fixed64)4, Vector3d.Zero, FixedQuaternion.Identity, scale);
+                second = CompoundColliderPart.Capsule(Fixed64.One, (Fixed64)16, offset);
+                break;
+            case 3:
+                first = CompoundColliderPart.Cone(Fixed64.One, (Fixed64)4, Vector3d.Zero, FixedQuaternion.Identity, scale);
+                second = CompoundColliderPart.Cone(Fixed64.One, (Fixed64)16, offset);
+                break;
+            default:
+                first = CompoundColliderPart.Cuboid(Vector3d.One * Fixed64.Two, Vector3d.Zero, FixedQuaternion.Identity, scale);
+                second = CompoundColliderPart.Cuboid(new Vector3d(Fixed64.Two, (Fixed64)8, Fixed64.Two), offset);
+                break;
+        }
+
+        var compound = new LSCompoundCollider(first, second);
+        Vector3d expectedCenter = new((Fixed64)5, family == 3 ? (Fixed64)(-4) : Fixed64.Zero, Fixed64.Zero);
+        compound.CalculateLocalCenterOfMassOffset().Should().Be(expectedCenter);
+        Fixed3x3 detachedTensor = compound.CalculateInertiaTensor(Fixed64.Two, expectedCenter);
+        using var context = GravitasWorldContext.CreateOwned();
+        compound.InitializeWithNoBody(new TestMatterAgent(context));
+
+        compound.CalculateLocalCenterOfMassOffset().Should().Be(expectedCenter);
+        compound.CalculateInertiaTensor(Fixed64.Two, expectedCenter).Should().Be(detachedTensor);
+    }
+
+    [Theory]
+    [InlineData(0, 1, 419430, 419430)]
+    [InlineData(0, 3, 1258291, 1258291)]
+    [InlineData(0, 4294967296, 1801439850528768, 1801439850528768)]
+    [InlineData(1, 1, 419430, 419430)]
+    [InlineData(1, 3, 1258291, 1258291)]
+    [InlineData(2, 1, 611669, 524288)]
+    [InlineData(2, 3, 1835008, 1572864)]
+    [InlineData(3, 1, 314573, 314573)]
+    [InlineData(3, 3, 943718, 943718)]
+    [InlineData(4, 1, 763963, 464369)]
+    [InlineData(4, 3, 2291888, 1393108)]
+    public void CurvedInertia_ShouldApplyMassBeforeFinalRounding(int family, long massRaw, long transverseRaw, long axialRaw)
+    {
+        Fixed64 radius = (Fixed64)1024;
+        LSCollider collider = family switch
+        {
+            0 => new LSSphereCollider(ColliderShapeDefinition.Sphere(radius)),
+            1 => new LSCapsuleCollider(ColliderShapeDefinition.Capsule(radius, (Fixed64)2048)),
+            2 => new LSCylinderCollider(ColliderShapeDefinition.Cylinder(radius, (Fixed64)2048)),
+            3 => new LSConeCollider(ColliderShapeDefinition.Cone(radius, (Fixed64)2048)),
+            _ => new LSCapsuleCollider(ColliderShapeDefinition.Capsule(radius, (Fixed64)3072))
+        };
+        using var context = GravitasWorldContext.CreateOwned();
+        collider.InitializeWithNoBody(new TestMatterAgent(context));
+
+        // Independently rounded raw products retain each documented fixed coefficient.
+        Fixed3x3 tensor = collider.CalculateInertiaTensor(Fixed64.FromRaw(massRaw), collider.CalculateLocalCenterOfMassOffset());
+        tensor.Should().Be(new Fixed3x3(
+            Fixed64.FromRaw(transverseRaw), Fixed64.Zero, Fixed64.Zero,
+            Fixed64.Zero, Fixed64.FromRaw(axialRaw), Fixed64.Zero,
+            Fixed64.Zero, Fixed64.Zero, Fixed64.FromRaw(transverseRaw)));
+    }
+
+    [Theory]
     [InlineData(0)]
     [InlineData(-1)]
     public void CalculateInertiaTensor_ForNonpositiveMass_ShouldReturnZeroBeforeGeometryEvaluation(int mass)

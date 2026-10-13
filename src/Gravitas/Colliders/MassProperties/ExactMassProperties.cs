@@ -27,6 +27,42 @@ internal static class ExactMassProperties
     private static readonly Signed576 ParallelAxis3dDenominator =
         PowerOfOne(6);
 
+    // Geometry retains Q96 products until mass is applied. Three positive raw
+    // factors fit 192 bits; applying a full-domain mass fits 320 bits.
+    internal static Signed192 InertiaGeometryTerm(
+        Fixed64 coefficient, Fixed64 first, Fixed64 second) =>
+        Signed192.NarrowValue(WideArithmetic.MultiplySigned192(
+            Signed192.Raw(coefficient), Fixed64.GetExactRawProduct(first, second)));
+
+    internal static Fixed64 InertiaMoment(Fixed64 mass, Signed192 geometry) =>
+        MaterializeInertia(WideArithmetic.MultiplySigned192(Signed192.Raw(mass), geometry));
+
+    // Cancelled common radius factors leave linear weights. Keeping those
+    // weights exact avoids quantizing a whole shape's internal component mass.
+    internal static Fixed64 InertiaWeightedMoment(
+        Fixed64 mass, Signed192 firstGeometry, Signed192 firstWeight,
+        Signed192 secondGeometry, Signed192 secondWeight, uint divisor = 1)
+    {
+        Signed320 weightedGeometry = WideArithmetic.AddSigned320(
+            WideArithmetic.MultiplySigned192(firstGeometry, firstWeight),
+            WideArithmetic.MultiplySigned192(secondGeometry, secondWeight));
+        Signed576 numerator = WideArithmetic.MultiplySigned576(
+            Signed576.ExtendValue(weightedGeometry), Signed192.Raw(mass));
+        Signed192 weight = WideArithmetic.AddSigned192(firstWeight, secondWeight);
+        if (divisor != 1)
+            weight = Signed192.NarrowValue(WideArithmetic.MultiplySigned192(weight, Signed192.Signed(divisor)));
+        Signed320 denominator = WideArithmetic.MultiplySigned192(
+            weight, Signed192.NarrowValue(WeightMeasureDenominator));
+        // Geometry is Q96 and linear weights are Q64: numerator stays below
+        // 330 bits, denominator below 200 bits, and only final inertia saturates.
+        return Fixed64.TryGetSignedRawRatio(numerator, denominator, out Fixed64 moment)
+            ? moment : Fixed64.MaxValue;
+    }
+
+    private static Fixed64 MaterializeInertia(Signed320 numerator) =>
+        Fixed64.TryRoundNonnegativeQ128(numerator, out Fixed64 moment)
+            ? moment : Fixed64.MaxValue;
+
     internal static ExactMassWeight CreateWeight(Fixed64 measure)
     {
         EnsureNonNegative(measure, nameof(measure));
@@ -452,6 +488,11 @@ internal static class ExactMassProperties
         Signed320 dz = WideArithmetic.SubtractSigned320(
             point.ZNumerator,
             Product(Signed192.Raw(referencePoint.Z), One, One));
+        if (dx.IsZero && dy.IsZero && dz.IsZero)
+        {
+            tensor = centerTensor;
+            return true;
+        }
         Signed576 dxSquared = WideArithmetic.MultiplySigned320(dx, dx);
         Signed576 dySquared = WideArithmetic.MultiplySigned320(dy, dy);
         Signed576 dzSquared = WideArithmetic.MultiplySigned320(dz, dz);
@@ -537,6 +578,11 @@ internal static class ExactMassProperties
             WideArithmetic.MultiplySigned192(
                 Signed192.Raw(referencePoint.Y),
                 One));
+        if (dx.IsZero && dy.IsZero)
+        {
+            moment = centerMoment;
+            return true;
+        }
         Signed576 squaredDistance = WideArithmetic.AddSigned576(
             WideArithmetic.MultiplySigned320(dx, dx),
             WideArithmetic.MultiplySigned320(dy, dy));

@@ -8,9 +8,9 @@
 > design document or phase report.
 
 **Date:** 2026-10-12  
-**Status:** Phase 1 evidence collected; numerical prerequisites #113-#116 are
-resolved. Mass-property parity #117/#118 is queued before ceiling locking and
-admission implementation, which has not started. The bounded
+**Status:** Phase 1 evidence collected; numerical prerequisites #113-#118 are
+resolved. Compound child-mass quantization #119 remains before ceiling locking
+and admission implementation, which has not started. The bounded
 effective-geometry direction is approved. The proposed
 ceiling remains provisional while confirmed in-range numerical defects are
 resolved; admission alone cannot establish the intended safety guarantee.  
@@ -244,6 +244,11 @@ supported safety claim or implementing around an assumed safe range:
 | [#114](issue-tracker.md#grv-issue-114---polygon-moment-integrals-saturate-before-normalization) | Side-256 square publishes moment `2,730⅔` instead of `10,922⅔`; equivalent AABB remains correct. | Resolved: exact mass-applied normalization with geometry caching; retain the existing final-overflow policy. |
 | [#115](issue-tracker.md#grv-issue-115---cone-volume-saturates-before-final-division) | Radius/height `1,024`, reach `1,536`: representable cone volume was reduced from about `1.124B` to `715.8M`. | Resolved: round the complete fixed-Pi product/ratio once; saturate only genuinely unrepresentable final volume. |
 | [#116](issue-tracker.md#grv-issue-116---cone-overlap-gjk-loses-scale-and-rotation-invariance) | Length `4,096`, end radius `2,048`: public cone overlaps produce both false positives and false negatives. | Resolved: bounded scalar crosses and exact dot signs; wide simplex predicates where needed. Closest/all queries and shared contact callers pass. |
+
+
+| [#117](issue-tracker.md#grv-issue-117---detached-compound-cone-mass-weights-disagree-with-committed-geometry) | Equivalent Y-scaled cones have different detached weights despite identical prepared geometry; the parity audit found other primitive cache defaults. | Resolved: detached and prepared mass properties share effective dimensions across all five primitive families. |
+| [#118](issue-tracker.md#grv-issue-118---sphere-inertia-rounds-small-mass-before-radius-squared) | Radius `1,024`, three-raw-unit mass gives sphere inertia `1048576` instead of `1258291`; other curved moments also round too soon. | Resolved: exact coefficient/geometry/mass normalization, exact internal capsule weights and corrected 2D cap polar moment. |
+| [#119](issue-tracker.md#grv-issue-119---compound-inertia-quantizes-child-masses-before-applying-geometry) | Radius `512`/`1,024` spheres at `0`/`2,048`, total mass three raw units: child masses round to `0`/`3`, biasing the compound tensor. | Pending: rational heterogeneous child contributions and parallel-axis normalization without intermediate tensor materialization. |
 
 These are prerequisites, not optimizations and not bugs introduced by admission.
 Do not reduce the candidate ceiling to hide failures at ordinary useful sizes.
@@ -517,9 +522,85 @@ metadata differs between snapshots; no projection code change is retained.
 Ignored `artifacts/grv-116/` retains red regressions, rejected patches, fresh
 closeout coverage/replay, source provenance and immutable native snapshots.
 Final core SHA256 is `457D3EC9752F80484421C88B5C954C8E8220DE306E0EB14EC924D31AC246CAE1`.
-No native Linux/ARM64 or released-package validation is claimed. #117/#118,
-the provisional ceiling and #096 remain open; close the mass-property pair
-before locking or enforcing admission.
+No native Linux/ARM64 or released-package validation is claimed. At this
+checkpoint #117/#118, the provisional ceiling and #096 remained open; the
+mass-property pair was next before locking or enforcing admission.
+
+**Mass-property refinement (2026-10-13):** #117/#118 are resolved together.
+Detached/prepared public COM and inertia now agree across sphere, cylinder,
+capsule, cone and cuboid parts, including equivalent and unequal-volume scales.
+Capsule dimension derivation reuses preparation's existing scale/axis validation.
+No public API, runtime cache, numeric owner or production source file is added:
+the production delta is **105 net Gravitas lines in seven existing files** and
+**53 net FixedMathSharp lines in two existing files**.
+
+Curved moments keep Q32.32 coefficient quantization and exact raw geometry/mass
+products until final ties-to-even materialization. In particular the sphere
+coefficient stays raw `1717986918`; radius `1,024`, mass raw `1` or `3` now gives
+inertia raw `419430/1258291`, while its unit-mass control remains unchanged.
+Cylinder/cone intermediates no longer saturate a representable final moment.
+Full capsules retain exact internal cylinder/cap weights by cancelling their
+common radius factors, then normalize the complete mass-weighted moment once.
+The 2D formula also corrects paired semicircle polar inertia and odd-raw-mass
+loss. Radius/core `1,024`, total mass raw `3` gives 3D transverse/axial moments
+`2291888/1393108` and 2D moment `2767176`. Fractional geometry, circle/sphere
+limits, thin rods, final overflow, compounds, real angular response, mass setters
+and sleeping populate-existing loads have independent regressions.
+
+FixedMathSharp promotes its existing Q128 final quantizer without changing that
+algorithm, and adds the consumed `Signed576/Signed320` raw-ratio overload using
+existing magnitude division and half-even rounding. The weighted numerator is
+below 330 bits and denominator below 200 bits for the actual shape coefficients
+and divisors `1` and `12`; no new limb arithmetic or downstream numeric facade is
+needed. Publish FixedMathSharp first, then validate Gravitas against the released
+package. The develop CI checkout pin must be advanced to that committed upstream
+revision before pushing the consuming Gravitas change; it is deliberately not
+changed to an uncommitted revision here.
+
+Four test-backed candidates were rejected: generic normalization and two
+partial fast paths regressed warm curved arithmetic, and a faster prototype
+still quantized a full capsule's component masses. The final exact-weight
+formula removes that intermediate share work. Native original/candidate
+snapshots use matched two launches, six warmups/measurements and 500 ms
+iterations. All **35** rows and **36** direct warmed output/allocation guards
+allocate **0 B/op**; all **27** meaningful timing comparisons improve. Seven
+wrong-original rows report corrected output/current cost only; one cached getter
+is below timing resolution. 3D capsule ordinary/fractional costs move
+`1.669 -> 1.247 us` / `1.768 -> 1.293 us`; 2D costs move
+`943 -> 473 ns` / `972 -> 477 ns`. The sphere-world gate is affected by the
+per-pose inertia refresh and is not an independent host-drift control.
+A fresh reversed candidate/original repeat (three launches, eight measurements,
+six warmups, 500 ms) confirms no resolved warm regression: ordinary/fractional
+cone mass changes average `12.176 -> 11.948 us` / `12.309 -> 12.081 us`.
+Ordinary intervals overlap; fractional intervals are narrowly separated.
+Unchanged public arithmetic controls shift about `+0.4%` with overlapping
+99.9% intervals and also allocate zero; this is not a repeatable regression.
+
+Both local-stack configurations build with zero warnings/errors. Full suites
+pass: Gravitas **5,917 Release / 5,851 Lean**, FixedMathSharp **5,731 / 5,710**,
+and its Chronicler adapter **49 / 49**. Raw OpenCover reports have zero unvisited
+sequence points, branches or reachable methods in Gravitas, FixedMathSharp,
+FixedMathSharp.Chronicler and FixedMathSharp.FluentAssertions in both profiles;
+no coverage exclusions were added. The six native Windows x64 shared replay
+fixtures retain their checked expectations and directly agree across profiles.
+Independent numerical/ponytail
+review has no outstanding source findings. Native Linux/ARM64 and released
+package validation remain pending.
+
+A separate public compound probe confirms pre-existing **#119** on both frozen
+binaries: sphere radii `512/1,024`, offsets `0/2,048`, total mass raw `3`.
+Cumulative child allocations still round to raw `0/3`. Original/corrected axial
+inertia is `1048576/1258291`, versus an independent uniform-density oracle
+`1153434`; both public COMs agree. Exact heterogeneous child contributions need
+their own contract, including parallel-axis terms and final overflow, rather
+than weighting materialized child tensors. This remains a prerequisite to
+locking the supported safety claim; #096 is not closed by primitive fixes.
+
+Ignored `artifacts/grv-117-118/` retains red regressions, rejected experiments,
+raw coverage/replay, source provenance, independent probes and immutable native
+snapshots. The measured final Release stack hashes are Gravitas
+`61E604CE5BFB6F51F0503AC7D27A33BEE949D80F74B2636268822C2A8BF078E2` and FixedMathSharp
+`45DDBF81C1C8F0CB3F9B93A80BE9E1EDF5A626CA1CE9668FCBEFF337E64E4900`.
 
 ## Phase 2: Enforce Complete Collider Admission
 

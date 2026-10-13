@@ -336,6 +336,21 @@ configuration only; initialization derives inertia from the committed shape.
 Recorded-state loading retains saved sleep and motion rather than applying the
 public setter's wake policy.
 
+Built-in primitive and compound mass calculations use the effective shape
+dimensions before and after initialization. Detached shapes use their authored
+dimensions and part scales; initialized shapes use committed owner and part
+scales. A sphere takes the largest radial scale across X/Y/Z, while a cone,
+cylinder, or 3D capsule uses X/Z for radius and Y for height.
+
+Curved inertia retains geometry and mass products through final rounding.
+Existing fixed coefficients retain their Q32.32 quantization, including the
+sphere's `2/5` coefficient. Compounds preserve their total assigned child mass;
+capsules retain exact internal component weights until final inertia rounding.
+A 2D capsule treats both semicircular caps together and
+includes their complete polar moment about the capsule center. Only an
+unrepresentable final inertia value saturates; a large intermediate radius
+square does not discard a representable final moment.
+
 ### Explicit body pose changes
 
 Static bodies do not poll their host transforms. `SetPosition(...)`,

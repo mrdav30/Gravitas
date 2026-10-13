@@ -40,27 +40,21 @@ public sealed class LSCuboidCollider : LSCollider
 
     internal override ExactMassWeight CalculateMassPropertyWeight()
     {
-        Vector3d halfExtents;
-        if (HasCommittedShape)
-        {
-            halfExtents = _orientedBox.HalfExtents;
-        }
-        else
-        {
-            GetCurrentShapeScales(
-                out Vector3d ownerScale,
-                out Vector3d partScale);
-            halfExtents = ColliderScalePolicy.ScalePositive(
-                Size,
-                ownerScale,
-                partScale,
-                Fixed64.Two);
-        }
+        Vector3d halfExtents = GetMassPropertyHalfExtents();
         return ExactMassWeight.FromProduct(
             halfExtents.X,
             halfExtents.Y,
             halfExtents.Z,
             (Fixed64)8);
+    }
+
+    private Vector3d GetMassPropertyHalfExtents()
+    {
+        if (HasCommittedShape)
+            return _orientedBox.HalfExtents;
+
+        GetCurrentShapeScales(out Vector3d ownerScale, out Vector3d partScale);
+        return ColliderScalePolicy.ScalePositive(Size, ownerScale, partScale, Fixed64.Two);
     }
 
     internal override ExactMassWeight CalculatePreparedMassPropertyWeight()
@@ -108,7 +102,7 @@ public sealed class LSCuboidCollider : LSCollider
 
     internal override Fixed3x3 CalculateCenterOfMassInertiaTensor(Fixed64 mass)
     {
-        Vector3d halfExtents = _orientedBox.HalfExtents;
+        Vector3d halfExtents = GetMassPropertyHalfExtents();
         Fixed64 xContribution = GetInertiaContribution(mass, halfExtents.X);
         Fixed64 yContribution = GetInertiaContribution(mass, halfExtents.Y);
         Fixed64 zContribution = GetInertiaContribution(mass, halfExtents.Z);

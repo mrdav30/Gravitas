@@ -2,7 +2,7 @@
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-119`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-120`.
 - Assign an ID when an issue enters this tracker, keep it through resolution,
   and never reuse an ID even if an entry is later removed. Check this file's Git
   history before advancing or repairing the counter.
@@ -38,73 +38,51 @@
 ### Ordered Queue
 
 Phase 1 of the supported-geometry plan confirmed in-range numerical defects on
-the original binaries. Integral, volume and overlap fixes #113-#116 are resolved.
-Resolve mass-property parity #117/#118 together before locking #096's safety
-contract and implementing admission.
+the original binaries. Integral, volume, overlap and primitive mass-property
+fixes #113-#118 are resolved. Resolve compound child-mass quantization #119 before
+locking #096's safety contract and implementing admission.
 #111 remains an independent validation-tooling issue.
 
-### GRV-Issue-117 - Detached compound cone mass weights disagree with committed geometry
+### GRV-Issue-119 - Compound inertia quantizes child masses before applying geometry
 
-- **Confirmed:** 2026-10-13 during #115 caller/parity review, on both the original
-  committed binary and the volume-corrected binary. This is pre-existing and
-  independent of final volume normalization.
-- **Reproduction:** Create two cone parts with radius `1`. The first has authored
-  height `4`, part scale `(1,4,1)` and zero offset; the second has height `16`,
-  unit scale and offset `(10,0,0)`. Both have effective radius `1`, height `16`
-  and equal physical volume. Before initialization, the public compound
-  `CalculateLocalCenterOfMassOffset()` returns X raw `2526451351` (about `10/17`);
-  after initialization it correctly returns X raw `21474836480` (`5`). Both
-  return Y `-4`, Z `0`. No large dimensions or saturation are involved.
-- **Root cause:** The uncommitted cone weight uses the base
-  `GetCurrentScaledRadius()`, which takes the maximum X/Y/Z scale. Cone
-  preparation uses only X/Z radial scale. A Y-only height scale therefore
-  increases the detached radial weight and biases the aggregate COM.
-- **Follow-up:** Derive detached mass weights from the same effective shape
-  dimensions as prepared/committed geometry. Add the equivalent-cone public COM
-  regression and audit detached/prepared parity for other primitive families;
-  this reproduction does not establish defects in those families.
-- **Evidence:** Ignored `artifacts/grv-115/parity-probe/` retains the public probe,
-  frozen references and original/candidate raw results with loaded DLL hashes.
-  The original Gravitas SHA256 is
-  `CED874321E77CA5005BE9B5FC13E515CE739662AD260410724067FD8B0CA7BF9`.
-
-### GRV-Issue-118 - Sphere inertia rounds small mass before radius squared
-
-- **Confirmed:** 2026-10-13 during #115's primitive/parity audit, on both the
-  original committed binary and final volume-corrected binary. This is
-  pre-existing; #115 does not change sphere inertia.
-- **Reproduction:** Initialize a bodyless sphere with radius `1,024`, centered
-  reach `1,024`, then call public
-  `CalculateInertiaTensor(Fixed64.FromRaw(3), Vector3d.Zero)`. All three diagonal
-  entries are raw `1048576` instead of raw `1258291`, about `16.7%` too small.
-  Final inertia and inverse mass both fit: inverse mass is raw
-  `6148914691236517205`. No large world coordinate or final saturation is involved.
-  With one-raw-unit mass, the diagonal becomes zero instead of raw `419430`;
-  unit mass is a passing control at raw `1801439850528768`.
-- **Root cause:** `LSSphereCollider.CalculateCenterOfMassInertiaTensor` rounds
-  `(2/5) * mass` before multiplying by `ScaledRadiusSqr`. Large radius squared
-  amplifies that early error even when the final tensor coefficient fits.
-- **Expected contract:** An independent integer oracle rounds the final fixed
-  coefficient product `1717986918 * massRaw * radiusRaw * radiusRaw / 2^96`
-  once. The two tiny-mass expected values also agree with the exact rational
-  `2/5` result; the unit-mass control retains the fixed coefficient's quantization.
-- **Follow-up:** Preserve mass and geometry products until final normalization,
-  reusing existing FixedMathSharp arithmetic. Verify public inertia, body mass
-  refresh, compound shares, ordinary-mass controls and warm costs. Audit other
-  curved primitive inertia paths for the same pattern; this reproduction does
-  not establish defects in those families.
-- **Evidence:** Ignored `artifacts/grv-115/inertia-probe/` retains public probes,
-  a BigInteger oracle, frozen reference projects and original/final results.
-  Original Gravitas SHA256 is
-  `CED874321E77CA5005BE9B5FC13E515CE739662AD260410724067FD8B0CA7BF9`;
-  final SHA256 is `51DF2FA669DECB63C859C841EA902FBFBCA889F390E28B7B647AC24B3B4DE9C1`.
+- **Confirmed:** 2026-10-13 during #117/#118's whole-shape review, on both
+  original committed and corrected primitive binaries. The compound allocation
+  algorithm is unchanged by those fixes; this is a pre-existing precision gap.
+- **Reproduction:** Initialize a compound with sphere radius `512` at zero and
+  sphere radius `1,024` at local offset `(2,048,0,0)`. Calculate its inertia
+  about its public COM using total mass `Fixed64.FromRaw(3)`. Both binaries
+  return COM X raw `7818749353074` (`8*2,048/9`). The original tensor diagonal is
+  raw `(1048576,1203921,1203921)`; corrected primitive arithmetic returns
+  `(1258291,1413636,1413636)`. All off-diagonal entries are zero. An independent
+  volume-weighted oracle gives axial M11 raw `1153434`, using the preserved
+  sphere coefficient raw `1717986918`, masses `3/9` and `24/9` raw units and
+  final ties-to-even rounding. Geometry stays below the proposed reach ceiling;
+  final inertia and inverse parent mass are representable.
+- **Root cause:** `LSCompoundCollider` rounds cumulative volume-weighted mass
+  allocations into `Fixed64` before asking children for inertia. This fixture
+  assigns raw masses `0` and `3` instead of preserving the `1:8` ratio through
+  the geometry products. Exact COM weighting does not remove that tensor bias.
+  `LSCompoundCollider2D` uses the same allocation policy and needs parity review;
+  this reproduction establishes the 3D sphere case only.
+- **Follow-up:** Retain rational child contributions through final compound
+  normalization, including parallel-axis terms, without weighting already
+  rounded or saturated child tensors. Design the contract across primitive,
+  capsule, polygon and mesh children; preserve stable ordering, final-overflow
+  policy and the warm baseline. Audit equivalent single/compound geometry and
+  both dimensions. This is distinct from a capsule's internal component weights,
+  which #118 now retains exactly within its existing formula owner.
+- **Evidence:** Ignored `artifacts/grv-117-118/perf/` retains
+  `original-child-share-probe.log`, `candidate-child-share-probe.log` and the
+  public probe source, with loaded DLL hashes. The phase 1 refinement summary in
+  the [Supported Geometry Range Plan](2026-10-12-supported-geometry-range-plan.md)
+  records the separate prerequisite.
 
 ### GRV-Issue-096 - Extreme-scale capsule initial mesh sweep can miss a genuine overlap
 
 - **Status:** Approved bounded effective-geometry direction; implementation
   planned in the [Supported Geometry Range Plan](2026-10-12-supported-geometry-range-plan.md).
   The candidate `4,096`-unit reach remains provisional until phase 1 validation;
-  remaining in-range prerequisite #116 must be repaired first. This issue
+  remaining in-range prerequisite #119 must be repaired first. This issue
   stays open until the complete admission contract is implemented.
 - **Confirmed:** 2026-10-07 in the isolated local-stack Release
   `CapsuleInitialContact_WithUnavailableTriangleCharts_ShouldRetainGeometricFallback`
@@ -159,6 +137,77 @@ contract and implementing admission.
 Remaining measured performance costs are tracked in the benchmark backlog.
 
 ## Resolved Issues
+
+### GRV-Issue-117 - Detached compound cone mass weights disagree with committed geometry
+
+- **Confirmed:** 2026-10-13 during #115 caller/parity review, on both the original
+  committed binary and the volume-corrected binary. This is pre-existing and
+  independent of final volume normalization.
+- **Reproduction:** Create two cone parts with radius `1`. The first has authored
+  height `4`, part scale `(1,4,1)` and zero offset; the second has height `16`,
+  unit scale and offset `(10,0,0)`. Both have effective radius `1`, height `16`
+  and equal physical volume. Before initialization, the public compound
+  `CalculateLocalCenterOfMassOffset()` returns X raw `2526451351` (about `10/17`);
+  after initialization it correctly returns X raw `21474836480` (`5`). Both
+  return Y `-4`, Z `0`. No large dimensions or saturation are involved.
+- **Root cause:** The uncommitted cone weight uses the base
+  `GetCurrentScaledRadius()`, which takes the maximum X/Y/Z scale. Cone
+  preparation uses only X/Z radial scale. A Y-only height scale therefore
+  increases the detached radial weight and biases the aggregate COM.
+- **Resolved:** 2026-10-13.
+- **Fix:** Reuse the effective geometry rules for detached and prepared mass
+  properties. The audit also corrected detached sphere, cylinder and capsule
+  cache defaults and cuboid tensor extents. Shared capsule scale/axis derivation
+  keeps validation identical; no public API or new geometry owner is added.
+- **Regression coverage:** Equivalent and unequal-volume scaled compounds across
+  all five primitive families, public COM and inertia before/after initialization.
+  Combined verification and warm evidence are recorded in the phase 1 summary
+  of the [Supported Geometry Range Plan](2026-10-12-supported-geometry-range-plan.md).
+- **Evidence:** Ignored `artifacts/grv-115/parity-probe/` retains the public probe,
+  frozen references and original/candidate raw results with loaded DLL hashes.
+  The original Gravitas SHA256 is
+  `CED874321E77CA5005BE9B5FC13E515CE739662AD260410724067FD8B0CA7BF9`.
+
+### GRV-Issue-118 - Sphere inertia rounds small mass before radius squared
+
+- **Confirmed:** 2026-10-13 during #115's primitive/parity audit, on both the
+  original committed binary and final volume-corrected binary. This is
+  pre-existing; #115 does not change sphere inertia.
+- **Reproduction:** Initialize a bodyless sphere with radius `1,024`, centered
+  reach `1,024`, then call public
+  `CalculateInertiaTensor(Fixed64.FromRaw(3), Vector3d.Zero)`. All three diagonal
+  entries are raw `1048576` instead of raw `1258291`, about `16.7%` too small.
+  Final inertia and inverse mass both fit: inverse mass is raw
+  `6148914691236517205`. No large world coordinate or final saturation is involved.
+  With one-raw-unit mass, the diagonal becomes zero instead of raw `419430`;
+  unit mass is a passing control at raw `1801439850528768`.
+- **Root cause:** `LSSphereCollider.CalculateCenterOfMassInertiaTensor` rounds
+  `(2/5) * mass` before multiplying by `ScaledRadiusSqr`. Large radius squared
+  amplifies that early error even when the final tensor coefficient fits.
+- **Expected contract:** An independent integer oracle rounds the final fixed
+  coefficient product `1717986918 * massRaw * radiusRaw * radiusRaw / 2^96`
+  once. The two tiny-mass expected values also agree with the exact rational
+  `2/5` result; the unit-mass control retains the fixed coefficient's quantization.
+- **Resolved:** 2026-10-13.
+- **Fix:** Preserve fixed coefficients, geometry products and applied mass until
+  final moment materialization for sphere, cylinder, cone and 3D/2D capsules.
+  Cancel common capsule radius factors to retain exact internal component
+  weights; only final inertia saturates. The 2D audit also corrected the paired
+  semicircle polar moment and odd-raw-mass loss. Reuse existing FixedMathSharp
+  rounding/division owners through the coordinated internal friendship boundary.
+- **Regression coverage:** Independent raw-product and physical oracles, tiny and
+  ordinary masses, fractional geometry, sphere/circle limits, full capsules,
+  final overflow, compound allocation controls, angular response, mass mutation
+  and sleeping populate-existing loads. Existing compound child-mass quantization
+  is separately confirmed as #119; this fix does not claim to solve it.
+- **Verification:** Full local-stack Release/Lean suites, raw reachable coverage,
+  shared replay and native warm gates are recorded in the phase 1 summary of the
+  [Supported Geometry Range Plan](2026-10-12-supported-geometry-range-plan.md).
+- **Evidence:** Ignored `artifacts/grv-115/inertia-probe/` retains public probes,
+  a BigInteger oracle, frozen reference projects and original/final results.
+  Original Gravitas SHA256 is
+  `CED874321E77CA5005BE9B5FC13E515CE739662AD260410724067FD8B0CA7BF9`;
+  final SHA256 is `51DF2FA669DECB63C859C841EA902FBFBCA889F390E28B7B647AC24B3B4DE9C1`.
 
 ### GRV-Issue-116 - Cone overlap GJK loses scale and rotation invariance
 

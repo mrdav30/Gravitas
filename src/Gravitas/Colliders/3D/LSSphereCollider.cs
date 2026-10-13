@@ -74,12 +74,18 @@ public sealed class LSSphereCollider : LSCollider
         Area = _preparedArea;
     }
 
-    internal override ExactMassWeight CalculateMassPropertyWeight() =>
-        ExactMassWeight.FromProduct(
+    internal override ExactMassWeight CalculateMassPropertyWeight()
+    {
+        Fixed64 radius = GetMassPropertyRadius();
+        return ExactMassWeight.FromProduct(
             Fixed64.FromFraction(4, 3) * Fixed64.Pi,
-            ScaledRadius,
-            ScaledRadius,
-            ScaledRadius);
+            radius,
+            radius,
+            radius);
+    }
+
+    private Fixed64 GetMassPropertyRadius() =>
+        HasCommittedShape ? _scaledRadius : GetCurrentScaledRadius();
 
     internal override ExactMassWeight CalculatePreparedMassPropertyWeight() =>
         ExactMassWeight.FromProduct(
@@ -91,7 +97,9 @@ public sealed class LSSphereCollider : LSCollider
     internal override Fixed3x3 CalculateCenterOfMassInertiaTensor(Fixed64 mass)
     {
         // For a solid sphere, the inertia tensor is (2/5)*m*r^2 for the diagonal elements
-        Fixed64 diagonalElement = Fixed64.FromFraction(2, 5) * mass * ScaledRadiusSqr;
+        Fixed64 radius = GetMassPropertyRadius();
+        Fixed64 diagonalElement = ExactMassProperties.InertiaMoment(
+            mass, ExactMassProperties.InertiaGeometryTerm(Fixed64.FromFraction(2, 5), radius, radius));
 
         Fixed3x3 tensor = new(
             diagonalElement, Fixed64.Zero, Fixed64.Zero,

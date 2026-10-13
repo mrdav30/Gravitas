@@ -10,6 +10,61 @@ namespace Gravitas.Tests.Colliders;
 
 public sealed class Collider2DMassPropertyTests
 {
+    [Theory]
+    [InlineData(3, 5)]
+    [InlineData(1, 1)]
+    public void CapsuleMoment_ShouldSaturateAnUnrepresentableFinalProduct(int radiusNumerator, int radiusDenominator)
+    {
+        var capsule = new LSCapsuleCollider2D(Fixed64.FromFraction(radiusNumerator, radiusDenominator), (Fixed64)5);
+        capsule.CalculateMomentOfInertia(Fixed64.MaxValue, Vector2d.Zero).Should().Be(Fixed64.MaxValue);
+    }
+
+    [Fact]
+    public void CapsuleMoment_ShouldRetainNonbinaryMassAndGeometryProducts()
+    {
+        var capsule = new LSCapsuleCollider2D(Fixed64.FromFraction(3, 5), Fixed64.FromFraction(11, 4));
+        capsule.CalculateMomentOfInertia(Fixed64.FromFraction(7, 3), Vector2d.Zero)
+            .Should().Be(Fixed64.FromRaw(6449436936));
+    }
+
+    [Theory]
+    [InlineData(1, 1)]
+    [InlineData(4294967296, 3)]
+    [InlineData(4398046511104, 1)]
+    [InlineData(4398046511104, 3)]
+    public void CollapsedCapsule_ShouldMatchCircleMoment(long radiusRaw, long massRaw)
+    {
+        Fixed64 radius = Fixed64.FromRaw(radiusRaw);
+        Fixed64 mass = Fixed64.FromRaw(massRaw);
+        var capsule = new LSCapsuleCollider2D(radius, radius * Fixed64.Two);
+        var circle = new LSCircleCollider2D(radius);
+
+        capsule.CalculateMomentOfInertia(mass, Vector2d.Zero)
+            .Should().Be(circle.CalculateMomentOfInertia(mass, Vector2d.Zero));
+    }
+
+    [Theory]
+    [InlineData(1, 1, 524614)]
+    [InlineData(1, 3, 1573842)]
+    [InlineData(1024, 3, 2767176)]
+    public void Capsule_ShouldRetainExactComponentWeightsThroughFinalMoment(int coreLength, long massRaw, long expectedRaw)
+    {
+        var capsule = new LSCapsuleCollider2D((Fixed64)1024, (Fixed64)(2048 + coreLength));
+        capsule.CalculateMomentOfInertia(Fixed64.FromRaw(massRaw), Vector2d.Zero)
+            .Should().Be(Fixed64.FromRaw(expectedRaw));
+    }
+
+    [Fact]
+    public void Capsule_ShouldIncludeBothSemicirclePolarMoments()
+    {
+        var capsule = new LSCapsuleCollider2D(Fixed64.One, (Fixed64)4);
+        // At unit density, rectangle inertia is 8/3 and the paired caps contribute
+        // 3*pi/2 + 8/3: analytic integration about the stadium center gives 3*pi/2 + 16/3.
+        Fixed64 expected = Fixed64.Pi * Fixed64.FromFraction(3, 2) + Fixed64.FromFraction(16, 3);
+        Fixed64 actual = capsule.CalculateMomentOfInertia(Fixed64.Pi + (Fixed64)4, Vector2d.Zero);
+        (actual - expected).Abs().Should().BeLessThanOrEqualTo(Fixed64.FromRaw(4));
+    }
+
     [Fact]
     public void DetachedCompound_ShouldAggregateAnUnrepresentableChildCenter()
     {
@@ -518,6 +573,17 @@ public sealed class Collider2DMassPropertyTests
                 center)
             .Should()
             .Be(expected);
+    }
+
+    [Fact]
+    public void ThinRodCapsule_ShouldSaturateOnlyItsFinalMoment()
+    {
+        var compound = new LSCompoundCollider2D(
+            CompoundColliderPart2D.Capsule(Fixed64.FromRaw(1), (Fixed64)16,
+                Vector2d.Zero, Fixed64.Zero, Vector2d.One * Fixed64.Half));
+
+        compound.CalculateMomentOfInertia(Fixed64.MaxValue, Vector2d.Zero)
+            .Should().Be(Fixed64.MaxValue);
     }
 
     [Fact]

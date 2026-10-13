@@ -11,6 +11,19 @@ namespace Gravitas.Tests.Core;
 public sealed class SolidBody2DMassPropertiesTests
 {
     [Fact]
+    public void CapsuleTinyMassMutation_ShouldRetainBothCapsAndAngularResponse()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        SolidBody2D body = CreateBody(context, new LSCapsuleCollider2D((Fixed64)1024, (Fixed64)2049), mass: Fixed64.One);
+        body.Mass = Fixed64.FromRaw(3);
+
+        body.MomentOfInertia.Should().Be(Fixed64.FromRaw(1573842));
+        body.InverseMomentOfInertia.Should().Be(Fixed64.One / Fixed64.FromRaw(1573842));
+        body.AddAngularImpulse(Fixed64.FromRaw(1573842));
+        body.AngularVelocity.Should().Be(Fixed64.One);
+    }
+
+    [Fact]
     public void EffectiveMassHelpers_ShouldSeparateTranslationAndRotationPolicy()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();

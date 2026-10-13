@@ -67,6 +67,23 @@ public sealed class LSCapsuleCollider : LSCollider
 
     private protected override void PrepareShape(in ColliderShapeSnapshot snapshot)
     {
+        GetScaledGeometry(snapshot, out _preparedRadius, out _preparedAxisLength);
+        _preparedAxis = (snapshot.Rotation * Vector3d.Up).Normalized;
+        _preparedArea = Fixed64.Two * Fixed64.Pi * _preparedRadius * _preparedAxisLength
+            + Fixed64.Two * Fixed64.Pi * _preparedRadius * _preparedRadius;
+        SetPreparedBounds(FixedBoundBox.FromCenteredCapsuleClippedToDomain(
+            snapshot.Center,
+            snapshot.Rotation,
+            Vector3d.Up,
+            _preparedAxisLength,
+            _preparedRadius));
+    }
+
+    private static void GetScaledGeometry(
+        in ColliderShapeSnapshot snapshot,
+        out Fixed64 radius,
+        out Fixed64 axisLength)
+    {
         Fixed64 radiusX = ColliderScalePolicy.ScalePositive(
             snapshot.Radius,
             snapshot.OwnerScale.X,
@@ -75,7 +92,7 @@ public sealed class LSCapsuleCollider : LSCollider
             snapshot.Radius,
             snapshot.OwnerScale.Z,
             snapshot.PartScale.Z);
-        _preparedRadius = FixedMath.Max(radiusX, radiusZ);
+        radius = FixedMath.Max(radiusX, radiusZ);
         SwiftThrowHelper.ThrowIfArgument(
             !HasValidScaledDimensions(snapshot),
             nameof(snapshot),
@@ -103,16 +120,7 @@ public sealed class LSCapsuleCollider : LSCollider
                 out Fixed64 axisLengthZ),
             nameof(snapshot),
             "Scaled capsule center-axis length must be representable.");
-        _preparedAxisLength = FixedMath.Min(axisLengthX, axisLengthZ);
-        _preparedAxis = (snapshot.Rotation * Vector3d.Up).Normalized;
-        _preparedArea = Fixed64.Two * Fixed64.Pi * _preparedRadius * _preparedAxisLength
-            + Fixed64.Two * Fixed64.Pi * _preparedRadius * _preparedRadius;
-        SetPreparedBounds(FixedBoundBox.FromCenteredCapsuleClippedToDomain(
-            snapshot.Center,
-            snapshot.Rotation,
-            Vector3d.Up,
-            _preparedAxisLength,
-            _preparedRadius));
+        axisLength = FixedMath.Min(axisLengthX, axisLengthZ);
     }
 
     private static bool HasValidScaledDimensions(
@@ -144,9 +152,32 @@ public sealed class LSCapsuleCollider : LSCollider
         Area = _preparedArea;
     }
 
-    internal override ExactMassWeight CalculateMassPropertyWeight() =>
-        GetCylinderWeight(ScaledRadius, AxisLength)
-            .Add(GetCapWeight(ScaledRadius));
+    internal override ExactMassWeight CalculateMassPropertyWeight()
+    {
+        GetMassPropertyGeometry(out Fixed64 radius, out Fixed64 axisLength);
+        return GetCylinderWeight(radius, axisLength).Add(GetCapWeight(radius));
+    }
+
+    private void GetMassPropertyGeometry(out Fixed64 radius, out Fixed64 axisLength)
+    {
+        if (HasCommittedShape)
+        {
+            radius = _scaledRadius;
+            axisLength = AxisLength;
+            return;
+        }
+
+        GetCurrentShapeScales(out Vector3d ownerScale, out Vector3d partScale);
+        var snapshot = new ColliderShapeSnapshot(
+            Vector3d.Zero,
+            FixedQuaternion.Identity,
+            ownerScale,
+            partScale,
+            LocalOffset,
+            Size,
+            Radius);
+        GetScaledGeometry(snapshot, out radius, out axisLength);
+    }
 
     internal override ExactMassWeight CalculatePreparedMassPropertyWeight() =>
         GetCylinderWeight(_preparedRadius, _preparedAxisLength)
@@ -157,44 +188,36 @@ public sealed class LSCapsuleCollider : LSCollider
     // its sphere center, which contributes the 3dr/4 cross term to transverse cap inertia.
     internal override Fixed3x3 CalculateCenterOfMassInertiaTensor(Fixed64 mass)
     {
-        if (AxisLength <= Fixed64.Epsilon)
+        GetMassPropertyGeometry(out Fixed64 radius, out Fixed64 axisLength);
+        Signed192 sphereAxial = ExactMassProperties.InertiaGeometryTerm(
+            Fixed64.FromFraction(2, 5), radius, radius);
+        if (axisLength <= Fixed64.Epsilon)
         {
-            Fixed64 sphereDiagonal = Fixed64.FromFraction(2, 5) * mass * ScaledRadiusSqr;
-            Fixed3x3 sphereTensor = new(
+            Fixed64 sphereDiagonal = ExactMassProperties.InertiaMoment(mass, sphereAxial);
+            return new Fixed3x3(
                 sphereDiagonal, Fixed64.Zero, Fixed64.Zero,
                 Fixed64.Zero, sphereDiagonal, Fixed64.Zero,
-                Fixed64.Zero, Fixed64.Zero, sphereDiagonal
-            );
-            return sphereTensor;
+                Fixed64.Zero, Fixed64.Zero, sphereDiagonal);
         }
 
-        // Masses of the cylinder and spheres (proportional to their volumes)
-        ExactMassWeight cylinderWeight =
-            GetCylinderWeight(ScaledRadius, AxisLength);
-        ExactMassWeight capWeight = GetCapWeight(ScaledRadius);
-        ExactMassWeight totalWeight = cylinderWeight.Add(capWeight);
-
-        _ = cylinderWeight.TryGetProportionalShare(
-            mass,
-            totalWeight,
-            out Fixed64 cylinderMass);
-        Fixed64 sphereMass = mass - cylinderMass;
-
-        // Distance from the center of the hemisphere to the center of the capsule
-        Fixed64 d = AxisLength / 2;
-
-        // Calculating the inertia tensors for the cylinder and the spheres
-        Fixed64 cylinderInertiaY = Fixed64.FromFraction(1, 2) * cylinderMass * ScaledRadiusSqr;
-        Fixed64 cylinderInertiaXZ = Fixed64.FromFraction(1, 12) * cylinderMass * ((3 * ScaledRadiusSqr) + (AxisLength * AxisLength));
-        Fixed64 sphereInertiaXZ = sphereMass
-            * (Fixed64.FromFraction(2, 5) * ScaledRadiusSqr
-                + d * d
-                + Fixed64.FromFraction(3, 4) * d * ScaledRadius);
-        Fixed64 sphereInertiaY = Fixed64.FromFraction(2, 5) * sphereMass * ScaledRadiusSqr;
-
-        // The total inertia tensor for the capsule
-        Fixed64 totalInertia_xz = cylinderInertiaXZ + sphereInertiaXZ;
-        Fixed64 totalInertia_y = cylinderInertiaY + sphereInertiaY;
+        // Cancelling the shared r^2 retains the existing volume coefficients
+        // while preserving the exact internal cylinder/hemisphere mass ratio.
+        Signed192 cylinderWeight = Fixed64.GetExactRawProduct(Fixed64.Pi, axisLength);
+        Signed192 capWeight = Fixed64.GetExactRawProduct(
+            Fixed64.FromFraction(4, 3) * Fixed64.Pi, radius);
+        Fixed64 twelfth = Fixed64.FromFraction(1, 12);
+        Signed192 cylinderTransverse = WideArithmetic.AddSigned192(
+            ExactMassProperties.InertiaGeometryTerm(twelfth * (Fixed64)3, radius, radius),
+            ExactMassProperties.InertiaGeometryTerm(twelfth, axisLength, axisLength));
+        Signed192 sphereTransverse = WideArithmetic.AddSigned192(sphereAxial,
+            WideArithmetic.AddSigned192(
+                ExactMassProperties.InertiaGeometryTerm(Fixed64.FromFraction(1, 4), axisLength, axisLength),
+                ExactMassProperties.InertiaGeometryTerm(Fixed64.FromFraction(3, 8), axisLength, radius)));
+        Fixed64 totalInertia_xz = ExactMassProperties.InertiaWeightedMoment(
+            mass, cylinderTransverse, cylinderWeight, sphereTransverse, capWeight);
+        Fixed64 totalInertia_y = ExactMassProperties.InertiaWeightedMoment(
+            mass, ExactMassProperties.InertiaGeometryTerm(Fixed64.Half, radius, radius), cylinderWeight,
+            sphereAxial, capWeight);
 
         Fixed3x3 tensor = new(
             totalInertia_xz, Fixed64.Zero, Fixed64.Zero,

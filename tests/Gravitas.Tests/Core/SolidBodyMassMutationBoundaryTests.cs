@@ -14,6 +14,26 @@ public sealed class SolidBodyMassMutationBoundaryTests
 {
     public static TheoryData<GravitasSerializationTransport> Transports => GravitasSerializationTransportCases.All();
 
+    [Theory]
+    [MemberData(nameof(Transports))]
+    public void PopulateTinyMass_ShouldRestoreLargeRadiusInertiaAndSleep(GravitasSerializationTransport transport)
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        var body = new SolidBody(new TestMatterAgent(context),
+            new LSSphereCollider(ColliderShapeDefinition.Sphere((Fixed64)1024))) { Mass = Fixed64.FromRaw(3) };
+        body.Initialize(Vector3d.Zero, FixedQuaternion.Identity);
+        body.Sleep();
+        object payload = GravitasSerializationHarness.Serialize(body, transport);
+        body.Mass = Fixed64.One;
+
+        GravitasSerializationHarness.Populate(body, payload, transport);
+
+        body.Mass.Should().Be(Fixed64.FromRaw(3));
+        body.InverseInertiaTensor.M11.Should().Be(Fixed64.One / Fixed64.FromRaw(1258291));
+        body.IsSleeping.Should().BeTrue();
+    }
+
+
     [Fact]
     public void MassChange_DuringOpenFixedStep_ShouldRejectChangesButAllowNoOpsInBothDimensions()
     {

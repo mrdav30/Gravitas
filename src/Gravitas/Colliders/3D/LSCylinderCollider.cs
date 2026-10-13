@@ -64,12 +64,31 @@ public sealed class LSCylinderCollider : LSCollider
     protected override Vector3d NormalizeSize(Vector3d value) =>
         new(_radius * 2, value.Y, _radius * 2);
 
-    internal override ExactMassWeight CalculateMassPropertyWeight() =>
-        ExactMassWeight.FromProduct(
+    internal override ExactMassWeight CalculateMassPropertyWeight()
+    {
+        GetMassPropertyGeometry(out Fixed64 radius, out Fixed64 height);
+        return ExactMassWeight.FromProduct(
             Fixed64.Pi,
-            ScaledRadius,
-            ScaledRadius,
-            Height);
+            radius,
+            radius,
+            height);
+    }
+
+    private void GetMassPropertyGeometry(out Fixed64 radius, out Fixed64 height)
+    {
+        if (HasCommittedShape)
+        {
+            radius = _scaledRadius;
+            height = Height;
+            return;
+        }
+
+        GetCurrentShapeScales(out Vector3d ownerScale, out Vector3d partScale);
+        radius = FixedMath.Max(
+            ColliderScalePolicy.ScalePositive(Radius, ownerScale.X, partScale.X),
+            ColliderScalePolicy.ScalePositive(Radius, ownerScale.Z, partScale.Z));
+        height = ColliderScalePolicy.ScalePositive(Size.Y, ownerScale.Y, partScale.Y);
+    }
 
     internal override ExactMassWeight CalculatePreparedMassPropertyWeight() =>
         ExactMassWeight.FromProduct(
@@ -80,10 +99,14 @@ public sealed class LSCylinderCollider : LSCollider
 
     internal override Fixed3x3 CalculateCenterOfMassInertiaTensor(Fixed64 mass)
     {
-        Fixed64 radiusSqr = ScaledRadiusSqr;
-        Fixed64 heightSqr = Height * Height;
-        Fixed64 inertiaXZ = Fixed64.FromFraction(1, 12) * mass * ((3 * radiusSqr) + heightSqr);
-        Fixed64 inertiaY = Fixed64.Half * mass * radiusSqr;
+        GetMassPropertyGeometry(out Fixed64 radius, out Fixed64 height);
+        Fixed64 twelfth = Fixed64.FromFraction(1, 12);
+        Signed192 transverse = WideArithmetic.AddSigned192(
+            ExactMassProperties.InertiaGeometryTerm(twelfth * (Fixed64)3, radius, radius),
+            ExactMassProperties.InertiaGeometryTerm(twelfth, height, height));
+        Fixed64 inertiaXZ = ExactMassProperties.InertiaMoment(mass, transverse);
+        Fixed64 inertiaY = ExactMassProperties.InertiaMoment(
+            mass, ExactMassProperties.InertiaGeometryTerm(Fixed64.Half, radius, radius));
 
         Fixed3x3 tensor = new(
             inertiaXZ, Fixed64.Zero, Fixed64.Zero,

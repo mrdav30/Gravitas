@@ -10,6 +10,27 @@ namespace Gravitas.Tests.Core;
 public sealed class SolidBodyMassMutationTests
 {
     [Fact]
+    public void TinyMassMutation_ShouldRetainLargeRadiusAngularResponse()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        var body = new SolidBody(new TestMatterAgent(context),
+            new LSSphereCollider(ColliderShapeDefinition.Sphere((Fixed64)1024))) { Mass = Fixed64.One };
+        body.Initialize(Vector3d.Zero, FixedQuaternion.Identity);
+        body.Sleep();
+
+        body.Mass = Fixed64.FromRaw(3);
+
+        Fixed64 inverse = Fixed64.One / Fixed64.FromRaw(1258291);
+        body.InverseInertiaTensor.Should().Be(new Fixed3x3(
+            inverse, Fixed64.Zero, Fixed64.Zero,
+            Fixed64.Zero, inverse, Fixed64.Zero,
+            Fixed64.Zero, Fixed64.Zero, inverse));
+        body.IsSleeping.Should().BeFalse();
+        body.AddAngularImpulse(Vector3d.Up * Fixed64.FromRaw(1258291));
+        body.AngularVelocity.Y.Should().Be(Fixed64.One);
+    }
+
+    [Fact]
     public void ChangedMass_ShouldMatchFreshBodyAngularResponseAndPreserveAcceptedMotion()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
