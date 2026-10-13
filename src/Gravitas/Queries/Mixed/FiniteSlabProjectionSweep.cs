@@ -113,10 +113,10 @@ internal static partial class FiniteSlabProjectionSweep
             || (directionMagnitude != Fixed64.Zero
                 && FixedMath.Abs(directionMagnitude - Fixed64.One) > Fixed64.Epsilon)
             || maxConservativeAdvancementIterations <= 0
-            || !target.TrySupport(Vector2d.Right, out Vector2d rightSupport))
+            || !target.TrySupport(Vector2d.Right, out Vector2d rightSupport, out bool translated))
             return false;
 
-        if (target.TryGetPlanarCircle(rightSupport, out Vector2d targetCenter, out Fixed64 targetRadius))
+        if (target.TryGetPlanarCircle(rightSupport, translated, out Vector2d targetCenter, out Fixed64 targetRadius))
         {
             return new FixedSegment2d(start, end)
                 .TryGetCircleIntersectionDistanceInterval(
@@ -194,11 +194,7 @@ internal static partial class FiniteSlabProjectionSweep
         out PlanarGjkResult result)
     {
         Span<PlanarSupportPoint> simplex = stackalloc PlanarSupportPoint[3];
-        int workingShift = GjkSimplexScale.SelectThreeTermShift(
-            point,
-            target.BoundsMin,
-            target.BoundsMax,
-            expansionRadius);
+        int workingShift = target.SelectWorkingShift(point, expansionRadius);
         Fixed64 workingScale = GjkSimplexScale.GetCoordinateScale(workingShift);
         Fixed64 workingScaleSqr = workingScale * workingScale;
         Fixed64 workingDistanceTolerance = DistanceTolerance * workingScale;
@@ -276,7 +272,7 @@ internal static partial class FiniteSlabProjectionSweep
     {
         Vector2d supportDirection = direction.Normalized;
         Vector2d targetDirection = -supportDirection;
-        if (!target.TrySupport(targetDirection, out Vector2d targetSupport))
+        if (!target.TrySupport(targetDirection, out Vector2d targetSupport, out bool translated))
         {
             support = default;
             return false;
@@ -284,7 +280,9 @@ internal static partial class FiniteSlabProjectionSweep
 
         Vector2d expansion = targetDirection * expansionRadius;
         support = new PlanarSupportPoint(
-            GjkSimplexScale.CreateWorkingDifference(point, targetSupport, expansion, workingShift));
+            translated
+                ? GjkSimplexScale.CreateWorkingDifference(point, target.Center, targetSupport, expansion, workingShift)
+                : GjkSimplexScale.CreateWorkingDifference(point, targetSupport, expansion, workingShift));
         return true;
     }
 
@@ -471,6 +469,8 @@ internal static partial class FiniteSlabProjectionSweep
         private readonly FixedRange _slabY;
         private readonly Vector2d _center;
         private readonly Vector3d _axis;
+        private readonly bool _useTranslatedSupport;
+        private readonly Fixed64 _supportExtent;
 
         private ProjectionTarget(
             LSCapsuleCollider? capsule,
@@ -487,6 +487,19 @@ internal static partial class FiniteSlabProjectionSweep
             _slabY = new FixedRange(slabMinY, slabMaxY);
             _center = center;
             _axis = axis;
+            Fixed64 length = capsule?.AxisLength ?? cylinder?.Height ?? cone!.Height;
+            Fixed64 radius = capsule?.ScaledRadius ?? cylinder?.ScaledRadius ?? cone!.ScaledRadius;
+            Fixed64 halfLength = Fixed64.FromRaw((length.m_rawValue >> 1) + (length.m_rawValue & 1));
+            Fixed64 axialComponent = FixedMath.Max(axis.X.Abs(), axis.Z.Abs());
+            _supportExtent = default;
+            // Support uses a rounded axis, so exact rigid bounds alone cannot select the frame.
+            bool hasSupportExtent = Fixed64.TryMultiplyAdd(halfLength, axialComponent, radius, out Fixed64 extent)
+                && Fixed64.TryAdd(extent, Fixed64.MinIncrement, out _supportExtent);
+            Vector2d planarExtent = new(_supportExtent, _supportExtent);
+            // Huge local envelopes retain absolute support: translation can make them unrepresentable.
+            _useTranslatedSupport = hasSupportExtent
+                && (!Vector2d.TryAdd(center, planarExtent, out _)
+                    || !Vector2d.TrySubtract(center, planarExtent, out _));
         }
 
         public Vector2d Center => _center;
@@ -529,13 +542,27 @@ internal static partial class FiniteSlabProjectionSweep
                 new Vector2d(cone.Center.X, cone.Center.Z),
                 GetRigidUpAxis(cone.Rotation));
 
-        public bool TrySupport(Vector2d direction, out Vector2d support)
+        public int SelectWorkingShift(Vector2d point, Fixed64 radius)
+        {
+            if (!_useTranslatedSupport)
+                return GjkSimplexScale.SelectThreeTermShift(point, BoundsMin, BoundsMax, radius);
+            Vector2d extent = new(_supportExtent, _supportExtent);
+            return GjkSimplexScale.SelectFourTermShift(point, _center, -extent, extent, radius);
+        }
+
+        public bool TrySupport(Vector2d direction, out Vector2d support, out bool translated)
         {
             Vector2d normal = direction.Normalized;
+            Vector3d center = _capsule?.Center ?? _cylinder?.Center ?? _cone!.Center;
+            // Select the frame once; retrying every unavailable support repeats the expensive solve.
+            translated = _useTranslatedSupport;
+            if (translated)
+                center = new Vector3d(Fixed64.Zero, center.Y, Fixed64.Zero);
+
             if (_capsule != null)
             {
                 return FixedSlabProjection.TryGetCapsuleSupport(
-                    _capsule.Center,
+                    center,
                     _axis,
                     _capsule.AxisLength,
                     _capsule.ScaledRadius,
@@ -547,7 +574,7 @@ internal static partial class FiniteSlabProjectionSweep
             if (_cylinder != null)
             {
                 return FixedSlabProjection.TryGetCylinderSupport(
-                    _cylinder.Center,
+                    center,
                     _axis,
                     _cylinder.Height,
                     _cylinder.ScaledRadius,
@@ -557,9 +584,9 @@ internal static partial class FiniteSlabProjectionSweep
             }
 
             return FixedSlabProjection.TryGetConeSupport(
-                _cone!.Center,
+                center,
                 _axis,
-                _cone.Height,
+                _cone!.Height,
                 _cone.ScaledRadius,
                 _slabY,
                 normal,
@@ -568,6 +595,7 @@ internal static partial class FiniteSlabProjectionSweep
 
         public bool TryGetPlanarCircle(
             Vector2d rightSupport,
+            bool translated,
             out Vector2d center,
             out Fixed64 radius)
         {
@@ -579,7 +607,7 @@ internal static partial class FiniteSlabProjectionSweep
             }
 
             center = _center;
-            radius = rightSupport.X - _center.X;
+            radius = translated ? rightSupport.X : rightSupport.X - _center.X;
             return true;
         }
 

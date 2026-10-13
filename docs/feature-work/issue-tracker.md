@@ -37,39 +37,6 @@
 
 ### Ordered Queue
 
-### GRV-Issue-110 - Mixed curved-target sweeps can miss contained starts near scalar limits
-
-- **Confirmed:** 2026-10-12 during #103's conceptual-witness review. An isolated
-  Release probe verifies exact source-center containment, then fails reducer
-  admission before the corrected contact builder runs. The projected-support
-  admission owner is unchanged by #103.
-- **Reproduction:** Let `m = Fixed64.MaxValue`. Initialize a cylinder of radius
-  `1/4`, full height `1/10`, center `(m - 1/100,0,0)` and normalized rotation
-  `(0,0,-1,2)`. Sweep a circle slab from X/Z `(m - 1/20,0)` left by `1/1000`,
-  with radius `1/100`, slab Y zero and half-thickness `1/4`, through the mixed
-  circle/3D reducer. The target's exact closest-surface owner confirms that the
-  source center is inside, but `TrySweepCircleAgainst3DCollider` returns false.
-  Source centers and expanded X bounds remain representable.
-- **Root cause:** `FiniteSlabProjectionSweep.TrySweepCircle` requires an initial
-  absolute right support. `FixedSlabProjection` legitimately rejects a support
-  that cannot materialize; the admission gate interprets that failure as a miss.
-  Here the cylinder's right support is approximately `(m + 0.18,-0.17,0)`:
-  its Y lies inside the source slab but its X exceeds the scalar range.
-- **Follow-up:** Preserve conceptual or translated support through projected
-  admission instead of equating unavailable absolute support with separation.
-  Check cylinder, capsule and cone parity, both coordinate limits, entering and
-  leaving controls, and the production query/CCD paths. Keep host/grid bounds
-  and final body-position policy separate from geometric admission.
-- **Boundary:** A second, extreme-size cylinder probe also fails this gate.
-  That result complements #096's geometry-range decision, but the ordinary
-  dimensions above require an independent fix; a radius cap cannot repair it.
-- **Evidence:** Ignored `artifacts/grv-issue-103/OrdinaryCylinderBoundaryProbe.cs`,
-  `boundary-probe/boundary-probe.trx` and
-  `artifacts/grv-issue-103-boundary-probe.log`
-  retain the failed direct-owner fixture. `review-red/review-red.trx` retains
-  the earlier extreme-size admission miss. These are diagnostic probes, not
-  passing regressions or an executed full-host reproduction.
-
 ### GRV-Issue-096 - Extreme-scale capsule initial mesh sweep can miss a genuine overlap
 
 - **Status:** Supported geometry range decision; extreme-radius algorithm work
@@ -127,6 +94,57 @@
 Remaining measured performance costs are tracked in the benchmark backlog.
 
 ## Resolved Issues
+
+### GRV-Issue-110 - Mixed curved-target sweeps can miss contained starts near scalar limits
+
+- **Resolved:** 2026-10-12. Capsule, cylinder and cone mixed circle/slab sweeps
+  retain contained and entering contacts near either X/Z scalar limit.
+- **Reproduction:** A cylinder of radius `1/4`, height `1/10`, center
+  `(Fixed64.MaxValue - 1/100,0,0)` and normalized rotation `(0,0,-1,2)`
+  contains a circle source at X/Z `(Fixed64.MaxValue - 1/20,0)`, but the
+  original reducer rejects a leftward `1/1000` sweep with radius `1/100`
+  and slab Y zero, half-thickness `1/4`. Twenty-four maintained boundary
+  cases fail against the pre-fix engine before the contact builder runs.
+- **Root cause:** The projected support owner legitimately refuses to
+  materialize an absolute support outside Q32.32. Initial admission and later
+  GJK support requests interpret that numerical failure as a miss.
+- **Resolution:** Select a target-relative X/Z support frame when the actual
+  rounded-axis local envelope fits but crosses the world scalar domain. Keep
+  world-Y clipping unchanged. Compose the four-term Minkowski difference in
+  the existing adaptive GJK scale owner without materializing world support.
+  Ordinary envelopes retain existing absolute rounding; huge unrepresentable
+  local envelopes retain absolute support behavior and previously valid hits.
+  The shared fix adds about `70` net runtime lines in two existing files; no
+  public API, package pin or upstream source changes are required.
+- **Regression coverage:** `42` new cases cover three-shape parity, both limits
+  and planar axes, translated-origin anchors/normals and entry distances,
+  strict closing versus stationary/escaping starts, public query candidates,
+  full `Simulate`/`LateSimulate` CCD, nonzero world-Y clipping, rounded capsule
+  support beyond representable rigid bounds, adaptive scaling and genuine
+  huge-support acceptance/refusal controls. Extreme geometry remains #096's
+  separate supported-range decision; body-position exhaustion remains explicit.
+- **Validation:** With `UseLocalLsfStack=true`, Release passes `5,799` tests
+  with raw coverage `47,203/47,203` sequence points, `15,464/15,464` branches
+  and `4,925/4,925` methods. ReleaseLean passes `5,734` with `47,201/47,201`,
+  `15,464/15,464` and `4,924/4,924`. Both reports have zero uncovered points
+  or methods without new exclusions. Both solution configurations and both
+  core target frameworks build with zero warnings/errors. Native Windows x64
+  Release/Lean replay agrees on all six shared fixtures and cross-lane hashes.
+  DocFX passes with warnings as errors; changed documentation links resolve.
+- **Performance:** Fixed-JIT warmed controls remain approximately `11-27 us`
+  per query with `0 B/op`; boundary fixtures track their origin controls and
+  ordinary-coordinate costs show no material regression. Old incorrect misses
+  are not speed baselines. The initial 18-case out-of-process run reports
+  approximately `11-28 us`; final helper-inlining smoke executes all 18 cases,
+  reports `0 B/op` and approximately `10-31 us`. Short iteration warnings and
+  small sample counts limit precision; these are reducer costs, not host capacity.
+- **Review and evidence:** Independent ponytail review has no remaining
+  correctness or bloat blockers. Ignored `artifacts/grv-issue-110/` retains red
+  regressions, `release-closeout`/`lean-closeout` raw coverage, build/DocFX logs,
+  replay captures/comparison, both benchmark runs and paired timing controls.
+  `timing-provenance.json` identifies both engine hashes, dependency revisions
+  and the unstaged candidate on `3b8af4fcfb191aff28b19c078aa189595555e6c8`.
+  Native Linux/ARM replay and released-package validation remain CI/release gates.
 
 ### GRV-Issue-102 - Collision position correction silently saturates at scalar coordinate limits
 

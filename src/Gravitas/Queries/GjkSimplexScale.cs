@@ -93,6 +93,25 @@ internal static class GjkSimplexScale
         throw new InvalidOperationException("The selected GJK working shift does not preserve an exact difference.");
     }
 
+    /// <summary>
+    /// Creates a four-term Minkowski difference for owner-relative support
+    /// without materializing the support in absolute coordinates.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Vector2d CreateWorkingDifference(
+        Vector2d first,
+        Vector2d second,
+        Vector2d third,
+        Vector2d fourth,
+        int shift)
+    {
+        Vector2d difference = CreateWorkingDifference(first, second, third, shift);
+        if (Vector2d.TrySubtract(difference, ScaleByPowerOfTwo(fourth, shift), out Vector2d result))
+            return result;
+
+        throw new InvalidOperationException("The selected GJK working shift does not preserve an exact difference.");
+    }
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static Fixed64 RestoreTwoTermDistance(Fixed64 workingDistance) =>
         RestoreDistance(workingDistance, 1);
@@ -139,6 +158,19 @@ internal static class GjkSimplexScale
         return CanSubtractExpandedBounds(point, targetMin, targetMax, expansionRadius, 1) ? 1 : 2;
     }
 
+    public static int SelectFourTermShift(
+        Vector2d point,
+        Vector2d origin,
+        Vector2d targetMinOffset,
+        Vector2d targetMaxOffset,
+        Fixed64 expansionRadius)
+    {
+        if (CanSubtractExpandedBounds(point, targetMinOffset, targetMaxOffset, expansionRadius, 0, origin))
+            return 0;
+
+        return CanSubtractExpandedBounds(point, targetMinOffset, targetMaxOffset, expansionRadius, 1, origin) ? 1 : 2;
+    }
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Vector3d ScaleByPowerOfTwo(Vector3d value, int shift) =>
         new(
@@ -165,9 +197,19 @@ internal static class GjkSimplexScale
         Vector2d targetMin,
         Vector2d targetMax,
         Fixed64 expansionRadius,
-        int shift)
+        int shift,
+        Vector2d? origin = null)
     {
         Vector2d scaledPoint = ScaleByPowerOfTwo(point, shift);
+        if (origin is Vector2d targetOrigin)
+        {
+            Vector2d scaledOrigin = ScaleByPowerOfTwo(targetOrigin, shift);
+            // The initial direction reverses this difference; both signs must fit.
+            if (!Vector2d.TrySubtract(scaledOrigin, scaledPoint, out _)
+                || !Vector2d.TrySubtract(scaledPoint, scaledOrigin, out scaledPoint))
+                return false;
+        }
+
         Vector2d scaledMin = ScaleByPowerOfTwo(targetMin, shift);
         Vector2d scaledMax = ScaleByPowerOfTwo(targetMax, shift);
         Fixed64 scaledRadius = ScaleRadiusCeiling(expansionRadius, shift);

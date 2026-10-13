@@ -312,13 +312,19 @@ and half-thickness against 3D targets:
 
 - spheres use finite-slab projection.
 - cuboids project the slab-intersecting portion into X/Z.
-- capsule edges use full-domain finite-segment capsule intervals, and cylinders
-  use deterministic finite-slab reducers.
-- finite cones use slab-clipped or support-mapped convex reducers depending on
-  orientation.
+- capsules, cylinders and finite cones clip the curved target to the world-Y
+  slab, then use planar circle intervals or support-mapped convex reducers.
 - mesh targets clip candidate triangles to the slab Y interval, project into
   X/Z, and report the owning `LSMeshCollider`.
 - compounds reduce supported parts in authored order and report the owner.
+
+Curved targets whose representable support envelope crosses the world X/Z
+scalar limits use a target-relative X/Z frame while retaining the same world-Y
+clipping interval.
+Ordinary-sized targets near scalar coordinate limits therefore do not become
+misses merely because an absolute support point is unavailable. This geometric
+admission remains separate from the
+[representable body-position contract](HOST_INTEGRATION.md#representable-body-positions).
 
 When diagnostics are enabled, mixed queries emit both `MixedQuery` and
 `QuerySummary` events. `QuerySummary` reports exact reducer attempts, accepted

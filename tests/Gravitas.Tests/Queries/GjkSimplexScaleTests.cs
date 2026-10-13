@@ -59,6 +59,76 @@ public sealed class GjkSimplexScaleTests
     }
 
     [Fact]
+    public void FourTermWorkingDifference_ShouldCoverEverySignedScalarEndpoint()
+    {
+        Vector2d first = new(Fixed64.MaxValue, Fixed64.MinValue);
+        Vector2d other = new(Fixed64.MinValue, Fixed64.MaxValue);
+
+        Vector2d difference = GjkSimplexScale.CreateWorkingDifference(first, other, other, other, 2);
+
+        Assert.Equal(Fixed64.MaxValue, difference.X);
+        Assert.Equal(Fixed64.FromRaw(long.MinValue + 3), difference.Y);
+    }
+
+    [Fact]
+    public void FourTermShift_ShouldRetainPrecisionAndCoverTranslatedExpandedBounds()
+    {
+        int ordinary = GjkSimplexScale.SelectFourTermShift(
+            Vector2d.Zero, Vector2d.Zero, -Vector2d.One, Vector2d.One, Fixed64.Half);
+        int half = GjkSimplexScale.SelectFourTermShift(
+            new Vector2d((Fixed64)1_500_000_000, Fixed64.Zero),
+            new Vector2d((Fixed64)(-1_500_000_000), Fixed64.Zero),
+            -Vector2d.One, Vector2d.One, Fixed64.Half);
+        Vector2d maximum = new(Fixed64.MaxValue, Fixed64.Zero);
+        Vector2d minimum = new(Fixed64.MinValue, Fixed64.Zero);
+        int positiveQuarter = GjkSimplexScale.SelectFourTermShift(
+            maximum, minimum, minimum, maximum, Fixed64.MaxValue);
+        int negativeQuarter = GjkSimplexScale.SelectFourTermShift(
+            minimum, maximum, minimum, maximum, Fixed64.MaxValue);
+
+        Assert.Equal(0, ordinary);
+        Assert.Equal(1, half);
+        Assert.Equal(2, positiveQuarter);
+        Assert.Equal(2, negativeQuarter);
+    }
+
+    [Fact]
+    public void FourTermShift_ShouldCheckBothOriginDifferenceSignsWithoutChangingLegacySelection()
+    {
+        Vector2d minimum = new(Fixed64.MinValue, Fixed64.Zero);
+        int translated = GjkSimplexScale.SelectFourTermShift(
+            minimum, Vector2d.Zero, Vector2d.Zero, Vector2d.Zero, Fixed64.Zero);
+        int translatedOpposite = GjkSimplexScale.SelectFourTermShift(
+            Vector2d.Zero, minimum, Vector2d.Zero, Vector2d.Zero, Fixed64.Zero);
+        int legacy = GjkSimplexScale.SelectThreeTermShift(
+            minimum, minimum, minimum, Fixed64.Zero);
+
+        Assert.Equal(1, translated);
+        Assert.Equal(1, translatedOpposite);
+        Assert.Equal(0, legacy);
+        Assert.Equal(new Vector2d(Fixed64.MinValue >> 1, Fixed64.Zero),
+            GjkSimplexScale.CreateWorkingDifference(
+                minimum, Vector2d.Zero, Vector2d.Zero, Vector2d.Zero, translated));
+    }
+
+    [Fact]
+    public void FourTermShift_ShouldCoverNegativeOddRawExpansion()
+    {
+        Vector2d point = new(Fixed64.MaxValue, Fixed64.Zero);
+        Vector2d origin = new(Fixed64.MinValue, Fixed64.Zero);
+        Vector2d expansion = new(-Fixed64.MinIncrement, Fixed64.Zero);
+
+        int shift = GjkSimplexScale.SelectFourTermShift(
+            point, origin, Vector2d.Zero, Vector2d.Zero, Fixed64.MinIncrement);
+        Vector2d difference = GjkSimplexScale.CreateWorkingDifference(
+            point, origin, Vector2d.Zero, expansion, shift);
+
+        Assert.Equal(2, shift);
+        Assert.Equal(Fixed64.FromRaw(1L << 62), difference.X);
+        Assert.Equal(Fixed64.Zero, difference.Y);
+    }
+
+    [Fact]
     public void ShiftSelection_ShouldPreserveFullPrecisionUntilBoundsRequireScaling()
     {
         int ordinaryTwoTerm = GjkSimplexScale.SelectTwoTermShift(
@@ -145,6 +215,8 @@ public sealed class GjkSimplexScaleTests
             GjkSimplexScale.CreateWorkingDifference(Vector2d.Zero, Vector2d.Zero, shift));
         Assert.Throws<ArgumentOutOfRangeException>(() =>
             GjkSimplexScale.CreateWorkingDifference(Vector2d.Zero, Vector2d.Zero, Vector2d.Zero, shift));
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            GjkSimplexScale.CreateWorkingDifference(Vector2d.Zero, Vector2d.Zero, Vector2d.Zero, Vector2d.Zero, shift));
     }
 
     [Fact]
@@ -167,6 +239,18 @@ public sealed class GjkSimplexScaleTests
             new Vector2d(Fixed64.MaxValue, Fixed64.Zero),
             new Vector2d(Fixed64.MinValue, Fixed64.Zero),
             Vector2d.Zero,
+            shift: 0));
+        Assert.Throws<InvalidOperationException>(() => GjkSimplexScale.CreateWorkingDifference(
+            new Vector2d(Fixed64.MaxValue, Fixed64.Zero),
+            new Vector2d(Fixed64.MinValue, Fixed64.Zero),
+            Vector2d.Zero,
+            Vector2d.Zero,
+            shift: 0));
+        Assert.Throws<InvalidOperationException>(() => GjkSimplexScale.CreateWorkingDifference(
+            new Vector2d(Fixed64.MaxValue, Fixed64.Zero),
+            Vector2d.Zero,
+            Vector2d.Zero,
+            new Vector2d(-Fixed64.MinIncrement, Fixed64.Zero),
             shift: 0));
     }
 
