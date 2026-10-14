@@ -9,8 +9,9 @@
 
 **Date:** 2026-10-12  
 **Status:** Phase 1 evidence collected; numerical prerequisites #113-#118 are
-resolved. Compound child-mass quantization #119 remains before ceiling locking
-and admission implementation, which has not started. The bounded
+resolved, as are compound normalization and related tensor/box fixes #119-#121.
+Mesh and polygon mass-property prerequisites #122-#124 remain before ceiling
+locking and admission implementation, which has not started. The bounded
 effective-geometry direction is approved. The proposed
 ceiling remains provisional while confirmed in-range numerical defects are
 resolved; admission alone cannot establish the intended safety guarantee.  
@@ -244,11 +245,14 @@ supported safety claim or implementing around an assumed safe range:
 | [#114](issue-tracker.md#grv-issue-114---polygon-moment-integrals-saturate-before-normalization) | Side-256 square publishes moment `2,730⅔` instead of `10,922⅔`; equivalent AABB remains correct. | Resolved: exact mass-applied normalization with geometry caching; retain the existing final-overflow policy. |
 | [#115](issue-tracker.md#grv-issue-115---cone-volume-saturates-before-final-division) | Radius/height `1,024`, reach `1,536`: representable cone volume was reduced from about `1.124B` to `715.8M`. | Resolved: round the complete fixed-Pi product/ratio once; saturate only genuinely unrepresentable final volume. |
 | [#116](issue-tracker.md#grv-issue-116---cone-overlap-gjk-loses-scale-and-rotation-invariance) | Length `4,096`, end radius `2,048`: public cone overlaps produce both false positives and false negatives. | Resolved: bounded scalar crosses and exact dot signs; wide simplex predicates where needed. Closest/all queries and shared contact callers pass. |
-
-
 | [#117](issue-tracker.md#grv-issue-117---detached-compound-cone-mass-weights-disagree-with-committed-geometry) | Equivalent Y-scaled cones have different detached weights despite identical prepared geometry; the parity audit found other primitive cache defaults. | Resolved: detached and prepared mass properties share effective dimensions across all five primitive families. |
 | [#118](issue-tracker.md#grv-issue-118---sphere-inertia-rounds-small-mass-before-radius-squared) | Radius `1,024`, three-raw-unit mass gives sphere inertia `1048576` instead of `1258291`; other curved moments also round too soon. | Resolved: exact coefficient/geometry/mass normalization, exact internal capsule weights and corrected 2D cap polar moment. |
-| [#119](issue-tracker.md#grv-issue-119---compound-inertia-quantizes-child-masses-before-applying-geometry) | Radius `512`/`1,024` spheres at `0`/`2,048`, total mass three raw units: child masses round to `0`/`3`, biasing the compound tensor. | Pending: rational heterogeneous child contributions and parallel-axis normalization without intermediate tensor materialization. |
+| [#119](issue-tracker.md#grv-issue-119---compound-inertia-quantizes-child-masses-before-applying-geometry) | Radius `512`/`1,024` spheres at `0`/`2,048`, total mass three raw units: child masses round to `0`/`3`, biasing the compound tensor. | Resolved: homogeneous child moments, exact reference reduction and one final parent-mass normalization, with warm geometry caching. |
+| [#120](issue-tracker.md#grv-issue-120---3d-inertia-tensor-transport-reverses-the-geometry-rotation) | Anisotropic tensors rotate opposite to geometry; principal-axis impulses produce perpendicular spin. | Resolved: consistent active transport in compound, body and sampled CCD owners. |
+| [#121](issue-tracker.md#grv-issue-121---box-inertia-rounds-separate-axis-terms-before-their-sum) | A unit cube/square at mass raw `6` gives zero rather than raw `1`. | Resolved: normalize each complete box diagonal/moment once; warmed primitive costs improve. |
+| [#122](issue-tracker.md#grv-issue-122---standalone-mesh-inertia-amplifies-rounded-unit-coefficients) | Microcube unit-tensor projection error grows with ordinary representable mass. | Pending: runtime mesh final normalization while preserving public projections and warm costs. |
+| [#123](issue-tracker.md#grv-issue-123---detached-compound-meshes-omit-authored-part-scale-in-mass-properties) | A scale-two mesh part has fourfold different detached/committed inertia. | Pending with #122: effective mesh geometry and transaction parity. |
+| [#124](issue-tracker.md#grv-issue-124---standalone-polygon-reference-shifts-omit-the-centroid-residual) | Standalone triangle reference shifts omit its rounded centroid's first moment. | Pending: reuse retained polygon moments for complete reference reduction. |
 
 These are prerequisites, not optimizations and not bugs introduced by admission.
 Do not reduce the candidate ceiling to hide failures at ordinary useful sizes.
@@ -601,6 +605,119 @@ raw coverage/replay, source provenance, independent probes and immutable native
 snapshots. The measured final Release stack hashes are Gravitas
 `61E604CE5BFB6F51F0503AC7D27A33BEE949D80F74B2636268822C2A8BF078E2` and FixedMathSharp
 `45DDBF81C1C8F0CB3F9B93A80BE9E1EDF5A626CA1CE9668FCBEFF337E64E4900`.
+
+**Compound contribution design (#119, 2026-10-13):** Replace cumulative
+rounded child masses with homogeneous weighted geometric moments. Use a common
+semantic weight factor of six, cancelling closed tetrahedron volume's divisor
+without changing measure projections or normalized shares. A common moment
+factor of sixty covers box, polygon, capsule, tetrahedron and triangle-shell
+constants. Retain fixed coefficients and the published Q32.32 inertia rotation
+matrix, transposed into the active-column frame consistently with geometry;
+preserve semantic mass-point guard bits and the public COM reference.
+Sum unmaterialized intrinsic and parallel-axis terms, then apply total mass and
+round each final tensor entry once. Checked compound overflow must reject a
+nonrepresentable aggregate instead of concealing an already saturated child.
+
+Mesh public unit tensors remain rounded projections. Private first/second
+integral caches supply compound contributions, retaining first moments when
+translating the integration reference to a published COM or explicit reference.
+Polygon contributions likewise retain their rounded centroid's first-moment
+residual. Reuse existing integration loops and geometry publication. Each mesh
+gains a cache reference; its wide current/prepared cache is allocated only for
+compound use. Compounds retain the reduced geometry for mass and pose updates;
+public mesh data and serialized layouts do not acquire wide fields.
+Primitive/polygon denominators cancel against their weights;
+there is no arbitrary rational type or per-child applied tensor conversion.
+Cache complete aggregate geometry on effective-scale/local-offset changes;
+pose and mass updates reuse it. Retain detached/prepared parity, failed
+transaction isolation, equal nominal fallback for degenerate 2D shapes, and
+stable source order. Independent all-entry integer oracles, representation and
+part-order parity, tiny/ordinary masses, final overflow, cache invalidation,
+body/load behavior, full raw coverage/replay and immutable native comparisons
+must pass before closeout. The current original local-stack Release snapshot
+and 44-row warm matrix establish the no-regression gate; introduced cost must
+be refined within this issue.
+
+The whole-shape review confirmed two related pre-existing defects, combined
+here as **#120/#121**: row-vector matrices were used in the reverse 3D tensor
+transport, and box formulas rounded axis terms separately. Correct active
+transport in the compound, body and sampled CCD owners; normalize each complete
+box diagonal once with the existing bounded wide-ratio division. The first box
+candidate using the general ratio kernel failed its warm gate by 75-87%, so it
+is rejected rather than deferred. Its bounded nine/five-word replacement still
+regressed 9-22%. The refined box numerator fits three words, so FixedMathSharp
+now exposes that exact raw-ratio width. Its power-of-two-word denominator
+uses bounded division and exact remainder comparison; uncommon denominators
+reuse the existing wider owner. The existing wider implementation remains
+unchanged, preserving its capsule callers and sharing final rounding. This is
+a coordinated internal ABI addition: validate both profiles and libraries, release FixedMathSharp first, then revalidate Gravitas
+against that package. No dependency pin is advanced here. Seven independently
+integrated triangle cases also rejected the new polygon prototype's missing residual; that introduced
+defect was fixed before acceptance, without opening a follow-up issue.
+
+The unchanged standalone mesh path amplifies public rounded unit coefficients
+(**#122**), and detached mesh parts omit authored part scale before publication
+(**#123**). Frozen original/corrected public probes confirm both are pre-existing.
+Resolve these together in the mesh owner before completing the numerical safety
+inventory; keep public unit-tensor projections and the existing warm mesh gate.
+Neither should be concealed by changing the proposed geometry ceiling.
+Standalone polygon reference shifts also omit the rounded centroid's first
+moment (**#124**); the same frozen public probe reproduces it on both binaries,
+while the corrected compound agrees with the independently integrated triangle.
+Reuse its retained moments in the standalone polygon owner as a separate
+follow-up, preserving the requested-reference and final-overflow contracts.
+
+**Compound contribution closeout (#119/#120/#121, 2026-10-13):** Resolved all
+three issues after independent ponytail review and test-backed refinement.
+The old rounded child-mass allocation is removed; four focused internal owners
+retain dimensional moments, mesh integrals and their transactional cache.
+The three-raw-unit unequal sphere fixture now returns axial raw `1153434`.
+Independent triangle integration rejected an introduced first-moment omission;
+it was repaired in this change. No introduced defect or timing regression was
+deferred. The confirmed pre-existing standalone/detached gaps #122-#124 remain
+prerequisites; phase 1 and #096 are still open.
+
+Both solutions build Release/Lean and their core target frameworks with zero
+warnings/errors using `UseLocalLsfStack=true`. Gravitas passes **5,982/5,916**
+tests; FixedMathSharp core passes **5,732/5,711**, plus **49** serialization tests
+per profile. Raw OpenCover visited/total sequence points, branches and methods
+are equal: Gravitas **47,569/15,634/4,983** (Release) and
+**47,567/15,634/4,982** (Lean); FixedMathSharp **59,840/16,988/4,537** and
+**59,933/16,988/4,533**. No coverage exclusions changed. Six full-lifecycle
+fixtures agree across native Windows x64 Release/Lean. Restoring only the old
+body transport reproduces all old expectations; corrected transport changes
+three solver-cache hashes without changing commands or authoritative hashes.
+Native Linux/ARM lanes and released-package validation remain unexecuted here.
+
+The immutable original baseline and accepted comparison each execute **44**
+native rows: **41** comparable timings and three tiny-mass corrected-output
+cost diagnostics. All native rows and 44 warm allocation guards report **0 B**.
+BenchmarkDotNet **0.15.8**, native Windows x64/.NET **8.0.29**, two launches,
+six warmups and six measurements at **500 ms** per iteration are matched.
+No comparable row has a resolved positive 99.9% interval; unchanged controls'
+small nominal differences overlap their original intervals. All 21 compound
+public/mass-change/pose cases and both complete host frames improve.
+Representative means:
+
+| Warm workload | Original | Accepted |
+| --- | ---: | ---: |
+| 3D unequal spheres, public inertia | 17.66 us | 1.80 us |
+| 3D fractional spheres, public inertia | 19.98 us | 1.95 us |
+| 3D rotated heterogeneous, public inertia | 56.75 us | 3.54 us |
+| 3D rotated closed/surface mesh, public inertia | 32.30 / 32.18 us | 3.43 / 3.50 us |
+| 2D circles/fractional heterogeneous, public moment | 4.18 / 10.45 us | 0.45 / 0.51 us |
+| Eight-actor complete 3D host frame | 609.77 us | 446.08 us |
+| Eight-actor complete 2D host frame | 134.87 us | 96.71 us |
+
+Ignored `artifacts/grv-119/` retains red regressions, original/corrected public
+probes, rejected candidates, final coverage, replay attribution and captures.
+`perf/` retains frozen binaries, source/dependency provenance, 44 guards,
+native JSON with uncertainty, and the comparison scripts/commands. The first
+12 accepted controls use frozen F; the final 32 use G after a comment-only
+correction about lazy cache allocation. FixedMathSharp is identical between
+those builds; the retained IL comparison verifies identical Gravitas method
+bodies. Release FixedMathSharp's new internal ratio ABI first, then update the
+coordinated develop pin and validate Gravitas against released packages.
 
 ## Phase 2: Enforce Complete Collider Admission
 

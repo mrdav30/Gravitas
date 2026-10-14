@@ -93,7 +93,9 @@ internal static class InertiaTensorMath
             return tensor;
 
         Fixed3x3 rotationMatrix = rotation.ToMatrix3x3();
-        return ClampNearZero(rotationMatrix * tensor * rotationMatrix.Transpose());
+        // FixedMathSharp matrices rotate row vectors; tensor transport uses
+        // the corresponding active-column basis, consistently with geometry.
+        return ClampNearZero(rotationMatrix.Transpose() * tensor * rotationMatrix);
     }
 
     private static Fixed3x3 InvertDiagonalForSolver(Fixed3x3 tensor) =>

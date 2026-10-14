@@ -48,7 +48,7 @@ public sealed class LSCuboidCollider : LSCollider
             (Fixed64)8);
     }
 
-    private Vector3d GetMassPropertyHalfExtents()
+    internal Vector3d GetMassPropertyHalfExtents()
     {
         if (HasCommittedShape)
             return _orientedBox.HalfExtents;
@@ -103,12 +103,12 @@ public sealed class LSCuboidCollider : LSCollider
     internal override Fixed3x3 CalculateCenterOfMassInertiaTensor(Fixed64 mass)
     {
         Vector3d halfExtents = GetMassPropertyHalfExtents();
-        Fixed64 xContribution = GetInertiaContribution(mass, halfExtents.X);
-        Fixed64 yContribution = GetInertiaContribution(mass, halfExtents.Y);
-        Fixed64 zContribution = GetInertiaContribution(mass, halfExtents.Z);
-        Fixed64 xx = yContribution + zContribution;
-        Fixed64 yy = xContribution + zContribution;
-        Fixed64 zz = xContribution + yContribution;
+        Signed192 xSquared = Fixed64.GetExactRawProduct(halfExtents.X, halfExtents.X);
+        Signed192 ySquared = Fixed64.GetExactRawProduct(halfExtents.Y, halfExtents.Y);
+        Signed192 zSquared = Fixed64.GetExactRawProduct(halfExtents.Z, halfExtents.Z);
+        Fixed64 xx = ExactMassProperties.InertiaBoxMoment(mass, ySquared, zSquared);
+        Fixed64 yy = ExactMassProperties.InertiaBoxMoment(mass, xSquared, zSquared);
+        Fixed64 zz = ExactMassProperties.InertiaBoxMoment(mass, xSquared, ySquared);
 
         Fixed3x3 tensor = new(
             xx, Fixed64.Zero, Fixed64.Zero,
@@ -193,16 +193,6 @@ public sealed class LSCuboidCollider : LSCollider
             Fixed64.One / (Fixed64)4,
             out Fixed64 area)
             ? area
-            : Fixed64.MaxValue;
-
-    private static Fixed64 GetInertiaContribution(Fixed64 mass, Fixed64 halfExtent) =>
-        Fixed64.TryMultiplyDivide(
-            mass,
-            halfExtent,
-            halfExtent,
-            (Fixed64)3,
-            out Fixed64 contribution)
-            ? contribution
             : Fixed64.MaxValue;
 
     private static Fixed64 GetScaledProduct(

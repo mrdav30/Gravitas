@@ -336,20 +336,36 @@ configuration only; initialization derives inertia from the committed shape.
 Recorded-state loading retains saved sleep and motion rather than applying the
 public setter's wake policy.
 
-Built-in primitive and compound mass calculations use the effective shape
-dimensions before and after initialization. Detached shapes use their authored
+Built-in primitive mass calculations use the effective shape dimensions
+before and after initialization. These dimensions also supply primitive
+compound contributions. Detached shapes use their authored
 dimensions and part scales; initialized shapes use committed owner and part
 scales. A sphere takes the largest radial scale across X/Y/Z, while a cone,
 cylinder, or 3D capsule uses X/Z for radius and Y for height.
 
-Curved inertia retains geometry and mass products through final rounding.
+Primitive intrinsic inertia retains geometry and mass products through final
+rounding.
 Existing fixed coefficients retain their Q32.32 quantization, including the
-sphere's `2/5` coefficient. Compounds preserve their total assigned child mass;
-capsules retain exact internal component weights until final inertia rounding.
-A 2D capsule treats both semicircular caps together and
-includes their complete polar moment about the capsule center. Only an
-unrepresentable final inertia value saturates; a large intermediate radius
-square does not discard a representable final moment.
+sphere's `2/5` coefficient. Capsules retain exact internal component weights;
+a 2D capsule includes both semicircular caps' complete polar moment about its
+center. A box rounds the sum of its axis contributions once. Primitive scalar
+formulas saturate only an unrepresentable final value, so a large intermediate
+radius square does not discard a representable final moment.
+
+Compounds retain volume or area weights, intrinsic moments and parallel-axis
+terms until parent mass is applied. Children do not receive rounded mass
+allocations. Polygon and mesh integrals include the first-moment residual when
+their published COM is rounded, and reference-point overrides participate in
+the same final calculation. An unrepresentable final compound tensor or moment
+throws before body mass is changed. Completed geometry is cached for mass and
+world-pose changes; changing owner scale, local offset or the requested reference
+refreshes it.
+
+3D tensor transport follows the same active rotation as collider geometry,
+including temporary CCD poses. Mesh public unit-tensor data remains a Q32.32
+projection. Standalone mesh inertia currently scales that published projection;
+compound mesh inertia retains its unrounded integrals through parent-mass
+normalization.
 
 ### Explicit body pose changes
 

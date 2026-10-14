@@ -1034,7 +1034,9 @@ public sealed class ContactNormalImpulseBoundaryTests
             Vector3d.Zero,
             rotation).Body;
         Vector3d normal = Vector3d.Right;
-        Vector3d torque = (Vector3d.Up + Vector3d.Backward).Normalized
+        // Apply along the rotated high-inertia principal axis, where the large
+        // matrix products cancel into a small representable angular response.
+        Vector3d torque = (rotation * Vector3d.Up).Normalized
             * (Fixed64)1_500_000_000;
         Vector3d lever = Vector3d.Cross(normal, torque);
         Fixed3x3 inverseInertia =

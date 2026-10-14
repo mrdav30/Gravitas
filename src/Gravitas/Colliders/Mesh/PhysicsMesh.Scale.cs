@@ -150,6 +150,11 @@ public partial class PhysicsMesh
             || ownerScale != _ownerScale
             || partScale != _partScale;
         _preparedGeometryChanged = geometryChanged;
+        if (_compoundMassCache != null)
+        {
+            _compoundMassCache.PreparedValid = !geometryChanged && _compoundMassCache.CurrentValid;
+            _compoundMassCache.Prepared = _compoundMassCache.Current;
+        }
         if (geometryChanged)
             PrepareScaledGeometry(ownerScale, partScale);
         else
@@ -216,6 +221,11 @@ public partial class PhysicsMesh
                 _preparedScaledTotalAreaWeight;
             _scaledLocalRadius = _preparedScaledLocalRadius;
             _surfaceMassProperties = _preparedSurfaceMassProperties;
+            if (_compoundMassCache != null)
+            {
+                _compoundMassCache.Current = _compoundMassCache.Prepared;
+                _compoundMassCache.CurrentValid = _compoundMassCache.PreparedValid;
+            }
             _surfaceMassPropertiesValid = _preparedSurfaceMassPropertiesValid;
             _triangleBvhBuildCount++;
             PublishPreparedClosedVolumeMassProperties();
@@ -353,7 +363,13 @@ public partial class PhysicsMesh
             _triangles,
             _preparedScaledTotalArea,
             out _preparedScaledTotalAreaWeight,
-            out _preparedSurfaceMassProperties);
+            out _preparedSurfaceMassProperties,
+            out MeshMassIntegrals shellIntegrals);
+        if (_compoundMassCache != null && _compoundMassCache.Policy == MeshInertiaPolicy.SurfaceApproximation)
+        {
+            _compoundMassCache.Prepared = shellIntegrals;
+            _compoundMassCache.PreparedValid = _preparedSurfaceMassPropertiesValid;
+        }
 
         PrepareCoplanarPatches(_preparedScaledLocalVertices);
         BuildTriangleBVH(_preparedTriangleBVH, _preparedScaledLocalVertices);

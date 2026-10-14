@@ -3,12 +3,70 @@ using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Tests.Support;
 using System;
+using System.Reflection;
 using Xunit;
 
 namespace Gravitas.Tests.Core;
 
 public sealed class SolidBodyMassMutationTests
 {
+    [Theory]
+    [InlineData(30)]
+    [InlineData(-30)]
+    public void SampledContinuousCollisionInertia_ShouldMatchTheOrdinaryTensorFrame(int angle)
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        Vector3d size = new(2, 4, 6);
+        var source = new SolidBody(new TestMatterAgent(context),
+            new LSCuboidCollider(ColliderShapeDefinition.Cuboid(size))) { Mass = Fixed64.One };
+        var reference = new SolidBody(new TestMatterAgent(context),
+            new LSCuboidCollider(ColliderShapeDefinition.Cuboid(size))) { Mass = Fixed64.One };
+        source.Initialize(Vector3d.Zero, FixedQuaternion.Identity);
+        reference.Initialize(Vector3d.Right * 10, FixedQuaternion.FromEulerAnglesInDegrees(
+            Fixed64.Zero, Fixed64.Zero, (Fixed64)angle));
+        Fixed3x3 original = source.InverseInertiaTensor;
+
+        // CCD evaluates a temporary pose without publishing it to the body. Pin
+        // that source helper against ordinary response at the same canonical pose.
+        MethodInfo sampler = typeof(SolidBody).GetMethod("ResolveContinuousCollisionInverseInertia",
+            BindingFlags.Instance | BindingFlags.NonPublic)!;
+        Fixed3x3 sampled = (Fixed3x3)sampler.Invoke(source, new object[] { reference.Rotation })!;
+
+        sampled.Should().Be(reference.InverseInertiaTensor);
+        source.InverseInertiaTensor.Should().Be(original);
+        Vector3d axis = reference.Rotation * Vector3d.Right;
+        Vector3d response = axis * sampled;
+        reference.AddAngularImpulse(axis);
+        response.Should().Be(reference.AngularVelocity);
+        // A 2x4x6 unit-mass box has principal moment Ix = (4²+6²)/12 = 13/3.
+        // The bound covers Q32 rotation, inverse-tensor and vector materialization.
+        Vector3d expected = axis * Fixed64.FromFraction(3, 13);
+        FixedMath.Abs(response.X - expected.X).Should().BeLessThanOrEqualTo(Fixed64.FromRaw(32));
+        FixedMath.Abs(response.Y - expected.Y).Should().BeLessThanOrEqualTo(Fixed64.FromRaw(32));
+        FixedMath.Abs(response.Z - expected.Z).Should().BeLessThanOrEqualTo(Fixed64.FromRaw(32));
+    }
+
+    [Theory]
+    [InlineData(30)]
+    [InlineData(-30)]
+    public void AngularImpulseAlongRotatedPrincipalAxis_ShouldRemainOnThatAxis(int angle)
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        FixedQuaternion rotation = FixedQuaternion.FromEulerAnglesInDegrees(
+            Fixed64.Zero, Fixed64.Zero, (Fixed64)angle);
+        var collider = new LSCuboidCollider(ColliderShapeDefinition.Cuboid(new Vector3d(2, 4, 6)));
+        var body = new SolidBody(new TestMatterAgent(context), collider) { Mass = Fixed64.One };
+        body.Initialize(Vector3d.Zero, rotation);
+        Vector3d axis = rotation * Vector3d.Right;
+        body.AddAngularImpulse(axis);
+
+        // A principal-axis impulse cannot couple into a perpendicular angular axis.
+        Vector3d expected = axis * Fixed64.FromFraction(3, 13);
+        FixedMath.Abs(body.AngularVelocity.X - expected.X).Should().BeLessThanOrEqualTo(Fixed64.FromRaw(32));
+        FixedMath.Abs(body.AngularVelocity.Y - expected.Y).Should().BeLessThanOrEqualTo(Fixed64.FromRaw(32));
+        FixedMath.Abs(body.AngularVelocity.Z - expected.Z).Should().BeLessThanOrEqualTo(Fixed64.FromRaw(32));
+    }
+
     [Fact]
     public void TinyMassMutation_ShouldRetainLargeRadiusAngularResponse()
     {

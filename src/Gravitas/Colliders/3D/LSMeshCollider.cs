@@ -122,7 +122,7 @@ public sealed class LSMeshCollider : LSCollider
             return Mesh.SurfaceMassWeight;
 
         if (Mesh.TryGetClosedVolumeMassProperties(out MeshMassProperties properties, out _))
-            return ExactMassWeight.FromMeasure(properties.Volume);
+            return Mesh.GetCompoundMassIntegrals(usePrepared: false, InertiaPolicy).Weight;
 
         return ExactMassWeight.Zero;
     }
@@ -136,7 +136,7 @@ public sealed class LSMeshCollider : LSCollider
             out MeshMassProperties properties,
             out _))
         {
-            return ExactMassWeight.FromMeasure(properties.Volume);
+            return Mesh.GetCompoundMassIntegrals(usePrepared: true, InertiaPolicy).Weight;
         }
 
         return ExactMassWeight.Zero;

@@ -25,6 +25,13 @@ public sealed class LSCompoundCollider : LSCollider
     private readonly LSCollider[] _partColliders;
     private readonly ExactMassPoint3D[] _massPointScratch;
     private readonly ExactMassWeight[] _massWeightScratch;
+    private bool _hasMassPropertyCenter, _massPropertyCommitted;
+    private Vector3d _massPropertyCenter, _massPropertyOwnerScale, _massPropertyOffset;
+    private bool _inertiaGeometryValid, _inertiaGeometryCommitted;
+    private Vector3d _inertiaGeometryScale, _inertiaGeometryOffset, _inertiaGeometryReference;
+    private ExactMassWeight _inertiaGeometryWeight;
+    private CompoundInertiaTensor _inertiaGeometry;
+
 
     /// <summary>Creates a runtime compound collider from authored 3D parts.</summary>
     public LSCompoundCollider(params CompoundColliderPart[] parts)
@@ -139,8 +146,14 @@ public sealed class LSCompoundCollider : LSCollider
         Area = area;
     }
 
-    internal override ExactMassPoint3D CalculateLocalMassPoint() =>
-        CalculateAggregateMassPoint(usePrepared: false);
+    internal override ExactMassPoint3D CalculateLocalMassPoint()
+    {
+        GetCurrentShapeScales(out Vector3d scale, out _);
+        return _hasMassPropertyCenter && _massPropertyOwnerScale == scale
+            && _massPropertyOffset == LocalOffset && _massPropertyCommitted == HasCommittedShape
+            ? ExactMassPoint3D.FromPoint(_massPropertyCenter)
+            : CalculateAggregateMassPoint(usePrepared: false);
+    }
 
     internal override ExactMassPoint3D CalculatePreparedLocalMassPoint() =>
         CalculateAggregateMassPoint(usePrepared: true);
@@ -190,6 +203,14 @@ public sealed class LSCompoundCollider : LSCollider
                     ? "Prepared compound mass-property point is outside the Fixed64 coordinate domain."
                     : "The compound collider's center of mass is outside the Fixed64 coordinate domain.");
         }
+        if (!usePrepared)
+        {
+            GetCurrentShapeScales(out _massPropertyOwnerScale, out _);
+            _massPropertyOffset = LocalOffset;
+            _massPropertyCommitted = HasCommittedShape;
+            _massPropertyCenter = center;
+            _hasMassPropertyCenter = true;
+        }
         return ExactMassPoint3D.FromPoint(center);
     }
 
@@ -212,107 +233,43 @@ public sealed class LSCompoundCollider : LSCollider
         return totalWeight;
     }
 
-    internal override Fixed3x3 CalculateCenterOfMassInertiaTensor(
-        Fixed64 mass)
+    internal override Fixed3x3 CalculateCenterOfMassInertiaTensor(Fixed64 mass) =>
+        CalculateInertiaTensor(mass, CalculateLocalCenterOfMassOffset());
+
+    /// <inheritdoc/>
+    public override Fixed3x3 CalculateInertiaTensor(Fixed64 mass, Vector3d localCenterOfMassOffset)
     {
-        Vector3d center = CalculateLocalCenterOfMassOffset();
-        ExactMassWeight totalWeight = ExactMassWeight.Zero;
-        int residualPartIndex = _parts.Length - 1;
-        int eligiblePartCount = 0;
-        for (int i = 0; i < _parts.Length; i++)
+        if (mass <= Fixed64.Zero)
+            return Fixed3x3.Zero;
+        GetCurrentShapeScales(out Vector3d scale, out _);
+        if (!_inertiaGeometryValid || _inertiaGeometryCommitted != HasCommittedShape || _inertiaGeometryScale != scale
+            || _inertiaGeometryOffset != LocalOffset || _inertiaGeometryReference != localCenterOfMassOffset)
         {
-            LSCollider part = _partColliders[i];
-            if (!part.SupportsMassProperties)
+            ExactMassWeight total = ExactMassWeight.Zero;
+            CompoundInertiaTensor geometry = default;
+            for (int i = 0; i < _partColliders.Length; i++)
             {
-                _massWeightScratch[i] = ExactMassWeight.Zero;
-                continue;
+                LSCollider part = _partColliders[i];
+                if (!part.SupportsMassProperties)
+                    continue;
+                ExactMassWeight weight = part.CalculateMassPropertyWeight();
+                total = total.Add(weight);
+                CompoundInertiaMath3D.Add(ref geometry, part, weight, localCenterOfMassOffset);
             }
+            if (total.IsZero)
+                throw new InvalidOperationException("Compound inertia requires at least one part with valid mass properties.");
 
-            eligiblePartCount++;
-            ExactMassWeight weight = part.CalculateMassPropertyWeight();
-            _massWeightScratch[i] = weight;
-            totalWeight = totalWeight.Add(weight);
-            residualPartIndex = i;
+            // Cache geometry only after a complete evaluation. Neither a mass
+            // change nor world pose changes the local intrinsic contribution.
+            _inertiaGeometry = geometry;
+            _inertiaGeometryWeight = total;
+            _inertiaGeometryScale = scale;
+            _inertiaGeometryOffset = LocalOffset;
+            _inertiaGeometryReference = localCenterOfMassOffset;
+            _inertiaGeometryCommitted = HasCommittedShape;
+            _inertiaGeometryValid = true;
         }
-
-        if (eligiblePartCount == 0)
-        {
-            throw new InvalidOperationException(
-                "Compound inertia requires at least one part with valid mass properties.");
-        }
-
-        ExactMassWeight cumulativeWeight = ExactMassWeight.Zero;
-        Fixed64 assignedMass = Fixed64.Zero;
-        Fixed3x3 tensor = Fixed3x3.Zero;
-
-        for (int i = 0; i < _parts.Length; i++)
-        {
-            LSCollider part = _partColliders[i];
-            ExactMassWeight weight = _massWeightScratch[i];
-            cumulativeWeight = cumulativeWeight.Add(weight);
-            Fixed64 partMass;
-            if (i == residualPartIndex)
-            {
-                partMass = mass - assignedMass;
-                assignedMass = mass;
-            }
-            else
-            {
-                _ = cumulativeWeight.TryGetProportionalShare(
-                    mass,
-                    totalWeight,
-                    out Fixed64 cumulativeMass);
-                partMass = cumulativeMass - assignedMass;
-                assignedMass = cumulativeMass;
-            }
-
-            if (partMass == Fixed64.Zero)
-                continue;
-
-            ExactMassPoint3D partCenterOfMass =
-                part.CalculateLocalMassPoint();
-            Fixed3x3 partTensor =
-                part.CalculateCenterOfMassInertiaTensor(partMass);
-            partTensor = InertiaTensorMath.RotateToFrame(partTensor, part.CompoundLocalRotation);
-            if (!partCenterOfMass.TryAddParallelAxisTensor(
-                    partTensor,
-                    partMass,
-                    center,
-                    out Fixed3x3 contribution)
-                || !TryAddTensor(
-                    tensor,
-                    contribution,
-                    out tensor))
-            {
-                throw new InvalidOperationException(
-                    "The compound collider's inertia tensor is outside the Fixed64 scalar domain.");
-            }
-        }
-
-        return tensor;
-    }
-
-    private static bool TryAddTensor(
-        Fixed3x3 first,
-        Fixed3x3 second,
-        out Fixed3x3 result)
-    {
-        bool representable = Fixed64.TryAdd(first.M11, second.M11, out Fixed64 m11)
-            & Fixed64.TryAdd(first.M12, second.M12, out Fixed64 m12)
-            & Fixed64.TryAdd(first.M13, second.M13, out Fixed64 m13)
-            & Fixed64.TryAdd(first.M21, second.M21, out Fixed64 m21)
-            & Fixed64.TryAdd(first.M22, second.M22, out Fixed64 m22)
-            & Fixed64.TryAdd(first.M23, second.M23, out Fixed64 m23)
-            & Fixed64.TryAdd(first.M31, second.M31, out Fixed64 m31)
-            & Fixed64.TryAdd(first.M32, second.M32, out Fixed64 m32)
-            & Fixed64.TryAdd(first.M33, second.M33, out Fixed64 m33);
-        result = representable
-            ? new Fixed3x3(
-                m11, m12, m13,
-                m21, m22, m23,
-                m31, m32, m33)
-            : default;
-        return representable;
+        return _inertiaGeometry.Materialize(mass, _inertiaGeometryWeight);
     }
 
     /// <inheritdoc/>

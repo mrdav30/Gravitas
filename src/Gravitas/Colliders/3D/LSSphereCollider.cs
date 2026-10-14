@@ -84,7 +84,7 @@ public sealed class LSSphereCollider : LSCollider
             radius);
     }
 
-    private Fixed64 GetMassPropertyRadius() =>
+    internal Fixed64 GetMassPropertyRadius() =>
         HasCommittedShape ? _scaledRadius : GetCurrentScaledRadius();
 
     internal override ExactMassWeight CalculatePreparedMassPropertyWeight() =>

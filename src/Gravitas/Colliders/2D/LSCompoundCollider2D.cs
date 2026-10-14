@@ -25,6 +25,15 @@ public sealed class LSCompoundCollider2D : LSCollider2D
     private readonly ExactMassPoint2D[] _massPointScratch;
     private readonly ExactMassWeight[] _massWeightScratch;
     private readonly ContactManifold2D _partManifoldScratch = new();
+    private bool _hasMassPropertyCenter;
+    private Vector2d _massPropertyOwnerScale;
+    private Vector2d _massPropertyOffset;
+    private bool _massPropertyCommitted;
+    private Vector2d _massPropertyCenter;
+    private bool _hasMomentGeometry;
+    private Vector2d _momentReferencePoint;
+    private Signed576 _momentGeometry;
+    private Signed704 _momentDenominator;
 
     /// <summary>Creates a runtime compound collider from authored pure 2D parts.</summary>
     public LSCompoundCollider2D(params CompoundColliderPart2D[] parts)
@@ -141,8 +150,16 @@ public sealed class LSCompoundCollider2D : LSCollider2D
         return bestPoint;
     }
 
-    internal override ExactMassPoint2D CalculateLocalMassPoint() =>
-        CalculateAggregateMassPoint(usePrepared: false);
+    internal override ExactMassPoint2D CalculateLocalMassPoint()
+    {
+        GetCurrentScaleFactors(out Vector2d ownerScale, out _);
+        return _hasMassPropertyCenter
+            && ownerScale == _massPropertyOwnerScale
+            && LocalOffset == _massPropertyOffset
+            && HasCommittedShape == _massPropertyCommitted
+            ? ExactMassPoint2D.FromPoint(_massPropertyCenter)
+            : CalculateAggregateMassPoint(usePrepared: false);
+    }
 
     internal override ExactMassPoint2D CalculatePreparedLocalMassPoint() =>
         CalculateAggregateMassPoint(usePrepared: true);
@@ -204,71 +221,100 @@ public sealed class LSCompoundCollider2D : LSCollider2D
 
     internal override Fixed64 CalculateCenterOfMassMoment(Fixed64 mass)
     {
-        Vector2d center = CalculateLocalCenterOfMassOffset();
+        EnsureMassPropertyCenter();
+        return CalculateMomentAboutReference(mass, _massPropertyCenter);
+    }
+
+    /// <inheritdoc/>
+    public override Fixed64 CalculateMomentOfInertia(Fixed64 mass, Vector2d localReferencePoint)
+    {
+        if (mass <= Fixed64.Zero)
+            return Fixed64.Zero;
+        EnsureMassPropertyCenter();
+        return localReferencePoint == _massPropertyCenter
+            ? CalculateCenterOfMassMoment(mass)
+            : CalculateMomentAboutReference(mass, localReferencePoint);
+    }
+
+    private void EnsureMassPropertyCenter()
+    {
+        GetCurrentScaleFactors(out Vector2d ownerScale, out _);
+        if (_hasMassPropertyCenter && ownerScale == _massPropertyOwnerScale
+            && LocalOffset == _massPropertyOffset && HasCommittedShape == _massPropertyCommitted)
+            return;
+
+        _hasMassPropertyCenter = false;
+        _massPropertyCenter = CalculateLocalCenterOfMassOffset();
+        _massPropertyOwnerScale = ownerScale;
+        _massPropertyOffset = LocalOffset;
+        _massPropertyCommitted = HasCommittedShape;
+        _hasMomentGeometry = false;
+        _hasMassPropertyCenter = true;
+    }
+
+    private Fixed64 CalculateMomentAboutReference(Fixed64 mass, Vector2d referencePoint)
+    {
+        if (!_hasMomentGeometry || referencePoint != _momentReferencePoint)
+            CacheMomentGeometry(referencePoint);
+
+        Signed704 numerator = WideArithmetic.MultiplySigned576ToSigned704(
+            _momentGeometry, Signed320.ExtendValue(Signed192.Raw(mass)));
+        if (!Fixed64.TryGetSignedRawRatio(numerator, _momentDenominator, out Fixed64 moment))
+        {
+            throw new InvalidOperationException(
+                "The 2D compound collider's moment of inertia is outside the Fixed64 scalar domain.");
+        }
+        return moment;
+    }
+
+    private void CacheMomentGeometry(Vector2d referencePoint)
+    {
         ExactMassWeight totalWeight = ExactMassWeight.Zero;
-        int residualPartIndex = _partColliders.Length - 1;
         for (int i = 0; i < _partColliders.Length; i++)
         {
-            ExactMassWeight weight =
-                _partColliders[i].CalculateAreaForMassProperties();
+            ExactMassWeight weight = _partColliders[i].CalculateAreaForMassProperties();
+            _massWeightScratch[i] = weight;
             totalWeight = totalWeight.Add(weight);
-            residualPartIndex = i;
         }
 
-        bool useEqualWeights = totalWeight.IsZero;
-        if (useEqualWeights)
+        if (totalWeight.IsZero)
         {
-            totalWeight = ExactMassWeight.Zero;
             for (int i = 0; i < _partColliders.Length; i++)
+            {
+                _massWeightScratch[i] = ExactMassWeight.One;
                 totalWeight = totalWeight.Add(ExactMassWeight.One);
+            }
         }
 
-        ExactMassWeight cumulativeWeight = ExactMassWeight.Zero;
-        Fixed64 assignedMass = Fixed64.Zero;
-        Fixed64 moment = Fixed64.Zero;
+        ExactMassPoint2D reference = ExactMassPoint2D.FromPoint(referencePoint);
+        Signed576 geometry = default;
         for (int i = 0; i < _partColliders.Length; i++)
         {
             LSCollider2D part = _partColliders[i];
-            ExactMassWeight weight = useEqualWeights
-                ? ExactMassWeight.One
-                : part.CalculateAreaForMassProperties();
-            cumulativeWeight = cumulativeWeight.Add(weight);
-            Fixed64 partMass;
-            if (i == residualPartIndex)
-            {
-                partMass = mass - assignedMass;
-                assignedMass = mass;
-            }
-            else
-            {
-                _ = cumulativeWeight.TryGetProportionalShare(
-                    mass,
-                    totalWeight,
-                    out Fixed64 cumulativeMass);
-                partMass = cumulativeMass - assignedMass;
-                assignedMass = cumulativeMass;
-            }
-
-            if (partMass == Fixed64.Zero)
+            ExactMassWeight weight = _massWeightScratch[i];
+            if (weight.IsZero)
                 continue;
-
-            if (!part.CalculateLocalMassPoint()
-                    .TryAddParallelAxisMoment(
-                        part.CalculateCenterOfMassMoment(partMass),
-                        partMass,
-                        center,
-                        out Fixed64 contribution)
-                || !Fixed64.TryAdd(
-                    moment,
-                    contribution,
-                    out moment))
-            {
-                throw new InvalidOperationException(
-                    "The 2D compound collider's moment of inertia is outside the Fixed64 scalar domain.");
-            }
+            ExactMassPoint2D point = part.CalculateLocalMassPoint();
+            Signed320 dx = WideArithmetic.SubtractSigned320(point.XNumerator, reference.XNumerator);
+            Signed320 dy = WideArithmetic.SubtractSigned320(point.YNumerator, reference.YNumerator);
+            Signed320 squaredDistance = Signed320.NarrowValue(WideArithmetic.AddSigned576(
+                WideArithmetic.MultiplySigned320(dx, dx), WideArithmetic.MultiplySigned320(dy, dy)));
+            Signed576 parallelAxis = WideArithmetic.MultiplySigned576(
+                WideArithmetic.MultiplySigned320(squaredDistance, weight.Numerator), 60);
+            Signed576 intrinsic = WideArithmetic.MultiplySigned576(
+                CompoundMomentMath2D.GetWeightedMoment(part, weight, _parts[i].LocalRotation, dx, dy,
+                    out Signed576 firstMomentContribution), Signed192.One);
+            geometry = WideArithmetic.AddSigned576(geometry, WideArithmetic.AddSigned576(intrinsic, parallelAxis));
+            geometry = WideArithmetic.AddSigned576(geometry, firstMomentContribution);
         }
-
-        return moment;
+        // Semantic points retain Q64 coordinates. Their squared offsets and
+        // weighted intrinsic moments share Q256; only the final parent moment rounds.
+        _momentGeometry = geometry;
+        _momentDenominator = Signed704.ExtendValue(WideArithmetic.MultiplySigned576(
+            WideArithmetic.MultiplySigned576(Signed576.ExtendValue(totalWeight.Numerator),
+                Signed192.One, Signed192.One, Signed192.One, Signed192.One), 60));
+        _momentReferencePoint = referencePoint;
+        _hasMomentGeometry = true;
     }
 
     private protected override void PrepareShape(in ColliderShapeSnapshot2D snapshot)

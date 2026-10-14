@@ -154,8 +154,8 @@ public sealed class SolidBodyMotionHardeningTests
         AngularStepResult second = RunAnisotropicAngularStep(Vector3d.Zero);
         Fixed3x3 localInertia = first.LocalInertia;
         Fixed3x3 inverseLocalInertia = InertiaTensorMath.InvertForSolver(localInertia);
-        Fixed3x3 orientation = first.Rotation.ToMatrix3x3();
-        Fixed3x3 inverseOrientation = first.Rotation.Conjugate().ToMatrix3x3();
+        Fixed3x3 orientation = first.Rotation.Conjugate().ToMatrix3x3();
+        Fixed3x3 inverseOrientation = first.Rotation.ToMatrix3x3();
         Fixed3x3 worldInertia = orientation * localInertia * inverseOrientation;
         Fixed3x3 inverseWorldInertia = orientation * inverseLocalInertia * inverseOrientation;
         Vector3d expectedVelocity = initialVelocity

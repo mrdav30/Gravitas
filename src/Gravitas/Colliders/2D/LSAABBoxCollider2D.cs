@@ -185,23 +185,9 @@ public sealed class LSAABBoxCollider2D : LSCollider2D, IConvexVertexSource2D
     internal override Fixed64 CalculateCenterOfMassMoment(Fixed64 mass)
     {
         Vector2d halfExtents = ScaledHalfExtents;
-        bool representable = Fixed64.TryMultiplyDivide(
-                mass,
-                halfExtents.X,
-                halfExtents.X,
-                (Fixed64)3,
-                out Fixed64 xMoment)
-            & Fixed64.TryMultiplyDivide(
-                mass,
-                halfExtents.Y,
-                halfExtents.Y,
-                (Fixed64)3,
-                out Fixed64 yMoment)
-            & Fixed64.TryAdd(xMoment, yMoment, out Fixed64 momentAboutCenterOfMass);
-        if (!representable)
-            momentAboutCenterOfMass = Fixed64.MaxValue;
-
-        return momentAboutCenterOfMass;
+        return ExactMassProperties.InertiaBoxMoment(mass,
+            Fixed64.GetExactRawProduct(halfExtents.X, halfExtents.X),
+            Fixed64.GetExactRawProduct(halfExtents.Y, halfExtents.Y));
     }
 
     private protected override void PrepareShape(in ColliderShapeSnapshot2D snapshot)

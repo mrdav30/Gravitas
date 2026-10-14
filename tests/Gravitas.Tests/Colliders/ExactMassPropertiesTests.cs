@@ -45,7 +45,7 @@ public sealed class ExactMassPropertiesTests
             indices,
             out ExactMassWeight surfaceWeight,
             out Vector3d center,
-            out Fixed3x3 tensor));
+            out Fixed3x3 tensor, out _));
         Fixed64 expectedArea = first.Area + second.Area;
         Assert.True(surfaceWeight.TryGetMeasure(out Fixed64 area));
         Assert.Equal(expectedArea, area);
@@ -84,13 +84,13 @@ public sealed class ExactMassPropertiesTests
             indices,
             out _,
             out Vector3d center,
-            out Fixed3x3 tensor));
+            out Fixed3x3 tensor, out _));
         Assert.True(TriangleShellMassProperties.TryCreateUniformShell(
             translatedVertices,
             indices,
             out _,
             out Vector3d translatedCenter,
-            out Fixed3x3 translatedTensor));
+            out Fixed3x3 translatedTensor, out _));
 
         Assert.Equal(new Vector3d(
             Fixed64.FromFraction(2, 3),
@@ -122,34 +122,34 @@ public sealed class ExactMassPropertiesTests
                 new[] { 0, 1 },
                 out _,
                 out _,
-                out _));
+                out _, out _));
         Assert.Throws<ArgumentOutOfRangeException>(
             () => TriangleShellMassProperties.TryCreateUniformShell(
                 vertices,
                 new[] { 3, 1, 2 },
                 out _,
                 out _,
-                out _));
+                out _, out _));
         Assert.Throws<ArgumentOutOfRangeException>(
             () => TriangleShellMassProperties.TryCreateUniformShell(
                 vertices,
                 new[] { 0, 3, 2 },
                 out _,
                 out _,
-                out _));
+                out _, out _));
         Assert.Throws<ArgumentOutOfRangeException>(
             () => TriangleShellMassProperties.TryCreateUniformShell(
                 vertices,
                 new[] { 0, 1, 3 },
                 out _,
                 out _,
-                out _));
+                out _, out _));
         Assert.False(TriangleShellMassProperties.TryCreateUniformShell(
             vertices,
             Array.Empty<int>(),
             out ExactMassWeight surfaceWeight,
             out Vector3d center,
-            out Fixed3x3 tensor));
+            out Fixed3x3 tensor, out _));
         Assert.Equal(default, surfaceWeight);
         Assert.Equal(default, center);
         Assert.Equal(default, tensor);
@@ -173,7 +173,7 @@ public sealed class ExactMassPropertiesTests
             new[] { 0, 1, 2, 3, 4, 5 },
             out ExactMassWeight surfaceWeight,
             out Vector3d center,
-            out Fixed3x3 tensor));
+            out Fixed3x3 tensor, out _));
         Assert.Equal(default, surfaceWeight);
         Assert.Equal(default, center);
         Assert.Equal(default, tensor);

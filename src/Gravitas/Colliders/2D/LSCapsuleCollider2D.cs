@@ -324,7 +324,7 @@ public sealed class LSCapsuleCollider2D : LSCollider2D
         }
     }
 
-    private void GetMassPropertyGeometry(
+    internal void GetMassPropertyGeometry(
         out Fixed64 radius,
         out Fixed64 axisLength)
     {
@@ -395,19 +395,27 @@ public sealed class LSCapsuleCollider2D : LSCollider2D
         // Cancelling the common radius leaves exact linear area weights.
         Signed192 rectangleWeight = Fixed64.GetExactRawProduct(Fixed64.Two, cylinderLength);
         Signed192 capWeight = Fixed64.GetExactRawProduct(Fixed64.Pi, radius);
-        Signed192 rectangleGeometry = WideArithmetic.AddSigned192(
+        GetCenteredMomentGeometry(radius, cylinderLength,
+            out Signed192 rectangleGeometry, out Signed192 capGeometry);
+        return ExactMassProperties.InertiaWeightedMoment(
+            mass, rectangleGeometry, rectangleWeight, capGeometry, capWeight, divisor: 12);
+    }
+
+    /// <summary>Gets exact Q96 rectangle and paired-cap geometry with common divisor twelve.</summary>
+    internal static void GetCenteredMomentGeometry(Fixed64 radius, Fixed64 cylinderLength,
+        out Signed192 rectangleGeometry, out Signed192 capGeometry)
+    {
+        rectangleGeometry = WideArithmetic.AddSigned192(
             ExactMassProperties.InertiaGeometryTerm((Fixed64)4, radius, radius),
             ExactMassProperties.InertiaGeometryTerm(Fixed64.One, cylinderLength, cylinderLength));
 
         // Combining both caps cancels their centroid-square terms and retains
         // odd raw mass: Ic = mc*(r^2/2 + L^2/4 + 4Lr/(3*pi)).
-        Signed192 capGeometry = WideArithmetic.AddSigned192(
+        capGeometry = WideArithmetic.AddSigned192(
             ExactMassProperties.InertiaGeometryTerm((Fixed64)6, radius, radius),
             WideArithmetic.AddSigned192(
                 ExactMassProperties.InertiaGeometryTerm((Fixed64)3, cylinderLength, cylinderLength),
                 ExactMassProperties.InertiaGeometryTerm(CapCrossFactor, cylinderLength, radius)));
-        return ExactMassProperties.InertiaWeightedMoment(
-            mass, rectangleGeometry, rectangleWeight, capGeometry, capWeight, divisor: 12);
     }
 
     private static ExactMassWeight GetRectangleWeight(

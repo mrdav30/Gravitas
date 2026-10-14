@@ -6,12 +6,190 @@ using Gravitas.Queries;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
 using System;
+using System.Numerics;
 using Xunit;
 
 namespace Gravitas.Tests.Colliders;
 
 public sealed class LSCompoundColliderMassPropertyTests
 {
+    [Theory]
+    [InlineData(3, 0)]
+    [InlineData(6, 1)]
+    public void CubeInertia_ShouldRoundTheCompleteDiagonalOnceAcrossRepresentations(long massRaw, long diagonalRaw)
+    {
+        var box = new LSCuboidCollider { Size = Vector3d.One };
+        CompoundColliderPart part = CompoundColliderPart.Cuboid(Vector3d.One, Vector3d.Zero);
+        var single = new LSCompoundCollider(part);
+        var coincident = new LSCompoundCollider(part, part);
+        Fixed64 mass = Fixed64.FromRaw(massRaw);
+        // A unit cube has all three unit-mass diagonal entries 1/6.
+        Fixed3x3 expected = RawTensor(diagonalRaw, diagonalRaw, diagonalRaw, 0, 0, 0);
+
+        box.CalculateInertiaTensor(mass, Vector3d.Zero).Should().Be(expected);
+        single.CalculateInertiaTensor(mass, Vector3d.Zero).Should().Be(expected);
+        coincident.CalculateInertiaTensor(mass, Vector3d.Zero).Should().Be(expected);
+    }
+
+    [Fact]
+    public void CubeInertia_ShouldRetainLargeUnitGeometryUntilTinyMassIsApplied()
+    {
+        Vector3d size = Vector3d.One * Fixed64.MaxValue;
+        var box = new LSCuboidCollider { Size = size };
+        var compound = new LSCompoundCollider(CompoundColliderPart.Cuboid(size, Vector3d.Zero));
+        // Half extents round to 2^62 raw; Iraw = 2*hRaw^2/(3*Q^2).
+        Fixed3x3 expected = RawTensor(768614336404564651, 768614336404564651, 768614336404564651, 0, 0, 0);
+
+        box.CalculateInertiaTensor(Fixed64.FromRaw(1), Vector3d.Zero).Should().Be(expected);
+        compound.CalculateInertiaTensor(Fixed64.FromRaw(1), Vector3d.Zero).Should().Be(expected);
+    }
+
+    [Fact]
+    public void MicroCubeMeshCompound_ShouldRetainUnroundedVolumeIntegrals()
+    {
+        ColliderShapeDefinition source = MeshTestFixtures.CreateConvexCubeDefinition();
+        Fixed64 side = Fixed64.FromFraction(1, 128);
+        var vertices = new Vector3d[source.MeshVertexCount];
+        var triangles = new int[source.MeshTriangleIndexCount];
+        for (int i = 0; i < vertices.Length; i++) vertices[i] = source.GetMeshVertex(i) * side;
+        for (int i = 0; i < triangles.Length; i++) triangles[i] = source.GetMeshTriangleIndex(i);
+        var compound = new LSCompoundCollider(new CompoundColliderPart(ColliderShapeDefinition.ConvexMesh(vertices, triangles)));
+        var box = new LSCuboidCollider { Size = Vector3d.One * side };
+        using var context = GravitasWorldContext.CreateOwned();
+        compound.InitializeWithNoBody(new TestMatterAgent(context));
+        // I/m = side^2/6; scalar unit-inertia rounding must not be amplified by mass.
+        Fixed3x3 expected = RawTensor(43690666666667, 43690666666667, 43690666666667, 0, 0, 0);
+        Fixed64 mass = (Fixed64)1_000_000_000;
+
+        compound.CalculateInertiaTensor(mass, Vector3d.Zero).Should().Be(expected);
+        box.CalculateInertiaTensor(mass, Vector3d.Zero).Should().Be(expected);
+    }
+
+    [Fact]
+    public void MicroTriangleShellCompound_ShouldRetainUnroundedCenteredSurfaceIntegrals()
+    {
+        Fixed64 side = Fixed64.FromFraction(1, 128);
+        Vector3d[] vertices = { Vector3d.Zero, Vector3d.Right * side, Vector3d.Up * side };
+        // Mesh preparation centers the authored bounds; restore the authored
+        // frame so the independent triangle integral uses its original vertices.
+        Vector3d offset = new(side * Fixed64.Half, side * Fixed64.Half, Fixed64.Zero);
+        var compound = new LSCompoundCollider(CompoundColliderPart.ConvexMesh(
+            vertices, new[] { 0, 1, 2 }, offset, MeshInertiaPolicy.SurfaceApproximation));
+        using var context = GravitasWorldContext.CreateOwned();
+        compound.InitializeWithNoBody(new TestMatterAgent(context));
+        Fixed64 mass = (Fixed64)1_000_000_000;
+        BigInteger q = BigInteger.One << 32;
+        BigInteger s = side.m_rawValue;
+        BigInteger c = 11184811;
+        BigInteger variance = s * s - 4 * c * s + 6 * c * c;
+        Fixed64 diagonal = RoundRational(mass.m_rawValue * variance, 6 * q * q);
+        Fixed64 polar = RoundRational(2 * mass.m_rawValue * variance, 6 * q * q);
+        Fixed64 product = RoundRational(mass.m_rawValue * (-s * s + 8 * c * s - 12 * c * c), 12 * q * q);
+        Vector3d center = new(Fixed64.FromRaw((long)c), Fixed64.FromRaw((long)c), Fixed64.Zero);
+
+        compound.CalculateLocalCenterOfMassOffset().Should().Be(center);
+        compound.CalculateInertiaTensor(mass, center).Should().Be(new Fixed3x3(
+            diagonal, product, Fixed64.Zero,
+            product, diagonal, Fixed64.Zero,
+            Fixed64.Zero, Fixed64.Zero, polar));
+    }
+
+    [Theory]
+    [InlineData(1, false, true)]
+    [InlineData(1, true, true)]
+    [InlineData(3, false, false)]
+    [InlineData(3, true, false)]
+    [InlineData(3, false, true)]
+    [InlineData(3, true, true)]
+    [InlineData(4294967296, false, true)]
+    [InlineData(4294967296, true, true)]
+    public void UnequalSphereCompound_ShouldNormalizeEveryTensorEntryOnce(long massRaw, bool reversed, bool obliqueOffset)
+    {
+        Vector3d secondOffset = obliqueOffset
+            ? new Vector3d((Fixed64)2048, (Fixed64)1024, (Fixed64)(-512))
+            : Vector3d.Right * (Fixed64)2048;
+        CompoundColliderPart first = CompoundColliderPart.Sphere((Fixed64)512, Vector3d.Zero);
+        CompoundColliderPart second = CompoundColliderPart.Sphere((Fixed64)1024, secondOffset);
+        var compound = reversed ? new LSCompoundCollider(second, first) : new LSCompoundCollider(first, second);
+        Fixed3x3 expected = SphereCompoundOracle(massRaw, secondOffset, out Vector3d expectedCenter);
+        using var context = GravitasWorldContext.CreateOwned();
+        compound.InitializeWithNoBody(new TestMatterAgent(context));
+
+        compound.CalculateLocalCenterOfMassOffset().Should().Be(expectedCenter);
+        compound.CalculateInertiaTensor(Fixed64.FromRaw(massRaw), expectedCenter).Should().Be(expected);
+    }
+
+    [Fact]
+    public void CoincidentSphereParts_ShouldMatchSingleSphereWithoutRoundingChildContributions()
+    {
+        Fixed64 radius = Fixed64.FromFraction(3, 4);
+        var sphere = new LSSphereCollider { Radius = radius };
+        var compound = new LSCompoundCollider(
+            CompoundColliderPart.Sphere(radius, Vector3d.Zero),
+            CompoundColliderPart.Sphere(radius, Vector3d.Zero));
+        Fixed64 mass = Fixed64.FromRaw(3);
+        Fixed3x3 expected = new(Fixed64.FromRaw(1), Fixed64.Zero, Fixed64.Zero,
+            Fixed64.Zero, Fixed64.FromRaw(1), Fixed64.Zero,
+            Fixed64.Zero, Fixed64.Zero, Fixed64.FromRaw(1));
+
+        sphere.CalculateInertiaTensor(mass, Vector3d.Zero).Should().Be(expected);
+        compound.CalculateInertiaTensor(mass, Vector3d.Zero).Should().Be(expected);
+    }
+
+    [Fact]
+    public void SphereCompound_ShouldRetainUnrepresentableUnitInertiaUntilTinyParentMassIsApplied()
+    {
+        var compound = new LSCompoundCollider(
+            CompoundColliderPart.Sphere(Fixed64.MaxValue, Vector3d.Zero),
+            CompoundColliderPart.Sphere(Fixed64.MaxValue, Vector3d.Zero));
+        Fixed64 expected = Fixed64.FromRaw(1844674406941458432);
+
+        compound.CalculateInertiaTensor(Fixed64.FromRaw(1), Vector3d.Zero).Should().Be(new Fixed3x3(
+            expected, Fixed64.Zero, Fixed64.Zero,
+            Fixed64.Zero, expected, Fixed64.Zero,
+            Fixed64.Zero, Fixed64.Zero, expected));
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void CubeAndMeshCompound_ShouldRetainVolumeOrShellWeightsThroughTensorReduction(bool shell, bool reversed)
+    {
+        CompoundColliderPart first = CompoundColliderPart.Cuboid(Vector3d.One, Vector3d.Zero);
+        CompoundColliderPart second = new(MeshTestFixtures.CreateConvexCubeDefinition(
+            shell ? MeshInertiaPolicy.SurfaceApproximation : MeshInertiaPolicy.RequireClosedVolume),
+            new Vector3d((Fixed64)3, Fixed64.One, (Fixed64)2));
+        var compound = reversed ? new LSCompoundCollider(second, first) : new LSCompoundCollider(first, second);
+        using var context = GravitasWorldContext.CreateOwned();
+        compound.InitializeWithNoBody(new TestMatterAgent(context));
+        // Unit cubes have volume 1; the shell has area 6 and unit-mass diagonal 5/18.
+        Fixed3x3 expected = shell
+            ? RawTensor(3, 6, 4, -1, -2, -1)
+            : RawTensor(4, 10, 8, -2, -4, -2);
+
+        compound.CalculateInertiaTensor(Fixed64.FromRaw(3), compound.CalculateLocalCenterOfMassOffset())
+            .Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData(1, 4, 2)]
+    [InlineData(3, 12, 5)]
+    [InlineData(4294967296, 16464041301, 7158278827)]
+    public void RotatedBoxCompound_ShouldCombineUnroundedAnisotropicContributions(long massRaw, long xyRaw, long zRaw)
+    {
+        ColliderShapeDefinition shape = ColliderShapeDefinition.Cuboid(new Vector3d((Fixed64)2, (Fixed64)4, (Fixed64)6));
+        FixedQuaternion quarterTurn = new FixedQuaternion(Fixed64.Zero, Fixed64.Zero, Fixed64.One, Fixed64.One).Normalized;
+        var compound = new LSCompoundCollider(new CompoundColliderPart(shape),
+            new CompoundColliderPart(shape, Vector3d.Zero, quarterTurn));
+        using var context = GravitasWorldContext.CreateOwned();
+        compound.InitializeWithNoBody(new TestMatterAgent(context));
+        // Averaging the original and quarter-turned box yields unit diagonals 23/6, 23/6, 5/3.
+        compound.CalculateInertiaTensor(Fixed64.FromRaw(massRaw), Vector3d.Zero)
+            .Should().Be(RawTensor(xyRaw, xyRaw, zRaw, 0, 0, 0));
+    }
+
     [Theory]
     [InlineData(0, 1443109012, 1443109012)]
     [InlineData(1, 7217632882, 1803886265)]
@@ -36,7 +214,7 @@ public sealed class LSCompoundColliderMassPropertyTests
     }
 
     [Fact]
-    public void TinyCompoundMass_ShouldPreserveSharesAndParallelAxisTerms()
+    public void TinyCompoundMass_ShouldRetainMassRatiosAndParallelAxisTerms()
     {
         var compound = new LSCompoundCollider(
             CompoundColliderPart.Sphere((Fixed64)1024, Vector3d.Right),
@@ -349,7 +527,7 @@ public sealed class LSCompoundColliderMassPropertyTests
     }
 
     [Fact]
-    public void MassProperties_WhenAllVolumeMeasuresRoundToZero_ShouldConserveMassInAuthoredOrder()
+    public void MassProperties_WhenScalarVolumesRoundToZero_ShouldRetainRationalWeightsThroughInertia()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         Fixed64 tinyRadius = Fixed64.FromRaw(1);
@@ -360,19 +538,8 @@ public sealed class LSCompoundColliderMassPropertyTests
         scenario.CreateBody(compound, Vector3d.Zero, FixedQuaternion.Identity);
         Fixed64 mass = Fixed64.One;
         Vector3d center = compound.CalculateLocalCenterOfMassOffset();
-        Fixed64 firstMass = mass / (Fixed64)3;
-        Fixed64.TryMultiplyDivide(
-                mass,
-                Fixed64.Two,
-                (Fixed64)3,
-                out Fixed64 cumulativeSecondMass)
-            .Should()
-            .BeTrue();
-        Fixed64 secondMass = cumulativeSecondMass - firstMass;
-        Fixed64 lastMass = mass - cumulativeSecondMass;
-        Fixed64 expectedTransverse = firstMass * (center.X + Fixed64.One) * (center.X + Fixed64.One)
-            + secondMass * center.X * center.X
-            + lastMass * ((Fixed64)4 - center.X) * ((Fixed64)4 - center.X);
+        // Equal masses at offsets -2, -1, 3 give mean squared distance 14/3.
+        Fixed64 expectedTransverse = Fixed64.FromFraction(14, 3);
         Fixed3x3 expected = new(
             Fixed64.Zero, Fixed64.Zero, Fixed64.Zero,
             Fixed64.Zero, expectedTransverse, Fixed64.Zero,
@@ -383,7 +550,7 @@ public sealed class LSCompoundColliderMassPropertyTests
     }
 
     [Fact]
-    public void MassProperties_ShouldAssignResidualToLastPositiveWeightBeforeTrailingZeroParts()
+    public void MassProperties_ShouldRetainNegligiblePositiveWeightsWithoutBiasingFinalTensor()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         var compound = new LSCompoundCollider(
@@ -401,7 +568,7 @@ public sealed class LSCompoundColliderMassPropertyTests
     }
 
     [Fact]
-    public void MassProperties_ShouldApportionTinyMassFromCumulativeWeightShares()
+    public void MassProperties_ShouldRetainUnequalBoxWeightsThroughFinalTensor()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         var compound = new LSCompoundCollider(
@@ -420,12 +587,8 @@ public sealed class LSCompoundColliderMassPropertyTests
             Vector3d.Zero,
             FixedQuaternion.Identity,
             preventAngularForces: true);
-        Fixed64 apportionedMass = Fixed64.FromRaw(1);
-        Fixed3x3 expected =
-            compound.GetPartCollider(0)
-                .CalculateCenterOfMassInertiaTensor(apportionedMass)
-            + compound.GetPartCollider(2)
-                .CalculateCenterOfMassInertiaTensor(apportionedMass);
+        // Weights 3:3:3:1 give transverse raw inertia 2*(9*5/6+1/6)/10 = 23/15.
+        Fixed3x3 expected = RawTensor(0, 2, 2, 0, 0, 0);
 
         compound.CalculateInertiaTensor(
                 Fixed64.FromRaw(2),
@@ -691,6 +854,52 @@ public sealed class LSCompoundColliderMassPropertyTests
                     Vector3d.Zero))
             .Should().Throw<InvalidOperationException>()
             .WithMessage("*outside the Fixed64 scalar domain*");
+    }
+
+    private static Fixed3x3 SphereCompoundOracle(long massRaw, Vector3d secondOffset, out Vector3d center)
+    {
+        BigInteger q = BigInteger.One << 32;
+        BigInteger[] radii = { 512 * q, 1024 * q };
+        BigInteger[] weights = { BigInteger.Pow(radii[0], 3), BigInteger.Pow(radii[1], 3) };
+        BigInteger totalWeight = weights[0] + weights[1];
+        BigInteger[] offset = { secondOffset.X.m_rawValue, secondOffset.Y.m_rawValue, secondOffset.Z.m_rawValue };
+        Fixed64[] coordinates = new Fixed64[3];
+        for (int axis = 0; axis < 3; axis++)
+            coordinates[axis] = RoundRational(weights[1] * offset[axis], totalWeight);
+        center = new Vector3d(coordinates[0], coordinates[1], coordinates[2]);
+        Fixed64[] entries = new Fixed64[9];
+        for (int row = 0; row < 3; row++)
+        for (int column = 0; column < 3; column++)
+        {
+            BigInteger integral = BigInteger.Zero;
+            for (int part = 0; part < 2; part++)
+            {
+                BigInteger[] shift = new BigInteger[3];
+                for (int axis = 0; axis < 3; axis++)
+                    shift[axis] = (part == 0 ? BigInteger.Zero : offset[axis]) - coordinates[axis].m_rawValue;
+                BigInteger geometry = row == column ? 1717986918 * radii[part] * radii[part]
+                    : -q * shift[row] * shift[column];
+                if (row == column)
+                    for (int axis = 0; axis < 3; axis++)
+                        if (axis != row) geometry += q * shift[axis] * shift[axis];
+                integral += weights[part] * geometry;
+            }
+            entries[row * 3 + column] = RoundRational(massRaw * integral, totalWeight * q * q * q);
+        }
+        return new Fixed3x3(entries[0], entries[1], entries[2], entries[3], entries[4], entries[5], entries[6], entries[7], entries[8]);
+    }
+
+    private static Fixed3x3 RawTensor(long xx, long yy, long zz, long xy, long xz, long yz) =>
+        new(Fixed64.FromRaw(xx), Fixed64.FromRaw(xy), Fixed64.FromRaw(xz),
+            Fixed64.FromRaw(xy), Fixed64.FromRaw(yy), Fixed64.FromRaw(yz),
+            Fixed64.FromRaw(xz), Fixed64.FromRaw(yz), Fixed64.FromRaw(zz));
+
+    private static Fixed64 RoundRational(BigInteger numerator, BigInteger denominator)
+    {
+        BigInteger rounded = BigInteger.DivRem(BigInteger.Abs(numerator), denominator, out BigInteger remainder);
+        int half = (2 * remainder).CompareTo(denominator);
+        if (half > 0 || half == 0 && !rounded.IsEven) rounded++;
+        return Fixed64.FromRaw((long)(numerator.Sign < 0 ? -rounded : rounded));
     }
 
     private static void AssertNear(Fixed64 actual, Fixed64 expected) =>

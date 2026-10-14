@@ -97,16 +97,21 @@ public sealed class LSCylinderCollider : LSCollider
             _preparedRadius,
             _preparedHeight);
 
-    internal override Fixed3x3 CalculateCenterOfMassInertiaTensor(Fixed64 mass)
+    internal void GetInertiaGeometry(out Signed192 transverse, out Signed192 axial)
     {
         GetMassPropertyGeometry(out Fixed64 radius, out Fixed64 height);
         Fixed64 twelfth = Fixed64.FromFraction(1, 12);
-        Signed192 transverse = WideArithmetic.AddSigned192(
+        transverse = WideArithmetic.AddSigned192(
             ExactMassProperties.InertiaGeometryTerm(twelfth * (Fixed64)3, radius, radius),
             ExactMassProperties.InertiaGeometryTerm(twelfth, height, height));
+        axial = ExactMassProperties.InertiaGeometryTerm(Fixed64.Half, radius, radius);
+    }
+
+    internal override Fixed3x3 CalculateCenterOfMassInertiaTensor(Fixed64 mass)
+    {
+        GetInertiaGeometry(out Signed192 transverse, out Signed192 axial);
         Fixed64 inertiaXZ = ExactMassProperties.InertiaMoment(mass, transverse);
-        Fixed64 inertiaY = ExactMassProperties.InertiaMoment(
-            mass, ExactMassProperties.InertiaGeometryTerm(Fixed64.Half, radius, radius));
+        Fixed64 inertiaY = ExactMassProperties.InertiaMoment(mass, axial);
 
         Fixed3x3 tensor = new(
             inertiaXZ, Fixed64.Zero, Fixed64.Zero,

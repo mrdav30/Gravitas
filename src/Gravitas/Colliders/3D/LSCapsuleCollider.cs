@@ -158,7 +158,7 @@ public sealed class LSCapsuleCollider : LSCollider
         return GetCylinderWeight(radius, axisLength).Add(GetCapWeight(radius));
     }
 
-    private void GetMassPropertyGeometry(out Fixed64 radius, out Fixed64 axisLength)
+    internal void GetMassPropertyGeometry(out Fixed64 radius, out Fixed64 axisLength)
     {
         if (HasCommittedShape)
         {
@@ -205,14 +205,8 @@ public sealed class LSCapsuleCollider : LSCollider
         Signed192 cylinderWeight = Fixed64.GetExactRawProduct(Fixed64.Pi, axisLength);
         Signed192 capWeight = Fixed64.GetExactRawProduct(
             Fixed64.FromFraction(4, 3) * Fixed64.Pi, radius);
-        Fixed64 twelfth = Fixed64.FromFraction(1, 12);
-        Signed192 cylinderTransverse = WideArithmetic.AddSigned192(
-            ExactMassProperties.InertiaGeometryTerm(twelfth * (Fixed64)3, radius, radius),
-            ExactMassProperties.InertiaGeometryTerm(twelfth, axisLength, axisLength));
-        Signed192 sphereTransverse = WideArithmetic.AddSigned192(sphereAxial,
-            WideArithmetic.AddSigned192(
-                ExactMassProperties.InertiaGeometryTerm(Fixed64.FromFraction(1, 4), axisLength, axisLength),
-                ExactMassProperties.InertiaGeometryTerm(Fixed64.FromFraction(3, 8), axisLength, radius)));
+        GetComponentInertiaGeometry(radius, axisLength, sphereAxial,
+            out Signed192 cylinderTransverse, out Signed192 sphereTransverse);
         Fixed64 totalInertia_xz = ExactMassProperties.InertiaWeightedMoment(
             mass, cylinderTransverse, cylinderWeight, sphereTransverse, capWeight);
         Fixed64 totalInertia_y = ExactMassProperties.InertiaWeightedMoment(
@@ -227,7 +221,21 @@ public sealed class LSCapsuleCollider : LSCollider
         return tensor;
     }
 
-    private static ExactMassWeight GetCylinderWeight(
+    internal static void GetComponentInertiaGeometry(
+        Fixed64 radius, Fixed64 axisLength, Signed192 sphereAxial,
+        out Signed192 cylinderTransverse, out Signed192 sphereTransverse)
+    {
+        Fixed64 twelfth = Fixed64.FromFraction(1, 12);
+        cylinderTransverse = WideArithmetic.AddSigned192(
+            ExactMassProperties.InertiaGeometryTerm(twelfth * (Fixed64)3, radius, radius),
+            ExactMassProperties.InertiaGeometryTerm(twelfth, axisLength, axisLength));
+        sphereTransverse = WideArithmetic.AddSigned192(sphereAxial,
+            WideArithmetic.AddSigned192(
+                ExactMassProperties.InertiaGeometryTerm(Fixed64.FromFraction(1, 4), axisLength, axisLength),
+                ExactMassProperties.InertiaGeometryTerm(Fixed64.FromFraction(3, 8), axisLength, radius)));
+    }
+
+    internal static ExactMassWeight GetCylinderWeight(
         Fixed64 radius,
         Fixed64 axisLength) =>
         ExactMassWeight.FromProduct(
@@ -236,7 +244,7 @@ public sealed class LSCapsuleCollider : LSCollider
             radius,
             axisLength);
 
-    private static ExactMassWeight GetCapWeight(Fixed64 radius) =>
+    internal static ExactMassWeight GetCapWeight(Fixed64 radius) =>
         ExactMassWeight.FromProduct(
             Fixed64.FromFraction(4, 3) * Fixed64.Pi,
             radius,

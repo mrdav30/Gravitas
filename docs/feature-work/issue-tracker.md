@@ -2,7 +2,7 @@
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-120`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-125`.
 - Assign an ID when an issue enters this tracker, keep it through resolution,
   and never reuse an ID even if an entry is later removed. Check this file's Git
   history before advancing or repairing the counter.
@@ -38,52 +38,91 @@
 ### Ordered Queue
 
 Phase 1 of the supported-geometry plan confirmed in-range numerical defects on
-the original binaries. Integral, volume, overlap and primitive mass-property
-fixes #113-#118 are resolved. Resolve compound child-mass quantization #119 before
-locking #096's safety contract and implementing admission.
+the original binaries. Integral, volume, overlap and mass-property fixes
+#113-#121 are resolved. Resolve standalone mesh precision and detached part
+scaling **#122/#123 together**, then polygon reference-shift precision **#124**,
+before locking #096's safety contract and implementing admission.
 #111 remains an independent validation-tooling issue.
 
-### GRV-Issue-119 - Compound inertia quantizes child masses before applying geometry
+### GRV-Issue-122 - Standalone mesh inertia amplifies rounded unit coefficients
 
-- **Confirmed:** 2026-10-13 during #117/#118's whole-shape review, on both
-  original committed and corrected primitive binaries. The compound allocation
-  algorithm is unchanged by those fixes; this is a pre-existing precision gap.
-- **Reproduction:** Initialize a compound with sphere radius `512` at zero and
-  sphere radius `1,024` at local offset `(2,048,0,0)`. Calculate its inertia
-  about its public COM using total mass `Fixed64.FromRaw(3)`. Both binaries
-  return COM X raw `7818749353074` (`8*2,048/9`). The original tensor diagonal is
-  raw `(1048576,1203921,1203921)`; corrected primitive arithmetic returns
-  `(1258291,1413636,1413636)`. All off-diagonal entries are zero. An independent
-  volume-weighted oracle gives axial M11 raw `1153434`, using the preserved
-  sphere coefficient raw `1717986918`, masses `3/9` and `24/9` raw units and
-  final ties-to-even rounding. Geometry stays below the proposed reach ceiling;
-  final inertia and inverse parent mass are representable.
-- **Root cause:** `LSCompoundCollider` rounds cumulative volume-weighted mass
-  allocations into `Fixed64` before asking children for inertia. This fixture
-  assigns raw masses `0` and `3` instead of preserving the `1:8` ratio through
-  the geometry products. Exact COM weighting does not remove that tensor bias.
-  `LSCompoundCollider2D` uses the same allocation policy and needs parity review;
-  this reproduction establishes the 3D sphere case only.
-- **Follow-up:** Retain rational child contributions through final compound
-  normalization, including parallel-axis terms, without weighting already
-  rounded or saturated child tensors. Design the contract across primitive,
-  capsule, polygon and mesh children; preserve stable ordering, final-overflow
-  policy and the warm baseline. Audit equivalent single/compound geometry and
-  both dimensions. This is distinct from a capsule's internal component weights,
-  which #118 now retains exactly within its existing formula owner.
-- **Evidence:** Ignored `artifacts/grv-117-118/perf/` retains
-  `original-child-share-probe.log`, `candidate-child-share-probe.log` and the
-  public probe source, with loaded DLL hashes. The phase 1 refinement summary in
-  the [Supported Geometry Range Plan](2026-10-12-supported-geometry-range-plan.md)
-  records the separate prerequisite.
+- **Confirmed:** 2026-10-13 during #119's mesh representation review, in the
+  unchanged standalone runtime path. This is pre-existing; the new compound
+  path retains raw integrals and does not introduce the discrepancy.
+- **Reproduction:** An admitted closed cube of side `1/128` has unit diagonal
+  raw `43690 + 2/3`. At mass `1,000,000,000`, final normalization gives raw
+  `43690666666667`. `LSMeshCollider` and `PhysicsMesh` instead multiply the
+  published unit coefficient raw `43691`, giving raw `43691000000000`.
+  Both the volume and final tensor are representable. An equivalent primitive
+  cube and the corrected compound mesh return the final-normalized value.
+- **Root cause:** Runtime mass application consumes `MeshMassProperties`'s
+  quantized `UnitMassInertiaTensor`. The public data object's scaling helper
+  correctly projects that published coefficient; the missing precision belongs
+  to runtime mesh inertia, not the data object's contract.
+- **Follow-up:** Reuse retained mesh integrals for runtime mass and reference
+  application while preserving public unit-tensor projections. Audit closed
+  and surface meshes, translations, winding, scaling, body mass changes and
+  standalone/compound parity. Keep the existing warmed mesh inertia baseline;
+  replacing a cached scalar multiplication with uncached wide normalization is
+  insufficient. This is separate from #119's child-mass allocation fix.
+- **Evidence:** #119's independent microcube integral regression verifies the
+  corrected compound result. Ignored `artifacts/grv-119/probes/original.log` and
+  `current.log` confirm the public outputs on frozen original and corrected
+  binaries, with loaded stack hashes.
+
+### GRV-Issue-123 - Detached compound meshes omit authored part scale in mass properties
+
+- **Confirmed:** 2026-10-13 during #119's detached/committed parity review, on
+  frozen original and corrected binaries. This is pre-existing and distinct
+  from child-mass rounding; committed geometry has the intended scale.
+- **Reproduction:** A unit cube mesh part with local scale `(2,2,2)`, centered
+  in a single-part compound, at mass `6` should have each diagonal raw
+  `17179869184` (`4`). The original detached calculation returns `4294967298`,
+  then `17179869216` after initialization. The corrected compound arithmetic
+  returns `4294967296` detached, then exactly `17179869184` after initialization.
+  These are ordinary-sized, representable shapes; admission cannot repair the
+  fourfold discrepancy.
+- **Root cause:** Detached mesh mass-property requests read `PhysicsMesh`'s
+  current unit-scale geometry rather than applying the reserved compound part
+  scale. Primitive owners derive their effective detached dimensions, while
+  mesh owner/part scale is applied during preparation and publication.
+- **Follow-up:** Resolve alongside #122 in the mesh mass-property owner. Reuse
+  its geometry transactions and caches to align detached, prepared and committed
+  weights, COM and inertia for closed and surface meshes. Verify nonuniform
+  scale, rotations, offsets and rejected preparation without adding warm walks.
+- **Evidence:** Ignored `artifacts/grv-119/probes/` holds the public probe and
+  original/corrected outputs with loaded assembly hashes.
+
+### GRV-Issue-124 - Standalone polygon reference shifts omit the centroid residual
+
+- **Confirmed:** 2026-10-13 during #119's triangle representation check, on
+  frozen original and corrected binaries. The standalone owner is unchanged;
+  the corrected compound path retains the missing first moment.
+- **Reproduction:** A uniform unit right triangle with vertices `(0,0)`,
+  `(1,0)`, `(0,1)`, at mass `1,000,000,000`, about the origin has moment raw
+  `1431655765333333333` (`mass/3`). `LSPolygonCollider2D` returns raw
+  `1431655764888888888` before and after #119. The corrected single-part
+  compound returns the independently integrated value. Everything is within
+  the coordinate and final scalar domains.
+- **Root cause:** The centered polygon integral is exact about its published,
+  rounded centroid. The base collider's reference shift adds only `mass*|d|²`,
+  assuming the centroid's first moment vanishes. Its rounding residual requires
+  the additional `2*d·F` term retained by the compound calculation.
+- **Follow-up:** Apply the existing retained polygon first and second moments
+  to standalone reference overrides, preserving published COM, winding,
+  rotation, offset, scale, final-overflow behavior and warm costs. Keep the
+  reduction in the polygon mass-property owner and reuse the compound work;
+  avoid another arithmetic layer.
+- **Evidence:** Ignored `artifacts/grv-119/probes/` confirms the standalone and
+  compound outputs on original/corrected binaries with their loaded hashes.
 
 ### GRV-Issue-096 - Extreme-scale capsule initial mesh sweep can miss a genuine overlap
 
 - **Status:** Approved bounded effective-geometry direction; implementation
   planned in the [Supported Geometry Range Plan](2026-10-12-supported-geometry-range-plan.md).
   The candidate `4,096`-unit reach remains provisional until phase 1 validation;
-  remaining in-range prerequisite #119 must be repaired first. This issue
-  stays open until the complete admission contract is implemented.
+  remaining in-range mass-property prerequisites #122-#124 must be repaired
+  first. This issue stays open until the complete admission contract is implemented.
 - **Confirmed:** 2026-10-07 in the isolated local-stack Release
   `CapsuleInitialContact_WithUnavailableTriangleCharts_ShouldRetainGeometricFallback`
   experiment. An ordinary-radius source control passes; the extreme
@@ -137,6 +176,102 @@ locking #096's safety contract and implementing admission.
 Remaining measured performance costs are tracked in the benchmark backlog.
 
 ## Resolved Issues
+
+### GRV-Issue-119 - Compound inertia quantizes child masses before applying geometry
+
+- **Resolved:** 2026-10-13.
+- **Confirmed:** 2026-10-13 during #117/#118's whole-shape review, on both
+  original committed and corrected primitive binaries. The compound allocation
+  algorithm is unchanged by those fixes; this is a pre-existing precision gap.
+- **Reproduction:** Initialize a compound with sphere radius `512` at zero and
+  sphere radius `1,024` at local offset `(2,048,0,0)`. Calculate its inertia
+  about its public COM using total mass `Fixed64.FromRaw(3)`. Both binaries
+  return COM X raw `7818749353074` (`8*2,048/9`). The original tensor diagonal is
+  raw `(1048576,1203921,1203921)`; corrected primitive arithmetic returns
+  `(1258291,1413636,1413636)`. All off-diagonal entries are zero. An independent
+  volume-weighted oracle gives axial M11 raw `1153434`, using the preserved
+  sphere coefficient raw `1717986918`, masses `3/9` and `24/9` raw units and
+  final ties-to-even rounding. Geometry stays below the proposed reach ceiling;
+  final inertia and inverse parent mass are representable.
+- **Root cause:** `LSCompoundCollider` rounds cumulative volume-weighted mass
+  allocations into `Fixed64` before asking children for inertia. This fixture
+  assigns raw masses `0` and `3` instead of preserving the `1:8` ratio through
+  the geometry products. Exact COM weighting does not remove that tensor bias.
+  `LSCompoundCollider2D` used the same allocation policy. The correction and
+  independent regressions cover both dimensions.
+- **Resolution:** Retain homogeneous volume/area-weighted intrinsic, first and
+  parallel-axis moments through one final parent-mass normalization. Primitive,
+  capsule, polygon and mesh contributions reuse their existing geometry/math
+  owners; cached aggregate geometry removes repeated child work. Preserve
+  published COM, nominal degenerate 2D weights and checked final overflow.
+  The separate standalone/detached owner defects #122-#124 remain open.
+- **Verification:** Independent full-tensor and planar integer oracles cover
+  tiny/nonbinary/ordinary masses, part order, representations, translations,
+  winding, scale, requested references and cache publication/rejection. Both
+  libraries retain raw 100% reachable line/branch/method coverage in Release
+  and Lean; replay and all warm allocation/comparison gates pass. See the
+  dated closeout in the [Supported Geometry Range Plan](2026-10-12-supported-geometry-range-plan.md).
+- **Evidence:** Ignored `artifacts/grv-117-118/perf/` retains
+  `original-child-share-probe.log`, `candidate-child-share-probe.log` and the
+  public probe source, with loaded DLL hashes. The phase 1 refinement summary in
+  the [Supported Geometry Range Plan](2026-10-12-supported-geometry-range-plan.md)
+  records the separate prerequisite.
+
+### GRV-Issue-120 - 3D inertia tensor transport reverses the geometry rotation
+
+- **Resolved:** 2026-10-13.
+- **Confirmed:** 2026-10-13 during #119's translated mesh whole-tensor check,
+  in the unchanged transport owners. Independent review and four failing
+  directional/impulse regressions confirm a pre-existing defect.
+- **Reproduction:** Local tensor `diag(1,3,4)`, active Z rotation `+45/-45`
+  degrees: Ixy must be `-1/+1`; `InertiaTensorMath.RotateToFrame` gives the
+  opposite sign. A `(2,4,6)` cuboid at `+30/-30` degrees responds to an impulse
+  along its rotated local X principal axis with a spurious perpendicular spin.
+- **Root cause:** FixedMathSharp's `ToMatrix3x3` is a row-vector rotation matrix
+  `M`. Geometry's active rotation is `M.Transpose()`, so tensor transport is
+  `M.Transpose() * I * M`. Compound, body world/inverse inertia and sampled
+  rotational CCD used the reverse transport. Cardinal rotations hide the sign.
+- **Resolution:** Transport inertia using the active geometry basis
+  `M.Transpose() * I * M`; correct compound tensors, body world/inverse inertia
+  and temporary rotational CCD poses without changing FixedMathSharp's matrix
+  convention or adding another transformation layer.
+- **Verification:** Signed off-diagonal and principal-axis angular-response
+  regressions, rotated mesh tensors and the actual CCD sampler pass. The three
+  changed shared replay hashes are isolated to solver caches by restoring only
+  the old body transport; commands and authoritative frame hashes are unchanged.
+  Release/Lean replay, raw full coverage and warmed integration gates pass.
+- **Evidence:** Ignored `artifacts/grv-119/red-frame.log` records four failing
+  source-behavior tests before any transport owner was changed. The phase 1
+  design in the [Supported Geometry Range Plan](2026-10-12-supported-geometry-range-plan.md)
+  records the coupled contribution work.
+
+### GRV-Issue-121 - Box inertia rounds separate axis terms before their sum
+
+- **Resolved:** 2026-10-13.
+- **Confirmed:** 2026-10-13 during #119's standalone/compound representation
+  parity checks. The existing 3D cuboid and 2D AABB formulas are unchanged at
+  reproduction; six failing focused cases confirm the pre-existing defect.
+- **Reproduction:** A unit cube or unit square at mass raw `6` has centered
+  diagonal/moment raw `1` (`mass/6`), but each axis contributes raw `0.5` and
+  rounds to even zero before summation, producing zero. Mass raw `3` is the
+  passing half-even control. A maximum-size box with mass raw `1` gives raw
+  `768614336404564650` instead of `768614336404564651`.
+- **Root cause:** Both owners normalize each squared half-extent term by three,
+  then add already materialized results. This changes final half-even parity
+  and disagrees with #119's unmaterialized compound geometry.
+- **Resolution:** Share the physical box formula across 3D and 2D and round
+  each complete `mass*(hx^2+hy^2)/3` moment once. Reuse exact squares and
+  FixedMathSharp's bounded three-word raw ratio; preserve primitive final
+  saturation and checked compound overflow. Existing wider ratio code remains
+  unchanged after rejecting slower normalization/helper candidates.
+- **Verification:** Half-even, maximum-size and primitive/compound parity
+  regressions pass. Independent upstream integer-ratio cases cover signs,
+  overflow and rounding boundaries. Both profiles retain raw full coverage;
+  warmed box timings improve with zero allocations and other primitive/math
+  controls show no resolved slowdown.
+- **Evidence:** Ignored `artifacts/grv-119/red-box-and-mesh.log` records the
+  old failures; the microcube mesh case also demonstrates the separate axis
+  rounding difference at ordinary representable final inertia.
 
 ### GRV-Issue-117 - Detached compound cone mass weights disagree with committed geometry
 

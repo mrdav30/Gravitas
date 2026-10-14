@@ -125,8 +125,9 @@ public partial class SolidBody
             return;
         }
 
-        Fixed3x3 inverseOrientation = Rotation.Conjugate().ToMatrix3x3();
-        Fixed3x3 orientation = Rotation.ToMatrix3x3();
+        // Convert the row-vector matrix convention to active tensor transport.
+        Fixed3x3 inverseOrientation = Rotation.ToMatrix3x3();
+        Fixed3x3 orientation = Rotation.Conjugate().ToMatrix3x3();
 
         worldInertia = orientation * inertia * inverseOrientation;
         inverseInertia = orientation * inverseLocalInertia * inverseOrientation;

@@ -253,7 +253,7 @@ public sealed class LSPolygonCollider2D : LSCollider2D, IConvexVertexSource2D
             "2D polygon vertices must form a strictly convex boundary.");
     }
 
-    private PolygonMassProperties2D GetMassProperties() => HasCommittedShape
+    internal PolygonMassProperties2D GetMassProperties() => HasCommittedShape
         ? _massProperties
         : PolygonMassProperties2D.Create(GetMassPropertyVertices());
 

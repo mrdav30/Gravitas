@@ -196,15 +196,20 @@ public sealed class LSConeCollider : LSCollider
             -height * Fixed64.FromFraction(1, 4),
             Fixed64.Zero);
 
-    internal override Fixed3x3 CalculateCenterOfMassInertiaTensor(Fixed64 mass)
+    internal void GetInertiaGeometry(out Signed192 transverse, out Signed192 axial)
     {
         GetMassPropertyGeometry(out Fixed64 radius, out Fixed64 height);
-        Signed192 transverse = WideArithmetic.AddSigned192(
+        transverse = WideArithmetic.AddSigned192(
             ExactMassProperties.InertiaGeometryTerm(Fixed64.FromFraction(3, 20), radius, radius),
             ExactMassProperties.InertiaGeometryTerm(Fixed64.FromFraction(3, 80), height, height));
+        axial = ExactMassProperties.InertiaGeometryTerm(Fixed64.FromFraction(3, 10), radius, radius);
+    }
+
+    internal override Fixed3x3 CalculateCenterOfMassInertiaTensor(Fixed64 mass)
+    {
+        GetInertiaGeometry(out Signed192 transverse, out Signed192 axial);
         Fixed64 inertiaXZ = ExactMassProperties.InertiaMoment(mass, transverse);
-        Fixed64 inertiaY = ExactMassProperties.InertiaMoment(
-            mass, ExactMassProperties.InertiaGeometryTerm(Fixed64.FromFraction(3, 10), radius, radius));
+        Fixed64 inertiaY = ExactMassProperties.InertiaMoment(mass, axial);
 
         Fixed3x3 tensor = new(
             inertiaXZ, Fixed64.Zero, Fixed64.Zero,

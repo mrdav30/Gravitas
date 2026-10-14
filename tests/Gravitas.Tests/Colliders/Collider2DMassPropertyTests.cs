@@ -4,12 +4,184 @@ using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Tests.Support;
 using System;
+using System.Numerics;
 using Xunit;
 
 namespace Gravitas.Tests.Colliders;
 
 public sealed class Collider2DMassPropertyTests
 {
+    [Theory]
+    [InlineData(3, 0)]
+    [InlineData(6, 1)]
+    public void SquareMoment_ShouldRoundBothAxisTermsOnceAcrossRepresentations(long massRaw, long expectedRaw)
+    {
+        var box = new LSAABBoxCollider2D(Vector2d.One);
+        CompoundColliderPart2D part = CompoundColliderPart2D.AABBox(Vector2d.One, Vector2d.Zero);
+        var single = new LSCompoundCollider2D(part);
+        var coincident = new LSCompoundCollider2D(part, part);
+        Fixed64 mass = Fixed64.FromRaw(massRaw);
+        Fixed64 expected = Fixed64.FromRaw(expectedRaw);
+
+        box.CalculateMomentOfInertia(mass, Vector2d.Zero).Should().Be(expected);
+        single.CalculateMomentOfInertia(mass, Vector2d.Zero).Should().Be(expected);
+        coincident.CalculateMomentOfInertia(mass, Vector2d.Zero).Should().Be(expected);
+    }
+
+    [Fact]
+    public void SquareMoment_ShouldRetainLargeUnitGeometryUntilTinyMassIsApplied()
+    {
+        Vector2d size = Vector2d.One * Fixed64.MaxValue;
+        var box = new LSAABBoxCollider2D(size);
+        var compound = new LSCompoundCollider2D(CompoundColliderPart2D.AABBox(size, Vector2d.Zero));
+        Fixed64 expected = Fixed64.FromRaw(768614336404564651);
+
+        box.CalculateMomentOfInertia(Fixed64.FromRaw(1), Vector2d.Zero).Should().Be(expected);
+        compound.CalculateMomentOfInertia(Fixed64.FromRaw(1), Vector2d.Zero).Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData(1, false)]
+    [InlineData(1, true)]
+    [InlineData(3, false)]
+    [InlineData(3, true)]
+    [InlineData(4294967296, false)]
+    [InlineData(4294967296, true)]
+    public void UnequalCircleCompound_ShouldRetainAreaWeightsThroughFinalMoment(long massRaw, bool reversed)
+    {
+        Vector2d offset = new((Fixed64)2048, (Fixed64)1024);
+        CompoundColliderPart2D first = CompoundColliderPart2D.Circle((Fixed64)512, Vector2d.Zero);
+        CompoundColliderPart2D second = CompoundColliderPart2D.Circle((Fixed64)1024, offset);
+        var compound = reversed ? new LSCompoundCollider2D(second, first) : new LSCompoundCollider2D(first, second);
+        BigInteger q = BigInteger.One << 32;
+        BigInteger[] radii = { 512 * q, 1024 * q };
+        BigInteger[] weights = { radii[0] * radii[0], radii[1] * radii[1] };
+        BigInteger totalWeight = weights[0] + weights[1];
+        Vector2d center = new(RoundRational(weights[1] * offset.X.m_rawValue, totalWeight),
+            RoundRational(weights[1] * offset.Y.m_rawValue, totalWeight));
+        BigInteger integral = BigInteger.Zero;
+        for (int part = 0; part < 2; part++)
+        {
+            BigInteger dx = (part == 0 ? 0L : offset.X.m_rawValue) - (BigInteger)center.X.m_rawValue;
+            BigInteger dy = (part == 0 ? 0L : offset.Y.m_rawValue) - (BigInteger)center.Y.m_rawValue;
+            integral += weights[part] * (radii[part] * radii[part] + 2 * (dx * dx + dy * dy));
+        }
+        Fixed64 expected = RoundRational(massRaw * integral, 2 * totalWeight * q * q);
+        using var context = GravitasWorldContext.CreateOwned();
+        compound.InitializeWithNoBody(new TestMatterAgent(context));
+
+        compound.CalculateLocalCenterOfMassOffset().Should().Be(center);
+        compound.CalculateMomentOfInertia(Fixed64.FromRaw(massRaw), center).Should().Be(expected);
+    }
+
+    [Fact]
+    public void CoincidentCircleParts_ShouldMatchSingleCircleWithoutRoundingChildContributions()
+    {
+        var compound = new LSCompoundCollider2D(
+            CompoundColliderPart2D.Circle(Fixed64.One, Vector2d.Zero),
+            CompoundColliderPart2D.Circle(Fixed64.One, Vector2d.Zero));
+        var circle = new LSCircleCollider2D(Fixed64.One);
+        Fixed64 mass = Fixed64.FromRaw(3);
+        Fixed64 expected = Fixed64.FromRaw(2);
+
+        circle.CalculateMomentOfInertia(mass, Vector2d.Zero).Should().Be(expected);
+        compound.CalculateMomentOfInertia(mass, Vector2d.Zero).Should().Be(expected);
+        // Center and shift round separately to 2+1, but their exact sum is 2.25 raw.
+        compound.CalculateMomentOfInertia(mass, new Vector2d(Fixed64.Half, Fixed64.Zero)).Should().Be(expected);
+        compound.CalculateMomentOfInertia(Fixed64.Zero, Vector2d.Zero).Should().Be(Fixed64.Zero);
+        using var context = GravitasWorldContext.CreateOwned();
+        compound.InitializeWithNoBody(new TestMatterAgent(context));
+        compound.CalculateMomentOfInertia(mass, Vector2d.Zero).Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData(4294967296, 8589934592, 3, 2)]
+    [InlineData(4294967296, 17179869184, 3, 4)]
+    [InlineData(2576980378, 11811160064, 10021590357, 6449436936)]
+    public void SingleCapsuleCompound_ShouldRetainTheStandaloneIntrinsicModel(long radiusRaw, long heightRaw, long massRaw, long expectedRaw)
+    {
+        Fixed64 radius = Fixed64.FromRaw(radiusRaw);
+        Fixed64 height = Fixed64.FromRaw(heightRaw);
+        Fixed64 mass = Fixed64.FromRaw(massRaw);
+        var capsule = new LSCapsuleCollider2D(radius, height);
+        var compound = new LSCompoundCollider2D(CompoundColliderPart2D.Capsule(radius, height, Vector2d.Zero));
+        Fixed64 expected = Fixed64.FromRaw(expectedRaw);
+
+        capsule.CalculateMomentOfInertia(mass, Vector2d.Zero).Should().Be(expected);
+        compound.CalculateMomentOfInertia(mass, Vector2d.Zero).Should().Be(expected);
+    }
+
+    [Fact]
+    public void CompoundMomentCache_ShouldFollowOwnerScaleLocalOffsetAndRequestedReference()
+    {
+        var compound = new LSCompoundCollider2D(
+            CompoundColliderPart2D.Circle(Fixed64.One, Vector2d.Right),
+            CompoundColliderPart2D.Circle(Fixed64.One, -Vector2d.Right));
+        compound.CalculateMomentOfInertia(Fixed64.Two, Vector2d.Zero).Should().Be((Fixed64)3);
+        compound.CalculateMomentOfInertia((Fixed64)4, Vector2d.Zero).Should().Be((Fixed64)6);
+        compound.LocalOffset = new Vector2d((Fixed64)3, -Fixed64.One);
+        compound.CalculateMomentOfInertia(Fixed64.Two, Vector2d.Zero).Should().Be((Fixed64)23);
+        compound.CalculateMomentOfInertia(Fixed64.Two, compound.CalculateLocalCenterOfMassOffset()).Should().Be((Fixed64)3);
+
+        using var context = GravitasWorldContext.CreateOwned();
+        var transform = new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One * Fixed64.Two);
+        compound.InitializeWithNoBody(new TestMatterAgent(context, transform));
+        compound.CalculateLocalCenterOfMassOffset().Should().Be(new Vector2d((Fixed64)6, (Fixed64)(-2)));
+        compound.CalculateMomentOfInertia(Fixed64.Two, Vector2d.Zero).Should().Be((Fixed64)92);
+        compound.CalculateMomentOfInertia(Fixed64.Two, compound.CalculateLocalCenterOfMassOffset()).Should().Be((Fixed64)12);
+        transform.LocalPosition = new Vector3d((Fixed64)100, Fixed64.Zero, (Fixed64)200);
+        compound.Simulate();
+        compound.CalculateMomentOfInertia(Fixed64.Two, compound.CalculateLocalCenterOfMassOffset()).Should().Be((Fixed64)12);
+    }
+
+    [Fact]
+    public void CompoundMoment_ShouldIgnoreDetachedPartsWithZeroSemanticArea()
+    {
+        var compound = new LSCompoundCollider2D(
+            CompoundColliderPart2D.Circle(Fixed64.FromRaw(1), new Vector2d((Fixed64)100, Fixed64.Zero),
+                Fixed64.Zero, Vector2d.One * Fixed64.Half),
+            CompoundColliderPart2D.Circle(Fixed64.One, Vector2d.Zero));
+
+        compound.CalculateLocalCenterOfMassOffset().Should().Be(Vector2d.Zero);
+        compound.CalculateMomentOfInertia(Fixed64.One, Vector2d.Zero).Should().Be(Fixed64.Half);
+    }
+
+    [Fact]
+    public void CircleCompound_ShouldRetainUnrepresentableUnitMomentUntilTinyParentMassIsApplied()
+    {
+        var compound = new LSCompoundCollider2D(
+            CompoundColliderPart2D.Circle(Fixed64.MaxValue, Vector2d.Zero),
+            CompoundColliderPart2D.Circle(Fixed64.MaxValue, Vector2d.Zero));
+
+        compound.CalculateMomentOfInertia(Fixed64.FromRaw(1), Vector2d.Zero)
+            .Should().Be(Fixed64.FromRaw(2305843009213693952));
+    }
+
+    [Theory]
+    [InlineData(1, 3, false, false)]
+    [InlineData(3, 8, false, false)]
+    [InlineData(3, 8, true, false)]
+    [InlineData(3, 8, true, true)]
+    [InlineData(4294967296, 11453246123, false, false)]
+    public void BoxAndPolygonCompound_ShouldRetainUnroundedIntrinsicAndOffsetMoments(long massRaw, long expectedRaw, bool reversed, bool clockwise)
+    {
+        CompoundColliderPart2D box = CompoundColliderPart2D.AABBox(Vector2d.One, Vector2d.Zero);
+        Fixed64 half = Fixed64.Half;
+        Vector2d[] vertices =
+        {
+            new Vector2d(-half, -half), new Vector2d(half, -half),
+            new Vector2d(half, half), new Vector2d(-half, half)
+        };
+        if (clockwise) Array.Reverse(vertices);
+        CompoundColliderPart2D polygon = CompoundColliderPart2D.ConvexPolygon(vertices, new Vector2d((Fixed64)3, Fixed64.One));
+        var compound = reversed ? new LSCompoundCollider2D(polygon, box) : new LSCompoundCollider2D(box, polygon);
+        using var context = GravitasWorldContext.CreateOwned();
+        compound.InitializeWithNoBody(new TestMatterAgent(context));
+        // Unit-mass moment is 1/6 + (3^2+1^2)/4 = 8/3.
+        compound.CalculateMomentOfInertia(Fixed64.FromRaw(massRaw), compound.CalculateLocalCenterOfMassOffset())
+            .Should().Be(Fixed64.FromRaw(expectedRaw));
+    }
+
     [Theory]
     [InlineData(3, 5)]
     [InlineData(1, 1)]
@@ -426,7 +598,7 @@ public sealed class Collider2DMassPropertyTests
     }
 
     [Fact]
-    public void RotatedCompoundPolygon_ShouldDeriveMassPropertiesWithoutMaterializingVertices()
+    public void RotatedCompoundPolygon_ShouldCheckFinalMomentWithoutMaterializingVertices()
     {
         Fixed64 extent = Fixed64.MaxValue * Fixed64.FromFraction(3, 4);
         Vector2d[] vertices =
@@ -450,11 +622,18 @@ public sealed class Collider2DMassPropertyTests
                 Vector2d.One));
 
         collider.CalculateLocalCenterOfMassOffset().Should().Be(Vector2d.Zero);
+        // A square of side 2e has I/m = 2e^2/3, invariant under its planar rotation.
+        BigInteger q = BigInteger.One << 32;
+        BigInteger twiceExtentSquared = 2 * (BigInteger)extent.m_rawValue * extent.m_rawValue;
+        Assert.True(twiceExtentSquared / (3 * q) > long.MaxValue);
         FluentActions.Invoking(
                 () => collider.CalculateMomentOfInertia(
                     Fixed64.One,
                     Vector2d.Zero))
-            .Should().NotThrow();
+            .Should().Throw<InvalidOperationException>().WithMessage("*outside the Fixed64 scalar domain*");
+        Fixed64 expectedTinyMoment = RoundRational(twiceExtentSquared, 3 * q * q);
+        collider.CalculateMomentOfInertia(Fixed64.FromRaw(1), Vector2d.Zero)
+            .Should().Be(expectedTinyMoment);
     }
 
     [Fact]
@@ -491,7 +670,7 @@ public sealed class Collider2DMassPropertyTests
     }
 
     [Fact]
-    public void Compound_ShouldApportionTinyMassFromCumulativeWeightShares()
+    public void Compound_ShouldRetainUnequalBoxWeightsThroughFinalMoment()
     {
         using GravitasWorldContext context =
             Physics2DTestWorld.CreateContext();
@@ -507,12 +686,8 @@ public sealed class Collider2DMassPropertyTests
                 Vector2d.Zero),
             CompoundColliderPart2D.AABBox(Vector2d.One, Vector2d.Zero));
         collider.InitializeWithNoBody(new TestMatterAgent(context));
-        Fixed64 apportionedMass = Fixed64.FromRaw(1);
-        Fixed64 expected =
-            collider.GetPartCollider(0)
-                .CalculateCenterOfMassMoment(apportionedMass)
-            + collider.GetPartCollider(2)
-                .CalculateCenterOfMassMoment(apportionedMass);
+        // Weights 3:3:3:1 give raw moment 2*(9*5/6+1/6)/10 = 23/15.
+        Fixed64 expected = Fixed64.FromRaw(2);
 
         collider.CalculateMomentOfInertia(
                 Fixed64.FromRaw(2),
@@ -522,7 +697,7 @@ public sealed class Collider2DMassPropertyTests
     }
 
     [Fact]
-    public void Compound_WhenDetachedPartsHaveZeroSemanticArea_ShouldUseEqualNominalShares()
+    public void Compound_WhenDetachedPartsHaveZeroSemanticArea_ShouldRetainEqualNominalWeights()
     {
         Vector2d tinyScale =
             Vector2d.One * Fixed64.FromRaw(1);
@@ -547,23 +722,15 @@ public sealed class Collider2DMassPropertyTests
                 tinyScale));
         Vector2d center =
             collider.CalculateLocalCenterOfMassOffset();
-        Fixed64 expected = Fixed64.Zero;
         for (int i = 0; i < 3; i++)
-        {
-            LSCollider2D part = collider.GetPartCollider(i);
-            part.CalculateAreaForMassProperties().IsZero
+            collider.GetPartCollider(i).CalculateAreaForMassProperties().IsZero
                 .Should()
                 .BeTrue();
-            part.CalculateLocalMassPoint()
-                .TryAddParallelAxisMoment(
-                    part.CalculateCenterOfMassMoment(Fixed64.One),
-                    Fixed64.One,
-                    center,
-                    out Fixed64 contribution)
-                .Should()
-                .BeTrue();
-            expected += contribution;
-        }
+        // Equal rods of total mass 3 have intrinsic moment 3*L^2/12;
+        // their offsets -2, -1, 3 contribute 14 about the aggregate center.
+        // Exact diameter subtraction retains one raw unit even though radius rounds to zero.
+        BigInteger q = BigInteger.One << 32;
+        Fixed64 expected = RoundRational((BigInteger)999_999_999 * 999_999_999 + 56 * q * q, 4 * q);
 
         center.Should().Be(new Vector2d(
             Fixed64.One,
@@ -576,14 +743,14 @@ public sealed class Collider2DMassPropertyTests
     }
 
     [Fact]
-    public void ThinRodCapsule_ShouldSaturateOnlyItsFinalMoment()
+    public void ThinRodCompound_ShouldRejectAnUnrepresentableFinalMoment()
     {
         var compound = new LSCompoundCollider2D(
             CompoundColliderPart2D.Capsule(Fixed64.FromRaw(1), (Fixed64)16,
                 Vector2d.Zero, Fixed64.Zero, Vector2d.One * Fixed64.Half));
 
-        compound.CalculateMomentOfInertia(Fixed64.MaxValue, Vector2d.Zero)
-            .Should().Be(Fixed64.MaxValue);
+        FluentActions.Invoking(() => compound.CalculateMomentOfInertia(Fixed64.MaxValue, Vector2d.Zero))
+            .Should().Throw<InvalidOperationException>().WithMessage("*outside the Fixed64 scalar domain*");
     }
 
     [Fact]
@@ -647,6 +814,14 @@ public sealed class Collider2DMassPropertyTests
     {
         Fixed64 tolerance = Fixed64.Epsilon * (Fixed64)16;
         FixedMath.Abs(actual - expected).Should().BeLessThanOrEqualTo(tolerance);
+    }
+
+    private static Fixed64 RoundRational(BigInteger numerator, BigInteger denominator)
+    {
+        BigInteger rounded = BigInteger.DivRem(BigInteger.Abs(numerator), denominator, out BigInteger remainder);
+        int half = (2 * remainder).CompareTo(denominator);
+        if (half > 0 || half == 0 && !rounded.IsEven) rounded++;
+        return Fixed64.FromRaw((long)(numerator.Sign < 0 ? -rounded : rounded));
     }
 
     private static Fixed64 GetMeasure(ExactMassWeight weight)

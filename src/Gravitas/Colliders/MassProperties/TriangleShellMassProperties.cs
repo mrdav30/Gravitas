@@ -26,8 +26,10 @@ internal static class TriangleShellMassProperties
         ReadOnlySpan<int> triangleIndices,
         out ExactMassWeight surfaceWeight,
         out Vector3d centerOfMass,
-        out Fixed3x3 unitMassInertiaTensor)
+        out Fixed3x3 unitMassInertiaTensor,
+        out MeshMassIntegrals integrals)
     {
+        integrals = default;
         if (triangleIndices.Length % FixedTriangle.VertexCount != 0)
         {
             throw new ArgumentException(
@@ -121,11 +123,16 @@ internal static class TriangleShellMassProperties
             surfaceWeight = default;
             centerOfMass = default;
             unitMassInertiaTensor = default;
+            integrals = default;
             return false;
         }
 
         surfaceWeight = new ExactMassWeight(
             Signed320.NarrowValue(totalWeight));
+        integrals = MeshMassIntegrals.FromShell(surfaceWeight,
+            firstMomentX, firstMomentY, firstMomentZ,
+            secondMomentX, secondMomentY, secondMomentZ,
+            productMomentXY, productMomentXZ, productMomentYZ);
         Signed576 centerDenominator =
             WideArithmetic.MultiplySigned576(
                 totalWeight,
@@ -229,6 +236,7 @@ internal static class TriangleShellMassProperties
             surfaceWeight = default;
             centerOfMass = default;
             unitMassInertiaTensor = default;
+            integrals = default;
             return false;
         }
 

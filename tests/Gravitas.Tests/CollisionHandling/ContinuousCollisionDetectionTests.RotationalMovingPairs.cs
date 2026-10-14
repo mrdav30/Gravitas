@@ -329,9 +329,9 @@ public sealed partial class ContinuousCollisionDetectionTests
             .BeTrue();
 
         body.Body.InverseInertiaTensor.Should().Be(
-            impactRotation.ToMatrix3x3()
+            impactRotation.Conjugate().ToMatrix3x3()
             * localInverseInertia
-            * impactRotation.Conjugate().ToMatrix3x3());
+            * impactRotation.ToMatrix3x3());
 
         body.Body.TryConsumeContinuousCollisionHandoff(
                 updateSleepState: false,
@@ -339,9 +339,9 @@ public sealed partial class ContinuousCollisionDetectionTests
             .Should()
             .BeTrue();
         body.Body.InverseInertiaTensor.Should().Be(
-            body.Body.Rotation.ToMatrix3x3()
+            body.Body.Rotation.Conjugate().ToMatrix3x3()
             * localInverseInertia
-            * body.Body.Rotation.Conjugate().ToMatrix3x3());
+            * body.Body.Rotation.ToMatrix3x3());
     }
 
     [Fact]

@@ -20,17 +20,23 @@ internal readonly struct PolygonMassProperties2D
     internal readonly ExactMassWeight Weight;
     internal readonly Vector2d Centroid;
     private readonly Signed320 _centeredIntegral;
+    private readonly Signed320 _centeredFirstX;
+    private readonly Signed320 _centeredFirstY;
     private readonly Signed320 _momentDenominator;
 
     private PolygonMassProperties2D(
         ExactMassWeight weight,
         Vector2d centroid,
         Signed320 centeredIntegral,
+        Signed320 centeredFirstX,
+        Signed320 centeredFirstY,
         Signed320 momentDenominator)
     {
         Weight = weight;
         Centroid = centroid;
         _centeredIntegral = centeredIntegral;
+        _centeredFirstX = centeredFirstX;
+        _centeredFirstY = centeredFirstY;
         _momentDenominator = momentDenominator;
     }
 
@@ -41,6 +47,8 @@ internal readonly struct PolygonMassProperties2D
             return default;
 
         Signed320 integral = default;
+        Signed320 firstX = default;
+        Signed320 firstY = default;
         for (int i = 0; i < vertices.Length; i++)
         {
             Vector2d first = vertices[i];
@@ -59,6 +67,10 @@ internal readonly struct PolygonMassProperties2D
                 SquaredSum(ax, bx), SquaredSum(ay, by));
             integral = WideArithmetic.AddSigned320(integral,
                 Signed320.NarrowValue(WideArithmetic.MultiplySigned320(cross, term)));
+            firstX = WideArithmetic.AddSigned320(firstX, Signed320.NarrowValue(
+                WideArithmetic.MultiplySigned320(cross, WideArithmetic.AddSigned192(ax, bx))));
+            firstY = WideArithmetic.AddSigned320(firstY, Signed320.NarrowValue(
+                WideArithmetic.MultiplySigned320(cross, WideArithmetic.AddSigned192(ay, by))));
         }
 
         // Degree-four raw-coordinate products plus an int-bounded vertex count
@@ -67,7 +79,7 @@ internal readonly struct PolygonMassProperties2D
             Signed576.ExtendValue(signedDoubleArea),
             Signed192.One, Signed192.One, Signed192.Signed(6)));
         return new PolygonMassProperties2D(
-            ExactMassProperties.CreateAreaWeight(signedDoubleArea), centroid, integral, denominator);
+            ExactMassProperties.CreateAreaWeight(signedDoubleArea), centroid, integral, firstX, firstY, denominator);
     }
 
     internal Fixed64 CalculateMoment(Fixed64 mass)
@@ -82,6 +94,58 @@ internal readonly struct PolygonMassProperties2D
             Signed576.ExtendValue(_momentDenominator), out Fixed64 moment)
             ? moment
             : Fixed64.MaxValue;
+    }
+
+    /// <summary>
+    /// Gets the centered integral weighted by semantic area and the compound's
+    /// common moment factor of sixty, retaining Q224 products without division.
+    /// </summary>
+    internal Signed576 CalculateWeightedMoment()
+    {
+        // Scaled area is 3*|doubleArea|*Q^2. Its area factor cancels
+        // I/m = integral/(6*doubleArea*Q^2), leaving 30*|integral|*Q^3.
+        Signed576 integral = Signed576.ExtendValue(_centeredIntegral);
+        if (_momentDenominator.Sign < 0)
+            integral = WideArithmetic.SubtractSigned576(default, integral);
+        return WideArithmetic.MultiplySigned576(integral,
+            Signed192.One, Signed192.One, Signed192.One, Signed192.Signed(30));
+    }
+
+    internal Signed576 CalculateWeightedFirstMomentContribution(Fixed64 rotation, Signed320 dx, Signed320 dy)
+    {
+        if (_centeredFirstX.IsZero && _centeredFirstY.IsZero)
+            return default;
+
+        // The published centroid is rounded, so its centered first moments need
+        // not vanish. With d = centroid-reference, add W|d|² + 2*d·F(c); omitting F loses accuracy
+        // whenever the requested reference differs from that rounded centroid.
+        Signed320 firstX = _centeredFirstX;
+        Signed320 firstY = _centeredFirstY;
+        if (_momentDenominator.Sign < 0)
+        {
+            firstX = WideArithmetic.SubtractSigned320(default, firstX);
+            firstY = WideArithmetic.SubtractSigned320(default, firstY);
+        }
+
+        // WNum = 3*|doubleArea|*Q² and mean residual = first/(3*doubleArea*Q).
+        // Before rotation, 60*first*Q² retains weighted first moments at Q160;
+        // rotation's Q32 factors and semantic displacement's Q64 produce Q256.
+        Signed320 x = Signed320.NarrowValue(WideArithmetic.MultiplySigned576(
+            Signed576.ExtendValue(firstX), Signed192.One, Signed192.One, Signed192.Signed(60)));
+        Signed320 y = Signed320.NarrowValue(WideArithmetic.MultiplySigned576(
+            Signed576.ExtendValue(firstY), Signed192.One, Signed192.One, Signed192.Signed(60)));
+        Signed192 cosine = Signed192.Raw(FixedMath.Cos(rotation));
+        Signed192 sine = Signed192.Raw(FixedMath.Sin(rotation));
+        Signed576 rotatedX = WideArithmetic.SubtractSigned576(
+            WideArithmetic.MultiplySigned320(x, cosine), WideArithmetic.MultiplySigned320(y, sine));
+        Signed576 rotatedY = WideArithmetic.AddSigned576(
+            WideArithmetic.MultiplySigned320(x, sine), WideArithmetic.MultiplySigned320(y, cosine));
+        // Degree-three edge sums, an int-bounded vertex count, and these fixed
+        // factors fit 320 bits before rotation and 576 bits after translation.
+        Signed576 contribution = WideArithmetic.AddSigned576(
+            Signed576.NarrowValue(WideArithmetic.MultiplySigned576ToSigned704(rotatedX, dx)),
+            Signed576.NarrowValue(WideArithmetic.MultiplySigned576ToSigned704(rotatedY, dy)));
+        return WideArithmetic.MultiplySigned576(contribution, 2);
     }
 
     private static Signed320 SquaredSum(Signed192 first, Signed192 second) =>

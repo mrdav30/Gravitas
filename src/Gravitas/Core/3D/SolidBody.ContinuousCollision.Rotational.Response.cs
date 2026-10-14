@@ -299,10 +299,11 @@ public partial class SolidBody
         if (_inverseLocalInertiaTensor == Fixed3x3.Zero)
             return Fixed3x3.Zero;
 
-        Fixed3x3 orientation = rotation.ToMatrix3x3();
+        // Sampled poses use the same active tensor frame as ordinary response.
+        Fixed3x3 orientation = rotation.Conjugate().ToMatrix3x3();
         return orientation
             * _inverseLocalInertiaTensor
-            * rotation.Conjugate().ToMatrix3x3();
+            * rotation.ToMatrix3x3();
     }
 
     private void StopRotationalContinuousCollision(Vector3d contactNormal)

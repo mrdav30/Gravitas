@@ -59,7 +59,8 @@ public readonly struct MeshSurfaceMassProperties
         ReadOnlySpan<int> triangles,
         Fixed64 totalArea,
         out ExactMassWeight totalWeight,
-        out MeshSurfaceMassProperties properties)
+        out MeshSurfaceMassProperties properties,
+        out MeshMassIntegrals integrals)
     {
         properties = default;
         if (!TriangleShellMassProperties.TryCreateUniformShell(
@@ -67,7 +68,8 @@ public readonly struct MeshSurfaceMassProperties
                 triangles,
                 out totalWeight,
                 out Vector3d centerOfMass,
-                out Fixed3x3 unitCenterTensor))
+                out Fixed3x3 unitCenterTensor,
+                out integrals))
         {
             return false;
         }

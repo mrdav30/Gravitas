@@ -22,10 +22,15 @@ internal static class ExactMassProperties
         WideArithmetic.MultiplySigned192(One, One);
     private static readonly Signed576 WeightMeasureDenominator =
         PowerOfOne(3);
+    // A common factor of six preserves tetrahedron volumes without dividing
+    // their determinant before compound moments have been normalized.
+    private static readonly Signed192 WeightFactor = Signed192.Signed(6);
     private static readonly Signed576 ParallelAxis2dDenominator =
         PowerOfOne(4);
     private static readonly Signed576 ParallelAxis3dDenominator =
         PowerOfOne(6);
+    private static readonly Signed192 BoxMomentDenominator = Signed192.NarrowValue(
+        WideArithmetic.MultiplySigned192(Fixed64.GetExactRawProduct(Fixed64.One, Fixed64.One), Signed192.Signed(3)));
 
     // Geometry retains Q96 products until mass is applied. Three positive raw
     // factors fit 192 bits; applying a full-domain mass fits 320 bits.
@@ -36,6 +41,17 @@ internal static class ExactMassProperties
 
     internal static Fixed64 InertiaMoment(Fixed64 mass, Signed192 geometry) =>
         MaterializeInertia(WideArithmetic.MultiplySigned192(Signed192.Raw(mass), geometry));
+
+    // A box diagonal contains both squared extents. Rounding each /3 term
+    // separately loses half-even parity even when the complete moment fits.
+    internal static Fixed64 InertiaBoxMoment(Fixed64 mass, Signed192 firstSquare, Signed192 secondSquare)
+    {
+        Signed192 squares = WideArithmetic.AddSigned192(firstSquare, secondSquare);
+        // Two full-domain squared coordinates and one mass need at most 191 bits.
+        Signed192 numerator = Signed192.NarrowValue(WideArithmetic.MultiplySigned192(Signed192.Raw(mass), squares));
+        return Fixed64.TryGetSignedRawRatio(numerator, BoxMomentDenominator, out Fixed64 moment)
+            ? moment : Fixed64.MaxValue;
+    }
 
     // Cancelled common radius factors leave linear weights. Keeping those
     // weights exact avoids quantizing a whole shape's internal component mass.
@@ -124,7 +140,7 @@ internal static class ExactMassProperties
             : signedDoubleArea;
         Signed320 halfScale = WideArithmetic.MultiplySigned192(
             Signed192.Raw(Fixed64.Half),
-            One);
+            Signed192.NarrowValue(WideArithmetic.MultiplySigned192(One, WeightFactor)));
         return new ExactMassWeight(
             Signed320.NarrowValue(
                 WideArithmetic.MultiplySigned320(
@@ -142,6 +158,7 @@ internal static class ExactMassProperties
             scaledRoot,
             Signed320.ExtendValue(
                 Signed192.Raw(Fixed64.Half)));
+        numerator = WideArithmetic.MultiplySigned576(numerator, WeightFactor);
         return new ExactMassWeight(
             Signed320.NarrowValue(numerator));
     }
@@ -151,7 +168,7 @@ internal static class ExactMassProperties
         out Fixed64 measure) =>
         Fixed64.TryGetSignedRawRatio(
             Signed576.ExtendValue(weight.Numerator),
-            WeightMeasureDenominator,
+            WideArithmetic.MultiplySigned576(WeightMeasureDenominator, WeightFactor),
             out measure);
 
     internal static bool TryAdd(
@@ -611,7 +628,8 @@ internal static class ExactMassProperties
             Signed192.Raw(second),
             Signed192.Raw(third),
             Signed192.Raw(fourth));
-        return new ExactMassWeight(Signed320.NarrowValue(product));
+        return new ExactMassWeight(Signed320.NarrowValue(
+            WideArithmetic.MultiplySigned576(product, WeightFactor)));
     }
 
     private static bool TryGetParallelAxisValue(

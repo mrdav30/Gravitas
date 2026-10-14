@@ -333,38 +333,10 @@ public partial class PhysicsMesh
         bool recenter = false)
     {
         Vector3d reference = bounds.Center;
-        Signed576 signedVolume = default;
-        Signed576 firstX = default, firstY = default, firstZ = default;
-        Signed576 integralX2 = default, integralY2 = default, integralZ2 = default;
-        Signed576 integralXY = default, integralXZ = default, integralYZ = default;
-
-        // Raw determinant weights retain all tetrahedra until normalization.
-        // Degree-five products plus int-bounded triangle accumulation fit 576 bits.
-        for (int i = 0; i < _triangleCount; i++)
-        {
-            int triangleIndex = i * 3;
-            // The bounds midpoint keeps each coordinate difference representable,
-            // including the full signed raw span; subsequent products stay wide.
-            var triangle = new FixedTriangle(
-                vertices[_triangles[triangleIndex]] - reference,
-                vertices[_triangles[triangleIndex + 1]] - reference,
-                vertices[_triangles[triangleIndex + 2]] - reference);
-            Signed320 weight = GetTetrahedronDeterminant(triangle);
-            signedVolume = WideArithmetic.AddSigned576(signedVolume, Signed576.ExtendValue(weight));
-            firstX = TriangleShellMassProperties.AddWeightedVertexSum(firstX, triangle.A.X, triangle.B.X, triangle.C.X, weight);
-            firstY = TriangleShellMassProperties.AddWeightedVertexSum(firstY, triangle.A.Y, triangle.B.Y, triangle.C.Y, weight);
-            firstZ = TriangleShellMassProperties.AddWeightedVertexSum(firstZ, triangle.A.Z, triangle.B.Z, triangle.C.Z, weight);
-
-            TriangleShellMassProperties.GetProductSums(triangle,
-                out Signed320 x2, out Signed320 y2, out Signed320 z2,
-                out Signed320 xy, out Signed320 xz, out Signed320 yz);
-            integralX2 = WideArithmetic.AddSigned576(integralX2, WideArithmetic.MultiplySigned320(weight, x2));
-            integralY2 = WideArithmetic.AddSigned576(integralY2, WideArithmetic.MultiplySigned320(weight, y2));
-            integralZ2 = WideArithmetic.AddSigned576(integralZ2, WideArithmetic.MultiplySigned320(weight, z2));
-            integralXY = WideArithmetic.AddSigned576(integralXY, WideArithmetic.MultiplySigned320(weight, xy));
-            integralXZ = WideArithmetic.AddSigned576(integralXZ, WideArithmetic.MultiplySigned320(weight, xz));
-            integralYZ = WideArithmetic.AddSigned576(integralYZ, WideArithmetic.MultiplySigned320(weight, yz));
-        }
+        IntegrateClosedVolume(vertices, reference, out Signed576 signedVolume,
+            out Signed576 firstX, out Signed576 firstY, out Signed576 firstZ,
+            out Signed576 integralX2, out Signed576 integralY2, out Signed576 integralZ2,
+            out Signed576 integralXY, out Signed576 integralXZ, out Signed576 integralYZ);
 
         Signed576 absoluteWeight = signedVolume.Sign < 0
             ? WideArithmetic.SubtractSigned576(default, signedVolume) : signedVolume;
@@ -414,6 +386,47 @@ public partial class PhysicsMesh
                 ixz, iyz, izz));
         result = MeshVolumeValidationResult.Valid;
         return true;
+    }
+
+    private void IntegrateClosedVolume(ReadOnlySpan<Vector3d> vertices, Vector3d reference,
+        out Signed576 signedVolume,
+        out Signed576 firstX, out Signed576 firstY, out Signed576 firstZ,
+        out Signed576 integralX2, out Signed576 integralY2, out Signed576 integralZ2,
+        out Signed576 integralXY, out Signed576 integralXZ, out Signed576 integralYZ)
+    {
+        signedVolume = default;
+        firstX = firstY = firstZ = default;
+        integralX2 = integralY2 = integralZ2 = default;
+        integralXY = integralXZ = integralYZ = default;
+
+        // Raw determinant weights retain all tetrahedra until normalization.
+        // Degree-five products plus int-bounded triangle accumulation fit 576 bits.
+        for (int i = 0; i < _triangleCount; i++)
+        {
+            int triangleIndex = i * 3;
+            // The bounds midpoint keeps each coordinate difference representable,
+            // including the full signed raw span; subsequent products stay wide.
+            var triangle = new FixedTriangle(
+                vertices[_triangles[triangleIndex]] - reference,
+                vertices[_triangles[triangleIndex + 1]] - reference,
+                vertices[_triangles[triangleIndex + 2]] - reference);
+            Signed320 weight = GetTetrahedronDeterminant(triangle);
+            signedVolume = WideArithmetic.AddSigned576(signedVolume, Signed576.ExtendValue(weight));
+            firstX = TriangleShellMassProperties.AddWeightedVertexSum(firstX, triangle.A.X, triangle.B.X, triangle.C.X, weight);
+            firstY = TriangleShellMassProperties.AddWeightedVertexSum(firstY, triangle.A.Y, triangle.B.Y, triangle.C.Y, weight);
+            firstZ = TriangleShellMassProperties.AddWeightedVertexSum(firstZ, triangle.A.Z, triangle.B.Z, triangle.C.Z, weight);
+
+            TriangleShellMassProperties.GetProductSums(triangle,
+                out Signed320 x2, out Signed320 y2, out Signed320 z2,
+                out Signed320 xy, out Signed320 xz, out Signed320 yz);
+            integralX2 = WideArithmetic.AddSigned576(integralX2, WideArithmetic.MultiplySigned320(weight, x2));
+            integralY2 = WideArithmetic.AddSigned576(integralY2, WideArithmetic.MultiplySigned320(weight, y2));
+            integralZ2 = WideArithmetic.AddSigned576(integralZ2, WideArithmetic.MultiplySigned320(weight, z2));
+            integralXY = WideArithmetic.AddSigned576(integralXY, WideArithmetic.MultiplySigned320(weight, xy));
+            integralXZ = WideArithmetic.AddSigned576(integralXZ, WideArithmetic.MultiplySigned320(weight, xz));
+            integralYZ = WideArithmetic.AddSigned576(integralYZ, WideArithmetic.MultiplySigned320(weight, yz));
+        }
+
     }
 
     private static bool TryGetIntegratedCenter(Signed576 firstMoment, Signed576 denominator, Fixed64 reference, out Fixed64 center) =>

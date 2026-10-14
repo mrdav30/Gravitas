@@ -6,6 +6,25 @@ namespace Gravitas.Tests.Core;
 
 public sealed class InertiaTensorMathTests
 {
+    [Theory]
+    [InlineData(45, -1)]
+    [InlineData(-45, 1)]
+    public void RotateToFrame_ShouldFollowTheGeometryRotation(int angle, int expectedProduct)
+    {
+        var tensor = new Fixed3x3(Fixed64.One, Fixed64.Zero, Fixed64.Zero,
+            Fixed64.Zero, (Fixed64)3, Fixed64.Zero, Fixed64.Zero, Fixed64.Zero, (Fixed64)4);
+        FixedQuaternion rotation = FixedQuaternion.FromEulerAnglesInDegrees(
+            Fixed64.Zero, Fixed64.Zero, (Fixed64)angle);
+        Fixed3x3 rotated = InertiaTensorMath.RotateToFrame(tensor, rotation);
+
+        // At +/-45 degrees, (Ix-Iy)*sin(angle)*cos(angle) is exactly -/+1.
+        // The tolerance covers the published matrix's fixed coefficient rounding.
+        FixedMath.Abs(rotated.M12 - (Fixed64)expectedProduct)
+            .Should().BeLessThanOrEqualTo(Fixed64.FromRaw(32));
+        rotated.M21.Should().Be(rotated.M12);
+        InertiaTensorMath.RotateToFrame(tensor, FixedQuaternion.Identity).Should().Be(tensor);
+    }
+
     [Fact]
     public void InvertForSolver_WithFullTensor_ShouldPreserveProductsOfInertia()
     {
