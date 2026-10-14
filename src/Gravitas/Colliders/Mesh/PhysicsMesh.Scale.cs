@@ -150,10 +150,10 @@ public partial class PhysicsMesh
             || ownerScale != _ownerScale
             || partScale != _partScale;
         _preparedGeometryChanged = geometryChanged;
-        if (_compoundMassCache != null)
+        for (CompoundMassCache? cache = _compoundMassCache; cache != null; cache = cache.Alternate)
         {
-            _compoundMassCache.PreparedValid = !geometryChanged && _compoundMassCache.CurrentValid;
-            _compoundMassCache.Prepared = _compoundMassCache.Current;
+            cache.PreparedValid = !geometryChanged && cache.CurrentValid;
+            cache.Prepared = cache.Current;
         }
         if (geometryChanged)
             PrepareScaledGeometry(ownerScale, partScale);
@@ -221,10 +221,11 @@ public partial class PhysicsMesh
                 _preparedScaledTotalAreaWeight;
             _scaledLocalRadius = _preparedScaledLocalRadius;
             _surfaceMassProperties = _preparedSurfaceMassProperties;
-            if (_compoundMassCache != null)
+            for (CompoundMassCache? cache = _compoundMassCache; cache != null; cache = cache.Alternate)
             {
-                _compoundMassCache.Current = _compoundMassCache.Prepared;
-                _compoundMassCache.CurrentValid = _compoundMassCache.PreparedValid;
+                cache.Current = cache.Prepared;
+                cache.CurrentValid = cache.PreparedValid;
+                if (cache.Runtime != null) cache.Runtime.Ready = false;
             }
             _surfaceMassPropertiesValid = _preparedSurfaceMassPropertiesValid;
             _triangleBvhBuildCount++;
@@ -365,10 +366,11 @@ public partial class PhysicsMesh
             out _preparedScaledTotalAreaWeight,
             out _preparedSurfaceMassProperties,
             out MeshMassIntegrals shellIntegrals);
-        if (_compoundMassCache != null && _compoundMassCache.Policy == MeshInertiaPolicy.SurfaceApproximation)
+        for (CompoundMassCache? cache = _compoundMassCache; cache != null; cache = cache.Alternate)
         {
-            _compoundMassCache.Prepared = shellIntegrals;
-            _compoundMassCache.PreparedValid = _preparedSurfaceMassPropertiesValid;
+            if (cache.Policy != MeshInertiaPolicy.SurfaceApproximation) continue;
+            cache.Prepared = shellIntegrals;
+            cache.PreparedValid = _preparedSurfaceMassPropertiesValid;
         }
 
         PrepareCoplanarPatches(_preparedScaledLocalVertices);

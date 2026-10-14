@@ -363,9 +363,14 @@ refreshes it.
 
 3D tensor transport follows the same active rotation as collider geometry,
 including temporary CCD poses. Mesh public unit-tensor data remains a Q32.32
-projection. Standalone mesh inertia currently scales that published projection;
-compound mesh inertia retains its unrounded integrals through parent-mass
-normalization.
+projection. Runtime mesh inertia retains its integrals through mass application
+and reference translation, including the first-moment residual of a rounded
+published COM. Closed-volume and surface policies cache their own geometry;
+pose changes reuse it. Standalone results saturate only an unrepresentable final
+entry, while compound results remain checked. `PhysicsMesh` applies signed mass
+algebraically after geometry validation; collider APIs return zero for
+nonpositive mass. Public mass-property data objects continue to scale their
+published unit-tensor projections.
 
 ### Explicit body pose changes
 

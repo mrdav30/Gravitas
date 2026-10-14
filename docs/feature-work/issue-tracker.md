@@ -2,7 +2,7 @@
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-125`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-126`.
 - Assign an ID when an issue enters this tracker, keep it through resolution,
   and never reuse an ID even if an entry is later removed. Check this file's Git
   history before advancing or repairing the counter.
@@ -39,59 +39,11 @@
 
 Phase 1 of the supported-geometry plan confirmed in-range numerical defects on
 the original binaries. Integral, volume, overlap and mass-property fixes
-#113-#121 are resolved. Resolve standalone mesh precision and detached part
-scaling **#122/#123 together**, then polygon reference-shift precision **#124**,
+#113-#123 are resolved. Resolve polygon reference-shift precision **#124**
 before locking #096's safety contract and implementing admission.
 #111 remains an independent validation-tooling issue.
-
-### GRV-Issue-122 - Standalone mesh inertia amplifies rounded unit coefficients
-
-- **Confirmed:** 2026-10-13 during #119's mesh representation review, in the
-  unchanged standalone runtime path. This is pre-existing; the new compound
-  path retains raw integrals and does not introduce the discrepancy.
-- **Reproduction:** An admitted closed cube of side `1/128` has unit diagonal
-  raw `43690 + 2/3`. At mass `1,000,000,000`, final normalization gives raw
-  `43690666666667`. `LSMeshCollider` and `PhysicsMesh` instead multiply the
-  published unit coefficient raw `43691`, giving raw `43691000000000`.
-  Both the volume and final tensor are representable. An equivalent primitive
-  cube and the corrected compound mesh return the final-normalized value.
-- **Root cause:** Runtime mass application consumes `MeshMassProperties`'s
-  quantized `UnitMassInertiaTensor`. The public data object's scaling helper
-  correctly projects that published coefficient; the missing precision belongs
-  to runtime mesh inertia, not the data object's contract.
-- **Follow-up:** Reuse retained mesh integrals for runtime mass and reference
-  application while preserving public unit-tensor projections. Audit closed
-  and surface meshes, translations, winding, scaling, body mass changes and
-  standalone/compound parity. Keep the existing warmed mesh inertia baseline;
-  replacing a cached scalar multiplication with uncached wide normalization is
-  insufficient. This is separate from #119's child-mass allocation fix.
-- **Evidence:** #119's independent microcube integral regression verifies the
-  corrected compound result. Ignored `artifacts/grv-119/probes/original.log` and
-  `current.log` confirm the public outputs on frozen original and corrected
-  binaries, with loaded stack hashes.
-
-### GRV-Issue-123 - Detached compound meshes omit authored part scale in mass properties
-
-- **Confirmed:** 2026-10-13 during #119's detached/committed parity review, on
-  frozen original and corrected binaries. This is pre-existing and distinct
-  from child-mass rounding; committed geometry has the intended scale.
-- **Reproduction:** A unit cube mesh part with local scale `(2,2,2)`, centered
-  in a single-part compound, at mass `6` should have each diagonal raw
-  `17179869184` (`4`). The original detached calculation returns `4294967298`,
-  then `17179869216` after initialization. The corrected compound arithmetic
-  returns `4294967296` detached, then exactly `17179869184` after initialization.
-  These are ordinary-sized, representable shapes; admission cannot repair the
-  fourfold discrepancy.
-- **Root cause:** Detached mesh mass-property requests read `PhysicsMesh`'s
-  current unit-scale geometry rather than applying the reserved compound part
-  scale. Primitive owners derive their effective detached dimensions, while
-  mesh owner/part scale is applied during preparation and publication.
-- **Follow-up:** Resolve alongside #122 in the mesh mass-property owner. Reuse
-  its geometry transactions and caches to align detached, prepared and committed
-  weights, COM and inertia for closed and surface meshes. Verify nonuniform
-  scale, rotations, offsets and rejected preparation without adding warm walks.
-- **Evidence:** Ignored `artifacts/grv-119/probes/` holds the public probe and
-  original/corrected outputs with loaded assembly hashes.
+#125 is a low-priority, non-blocking runtime crash observation; defer further
+investigation unless it recurs or a reliable reproducer becomes available.
 
 ### GRV-Issue-124 - Standalone polygon reference shifts omit the centroid residual
 
@@ -121,7 +73,7 @@ before locking #096's safety contract and implementing admission.
 - **Status:** Approved bounded effective-geometry direction; implementation
   planned in the [Supported Geometry Range Plan](2026-10-12-supported-geometry-range-plan.md).
   The candidate `4,096`-unit reach remains provisional until phase 1 validation;
-  remaining in-range mass-property prerequisites #122-#124 must be repaired
+  remaining in-range mass-property prerequisite #124 must be repaired
   first. This issue stays open until the complete admission contract is implemented.
 - **Confirmed:** 2026-10-07 in the isolated local-stack Release
   `CapsuleInitialContact_WithUnavailableTriangleCharts_ShouldRetainGeometricFallback`
@@ -173,9 +125,97 @@ before locking #096's safety contract and implementing admission.
   verifying the complete graph. Cover representative parameters and return
   types, then rerun affected out-of-process jobs in source and package modes.
 
+### GRV-Issue-125 - Isolated native access violation during mesh inertia benchmarking
+
+- **Observed:** 2026-10-13 on Windows x64, during local-stack Release benchmark
+  validation of the `EnclosedQ96Coefficient` ownership cleanup. The failing
+  process used the frozen pre-cleanup binary, not the extracted implementation.
+- **Status:** Low priority, non-blocking; no reliable reproducer. Defer further
+  investigation unless the crash recurs, appears in CI or normal simulation,
+  or a reliable reproducer becomes available.
+- **Evidence:** One fractional-surface changing-mass benchmark process failed
+  with `AccessViolationException` inside `MeshRuntimeInertia.TryMaterialize`
+  after six warmups and two measured iterations. Its dump shows a scalar-result
+  write through an invalid native address containing a coefficient fraction.
+  The failed process's timing results are invalid.
+- **Uncertainty:** A bounded two-launch follow-up using the same frozen binary
+  completed without reproducing the crash. The small dump omits the preceding
+  native instructions needed to establish how the invalid address arose.
+  A JIT defect is a hypothesis, not a confirmed cause; source review found no
+  unsafe operation or escaping reference in the affected path. The observation
+  does not establish a defect in the struct extraction.
+- **Disposition:** Preserve the failure log, dump and binary identities; do
+  not pursue further hardening solely on this observation. An experimental
+  raw-output variant passed stress checks, but those checks neither establish
+  the original cause nor prove that the variant fixes it.
+- **Artifacts:** Ignored `artifacts/grv-122-123/perf/accepted-cleanup-reverse.log`,
+  `perf/accepted-rca-default-jit.log`, and `perf/rca/` under the same artifact
+  root retain the failure, follow-up, dump, binary hashes and diagnostic notes.
+
 Remaining measured performance costs are tracked in the benchmark backlog.
 
 ## Resolved Issues
+
+### GRV-Issue-122 - Standalone mesh inertia amplifies rounded unit coefficients
+
+- **Resolved:** 2026-10-13.
+- **Confirmed:** 2026-10-13 during #119's mesh representation review, in the
+  unchanged standalone runtime path. This is pre-existing; the new compound
+  path retains raw integrals and does not introduce the discrepancy.
+- **Reproduction:** An admitted closed cube of side `1/128` has unit diagonal
+  raw `43690 + 2/3`. At mass `1,000,000,000`, final normalization gives raw
+  `43690666666667`. `LSMeshCollider` and `PhysicsMesh` instead multiply the
+  published unit coefficient raw `43691`, giving raw `43691000000000`.
+  Both the volume and final tensor are representable. An equivalent primitive
+  cube and the corrected compound mesh return the final-normalized value.
+- **Root cause:** Runtime mass application consumes `MeshMassProperties`'s
+  quantized `UnitMassInertiaTensor`. The public data object's scaling helper
+  correctly projects that published coefficient; the missing precision belongs
+  to runtime mesh inertia, not the data object's contract.
+- **Resolution:** Apply runtime mass and complete reference translation to
+  retained mesh integrals. Cached enclosed coefficients certify final scalar
+  rounding; ambiguous products reuse the existing exact compound reduction.
+  Preserve public unit-tensor projections and standalone final saturation.
+- **Verification:** Independent integer oracles cover closed/surface tensors,
+  first-moment residuals, semantic references, signed saturation and actual body
+  mass mutation. Both libraries retain raw 100% reachable line/branch/method
+  coverage in Release/Lean; replay, warm allocation and matched performance
+  gates pass. Changing-input cases are retained in the mesh benchmark class.
+  See the dated closeout in the [Supported Geometry Range Plan](2026-10-12-supported-geometry-range-plan.md).
+- **Evidence:** #119's independent microcube integral regression verifies the
+  corrected compound result. Ignored `artifacts/grv-119/probes/original.log` and
+  `current.log` confirm the public outputs on frozen original and corrected
+  binaries, with loaded stack hashes.
+
+### GRV-Issue-123 - Detached compound meshes omit authored part scale in mass properties
+
+- **Resolved:** 2026-10-13.
+- **Confirmed:** 2026-10-13 during #119's detached/committed parity review, on
+  frozen original and corrected binaries. This is pre-existing and distinct
+  from child-mass rounding; committed geometry has the intended scale.
+- **Reproduction:** A unit cube mesh part with local scale `(2,2,2)`, centered
+  in a single-part compound, at mass `6` should have each diagonal raw
+  `17179869184` (`4`). The original detached calculation returns `4294967298`,
+  then `17179869216` after initialization. The corrected compound arithmetic
+  returns `4294967296` detached, then exactly `17179869184` after initialization.
+  These are ordinary-sized, representable shapes; admission cannot repair the
+  fourfold discrepancy.
+- **Root cause:** Detached mesh mass-property requests read `PhysicsMesh`'s
+  current unit-scale geometry rather than applying the reserved compound part
+  scale. Primitive owners derive their effective detached dimensions, while
+  mesh owner/part scale is applied during preparation and publication.
+- **Resolution:** Lazily apply effective owner/part scale through the existing
+  mesh preparation/publication transaction before detached mass reads. Prepared
+  readers retain their host candidate; rejected preparation preserves current
+  geometry. Both physical policies retain bounded independent caches, reused
+  during pose changes and warmed alternation.
+- **Verification:** Closed/surface integer tensor oracles cover authored
+  nonuniform scale, offsets, rotation, detached/committed parity and a later
+  compensating host scale. Rejected candidates and zero-weight fallback preserve
+  the intended transaction. Coverage, replay and all warm gates pass alongside
+  #122; its plan closeout records the shared evidence.
+- **Evidence:** Ignored `artifacts/grv-119/probes/` holds the public probe and
+  original/corrected outputs with loaded assembly hashes.
 
 ### GRV-Issue-119 - Compound inertia quantizes child masses before applying geometry
 
@@ -204,7 +244,7 @@ Remaining measured performance costs are tracked in the benchmark backlog.
   capsule, polygon and mesh contributions reuse their existing geometry/math
   owners; cached aggregate geometry removes repeated child work. Preserve
   published COM, nominal degenerate 2D weights and checked final overflow.
-  The separate standalone/detached owner defects #122-#124 remain open.
+  The separate standalone polygon reference defect #124 remains open.
 - **Verification:** Independent full-tensor and planar integer oracles cover
   tiny/nonbinary/ordinary masses, part order, representations, translations,
   winding, scale, requested references and cache publication/rejection. Both

@@ -9,8 +9,8 @@
 
 **Date:** 2026-10-12  
 **Status:** Phase 1 evidence collected; numerical prerequisites #113-#118 are
-resolved, as are compound normalization and related tensor/box fixes #119-#121.
-Mesh and polygon mass-property prerequisites #122-#124 remain before ceiling
+resolved, as are compound normalization and related tensor/box fixes #119-#121
+and mesh runtime/scale fixes #122/#123. Polygon prerequisite #124 remains before ceiling
 locking and admission implementation, which has not started. The bounded
 effective-geometry direction is approved. The proposed
 ceiling remains provisional while confirmed in-range numerical defects are
@@ -250,8 +250,8 @@ supported safety claim or implementing around an assumed safe range:
 | [#119](issue-tracker.md#grv-issue-119---compound-inertia-quantizes-child-masses-before-applying-geometry) | Radius `512`/`1,024` spheres at `0`/`2,048`, total mass three raw units: child masses round to `0`/`3`, biasing the compound tensor. | Resolved: homogeneous child moments, exact reference reduction and one final parent-mass normalization, with warm geometry caching. |
 | [#120](issue-tracker.md#grv-issue-120---3d-inertia-tensor-transport-reverses-the-geometry-rotation) | Anisotropic tensors rotate opposite to geometry; principal-axis impulses produce perpendicular spin. | Resolved: consistent active transport in compound, body and sampled CCD owners. |
 | [#121](issue-tracker.md#grv-issue-121---box-inertia-rounds-separate-axis-terms-before-their-sum) | A unit cube/square at mass raw `6` gives zero rather than raw `1`. | Resolved: normalize each complete box diagonal/moment once; warmed primitive costs improve. |
-| [#122](issue-tracker.md#grv-issue-122---standalone-mesh-inertia-amplifies-rounded-unit-coefficients) | Microcube unit-tensor projection error grows with ordinary representable mass. | Pending: runtime mesh final normalization while preserving public projections and warm costs. |
-| [#123](issue-tracker.md#grv-issue-123---detached-compound-meshes-omit-authored-part-scale-in-mass-properties) | A scale-two mesh part has fourfold different detached/committed inertia. | Pending with #122: effective mesh geometry and transaction parity. |
+| [#122](issue-tracker.md#grv-issue-122---standalone-mesh-inertia-amplifies-rounded-unit-coefficients) | Microcube unit-tensor projection error grows with ordinary representable mass. | Resolved: retained runtime integrals, certified final rounding and exact refinement preserve public projections and warm costs. |
+| [#123](issue-tracker.md#grv-issue-123---detached-compound-meshes-omit-authored-part-scale-in-mass-properties) | A scale-two mesh part has fourfold different detached/committed inertia. | Resolved with #122: effective detached mesh geometry and current/prepared publication parity. |
 | [#124](issue-tracker.md#grv-issue-124---standalone-polygon-reference-shifts-omit-the-centroid-residual) | Standalone triangle reference shifts omit its rounded centroid's first moment. | Pending: reuse retained polygon moments for complete reference reduction. |
 
 These are prerequisites, not optimizations and not bugs introduced by admission.
@@ -718,6 +718,141 @@ correction about lazy cache allocation. FixedMathSharp is identical between
 those builds; the retained IL comparison verifies identical Gravitas method
 bodies. Release FixedMathSharp's new internal ratio ABI first, then update the
 coordinated develop pin and validate Gravitas against released packages.
+
+**Mesh runtime closeout (#122/#123, 2026-10-13):** Runtime mesh
+inertia must reduce retained integrals, including the first-moment residual and
+requested reference, before mass application. Public unit-tensor data remains
+a rounded projection. Reuse the existing weighted tensor owner for exact
+fallback, preserving standalone final saturation and compound checked overflow.
+
+Detached mesh mass readers lazily prepare authored part scale through the
+existing private mesh transaction. Do not reject oversized authored parts in
+the compound constructor when a later host scale can compensate them. Current
+support, weight and COM use current geometry; prepared fallback consumes only
+prepared points and weights so a detached refresh cannot replace a host candidate. Retain
+the two physical policy caches lazily, without allocation on warmed alternation.
+
+The immutable baseline includes fixed mass, actual changing mass/reference,
+body mutation, pose, compounds and full host frames. Standalone changing-input
+costs were approximately 50-90 ns. A last-result cache or repeated wide
+normalization alone cannot satisfy that gate. The runtime cache retains
+signed intrinsic coefficients at Q96 and first moments at Q128, both
+truncated toward zero. With raw reference differences of magnitude below
+2^64, translated diagonal error is strictly below nine Q96 integer units;
+off-diagonal error is below five. Parallel terms are exact. Applying any
+scalar mass gives uncertainty below nine times 2^-33 raw units. Accept the
+projected result only when its entire enclosure has the same half-even scalar
+rounding; use retained exact ratios at ambiguous ties, unsupported widths or
+semantic points that do not meet the raw-coordinate precondition. Reuse
+FixedMathSharp rounding and wide arithmetic, promoting only policy-neutral
+operations with implemented production callers. Independent integer oracles,
+raw full coverage and native warm comparisons validate this reduction;
+#122/#123 are resolved. Polygon prerequisite #124 keeps phase 1 and #096 open.
+
+The ordinary coefficient path first projects Q96 to a 64-bit Q60 mantissa.
+For coefficient magnitude below 2^100 and raw mass magnitude below 2^58,
+discarded bits plus the original uint-sized error are strictly below two Q60
+units. One product can therefore certify rounding when its distance from the
+half boundary exceeds twice the raw mass. A zero mantissa certifies zero under
+the same bounds. Ineligible or uncertain cases refine through the full Q96
+certificate, then the retained exact integral; these are arithmetic fast-path
+bounds, not geometry or mass admission limits. Independent integer tests pin
+both boundaries and coarse-uncertain/full-certain cases.
+
+Experiments A-E were rejected for warm increases. Disassembly isolated a
+1,592-byte shared translation frame and repeated coefficient normalization;
+single-launch evidence also hid substantial launch variation. The translated
+frame is now separate, and the coarse certificate uses its proven range and
+non-tie bounds without redundant generic range checks. Uncertain products
+retain full refinement.
+
+Accepted candidate F prepares sign and width metadata in FixedMathSharp's immutable
+32-byte `EnclosedQ96Coefficient`. Six prepared coefficients replace six raw
+values, adding only 48 bytes per runtime policy cache. All six matched
+changing-mass cases improve with disjoint 99.9% confidence intervals. The
+complete warm matrix and refreshed full-profile gates pass on the same source.
+
+The zero-weight COM fallback no longer rechecks part support. Admitted solids
+and shells retain strictly positive exact weights, even when their public
+measure rounds to zero. All-zero weights therefore mean unsupported closed-mesh
+parts and retain the existing equal-point average. Removing the obsolete
+rounded-weight support filter also removes the proposed prepared-support API;
+the independent reviewer confirmed the admission and exact-weight invariants.
+
+Fresh validation uses `UseLocalLsfStack=true`: Gravitas passes 6,008 Release
+and 5,942 Lean tests; FixedMathSharp passes 5,737 Release and 5,716 Lean core
+tests plus 49 adapter tests per profile. Both libraries and the affected math
+adapters retain raw 100% reachable line, branch and method coverage. Six replay
+fixtures match their shared expectations and each other across Windows x64
+Release/Lean. Independent integer regressions cover complete tensors, signed
+final saturation, mass mutation, semantic references, detached/committed scale,
+policy alternation and rejected preparation. Independent ponytail review
+approved the arithmetic, transactions, cache layout and simplification.
+Other platform lanes were not run locally.
+
+The native matrix uses two launches, six warmups and six measurements at
+500 ms. All 45 unique cases and 45 strict guards allocate 0 B; 41 valid timing
+gates have no unresolved increase. Four corrected-output cases retain costs
+without speed ratios against the incorrect original results. Five initial
+compound/frame increases were investigated with contemporary original/current
+pairs: the original runtime shifted too, and every fresh pair overlaps its
+99.9% interval. A separate reversed pair likewise corroborates the sole nominal
+standalone reference increase (85.770 ns original versus 85.897 ns current).
+Initial measurements remain in the evidence rather than being replaced.
+
+| Warm workload | Original | Current |
+| --- | ---: | ---: |
+| Mesh, fixed mass/reference | 45.03-48.45 ns | 5.69-6.61 ns |
+| Mesh, changing mass | 47.48-53.84 ns | 21.62-39.26 ns |
+| Mesh, changing reference | 83.14-88.78 ns | 81.72-86.02 ns |
+| Initialized mesh, public inertia | 829-858 ns | 51-52 ns |
+| Initialized mesh, body mass mutation | 7.19-8.21 us | 6.66-7.58 us |
+| Eight-actor mesh compound frame, contemporary pair | 661.53-667.30 us | 659.00-659.68 us |
+
+The existing mesh benchmark class now retains actual alternating mass and
+reference cases for both policies and all three subdivision sizes. All 12
+configurations pass functional in-process Dry smoke; these timings are not the
+native acceptance evidence. The benchmark project builds with zero warnings/errors.
+
+Ignored `artifacts/grv-122-123/` retains red regressions, full-profile coverage,
+replay captures and benchmark smoke. `perf/final45-disposition.json` preserves
+every primary comparison and contemporary corroboration, with immutable binary
+snapshots and source/dependency hashes. Accepted F's 694 production inputs were
+frozen and verified before the ownership cleanup below. The last original
+two-row child was cleaned before direct hashing; its
+unchanged host/snapshot hashes and build graph are retained, and other primary
+and fresh child hashes were observed directly. FixedMathSharp's new internal
+coefficient/division ABI must land first; no dependency pin is advanced here.
+Revalidate against released packages before releasing Gravitas.
+
+Review cleanup extracts `EnclosedQ96Coefficient` into its own internal
+FixedMathSharp scalar file, with its full-precision refinement private to that
+owner. The shared scalar rounding primitive remains in `Fixed64`; no arithmetic
+is copied downstream. Independent ponytail review approves the ownership and
+narrow internal access. Fresh Release/Lean validation retains the test counts,
+raw 100% coverage and replay results above. Normalized comparison of 4,690 math
+and 6,269 physics methods finds no IL-body changes after accounting for the
+intended owner/helper-name/access changes; the coefficient retains its 32-byte
+field layout. All 45 strict correctness/allocation guards still pass at 0 B.
+Focused timing validation remains open: its reversed accepted-F comparison
+terminated with an access violation inside `MeshRuntimeInertia.TryMaterialize`
+after six warmups and two actual iterations. The failed statistics are invalid
+and retained at `perf/accepted-cleanup-reverse.log`; a preserved Windows dump
+shows the Q60 fractional value used as a native write destination, while the
+coefficient references and tensor output address remain valid. Source audits
+find no unsafe operation or escaping reference in this path. Native-code and
+reproduction investigation must resolve this reliability gate before accepting
+the cleanup; IL equivalence alone is insufficient.
+
+The controlled mitigation changes only the certificate output to
+`TryMultiplyRaw(Fixed64, out long)`, preserving its bounds, rounding and zeroed
+failure result. Gravitas constructs scalar values at final matrix materialization.
+This removes the scalar-struct output assignment implicated by the dump without
+new arithmetic, caches, coefficient copies or global PGO changes. Independent
+source review approves the candidate; fresh full Release/Lean suites, raw 100%
+coverage and six replay fixtures pass. Sustained default-PGO/compacting-GC and
+native timing gates remain pending; the precise failed compilation's register
+flow is not available in the small dump.
 
 ## Phase 2: Enforce Complete Collider Admission
 

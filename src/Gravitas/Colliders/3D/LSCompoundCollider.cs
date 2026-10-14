@@ -176,21 +176,10 @@ public sealed class LSCompoundCollider : LSCollider
 
         if (!hasPositiveWeight)
         {
-            int supportedPartCount = 0;
+            // Admitted solids and shells have positive exact weights. Only
+            // unsupported closed-mesh parts need this equal-point fallback.
             for (int i = 0; i < _massWeightScratch.Length; i++)
-            {
-                if (_partColliders[i].SupportsMassProperties)
-                {
-                    _massWeightScratch[i] = ExactMassWeight.One;
-                    supportedPartCount++;
-                }
-            }
-
-            if (supportedPartCount == 0)
-            {
-                for (int i = 0; i < _massWeightScratch.Length; i++)
-                    _massWeightScratch[i] = ExactMassWeight.One;
-            }
+                _massWeightScratch[i] = ExactMassWeight.One;
         }
 
         if (!ExactMassPoint3D.TryGetWeightedAverage(

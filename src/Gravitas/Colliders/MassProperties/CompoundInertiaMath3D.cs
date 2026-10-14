@@ -37,6 +37,20 @@ internal struct CompoundInertiaTensor
         Fixed64.TryGetSignedRawRatio(
             WideArithmetic.MultiplySigned704ToSigned832(geometry, Signed192.Raw(mass)),
             Signed832.ExtendValue(denominator), numeratorLeftShift: 0, out moment);
+
+    internal Fixed3x3 MaterializeSaturated(Fixed64 mass, ExactMassWeight weight)
+    {
+        Signed576 denominator = WideArithmetic.MultiplySigned320(
+            CompoundInertiaMath3D.ScaleWeight(weight), CompoundInertiaMath3D.Q192);
+        Fixed64 xx = SaturatedMoment(Xx, mass, denominator), yy = SaturatedMoment(Yy, mass, denominator);
+        Fixed64 zz = SaturatedMoment(Zz, mass, denominator), xy = SaturatedMoment(Xy, mass, denominator);
+        Fixed64 xz = SaturatedMoment(Xz, mass, denominator), yz = SaturatedMoment(Yz, mass, denominator);
+        return new Fixed3x3(xx, xy, xz, xy, yy, yz, xz, yz, zz);
+    }
+
+    private static Fixed64 SaturatedMoment(Signed704 geometry, Fixed64 mass, Signed576 denominator) =>
+        TryMoment(geometry, mass, denominator, out Fixed64 moment) ? moment
+            : (geometry.Sign < 0) != (mass < Fixed64.Zero) ? Fixed64.MinValue : Fixed64.MaxValue;
 }
 
 /// <summary>Accumulates homogeneous weighted moments without child mass or tensor rounding.</summary>
@@ -53,22 +67,17 @@ internal static class CompoundInertiaMath3D
     internal static void Add(ref CompoundInertiaTensor tensor, LSCollider part,
         ExactMassWeight weight, Vector3d reference)
     {
-        Span<Signed576> intrinsic = stackalloc Signed576[6];
-        intrinsic.Clear();
-        ExactMassPoint3D point;
-        MeshMassIntegrals mesh = default;
         if (part is LSMeshCollider meshCollider)
         {
-            mesh = meshCollider.Mesh.GetCompoundMassIntegrals(usePrepared: false, meshCollider.InertiaPolicy);
-            intrinsic[0] = mesh.Ixx; intrinsic[1] = mesh.Iyy; intrinsic[2] = mesh.Izz;
-            intrinsic[3] = mesh.Ixy; intrinsic[4] = mesh.Ixz; intrinsic[5] = mesh.Iyz;
-            point = part.TransformRelativeMassPropertyPointExact(mesh.Reference);
+            MeshMassIntegrals mesh = meshCollider.Mesh.GetCompoundMassIntegrals(usePrepared: false, meshCollider.InertiaPolicy);
+            AddMesh(ref tensor, mesh, part.CompoundLocalRotation,
+                part.TransformRelativeMassPropertyPointExact(mesh.Reference), reference);
+            return;
         }
-        else
-        {
-            GetIntrinsic(part, weight, intrinsic);
-            point = part.CalculateLocalMassPoint();
-        }
+        Span<Signed576> intrinsic = stackalloc Signed576[6];
+        intrinsic.Clear();
+        GetIntrinsic(part, weight, intrinsic);
+        ExactMassPoint3D point = part.CalculateLocalMassPoint();
 
         // Q224 intrinsic moments acquire Q64 rotation products and Q32 padding.
         // Q96 semantic displacements square directly into the same Q320 frame.
@@ -77,7 +86,20 @@ internal static class CompoundInertiaMath3D
         Signed320 dy = Difference(point.YNumerator, reference.Y);
         Signed320 dz = Difference(point.ZNumerator, reference.Z);
         AddParallelAxis(ref tensor, ScaleWeight(weight), dx, dy, dz);
-        AddFirstMoments(ref tensor, mesh, part.CompoundLocalRotation, dx, dy, dz);
+    }
+
+    internal static void AddMesh(ref CompoundInertiaTensor tensor, in MeshMassIntegrals mesh,
+        FixedQuaternion rotation, ExactMassPoint3D point, Vector3d reference)
+    {
+        Span<Signed576> intrinsic = stackalloc Signed576[6];
+        intrinsic[0] = mesh.Ixx; intrinsic[1] = mesh.Iyy; intrinsic[2] = mesh.Izz;
+        intrinsic[3] = mesh.Ixy; intrinsic[4] = mesh.Ixz; intrinsic[5] = mesh.Iyz;
+        AddIntrinsic(ref tensor, intrinsic, rotation);
+        Signed320 dx = Difference(point.XNumerator, reference.X);
+        Signed320 dy = Difference(point.YNumerator, reference.Y);
+        Signed320 dz = Difference(point.ZNumerator, reference.Z);
+        AddParallelAxis(ref tensor, ScaleWeight(mesh.Weight), dx, dy, dz);
+        AddFirstMoments(ref tensor, mesh, rotation, dx, dy, dz);
     }
 
     private static Signed320 Difference(Signed320 point, Fixed64 reference) =>

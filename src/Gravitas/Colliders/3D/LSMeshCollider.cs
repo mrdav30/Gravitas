@@ -19,6 +19,8 @@ namespace Gravitas.Colliders;
 public sealed class LSMeshCollider : LSCollider
 {
     private readonly SwiftList<int> _triangleQueryBuffer = new();
+    private bool _inertiaOriginValid, _inertiaOriginExact;
+    private Vector3d _inertiaOriginOffset, _inertiaOriginScale, _inertiaOrigin;
 
     /// <inheritdoc/>
     public override ColliderType Shape => ColliderType.Mesh;
@@ -118,8 +120,12 @@ public sealed class LSMeshCollider : LSCollider
 
     internal override ExactMassWeight CalculateMassPropertyWeight()
     {
+        EnsureDetachedMassGeometry();
         if (InertiaPolicy == MeshInertiaPolicy.SurfaceApproximation)
+        {
+            _ = Mesh.SurfaceMassProperties;
             return Mesh.SurfaceMassWeight;
+        }
 
         if (Mesh.TryGetClosedVolumeMassProperties(out MeshMassProperties properties, out _))
             return Mesh.GetCompoundMassIntegrals(usePrepared: false, InertiaPolicy).Weight;
@@ -142,12 +148,19 @@ public sealed class LSMeshCollider : LSCollider
         return ExactMassWeight.Zero;
     }
 
-    internal override bool SupportsMassProperties =>
-        InertiaPolicy == MeshInertiaPolicy.SurfaceApproximation
-        || Mesh.TryGetClosedVolumeMassProperties(out _, out _);
+    internal override bool SupportsMassProperties
+    {
+        get
+        {
+            EnsureDetachedMassGeometry();
+            return InertiaPolicy == MeshInertiaPolicy.SurfaceApproximation
+                || Mesh.TryGetClosedVolumeMassProperties(out _, out _);
+        }
+    }
 
     internal override ExactMassPoint3D CalculateLocalMassPoint()
     {
+        EnsureDetachedMassGeometry();
         Vector3d meshCenterOfMass;
         if (InertiaPolicy == MeshInertiaPolicy.SurfaceApproximation)
         {
@@ -192,29 +205,57 @@ public sealed class LSMeshCollider : LSCollider
             meshCenterOfMass);
     }
 
-    internal override Fixed3x3 CalculateCenterOfMassInertiaTensor(
-        Fixed64 mass)
+    /// <inheritdoc/>
+    public override Fixed3x3 CalculateInertiaTensor(Fixed64 mass, Vector3d localCenterOfMassOffset)
     {
-        Vector3d center;
+        if (mass <= Fixed64.Zero) return Fixed3x3.Zero;
+        EnsureDetachedMassGeometry();
+        if (CompoundOwner == null)
+        {
+            GetCurrentShapeScales(out Vector3d ownerScale, out _);
+            if (!_inertiaOriginValid || _inertiaOriginOffset != LocalOffset || _inertiaOriginScale != ownerScale)
+            {
+                ExactMassPoint3D origin = TransformRelativeMassPropertyPointExact(Vector3d.Zero);
+                _inertiaOriginExact = origin.TryGetPoint(out _inertiaOrigin);
+                if (_inertiaOriginExact)
+                {
+                    ExactMassPoint3D projected = ExactMassPoint3D.FromPoint(_inertiaOrigin);
+                    _inertiaOriginExact = WideArithmetic.SubtractSigned320(origin.XNumerator, projected.XNumerator).IsZero
+                        && WideArithmetic.SubtractSigned320(origin.YNumerator, projected.YNumerator).IsZero
+                        && WideArithmetic.SubtractSigned320(origin.ZNumerator, projected.ZNumerator).IsZero;
+                }
+                _inertiaOriginOffset = LocalOffset;
+                _inertiaOriginScale = ownerScale;
+                _inertiaOriginValid = true;
+            }
+            if (_inertiaOriginExact && Vector3d.TrySubtract(localCenterOfMassOffset, _inertiaOrigin, out Vector3d reference))
+                return Mesh.CalculateInertiaTensor(mass, InertiaPolicy, reference);
+        }
+        // Keep semantic offsets and first moments until the final mass-applied
+        // conversion when a body-local reference cannot be mapped to a scalar.
         if (InertiaPolicy == MeshInertiaPolicy.SurfaceApproximation)
-        {
-            center = Mesh.SurfaceMassProperties.CenterOfMass;
-        }
-        else if (Mesh.TryGetClosedVolumeMassProperties(
-            out MeshMassProperties properties,
-            out _))
-        {
-            center = properties.CenterOfMass;
-        }
-        else
-        {
-            center = Vector3d.Zero;
-        }
+            _ = Mesh.SurfaceMassProperties;
+        else if (!Mesh.TryGetClosedVolumeMassProperties(out _, out MeshVolumeValidationResult result))
+            throw new InvalidOperationException($"Mesh inertia requires a validated closed volume. Validation result: {result}.");
+        MeshMassIntegrals integrals = Mesh.GetCompoundMassIntegrals(false, InertiaPolicy);
+        CompoundInertiaTensor exact = default;
+        CompoundInertiaMath3D.AddMesh(ref exact, integrals, CompoundLocalRotation,
+            TransformRelativeMassPropertyPointExact(integrals.Reference), localCenterOfMassOffset);
+        return exact.MaterializeSaturated(mass, integrals.Weight);
+    }
 
-        return Mesh.CalculateInertiaTensor(
-            mass,
-            InertiaPolicy,
-            center);
+    internal override Fixed3x3 CalculateCenterOfMassInertiaTensor(Fixed64 mass) =>
+        CalculateInertiaTensor(mass, CalculateLocalCenterOfMassOffset());
+
+    private void EnsureDetachedMassGeometry()
+    {
+        if (HasCommittedShape) return;
+        GetCurrentShapeScales(out Vector3d ownerScale, out Vector3d partScale);
+        if (Mesh.OwnerScale == ownerScale && Mesh.PartScale == partScale) return;
+        // Authored part scale may be compensated by a later host scale; prepare
+        // only when current properties are requested, never during construction.
+        Mesh.PrepareTransformation(Vector3d.Zero, FixedQuaternion.Identity, ownerScale, partScale, null);
+        Mesh.PublishPreparedTransformation();
     }
 
     /// <inheritdoc/>

@@ -36,42 +36,24 @@ public partial class PhysicsMesh
 
     /// <summary>
     /// Calculates mesh inertia for the supplied mass using the requested policy.
+    /// Applies signed mass algebraically and saturates only final entries.
     /// This is a geometry/topology API; callers apply body mobility gates before requesting inertia.
     /// </summary>
     public Fixed3x3 CalculateInertiaTensor(Fixed64 mass, MeshInertiaPolicy policy)
     {
-        if (policy == MeshInertiaPolicy.RequireClosedVolume
-            && TryGetClosedVolumeMassProperties(out MeshMassProperties properties, out _))
-        {
-            return CalculateInertiaTensor(mass, policy, properties.CenterOfMass);
-        }
-
-        if (policy == MeshInertiaPolicy.SurfaceApproximation)
-            return CalculateInertiaTensor(mass, policy, SurfaceMassProperties.CenterOfMass);
-
-        return CalculateInertiaTensor(mass, policy, _scaledLocalBounds.Center);
+        CompoundMassCache cache = GetRuntimeMassCache(policy);
+        return cache.Runtime!.Calculate(mass, cache.Runtime.Center, cache.Current);
     }
 
     /// <summary>
     /// Calculates mesh inertia for the supplied mass about a specific local reference point.
+    /// Applies signed mass algebraically and saturates only final entries.
     /// This is a geometry/topology API; callers apply body mobility gates before requesting inertia.
     /// </summary>
     public Fixed3x3 CalculateInertiaTensor(Fixed64 mass, MeshInertiaPolicy policy, Vector3d localReferencePoint)
     {
-        switch (policy)
-        {
-            case MeshInertiaPolicy.RequireClosedVolume:
-                if (!TryGetClosedVolumeMassProperties(out MeshMassProperties properties, out MeshVolumeValidationResult result))
-                    throw new InvalidOperationException($"Mesh inertia requires a validated closed volume. Validation result: {result}.");
-
-                return properties.CalculateInertiaTensor(mass, localReferencePoint);
-
-            case MeshInertiaPolicy.SurfaceApproximation:
-                return SurfaceMassProperties.CalculateInertiaTensor(mass, localReferencePoint);
-
-            default:
-                throw new ArgumentOutOfRangeException(nameof(policy), policy, "Unsupported mesh inertia policy.");
-        }
+        CompoundMassCache cache = GetRuntimeMassCache(policy);
+        return cache.Runtime!.Calculate(mass, localReferencePoint, cache.Current);
     }
 
     /// <summary>

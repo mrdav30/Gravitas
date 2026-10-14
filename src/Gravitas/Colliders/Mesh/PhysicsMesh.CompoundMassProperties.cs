@@ -6,13 +6,15 @@
 //=======================================================================
 
 using FixedMathSharp;
+using System;
+using System.Runtime.CompilerServices;
 
 namespace Gravitas.Colliders;
 
 public partial class PhysicsMesh
 {
-    // Allocate the wide retained cache only when this mesh participates in
-    // compound inertia. Standalone meshes do not allocate this wide cache.
+    // Allocate retained moments only when inertia is requested. Each physical
+    // policy keeps its geometry across alternating requests and pose changes.
     private CompoundMassCache? _compoundMassCache;
 
     private sealed class CompoundMassCache
@@ -20,15 +22,48 @@ public partial class PhysicsMesh
         internal readonly MeshInertiaPolicy Policy;
         internal MeshMassIntegrals Current, Prepared;
         internal bool CurrentValid, PreparedValid;
+        internal CompoundMassCache? Alternate;
+        internal MeshRuntimeInertia? Runtime;
 
         internal CompoundMassCache(MeshInertiaPolicy policy) => Policy = policy;
     }
 
+    private CompoundMassCache GetMassCache(MeshInertiaPolicy policy)
+    {
+        if (_compoundMassCache == null)
+            _compoundMassCache = new CompoundMassCache(policy);
+        return _compoundMassCache.Policy == policy ? _compoundMassCache
+            : _compoundMassCache.Alternate ??= new CompoundMassCache(policy);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private CompoundMassCache GetRuntimeMassCache(MeshInertiaPolicy policy)
+    {
+        if (policy != MeshInertiaPolicy.RequireClosedVolume && policy != MeshInertiaPolicy.SurfaceApproximation)
+            throw new ArgumentOutOfRangeException(nameof(policy), policy, "Unsupported mesh inertia policy.");
+        CompoundMassCache cache = GetMassCache(policy);
+        if (cache.Runtime?.Ready != true) BuildRuntimeMassCache(cache);
+        return cache;
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private void BuildRuntimeMassCache(CompoundMassCache cache)
+    {
+        Vector3d center;
+        if (cache.Policy == MeshInertiaPolicy.RequireClosedVolume)
+        {
+            if (!TryGetClosedVolumeMassProperties(out MeshMassProperties properties, out MeshVolumeValidationResult result))
+                throw new InvalidOperationException($"Mesh inertia requires a validated closed volume. Validation result: {result}.");
+            center = properties.CenterOfMass;
+        }
+        else center = SurfaceMassProperties.CenterOfMass;
+        MeshMassIntegrals integrals = GetCompoundMassIntegrals(usePrepared: false, cache.Policy);
+        (cache.Runtime ??= new MeshRuntimeInertia()).Build(integrals, center);
+    }
+
     internal MeshMassIntegrals GetCompoundMassIntegrals(bool usePrepared, MeshInertiaPolicy policy)
     {
-        if (_compoundMassCache == null || _compoundMassCache.Policy != policy)
-            _compoundMassCache = new CompoundMassCache(policy);
-        CompoundMassCache cache = _compoundMassCache;
+        CompoundMassCache cache = GetMassCache(policy);
         ref MeshMassIntegrals integrals = ref (usePrepared ? ref cache.Prepared : ref cache.Current);
         ref bool valid = ref (usePrepared ? ref cache.PreparedValid : ref cache.CurrentValid);
         if (!valid)

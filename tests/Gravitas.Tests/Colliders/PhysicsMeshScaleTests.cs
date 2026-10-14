@@ -35,7 +35,8 @@ public sealed class PhysicsMeshScaleTests
             diagonal, Fixed64.Zero, Fixed64.Zero,
             Fixed64.Zero, diagonal, Fixed64.Zero,
             Fixed64.Zero, Fixed64.Zero, diagonal));
-        mesh.CalculateInertiaTensor((Fixed64)16).M11.Should().Be(diagonal * 16);
+        mesh.CalculateInertiaTensor((Fixed64)16).M11.Should()
+            .Be(Fixed64.FromRaw(((((long)side * side * 16) << 32) + 3) / 6));
     }
 
     [Fact]
