@@ -10,6 +10,46 @@ namespace Gravitas.Tests.Colliders;
 
 public sealed class ColliderExactScaleAdmissionTests
 {
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void ScaledRotations_ShouldAdmitCompensatedPhysicalGeometry(bool planar, bool hierarchy)
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        FixedQuaternion rotation = planar
+            ? FixedQuaternion.FromAxisAngle(Vector3d.Up, -Fixed64.PiOver4)
+            : FixedQuaternion.FromEulerAnglesInDegrees((Fixed64)19, (Fixed64)31, (Fixed64)11);
+        var root = new FixedTransform(Vector3d.Zero, rotation, Vector3d.One * (Fixed64)2048);
+        FixedTransform transform = hierarchy
+            ? new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One, root)
+            : root;
+        Vector3d captured = ColliderScalePolicy.Capture(transform, out _, out _);
+        Vector3d scaleOnly = ColliderScalePolicy.CaptureScale(transform);
+        for (int axis = 0; axis < 3; axis++)
+        {
+            (captured[axis] / (Fixed64)2048 - Fixed64.One).Abs().Should().BeLessThanOrEqualTo(Fixed64.Epsilon);
+            (scaleOnly[axis] / (Fixed64)2048 - Fixed64.One).Abs().Should().BeLessThanOrEqualTo(Fixed64.Epsilon);
+        }
+
+        var sphere = new LSSphereCollider { Radius = Fixed64.FromFraction(1, 2048) };
+        sphere.InitializeWithNoBody(new TestMatterAgent(context, transform));
+        (sphere.ScaledRadius - Fixed64.One).Abs().Should().BeLessThanOrEqualTo(Fixed64.Epsilon);
+        context.Physics.ColliderCount.Should().Be(1);
+
+        if (planar)
+        {
+            Vector2d fullScale = ColliderScalePolicy.CapturePlanar(transform, out _, out _);
+            Vector2d planarScaleOnly = ColliderScalePolicy.CapturePlanar(transform, out _, out _, captureRotation: false);
+            planarScaleOnly.Should().Be(fullScale);
+            var circle = new LSCircleCollider2D(Fixed64.FromFraction(1, 2048));
+            circle.InitializeWithNoBody(new TestMatterAgent(context, transform));
+            (circle.ScaledRadius - Fixed64.One).Abs().Should().BeLessThanOrEqualTo(Fixed64.Epsilon);
+            context.Physics2D.ColliderCount.Should().Be(1);
+        }
+    }
+
     [Fact]
     public void CustomColliderCanonicalBounds_ShouldRemainConservative()
     {

@@ -259,14 +259,19 @@ Resolve coherent numerical domains together where ownership permits, retaining
 each regression. Recheck representative mass/shape ratios independently of size;
 even an admitted sphere can have unrepresentable inertia at excessive mass.
 
-The oblique host-scale probe also confirmed FixedMathSharp's existing strict
-decomposition limitation, recorded as `FMS-Issue-029` in its own tracker. Uniform
-scale `2,048` amplifies quaternion reconstruction rounding beyond the fixed
-absolute matrix tolerance although the source matrix is representable and its
-normalized basis passes. This follows the current round-trip contract; do not
-claim a new geometry miss or silently loosen shear checks here. Preserve this
-boundary in subsequent compensated-scale tests and coordinate any upstream
-contract revision separately.
+The oblique host-scale probe also exposed `FMS-Issue-029`: uniform scale `2,048`
+amplifies quaternion reconstruction rounding beyond an absolute matrix tolerance
+although the source matrix is representable and its normalized basis passes.
+The coordinated FixedMathSharp fix retains normalized orthogonality/quaternion
+checks and requires representable scaled reconstruction. Its per-row coefficient
+error bound is `abs(scale) * (Epsilon + q/2) + q/2`, where `q` is one raw unit.
+Gravitas's existing scale policy consumes that shared fix. Compensated-scale
+regressions now admit unit-radius 2D/3D geometry under direct and parented rotated
+scale-2,048 transforms, covering full and scale-only capture. This resolves the
+upstream decomposition prerequisite without weakening physical ancestry,
+planar-coupling or shear rejection, or locking this plan's candidate ceiling.
+See FixedMathSharp's completed `2026-10-14-scaled-rotation-decomposition.md`
+record for the contract proof and coordinated Release/ReleaseLean validation.
 
 ## Phase 1: Validate And Lock The Supported Range
 
