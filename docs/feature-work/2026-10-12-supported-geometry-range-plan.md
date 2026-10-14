@@ -8,12 +8,13 @@
 > design document or phase report.
 
 **Date:** 2026-10-12  
-**Status:** Phase 1 evidence collected; numerical prerequisites #113-#124 are
-resolved. Ceiling locking and admission implementation remain pending; admission
-implementation has not started. The bounded
-effective-geometry direction is approved. The proposed
-ceiling remains provisional while confirmed in-range numerical defects are
-resolved; admission alone cannot establish the intended safety guarantee.  
+**Contract locked:** 2026-10-14  
+**Status:** Phase 1 contract review complete: the inclusive `4,096`-unit
+conservative reach and measurement rules below are locked. Numerical
+prerequisites #113-#124 and the upstream scaled-decomposition prerequisite are
+resolved. Admission enforcement has not started; #096 remains open until the
+complete contract is implemented and verified. The ceiling is a supported-workload
+boundary, not a proof that every derived physics quantity is representable.  
 **Owner:** Gravitas geometry admission and lifecycle transactions.
 
 **Goal:** Close `GRV-Issue-096` with explicit, consistent admission of supported
@@ -47,8 +48,9 @@ have different numerical requirements. Large geometry also increases partition
 coverage independently of its mathematical representability.
 
 This work establishes an honest geometry boundary. It does not promise arbitrary
-mass, speed, aspect ratio, one-raw-unit features or cheap voxel coverage at every
-cell size. It does not reopen manifold algorithms, redesign response, replace
+mass, speed, aspect ratio, COM/inertia-reference overrides, one-raw-unit features
+or cheap voxel coverage at every cell size. Those retain their existing independent
+representability and solver contracts. It does not reopen manifold algorithms, redesign response, replace
 GridForge, change the coordinate representation or restrict FixedMathSharp's
 general-purpose APIs. #111's generated benchmark-host references remain separate;
 coordinate measurement execution with that issue if it blocks an existing row.
@@ -60,11 +62,12 @@ coordinate measurement execution with that issue if it blocks an existing row.
    scalar limit retains translated-frame and anchor behavior, including conceptual
    supports outside the absolute scalar domain. Actual body-position exhaustion
    continues to fail explicitly.
-2. **Bound the final physical envelope.** Start phase 1 with `4,096` world units
-   as a candidate maximum conservative center-to-surface reach. It is a workload
-   candidate, not a numerical proof or an unconditional final value. The budget is
-   inclusive; a measured reach one raw increment above it rejects. Units belong
-   to the host: `4,096` metres is about a `8,192`-metre sphere diameter only when
+2. **Bound the final physical envelope.** The maximum conservative reach is
+   `4,096` world units, inclusive, using the measurement rules below. A measured
+   reach one raw increment above it rejects; do not add an epsilon allowance.
+   This is an evidence-backed workload boundary, not a blanket numerical proof.
+   Units belong to the host: `4,096` metres permits an `8,192`-metre unattached
+   sphere diameter only when
    the host chooses metres consistently throughout its simulation.
 3. **Use one reviewed library ceiling.** Publish the approved value through
    existing dimensional collider settings, with one internal source of truth.
@@ -84,28 +87,38 @@ coordinate measurement execution with that issue if it blocks an existing row.
    public bypass or an unnecessary construction overload.
 5. **Use candidate-local geometry, not clipped world bounds.** Reuse the existing
    conservative centered proxy formulas and ceiling-magnitude arithmetic;
-   document their conservatism. Rotating a rigid shape must not change admission.
+   document their conservatism. A rigid pose change with unchanged prepared
+   local geometry must not change admission. Independently rounding rotated
+   world-vertex inputs creates slightly different geometry and may change the
+   result at the exact cutoff.
    A compact mesh translated in its authored vertex frame retains the existing
    recentering behavior and must not become huge merely because of that origin.
    This preserves intrinsic reach; if the authored center becomes a real
    body-local attachment offset, that physical lever still counts under rule 6.
-6. **Account for the owning object's complete reach.** A standalone body-owned
-   shape includes its effective body-local attachment offset; a bodyless shape
-   uses its physical collider origin. A compound includes every effective part
-   offset plus that part's centered reach, then its owner attachment offset.
-   Compute these offsets in the existing local frames, without subtracting
-   absolute world centers. Small leaves cannot bypass admission through enormous
-   spacing. Bounding sums may conservatively overestimate the actual envelope;
-   they are the documented admission metric, not a minimum enclosing sphere.
+6. **Account for the owning object's complete reach.** Measure a body-owned
+   shape from the body pose origin, independently of derived or overridden COM.
+   A bodyless root uses its physical collider origin. The additive metric below
+   includes effective part offsets and adds owner attachment once. Measure exact
+   owner-scaled offset products in local frames before component rounding or
+   world rotation; subtracting materialized world centers can lose reach.
+   Small leaves cannot bypass admission through enormous spacing. This deliberately
+   conservative metric does not cancel opposed owner/part offsets and is not a
+   minimum enclosing sphere.
 7. **Keep dimension parity explicit.** Apply the same reach budget to 3D and pure
-   2D. In mixed mode include the finite slab's Y half-thickness in its conservative
-   3D envelope. Pure 2D admission must not depend on unused physical Y thickness.
+   2D. Compute the complete planar reach first, then include the finite slab's
+   physical, unscaled Y half-thickness through the mixed formula below. Absolute
+   host-transform Y is embedding position, not attachment reach. Pure 2D admission
+   must not depend on unused thickness; explicit mixed queries must validate the
+   slab they use even when the runtime mode is not `Mixed`.
 8. **Cover query geometry.** Public overlap and swept-source shapes share the
    applicable reach budget. A finite cone query includes its length and end
    radius in its physical envelope. Measure it about the apex/base midpoint with
    the centered cone collider's conservative formula; the public apex anchor does
-   not consume attachment budget. Ray length and travel of a bounded swept
-   source remain separate from source size and retain their existing contracts.
+   not consume attachment budget. Its existing endpoint-representability checks
+   still apply. World-vertex polygon queries use the exact arithmetic vertex mean
+   for admission, with wide differences and outward distances, rather than a
+   world-axis AABB midpoint. Ray length and travel of a bounded swept source remain
+   separate from source size and retain their existing contracts.
 9. **Reject before publication.** Unsupported geometry produces a descriptive
    argument/validation failure using existing API conventions. It cannot become
    a collision miss, a smaller clamped shape or a clearance `Blocked` result.
@@ -178,6 +191,45 @@ queries and mixed thickness outside collider preparation; and rejected live or
 recorded mutations after derived caches have been prepared. Their tests belong
 to phases 1, 2 and 3 below, not to a separate test framework.
 
+### Locked Admission Metric
+
+Let `q = 2^-32`. Define `C(v)` as the least nonnegative Q32.32 value whose
+exact square encloses the exact squared norm of local vector `v`. Retain exact
+scaled attachment products until this outward norm; nearest-even projection of
+each offset component must not hide a fractional-raw excess at the ceiling.
+Effective shape dimensions and vertices retain their existing fused nearest-even
+materialization. Outward measurement bounds that prepared geometry, without
+changing it. Unrepresentable norms or checked sums reject rather than saturate.
+
+For a leaf let `R` be its intrinsic reach from the table below. A compound's
+intrinsic reach is `max_i(C(partOffset_i) + R_i)`. Let `A` be
+`C(ownerAttachment)` for a body-owned root, or zero for a bodyless root. Its
+complete planar or spatial reach is `P = A + intrinsicReach`. All additions are
+checked, and the root is admitted exactly when `P <= 4,096`. This policy
+deliberately rejects owner offset `+3,000`, part offset `-3,000`, radius `1`:
+its metric is `6,001` despite cancellation in the final leaf position. Hosts can
+normalize their authored frames instead of depending on offset cancellation.
+
+For mixed 2D geometry, admit exactly when `C([P, h]) <= 4,096`, where `P` is
+the **complete** planar reach and `h` is the effective physical half-thickness.
+A 2D compound's leaves inherit that thickness from its owner snapshot. Do not
+apply thickness before adding attachment reach, scale it by host Y scale, or
+count absolute host Y. Query sources use their explicit thickness; queries
+against stored 2D slabs validate the target slab at use time.
+
+For a public world-vertex polygon with `n` vertices, use its exact rational
+vertex mean `sum(v_i)/n` and `max_i C(v_i - mean)` for admission. Compute in wide
+arithmetic without materializing the mean or subtracting rounded world centers;
+equivalently retain `n*v_i - sum(v)` and the denominator `n`. Reversal and cyclic
+vertex order do not change this metric. The existing Q32.32 query-runtime center
+can remain unchanged. Center-and-size AABB queries use the supplied center and
+`C(preparedHalfExtents)`, preserving their existing nearest-even half-size
+materialization, including odd raw sizes; do not invent a new midpoint or
+independently enlarge their prepared half-extents.
+Finite cone queries use their apex/base midpoint and the centered finite-axis
+formula. These choices define admission anchors, not
+new public geometry or contact algorithms.
+
 ### Phase 1 Admission Inventory And Measurement Decisions
 
 The shared preparation seam covers initialization, detached/live rebuild, body
@@ -190,19 +242,21 @@ preparation and compound part traversal can supply reach without a second scan.
 | Family | Conservative intrinsic reach, rounded outward |
 | --- | --- |
 | Sphere/circle | Effective radius. |
-| Capsule/stadium | Half core length plus radius, retaining an odd raw half-length. |
+| Capsule/stadium | `radiusRaw + ceil(coreLengthRaw / 2)`, retaining an odd raw half-length. |
 | Cuboid/AABB | Ceiling norm of final half-extents. |
-| Cone/cylinder | Ceiling norm of `[radius, outward-rounded height/2, radius]`; intentionally the bounding-box diagonal, not the tight support radius. |
+| Cone/cylinder | `C([radius, ceil(heightRaw / 2), radius])`, with the raw half-height converted back to Q32.32; intentionally the bounding-box diagonal, not the tight support radius. |
 | Mesh | Maximum ceiling norm of final scaled vertices in the existing recentered local frame. |
 | Polygon | Maximum ceiling norm of final scaled local vertices about the actual collider origin. |
 | Compound | Maximum of ceiling part-offset norm plus that leaf's intrinsic reach. |
-| Mixed slab | Ceiling norm of planar reach and physical half-thickness. |
+| Mixed slab | `C([completePlanarReach, physicalHalfThickness])`, after all planar attachments. |
 
-Add effective owner attachment reach once, in the body's local frame, for a
+Add effective owner attachment reach once, in the body's pose-origin frame, for a
 body-owned collider. A bodyless collider uses its physical origin. Use existing
 ceiling-magnitude and checked-sum arithmetic; an unrepresentable envelope rejects.
-These formulas are the reviewed measurement direction; `4,096` is still a
-candidate ceiling, not a claim of safe higher-order scalar arithmetic.
+These formulas and the inclusive `4,096` ceiling are locked admission policy,
+not a claim of safe arbitrary higher-order scalar arithmetic. Existing committed
+compound proxy helpers that subtract rounded world centers are not admission
+measurements; reuse their formula and local prepared data instead.
 
 Four lifecycle details need more than a check at the common preparation seam:
 
@@ -216,12 +270,14 @@ Four lifecycle details need more than a check at the common preparation seam:
   transaction failure alone cannot preserve the old awake state.
 - Mutable, contextless settings currently allow pure-2D admission to acquire a
   mixed slab later. Mode/thickness/settings replacement require an owning-context
-  preflight before publishing the changed configuration.
+  preflight before publishing the changed configuration, including every observing
+  context if a mutable settings instance is shared. Resolve ownership in phase 3;
+  one context callback alone is insufficient for a shared instance.
 - Recorded fields are written before rebuilding. Preserve the supported runtime
   transaction boundary without claiming globally atomic arbitrary payload loads.
 
 Public 2D AABB and world-vertex polygon queries also need admission. Measure a
-query polygon about a derived local midpoint, not absolute world coordinates.
+query polygon about the exact vertex mean specified above, not absolute world coordinates.
 Unknown internal collider fallbacks currently expose a `MaxValue` conservative
 proxy; reject unsupported runtime shape admission explicitly rather than treat
 the sentinel as a valid prepared envelope.
@@ -313,15 +369,16 @@ and mixed query tests; reuse `MeshMassPropertyBenchmarks`,
       ambiguous differences under matched host/JIT conditions.
       Use native out-of-process benchmark evidence where the existing host works;
       label diagnostic timings honestly if #111 blocks a row.
-- [ ] Lock the ceiling, conservative shape formulas, inclusive rounding rule,
+- [x] Lock the ceiling, conservative shape formulas, inclusive rounding rule,
       attachment frame and mixed-slab formula in this contract after focused
       geometry and ponytail review. If evidence requires changing the approved
       direction or a materially different workload range, bring that decision
       back to the user before enforcement.
 
 **Exit:** A reviewed numerical range and measurement contract with baseline
-evidence. `4,096` remains provisional until this exit; no supported-safety claim
-is based solely on its proximity to Q32.32 square limits.
+evidence. The inclusive `4,096` ceiling and exact measurement rules are locked;
+enforcement and its no-regression gates remain in phases 2-4. No supported-safety
+claim is based solely on proximity to Q32.32 square limits.
 
 **Phase summary (2026-10-12):** Evidence collection is complete; independent
 geometry/ponytail review agrees that ceiling locking remains pending #113-#116.
@@ -894,7 +951,35 @@ The ten maintained polygon benchmark cases pass functional in-process Dry smoke;
 their smoke timings are not acceptance evidence. Ignored `artifacts/grv-124/`
 retains red/full-profile coverage/replay evidence, frozen inputs, loaded child
 hashes, exact intervals and `final-C-disposition.json`. #124 is resolved; phase 1
-ceiling locking and the complete #096 admission contract remain pending.
+ceiling locking and the complete #096 admission contract remained pending at
+that checkpoint.
+
+**Phase 1 contract lock (2026-10-14):** Independent ponytail and geometry reviews
+approve the inclusive `4,096`-unit ceiling, exact outward attachment measurement,
+additive frame policy, complete-planar-then-thickness mixed formula and exact
+vertex-mean query anchor. #111, #125 and the remaining benchmark signals are
+independent follow-ups, not blockers for this contract decision. Numerical
+prerequisites #113-#124 and FixedMathSharp's scaled-decomposition prerequisite
+are resolved; no new production or upstream changes were made in this lock step.
+
+Fresh local-stack Release/Lean solution builds pass with zero warnings/errors;
+**6,030 / 5,964** tests pass with raw **100%** reachable line/branch/method coverage
+in both profiles. All six shared replay fixtures match expectations and directly
+agree across native Windows x64 profiles. The unchanged family probe reruns
+**726 checks / zero failures** on Gravitas `6a565e3f` and FixedMathSharp `fe4e2188`.
+#096's ordinary radius-1,024, one-raw-core control hits at distance zero. The
+extreme capsule still initializes and misses, with reach exactly `1,073,741,824`
+units, confirming the future policy rejects its scale without treating the
+current miss as fixed. Both probe builds pass and their loaded stack hashes match
+the frozen validated binaries. Ignored `artifacts/geometry-range/phase1/contract-lock/`
+retains full coverage/replay captures, probe results, source revisions and hashes.
+
+Phase 1 is complete. Runtime enforcement, migration and row-wise warm-regression
+gates remain in phases 2-4; #096 stays open. Existing timings remain historical
+evidence: capture affected controls on the current accepted stack before phase 2
+source edits, then compare each row independently. Native Linux/ARM and released
+package validation remain CI/release gates. This documentation-only lock introduces
+no runtime admission overhead and makes no new timing claim.
 
 ## Phase 2: Enforce Complete Collider Admission
 
@@ -908,9 +993,15 @@ candidate-local measurements supplied by existing dimensional owners. Reuse
 FixedMathSharp ceiling magnitudes and checked sums for effective offset plus
 centered reach. No internal wide types enter public APIs or serialized layouts.
 
+- [ ] Freeze the current accepted source stack and capture affected ordinary warm
+      controls before admission source edits. Reuse maintained contact, query,
+      body-pose and mesh/compound fixtures; older pre-prerequisite binaries are
+      historical evidence rather than the sole performance comparison.
 - [ ] Add failing production tests for the locked limit, one raw increment above
       it, and oversized dimensions that scale down to admitted geometry. Cover
       overflowed intermediate scale products with representable final results.
+      Include fractional-raw attachments, odd raw core lengths/heights, deliberate
+      offset-cancellation rejection and complete-planar-before-thickness boundaries.
       Include primitive, mesh and polygon authoring controls, with shrinking host
       and compound-part scales applied after construction.
 - [ ] Implement candidate reach and shared validation before publication across
@@ -956,12 +1047,16 @@ owners; tests under `Queries`, `Physics2D`, `MixedDimensions` and `Serialization
 - [ ] Apply shared geometry admission to query sources and mixed thickness.
       Preserve zero-radius/degenerate input rules that differ by existing query
       API; do not silently tighten them as a side effect of the maximum limit.
+      Cover explicit mixed queries in non-`Mixed` runtime modes and world-polygon
+      vertex-mean admission under translation, winding and cyclic-order changes.
 - [ ] Prove long rays and long travel of small swept sources remain admitted under
       existing endpoint/distance rules, including ordinary shapes near both world
       limits. Cover 2D, 3D and mixed counterparts and finite cone length/radius.
 - [ ] Audit settings changes and every recorded/load path that can change effective
       geometry. Unsupported candidates reject through the existing ownership
       transaction; verify no invalid geometry reaches partitions or solver caches.
+      Close shared mutable settings as a bypass through explicit ownership or
+      complete observer preflight; retain pure-2D independence from unused thickness.
       Do not claim arbitrary Chronicler payload application is globally atomic:
       test and document the actual supported load boundary and preserve saved
       sleep/caches for successful loads according to current contracts.

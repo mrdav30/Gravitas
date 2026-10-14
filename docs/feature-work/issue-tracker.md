@@ -39,19 +39,21 @@
 
 Phase 1 of the supported-geometry plan confirmed in-range numerical defects on
 the original binaries. Integral, volume, overlap and mass-property fixes
-#113-#124 are resolved. Return to **#096** to review and lock the supported
-geometry contract before implementing admission.
+#113-#124 are resolved. **#096** has a locked supported-geometry contract;
+implement admission next, preserving the current warm performance baseline.
 #111 remains an independent validation-tooling issue.
 #125 is a low-priority, non-blocking runtime crash observation; defer further
 investigation unless it recurs or a reliable reproducer becomes available.
 
 ### GRV-Issue-096 - Extreme-scale capsule initial mesh sweep can miss a genuine overlap
 
-- **Status:** Approved bounded effective-geometry direction; implementation
-  planned in the [Supported Geometry Range Plan](2026-10-12-supported-geometry-range-plan.md).
-  The candidate `4,096`-unit reach remains provisional until phase 1 validation;
-  in-range numerical prerequisites #113-#124 are resolved. This issue stays open
-  until the complete admission contract is implemented.
+- **Status:** Contract locked 2026-10-14 after phase 1 validation and independent
+  geometry/ponytail review: inclusive `4,096`-unit conservative reach, exact outward
+  attachment norms, explicit body/bodyless frames, mixed thickness after complete
+  planar reach, and exact vertex-mean query-polygon admission. In-range numerical
+  prerequisites #113-#124 and upstream scaled decomposition are resolved.
+  Enforcement remains pending in the [Supported Geometry Range Plan](2026-10-12-supported-geometry-range-plan.md).
+  This issue stays open until the complete admission contract is implemented.
 - **Confirmed:** 2026-10-07 in the isolated local-stack Release
   `CapsuleInitialContact_WithUnavailableTriangleCharts_ShouldRetainGeometricFallback`
   experiment. An ordinary-radius source control passes; the extreme
@@ -69,12 +71,12 @@ investigation unless it recurs or a reliable reproducer becomes available.
   extreme, while the plane overlap is only one world unit; this is distinct
   from #094's source-side and reduction defect. The generic candidate/GJK path
   before that resolution is unchanged by #094.
-- **Follow-up:** Define a practical supported geometry range and consider hard
-  admission limits consistently across radii, extents, authored scale and
-  offsets. Do not infer a geometry-size promise from the full Fixed64 position
-  domain: ordinary-sized shapes at large coordinates remain a distinct useful
-  contract. If extreme geometry remains supported, attribute the miss to
-  candidate admission or bounded GJK scaling before changing contact policy.
+- **Follow-up:** Enforce the locked metric consistently across collider
+  preparation, effective scale and offsets, standalone meshes, queries, mixed
+  settings and restored state. Reject the original unsupported capsule before
+  narrow phase while preserving ordinary geometry at large coordinates. Preflight
+  failed live changes before publication/waking and retain the current warm
+  performance baseline; do not replace the miss with silent clamping or clearance.
 - **Evidence:** Ignored `artifacts/grv-issue-094/rotational-boundary-third.log`
   retains the isolated failure. The experimental fixture was removed from the
   maintained suite after recording this independent boundary.
