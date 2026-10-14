@@ -39,42 +39,19 @@
 
 Phase 1 of the supported-geometry plan confirmed in-range numerical defects on
 the original binaries. Integral, volume, overlap and mass-property fixes
-#113-#123 are resolved. Resolve polygon reference-shift precision **#124**
-before locking #096's safety contract and implementing admission.
+#113-#124 are resolved. Return to **#096** to review and lock the supported
+geometry contract before implementing admission.
 #111 remains an independent validation-tooling issue.
 #125 is a low-priority, non-blocking runtime crash observation; defer further
 investigation unless it recurs or a reliable reproducer becomes available.
-
-### GRV-Issue-124 - Standalone polygon reference shifts omit the centroid residual
-
-- **Confirmed:** 2026-10-13 during #119's triangle representation check, on
-  frozen original and corrected binaries. The standalone owner is unchanged;
-  the corrected compound path retains the missing first moment.
-- **Reproduction:** A uniform unit right triangle with vertices `(0,0)`,
-  `(1,0)`, `(0,1)`, at mass `1,000,000,000`, about the origin has moment raw
-  `1431655765333333333` (`mass/3`). `LSPolygonCollider2D` returns raw
-  `1431655764888888888` before and after #119. The corrected single-part
-  compound returns the independently integrated value. Everything is within
-  the coordinate and final scalar domains.
-- **Root cause:** The centered polygon integral is exact about its published,
-  rounded centroid. The base collider's reference shift adds only `mass*|d|²`,
-  assuming the centroid's first moment vanishes. Its rounding residual requires
-  the additional `2*d·F` term retained by the compound calculation.
-- **Follow-up:** Apply the existing retained polygon first and second moments
-  to standalone reference overrides, preserving published COM, winding,
-  rotation, offset, scale, final-overflow behavior and warm costs. Keep the
-  reduction in the polygon mass-property owner and reuse the compound work;
-  avoid another arithmetic layer.
-- **Evidence:** Ignored `artifacts/grv-119/probes/` confirms the standalone and
-  compound outputs on original/corrected binaries with their loaded hashes.
 
 ### GRV-Issue-096 - Extreme-scale capsule initial mesh sweep can miss a genuine overlap
 
 - **Status:** Approved bounded effective-geometry direction; implementation
   planned in the [Supported Geometry Range Plan](2026-10-12-supported-geometry-range-plan.md).
   The candidate `4,096`-unit reach remains provisional until phase 1 validation;
-  remaining in-range mass-property prerequisite #124 must be repaired
-  first. This issue stays open until the complete admission contract is implemented.
+  in-range numerical prerequisites #113-#124 are resolved. This issue stays open
+  until the complete admission contract is implemented.
 - **Confirmed:** 2026-10-07 in the isolated local-stack Release
   `CapsuleInitialContact_WithUnavailableTriangleCharts_ShouldRetainGeometricFallback`
   experiment. An ordinary-radius source control passes; the extreme
@@ -155,6 +132,38 @@ investigation unless it recurs or a reliable reproducer becomes available.
 Remaining measured performance costs are tracked in the benchmark backlog.
 
 ## Resolved Issues
+
+### GRV-Issue-124 - Standalone polygon reference shifts omit the centroid residual
+
+- **Resolved:** 2026-10-14.
+- **Confirmed:** 2026-10-13 during #119's triangle representation check, on
+  frozen original and corrected binaries. The standalone owner was unchanged
+  by #119; the corrected compound path retained the missing first moment.
+- **Reproduction:** A uniform unit right triangle with vertices `(0,0)`,
+  `(1,0)`, `(0,1)`, at mass `1,000,000,000`, about the origin has moment raw
+  `1431655765333333333` (`mass/3`). `LSPolygonCollider2D` returned raw
+  `1431655764888888888` before and after #119. The corrected single-part
+  compound returned the independently integrated value. Everything is within
+  the coordinate and final scalar domains.
+- **Root cause:** The centered polygon integral is exact about its published,
+  rounded centroid. The base collider's reference shift adds only `mass*|d|²`,
+  assuming the centroid's first moment vanishes. Its rounding residual requires
+  the additional `2*d·F` term retained by the compound calculation.
+- **Resolution:** Override the complete polygon reference calculation using its
+  retained centered and first moments. Cancel compound weighting factors before
+  evaluation, share the signed first-moment rotation/dot helper, and round once
+  after mass application. Preserve body-local references, exact semantic offsets,
+  published COM, detached zero-area behavior and final-overflow policy. No new
+  cache, retained fields or upstream changes are needed.
+- **Verification:** Independent integer integration covers winding, single-axis
+  residuals, half ties, tiny/large masses, fractional offsets/scales, compound-part
+  rotations, detached/committed parity and actual body mass/scale refresh.
+  Release/Lean retain raw 100% reachable line/branch/method coverage; shared replay
+  expectations and warm correctness/allocation/performance gates pass. See the
+  dated closeout in the [Supported Geometry Range Plan](2026-10-12-supported-geometry-range-plan.md).
+- **Evidence:** Ignored `artifacts/grv-124/` retains the failing regression,
+  complete validation, immutable native comparisons and their loaded stack hashes.
+  `artifacts/grv-119/probes/` retains the original standalone/compound discrepancy.
 
 ### GRV-Issue-122 - Standalone mesh inertia amplifies rounded unit coefficients
 
@@ -244,7 +253,7 @@ Remaining measured performance costs are tracked in the benchmark backlog.
   capsule, polygon and mesh contributions reuse their existing geometry/math
   owners; cached aggregate geometry removes repeated child work. Preserve
   published COM, nominal degenerate 2D weights and checked final overflow.
-  The separate standalone polygon reference defect #124 remains open.
+  The separate standalone polygon reference defect is resolved under #124.
 - **Verification:** Independent full-tensor and planar integer oracles cover
   tiny/nonbinary/ordinary masses, part order, representations, translations,
   winding, scale, requested references and cache publication/rejection. Both

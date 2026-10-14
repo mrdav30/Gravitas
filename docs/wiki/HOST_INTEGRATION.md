@@ -372,6 +372,13 @@ algebraically after geometry validation; collider APIs return zero for
 nonpositive mass. Public mass-property data objects continue to scale their
 published unit-tensor projections.
 
+Standalone 2D polygons likewise retain centered integrals and the first-moment
+residual through complete reference translation and final mass-applied rounding.
+References are body-local: host yaw does not affect the scalar moment, while an
+authored compound-part rotation rotates the residual into the parent's frame.
+An unrepresentable final standalone polygon moment saturates when its semantic
+center is representable; if both are outside the scalar domain, the request throws.
+
 ### Explicit body pose changes
 
 Static bodies do not poll their host transforms. `SetPosition(...)`,

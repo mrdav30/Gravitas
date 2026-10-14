@@ -8,10 +8,9 @@
 > design document or phase report.
 
 **Date:** 2026-10-12  
-**Status:** Phase 1 evidence collected; numerical prerequisites #113-#118 are
-resolved, as are compound normalization and related tensor/box fixes #119-#121
-and mesh runtime/scale fixes #122/#123. Polygon prerequisite #124 remains before ceiling
-locking and admission implementation, which has not started. The bounded
+**Status:** Phase 1 evidence collected; numerical prerequisites #113-#124 are
+resolved. Ceiling locking and admission implementation remain pending; admission
+implementation has not started. The bounded
 effective-geometry direction is approved. The proposed
 ceiling remains provisional while confirmed in-range numerical defects are
 resolved; admission alone cannot establish the intended safety guarantee.  
@@ -252,7 +251,7 @@ supported safety claim or implementing around an assumed safe range:
 | [#121](issue-tracker.md#grv-issue-121---box-inertia-rounds-separate-axis-terms-before-their-sum) | A unit cube/square at mass raw `6` gives zero rather than raw `1`. | Resolved: normalize each complete box diagonal/moment once; warmed primitive costs improve. |
 | [#122](issue-tracker.md#grv-issue-122---standalone-mesh-inertia-amplifies-rounded-unit-coefficients) | Microcube unit-tensor projection error grows with ordinary representable mass. | Resolved: retained runtime integrals, certified final rounding and exact refinement preserve public projections and warm costs. |
 | [#123](issue-tracker.md#grv-issue-123---detached-compound-meshes-omit-authored-part-scale-in-mass-properties) | A scale-two mesh part has fourfold different detached/committed inertia. | Resolved with #122: effective detached mesh geometry and current/prepared publication parity. |
-| [#124](issue-tracker.md#grv-issue-124---standalone-polygon-reference-shifts-omit-the-centroid-residual) | Standalone triangle reference shifts omit its rounded centroid's first moment. | Pending: reuse retained polygon moments for complete reference reduction. |
+| [#124](issue-tracker.md#grv-issue-124---standalone-polygon-reference-shifts-omit-the-centroid-residual) | Standalone triangle reference shifts omit its rounded centroid's first moment. | Resolved: retained moments and exact reference reduction, with shared first-moment arithmetic and preserved warm costs. |
 
 These are prerequisites, not optimizations and not bugs introduced by admission.
 Do not reduce the candidate ceiling to hide failures at ordinary useful sizes.
@@ -674,8 +673,8 @@ retain dimensional moments, mesh integrals and their transactional cache.
 The three-raw-unit unequal sphere fixture now returns axial raw `1153434`.
 Independent triangle integration rejected an introduced first-moment omission;
 it was repaired in this change. No introduced defect or timing regression was
-deferred. The confirmed pre-existing standalone/detached gaps #122-#124 remain
-prerequisites; phase 1 and #096 are still open.
+deferred. At that checkpoint, the confirmed pre-existing standalone/detached
+gaps #122-#124 remained prerequisites; their subsequent closeouts follow below.
 
 Both solutions build Release/Lean and their core target frameworks with zero
 warnings/errors using `UseLocalLsfStack=true`. Gravitas passes **5,982/5,916**
@@ -747,7 +746,8 @@ semantic points that do not meet the raw-coordinate precondition. Reuse
 FixedMathSharp rounding and wide arithmetic, promoting only policy-neutral
 operations with implemented production callers. Independent integer oracles,
 raw full coverage and native warm comparisons validate this reduction;
-#122/#123 are resolved. Polygon prerequisite #124 keeps phase 1 and #096 open.
+#122/#123 are resolved. At this checkpoint, polygon prerequisite #124 remained
+before ceiling locking; its subsequent closeout is recorded below.
 
 The ordinary coefficient path first projects Q96 to a 64-bit Q60 mantissa.
 For coefficient magnitude below 2^100 and raw mass magnitude below 2^58,
@@ -834,15 +834,16 @@ raw 100% coverage and replay results above. Normalized comparison of 4,690 math
 and 6,269 physics methods finds no IL-body changes after accounting for the
 intended owner/helper-name/access changes; the coefficient retains its 32-byte
 field layout. All 45 strict correctness/allocation guards still pass at 0 B.
-Focused timing validation remains open: its reversed accepted-F comparison
+During focused timing validation, a reversed accepted-F comparison
 terminated with an access violation inside `MeshRuntimeInertia.TryMaterialize`
 after six warmups and two actual iterations. The failed statistics are invalid
 and retained at `perf/accepted-cleanup-reverse.log`; a preserved Windows dump
 shows the Q60 fractional value used as a native write destination, while the
 coefficient references and tensor output address remain valid. Source audits
-find no unsafe operation or escaping reference in this path. Native-code and
-reproduction investigation must resolve this reliability gate before accepting
-the cleanup; IL equivalence alone is insufficient.
+find no unsafe operation or escaping reference in this path. A bounded follow-up
+on the same frozen binary did not reproduce the crash. The exact cause remains
+unconfirmed; #125 records the agreed low-priority, non-blocking follow-up and
+conditions for reopening investigation.
 
 The controlled mitigation changes only the certificate output to
 `TryMultiplyRaw(Fixed64, out long)`, preserving its bounds, rounding and zeroed
@@ -850,9 +851,45 @@ failure result. Gravitas constructs scalar values at final matrix materializatio
 This removes the scalar-struct output assignment implicated by the dump without
 new arithmetic, caches, coefficient copies or global PGO changes. Independent
 source review approves the candidate; fresh full Release/Lean suites, raw 100%
-coverage and six replay fixtures pass. Sustained default-PGO/compacting-GC and
-native timing gates remain pending; the precise failed compilation's register
-flow is not available in the small dump.
+coverage and six replay fixtures pass. Subsequent stress and matched native
+comparisons passed, but do not establish the original cause or prove a fix; the
+precise failed compilation's register flow is not available in the small dump.
+
+**Polygon prerequisite #124 closeout (2026-10-14):** Standalone polygons now
+reduce retained intrinsic, parallel-axis and residual first moments before one
+mass-applied rounding. Published COM and overflow policy remain unchanged;
+body-local references retain semantic offset products and authored part rotation,
+independent of host world yaw. The compound and standalone paths share the signed
+first-moment rotation/dot helper. Cancelling compound weighting factors permits
+an exact Q192 calculation with a 576-bit mass-applied numerator and 320-bit
+denominator. No new fields, cache, upstream changes or dependency pins are needed.
+
+The original unit-triangle regression fails at raw `1431655764888888888` and now
+returns the independently integrated `1431655765333333333`. Eighteen added cases
+cover both windings, single-axis residuals, half ties, tiny/large masses,
+fractional offsets/scales, reserved parts, detached/committed parity, final
+overflow and actual body mass/scale refresh. Release passes **6,026** tests and
+Lean **5,960**. Raw coverage is 100%: Release **47,719** sequence points,
+**15,702** branches and **5,004** methods; Lean **47,717 / 15,702 / 5,003**.
+Both solution profiles build with zero warnings/errors. All six replay fixtures
+match shared expectations and each other on native Windows x64; other platform
+lanes remain CI validation. Independent ponytail review approves the arithmetic,
+widths, ownership and scope.
+
+The initial compound-weighted reduction cost **1,568 ns** for the corrected
+triangle reference row and was rejected. The final direct reduction costs
+**755–757 ns** for changing/fixed triangle reference workloads, against
+**889–902 ns** for the old incorrect results; those correction costs are recorded
+separately from equal-output comparisons. Published-COM workloads retain their
+baseline (**501–521 ns**); equal-output square reference workloads cost
+**593–603 ns**, against **829–847 ns**. All **14** matched native rows and
+correctness/allocation guards retain **0 B**, with no resolved increase,
+including affected compound reference changes, body mass mutation and pose refresh.
+The ten maintained polygon benchmark cases pass functional in-process Dry smoke;
+their smoke timings are not acceptance evidence. Ignored `artifacts/grv-124/`
+retains red/full-profile coverage/replay evidence, frozen inputs, loaded child
+hashes, exact intervals and `final-C-disposition.json`. #124 is resolved; phase 1
+ceiling locking and the complete #096 admission contract remain pending.
 
 ## Phase 2: Enforce Complete Collider Admission
 

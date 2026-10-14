@@ -454,6 +454,17 @@ public sealed class Collider2DMassPropertyTests
     }
 
     [Fact]
+    public void ConvexPolygon_ReferenceShift_ShouldRetainRoundedCentroidResidual()
+    {
+        var polygon = new LSPolygonCollider2D(Vector2d.Zero, Vector2d.Right, Vector2d.Forward);
+        Fixed64 mass = (Fixed64)1_000_000_000;
+        // Direct integration over the unit right triangle gives I(origin) = mass/3.
+        Fixed64 expected = RoundRational((BigInteger)mass.m_rawValue, 3);
+
+        polygon.CalculateMomentOfInertia(mass, Vector2d.Zero).Should().Be(expected);
+    }
+
+    [Fact]
     public void ConvexPolygon_ShouldCalculateCentroidAreaAndMoment()
     {
         var collider = new LSPolygonCollider2D(

@@ -113,6 +113,16 @@ internal readonly struct PolygonMassProperties2D
 
     internal Signed576 CalculateWeightedFirstMomentContribution(Fixed64 rotation, Signed320 dx, Signed320 dy)
     {
+        // Area weighting and the compound factor sixty give 120*Q² times the dot product.
+        Signed576 dot = CalculateFirstMomentDot(rotation, dx, dy);
+        if (_momentDenominator.Sign < 0)
+            dot = WideArithmetic.SubtractSigned576(default, dot);
+        return WideArithmetic.MultiplySigned576(dot,
+            Signed192.One, Signed192.One, Signed192.Signed(120));
+    }
+
+    private Signed576 CalculateFirstMomentDot(Fixed64 rotation, Signed320 dx, Signed320 dy)
+    {
         if (_centeredFirstX.IsZero && _centeredFirstY.IsZero)
             return default;
 
@@ -121,31 +131,38 @@ internal readonly struct PolygonMassProperties2D
         // whenever the requested reference differs from that rounded centroid.
         Signed320 firstX = _centeredFirstX;
         Signed320 firstY = _centeredFirstY;
-        if (_momentDenominator.Sign < 0)
-        {
-            firstX = WideArithmetic.SubtractSigned320(default, firstX);
-            firstY = WideArithmetic.SubtractSigned320(default, firstY);
-        }
-
-        // WNum = 3*|doubleArea|*Q² and mean residual = first/(3*doubleArea*Q).
-        // Before rotation, 60*first*Q² retains weighted first moments at Q160;
-        // rotation's Q32 factors and semantic displacement's Q64 produce Q256.
-        Signed320 x = Signed320.NarrowValue(WideArithmetic.MultiplySigned576(
-            Signed576.ExtendValue(firstX), Signed192.One, Signed192.One, Signed192.Signed(60)));
-        Signed320 y = Signed320.NarrowValue(WideArithmetic.MultiplySigned576(
-            Signed576.ExtendValue(firstY), Signed192.One, Signed192.One, Signed192.Signed(60)));
         Signed192 cosine = Signed192.Raw(FixedMath.Cos(rotation));
         Signed192 sine = Signed192.Raw(FixedMath.Sin(rotation));
-        Signed576 rotatedX = WideArithmetic.SubtractSigned576(
-            WideArithmetic.MultiplySigned320(x, cosine), WideArithmetic.MultiplySigned320(y, sine));
-        Signed576 rotatedY = WideArithmetic.AddSigned576(
-            WideArithmetic.MultiplySigned320(x, sine), WideArithmetic.MultiplySigned320(y, cosine));
+        Signed320 rotatedX = Signed320.NarrowValue(WideArithmetic.SubtractSigned576(
+            WideArithmetic.MultiplySigned320(firstX, cosine), WideArithmetic.MultiplySigned320(firstY, sine)));
+        Signed320 rotatedY = Signed320.NarrowValue(WideArithmetic.AddSigned576(
+            WideArithmetic.MultiplySigned320(firstX, sine), WideArithmetic.MultiplySigned320(firstY, cosine)));
         // Degree-three edge sums, an int-bounded vertex count, and these fixed
         // factors fit 320 bits before rotation and 576 bits after translation.
-        Signed576 contribution = WideArithmetic.AddSigned576(
-            Signed576.NarrowValue(WideArithmetic.MultiplySigned576ToSigned704(rotatedX, dx)),
-            Signed576.NarrowValue(WideArithmetic.MultiplySigned576ToSigned704(rotatedY, dy)));
-        return WideArithmetic.MultiplySigned576(contribution, 2);
+        return WideArithmetic.AddSigned576(
+            WideArithmetic.MultiplySigned320(rotatedX, dx), WideArithmetic.MultiplySigned320(rotatedY, dy));
+    }
+
+    internal bool TryCalculateMoment(Fixed64 mass, Fixed64 rotation,
+        Signed320 dx, Signed320 dy, out Fixed64 moment)
+    {
+        // Cancel compound weighting before evaluation: A=6*signedDoubleAreaRaw,
+        // N=I*Q²+A*|d|²+4*d·Rot(F), D=A*Q^4, with d in Q64.
+        // Semantic coordinates fit 130 bits; N*mass fits 576 and D fits 320.
+        Signed192 areaFactor = WideArithmetic.TruncateSigned320By64(_momentDenominator);
+        Signed320 squaredDistance = Signed320.NarrowValue(WideArithmetic.AddSigned576(
+            WideArithmetic.MultiplySigned320(dx, dx), WideArithmetic.MultiplySigned320(dy, dy)));
+        Signed576 parallelAxis = WideArithmetic.MultiplySigned320(squaredDistance, areaFactor);
+        Signed576 intrinsic = WideArithmetic.MultiplySigned576(
+            Signed576.ExtendValue(_centeredIntegral), Signed192.One, Signed192.One);
+        Signed576 geometry = WideArithmetic.AddSigned576(
+            WideArithmetic.AddSigned576(intrinsic, parallelAxis),
+            WideArithmetic.MultiplySigned576(CalculateFirstMomentDot(rotation, dx, dy), 4));
+        Signed320 denominator = Signed320.NarrowValue(WideArithmetic.MultiplySigned576(
+            Signed576.ExtendValue(_momentDenominator), Signed192.One, Signed192.One));
+        return Fixed64.TryGetSignedRawRatio(
+            WideArithmetic.MultiplySigned576(geometry, Signed192.Raw(mass)),
+            denominator, out moment);
     }
 
     private static Signed320 SquaredSum(Signed192 first, Signed192 second) =>

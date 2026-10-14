@@ -797,6 +797,8 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
                 _compoundLocalRotation);
     }
 
+    internal Fixed64 CompoundLocalRotation => _compoundLocalRotation;
+
     /// <summary>Rotates a planar vector and removes fixed-point epsilon residue.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     protected static Vector2d Rotate(Vector2d value, Fixed64 radians)

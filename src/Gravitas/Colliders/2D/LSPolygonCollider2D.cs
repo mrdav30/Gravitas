@@ -171,6 +171,33 @@ public sealed class LSPolygonCollider2D : LSCollider2D, IConvexVertexSource2D
         return GetMassProperties().CalculateMoment(mass);
     }
 
+    /// <inheritdoc/>
+    public override Fixed64 CalculateMomentOfInertia(Fixed64 mass, Vector2d localReferencePoint)
+    {
+        if (mass <= Fixed64.Zero)
+            return Fixed64.Zero;
+
+        PolygonMassProperties2D properties = GetMassProperties();
+        // Detached scaling may collapse area before shape admission. Retain the
+        // base point-mass limit rather than dividing by a zero polygon weight.
+        if (properties.Weight.IsZero)
+            return base.CalculateMomentOfInertia(mass, localReferencePoint);
+
+        ExactMassPoint2D point = TransformRelativeMassPropertyPointExact(properties.Centroid);
+        ExactMassPoint2D reference = ExactMassPoint2D.FromPoint(localReferencePoint);
+        Signed320 dx = WideArithmetic.SubtractSigned320(point.XNumerator, reference.XNumerator);
+        Signed320 dy = WideArithmetic.SubtractSigned320(point.YNumerator, reference.YNumerator);
+        if (dx.IsZero && dy.IsZero)
+            return properties.CalculateMoment(mass);
+
+        if (properties.TryCalculateMoment(mass, CompoundLocalRotation, dx, dy, out Fixed64 moment))
+            return moment;
+
+        if (!point.TryGetPoint(out _))
+            throw new InvalidOperationException("The requested moment of inertia is outside the Fixed64 scalar domain.");
+        return Fixed64.MaxValue;
+    }
+
     private protected override void PrepareShape(in ColliderShapeSnapshot2D snapshot)
     {
         bool verticesChanged = !HasCommittedShape
