@@ -28,7 +28,8 @@ height data for physics and navigation.
 ## Current Evidence And Ownership
 
 [#132](issue-tracker.md#grv-issue-132---bodyless-3d-static-geometry-does-not-receive-discrete-blocking-response)
-owns missing bodyless 3D discrete response.
+resolved missing bodyless 3D discrete response using the existing solver and
+zero-mobility endpoints. Bodyless and explicit-static support now agree.
 [#133](issue-tracker.md#grv-issue-133---adjacent-mesh-collider-rims-alter-frictionless-seam-crossing-response)
 owns the artificial-rim response difference across separate mesh colliders.
 The [supported-geometry closeout](done/2026-10-12-supported-geometry-range-plan.md#phase-4-compatibility-performance-and-096-closeout)

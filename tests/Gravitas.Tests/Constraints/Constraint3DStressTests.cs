@@ -1,6 +1,7 @@
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
+using Gravitas.CollisionHandling;
 using Gravitas.Constraints;
 using Gravitas.Diagnostics;
 using Gravitas.Tests.Determinism;
@@ -62,6 +63,8 @@ public sealed class Constraint3DStressTests
 
         MaxAnchorError(joints).Should().BeLessThan((Fixed64)3);
         MaxPositionMagnitude(bodies).Should().BeLessThan((Fixed64)96);
+        foreach (SolidBody body in bodies)
+            body.Position3d.Y.Should().BeGreaterThan(-Fixed64.Half, "the floor supports the rigid links without height snapping");
     }
 
     [Fact]
@@ -95,11 +98,32 @@ public sealed class Constraint3DStressTests
         SumMotorImpulse(joints).Should().BeGreaterThan(Fixed64.Zero);
     }
 
-    [Fact]
-    public void ConstraintStressSolve_ShouldNotAllocateAfterWarmup()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ContactAndJointIsland_ShouldNotAllocateAfterWarmup(bool bodylessFloor)
     {
-        using GravitasWorldContext context = CreateHumanoidRagdollOnFloor(out _, out Joint3D[] joints, sleepEnabled: false);
-        Step(context, 80);
+        using PhysicsScenarioBuilder scenario = CreateConstraintScenario((Fixed64)10, solverIterations: 12);
+        GravitasWorldContext context = scenario.Context;
+        var floor = new LSCuboidCollider { Size = new Vector3d(24, 1, 24) };
+        Vector3d floorPosition = Vector3d.Down;
+        if (bodylessFloor) scenario.InitializeStaticCollider(floor, floorPosition);
+        else scenario.CreateBody(floor, floorPosition, FixedQuaternion.Identity, immovable: true);
+        // Exact joint spacing and equal floor support keep topology bounded while gravity drives contact response.
+        SolidBody[] bodies = CreateSphereLine(scenario, 6, Fixed64.One, firstImmovable: false);
+        var joints = new Joint3D[bodies.Length - 1];
+        for (int i = 0; i < bodies.Length; i++)
+        {
+            bodies[i].UseManualGrounding();
+            bodies[i].SleepEnabled = false;
+            if (i > 0)
+                joints[i - 1] = context.Constraints3D.RegisterJoint(new JointDefinition3D(
+                    bodies[i - 1], bodies[i], LocalFrame(Vector3d.Right * Fixed64.Half),
+                    LocalFrame(Vector3d.Left * Fixed64.Half), JointType3D.BallSocket,
+                    JointLimit3D.Unrestricted, JointMotor3D.Disabled, JointCollisionPolicy.SuppressLinked));
+        }
+        // Warm the retained-pair pool's first eight-second retirement/reuse cycle too.
+        Step(context, context.FrameRate * 8);
 
         long allocatedBytes = AllocationTestHelper.MeasureSteadyState(
             () =>
@@ -113,6 +137,14 @@ public sealed class Constraint3DStressTests
 
         SumSolvedRows(joints).Should().BeGreaterThan(0);
         allocatedBytes.Should().Be(0);
+        foreach (SolidBody body in bodies)
+        {
+            body.Position3d.Y.Should().BeGreaterThan(floor.Bounds.Max.Y);
+            bool found = body.Collider.TryGetCollisionPair(floor.Id, out CollisionPair? pair)
+                || floor.TryGetCollisionPair(body.Collider.Id, out pair);
+            found.Should().BeTrue();
+            pair!.Manifold.HasContact.Should().BeTrue();
+        }
     }
 
     [Fact]
@@ -241,7 +273,10 @@ public sealed class Constraint3DStressTests
             scenario.CreateSphere(new Vector3d(Fixed64.FromFraction(3, 4), (Fixed64)3, Fixed64.Zero), mass: Fixed64.One).Body
         };
         for (int i = 0; i < bodies.Length; i++)
+        {
             bodies[i].SleepEnabled = sleepEnabled;
+            bodies[i].UseManualGrounding();
+        }
 
         RagdollRuntime3D runtime = scenario.Context.Constraints3D.RegisterRagdoll(new RagdollDefinition3D(
             new[]

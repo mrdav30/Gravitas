@@ -16,6 +16,41 @@ public sealed class CollisionResponseExactLeverTests
     private static readonly Fixed64 StandardSpeed = Fixed64.Two;
 
     [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void CalculateImpulse_WithBodylessExactParticipant_ShouldPreserveDynamicTorque(
+        bool bodylessFirst, bool positiveFace)
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSSphereCollider wall = scenario.CreateStaticSphere(Vector3d.Zero);
+        ScenarioBody<LSSphereCollider> mover = scenario.CreateSphere(Vector3d.Right);
+        wall.Material = mover.Collider.Material = PhysicsMaterial.Frictionless;
+        mover.Body.ApplyCollisionLinearVelocityDelta(Vector3d.Left * StandardSpeed);
+        CollisionPair pair = bodylessFirst
+            ? scenario.CreatePair(wall, mover.Collider)
+            : scenario.CreatePair(mover.Collider, wall);
+        Fixed64 face = positiveFace ? Fixed64.MaxValue : Fixed64.MinValue;
+        Fixed64 outward = positiveFace ? Fixed64.MinIncrement : -Fixed64.MinIncrement;
+        ContactAnchor exact = new(new Vector3d(face, Fixed64.Zero, Fixed64.Zero),
+            new Vector3d(outward, Fixed64.One, Fixed64.Zero));
+        ContactAnchor staticAnchor = ContactAnchor.FromWorldPoint(wall.Center);
+        bool staticLeads = pair.ColliderA == wall;
+        staticLeads.Should().Be(bodylessFirst);
+        pair.Manifold.SetContact(staticLeads ? staticAnchor : exact,
+            staticLeads ? exact : staticAnchor, Fixed64.Zero,
+            staticLeads ? Vector3d.Right : Vector3d.Left);
+
+        CollisionResponse.CalculateImpulse(pair, applyCachedImpulse: false,
+            applyPositionCorrection: false);
+
+        mover.Body.LinearVelocity.X.Should().BeGreaterThan(-StandardSpeed);
+        mover.Body.AngularVelocity.Z.Should().BeLessThan(Fixed64.Zero);
+        wall.Center.Should().Be(Vector3d.Zero);
+    }
+
+    [Theory]
     [InlineData(true)]
     [InlineData(false)]
     public void CalculateImpulse_WithUnrepresentableParallelLeverComponent_ShouldPreserveResponse(

@@ -10,10 +10,11 @@ namespace Gravitas.CollisionHandling;
 /// <summary>Pre-warm-start motion and lever frames for one discrete solver pass.</summary>
 internal readonly struct ContactResponseSnapshot
 {
-    internal ContactResponseSnapshot(SolidBody first, SolidBody second,
+    internal ContactResponseSnapshot(SolidBody? first, SolidBody? second,
         Vector3d linearA, Vector3d angularA, Vector3d linearB, Vector3d angularB)
-        : this(first.Position3d, second.Position3d, first.GetCenterOfMassAnchor(),
-            second.GetCenterOfMassAnchor(), linearA, angularA, linearB, angularB)
+        : this(first?.Position3d ?? Vector3d.Zero, second?.Position3d ?? Vector3d.Zero,
+            first?.GetCenterOfMassAnchor() ?? default, second?.GetCenterOfMassAnchor() ?? default,
+            linearA, angularA, linearB, angularB)
     {
     }
 

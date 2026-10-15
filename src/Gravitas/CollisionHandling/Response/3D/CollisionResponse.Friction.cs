@@ -329,7 +329,7 @@ public static partial class CollisionResponse
         inverseMass = body.GetConstrainedInverseMass(axis);
         return inverseMass != Fixed64.Zero
             || body.InverseMass == Fixed64.Zero
-            || body.Body.ProjectLinearMotion(axis) == Vector3d.Zero;
+            || body.Body!.ProjectLinearMotion(axis) == Vector3d.Zero;
     }
 
     private static bool TryGetFrictionLimit(

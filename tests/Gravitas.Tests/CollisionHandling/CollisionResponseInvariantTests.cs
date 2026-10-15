@@ -358,21 +358,30 @@ public sealed class CollisionResponseInvariantTests
         solid.Body.LinearVelocity.Should().Be(solidVelocityBefore);
     }
 
-    [Fact]
-    public void CalculateImpulse_WithBodylessOrFrozenPairs_ShouldNotMutateBodies()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CalculateImpulse_WithBodylessParticipant_ShouldBlockDynamicBody(bool bodylessFirst)
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         LSSphereCollider staticCollider = scenario.CreateStaticSphere(PhysicsScenarioBuilder.Vector(0, 0, 0));
         ScenarioBody<LSSphereCollider> solid = scenario.CreateSphere(PhysicsScenarioBuilder.Vector(Fixed64.FromFraction(3, 4), Fixed64.Zero, Fixed64.Zero));
         Push(solid.Body, -StandardSpeed);
-        CollisionPair bodylessPair = scenario.CreatePair(staticCollider, solid.Collider);
-        bodylessPair.Manifold.SetContact(staticCollider.Center, solid.Collider.Center, Fixed64.FromFraction(1, 4), Vector3d.Right);
+        CollisionPair bodylessPair = bodylessFirst
+            ? CreateDetectedPair(scenario, staticCollider, solid.Collider)
+            : CreateDetectedPair(scenario, solid.Collider, staticCollider);
         Vector3d solidVelocityBefore = solid.Body.LinearVelocity;
 
         CollisionResponse.CalculateImpulse(bodylessPair);
 
-        solid.Body.LinearVelocity.Should().Be(solidVelocityBefore);
+        solid.Body.LinearVelocity.X.Should().BeGreaterThan(solidVelocityBefore.X);
+        staticCollider.Center.Should().Be(Vector3d.Zero);
+    }
 
+    [Fact]
+    public void CalculateImpulse_WithFrozenPairs_ShouldNotMutateBodies()
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSSphereCollider> frozenA = scenario.CreateSphere(
             PhysicsScenarioBuilder.Vector(2, 0, 0),
             immovable: true,
@@ -688,17 +697,20 @@ public sealed class CollisionResponseInvariantTests
         allocatedBytes.Should().Be(0);
     }
 
-    [Fact]
-    public void CalculateImpulse_WithPositionCorrectionCrossing3DPartitions_ShouldNotAllocateAfterWarmup()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CalculateImpulse_WithPositionCorrectionCrossing3DPartitions_ShouldNotAllocateAfterWarmup(bool bodyless)
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSSphereCollider> moving = scenario.CreateSphere(
             Vector3d.Zero,
             preventAngularForces: true);
-        ScenarioBody<LSSphereCollider> wall = scenario.CreateSphere(
-            new Vector3d((Fixed64)2, Fixed64.Zero, Fixed64.Zero),
-            immovable: true);
-        CollisionPair pair = scenario.CreatePair(moving.Collider, wall.Collider);
+        Vector3d wallPosition = new((Fixed64)2, Fixed64.Zero, Fixed64.Zero);
+        LSSphereCollider wall = bodyless
+            ? scenario.CreateStaticSphere(wallPosition)
+            : scenario.CreateSphere(wallPosition, immovable: true).Collider;
+        CollisionPair pair = scenario.CreatePair(moving.Collider, wall);
         Fixed64 depth = scenario.Context.VoxelSize + CollisionResponse.PenetrationSlop;
 
         long allocatedBytes = AllocationTestHelper.MeasureSteadyState(

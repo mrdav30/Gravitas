@@ -129,7 +129,8 @@ public partial class CollisionPair
         _fastCollideDistance = ColliderA!.Bounds.Scope.Magnitude + ColliderB!.Bounds.Scope.Magnitude;
         _fastCollideDistance *= _fastCollideDistance;
 
-        _doPhysics = ColliderA!.Body != null && ColliderB!.Body != null && !ColliderA!.IsTrigger && !ColliderB!.IsTrigger;
+        _doPhysics = (ColliderA.Body != null || ColliderB.Body != null)
+            && !ColliderA.IsTrigger && !ColliderB.IsTrigger;
 
         // Immediately check collision. If collision distance is too large, do
         // not cull based on distance.

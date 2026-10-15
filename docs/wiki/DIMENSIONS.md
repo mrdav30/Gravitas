@@ -211,6 +211,12 @@ inside or tangent to geometry. Manual grounding retains the host's supplied
 normal. Automatic 2D grounding excludes triggers and applies its planar
 support-normal policy against its resolved up direction.
 
+Automatic 3D height snapping places the body origin at the support height.
+Author a feet-origin body with its collider above that origin, such as a sphere
+with `LocalOffset = Vector3d.Up * Radius`. A collider centered on the snapped
+origin penetrates the support and still receives discrete collision correction.
+Use manual grounding when the host owns a different pose/support convention.
+
 Changing the 3D threshold invalidates the automatic probe cache and wakes the
 body so its next simulation step uses the new limit. Equal assignments are
 no-ops; manual grounding remains host-owned. Recorded loads restore the limit

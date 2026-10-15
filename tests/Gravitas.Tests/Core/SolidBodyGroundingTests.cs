@@ -81,7 +81,10 @@ public sealed class SolidBodyGroundingTests
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         StaticCollider<LSCuboidCollider> ground = CreateGround(scenario, new PhysicsLayer(1));
         scenario.Context.Settings.GroundCheckLayerMask = PhysicsLayerMask.FromLayer(1);
-        ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(Vector3d.Zero);
+        // Automatic height snapping uses a feet-origin body pose.
+        ScenarioBody<LSSphereCollider> body = scenario.CreateBody(
+            new LSSphereCollider { LocalOffset = Vector3d.Up * Fixed64.Half },
+            Vector3d.Zero, FixedQuaternion.Identity);
 
         ground.Transform.LocalPosition = new Vector3d(Fixed64.Zero, -Fixed64.FromFraction(1, 4), Fixed64.Zero);
         ground.Collider.Simulate();
@@ -320,8 +323,9 @@ public sealed class SolidBodyGroundingTests
                     (Fixed64)8,
                     (Fixed64)8)),
             out _).Should().BeTrue();
-        context.Settings.GroundCheckLayerMask =
-            PhysicsLayerMask.FromLayer(new PhysicsLayer(1));
+        // Isolate witness materialization from discrete penetration response; queries retain their ground mask.
+        context.ApplySettings(new PhysicsSettings(context.FrameRate,
+            new[,] { { true, false }, { false, true } }, PhysicsLayerMask.FromLayer(1)));
         context.Environment.Gravity = Fixed64.Zero;
         var ground = new LSCuboidCollider
         {

@@ -161,9 +161,6 @@ public static partial class CollisionResponse
         if (pair.ColliderA.IsTrigger || pair.ColliderB.IsTrigger)
             return false;
 
-        if (pair.ColliderA.Body == null || pair.ColliderB.Body == null)
-            return false;
-
         if (!pair.Manifold.HasContact)
             return false;
 
@@ -188,10 +185,11 @@ public static partial class CollisionResponse
         Vector3d normal = ResolveContactNormal(manifoldContact.Normal, pair.ColliderB.Center - pair.ColliderA.Center);
         if (normal == Vector3d.Zero)
             return false;
-        ContactLever3D relativeA = ContactLever3D.Create(
+        // A bodyless static endpoint has no torque arm or mutable solver state.
+        ContactLever3D relativeA = bodyA.Body == null ? default : ContactLever3D.Create(
             manifoldContact.AnchorA,
             responseCenterA);
-        ContactLever3D relativeB = ContactLever3D.Create(
+        ContactLever3D relativeB = bodyB.Body == null ? default : ContactLever3D.Create(
             manifoldContact.AnchorB,
             responseCenterB);
         PhysicsMaterial materialA = manifoldContact.HasMaterialOverride
@@ -297,10 +295,10 @@ public static partial class CollisionResponse
                 weightedDepth, inverseMassB, inverseMassA, inverseMassB);
         }
         // Prepare both endpoints before publishing either participant's correction.
-        Vector3d positionA = contact.A.Body.PrepareCollisionPositionCorrection(correctionA);
-        Vector3d positionB = contact.B.Body.PrepareCollisionPositionCorrection(correctionB);
-        contact.A.Body.ApplyCollisionPositionState(positionA);
-        contact.B.Body.ApplyCollisionPositionState(positionB);
+        Vector3d positionA = contact.A.Body?.PrepareCollisionPositionCorrection(correctionA) ?? default;
+        Vector3d positionB = contact.B.Body?.PrepareCollisionPositionCorrection(correctionB) ?? default;
+        contact.A.Body?.ApplyCollisionPositionState(positionA);
+        contact.B.Body?.ApplyCollisionPositionState(positionB);
     }
 
     private static bool TryApplyCachedImpulse(
@@ -512,15 +510,15 @@ public static partial class CollisionResponse
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Vector3d ResolveLinearVelocity(SolidBody body) =>
-        body.ProjectLinearMotion(
+    private static Vector3d ResolveLinearVelocity(SolidBody? body) =>
+        body == null ? Vector3d.Zero : body.ProjectLinearMotion(
             body.IsKinematic
                 ? body.SampleContinuousCollisionLinearVelocity(Fixed64.One)
                 : body.LinearVelocity);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Vector3d ResolveAngularVelocity(SolidBody body) =>
-        body.ProjectAngularMotion(
+    private static Vector3d ResolveAngularVelocity(SolidBody? body) =>
+        body == null ? Vector3d.Zero : body.ProjectAngularMotion(
             body.IsKinematic
                 ? body.SampleContinuousCollisionAngularVelocity(Fixed64.One)
                 : body.AngularVelocity);
@@ -618,7 +616,7 @@ public static partial class CollisionResponse
         Vector3d impulse,
         out Vector3d velocityDelta)
     {
-        if (!body.HasSolverMobility || !body.Body.CanTranslate)
+        if (!body.HasSolverMobility || !body.Body!.CanTranslate)
         {
             velocityDelta = Vector3d.Zero;
             return true;
@@ -639,11 +637,11 @@ public static partial class CollisionResponse
         out Vector3d velocityDelta)
     {
         velocityDelta = Vector3d.Zero;
-        if (!body.HasSolverMobility || !body.CanRotate)
+        if (!body.HasSolverMobility || !body.Body!.CanRotate)
             return true;
 
         Fixed3x3 inverseInertia =
-            body.Body.GetConstrainedInverseInertiaTensor();
+            body.Body!.GetConstrainedInverseInertiaTensor();
         if (ContactResponseArithmetic3D.CanUseFastAngularResponse(
                 relativeContactPoint,
                 impulse,
@@ -691,14 +689,15 @@ public static partial class CollisionResponse
         out Vector3d preparedLinearB,
         out Vector3d preparedAngularB)
     {
+        preparedLinearA = preparedAngularA = preparedLinearB = preparedAngularB = default;
         bool firstPrepared =
-            contact.A.Body.TryPrepareCollisionVelocityState(
+            contact.A.Body == null || contact.A.Body.TryPrepareCollisionVelocityState(
                 linearA,
                 angularA,
                 out preparedLinearA,
                 out preparedAngularA);
         bool secondPrepared =
-            contact.B.Body.TryPrepareCollisionVelocityState(
+            contact.B.Body == null || contact.B.Body.TryPrepareCollisionVelocityState(
                 linearB,
                 angularB,
                 out preparedLinearB,
@@ -743,8 +742,8 @@ public static partial class CollisionResponse
         Vector3d linearB,
         Vector3d angularB)
     {
-        contact.A.Body.ApplyCollisionVelocityState(linearA, angularA);
-        contact.B.Body.ApplyCollisionVelocityState(linearB, angularB);
+        contact.A.Body?.ApplyCollisionVelocityState(linearA, angularA);
+        contact.B.Body?.ApplyCollisionVelocityState(linearB, angularB);
     }
 
     private static void GetExactLevers(
@@ -757,16 +756,15 @@ public static partial class CollisionResponse
     {
         ManifoldContact manifoldContact =
             pair.Manifold.GetGroup(contact.GroupIndex)[contact.PointIndex];
-        var centerA = new ContactAnchor(
-            responsePositionA,
-            contact.A.Body.Rotation,
-            contact.A.Body.LocalCenterOfMassOffset);
-        var centerB = new ContactAnchor(
-            responsePositionB,
-            contact.B.Body.Rotation,
-            contact.B.Body.LocalCenterOfMassOffset);
-        exactA = manifoldContact.AnchorA.GetLeverFrom(centerA);
-        exactB = manifoldContact.AnchorB.GetLeverFrom(centerB);
+        ContactAnchor zero = ContactAnchor.FromWorldPoint(Vector3d.Zero);
+        exactA = contact.A.Body == null
+            ? zero.GetLeverFrom(zero)
+            : manifoldContact.AnchorA.GetLeverFrom(new ContactAnchor(responsePositionA,
+                contact.A.Body.Rotation, contact.A.Body.LocalCenterOfMassOffset));
+        exactB = contact.B.Body == null
+            ? zero.GetLeverFrom(zero)
+            : manifoldContact.AnchorB.GetLeverFrom(new ContactAnchor(responsePositionB,
+                contact.B.Body.Rotation, contact.B.Body.LocalCenterOfMassOffset));
     }
 
     private static void RejectResponse(CollisionPair pair, SolverContact contact)

@@ -290,13 +290,11 @@ LSCuboidCollider floor = new();
 floor.InitializeWithNoBody(agent);
 ```
 
-For terrain that must block dynamic 3D bodies through discrete response, attach
-the collider to a `SolidBody` initialized with `BodyMotionType.Static`. The 3D
-discrete solver currently requires bodies on both participants; a non-trigger
-bodyless collider can produce narrow-phase/query hits without a blocking
-response. The pure 2D solver supports bodyless static participants. Queries,
-triggers and CCD have separate paths; do not infer discrete response from a
-successful query hit.
+Non-trigger bodyless colliders block dynamic bodies in discrete response in
+both 3D and pure 2D. They contribute collision geometry and material, with zero
+velocity, inverse mass and inverse inertia. Only the body-owned participant
+receives correction or impulse. Use an explicit `BodyMotionType.Static` body
+when the host needs body-owned state; it is not required for a solid floor.
 
 A body with all translation axes frozen is different from a static body or a
 bodyless collider. Select the runtime role explicitly:

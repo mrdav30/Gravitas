@@ -10,6 +10,8 @@ explicit.
 - Narrow phase writes pair-owned contact manifolds.
 - Bodyless trigger volumes skip physical response and emit trigger events for
   valid trigger/body pairs.
+- Non-trigger bodyless geometry is an immobile response participant in 3D and
+  pure 2D, contributing shape and material without body state or solver mass.
 - Non-trigger pairs are solved with enabled joints in deterministic body
   islands.
 - 3D response uses 3D mass, inertia tensors, contact arms, and tangent frames.
@@ -281,6 +283,10 @@ false contact exit simply because their partition skipped pair generation.
   collider is a trigger volume and the non-trigger collider is body-owned. Both
   colliders in the pair receive the trigger callback.
 - `OnContactEnter`, `OnContact`, and `OnContactExit` for body contacts.
+
+Contact callbacks receive the other `SolidBody` or `SolidBody2D`. A bodyless
+floor can receive these callbacks for a dynamic visitor; the visitor receives
+no body-contact callback for the floor because the floor has no body.
 
 Mixed pairs follow the same rule with `OnMixedTriggerEnter`,
 `OnMixedTriggerStay`, and `OnMixedTriggerExit`. Trigger pairs never emit contact

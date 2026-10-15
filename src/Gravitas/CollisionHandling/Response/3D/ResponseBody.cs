@@ -21,26 +21,18 @@ internal readonly struct ResponseBody
         InverseMass = inverseMass;
     }
 
-    public SolidBody Body { get; }
+    public SolidBody? Body { get; }
 
     public Fixed64 InverseMass { get; }
 
-    public bool HasSolverMobility => Body.HasSolverMobility;
-
-    public bool CanRotate => Body.CanRotate;
+    public bool HasSolverMobility => Body?.HasSolverMobility == true;
 
     public Fixed64 GetConstrainedInverseMass(Vector3d axis) =>
-        Body.GetConstrainedInverseMass(axis);
+        Body?.GetConstrainedInverseMass(axis) ?? Fixed64.Zero;
 
     public static ResponseBody Create(LSCollider collider)
     {
-        SolidBody body = collider.Body!;
-        return Create(body);
-    }
-
-    public static ResponseBody Create(SolidBody body)
-    {
-        Fixed64 inverseMass = body.EffectiveInverseMass;
-        return new ResponseBody(body, inverseMass);
+        SolidBody? body = collider.Body;
+        return body == null ? default : new ResponseBody(body, body.EffectiveInverseMass);
     }
 }

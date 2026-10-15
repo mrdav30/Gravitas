@@ -2,7 +2,7 @@
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-134`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-135`.
 - Assign an ID when an issue enters this tracker, keep it through resolution,
   and never reuse an ID even if an entry is later removed. Check this file's Git
   history before advancing or repairing the counter.
@@ -37,40 +37,45 @@
 
 ### Ordered Queue
 
-The supported-geometry contract and #096 are complete. Next resolve **#132**,
-bodyless 3D static response, then **#133**, artificial mesh-chunk seam response.
-Both are reproduced on pre-admission binaries and independent of the size cap.
-Keep physical-quality fixes ahead of the benchmark queue; combine work only
-where the response ownership actually overlaps.
+The supported-geometry contract and #096 are complete, and #132 now provides
+bodyless 3D static response. Next resolve **#134**, untouched-pair separation
+cleanup, before **#133**, artificial mesh-chunk seam response. Reliable pair
+retirement and notifications should precede cross-collider surface continuity.
+Both remaining defects reproduce on earlier binaries and are independent of
+the size cap. Keep physical-quality fixes ahead of the benchmark queue;
+combine work only where the response ownership actually overlaps.
 
 #111 remains an independent validation-tooling issue.
 #125 is a low-priority, non-blocking runtime crash observation; defer further
 investigation unless it recurs or a reliable reproducer becomes available.
 
-### GRV-Issue-132 - Bodyless 3D static geometry does not receive discrete blocking response
+### GRV-Issue-134 - Untouched 3D pairs retain stale contact notifications after separation
 
-- **Confirmed:** 2026-10-15 during supported-geometry terrain migration checks.
-- **Affected area:** `CollisionHandling/Response/3D/CollisionResponse.cs`,
-  `TryCreateBodyPair`, and the host integration bodyless/static distinction.
-- **Reproduction:** A frictionless dynamic sphere (radius `0.5`) or vertical
-  capsule (radius `0.5`, full height `2`) starts touching a flat bodyless mesh.
-  With gravity `1`, frame rate `16` and complete host steps, it falls through.
-  Direct narrow phase reports upward contacts and a downward sphere sweep hits
-  the same floor. Replacing the floor with an explicit static `SolidBody`
-  restores blocking response.
-- **Root cause:** The 3D response owner rejects the pair if either collider's
-  body is null. This guard is also present in pre-plan commit `9752c9f`; it was
-  not introduced by geometry admission. The pure 2D response owner supports
-  bodyless static participants and has an existing regression for both orders.
-- **Follow-up:** Give 3D bodyless non-trigger static targets coherent response
-  using the existing body/response owners, retaining zero target mobility,
-  exact contact frames and dimensional parity. Cover both input orders,
-  primitive/mesh targets, full-loop support, events, replay and allocation.
-  Do not infer CCD or mixed behavior from this discrete-only reproduction.
-- **Evidence:** Ignored `artifacts/geometry-range/phase4/terrain-diagnose.log`
-  retains falling trajectories and successful direct contacts;
-  `terrain-static.log` demonstrates restored normal response with static bodies.
-  Host guidance now states the current limitation explicitly.
+- **Confirmed:** 2026-10-15 while testing #132's contact lifecycle.
+- **Affected area:** `Core/3D/GravitasPhysicsService.Pairs.cs`,
+  `ProcessActiveCollisionPairs`, and retained 3D pair cleanup.
+- **Reproduction:** Establish a dynamic sphere/floor contact, then teleport the
+  awake sphere above the floor so their bounds no longer share partitions.
+  Disable gravity and clear velocity to keep the geometry separated. Check
+  contact/stay/exit callbacks through complete host steps. A nearby gap that
+  retains a shared voxel produces an exit on the next step; a distant teleport
+  produced four stale contact callbacks and no exit during the four observed
+  steps. Both explicit-static and bodyless floors reproduce on the original
+  pre-fix binaries and the corrected binaries.
+- **Root cause:** Broad-phase distribution no longer visits the separated pair,
+  but active-pair processing can notify from its retained colliding state without
+  checking its current bounds or `LastFrame`. The existing inactivity threshold
+  is eight simulation seconds; the full retirement delay is source-derived
+  until measured. This cleanup code is unchanged by #132. Explicit static
+  bodies use the same path, so bodyless response is not the underlying cause.
+- **Parity:** The 2D and mixed owners already clean up untouched pairs. Check
+  physical contact and trigger notifications, sleeping-contact preservation,
+  pair pooling/reuse, mutation during callbacks and deterministic replay.
+- **Evidence:** Ignored `artifacts/grv-issue-132/perf/probe-stale/` retains
+  original/candidate event counts, disjoint bounds and runtime module hashes.
+- **Follow-up:** Resolve untouched 3D pairs in the owning lifecycle, preserving
+  legitimate sleeping contacts and allocation-free warm cleanup. Keep this
+  separate from bodyless response and mesh-surface continuity.
 
 ### GRV-Issue-133 - Adjacent mesh collider rims alter frictionless seam-crossing response
 
@@ -160,6 +165,56 @@ investigation unless it recurs or a reliable reproducer becomes available.
 Remaining measured performance costs are tracked in the benchmark backlog.
 
 ## Resolved Issues
+
+### GRV-Issue-132 - Bodyless 3D static geometry does not receive discrete blocking response
+
+- **Confirmed/resolved:** 2026-10-15. Dynamic spheres and capsules could report
+  contacts against a bodyless floor yet receive no discrete blocking response.
+  The exclusion predates geometry admission and is present in `9752c9f`.
+- **Root cause:** Pair initialization required two bodies, the shared response
+  owner rejected a null endpoint, and deferred island admission assumed both
+  endpoints owned body state. Narrow phase and the underlying impulse math
+  already supported immobile geometry.
+- **Resolution:** Admit one-body non-trigger pairs, represent the bodyless
+  endpoint with zero velocity/mass/inertia, and reuse existing normal, friction,
+  warm-start and exact-lever response. Only real bodies receive prepared state
+  changes; both endpoints are still validated before publication. Static
+  geometry contributes constraints without connecting unrelated dynamic islands.
+  No public API, dependency, or upstream source changes were required.
+- **Regression evidence:** The initial detected sphere contact failed in both
+  input orders before the fix. Full-loop tests compare primitive/concave-mesh
+  floors with explicit-static controls for sphere, capsule and cuboid support,
+  friction, restitution, angular response, events and island wake/separation.
+  Exact-anchor tests cover both null operand positions at both scalar faces;
+  repeated replay and partition-crossing allocation guards cover the new path.
+- **Fixture hardening:** Grounding tests now use the intended feet-origin
+  offset or isolate query witness materialization. Ragdolls use manual grounding
+  and assert physical floor support. Their evolving, undamped contact topology
+  was unsuitable for a steady-state allocation gate: original explicit-static
+  binaries reproduce the late growth. The gate now uses a bounded six-body,
+  five-joint floor island in both ownership modes, including the first pair
+  retirement/reuse warmup and a strict 128-step zero-allocation window.
+- **Validation:** `UseLocalLsfStack=true`; full solution `Release` and
+  `ReleaseLean` builds passed with zero warnings/errors, and all 6,406/6,338
+  tests passed. Raw coverage is 47,635/47,633 sequence points, 15,800 branches
+  each, and 5,036/5,035 methods, all visited. All six shared replay fixtures
+  match existing expectations and direct Windows x64 Release/Lean captures.
+  The full suite retains 2D, mixed, grounding and CCD counterpart checks. The
+  independent ponytail review found no outstanding findings.
+- **Warm gate:** Eight physical/allocation guards pass at `0 B`; bodyless and
+  explicit-static full-step states match for one and 64 pairs. Six native
+  timing rows remain within overlapping 99.9% confidence intervals. The
+  explicit-static 64-response batch is 772.4→780.4 µs, dynamic 827.4→825.6 µs,
+  one-pair full step 46.40→45.64 µs, and 64-pair full step 3.828→3.942 ms;
+  unchanged 2D/mixed controls are 312.0→310.1 / 314.3→313.3 µs. Every row is
+  `0 B`; there is no resolved warm regression. Correct blocking work is
+  compared with explicit-static response, not the formerly skipped bodyless path.
+- **Evidence:** Ignored `artifacts/grv-issue-132/` retains the red regression,
+  focused/full test logs, raw coverage, shared replay captures, original/final
+  runtime and source hashes, native timing distributions and the original/static
+  allocation RCA. #133 remains independent; the pre-existing stale separation
+  notifications uncovered here are recorded as #134. Package-based release
+  validation and the other native CI lanes remain release gates.
 
 ### GRV-Issue-096 - Extreme-scale capsule initial mesh sweep can miss a genuine overlap
 
