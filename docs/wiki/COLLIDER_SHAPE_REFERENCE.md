@@ -164,8 +164,16 @@ the same residual rule.
 Part centers of mass and anisotropic center tensors are transformed into the
 compound owner's local frame before parallel-axis shifts. Aggregate frontal area
 remains the deterministic sum of part projections; it is conservative for
-overlapping projections rather than an exact silhouette union. Aggregate
-`ScaledRadius` encloses the compound's world bounds about the owner center.
+overlapping projections rather than an exact silhouette union.
+
+`ScaledRadius` conservatively encloses the aggregate shape about the owner
+center. Detached polygon and mesh parts are measured from their effective authored
+vertices, including part scale, before runtime preparation. An unrepresentable
+vertex enclosure returns `Fixed64.MaxValue`; inspection does not admit or publish
+runtime geometry, so a later host scale can still compensate oversized authoring.
+After publication, the radius describes committed geometry until the next
+successful shape transaction.
+
 There is no aggregate `ScaledSize` contract: a world AABB cannot represent an
 owner-local size under arbitrary part rotations, and canonical primitive
 geometry exposes radius, full axis length, or half-extents explicitly.

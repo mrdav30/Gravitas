@@ -40,37 +40,13 @@
 Phase 1 of the supported-geometry plan confirmed in-range numerical defects on
 the original binaries. Integral, volume, overlap and mass-property fixes
 #113-#124 are resolved. **#096** collider/standalone-mesh admission is complete
-and passes correctness, coverage, replay and warm performance checks. Resolve the
-focused correctness queue below before resuming phase 3's query, settings and
-restore admission:
-
-1. #129: detached polygon compound inspection.
+and passes correctness, coverage, replay and warm performance checks. The focused
+correctness follow-ups #126-#131, including detached polygon inspection #129, are
+resolved. Resume #096 phase 3's query, settings and restore admission next.
 
 #111 remains an independent validation-tooling issue.
 #125 is a low-priority, non-blocking runtime crash observation; defer further
 investigation unless it recurs or a reliable reproducer becomes available.
-The remaining focused geometry issue reproduces on the original stack. Resolve
-#129 before resuming phase 3; generic 3D sweep accuracy #131 is now resolved.
-
-### GRV-Issue-129 - Detached polygon compound reports a zero conservative proxy radius
-
-- **Confirmed:** 2026-10-14 on the accepted pre-admission binaries and the
-  phase-2 candidate. This predates deferred collider-owned mesh preparation.
-- **Reproduction:** Construct an unbound `LSCompoundCollider2D` with one convex
-  polygon part at zero using vertices `(0,0)`, `(6,000,0)`, `(0,6,000)`.
-  `ScaledRadius` returns zero, although its public contract describes a
-  conservative enclosure of the current aggregate shape. The detached path
-  reads an unprepared polygon vertex cache; circle/capsule/AABB metadata uses
-  effective authored geometry instead.
-- **Boundary:** No unsupported runtime shape is published. Large detached
-  authoring is valid while awaiting a shrinking host/part scale; admission of
-  the eventual runtime shape remains separate.
-- **Follow-up:** Reuse the polygon's effective authored vertex preparation or
-  candidate measurement for detached inspection, preserving compensation,
-  outward rounding and compound attachment semantics. Check dimensional and
-  shape-family parity without adding a second geometry representation.
-- **Evidence:** Ignored `artifacts/geometry-range/phase2/probe-projection/`
-  records the zero result on both binary snapshots.
 
 ### GRV-Issue-096 - Extreme-scale capsule initial mesh sweep can miss a genuine overlap
 
@@ -164,6 +140,54 @@ The remaining focused geometry issue reproduces on the original stack. Resolve
 Remaining measured performance costs are tracked in the benchmark backlog.
 
 ## Resolved Issues
+
+### GRV-Issue-129 - Detached polygon compound reports a zero conservative proxy radius
+
+- **Resolved:** 2026-10-15. Detached compound inspection now measures effective
+  authored polygon vertices through the polygon's existing candidate-reach
+  calculation. The `(0,0)`, `(6,000,0)`, `(0,6,000)` triangle reports `6,000`
+  instead of zero; ordinary polygons had the same defect.
+- **Root cause:** Polygon construction allocated a zero-filled scaled-vertex
+  cache whose values were populated only during runtime preparation. Detached
+  compound radius inspection incorrectly treated that cache as current geometry.
+  The defect reproduced on both the accepted pre-admission and phase-2 binaries,
+  before deferred collider-owned mesh preparation.
+- **Contract:** Fused owner/part scaling and outward norm rounding are preserved.
+  An unrepresentable vertex or enclosure returns `Fixed64.MaxValue` without
+  admitting or publishing runtime geometry. Later shrinking host scales can
+  compensate oversized authoring; failed initialization leaves inspection and
+  host binding unchanged. Runtime preparation and complete-owner admission still
+  reject unsupported effective geometry. Committed radius getters, scratch
+  buffers and mass calculations are unchanged.
+- **Parity and scope:** The existing 3D mesh counterpart already measures
+  effective authored vertices and retains the same overflow sentinel. The fix
+  adds no geometry representation, cache, type, dependency or upstream change.
+  Independent ponytail review found no actionable source/test findings.
+- **Correctness:** Eight regression cases fail on the original source and pass
+  with the fix: ordinary/oversized authoring, part scale/rotation/offset,
+  sub-raw outward rounding, independent X/Y/norm overflow, failed admission and
+  later host compensation. All 134 focused 2D/3D compound, range and scale tests
+  pass. Full local-stack Release/ReleaseLean builds have zero warnings/errors;
+  all 6,301/6,235 tests pass with no skips. Raw coverage is 100% line/branch/method:
+  Release `47,525/47,525`, `15,708/15,708`, `5,028/5,028`; Lean
+  `47,523/47,523`, `15,708/15,708`, `5,027/5,027`. All six existing Windows x64
+  replay fixtures match shared expectations and cross-profile captures unchanged.
+- **Warm gate:** Three matched native Release controls retain `0 B/op`.
+  Committed radius batch-64 means are `65.255 -> 60.258 ns`; candidate reach
+  batch-64 is `35.940 -> 36.556 us`; heterogeneous 2D compound pose refresh is
+  `42.853 -> 43.066 us`. The latter two have overlapping 99.9% confidence
+  intervals, with no statistically resolved regression. The committed getter is
+  unchanged; its lower mean is not attributed to this fix. The incorrect original
+  detached zero is excluded from timing comparisons. Two launches, six warmups,
+  six measurements and 500 ms iterations bind all eight tested runtime modules
+  to the actual measured child; 699 production and 80 fixture inputs remain
+  unchanged after measurement. Byte-different upstream builds have identical
+  method bodies/signatures/flags and no source changes.
+- **Evidence:** Ignored `artifacts/geometry-range/phase2/probe-projection/`
+  retains original confirmation. `artifacts/grv-129/` retains red/green tests,
+  full raw coverage and replay logs; `perf/acceptance.json` links native reports,
+  source/module inventories, child hashes and tested-stack binding. Linux/ARM64
+  and released-package validation were not run. Dependency pins are unchanged.
 
 ### GRV-Issue-131 - Generic 3D cylinder sweep reports early entry at supported scale
 

@@ -78,6 +78,8 @@ internal static class ColliderCanonicalBounds2D
                     capsule.ScaledRadius);
             return localBounds.Max.Y;
         }
+        if (collider is LSPolygonCollider2D polygon)
+            return polygon.GetCurrentGeometryReach();
         Fixed64 radius = Fixed64.Zero;
         for (int index = 0; index < collider.VertexCount; index++)
         {

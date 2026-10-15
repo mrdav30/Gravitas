@@ -198,12 +198,28 @@ public sealed class LSPolygonCollider2D : LSCollider2D, IConvexVertexSource2D
         return Fixed64.MaxValue;
     }
 
+    internal Fixed64 GetCurrentGeometryReach()
+    {
+        GetCurrentScaleFactors(out Vector2d ownerScale, out Vector2d partScale);
+        return GetCandidateGeometryReach(ownerScale, partScale);
+    }
+
     internal Fixed64 GetCandidateGeometryReach(Vector2d ownerScale, Vector2d partScale)
     {
         Fixed64 reach = Fixed64.Zero;
         for (int i = 0; i < _localVertices.Length; i++)
-            reach = FixedMath.Max(reach, ColliderGeometryPolicy.Magnitude(
-                ColliderScalePolicy.Scale(_localVertices[i], ownerScale, partScale)));
+        {
+            Vector2d vertex = _localVertices[i];
+            // Detached metadata can precede a compensating host scale; do not
+            // publish or reject runtime geometry while measuring its enclosure.
+            if (!Fixed64.TryMultiplyDivide(vertex.X, ownerScale.X, partScale.X,
+                    Fixed64.One, out Fixed64 x)
+                || !Fixed64.TryMultiplyDivide(vertex.Y, ownerScale.Y, partScale.Y,
+                    Fixed64.One, out Fixed64 y)
+                || !new Vector2d(x, y).TryGetMagnitudeCeiling(out Fixed64 vertexReach))
+                return Fixed64.MaxValue;
+            reach = FixedMath.Max(reach, vertexReach);
+        }
         return reach;
     }
 

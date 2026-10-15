@@ -269,6 +269,100 @@ public sealed class CompoundCollider2DTests
         compound.RuntimeShapeVersion.Should().BeGreaterThan(1u);
     }
 
+    [Theory]
+    [InlineData(1)]
+    [InlineData(1000)]
+    public void ScaledRadius_WithDetachedPolygon_ShouldMeasureAuthoredGeometry(int scale)
+    {
+        var compound = new LSCompoundCollider2D(CompoundColliderPart2D.ConvexPolygon(
+            new[] { Vector2d.Zero, Vector2d.Right * (Fixed64)(6 * scale),
+                Vector2d.Forward * (Fixed64)(6 * scale) }, Vector2d.Zero));
+
+        compound.ScaledRadius.Should().Be((Fixed64)(6 * scale));
+        compound.Id.Should().Be(-1);
+        compound.HasHostBinding.Should().BeFalse();
+        compound.RuntimeShapeVersion.Should().Be(0u);
+    }
+
+    [Fact]
+    public void ScaledRadius_WithDetachedScaledPolygon_ShouldMatchPublishedEnvelope()
+    {
+        var compound = new LSCompoundCollider2D(CompoundColliderPart2D.ConvexPolygon(
+            new[] { Vector2d.Zero, new Vector2d(3, 0), new Vector2d(3, 2) },
+            new Vector2d(3, 4), Fixed64.HalfPi, new Vector2d(1, 2)));
+
+        // The offset has length five; anisotropic scaling gives a 3-4-5 vertex.
+        Fixed64 detachedRadius = compound.ScaledRadius;
+        detachedRadius.Should().Be((Fixed64)10);
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        _ = CreateBody(context, compound, Vector2d.Zero);
+        compound.ScaledRadius.Should().Be(detachedRadius);
+    }
+
+    [Fact]
+    public void ScaledRadius_WithDetachedSubRawPolygon_ShouldRoundNormOutward()
+    {
+        Fixed64 raw = Fixed64.MinIncrement;
+        var compound = new LSCompoundCollider2D(CompoundColliderPart2D.ConvexPolygon(
+            new[] { Vector2d.Zero, new Vector2d(raw, Fixed64.Zero), new Vector2d(raw, raw) },
+            Vector2d.Zero));
+
+        compound.ScaledRadius.Should().Be(Fixed64.FromRaw(2));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void ScaledRadius_WithUnrepresentableDetachedPolygon_ShouldReturnMaximum(int overflow)
+    {
+        Fixed64 extent = overflow == 2
+            ? Fixed64.MaxValue * Fixed64.FromFraction(3, 4) : Fixed64.MaxValue;
+        Vector2d[] vertices = overflow == 2
+            ? new[] { Vector2d.Zero, new Vector2d(extent, Fixed64.Zero), new Vector2d(extent, extent) }
+            : new[] { Vector2d.Zero, Vector2d.Right * extent, Vector2d.Forward * extent };
+        Vector2d partScale = overflow switch
+        {
+            0 => new Vector2d(2, 1),
+            1 => new Vector2d(1, 2),
+            _ => Vector2d.One
+        };
+        var compound = new LSCompoundCollider2D(CompoundColliderPart2D.ConvexPolygon(
+            vertices, Vector2d.Zero, Fixed64.Zero, partScale));
+
+        compound.ScaledRadius.Should().Be(Fixed64.MaxValue);
+        compound.HasHostBinding.Should().BeFalse();
+        compound.RuntimeShapeVersion.Should().Be(0u);
+        if (overflow < 2)
+        {
+            using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+            var transform = new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity,
+                new Vector3d(Fixed64.MinIncrement, Fixed64.One, Fixed64.MinIncrement));
+            compound.InitializeWithNoBody(new TestMatterAgent(context, transform));
+            compound.ScaledRadius.Should().Be(Fixed64.One);
+        }
+    }
+
+    [Fact]
+    public void ScaledRadius_InspectingLargeDetachedPolygon_ShouldPreserveLaterHostCompensation()
+    {
+        var compound = new LSCompoundCollider2D(CompoundColliderPart2D.ConvexPolygon(
+            new[] { Vector2d.Zero, new Vector2d(6000, 0), new Vector2d(0, 6000) }, Vector2d.Zero));
+        compound.ScaledRadius.Should().Be((Fixed64)6000);
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext(extent: 2);
+        var transform = new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One);
+        var agent = new TestMatterAgent(context, transform);
+
+        Action initialize = () => compound.InitializeWithNoBody(agent);
+        initialize.Should().Throw<ArgumentException>();
+        compound.HasHostBinding.Should().BeFalse();
+        compound.RuntimeShapeVersion.Should().Be(0u);
+        compound.ScaledRadius.Should().Be((Fixed64)6000);
+        transform.LocalScale = new Vector3d(Fixed64.Quarter, Fixed64.One, Fixed64.Quarter);
+        compound.InitializeWithNoBody(agent);
+        compound.ScaledRadius.Should().Be((Fixed64)1500);
+    }
+
     [Fact]
     public void ScaledRadius_ShouldUseFarthestCanonicalPartProxy()
     {

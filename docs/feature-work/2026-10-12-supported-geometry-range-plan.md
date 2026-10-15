@@ -1150,9 +1150,23 @@ upstream support calls; direct cylinder and complete CCD costs fall by about
 65% and 46%. Independent ponytail review approves the coordinated implementation.
 Complete Release/Lean builds and tests pass in both repositories at raw 100%
 line/branch/method coverage. All six existing replay fixtures match shared and
-cross-profile expectations. Detailed evidence belongs to resolved #131; resolve
-#129 before phase 3. Dependency pins remain unchanged; release the math change
-before package-based validation.
+cross-profile expectations. Detailed evidence belongs to resolved #131; the #129
+follow-up below clears the remaining focused prerequisite. Dependency pins remain
+unchanged; release the math change before package-based validation.
+
+**2026-10-15 detached-inspection follow-up (#129):** Detached polygon compound
+radius inspection now reuses the existing effective authored-vertex reach
+calculation instead of reading an unprepared cache. Fused scaling, outward
+rounding and overflow sentinels preserve inspection before compensating host
+scales without publishing or admitting geometry. The committed getter and runtime
+preparation are unchanged; the 3D mesh counterpart already satisfies this
+contract. Eight regression cases, 134 focused tests, full Release/Lean builds
+and 6,301/6,235 tests pass at raw 100% line/branch/method coverage. All six existing
+replay fixtures match unchanged expectations. Three matched native controls retain
+0 B/op with no statistically resolved slowdown, bound to the exact tested stack.
+Independent ponytail review clears the focused implementation; detailed evidence
+belongs to resolved #129. No upstream source or dependency pin changes are needed.
+The focused correctness prerequisites are resolved; resume phase 3 next.
 
 ## Phase 3: Close Query, Settings And Restore Bypasses
 
