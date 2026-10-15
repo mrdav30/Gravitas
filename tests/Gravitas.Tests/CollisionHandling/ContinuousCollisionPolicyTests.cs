@@ -14,6 +14,24 @@ namespace Gravitas.Tests.CollisionHandlingTests;
 public sealed class ContinuousCollisionPolicyTests
 {
     [Theory]
+    [InlineData(true, false, false, true, true, false, false)]
+    [InlineData(false, true, false, true, true, false, false)]
+    [InlineData(false, false, true, true, true, false, false)]
+    [InlineData(false, false, false, false, true, false, false)]
+    [InlineData(false, false, false, true, false, false, false)]
+    [InlineData(false, false, false, true, true, false, true)]
+    [InlineData(false, false, false, true, false, true, true)]
+    public void StaticTargetPolicy_ShouldRequireEligiblePhysicalPairInBothDimensions(
+        bool isSelf, bool ignored, bool trigger, bool physicalPairRequired,
+        bool isStatic, bool bodyKinematic, bool expected)
+    {
+        ContinuousCollisionTargetPolicy.AllowsStaticOrKinematic3DTarget(
+            isSelf, ignored, trigger, physicalPairRequired, isStatic, bodyKinematic).Should().Be(expected);
+        ContinuousCollisionTargetPolicy.AllowsStaticOrKinematic2DTarget(
+            isSelf, ignored, trigger, physicalPairRequired, isStatic, bodyKinematic).Should().Be(expected);
+    }
+
+    [Theory]
     [InlineData(false, false, false)]
     [InlineData(false, false, true)]
     [InlineData(false, true, false)]

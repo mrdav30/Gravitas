@@ -356,7 +356,9 @@ public sealed partial class ContinuousCollisionDetectionTests
             collider,
             Vector3d.Zero,
             FixedQuaternion.Identity);
-        Fixed64 expectedRadius = Fixed64.FromFraction(9, 2);
+        Fixed64 expectedRadius = mover.Body.ResolveContinuousCollisionProxyRadius();
+        expectedRadius.Should().BeInRange(Fixed64.FromFraction(9, 2),
+            Fixed64.FromFraction(9, 2) + Fixed64.FromRaw(2));
         mover.Body.ResolveContinuousCollisionProxyRadius()
             .Should()
             .Be(expectedRadius);

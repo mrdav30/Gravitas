@@ -321,18 +321,18 @@ internal static class ColliderCanonicalBounds
                 FixedMath.Max(radiusX, radiusZ)));
     }
 
-    internal static Fixed64 GetCompoundCenteredProxyRadius(LSCompoundCollider compound)
+    internal static Fixed64 GetCompoundCenteredProxyRadius(LSCompoundCollider compound, out Fixed64 rotationalRadius)
     {
         Fixed64 radius = Fixed64.Zero;
+        rotationalRadius = Fixed64.Zero;
         for (int index = 0; index < compound.PartCount; index++)
         {
             var part = compound.GetPartCollider(index);
-            // Published centers include scalar transform rounding. Admission uses
-            // exact authored attachment reach; the CCD proxy must enclose the
-            // actual committed centers instead of reusing that admission metric.
             Vector3d offset = part.CanonicalCenter - compound.CanonicalCenter;
             radius = FixedMath.Max(radius, ColliderGeometryPolicy.Add(
                 ColliderGeometryPolicy.Magnitude(offset), part.CanonicalCenteredProxyRadius));
+            // Retain a separate all-angle enclosure for the frame's CCD proxy.
+            rotationalRadius = FixedMath.Max(rotationalRadius, part.CanonicalPivotProxyRadius);
         }
         return radius;
     }

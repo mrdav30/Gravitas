@@ -1837,8 +1837,9 @@ public sealed partial class ContinuousCollision2DTests
             immovable: false);
 
         collider.AxisLength.Should().Be(Fixed64.FromRaw(3));
+        collider.CanonicalCenteredProxyRadius.Should().Be(Fixed64.FromRaw(3));
         source.ResolveContinuousCollisionProxyRadius()
-            .Should().Be(Fixed64.FromRaw(3));
+            .Should().Be(Fixed64.FromRaw(5)); // The all-angle enclosure also accounts for final materialization.
     }
 
     [Fact]
@@ -1855,7 +1856,8 @@ public sealed partial class ContinuousCollision2DTests
             Vector2d.Zero,
             immovable: false);
 
-        source.ResolveContinuousCollisionProxyRadius().Should().Be((Fixed64)1000);
+        source.ResolveContinuousCollisionProxyRadius().Should().Be((Fixed64)1000
+            + (Fixed64)2000 * FixedMath.CanonicalSinCosErrorBound + Fixed64.FromRaw(2));
     }
 
     [Fact]

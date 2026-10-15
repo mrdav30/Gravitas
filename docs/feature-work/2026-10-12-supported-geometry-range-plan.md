@@ -265,8 +265,15 @@ attachment products define the admission budget; a compound's physical proxy
 must still enclose its published child centers after component rounding. For
 example, a two-component one-raw attachment at scale `5/8` has exact ceiling
 norm one raw unit, but its rounded center `(1 raw, 1 raw)` needs two. Preserve
-the committed-center proxy calculation rather than reuse the admission total
-or add an arbitrary admission margin.
+a conservative physical enclosure rather than reuse the admission total or add
+an arbitrary admission margin. The #126/#130 follow-up publishes a coherent
+pivot proxy with the shape. For every nonzero attachment stage, its all-angle
+bound adds one raw unit after the exact 3D norm; planar stages first multiply
+by `1 + 2e`, where `e = CanonicalSinCosErrorBound`, then add two raw units for
+the scalar-product and component rounding. Compound reduction retains each
+leaf's attachment stage. Rotating intrinsic vertices use the corresponding
+bound; circle/sphere radii and axis-aligned planar boxes remain unchanged.
+These allowances belong only to CCD enclosure and do not alter admission.
 
 Four lifecycle details need more than a check at the common preparation seam:
 
@@ -1104,6 +1111,18 @@ No Linux/ARM64 or released-package validation is claimed. The develop dependency
 pin is unchanged; update it after committing the coordinated FixedMathSharp
 helper. Release FixedMathSharp before validating Gravitas against its package.
 #096 remains open for query, settings and restore admission.
+
+**2026-10-14 proxy follow-up (#126/#130):** Pending authored geometry now publishes
+before CCD indexing and inertia integration, while pose-only publication retains
+its normal lifecycle. The shape transaction publishes a separate all-angle pivot
+proxy, preserves public compound radius semantics and refreshes 2D membership.
+Rounded attachment/vertex enclosures cover both dimensions and compound leaves;
+obsolete full-domain source-radius scans are removed. Full Release/Lean tests,
+raw 100% line/branch/method coverage and all six existing replay fixtures pass.
+The 14 native controls retain zero warmed allocations and no confirmed slowdown,
+including a fresh reversed check of the initially noisy compound pose control.
+Detailed evidence belongs to the two resolved tracker entries. Continue with
+#128/#129 before phase 3.
 
 ## Phase 3: Close Query, Settings And Restore Bypasses
 

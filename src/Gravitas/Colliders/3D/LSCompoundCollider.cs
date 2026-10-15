@@ -130,7 +130,7 @@ public sealed class LSCompoundCollider : LSCollider
                 part.LocalScale,
                 PreparedContext);
             reach = FixedMath.Max(reach, ColliderGeometryPolicy.Add(
-                ColliderGeometryPolicy.Attachment(partCollider.LocalOffset, snapshot.OwnerScale),
+                partCollider.PreparedAttachmentReach,
                 partCollider.PreparedGeometryReach));
 
             if (i == 0)

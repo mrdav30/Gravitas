@@ -350,7 +350,7 @@ public sealed class LSCompoundCollider2D : LSCollider2D
                 part.LocalScale,
                 PreparedContext);
             reach = FixedMath.Max(reach, ColliderGeometryPolicy.Add(
-                ColliderGeometryPolicy.Attachment(partCollider.LocalOffset, snapshot.OwnerScale),
+                partCollider.PreparedAttachmentReach,
                 partCollider.PreparedGeometryReach));
 
             Vector2d partMin = partCollider.PreparedShapeBounds.Min;

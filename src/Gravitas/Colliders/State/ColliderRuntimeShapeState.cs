@@ -18,6 +18,7 @@ internal class ColliderRuntimeShapeState<TSnapshot>
     private bool _dirty = true;
 
     public uint RuntimeVersion { get; private set; }
+    public bool IsDirty => _dirty;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void MarkDirty() => _dirty = true;

@@ -169,7 +169,7 @@ public sealed class ColliderGeometryRangeTests
     }
 
     [Fact]
-    public void PendingCompensatedSpatialAuthoring_ShouldRetainConservativeCandidateFallback()
+    public void PendingCompensatedSpatialAuthoring_ShouldPublishBeforeCandidateIndexing()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         context.SetFrameRate(1);
@@ -181,51 +181,25 @@ public sealed class ColliderGeometryRangeTests
         context.AdvanceLateSimulateToken();
         context.Physics.PrepareContinuousCollisionFrame();
         Fixed64 pendingProxy = source.ResolveContinuousCollisionProxyRadius();
-        pendingProxy.Should().Be(Fixed64.MaxValue);
-        collider.ScaledRadius.Should().Be((Fixed64)2048);
+        pendingProxy.Should().Be(Fixed64.FromFraction(3, 4) + RawUnit);
+        collider.ScaledRadius.Should().Be(Fixed64.Quarter);
         source.GatherRotationalContinuousCollisionCandidates(Vector3d.Zero, Vector3d.Zero,
-            Vector3d.Zero, pendingProxy).Should().Be(1);
+            Vector3d.Zero, pendingProxy).Should().Be(0); // Only the source's own indexed entry remains.
         var farBounds = DynamicCcdCandidateIndex.CreateBoundsBetween(
             new Vector3d(100000, 0, 0), new Vector3d(100000, 0, 0), Vector3d.One);
-        context.Physics.QueryContinuousCollisionCandidates(farBounds).Should().Contain(source.DynamicId);
+        context.Physics.QueryContinuousCollisionCandidates(farBounds).Should().NotContain(source.DynamicId);
 
-        collider.RebuildRuntimeShapeOnly().Should().BeTrue();
+        collider.RebuildRuntimeShapeOnly().Should().BeFalse();
         collider.ScaledRadius.Should().Be(Fixed64.Quarter);
-        source.ResolveContinuousCollisionProxyRadius().Should().Be(Fixed64.FromFraction(3, 4));
+        source.ResolveContinuousCollisionProxyRadius().Should().Be(pendingProxy);
         context.AdvanceLateSimulateToken();
         context.Physics.QueryContinuousCollisionCandidates(farBounds).Should().NotContain(source.DynamicId);
     }
 
     [Theory]
-    [InlineData(0)]
-    [InlineData(1)]
-    [InlineData(2)]
-    public void PendingCompensatedSpatialAuthoring_RegistryFallback_ShouldRespectTargetPolicies(int filteredPolicy)
-    {
-        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
-        var dynamicTarget = new SolidBody(new TestMatterAgent(context), new LSSphereCollider { Radius = Fixed64.Half });
-        dynamicTarget.Initialize(Vector3d.Zero, FixedQuaternion.Identity);
-        var staticTarget = new LSSphereCollider { Radius = Fixed64.Half };
-        staticTarget.InitializeWithNoBody(new TestMatterAgent(context));
-        var filtered = new LSSphereCollider { Radius = Fixed64.Half, Layer = new Gravitas.Support.PhysicsLayer(1) };
-        filtered.InitializeWithNoBody(new TestMatterAgent(context));
-        if (filteredPolicy == 0) filtered.IsTrigger = true;
-        if (filteredPolicy == 2) filtered.IsActive = false;
-        SolidBody source = CreatePendingCompensatedSphere(context);
-        if (filteredPolicy == 1)
-            source.Collider.IgnoredCollisionLayers = Gravitas.Support.PhysicsLayerMask.FromLayer(filtered.Layer);
-        context.AdvanceLateSimulateToken();
-        context.Physics.PrepareContinuousCollisionFrame();
-        Fixed64 radius = source.ResolveContinuousCollisionProxyRadius();
-        radius.Should().Be(Fixed64.MaxValue);
-        source.GatherRotationalContinuousCollisionCandidates(Vector3d.Zero, Vector3d.Zero,
-            Vector3d.Zero, radius).Should().Be(2);
-    }
-
-    [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void PendingCompensatedSpatialAuthoring_MixedFallback_ShouldRetainStaticAndDynamicTargets(bool pending)
+    public void CompensatedSpatialAuthoring_MixedPublication_ShouldRetainStaticAndDynamicTargets(bool pending)
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         context.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
@@ -244,7 +218,7 @@ public sealed class ColliderGeometryRangeTests
         context.AdvanceLateSimulateToken();
         context.Physics.PrepareContinuousCollisionFrame();
         context.Physics2D.PrepareContinuousCollisionFrame();
-        source.ResolveContinuousCollisionProxyRadius().Should().Be(pending ? Fixed64.MaxValue : Fixed64.FromFraction(3, 4));
+        source.ResolveContinuousCollisionProxyRadius().Should().Be(Fixed64.FromFraction(3, 4) + RawUnit);
         FixedQuaternion requestedRotation = source.ContinuousCollisionFrameTargetRotation;
 
         source.LateSimulate(updateSleepState: false, updateColliderState: false);

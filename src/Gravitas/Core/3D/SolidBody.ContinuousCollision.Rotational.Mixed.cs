@@ -177,27 +177,6 @@ public partial class SolidBody
     {
         _rotationalMixedStatic2DCandidates.FastClear();
         _rotationalMixedMoving2DCandidateIds.FastClear();
-        if (pivotRadius == Fixed64.MaxValue)
-        {
-            int count = Context.Physics2D.ColliderCount;
-            _rotationalMixedStatic2DCandidates.EnsureCapacity(count);
-            _rotationalMixedMoving2DCandidateIds.EnsureCapacity(count);
-            for (int i = 0; i < count; i++)
-            {
-                LSCollider2D target = Context.Physics2D.GetColliderByServiceIndex(i);
-                if (target.Body is SolidBody2D targetBody
-                    && IsMovingMixedRotationalContinuousCollisionTarget(targetBody))
-                {
-                    _rotationalMixedMoving2DCandidateIds.Add(targetBody.DynamicId);
-                    continue;
-                }
-
-                _rotationalMixedStatic2DCandidates.Add(target);
-            }
-
-            return;
-        }
-
         FixedBoundVolume bounds = DynamicCcdCandidateIndex.CreateSweptSphereBounds(
             startPosition,
             displacement,

@@ -948,9 +948,7 @@ public partial class SolidBody
 
     private bool IsMovingRotationalContinuousCollisionTarget(SolidBody target)
     {
-        if (target == this || !target.Active)
-            return false;
-
+        // Query/index admission has already validated an active, nonself target.
         if (target.IsKinematic)
             target.EnsureContinuousCollisionFramePrepared(Context.LateSimulateToken);
 

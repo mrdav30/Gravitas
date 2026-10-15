@@ -39,31 +39,10 @@ public sealed partial class SolidBody2D
             : mode;
     }
 
-    internal Fixed64 ResolveContinuousCollisionProxyRadius()
-    {
-        bool offsetResolved =
-            Collider.TryGetCurrentScaledOffset(out Vector2d centerOffset);
-        bool distanceResolved =
-            centerOffset.TryGetMagnitudeCeiling(
-                out Fixed64 offsetDistance);
-        bool radiusResolved = Fixed64.TryAdd(
-            offsetDistance,
-            Collider.CanonicalCenteredProxyRadius,
-            out Fixed64 proxyRadius);
-        return offsetResolved & distanceResolved & radiusResolved
-            ? proxyRadius
-            : Fixed64.MaxValue;
-    }
+    internal Fixed64 ResolveContinuousCollisionProxyRadius() => Collider.CanonicalPivotProxyRadius;
 
-    internal Fixed64 ResolveMixedContinuousCollisionProxyRadius()
-    {
-        Vector2d mixedExtents = new(
-            ResolveContinuousCollisionProxyRadius(),
-            Collider.MixedHalfThickness);
-        return mixedExtents.TryGetMagnitudeCeiling(out Fixed64 radius)
-            ? radius
-            : Fixed64.MaxValue;
-    }
+    internal Fixed64 ResolveMixedContinuousCollisionProxyRadius() =>
+        ColliderGeometryPolicy.Mixed(ResolveContinuousCollisionProxyRadius(), Collider.MixedHalfThickness);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private bool IsValidContinuousCollisionHit(Physics2DHit hit) =>

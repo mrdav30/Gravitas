@@ -164,6 +164,10 @@ public partial class SolidBody
         if (_continuousCollisionFrameToken == token)
             return;
 
+        // Publish pending authoring before inertia integration and CCD indexing;
+        // rotational samples must not introduce a different geometry epoch.
+        Collider.RebuildRuntimeShapeOnly(geometryOnly: true);
+
         Vector3d startPosition = Position3d;
         FixedQuaternion startRotation = Rotation;
         Vector3d displacement;

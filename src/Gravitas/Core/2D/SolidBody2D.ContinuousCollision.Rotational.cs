@@ -45,21 +45,6 @@ public sealed partial class SolidBody2D
         if (!Context.Settings.RuntimeMode.RunsMixedContacts())
             return false;
 
-        if (pivotRadius == Fixed64.MaxValue)
-        {
-            int colliderCount = Context.Physics.ColliderCount;
-            for (int i = 0; i < colliderCount; i++)
-            {
-                if (IsRotatingContinuousCollisionTarget(
-                    Context.Physics.GetColliderByServiceIndex(i).Body))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
         Vector3d start3D = new(startPosition.X, Collider.MixedSlabCenterY, startPosition.Y);
         Vector3d end3D = new(
             startPosition.X + displacement.X,
@@ -92,9 +77,9 @@ public sealed partial class SolidBody2D
         return !target.HasRotationInvariantCollider && target.HasContinuousCollisionRotationalMotion;
     }
 
-    private bool IsRotatingContinuousCollisionTarget(SolidBody? target)
+    private bool IsRotatingContinuousCollisionTarget(SolidBody target)
     {
-        if (target == null || !IsMovingMixedRotationalContinuousCollisionTarget(target))
+        if (!IsMovingMixedRotationalContinuousCollisionTarget(target))
             return false;
 
         target.EnsureContinuousCollisionFramePrepared(Context.LateSimulateToken);
@@ -438,9 +423,6 @@ public sealed partial class SolidBody2D
         Fixed64 pivotRadius)
     {
         _rotationalContinuousCollisionCandidateIds.FastClear();
-        if (pivotRadius == Fixed64.MaxValue)
-            return GatherAllRegisteredRotationalContinuousCollisionCandidates();
-
         int staticHitCount = displacement.MagnitudeSquared <= Fixed64.Epsilon
             ? Context.Query2D.OverlapCircleAgainstStaticAll(
                 startPosition,
@@ -465,39 +447,13 @@ public sealed partial class SolidBody2D
                 pivotRadius));
         _rotationalContinuousCollisionCandidateIds.EnsureCapacity(candidateIds.Count);
         for (int i = 0; i < candidateIds.Count; i++)
-            _rotationalContinuousCollisionCandidateIds.Add(candidateIds[i]);
-
-        return staticHitCount + _rotationalContinuousCollisionCandidateIds.Count;
-    }
-
-    private int GatherAllRegisteredRotationalContinuousCollisionCandidates()
-    {
-        _continuousCollisionHits.FastClear();
-        _rotationalContinuousCollisionCandidateIds.FastClear();
-        int colliderCount = Context.Physics2D.ColliderCount;
-        _continuousCollisionHits.EnsureCapacity(colliderCount);
-        for (int serviceIndex = 0; serviceIndex < colliderCount; serviceIndex++)
         {
-            LSCollider2D target = Context.Physics2D.GetColliderByServiceIndex(serviceIndex);
-            if (target.Body is SolidBody2D targetBody
-                && IsMovingRotationalContinuousCollisionTarget(targetBody))
-            {
-                _rotationalContinuousCollisionCandidateIds.Add(targetBody.DynamicId);
-                continue;
-            }
-
-            if (!IsValidContinuousCollisionTarget(target))
-                continue;
-
-            _continuousCollisionHits.Add(new Physics2DHit(
-                target,
-                target.Center,
-                Vector2d.Zero,
-                Fixed64.Zero));
+            int candidateId = candidateIds[i];
+            if (candidateId != DynamicId)
+                _rotationalContinuousCollisionCandidateIds.Add(candidateId);
         }
 
-        return _continuousCollisionHits.Count
-            + _rotationalContinuousCollisionCandidateIds.Count;
+        return staticHitCount + _rotationalContinuousCollisionCandidateIds.Count;
     }
 
     private bool TryFindEarliestRotationalContinuousCollision(
@@ -535,7 +491,6 @@ public sealed partial class SolidBody2D
             Physics2DHit hit = _continuousCollisionHits[hitIndex];
             LSCollider2D target = hit.Collider;
             if (!IsValidContinuousCollisionTarget(target)
-                || ColliderSettings2D.GetCollisionType(Collider.Shape, target.Shape) == CollisionType2D.None
                 || CanExcludeInvariantTangentialContact(hit, displacement)
                 || !TryFindEarliestRotationalContinuousCollisionAgainstTarget(
                     target,
@@ -898,9 +853,7 @@ public sealed partial class SolidBody2D
 
     private bool IsMovingRotationalContinuousCollisionTarget(SolidBody2D target)
     {
-        if (ReferenceEquals(target, this) || !target.Active)
-            return false;
-
+        // Query/index admission has already validated an active, nonself target.
         if (target.IsKinematic)
             target.EnsureContinuousCollisionFramePrepared(Context.LateSimulateToken);
 

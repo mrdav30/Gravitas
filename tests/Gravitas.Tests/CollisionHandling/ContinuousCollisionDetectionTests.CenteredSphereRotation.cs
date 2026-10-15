@@ -320,19 +320,19 @@ public sealed partial class ContinuousCollisionDetectionTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void RotationalMixedCandidateFallback_WithConservativeRadius_ShouldAdmitOnlyRotating2DBodies(
+    public void RotationalMixedCandidateSearch_WithFiniteRadius_ShouldAdmitOnlyRotating2DBodies(
         bool targetRotates)
     {
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();
         scenario.Context.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
         ScenarioBody<LSSphereCollider> source = scenario.CreateSphere(Vector3d.Zero, isKinematic: true);
         source.Body.HasNearbyRotationalContinuousCollisionTarget(
-            Vector3d.Zero, Vector3d.Zero, Fixed64.MaxValue).Should().BeFalse();
+            Vector3d.Zero, Vector3d.Zero, (Fixed64)8).Should().BeFalse();
         var bodyless = new LSCircleCollider2D(Fixed64.Half);
         bodyless.InitializeWithNoBody(new TestMatterAgent(scenario.Context,
             new FixedTransform(Vector3d.Right * (Fixed64)2, FixedQuaternion.Identity, Vector3d.One)));
         source.Body.HasNearbyRotationalContinuousCollisionTarget(
-            Vector3d.Zero, Vector3d.Zero, Fixed64.MaxValue).Should().BeFalse();
+            Vector3d.Zero, Vector3d.Zero, (Fixed64)8).Should().BeFalse();
         var targetCollider = new LSPolygonCollider2D(
             new Vector2d(-Fixed64.One, -Fixed64.Quarter),
             new Vector2d(Fixed64.One, -Fixed64.Quarter),
@@ -348,11 +348,12 @@ public sealed partial class ContinuousCollisionDetectionTests
         if (targetRotates)
             target.AddAngularImpulse(Fixed64.One / target.EffectiveInverseMomentOfInertia);
 
-        // The query bound is deliberately conservative; registered geometry remains ordinary and valid.
+        // Candidate indices are immutable within a frame; start the next frame after the command batch.
+        scenario.Context.AdvanceLateSimulateToken();
         source.Body.HasNearbyRotationalContinuousCollisionTarget(
-            Vector3d.Zero, Vector3d.Zero, Fixed64.MaxValue).Should().Be(targetRotates);
+            Vector3d.Zero, Vector3d.Zero, (Fixed64)8).Should().Be(targetRotates);
         scenario.Context.Settings.RuntimeMode = PhysicsRuntimeMode.Both;
         source.Body.HasNearbyRotationalContinuousCollisionTarget(
-            Vector3d.Zero, Vector3d.Zero, Fixed64.MaxValue).Should().BeFalse();
+            Vector3d.Zero, Vector3d.Zero, (Fixed64)8).Should().BeFalse();
     }
 }

@@ -586,9 +586,9 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
         Rebuild();
     }
 
-    internal bool Rebuild()
+    internal bool Rebuild(bool geometryOnly = false)
     {
-        if (!RebuildRuntimeShapeState())
+        if (!RebuildRuntimeShapeState(geometryOnly))
             return false;
 
         if (_id >= 0)

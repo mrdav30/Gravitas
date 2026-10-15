@@ -731,9 +731,13 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
     internal bool ExcludesMixedCollisionWith(LSCollider2D other) =>
         _hierarchyState.ExcludesCollisionWith(other.HierarchyState, HierarchyKey, other.HierarchyKey);
 
-    private bool RebuildRuntimeShapeState(bool refreshMassProperties = true)
+    private bool RebuildRuntimeShapeState(bool refreshMassProperties = true, bool geometryOnly = false)
     {
         ColliderShapeSnapshot snapshot = CaptureShapeSnapshot();
+        // CCD needs pending geometry, not an extra pose-only publication that
+        // would advance runtime versions and disturb retained solver caches.
+        if (geometryOnly && !_runtimeShapeState.IsDirty && snapshot.OwnerScale == _committedOwnerScale)
+            return false;
         if (!_runtimeShapeState.ShouldRebuild(snapshot))
             return false;
 
@@ -748,8 +752,8 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal bool RebuildRuntimeShapeOnly(bool refreshMassProperties = true) =>
-        RebuildRuntimeShapeState(refreshMassProperties);
+    internal bool RebuildRuntimeShapeOnly(bool refreshMassProperties = true, bool geometryOnly = false) =>
+        RebuildRuntimeShapeState(refreshMassProperties, geometryOnly);
 
     /// <summary>Marks derived runtime shape state for deterministic rebuilding.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

@@ -520,7 +520,7 @@ public sealed partial class ContinuousCollisionDetectionTests
     }
 
     [Fact]
-    public void RotationalCandidateFallback_UnrepresentableRadius_ShouldFindOnlyRotatingBodies()
+    public void RotationalCandidateSearch_WithFiniteRadius_ShouldFindOnlyRotatingBodies()
     {
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();
         ScenarioBody<LSSphereCollider> source = scenario.CreateSphere(
@@ -530,7 +530,7 @@ public sealed partial class ContinuousCollisionDetectionTests
         source.Body.HasNearbyRotationalContinuousCollisionTarget(
                 Vector3d.Zero,
                 Vector3d.Zero,
-                Fixed64.MaxValue)
+                (Fixed64)8)
             .Should()
             .BeFalse();
 
@@ -538,25 +538,26 @@ public sealed partial class ContinuousCollisionDetectionTests
         source.Body.HasNearbyRotationalContinuousCollisionTarget(
                 Vector3d.Zero,
                 Vector3d.Zero,
-                Fixed64.MaxValue)
+                (Fixed64)8)
             .Should()
             .BeFalse();
 
         ScenarioBody<LSCuboidCollider> rotatingTarget = scenario.CreateCuboid(
             Vector3d.Right * (Fixed64)4);
         rotatingTarget.Body.ApplyCollisionAngularVelocityDelta(Vector3d.Up);
+        scenario.Context.AdvanceLateSimulateToken();
 
         source.Body.HasNearbyRotationalContinuousCollisionTarget(
                 Vector3d.Zero,
                 Vector3d.Zero,
-                Fixed64.MaxValue)
+                (Fixed64)8)
             .Should()
             .BeTrue();
         source.Body.GatherRotationalContinuousCollisionCandidates(
                 Vector3d.Zero,
                 Vector3d.Zero,
                 Vector3d.Zero,
-                Fixed64.MaxValue)
+                (Fixed64)8)
             .Should()
             .Be(2);
     }

@@ -435,9 +435,14 @@ public abstract partial class LSCollider2D
         _body?.Wake();
     }
 
-    private bool RebuildRuntimeShapeState()
+    private bool RebuildRuntimeShapeState(bool geometryOnly = false)
     {
         ColliderShapeSnapshot2D snapshot = CaptureShapeSnapshot();
+        // Preserve pose-only publication and solver-cache lifetime at the normal
+        // lifecycle boundary; only pending physical geometry must precede CCD.
+        if (geometryOnly && !_runtimeShapeState.IsDirty && snapshot.OwnerScale == _committedOwnerScale
+            && snapshot.MixedSlabCenterY == _mixedSlabCenterY && snapshot.MixedHalfThickness == _mixedHalfThickness)
+            return false;
         if (!_runtimeShapeState.ShouldRebuild(snapshot))
             return false;
 

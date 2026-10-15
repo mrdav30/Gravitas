@@ -124,6 +124,13 @@ vertex; compound targets include every mesh/cuboid leaf. A floor contact cannot
 hide another blocking part. General rotations, moving targets and curved target
 leaves retain the conservative interval search when this proof is unavailable.
 
+Before frame preparation, body-owned colliders publish pending geometry through
+the normal shape transaction. Candidate bounds, inertia and mixed slab thickness
+therefore use the same committed geometry as subsequent motion samples. The
+published body proxy encloses the entire sampled rotation about the body's pose
+origin, including rounded attachments and compound leaves. This physical
+enclosure is separate from the supported geometry admission budget.
+
 Moving-pair CCD uses immutable frame-start candidate indices plus bounded dirty
 overlays for bodies whose same-frame handoff changes their remaining swept
 bounds. A dirty body shadows its immutable entry; stale prepared bounds are not

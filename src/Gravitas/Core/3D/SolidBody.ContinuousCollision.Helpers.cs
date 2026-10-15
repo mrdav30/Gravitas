@@ -70,21 +70,7 @@ public partial class SolidBody
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal Fixed64 ResolveContinuousCollisionProxyRadius()
-    {
-        bool offsetResolved =
-            Collider.TryGetCurrentScaledOffset(out Vector3d centerOffset);
-        bool distanceResolved =
-            centerOffset.TryGetMagnitudeCeiling(
-                out Fixed64 offsetDistance);
-        bool radiusResolved = Fixed64.TryAdd(
-            offsetDistance,
-            Collider.CanonicalCenteredProxyRadius,
-            out Fixed64 radius);
-        return offsetResolved & distanceResolved & radiusResolved
-            ? radius
-            : Fixed64.MaxValue;
-    }
+    internal Fixed64 ResolveContinuousCollisionProxyRadius() => Collider.CanonicalPivotProxyRadius;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool IsClosingContinuousCollisionHit(Vector3d displacement, Vector3d normal) =>

@@ -24,9 +24,12 @@ public abstract partial class LSCollider
     private ColliderShapeSnapshot _preparedSnapshot;
     private FixedBoundBox _preparedBounds;
     private Fixed64 _canonicalCenteredProxyRadius = Fixed64.MaxValue;
+    private Fixed64 _canonicalPivotProxyRadius = Fixed64.MaxValue;
+    private Fixed64 _preparedAttachmentReach;
     private Fixed64 _preparedGeometryReach = Fixed64.MaxValue;
 
     internal Fixed64 PreparedGeometryReach => _preparedGeometryReach;
+    internal Fixed64 PreparedAttachmentReach => _preparedAttachmentReach;
     private Fixed64 _canonicalGroundProbeRadius;
     private GravitasWorldContext? _preparedContext;
     private FixedQuaternion _preparedCompoundLocalRotation = FixedQuaternion.Identity;
@@ -37,6 +40,8 @@ public abstract partial class LSCollider
 
     internal Fixed64 CanonicalCenteredProxyRadius =>
         _canonicalCenteredProxyRadius;
+
+    internal Fixed64 CanonicalPivotProxyRadius => _canonicalPivotProxyRadius;
 
     internal Fixed64 CanonicalGroundProbeRadius =>
         _canonicalGroundProbeRadius;
@@ -231,10 +236,11 @@ public abstract partial class LSCollider
         _preparedSnapshot = snapshot;
         _preparedGeometryReach = Fixed64.MaxValue;
         PrepareShape(snapshot);
+        _preparedAttachmentReach = ColliderGeometryPolicy.Attachment(snapshot.LocalOffset, snapshot.OwnerScale);
         Fixed64 completeReach = _preparedGeometryReach;
         if (includeBodyAttachment)
             completeReach = ColliderGeometryPolicy.Add(
-                ColliderGeometryPolicy.Attachment(snapshot.LocalOffset, snapshot.OwnerScale), completeReach);
+                _preparedAttachmentReach, completeReach);
         ColliderGeometryPolicy.ValidateReach(completeReach, nameof(snapshot));
     }
 
@@ -246,9 +252,17 @@ public abstract partial class LSCollider
         _committedPartScale = _preparedSnapshot.PartScale;
         _bounds = _preparedBounds;
         PublishShape();
-        _canonicalCenteredProxyRadius = this is LSCompoundCollider compound
-            ? ColliderCanonicalBounds.GetCompoundCenteredProxyRadius(compound)
-            : _preparedGeometryReach;
+        Fixed64 intrinsic;
+        if (this is LSCompoundCollider compound)
+            _canonicalCenteredProxyRadius = ColliderCanonicalBounds.GetCompoundCenteredProxyRadius(compound, out intrinsic);
+        else
+        {
+            _canonicalCenteredProxyRadius = _preparedGeometryReach;
+            intrinsic = this is LSSphereCollider ? _canonicalCenteredProxyRadius
+                : ColliderGeometryPolicy.RotatedReach(_canonicalCenteredProxyRadius, planar: false);
+        }
+        _canonicalPivotProxyRadius = ColliderGeometryPolicy.Add(
+            ColliderGeometryPolicy.RotatedReach(_preparedAttachmentReach, planar: false), intrinsic);
         _canonicalGroundProbeRadius =
             ColliderCanonicalBounds.GetGroundProbeRadius(this);
         _runtimeShapeState.Commit(_preparedSnapshot);

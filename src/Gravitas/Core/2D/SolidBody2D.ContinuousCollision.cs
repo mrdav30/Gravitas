@@ -168,6 +168,10 @@ public sealed partial class SolidBody2D
         if (_continuousCollisionFrameToken == token)
             return;
 
+        // Publish pending authoring before inertia integration and CCD indexing;
+        // rotational samples must not introduce a different geometry epoch.
+        Collider.Rebuild(geometryOnly: true);
+
         Vector2d startPosition = _position;
         Fixed64 startRotation = _rotation;
         Vector2d displacement;

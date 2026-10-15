@@ -33,6 +33,21 @@ internal static class ColliderGeometryPolicy
         Attachment(new Vector3d(offset.X, offset.Y, Fixed64.Zero),
             new Vector3d(scale.X, scale.Y, Fixed64.One));
 
+    internal static Fixed64 RotatedReach(Fixed64 reach, bool planar)
+    {
+        if (reach == Fixed64.Zero)
+            return Fixed64.Zero;
+
+        // The rational 3D basis preserves norm; final component rounding adds
+        // less than one raw unit to length. Planar sin/cos has operator norm
+        // at most 1 + 2e; its scalar product rounding needs another half raw.
+        if (planar)
+            reach = Fixed64.MultiplyDivide(reach,
+                Fixed64.One + Fixed64.Two * FixedMath.CanonicalSinCosErrorBound,
+                Fixed64.One, out _);
+        return Add(reach, Fixed64.FromRaw(planar ? 2 : 1));
+    }
+
     // Dividing raw lengths outward preserves the half-raw endpoint of an odd core/height.
     internal static Fixed64 Capsule(Fixed64 radius, Fixed64 coreLength) =>
         Add(radius, HalfCeiling(coreLength));

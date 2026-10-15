@@ -75,7 +75,7 @@ public sealed partial class ContinuousCollision2DTests
 
         blade.Agent.Transform.LocalRotationXZRadians = RotationalMovingPairQuarterTurn2D;
         if (immovable)
-            blade.ResolveContinuousCollisionProxyRadius().Should().Be(Fixed64.MaxValue);
+            blade.ResolveContinuousCollisionProxyRadius().Should().Be((Fixed64)2048);
         context.LateSimulate();
 
         blade.Rotation.Should().Be(RotationalMovingPairQuarterTurn2D);

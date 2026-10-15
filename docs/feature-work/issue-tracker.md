@@ -44,42 +44,14 @@ and passes correctness, coverage, replay and warm performance checks. Resolve th
 focused correctness queue below before resuming phase 3's query, settings and
 restore admission:
 
-1. #126/#130 together: coherent body CCD proxies and rounded attachment enclosure.
-2. #128: supported-scale projected-sweep accuracy.
-3. #129: detached polygon compound inspection.
+1. #128: supported-scale projected-sweep accuracy.
+2. #129: detached polygon compound inspection.
 
 #111 remains an independent validation-tooling issue.
 #125 is a low-priority, non-blocking runtime crash observation; defer further
 investigation unless it recurs or a reliable reproducer becomes available.
-#127 is resolved across 2D, 3D and mixed response. #126/#130 share the body CCD
-proxy owner and should be resolved together. They cover pending-state coherence
-and published attachment rounding respectively. Neither blocks geometry
-admission. Continue with the combined proxy work.
-#128 tracks an independent projected-sweep precision discrepancy; #129 tracks
-detached planar compound inspection. Both reproduce on the original stack.
-
-### GRV-Issue-130 - Rotated body attachments can under-enclose the published CCD proxy
-
-- **Confirmed:** 2026-10-14 in 2D and 3D on both the accepted pre-admission
-  binaries and the corrected phase-2 candidate. This is separate from the
-  introduced compound-proxy aliasing, which phase 2 fixes before closeout.
-- **Reproduction:** Bind a radius-`400` circle/sphere with unit scale, local
-  attachment `(3 raw, 0)` / `(3 raw, 0, 0)`, body origin zero, and rotation
-  `Pi/6` in the planar/spatial yaw convention. Published centers are
-  `(3 raw, 1 raw)` and `(3 raw, 0, -1 raw)` respectively. The body's CCD proxy
-  is `400 + 3 raw` (`1717986918403` raw), but the actual `+X` surface witness
-  has ceiling norm `400 + 4 raw` (`1717986918404` raw).
-- **Root cause:** The body proxy measures its attachment before rotation and
-  final center rounding. Component materialization can enlarge the published
-  enclosure by one raw unit even with coherent, fully committed geometry.
-- **Impact:** Confirmed non-enclosure; no missed collision has been demonstrated.
-  Exact attachment admission remains a separate policy measurement.
-- **Follow-up:** Resolve with #126 in the shared dimensional body-proxy owners.
-  Retain a coherent conservative enclosure of physical geometry, cover rotated
-  attachment and compound parity, and preserve warm allocation/performance.
-- **Evidence:** Ignored `artifacts/geometry-range/phase2/attachment-parity-proof.json`
-  and `attachment-original.jsonl` / `attachment-candidate.jsonl` retain exact raw
-  results and matching immutable runtime hashes.
+The remaining focused geometry issues reproduce on the original stack. Continue
+with #128 before resuming phase 3.
 
 ### GRV-Issue-128 - Projected capsule sweep entry error grows with supported geometry scale
 
@@ -123,31 +95,6 @@ detached planar compound inspection. Both reproduce on the original stack.
   shape-family parity without adding a second geometry representation.
 - **Evidence:** Ignored `artifacts/geometry-range/phase2/probe-projection/`
   records the zero result on both binary snapshots.
-
-### GRV-Issue-126 - Pending compensated authoring mixes CCD proxy geometry epochs
-
-- **Confirmed:** 2026-10-14 through public pending mutations in both 2D and 3D.
-  The proxy owner is unchanged by phase-2 admission; the failure is pre-existing.
-- **Reproduction:** Bind a radius-`1/2` circle or sphere with owner scale `4,096`
-  (published radius `2,048`). Before publishing the next shape, set host scale
-  to one raw unit, authored radius to `2^30`, and local X offset to `MaxValue`.
-  Each pending candidate fits the supported envelope at its new scale. Frame
-  preparation nevertheless combines the new offset with the old scale and
-  published radius, returning a `MaxValue` CCD proxy. A target `100,000` units
-  away enters the conservative registry fallback and candidate index. After
-  shape publication the radius is `1/4`, complete proxy is `3/4`, and the far
-  candidate disappears on the next frame.
-- **Impact:** Confirmed excess candidate coverage; no missed collision has been
-  demonstrated. Keep the conservative fallback until proxy measurements use a
-  coherent shape epoch. Geometry admission alone cannot make it unreachable.
-- **Follow-up:** Align CCD offset, scale and intrinsic geometry publication in
-  both dimensions and mixed indexing, without tightening the conservative
-  rounded support enclosure or adding per-frame allocations. Include pending
-  shape changes, motion-only preparation and registry/index refresh tests.
-- **Evidence:** Maintained `PendingCompensatedAuthoring` and
-  `PendingCompensatedSpatialAuthoring` regressions exercise real preparation,
-  resolved proxies, registry gathering and index refresh. Focused results are
-  retained under ignored `artifacts/geometry-range/phase2/focused-hybrid/`.
 
 ### GRV-Issue-096 - Extreme-scale capsule initial mesh sweep can miss a genuine overlap
 
@@ -241,6 +188,101 @@ detached planar compound inspection. Both reproduce on the original stack.
 Remaining measured performance costs are tracked in the benchmark backlog.
 
 ## Resolved Issues
+
+### GRV-Issue-126 - Pending compensated authoring mixes CCD proxy geometry epochs
+
+- **Resolved:** 2026-10-14 together with #130.
+- **Confirmed:** 2026-10-14 through public pending mutations in both 2D and 3D.
+  The proxy owner is unchanged by phase-2 admission; the failure is pre-existing.
+- **Reproduction:** Bind a radius-`1/2` circle or sphere with owner scale `4,096`
+  (published radius `2,048`). Before publishing the next shape, set host scale
+  to one raw unit, authored radius to `2^30`, and local X offset to `MaxValue`.
+  Each pending candidate fits the supported envelope at its new scale. Frame
+  preparation nevertheless combines the new offset with the old scale and
+  published radius, returning a `MaxValue` CCD proxy. A target `100,000` units
+  away enters the conservative registry fallback and candidate index. After
+  shape publication the radius is `1/4`, complete proxy is `3/4`, and the far
+  candidate disappears on the next frame.
+- **Impact:** Confirmed excess candidate coverage; no missed collision has been
+  demonstrated. Geometry admission alone could not prevent the mixed epoch;
+  coherent publication now makes the old full-domain source-radius fallback
+  unnecessary.
+- **Resolution:** Publish pending authored geometry and effective scale before
+  frame preparation integrates inertia or builds CCD indexes. Reuse existing
+  dirty state and committed scale/mixed fields to preserve the normal pose-only
+  publication point and solver-cache lifetime. Publish a rotation-safe pivot
+  proxy in the same shape transaction; its getter cannot mix pending offsets
+  with committed geometry. Refresh pure 2D partitions when publishing early.
+  Compound current-pose public radii retain their existing semantics while the
+  same leaf scan also derives the separate all-angle enclosure. Remove the now
+  unreachable full-domain source-radius registry scans and exclude the source
+  from finite candidate gathering. World-coordinate clipping, lifetime checks
+  and query/index overflow handling remain in place.
+- **Verification:** Local-stack Release/Lean solution builds have zero warnings
+  or errors; **6,240 / 6,174** tests pass without failures or skips. Raw reachable
+  coverage is **100% line, branch and method** in both configurations:
+  `47,576 / 15,692 / 5,033` sequence/branch/method points in Release and
+  `47,574 / 15,692 / 5,032` in Lean. Regressions cover compensated shrinking,
+  pending enlargement, scale-only mutation, mixed thickness/Y changes, exact
+  committed getters and full-loop stationary partition refresh. Six replay
+  fixtures match existing shared expectations and directly across Windows x64
+  Release/Lean. Independent geometry and ponytail reviews clear the change.
+- **Performance:** All **14** matched native gates and **14** correctness/allocation
+  guards retain **0 B/op**. The main matrix has no slowdown resolved outside its
+  measured 99.9% intervals; it covers centered/attached/compound proxy reads,
+  primitive/compound pose publication, and pure 2D/3D plus both mixed CCD source
+  directions. All four runtime output checksums match the original. The eight
+  timed fixture/wrapper method bodies are byte-identical between measured hosts;
+  only non-timed validation accepts the reviewed conservative enclosure.
+  The initial 2D compound pose result (`7.103 -> 7.180 us`) had overlapping
+  intervals. A fresh reversed comparison does not repeat it: candidate
+  `7.216 us` versus original `7.468 us`, with separated 99.9% intervals.
+  Cached proxy reads are now near benchmark overhead; this is a getter result,
+  not a claim of a corresponding whole-frame speedup.
+  No upstream source or dependency pin changes are needed. Native Linux/ARM64
+  and released-package validation are not claimed.
+- **Evidence:** Maintained `PendingCompensatedAuthoring` and
+  `PendingCompensatedSpatialAuthoring` regressions exercise real preparation,
+  committed proxies, finite candidate gathering and index refresh. Original
+  focused results are retained under ignored
+  `artifacts/geometry-range/phase2/focused-hybrid/`.
+  Ignored `artifacts/grv-126-130/` retains the original 16-case red run, final
+  full coverage/replays, immutable source/runtime snapshots, native statistics,
+  allocation checks and actual generated-child hashes.
+
+### GRV-Issue-130 - Rotated body attachments can under-enclose the published CCD proxy
+
+- **Resolved:** 2026-10-14 together with #126.
+- **Confirmed:** 2026-10-14 in 2D and 3D on both the accepted pre-admission
+  binaries and the corrected phase-2 candidate. This is separate from the
+  introduced compound-proxy aliasing, which phase 2 fixes before closeout.
+- **Reproduction:** Bind a radius-`400` circle/sphere with unit scale, local
+  attachment `(3 raw, 0)` / `(3 raw, 0, 0)`, body origin zero, and rotation
+  `Pi/6` in the planar/spatial yaw convention. Published centers are
+  `(3 raw, 1 raw)` and `(3 raw, 0, -1 raw)` respectively. The body's CCD proxy
+  is `400 + 3 raw` (`1717986918403` raw), but the actual `+X` surface witness
+  has ceiling norm `400 + 4 raw` (`1717986918404` raw).
+- **Root cause:** The body proxy measures its attachment before rotation and
+  final center rounding. Component materialization can enlarge the published
+  enclosure by one raw unit even with coherent, fully committed geometry.
+- **Impact:** Confirmed non-enclosure; no missed collision has been demonstrated.
+  Exact attachment admission remains a separate policy measurement.
+- **Resolution:** Keep a separately published, rotation-independent pivot
+  enclosure. Exact norm-preserving 3D transforms need one raw unit per rounded
+  attachment or intrinsic vertex stage. Planar transforms use the existing
+  canonical sine/cosine error bound and account for final scalar/component
+  rounding. Compound reduction retains each leaf's independently rounded
+  attachment stage. Circle/sphere radii and axis-aligned planar boxes retain
+  their intrinsic measurements; geometry admission still uses its exact budget.
+- **Verification:** Whole circle/sphere leaf enclosures, polygon vertices,
+  cuboid corners and capsule support points remain inside both the retained
+  frame proxy and newly published proxies across sampled rotations. Primitive
+  and compound cases cover independent published/body poses and origins near
+  both scalar limits. Full coverage, replay and warm validation are recorded
+  with #126 above.
+- **Evidence:** Ignored `artifacts/geometry-range/phase2/attachment-parity-proof.json`
+  and `attachment-original.jsonl` / `attachment-candidate.jsonl` retain exact raw
+  results and matching immutable runtime hashes.
 
 ### GRV-Issue-127 - Tiny-mass planar positional correction consumes penetration slop
 

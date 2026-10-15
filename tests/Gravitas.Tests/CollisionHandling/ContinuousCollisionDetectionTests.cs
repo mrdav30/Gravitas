@@ -1165,7 +1165,7 @@ public sealed partial class ContinuousCollisionDetectionTests
         ScenarioBody<LSSphereCollider> source = scenario.CreateBody(
             new LSSphereCollider
             {
-                Radius = Fixed64.Epsilon * Fixed64.Half,
+                Radius = Fixed64.Epsilon * Fixed64.Half - Fixed64.MinIncrement,
                 LocalOffset = Vector3d.Right * (Fixed64.Epsilon * Fixed64.Half)
             },
             Vector3d.Zero,
@@ -2231,8 +2231,9 @@ public sealed partial class ContinuousCollisionDetectionTests
         source.Collider.RebuildRuntimeShapeOnly(
             refreshMassProperties: false);
 
+        source.Collider.CanonicalCenteredProxyRadius.Should().Be(Fixed64.FromRaw(2));
         source.Body.ResolveContinuousCollisionProxyRadius()
-            .Should().Be(Fixed64.FromRaw(2));
+            .Should().Be(Fixed64.FromRaw(3));
     }
 
     [Fact]
@@ -2575,7 +2576,7 @@ public sealed partial class ContinuousCollisionDetectionTests
         ScenarioBody<LSSphereCollider> source = scenario.CreateBody(
             new LSSphereCollider
             {
-                Radius = Fixed64.Epsilon * Fixed64.Half,
+                Radius = Fixed64.Epsilon * Fixed64.Half - Fixed64.MinIncrement,
                 LocalOffset = Vector3d.Right * (Fixed64.Epsilon * Fixed64.Half)
             },
             Vector3d.Zero,

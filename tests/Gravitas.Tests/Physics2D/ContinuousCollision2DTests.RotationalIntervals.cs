@@ -137,11 +137,12 @@ public sealed partial class ContinuousCollision2DTests
             collider,
             Vector2d.Zero,
             immovable: false);
+        Fixed64 committedProxy = source.ResolveContinuousCollisionProxyRadius();
         Action changeOffset = () => collider.LocalOffset = new Vector2d(Fixed64.MaxValue, Fixed64.MaxValue);
         changeOffset.Should().Throw<ArgumentException>();
         collider.LocalOffset.Should().Be(Vector2d.Zero);
 
-        source.ResolveContinuousCollisionProxyRadius().Should().Be(Fixed64.FromFraction(3, 2));
+        source.ResolveContinuousCollisionProxyRadius().Should().Be(committedProxy);
     }
 
     private static SolidBody2D CreateRotationalBlade(GravitasWorldContext context)

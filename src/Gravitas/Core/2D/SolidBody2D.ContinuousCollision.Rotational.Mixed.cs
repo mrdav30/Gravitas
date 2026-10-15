@@ -186,27 +186,6 @@ public sealed partial class SolidBody2D
     {
         _rotationalMixedStatic3DCandidates.FastClear();
         _rotationalMixedMoving3DCandidateIds.FastClear();
-        if (pivotRadius == Fixed64.MaxValue)
-        {
-            int count = Context.Physics.ColliderCount;
-            _rotationalMixedStatic3DCandidates.EnsureCapacity(count);
-            _rotationalMixedMoving3DCandidateIds.EnsureCapacity(count);
-            for (int i = 0; i < count; i++)
-            {
-                LSCollider target = Context.Physics.GetColliderByServiceIndex(i);
-                if (target.Body is SolidBody targetBody
-                    && IsMovingMixedRotationalContinuousCollisionTarget(targetBody))
-                {
-                    _rotationalMixedMoving3DCandidateIds.Add(targetBody.DynamicId);
-                    continue;
-                }
-
-                _rotationalMixedStatic3DCandidates.Add(target);
-            }
-
-            return;
-        }
-
         Vector3d start3D = new(
             startPosition.X,
             Collider.MixedSlabCenterY,
