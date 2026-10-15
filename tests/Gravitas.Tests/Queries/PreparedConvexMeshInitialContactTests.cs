@@ -32,6 +32,32 @@ public sealed class PreparedConvexMeshInitialContactTests
         }
     }
 
+    [Theory]
+    [InlineData(ColliderType.Cylinder)]
+    [InlineData(ColliderType.Cone)]
+    public void SeparatedCurvedSourceWithinTolerance_ShouldKeepDiagonalGapNormal(ColliderType shape)
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        LSMeshCollider target = MeshTestFixtures.CreateConvexCube();
+        scenario.InitializeStaticCollider(target, Vector3d.Zero);
+        LSCollider source = shape == ColliderType.Cylinder
+            ? new LSCylinderCollider() : new LSConeCollider();
+        source.Radius = Fixed64.Half;
+        source.Size = Vector3d.One;
+        Fixed64 coordinate = Fixed64.One + ConvexSweepQueryWorker.ContactTolerance / 2;
+        scenario.InitializeStaticCollider(source, new Vector3d(coordinate, coordinate, Fixed64.Zero));
+        var worker = new ConvexSweepQueryWorker();
+        worker.PreparePrimitiveSource(source, Vector3d.Left);
+
+        worker.TrySweepPreparedSource(target, out Physics3DHit hit).Should().BeTrue();
+
+        hit.Distance.Should().Be(Fixed64.Zero);
+        // Both closest features are outside the cube corner. A hull face exit
+        // would invent an axis normal instead of preserving this diagonal gap.
+        Vector3d expected = new Vector3d(Fixed64.One, Fixed64.One, Fixed64.Zero).Normalized;
+        Vector3d.Dot(hit.Normal, expected).Should().BeGreaterThan(Fixed64.FromFraction(9999, 10000));
+    }
+
     [Fact]
     public void ProjectedTiltedSupportInsideFace_ShouldNotInventFiniteContact()
     {
@@ -263,7 +289,7 @@ public sealed class PreparedConvexMeshInitialContactTests
         target.Mesh.GetLocalTriangleVertices(0, out Vector3d a, out Vector3d b, out Vector3d c);
         var sourceShape = new ConvexShape(source, Vector3d.Zero);
         var targetShape = new ConvexShape(target, 0, a, b, c);
-        targetShape.TryGetInitialMeshContactNormal(sourceShape, out _, out _).Should().BeFalse();
+        targetShape.TryGetInitialMeshContactNormal(sourceShape, allowHullFaceExit: true, out _, out _).Should().BeFalse();
         var targetWitness = new FixedPointAnchor(target.Mesh.Origin, target.Mesh.Rotation,
             coincidentWitnesses ? new Vector3d(2, 0, 0) : a);
         var sourceWitness = coincidentWitnesses ? targetWitness

@@ -60,11 +60,10 @@ Reducer notes:
   squared length of an accepted near-unit axis rather than treating it as a
   mathematically exact unit vector.
 - Swept-sphere capsule and mesh-edge reducers use full-domain finite-axis
-  admission. Finite-cylinder sweeps use the exact spherical dilation of the
-  authored cylinder, including its rounded cap rims; the entry-only lower-stack
-  contract avoids refining an unused toroidal-rim exit root.
+  intervals. Finite-cylinder and finite-cone targets share the canonical
+  support-mapped convex sweep worker, including sphere expansion at cap rims.
 - mesh targets query triangle BVH candidates and report the owning collider.
-- registered convex source sweeps use exact support-mapped conservative
+- registered convex source sweeps use deterministic support-mapped conservative
   advancement and skip the source collider.
 - high-vertex convex mesh sources use deterministic support-tree pruning.
 - concave source meshes throw; author stable convex compound source parts.
@@ -223,7 +222,16 @@ testing candidate triangles.
 
 Registered source sweeps use support-mapped conservative advancement for convex
 3D sources. The source collider is skipped automatically, and `excludedCollider`
-can skip one additional collider.
+can skip one additional collider. Tetrahedron containment uses exact determinant
+signs, and distance convergence is checked against the supporting plane rather
+than successive distance improvements.
+
+The support-mapped reducers accept contact within `1/4,096` world units of
+separation. This bounds the normal gap, not travel-distance error: grazing
+approaches can have a larger difference along the chord. At an initial mesh
+contact, an exact face or boundary certificate takes precedence over an
+approximate separating normal. Genuinely disjoint contacts inside tolerance
+retain their separation axis rather than an uncertified hull face exit.
 
 `OverlapCone` and `OverlapConeAll` query an apex-origin finite cone volume.
 Supported convex targets use deterministic support-mapped cone-volume

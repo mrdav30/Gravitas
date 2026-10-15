@@ -252,7 +252,7 @@ internal readonly partial struct ConvexShape
                 _offset + additionalOffset)
             : new ConvexShape(_collider!, _offset + additionalOffset);
 
-    public FixedPointAnchor GetSupportAnchor(Vector3d direction)
+    public FixedPointAnchor GetSupportAnchor(Vector3d direction, bool preferAxialCenter = false)
     {
         if (_kind == ConvexShapeKind.Triangle)
         {
@@ -285,7 +285,8 @@ internal readonly partial struct ConvexShape
         return ConvexColliderSupport.GetSupportAnchor(
             _collider!,
             direction,
-            _offset);
+            _offset,
+            preferAxialCenter);
     }
 
     public FixedPointAnchor GetFallbackSurfaceAnchor(Vector3d direction)

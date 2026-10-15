@@ -12,6 +12,29 @@ namespace Gravitas.Tests.CollisionHandlingTests;
 public sealed class ConvexColliderSupportTests
 {
     [Fact]
+    public void CylinderSupport_InteriorDistanceSupport_ShouldPreserveContactFeatureSelection()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        var cylinder = new LSCylinderCollider(ColliderShapeDefinition.Cylinder(Fixed64.One, (Fixed64)20));
+        cylinder.InitializeWithNoBody(new TestMatterAgent(context, new FixedTransform(
+            new Vector3d(Fixed64.FromFraction(19, 10), (Fixed64)10, Fixed64.Zero),
+            FixedQuaternion.Identity, Vector3d.One)));
+
+        // A response witness must retain its cap feature; only distance searches
+        // can choose the interior of the exactly tied axial support face.
+        FixedPointAnchor contact = ConvexColliderSupport.GetSupportAnchor(
+            cylinder, Vector3d.Left, Vector3d.Zero);
+        FixedPointAnchor distance = ConvexColliderSupport.GetSupportAnchor(
+            cylinder, Vector3d.Left, Vector3d.Zero, preferAxialCenter: true);
+        contact.TryGetPoint(out Vector3d contactPoint).Should().BeTrue();
+        distance.TryGetPoint(out Vector3d distancePoint).Should().BeTrue();
+        contactPoint.Y.Should().Be(Fixed64.Zero);
+        distancePoint.Y.Should().Be((Fixed64)10);
+        contactPoint.X.Should().Be(distancePoint.X);
+        contactPoint.Z.Should().Be(distancePoint.Z);
+    }
+
+    [Fact]
     public void Intersects_WhenLaterRemoteSupportLeavesTheScalarDomain_ShouldRejectSeparation()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();

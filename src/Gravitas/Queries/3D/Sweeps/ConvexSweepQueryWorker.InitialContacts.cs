@@ -20,8 +20,9 @@ internal sealed partial class ConvexSweepQueryWorker
     {
         if (!result.Intersects)
         {
-            // A tolerant seam witness must yield to an exact contact on the neighboring filled face.
-            if (targetShape.TryGetInitialMeshFaceContactNormal(sourceShape,
+            // An exact face or boundary contact takes precedence over a tolerant
+            // GJK witness; a genuinely disjoint near-contact retains its gap axis.
+            if (targetShape.TryGetInitialMeshContactNormal(sourceShape, allowHullFaceExit: false,
                     out FixedPointAnchor faceAnchor, out Vector3d faceNormal))
             {
                 anchor = new ContactAnchor(faceAnchor);
@@ -52,7 +53,7 @@ internal sealed partial class ConvexSweepQueryWorker
             }
         }
 
-        if (targetShape.TryGetInitialMeshContactNormal(sourceShape,
+        if (targetShape.TryGetInitialMeshContactNormal(sourceShape, allowHullFaceExit: true,
                 out FixedPointAnchor targetAnchor, out Vector3d contactNormal))
         {
             anchor = new ContactAnchor(targetAnchor);

@@ -1611,8 +1611,13 @@ public sealed class GravitasQuery3DServiceSweepTests
 
         hit.Should().BeTrue();
         sweepHit.Collider.Should().BeSameAs(target);
-        sweepHit.Distance.Should().BeGreaterThan((Fixed64)3);
-        sweepHit.Distance.Should().BeLessThan(Fixed64.FromFraction(31, 10));
+        // The cube's Y faces are tangent to the spheres: first contact occurs
+        // when its right X face reaches zero, at distance 3.5, not the AABB entry 3.
+        Fixed64 exactEntry = Fixed64.FromFraction(7, 2);
+        sweepHit.Distance.Should().BeLessThanOrEqualTo(exactEntry);
+        Fixed64 horizontalGap = exactEntry - sweepHit.Distance;
+        Fixed64 separation = FixedMath.Sqrt(horizontalGap * horizontalGap + Fixed64.Quarter) - Fixed64.Half;
+        separation.Should().BeLessThanOrEqualTo(SweepContactTolerance + QueryTolerance);
         sweepHit.Point.Y.Should().BeLessThan(Fixed64.Zero);
     }
 
@@ -2653,26 +2658,6 @@ public sealed class GravitasQuery3DServiceSweepTests
         hit.Should().BeTrue();
         result.Collider.Should().BeSameAs(target);
         result.Distance.Should().Be((Fixed64)4);
-    }
-
-    [Fact]
-    public void ConvexSweepWorker_SaturatedSimplexOrdering_ShouldUseExactMagnitudeAndRemainStable()
-    {
-        Vector3d closer = new(30_000, 40_000, 0);
-        Vector3d farther = new(60_000, 80_000, 0);
-        Vector3d unrepresentableShorter = new(Fixed64.MaxValue, Fixed64.MaxValue - Fixed64.One, Fixed64.Zero);
-        Vector3d unrepresentable = new(Fixed64.MaxValue, Fixed64.MaxValue, Fixed64.Zero);
-
-        ConvexSweepQueryWorker.IsCloser((Fixed64)2, Vector3d.Zero, (Fixed64)3, Vector3d.Zero).Should().BeTrue();
-        ConvexSweepQueryWorker.IsCloser((Fixed64)3, Vector3d.Zero, (Fixed64)2, Vector3d.Zero).Should().BeFalse();
-        ConvexSweepQueryWorker.IsCloser((Fixed64)2, Vector3d.Zero, (Fixed64)2, Vector3d.Zero).Should().BeFalse();
-        ConvexSweepQueryWorker.IsCloser(Fixed64.MaxValue, closer, Fixed64.MaxValue, farther).Should().BeTrue();
-        ConvexSweepQueryWorker.IsCloser(Fixed64.MaxValue, farther, Fixed64.MaxValue, closer).Should().BeFalse();
-        ConvexSweepQueryWorker.IsCloser(Fixed64.MaxValue, closer, Fixed64.MaxValue, unrepresentable).Should().BeTrue();
-        ConvexSweepQueryWorker.IsCloser(Fixed64.MaxValue, unrepresentable, Fixed64.MaxValue, closer).Should().BeFalse();
-        ConvexSweepQueryWorker.IsCloser(Fixed64.MaxValue, unrepresentableShorter, Fixed64.MaxValue, unrepresentable).Should().BeTrue();
-        ConvexSweepQueryWorker.IsCloser(Fixed64.MaxValue, unrepresentable, Fixed64.MaxValue, unrepresentableShorter).Should().BeFalse();
-        ConvexSweepQueryWorker.IsCloser(Fixed64.MaxValue, unrepresentable, Fixed64.MaxValue, unrepresentable).Should().BeFalse();
     }
 
     [Fact]

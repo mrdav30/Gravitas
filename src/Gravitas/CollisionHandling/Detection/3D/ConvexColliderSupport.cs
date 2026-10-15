@@ -18,7 +18,8 @@ internal static class ConvexColliderSupport
     public static FixedPointAnchor GetSupportAnchor(
         LSCollider collider,
         Vector3d direction,
-        Vector3d originOffset)
+        Vector3d originOffset,
+        bool preferAxialCenter = false)
     {
         Vector3d normal = ResolveSupportDirection(direction);
         Vector3d localTranslation =
@@ -53,13 +54,14 @@ internal static class ConvexColliderSupport
         }
         if (collider is LSCylinderCollider cylinder)
         {
-            return FixedSegment.GetCenteredFiniteCylinderSupportAnchor(
-                    cylinder.Center,
-                    cylinder.Rotation,
-                    cylinder.Height,
-                    cylinder.ScaledRadius,
-                    normal)
-                .WithLocalTranslation(localTranslation);
+            FixedPointAnchor support = preferAxialCenter
+                ? WideGeometry.GetCenteredCylinderSupportAnchor(
+                    cylinder.Center, cylinder.Rotation, cylinder.Height,
+                    cylinder.ScaledRadius, normal, preferAxialCenter: true)
+                : FixedSegment.GetCenteredFiniteCylinderSupportAnchor(
+                    cylinder.Center, cylinder.Rotation, cylinder.Height,
+                    cylinder.ScaledRadius, normal);
+            return support.WithLocalTranslation(localTranslation);
         }
         if (collider is LSConeCollider cone)
         {

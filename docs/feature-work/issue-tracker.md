@@ -44,43 +44,13 @@ and passes correctness, coverage, replay and warm performance checks. Resolve th
 focused correctness queue below before resuming phase 3's query, settings and
 restore admission:
 
-1. #131: supported-scale generic 3D cylinder sweep accuracy.
-2. #129: detached polygon compound inspection.
+1. #129: detached polygon compound inspection.
 
 #111 remains an independent validation-tooling issue.
 #125 is a low-priority, non-blocking runtime crash observation; defer further
 investigation unless it recurs or a reliable reproducer becomes available.
-The remaining focused geometry issues reproduce on the original stack. Continue
-with #131, then #129, before resuming phase 3.
-
-### GRV-Issue-131 - Generic 3D cylinder sweep reports early entry at supported scale
-
-- **Confirmed:** 2026-10-14 during #128's whole-shape and dimensional parity
-  checks, with identical results on the frozen accepted and refined binaries.
-  The generic 3D sweep worker is unchanged by #128.
-- **Reproduction:** A cylinder centered at zero has radius `2,500`, height `2`
-  and exact horizontal axis `(-1, 0, 0)`. Prepare a zero-radius sphere source
-  through `ConvexSweepQueryWorker.PrepareSphereSource` at `(0, 1,500, -2,500)`
-  with displacement `(0, 0, 5,000)`, then call `TrySweepPreparedSource`.
-  The exact 3-4-5 section enters at distance `500` (raw `2147483648000`);
-  the worker reports raw `2147390072490`, approximately `0.021788` units early.
-  This exceeds its `1/4,096` contact tolerance (`1048576` raw units).
-- **Boundary:** The collider passes the supported conservative-reach policy.
-  A hit is retained; this is an accuracy defect, not a demonstrated missed hit.
-  Radius-`1,000` cylinder and corresponding capsule/cone controls remain within
-  that worker's tolerance. The finite-slab worker has a different simplex owner
-  and a tighter tolerance, so do not copy its planar changes into 3D blindly.
-- **Follow-up:** Trace generic 3D simplex reduction, convergence and advancement
-  against the analytic section. Preserve ordinary warm query and CCD costs,
-  deterministic ordering and full coverage; check source-radius, reversal,
-  translation and whole-shape parity around the owning fix.
-- **Evidence:** Ignored `artifacts/grv-128/parity/original.log` and
-  `candidate.log` retain all six shape/scale outputs. The probe builds explicitly
-  select the immutable accepted stack from
-  `artifacts/grv-128/perf/original-snapshot/` or the candidate test-runtime
-  directory. Accepted snapshot hashes are retained in
-  `artifacts/grv-128/perf/original-provenance.json`; the parity logs do not record
-  loaded-module hashes themselves.
+The remaining focused geometry issue reproduces on the original stack. Resolve
+#129 before resuming phase 3; generic 3D sweep accuracy #131 is now resolved.
 
 ### GRV-Issue-129 - Detached polygon compound reports a zero conservative proxy radius
 
@@ -195,6 +165,104 @@ Remaining measured performance costs are tracked in the benchmark backlog.
 
 ## Resolved Issues
 
+### GRV-Issue-131 - Generic 3D cylinder sweep reports early entry at supported scale
+
+- **Resolved:** 2026-10-15 after coordinated FixedMathSharp/Gravitas validation.
+- **Confirmed:** 2026-10-14 during #128's whole-shape and dimensional parity
+  checks, with identical results on frozen accepted and refined binaries. This
+  predates #128; its generic 3D worker was unchanged.
+- **Reproduction:** A cylinder at zero has radius `2,500`, height `2` and exact
+  horizontal axis `(-1, 0, 0)`. Sweep a zero-radius sphere from
+  `(0, 1,500, -2,500)` by `(0, 0, 5,000)`. The exact 3-4-5 section enters at
+  distance `500` (raw `2147483648000`); the original worker returns
+  `2147390072490`, approximately `0.0217872462` units early, exceeding its
+  `1/4,096` contact tolerance. The collider passes supported-reach admission.
+- **Root cause:** Rounded products of opposite face-side signs became zero,
+  falsely admitting an outside GJK tetrahedron. A separate small-distance-
+  improvement exit could stop on a thin simplex without certifying convergence.
+  Rounded squared-distance ranking also discarded genuinely closer tiny faces,
+  producing stalled refinement and inaccurate normals at ordinary scale.
+- **Implementation:** Exact oriented determinant signs certify inclusive
+  nondegenerate tetrahedron containment; an exact closest-point/support-plane
+  gap replaces the improvement heuristic. Face ranking compares exact squared
+  magnitudes. Triangle reduction consumes the existing FixedMathSharp Voronoi
+  weights directly, avoiding a rounded-point/reprojection roundtrip. Losing
+  tetrahedron faces no longer construct unused witness anchors; the winning
+  indices, weights and witness frames retain their deterministic order.
+- **Support selection:** An internal FixedMathSharp overload lets GJK choose the
+  axial midpoint only for an exactly perpendicular cylinder support direction.
+  It composes the existing owner with zero effective axial length and an exact
+  forced sign. The original public/forced-feature support paths are unchanged.
+  Only sweep support iteration opts in; response/contact witnesses retain their
+  cap-selection policy. Keeping the original shared implementation intact also
+  avoids a measured slowdown in default public support calls. Nonzero one-raw
+  axial projections still select the exact endpoint. No tolerance, iteration
+  budget, public API or persistent cache was added.
+- **Contact parity:** Exact initial mesh face/boundary certificates take
+  precedence over a tolerant GJK witness. An uncertified hull-face exit cannot
+  replace a genuinely disjoint near-contact normal. Tests cover direct and
+  public sweeps, capsule/cylinder/cone parity, nonzero source radius, reversal,
+  translated scalar faces, tetrahedron boundary/degeneracy across all windings,
+  and ordinary-scale radial normals. The compound tangency oracle now checks
+  the analytic `3.5` entry through its actual separation bound, retaining stable
+  part ordering; the former `3.0-3.1` expectation was only the AABB entry.
+- **Accuracy:** The radius-`2,500` cylinder now returns raw `2147483648177`, only
+  `177` raw units late (about `0.0000000412` world units). All six radius-
+  `1,000/2,500` capsule/cylinder/cone diagnostics meet their derived along-chord
+  bound. The contact tolerance bounds normal separation; a 4/5 closing speed
+  gives an entry bound of `ContactTolerance * 5/4 + DistanceTolerance`.
+- **Warm performance:** Twelve matched native Release controls pass with
+  `0 B/op` and no confirmed regression. Means on this Windows x64 host:
+
+  | Workload | Original | Refined |
+  | --- | ---: | ---: |
+  | Direct capsule | 41.550 us | 37.939 us |
+  | Direct cone | 46.031 us | 42.066 us |
+  | Direct cylinder | 115.723 us | 40.623 us |
+  | Direct oblique cylinder | 160.397 us | 147.281 us |
+  | Actual 3D sphere/cylinder CCD step | 146.563 us | 79.621 us |
+  | Public 64-target convex-mesh/sphere query | 4.425 ms | 3.973 ms |
+  | Public 64-target cylinder/sphere query | 2.210 ms | 2.191 ms |
+  | Public 64-target sphere/cone query | 9.636 ms | 8.538 ms |
+  | Rotational 3D CCD control | 594.595 us | 580.426 us |
+  | Projected 2D control | 48.749 us | 47.201 us |
+  | Default public oblique cylinder support | 1507.678 ns | 1508.869 ns |
+  | Default public perpendicular cylinder support | 730.484 ns | 733.376 ns |
+
+  Both default-support confidence intervals overlap their originals, and their
+  complete anchors remain bit-identical. Small shifts in unchanged controls may
+  include host drift. Two launches, six warmups and six measurements at 500 ms
+  retain confidence intervals, allocations and actual generated-child hashes.
+  Ten physics guards, 192 independently checked public hits and six large-shape
+  diagnostics also pass. The inaccurate large-scale original is diagnostic
+  evidence, not a timing denominator.
+- **Evidence:** `artifacts/grv-131/perf/candidate-separate-overload-acceptance.json`
+  records all twelve unique rows, immutable source/fixture inventories, five
+  identical timed-wrapper IL bodies, eight loaded modules and actual child
+  hashes. The measured Gravitas/FixedMathSharp hashes begin `674ABD5C`/`CE69E58B`.
+  All runtime module identities remain unchanged; dependent assemblies were
+  rebuilt against the math change. Original #128 parity evidence remains
+  under `artifacts/grv-128/parity/` and its accepted snapshot provenance.
+- **Validation:** Complete local-stack Release/ReleaseLean solution builds pass
+  with zero warnings/errors. Gravitas passes `6,293/6,227` tests; raw sequence
+  coverage is `47,515/47,515` and `47,513/47,513`, branches `15,700/15,700`
+  in both profiles, and methods `5,027/5,027` and `5,026/5,026`.
+  FixedMathSharp passes `5,872/5,851` core tests plus `49` Chronicler tests in
+  each profile; raw sequence coverage is `59,653/59,653` and `59,645/59,645`,
+  branches `17,044/17,044` in both, and methods `4,491/4,491` and `4,487/4,487`.
+  All six existing replay fixtures match shared expectations and direct
+  Windows x64 Release/Lean captures; no expectations changed. The restored
+  downstream DLL hashes match the measured pair. Independent ponytail review
+  clears the source, tests and evergreen query documentation.
+- **Validation evidence:** Gravitas captures, raw coverage and replay comparison
+  are under `artifacts/grv-131/` with label `separate-overload-final`;
+  FixedMathSharp records are under its
+  `artifacts/grv-131-anchor/separate-overload-final/`. Native performance is
+  Windows x64 Release evidence; Linux/ARM and released-package validation were
+  not run. Use `UseLocalLsfStack=true` for this coordinated change. Commit and
+  release FixedMathSharp first, then validate Gravitas against its released
+  package. Dependency pins remain unchanged pending the upstream commit/release.
+
 ### GRV-Issue-128 - Projected capsule sweep entry error grows with supported geometry scale
 
 - **Resolved:** 2026-10-14 in Gravitas; no upstream source, public API or
@@ -252,7 +320,7 @@ Remaining measured performance costs are tracked in the benchmark backlog.
   bind the immutable original/final stack, 699 production and 75 fixture inputs,
   unchanged upstream modules and actual generated-child hashes to the unique
   eight-row comparison. Dimensional parity exposed the separate pre-existing
-  generic 3D cylinder accuracy defect #131, which remains queued before #129.
+  generic 3D cylinder accuracy defect #131, now resolved in its own entry.
   Native Linux/ARM64 and released-package validation are not claimed.
 
 ### GRV-Issue-126 - Pending compensated authoring mixes CCD proxy geometry epochs

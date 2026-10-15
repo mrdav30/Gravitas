@@ -41,8 +41,6 @@ internal sealed partial class ConvexSweepQueryWorker
             direction = Vector3d.Right;
         }
 
-        bool hasPreviousDistance = false;
-        Fixed64 previousDistance = Fixed64.Zero;
         ClosestSimplexResult closest = default;
         Fixed64 workingDistance = Fixed64.MaxValue;
 
@@ -53,6 +51,17 @@ internal sealed partial class ConvexSweepQueryWorker
                 targetShape,
                 direction,
                 workingScale);
+            if (simplexCount > 0)
+            {
+                // A small closest-distance improvement does not certify convergence
+                // on a thin simplex. Bound the remaining error by its support plane.
+                Signed192 gap = WideGeometry.GetDifferenceDotProduct3D(
+                    closest.Point.X, Fixed64.Zero, closest.Point.Y, Fixed64.Zero, closest.Point.Z, Fixed64.Zero,
+                    closest.Point.X, support.Point.X, closest.Point.Y, support.Point.Y, closest.Point.Z, support.Point.Z);
+                if (WideArithmetic.SubtractSigned192(gap,
+                        Fixed64.GetExactRawProduct(workingDistanceTolerance, workingDistance)).Sign <= 0)
+                    break;
+            }
             if (ContainsSupportPoint(_simplex, simplexCount, support.Point))
                 break;
 
@@ -71,14 +80,6 @@ internal sealed partial class ConvexSweepQueryWorker
             if (workingDistance <= workingDistanceTolerance)
                 return GjkResult.CreateIntersection(closest.PointA, closest.PointB);
 
-            if (hasPreviousDistance
-                && previousDistance - workingDistance <= Fixed64.Epsilon)
-            {
-                break;
-            }
-
-            hasPreviousDistance = true;
-            previousDistance = workingDistance;
             direction = -closest.Point;
         }
 
@@ -94,10 +95,12 @@ internal sealed partial class ConvexSweepQueryWorker
         Fixed64 workingScale)
     {
         Vector3d supportDirection = direction.Normalized;
+        // Interior face supports avoid artificial simplex dimensions; contact
+        // witnesses keep their established feature-selection policy.
         FixedPointAnchor pointA =
-            sourceShape.GetSupportAnchor(supportDirection);
+            sourceShape.GetSupportAnchor(supportDirection, preferAxialCenter: true);
         FixedPointAnchor pointB =
-            targetShape.GetSupportAnchor(-supportDirection);
+            targetShape.GetSupportAnchor(-supportDirection, preferAxialCenter: true);
         // The same bounds-selected shift covers every enclosed support pair.
         _ = pointA.TryGetScaledOffsetFrom(
             pointB,
@@ -120,6 +123,6 @@ internal sealed partial class ConvexSweepQueryWorker
         if (count == 3)
             return ReduceTriangle(simplex, ref count);
 
-        return ReduceTetrahedron(simplex, ref count, workingScale);
+        return ReduceTetrahedron(simplex, ref count);
     }
 }

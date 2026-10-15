@@ -107,7 +107,6 @@ internal sealed partial class ConvexSweepQueryWorker
             Point = point;
             PointA = pointA;
             PointB = pointB;
-            DistanceSqr = point.MagnitudeSquared;
         }
 
         public bool Intersects { get; }
@@ -117,8 +116,6 @@ internal sealed partial class ConvexSweepQueryWorker
         public FixedPointAnchor PointA { get; }
 
         public FixedPointAnchor PointB { get; }
-
-        public Fixed64 DistanceSqr { get; }
 
         public static ClosestSimplexResult Intersection =>
             new(true, Vector3d.Zero, default, default);
@@ -137,18 +134,6 @@ internal sealed partial class ConvexSweepQueryWorker
             weights[2] = third;
             weights[3] = fourth;
             return FromArrayWeights(simplex, weights, count);
-        }
-
-        public static ClosestSimplexResult FromIndexedWeights(
-            SupportPoint[] simplex,
-            Span<int> indices,
-            Span<Fixed64> weights)
-        {
-            Span<SupportPoint> selected = stackalloc SupportPoint[3];
-            for (int i = 0; i < 3; i++)
-                selected[i] = simplex[indices[i]];
-
-            return FromSpanWeights(selected, weights, 3);
         }
 
         public static ClosestSimplexResult FromSpanWeights(

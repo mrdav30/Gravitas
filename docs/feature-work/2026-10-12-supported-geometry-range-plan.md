@@ -1135,8 +1135,24 @@ The clipped 64-target capsule/cylinder/cone workloads improve by approximately
 17%/6%/25% on this host. A maintained direct benchmark retains ordinary and
 supported-scale controls. Independent ponytail review clears the smaller runtime
 implementation. Detailed evidence belongs to resolved #128. Parity checks exposed
-pre-existing generic 3D cylinder accuracy defect #131; resolve #131, then #129,
-before phase 3. No upstream source or dependency pin changes are required.
+pre-existing generic 3D cylinder accuracy defect #131, resolved in the follow-up
+below. The projected-sweep fix required no upstream source or pin changes.
+
+**2026-10-15 generic-sweep follow-up (#131):** Exact tetrahedron signs,
+support-plane convergence and exact face ranking correct supported-scale early
+entry and ordinary-scale normal error. Direct Voronoi weights and deferred
+witness construction remove redundant work. An internal FixedMathSharp cylinder
+support overload chooses an axial midpoint only for exactly perpendicular GJK
+searches; existing public and contact-witness selection stays unchanged. The
+radius-2,500 cylinder error falls from about 0.021787 world units to 177 raw units.
+Twelve native controls retain 0 B/op with no confirmed slowdown, including default
+upstream support calls; direct cylinder and complete CCD costs fall by about
+65% and 46%. Independent ponytail review approves the coordinated implementation.
+Complete Release/Lean builds and tests pass in both repositories at raw 100%
+line/branch/method coverage. All six existing replay fixtures match shared and
+cross-profile expectations. Detailed evidence belongs to resolved #131; resolve
+#129 before phase 3. Dependency pins remain unchanged; release the math change
+before package-based validation.
 
 ## Phase 3: Close Query, Settings And Restore Bypasses
 

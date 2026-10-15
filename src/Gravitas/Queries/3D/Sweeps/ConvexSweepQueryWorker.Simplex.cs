@@ -62,31 +62,28 @@ internal sealed partial class ConvexSweepQueryWorker
 
     private static ClosestSimplexResult ReduceTetrahedron(
         SupportPoint[] simplex,
-        ref int count,
-        Fixed64 workingScale)
+        ref int count)
     {
         if (IsOriginInsideTetrahedron(
                 simplex[0].Point,
                 simplex[1].Point,
                 simplex[2].Point,
-                simplex[3].Point,
-                workingScale))
+                simplex[3].Point))
         {
             count = 4;
             return ClosestSimplexResult.Intersection;
         }
 
-        ClosestSimplexResult best = default;
+        Vector3d bestPoint = default;
         bool hasBest = false;
         Span<int> bestIndices = stackalloc int[3];
         Span<Fixed64> bestWeights = stackalloc Fixed64[3];
-        Span<int> face = stackalloc int[3];
         Span<Fixed64> weights = stackalloc Fixed64[3];
 
-        EvaluateFace(simplex, 0, 1, 2, ref best, ref hasBest, bestIndices, bestWeights, face, weights);
-        EvaluateFace(simplex, 0, 3, 1, ref best, ref hasBest, bestIndices, bestWeights, face, weights);
-        EvaluateFace(simplex, 0, 2, 3, ref best, ref hasBest, bestIndices, bestWeights, face, weights);
-        EvaluateFace(simplex, 1, 3, 2, ref best, ref hasBest, bestIndices, bestWeights, face, weights);
+        EvaluateFace(simplex, 0, 1, 2, ref bestPoint, ref hasBest, bestIndices, bestWeights, weights);
+        EvaluateFace(simplex, 0, 3, 1, ref bestPoint, ref hasBest, bestIndices, bestWeights, weights);
+        EvaluateFace(simplex, 0, 2, 3, ref bestPoint, ref hasBest, bestIndices, bestWeights, weights);
+        EvaluateFace(simplex, 1, 3, 2, ref bestPoint, ref hasBest, bestIndices, bestWeights, weights);
 
         SupportPoint first = simplex[bestIndices[0]];
         SupportPoint second = simplex[bestIndices[1]];
@@ -103,16 +100,12 @@ internal sealed partial class ConvexSweepQueryWorker
         int first,
         int second,
         int third,
-        ref ClosestSimplexResult best,
+        ref Vector3d bestPoint,
         ref bool hasBest,
         Span<int> bestIndices,
         Span<Fixed64> bestWeights,
-        Span<int> face,
         Span<Fixed64> weights)
     {
-        face[0] = first;
-        face[1] = second;
-        face[2] = third;
         TriangleWeights triangleWeights = ClosestPointOnTriangleToOrigin(
             simplex[first].Point,
             simplex[second].Point,
@@ -120,15 +113,16 @@ internal sealed partial class ConvexSweepQueryWorker
         weights[0] = triangleWeights.A;
         weights[1] = triangleWeights.B;
         weights[2] = triangleWeights.C;
-        ClosestSimplexResult candidate = ClosestSimplexResult.FromIndexedWeights(simplex, face, weights);
-        if (hasBest && !IsCloser(
-                candidate.DistanceSqr,
-                candidate.Point,
-                best.DistanceSqr,
-                best.Point))
+        // Rank only the Minkowski point; construct both witnesses once for the winner.
+        Span<Vector3d> points = stackalloc Vector3d[3];
+        points[0] = simplex[first].Point;
+        points[1] = simplex[second].Point;
+        points[2] = simplex[third].Point;
+        _ = Vector3d.TryGetWeightedAverage(points, weights, out Vector3d candidatePoint);
+        if (hasBest && Vector3d.CompareMagnitudeSquared(candidatePoint, bestPoint) >= 0)
             return;
 
-        best = candidate;
+        bestPoint = candidatePoint;
         hasBest = true;
         bestIndices[0] = first;
         bestIndices[1] = second;
@@ -136,18 +130,6 @@ internal sealed partial class ConvexSweepQueryWorker
         bestWeights[0] = weights[0];
         bestWeights[1] = weights[1];
         bestWeights[2] = weights[2];
-    }
-
-    internal static bool IsCloser(
-        Fixed64 candidateDistanceSqr,
-        Vector3d candidatePoint,
-        Fixed64 bestDistanceSqr,
-        Vector3d bestPoint)
-    {
-        if (candidateDistanceSqr != bestDistanceSqr || candidateDistanceSqr != Fixed64.MaxValue)
-            return candidateDistanceSqr < bestDistanceSqr;
-
-        return Vector3d.CompareMagnitudeSquared(candidatePoint, bestPoint) < 0;
     }
 
     private static ClosestSimplexResult ReduceByWeights(
@@ -203,16 +185,16 @@ internal sealed partial class ConvexSweepQueryWorker
         c = scaled[2];
 
         var triangle = new FixedTriangle(a, b, c);
-        Vector3d closest = triangle.ClosestPoint(Vector3d.Zero);
-        if (!triangle.TryGetProjectedBarycentricWeights(
-                closest,
-                out _,
-                out Fixed64 weightB,
-                out Fixed64 weightC))
+        if (!triangle.TryGetClosestPointBarycentrics(Vector3d.Zero,
+                out Signed320 numeratorB, out Signed320 numeratorC,
+                out Signed320 denominator, out _))
         {
             return ClosestPointOnDegenerateTriangleToOrigin(a, b, c);
         }
 
+        // Retain exact feature weights rather than reprojecting a rounded point.
+        _ = Fixed64.TryGetUnitIntervalRatio(numeratorB, denominator, out Fixed64 weightB);
+        _ = Fixed64.TryGetUnitIntervalRatio(numeratorC, denominator, out Fixed64 weightC);
         weightB = FixedMath.Clamp(
             weightB,
             Fixed64.Zero,
@@ -309,60 +291,30 @@ internal sealed partial class ConvexSweepQueryWorker
         point = start * startWeight + end * endWeight;
     }
 
-    private static bool IsOriginInsideTetrahedron(
+    /// <summary>Tests inclusive origin containment in a nondegenerate GJK tetrahedron.</summary>
+    internal static bool IsOriginInsideTetrahedron(
         Vector3d a,
         Vector3d b,
         Vector3d c,
-        Vector3d d,
-        Fixed64 workingScale)
+        Vector3d d)
     {
-        Span<Vector3d> scaled = stackalloc Vector3d[4];
-        scaled[0] = a;
-        scaled[1] = b;
-        scaled[2] = c;
-        scaled[3] = d;
-        Fixed64 productScale = GjkSimplexScale.ScaleForProducts(scaled);
-        a = scaled[0];
-        b = scaled[1];
-        c = scaled[2];
-        d = scaled[3];
-
-        Fixed64 productScaleSqr = productScale * productScale;
-        Fixed64 productScaleCubed = productScaleSqr * productScale;
-        Fixed64 workingScaleSqr = workingScale * workingScale;
-        Fixed64 workingScaleCubed = workingScaleSqr * workingScale;
-        Fixed64 volumeTolerance = DistanceTolerance * workingScaleCubed * productScaleCubed;
-        if (SignedTetrahedronVolume6(a, b, c, d).Abs() <= volumeTolerance)
-            return false;
-
-        Fixed64 workingScaleSixth = workingScaleCubed * workingScaleCubed;
-        Fixed64 sideTolerance =
-            DistanceTolerance * workingScaleSixth * productScaleCubed * productScaleCubed;
-        return IsSameSideOfFace(Vector3d.Zero, d, a, b, c, sideTolerance)
-            && IsSameSideOfFace(Vector3d.Zero, c, a, d, b, sideTolerance)
-            && IsSameSideOfFace(Vector3d.Zero, b, a, c, d, sideTolerance)
-            && IsSameSideOfFace(Vector3d.Zero, a, b, d, c, sideTolerance);
+        // These consistently oriented face determinants are barycentric volume
+        // numerators. Equal nonzero signs certify containment and nonzero volume;
+        // rounded plane-side products can instead erase a genuine separation.
+        int abc = WideGeometry.GetTripleProductSign(
+            a.X, a.Y, a.Z, b.X, b.Y, b.Z, c.X, c.Y, c.Z);
+        int adb = WideGeometry.GetTripleProductSign(
+            a.X, a.Y, a.Z, d.X, d.Y, d.Z, b.X, b.Y, b.Z);
+        int acd = WideGeometry.GetTripleProductSign(
+            a.X, a.Y, a.Z, c.X, c.Y, c.Z, d.X, d.Y, d.Z);
+        int bdc = WideGeometry.GetTripleProductSign(
+            b.X, b.Y, b.Z, d.X, d.Y, d.Z, c.X, c.Y, c.Z);
+        bool hasPositive = abc > 0 || adb > 0 || acd > 0 || bdc > 0;
+        bool hasNegative = abc < 0 || adb < 0 || acd < 0 || bdc < 0;
+        // Coplanar simplexes have conflicting signs or four zeros; retain their
+        // closest-face reduction rather than declaring a volume intersection.
+        return hasPositive != hasNegative;
     }
-
-    private static bool IsSameSideOfFace(
-        Vector3d point,
-        Vector3d opposite,
-        Vector3d a,
-        Vector3d b,
-        Vector3d c,
-        Fixed64 sideTolerance)
-    {
-        Vector3d normal = Vector3d.Cross(b - a, c - a);
-        if (normal.MagnitudeSquared <= Fixed64.Zero)
-            return false;
-
-        Fixed64 pointSide = Vector3d.Dot(normal, point - a);
-        Fixed64 oppositeSide = Vector3d.Dot(normal, opposite - a);
-        return pointSide * oppositeSide >= -sideTolerance;
-    }
-
-    private static Fixed64 SignedTetrahedronVolume6(Vector3d a, Vector3d b, Vector3d c, Vector3d d) =>
-        Vector3d.Dot(b - a, Vector3d.Cross(c - a, d - a));
 
     private static bool ContainsSupportPoint(
         SupportPoint[] simplex,

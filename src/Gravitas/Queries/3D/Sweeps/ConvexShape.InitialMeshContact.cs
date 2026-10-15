@@ -20,6 +20,7 @@ internal readonly partial struct ConvexShape
     // must call this while the actual source and target leaves are retained.
     internal bool TryGetInitialMeshContactNormal(
         in ConvexShape source,
+        bool allowHullFaceExit,
         out FixedPointAnchor targetAnchor,
         out Vector3d normal)
     {
@@ -72,6 +73,13 @@ internal readonly partial struct ConvexShape
                         FixedQuaternion.Identity, Fixed64.Zero, source._radius, out contact);
                     break;
                 }
+                // A hull face exit alone cannot certify a tolerant, disjoint contact.
+                if (!allowHullFaceExit)
+                {
+                    targetAnchor = default;
+                    normal = default;
+                    return false;
+                }
                 GetInitialHullFaceExit(source, hull, out targetAnchor, out normal);
                 return true;
         }
@@ -86,7 +94,7 @@ internal readonly partial struct ConvexShape
     {
         targetAnchor = default;
         normal = default;
-        if (_kind != ConvexShapeKind.Triangle) return false;
+        Debug.Assert(_kind == ConvexShapeKind.Triangle);
         PhysicsMesh mesh = _triangleOwner!.Mesh;
         Vector3d planeNormal = GetInitialExitNormal(source, mesh.GetFaceNormalWorld(_triangleIndex));
         FixedPointAnchor support = source.GetSupportAnchor(-planeNormal);
