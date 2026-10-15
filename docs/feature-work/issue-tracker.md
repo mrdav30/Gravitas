@@ -101,6 +101,11 @@ investigation unless it recurs or a reliable reproducer becomes available.
   Check sphere/capsule equivalence, whole-shape clearance, 2D/mixed counterparts,
   CCD, support/grounding and response with matching seam/interior cost controls.
   Do not indiscriminately weld neighboring colliders or erase real boundaries.
+- **Related feature work:** The deferred
+  [Static Surface Continuity And Heightfield Integration proposal](2026-10-15-static-surface-continuity-and-heightfield-plan.md)
+  captures later environment/heightfield integration. Any generic continuity
+  needed to resolve this issue remains #133's responsibility; terrain work
+  must reuse that foundation rather than delay or duplicate it.
 
 ### GRV-Issue-111 - Local-stack benchmark hosts can omit FixedMathSharp compile references
 

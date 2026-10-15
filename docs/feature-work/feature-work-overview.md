@@ -54,6 +54,14 @@ instead of burying it in notes.
   - Reproduce and close confirmed release-relevant signals alongside the owning
     library change. Do not broaden this into speculative optimization work.
 
+## Deferred Design
+
+- [`Static Surface Continuity And Heightfield Integration`](2026-10-15-static-surface-continuity-and-heightfield-plan.md)
+  - After the bodyless-response and mesh-seam prerequisites, define continuous
+    static surfaces across bounded spatial pieces and assess reuse of existing
+    height data. Preserve physics/navigation ownership, explicit surface
+    evaluation and existing spatial indexing; specialize only with evidence.
+
 ## Recently Completed
 
 - [`Supported Geometry Range`](done/2026-10-12-supported-geometry-range-plan.md)
