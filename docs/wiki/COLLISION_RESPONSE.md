@@ -270,12 +270,23 @@ Collision pairs are queued into the physics service active-pair queue the first
 time they update. During late simulation, active pair maintenance:
 
 - deactivates pairs that have not collided for the inactive-frame threshold.
+- validates retained live contacts when either collider's published geometry
+  changes, including pairs skipped by partition distribution.
 - emits ongoing contact notifications when a pair is active and not culled.
+- delivers pending separation without waiting for a collision-check cull countdown.
 - keeps active pairs queued for later maintenance.
 
-Sleeping contact pairs are preserved while their manifold is known to be
-colliding. This prevents resting sleeping contacts from aging out and emitting a
-false contact exit simply because their partition skipped pair generation.
+Unchanged sleeping contacts retain their manifold and warm-start cache. Changed
+geometry must still overlap in bounds and pass narrow phase before an old
+contact is retained; invalid contacts retire and emit their admitted exits in
+the same maintenance pass. This prevents both false exits during rest and stale
+contact notifications after a support moves or changes shape. This validation
+does not run response a second time. Ordinary noncontact candidates retain their
+inactive reuse lifetime.
+
+Pure 2D and mixed pair cleanup uses the context's late-step token for contact
+freshness. `LastFrame` continues to describe the public frame clock; repeated
+`LateSimulate()` calls without `Simulate()` still perform separation cleanup.
 
 `LSCollider.NotifyContact(...)` and `LSCollider2D.NotifyContact(...)` emit:
 

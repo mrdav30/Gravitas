@@ -153,7 +153,7 @@ internal sealed partial class GravitasMixedCollisionService
                 if (!IsCurrentPair(token))
                     continue;
 
-                if (pair.LastFrame == frame)
+                if (pair.LastVisitToken == _context.LateSimulateToken)
                     continue;
 
                 if (TryKeepUntouchedPair(pair, frame))

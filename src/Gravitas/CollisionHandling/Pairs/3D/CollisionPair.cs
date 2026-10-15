@@ -87,6 +87,8 @@ public partial class CollisionPair
 
     internal bool IsNotificationInProgress => _notificationInProgress;
 
+    internal bool HasContactTransition => _isCollidingChanged;
+
     internal long LifetimeVersion => _lifetimeVersion;
 
     /// <summary>Gets the deterministic contact manifold owned by this pair.</summary>
@@ -470,15 +472,24 @@ public partial class CollisionPair
         CalculateCullScore();
     }
 
-    internal bool TryPreserveSleepingRestingContact()
+    internal bool TryRefreshRetainedContact()
     {
-        if (!_isColliding || !Manifold.HasContact)
+        if (!_isColliding)
+            return true;
+        if (!Manifold.HasContact)
             return false;
 
-        if (ColliderA.Body?.IsSleeping != true && ColliderB.Body?.IsSleeping != true)
-            return false;
+        // A sleeping participant does not make a moved or reshaped support's old manifold valid.
+        if (BroadPhaseVersionChanged())
+        {
+            if (!BoundsOverlapInclusive(ColliderA, ColliderB)
+                || !CollisionDetection.DoCollisionCheck(this))
+                return false;
+            RefreshBroadPhaseVersions();
+        }
 
-        LastCollidedFrame = Context.FrameCount;
+        if (ColliderA.Body?.IsSleeping == true || ColliderB.Body?.IsSleeping == true)
+            LastCollidedFrame = Context.FrameCount;
         return true;
     }
 

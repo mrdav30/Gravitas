@@ -13,6 +13,8 @@ using System;
 
 namespace Gravitas;
 
+/// <summary>Owns one deterministic pure 2D contact pair and its lifecycle.</summary>
+/// <content>Owns pair identity, contact notifications, warm starts and collision-pass freshness.</content>
 internal sealed partial class CollisionPair2D
 {
     private bool _isColliding;
@@ -43,6 +45,9 @@ internal sealed partial class CollisionPair2D
     public CollisionType2D CollisionType { get; private set; }
 
     public long LastFrame { get; private set; } = -1;
+
+    // Collision-pass freshness is independent of hosts advancing the public frame clock.
+    internal long LastVisitToken { get; private set; } = -1;
 
     public bool IsColliding => _isColliding;
 
@@ -119,6 +124,7 @@ internal sealed partial class CollisionPair2D
     public void MarkResting(long frame)
     {
         LastFrame = frame;
+        LastVisitToken = ColliderA.Context.LateSimulateToken;
     }
 
     public void MarkSeparated()
@@ -163,6 +169,7 @@ internal sealed partial class CollisionPair2D
     {
         _isColliding = false;
         LastFrame = -1;
+        LastVisitToken = -1;
         Manifold.Reset();
         _warmStart.Clear();
     }
@@ -354,6 +361,7 @@ internal sealed partial class CollisionPair2D
         bool changed = !_isColliding;
         _isColliding = true;
         LastFrame = frame;
+        LastVisitToken = ColliderA.Context.LateSimulateToken;
         return changed;
     }
 

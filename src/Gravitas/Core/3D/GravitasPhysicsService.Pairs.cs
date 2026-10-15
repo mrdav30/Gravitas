@@ -260,19 +260,19 @@ public sealed partial class GravitasPhysicsService
                 if (!token.IsCurrentLifetime || !instancePair.Active)
                     continue;
 
-                if (!RequireCollisionPair(instancePair.ColliderA, instancePair.ColliderB))
+                if (!RequireCollisionPair(instancePair.ColliderA, instancePair.ColliderB)
+                    || !instancePair.TryRefreshRetainedContact())
                 {
                     FullDeactivateCollisionPair(instancePair);
                     continue;
                 }
 
-                bool preservedSleepingContact = instancePair.TryPreserveSleepingRestingContact();
                 long passedFrames = _context.FrameCount - instancePair.LastCollidedFrame;
-                if (!preservedSleepingContact && passedFrames >= InactiveFrameThreshold)
+                if (passedFrames >= InactiveFrameThreshold)
                     FullDeactivateCollisionPair(instancePair);
                 else
                 {
-                    if (instancePair.CullCounter <= 0)
+                    if (instancePair.CullCounter <= 0 || instancePair.HasContactTransition)
                         instancePair.NotifyCollidersOfContact();
                     if (token.IsCurrentLifetime && instancePair.Active)
                         _activeCollisionPairs.Enqueue(token);

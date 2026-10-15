@@ -2,7 +2,7 @@
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-135`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-136`.
 - Assign an ID when an issue enters this tracker, keep it through resolution,
   and never reuse an ID even if an entry is later removed. Check this file's Git
   history before advancing or repairing the counter.
@@ -37,45 +37,44 @@
 
 ### Ordered Queue
 
-The supported-geometry contract and #096 are complete, and #132 now provides
-bodyless 3D static response. Next resolve **#134**, untouched-pair separation
-cleanup, before **#133**, artificial mesh-chunk seam response. Reliable pair
-retirement and notifications should precede cross-collider surface continuity.
-Both remaining defects reproduce on earlier binaries and are independent of
-the size cap. Keep physical-quality fixes ahead of the benchmark queue;
-combine work only where the response ownership actually overlaps.
+The supported-geometry contract and #096 are complete. #132 now provides
+bodyless 3D static response, and #134 repairs stale separation notifications.
+Next resolve **#135**, waking sleeping bodies when their support disappears,
+before **#133**, artificial mesh-chunk seam response. Support invalidation and
+pair lifecycle should be sound before cross-collider surface continuity.
+Both remaining physical defects reproduce on earlier binaries and are
+independent of the size cap. Keep physical-quality fixes ahead of the benchmark
+queue; combine work only where the response ownership actually overlaps.
 
 #111 remains an independent validation-tooling issue.
 #125 is a low-priority, non-blocking runtime crash observation; defer further
 investigation unless it recurs or a reliable reproducer becomes available.
 
-### GRV-Issue-134 - Untouched 3D pairs retain stale contact notifications after separation
+### GRV-Issue-135 - Sleeping dynamic bodies can remain suspended after static support disappears
 
-- **Confirmed:** 2026-10-15 while testing #132's contact lifecycle.
-- **Affected area:** `Core/3D/GravitasPhysicsService.Pairs.cs`,
-  `ProcessActiveCollisionPairs`, and retained 3D pair cleanup.
-- **Reproduction:** Establish a dynamic sphere/floor contact, then teleport the
-  awake sphere above the floor so their bounds no longer share partitions.
-  Disable gravity and clear velocity to keep the geometry separated. Check
-  contact/stay/exit callbacks through complete host steps. A nearby gap that
-  retains a shared voxel produces an exit on the next step; a distant teleport
-  produced four stale contact callbacks and no exit during the four observed
-  steps. Both explicit-static and bodyless floors reproduce on the original
-  pre-fix binaries and the corrected binaries.
-- **Root cause:** Broad-phase distribution no longer visits the separated pair,
-  but active-pair processing can notify from its retained colliding state without
-  checking its current bounds or `LastFrame`. The existing inactivity threshold
-  is eight simulation seconds; the full retirement delay is source-derived
-  until measured. This cleanup code is unchanged by #132. Explicit static
-  bodies use the same path, so bodyless response is not the underlying cause.
-- **Parity:** The 2D and mixed owners already clean up untouched pairs. Check
-  physical contact and trigger notifications, sleeping-contact preservation,
-  pair pooling/reuse, mutation during callbacks and deterministic replay.
-- **Evidence:** Ignored `artifacts/grv-issue-132/perf/probe-stale/` retains
-  original/candidate event counts, disjoint bounds and runtime module hashes.
-- **Follow-up:** Resolve untouched 3D pairs in the owning lifecycle, preserving
-  legitimate sleeping contacts and allocation-free warm cleanup. Keep this
-  separate from bodyless response and mesh-surface continuity.
+- **Confirmed:** 2026-10-15 during #134's sleeping-contact review. This is a
+  pre-existing wake-policy defect, distinct from stale contact notifications.
+- **Reproduction:** At gravity `1` and frame rate `16`, settle a radius-`0.5`
+  sphere on an explicit-static or bodyless floor, then put it to sleep with a
+  live supporting contact. Use manual grounding with `IsGrounded=false` so no
+  host grounding flag can suppress gravity. Move the floor twelve units away
+  and advance eight complete steps. The body remains asleep at its original
+  position with zero velocity. An otherwise identical explicit `Wake()` control
+  falls. The original pre-#134 binary reproduces both ownership cases.
+- **Affected area:** Sleeping motion preparation skips gravity; separation and
+  pair retirement do not wake the surviving participant. The 2D and mixed
+  owners have corresponding source-level gaps; their physical reproductions
+  and automatic-grounding counterparts still need validation.
+- **Follow-up:** Define support/contact invalidation and wake propagation in the
+  dimensional owners. Cover moving, shrinking and deactivating support, automatic
+  and manual grounding, bodyless/static ownership and 2D/3D/mixed parity. Preserve
+  legitimate unchanged sleeping contacts, cache reuse, deterministic notification
+  order and the warm allocation/performance baseline. Do not make trigger exits
+  or every unrelated contact change wake a resting island indiscriminately.
+- **Evidence:** Ignored `artifacts/grv-issue-134/sleep-loss-probe/` retains the
+  isolated probe, frozen-stack module hashes and per-step original/candidate
+  states with explicit-wake controls. #134 corrects the event/manifold truth;
+  waking unsupported sleepers remains independent work here.
 
 ### GRV-Issue-133 - Adjacent mesh collider rims alter frictionless seam-crossing response
 
@@ -165,6 +164,50 @@ investigation unless it recurs or a reliable reproducer becomes available.
 Remaining measured performance costs are tracked in the benchmark backlog.
 
 ## Resolved Issues
+
+### GRV-Issue-134 - Untouched 3D pairs retain stale contact notifications after separation
+
+- **Confirmed/resolved:** 2026-10-15. A far-separated 3D pair could continue
+  emitting contact notifications because partition distribution stopped visiting
+  it while active-pair maintenance trusted its old colliding state. Explicit-static,
+  bodyless and trigger contacts shared the defect; #132 did not introduce it.
+- **Resolution:** Reuse published collider geometry versions to validate retained
+  live contacts with current bounds and, when needed, narrow phase. Retire invalid
+  contacts and deliver pending separation even when collision checks are culled.
+  Preserve unchanged sleeping manifolds and warm starts, ordinary noncontact
+  candidate reuse, queue lifetime checks and exception-safe notification cleanup.
+  Maintenance does not solve response a second time.
+- **Parity:** Pure 2D and mixed cleanup previously used the public frame clock
+  for freshness, so repeated `LateSimulate()` calls could preserve stale contacts.
+  Stamp successful contact visits with the existing late-step token instead;
+  keep public `LastFrame` and replay hashes unchanged. Mixed processing also
+  advances and preflights that token when both pure physics services are disabled.
+- **Regression evidence:** The original 3D and late-only parity regressions fail
+  before their respective fixes. Tests cover full/late-only hosts, solid/trigger
+  contacts, bodyless/static ownership, cleared public narrow-phase results,
+  unchanged sleeping caches, moved/reshaped sleeping supports, overlapping bounds
+  with disjoint actual shapes, positive cull countdowns, callback exceptions,
+  reentrant rebinding/pool lifetimes and mixed-only token exhaustion.
+- **Validation:** `UseLocalLsfStack=true`; full solution `Release`/`ReleaseLean`
+  builds pass with zero warnings/errors, all 6,435/6,367 tests pass, and raw
+  coverage visits all 47,651/47,649 sequence points, 15,810 branches each and
+  5,037/5,036 methods. All six shared replay fixtures match existing expectations
+  and direct Windows x64 Release/Lean captures. Independent ponytail review
+  has no outstanding findings. No upstream source changes were needed.
+- **Warm gate:** All twelve warmed physical/allocation guards pass at `0 B`,
+  including one/64-pair repeated separation and retirement for both static
+  ownership modes. All six native timing rows overlap the accepted baseline's
+  99.9% confidence intervals. An earlier 3D dynamic increase did not repeat in
+  fresh candidate-then-original attribution: original→candidate is
+  850.6→846.9 µs for 64 dynamic responses, 3.958→3.972 ms for the 64-pair full
+  step and 313.0→315.2 µs for the 2D control; each has overlapping intervals and
+  `0 B`. No resolved warm regression remains in the measured workloads.
+- **Evidence:** Ignored `artifacts/grv-issue-134/` retains red/focused/full logs,
+  raw coverage, replay captures, twelve guard results, native distributions,
+  exact source/runtime/workload bindings and the fresh attribution. Earlier
+  timing observations are retained separately. #135 records the pre-existing
+  support-loss wake defect; #133 remains independent. Package-based release
+  validation and the other native CI lanes remain release gates.
 
 ### GRV-Issue-132 - Bodyless 3D static geometry does not receive discrete blocking response
 

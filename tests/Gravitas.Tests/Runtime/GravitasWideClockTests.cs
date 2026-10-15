@@ -99,11 +99,19 @@ public sealed class GravitasWideClockTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void ExhaustedLateTokenRejectsBeforeWorldMutation(bool latePhase)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public void ExhaustedLateTokenRejectsBeforeWorldMutation(bool latePhase, bool mixedOnly)
     {
         using var context = GravitasWorldContext.CreateOwned();
+        if (mixedOnly)
+        {
+            context.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
+            context.Physics.SimulatePhysics = false;
+            context.Physics2D.SimulatePhysics = false;
+        }
         TimingTestUtility.SetLateToken(context, long.MaxValue);
         var before = context.ComputeReplayHash();
         Assert.Throws<InvalidOperationException>(latePhase ? context.LateSimulate : context.Simulate);

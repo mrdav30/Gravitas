@@ -358,7 +358,8 @@ public sealed partial class GravitasWorldContext : IDisposable
         ThrowIfDisposed();
         PhysicsRuntimeMode runtimeMode = Settings.RuntimeMode;
         if ((runtimeMode.Runs3D() && Physics.SimulatePhysics)
-            || (runtimeMode.Runs2D() && Physics2D.SimulatePhysics))
+            || (runtimeMode.Runs2D() && Physics2D.SimulatePhysics)
+            || runtimeMode.RunsMixedContacts())
             ThrowIfLateSimulateTokenExhausted();
         // Clock exhaustion must reject before opening the containing fixed step.
         _clock.Simulate();
@@ -405,7 +406,8 @@ public sealed partial class GravitasWorldContext : IDisposable
         PhysicsRuntimeMode runtimeMode = Settings.RuntimeMode;
         bool willRun3D = runtimeMode.Runs3D() && Physics.SimulatePhysics;
         bool willRun2D = runtimeMode.Runs2D() && Physics2D.SimulatePhysics;
-        if (willRun3D || willRun2D)
+        bool willRunMixed = runtimeMode.RunsMixedContacts();
+        if (willRun3D || willRun2D || willRunMixed)
             AdvanceLateSimulateToken();
         RefreshQueryPartitions();
         _fixedStepOpen = true;
@@ -426,7 +428,7 @@ public sealed partial class GravitasWorldContext : IDisposable
                 Physics.CompleteLateSimulatePhysicsStep();
             if (ran2D)
                 Physics2D.CompleteLateSimulatePhysicsStep();
-            if (runtimeMode.RunsMixedContacts())
+            if (willRunMixed)
                 MixedCollisions.LateSimulate();
 
             _hooks.InvokeLateSimulate();

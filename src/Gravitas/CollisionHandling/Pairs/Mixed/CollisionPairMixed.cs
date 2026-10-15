@@ -47,6 +47,9 @@ internal sealed partial class CollisionPairMixed
 
     public long LastFrame { get; private set; } = -1;
 
+    // Collision-pass freshness is independent of hosts advancing the public frame clock.
+    internal long LastVisitToken { get; private set; } = -1;
+
     public MixedContact Contact { get; private set; }
 
     public ContactManifold Manifold { get; } = new();
@@ -74,6 +77,7 @@ internal sealed partial class CollisionPairMixed
         Collider2DId = collider2D.Id;
         Key = MixedColliderKey.CreateKey(Collider3DId, Collider2DId);
         LastFrame = -1;
+        LastVisitToken = -1;
         _isColliding = false;
         _isTriggerPair = collider3D.IsTrigger || collider2D.IsTrigger;
         _notificationInProgress = false;
@@ -103,6 +107,7 @@ internal sealed partial class CollisionPairMixed
         _isColliding = true;
         _isTriggerPair = Collider3D.IsTrigger || Collider2D.IsTrigger;
         LastFrame = frame;
+        LastVisitToken = Context.LateSimulateToken;
 
         Context.Diagnostics.EmitMixedContact(this, Contact);
 
@@ -162,6 +167,7 @@ internal sealed partial class CollisionPairMixed
     public void MarkResting(long frame)
     {
         LastFrame = frame;
+        LastVisitToken = Context.LateSimulateToken;
         ClearSolveState();
     }
 
@@ -169,6 +175,7 @@ internal sealed partial class CollisionPairMixed
     {
         PublishManifold(frame, manifold);
         LastFrame = frame;
+        LastVisitToken = Context.LateSimulateToken;
     }
 
     private void PublishContact(long frame, MixedContact contact)

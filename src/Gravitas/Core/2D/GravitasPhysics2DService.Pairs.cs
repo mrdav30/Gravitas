@@ -276,7 +276,7 @@ public sealed partial class GravitasPhysics2DService
             if (!_pairs.TryGetValue(key, out CollisionPair2D pair))
                 continue;
 
-            if (pair.LastFrame == frame)
+            if (pair.LastVisitToken == _context.LateSimulateToken)
                 continue;
 
             if (TryKeepUntouchedPair(pair, frame))
