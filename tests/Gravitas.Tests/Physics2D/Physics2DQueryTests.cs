@@ -208,7 +208,7 @@ public sealed class Physics2DQueryTests
     }
 
     [Fact]
-    public void ValidateConvexQueryPolygon_WithFullDomainEdges_ShouldUseExactOrientation()
+    public void ValidateConvexQueryPolygon_WithFullDomainEdges_ShouldRejectReachAfterExactOrientation()
     {
         Vector2d[] vertices =
         {
@@ -220,7 +220,7 @@ public sealed class Physics2DQueryTests
         Action validate = () =>
             QueryDetection2D.ValidateConvexQueryPolygon(vertices);
 
-        validate.Should().NotThrow();
+        validate.Should().Throw<ArgumentException>().WithMessage("*4,096*");
     }
 
     [Fact]

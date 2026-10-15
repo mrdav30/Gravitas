@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using Gravitas.Colliders;
 using SwiftCollections;
 using System;
 
@@ -366,6 +367,7 @@ public sealed partial class GravitasQuery2DService
                 requests[i].Radius < Fixed64.Zero,
                 nameof(requests),
                 "2D query radius cannot be negative.");
+            ColliderGeometryPolicy.ValidateReach(requests[i].Radius, nameof(requests));
         }
     }
 
@@ -383,6 +385,7 @@ public sealed partial class GravitasQuery2DService
                 requests[i].Radius <= Fixed64.Zero,
                 nameof(requests),
                 "2D sweep radius must be greater than zero.");
+            ColliderGeometryPolicy.ValidateReach(requests[i].Radius, nameof(requests));
         }
     }
 }

@@ -6,6 +6,7 @@
 //=======================================================================
 
 using FixedMathSharp;
+using Gravitas.Colliders;
 using SwiftCollections;
 using System;
 
@@ -234,6 +235,7 @@ public sealed partial class GravitasQueryMixedService
                 requests[i].Radius <= Fixed64.Zero,
                 nameof(requests),
                 "Mixed swept sphere radius must be greater than zero.");
+            ColliderGeometryPolicy.ValidateReach(requests[i].Radius, nameof(requests));
         }
     }
 
@@ -249,6 +251,7 @@ public sealed partial class GravitasQueryMixedService
                 requests[i].HalfThickness <= Fixed64.Zero,
                 nameof(requests),
                 "Mixed swept circle half-thickness must be greater than zero.");
+            ColliderGeometryPolicy.ValidateReach(new Vector2d(requests[i].Radius, requests[i].HalfThickness), nameof(requests));
         }
     }
 }

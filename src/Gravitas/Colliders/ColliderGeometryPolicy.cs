@@ -3,6 +3,7 @@
 
 using FixedMathSharp;
 using FixedMathSharp.Geometry;
+using System;
 
 namespace Gravitas.Colliders;
 
@@ -14,6 +15,42 @@ internal static class ColliderGeometryPolicy
     internal static void ValidateReach(Fixed64 reach, string parameterName) =>
         SwiftThrowHelper.ThrowIfArgument(reach < Fixed64.Zero || reach > MaximumGeometryReach,
             parameterName, "Effective geometry reach must not exceed 4,096 world units.");
+
+    internal static void ValidateReach(Vector2d envelope, string parameterName) =>
+        SwiftThrowHelper.ThrowIfArgument(Vector2d.CompareMagnitudeSquared(
+                envelope, new Vector2d(MaximumGeometryReach, Fixed64.Zero)) > 0,
+            parameterName, "Effective geometry reach must not exceed 4,096 world units.");
+
+    internal static void ValidateFiniteAxisReach(Fixed64 radius, Fixed64 height, string parameterName) =>
+        SwiftThrowHelper.ThrowIfArgument(Fixed64.CompareMagnitudeSquared(
+                radius, HalfCeiling(height), radius, Fixed64.Zero,
+                MaximumGeometryReach, Fixed64.Zero, Fixed64.Zero, Fixed64.Zero) > 0,
+            parameterName, "Effective finite-axis geometry reach must not exceed 4,096 world units.");
+
+    internal static void ValidateWorldPolygonReach(ReadOnlySpan<Vector2d> vertices)
+    {
+        Signed192 sumX = default, sumY = default;
+        for (int i = 0; i < vertices.Length; i++)
+        {
+            sumX = WideArithmetic.AddSigned192(sumX, Signed192.Raw(vertices[i].X));
+            sumY = WideArithmetic.AddSigned192(sumY, Signed192.Raw(vertices[i].Y));
+        }
+        // Retain n*v - sum(v): a rounded mean can hide an excess at the cutoff.
+        // Span counts keep these numerators below 95 bits and their squared sum below 191.
+        Fixed64 countRaw = Fixed64.FromRaw(vertices.Length);
+        Signed192 limit = Fixed64.GetExactRawProduct(MaximumGeometryReach, countRaw);
+        Signed320 limitSquared = WideArithmetic.MultiplySigned192(limit, limit);
+        for (int i = 0; i < vertices.Length; i++)
+        {
+            Signed192 x = WideArithmetic.SubtractSigned192(
+                Fixed64.GetExactRawProduct(vertices[i].X, countRaw), sumX);
+            Signed192 y = WideArithmetic.SubtractSigned192(
+                Fixed64.GetExactRawProduct(vertices[i].Y, countRaw), sumY);
+            SwiftThrowHelper.ThrowIfArgument(WideArithmetic.CompareMagnitude(
+                    WideArithmetic.AddProducts(x, x, y, y), limitSquared) > 0,
+                nameof(vertices), "Effective polygon geometry reach must not exceed 4,096 world units.");
+        }
+    }
 
     internal static Fixed64 Add(Fixed64 attachment, Fixed64 intrinsic) =>
         Fixed64.TryAdd(attachment, intrinsic, out Fixed64 reach) ? reach : Fixed64.MaxValue;

@@ -44,9 +44,20 @@ public partial class SolidBody
     public GroundProbeMode GroundProbeMode { get; set; } = GroundProbeMode.Auto;
 
     /// <summary>
-    /// Optional explicit radius for swept-sphere ground probes. A zero value derives the radius from the collider.
+    /// Optional explicit radius for swept-sphere ground probes. Nonpositive values derive it from the collider.
     /// </summary>
-    public Fixed64 GroundProbeRadius { get; set; }
+    public Fixed64 GroundProbeRadius
+    {
+        get => _groundProbeRadius;
+        set
+        {
+            SwiftThrowHelper.ThrowIfArgument(value > ColliderGeometryPolicy.MaximumGeometryReach,
+                nameof(value), "Ground probe radius must not exceed 4,096 world units.");
+            _groundProbeRadius = value;
+        }
+    }
+
+    private Fixed64 _groundProbeRadius;
 
     private Fixed64 _groundMinNormalDot = Fixed64.Half;
 

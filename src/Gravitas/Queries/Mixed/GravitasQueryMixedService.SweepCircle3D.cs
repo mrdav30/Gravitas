@@ -116,6 +116,7 @@ public sealed partial class GravitasQueryMixedService
     {
         SwiftThrowHelper.ThrowIfArgument(radius <= Fixed64.Zero, nameof(radius), "Mixed swept circle radius must be greater than zero.");
         SwiftThrowHelper.ThrowIfArgument(halfThickness <= Fixed64.Zero, nameof(halfThickness), "Mixed swept circle half-thickness must be greater than zero.");
+        ColliderGeometryPolicy.ValidateReach(new Vector2d(radius, halfThickness), nameof(radius));
 
         if (!Vector2d.TrySubtract(end, start, out Vector2d segment)
             || !Vector2d.TryGetMagnitude(segment, out Fixed64 length)
@@ -207,6 +208,8 @@ public sealed partial class GravitasQueryMixedService
         SwiftThrowHelper.ThrowIfNull(results, nameof(results));
         SwiftThrowHelper.ThrowIfArgument(radius <= Fixed64.Zero, nameof(radius), "Mixed swept circle radius must be greater than zero.");
         SwiftThrowHelper.ThrowIfArgument(halfThickness <= Fixed64.Zero, nameof(halfThickness), "Mixed swept circle half-thickness must be greater than zero.");
+        if (!staticTargetsOnly)
+            ColliderGeometryPolicy.ValidateReach(new Vector2d(radius, halfThickness), nameof(radius));
 
         results.FastClear();
         if (!Vector2d.TrySubtract(end, start, out Vector2d segment)

@@ -7,6 +7,7 @@
 
 using Chronicler;
 using FixedMathSharp;
+using Gravitas.Colliders;
 
 namespace Gravitas;
 
@@ -63,6 +64,9 @@ public partial class SolidBody
         RecordValues.Look(chronicler, ref groundingMode, "GroundingMode", GroundingMode.Automatic);
         RecordValues.Look(chronicler, ref groundProbeMode, "GroundProbeMode", GroundProbeMode.Auto);
         RecordValues.Look(chronicler, ref groundProbeRadius, "GroundProbeRadius");
+        if (chronicler.Mode == SerializationMode.Loading)
+            SwiftThrowHelper.ThrowIfArgument(groundProbeRadius > ColliderGeometryPolicy.MaximumGeometryReach,
+                nameof(GroundProbeRadius), "Ground probe radius must not exceed 4,096 world units.");
         RecordValues.Look(chronicler, ref _skipGroundingCheck, "SkipGroundingCheck", false);
         RecordValues.Look(chronicler, ref StepOffset, "StepOffset");
         RecordValues.Look(chronicler, ref _groundNormal, "GroundNormal");

@@ -20,6 +20,7 @@ namespace Gravitas.Queries;
 /// <summary>
 /// Owns 3D raycast, swept-sphere, and X/Z circle query buffers for one <see cref="GravitasWorldContext"/>.
 /// </summary>
+/// <content>Owns query services, shared buffers, raycasts and swept-source preparation.</content>
 public sealed partial class GravitasQuery3DService
 {
     private readonly GravitasWorldContext _context;
@@ -178,6 +179,8 @@ public sealed partial class GravitasQuery3DService
         PhysicsLayerMask layerMask,
         LSCollider? excludedCollider = null)
     {
+        SwiftThrowHelper.ThrowIfArgument(radius > ColliderGeometryPolicy.MaximumGeometryReach,
+            nameof(radius), "Effective geometry reach must not exceed 4,096 world units.");
         if (direction == Vector3d.Zero || maxDistance <= Fixed64.Zero)
         {
             ResetLastQueryCounters();
@@ -544,6 +547,8 @@ public sealed partial class GravitasQuery3DService
         bool staticTargetsOnly)
     {
         SwiftThrowHelper.ThrowIfNull(results, nameof(results));
+        SwiftThrowHelper.ThrowIfArgument(!staticTargetsOnly && radius > ColliderGeometryPolicy.MaximumGeometryReach,
+            nameof(radius), "Effective geometry reach must not exceed 4,096 world units.");
 
         results.FastClear();
         if (!Vector3d.TrySubtract(end3d, start3d, out Vector3d segment)
@@ -690,6 +695,8 @@ public sealed partial class GravitasQuery3DService
         LSCollider? excludedCollider,
         out Physics3DHit sweepHit)
     {
+        SwiftThrowHelper.ThrowIfArgument(radius > ColliderGeometryPolicy.MaximumGeometryReach,
+            nameof(radius), "Effective geometry reach must not exceed 4,096 world units.");
         sweepHit = default;
         if (radius <= Fixed64.Zero)
         {
@@ -855,15 +862,14 @@ public sealed partial class GravitasQuery3DService
         if (!found)
             return false;
 
-        if (!ContinuousCollisionContactPolicy.TryResolveSweptSphereContact(
+        // Admitted source/target reach bounds a hit's surface separation even at world limits.
+        bool resolved = ContinuousCollisionContactPolicy.TryResolveSweptSphereContact(
                 collider,
                 sweepCenter,
                 direction,
                 out ContactAnchor anchor,
-                out Vector3d normal))
-        {
-            return false;
-        }
+                out Vector3d normal);
+        System.Diagnostics.Debug.Assert(resolved);
 
         sweepHit = new Physics3DHit(collider, anchor, normal, distance, direction);
         return true;

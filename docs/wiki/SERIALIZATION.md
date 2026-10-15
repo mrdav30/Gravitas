@@ -75,6 +75,18 @@ preserves recorded sleep and motion rather than invoking the public mass
 setter's wake policy. Restoring an active body clears contact and connected-joint
 impulse caches and prepared CCD state while retaining pair and joint identity.
 
+Loaded geometry passes the same effective-size admission as initialization,
+including host-scale compensation and complete body/compound attachment reach.
+An unsupported candidate cannot publish new runtime geometry or partitions.
+Optional mixed thickness must remain positive; its mixed-size budget applies when
+the slab is used. Successful loads retain saved sleep rather than invoking the
+waking geometry setters.
+
+This protects geometry publication, not arbitrary payload application as a whole.
+Chronicler can write authored or body fields before a nested geometry load fails.
+After a rejected record, restore a known valid payload or discard the affected
+shell before resuming simulation; do not assume the entire record rolled back.
+
 ## Recordable Types
 
 The 3D body record starts with `BodySchemaVersion = 1` and a signed 64-bit

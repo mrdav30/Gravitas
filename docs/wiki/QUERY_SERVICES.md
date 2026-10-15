@@ -123,6 +123,34 @@ admitted before rounding the reported distance, and triangle surface witnesses
 round directly from the geometric intersection. Exact grazing remains a query
 hit without becoming a closing constraint that blocks CCD.
 
+## Query Geometry Admission
+
+Query sources share the inclusive `4,096`-world-unit conservative reach ceiling
+exposed by `ColliderSettings.MaximumGeometryReach` and its 2D counterpart.
+Circle and sphere queries use their radius. AABB queries measure their prepared
+half-extents, retaining nearest-even half-size rounding. World-polygon queries
+measure every vertex about the exact arithmetic vertex mean; rounding that mean
+first cannot hide an excess at the boundary. A finite cone uses its centered
+collider enclosure, including its length and end radius. Mixed circle slabs
+include both planar radius and physical Y half-thickness.
+
+Oversized sources throw `ArgumentException` before tracing, diagnostics, counters
+or direct result-buffer mutation. Existing zero-radius and degenerate-query
+rules remain specific to each API. Ray length and swept travel are separate from
+source size; long travel and ordinary geometry near scalar world limits remain
+supported under their existing representability rules.
+
+Explicit mixed queries also validate active 2D target slabs before indexing them,
+including in `TwoD`, `ThreeD` and `Both` modes. Pure 2D geometry remains independent
+of unused thickness. Inactive targets and degenerate sweeps do not require a
+mixed envelope that the query will not use.
+
+Numeric source-size limits are checked across a batch before outputs are cleared
+or written. Other failures encountered while executing a request, including
+invalid registered-source state or a live target slab, retain the completed
+prefix and leave later output slots/ranges untouched. Batches do not roll back
+completed requests.
+
 ## Hit Witnesses
 
 `Physics3DHit`, `Physics2DHit`, and `PhysicsMixedHit` retain surface witnesses

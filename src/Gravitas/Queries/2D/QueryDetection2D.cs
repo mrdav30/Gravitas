@@ -146,12 +146,15 @@ internal static partial class QueryDetection2D
         return TryOverlapConvexArea(center, vertices, collider, out hit);
     }
 
-    internal static void ValidateAabbSize(Vector2d size)
+    internal static Vector2d ValidateAabbSize(Vector2d size)
     {
         SwiftThrowHelper.ThrowIfArgument(
             size.X <= Fixed64.Zero || size.Y <= Fixed64.Zero,
             nameof(size),
             "2D AABB query size components must be greater than zero.");
+        Vector2d halfExtents = size * Fixed64.Half;
+        ColliderGeometryPolicy.ValidateReach(halfExtents, nameof(size));
+        return halfExtents;
     }
 
     internal static void ValidateConvexQueryPolygon(ReadOnlySpan<Vector2d> vertices)
@@ -161,6 +164,7 @@ internal static partial class QueryDetection2D
             !FixedConvex2dRelations.IsStrictlyConvex(vertices),
             nameof(vertices),
             "2D polygon query vertices must form a strictly convex boundary.");
+        ColliderGeometryPolicy.ValidateWorldPolygonReach(vertices);
     }
 
     internal static Vector2d CalculateAverageCenter(ReadOnlySpan<Vector2d> vertices) =>

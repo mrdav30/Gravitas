@@ -227,10 +227,10 @@ public sealed class GravitasQuery3DServiceCircleTests
                 FixedQuaternion.Identity,
                 Vector3d.One)));
 
-        bool hit = context.Query3D.OverlapCircle(
+        Action query = () => context.Query3D.OverlapCircle(
             Vector3d.Zero,
             Fixed64.MaxValue,
-            out Physics3DHit result,
+            out _,
             IncludeLayerZero);
         bool surfaceHit = GravitasQuery3DService.TryBuildSurfaceOverlapHit(
             cuboid,
@@ -238,11 +238,10 @@ public sealed class GravitasQuery3DServiceCircleTests
             Fixed64.MaxValue,
             out Physics3DHit surfaceResult);
 
-        hit.Should().BeFalse();
-        result.Should().Be(default(Physics3DHit));
+        query.Should().Throw<ArgumentException>().WithMessage("*4,096*");
         surfaceHit.Should().BeFalse();
         surfaceResult.Should().Be(default(Physics3DHit));
-        context.Query3D.LastQueryCandidateCount.Should().Be(1);
+        context.Query3D.LastQueryCandidateCount.Should().Be(0);
     }
 
     [Fact]

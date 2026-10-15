@@ -14,6 +14,7 @@ public readonly struct Physics2DSupportQuery
     {
         SwiftThrowHelper.ThrowIfNull(source, nameof(source));
         SwiftThrowHelper.ThrowIfArgument(radius <= Fixed64.Zero, nameof(radius), "Support radius must be positive.");
+        ColliderGeometryPolicy.ValidateReach(radius, nameof(radius));
         SwiftThrowHelper.ThrowIfArgument(distance <= Fixed64.Zero, nameof(distance), "Support distance must be positive.");
         SwiftThrowHelper.ThrowIfArgument(up == Vector2d.Zero, nameof(up), "Support up must be nonzero.");
         SwiftThrowHelper.ThrowIfArgument(minimumNormalDot <= Fixed64.Zero || minimumNormalDot > Fixed64.One,

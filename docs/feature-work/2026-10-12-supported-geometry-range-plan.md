@@ -13,9 +13,10 @@
 conservative reach and measurement rules below are locked. Numerical
 prerequisites #113-#124 and the upstream scaled-decomposition prerequisite are
 resolved. Phase 2 collider admission is complete and passes correctness,
-coverage, replay and warm performance validation. Query, settings
-and restore admission remain phase 3; #096 stays open until the complete
-contract is implemented and verified. The ceiling is a supported-workload
+coverage, replay and warm performance validation. Phase 3 query/settings/restore
+admission is complete and passes correctness, coverage, replay and warm performance
+validation. Phase 4 compatibility and final closeout remain; #096 stays open until
+the complete contract is verified. The ceiling is a supported-workload
 boundary, not a proof that every derived physics quantity is representable.  
 **Owner:** Gravitas geometry admission and lifecycle transactions.
 
@@ -287,9 +288,9 @@ Four lifecycle details need more than a check at the common preparation seam:
   transaction failure alone cannot preserve the old awake state.
 - Mutable, contextless settings currently allow pure-2D admission to acquire a
   mixed slab later. Mode/thickness/settings replacement require an owning-context
-  preflight before publishing the changed configuration, including every observing
-  context if a mutable settings instance is shared. Resolve ownership in phase 3;
-  one context callback alone is insufficient for a shared instance.
+  preflight before publishing the changed configuration. Mutable settings bind
+  to one context, releasing ownership on replacement or disposal; sharing a
+  mutable instance across simultaneous contexts is rejected.
 - Recorded fields are written before rebuilding. Preserve the supported runtime
   transaction boundary without claiming globally atomic arbitrary payload loads.
 
@@ -1174,19 +1175,19 @@ The focused correctness prerequisites are resolved; resume phase 3 next.
 `src/Gravitas/Queries`, mixed thickness settings/overrides, existing record/load
 owners; tests under `Queries`, `Physics2D`, `MixedDimensions` and `Serialization`.
 
-- [ ] Add failing tests for oversized overlap radii, swept-source sizes, finite
+- [x] Add failing tests for oversized overlap radii, swept-source sizes, finite
       cone volumes and mixed slabs through closest/all-hit/batch variants where
       exposed. Verify rejection precedes tracing and output/diagnostic mutation;
       for batches retain documented caller-buffer and per-request failure semantics.
-- [ ] Apply shared geometry admission to query sources and mixed thickness.
+- [x] Apply shared geometry admission to query sources and mixed thickness.
       Preserve zero-radius/degenerate input rules that differ by existing query
       API; do not silently tighten them as a side effect of the maximum limit.
       Cover explicit mixed queries in non-`Mixed` runtime modes and world-polygon
       vertex-mean admission under translation, winding and cyclic-order changes.
-- [ ] Prove long rays and long travel of small swept sources remain admitted under
+- [x] Prove long rays and long travel of small swept sources remain admitted under
       existing endpoint/distance rules, including ordinary shapes near both world
       limits. Cover 2D, 3D and mixed counterparts and finite cone length/radius.
-- [ ] Audit settings changes and every recorded/load path that can change effective
+- [x] Audit settings changes and every recorded/load path that can change effective
       geometry. Unsupported candidates reject through the existing ownership
       transaction; verify no invalid geometry reaches partitions or solver caches.
       Close shared mutable settings as a bypass through explicit ownership or
@@ -1194,11 +1195,11 @@ owners; tests under `Queries`, `Physics2D`, `MixedDimensions` and `Serialization
       Do not claim arbitrary Chronicler payload application is globally atomic:
       test and document the actual supported load boundary and preserve saved
       sleep/caches for successful loads according to current contracts.
-- [ ] Cover effective-size-preserving restored records, oversized restored state
+- [x] Cover effective-size-preserving restored records, oversized restored state
       and failed mixed-thickness mutations. Preserve existing serialization layout
       and hashes unless an implemented state change genuinely requires a version
       change; document any intentional compatibility break.
-- [ ] Run full Release/Lean raw coverage, replay fixtures and affected allocation
+- [x] Run full Release/Lean raw coverage, replay fixtures and affected allocation
       gates; obtain independent ponytail review. Resolve every bypass introduced
       by the new contract before phase completion.
 
@@ -1206,7 +1207,37 @@ owners; tests under `Queries`, `Physics2D`, `MixedDimensions` and `Serialization
 unsupported effective geometry. Existing travel, world-position and load
 semantics remain explicit and tested.
 
-**Phase summary:** Pending.
+**Phase summary (2026-10-15):** Public queries enforce the locked metrics before
+tracing/output mutation, including exact vertex-mean polygons, finite cones and
+explicit mixed slabs outside mixed runtime mode. Settings bind to one context
+and preflight mode/thickness changes between fixed steps. Restore admission
+preserves geometry publication and saved sleep without promising whole-payload
+rollback; ground-probe producers validate before use. Trusted CCD padding remains
+uncapped. One derived `Fixed64` per 2D collider avoids repeated mixed-target
+geometry scans. Reconfiguration now copies prepared attachment reach, correcting
+its prior proxy omission. No new runtime types, upstream changes, serialized
+fields or replay expectations were needed.
+
+Both local-stack solution builds pass without warnings/errors: 6,371 Release
+and 6,303 Lean tests, raw 100% line/branch/method coverage, and all six Windows x64
+replay fixtures matching shared expectations and cross-profile captures. Seventy
+new Release regression cases cover admission and producer integration.
+
+An initial `4.286808 -> 4.482900 ms` non-Mixed query regression (+4.574%, disjoint
+99.9% intervals) was rejected and refined with the committed metric. Its final
+mean is `4.327293 ms` (+0.944%, overlapping intervals). All fourteen matched
+native controls pass at 0 B/op with identical guarded outputs and no resolved
+regression. Nominal changes range from -4.18% to +3.33%, all with overlapping
+intervals; these are not claimed speedups or proof of zero overhead.
+
+Ignored `artifacts/geometry-range/phase3/` retains RED/green tests, raw coverage
+and replay evidence. `perf/acceptance-final14.json` links per-row timing,
+1,675 ordered hit records plus pose guards, identical wrapper IL and generated
+child hashes. All eight tested modules, 941 production inputs and 82 fixture
+inputs match the frozen measured candidate. Independent source, geometry and
+documentation reviews approve. CI pins pushed FixedMathSharp develop
+`961ed6a5ea3c07bf356c6b3c66404c4dcba2a3bd`. Linux/ARM64 and released-package
+validation remain unrun; phase 4 and #096 remain open.
 
 ## Phase 4: Compatibility, Performance And #096 Closeout
 

@@ -413,6 +413,21 @@ internal sealed partial class GravitasMixedCollisionService
 
     private void Refresh2DColliderPartitionsForQuery(bool cachePartitionRefresh)
     {
+        if (!_context.Settings.RuntimeMode.RunsMixedContacts())
+        {
+            // Explicit mixed queries can index slabs that pure 2D admission did not use.
+            for (int i = 0; i < _context.Physics2D.ColliderCount; i++)
+            {
+                LSCollider2D collider = _context.Physics2D.GetColliderByServiceIndex(i);
+                if (collider.IsActive)
+                {
+                    collider.Rebuild();
+                    collider.ValidateCommittedMixedGeometry();
+                }
+            }
+            Refresh2DColliderPartitions(rebuildShapes: false);
+            return;
+        }
         if (!cachePartitionRefresh)
         {
             Refresh2DColliderPartitions();

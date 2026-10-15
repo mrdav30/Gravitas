@@ -1,5 +1,19 @@
 # Gravitas Migration Guide
 
+## Query geometry and settings ownership
+
+Numeric query sources and explicit ground-probe radii enforce the supported
+`4,096`-unit reach budget. Validate authored workloads before issuing queries;
+oversized geometry now throws instead of tracing. Long rays and travel of small
+sources retain their existing contracts. See [query geometry admission](wiki/QUERY_SERVICES.md#query-geometry-admission)
+for polygon, cone and mixed-slab measurements and batch failure semantics.
+
+Use a separate mutable `PhysicsSettings` instance for each simultaneous context.
+`ApplySettings` rejects an instance already bound elsewhere; replacement or
+disposal releases it. Apply settings and change dimensional mode/mixed thickness
+between fixed steps. Invalid mixed envelopes reject before configuration changes.
+Recorded schemas and field keys are unchanged.
+
 ## Runtime mass changes
 
 `SolidBody.Mass` is now a property instead of a public field. Rebuild consuming

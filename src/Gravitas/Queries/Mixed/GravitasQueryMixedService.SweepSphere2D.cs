@@ -101,6 +101,7 @@ public sealed partial class GravitasQueryMixedService
         out PhysicsMixedHit hit)
     {
         SwiftThrowHelper.ThrowIfArgument(radius <= Fixed64.Zero, nameof(radius), "Mixed swept sphere radius must be greater than zero.");
+        ColliderGeometryPolicy.ValidateReach(radius, nameof(radius));
 
         if (!Vector3d.TrySubtract(end, start, out Vector3d segment)
             || !Vector3d.TryGetMagnitude(segment, out Fixed64 length)
@@ -183,12 +184,14 @@ public sealed partial class GravitasQueryMixedService
     {
         SwiftThrowHelper.ThrowIfNull(results, nameof(results));
         SwiftThrowHelper.ThrowIfArgument(radius <= Fixed64.Zero, nameof(radius), "Mixed swept sphere radius must be greater than zero.");
+        if (!staticTargetsOnly)
+            ColliderGeometryPolicy.ValidateReach(radius, nameof(radius));
 
-        results.FastClear();
         if (!Vector3d.TrySubtract(end, start, out Vector3d segment)
             || !Vector3d.TryGetMagnitude(segment, out Fixed64 length)
             || length <= Fixed64.Epsilon)
         {
+            results.FastClear();
             ResetLastQueryCounters();
             return 0;
         }
@@ -202,6 +205,7 @@ public sealed partial class GravitasQueryMixedService
             _candidates2D,
             staticStyleOnly: staticTargetsOnly,
             cachePartitionRefresh: cacheTargetPartitions);
+        results.FastClear();
         LastQueryCandidateCount = _candidates2D.Count;
         LastMeshTriangleCandidateCount = 0;
         bool captureReducerDiagnostics = _context.Diagnostics.Enabled;

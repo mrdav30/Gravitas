@@ -35,6 +35,7 @@ public sealed partial class GravitasQuery3DService
             radius < Fixed64.Zero,
             nameof(radius),
             "3D query radius cannot be negative.");
+        ColliderGeometryPolicy.ValidateReach(radius, nameof(radius));
 
         _currentLayerMask = layerMask;
         ResetLastQueryCounters();
@@ -75,6 +76,7 @@ public sealed partial class GravitasQuery3DService
             radius < Fixed64.Zero,
             nameof(radius),
             "3D query radius cannot be negative.");
+        ColliderGeometryPolicy.ValidateReach(radius, nameof(radius));
 
         _currentLayerMask = layerMask;
         ResetLastQueryCounters();
@@ -125,6 +127,7 @@ public sealed partial class GravitasQuery3DService
             radius < Fixed64.Zero,
             nameof(radius),
             "3D query radius cannot be negative.");
+        ColliderGeometryPolicy.ValidateReach(radius, nameof(radius));
 
         _currentLayerMask = layerMask;
         ResetLastQueryCounters();

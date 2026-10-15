@@ -825,10 +825,10 @@ public sealed class GravitasQuery3DServiceSweepTests
         distance.Should().Be(Fixed64.Zero);
         ContinuousCollisionContactPolicy.TryResolveSweptSphereContact(
             cylinder, center, Vector3d.Left, out _, out _).Should().BeFalse();
-        scenario.Context.Query3D.SweepSphere(start, Fixed64.MaxValue,
-            Vector3d.Left, Fixed64.One, out Physics3DHit hit, IncludeLayerZero).Should().BeFalse();
-        hit.Should().Be(default(Physics3DHit));
-        scenario.Context.Query3D.LastQueryCandidateCount.Should().Be(1);
+        Action query = () => scenario.Context.Query3D.SweepSphere(start, Fixed64.MaxValue,
+            Vector3d.Left, Fixed64.One, out _, IncludeLayerZero);
+        query.Should().Throw<ArgumentException>().WithMessage("*4,096*");
+        scenario.Context.Query3D.LastQueryCandidateCount.Should().Be(0);
     }
 
     [Fact]

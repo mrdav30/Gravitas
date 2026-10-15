@@ -219,6 +219,13 @@ mass is a no-op. Populate-existing loads bypass the waking setter and refresh
 derived state and caches while retaining saved sleep. See the
 [mass mutation contract](docs/wiki/HOST_INTEGRATION.md#runtime-mass-changes).
 
+Keep mutable `PhysicsSettings` bound to one context, releasing ownership on
+replacement/disposal. Preflight mode and mixed-thickness changes between fixed
+steps before assigning configuration. Public query size admission must not cap
+trusted internal CCD search padding. Explicit mixed queries in pure modes validate
+active target slabs from committed admission geometry before mixed indexing;
+preparation scratch is not a committed metric after a failed transaction.
+
 ## Lockstep Host Lifecycle
 
 The important contract is an engine-agnostic lockstep loop. Hosts own the outer

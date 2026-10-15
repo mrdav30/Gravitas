@@ -591,6 +591,16 @@ grounding/support acceptance. Public query services use the caller's
 ### Settings And Environment
 
 Each context owns its own `PhysicsSettings` and `PhysicsEnvironment`.
+`ApplySettings` binds a mutable settings instance to one context; attaching it
+to another context throws until the first replaces it or is disposed. Create a
+separate settings instance for each simultaneous context.
+
+Apply settings and change `RuntimeMode` or `Mixed2DHalfThickness` between fixed
+steps. Those changes preflight every registered 2D collider's complete mixed
+envelope before assignment, respecting collider thickness overrides. A rejected
+change preserves the settings, clock and committed collider state. This scan
+belongs to explicit configuration changes and adds no unchanged-frame work.
+Pure 2D modes do not impose a mixed-size budget on unused thickness.
 
 ```csharp
 context.SetFrameRate(60);

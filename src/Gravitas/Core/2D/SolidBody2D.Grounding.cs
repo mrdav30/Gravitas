@@ -116,6 +116,7 @@ public sealed partial class SolidBody2D
         set
         {
             SwiftThrowHelper.ThrowIfArgument(value < Fixed64.Zero, nameof(value), "2D ground probe radius cannot be negative.");
+            ColliderGeometryPolicy.ValidateReach(value, nameof(value));
             _groundProbeRadius = value;
         }
     }

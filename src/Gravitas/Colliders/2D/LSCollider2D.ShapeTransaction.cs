@@ -17,6 +17,7 @@ public abstract partial class LSCollider2D
     private Vector2d _committedOwnerScale = Vector2d.One;
     private Vector2d _committedPartScale = Vector2d.One;
     private bool _hasCommittedShape;
+    private Fixed64 _committedGeometryReach;
 
     /// <summary>Gets whether this collider has committed runtime shape state.</summary>
     protected bool HasCommittedShape => _hasCommittedShape;
@@ -31,6 +32,9 @@ public abstract partial class LSCollider2D
 
     internal Fixed64 PreparedGeometryReach => _preparedGeometryReach;
     internal Fixed64 PreparedAttachmentReach => _preparedAttachmentReach;
+
+    internal void ValidateCommittedMixedGeometry() =>
+        ColliderGeometryPolicy.ValidateReach(new Vector2d(_committedGeometryReach, _mixedHalfThickness), nameof(MixedHalfThicknessOverride));
     private Fixed64 _canonicalGroundProbeRadius;
     private GravitasWorldContext? _preparedContext;
     private Fixed64 _preparedCompoundLocalRotation;
@@ -297,6 +301,9 @@ public abstract partial class LSCollider2D
         _mixedBounds3D = _preparedMixedBounds;
         _mixedSlabCenterY = _preparedSnapshot.MixedSlabCenterY;
         _mixedHalfThickness = _preparedSnapshot.MixedHalfThickness;
+        // Queries must not read preparation scratch after a rejected transaction.
+        _committedGeometryReach = _body == null ? _preparedGeometryReach
+            : ColliderGeometryPolicy.Add(_preparedAttachmentReach, _preparedGeometryReach);
         PublishShape();
         Fixed64 intrinsic;
         if (this is LSCompoundCollider2D compound)

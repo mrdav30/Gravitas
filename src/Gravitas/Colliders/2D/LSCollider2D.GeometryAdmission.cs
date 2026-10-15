@@ -10,7 +10,7 @@ public abstract partial class LSCollider2D
 {
     private protected void ValidateGeometryMutation(Vector2d? offset = null,
         Fixed64? radius = null, Fixed64? height = null, Vector2d? size = null,
-        Fixed64? halfThickness = null)
+        Fixed64? halfThickness = null, PhysicsRuntimeMode? runtimeMode = null)
     {
         LSCollider2D root = _compoundOwner ?? this;
         if (root._agent == null)
@@ -27,15 +27,19 @@ public abstract partial class LSCollider2D
         if (root._body != null)
             reach = ColliderGeometryPolicy.Add(ColliderGeometryPolicy.Attachment(
                 ReferenceEquals(root, this) ? offset ?? _localOffset : root._localOffset, ownerScale), reach);
-        if (root._context!.Settings.RuntimeMode.RunsMixedContacts())
+        if ((runtimeMode ?? root._context!.Settings.RuntimeMode).RunsMixedContacts())
         {
             Fixed64 thickness = ReferenceEquals(root, this) && halfThickness.HasValue
                 ? halfThickness.Value
-                : root._mixedHalfThicknessOverride ?? root._context.Settings.Mixed2DHalfThickness;
+                : root._mixedHalfThicknessOverride ?? root._context!.Settings.Mixed2DHalfThickness;
             reach = ColliderGeometryPolicy.Mixed(reach, thickness);
         }
         ColliderGeometryPolicy.ValidateReach(reach, nameof(intrinsic));
     }
+
+    internal void ValidateMixedGeometry(Fixed64 defaultHalfThickness) =>
+        ValidateGeometryMutation(halfThickness: _mixedHalfThicknessOverride ?? defaultHalfThickness,
+            runtimeMode: PhysicsRuntimeMode.Mixed);
 
     internal Fixed64 GetCandidateGeometryReach(Vector2d ownerScale, Vector2d partScale,
         Fixed64? radius = null, Fixed64? height = null, Vector2d? size = null)

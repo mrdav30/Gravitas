@@ -155,8 +155,12 @@ The shared hit list is cleared once at batch start. Each request writes one
 range, including misses and zero-length movement requests.
 
 Structurally invalid input, such as an undersized output span, invalid polygon
-vertex range, invalid AABB size, or invalid sweep radius, throws before caller
-output buffers are mutated.
+vertex range, invalid AABB size, or an unsupported numeric source-size envelope,
+throws before caller output buffers are mutated. Radius sign rules remain
+dimension-specific: nonpositive 3D sphere sweeps remain misses. Cone
+sign/direction/endpoint errors, registered-source preparation and invalid live
+target slabs are checked per request; failure retains a completed prefix rather
+than rolling back the batch.
 
 Each query service exposes summary counters for the last batch call:
 

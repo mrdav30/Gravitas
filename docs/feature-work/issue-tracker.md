@@ -42,7 +42,9 @@ the original binaries. Integral, volume, overlap and mass-property fixes
 #113-#124 are resolved. **#096** collider/standalone-mesh admission is complete
 and passes correctness, coverage, replay and warm performance checks. The focused
 correctness follow-ups #126-#131, including detached polygon inspection #129, are
-resolved. Resume #096 phase 3's query, settings and restore admission next.
+resolved. Phase 3 query, settings and restore admission is complete with the same
+validation gates. Continue #096 phase 4's compatibility, terrain-migration and
+final closeout checks next.
 
 #111 remains an independent validation-tooling issue.
 #125 is a low-priority, non-blocking runtime crash observation; defer further
@@ -56,8 +58,9 @@ investigation unless it recurs or a reliable reproducer becomes available.
   planar reach, and exact vertex-mean query-polygon admission. In-range numerical
   prerequisites #113-#124 and upstream scaled decomposition are resolved.
   Collider/standalone-mesh admission is complete and passes full correctness,
-  coverage, replay and warm performance checks. Query,
-  settings and restore admission remain pending in the
+  coverage, replay and warm performance checks. Query, settings and restore
+  admission is also complete; compatibility, terrain-migration and final
+  closeout checks remain in the
   [Supported Geometry Range Plan](2026-10-12-supported-geometry-range-plan.md).
   This issue stays open until the complete admission contract is implemented.
 - **Confirmed:** 2026-10-07 in the isolated local-stack Release

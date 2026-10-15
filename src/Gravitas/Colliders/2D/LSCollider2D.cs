@@ -38,6 +38,7 @@ internal readonly struct ColliderLifetimeToken2D
 /// shapes. Use <see cref="ColliderShapeDefinition2D.CreateCollider"/> when
 /// constructing from engine-adapter shape data.
 /// </summary>
+/// <content>Owns planar collider state, registration, authored mutations and recording.</content>
 public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode, IPhysicsColliderRegistryItem
 {
     internal LSCollider2D() { }
@@ -874,6 +875,8 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
 
         if (chronicler.Mode == SerializationMode.Loading)
         {
+            SwiftThrowHelper.ThrowIfArgument(_mixedHalfThicknessOverride <= Fixed64.Zero,
+                nameof(MixedHalfThicknessOverride), "2D mixed half-thickness override must be greater than zero.");
             ThrowIfLoadedTriggerHasBody(nameof(IsTrigger));
             ApplyLoadedState();
         }

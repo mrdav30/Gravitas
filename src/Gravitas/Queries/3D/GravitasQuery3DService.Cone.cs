@@ -482,6 +482,7 @@ public sealed partial class GravitasQuery3DService
             !new FixedRay(origin, normalizedDirection).TryGetPoint(length, out end),
             nameof(length),
             "Cone query endpoint must be representable without fixed-point saturation.");
+        ColliderGeometryPolicy.ValidateFiniteAxisReach(endRadius, length, nameof(endRadius));
         return normalizedDirection;
     }
 }

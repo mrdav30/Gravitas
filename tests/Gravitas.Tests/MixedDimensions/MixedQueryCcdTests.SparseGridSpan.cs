@@ -18,7 +18,7 @@ public sealed partial class MixedQueryCcdTests
     public void SweepCircleAgainst3DAll_WithExtremeSparseGridSpan_ShouldReturnOrderedHits()
     {
         using GravitasWorldContext context = CreateExtremeSparseGridContext();
-        Fixed64 extent = (Fixed64)100_000;
+        Fixed64 extent = (Fixed64)1000;
         var nearTarget = CreateBodyless3D(
             context,
             new LSSphereCollider { Radius = Fixed64.One },
@@ -41,9 +41,9 @@ public sealed partial class MixedQueryCcdTests
         hitCount.Should().Be(2);
         context.QueryMixed.LastQueryCandidateCount.Should().Be(2);
         hits[0].Collider3D.Should().BeSameAs(nearTarget);
-        hits[0].Distance.Should().Be((Fixed64)99_999);
+        hits[0].Distance.Should().Be((Fixed64)198_999);
         hits[1].Collider3D.Should().BeSameAs(farTarget);
-        hits[1].Distance.Should().Be((Fixed64)100_009);
+        hits[1].Distance.Should().Be((Fixed64)199_009);
     }
 
     [Fact]
@@ -54,7 +54,7 @@ public sealed partial class MixedQueryCcdTests
             context,
             new LSSphereCollider { Radius = Fixed64.One },
             Vector3d.Zero);
-        Fixed64 extent = (Fixed64)100_000;
+        Fixed64 extent = (Fixed64)1000;
         var hits = new SwiftList<PhysicsMixedHit>(1);
 
         long allocatedBytes = AllocationTestHelper.MeasureSteadyState(

@@ -26,6 +26,7 @@ namespace Gravitas;
 /// Owns world lifetime, deterministic timing, physics registries, collision
 /// partitioning, queries, coroutines, and lifecycle hooks for one simulation.
 /// </remarks>
+/// <content>Owns world lifetime, context services, configuration and the host lifecycle.</content>
 public sealed partial class GravitasWorldContext : IDisposable
 {
     private static readonly object _worldOwnershipLock = new();
@@ -81,6 +82,7 @@ public sealed partial class GravitasWorldContext : IDisposable
         Coroutines = new GravitasCoroutineService(this);
         _observedGridChangeSequence = World.ChangeSequence;
         World.OnChangeCommitted += OnQueryPartitionWorldChange;
+        Settings.Owner = this;
     }
 
     /// <summary>
@@ -562,10 +564,23 @@ public sealed partial class GravitasWorldContext : IDisposable
     {
         ThrowIfDisposed();
         SwiftThrowHelper.ThrowIfNull(settings, nameof(settings));
-
+        SwiftThrowHelper.ThrowIfTrue(settings.Owner != null && !ReferenceEquals(settings.Owner, this),
+            nameof(settings), "Physics settings are already owned by another context.");
+        ValidateMixedGeometry(settings.RuntimeMode, settings.Mixed2DHalfThickness);
+        Settings.Owner = null;
         Settings = settings;
+        settings.Owner = this;
         _clock.SetFrameRate(settings.FrameRate);
         _hooks.InvokeFrameRateChanged();
+    }
+
+    internal void ValidateMixedGeometry(PhysicsRuntimeMode mode, Fixed64 halfThickness)
+    {
+        ThrowIfFixedStepMutationNotAllowed();
+        if (!mode.RunsMixedContacts())
+            return;
+        for (int i = 0; i < Physics2D.ColliderCount; i++)
+            Physics2D.GetColliderByServiceIndex(i).ValidateMixedGeometry(halfThickness);
     }
 
     /// <summary>
@@ -627,6 +642,7 @@ public sealed partial class GravitasWorldContext : IDisposable
             Constraints3D.Reset();
             Constraints2D.Reset();
             World.OnChangeCommitted -= OnQueryPartitionWorldChange;
+            Settings.Owner = null;
             _disposed = true;
             try
             {

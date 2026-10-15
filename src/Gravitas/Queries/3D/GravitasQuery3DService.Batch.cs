@@ -102,6 +102,7 @@ public sealed partial class GravitasQuery3DService
     public int SweepSphereBatch(ReadOnlySpan<PhysicsSweepSphere3DRequest> requests, Span<Physics3DHit> closestHits)
     {
         ValidateClosestBatchOutput(requests.Length, closestHits);
+        ValidateSweepSphereRequests(requests);
         ResetBatchCounters(requests.Length);
 
         int hitCount = 0;
@@ -132,6 +133,7 @@ public sealed partial class GravitasQuery3DService
     {
         SwiftThrowHelper.ThrowIfNull(hits, nameof(hits));
         ValidateRangeBatchOutput(requests.Length, ranges);
+        ValidateSweepSphereRequests(requests);
         ResetBatchCounters(requests.Length);
         hits.FastClear();
 
@@ -582,6 +584,7 @@ public sealed partial class GravitasQuery3DService
     public int OverlapConeBatch(ReadOnlySpan<PhysicsOverlapCone3DRequest> requests, Span<Physics3DHit> closestHits)
     {
         ValidateClosestBatchOutput(requests.Length, closestHits);
+        ValidateOverlapConeEnvelopes(requests);
         ResetBatchCounters(requests.Length);
 
         int hitCount = 0;
@@ -606,6 +609,7 @@ public sealed partial class GravitasQuery3DService
     {
         SwiftThrowHelper.ThrowIfNull(hits, nameof(hits));
         ValidateRangeBatchOutput(requests.Length, ranges);
+        ValidateOverlapConeEnvelopes(requests);
         ResetBatchCounters(requests.Length);
         hits.FastClear();
 
@@ -837,6 +841,7 @@ public sealed partial class GravitasQuery3DService
                 requests[i].Radius < Fixed64.Zero,
                 nameof(requests),
                 "3D query radius cannot be negative.");
+            ColliderGeometryPolicy.ValidateReach(requests[i].Radius, nameof(requests));
         }
     }
 
@@ -849,6 +854,25 @@ public sealed partial class GravitasQuery3DService
                 requests[i].Radius < Fixed64.Zero,
                 nameof(requests),
                 "3D query radius cannot be negative.");
+            ColliderGeometryPolicy.ValidateReach(requests[i].Radius, nameof(requests));
+        }
+    }
+
+    private static void ValidateSweepSphereRequests(ReadOnlySpan<PhysicsSweepSphere3DRequest> requests)
+    {
+        // Nonpositive radii retain the existing 3D miss contract.
+        for (int i = 0; i < requests.Length; i++)
+            SwiftThrowHelper.ThrowIfArgument(requests[i].Radius > ColliderGeometryPolicy.MaximumGeometryReach,
+                nameof(requests), "Effective geometry reach must not exceed 4,096 world units.");
+    }
+
+    private static void ValidateOverlapConeEnvelopes(ReadOnlySpan<PhysicsOverlapCone3DRequest> requests)
+    {
+        for (int i = 0; i < requests.Length; i++)
+        {
+            // Existing sign/direction/endpoint errors retain their per-request behavior.
+            if (requests[i].Length > Fixed64.Zero && requests[i].EndRadius > Fixed64.Zero)
+                ColliderGeometryPolicy.ValidateFiniteAxisReach(requests[i].EndRadius, requests[i].Length, nameof(requests));
         }
     }
 

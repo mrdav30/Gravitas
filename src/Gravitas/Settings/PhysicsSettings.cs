@@ -16,8 +16,11 @@ namespace Gravitas;
 /// <summary>
 /// Stores context-local configuration for deterministic physics simulation.
 /// </summary>
+/// <content>Owns validated settings, their context binding and registered-layer defaults.</content>
 public sealed partial class PhysicsSettings
 {
+    internal GravitasWorldContext? Owner;
+
     /// <summary>
     /// Default fixed-step frame rate in simulation frames per second.
     /// </summary>
@@ -205,6 +208,9 @@ public sealed partial class PhysicsSettings
                 value <= Fixed64.Zero,
                 nameof(value),
                 "Mixed 2D half-thickness must be greater than zero.");
+            if (_mixed2DHalfThickness == value)
+                return;
+            Owner?.ValidateMixedGeometry(_runtimeMode, value);
             _mixed2DHalfThickness = value;
         }
     }
@@ -221,6 +227,9 @@ public sealed partial class PhysicsSettings
                 !value.IsValid(),
                 nameof(value),
                 "Physics runtime mode must be TwoD, ThreeD, Both, or Mixed.");
+            if (_runtimeMode == value)
+                return;
+            Owner?.ValidateMixedGeometry(value, _mixed2DHalfThickness);
             _runtimeMode = value;
         }
     }

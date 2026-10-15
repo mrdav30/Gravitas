@@ -72,6 +72,7 @@ public sealed partial class GravitasQuery2DService
     public bool OverlapCircle(Vector2d center, Fixed64 radius, PhysicsLayerMask layerMask, out Physics2DHit hit)
     {
         SwiftThrowHelper.ThrowIfArgument(radius < Fixed64.Zero, nameof(radius), "2D query radius cannot be negative.");
+        ColliderGeometryPolicy.ValidateReach(radius, nameof(radius));
 
         EnsureCandidateCapacity();
         uint queryVersion = NextOverlapQueryVersion();
@@ -115,8 +116,7 @@ public sealed partial class GravitasQuery2DService
     /// </summary>
     public bool OverlapAabb(Vector2d center, Vector2d size, PhysicsLayerMask layerMask, out Physics2DHit hit)
     {
-        QueryDetection2D.ValidateAabbSize(size);
-        Vector2d halfExtents = size * Fixed64.Half;
+        Vector2d halfExtents = QueryDetection2D.ValidateAabbSize(size);
         Span<Vector2d> vertices = stackalloc Vector2d[4];
         CreateAabbVertices(center, halfExtents, vertices);
         return OverlapAreaCore(
@@ -148,8 +148,7 @@ public sealed partial class GravitasQuery2DService
         SwiftList<Physics2DHit> results)
     {
         SwiftThrowHelper.ThrowIfNull(results, nameof(results));
-        QueryDetection2D.ValidateAabbSize(size);
-        Vector2d halfExtents = size * Fixed64.Half;
+        Vector2d halfExtents = QueryDetection2D.ValidateAabbSize(size);
         Span<Vector2d> vertices = stackalloc Vector2d[4];
         CreateAabbVertices(center, halfExtents, vertices);
         return OverlapAreaAllCore(
@@ -216,6 +215,9 @@ public sealed partial class GravitasQuery2DService
     {
         SwiftThrowHelper.ThrowIfNull(results, nameof(results));
         SwiftThrowHelper.ThrowIfArgument(radius < Fixed64.Zero, nameof(radius), "2D query radius cannot be negative.");
+        // CCD's internal search enclosure includes padding beyond admitted shape reach.
+        if (!staticTargetsOnly)
+            ColliderGeometryPolicy.ValidateReach(radius, nameof(radius));
 
         results.FastClear();
         EnsureCandidateCapacity();
