@@ -2,6 +2,7 @@ using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
+using System;
 using Xunit;
 
 namespace Gravitas.Tests.Physics2D;
@@ -95,7 +96,7 @@ public sealed partial class ContinuousCollision2DTests
     }
 
     [Fact]
-    public void ContinuousMode_UnrepresentablePivotRadius_ShouldUseBoundedRegisteredCandidateFallback()
+    public void ContinuousMode_OversizedPivotOffset_ShouldPreserveRegisteredCandidatesAfterRejection()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
         var sourceCollider = new LSCircleCollider2D(Fixed64.One);
@@ -111,19 +112,23 @@ public sealed partial class ContinuousCollision2DTests
             Vector2d.Zero,
             immovable: true);
         source.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
-        sourceCollider.LocalOffset = new Vector2d(Fixed64.MaxValue, Fixed64.Zero);
-        sourceCollider.RebuildRuntimeShapeOnly();
-        source.ResolveContinuousCollisionProxyRadius().Should().Be(Fixed64.MaxValue);
+        int originalCandidateCount = source.GatherRotationalContinuousCollisionCandidates(
+            Vector2d.Zero, Vector2d.Zero, Vector2d.Zero, Fixed64.One);
+        originalCandidateCount.Should().BeGreaterThan(0);
+        Action changeOffset = () => sourceCollider.LocalOffset = new Vector2d(Fixed64.MaxValue, Fixed64.Zero);
+        changeOffset.Should().Throw<ArgumentException>();
+        sourceCollider.LocalOffset.Should().Be(Vector2d.Zero);
+        source.ResolveContinuousCollisionProxyRadius().Should().Be(Fixed64.One);
 
         source.GatherRotationalContinuousCollisionCandidates(
             Vector2d.Zero,
             Vector2d.Zero,
             Vector2d.Zero,
-            Fixed64.MaxValue).Should().Be(1);
+            Fixed64.One).Should().Be(originalCandidateCount);
     }
 
     [Fact]
-    public void CapsuleProxyRadius_WithUnrepresentableBoundsDistance_ShouldRemainConservative()
+    public void CapsuleProxyRadius_AfterOversizedOffsetRejection_ShouldKeepCommittedReach()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
         var collider = new LSCapsuleCollider2D(Fixed64.Half, (Fixed64)3);
@@ -132,10 +137,11 @@ public sealed partial class ContinuousCollision2DTests
             collider,
             Vector2d.Zero,
             immovable: false);
-        collider.LocalOffset = new Vector2d(Fixed64.MaxValue, Fixed64.MaxValue);
-        collider.RebuildRuntimeShapeOnly();
+        Action changeOffset = () => collider.LocalOffset = new Vector2d(Fixed64.MaxValue, Fixed64.MaxValue);
+        changeOffset.Should().Throw<ArgumentException>();
+        collider.LocalOffset.Should().Be(Vector2d.Zero);
 
-        source.ResolveContinuousCollisionProxyRadius().Should().Be(Fixed64.MaxValue);
+        source.ResolveContinuousCollisionProxyRadius().Should().Be(Fixed64.FromFraction(3, 2));
     }
 
     private static SolidBody2D CreateRotationalBlade(GravitasWorldContext context)

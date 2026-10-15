@@ -13,6 +13,44 @@ namespace Gravitas.Tests.MixedDimensions;
 public sealed partial class MixedQueryCcdTests
 {
     [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void CircleSlabWitness_WithWideSourceOffset_ShouldResolveVerticalProjectionIndependently(
+        bool horizontalOverflow, bool reflect)
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        Fixed64 sign = reflect ? -Fixed64.One : Fixed64.One;
+        Vector3d targetCenter = (horizontalOverflow ? new Vector3d(-10, -450, 0)
+            : new Vector3d(-450, -10, 0)) * sign;
+        FixedQuaternion rotation = horizontalOverflow
+            ? new FixedQuaternion(Fixed64.Zero, Fixed64.Zero, (Fixed64)(-5), (Fixed64)6).Normalized
+            : new FixedQuaternion(Fixed64.Zero, Fixed64.Zero, -Fixed64.One, (Fixed64)10).Normalized;
+        var target = new LSCuboidCollider { Size = new Vector3d(1122, 2, 2) };
+        target.InitializeWithNoBody(new TestMatterAgent(context,
+            new FixedTransform(targetCenter, rotation, Vector3d.One)));
+        Fixed64 edge = reflect ? Fixed64.MaxValue : Fixed64.MinValue;
+        var start = new Vector2d(edge, Fixed64.Zero);
+        var center = new Vector3d(edge, edge, Fixed64.Zero);
+
+        // A wide source can intersect one part of a finite solid while its
+        // nearest Euclidean boundary lies beyond one source-coordinate span.
+        context.QueryMixed.TrySweepCircleAgainst3DCollider(target, start,
+            start + Vector2d.Right * sign, Vector2d.Right * sign, Fixed64.One,
+            Fixed64.MaxValue, edge, Fixed64.MaxValue, Vector3d.Right * sign,
+            null, out PhysicsMixedHit hit).Should().BeTrue();
+
+        hit.Distance.Should().Be(Fixed64.Zero);
+        hit.Anchor3D.TryGetOffsetFrom(center, out _).Should().BeFalse();
+        hit.TryGetPoint2D(out Vector3d planarWitness).Should().BeTrue();
+        if (horizontalOverflow)
+            planarWitness.Y.Should().Be(hit.Point3D.Y);
+        else
+            planarWitness.Y.Should().Be(edge + Fixed64.MaxValue * sign);
+    }
+
+    [Theory]
     [InlineData(0, false)]
     [InlineData(0, true)]
     [InlineData(1, false)]
@@ -349,10 +387,10 @@ public sealed partial class MixedQueryCcdTests
     [InlineData(false, false)]
     [InlineData(true, false)]
     [InlineData(true, true)]
-    public void LargeRotatedCuboidFaceWitness_ShouldProjectAndClampItsComponentsIndependently(bool swapAxes, bool negative)
+    public void SupportedRotatedCuboidFaceWitness_ShouldProjectAndClampItsComponentsIndependently(bool swapAxes, bool negative)
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
-        Fixed64 extent = Fixed64.MaxValue;
+        Fixed64 extent = (Fixed64)2048;
         FixedQuaternion rotation = new FixedQuaternion(Fixed64.Zero, Fixed64.Zero, -Fixed64.One,
             swapAxes ? (Fixed64)3 : (Fixed64)2).Normalized;
         Vector3d axis = rotation.Rotate(Vector3d.Up);
@@ -370,7 +408,7 @@ public sealed partial class MixedQueryCcdTests
             Vector2d.Right, Fixed64.One, extent * Fixed64.FromFraction(19, 20), Fixed64.Zero,
             extent * Fixed64.FromFraction(19, 20), Vector3d.Right, null, out PhysicsMixedHit hit).Should().BeTrue();
 
-        hit.Anchor3D.TryGetOffsetFrom(Vector3d.Zero, out _).Should().BeFalse();
+        hit.Anchor3D.TryGetOffsetFrom(Vector3d.Zero, out _).Should().BeTrue();
         if (swapAxes)
             hit.Point2D.Y.Should().Be((negative ? -extent : extent) * Fixed64.FromFraction(19, 20));
         else

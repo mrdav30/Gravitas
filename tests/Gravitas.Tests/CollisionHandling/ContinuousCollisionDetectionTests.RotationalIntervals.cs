@@ -69,26 +69,23 @@ public sealed partial class ContinuousCollisionDetectionTests
     }
 
     [Fact]
-    public void ContinuousMode_UnrepresentablePivotRadius_ShouldUseBoundedRegisteredCandidateFallback()
+    public void ContinuousMode_UnsupportedPivotOffset_ShouldPreserveOrdinaryCandidateCollectionAfterRejection()
     {
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();
         var sourceCollider = new LSSphereCollider { Radius = Fixed64.One };
-        ScenarioBody<LSSphereCollider> source = scenario.CreateBody(
-            sourceCollider,
-            Vector3d.Zero,
-            FixedQuaternion.Identity,
-            isKinematic: true);
+        ScenarioBody<LSSphereCollider> source = scenario.CreateBody(sourceCollider,
+            Vector3d.Zero, FixedQuaternion.Identity, isKinematic: true);
         _ = scenario.CreateStaticSphere(Vector3d.Zero);
         source.Body.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
-        sourceCollider.LocalOffset = new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero);
-        sourceCollider.RebuildRuntimeShapeOnly();
-        source.Body.ResolveContinuousCollisionProxyRadius().Should().Be(Fixed64.MaxValue);
-
-        source.Body.GatherRotationalContinuousCollisionCandidates(
-            Vector3d.Zero,
-            Vector3d.Zero,
-            Vector3d.Zero,
-            Fixed64.MaxValue).Should().Be(1);
+        int before = source.Body.GatherRotationalContinuousCollisionCandidates(Vector3d.Zero, Vector3d.Zero,
+            Vector3d.Zero, Fixed64.One);
+        before.Should().BeGreaterThan(0);
+        System.Action change = () => sourceCollider.LocalOffset = new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero);
+        change.Should().Throw<System.ArgumentException>();
+        sourceCollider.LocalOffset.Should().Be(Vector3d.Zero);
+        source.Body.ResolveContinuousCollisionProxyRadius().Should().Be(Fixed64.One);
+        source.Body.GatherRotationalContinuousCollisionCandidates(Vector3d.Zero, Vector3d.Zero,
+            Vector3d.Zero, Fixed64.One).Should().Be(before);
     }
 
     private static void AssertRotationalWitness(

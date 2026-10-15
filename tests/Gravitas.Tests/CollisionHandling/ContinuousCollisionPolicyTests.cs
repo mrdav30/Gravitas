@@ -204,10 +204,10 @@ public sealed class ContinuousCollisionPolicyTests
             Fixed64.MaxValue - Fixed64.One,
             Fixed64.Zero,
             Fixed64.Zero);
-        cylinder.LocalOffset = farCenter;
-        cone.LocalOffset = farCenter;
-        cylinder.RebuildRuntimeShapeOnly().Should().BeTrue();
-        cone.RebuildRuntimeShapeOnly().Should().BeTrue();
+        cylinder.Body!.ResetPosition(farCenter, FixedQuaternion.Identity);
+        cone.Body!.ResetPosition(farCenter, FixedQuaternion.Identity);
+        cylinder.RebuildRuntimeShapeOnly();
+        cone.RebuildRuntimeShapeOnly();
 
         ContinuousCollisionContactPolicy.TryResolveSweptSphereContact(
             cylinder,
@@ -302,15 +302,11 @@ public sealed class ContinuousCollisionPolicyTests
             out Vector3d zeroNormal).Should().BeTrue();
         zeroNormal.Should().Be(Vector3d.Zero);
 
-        custom.LocalOffset = new Vector3d(
-            Fixed64.MinValue + Fixed64.One,
-            Fixed64.Zero,
-            Fixed64.Zero);
+        custom.Position = new Vector3d(Fixed64.MinValue + Fixed64.One, Fixed64.Zero, Fixed64.Zero);
         custom.ClosestPointOverride = new Vector3d(
             Fixed64.MaxValue - Fixed64.One,
             Fixed64.Zero,
             Fixed64.Zero);
-        custom.RebuildRuntimeShapeOnly().Should().BeTrue();
         ContinuousCollisionContactPolicy.TryResolveSweptSphereContact(
             custom,
             custom.ClosestPointOverride.Value,

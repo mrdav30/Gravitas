@@ -98,11 +98,28 @@ public sealed class LSCompoundCollider : LSCollider
         return _partColliders[index];
     }
 
+    internal Fixed64 GetMutationGeometryReach(LSCollider changed, in ColliderShapeSnapshot candidate)
+    {
+        Fixed64 reach = Fixed64.Zero;
+        for (int i = 0; i < _parts.Length; i++)
+        {
+            LSCollider part = _partColliders[i];
+            ColliderShapeSnapshot snapshot = ReferenceEquals(part, changed) ? candidate
+                : new ColliderShapeSnapshot(default, default, candidate.OwnerScale, _parts[i].LocalScale,
+                    part.LocalOffset, part.Size, part.Radius);
+            reach = FixedMath.Max(reach, ColliderGeometryPolicy.Add(
+                ColliderGeometryPolicy.Attachment(snapshot.LocalOffset, snapshot.OwnerScale),
+                part.GetCandidateGeometryReach(snapshot)));
+        }
+        return reach;
+    }
+
     private protected override void PrepareShape(in ColliderShapeSnapshot snapshot)
     {
         Vector3d min = Vector3d.Zero;
         Vector3d max = Vector3d.Zero;
 
+        Fixed64 reach = Fixed64.Zero;
         for (int i = 0; i < _parts.Length; i++)
         {
             CompoundColliderPart part = _parts[i];
@@ -112,6 +129,9 @@ public sealed class LSCompoundCollider : LSCollider
                 part.LocalRotation,
                 part.LocalScale,
                 PreparedContext);
+            reach = FixedMath.Max(reach, ColliderGeometryPolicy.Add(
+                ColliderGeometryPolicy.Attachment(partCollider.LocalOffset, snapshot.OwnerScale),
+                partCollider.PreparedGeometryReach));
 
             if (i == 0)
             {
@@ -127,6 +147,7 @@ public sealed class LSCompoundCollider : LSCollider
 
         _ = CalculatePreparedLocalMassPoint();
         _ = CalculatePreparedMassPropertyWeight();
+        SetPreparedGeometryReach(reach);
         SetPreparedBounds(FixedBoundBox.FromMinMax(min, max));
     }
 

@@ -73,7 +73,7 @@ public sealed class LSCompoundCollider2D : LSCollider2D
         {
             return HasCommittedShape
                 ? CanonicalCenteredProxyRadius
-                : ColliderCanonicalBounds2D.GetCurrentCenteredProxyRadius(this);
+                : ColliderCanonicalBounds2D.GetCurrentCompoundCenteredProxyRadius(this);
         }
     }
 
@@ -317,11 +317,29 @@ public sealed class LSCompoundCollider2D : LSCollider2D
         _hasMomentGeometry = true;
     }
 
+    internal Fixed64 GetMutationGeometryReach(LSCollider2D changed, Vector2d ownerScale,
+        Fixed64 candidateIntrinsic, Vector2d candidateOffset)
+    {
+        Fixed64 reach = Fixed64.Zero;
+        for (int i = 0; i < _parts.Length; i++)
+        {
+            LSCollider2D part = _partColliders[i];
+            bool replaced = ReferenceEquals(part, changed);
+            Fixed64 intrinsic = replaced ? candidateIntrinsic
+                : part.GetCandidateGeometryReach(ownerScale, _parts[i].LocalScale);
+            reach = FixedMath.Max(reach, ColliderGeometryPolicy.Add(
+                ColliderGeometryPolicy.Attachment(replaced ? candidateOffset : part.LocalOffset, ownerScale),
+                intrinsic));
+        }
+        return reach;
+    }
+
     private protected override void PrepareShape(in ColliderShapeSnapshot2D snapshot)
     {
         Vector2d min = Vector2d.Zero;
         Vector2d max = Vector2d.Zero;
 
+        Fixed64 reach = Fixed64.Zero;
         for (int i = 0; i < _parts.Length; i++)
         {
             CompoundColliderPart2D part = _parts[i];
@@ -331,6 +349,9 @@ public sealed class LSCompoundCollider2D : LSCollider2D
                 part.LocalRotation,
                 part.LocalScale,
                 PreparedContext);
+            reach = FixedMath.Max(reach, ColliderGeometryPolicy.Add(
+                ColliderGeometryPolicy.Attachment(partCollider.LocalOffset, snapshot.OwnerScale),
+                partCollider.PreparedGeometryReach));
 
             Vector2d partMin = partCollider.PreparedShapeBounds.Min;
             Vector2d partMax = partCollider.PreparedShapeBounds.Max;
@@ -347,6 +368,7 @@ public sealed class LSCompoundCollider2D : LSCollider2D
 
         _ = CalculatePreparedLocalMassPoint();
         _ = CalculatePreparedAreaForMassProperties();
+        SetPreparedGeometryReach(reach);
         SetPreparedBounds(FixedBoundArea.FromMinMax(min, max));
     }
 

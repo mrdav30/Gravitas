@@ -11,16 +11,44 @@ namespace Gravitas.Tests.Physics2D;
 public sealed partial class CollisionDetection2DTests
 {
     [Fact]
+    public void PendingCompensatedCompoundOffsets_ShouldRetainDetectedCircularNormalCenter()
+    {
+        using GravitasWorldContext context = Create2DContext();
+        context.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
+        var compound = new LSCompoundCollider2D(CompoundColliderPart2D.Circle(Fixed64.One, Vector2d.Zero));
+        var body = new SolidBody2D(new TestMatterAgent(context), compound);
+        body.Initialize(Vector2d.Zero);
+        var sphere = new LSSphereCollider { Radius = Fixed64.Half };
+        sphere.InitializeWithNoBody(new TestMatterAgent(context,
+            new FixedTransform(Vector3d.Right, FixedQuaternion.Identity, Vector3d.One)));
+        var manifold = new ContactManifold();
+        CollisionDetectionMixed.TryBuildManifold(sphere, compound, manifold).Should().BeTrue();
+        ManifoldContact row = manifold.PrimaryContact;
+        row.FeatureNamespaceB.Should().Be(-1);
+        body.Agent.Transform.LocalScale = Vector3d.One * Fixed64.MinIncrement;
+        compound.LocalOffset = new Vector2d(Fixed64.MaxValue, Fixed64.Zero);
+        LSCollider2D leaf = compound.GetPartCollider(0);
+        leaf.LocalOffset = new Vector2d(Fixed64.MaxValue, Fixed64.Zero);
+        leaf.TransformRelativeMassPropertyPointExact(Vector2d.Zero).TryGetPoint(out _).Should().BeFalse();
+
+        ContactAnchor center = ContactAnchor.FromWorldPoint(Vector3d.Zero);
+        ContactAnchor normal = ExactContactLever2D.GetDetectedNormalAnchor(compound, row.FeatureNamespaceB, center, row.AnchorB);
+        normal.TryGetWorldPoint(out Vector3d point).Should().BeTrue();
+        point.Should().Be(leaf.Center.ToVector3d(Fixed64.Zero));
+        MixedContact.TrySelectClosingContact(manifold, ContactAnchor.FromWorldPoint(Vector3d.Right),
+            Vector3d.Zero, Vector3d.Zero, center, Vector2d.Zero, Fixed64.One, out _, compound).Should().BeFalse();
+    }
+
+    [Fact]
     public void TryCollide_WithSeparatedLargeCircles_ShouldRejectDespiteOverlappingBounds()
     {
         using GravitasWorldContext context = Create2DContext();
-        var first = new LSCircleCollider2D((Fixed64)25000);
-        var second = new LSCircleCollider2D((Fixed64)25000);
+        var first = new LSCircleCollider2D((Fixed64)2500);
+        var second = new LSCircleCollider2D((Fixed64)2500);
         _ = CreateBody(context, first, Vector2d.Zero);
-        _ = CreateBody(context, second, new Vector2d(40000, 40000));
+        _ = CreateBody(context, second, new Vector2d(4000, 4000));
 
-        // Exact squared distance 3,200,000,000 exceeds squared radius sum
-        // 2,500,000,000. Saturating both to Fixed64.MaxValue invents contact.
+        // Overlapping broad-phase boxes do not imply overlap of their circles.
         CollisionDetection2D.BoundsOverlap(first, second).Should().BeTrue();
         CollisionDetection2D.TryCollide(first, second, out Contact2D contact).Should().BeFalse();
         contact.Should().Be(default(Contact2D));
@@ -33,9 +61,9 @@ public sealed partial class CollisionDetection2DTests
     [InlineData(1, -1)]
     [InlineData(1, 0)]
     [InlineData(1, 1)]
-    [InlineData(10000, -1)]
-    [InlineData(10000, 0)]
-    [InlineData(10000, 1)]
+    [InlineData(1000, -1)]
+    [InlineData(1000, 0)]
+    [InlineData(1000, 1)]
     public void CircleContact_AtDiagonalTangency_ShouldDistinguishRawRadiusNeighbors(int scale, long step)
     {
         using GravitasWorldContext context = Create2DContext();
@@ -44,7 +72,7 @@ public sealed partial class CollisionDetection2DTests
         _ = CreateBody(context, first, Vector2d.Zero);
         _ = CreateBody(context, second, new Vector2d(3 * scale, 4 * scale));
 
-        // The 3-4-5 distance is exact, including beyond scalar squared range.
+        // The 3-4-5 distance is exact at both ordinary and supported large radii.
         CollisionDetection2D.BoundsOverlap(first, second).Should().BeTrue();
         bool hit = CollisionDetection2D.TryCollide(first, second, out Contact2D contact);
         hit.Should().Be(step >= 0);
@@ -101,20 +129,19 @@ public sealed partial class CollisionDetection2DTests
     }
 
     [Fact]
-    public void CircleContact_WithWideCenterDifferenceAndRadiusSum_ShouldKeepRepresentableDepth()
+    public void CircleContact_WithWideCenterDifference_ShouldRejectSeparatedSupportedCircles()
     {
         using GravitasWorldContext context = Create2DContext();
-        var first = new LSCircleCollider2D((Fixed64)1600000000);
-        var second = new LSCircleCollider2D((Fixed64)1600000000);
+        var first = new LSCircleCollider2D(Fixed64.One);
+        var second = new LSCircleCollider2D(Fixed64.One);
         _ = CreateBody(context, first, new Vector2d(-1500000000, 0));
         _ = CreateBody(context, second, new Vector2d(1500000000, 0));
 
-        CollisionDetection2D.TryCollide(first, second, out Contact2D contact).Should().BeTrue();
-        contact.Normal.Should().Be(Vector2d.Right);
-        contact.Depth.Should().Be((Fixed64)200000000);
-        contact.DepthIsClamped.Should().BeFalse();
-        contact.PointA.Should().Be(new Vector2d(100000000, 0));
-        contact.PointB.Should().Be(new Vector2d(-100000000, 0));
+        CollisionDetection2D.TryCollide(first, second, out Contact2D contact).Should().BeFalse();
+        contact.Should().Be(default(Contact2D));
+        (bool collided, ContactManifold2D manifold) = BuildManifold(first, second);
+        collided.Should().BeFalse();
+        manifold.HasContact.Should().BeFalse();
     }
 
     [Theory]
@@ -151,45 +178,38 @@ public sealed partial class CollisionDetection2DTests
         }
     }
 
-    [Theory]
-    [InlineData(1, 1, false)]
-    [InlineData(2, 3, true)]
-    public void CircleContact_WithSubRawOverflow_ShouldClassifyClampingBeforeRounding(long coordinate, long radius, bool clamped)
+    [Fact]
+    public void CircleContact_WithUnsupportedRadius_ShouldRejectBeforeBodyAdmission()
     {
         using GravitasWorldContext context = Create2DContext();
-        var first = new LSCircleCollider2D(Fixed64.MaxValue);
-        var second = new LSCircleCollider2D(Fixed64.FromRaw(radius));
-        _ = CreateBody(context, first, Vector2d.Zero);
-        _ = CreateBody(context, second, new Vector2d(Fixed64.FromRaw(coordinate), Fixed64.FromRaw(coordinate)));
+        var collider = new LSCircleCollider2D(Fixed64.MaxValue);
+        Action admit = () => CreateBody(context, collider, Vector2d.Zero);
 
-        // M+1-sqrt(2) is below M, while M+3-sqrt(8) is above it. Both round to M.
-        CollisionDetection2D.TryCollide(first, second, out Contact2D contact).Should().BeTrue();
-        contact.Depth.Should().Be(Fixed64.MaxValue);
-        contact.DepthIsClamped.Should().Be(clamped);
+        admit.Should().Throw<ArgumentException>();
     }
 
-    [Theory]
-    [InlineData(-1, true)]
-    [InlineData(0, false)]
-    [InlineData(1, false)]
-    public void CircleContact_AtMaximumDepth_ShouldPropagateExactClampingToManifold(long step, bool clamped)
+    [Fact]
+    public void CircleContact_AfterOversizedRadiusRejection_ShouldKeepCommittedManifold()
     {
         using GravitasWorldContext context = Create2DContext();
-        var first = new LSCircleCollider2D(Fixed64.MaxValue);
+        var first = new LSCircleCollider2D(Fixed64.One);
         var second = new LSCircleCollider2D(Fixed64.One);
         _ = CreateBody(context, first, Vector2d.Zero);
-        _ = CreateBody(context, second, new Vector2d(Fixed64.FromRaw(Fixed64.One.m_rawValue + step), Fixed64.Zero));
+        _ = CreateBody(context, second, Vector2d.Right);
+        Action resize = () => first.Radius = Fixed64.MaxValue;
+        resize.Should().Throw<ArgumentException>();
+        first.Radius.Should().Be(Fixed64.One);
 
-        Fixed64 expectedDepth = Fixed64.FromRaw(long.MaxValue - Math.Max(step, 0));
+        Fixed64 expectedDepth = Fixed64.One;
         CollisionDetection2D.TryCollide(first, second, out Contact2D contact).Should().BeTrue();
         contact.Normal.Should().Be(Vector2d.Right);
         contact.Depth.Should().Be(expectedDepth);
-        contact.DepthIsClamped.Should().Be(clamped);
+        contact.DepthIsClamped.Should().BeFalse();
         (bool collided, ContactManifold2D manifold) = BuildManifold(first, second);
         collided.Should().BeTrue();
         manifold.Count.Should().Be(1);
         manifold[0].Depth.Should().Be(expectedDepth);
-        manifold[0].DepthIsClamped.Should().Be(clamped);
+        manifold[0].DepthIsClamped.Should().BeFalse();
         manifold[0].Normal.Should().Be(Vector2d.Right);
     }
 
@@ -239,17 +259,17 @@ public sealed partial class CollisionDetection2DTests
     public void CircleContact_AfterWarmup_ShouldKeepDirectAndManifoldQueriesAllocationFree()
     {
         using GravitasWorldContext context = Create2DContext();
-        var first = new LSCircleCollider2D((Fixed64)25000);
-        var second = new LSCircleCollider2D((Fixed64)25000);
+        var first = new LSCircleCollider2D((Fixed64)2500);
+        var second = new LSCircleCollider2D((Fixed64)2500);
         _ = CreateBody(context, first, Vector2d.Zero, Fixed64.One);
-        _ = CreateBody(context, second, new Vector2d(18000, 24000), -Fixed64.One);
+        _ = CreateBody(context, second, new Vector2d(1800, 2400), -Fixed64.One);
         var manifold = new ContactManifold2D();
         var item = new CollisionWorkItem2D(first, second, CollisionType2D.Circle_Circle);
 
         long allocated = AllocationTestHelper.MeasureSteadyState(() =>
         {
             if (!CollisionDetection2D.TryCollide(first, second, out Contact2D contact) ||
-                contact.Depth != (Fixed64)20000 ||
+                contact.Depth != (Fixed64)2000 ||
                 !CollisionDetection2D.TryCollide(item, manifold, 42) || manifold[0].Depth != contact.Depth)
                 throw new InvalidOperationException("Circle contact changed during allocation measurement.");
         });

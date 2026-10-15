@@ -12,8 +12,10 @@
 **Status:** Phase 1 contract review complete: the inclusive `4,096`-unit
 conservative reach and measurement rules below are locked. Numerical
 prerequisites #113-#124 and the upstream scaled-decomposition prerequisite are
-resolved. Admission enforcement has not started; #096 remains open until the
-complete contract is implemented and verified. The ceiling is a supported-workload
+resolved. Phase 2 collider admission is complete and passes correctness,
+coverage, replay and warm performance validation. Query, settings
+and restore admission remain phase 3; #096 stays open until the complete
+contract is implemented and verified. The ceiling is a supported-workload
 boundary, not a proof that every derived physics quantity is representable.  
 **Owner:** Gravitas geometry admission and lifecycle transactions.
 
@@ -257,6 +259,14 @@ These formulas and the inclusive `4,096` ceiling are locked admission policy,
 not a claim of safe arbitrary higher-order scalar arithmetic. Existing committed
 compound proxy helpers that subtract rounded world centers are not admission
 measurements; reuse their formula and local prepared data instead.
+
+Admission and physical proxy enclosure remain separate measurements. Exact
+attachment products define the admission budget; a compound's physical proxy
+must still enclose its published child centers after component rounding. For
+example, a two-component one-raw attachment at scale `5/8` has exact ceiling
+norm one raw unit, but its rounded center `(1 raw, 1 raw)` needs two. Preserve
+the committed-center proxy calculation rather than reuse the admission total
+or add an arbitrary admission margin.
 
 Four lifecycle details need more than a check at the common preparation seam:
 
@@ -993,38 +1003,41 @@ candidate-local measurements supplied by existing dimensional owners. Reuse
 FixedMathSharp ceiling magnitudes and checked sums for effective offset plus
 centered reach. No internal wide types enter public APIs or serialized layouts.
 
-- [ ] Freeze the current accepted source stack and capture affected ordinary warm
+- [x] Freeze the current accepted source stack and capture affected ordinary warm
       controls before admission source edits. Reuse maintained contact, query,
       body-pose and mesh/compound fixtures; older pre-prerequisite binaries are
       historical evidence rather than the sole performance comparison.
-- [ ] Add failing production tests for the locked limit, one raw increment above
+- [x] Add failing production tests for the locked limit, one raw increment above
       it, and oversized dimensions that scale down to admitted geometry. Cover
       overflowed intermediate scale products with representable final results.
       Include fractional-raw attachments, odd raw core lengths/heights, deliberate
       offset-cancellation rejection and complete-planar-before-thickness boundaries.
       Include primitive, mesh and polygon authoring controls, with shrinking host
       and compound-part scales applied after construction.
-- [ ] Implement candidate reach and shared validation before publication across
+- [x] Implement candidate reach and shared validation before publication across
       3D, 2D and mixed colliders, including the full compound/body-local envelope.
       Validate mesh vertices within existing preparation and cached rebuild logic;
       reject unsupported standalone mesh transforms as well as collider updates.
-- [ ] Separate collider-owned authored mesh construction from standalone mesh
+- [x] Separate collider-owned authored mesh construction from standalone mesh
       runtime commitment through narrow internal reuse. Do not expose a public
       validation bypass or publish unsupported runtime geometry while waiting
       for the effective collider scale. Share topology/preparation ownership;
       do not create a second mesh representation or engine.
-- [ ] Prove near-limit clipping cannot hide oversized geometry. Keep ordinary
+- [x] Prove near-limit clipping cannot hide oversized geometry. Keep ordinary
       colliders near both scalar limits, authored-origin-recentered compact meshes,
       rotation invariance and compensated owner/part scale controls admitted.
-- [ ] Prove initialization and failed live pose/scale/reconfiguration candidates
+- [x] Keep compound physical proxies conservative after final center rounding,
+      independently of the exact attachment admission budget, with 2D/3D raw-unit
+      enclosure regressions and unchanged warm pose costs.
+- [x] Prove initialization and failed live pose/scale/reconfiguration candidates
       preserve IDs, committed geometry, mass, bounds, partitions, awake state and
       cache identity. A small leaf with excessive attachment/part separation must
       reject. Test synchronous public API behavior, not private helper behavior alone.
-- [ ] Replace deliberately unsupported giant runtime fixtures with explicit
+- [x] Replace deliberately unsupported giant runtime fixtures with explicit
       admission regressions. Retain or relocate useful math/large-position coverage
       through supported production behavior; remove dead branches only after a
       caller audit proves they have no admitted use.
-- [ ] Run full Release/Lean coverage and affected warmed allocation/performance
+- [x] Run full Release/Lean coverage and affected warmed allocation/performance
       comparisons. Resolve introduced failures and obtain independent ponytail
       review before completing the phase.
 
@@ -1032,7 +1045,65 @@ centered reach. No internal wide types enter public APIs or serialized layouts.
 reviewed budget atomically. Query/load coverage remains explicitly pending;
 #096 is still open.
 
-**Phase summary:** Pending.
+**Phase summary (2026-10-14):** Collider and standalone-mesh admission now enforce
+one shared, read-only ceiling through existing prepared-shape transactions.
+Bound setters preflight the complete owner before changing fields or waking;
+rejected candidates retain committed geometry and registration. Collider-owned
+mesh construction validates authoring/topology without a premature unit-scale
+commit; requesting detached runtime geometry prepares it at the current scale.
+Public mesh transforms cannot bypass collider ownership. FixedMathSharp adds a
+focused internal exact scaled-vector ceiling norm; no physics policy moves upstream.
+
+Exact admission and physical compound proxies remain separate. A new 2D/3D
+raw-unit regression exposed admission-total reuse under-enclosing a rounded leaf
+center; the corrected physical proxy again uses published center differences.
+The red/green enclosure test also checks the body CCD proxy. No rounding pad or
+extra cache is needed. Caller audits remove obsolete local overflow scaffolding
+and duplicate COM/proxy work while retaining world-position, long-travel,
+independent mass-property and real pending-state defenses.
+
+Local-stack Release/Lean solution builds pass with zero warnings/errors; Gravitas
+passes **6,093 / 6,027** tests with no skips. Raw reachable line/branch/method
+coverage is **100%**: `47,648 / 15,720 / 5,029` and
+`47,646 / 15,720 / 5,028`, all visited. FixedMathSharp passes
+**5,864 / 5,843**, plus **49** Chronicler tests per lane; its core, Chronicler
+adapter and FluentAssertions helper retain **100%** raw coverage in both lanes.
+Six shared replay fixtures match expectations and directly across native Windows
+x64 Release/Lean. Independent numerical and external ponytail reviews clear the
+corrected source.
+
+The final native Windows x64 comparison covers **20** maintained workloads using
+frozen original/candidate binaries, two launches, six warmups and six measurements
+at 500 ms per iteration. All report **0 B/op**, with no repeatable regression.
+Selected observed means (microseconds per benchmark operation, including each
+fixture's configured population) are:
+
+| Workload | Original | Phase 2 |
+| --- | ---: | ---: |
+| Capsule rebuild, 64 colliders | 1,341.855 | 1,245.937 |
+| Compound translation, 64 colliders | 57.566 | 48.258 |
+| Compound rotation, 64 colliders | 60.519 | 51.954 |
+| 2D full step, 64 contacts | 1,216.674 | 1,150.370 |
+| 3D partitioned full step, 64 spheres | 430.430 | 376.798 |
+
+The main cone-query row was noisy (`2,250.450` versus `2,217.434` us, overlapping
+intervals). A fresh reversed-order candidate/original comparison did not repeat
+the nominal increase: approximately `2.101` versus `2.144` ms. The companion
+sphere sweep also passes. Treat the observed gains as host-specific measurements,
+not universal speedup claims. Direct generated-child DLL hashes match the frozen
+snapshots, and all 699 recorded source/project hashes remain unchanged. No
+additional admission cache was justified.
+
+Pre-existing follow-ups #126-#130 are recorded separately: pending proxy epochs,
+tiny-mass correction/slop, projected capsule precision, detached polygon inspection
+and rotated body-attachment enclosure. Original-binary comparisons distinguish
+these from the introduced compound regression, which is fixed within this phase.
+Ignored `artifacts/geometry-range/phase2/` retains red/green tests, full raw coverage,
+replays, source/runtime provenance, original/candidate probes and native reports.
+No Linux/ARM64 or released-package validation is claimed. The develop dependency
+pin is unchanged; update it after committing the coordinated FixedMathSharp
+helper. Release FixedMathSharp before validating Gravitas against its package.
+#096 remains open for query, settings and restore admission.
 
 ## Phase 3: Close Query, Settings And Restore Bypasses
 

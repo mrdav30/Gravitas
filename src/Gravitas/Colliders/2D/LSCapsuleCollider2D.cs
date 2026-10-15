@@ -69,6 +69,7 @@ public sealed class LSCapsuleCollider2D : LSCollider2D
             if (_radius == value)
                 return;
 
+            ValidateGeometryMutation(radius: value);
             _radius = value;
             MarkShapeDirty();
         }
@@ -87,6 +88,7 @@ public sealed class LSCapsuleCollider2D : LSCollider2D
             if (_height == value)
                 return;
 
+            ValidateGeometryMutation(height: value);
             _height = value;
             MarkShapeDirty();
         }
@@ -244,53 +246,61 @@ public sealed class LSCapsuleCollider2D : LSCollider2D
 
     private protected override void PrepareShape(in ColliderShapeSnapshot2D snapshot)
     {
-        Fixed64 radiusX = ColliderScalePolicy.ScalePositive(
-            _radius,
-            snapshot.OwnerScale.X,
-            snapshot.PartScale.X);
-        Fixed64 radiusY = ColliderScalePolicy.ScalePositive(
-            _radius,
-            snapshot.OwnerScale.Y,
-            snapshot.PartScale.Y);
-        _preparedRadius = FixedMath.Max(radiusX, radiusY);
-        SwiftThrowHelper.ThrowIfArgument(
-            !HasValidScaledDimensions(
-                _radius,
-                _height,
-                snapshot.OwnerScale,
-                snapshot.PartScale),
-            nameof(snapshot),
-            "Scaled 2D capsule height must be at least the capsule diameter.");
-        SwiftThrowHelper.ThrowIfArgument(
-            !Fixed64.TryMultiplySubtractClamped(
-                _height,
-                snapshot.OwnerScale.Y,
-                snapshot.PartScale.Y,
-                Fixed64.One,
-                _radius,
-                Fixed64.Two,
-                snapshot.OwnerScale.X,
-                snapshot.PartScale.X,
-                out Fixed64 axisLengthX)
-            | !Fixed64.TryMultiplySubtractClamped(
-                _height,
-                snapshot.OwnerScale.Y,
-                snapshot.PartScale.Y,
-                Fixed64.One,
-                _radius,
-                Fixed64.Two,
-                snapshot.OwnerScale.Y,
-                snapshot.PartScale.Y,
-                out Fixed64 axisLengthY),
-            nameof(snapshot),
-            "Scaled 2D capsule center-axis length must be representable.");
-        _preparedAxisLength = FixedMath.Min(axisLengthX, axisLengthY);
+        GetScaledGeometry(_radius, _height, snapshot.OwnerScale, snapshot.PartScale,
+            out _preparedRadius, out _preparedAxisLength);
+        SetPreparedGeometryReach(ColliderGeometryPolicy.Capsule(_preparedRadius, _preparedAxisLength));
         _preparedAxis = Rotate(Vector2d.Forward, snapshot.Rotation).Normalized;
         SetPreparedBounds(FixedBoundArea.FromCenteredRotatedCapsuleClippedToDomain(
             snapshot.Center,
             snapshot.Rotation,
             _preparedAxisLength,
             _preparedRadius));
+    }
+
+    internal static void GetScaledGeometry(Fixed64 authoredRadius, Fixed64 authoredHeight,
+        Vector2d ownerScale, Vector2d partScale, out Fixed64 radius, out Fixed64 axisLength)
+    {
+        Fixed64 radiusX = ColliderScalePolicy.ScalePositive(
+            authoredRadius,
+            ownerScale.X,
+            partScale.X);
+        Fixed64 radiusY = ColliderScalePolicy.ScalePositive(
+            authoredRadius,
+            ownerScale.Y,
+            partScale.Y);
+        radius = FixedMath.Max(radiusX, radiusY);
+        SwiftThrowHelper.ThrowIfArgument(
+            !HasValidScaledDimensions(
+                authoredRadius,
+                authoredHeight,
+                ownerScale,
+                partScale),
+            nameof(authoredHeight),
+            "Scaled 2D capsule height must be at least the capsule diameter.");
+        SwiftThrowHelper.ThrowIfArgument(
+            !Fixed64.TryMultiplySubtractClamped(
+                authoredHeight,
+                ownerScale.Y,
+                partScale.Y,
+                Fixed64.One,
+                authoredRadius,
+                Fixed64.Two,
+                ownerScale.X,
+                partScale.X,
+                out Fixed64 axisLengthX)
+            | !Fixed64.TryMultiplySubtractClamped(
+                authoredHeight,
+                ownerScale.Y,
+                partScale.Y,
+                Fixed64.One,
+                authoredRadius,
+                Fixed64.Two,
+                ownerScale.Y,
+                partScale.Y,
+                out Fixed64 axisLengthY),
+            nameof(authoredHeight),
+            "Scaled 2D capsule center-axis length must be representable.");
+        axisLength = FixedMath.Min(axisLengthX, axisLengthY);
     }
 
     private protected override void PublishShape()

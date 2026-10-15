@@ -54,6 +54,7 @@ public sealed class LSAABBoxCollider2D : LSCollider2D, IConvexVertexSource2D
             if (_size == value)
                 return;
 
+            ValidateGeometryMutation(size: value);
             _size = value;
             _halfExtents = value * Fixed64.Half;
             MarkShapeDirty();
@@ -197,6 +198,8 @@ public sealed class LSAABBoxCollider2D : LSCollider2D, IConvexVertexSource2D
             snapshot.OwnerScale,
             snapshot.PartScale,
             Fixed64.Two);
+        SetPreparedGeometryReach(HasCommittedShape && _preparedHalfExtents == _scaledHalfExtents
+            ? CanonicalCenteredProxyRadius : ColliderGeometryPolicy.Magnitude(_preparedHalfExtents));
         SetPreparedBounds(FixedBoundArea.FromCenterAndScopeClippedToDomain(
             snapshot.Center,
             _preparedHalfExtents));

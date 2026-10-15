@@ -54,31 +54,30 @@ public readonly struct MeshSurfaceMassProperties
             localReferencePoint - CenterOfMass);
     }
 
-    internal static bool TryCreate(
+    internal static MeshSurfaceMassProperties Create(
         ReadOnlySpan<Vector3d> localVertices,
         ReadOnlySpan<int> triangles,
         Fixed64 totalArea,
         out ExactMassWeight totalWeight,
-        out MeshSurfaceMassProperties properties,
         out MeshMassIntegrals integrals)
     {
-        properties = default;
-        if (!TriangleShellMassProperties.TryCreateUniformShell(
-                localVertices,
-                triangles,
-                out totalWeight,
-                out Vector3d centerOfMass,
-                out Fixed3x3 unitCenterTensor,
-                out integrals))
-        {
-            return false;
-        }
+        // The caller has admitted every vertex within MaximumGeometryReach and
+        // every triangle above the degeneracy threshold. Positive shell weights
+        // bound the exact centroid by the hull; centered second moments, including
+        // scalar centroid rounding, stay well inside Fixed64 at the supported reach.
+        bool valid = TriangleShellMassProperties.TryCreateUniformShell(
+            localVertices,
+            triangles,
+            out totalWeight,
+            out Vector3d centerOfMass,
+            out Fixed3x3 unitCenterTensor,
+            out integrals);
+        System.Diagnostics.Debug.Assert(valid);
 
-        properties = new MeshSurfaceMassProperties(
+        return new MeshSurfaceMassProperties(
             totalArea,
             centerOfMass,
             centerOfMass,
             unitCenterTensor);
-        return true;
     }
 }

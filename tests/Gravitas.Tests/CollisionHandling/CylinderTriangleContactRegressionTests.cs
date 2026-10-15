@@ -67,30 +67,15 @@ public sealed class CylinderTriangleContactRegressionTests
     }
 
     [Fact]
-    public void CylinderTriangle_UnrepresentableCenterOffset_ShouldRetainRealIntersection()
+    public void CylinderTriangle_WithUnsupportedRadius_ShouldRejectBeforeNarrowPhase()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
-        var mesh = new LSMeshCollider(new[]
-        {
-            new Vector3d(-3, -1, 0), new Vector3d(3, -1, 0), new Vector3d(0, 1, 0)
-        }, new[] { 0, 1, 2 }, MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation);
-        mesh.InitializeWithNoBody(new TestMatterAgent(context,
-            new FixedTransform(new Vector3d(3, 0, 0), FixedQuaternion.Identity, Vector3d.One)));
         var cylinder = new LSCylinderCollider { Radius = Fixed64.MaxValue, Size = Vector3d.One };
-        cylinder.InitializeWithNoBody(new TestMatterAgent(context,
+        System.Action initialize = () => cylinder.InitializeWithNoBody(new TestMatterAgent(context,
             new FixedTransform(new Vector3d(Fixed64.MinValue + Fixed64.Two, Fixed64.Zero, Fixed64.Zero),
                 FixedQuaternion.Identity, Vector3d.One)));
-        var pair = new CollisionPair(mesh, cylinder);
-
-        // World triangle (0,-1,0),(6,-1,0),(3,1,0) contains (3/2,0,0).
-        // The cylinder extends to X=2-oneRaw, so this is a real intrusion
-        // despite its center being unrepresentable in the triangle's frame.
-        CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
-        ManifoldContact contact = pair.Manifold.PrimaryContact;
-        contact.Depth.Should().BeGreaterThan(Fixed64.Zero);
-        contact.DepthIsClamped.Should().BeFalse();
-        Fixed64 projected = Vector3d.Dot(contact.PointA - contact.PointB, contact.Normal);
-        projected.m_rawValue.Should().BeInRange(contact.Depth.m_rawValue - 8, contact.Depth.m_rawValue + 8);
+        initialize.Should().Throw<System.ArgumentException>().WithMessage("*geometry reach*");
+        cylinder.Id.Should().Be(-1);
     }
 
     [Theory]

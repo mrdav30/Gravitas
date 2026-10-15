@@ -2,7 +2,7 @@
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-126`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-131`.
 - Assign an ID when an issue enters this tracker, keep it through resolution,
   and never reuse an ID even if an entry is later removed. Check this file's Git
   history before advancing or repairing the counter.
@@ -39,11 +39,131 @@
 
 Phase 1 of the supported-geometry plan confirmed in-range numerical defects on
 the original binaries. Integral, volume, overlap and mass-property fixes
-#113-#124 are resolved. **#096** has a locked supported-geometry contract;
-implement admission next, preserving the current warm performance baseline.
+#113-#124 are resolved. **#096** collider/standalone-mesh admission is complete
+and passes correctness, coverage, replay and warm performance checks. Continue
+with query, settings and restore admission.
 #111 remains an independent validation-tooling issue.
 #125 is a low-priority, non-blocking runtime crash observation; defer further
 investigation unless it recurs or a reliable reproducer becomes available.
+#127 is a confirmed tiny-mass response defect; #126/#130 share the body CCD
+proxy owner and should be resolved together. They cover pending-state coherence
+and published attachment rounding respectively. Neither blocks geometry
+admission. Address response correctness first, then the combined proxy work.
+#128 tracks an independent projected-sweep precision discrepancy; #129 tracks
+detached planar compound inspection. Both reproduce on the original stack.
+
+### GRV-Issue-130 - Rotated body attachments can under-enclose the published CCD proxy
+
+- **Confirmed:** 2026-10-14 in 2D and 3D on both the accepted pre-admission
+  binaries and the corrected phase-2 candidate. This is separate from the
+  introduced compound-proxy aliasing, which phase 2 fixes before closeout.
+- **Reproduction:** Bind a radius-`400` circle/sphere with unit scale, local
+  attachment `(3 raw, 0)` / `(3 raw, 0, 0)`, body origin zero, and rotation
+  `Pi/6` in the planar/spatial yaw convention. Published centers are
+  `(3 raw, 1 raw)` and `(3 raw, 0, -1 raw)` respectively. The body's CCD proxy
+  is `400 + 3 raw` (`1717986918403` raw), but the actual `+X` surface witness
+  has ceiling norm `400 + 4 raw` (`1717986918404` raw).
+- **Root cause:** The body proxy measures its attachment before rotation and
+  final center rounding. Component materialization can enlarge the published
+  enclosure by one raw unit even with coherent, fully committed geometry.
+- **Impact:** Confirmed non-enclosure; no missed collision has been demonstrated.
+  Exact attachment admission remains a separate policy measurement.
+- **Follow-up:** Resolve with #126 in the shared dimensional body-proxy owners.
+  Retain a coherent conservative enclosure of physical geometry, cover rotated
+  attachment and compound parity, and preserve warm allocation/performance.
+- **Evidence:** Ignored `artifacts/geometry-range/phase2/attachment-parity-proof.json`
+  and `attachment-original.jsonl` / `attachment-candidate.jsonl` retain exact raw
+  results and matching immutable runtime hashes.
+
+### GRV-Issue-128 - Projected capsule sweep entry error grows with supported geometry scale
+
+- **Confirmed:** 2026-10-14 on the accepted pre-admission binaries and the
+  phase-2 candidate, with identical results and an exact horizontal world axis.
+- **Reproduction:** Capsule radius `1,000`, nonzero core length `2`, centered
+  at zero with axis `(-1, 0, 0)`. Sweep an X/Z point along Z from `-1,000` to
+  `1,000` through the zero-thickness Y=`600` slice. The analytic 3-4-5 section
+  has entry distance `200`. `FiniteSlabProjectionSweep` returns raw
+  `858993491192`, exceeding the expected `858993459200` by `31992` raw units
+  (`~7.45e-6`), above its nominal `1/1,048,576` distance tolerance. Radius `5`,
+  core `2`, Y=`3` and Z=`-5..5` returns the exact expected entry `1`.
+- **Boundary:** A hit is retained; no missed contact has been demonstrated.
+  The geometry fits the supported ceiling. This is distinct from world-frame
+  overflow or unsupported enormous colliders.
+- **Follow-up:** Audit projected GJK convergence, working-scale rounding and
+  final advancement error against an explicit world-unit accuracy bound. Keep
+  the nonzero-core oracle and ordinary-scale control; measure any refinement
+  against the existing warm query baseline.
+- **Evidence:** Ignored `artifacts/geometry-range/phase2/probe-projection/`
+  retains original/candidate output, exact axis values and binary hashes. The
+  maintained admission migration retains the exact small 3-4-5 control without
+  weakening its assertion tolerance.
+
+### GRV-Issue-129 - Detached polygon compound reports a zero conservative proxy radius
+
+- **Confirmed:** 2026-10-14 on the accepted pre-admission binaries and the
+  phase-2 candidate. This predates deferred collider-owned mesh preparation.
+- **Reproduction:** Construct an unbound `LSCompoundCollider2D` with one convex
+  polygon part at zero using vertices `(0,0)`, `(6,000,0)`, `(0,6,000)`.
+  `ScaledRadius` returns zero, although its public contract describes a
+  conservative enclosure of the current aggregate shape. The detached path
+  reads an unprepared polygon vertex cache; circle/capsule/AABB metadata uses
+  effective authored geometry instead.
+- **Boundary:** No unsupported runtime shape is published. Large detached
+  authoring is valid while awaiting a shrinking host/part scale; admission of
+  the eventual runtime shape remains separate.
+- **Follow-up:** Reuse the polygon's effective authored vertex preparation or
+  candidate measurement for detached inspection, preserving compensation,
+  outward rounding and compound attachment semantics. Check dimensional and
+  shape-family parity without adding a second geometry representation.
+- **Evidence:** Ignored `artifacts/geometry-range/phase2/probe-projection/`
+  records the zero result on both binary snapshots.
+
+### GRV-Issue-127 - Tiny-mass planar positional correction consumes penetration slop
+
+- **Confirmed:** 2026-10-14 on both the accepted pre-admission binaries and the
+  phase-2 candidate. This is pre-existing response behavior, not a consequence
+  of the supported-geometry ceiling.
+- **Reproduction:** Two coincident planar circles of radius `4,095`, one static
+  and one dynamic with mass `Fixed64.FromRaw(3)`, have an ordinary rightward
+  contact of depth `8,190`. With the default penetration slop, direct
+  `CollisionResponse2D.Resolve` moves the dynamic circle by `8,190` rather than
+  `8,189.9900000002235`. Actual and expected X raw values are
+  `35175782154240` and `35175739204568`; the excess is exactly the slop.
+  Unit-mass and `MaxValue`-mass controls retain the expected distance.
+- **Boundary:** Geometry and the correction are representable. The confirmed
+  failure is pure 2D response in a mixed-capable context; 3D response parity
+  needs investigation before making a broader claim.
+- **Follow-up:** Trace the weighted positional correction and compact/exact
+  fallback normalization. Preserve the penetration-slop contract before and
+  after mass weighting, add the small-mass regression and parity controls, and
+  retain ordinary warm response cost.
+- **Evidence:** Ignored `artifacts/geometry-range/phase2/probe-response/` retains
+  the controlled source, original/candidate logs and binary provenance.
+
+### GRV-Issue-126 - Pending compensated authoring mixes CCD proxy geometry epochs
+
+- **Confirmed:** 2026-10-14 through public pending mutations in both 2D and 3D.
+  The proxy owner is unchanged by phase-2 admission; the failure is pre-existing.
+- **Reproduction:** Bind a radius-`1/2` circle or sphere with owner scale `4,096`
+  (published radius `2,048`). Before publishing the next shape, set host scale
+  to one raw unit, authored radius to `2^30`, and local X offset to `MaxValue`.
+  Each pending candidate fits the supported envelope at its new scale. Frame
+  preparation nevertheless combines the new offset with the old scale and
+  published radius, returning a `MaxValue` CCD proxy. A target `100,000` units
+  away enters the conservative registry fallback and candidate index. After
+  shape publication the radius is `1/4`, complete proxy is `3/4`, and the far
+  candidate disappears on the next frame.
+- **Impact:** Confirmed excess candidate coverage; no missed collision has been
+  demonstrated. Keep the conservative fallback until proxy measurements use a
+  coherent shape epoch. Geometry admission alone cannot make it unreachable.
+- **Follow-up:** Align CCD offset, scale and intrinsic geometry publication in
+  both dimensions and mixed indexing, without tightening the conservative
+  rounded support enclosure or adding per-frame allocations. Include pending
+  shape changes, motion-only preparation and registry/index refresh tests.
+- **Evidence:** Maintained `PendingCompensatedAuthoring` and
+  `PendingCompensatedSpatialAuthoring` regressions exercise real preparation,
+  resolved proxies, registry gathering and index refresh. Focused results are
+  retained under ignored `artifacts/geometry-range/phase2/focused-hybrid/`.
 
 ### GRV-Issue-096 - Extreme-scale capsule initial mesh sweep can miss a genuine overlap
 
@@ -52,7 +172,10 @@ investigation unless it recurs or a reliable reproducer becomes available.
   attachment norms, explicit body/bodyless frames, mixed thickness after complete
   planar reach, and exact vertex-mean query-polygon admission. In-range numerical
   prerequisites #113-#124 and upstream scaled decomposition are resolved.
-  Enforcement remains pending in the [Supported Geometry Range Plan](2026-10-12-supported-geometry-range-plan.md).
+  Collider/standalone-mesh admission is complete and passes full correctness,
+  coverage, replay and warm performance checks. Query,
+  settings and restore admission remain pending in the
+  [Supported Geometry Range Plan](2026-10-12-supported-geometry-range-plan.md).
   This issue stays open until the complete admission contract is implemented.
 - **Confirmed:** 2026-10-07 in the isolated local-stack Release
   `CapsuleInitialContact_WithUnavailableTriangleCharts_ShouldRetainGeometricFallback`

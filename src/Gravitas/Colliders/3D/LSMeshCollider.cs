@@ -32,16 +32,30 @@ public sealed class LSMeshCollider : LSCollider
     public override Fixed64 Area => Mesh.TotalArea;
 
     /// <summary>Gets the deterministic runtime mesh geometry.</summary>
-    public PhysicsMesh Mesh { get; private set; }
+    /// <remarks>
+    /// Detached access prepares geometry at the current authored part scale.
+    /// Runtime transforms are owned by the collider, body and host transform;
+    /// the returned mesh cannot be transformed independently.
+    /// </remarks>
+    public PhysicsMesh Mesh
+    {
+        get
+        {
+            EnsureDetachedMassGeometry();
+            return GeometryMesh;
+        }
+    }
+
+    internal PhysicsMesh GeometryMesh { get; }
 
     /// <summary>Gets the mesh collision mode.</summary>
-    public MeshColliderMode Mode => Mesh.Mode;
+    public MeshColliderMode Mode => GeometryMesh.Mode;
 
     /// <summary>
     /// Gets whether the mesh's exact-position-welded triangle topology is one
     /// connected, consistently wound, closed two-manifold surface.
     /// </summary>
-    public bool IsClosedSurface => Mesh.IsClosedSurface;
+    public bool IsClosedSurface => GeometryMesh.IsClosedSurface;
 
     /// <summary>
     /// Determines how inertia is derived when this mesh collider is attached to a body with angular dynamics.
@@ -69,12 +83,11 @@ public sealed class LSMeshCollider : LSCollider
     {
         ValidateInertiaPolicy(inertiaPolicy);
         InertiaPolicy = inertiaPolicy;
-        Mesh = new PhysicsMesh(vertices, triangles, Vector3d.Zero, FixedQuaternion.Identity, mode);
-        _offset = Mesh.LocalBounds.Center;
-        Mesh.UpdatePosition(_offset, FixedQuaternion.Identity);
-        _size = Mesh.LocalBounds.Proportions;
+        GeometryMesh = new PhysicsMesh(vertices, triangles, mode, colliderOwned: true);
+        _offset = GeometryMesh.LocalBounds.Center;
+        // The inherited authoring summary may saturate; runtime vertices retain exact source differences.
+        _size = GeometryMesh.LocalBounds.Max - GeometryMesh.LocalBounds.Min;
         _radius = _size.Magnitude * Fixed64.Half;
-        _bounds = Mesh.Bounds;
     }
 
     /// <summary>Creates a runtime convex mesh from an authored shape definition.</summary>
@@ -94,13 +107,14 @@ public sealed class LSMeshCollider : LSCollider
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get
         {
-            return Mesh.ScaledLocalRadius;
+            EnsureDetachedMassGeometry();
+            return GeometryMesh.ScaledLocalRadius;
         }
     }
 
     private protected override void PrepareShape(in ColliderShapeSnapshot snapshot)
     {
-        Mesh.PrepareTransformation(
+        GeometryMesh.PrepareTransformation(
             snapshot.Center,
             snapshot.Rotation,
             snapshot.OwnerScale,
@@ -112,23 +126,24 @@ public sealed class LSMeshCollider : LSCollider
             throw new InvalidOperationException(
                 "Prepared collider mass-property point is outside the Fixed64 coordinate domain.");
         }
-        SetPreparedBounds(Mesh.PreparedBounds);
+        SetPreparedGeometryReach(GeometryMesh.PreparedScaledLocalRadius);
+        SetPreparedBounds(GeometryMesh.PreparedBounds);
     }
 
     private protected override void PublishShape() =>
-        Mesh.PublishPreparedTransformation();
+        GeometryMesh.PublishPreparedTransformation();
 
     internal override ExactMassWeight CalculateMassPropertyWeight()
     {
         EnsureDetachedMassGeometry();
         if (InertiaPolicy == MeshInertiaPolicy.SurfaceApproximation)
         {
-            _ = Mesh.SurfaceMassProperties;
-            return Mesh.SurfaceMassWeight;
+            _ = GeometryMesh.SurfaceMassProperties;
+            return GeometryMesh.SurfaceMassWeight;
         }
 
-        if (Mesh.TryGetClosedVolumeMassProperties(out MeshMassProperties properties, out _))
-            return Mesh.GetCompoundMassIntegrals(usePrepared: false, InertiaPolicy).Weight;
+        if (GeometryMesh.TryGetClosedVolumeMassProperties(out MeshMassProperties properties, out _))
+            return GeometryMesh.GetCompoundMassIntegrals(usePrepared: false, InertiaPolicy).Weight;
 
         return ExactMassWeight.Zero;
     }
@@ -136,13 +151,13 @@ public sealed class LSMeshCollider : LSCollider
     internal override ExactMassWeight CalculatePreparedMassPropertyWeight()
     {
         if (InertiaPolicy == MeshInertiaPolicy.SurfaceApproximation)
-            return Mesh.PreparedSurfaceMassWeight;
+            return GeometryMesh.PreparedSurfaceMassWeight;
 
-        if (Mesh.TryGetPreparedClosedVolumeMassProperties(
+        if (GeometryMesh.TryGetPreparedClosedVolumeMassProperties(
             out MeshMassProperties properties,
             out _))
         {
-            return Mesh.GetCompoundMassIntegrals(usePrepared: true, InertiaPolicy).Weight;
+            return GeometryMesh.GetCompoundMassIntegrals(usePrepared: true, InertiaPolicy).Weight;
         }
 
         return ExactMassWeight.Zero;
@@ -154,7 +169,7 @@ public sealed class LSMeshCollider : LSCollider
         {
             EnsureDetachedMassGeometry();
             return InertiaPolicy == MeshInertiaPolicy.SurfaceApproximation
-                || Mesh.TryGetClosedVolumeMassProperties(out _, out _);
+                || GeometryMesh.TryGetClosedVolumeMassProperties(out _, out _);
         }
     }
 
@@ -165,9 +180,9 @@ public sealed class LSMeshCollider : LSCollider
         if (InertiaPolicy == MeshInertiaPolicy.SurfaceApproximation)
         {
             meshCenterOfMass =
-                Mesh.SurfaceMassProperties.CenterOfMass;
+                GeometryMesh.SurfaceMassProperties.CenterOfMass;
         }
-        else if (Mesh.TryGetClosedVolumeMassProperties(
+        else if (GeometryMesh.TryGetClosedVolumeMassProperties(
             out MeshMassProperties properties,
             out _))
         {
@@ -188,9 +203,9 @@ public sealed class LSMeshCollider : LSCollider
         if (InertiaPolicy == MeshInertiaPolicy.SurfaceApproximation)
         {
             meshCenterOfMass =
-                Mesh.PreparedSurfaceMassProperties.CenterOfMass;
+                GeometryMesh.PreparedSurfaceMassProperties.CenterOfMass;
         }
-        else if (Mesh.TryGetPreparedClosedVolumeMassProperties(
+        else if (GeometryMesh.TryGetPreparedClosedVolumeMassProperties(
             out MeshMassProperties properties,
             out _))
         {
@@ -229,15 +244,15 @@ public sealed class LSMeshCollider : LSCollider
                 _inertiaOriginValid = true;
             }
             if (_inertiaOriginExact && Vector3d.TrySubtract(localCenterOfMassOffset, _inertiaOrigin, out Vector3d reference))
-                return Mesh.CalculateInertiaTensor(mass, InertiaPolicy, reference);
+                return GeometryMesh.CalculateInertiaTensor(mass, InertiaPolicy, reference);
         }
         // Keep semantic offsets and first moments until the final mass-applied
         // conversion when a body-local reference cannot be mapped to a scalar.
         if (InertiaPolicy == MeshInertiaPolicy.SurfaceApproximation)
-            _ = Mesh.SurfaceMassProperties;
-        else if (!Mesh.TryGetClosedVolumeMassProperties(out _, out MeshVolumeValidationResult result))
+            _ = GeometryMesh.SurfaceMassProperties;
+        else if (!GeometryMesh.TryGetClosedVolumeMassProperties(out _, out MeshVolumeValidationResult result))
             throw new InvalidOperationException($"Mesh inertia requires a validated closed volume. Validation result: {result}.");
-        MeshMassIntegrals integrals = Mesh.GetCompoundMassIntegrals(false, InertiaPolicy);
+        MeshMassIntegrals integrals = GeometryMesh.GetCompoundMassIntegrals(false, InertiaPolicy);
         CompoundInertiaTensor exact = default;
         CompoundInertiaMath3D.AddMesh(ref exact, integrals, CompoundLocalRotation,
             TransformRelativeMassPropertyPointExact(integrals.Reference), localCenterOfMassOffset);
@@ -251,11 +266,12 @@ public sealed class LSMeshCollider : LSCollider
     {
         if (HasCommittedShape) return;
         GetCurrentShapeScales(out Vector3d ownerScale, out Vector3d partScale);
-        if (Mesh.OwnerScale == ownerScale && Mesh.PartScale == partScale) return;
+        if (GeometryMesh.HasRuntimeGeometry && GeometryMesh.OwnerScale == ownerScale && GeometryMesh.PartScale == partScale) return;
         // Authored part scale may be compensated by a later host scale; prepare
         // only when current properties are requested, never during construction.
-        Mesh.PrepareTransformation(Vector3d.Zero, FixedQuaternion.Identity, ownerScale, partScale, null);
-        Mesh.PublishPreparedTransformation();
+        GeometryMesh.PrepareTransformation(_offset, FixedQuaternion.Identity, ownerScale, partScale, null);
+        GeometryMesh.PublishPreparedTransformation();
+        _bounds = GeometryMesh.Bounds;
     }
 
     /// <inheritdoc/>
@@ -265,6 +281,7 @@ public sealed class LSMeshCollider : LSCollider
     /// <summary>Writes triangle indices near a world-space point into a caller-owned buffer.</summary>
     public void GetNearbyTriangles(Vector3d queryPoint, SwiftList<int> result)
     {
+        EnsureDetachedMassGeometry();
         FixedBoundVolume queryBounds = CreateQueryBounds(queryPoint, GetMeshQueryHalfExtent());
         GetTrianglesInBounds(queryBounds, result);
     }

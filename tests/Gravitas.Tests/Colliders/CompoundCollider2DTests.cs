@@ -354,7 +354,7 @@ public sealed class CompoundCollider2DTests
 
         initialize.Should()
             .Throw<ArgumentException>()
-            .WithParameterName("snapshot")
+            .WithParameterName("authoredHeight")
             .WithMessage("*Scaled 2D capsule height must be at least the capsule diameter.*");
         body.Active.Should().BeFalse();
         compound.Body.Should().BeNull();
@@ -439,7 +439,7 @@ public sealed class CompoundCollider2DTests
     }
 
     [Fact]
-    public void ScaledRadius_WithSaturatingVertexSquares_ShouldRemainConservative()
+    public void ScaledRadius_ShouldMeasureThePreparedPythagoreanEnvelope()
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext(extent: 2);
         var compound = new LSCompoundCollider2D(
@@ -447,13 +447,13 @@ public sealed class CompoundCollider2DTests
                 new[]
                 {
                     Vector2d.Zero,
-                    new Vector2d((Fixed64)60000, Fixed64.Zero),
-                    new Vector2d((Fixed64)60000, (Fixed64)80000)
+                    new Vector2d((Fixed64)600, Fixed64.Zero),
+                    new Vector2d((Fixed64)600, (Fixed64)800)
                 },
                 Vector2d.Zero));
         _ = CreateBody(context, compound, Vector2d.Zero);
 
-        compound.ScaledRadius.Should().Be((Fixed64)100000);
+        compound.ScaledRadius.Should().Be((Fixed64)1000);
     }
 
     [Fact]

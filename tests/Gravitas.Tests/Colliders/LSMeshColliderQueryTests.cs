@@ -51,7 +51,7 @@ public sealed class LSMeshColliderQueryTests
         hit.Should().BeTrue();
         hits.Count.Should().Be(1);
         hits[0].Should().Be(expected);
-        mesh.Mesh.TriangleBvhBuildCount.Should().Be(2);
+        mesh.Mesh.TriangleBvhBuildCount.Should().Be(1);
     }
 
     [Fact]
@@ -352,7 +352,7 @@ public sealed class LSMeshColliderQueryTests
     [Fact]
     public void ClosestPointOnSurface_WhenUpperBoundSaturates_ShouldUseFullAuthoredScan()
     {
-        Fixed64 offset = new(1_500_000_000);
+        Fixed64 offset = (Fixed64)1000;
         Vector3d nearby = new(offset, offset, Fixed64.Zero);
         var mesh = new LSMeshCollider(
             new[]
@@ -368,9 +368,9 @@ public sealed class LSMeshColliderQueryTests
             MeshColliderMode.Concave,
             MeshInertiaPolicy.RequireClosedVolume);
 
-        Vector3d closest = mesh.ClosestPointOnSurface(nearby + Vector3d.Forward);
+        Vector3d closest = mesh.ClosestPointOnSurface(new Vector3d(1_500_000_000, 1_500_000_000, 1));
 
-        closest.Should().Be(nearby);
+        closest.Should().Be(nearby + new Vector3d(Fixed64.Half, Fixed64.Half, Fixed64.Zero));
     }
 
     [Fact]
@@ -410,10 +410,12 @@ public sealed class LSMeshColliderQueryTests
             new[] { 0, 1, 2, 3, 4, 5 },
             MeshColliderMode.Concave,
             MeshInertiaPolicy.SurfaceApproximation);
-        mesh.Mesh.UpdateTransform(
+        mesh.LocalOffset = Vector3d.Zero;
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        mesh.InitializeWithNoBody(new TestMatterAgent(context, new FixedTransform(
             new Vector3d(Fixed64.MaxValue - Fixed64.Two, Fixed64.Zero, Fixed64.Zero),
             FixedQuaternion.Identity,
-            Vector3d.One);
+            Vector3d.One)));
 
         Vector3d above = new(Fixed64.MinValue, Fixed64.Zero, Fixed64.Two);
         Vector3d below = new(Fixed64.MinValue, Fixed64.Zero, -Fixed64.One);
@@ -450,13 +452,15 @@ public sealed class LSMeshColliderQueryTests
             new[] { 0, 1, 2, 3, 4, 5 },
             MeshColliderMode.Concave,
             MeshInertiaPolicy.SurfaceApproximation);
-        mesh.Mesh.UpdateTransform(
+        mesh.LocalOffset = Vector3d.Zero;
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        mesh.InitializeWithNoBody(new TestMatterAgent(context, new FixedTransform(
             new Vector3d(
                 Fixed64.MaxValue - Fixed64.FromFraction(1, 8),
                 Fixed64.Zero,
                 Fixed64.Zero),
             FixedQuaternion.Identity,
-            Vector3d.One);
+            Vector3d.One)));
 
         Action query = () => mesh.ClosestPointOnSurface(
             mesh.Mesh.Origin + Vector3d.Down * Fixed64.FromFraction(11, 2));
@@ -559,6 +563,7 @@ public sealed class LSMeshColliderQueryTests
     public void GetNearbyTriangles_ShouldUseDominantBoundsAxis()
     {
         LSMeshCollider mesh = CreateZDominantMesh();
+        _ = mesh.Mesh; // Explicit detached runtime preparation precedes bounds inspection.
         var indices = new SwiftList<int>();
         mesh.Bounds.Min.Should().Be(new Vector3d(
             Fixed64.Zero,

@@ -491,84 +491,78 @@ public sealed class FiniteAxisProjectionWorkerTests
     }
 
     [Fact]
-    public void FiniteSlabCapsuleProjection_WithExtremeCrossSection_ShouldPreserveEntryDistance()
+    public void FiniteSlabCapsuleProjection_WithSupportedCrossSection_ShouldPreserveEntryDistance()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
-        FixedQuaternion rotation = FixedQuaternion.FromEulerAnglesInDegrees(
-            Fixed64.Zero,
-            Fixed64.Zero,
-            (Fixed64)90);
+        // Equal quaternion components avoid Euler-angle approximation in this analytic quarter-turn fixture.
+        FixedQuaternion rotation = new FixedQuaternion(Fixed64.Zero, Fixed64.Zero,
+            Fixed64.One, Fixed64.One).Normalized;
         var capsule = new LSCapsuleCollider();
+        capsule.Radius = (Fixed64)5;
+        capsule.Size = new Vector3d((Fixed64)10, (Fixed64)12, (Fixed64)10);
         capsule.InitializeWithNoBody(new TestMatterAgent(
             context,
             new FixedTransform(Vector3d.Zero, rotation, Vector3d.One)));
-        capsule.Radius = (Fixed64)100_000;
-        capsule.Size = new Vector3d((Fixed64)200_000, (Fixed64)200_002, (Fixed64)200_000);
-        capsule.RebuildRuntimeShapeOnly().Should().BeTrue();
 
         bool found = FiniteSlabProjectionSweep.TrySweepCircleAgainstCapsule(
-            new Vector2d(Fixed64.Zero, (Fixed64)(-100_000)),
-            new Vector2d(Fixed64.Zero, (Fixed64)100_000),
+            new Vector2d(Fixed64.Zero, (Fixed64)(-5)),
+            new Vector2d(Fixed64.Zero, (Fixed64)5),
             Vector2d.Forward,
-            (Fixed64)200_000,
+            (Fixed64)10,
             Fixed64.Zero,
-            (Fixed64)60_000,
-            (Fixed64)60_000,
+            (Fixed64)3,
+            (Fixed64)3,
             capsule,
             out Fixed64 distance);
 
         found.Should().BeTrue();
-        (distance - (Fixed64)20_000).Abs()
+        (distance - Fixed64.One).Abs()
             .Should().BeLessThan(Fixed64.FromFraction(1, 1_000_000));
     }
 
     [Fact]
-    public void FiniteSlabCylinderProjection_WithExtremeCrossSection_ShouldPreserveEntryDistance()
+    public void FiniteSlabCylinderProjection_WithSupportedCrossSection_ShouldPreserveEntryDistance()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
-        FixedQuaternion rotation = FixedQuaternion.FromEulerAnglesInDegrees(
-            Fixed64.Zero,
-            Fixed64.Zero,
-            (Fixed64)90);
+        // Equal quaternion components avoid Euler-angle approximation in this analytic quarter-turn fixture.
+        FixedQuaternion rotation = new FixedQuaternion(Fixed64.Zero, Fixed64.Zero,
+            Fixed64.One, Fixed64.One).Normalized;
         var cylinder = new LSCylinderCollider();
+        cylinder.Radius = (Fixed64)1_000;
+        cylinder.Size = new Vector3d((Fixed64)2_000, (Fixed64)2, (Fixed64)2_000);
         cylinder.InitializeWithNoBody(new TestMatterAgent(
             context,
             new FixedTransform(Vector3d.Zero, rotation, Vector3d.One)));
-        cylinder.Radius = (Fixed64)100_000;
-        cylinder.Size = new Vector3d((Fixed64)200_000, (Fixed64)2, (Fixed64)200_000);
-        cylinder.RebuildRuntimeShapeOnly().Should().BeTrue();
 
         bool found = FiniteSlabProjectionSweep.TrySweepCircleAgainstCylinder(
-            new Vector2d(Fixed64.Zero, (Fixed64)(-100_000)),
-            new Vector2d(Fixed64.Zero, (Fixed64)100_000),
+            new Vector2d(Fixed64.Zero, (Fixed64)(-1_000)),
+            new Vector2d(Fixed64.Zero, (Fixed64)1_000),
             Vector2d.Forward,
-            (Fixed64)200_000,
+            (Fixed64)2_000,
             Fixed64.Zero,
-            (Fixed64)60_000,
-            (Fixed64)60_000,
+            (Fixed64)600,
+            (Fixed64)600,
             cylinder,
             out Fixed64 distance);
 
         found.Should().BeTrue();
-        (distance - (Fixed64)20_000).Abs()
+        (distance - (Fixed64)200).Abs()
             .Should().BeLessThan(Fixed64.FromFraction(1, 1_000_000));
     }
 
     [Fact]
-    public void FiniteSlabConeProjection_WithExtremeBaseCrossSection_ShouldPreserveEntryDistance()
+    public void FiniteSlabConeProjection_WithSupportedBaseCrossSection_ShouldPreserveEntryDistance()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
-        FixedQuaternion rotation = FixedQuaternion.FromEulerAnglesInDegrees(
-            Fixed64.Zero,
-            Fixed64.Zero,
-            (Fixed64)90);
+        // Equal quaternion components avoid Euler-angle approximation in this analytic quarter-turn fixture.
+        FixedQuaternion rotation = new FixedQuaternion(Fixed64.Zero, Fixed64.Zero,
+            Fixed64.One, Fixed64.One).Normalized;
         var cone = new LSConeCollider();
+        cone.Radius = (Fixed64)1_000;
+        cone.Size = new Vector3d((Fixed64)2_000, (Fixed64)2, (Fixed64)2_000);
         cone.InitializeWithNoBody(new TestMatterAgent(
             context,
             new FixedTransform(Vector3d.Zero, rotation, Vector3d.One)));
-        cone.Radius = (Fixed64)100_000;
-        cone.Size = new Vector3d((Fixed64)200_000, (Fixed64)2, (Fixed64)200_000);
-        cone.RebuildRuntimeShapeOnly().Should().BeTrue();
 
         FixedSegment.TryGetCenteredAxisEndpoint(
             cone.Center,
@@ -577,18 +571,18 @@ public sealed class FiniteAxisProjectionWorkerTests
             positive: false,
             out Vector3d baseCenter).Should().BeTrue();
         bool found = FiniteSlabProjectionSweep.TrySweepCircleAgainstCone(
-            new Vector2d(baseCenter.X, (Fixed64)(-100_000)),
-            new Vector2d(baseCenter.X, (Fixed64)100_000),
+            new Vector2d(baseCenter.X, (Fixed64)(-1_000)),
+            new Vector2d(baseCenter.X, (Fixed64)1_000),
             Vector2d.Forward,
-            (Fixed64)200_000,
+            (Fixed64)2_000,
             Fixed64.Zero,
-            (Fixed64)60_000,
-            (Fixed64)60_000,
+            (Fixed64)600,
+            (Fixed64)600,
             cone,
             out Fixed64 distance);
 
         found.Should().BeTrue();
-        (distance - (Fixed64)20_000).Abs()
+        (distance - (Fixed64)200).Abs()
             .Should().BeLessThan(Fixed64.FromFraction(1, 1_000_000));
     }
 

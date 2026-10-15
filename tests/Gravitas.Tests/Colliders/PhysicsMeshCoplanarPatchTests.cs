@@ -254,22 +254,16 @@ public sealed class PhysicsMeshCoplanarPatchTests
     [InlineData(0)]
     [InlineData(1)]
     [InlineData(2)]
-    public void UnrepresentableSeamDifferences_ShouldDeclineWithoutNarrowingTheMesh(int wideDifference)
+    public void UnrepresentableSeamDifferences_ShouldRejectUnsupportedGeometry(int wideDifference)
     {
         Fixed64 left = Fixed64.MinValue, right = Fixed64.MaxValue;
         Vector3d[] vertices = { new(left, Fixed64.Zero, Fixed64.Zero),
             new(wideDifference == 0 ? right : left + Fixed64.One, Fixed64.Zero, Fixed64.Zero),
             new(wideDifference == 1 ? right : left, Fixed64.Zero, Fixed64.One),
             new(wideDifference == 2 ? right : left, Fixed64.Zero, -Fixed64.One) };
-        PhysicsMesh mesh = Create(vertices, new[] { 0, 1, 2, 1, 0, 3 });
-
-        // These valid faces need a wider difference carrier than this optional
-        // topology certificate. Declining must preserve their authored geometry.
-        mesh.GetManifoldSurfaceOwner(0).Should().NotBe(mesh.GetManifoldSurfaceOwner(1));
-        mesh.GetManifoldSurfaceBoundaryVertexPairs(0).IsEmpty.Should().BeTrue();
-        mesh.GetManifoldSurfaceBoundaryVertexPairs(1).IsEmpty.Should().BeTrue();
-        mesh.VertexCount.Should().Be(4);
-        mesh.TriangleCount.Should().Be(2);
+        // A seam spanning the scalar domain cannot belong to admitted geometry.
+        Action create = () => _ = Create(vertices, new[] { 0, 1, 2, 1, 0, 3 });
+        create.Should().Throw<ArgumentException>().WithMessage("*geometry reach*");
     }
 
     [Fact]
@@ -317,7 +311,7 @@ public sealed class PhysicsMeshCoplanarPatchTests
     }
 
     [Fact]
-    public void RejectedPreparedMassProperties_ShouldNotPublishNewPatchOwnership()
+    public void RejectedPreparedGeometry_ShouldNotPublishNewPatchOwnership()
     {
         Vector3d[] vertices = { new(0, 0, 0), new(Fixed64.One, Fixed64.Quarter, Fixed64.Zero),
             new((Fixed64)3, Fixed64.FromFraction(3, 4), Fixed64.One), new(0, 0, 1) };
@@ -328,9 +322,8 @@ public sealed class PhysicsMeshCoplanarPatchTests
             new Vector3d(Fixed64.FromFraction(1, 3), Fixed64.One, (Fixed64)1000000),
             Vector3d.One, MeshInertiaPolicy.SurfaceApproximation);
 
-        // The geometry candidate loses coplanarity, then its million-unit
-        // thin-shell moments fail the existing representability contract.
-        prepare.Should().Throw<ArgumentException>().WithMessage("*surface mass properties*");
+        // The oversized candidate must fail before publishing its changed patch.
+        prepare.Should().Throw<ArgumentException>().WithMessage("*geometry reach*");
         mesh.GetManifoldSurfaceOwner(0).Should().Be(0);
         mesh.GetManifoldSurfaceBoundaryVertexPairs(0).ToArray().Should().Equal(boundary);
         mesh.GetConvexCoplanarPatchCornerVertexIndices(0).ToArray().Should().Equal(corners);

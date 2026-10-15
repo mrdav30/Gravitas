@@ -40,6 +40,7 @@ public abstract partial class LSCollider2D
         _localOffset = candidate._localOffset;
         _shapeVersion++;
         _preparedSnapshot = CreateReconfigurationSnapshot(candidate, _shapeVersion);
+        _preparedGeometryReach = candidate._preparedGeometryReach;
         _preparedBounds = candidate._preparedBounds;
         _preparedMixedBounds = candidate._preparedMixedBounds;
         PublishPreparedShape();

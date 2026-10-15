@@ -267,10 +267,7 @@ public sealed partial class MixedNarrowPhaseTests
             context,
             new LSCircleCollider2D(Fixed64.Half),
             Vector2d.Zero);
-        cuboid.Collider.LocalOffset = new Vector3d(
-            Fixed64.Zero,
-            Fixed64.MinValue + Fixed64.One,
-            Fixed64.Zero);
+        cuboid.Body.SetPosition(new Vector3d(Fixed64.Zero, Fixed64.MinValue + Fixed64.One, Fixed64.Zero));
         circle.Collider.MixedHalfThicknessOverride = Fixed64.FromRaw(1);
         circle.Agent.Transform.LocalPosition = new Vector3d(
             Fixed64.Zero,

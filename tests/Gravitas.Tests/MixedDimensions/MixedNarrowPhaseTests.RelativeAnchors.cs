@@ -124,10 +124,8 @@ public sealed partial class MixedNarrowPhaseTests
             new LSCircleCollider2D(Fixed64.Half),
             Vector2d.Zero);
         Fixed64 capsuleCenter = Fixed64.MaxValue - Fixed64.FromFraction(1, 4);
-        capsule.Collider.LocalOffset = new Vector3d(capsuleCenter, Fixed64.Zero, Fixed64.Zero);
-        circle.Collider.LocalOffset = new Vector2d(Fixed64.MaxValue, Fixed64.Zero);
-        capsule.Collider.RebuildRuntimeShapeOnly().Should().BeTrue();
-        circle.Collider.RebuildRuntimeShapeOnly().Should().BeTrue();
+        capsule.Body.SetPosition(new Vector3d(capsuleCenter, Fixed64.Zero, Fixed64.Zero));
+        circle.SetPosition(new Vector2d(Fixed64.MaxValue, Fixed64.Zero));
 
         CollisionDetectionMixed.TryCollide(
                 capsule.Collider,
@@ -164,15 +162,8 @@ public sealed partial class MixedNarrowPhaseTests
             Vector2d.Zero);
         Fixed64 capsuleCenter =
             Fixed64.MaxValue - Fixed64.FromFraction(1, 4);
-        capsule.Collider.LocalOffset = new Vector3d(
-            -capsuleCenter,
-            Fixed64.Zero,
-            Fixed64.Zero);
-        circle.Collider.LocalOffset = new Vector2d(
-            Fixed64.MaxValue,
-            Fixed64.Zero);
-        capsule.Collider.RebuildRuntimeShapeOnly().Should().BeTrue();
-        circle.Collider.RebuildRuntimeShapeOnly().Should().BeTrue();
+        capsule.Body.SetPosition(new Vector3d(capsuleCenter, Fixed64.Zero, Fixed64.Zero));
+        circle.SetPosition(new Vector2d(Fixed64.MaxValue, Fixed64.Zero));
         capsule.Collider.WorldAxis.Should().Be(Vector3d.Up);
 
         CollisionDetectionMixed.TryCollide(
@@ -245,15 +236,8 @@ public sealed partial class MixedNarrowPhaseTests
             : Fixed64.MinValue + Fixed64.FromFraction(1, 4);
         Fixed64 slabCoordinate =
             positive ? Fixed64.MaxValue : Fixed64.MinValue;
-        collider3D.LocalOffset = new Vector3d(
-            shapeCoordinate,
-            Fixed64.Zero,
-            Fixed64.Zero);
-        capsule2D.Collider.LocalOffset = new Vector2d(
-            slabCoordinate,
-            Fixed64.Zero);
-        collider3D.RebuildRuntimeShapeOnly().Should().BeTrue();
-        capsule2D.Collider.RebuildRuntimeShapeOnly().Should().BeTrue();
+        collider3D.Body!.SetPosition(new Vector3d(shapeCoordinate, Fixed64.Zero, Fixed64.Zero));
+        capsule2D.SetPosition(new Vector2d(slabCoordinate, Fixed64.Zero));
 
         CollisionDetectionMixed.TryCollide(
                 collider3D,
@@ -299,15 +283,8 @@ public sealed partial class MixedNarrowPhaseTests
             : Fixed64.MinValue + Fixed64.FromFraction(1, 4);
         Fixed64 slabCoordinate =
             positive ? Fixed64.MaxValue : Fixed64.MinValue;
-        collider3D.LocalOffset = new Vector3d(
-            shapeCoordinate,
-            Fixed64.Zero,
-            Fixed64.Zero);
-        circle2D.Collider.LocalOffset = new Vector2d(
-            slabCoordinate,
-            Fixed64.Zero);
-        collider3D.RebuildRuntimeShapeOnly().Should().BeTrue();
-        circle2D.Collider.RebuildRuntimeShapeOnly().Should().BeTrue();
+        collider3D.Body!.SetPosition(new Vector3d(shapeCoordinate, Fixed64.Zero, Fixed64.Zero));
+        circle2D.SetPosition(new Vector2d(slabCoordinate, Fixed64.Zero));
 
         CollisionDetectionMixed.TryCollide(
                 collider3D,
@@ -436,12 +413,8 @@ public sealed partial class MixedNarrowPhaseTests
             CreateBody2D(context, circleCollider, Vector2d.Zero);
         Fixed64 center =
             Fixed64.MaxValue - Fixed64.FromFraction(1, 4);
-        sphere.Collider.LocalOffset =
-            new Vector3d(center, Fixed64.Zero, Fixed64.Zero);
-        circle.Collider.LocalOffset =
-            new Vector2d(center, Fixed64.Zero);
-        sphere.Collider.RebuildRuntimeShapeOnly().Should().BeTrue();
-        circle.Collider.RebuildRuntimeShapeOnly().Should().BeTrue();
+        sphere.Body.SetPosition(new Vector3d(center, Fixed64.Zero, Fixed64.Zero));
+        circle.SetPosition(new Vector2d(center, Fixed64.Zero));
 
         CollisionDetectionMixed.TryCollide(
                 sphere.Collider,
@@ -462,55 +435,25 @@ public sealed partial class MixedNarrowPhaseTests
     }
 
     [Fact]
-    public void SphereCircleSlab_WithUnrepresentableInteriorDepth_ShouldClampExplicitly()
+    public void SphereCircleSlab_WithUnsupportedRadius_ShouldRejectBeforeNarrowPhase()
     {
         using GravitasWorldContext context = CreateMixedContext();
-        ScenarioBody<LSSphereCollider> sphere =
-            CreateSphere3D(context, Vector3d.Zero);
-        SolidBody2D circle = CreateBody2D(
-            context,
-            new LSCircleCollider2D(Fixed64.One),
-            Vector2d.Zero);
-        sphere.Collider.Radius = Fixed64.MaxValue;
-        sphere.Collider.RebuildRuntimeShapeOnly(
-            refreshMassProperties: false).Should().BeTrue();
-
-        CollisionDetectionMixed.TryCollide(
-                sphere.Collider,
-                circle.Collider,
-                out MixedContact contact)
-            .Should()
-            .BeTrue();
-
-        contact.Depth.Should().Be(Fixed64.MaxValue);
-        contact.DepthIsClamped.Should().BeTrue();
+        ScenarioBody<LSSphereCollider> sphere = CreateSphere3D(context, Vector3d.Zero);
+        System.Action mutate = () => sphere.Collider.Radius = Fixed64.MaxValue;
+        mutate.Should().Throw<System.ArgumentException>().WithMessage("*geometry reach*");
+        sphere.Collider.Radius.Should().Be(Fixed64.Half);
     }
 
     [Fact]
     public void SphereCircleSlab_WithUnrepresentableDiagonalSeparation_ShouldRejectContact()
     {
         using GravitasWorldContext context = CreateMixedContext();
-        ScenarioBody<LSSphereCollider> sphere =
-            CreateSphere3D(context, Vector3d.Zero);
-        SolidBody2D embedded = CreateBody2D(
-            context,
-            new LSCircleCollider2D(Fixed64.One),
-            Vector2d.Zero);
-        sphere.Collider.Radius = Fixed64.MaxValue;
-        embedded.Collider.LocalOffset =
-            Vector2d.One * (Fixed64)1_600_000_000;
-        sphere.Collider.RebuildRuntimeShapeOnly(
-            refreshMassProperties: false).Should().BeTrue();
-        embedded.Collider.RebuildRuntimeShapeOnly().Should().BeTrue();
-
-        sphere.Collider.Bounds.Intersects(embedded.Collider.MixedBounds3D)
-            .Should().BeTrue();
-        CollisionDetectionMixed.TryCollide(
-                sphere.Collider,
-                embedded.Collider,
-                out MixedContact contact)
-            .Should()
-            .BeFalse();
+        ScenarioBody<LSSphereCollider> sphere = CreateSphere3D(context, Vector3d.Zero);
+        SolidBody2D embedded = CreateBody2D(context, new LSCircleCollider2D(Fixed64.One), Vector2d.Zero);
+        sphere.Body.SetPosition(new Vector3d(Fixed64.MinValue + Fixed64.One, Fixed64.Zero, Fixed64.Zero));
+        embedded.SetPosition(Vector2d.One * (Fixed64)1_600_000_000);
+        CollisionDetectionMixed.TryCollide(sphere.Collider, embedded.Collider, out MixedContact contact)
+            .Should().BeFalse();
         contact.HasContact.Should().BeFalse();
     }
 
@@ -527,7 +470,7 @@ public sealed partial class MixedNarrowPhaseTests
             ? -Fixed64.FromFraction(1, 4)
             : Fixed64.FromFraction(1, 4);
         Vector3d localOffset = new(
-            embeddedX + centerOffset,
+            centerOffset,
             Fixed64.Zero,
             Fixed64.Zero);
         FixedQuaternion localRotation = Euler(0, 0, 90);
@@ -556,7 +499,7 @@ public sealed partial class MixedNarrowPhaseTests
         ScenarioBody<LSCompoundCollider> owner = CreateBody3D(
             context,
             new LSCompoundCollider(part),
-            Vector3d.Zero,
+            new Vector3d(embeddedX, Fixed64.Zero, Fixed64.Zero),
             FixedQuaternion.Identity);
         LSCollider collider3D = owner.Collider.GetPartCollider(0);
         SolidBody2D body2D = shape2D == ColliderType2D.Circle
@@ -574,10 +517,7 @@ public sealed partial class MixedNarrowPhaseTests
         LSCollider2D collider2D = body2D.Collider;
         if (embeddedX != Fixed64.Zero)
         {
-            collider2D.LocalOffset = new Vector2d(
-                embeddedX,
-                Fixed64.Zero);
-            collider2D.RebuildRuntimeShapeOnly().Should().BeTrue();
+            body2D.SetPosition(new Vector2d(embeddedX, Fixed64.Zero));
         }
         collider3D.Bounds.Intersects(collider2D.MixedBounds3D)
             .Should().BeTrue();

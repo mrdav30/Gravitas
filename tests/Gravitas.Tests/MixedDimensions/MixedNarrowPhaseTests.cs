@@ -901,11 +901,7 @@ public sealed partial class MixedNarrowPhaseTests
         using GravitasWorldContext context = CreateMixedContext();
         ScenarioBody<LSSphereCollider> sphere = CreateSphere3D(context, Vector3d.Zero);
         SolidBody2D polygon = CreateBody2D(context, CreateSquarePolygon(), Vector2d.Zero);
-        sphere.Collider.LocalOffset = new Vector3d(
-            Fixed64.MaxValue,
-            Fixed64.Zero,
-            Fixed64.MaxValue);
-        sphere.Collider.RebuildRuntimeShapeOnly();
+        sphere.Body.SetPosition(new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.MaxValue));
 
         CollisionDetectionMixed.TryGetRotationalSeparationGap(
                 sphere.Collider,
@@ -926,13 +922,8 @@ public sealed partial class MixedNarrowPhaseTests
             context,
             new LSCircleCollider2D(Fixed64.Half),
             Vector2d.Zero);
-        cuboid.Collider.LocalOffset = new Vector3d(
-            Fixed64.MinValue,
-            Fixed64.Zero,
-            Fixed64.Zero);
-        circle.Collider.LocalOffset = new Vector2d(Fixed64.MaxValue, Fixed64.Zero);
-        cuboid.Collider.RebuildRuntimeShapeOnly();
-        circle.Collider.RebuildRuntimeShapeOnly();
+        cuboid.Body.SetPosition(new Vector3d(Fixed64.MinValue, Fixed64.Zero, Fixed64.Zero));
+        circle.SetPosition(new Vector2d(Fixed64.MaxValue, Fixed64.Zero));
 
         CollisionDetectionMixed.TryGetRotationalSeparationGap(
                 cuboid.Collider,

@@ -81,33 +81,14 @@ public sealed class MeshConeContactTests
     }
 
     [Fact]
-    public void UnrepresentableRelativeCenter_WithInteriorIntersection_RetainsCanonicalContact()
+    public void UnsupportedConeRadius_RejectsBeforeSurfaceContact()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
-        var mesh = CreateTriangle(new Vector3d(-3, -1, 0), new Vector3d(3, -1, 0), new Vector3d(0, 1, 0));
-        scenario.InitializeStaticCollider(mesh, new Vector3d(3, 0, 0));
         var cone = new LSConeCollider { Radius = Fixed64.MaxValue, Size = Vector3d.One };
-        scenario.InitializeStaticCollider(cone, new Vector3d(Fixed64.MinValue + Fixed64.Two, Fixed64.Zero, Fixed64.Zero));
-
-        mesh.Bounds.Intersects(cone.Bounds).Should().BeTrue();
-        new FixedPointAnchor(cone.Center, FixedQuaternion.Identity, Vector3d.Zero)
-            .TryGetLocalPointIn(mesh.Mesh.Origin, mesh.Mesh.Rotation, out _).Should().BeFalse();
-        // At Y=-1/2+oneRaw the triangle includes X=1, strictly inside the cone.
-        // Rejecting the unrepresentable center would discard that real overlap.
-        CollisionPair pair = scenario.CreatePair(mesh, cone);
-        CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
-        // Surface samples publish once-rounded world anchors. Their provenance
-        // is the admitted finite domain, rather than a particular anchor frame.
-        foreach (ManifoldContact sample in pair.Manifold)
-        {
-            sample.TryGetPointA(out Vector3d point).Should().BeTrue();
-            point.Z.Should().Be(Fixed64.Zero);
-            point.Y.Should().BeInRange(-Fixed64.Half, Fixed64.Half);
-            point.X.Should().BeInRange(Fixed64.Zero, (Fixed64)6);
-            cone.ContainsWorldPoint(point, Fixed64.FromRaw(64)).Should().BeTrue();
-            sample.TryGetPointB(out _).Should().BeTrue();
-        }
-        pair.Manifold.PrimaryContact.Normal.IsNormalized().Should().BeTrue();
+        System.Action initialize = () => scenario.InitializeStaticCollider(cone,
+            new Vector3d(Fixed64.MinValue + Fixed64.Two, Fixed64.Zero, Fixed64.Zero));
+        initialize.Should().Throw<System.ArgumentException>().WithMessage("*geometry reach*");
+        cone.Id.Should().Be(-1);
     }
 
     [Fact]

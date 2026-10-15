@@ -57,27 +57,14 @@ public sealed partial class MixedNarrowPhaseTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void CapsuleCircleSlab_WithUnrepresentableFullHeight_ShouldPreserveAdmittedHalfThickness(bool zeroCoreSlab)
+    public void CapsuleCircleSlab_WithUnsupportedFullHeight_ShouldRejectBeforeRegistration(bool zeroCoreSlab)
     {
         using GravitasWorldContext context = CreateMixedContext();
-        ScenarioBody<LSCapsuleCollider> capsule = CreateBody3D(context,
-            new LSCapsuleCollider { Radius = Fixed64.One, Size = new Vector3d(2, 4, 2) },
-            Vector3d.Zero, FixedQuaternion.Identity);
-        LSCollider2D slab = zeroCoreSlab
-            ? new LSCapsuleCollider2D(Fixed64.One, Fixed64.Two)
-            : new LSCircleCollider2D(Fixed64.One);
+        LSCollider2D slab = zeroCoreSlab ? new LSCapsuleCollider2D(Fixed64.One, Fixed64.Two) : new LSCircleCollider2D(Fixed64.One);
         slab.MixedHalfThicknessOverride = Fixed64.MaxValue;
-        CreateBody2D(context, slab, Vector2d.Zero);
-        capsule.Collider.LocalOffset = new Vector3d(Fixed64.Zero, Fixed64.MaxValue - Fixed64.One, Fixed64.Zero);
-        capsule.Collider.RebuildRuntimeShapeOnly().Should().BeTrue();
-
-        CollisionDetectionMixed.TryCollide(capsule.Collider, slab, out MixedContact contact).Should().BeTrue();
-        // Radial escape is 1 + 1; the upper cap requires a translation of 3.
-        contact.Depth.Should().Be(Fixed64.Two);
-        contact.Normal3DTo2D.Y.Should().Be(Fixed64.Zero);
-        contact.DepthIsClamped.Should().BeFalse();
-        contact.Anchor3D.Origin.Should().Be(capsule.Collider.Center);
-        contact.Anchor2D.Origin.Should().Be(Vector3d.Zero);
+        System.Action initialize = () => CreateBody2D(context, slab, Vector2d.Zero);
+        initialize.Should().Throw<System.ArgumentException>().WithMessage("*geometry reach*");
+        slab.Id.Should().Be(-1);
     }
 
     [Theory]
@@ -155,22 +142,13 @@ public sealed partial class MixedNarrowPhaseTests
     }
 
     [Fact]
-    public void CapsuleCircleSlab_WithUnrepresentableDepth_ShouldPreserveClampFlag()
+    public void CapsuleCircleSlab_WithUnsupportedGeometry_ShouldRejectBeforeRegistration()
     {
         using GravitasWorldContext context = CreateMixedContext();
-        Fixed64 radius = (Fixed64)1_000_000_000;
-        ScenarioBody<LSCapsuleCollider> capsule = CreateBody3D(context,
-            new LSCapsuleCollider { Radius = radius, Size = new Vector3d(2_000_000_000, 2_000_000_000, 2_000_000_000) },
-            Vector3d.Zero, FixedQuaternion.Identity);
-        SolidBody2D circle = CreateBody2D(context,
-            new LSCircleCollider2D((Fixed64)1_500_000_000) { MixedHalfThicknessOverride = Fixed64.MaxValue }, Vector2d.Zero);
-
-        CollisionDetectionMixed.TryCollide(capsule.Collider, circle.Collider, out MixedContact contact).Should().BeTrue();
-        // Both radial (2.5 billion) and axial escape exceed the scalar domain.
-        contact.Depth.Should().Be(Fixed64.MaxValue);
-        contact.DepthIsClamped.Should().BeTrue();
-        contact.Anchor3D.Origin.Should().Be(Vector3d.Zero);
-        contact.Anchor2D.Origin.Should().Be(Vector3d.Zero);
+        var capsule = new LSCapsuleCollider { Radius = (Fixed64)1_000_000_000, Size = Vector3d.One * Fixed64.MaxValue };
+        System.Action initialize = () => CreateBody3D(context, capsule, Vector3d.Zero, FixedQuaternion.Identity);
+        initialize.Should().Throw<System.ArgumentException>();
+        capsule.Id.Should().Be(-1);
     }
 
     [Theory]

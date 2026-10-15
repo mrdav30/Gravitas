@@ -136,7 +136,18 @@ namespace Gravitas.Colliders
             Vector3d position,
             FixedQuaternion rotation,
             MeshColliderMode mode)
+            : this(vertices, triangles, mode, colliderOwned: false)
         {
+            PrepareTransformation(position, rotation, Vector3d.One, Vector3d.One, null);
+            PublishPreparedTransformation();
+        }
+
+        private readonly bool _colliderOwned;
+
+        // Collider authoring cannot commit geometry until its owner and part scales are known.
+        internal PhysicsMesh(Vector3d[] vertices, int[] triangles, MeshColliderMode mode, bool colliderOwned)
+        {
+            _colliderOwned = colliderOwned;
             SwiftThrowHelper.ThrowIfArgument(
                 mode != MeshColliderMode.Convex && mode != MeshColliderMode.Concave,
                 nameof(mode),
@@ -161,8 +172,7 @@ namespace Gravitas.Colliders
 
             _localBounds = CalculateBounds(_localVertices);
 
-            // Scale validation proves every vertex span and triangle cross product used
-            // by the exact topology predicates below is representable.
+            // Topology uses exact source predicates; effective geometry is admitted during preparation.
             int[] topologyTriangles = CreateTopologyTriangles(_localVertices, _triangles);
             _convexSatEdgeVertexPairs = Mode == MeshColliderMode.Convex
                 ? CreateConvexSatEdgeVertexPairs(_localVertices, topologyTriangles, _triangleCount)
@@ -179,13 +189,14 @@ namespace Gravitas.Colliders
                 _preparedSupportTreeNodes = new SupportTreeNode[(2 * _localVertices.Length) - 1];
             }
 
-            PrepareTransformation(position, rotation, Vector3d.One, Vector3d.One, null);
-            PublishPreparedTransformation();
         }
 
         /// <summary>Updates the mesh world-space position and rigid rotation.</summary>
+        /// <exception cref="InvalidOperationException">The mesh is owned by a collider.</exception>
         public void UpdatePosition(Vector3d position, FixedQuaternion rotation)
         {
+            SwiftThrowHelper.ThrowIfTrue(_colliderOwned, nameof(PhysicsMesh),
+                "Collider-owned mesh transformations must be changed through the collider or its host transform.");
             PrepareTransformation(position, rotation, _ownerScale, _partScale, null);
             PublishPreparedTransformation();
         }
@@ -193,8 +204,11 @@ namespace Gravitas.Colliders
         /// <summary>
         /// Updates the mesh center, normalized rigid rotation, and strictly positive authored scale.
         /// </summary>
+        /// <exception cref="InvalidOperationException">The mesh is owned by a collider.</exception>
         public void UpdateTransform(Vector3d position, FixedQuaternion rotation, Vector3d scale)
         {
+            SwiftThrowHelper.ThrowIfTrue(_colliderOwned, nameof(PhysicsMesh),
+                "Collider-owned mesh transformations must be changed through the collider or its host transform.");
             PrepareTransformation(position, rotation, scale, Vector3d.One, null);
             PublishPreparedTransformation();
         }

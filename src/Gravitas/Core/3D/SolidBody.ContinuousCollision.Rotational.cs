@@ -798,13 +798,15 @@ public partial class SolidBody
             return false;
         }
 
-        if (!Vector3d.TryGetMagnitude(separation, out Fixed64 distance)
-            || !Fixed64.TryAdd(sphere.ScaledRadius, otherRadius, out Fixed64 combinedRadius))
+        if (!Vector3d.TryGetMagnitude(separation, out Fixed64 distance))
         {
             separationGap = default;
             return false;
         }
 
+        // Both committed sphere radii are admitted (at most 4096 each);
+        // their sum stays representable independently of world separation.
+        Fixed64 combinedRadius = sphere.ScaledRadius + otherRadius;
         Fixed64 rawGap = distance - combinedRadius;
         if (!Fixed64.TryAdd(distance, combinedRadius, out Fixed64 characteristicScale)
             || !Fixed64.TryAdd(characteristicScale, other.ScaledRadius, out characteristicScale)

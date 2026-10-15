@@ -73,6 +73,7 @@ public sealed class ColliderBodyPoseTransaction2DTests
             if (FailPreparation)
                 throw new InvalidOperationException("Simulated shape-admission failure.");
 
+            SetPreparedGeometryReach(ColliderGeometryPolicy.Magnitude(Vector2d.One));
             SetPreparedBounds(FixedBoundArea.FromMinMax(
                 snapshot.Center - Vector2d.One,
                 snapshot.Center + Vector2d.One));

@@ -305,7 +305,7 @@ public sealed class Collider2DMassPropertyTests
     }
 
     [Fact]
-    public void InitializedCompound_ShouldAggregateAnUnrepresentableBodyLocalChildCenter()
+    public void InitializedBodylessCompound_ShouldAggregateAnUnrepresentableLocalChildCenter()
     {
         using GravitasWorldContext context =
             Physics2DTestWorld.CreateContext();
@@ -317,16 +317,9 @@ public sealed class Collider2DMassPropertyTests
                 Fixed64.MaxValue,
                 Fixed64.Zero)
         };
-        var body = new SolidBody2D(
-            new TestMatterAgent(context),
-            compound)
-        {
-            Mass = Fixed64.One
-        };
-
-        body.Initialize(
-            new Vector2d(Fixed64.MinValue, Fixed64.Zero),
-            Fixed64.Zero);
+        compound.InitializeWithNoBody(new TestMatterAgent(context,
+            new FixedTransform(new Vector3d(Fixed64.MinValue, Fixed64.Zero, Fixed64.Zero),
+                FixedQuaternion.Identity, Vector3d.One)));
 
         compound.CalculateLocalCenterOfMassOffset().Should().Be(
             new Vector2d(

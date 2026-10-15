@@ -24,6 +24,9 @@ public abstract partial class LSCollider
     private ColliderShapeSnapshot _preparedSnapshot;
     private FixedBoundBox _preparedBounds;
     private Fixed64 _canonicalCenteredProxyRadius = Fixed64.MaxValue;
+    private Fixed64 _preparedGeometryReach = Fixed64.MaxValue;
+
+    internal Fixed64 PreparedGeometryReach => _preparedGeometryReach;
     private Fixed64 _canonicalGroundProbeRadius;
     private GravitasWorldContext? _preparedContext;
     private FixedQuaternion _preparedCompoundLocalRotation = FixedQuaternion.Identity;
@@ -221,17 +224,18 @@ public abstract partial class LSCollider
 
     private void PrepareRuntimeShape(
         in ColliderShapeSnapshot snapshot,
-        bool requireRepresentableMassPoint)
+        bool includeBodyAttachment)
     {
         _preparedContext ??= _context;
         ValidateShapeCandidate(snapshot);
         _preparedSnapshot = snapshot;
+        _preparedGeometryReach = Fixed64.MaxValue;
         PrepareShape(snapshot);
-        SwiftThrowHelper.ThrowIfTrue(
-            requireRepresentableMassPoint
-                && !CalculatePreparedLocalMassPoint().TryGetPoint(out _),
-            nameof(requireRepresentableMassPoint),
-            "The collider's body-local center of mass is outside the Fixed64 coordinate domain.");
+        Fixed64 completeReach = _preparedGeometryReach;
+        if (includeBodyAttachment)
+            completeReach = ColliderGeometryPolicy.Add(
+                ColliderGeometryPolicy.Attachment(snapshot.LocalOffset, snapshot.OwnerScale), completeReach);
+        ColliderGeometryPolicy.ValidateReach(completeReach, nameof(snapshot));
     }
 
     private void PublishPreparedShape()
@@ -242,8 +246,9 @@ public abstract partial class LSCollider
         _committedPartScale = _preparedSnapshot.PartScale;
         _bounds = _preparedBounds;
         PublishShape();
-        _canonicalCenteredProxyRadius =
-            ColliderCanonicalBounds.GetCenteredProxyRadius(this);
+        _canonicalCenteredProxyRadius = this is LSCompoundCollider compound
+            ? ColliderCanonicalBounds.GetCompoundCenteredProxyRadius(compound)
+            : _preparedGeometryReach;
         _canonicalGroundProbeRadius =
             ColliderCanonicalBounds.GetGroundProbeRadius(this);
         _runtimeShapeState.Commit(_preparedSnapshot);
@@ -263,7 +268,7 @@ public abstract partial class LSCollider
                 rotation);
             PrepareRuntimeShape(
                 snapshot,
-                requireRepresentableMassPoint: true);
+                includeBodyAttachment: true);
             return true;
         }
         catch (System.ArgumentException)
@@ -333,7 +338,7 @@ public abstract partial class LSCollider
             definition.Radius);
         PrepareRuntimeShape(
             snapshot,
-            requireRepresentableMassPoint: true);
+            includeBodyAttachment: true);
     }
 
     internal void PublishPreparedBodyReconfiguration(
@@ -361,7 +366,7 @@ public abstract partial class LSCollider
         _preparedContext = agent.Context;
         PrepareRuntimeShape(
             snapshot,
-            requireRepresentableMassPoint: useRequestedPose);
+            includeBodyAttachment: useRequestedPose);
     }
 
     internal void PrepareCompoundPart(
@@ -382,7 +387,7 @@ public abstract partial class LSCollider
         _preparedCompoundLocalRotation = localRotation;
         PrepareRuntimeShape(
             snapshot,
-            requireRepresentableMassPoint: false);
+            includeBodyAttachment: false);
     }
 
     internal void PublishCompoundPart(
@@ -395,6 +400,9 @@ public abstract partial class LSCollider
         _context = context;
         PublishPreparedShape();
     }
+
+    private protected void SetPreparedGeometryReach(Fixed64 reach) =>
+        _preparedGeometryReach = reach;
 
     /// <summary>Sets the bounds for the shape transaction being prepared.</summary>
     protected void SetPreparedBounds(FixedBoundBox bounds) =>

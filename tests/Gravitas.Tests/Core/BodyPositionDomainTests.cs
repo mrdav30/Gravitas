@@ -472,16 +472,16 @@ public sealed class BodyPositionDomainTests
     }
 
     [Fact]
-    public void PairedCorrection2D_RoundedCompactScaleOutsideDomain_ShouldKeepTheRepresentableWeightedDistance()
+    public void PairedCorrection2D_UnrepresentableCompactScale_ShouldKeepTheExactWeightedDistance()
     {
         using GravitasWorldContext context = CreateContext();
-        Fixed64 radius = Fixed64.FromRaw(long.MaxValue / 2);
+        Fixed64 radius = (Fixed64)4095;
         var fixedCollider = new LSCircleCollider2D(radius);
         fixedCollider.InitializeWithNoBody(new TestMatterAgent(context,
             new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)));
         var actor = new SolidBody2D(new TestMatterAgent(context,
             new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)),
-            new LSCircleCollider2D(radius)) { Mass = Fixed64.FromRaw(3), SleepEnabled = false };
+            new LSCircleCollider2D(radius)) { Mass = Fixed64.MaxValue, SleepEnabled = false };
         actor.Initialize(Vector2d.Zero);
         Fixed64 depth = radius * Fixed64.Two;
         var pair = new CollisionPair2D(fixedCollider, actor.Collider);

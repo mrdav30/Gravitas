@@ -62,6 +62,7 @@ public sealed class LSSphereCollider : LSCollider
             snapshot.OwnerScale.Z,
             snapshot.PartScale.Z);
         _preparedRadius = FixedMath.Max(radiusX, FixedMath.Max(radiusY, radiusZ));
+        SetPreparedGeometryReach(_preparedRadius);
         _preparedArea = Fixed64.Pi * _preparedRadius * _preparedRadius;
         SetPreparedBounds(FixedBoundBox.FromCenterAndScopeClippedToDomain(
             snapshot.Center,

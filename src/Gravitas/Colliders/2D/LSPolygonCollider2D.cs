@@ -152,7 +152,7 @@ public sealed class LSPolygonCollider2D : LSCollider2D, IConvexVertexSource2D
 
     internal override ExactMassPoint2D CalculatePreparedLocalMassPoint()
     {
-        return TransformPreparedRelativeMassPropertyPointExact(
+        return TransformPreparedPartMassPropertyPointExact(
             _preparedMassProperties.Centroid);
     }
 
@@ -198,8 +198,18 @@ public sealed class LSPolygonCollider2D : LSCollider2D, IConvexVertexSource2D
         return Fixed64.MaxValue;
     }
 
+    internal Fixed64 GetCandidateGeometryReach(Vector2d ownerScale, Vector2d partScale)
+    {
+        Fixed64 reach = Fixed64.Zero;
+        for (int i = 0; i < _localVertices.Length; i++)
+            reach = FixedMath.Max(reach, ColliderGeometryPolicy.Magnitude(
+                ColliderScalePolicy.Scale(_localVertices[i], ownerScale, partScale)));
+        return reach;
+    }
+
     private protected override void PrepareShape(in ColliderShapeSnapshot2D snapshot)
     {
+        Fixed64 reach = Fixed64.Zero;
         bool verticesChanged = !HasCommittedShape
             || _scaledLocalVertices.Length != _localVertices.Length;
         for (int i = 0; i < _localVertices.Length; i++)
@@ -210,6 +220,7 @@ public sealed class LSPolygonCollider2D : LSCollider2D, IConvexVertexSource2D
                 snapshot.PartScale);
             verticesChanged = verticesChanged || scaledVertex != _scaledLocalVertices[i];
             _scaledLocalVerticesScratch[i] = scaledVertex;
+            reach = FixedMath.Max(reach, ColliderGeometryPolicy.Magnitude(scaledVertex));
         }
 
         // Positive scaling can collapse a small edge through rounding. Validate
@@ -225,6 +236,7 @@ public sealed class LSPolygonCollider2D : LSCollider2D, IConvexVertexSource2D
             _preparedMassProperties = _massProperties;
         }
 
+        SetPreparedGeometryReach(reach);
         SetPreparedBounds(FixedBoundArea.FromRotatedOffsetsClippedToDomain(
             snapshot.Center,
             snapshot.Rotation,

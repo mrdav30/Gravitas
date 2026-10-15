@@ -73,11 +73,13 @@ internal static class ContinuousCollisionBounds
             LSCollider2D second = targetCompound?.GetPartCollider(j) ?? target;
             if (ContinuousCollisionMath.AreBoundsSeparatedByMoreThan(first.Bounds, second.MixedBounds3D, motionBound))
                 continue;
-            if (first is LSMeshCollider mesh
-                && ColliderCanonicalBounds2D.TryGetMixedRelativeBounds(second, mesh.Mesh.Origin, mesh.Mesh.Rotation,
-                    out FixedBoundBox localBounds, out FixedOrientedBox orientedBounds)
-                && IsMeshSeparated(mesh, localBounds, motionBound, orientedBounds))
-                continue;
+            if (first is LSMeshCollider mesh)
+            {
+                ColliderCanonicalBounds2D.GetMixedRelativeBounds(second, mesh.Mesh.Origin, mesh.Mesh.Rotation,
+                    out FixedBoundBox localBounds, out FixedOrientedBox orientedBounds);
+                if (IsMeshSeparated(mesh, localBounds, motionBound, orientedBounds))
+                    continue;
+            }
             return false;
         }
         return true;
@@ -85,10 +87,7 @@ internal static class ContinuousCollisionBounds
 
     private static bool IsMeshSeparated(LSMeshCollider mesh, LSCollider other, Fixed64 motionBound)
     {
-        // A clipped capsule-local extent would discard geometry before translation.
-        if (other is LSCapsuleCollider capsule && Fixed64.CompareProducts(capsule.AxisLength,
-                Fixed64.Half, Fixed64.MaxValue - capsule.ScaledRadius, Fixed64.One) > 0)
-            return false;
+        // Admitted local capsule extents fit; retain clipping only in the final mesh-relative frame.
         return IsMeshSeparated(mesh, ColliderCanonicalBounds.GetRelativeBounds(other,
             mesh.Mesh.Origin, mesh.Mesh.Rotation), motionBound, (other as LSCuboidCollider)?.OrientedBox);
     }

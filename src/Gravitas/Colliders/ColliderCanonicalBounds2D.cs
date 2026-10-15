@@ -18,7 +18,7 @@ internal static class ColliderCanonicalBounds2D
 {
     // The caller supplies a compound leaf. Retain its authored local box until
     // the final mesh-relative transform; clipped world bounds lose boundary geometry.
-    internal static bool TryGetMixedRelativeBounds(LSCollider2D collider,
+    internal static void GetMixedRelativeBounds(LSCollider2D collider,
         Vector3d referenceOrigin, FixedQuaternion referenceRotation, out FixedBoundBox relativeBounds,
         out FixedOrientedBox orientedBounds)
     {
@@ -32,13 +32,7 @@ internal static class ColliderCanonicalBounds2D
         }
         else if (collider is LSCapsuleCollider2D capsule)
         {
-            // Preserve half-raw-unit extents; dividing the axis first can round down.
-            if (Fixed64.CompareProducts(capsule.AxisLength, Fixed64.Half,
-                    Fixed64.MaxValue - capsule.ScaledRadius, Fixed64.One) > 0)
-            {
-                relativeBounds = default;
-                return false;
-            }
+            // Admitted capsule reach bounds every local extent before world clipping.
             FixedBoundArea bounds = FixedBoundArea.FromCenteredRotatedCapsuleClippedToDomain(
                 Vector2d.Zero, Fixed64.Zero, capsule.AxisLength, capsule.ScaledRadius);
             minimum = bounds.Min;
@@ -57,11 +51,7 @@ internal static class ColliderCanonicalBounds2D
         }
         // Keep the enclosure centered on the canonical origin, avoiding another
         // rounded world-center transform for asymmetric authored polygons.
-        if (!Vector2d.TrySubtract(Vector2d.Zero, minimum, out Vector2d negativeMinimum))
-        {
-            relativeBounds = default;
-            return false;
-        }
+        Vector2d negativeMinimum = -minimum;
         Vector3d origin = new(collider.Center.X, collider.MixedSlabCenterY, collider.Center.Y);
         FixedQuaternion orientation = FixedQuaternion.FromAxisAngle(Vector3d.Up, -rotation);
         orientedBounds = new FixedOrientedBox(origin, orientation, new Vector3d(
@@ -71,25 +61,6 @@ internal static class ColliderCanonicalBounds2D
             origin, orientation,
             new Vector3d(minimum.X, -collider.MixedHalfThickness, minimum.Y),
             new Vector3d(maximum.X, collider.MixedHalfThickness, maximum.Y), referenceOrigin, referenceRotation);
-        return true;
-    }
-
-    internal static Fixed64 GetCurrentCenteredProxyRadius(
-        LSCollider2D collider)
-    {
-        if (collider is LSCompoundCollider2D compound)
-            return GetCurrentCompoundCenteredProxyRadius(compound);
-
-        return GetShapeCenteredProxyRadius(collider);
-    }
-
-    internal static Fixed64 GetCenteredProxyRadius(
-        LSCollider2D collider)
-    {
-        if (collider is LSCompoundCollider2D compound)
-            return GetCompoundCenteredProxyRadius(compound);
-
-        return GetShapeCenteredProxyRadius(collider);
     }
 
     private static Fixed64 GetShapeCenteredProxyRadius(
@@ -107,9 +78,6 @@ internal static class ColliderCanonicalBounds2D
                     capsule.ScaledRadius);
             return localBounds.Max.Y;
         }
-        if (collider.VertexCount == 0)
-            return Fixed64.MaxValue;
-
         Fixed64 radius = Fixed64.Zero;
         for (int index = 0; index < collider.VertexCount; index++)
         {
@@ -125,7 +93,23 @@ internal static class ColliderCanonicalBounds2D
         return radius;
     }
 
-    private static Fixed64 GetCurrentCompoundCenteredProxyRadius(
+    internal static Fixed64 GetCompoundCenteredProxyRadius(LSCompoundCollider2D compound)
+    {
+        Fixed64 radius = Fixed64.Zero;
+        for (int index = 0; index < compound.PartCount; index++)
+        {
+            var part = compound.GetPartCollider(index);
+            // Published centers include scalar transform rounding. Admission uses
+            // exact authored attachment reach; the CCD proxy must enclose the
+            // actual committed centers instead of reusing that admission metric.
+            Vector2d offset = part.CanonicalCenter - compound.CanonicalCenter;
+            radius = FixedMath.Max(radius, ColliderGeometryPolicy.Add(
+                ColliderGeometryPolicy.Magnitude(offset), part.CanonicalCenteredProxyRadius));
+        }
+        return radius;
+    }
+
+    internal static Fixed64 GetCurrentCompoundCenteredProxyRadius(
         LSCompoundCollider2D compound)
     {
         Fixed64 radius = Fixed64.Zero;
@@ -138,7 +122,7 @@ internal static class ColliderCanonicalBounds2D
                     out Fixed64 centerDistance);
             bool radiusResolved = Fixed64.TryAdd(
                 centerDistance,
-                GetCurrentCenteredProxyRadius(part),
+                GetShapeCenteredProxyRadius(part),
                 out Fixed64 partRadius);
             if (!(distanceResolved & radiusResolved))
                 return Fixed64.MaxValue;
@@ -158,205 +142,83 @@ internal static class ColliderCanonicalBounds2D
             return capsule.ScaledRadius;
         if (collider is LSCompoundCollider2D compound)
         {
-            return TryGetCompoundRelativeBounds(
-                compound,
-                compound.CanonicalCenter,
-                out Vector2d minimum,
-                out Vector2d maximum)
-                ? GetMinimumAbsoluteExtent(minimum, maximum)
-                : Fixed64.MaxValue;
+            GetCompoundRelativeBounds(compound, compound.CanonicalCenter,
+                out Vector2d minimum, out Vector2d maximum);
+            return GetMinimumAbsoluteExtent(minimum, maximum);
         }
         if (collider.VertexCount == 0)
             return Fixed64.Zero;
 
-        return TryGetConvexBoundsFromRelativeCenter(
-            collider,
-            Vector2d.Zero,
-            out Vector2d convexMinimum,
-            out Vector2d convexMaximum)
-            ? GetMinimumAbsoluteExtent(convexMinimum, convexMaximum)
-            : Fixed64.MaxValue;
+        GetConvexBoundsFromRelativeCenter(collider, Vector2d.Zero,
+            out Vector2d convexMinimum, out Vector2d convexMaximum);
+        return GetMinimumAbsoluteExtent(convexMinimum, convexMaximum);
     }
 
-    private static Fixed64 GetCompoundCenteredProxyRadius(
-        LSCompoundCollider2D compound)
+    private static void GetCompoundRelativeBounds(LSCompoundCollider2D compound,
+        Vector2d referenceCenter, out Vector2d minimum, out Vector2d maximum)
     {
-        Fixed64 radius = Fixed64.Zero;
+        minimum = maximum = default;
         for (int index = 0; index < compound.PartCount; index++)
         {
-            LSCollider2D part = compound.GetPartCollider(index);
-            bool offsetResolved = Vector2d.TrySubtract(
-                part.CanonicalCenter,
-                compound.CanonicalCenter,
-                out Vector2d centerOffset);
-            bool distanceResolved =
-                centerOffset.TryGetMagnitudeCeiling(
-                    out Fixed64 centerDistance);
-            bool radiusResolved = Fixed64.TryAdd(
-                centerDistance,
-                part.CanonicalCenteredProxyRadius,
-                out Fixed64 partRadius);
-            if (!(offsetResolved & distanceResolved & radiusResolved))
-                return Fixed64.MaxValue;
-
-            radius = FixedMath.Max(radius, partRadius);
-        }
-
-        return radius;
-    }
-
-    private static bool TryGetCompoundRelativeBounds(
-        LSCompoundCollider2D compound,
-        Vector2d referenceCenter,
-        out Vector2d minimum,
-        out Vector2d maximum)
-    {
-        minimum = default;
-        maximum = default;
-        bool hasBounds = false;
-        for (int index = 0; index < compound.PartCount; index++)
-        {
-            LSCollider2D part = compound.GetPartCollider(index);
-            if (!TryGetRelativeBounds(
-                    part,
-                    referenceCenter,
-                    out Vector2d partMinimum,
-                    out Vector2d partMaximum))
-            {
-                minimum = default;
-                maximum = default;
-                return false;
-            }
-
-            if (!hasBounds)
+            GetRelativeBounds(compound.GetPartCollider(index), referenceCenter,
+                out Vector2d partMinimum, out Vector2d partMaximum);
+            if (index == 0)
             {
                 minimum = partMinimum;
                 maximum = partMaximum;
-                hasBounds = true;
-                continue;
             }
-
-            minimum = new Vector2d(
-                FixedMath.Min(minimum.X, partMinimum.X),
-                FixedMath.Min(minimum.Y, partMinimum.Y));
-            maximum = new Vector2d(
-                FixedMath.Max(maximum.X, partMaximum.X),
-                FixedMath.Max(maximum.Y, partMaximum.Y));
+            else
+            {
+                minimum = new Vector2d(FixedMath.Min(minimum.X, partMinimum.X), FixedMath.Min(minimum.Y, partMinimum.Y));
+                maximum = new Vector2d(FixedMath.Max(maximum.X, partMaximum.X), FixedMath.Max(maximum.Y, partMaximum.Y));
+            }
         }
-
-        return hasBounds;
     }
 
-    private static bool TryGetRelativeBounds(
-        LSCollider2D collider,
-        Vector2d referenceCenter,
-        out Vector2d minimum,
-        out Vector2d maximum)
+    private static void GetRelativeBounds(LSCollider2D collider, Vector2d referenceCenter,
+        out Vector2d minimum, out Vector2d maximum)
     {
-        if (!Vector2d.TrySubtract(
-                collider.CanonicalCenter,
-                referenceCenter,
-                out Vector2d relativeCenter))
-        {
-            minimum = default;
-            maximum = default;
-            return false;
-        }
-
+        // Called only during publication. Admitted part spacing and local reach
+        // bound these relative coordinates, even at an absolute scalar face.
+        Vector2d relativeCenter = collider.CanonicalCenter - referenceCenter;
         if (collider is LSCircleCollider2D circle)
         {
-            return TryGetRoundBounds(
-                relativeCenter,
-                circle.ScaledRadius,
-                circle.ScaledRadius,
-                out minimum,
-                out maximum);
+            GetRoundBounds(relativeCenter, circle.ScaledRadius, circle.ScaledRadius, out minimum, out maximum);
+            return;
         }
-
         if (collider is LSCapsuleCollider2D capsule)
         {
-            FixedBoundArea centeredBounds =
-                FixedBoundArea.FromCenteredRotatedCapsuleClippedToDomain(
-                    Vector2d.Zero,
-                    capsule.Rotation,
-                    capsule.AxisLength,
-                    capsule.ScaledRadius);
-            return TryGetRoundBounds(
-                relativeCenter,
-                centeredBounds.Max.X,
-                centeredBounds.Max.Y,
-                out minimum,
-                out maximum);
+            FixedBoundArea centeredBounds = FixedBoundArea.FromCenteredRotatedCapsuleClippedToDomain(
+                Vector2d.Zero, capsule.Rotation, capsule.AxisLength, capsule.ScaledRadius);
+            GetRoundBounds(relativeCenter, centeredBounds.Max.X, centeredBounds.Max.Y, out minimum, out maximum);
+            return;
         }
-
-        return TryGetConvexBoundsFromRelativeCenter(
-            collider,
-            relativeCenter,
-            out minimum,
-            out maximum);
+        GetConvexBoundsFromRelativeCenter(collider, relativeCenter, out minimum, out maximum);
     }
 
-    private static bool TryGetRoundBounds(
-        Vector2d center,
-        Fixed64 extentX,
-        Fixed64 extentY,
-        out Vector2d minimum,
-        out Vector2d maximum)
+    private static void GetRoundBounds(Vector2d center, Fixed64 extentX, Fixed64 extentY,
+        out Vector2d minimum, out Vector2d maximum)
     {
-        bool representable =
-            Fixed64.TrySubtract(center.X, extentX, out Fixed64 minimumX)
-            & Fixed64.TrySubtract(center.Y, extentY, out Fixed64 minimumY)
-            & Fixed64.TryAdd(center.X, extentX, out Fixed64 maximumX)
-            & Fixed64.TryAdd(center.Y, extentY, out Fixed64 maximumY);
-        minimum = representable
-            ? new Vector2d(minimumX, minimumY)
-            : default;
-        maximum = representable
-            ? new Vector2d(maximumX, maximumY)
-            : default;
-        return representable;
+        Vector2d extents = new(extentX, extentY);
+        minimum = center - extents;
+        maximum = center + extents;
     }
 
-    private static bool TryGetConvexBoundsFromRelativeCenter(
-        LSCollider2D collider,
-        Vector2d relativeCenter,
-        out Vector2d minimum,
-        out Vector2d maximum)
+    private static void GetConvexBoundsFromRelativeCenter(LSCollider2D collider, Vector2d relativeCenter,
+        out Vector2d minimum, out Vector2d maximum)
     {
-        if (!Vector2d.TryTransformPoint(
-                relativeCenter,
-                collider.GetScaledLocalVertexUnchecked(0),
-                collider.ConvexRotation,
-                out minimum))
-        {
-            minimum = default;
-            maximum = default;
-            return false;
-        }
-
+        // Admission bounds the local rotated sums; retain the existing fused
+        // transform rounding rather than project products independently.
+        _ = Vector2d.TryTransformPoint(relativeCenter, collider.GetScaledLocalVertexUnchecked(0),
+            collider.ConvexRotation, out minimum);
         maximum = minimum;
         for (int index = 1; index < collider.VertexCount; index++)
         {
-            if (!Vector2d.TryTransformPoint(
-                    relativeCenter,
-                    collider.GetScaledLocalVertexUnchecked(index),
-                    collider.ConvexRotation,
-                    out Vector2d point))
-            {
-                minimum = default;
-                maximum = default;
-                return false;
-            }
-
-            minimum = new Vector2d(
-                FixedMath.Min(minimum.X, point.X),
-                FixedMath.Min(minimum.Y, point.Y));
-            maximum = new Vector2d(
-                FixedMath.Max(maximum.X, point.X),
-                FixedMath.Max(maximum.Y, point.Y));
+            _ = Vector2d.TryTransformPoint(relativeCenter, collider.GetScaledLocalVertexUnchecked(index),
+                collider.ConvexRotation, out Vector2d point);
+            minimum = new Vector2d(FixedMath.Min(minimum.X, point.X), FixedMath.Min(minimum.Y, point.Y));
+            maximum = new Vector2d(FixedMath.Max(maximum.X, point.X), FixedMath.Max(maximum.Y, point.Y));
         }
-
-        return true;
     }
 
     private static Fixed64 GetMinimumAbsoluteExtent(

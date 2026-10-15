@@ -25,6 +25,9 @@ public abstract partial class LSCollider2D
     private FixedBoundArea _preparedBounds;
     private FixedBoundBox _preparedMixedBounds;
     private Fixed64 _canonicalCenteredProxyRadius = Fixed64.MaxValue;
+    private Fixed64 _preparedGeometryReach = Fixed64.MaxValue;
+
+    internal Fixed64 PreparedGeometryReach => _preparedGeometryReach;
     private Fixed64 _canonicalGroundProbeRadius;
     private GravitasWorldContext? _preparedContext;
     private Fixed64 _preparedCompoundLocalRotation;
@@ -252,17 +255,19 @@ public abstract partial class LSCollider2D
 
     private void PrepareRuntimeShape(
         in ColliderShapeSnapshot2D snapshot,
-        bool requireRepresentableMassPoint)
+        bool includeBodyAttachment)
     {
         _preparedContext ??= _context;
         _preparedSnapshot = snapshot;
+        _preparedGeometryReach = Fixed64.MaxValue;
         PrepareShape(snapshot);
-        if (requireRepresentableMassPoint
-            && !CalculatePreparedLocalMassPoint().TryGetPoint(out _))
-        {
-            throw new System.InvalidOperationException(
-                "The 2D collider's body-local center of mass is outside the Fixed64 coordinate domain.");
-        }
+        Fixed64 completeReach = _preparedGeometryReach;
+        if (includeBodyAttachment)
+            completeReach = ColliderGeometryPolicy.Add(
+                ColliderGeometryPolicy.Attachment(snapshot.LocalOffset, snapshot.OwnerScale), completeReach);
+        if (_compoundOwner == null && _preparedContext?.Settings.RuntimeMode.RunsMixedContacts() == true)
+            completeReach = ColliderGeometryPolicy.Mixed(completeReach, snapshot.MixedHalfThickness);
+        ColliderGeometryPolicy.ValidateReach(completeReach, nameof(snapshot));
         Vector2d min = _preparedBounds.Min;
         Vector2d max = _preparedBounds.Max;
         _preparedMixedBounds = FixedBoundBox.FromMinMax(
@@ -287,8 +292,9 @@ public abstract partial class LSCollider2D
         _mixedSlabCenterY = _preparedSnapshot.MixedSlabCenterY;
         _mixedHalfThickness = _preparedSnapshot.MixedHalfThickness;
         PublishShape();
-        _canonicalCenteredProxyRadius =
-            ColliderCanonicalBounds2D.GetCenteredProxyRadius(this);
+        _canonicalCenteredProxyRadius = this is LSCompoundCollider2D compound
+            ? ColliderCanonicalBounds2D.GetCompoundCenteredProxyRadius(compound)
+            : _preparedGeometryReach;
         _canonicalGroundProbeRadius =
             ColliderCanonicalBounds2D.GetGroundProbeRadius(this);
         _runtimeShapeState.Commit(_preparedSnapshot);
@@ -310,7 +316,7 @@ public abstract partial class LSCollider2D
                 : CreateDetachedBodySnapshot(position, rotation);
             PrepareRuntimeShape(
                 snapshot,
-                requireRepresentableMassPoint: true);
+                includeBodyAttachment: true);
             return true;
         }
         catch (System.ArgumentException)
@@ -375,7 +381,7 @@ public abstract partial class LSCollider2D
         _preparedContext = agent.Context;
         PrepareRuntimeShape(
             snapshot,
-            requireRepresentableMassPoint: useRequestedPose);
+            includeBodyAttachment: useRequestedPose);
     }
 
     internal void PrepareCompoundPart(
@@ -396,7 +402,7 @@ public abstract partial class LSCollider2D
         _preparedCompoundLocalRotation = localRotation;
         PrepareRuntimeShape(
             snapshot,
-            requireRepresentableMassPoint: false);
+            includeBodyAttachment: false);
     }
 
     internal void PublishCompoundPart(
@@ -409,6 +415,9 @@ public abstract partial class LSCollider2D
         _context = context;
         PublishPreparedShape();
     }
+
+    private protected void SetPreparedGeometryReach(Fixed64 reach) =>
+        _preparedGeometryReach = reach;
 
     /// <summary>Sets the bounds for the shape transaction being prepared.</summary>
     protected void SetPreparedBounds(FixedBoundArea bounds) =>

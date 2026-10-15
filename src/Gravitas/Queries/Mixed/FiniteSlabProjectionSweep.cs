@@ -135,10 +135,7 @@ internal static partial class FiniteSlabProjectionSweep
         for (int i = 0; i < maxConservativeAdvancementIterations; i++)
         {
             Vector2d point = segment.GetPointAtDistance(travelDistance, length);
-            if (!TryComputeDistance(point, radius, target, out PlanarGjkResult result))
-            {
-                return false;
-            }
+            PlanarGjkResult result = ComputeDistance(point, radius, target);
 
             if (result.Distance <= SweepContactTolerance)
             {
@@ -167,10 +164,7 @@ internal static partial class FiniteSlabProjectionSweep
                 || stepDistance > remainingDistance;
             if (reachedEndpoint)
             {
-                if (!TryComputeDistance(end, radius, target, out PlanarGjkResult endpoint))
-                {
-                    return false;
-                }
+                PlanarGjkResult endpoint = ComputeDistance(end, radius, target);
 
                 if (endpoint.Distance <= SweepContactTolerance)
                 {
@@ -187,11 +181,10 @@ internal static partial class FiniteSlabProjectionSweep
         return false;
     }
 
-    private static bool TryComputeDistance(
+    private static PlanarGjkResult ComputeDistance(
         Vector2d point,
         Fixed64 expansionRadius,
-        ProjectionTarget target,
-        out PlanarGjkResult result)
+        ProjectionTarget target)
     {
         Span<PlanarSupportPoint> simplex = stackalloc PlanarSupportPoint[3];
         int workingShift = target.SelectWorkingShift(point, expansionRadius);
@@ -214,17 +207,8 @@ internal static partial class FiniteSlabProjectionSweep
 
         for (int i = 0; i < MaxGjkIterations; i++)
         {
-            if (!TryCreateSupportPoint(
-                    point,
-                    expansionRadius,
-                    target,
-                    direction,
-                    workingShift,
-                    out PlanarSupportPoint support))
-            {
-                result = default;
-                return false;
-            }
+            PlanarSupportPoint support = CreateSupportPoint(
+                point, expansionRadius, target, direction, workingShift);
 
             if (ContainsSupportPoint(simplex, simplexCount, support.Point))
                 break;
@@ -240,8 +224,7 @@ internal static partial class FiniteSlabProjectionSweep
             if (closest.Intersects
                 || (distanceIsRepresentable && workingDistance <= workingDistanceTolerance))
             {
-                result = PlanarGjkResult.Intersection;
-                return true;
+                return PlanarGjkResult.Intersection;
             }
 
             if (hasPreviousDistance
@@ -258,32 +241,27 @@ internal static partial class FiniteSlabProjectionSweep
 
         Fixed64 distance = GjkSimplexScale.RestoreDistance(workingDistance, workingShift);
         Vector2d normal = closest.Point.Normalized;
-        result = new PlanarGjkResult(distance, normal);
-        return true;
+        return new PlanarGjkResult(distance, normal);
     }
 
-    private static bool TryCreateSupportPoint(
+    private static PlanarSupportPoint CreateSupportPoint(
         Vector2d point,
         Fixed64 expansionRadius,
         ProjectionTarget target,
         Vector2d direction,
-        int workingShift,
-        out PlanarSupportPoint support)
+        int workingShift)
     {
         Vector2d supportDirection = direction.Normalized;
         Vector2d targetDirection = -supportDirection;
-        if (!target.TrySupport(targetDirection, out Vector2d targetSupport, out bool translated))
-        {
-            support = default;
-            return false;
-        }
+        // The initial right support established a nonempty slab intersection;
+        // admission and the chosen chart bound every later directional support.
+        _ = target.TrySupport(targetDirection, out Vector2d targetSupport, out bool translated);
 
         Vector2d expansion = targetDirection * expansionRadius;
-        support = new PlanarSupportPoint(
+        return new PlanarSupportPoint(
             translated
                 ? GjkSimplexScale.CreateWorkingDifference(point, target.Center, targetSupport, expansion, workingShift)
                 : GjkSimplexScale.CreateWorkingDifference(point, targetSupport, expansion, workingShift));
-        return true;
     }
 
     private static ClosestPlanarSimplexResult SolveClosestSimplex(
@@ -491,15 +469,13 @@ internal static partial class FiniteSlabProjectionSweep
             Fixed64 radius = capsule?.ScaledRadius ?? cylinder?.ScaledRadius ?? cone!.ScaledRadius;
             Fixed64 halfLength = Fixed64.FromRaw((length.m_rawValue >> 1) + (length.m_rawValue & 1));
             Fixed64 axialComponent = FixedMath.Max(axis.X.Abs(), axis.Z.Abs());
-            _supportExtent = default;
             // Support uses a rounded axis, so exact rigid bounds alone cannot select the frame.
-            bool hasSupportExtent = Fixed64.TryMultiplyAdd(halfLength, axialComponent, radius, out Fixed64 extent)
-                && Fixed64.TryAdd(extent, Fixed64.MinIncrement, out _supportExtent);
+            // The admitted local dimensions bound this envelope well below the scalar limit.
+            _ = Fixed64.TryMultiplyAdd(halfLength, axialComponent, radius, out Fixed64 extent);
+            _supportExtent = extent + Fixed64.MinIncrement;
             Vector2d planarExtent = new(_supportExtent, _supportExtent);
-            // Huge local envelopes retain absolute support: translation can make them unrepresentable.
-            _useTranslatedSupport = hasSupportExtent
-                && (!Vector2d.TryAdd(center, planarExtent, out _)
-                    || !Vector2d.TrySubtract(center, planarExtent, out _));
+            _useTranslatedSupport = !Vector2d.TryAdd(center, planarExtent, out _)
+                    || !Vector2d.TrySubtract(center, planarExtent, out _);
         }
 
         public Vector2d Center => _center;

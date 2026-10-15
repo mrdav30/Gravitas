@@ -111,16 +111,13 @@ public sealed class Collider2DShapeTests
                 Fixed64.One));
         var body = new SolidBody2D(
             new TestMatterAgent(context, transform),
-            collider)
-        {
-            Mass = Fixed64.One
-        };
+            collider);
 
         Action initialize = () => body.Initialize(Vector2d.Zero);
 
         initialize.Should()
             .Throw<ArgumentException>()
-            .WithParameterName("snapshot");
+            .WithParameterName("authoredHeight");
     }
 
     [Fact]

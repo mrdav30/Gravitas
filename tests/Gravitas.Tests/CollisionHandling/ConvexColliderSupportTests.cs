@@ -11,6 +11,32 @@ namespace Gravitas.Tests.CollisionHandlingTests;
 
 public sealed class ConvexColliderSupportTests
 {
+    [Fact]
+    public void Intersects_WhenLaterRemoteSupportLeavesTheScalarDomain_ShouldRejectSeparation()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        FixedQuaternion tilt = new FixedQuaternion(Fixed64.Zero, Fixed64.Zero,
+            -Fixed64.FromRaw(2147), Fixed64.One).Normalized;
+        var size = new Vector3d(Fixed64.FromRaw(4295), (Fixed64)4000, Fixed64.One);
+        var first = new LSCuboidCollider { Size = size };
+        var second = new LSCuboidCollider { Size = size };
+        first.InitializeWithNoBody(new TestMatterAgent(context,
+            new FixedTransform(Vector3d.Zero, tilt, Vector3d.One)));
+        second.InitializeWithNoBody(new TestMatterAgent(context, new FixedTransform(
+            new Vector3d(Fixed64.MaxValue - Fixed64.MinIncrement, Fixed64.Zero, Fixed64.Zero),
+            tilt, Vector3d.One)));
+
+        // A small change in search direction switches the ends of ordinary thin
+        // rods; their remote world-space support difference still needs a guard.
+        FixedPointAnchor a = ConvexColliderSupport.GetSupportAnchor(first, Vector3d.Right, Vector3d.Zero);
+        FixedPointAnchor b = ConvexColliderSupport.GetSupportAnchor(second, Vector3d.Left, Vector3d.Zero);
+        a.TryGetOffsetFrom(b, out Vector3d difference).Should().BeTrue();
+        a = ConvexColliderSupport.GetSupportAnchor(first, -difference, Vector3d.Zero);
+        b = ConvexColliderSupport.GetSupportAnchor(second, difference, Vector3d.Zero);
+        a.TryGetOffsetFrom(b, out _).Should().BeFalse();
+        ConvexColliderSupport.Intersects(first, second).Should().BeFalse();
+    }
+
     [Theory]
     [InlineData(1, false)]
     [InlineData(1, true)]
@@ -370,34 +396,23 @@ public sealed class ConvexColliderSupportTests
             scenario.CreateCuboid(Vector3d.Zero);
         ScenarioBody<LSCuboidCollider> second =
             scenario.CreateCuboid(Vector3d.Zero);
-        first.Collider.LocalOffset = new Vector3d(
-            Fixed64.MinValue + Fixed64.One,
-            Fixed64.Zero,
-            Fixed64.Zero);
-        second.Collider.LocalOffset = new Vector3d(
-            Fixed64.MaxValue - Fixed64.One,
-            Fixed64.Zero,
-            Fixed64.Zero);
-        first.Collider.RebuildRuntimeShapeOnly().Should().BeTrue();
-        second.Collider.RebuildRuntimeShapeOnly().Should().BeTrue();
+        first.Body.ResetPosition(new Vector3d(Fixed64.MinValue + Fixed64.One, Fixed64.Zero, Fixed64.Zero), FixedQuaternion.Identity);
+        second.Body.ResetPosition(new Vector3d(Fixed64.MaxValue - Fixed64.One, Fixed64.Zero, Fixed64.Zero), FixedQuaternion.Identity);
+        first.Collider.RebuildRuntimeShapeOnly();
+        second.Collider.RebuildRuntimeShapeOnly();
 
         ConvexColliderSupport.Intersects(first.Collider, second.Collider)
             .Should().BeFalse();
     }
 
     [Fact]
-    public void Intersects_WhenLaterSupportDifferenceLeavesDomain_ShouldRejectCandidate()
+    public void Intersects_WithUnsupportedSphere_ShouldRejectBeforeNarrowPhase()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
-        var huge = new LSSphereCollider
-        {
-            Radius = Fixed64.MaxValue,
-        };
-        scenario.InitializeStaticCollider(huge, Vector3d.Zero);
-        LSSphereCollider small = scenario.CreateStaticSphere(
-            new Vector3d(Fixed64.Half, Fixed64.Zero, Fixed64.Zero));
-
-        ConvexColliderSupport.Intersects(huge, small).Should().BeFalse();
+        var huge = new LSSphereCollider { Radius = Fixed64.MaxValue };
+        Action initialize = () => scenario.InitializeStaticCollider(huge, Vector3d.Zero);
+        initialize.Should().Throw<ArgumentException>().WithMessage("*geometry reach*");
+        huge.Id.Should().Be(-1);
     }
 
     [Fact]

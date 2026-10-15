@@ -233,10 +233,11 @@ public partial class PhysicsMesh
             first.StartVertexIndex, first.EndVertexIndex)];
         Vector3d secondOpposite = vertices[FindOppositeVertexIndex(triangles, second.TriangleIndex,
             first.StartVertexIndex, first.EndVertexIndex)];
-        if (!Vector3d.TrySubtract(end, start, out Vector3d edge)
-            || !Vector3d.TrySubtract(firstOpposite, start, out Vector3d firstOffset)
-            || !Vector3d.TrySubtract(secondOpposite, start, out Vector3d secondOffset))
-            return -1;
+        // Prepared vertices have already passed the centered reach limit, so
+        // these local differences are bounded by twice that limit.
+        Vector3d edge = end - start;
+        Vector3d firstOffset = firstOpposite - start;
+        Vector3d secondOffset = secondOpposite - start;
         if (Vector3d.ScalarTripleProductSign(edge, firstOffset, secondOffset) != 0)
             return 0;
 

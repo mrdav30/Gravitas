@@ -606,38 +606,12 @@ internal sealed partial class ConvexSweepQueryWorker
                 out Fixed64 stepNumerator);
             Fixed64 nextTravelNumerator =
                 travelNumerator + stepNumerator;
-            if (result.Distance > closingPerFraction
-                || nextTravelNumerator > _length)
+            if (nextTravelNumerator >= _length)
             {
-                ConvexShape endpointSource = sourceShape.WithSourceOffset(_displacement);
-                GjkResult endpointResult = ComputeDistance(endpointSource, targetShape);
-                if (!endpointResult.Intersects && endpointResult.Distance > ContactTolerance)
-                    return false;
-
-                ContactAnchor anchor = ResolveHitAnchor(
-                    targetShape,
-                    targetCollider,
-                    endpointSource,
-                    endpointResult,
-                    out Vector3d point,
-                    out bool hasMaterializedPoint,
-                    out bool hasRefinedSurfaceNormal);
-                Vector3d hitNormal = ResolveHitNormal(
-                    targetShape,
-                    targetCollider,
-                    point,
-                    endpointResult.Normal,
-                    normal,
-                    hasRefinedSurfaceNormal,
-                    hasMaterializedPoint);
-                hit = new Physics3DHit(
-                    targetCollider,
-                    anchor,
-                    hitNormal,
-                    _length,
-                    _outputDirection);
-                hitNumerator = _length;
-                return true;
+                // A capped full-length step also covers every overshoot. Reuse
+                // endpoint materialization without refining a zero-width bracket.
+                return TryResolveEndpointBracket(sourceShape, targetShape, targetCollider,
+                    _length, out hit, out hitNumerator, normal);
             }
 
             travelNumerator = nextTravelNumerator;
@@ -658,7 +632,8 @@ internal sealed partial class ConvexSweepQueryWorker
         LSCollider targetCollider,
         Fixed64 lowerNumerator,
         out Physics3DHit hit,
-        out Fixed64 hitNumerator)
+        out Fixed64 hitNumerator,
+        Vector3d fallbackNormal = default)
     {
         hit = default;
         hitNumerator = default;
@@ -713,7 +688,7 @@ internal sealed partial class ConvexSweepQueryWorker
             targetCollider,
             point,
             upperResult.Normal,
-            Vector3d.Zero,
+            fallbackNormal,
             hasRefinedSurfaceNormal,
             hasMaterializedPoint);
         hit = new Physics3DHit(

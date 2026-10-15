@@ -31,7 +31,6 @@ public partial class PhysicsMesh
     private Fixed64 _scaledLocalRadius;
     private FixedBoundBox _scaledLocalBounds;
     private MeshSurfaceMassProperties _surfaceMassProperties;
-    private bool _surfaceMassPropertiesValid;
 
     private Vector3d _preparedPosition;
     private Vector3d _preparedOwnerScale;
@@ -43,7 +42,6 @@ public partial class PhysicsMesh
     private ExactMassWeight _preparedScaledTotalAreaWeight;
     private Fixed64 _preparedScaledLocalRadius;
     private MeshSurfaceMassProperties _preparedSurfaceMassProperties;
-    private bool _preparedSurfaceMassPropertiesValid;
     private bool _preparedGeometryChanged;
 
     /// <summary>
@@ -63,6 +61,10 @@ public partial class PhysicsMesh
     public FixedBoundBox ScaledLocalBounds => _scaledLocalBounds;
 
     internal Fixed64 ScaledLocalRadius => _scaledLocalRadius;
+
+    internal Fixed64 PreparedScaledLocalRadius => _preparedScaledLocalRadius;
+
+    internal bool HasRuntimeGeometry => _scaleInitialized;
 
     internal ExactMassWeight SurfaceMassWeight =>
         _scaledTotalAreaWeight;
@@ -124,16 +126,7 @@ public partial class PhysicsMesh
     /// <summary>
     /// Gets cached uniform thin-shell mass properties for the committed geometry.
     /// </summary>
-    public MeshSurfaceMassProperties SurfaceMassProperties
-    {
-        get
-        {
-            if (!_surfaceMassPropertiesValid)
-                throw new InvalidOperationException("Scaled mesh surface mass properties are not representable.");
-
-            return _surfaceMassProperties;
-        }
-    }
+    public MeshSurfaceMassProperties SurfaceMassProperties => _surfaceMassProperties;
 
     internal void PrepareTransformation(
         Vector3d position,
@@ -159,14 +152,6 @@ public partial class PhysicsMesh
             PrepareScaledGeometry(ownerScale, partScale);
         else
             CopyCommittedGeometryCandidate();
-
-        if (inertiaPolicy == MeshInertiaPolicy.SurfaceApproximation
-            && !_preparedSurfaceMassPropertiesValid)
-        {
-            throw new ArgumentException(
-                "Mesh scale must preserve representable surface mass properties.",
-                nameof(ownerScale));
-        }
 
         PrepareClosedVolumeMassProperties(
             inertiaPolicy,
@@ -227,7 +212,6 @@ public partial class PhysicsMesh
                 cache.CurrentValid = cache.PreparedValid;
                 if (cache.Runtime != null) cache.Runtime.Ready = false;
             }
-            _surfaceMassPropertiesValid = _preparedSurfaceMassPropertiesValid;
             _triangleBvhBuildCount++;
             PublishPreparedClosedVolumeMassProperties();
         }
@@ -328,6 +312,7 @@ public partial class PhysicsMesh
             }
         }
 
+        ColliderGeometryPolicy.ValidateReach(_preparedScaledLocalRadius, nameof(ownerScale));
         _preparedScaledLocalBounds = CalculateBounds(_preparedScaledLocalVertices);
         _preparedScaledTotalArea = Fixed64.Zero;
         _preparedScaledTotalAreaWeight = ExactMassWeight.Zero;
@@ -359,18 +344,17 @@ public partial class PhysicsMesh
             _preparedScaledFaceNormals[i] = normal;
         }
 
-        _preparedSurfaceMassPropertiesValid = MeshSurfaceMassProperties.TryCreate(
+        _preparedSurfaceMassProperties = MeshSurfaceMassProperties.Create(
             _preparedScaledLocalVertices,
             _triangles,
             _preparedScaledTotalArea,
             out _preparedScaledTotalAreaWeight,
-            out _preparedSurfaceMassProperties,
             out MeshMassIntegrals shellIntegrals);
         for (CompoundMassCache? cache = _compoundMassCache; cache != null; cache = cache.Alternate)
         {
             if (cache.Policy != MeshInertiaPolicy.SurfaceApproximation) continue;
             cache.Prepared = shellIntegrals;
-            cache.PreparedValid = _preparedSurfaceMassPropertiesValid;
+            cache.PreparedValid = true;
         }
 
         PrepareCoplanarPatches(_preparedScaledLocalVertices);
@@ -407,7 +391,6 @@ public partial class PhysicsMesh
             _scaledTotalAreaWeight;
         _preparedScaledLocalRadius = _scaledLocalRadius;
         _preparedSurfaceMassProperties = _surfaceMassProperties;
-        _preparedSurfaceMassPropertiesValid = _surfaceMassPropertiesValid;
     }
 
 }

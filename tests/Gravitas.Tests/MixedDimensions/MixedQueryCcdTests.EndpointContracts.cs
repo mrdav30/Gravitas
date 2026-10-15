@@ -288,24 +288,24 @@ public sealed partial class MixedQueryCcdTests
     }
 
     [Fact]
-    public void CircleSlabReducer_WithSaturatedLocalHeight_ShouldKeepExactTopCapEntry()
+    public void CircleSlabReducer_WithLargeSupportedSlab_ShouldKeepExactTopCapEntry()
     {
         using GravitasWorldContext context = CreateMixedContext();
-        LSCircleCollider2D target = CreateExtremeCircleSlab(context);
-        Vector3d start = new((Fixed64)(-1_000_000_000), (Fixed64)2_000_000_000, Fixed64.Zero);
-        Vector3d end = new((Fixed64)(-1_000_000_000), (Fixed64)1_800_000_000, Fixed64.Zero);
+        LSCircleCollider2D target = CreateLargeSupportedCircleSlab(context);
+        Vector3d start = new((Fixed64)(-1000), (Fixed64)2000, Fixed64.Zero);
+        Vector3d end = new((Fixed64)(-1000), (Fixed64)1800, Fixed64.Zero);
 
         bool found = GravitasQueryMixedService.TrySweepSphereAgainstCircleSlab(
             start,
             end,
             -Vector3d.Up,
-            (Fixed64)200_000_000,
-            (Fixed64)1_000_000_000,
+            (Fixed64)200,
+            (Fixed64)1000,
             target,
             out PhysicsMixedHit hit);
 
         found.Should().BeTrue();
-        hit.Distance.Should().Be((Fixed64)100_000_000);
+        hit.Distance.Should().Be((Fixed64)100);
     }
 
     [Fact]
@@ -352,16 +352,16 @@ public sealed partial class MixedQueryCcdTests
     public void CircleSlabReducer_WithRadialCrossingAboveExactTopCap_ShouldRejectSide()
     {
         using GravitasWorldContext context = CreateMixedContext();
-        LSCircleCollider2D target = CreateExtremeCircleSlab(context);
-        Vector3d start = new((Fixed64)1_500_000_000, (Fixed64)2_000_000_000, Fixed64.Zero);
-        Vector3d end = new((Fixed64)1_300_000_000, (Fixed64)2_000_000_000, Fixed64.Zero);
+        LSCircleCollider2D target = CreateLargeSupportedCircleSlab(context);
+        Vector3d start = new((Fixed64)1500, (Fixed64)2000, Fixed64.Zero);
+        Vector3d end = new((Fixed64)1300, (Fixed64)2000, Fixed64.Zero);
 
         bool found = GravitasQueryMixedService.TrySweepSphereAgainstCircleSlab(
             start,
             end,
             -Vector3d.Right,
-            (Fixed64)200_000_000,
-            (Fixed64)1_000_000_000,
+            (Fixed64)200,
+            (Fixed64)1000,
             target,
             out PhysicsMixedHit hit);
 
@@ -561,15 +561,15 @@ public sealed partial class MixedQueryCcdTests
         hit.Normal3DTo2D.Should().Be(Vector3d.Right);
     }
 
-    private static LSCircleCollider2D CreateExtremeCircleSlab(GravitasWorldContext context)
+    private static LSCircleCollider2D CreateLargeSupportedCircleSlab(GravitasWorldContext context)
     {
         var target = (LSCircleCollider2D)CreateBodylessCircle2D(context, Vector2d.Zero);
         target.AgentOrNull!.Transform.LocalPosition = new Vector3d(
-            (Fixed64)(-1_000_000_000),
-            (Fixed64)(-500_000_000),
+            (Fixed64)(-1000),
+            (Fixed64)(-500),
             Fixed64.Zero);
-        target.Radius = (Fixed64)1_400_000_000;
-        target.MixedHalfThicknessOverride = (Fixed64)1_400_000_000;
+        target.Radius = (Fixed64)1400;
+        target.MixedHalfThicknessOverride = (Fixed64)1400;
         target.RebuildRuntimeShapeOnly().Should().BeTrue();
         return target;
     }

@@ -16,6 +16,8 @@ namespace Gravitas.Tests.Support;
 
 internal sealed class UnsupportedTestCollider2D : LSCollider2D
 {
+    internal bool OmitGeometryReach { get; set; }
+
     internal bool ContainsQueryPoint { get; set; }
     internal Fixed64 MomentOfInertia { get; set; } = Fixed64.Zero;
 
@@ -49,16 +51,24 @@ internal sealed class UnsupportedTestCollider2D : LSCollider2D
     internal override ExactMassWeight CalculatePreparedAreaForMassProperties() =>
         ExactMassWeight.Zero;
 
-    private protected override void PrepareShape(in ColliderShapeSnapshot2D snapshot) =>
+    private protected override void PrepareShape(in ColliderShapeSnapshot2D snapshot)
+    {
+        if (!OmitGeometryReach)
+            SetPreparedGeometryReach(ColliderGeometryPolicy.Magnitude(Vector2d.One));
         SetPreparedBounds(FixedBoundArea.FromMinMax(
             snapshot.Center - Vector2d.One,
             snapshot.Center + Vector2d.One));
+    }
 
     private protected override void PublishShape() { }
 }
 
 internal sealed class UnsupportedTestCollider3D : LSCollider
 {
+    internal bool OmitGeometryReach { get; set; }
+
+    internal bool ThrowOnShapePreparation { get; set; }
+
     internal Fixed3x3 InertiaTensor { get; set; } = Fixed3x3.Zero;
 
     internal bool ThrowOnInertiaCalculation { get; set; }
@@ -81,10 +91,16 @@ internal sealed class UnsupportedTestCollider3D : LSCollider
 
     public override int Priority => 0;
 
-    private protected override void PrepareShape(in ColliderShapeSnapshot snapshot) =>
+    private protected override void PrepareShape(in ColliderShapeSnapshot snapshot)
+    {
+        if (ThrowOnShapePreparation)
+            throw new InvalidOperationException("Configured shape preparation failure.");
+        if (!OmitGeometryReach)
+            SetPreparedGeometryReach(ColliderGeometryPolicy.Magnitude(Vector3d.One));
         SetPreparedBounds(FixedBoundBox.FromMinMax(
             snapshot.Center - Vector3d.One,
             snapshot.Center + Vector3d.One));
+    }
 
     private protected override void PublishShape() => Area = Fixed64.One;
 

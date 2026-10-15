@@ -87,36 +87,6 @@ public sealed partial class ContinuousCollision2DTests
     }
 
     [Fact]
-    public void UnrepresentableRotationalRadius_ShouldClassifyMovingRegisteredTarget()
-    {
-        using GravitasWorldContext context = CreateContext(frameRate: 1);
-        var sourceCollider = new LSCircleCollider2D(Fixed64.One)
-        {
-            LocalOffset = new Vector2d(Fixed64.MaxValue, Fixed64.Zero)
-        };
-        SolidBody2D source = CreateBody(
-            context,
-            sourceCollider,
-            Vector2d.Zero,
-            immovable: false,
-            isKinematic: true);
-        SolidBody2D target = CreateBody(
-            context,
-            new LSCircleCollider2D(Fixed64.Half),
-            Vector2d.Zero,
-            immovable: false);
-        target.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
-
-        source.GatherRotationalContinuousCollisionCandidates(
-                Vector2d.Zero,
-                Vector2d.Zero,
-                Vector2d.Zero,
-                Fixed64.MaxValue)
-            .Should()
-            .Be(1);
-    }
-
-    [Fact]
     public void CircleSeparationGap_UnrepresentableCenterDistance_ShouldRemainUncertified()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);

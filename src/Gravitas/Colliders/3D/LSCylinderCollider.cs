@@ -184,6 +184,8 @@ public sealed class LSCylinderCollider : LSCollider
             snapshot.Size.Y,
             snapshot.OwnerScale.Y,
             snapshot.PartScale.Y);
+        SetPreparedGeometryReach(HasCommittedShape && _preparedRadius == _scaledRadius && _preparedHeight == Height
+            ? CanonicalCenteredProxyRadius : ColliderGeometryPolicy.FiniteAxis(_preparedRadius, _preparedHeight));
         _preparedAxis = (snapshot.Rotation * Vector3d.Up).Normalized;
         _preparedArea = Fixed64.Two * Fixed64.Pi * _preparedRadius
             * (_preparedHeight + _preparedRadius);

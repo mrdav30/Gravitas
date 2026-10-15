@@ -1788,7 +1788,7 @@ public sealed partial class ContinuousCollision2DTests
     }
 
     [Fact]
-    public void AabbProxyRadius_WithSaturatingHalfExtentSquares_ShouldRemainConservative()
+    public void AabbProxyRadius_AfterOversizedResizeRejection_ShouldKeepCommittedReach()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
         var collider = new LSAABBoxCollider2D(Vector2d.One);
@@ -1797,10 +1797,11 @@ public sealed partial class ContinuousCollision2DTests
             collider,
             Vector2d.Zero,
             immovable: false);
-        collider.Size = new Vector2d((Fixed64)120000, (Fixed64)160000);
-        source.Collider.RebuildRuntimeShapeOnly();
+        Action resize = () => collider.Size = new Vector2d((Fixed64)120000, (Fixed64)160000);
+        resize.Should().Throw<ArgumentException>();
+        collider.Size.Should().Be(Vector2d.One);
 
-        source.ResolveContinuousCollisionProxyRadius().Should().Be((Fixed64)100000);
+        source.ResolveContinuousCollisionProxyRadius().Should().Be(Fixed64.FromRaw(3037000500));
     }
 
     [Fact]
@@ -1841,20 +1842,20 @@ public sealed partial class ContinuousCollision2DTests
     }
 
     [Fact]
-    public void ConvexProxyRadius_WithSaturatingVertexSquares_ShouldRemainConservative()
+    public void ConvexProxyRadius_WithSupportedLargeVertices_ShouldRemainConservative()
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1, extent: 2);
         SolidBody2D source = CreateBody(
             context,
             new LSPolygonCollider2D(
-                new Vector2d((Fixed64)(-60000), (Fixed64)(-80000)),
-                new Vector2d((Fixed64)60000, (Fixed64)(-80000)),
-                new Vector2d((Fixed64)60000, (Fixed64)80000),
-                new Vector2d((Fixed64)(-60000), (Fixed64)80000)),
+                new Vector2d((Fixed64)(-600), (Fixed64)(-800)),
+                new Vector2d((Fixed64)600, (Fixed64)(-800)),
+                new Vector2d((Fixed64)600, (Fixed64)800),
+                new Vector2d((Fixed64)(-600), (Fixed64)800)),
             Vector2d.Zero,
             immovable: false);
 
-        source.ResolveContinuousCollisionProxyRadius().Should().Be((Fixed64)100000);
+        source.ResolveContinuousCollisionProxyRadius().Should().Be((Fixed64)1000);
     }
 
     [Fact]

@@ -2205,14 +2205,17 @@ public sealed partial class ContinuousCollisionDetectionTests
     }
 
     [Fact]
-    public void CuboidProxyRadius_WithSaturatingBoundsSquares_ShouldRemainConservative()
+    public void CuboidProxyRadius_WithUnsupportedHostScale_ShouldRejectWithoutPublishing()
     {
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();
         ScenarioBody<LSCuboidCollider> source = scenario.CreateCuboid(Vector3d.Zero);
+        var before = source.Collider.Bounds;
+        Fixed64 radius = source.Body.ResolveContinuousCollisionProxyRadius();
         source.Body.PositionTransform.LocalScale = new Vector3d((Fixed64)40000, (Fixed64)80000, (Fixed64)80000);
-        source.Collider.RebuildRuntimeShapeOnly(refreshMassProperties: false);
-
-        source.Body.ResolveContinuousCollisionProxyRadius().Should().Be((Fixed64)60000);
+        Action rebuild = () => source.Collider.RebuildRuntimeShapeOnly(refreshMassProperties: false);
+        rebuild.Should().Throw<ArgumentException>();
+        source.Collider.Bounds.Should().Be(before);
+        source.Body.ResolveContinuousCollisionProxyRadius().Should().Be(radius);
     }
 
     [Fact]

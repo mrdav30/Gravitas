@@ -362,7 +362,7 @@ public abstract partial class LSCollider2D
         TransformRelativeMassPropertyPointExact(Vector2d.Zero);
 
     internal virtual ExactMassPoint2D CalculatePreparedLocalMassPoint() =>
-        TransformPreparedRelativeMassPropertyPointExact(Vector2d.Zero);
+        TransformPreparedPartMassPropertyPointExact(Vector2d.Zero);
 
     /// <summary>
     /// Calculates the scalar moment of inertia about a requested body-local reference point.
@@ -409,18 +409,11 @@ public abstract partial class LSCollider2D
     protected virtual void OnMaterialChanged() { }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal ExactMassPoint2D TransformPreparedRelativeMassPropertyPointExact(
+    internal ExactMassPoint2D TransformPreparedPartMassPropertyPointExact(
         Vector2d partRelativePoint) =>
-        _compoundOwner == null
-            ? ExactMassPoint2D.CreateScaledLocalComposition(
-                _preparedSnapshot.LocalOffset,
-                _preparedSnapshot.OwnerScale,
-                Vector2d.Zero,
-                Vector2d.One,
-                partRelativePoint,
-                Fixed64.Zero)
-            : ExactMassPoint2D.CreateScaledLocalComposition(
-                _compoundOwner._preparedSnapshot.LocalOffset,
+        // Prepared mass points are consumed only by the compound's leaf reduction.
+        ExactMassPoint2D.CreateScaledLocalComposition(
+                _compoundOwner!._preparedSnapshot.LocalOffset,
                 _preparedSnapshot.OwnerScale,
                 _preparedSnapshot.LocalOffset,
                 _preparedSnapshot.OwnerScale,
@@ -450,8 +443,8 @@ public abstract partial class LSCollider2D
 
         PrepareRuntimeShape(
             snapshot,
-            requireRepresentableMassPoint:
-                _body != null || _compoundOwner != null);
+            includeBodyAttachment:
+                _body != null);
         PublishPreparedShape();
         _body?.RefreshMassPropertiesFromColliderShape();
         return true;

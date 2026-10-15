@@ -148,7 +148,7 @@ public sealed class LSPolygonCollider2DCoverageTests
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
         Vector2d[] vertices = { Vector2d.Zero, Vector2d.Right, Vector2d.Forward };
-        Vector2d translation = new((Fixed64)30000, (Fixed64)30000);
+        Vector2d translation = new((Fixed64)2000, (Fixed64)2000);
         Vector2d scale = new((Fixed64)2, (Fixed64)3);
         var originCompound = new LSCompoundCollider2D(
             CompoundColliderPart2D.ConvexPolygon(vertices, Vector2d.Zero, Fixed64.Zero, scale));

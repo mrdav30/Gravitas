@@ -130,21 +130,25 @@ public sealed class PhysicsMeshScaleTests
     }
 
     [Theory]
-    [InlineData(131072, MeshVolumeValidationResult.Valid)]
-    [InlineData(262144, MeshVolumeValidationResult.NonRepresentableMassProperties)]
-    public void ClosedMesh_WithUnusableSourceTensorOrCachedCovariance_ShouldIntegrateFinalGeometry(
-        int length, MeshVolumeValidationResult sourceResult)
+    [InlineData(131072)]
+    [InlineData(262144)]
+    public void ClosedMesh_WithOversizedAuthoredGeometry_ShouldIntegrateSupportedFinalGeometry(
+        int length)
     {
         CreateSubdividedClosedCubeTopology(1, out Vector3d[] vertices, out int[] triangles);
         Vector3d dimensions = new((Fixed64)length, Fixed64.One, Fixed64.One);
         for (int i = 0; i < vertices.Length; i++)
             vertices[i] *= dimensions;
-        var mesh = new PhysicsMesh(vertices, triangles, Vector3d.Zero, FixedQuaternion.Identity);
-        mesh.TryGetClosedVolumeMassProperties(out _, out MeshVolumeValidationResult originalResult);
-        originalResult.Should().Be(sourceResult);
-
-        mesh.UpdateTransform(Vector3d.Zero, FixedQuaternion.Identity,
-            new Vector3d(Fixed64.FromFraction(1, length), Fixed64.One, Fixed64.One));
+        Action standalone = () => _ = new PhysicsMesh(vertices, triangles,
+            Vector3d.Zero, FixedQuaternion.Identity);
+        standalone.Should().Throw<ArgumentException>().WithMessage("*geometry reach*");
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        var collider = new LSMeshCollider(vertices, triangles, MeshColliderMode.Convex,
+            MeshInertiaPolicy.RequireClosedVolume);
+        collider.InitializeWithNoBody(new TestMatterAgent(context,
+            new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity,
+                new Vector3d(Fixed64.FromFraction(1, length), Fixed64.One, Fixed64.One))));
+        PhysicsMesh mesh = collider.Mesh;
 
         mesh.TryGetClosedVolumeMassProperties(out MeshMassProperties properties, out _).Should().BeTrue();
         properties.Volume.Should().Be(Fixed64.One);
@@ -192,8 +196,8 @@ public sealed class PhysicsMeshScaleTests
         Vector3d[] vertices =
         {
             Vector3d.Zero,
-            Vector3d.Right * Fixed64.Half,
-            Vector3d.Up * Fixed64.FromFraction(1, 65536)
+            Vector3d.Right * Fixed64.FromRaw(1024),
+            Vector3d.Up
         };
         var compound = new LSCompoundCollider(
             CompoundColliderPart.ConvexMesh(
@@ -207,16 +211,17 @@ public sealed class PhysicsMeshScaleTests
         var transform = new FixedTransform(
             Vector3d.Zero,
             FixedQuaternion.Identity,
-            new Vector3d(ownerX, Fixed64.One, Fixed64.One));
+            new Vector3d(ownerX, Fixed64.FromFraction(1, 65536), Fixed64.One));
 
         compound.InitializeWithNoBody(new TestMatterAgent(context, transform));
 
         var meshPart = (LSMeshCollider)compound.GetPartCollider(0);
         meshPart.Mesh.OwnerScale.X.Should().Be(ownerX);
         meshPart.Mesh.PartScale.X.Should().Be((Fixed64)2);
-        meshPart.Mesh.GetVertexWorld(0).X.Should().Be((Fixed64)(-750000000));
-        meshPart.Mesh.GetVertexWorld(1).X.Should().Be((Fixed64)750000000);
-        meshPart.Area.Should().Be(Fixed64.FromFraction(1500000000, 131072));
+        meshPart.Mesh.GetVertexWorld(0).X.Should().Be(Fixed64.FromRaw(-1536000000000));
+        meshPart.Mesh.GetVertexWorld(1).X.Should().Be(Fixed64.FromRaw(1536000000000));
+        // Final width is 3,072,000,000,000 raw and height is 1/65536.
+        meshPart.Area.Should().Be(Fixed64.FromRaw(23437500));
     }
 
     [Fact]
@@ -755,26 +760,23 @@ public sealed class PhysicsMeshScaleTests
     [Fact]
     public void FullSpanAuthoredMesh_ShouldDownscaleWithoutIntermediateSubtractionLoss()
     {
-        var mesh = new PhysicsMesh(
-            new[]
-            {
-                new Vector3d(Fixed64.MinValue, Fixed64.Zero, Fixed64.Zero),
-                new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero),
-                new Vector3d(Fixed64.MaxValue, Fixed64.One, Fixed64.Zero),
-            },
-            new[] { 0, 1, 2 },
-            Vector3d.Zero,
-            FixedQuaternion.Identity);
-        FixedBoundBox priorBounds = mesh.Bounds;
+        Vector3d[] vertices =
+        {
+            new(Fixed64.MinValue, Fixed64.Zero, Fixed64.Zero),
+            new(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero),
+            new(Fixed64.MaxValue, Fixed64.One, Fixed64.Zero)
+        };
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        var collider = new LSMeshCollider(vertices, new[] { 0, 1, 2 },
+            MeshColliderMode.Convex, MeshInertiaPolicy.SurfaceApproximation);
+        Fixed64 scale = Fixed64.FromRaw(1024);
+        collider.InitializeWithNoBody(new TestMatterAgent(context,
+            new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity,
+                new Vector3d(scale, Fixed64.One, Fixed64.One))));
 
-        mesh.UpdateTransform(
-            Vector3d.Zero,
-            FixedQuaternion.Identity,
-            new Vector3d(Fixed64.Quarter, Fixed64.One, Fixed64.One));
-
-        mesh.ScaledLocalBounds.Min.X.Should().Be(Fixed64.MinValue / (Fixed64)4);
-        mesh.ScaledLocalBounds.Max.X.Should().Be(Fixed64.MaxValue / (Fixed64)4);
-        mesh.Bounds.Should().NotBe(priorBounds);
+        collider.Mesh.ScaledLocalBounds.Min.X.Should().Be(Fixed64.MinValue * scale);
+        collider.Mesh.ScaledLocalBounds.Max.X.Should().Be(Fixed64.MaxValue * scale);
+        (collider.Mesh.Bounds.Max.X - collider.Mesh.Bounds.Min.X).Should().Be((Fixed64)1024);
     }
 
     [Fact]
@@ -803,7 +805,9 @@ public sealed class PhysicsMeshScaleTests
     [Fact]
     public void ScaledSupportTree_ShouldMatchAuthoredOrderBruteForce()
     {
-        PhysicsMesh mesh = MeshTestFixtures.CreateConvexPolygonFan(40, (Fixed64)4).Mesh;
+        PhysicsMesh authored = MeshTestFixtures.CreateConvexPolygonFan(40, (Fixed64)4).Mesh;
+        var mesh = new PhysicsMesh(authored.LocalVertices.ToArray(), authored.Triangles.ToArray(),
+            Vector3d.Zero, FixedQuaternion.Identity);
         mesh.UpdateTransform(
             new Vector3d((Fixed64)4, (Fixed64)(-3), (Fixed64)2),
             FixedQuaternion.FromEulerAnglesInDegrees((Fixed64)15, (Fixed64)25, (Fixed64)35),
@@ -894,7 +898,7 @@ public sealed class PhysicsMeshScaleTests
     [Fact]
     public void CompoundClosedVolume_ShouldUsePreparedVerticesWhenCombinedScaleIsUnrepresentable()
     {
-        Fixed64 narrow = Fixed64.FromFraction(1, 65536);
+        Fixed64 narrow = Fixed64.FromRaw(1024);
         var mesh = new PhysicsMesh(
             new[]
             {
@@ -1014,7 +1018,7 @@ public sealed class PhysicsMeshScaleTests
     }
 
     [Fact]
-    public void RequireClosed_WithFiniteVolumeAndSaturatedTensor_ShouldReportNonRepresentableMassProperties()
+    public void RequireClosed_WithOversizedScaledGeometry_ShouldRejectBeforeRegistration()
     {
         CreateSubdividedClosedCubeTopology(32, out Vector3d[] vertices, out int[] triangles);
         for (int i = 0; i < vertices.Length; i++)
@@ -1023,10 +1027,10 @@ public sealed class PhysicsMeshScaleTests
         Vector3d scale = new((Fixed64)2000, Fixed64.One, Fixed64.One);
         var directMesh = new PhysicsMesh(vertices, triangles, Vector3d.Zero, FixedQuaternion.Identity);
         directMesh.TryGetClosedVolumeMassProperties(out _, out _).Should().BeTrue();
-        directMesh.UpdateTransform(Vector3d.Zero, FixedQuaternion.Identity, scale);
-
-        directMesh.TryGetClosedVolumeMassProperties(out _, out MeshVolumeValidationResult result).Should().BeFalse();
-        result.Should().Be(MeshVolumeValidationResult.NonRepresentableMassProperties);
+        FixedBoundBox priorBounds = directMesh.Bounds;
+        Action update = () => directMesh.UpdateTransform(Vector3d.Zero, FixedQuaternion.Identity, scale);
+        update.Should().Throw<ArgumentException>().WithMessage("*geometry reach*");
+        directMesh.Bounds.Should().Be(priorBounds);
 
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         var collider = new LSMeshCollider(vertices, triangles, MeshColliderMode.Convex, MeshInertiaPolicy.RequireClosedVolume);
@@ -1034,7 +1038,7 @@ public sealed class PhysicsMeshScaleTests
             context,
             new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, scale)));
 
-        initialize.Should().Throw<ArgumentException>().WithMessage("*NonRepresentableMassProperties*");
+        initialize.Should().Throw<ArgumentException>().WithMessage("*geometry reach*");
         collider.Id.Should().Be(-1);
         collider.HasHostBinding.Should().BeFalse();
         context.Physics.ColliderCount.Should().Be(0);
@@ -1045,8 +1049,8 @@ public sealed class PhysicsMeshScaleTests
     {
         Vector3d[] vertices =
         {
-            new((Fixed64)(-50000), Fixed64.Zero, Fixed64.Zero),
-            new((Fixed64)50000, Fixed64.Zero, Fixed64.Zero),
+            new((Fixed64)(-4000), Fixed64.Zero, Fixed64.Zero),
+            new((Fixed64)4000, Fixed64.Zero, Fixed64.Zero),
             new(Fixed64.Zero, Fixed64.FromFraction(1, 10), Fixed64.Zero)
         };
         int[] triangles = { 0, 1, 2 };
@@ -1238,7 +1242,9 @@ public sealed class PhysicsMeshScaleTests
     [Fact]
     public void ScaleAdmission_ShouldUseFinalCanonicalGeometryInsteadOfIntermediateAggregates()
     {
-        PhysicsMesh mesh = CreateOffsetTriangleMesh();
+        var mesh = new PhysicsMesh(new[] { Vector3d.Zero,
+            Vector3d.Right / (Fixed64)1024, Vector3d.Up / (Fixed64)1024 },
+            new[] { 0, 1, 2 }, Vector3d.Zero, FixedQuaternion.Identity);
         Action determinantOverflow = () => mesh.UpdateTransform(
             Vector3d.One,
             FixedQuaternion.Identity,
@@ -1259,59 +1265,30 @@ public sealed class PhysicsMeshScaleTests
             FixedQuaternion.Identity);
         sameSignBounds.LocalBounds.Center.X.Should().Be((Fixed64)1200000000 + Fixed64.Half);
 
-        var wideBounds = new PhysicsMesh(
+        Action wideBounds = () => _ = new PhysicsMesh(
             new[]
             {
                 new Vector3d((Fixed64)(-1000000000), Fixed64.Zero, Fixed64.Zero),
                 new Vector3d((Fixed64)1000000000, Fixed64.Zero, Fixed64.Zero),
                 new Vector3d((Fixed64)(-1000000000), Fixed64.MinIncrement, Fixed64.Zero)
-            },
-            new[] { 0, 1, 2 },
-            Vector3d.Zero,
-            FixedQuaternion.Identity);
-        Action boundsOverflow = () => wideBounds.UpdateTransform(
-            Vector3d.Zero,
-            FixedQuaternion.Identity,
-            new Vector3d(Fixed64.FromFraction(11, 10), Fixed64.One, Fixed64.One));
-        boundsOverflow.Should().NotThrow();
-        wideBounds.OwnerScale.X.Should().Be(Fixed64.FromFraction(11, 10));
+            }, new[] { 0, 1, 2 }, Vector3d.Zero, FixedQuaternion.Identity);
+        wideBounds.Should().Throw<ArgumentException>().WithMessage("*geometry reach*");
 
-        PhysicsMesh? crossProductMesh = null;
-        Action crossProductOverflow = () => crossProductMesh = new PhysicsMesh(
-            new[]
-            {
-                Vector3d.Zero,
-                new Vector3d(Fixed64.Zero, (Fixed64)100000, Fixed64.Zero),
-                new Vector3d(Fixed64.Zero, Fixed64.Zero, (Fixed64)100000)
-            },
-            new[] { 0, 1, 2 },
-            Vector3d.Zero,
-            FixedQuaternion.Identity);
-        crossProductOverflow.Should().NotThrow();
-        crossProductMesh!.TotalArea.Should().Be(Fixed64.MaxValue);
-
-        PhysicsMesh? crossDifferenceMesh = null;
-        Action crossDifferenceOverflow = () => crossDifferenceMesh = new PhysicsMesh(
-            new[]
-            {
-                Vector3d.Zero,
-                new Vector3d(Fixed64.Zero, (Fixed64)50000, (Fixed64)50000),
-                new Vector3d(Fixed64.Zero, (Fixed64)30000, (Fixed64)(-30000))
-            },
-            new[] { 0, 1, 2 },
-            Vector3d.Zero,
-            FixedQuaternion.Identity);
-        crossDifferenceOverflow.Should().NotThrow();
-        crossDifferenceMesh!.TotalArea.Should().Be((Fixed64)1500000000);
-
-        PhysicsMesh? largeTriangleMesh = null;
-        Action magnitudeOverflow = () => largeTriangleMesh = new PhysicsMesh(
-            new[] { Vector3d.Zero, Vector3d.Right * (Fixed64)50000, Vector3d.Up },
-            new[] { 0, 1, 2 },
-            Vector3d.Zero,
-            FixedQuaternion.Identity);
-        magnitudeOverflow.Should().NotThrow();
-        largeTriangleMesh!.TotalArea.Should().Be((Fixed64)25000);
+        // These formerly exercised saturated cross products. None is admitted
+        // geometry now; retain explicit rejection for each distinct input.
+        foreach (Vector3d[] vertices in new[]
+        {
+            new[] { Vector3d.Zero, Vector3d.Up * (Fixed64)100000,
+                Vector3d.Forward * (Fixed64)100000 },
+            new[] { Vector3d.Zero, new Vector3d(0, 50000, 50000),
+                new Vector3d(0, 30000, -30000) },
+            new[] { Vector3d.Zero, Vector3d.Right * (Fixed64)50000, Vector3d.Up }
+        })
+        {
+            Action create = () => _ = new PhysicsMesh(vertices, new[] { 0, 1, 2 },
+                Vector3d.Zero, FixedQuaternion.Identity);
+            create.Should().Throw<ArgumentException>().WithMessage("*geometry reach*");
+        }
     }
 
     [Fact]
@@ -1346,7 +1323,7 @@ public sealed class PhysicsMeshScaleTests
 
         PhysicsMesh? repeatedTriangleMesh = null;
         Action totalAreaOverflow = () => repeatedTriangleMesh = new PhysicsMesh(
-            new[] { Vector3d.Zero, Vector3d.Right * (Fixed64)45000, Vector3d.Up },
+            new[] { Vector3d.Zero, Vector3d.Right * (Fixed64)6000, Vector3d.Up * (Fixed64)10 },
             triangles,
             Vector3d.Zero,
             FixedQuaternion.Identity,
@@ -1361,9 +1338,33 @@ public sealed class PhysicsMeshScaleTests
             .Should().BeFalse();
         repeatedTriangleMesh.SurfaceMassProperties.CenterOfMass
             .Should().Be(new Vector3d(
-                (Fixed64)(-7500),
-                -Fixed64.FromFraction(1, 6),
+                (Fixed64)(-1000),
+                -Fixed64.FromFraction(5, 3),
                 Fixed64.Zero));
+    }
+
+    [Fact]
+    public void PreparedClosedVolume_ShouldRemainLazyUntilRequestedWithoutPublishingCandidate()
+    {
+        CreateSubdividedClosedCubeTopology(1, out Vector3d[] vertices, out int[] triangles);
+        var mesh = new PhysicsMesh(vertices, triangles, Vector3d.Zero, FixedQuaternion.Identity);
+        Vector3d scale = Vector3d.One * Fixed64.Two;
+
+        mesh.PrepareTransformation(Vector3d.Zero, FixedQuaternion.Identity,
+            scale, Vector3d.One, inertiaPolicy: null);
+        mesh.TryGetPreparedClosedVolumeMassProperties(out _, out _).Should().BeFalse();
+        mesh.TryGetClosedVolumeMassProperties(out MeshMassProperties published, out _).Should().BeTrue();
+        published.Volume.Should().Be(Fixed64.One);
+
+        mesh.PrepareTransformation(Vector3d.Zero, FixedQuaternion.Identity,
+            scale, Vector3d.One, MeshInertiaPolicy.RequireClosedVolume);
+        mesh.TryGetPreparedClosedVolumeMassProperties(out MeshMassProperties prepared, out _).Should().BeTrue();
+        prepared.Volume.Should().Be((Fixed64)8);
+        mesh.TryGetClosedVolumeMassProperties(out published, out _).Should().BeTrue();
+        published.Volume.Should().Be(Fixed64.One);
+        mesh.PublishPreparedTransformation();
+        mesh.TryGetClosedVolumeMassProperties(out published, out _).Should().BeTrue();
+        published.Volume.Should().Be((Fixed64)8);
     }
 
     [Fact]
@@ -1391,6 +1392,13 @@ public sealed class PhysicsMeshScaleTests
         inertiaReconstructionOverflow.TryScale(new Vector3d((Fixed64)2, (Fixed64)2, Fixed64.One), out _)
             .Should().Be(MeshMassScaleResult.NonRepresentableMassProperties);
 
+        // This public data-only value is not a committed collider. Its volume
+        // still fits while squaring the requested scale does not.
+        var covarianceScaleOverflow = new MeshMassProperties(
+            Fixed64.One, Vector3d.Zero, Vector3d.Zero, Fixed3x3.Identity);
+        covarianceScaleOverflow.TryScale(new Vector3d((Fixed64)50000, Fixed64.One, Fixed64.One), out _)
+            .Should().Be(MeshMassScaleResult.NonRepresentableMassProperties);
+
         var referenceShiftOverflow = new MeshMassProperties(
             Fixed64.One,
             Vector3d.Zero,
@@ -1401,9 +1409,9 @@ public sealed class PhysicsMeshScaleTests
     }
 
     [Fact]
-    public void SurfaceApproximation_WithLargeAsymmetricTriangle_ShouldRejectFirstMomentOverflow()
+    public void SurfaceApproximation_WithLargeAsymmetricTriangle_ShouldRejectUnsupportedGeometry()
     {
-        var mesh = new PhysicsMesh(
+        Action create = () => _ = new PhysicsMesh(
             new[]
             {
                 Vector3d.Zero,
@@ -1415,48 +1423,46 @@ public sealed class PhysicsMeshScaleTests
             FixedQuaternion.Identity,
             MeshColliderMode.Concave);
 
-        Action read = () => _ = mesh.SurfaceMassProperties;
-
-        read.Should().Throw<InvalidOperationException>().WithMessage("*not representable*");
+        create.Should().Throw<ArgumentException>().WithMessage("*geometry reach*");
     }
 
     [Fact]
-    public void SurfaceApproximation_WithSaturatedAreaNearScalarFace_ShouldPreserveSemanticCenter()
+    public void SurfaceApproximation_NearScalarFace_ShouldPreserveSemanticCenterWithinSupportedReach()
     {
         Fixed64 edge = Fixed64.MaxValue;
-        var mesh = new PhysicsMesh(
-            new[]
-            {
-                new Vector3d(edge - Fixed64.One, Fixed64.Zero, Fixed64.Zero),
-                new Vector3d(edge, (Fixed64)(-25000), (Fixed64)(-25000)),
-                new Vector3d(edge, (Fixed64)25000, (Fixed64)(-25000)),
-                new Vector3d(edge, (Fixed64)(-25000), (Fixed64)25000)
-            },
-            new[]
-            {
-                0, 1, 2,
-                1, 2, 3,
-                1, 2, 3
-            },
-            Vector3d.Zero,
-            FixedQuaternion.Identity,
-            MeshColliderMode.Concave);
+        Vector3d[] vertices =
+        {
+            new(edge - Fixed64.One, Fixed64.Zero, Fixed64.Zero),
+            new(edge, (Fixed64)(-2000), (Fixed64)(-2000)),
+            new(edge, (Fixed64)2000, (Fixed64)(-2000)),
+            new(edge, (Fixed64)(-2000), (Fixed64)2000)
+        };
+        int[] triangles = { 0, 1, 2, 1, 2, 3, 1, 2, 3 };
+        var mesh = new PhysicsMesh(vertices, triangles, Vector3d.Zero,
+            FixedQuaternion.Identity, MeshColliderMode.Concave);
+        Vector3d[] oversized = vertices.AsSpan().ToArray();
+        for (int i = 0; i < oversized.Length; i++)
+        {
+            oversized[i].Y *= Fixed64.FromFraction(25, 2);
+            oversized[i].Z *= Fixed64.FromFraction(25, 2);
+        }
+        Action createOversized = () => _ = new PhysicsMesh(oversized, triangles,
+            Vector3d.Zero, FixedQuaternion.Identity, MeshColliderMode.Concave);
+        createOversized.Should().Throw<ArgumentException>().WithMessage("*geometry reach*");
+        for (int i = 0; i < vertices.Length; i++)
+            vertices[i].X -= edge - Fixed64.One;
+        var originMesh = new PhysicsMesh(vertices, triangles, Vector3d.Zero,
+            FixedQuaternion.Identity, MeshColliderMode.Concave);
 
-        // Exact round-to-even centroid of the three canonical shell faces.
-        var expectedCenter = new Vector3d(
-            Fixed64.FromRaw(1_861_152_495L),
-            Fixed64.FromRaw(-28_633_115_302_085L),
-            Fixed64.FromRaw(-42_949_672_964_581L));
-        mesh.SurfaceMassWeight.TryGetMeasure(out _)
-            .Should().BeFalse();
-        mesh.SurfaceMassProperties.CenterOfMass
-            .Should().Be(expectedCenter);
+        mesh.SurfaceMassWeight.TryGetMeasure(out _).Should().BeTrue();
+        mesh.SurfaceMassProperties.CenterOfMass.Should().Be(originMesh.SurfaceMassProperties.CenterOfMass);
+        mesh.SurfaceMassProperties.UnitMassInertiaTensor.Should().Be(originMesh.SurfaceMassProperties.UnitMassInertiaTensor);
     }
 
     [Fact]
-    public void SurfaceApproximation_WithDistantBalancedTriangles_ShouldRejectParallelAxisOverflow()
+    public void SurfaceApproximation_WithDistantBalancedTriangles_ShouldRejectUnsupportedGeometry()
     {
-        var mesh = new PhysicsMesh(
+        Action create = () => _ = new PhysicsMesh(
             new[]
             {
                 new Vector3d((Fixed64)(-50001), Fixed64.Zero, Fixed64.Zero),
@@ -1471,9 +1477,7 @@ public sealed class PhysicsMeshScaleTests
             FixedQuaternion.Identity,
             MeshColliderMode.Concave);
 
-        Action read = () => _ = mesh.SurfaceMassProperties;
-
-        read.Should().Throw<InvalidOperationException>().WithMessage("*not representable*");
+        create.Should().Throw<ArgumentException>().WithMessage("*geometry reach*");
     }
 
     [Fact]

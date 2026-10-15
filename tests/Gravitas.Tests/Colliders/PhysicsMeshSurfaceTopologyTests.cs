@@ -112,7 +112,7 @@ public sealed class PhysicsMeshSurfaceTopologyTests
     }
 
     [Fact]
-    public void RejectedScaleAfterTopologyPreparation_ShouldKeepCommittedSpansAndOrdinals()
+    public void RejectedOversizedScale_ShouldKeepCommittedSpansAndOrdinals()
     {
         Vector3d[] vertices = { new(0, 0, 0), new(Fixed64.One, Fixed64.Quarter, Fixed64.Zero),
             new((Fixed64)3, Fixed64.FromFraction(3, 4), Fixed64.One), new(0, 0, 1) };
@@ -129,7 +129,7 @@ public sealed class PhysicsMeshSurfaceTopologyTests
             new Vector3d(Fixed64.FromFraction(1, 3), Fixed64.One, (Fixed64)1000000),
             Vector3d.One, MeshInertiaPolicy.SurfaceApproximation);
 
-        prepare.Should().Throw<ArgumentException>().WithMessage("*surface mass properties*");
+        prepare.Should().Throw<ArgumentException>().WithMessage("*geometry reach*");
         neighbors.ToArray().Should().Equal(1);
         incidence.ToArray().Should().Equal(0, 1);
         mesh.GetCanonicalSurfaceOrdinal(1).Should().Be(ordinal);

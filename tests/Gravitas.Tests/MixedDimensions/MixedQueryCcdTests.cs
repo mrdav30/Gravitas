@@ -2295,29 +2295,29 @@ public sealed partial class MixedQueryCcdTests
     }
 
     [Fact]
-    public void CircleSlabReducer_WithExtremeOffAxisCrossing_ShouldPreserveEntryDistance()
+    public void CircleSlabReducer_WithLargeSupportedOffAxisCrossing_ShouldPreserveEntryDistance()
     {
         using GravitasWorldContext context = CreateMixedContext();
         var target = (LSCircleCollider2D)CreateBodylessCircle2D(context, Vector2d.Zero);
-        // Keep the small registered footprint, then commit the larger shape
-        // before calling the reducer directly without broad-phase traversal.
-        target.Radius = (Fixed64)99_999;
+        // Exercise an exact off-axis interval at a large admitted radius, without
+        // asking GridForge to cover the direct reducer workload.
+        target.Radius = (Fixed64)2999;
         target.RebuildRuntimeShapeOnly().Should().BeTrue();
-        Vector3d start = new(-200_000, 0, 60_000);
-        Vector3d end = new(200_000, 0, 60_000);
+        Vector3d start = new(-6000, 0, 1800);
+        Vector3d end = new(6000, 0, 1800);
 
         bool found = GravitasQueryMixedService.TrySweepSphereAgainstCircleSlab(
             start,
             end,
             Vector3d.Right,
-            (Fixed64)400_000,
+            (Fixed64)12000,
             Fixed64.One,
             target,
             out PhysicsMixedHit hit);
 
         found.Should().BeTrue();
         hit.Collider2D.Should().BeSameAs(target);
-        hit.Distance.Should().Be((Fixed64)120_000);
+        hit.Distance.Should().Be((Fixed64)3600);
         hit.ReducerKind.Should().Be(PhysicsQueryReducerKind.Exact);
     }
 
@@ -2433,8 +2433,8 @@ public sealed partial class MixedQueryCcdTests
     {
         using GravitasWorldContext context = CreateMixedContext();
         LSSphereCollider target = CreateBodyless3D(context, new LSSphereCollider(), Vector3d.Zero);
-        target.Radius = Fixed64.MaxValue;
-        target.LocalOffset = new Vector3d(Fixed64.Zero, Fixed64.MaxValue, Fixed64.Zero);
+        target.AgentOrNull!.Transform.LocalPosition = new Vector3d(Fixed64.Zero, Fixed64.MaxValue, Fixed64.Zero);
+        target.RebuildRuntimeShapeOnly();
 
         bool found = GravitasQueryMixedService.TrySweepCircleAgainstSphere(
             -Vector2d.One,

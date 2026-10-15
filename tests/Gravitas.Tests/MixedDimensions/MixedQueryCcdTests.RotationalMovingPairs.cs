@@ -381,89 +381,26 @@ public sealed partial class MixedQueryCcdTests
     }
 
     [Fact]
-    public void MixedMode_Unrepresentable3DPivotRadius_ShouldStillAdmitMoving2DTarget()
+    public void MixedMode_Unrepresentable3DPivotRadius_ShouldRejectBeforeCandidateCollection()
     {
         using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
         ScenarioBody<LSCuboidCollider> blade = CreateRotationalMixedBlade3D(context);
-        SolidBody2D target = CreateRotationalMixedTarget2D(context);
-        Vector3d extremeOffset = new(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero);
-        blade.Collider.LocalOffset = extremeOffset;
-        blade.Body.ResetPosition(Vector3d.Zero, FixedQuaternion.Identity);
-        blade.Collider.RebuildRuntimeShapeOnly();
-        target.Collider.LocalOffset = (FixedQuaternion.FromAxisAngle(
-                Vector3d.Up,
-                RotationalMixedQuarterTurn * Fixed64.Half)
-            * extremeOffset).ToVector2d();
-        target.ResetPosition(Vector2d.Zero);
-        target.Sleep();
-        blade.Body.ResolveContinuousCollisionProxyRadius().Should().Be(Fixed64.MaxValue);
-
-        blade.Body.Agent.Transform.LocalRotation = RotationalMixedQuarterTurn3D;
-        context.AdvanceLateSimulateToken();
-        context.Physics.PrepareContinuousCollisionFrame();
-        context.Physics2D.PrepareContinuousCollisionFrame();
-        blade.Body.LateSimulate(updateSleepState: false, updateColliderState: false);
-
-        blade.Body.Rotation.Should().NotBe(RotationalMixedQuarterTurn3D);
-        blade.Body.LastContinuousCollisionToiIterationCount.Should().BeGreaterThan(0);
+        Vector3d before = blade.Collider.LocalOffset;
+        System.Action mutate = () => blade.Collider.LocalOffset = new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero);
+        mutate.Should().Throw<System.ArgumentException>();
+        blade.Collider.LocalOffset.Should().Be(before);
     }
 
-    [Fact]
-    public void MixedMode_Unrepresentable3DPivotRadius_ShouldStillClampAgainstBodyless2DTarget()
-    {
-        using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
-        ScenarioBody<LSCuboidCollider> blade = CreateRotationalMixedBlade3D(context);
-        Vector3d extremeOffset = new(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero);
-        blade.Collider.LocalOffset = extremeOffset;
-        blade.Body.ResetPosition(Vector3d.Zero, FixedQuaternion.Identity);
-        blade.Collider.RebuildRuntimeShapeOnly();
-        Vector2d targetPosition = (FixedQuaternion.FromAxisAngle(
-                Vector3d.Up,
-                RotationalMixedQuarterTurn * Fixed64.Half)
-            * extremeOffset).ToVector2d();
-        _ = CreateBodylessCircle2D(context, targetPosition);
-        blade.Body.ResolveContinuousCollisionProxyRadius().Should().Be(Fixed64.MaxValue);
-
-        blade.Body.Agent.Transform.LocalRotation = RotationalMixedQuarterTurn3D;
-        context.AdvanceLateSimulateToken();
-        context.Physics.PrepareContinuousCollisionFrame();
-        context.Physics2D.PrepareContinuousCollisionFrame();
-        blade.Body.LateSimulate(updateSleepState: false, updateColliderState: false);
-
-        blade.Body.Rotation.Should().NotBe(RotationalMixedQuarterTurn3D);
-        blade.Body.LastContinuousCollisionToiIterationCount.Should().BeGreaterThan(0);
-    }
 
     [Fact]
-    public void MixedMode_Unrepresentable2DPivotRadius_ShouldStillAdmitMoving3DTarget()
+    public void MixedMode_Unrepresentable2DPivotRadius_ShouldRejectBeforeMovingPairCollection()
     {
         using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
         SolidBody2D blade = CreateRotationalMixedBlade2D(context);
-        ScenarioBody<LSSphereCollider> target = CreateRotationalMixedTarget3D(context);
-        Vector2d extremeOffset = new(Fixed64.MaxValue, Fixed64.Zero);
-        blade.Collider.LocalOffset = extremeOffset;
-        blade.ResetPosition(Vector2d.Zero);
-        target.Collider.LocalOffset = Vector2d.Rotate(
-                extremeOffset,
-                RotationalMixedQuarterTurn * Fixed64.Half)
-            .ToVector3d(Fixed64.Zero);
-        target.Body.ResetPosition(Vector3d.Zero, FixedQuaternion.Identity);
-        target.Body.Sleep();
-        blade.ResolveContinuousCollisionProxyRadius().Should().Be(Fixed64.MaxValue);
-        blade.ResolveMixedContinuousCollisionProxyRadius().Should().Be(Fixed64.MaxValue);
-
-        blade.Agent.Transform.LocalRotationXZRadians = RotationalMixedQuarterTurn;
-        context.AdvanceLateSimulateToken();
-        context.Physics.PrepareContinuousCollisionFrame();
-        context.Physics2D.PrepareContinuousCollisionFrame();
-        blade.LateSimulate(updateSleepState: false, updateColliderState: false);
-
-        blade.Rotation.Should().Be(RotationalMixedQuarterTurn);
-        (target.Body.LinearVelocity.MagnitudeSquared
-            + target.Body.AngularVelocity.MagnitudeSquared)
-            .Should()
-            .BeGreaterThan(Fixed64.Zero);
-        blade.LastContinuousCollisionToiIterationCount.Should().BeGreaterThan(0);
+        Vector2d before = blade.Collider.LocalOffset;
+        System.Action mutate = () => blade.Collider.LocalOffset = new Vector2d(Fixed64.MaxValue, Fixed64.Zero);
+        mutate.Should().Throw<System.ArgumentException>();
+        blade.Collider.LocalOffset.Should().Be(before);
     }
 
     [Fact]

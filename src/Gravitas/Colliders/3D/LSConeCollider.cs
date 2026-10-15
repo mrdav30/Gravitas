@@ -106,11 +106,14 @@ public sealed class LSConeCollider : LSCollider
         }
         _preparedRadius = radius;
         _preparedHeight = height;
+        SetPreparedGeometryReach(HasCommittedShape && radius == _scaledRadius && height == Height
+            ? CanonicalCenteredProxyRadius : ColliderGeometryPolicy.FiniteAxis(radius, height));
         _preparedVolume = volume;
         _preparedAxis = HasCommittedShape && snapshot.Rotation == CanonicalRotation
             ? WorldAxis
             : (snapshot.Rotation * Vector3d.Up).Normalized;
-        // Body-bound shapes are checked by the shared shape transaction.
+        // The complete admitted body-relative reach also bounds this primitive's
+        // centroid; bodyless attachments retain their independent scalar check.
         if (CompoundOwner == null
             && Body == null
             && !CalculatePreparedLocalMassPoint().TryGetPoint(out _))

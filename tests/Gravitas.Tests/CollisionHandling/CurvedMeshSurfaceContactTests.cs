@@ -351,15 +351,15 @@ public sealed class CurvedMeshSurfaceContactTests
     }
 
     [Fact]
-    public void WorldChart_ShouldRejectCoveredSeamWithoutNarrowingRelativeCenter()
+    public void WorldChart_AtScalarFace_ShouldRejectCoveredSeam()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         var mesh = new LSMeshCollider(new[] { new Vector3d(4, -2, -2), new Vector3d(4, 2, -2),
             new Vector3d(4, -2, 2), new Vector3d(4, 2, 2), new Vector3d(-4, -2, -2), new Vector3d(-4, 2, -2),
             new Vector3d(-4, -2, 2), new Vector3d(-4, 2, 2) }, new[] { 0, 2, 1, 1, 2, 3, 4, 6, 5, 5, 6, 7 }, MeshColliderMode.Concave);
         scenario.InitializeStaticCollider(mesh, new(Fixed64.MinValue, Fixed64.Zero, Fixed64.Zero));
-        var curved = new LSSphereCollider { Radius = Fixed64.MaxValue - Fixed64.One };
-        scenario.InitializeStaticCollider(curved, new(Fixed64.Zero, Fixed64.FromFraction(3, 10), Fixed64.FromFraction(3, 10)));
+        var curved = new LSSphereCollider { Radius = Fixed64.Half };
+        scenario.InitializeStaticCollider(curved, new(Fixed64.MinValue + (Fixed64)4 + Fixed64.Quarter, Fixed64.FromFraction(3, 10), Fixed64.FromFraction(3, 10)));
         CollisionPair pair = scenario.CreatePair(mesh, curved);
 
         CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
@@ -373,8 +373,8 @@ public sealed class CurvedMeshSurfaceContactTests
         var mesh = new LSMeshCollider(new[] { new Vector3d(0, 0, -2), new Vector3d(0, 2, -2),
             new Vector3d(0, 2, 2), new Vector3d(0, -2, 2) }, new[] { 0, 1, 2, 0, 2, 3 }, MeshColliderMode.Concave);
         scenario.InitializeStaticCollider(mesh, new(Fixed64.Zero, Fixed64.MinValue, Fixed64.Zero));
-        var sphere = new LSSphereCollider { Radius = Fixed64.MaxValue };
-        scenario.InitializeStaticCollider(sphere, new(Fixed64.Quarter, Fixed64.Zero, (Fixed64)3));
+        var sphere = new LSSphereCollider { Radius = Fixed64.FromFraction(3, 2) };
+        scenario.InitializeStaticCollider(sphere, new(Fixed64.Quarter, Fixed64.MinValue + Fixed64.FromFraction(9, 4), (Fixed64)3));
         CollisionPair pair = scenario.CreatePair(mesh, sphere);
 
         CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();

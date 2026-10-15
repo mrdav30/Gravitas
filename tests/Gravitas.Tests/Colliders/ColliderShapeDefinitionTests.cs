@@ -437,18 +437,14 @@ public sealed class ColliderShapeDefinitionTests
     [Fact]
     public void CuboidCanonicalHalfExtents_ShouldSurviveWhenDerivedPropertiesExceedTheScalarDomain()
     {
-        Fixed64.TryMultiplyDivide(
-            Fixed64.MaxValue,
-            Fixed64.One,
-            Fixed64.Two,
-            out Fixed64 expectedHalfExtent).Should().BeTrue();
+        Fixed64 expectedHalfExtent = (Fixed64)2000;
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         var collider = new LSCuboidCollider
         {
             Size = new Vector3d(
-                Fixed64.MaxValue,
-                Fixed64.MaxValue,
-                Fixed64.MaxValue)
+                (Fixed64)4000,
+                (Fixed64)4000,
+                (Fixed64)4000)
         };
         var ownerSnapshot = new ColliderShapeSnapshot(
             Vector3d.Zero,
@@ -470,14 +466,14 @@ public sealed class ColliderShapeDefinitionTests
 
         collider.OrientedBox.HalfExtents.Should().Be(
             new Vector3d(expectedHalfExtent, expectedHalfExtent, expectedHalfExtent));
-        collider.Area.Should().Be(Fixed64.MaxValue);
+        collider.Area.Should().Be((Fixed64)96000000);
         collider.CalculateMassPropertyWeight()
             .TryGetMeasure(out _)
             .Should().BeFalse();
-        collider.GetFrontalArea(Vector3d.Right).Should().Be(Fixed64.MaxValue);
+        collider.GetFrontalArea(Vector3d.Right).Should().Be((Fixed64)16000000);
 
         Fixed3x3 inertia = collider.CalculateInertiaTensor(
-            Fixed64.One,
+            Fixed64.MaxValue,
             Vector3d.Zero);
         inertia.M11.Should().Be(Fixed64.MaxValue);
         inertia.M22.Should().Be(Fixed64.MaxValue);

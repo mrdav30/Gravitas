@@ -53,12 +53,14 @@ internal sealed class MeshCapsuleSurfaceBoundary
             Vector3d fallback = faces.GetNormal(region);
             if (!triangle.TryGetCenteredCapsuleContact(mesh.Origin, mesh.Rotation, center, rotation,
                     coreLength, radius, fallback, out FixedContactAnchors contact,
-                    out AxisTriangleContactFeature feature, out bool localChart)
+                    out AxisTriangleContactFeature feature, out _)
                 || !pointOnly && feature.TriangleVertex >= 0) return;
             Span<WideAxis3> fan = stackalloc WideAxis3[5];
             int count = MeshSurfaceBoundaryTopology.GetIncidentFan(mesh, owner, first, second, !pointOnly, fan);
-            if (!SupportsFan(feature, fan[..count], mesh.Rotation, localChart)
-                || !SupportsSelectedHemisphere(feature, mesh.Rotation, localChart,
+            // A successful contact between admitted local envelopes keeps the
+            // capsule center representable in the mesh chart (two reaches plus final rounding).
+            if (!SupportsFan(feature, fan[..count])
+                || !SupportsSelectedHemisphere(feature,
                     faces.Frame.AuthoredNormal, faces.GetOrientation(region))) return;
             fan[count++] = faces.GetOrientation(region) > 0 ? faces.Frame.AuthoredNormal : -faces.Frame.AuthoredNormal;
             if (coreLength > Fixed64.Zero && feature.IsZeroSeparation
@@ -78,33 +80,22 @@ internal sealed class MeshCapsuleSurfaceBoundary
         }
     }
 
-    private static bool SupportsFan(in AxisTriangleContactFeature feature, ReadOnlySpan<WideAxis3> fan,
-        FixedQuaternion rotation, bool localChart)
+    private static bool SupportsFan(in AxisTriangleContactFeature feature, ReadOnlySpan<WideAxis3> fan)
     {
         foreach (WideAxis3 inward in fan)
         {
-            WideAxis3 direction = localChart ? inward : WideRigidProjection.TransformLocalAxis(
-                new WideRationalBasis3d(rotation), Signed192.NarrowProven(inward.X),
-                Signed192.NarrowProven(inward.Y), Signed192.NarrowProven(inward.Z));
-            // Inward rays are full-domain 65-bit differences; a normalized
-            // rigid basis adds at most 66 bits, still within Signed192.
-            if (feature.CompareSeparationProjection(Signed192.NarrowProven(direction.X),
-                Signed192.NarrowProven(direction.Y), Signed192.NarrowProven(direction.Z)) > 0) return false;
+            if (feature.CompareSeparationProjection(Signed192.NarrowProven(inward.X),
+                Signed192.NarrowProven(inward.Y), Signed192.NarrowProven(inward.Z)) > 0) return false;
         }
         return true;
     }
 
     private static bool SupportsSelectedHemisphere(in AxisTriangleContactFeature feature,
-        FixedQuaternion rotation, bool localChart, in WideAxis3 canonicalNormal, int orientation)
+        in WideAxis3 canonicalNormal, int orientation)
     {
-        if (localChart)
-            return orientation * feature.CompareSeparationProjection(
-                Signed192.NarrowProven(canonicalNormal.X), Signed192.NarrowProven(canonicalNormal.Y),
-                Signed192.NarrowProven(canonicalNormal.Z)) <= 0;
-        WideAxis3 normal = WideRigidProjection.TransformLocalAxis(new WideRationalBasis3d(rotation),
+        return orientation * feature.CompareSeparationProjection(
             Signed192.NarrowProven(canonicalNormal.X), Signed192.NarrowProven(canonicalNormal.Y),
-            Signed192.NarrowProven(canonicalNormal.Z));
-        return orientation * feature.CompareSeparationProjection(normal) <= 0;
+            Signed192.NarrowProven(canonicalNormal.Z)) <= 0;
     }
 
     private static bool TryGetPerpendicularFallback(in CapsuleFiniteSectionFrame finite,

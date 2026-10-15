@@ -2,6 +2,7 @@ using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
+using Gravitas.Tests.Support;
 using SwiftCollections.Query;
 using Xunit;
 
@@ -9,6 +10,95 @@ namespace Gravitas.Tests.Physics2D;
 
 public sealed partial class ContinuousCollision2DTests
 {
+    [Fact]
+    public void PendingCompensatedAuthoring_ShouldRetainConservativeRegisteredCandidateFallback()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        context.Settings.RuntimeMode = PhysicsRuntimeMode.TwoD;
+        context.SetFrameRate(1);
+        _ = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), new Vector2d(100000, 0), immovable: true);
+        SolidBody2D source = CreatePendingCompensatedCircle(context);
+        var collider = (LSCircleCollider2D)source.Collider;
+        context.AdvanceLateSimulateToken();
+        context.Physics2D.PrepareContinuousCollisionFrame();
+        Fixed64 pendingProxy = source.ResolveContinuousCollisionProxyRadius();
+        pendingProxy.Should().Be(Fixed64.MaxValue);
+        collider.MixedHalfThickness.Should().Be(Fixed64.One);
+        source.ResolveMixedContinuousCollisionProxyRadius().Should().Be(Fixed64.MaxValue);
+        collider.ScaledRadius.Should().Be((Fixed64)2048);
+        source.GatherRotationalContinuousCollisionCandidates(Vector2d.Zero, Vector2d.Zero,
+            Vector2d.Zero, pendingProxy).Should().Be(1);
+        DynamicCcdPlanarBounds farBounds = DynamicCcdCandidateIndex2D.CreateBoundsBetween(
+            new Vector2d(100000, 0), new Vector2d(100000, 0), Fixed64.One);
+        context.Physics2D.QueryPlanarContinuousCollisionCandidates(farBounds).Should().Contain(source.DynamicId);
+
+        collider.RebuildRuntimeShapeOnly().Should().BeTrue();
+        collider.ScaledRadius.Should().Be(Fixed64.Quarter);
+        source.ResolveContinuousCollisionProxyRadius().Should().Be(Fixed64.FromFraction(3, 4));
+        context.AdvanceLateSimulateToken();
+        context.Physics2D.QueryPlanarContinuousCollisionCandidates(farBounds).Should().NotContain(source.DynamicId);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void PendingCompensatedAuthoring_RegistryFallback_ShouldRespectTargetPolicies(int filteredPolicy)
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        context.Settings.RuntimeMode = PhysicsRuntimeMode.TwoD;
+        _ = CreateBody(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero, immovable: false);
+        _ = CreateBodylessCircle(context, Vector2d.Zero);
+        LSCircleCollider2D filtered = CreateBodylessCircle(context, Vector2d.Zero, layer: new Gravitas.Support.PhysicsLayer(1));
+        if (filteredPolicy == 0) filtered.IsTrigger = true;
+        if (filteredPolicy == 2) filtered.IsActive = false;
+        SolidBody2D source = CreatePendingCompensatedCircle(context);
+        if (filteredPolicy == 1)
+            source.Collider.IgnoredCollisionLayers = Gravitas.Support.PhysicsLayerMask.FromLayer(filtered.Layer);
+        context.AdvanceLateSimulateToken();
+        context.Physics2D.PrepareContinuousCollisionFrame();
+
+        Fixed64 radius = source.ResolveContinuousCollisionProxyRadius();
+        radius.Should().Be(Fixed64.MaxValue);
+        // One eligible static target and one dynamic target survive; the source
+        // itself and the filtered target do not become fallback candidates.
+        source.GatherRotationalContinuousCollisionCandidates(Vector2d.Zero, Vector2d.Zero,
+            Vector2d.Zero, radius).Should().Be(2);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PendingCompensatedAuthoring_MixedFallback_ShouldRetainStaticAndDynamicTargets(bool pending)
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        context.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
+        context.SetFrameRate(1);
+        context.Environment.Gravity = Fixed64.Zero;
+        var staticCollider = new LSSphereCollider { Radius = (Fixed64)10 };
+        staticCollider.InitializeWithNoBody(new TestMatterAgent(context));
+        var dynamicTarget = new SolidBody(new TestMatterAgent(context), new LSSphereCollider { Radius = (Fixed64)10 });
+        dynamicTarget.Initialize(Vector3d.Zero, FixedQuaternion.Identity);
+        var staticTarget = new SolidBody(new TestMatterAgent(context), new LSSphereCollider { Radius = (Fixed64)10 });
+        staticTarget.Initialize(Vector3d.Zero, FixedQuaternion.Identity, BodyMotionType.Static);
+        SolidBody2D source = CreatePendingCompensatedCircle(context, pending);
+        source.Agent.Transform.LocalRotationXZRadians = Fixed64.HalfPi;
+        context.AdvanceLateSimulateToken();
+        context.Physics.PrepareContinuousCollisionFrame();
+        context.Physics2D.PrepareContinuousCollisionFrame();
+        source.ResolveContinuousCollisionProxyRadius().Should().Be(pending ? Fixed64.MaxValue : Fixed64.FromFraction(3, 4));
+
+        source.LateSimulate(updateSleepState: false, updateColliderState: false);
+
+        // Contained contacts may conservatively shorten the requested arc.
+        // Pending and coherent authoring must both retain a valid swept pose.
+        source.Rotation.Should().BeInRange(Fixed64.Zero, Fixed64.HalfPi);
+        source.Position.Should().Be(Vector2d.Zero);
+        ((LSCircleCollider2D)source.Collider).ScaledRadius.Should().Be(Fixed64.Quarter);
+        dynamicTarget.Position3d.Should().Be(Vector3d.Zero);
+        dynamicTarget.LinearVelocity.Should().Be(Vector3d.Zero);
+    }
+
     [Fact]
     public void ClippedTrajectory2D_ShouldHaveStableReplayHashAfterSupersededTailReplacement()
     {
@@ -584,4 +674,22 @@ public sealed partial class ContinuousCollision2DTests
             .Should()
             .Be(impactPosition);
     }
+
+    private static SolidBody2D CreatePendingCompensatedCircle(GravitasWorldContext context, bool pending = true)
+    {
+        var transform = new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One * (pending ? (Fixed64)4096 : Fixed64.One));
+        var collider = new LSCircleCollider2D(pending ? Fixed64.Half : Fixed64.Quarter)
+        { LocalOffset = pending ? Vector2d.Zero : Vector2d.Right * Fixed64.Half,
+            MixedHalfThicknessOverride = Fixed64.One };
+        var source = new SolidBody2D(new TestMatterAgent(context, transform), collider);
+        source.Initialize(Vector2d.Zero, motionType: BodyMotionType.Kinematic);
+        source.ContinuousCollisionMode = ContinuousCollisionMode.Continuous;
+        // Old radius 2048 and pending offset/radius (1/2, 1/4) are both supported.
+        if (!pending) return source;
+        transform.LocalScale = Vector3d.One * Fixed64.MinIncrement;
+        collider.Radius = (Fixed64)(1 << 30);
+        collider.LocalOffset = new Vector2d(Fixed64.MaxValue, Fixed64.Zero);
+        return source;
+    }
+
 }

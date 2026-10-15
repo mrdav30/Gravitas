@@ -346,17 +346,12 @@ public sealed class MeshConeFaceRegionsTests
     }
 
     [Fact]
-    public void UnrepresentableOppositeDepth_DoesNotPoisonTheSelectedOrientation()
+    public void UnsupportedPatchExtent_RejectsBeforeBuildingContactRegions()
     {
         Fixed64 extent = Fixed64.MaxValue / 2, width = Fixed64.MaxValue / 4;
-        var mesh = Create(new[] { new Vector3d(-extent,extent,-width), new Vector3d(extent,-extent,-width),
-            new Vector3d(extent,-extent,width), new Vector3d(-extent,extent,width) }, new[] { 0,1,2, 0,2,3 });
-        var regions = new MeshConeFaceRegions(); var connectivity = new MeshSurfaceConnectivity();
-        Build(regions, connectivity, mesh, Vector3d.Zero, FixedQuaternion.Identity,
-            Fixed64.MaxValue, Fixed64.MaxValue, new[] { 0,1 });
-        Assert.True(regions.TryGetSelectedRay(0, out _, out _, out Fixed64 depth));
-        Assert.True(depth > Fixed64.Zero && depth < Fixed64.MaxValue);
-        Assert.Equal(4, regions.GetSampleCount(0));
+        Assert.Throws<ArgumentException>(() => Create(new[] {
+            new Vector3d(-extent,extent,-width), new Vector3d(extent,-extent,-width),
+            new Vector3d(extent,-extent,width), new Vector3d(-extent,extent,width) }, new[] { 0,1,2, 0,2,3 }));
     }
 
     [Theory]

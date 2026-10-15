@@ -5,6 +5,7 @@
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
+using FixedMathSharp;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas.Colliders;
@@ -14,6 +15,9 @@ namespace Gravitas.Colliders;
 /// </summary>
 public static class ColliderSettings2D
 {
+    /// <summary>Gets the inclusive maximum effective collider reach in world units.</summary>
+    public static Fixed64 MaximumGeometryReach => ColliderGeometryPolicy.MaximumGeometryReach;
+
     /// <summary>
     /// Gets the narrow-phase priority used to order 2D colliders before dispatch.
     /// </summary>

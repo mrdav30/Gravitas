@@ -1423,7 +1423,7 @@ public sealed class RaycastSegmentWorkerTests
     public void CheckOBBoxOverlaps_WithLargeScaleTangentAndCompoundRotation_ShouldReturnSingleIntersection()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
-        Fixed64 halfExtent = (Fixed64)50_000;
+        Fixed64 halfExtent = (Fixed64)2000;
         FixedQuaternion rotation = FixedQuaternion.FromEulerAnglesInDegrees(
             (Fixed64)23,
             (Fixed64)37,

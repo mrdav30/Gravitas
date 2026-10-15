@@ -10,53 +10,27 @@ namespace Gravitas.Tests.CollisionHandlingTests;
 
 public sealed class ContinuousCollisionBoundsTests
 {
-    [Theory]
-    [InlineData(false, false)]
-    [InlineData(false, true)]
-    [InlineData(true, false)]
-    [InlineData(true, true)]
-    public void MeshInterval_WithUnrepresentableCapsuleLocalExtent_ShouldRemainUncertified(
-        bool capsuleIsSource, bool positiveMotionBound)
+    [Fact]
+    public void MeshInterval_WithUnsupportedCapsuleExtent_ShouldRejectBeforeRegistration()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         var capsule = new LSCapsuleCollider { Radius = Fixed64.One, Size = new Vector3d(2, 3, 2) };
-        Initialize(context, capsule, new Vector3d(0, 0, -1_000_000_000),
-            FixedQuaternion.FromAxisAngle(Vector3d.Right, Fixed64.Pi * Fixed64.Half),
-            Vector3d.One * (Fixed64)2_000_000_000);
-        LSMeshCollider mesh = CreateSmallTriangleAtZ(context, (Fixed64)1_500_000_000);
-
-        capsule.ScaledRadius.Should().Be((Fixed64)2_000_000_000);
-        capsule.AxisLength.Should().Be((Fixed64)2_000_000_000);
-        capsule.Bounds.Intersects(mesh.Bounds).Should().BeTrue();
-        // The upper core endpoint is near Z=0; the triangle at Z=1.5 billion
-        // is inside its radius-two-billion cap, despite the clipped local extent.
-        ContinuousCollisionBounds.AreSeparated(capsuleIsSource ? capsule : mesh,
-            capsuleIsSource ? mesh : capsule,
-            positiveMotionBound ? Fixed64.Half : Fixed64.Zero).Should().BeFalse();
+        System.Action initialize = () => Initialize(context, capsule, Vector3d.Zero,
+            FixedQuaternion.Identity, Vector3d.One * (Fixed64)2_000_000_000);
+        initialize.Should().Throw<System.ArgumentException>().WithMessage("*geometry reach*");
+        capsule.Id.Should().Be(-1);
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void MixedMeshInterval_WithUnrepresentableCapsuleLocalExtent_ShouldRemainUncertified(
-        bool positiveMotionBound)
+    [Fact]
+    public void MixedMeshInterval_WithUnsupportedCapsuleExtent_ShouldRejectBeforeRegistration()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         context.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
-        var capsule = new LSCapsuleCollider2D(Fixed64.One, (Fixed64)3)
-        {
-            MixedHalfThicknessOverride = Fixed64.Half
-        };
-        capsule.InitializeWithNoBody(new TestMatterAgent(context,
-            new FixedTransform(new Vector3d(0, 0, -1_000_000_000), FixedQuaternion.Identity,
-                Vector3d.One * (Fixed64)2_000_000_000)));
-        LSMeshCollider mesh = CreateSmallTriangleAtZ(context, (Fixed64)1_500_000_000);
-
-        capsule.ScaledRadius.Should().Be((Fixed64)2_000_000_000);
-        capsule.AxisLength.Should().Be((Fixed64)2_000_000_000);
-        mesh.Bounds.Intersects(capsule.MixedBounds3D).Should().BeTrue();
-        ContinuousCollisionBounds.AreSeparated(mesh, capsule,
-            positiveMotionBound ? Fixed64.Half : Fixed64.Zero).Should().BeFalse();
+        var capsule = new LSCapsuleCollider2D(Fixed64.One, (Fixed64)3);
+        System.Action initialize = () => capsule.InitializeWithNoBody(new TestMatterAgent(context,
+            new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One * (Fixed64)2_000_000_000)));
+        initialize.Should().Throw<System.ArgumentException>().WithMessage("*geometry reach*");
+        capsule.Id.Should().Be(-1);
     }
 
     [Theory]
@@ -207,13 +181,12 @@ public sealed class ContinuousCollisionBoundsTests
     public void MeshInterval_WithUnrepresentableExpandedHalfExtent_ShouldRemainUncertified()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
-        var source = new LSSphereCollider { Radius = Fixed64.MaxValue };
+        var source = new LSSphereCollider { Radius = Fixed64.One };
         Initialize(context, source, Vector3d.Zero);
         LSMeshCollider target = CreateSmallTriangleAtZ(context, Fixed64.Zero);
 
-        // Expanding the admitted radius by one spans the full scalar domain;
-        // no representable centered half-extent encloses both clipped endpoints.
-        ContinuousCollisionBounds.AreSeparated(source, target, Fixed64.One).Should().BeFalse();
+        // Long-travel motion bounds remain independent of the admitted source size.
+        ContinuousCollisionBounds.AreSeparated(source, target, Fixed64.MaxValue).Should().BeFalse();
     }
 
     [Fact]
@@ -270,7 +243,7 @@ public sealed class ContinuousCollisionBoundsTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void MixedMeshInterval_WithUnrepresentableOriginCenteredPolygonExtent_ShouldRemainUncertified(
+    public void MixedMeshInterval_WithUnsupportedOriginCenteredPolygonExtent_ShouldRejectBeforeRegistration(
         bool minimumOnZ)
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
@@ -282,17 +255,10 @@ public sealed class ContinuousCollisionBoundsTests
             : new[] { new Vector2d(Fixed64.MinValue, -Fixed64.Half),
                 new Vector2d(Fixed64.Zero, -Fixed64.Half), new Vector2d(Fixed64.Zero, Fixed64.Half),
                 new Vector2d(Fixed64.MinValue, Fixed64.Half) };
-        var polygon = new LSPolygonCollider2D(vertices) { MixedHalfThicknessOverride = Fixed64.Half };
-        polygon.InitializeWithNoBody(new TestMatterAgent(context));
-        LSMeshCollider mesh = CreateSmallTriangleAtZ(context,
-            minimumOnZ ? Fixed64.FromFraction(-1, 10) : Fixed64.Zero);
-
-        polygon.ContainsPoint(new Vector2d(Fixed64.FromFraction(-1, 10),
-            Fixed64.FromFraction(-1, 10))).Should().BeTrue();
-        mesh.Bounds.Intersects(polygon.MixedBounds3D).Should().BeTrue();
-        // -MinValue is outside the scalar domain: a saturated symmetric box
-        // cannot replace the admitted polygon's conceptual local extent.
-        ContinuousCollisionBounds.AreSeparated(mesh, polygon, Fixed64.Zero).Should().BeFalse();
+        var polygon = new LSPolygonCollider2D(vertices);
+        System.Action initialize = () => polygon.InitializeWithNoBody(new TestMatterAgent(context));
+        initialize.Should().Throw<System.ArgumentException>().WithMessage("*geometry reach*");
+        polygon.Id.Should().Be(-1);
     }
 
     private static LSMeshCollider CreateSmallTriangleAtZ(GravitasWorldContext context, Fixed64 z)

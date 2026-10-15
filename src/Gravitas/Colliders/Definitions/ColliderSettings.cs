@@ -5,6 +5,7 @@
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
+using FixedMathSharp;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas.Colliders;
@@ -12,6 +13,9 @@ namespace Gravitas.Colliders;
 /// <summary>Provides deterministic priority and collision-dispatch metadata for 3D collider shapes.</summary>
 public static class ColliderSettings
 {
+    /// <summary>Gets the inclusive maximum effective collider reach in world units.</summary>
+    public static Fixed64 MaximumGeometryReach => ColliderGeometryPolicy.MaximumGeometryReach;
+
     /// <summary>Gets the narrow-phase priority used to order 3D colliders before dispatch.</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int GetPriority(ColliderType type) =>

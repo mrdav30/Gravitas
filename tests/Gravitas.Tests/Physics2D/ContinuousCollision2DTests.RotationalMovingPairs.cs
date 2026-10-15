@@ -61,15 +61,9 @@ public sealed partial class ContinuousCollision2DTests
         bool immovable)
     {
         using GravitasWorldContext context = CreateContext(frameRate: 1);
-        SolidBody2D blade = CreateRotationalMovingPairBlade2D(
-            context,
-            isKinematic: true);
-        if (immovable)
-        {
-            // An unrepresentable pivot radius deliberately takes the registered-
-            // collider fallback instead of relying on shape-specific broad phase.
-            blade.Collider.LocalOffset = new Vector2d(Fixed64.MaxValue, Fixed64.Zero);
-        }
+        SolidBody2D blade = immovable
+            ? CreatePendingCompensatedCircle(context)
+            : CreateRotationalMovingPairBlade2D(context, isKinematic: true);
         Vector2d targetPosition = Vector2d.Rotate(
             new Vector2d(Fixed64.FromFraction(16, 5), Fixed64.Zero),
             FixedMath.DegToRad((Fixed64)45));
@@ -80,11 +74,16 @@ public sealed partial class ContinuousCollision2DTests
             immovable);
 
         blade.Agent.Transform.LocalRotationXZRadians = RotationalMovingPairQuarterTurn2D;
+        if (immovable)
+            blade.ResolveContinuousCollisionProxyRadius().Should().Be(Fixed64.MaxValue);
         context.LateSimulate();
 
         blade.Rotation.Should().Be(RotationalMovingPairQuarterTurn2D);
         blade.LastContinuousCollisionToiIterationCount.Should().Be(0);
         target.Position.Should().Be(targetPosition);
+        target.LinearVelocity.Should().Be(Vector2d.Zero);
+        if (immovable)
+            ((LSCircleCollider2D)blade.Collider).ScaledRadius.Should().Be(Fixed64.Quarter);
     }
 
     [Fact]

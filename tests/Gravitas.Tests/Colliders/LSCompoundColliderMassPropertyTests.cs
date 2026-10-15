@@ -427,7 +427,7 @@ public sealed class LSCompoundColliderMassPropertyTests
     }
 
     [Fact]
-    public void InitializedCompound_ShouldAggregateAnUnrepresentableBodyLocalChildCenter()
+    public void InitializedBodylessCompound_ShouldAggregateAnUnrepresentableLocalChildCenter()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         var compound = new LSCompoundCollider(
@@ -440,14 +440,8 @@ public sealed class LSCompoundColliderMassPropertyTests
                 Fixed64.Zero)
         };
 
-        scenario.CreateBody(
-            compound,
-            new Vector3d(
-                Fixed64.MinValue,
-                Fixed64.Zero,
-                Fixed64.Zero),
-            FixedQuaternion.Identity,
-            mass: Fixed64.One);
+        scenario.InitializeStaticCollider(compound,
+            new Vector3d(Fixed64.MinValue, Fixed64.Zero, Fixed64.Zero));
 
         compound.CalculateLocalCenterOfMassOffset().Should().Be(
             new Vector3d(
@@ -557,7 +551,7 @@ public sealed class LSCompoundColliderMassPropertyTests
             CompoundColliderPart.Sphere(Fixed64.One, Vector3d.Zero),
             CompoundColliderPart.Sphere(
                 Fixed64.FromRaw(1),
-                new Vector3d((Fixed64)1_000_000, Fixed64.Zero, Fixed64.Zero)));
+                new Vector3d((Fixed64)4095, Fixed64.Zero, Fixed64.Zero)));
         scenario.CreateBody(compound, Vector3d.Zero, FixedQuaternion.Identity);
 
         compound.CalculateLocalCenterOfMassOffset().Should().Be(Vector3d.Zero);
@@ -818,10 +812,10 @@ public sealed class LSCompoundColliderMassPropertyTests
         var compound = new LSCompoundCollider(
             CompoundColliderPart.Sphere(
                 Fixed64.One,
-                new Vector3d((Fixed64)(-50000), Fixed64.Zero, Fixed64.Zero)),
+                new Vector3d((Fixed64)(-4000), Fixed64.Zero, Fixed64.Zero)),
             CompoundColliderPart.Sphere(
                 Fixed64.One,
-                new Vector3d((Fixed64)50000, Fixed64.Zero, Fixed64.Zero)));
+                new Vector3d((Fixed64)4000, Fixed64.Zero, Fixed64.Zero)));
         scenario.CreateBody(
             compound,
             Vector3d.Zero,
@@ -830,7 +824,7 @@ public sealed class LSCompoundColliderMassPropertyTests
 
         FluentActions.Invoking(
                 () => compound.CalculateInertiaTensor(
-                    Fixed64.Two,
+                    Fixed64.MaxValue,
                     Vector3d.Zero))
             .Should().Throw<InvalidOperationException>()
             .WithMessage("*outside the Fixed64 scalar domain*");

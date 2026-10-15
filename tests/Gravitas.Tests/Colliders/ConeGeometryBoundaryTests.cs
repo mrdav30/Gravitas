@@ -15,12 +15,12 @@ public sealed class ConeGeometryBoundaryTests
     [InlineData(2199023255552L, 2199023255552L, 603668288149738837L)]
     [InlineData(4398046511104L, 4398046511104L, 4829346305197910699L)]
     [InlineData(8796093022208L, 8796093022208L, long.MaxValue)]
-    [InlineData(214748364800000L, 4194304L, 10980662194010417L)]
+    [InlineData(8589934592000L, 2621440000L, 10980662194010417L)]
     [InlineData(2147483648L, 2147483648L, 562209904L)]
     [InlineData(4294967297L, 4294967299L, 4497679240L)]
     [InlineData(1073741824L, 12884901888L, 843314856L)]
     [InlineData(1073741824L, 38654705664L, 2529944570L)]
-    [InlineData(1024L, 4503599627370496L, 268L)]
+    [InlineData(16384L, 17592186044416L, 268L)]
     [InlineData(1L, 1L, 0L)]
     public void ConeVolume_ShouldRoundOnlyTheFinalProductRatio(
         long radiusRaw, long heightRaw, long expectedRaw)
@@ -98,7 +98,7 @@ public sealed class ConeGeometryBoundaryTests
     }
 
     [Fact]
-    public void BodyBoundConeVolume_ShouldPreserveCommittedGeometryWhenMassPointCannotBeRepresented()
+    public void BodyBoundConeVolume_ShouldRejectUnsupportedAttachmentBeforePublication()
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         var cone = new LSConeCollider(ColliderShapeDefinition.Cone(Fixed64.One, (Fixed64)4));
@@ -108,10 +108,10 @@ public sealed class ConeGeometryBoundaryTests
         FixedBoundBox bounds = cone.Bounds;
 
         cone.Radius = Fixed64.Two;
-        cone.LocalOffset = new Vector3d(Fixed64.Zero, Fixed64.MinValue, Fixed64.Zero);
-        Action invalidPrepare = () => cone.Simulate();
+        Action invalidOffset = () => cone.LocalOffset = new Vector3d(Fixed64.Zero, Fixed64.MinValue, Fixed64.Zero);
 
-        invalidPrepare.Should().Throw<InvalidOperationException>();
+        invalidOffset.Should().Throw<ArgumentException>();
+        cone.LocalOffset.Should().Be(Vector3d.Zero);
         cone.Volume.Should().Be(volume);
         cone.Area.Should().Be(volume);
         cone.ScaledRadius.Should().Be(Fixed64.One);

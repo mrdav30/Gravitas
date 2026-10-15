@@ -40,7 +40,7 @@ internal static class ColliderCanonicalBounds
                     mesh.GetCurrentShapeScales(
                         out Vector3d ownerScale,
                         out Vector3d partScale);
-                    return mesh.Mesh.GetScaledLocalRadius(
+                    return mesh.GeometryMesh.GetScaledLocalRadius(
                         ownerScale,
                         partScale);
                 }
@@ -94,52 +94,6 @@ internal static class ColliderCanonicalBounds
             localMax,
             referenceOrigin,
             referenceRotation);
-    }
-
-    internal static Fixed64 GetCenteredProxyRadius(
-        LSCollider collider)
-    {
-        switch (collider)
-        {
-            case LSSphereCollider sphere:
-                return sphere.ScaledRadius;
-            case LSCapsuleCollider capsule:
-                {
-                    FixedBoundBox localBounds =
-                        FixedBoundBox.FromCenteredCapsuleClippedToDomain(
-                            Vector3d.Zero,
-                            Vector3d.Up,
-                            capsule.AxisLength,
-                            capsule.ScaledRadius);
-                    return localBounds.Max.Y;
-                }
-            case LSCuboidCollider cuboid:
-                return cuboid.OrientedBox.HalfExtents
-                    .TryGetMagnitudeCeiling(
-                        out Fixed64 cuboidRadius)
-                    ? cuboidRadius
-                    : Fixed64.MaxValue;
-            case LSCylinderCollider cylinder:
-                return GetFiniteAxisLocalRadius(
-                    FixedBoundBox.FromCenteredFiniteCylinderClippedToDomain(
-                        Vector3d.Zero,
-                        Vector3d.Up,
-                        cylinder.Height,
-                        cylinder.ScaledRadius));
-            case LSConeCollider cone:
-                return GetFiniteAxisLocalRadius(
-                    FixedBoundBox.FromCenteredFiniteConeClippedToDomain(
-                        Vector3d.Zero,
-                        Vector3d.Up,
-                        cone.Height,
-                        cone.ScaledRadius));
-            case LSMeshCollider mesh:
-                return mesh.Mesh.ScaledLocalRadius;
-            case LSCompoundCollider compound:
-                return GetCompoundCenteredProxyRadius(compound);
-            default:
-                return Fixed64.MaxValue;
-        }
     }
 
     internal static Fixed64 GetGroundProbeRadius(
@@ -367,31 +321,20 @@ internal static class ColliderCanonicalBounds
                 FixedMath.Max(radiusX, radiusZ)));
     }
 
-    private static Fixed64 GetCompoundCenteredProxyRadius(
-        LSCompoundCollider compound)
+    internal static Fixed64 GetCompoundCenteredProxyRadius(LSCompoundCollider compound)
     {
-        Fixed64 bestRadius = Fixed64.Zero;
+        Fixed64 radius = Fixed64.Zero;
         for (int index = 0; index < compound.PartCount; index++)
         {
-            LSCollider part = compound.GetPartCollider(index);
-            bool offsetResolved = Vector3d.TrySubtract(
-                part.CanonicalCenter,
-                compound.CanonicalCenter,
-                out Vector3d offset);
-            bool distanceResolved =
-                offset.TryGetMagnitudeCeiling(
-                    out Fixed64 distance);
-            bool radiusResolved = Fixed64.TryAdd(
-                distance,
-                part.CanonicalCenteredProxyRadius,
-                out Fixed64 radius);
-            if (!(offsetResolved & distanceResolved & radiusResolved))
-                return Fixed64.MaxValue;
-
-            bestRadius = FixedMath.Max(bestRadius, radius);
+            var part = compound.GetPartCollider(index);
+            // Published centers include scalar transform rounding. Admission uses
+            // exact authored attachment reach; the CCD proxy must enclose the
+            // actual committed centers instead of reusing that admission metric.
+            Vector3d offset = part.CanonicalCenter - compound.CanonicalCenter;
+            radius = FixedMath.Max(radius, ColliderGeometryPolicy.Add(
+                ColliderGeometryPolicy.Magnitude(offset), part.CanonicalCenteredProxyRadius));
         }
-
-        return bestRadius;
+        return radius;
     }
 
     private static Fixed64 GetCurrentCompoundCenteredProxyRadius(

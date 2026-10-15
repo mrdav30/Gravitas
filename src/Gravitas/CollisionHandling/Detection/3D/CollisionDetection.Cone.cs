@@ -41,11 +41,9 @@ public static partial class CollisionDetection
         // Containment increases penetration depth; the sphere still escapes
         // along the solid surface's outward normal, not toward the cone center.
         Vector3d normal = outwardNormal;
-        ResolvePenetrationDepth(
-            sphere.ScaledRadius,
-            signedDistance,
-            out Fixed64 penetrationDepth,
-            out bool depthIsClamped);
+        // Admitted cone and sphere reaches bound containment depth by their
+        // sum, so no scalar clamping is needed for this complete difference.
+        Fixed64 penetrationDepth = sphere.ScaledRadius - signedDistance;
         pair.Manifold.SetContact(
             new ContactAnchor(coneAnchor),
             new ContactAnchor(
@@ -57,7 +55,7 @@ public static partial class CollisionDetection
                     -normal)),
             penetrationDepth,
             normal,
-            depthIsClamped);
+            depthIsClamped: false);
 
         return true;
     }
@@ -162,11 +160,9 @@ public static partial class CollisionDetection
             var connectivity = scratch.MeshConnectivity;
             connectivity.Build(mesh, triangleIndex, frame, admitted.AsReadOnlySpan());
             var faces = scratch.MeshConeFaces;
-            // Ordinary cones fit around their center even at a scalar face.
-            // If that conservative size certificate is inconclusive, retain
-            // the world frame rather than narrow an existing finite sample.
-            Vector3d samplingOrigin = ConePlaneRayPointMaterialization.IsRangeRepresentable(frame, cone.Center)
-                ? cone.Center : Vector3d.Zero;
+            // Admission bounds radius + half-height to a few thousand units,
+            // so centered sampling fits even when the cone touches a scalar face.
+            Vector3d samplingOrigin = cone.Center;
             faces.Build(mesh, triangleIndex, frame, connectivity, admitted.AsReadOnlySpan(), samplingOrigin);
             int surface = mesh.GetCanonicalSurfaceOrdinal(triangleIndex);
             for (int region = 0; region < faces.RegionCount; region++)

@@ -50,6 +50,26 @@ bit combinations are rejected as settings values.
 
 ## Public Surface
 
+Collider preparation uses an inclusive maximum effective reach of `4,096`
+world units, exposed by `ColliderSettings.MaximumGeometryReach` and
+`ColliderSettings2D.MaximumGeometryReach`. It measures the prepared local
+geometry after owner and compound-part scale, independently of world position.
+For a body-owned collider, its attachment to the body origin counts toward the
+budget. A compound also counts each part's attachment plus that part's reach;
+opposing attachment offsets do not cancel this conservative budget. Mixed
+colliders include physical half-thickness after the complete planar reach.
+Oversized candidates fail before committed geometry is replaced.
+Compound centered proxies separately enclose the published child centers,
+preserving final child-center rounding in that physical enclosure.
+
+Large authored dimensions can be scaled down before initialization. A
+collider-owned mesh prepares runtime geometry when its effective scale is known;
+requesting its detached runtime mesh first requires admissible geometry at that
+detached scale. Change collider-owned mesh poses and scales through the collider,
+body or host transform. Calling `PhysicsMesh.UpdatePosition` or `UpdateTransform`
+on a collider-owned mesh throws; independently constructed `PhysicsMesh`
+instances retain these transformation APIs and validate their own reach.
+
 | Domain      | Bodies                    | Colliders                               | Constraints                      | Queries              |
 | ----------- | ------------------------- | --------------------------------------- | -------------------------------- | -------------------- |
 | 3D          | `SolidBody`               | built-in `LSCollider` implementations   | `Joint3D`, `RagdollRuntime3D`    | `context.Query3D`    |

@@ -367,6 +367,7 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
             if (_localOffset == value)
                 return;
 
+            ValidateGeometryMutation(offset: value);
             _localOffset = value;
             MarkShapeDirty();
         }
@@ -401,6 +402,8 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
             if (_mixedHalfThicknessOverride == value)
                 return;
 
+            ValidateGeometryMutation(halfThickness: value ?? _context?.Settings.Mixed2DHalfThickness
+                ?? PhysicsSettings.DefaultMixed2DHalfThickness);
             _mixedHalfThicknessOverride = value;
             MarkShapeDirty();
         }
@@ -600,7 +603,7 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
     internal void ValidateCurrentRuntimeTransform() =>
         PrepareRuntimeShape(
             CaptureShapeSnapshot(),
-            requireRepresentableMassPoint: true);
+            includeBodyAttachment: true);
 
     /// <summary>Assigns a 2D hierarchy parent used for collision exclusion.</summary>
     public void SetParent(LSCollider2D parent)

@@ -68,6 +68,7 @@ public sealed class LSCapsuleCollider : LSCollider
     private protected override void PrepareShape(in ColliderShapeSnapshot snapshot)
     {
         GetScaledGeometry(snapshot, out _preparedRadius, out _preparedAxisLength);
+        SetPreparedGeometryReach(ColliderGeometryPolicy.Capsule(_preparedRadius, _preparedAxisLength));
         _preparedAxis = (snapshot.Rotation * Vector3d.Up).Normalized;
         _preparedArea = Fixed64.Two * Fixed64.Pi * _preparedRadius * _preparedAxisLength
             + Fixed64.Two * Fixed64.Pi * _preparedRadius * _preparedRadius;
@@ -79,7 +80,7 @@ public sealed class LSCapsuleCollider : LSCollider
             _preparedRadius));
     }
 
-    private static void GetScaledGeometry(
+    internal static void GetScaledGeometry(
         in ColliderShapeSnapshot snapshot,
         out Fixed64 radius,
         out Fixed64 axisLength)

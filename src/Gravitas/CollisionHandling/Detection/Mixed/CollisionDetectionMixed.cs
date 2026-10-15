@@ -107,8 +107,11 @@ public static partial class CollisionDetectionMixed
         _ = embeddedAnchor.TryGetOffsetFrom(
             sphereCenter,
             out Vector3d delta);
-        if (!Vector3d.TryGetMagnitude(delta, out Fixed64 distance)
-            || (!inside && distance > sphere.ScaledRadius))
+        // Outside overlap bounds the closest witness by the sphere's local
+        // reach; inside, the nearer planar boundary bounds it independently of
+        // slab height. Its magnitude and final penetration therefore fit.
+        _ = Vector3d.TryGetMagnitude(delta, out Fixed64 distance);
+        if (!inside && distance > sphere.ScaledRadius)
         {
             contact = default;
             return false;
@@ -117,17 +120,7 @@ public static partial class CollisionDetectionMixed
         Vector3d normal = distance > Fixed64.Zero
             ? WideNormalization.GetNormalized(inside ? -delta : delta)
             : ResolveFallbackNormal(sphereCenter, embedded);
-        bool exactDepth = inside
-            ? Fixed64.TryAdd(
-                sphere.ScaledRadius,
-                distance,
-                out Fixed64 depth)
-            : Fixed64.TrySubtract(
-                sphere.ScaledRadius,
-                distance,
-                out depth);
-        if (!exactDepth)
-            depth = Fixed64.MaxValue;
+        Fixed64 depth = inside ? sphere.ScaledRadius + distance : sphere.ScaledRadius - distance;
         contact = new MixedContact(
             new ContactAnchor(
                 sphereCenter,
@@ -135,7 +128,7 @@ public static partial class CollisionDetectionMixed
             embeddedAnchor,
             normal,
             depth,
-            depthIsClamped: !exactDepth);
+            depthIsClamped: false);
         return true;
     }
 

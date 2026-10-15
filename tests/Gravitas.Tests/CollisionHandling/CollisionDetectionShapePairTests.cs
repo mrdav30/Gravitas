@@ -281,23 +281,17 @@ public sealed class CollisionDetectionShapePairTests
     }
 
     [Fact]
-    public void CuboidCapsule_WithSaturatedSquaredDistances_ShouldRejectRepresentableSeparation()
+    public void CuboidCapsule_WithSaturatedSquaredWorldDistance_ShouldRejectSupportedSeparation()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSCuboidCollider> cuboid = scenario.CreateCuboid(Vector3d.Zero);
-        ScenarioBody<LSCapsuleCollider> capsule = scenario.CreateCapsule(Vector3d.Zero);
-        Fixed64 radius = (Fixed64)48_000;
-        capsule.Collider.Size = Vector3d.One * (radius * 2);
-        capsule.Collider.Radius = radius;
-        capsule.Body.ResetPosition(new Vector3d((Fixed64)50_001, Fixed64.Zero, Fixed64.Zero));
-        capsule.Collider.RebuildRuntimeShapeOnly();
-
+        ScenarioBody<LSCapsuleCollider> capsule = scenario.CreateBody(
+            new LSCapsuleCollider { Radius = (Fixed64)3000, Size = Vector3d.One * (Fixed64)6000 },
+            new Vector3d((Fixed64)50001, Fixed64.Zero, Fixed64.Zero), FixedQuaternion.Identity);
         Vector3d separation = capsule.Collider.Center - cuboid.Collider.BoundsMax;
         separation.MagnitudeSquared.Should().Be(Fixed64.MaxValue);
-        capsule.Collider.ScaledRadiusSqr.Should().Be(Fixed64.MaxValue);
         Vector3d.TryGetMagnitude(separation, out Fixed64 distance).Should().BeTrue();
-        distance.Should().BeGreaterThan(radius);
-
+        distance.Should().BeGreaterThan(capsule.Collider.ScaledRadius);
         AssertNoCollision(scenario, cuboid.Collider, capsule.Collider, CollisionType.AABox_Capsule);
         AssertNoCollision(scenario, capsule.Collider, cuboid.Collider, CollisionType.AABox_Capsule);
     }
@@ -308,8 +302,8 @@ public sealed class CollisionDetectionShapePairTests
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         ScenarioBody<LSCuboidCollider> cuboid = scenario.CreateCuboid(Vector3d.Zero);
         ScenarioBody<LSCapsuleCollider> capsule = scenario.CreateCapsule(Vector3d.Zero);
-        capsule.Collider.Radius = Fixed64.One;
         capsule.Collider.Size = Vector3d.One * Fixed64.Two;
+        capsule.Collider.Radius = Fixed64.One;
         capsule.Body.ResetPosition(new Vector3d(
             (Fixed64)1_600_000_000,
             (Fixed64)1_600_000_000,
@@ -881,22 +875,13 @@ public sealed class CollisionDetectionShapePairTests
     }
 
     [Fact]
-    public void CylinderSphere_WithFullDomainContainment_ShouldClampContactDepth()
+    public void CylinderSphere_WithUnsupportedSphere_ShouldRejectBeforePairCreation()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
-        ScenarioBody<LSCylinderCollider> cylinder =
-            scenario.CreateCylinder(Vector3d.Zero);
-        var sphere = new LSSphereCollider
-        {
-            Radius = Fixed64.MaxValue,
-        };
-        scenario.InitializeStaticCollider(sphere, Vector3d.Zero);
-        CollisionPair pair = scenario.CreatePair(cylinder.Collider, sphere);
-
-        CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
-        pair.Manifold.HasContact.Should().BeTrue();
-        pair.Manifold.PrimaryContact.Depth.Should().Be(Fixed64.MaxValue);
-        pair.Manifold.PrimaryContact.DepthIsClamped.Should().BeTrue();
+        var sphere = new LSSphereCollider { Radius = Fixed64.MaxValue };
+        System.Action initialize = () => scenario.InitializeStaticCollider(sphere, Vector3d.Zero);
+        initialize.Should().Throw<System.ArgumentException>().WithMessage("*geometry reach*");
+        sphere.Id.Should().Be(-1);
     }
 
     [Fact]
@@ -1452,7 +1437,7 @@ public sealed class CollisionDetectionShapePairTests
     [Theory]
     [InlineData(ColliderType.Cylinder)]
     [InlineData(ColliderType.Cone)]
-    public void FiniteAxisMeshContact_WithOverlappingClippedBoundsAndUnrepresentableFrameOffset_ShouldReject(
+    public void FiniteAxisMeshContact_WithUnrepresentableFrameOffset_ShouldRejectSupportedSeparation(
         ColliderType shape)
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
@@ -1475,12 +1460,12 @@ public sealed class CollisionDetectionShapePairTests
         LSCollider finiteAxis = shape == ColliderType.Cylinder
             ? new LSCylinderCollider
             {
-                Radius = Fixed64.MaxValue,
+                Radius = Fixed64.One,
                 Size = Vector3d.One
             }
             : new LSConeCollider
             {
-                Radius = Fixed64.MaxValue,
+                Radius = Fixed64.One,
                 Size = Vector3d.One
             };
         scenario.InitializeStaticCollider(
@@ -1490,7 +1475,7 @@ public sealed class CollisionDetectionShapePairTests
                 Fixed64.Zero,
                 Fixed64.Zero));
 
-        mesh.Bounds.Intersects(finiteAxis.Bounds).Should().BeTrue();
+        mesh.Bounds.Intersects(finiteAxis.Bounds).Should().BeFalse();
         new FixedPointAnchor(
                 finiteAxis.Center,
                 FixedQuaternion.Identity,

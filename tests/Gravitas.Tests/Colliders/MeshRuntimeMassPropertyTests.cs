@@ -105,7 +105,9 @@ public sealed class MeshRuntimeMassPropertyTests
     [Fact]
     public void RuntimeMesh_ShouldRefreshOnlyPublishedGeometryAndRetainBothPolicyResults()
     {
-        PhysicsMesh mesh = Box(Vector3d.One, MeshInertiaPolicy.RequireClosedVolume).Mesh;
+        ColliderShapeDefinition definition = MeshTestFixtures.CreateConvexCubeDefinition();
+        var mesh = new PhysicsMesh(definition.GetMeshVerticesForRuntime(), definition.GetMeshTrianglesForRuntime(),
+            Vector3d.Zero, FixedQuaternion.Identity);
         foreach (Vector3d scale in new[] { Vector3d.One, Vector3d.One * Fixed64.Two, new Vector3d((Fixed64)2, (Fixed64)3, (Fixed64)4) })
         {
             mesh.UpdateTransform(Vector3d.Zero, FixedQuaternion.Identity, scale);
@@ -181,7 +183,7 @@ public sealed class MeshRuntimeMassPropertyTests
         var compound = new LSCompoundCollider(new CompoundColliderPart(definition, Vector3d.Zero,
             FixedQuaternion.Identity, Vector3d.One * large));
         Action detached = () => compound.CalculateInertiaTensor(Fixed64.One, Vector3d.Zero);
-        detached.Should().Throw<InvalidOperationException>();
+        detached.Should().Throw<ArgumentException>();
         using var context = GravitasWorldContext.CreateOwned();
         compound.InitializeWithNoBody(new TestMatterAgent(context,
             new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One / large)));
@@ -211,7 +213,7 @@ public sealed class MeshRuntimeMassPropertyTests
                 Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One * (Fixed64)1048576),
             new CompoundColliderPart(ColliderShapeDefinition.Sphere(Fixed64.One), Vector3d.Zero));
         Action calculate = () => compound.CalculateInertiaTensor(Fixed64.FromRaw(1), Vector3d.Zero);
-        calculate.Should().Throw<InvalidOperationException>();
+        calculate.Should().Throw<ArgumentException>();
     }
 
     [Fact]

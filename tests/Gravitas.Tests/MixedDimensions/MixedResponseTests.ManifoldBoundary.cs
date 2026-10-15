@@ -465,7 +465,7 @@ public sealed partial class MixedResponseTests
     }
 
     [Fact]
-    public void DetectedCircularNormal_WithWideCompoundLocalCenter_ShouldUseTheFiniteFrozenCenter()
+    public void CompoundWithUnsupportedPartSpacing_ShouldRejectEvenWhenWorldOffsetsCancel()
     {
         using GravitasWorldContext context = CreateMixedContext();
         var collider = new LSCompoundCollider2D(
@@ -475,45 +475,10 @@ public sealed partial class MixedResponseTests
             LocalOffset = Vector2d.Right * (Fixed64)1_500_000_000,
             MixedHalfThicknessOverride = Fixed64.Half
         };
-        Vector2d position = Vector2d.Left * (Fixed64)1_500_000_000;
-        var body = new SolidBody2D(new TestMatterAgent(context,
-            new FixedTransform(position.ToVector3d(Fixed64.Zero), FixedQuaternion.Identity, Vector3d.One)), collider)
-        {
-            // The enormous authored lever remains physical: minimum positive mass
-            // keeps its second moment in the scalar domain rather than saturating it.
-            Mass = Fixed64.MinIncrement
-        };
-        body.Initialize(position);
-        body.UseManualGrounding();
-        Fixed64 x = (Fixed64)1_000_000_000 + Fixed64.Quarter;
-        var mesh = new LSMeshCollider(new[]
-        {
-            new Vector3d(x, (Fixed64)(-2), (Fixed64)(-2)), new Vector3d(x, (Fixed64)2, (Fixed64)(-2)),
-            new Vector3d(x, (Fixed64)(-2), (Fixed64)2), new Vector3d(x, (Fixed64)2, (Fixed64)2)
-        }, new[] { 0, 2, 1, 1, 2, 3 }, MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation);
-        mesh.InitializeWithNoBody(new TestMatterAgent(context,
-            new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)));
-        var manifold = new ContactManifold();
-        CollisionDetectionMixed.TryBuildManifold(mesh, collider, manifold).Should().BeTrue();
-        collider.GetPartCollider(0).TransformRelativeMassPropertyPointExact(Vector2d.Zero)
-            .TryGetPoint(out _).Should().BeFalse();
-        var center = new ContactAnchor(position.ToVector3d(Fixed64.Zero), FixedQuaternion.Identity,
-            body.LocalCenterOfMassOffset.ToVector3d(Fixed64.Zero));
-
-        foreach (ManifoldContact row in manifold)
-        {
-            row.FeatureNamespaceB.Should().Be(-1);
-            ContactAnchor normalPoint = ExactContactLever2D.GetDetectedNormalAnchor(collider,
-                row.FeatureNamespaceB, center, row.AnchorB);
-            normalPoint.TryGetWorldPoint(out Vector3d worldPoint).Should().BeTrue();
-            worldPoint.Should().Be(Vector3d.Right * (Fixed64)1_000_000_000);
-        }
-        // This leaf lies on the body's X axis and meets a vertical X wall.
-        // Its genuine center-to-COM lever is parallel to the normal, so yaw
-        // contributes no normal speed, even though its local center cannot narrow.
-        MixedContact.TrySelectClosingContact(manifold, ContactAnchor.FromWorldPoint(Vector3d.Zero),
-            Vector3d.Zero, Vector3d.Zero, center, Vector2d.Zero, Fixed64.One, out _, collider)
-            .Should().BeFalse();
+        var body = new SolidBody2D(new TestMatterAgent(context), collider) { Mass = Fixed64.MinIncrement };
+        System.Action initialize = () => body.Initialize(Vector2d.Left * (Fixed64)1_500_000_000);
+        initialize.Should().Throw<System.ArgumentException>();
+        collider.Id.Should().Be(-1);
     }
 
     [Fact]

@@ -54,83 +54,21 @@ public sealed class MeshTrianglePairContactTests
     }
 
     [Fact]
-    public void MeshMesh_DistinctExtremeFramesShouldRetainExactContactWhenVertexReframeFails()
+    public void MeshMesh_WithUnsupportedCanonicalExtent_ShouldRejectBeforePairCreation()
     {
-        // This admitted authored extent/scale pair produces canonical vertices
-        // at exactly +/- (Fixed64.MaxValue - 4) after round-to-even scaling.
-        Fixed64 extent = Fixed64.FromRaw(4611686011448066045L);
-        Vector3d scale = Fixed64.FromRaw(8589934589L) * Vector3d.One;
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
-        LSMeshCollider first = CreateSeparatedTriangleMesh(extent);
-        LSMeshCollider second = CreateSeparatedTriangleMesh(extent);
-        InitializeStaticMesh(
-            scenario.Context,
-            first,
-            new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero),
-            scale);
-        InitializeStaticMesh(
-            scenario.Context,
-            second,
-            new Vector3d(Fixed64.MinValue + (Fixed64)9, Fixed64.Zero, Fixed64.Zero),
-            FixedQuaternion.FromEulerAnglesInDegrees(
-                Fixed64.Zero,
-                (Fixed64)(-45),
-                Fixed64.Zero),
-            scale);
-        first.Mesh.GetLocalTriangleVertices(
-            0,
-            out Vector3d firstVertex,
-            out Vector3d secondVertex,
-            out Vector3d thirdVertex);
-        second.Mesh.GetLocalTriangleVertices(
-            0,
-            out Vector3d otherFirstVertex,
-            out Vector3d otherSecondVertex,
-            out Vector3d otherThirdVertex);
-        var firstTriangle = new FixedTriangle(firstVertex, secondVertex, thirdVertex);
-        var secondTriangle = new FixedTriangle(
-            otherFirstVertex,
-            otherSecondVertex,
-            otherThirdVertex);
-        bool firstVertexReframed = first.Mesh.CreatePointAnchor(firstVertex)
-            .TryGetLocalPointIn(
-                second.Mesh.Origin,
-                second.Mesh.Rotation,
-                out _);
-        bool secondVertexReframed = first.Mesh.CreatePointAnchor(secondVertex)
-            .TryGetLocalPointIn(
-                second.Mesh.Origin,
-                second.Mesh.Rotation,
-                out _);
-        bool thirdVertexReframed = first.Mesh.CreatePointAnchor(thirdVertex)
-            .TryGetLocalPointIn(
-                second.Mesh.Origin,
-                second.Mesh.Rotation,
-                out _);
-
-        firstVertexReframed.Should().BeFalse();
-        secondVertexReframed.Should().BeFalse();
-        thirdVertexReframed.Should().BeFalse();
-        firstTriangle.TryGetContact(
-            first.Mesh.Origin,
-            first.Mesh.Rotation,
-            second.Mesh.Origin,
-            second.Mesh.Rotation,
-            secondTriangle,
-            out _).Should().BeTrue();
-        var manifold = new ContactManifold();
-        CollisionDetection.DoCollisionCheck(CreateWorkItem(
-            scenario.Context,
-            first,
-            second,
-            manifold)).Should().BeTrue();
-        manifold.HasContact.Should().BeTrue();
+        Fixed64 extent = Fixed64.FromRaw(4611686011448066045L);
+        LSMeshCollider mesh = CreateSeparatedTriangleMesh(extent);
+        Action initialize = () => InitializeStaticMesh(scenario.Context, mesh,
+            new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero), Vector3d.One);
+        initialize.Should().Throw<ArgumentException>().WithMessage("*geometry reach*");
+        mesh.Id.Should().Be(-1);
     }
 
     [Fact]
-    public void MeshMesh_FullDomainEdgeCrossSeparatorShouldNotProduceContact()
+    public void MeshMesh_SupportedLargeEdgeCrossSeparatorShouldNotProduceContact()
     {
-        Fixed64 scale = Fixed64.MaxValue / (Fixed64)8;
+        Fixed64 scale = (Fixed64)512;
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         LSMeshCollider first = CreateTriangleMesh(
             new Vector3d(1, -2, 2) * scale,
@@ -140,6 +78,8 @@ public sealed class MeshTrianglePairContactTests
             new Vector3d(2, 2, -2) * scale,
             new Vector3d(-2, 0, -3) * scale,
             new Vector3d(-2, -1, 2) * scale);
+        InitializeStaticMesh(context, first, Vector3d.One);
+        InitializeStaticMesh(context, second, Vector3d.One);
         var manifold = new ContactManifold();
         var workItem = new CollisionWorkItem(
             context,
@@ -266,30 +206,15 @@ public sealed class MeshTrianglePairContactTests
     }
 
     [Fact]
-    public void MeshMesh_ShouldPropagateClampedTriangleDepth()
+    public void MeshMesh_WithUnsupportedDepthGeometry_ShouldRejectBeforePairCreation()
     {
-        Fixed64 half = Fixed64.MaxValue / Fixed64.Two - Fixed64.One;
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
-        LSMeshCollider first = CreateTriangleMesh(
-            new Vector3d(-half, half, -half),
-            new Vector3d(-half, -half, half),
-            new Vector3d(half, half, half),
-            MeshInertiaPolicy.RequireClosedVolume);
-        LSMeshCollider second = CreateTriangleMesh(
-            new Vector3d(-half, half, half),
-            new Vector3d(half, -half, half),
-            new Vector3d(half, half, -half),
-            MeshInertiaPolicy.RequireClosedVolume);
-        Vector3d scale = Fixed64.Two * Vector3d.One;
-        InitializeStaticMesh(scenario.Context, first, scale);
-        InitializeStaticMesh(scenario.Context, second, scale);
-
-        CollisionPair pair = scenario.CreatePair(first, second);
-        CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
-        ManifoldContact contact = pair.Manifold.PrimaryContact;
-
-        contact.Depth.Should().Be(Fixed64.MaxValue);
-        contact.DepthIsClamped.Should().BeTrue();
+        Fixed64 half = Fixed64.MaxValue / Fixed64.Two - Fixed64.One;
+        LSMeshCollider mesh = CreateTriangleMesh(new Vector3d(-half, half, -half),
+            new Vector3d(-half, -half, half), new Vector3d(half, half, half), MeshInertiaPolicy.RequireClosedVolume);
+        Action initialize = () => InitializeStaticMesh(scenario.Context, mesh, Vector3d.One * Fixed64.Two);
+        initialize.Should().Throw<ArgumentException>().WithMessage("*geometry reach*");
+        mesh.Id.Should().Be(-1);
     }
 
     [Fact]

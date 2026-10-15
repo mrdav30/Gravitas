@@ -312,6 +312,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
             if (_offset == value)
                 return;
 
+            ValidateGeometryMutation(value, _size, _radius);
             _offset = value;
             MarkShapeDirty();
         }
@@ -342,6 +343,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
             if (_radius == value)
                 return;
 
+            ValidateGeometryMutation(_offset, _size, value);
             _radius = value;
             OnRadiusChanged();
             MarkShapeDirty();
@@ -375,6 +377,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
             if (_size == normalizedSize)
                 return;
 
+            ValidateGeometryMutation(_offset, normalizedSize, _radius);
             _size = normalizedSize;
             MarkShapeDirty();
         }
@@ -593,7 +596,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
         ColliderShapeSnapshot snapshot = CaptureShapeSnapshot();
         PrepareRuntimeShape(
             snapshot,
-            requireRepresentableMassPoint: true);
+            includeBodyAttachment: true);
     }
 
     private void InitialPartition()
@@ -736,8 +739,8 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
 
         PrepareRuntimeShape(
             snapshot,
-            requireRepresentableMassPoint:
-                _body != null || _compoundOwner != null);
+            includeBodyAttachment:
+                _body != null);
         PublishPreparedShape();
         if (refreshMassProperties)
             _body?.RefreshMassPropertiesFromColliderShape();

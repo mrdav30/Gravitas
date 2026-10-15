@@ -49,6 +49,7 @@ public sealed class LSCircleCollider2D : LSCollider2D
             if (_radius == value)
                 return;
 
+            ValidateGeometryMutation(radius: value);
             _radius = value;
             MarkShapeDirty();
         }
@@ -171,6 +172,7 @@ public sealed class LSCircleCollider2D : LSCollider2D
             snapshot.OwnerScale.Y,
             snapshot.PartScale.Y);
         _preparedRadius = FixedMath.Max(radiusX, radiusY);
+        SetPreparedGeometryReach(_preparedRadius);
         SetPreparedBounds(FixedBoundArea.FromCenterAndScopeClippedToDomain(
             snapshot.Center,
             new Vector2d(_preparedRadius, _preparedRadius)));

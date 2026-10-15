@@ -673,13 +673,15 @@ public sealed partial class ContinuousCollisionDetectionTests
             .BeFalse();
     }
 
-    [Fact]
-    public void SphereSeparationGap_UnrepresentableCharacteristicScale_ShouldRemainUncertified()
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    public void SphereSeparationGap_UnrepresentableCharacteristicScale_ShouldRemainUncertified(int inset)
     {
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();
         LSSphereCollider source = scenario.CreateStaticSphere(Vector3d.Zero);
         LSSphereCollider target = scenario.CreateStaticSphere(
-            new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero));
+            new Vector3d(Fixed64.MaxValue - (Fixed64)inset, Fixed64.Zero, Fixed64.Zero));
 
         SolidBody.TryGetSphereSeparationGap(source, target, out _)
             .Should()
@@ -687,36 +689,28 @@ public sealed partial class ContinuousCollisionDetectionTests
     }
 
     [Fact]
-    public void SphereCuboidSeparationGap_UnrepresentableProxyScale_ShouldRemainUncertified()
+    public void SphereCuboidSeparationGap_AfterUnsupportedResizeRejection_ShouldKeepSupportedGeometry()
     {
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();
         LSSphereCollider source = scenario.CreateStaticSphere(Vector3d.Zero);
         var target = new LSCuboidCollider();
-        scenario.InitializeStaticCollider(
-            target,
-            new Vector3d((Fixed64)1_500_000_000, Fixed64.Zero, Fixed64.Zero));
-        target.Size = new Vector3d(
-            Fixed64.One,
-            (Fixed64)2_000_000_000,
-            (Fixed64)2_000_000_000);
-        target.RebuildRuntimeShapeOnly(refreshMassProperties: false);
-
-        SolidBody.TryGetSphereSeparationGap(source, target, out _)
-            .Should()
-            .BeFalse();
+        scenario.InitializeStaticCollider(target, new Vector3d((Fixed64)1_500_000_000, Fixed64.Zero, Fixed64.Zero));
+        System.Action resize = () => target.Size = new Vector3d(Fixed64.One, (Fixed64)2_000_000_000, (Fixed64)2_000_000_000);
+        resize.Should().Throw<System.ArgumentException>();
+        target.Size.Should().Be(Vector3d.One);
+        SolidBody.TryGetSphereSeparationGap(source, target, out Fixed64 gap).Should().BeTrue();
+        gap.Should().BeGreaterThan(Fixed64.Zero);
     }
 
     [Fact]
-    public void SphereSeparationGap_UnrepresentableCombinedRadius_ShouldRemainUncertified()
+    public void SphereSeparationGap_AfterUnsupportedRadiusRejection_ShouldKeepSupportedGeometry()
     {
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();
         LSSphereCollider source = scenario.CreateStaticSphere(Vector3d.Zero);
         LSSphereCollider target = scenario.CreateStaticSphere(Vector3d.Zero);
-        source.Radius = Fixed64.MaxValue;
-        target.Radius = Fixed64.MaxValue;
-
-        SolidBody.TryGetSphereSeparationGap(source, target, out _)
-            .Should()
-            .BeFalse();
+        System.Action resize = () => source.Radius = Fixed64.MaxValue;
+        resize.Should().Throw<System.ArgumentException>();
+        SolidBody.TryGetSphereSeparationGap(source, target, out Fixed64 gap).Should().BeFalse();
+        gap.Should().BeLessThanOrEqualTo(Fixed64.Zero);
     }
 }

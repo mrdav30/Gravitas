@@ -56,7 +56,7 @@ public sealed class PhysicsMeshTests
     }
 
     [Fact]
-    public void Constructor_ShouldAdmitFullDomainTriangleArea()
+    public void Constructor_ShouldRejectFullDomainTriangleReach()
     {
         Vector3d[] vertices =
         {
@@ -72,7 +72,7 @@ public sealed class PhysicsMeshTests
             FixedQuaternion.Identity,
             MeshColliderMode.Concave);
 
-        create.Should().NotThrow();
+        create.Should().Throw<ArgumentException>().WithMessage("*geometry reach*");
     }
 
     [Fact]
@@ -194,9 +194,9 @@ public sealed class PhysicsMeshTests
     {
         Vector3d extreme = axis switch
         {
-            0 => new Vector3d(Fixed64.MaxValue, Fixed64.Zero, Fixed64.Zero),
-            1 => new Vector3d(Fixed64.Zero, Fixed64.MaxValue, Fixed64.Zero),
-            _ => new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.MaxValue)
+            0 => new Vector3d((Fixed64)4096, Fixed64.Zero, Fixed64.Zero),
+            1 => new Vector3d(Fixed64.Zero, (Fixed64)4096, Fixed64.Zero),
+            _ => new Vector3d(Fixed64.Zero, Fixed64.Zero, (Fixed64)4096)
         };
         Vector3d transverse = axis switch
         {
@@ -210,7 +210,9 @@ public sealed class PhysicsMeshTests
             Vector3d.Zero,
             FixedQuaternion.Identity,
             MeshColliderMode.Concave);
-        Vector3d scale = Vector3d.One * (Fixed64)3;
+        var priorBounds = mesh.Bounds;
+        Vector3d[] priorVertices = mesh.ScaledLocalVertices.ToArray();
+        Vector3d scale = Vector3d.One * Fixed64.MaxValue;
 
         mesh.GetScaledLocalRadius(scale, Vector3d.One)
             .Should().Be(Fixed64.MaxValue);
@@ -223,6 +225,9 @@ public sealed class PhysicsMeshTests
 
         prepare.Should().Throw<ArgumentException>()
             .WithParameterName("ownerScale");
+        mesh.Bounds.Should().Be(priorBounds);
+        mesh.OwnerScale.Should().Be(Vector3d.One);
+        mesh.ScaledLocalVertices.ToArray().Should().Equal(priorVertices);
     }
 
     [Fact]
@@ -622,10 +627,10 @@ public sealed class PhysicsMeshTests
     [Fact]
     public void GetSupportVertexWorld_ShouldMatchStableWorldVertexScan()
     {
-        PhysicsMesh mesh = MeshTestFixtures.CreateConvexCube().Mesh;
-        PhysicsMesh denseMesh = MeshTestFixtures.CreateConvexPolygonFan(
+        PhysicsMesh mesh = Standalone(MeshTestFixtures.CreateConvexCube().Mesh);
+        PhysicsMesh denseMesh = Standalone(MeshTestFixtures.CreateConvexPolygonFan(
             40,
-            (Fixed64)4).Mesh;
+            (Fixed64)4).Mesh);
         Vector3d[] directions =
         {
             Vector3d.Right,
@@ -662,9 +667,9 @@ public sealed class PhysicsMeshTests
     [Fact]
     public void GetSupportVertexWorld_WithAcceleratedExtremeTranslatedMesh_ShouldCompareLocalFeatures()
     {
-        PhysicsMesh mesh = MeshTestFixtures.CreateConvexPolygonFan(
+        PhysicsMesh mesh = Standalone(MeshTestFixtures.CreateConvexPolygonFan(
             40,
-            (Fixed64)4).Mesh;
+            (Fixed64)4).Mesh);
         Vector3d direction = new Vector3d(Fixed64.One, Fixed64.One, Fixed64.Zero).Normalized;
         Vector3d untranslatedSupport = mesh.GetSupportVertexWorld(direction);
         Fixed64 offset = new(2_000_000_000);
@@ -716,7 +721,7 @@ public sealed class PhysicsMeshTests
     [Fact]
     public void GetFrontalArea_ShouldSumOnlyFacingWorldTriangles()
     {
-        PhysicsMesh mesh = MeshTestFixtures.CreateConvexQuadFloor().Mesh;
+        PhysicsMesh mesh = Standalone(MeshTestFixtures.CreateConvexQuadFloor().Mesh);
 
         mesh.GetFrontalArea(Vector3d.Up).Should().Be(mesh.TotalArea);
         mesh.GetFrontalArea(-Vector3d.Up).Should().Be(Fixed64.Zero);
@@ -883,7 +888,7 @@ public sealed class PhysicsMeshTests
     [Fact]
     public void CalculateInertiaTensor_ShouldUseLocalGeometryForRigidMovement()
     {
-        PhysicsMesh mesh = MeshTestFixtures.CreateConvexCube().Mesh;
+        PhysicsMesh mesh = Standalone(MeshTestFixtures.CreateConvexCube().Mesh);
 
         Fixed3x3 originTensor = mesh.CalculateInertiaTensor((Fixed64)3);
         mesh.UpdatePosition(new Vector3d((Fixed64)10, (Fixed64)4, (Fixed64)(-2)), FixedQuaternion.Identity);
@@ -1352,6 +1357,10 @@ public sealed class PhysicsMeshTests
             0, 1, 3,
             0, 3, 2
         };
+
+    private static PhysicsMesh Standalone(PhysicsMesh mesh) =>
+        new(mesh.LocalVertices.ToArray(), mesh.Triangles.ToArray(),
+            Vector3d.Zero, FixedQuaternion.Identity, mesh.Mode);
 
     private static void AssertNear(Fixed64 actual, Fixed64 expected) =>
         (actual - expected).Abs().Should().BeLessThan(Fixed64.FromFraction(1, 1000));

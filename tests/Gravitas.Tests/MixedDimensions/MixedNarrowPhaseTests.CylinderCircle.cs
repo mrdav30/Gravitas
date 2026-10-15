@@ -101,35 +101,15 @@ public sealed partial class MixedNarrowPhaseTests
         contact.HasMaterialOverride.Should().BeFalse();
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void CylinderCircleSlab_WithUnrepresentableFullSlabHeight_ShouldPreserveAdmittedHalfThickness(bool perpendicular)
+    [Fact]
+    public void CylinderCircleSlab_WithUnsupportedFullSlabHeight_ShouldRejectBeforeRegistration()
     {
         using GravitasWorldContext context = CreateMixedContext();
-        ScenarioBody<LSCylinderCollider> cylinder = perpendicular
-            ? CreateCylinderCircleRegressionBody(context, Fixed64.One, Vector3d.Zero)
-            : CreateBody3D(context,
-                new LSCylinderCollider { Radius = Fixed64.One, Size = new Vector3d(2, 2, 2) },
-                Vector3d.Zero, FixedQuaternion.Identity);
-        SolidBody2D circle = CreateBody2D(context,
-            new LSCircleCollider2D(Fixed64.One) { MixedHalfThicknessOverride = Fixed64.MaxValue },
-            Vector2d.Zero);
-        Fixed64 centerY = Fixed64.MaxValue - (perpendicular ? Fixed64.Half : Fixed64.One);
-        cylinder.Collider.LocalOffset = perpendicular
-            ? new Vector3d(-centerY, Fixed64.Zero, Fixed64.Zero)
-            : new Vector3d(Fixed64.Zero, centerY, Fixed64.Zero);
-        cylinder.Collider.RebuildRuntimeShapeOnly().Should().BeTrue();
-        cylinder.Collider.Center.Y.Should().Be(centerY);
-
-        CollisionDetectionMixed.TryCollide(cylinder.Collider, circle.Collider,
-            out MixedContact contact).Should().BeTrue();
-        contact.Depth.Should().Be(perpendicular ? Fixed64.FromFraction(3, 2) : (Fixed64)2);
-        if (perpendicular)
-            contact.Normal3DTo2D.Should().Be(-Vector3d.Up);
-        contact.DepthIsClamped.Should().BeFalse();
-        contact.Anchor3D.Origin.Should().Be(cylinder.Collider.Center);
-        contact.Anchor2D.Origin.Should().Be(Vector3d.Zero);
+        LSCollider2D slab = new LSCircleCollider2D(Fixed64.One);
+        slab.MixedHalfThicknessOverride = Fixed64.MaxValue;
+        System.Action initialize = () => CreateBody2D(context, slab, Vector2d.Zero);
+        initialize.Should().Throw<System.ArgumentException>().WithMessage("*geometry reach*");
+        slab.Id.Should().Be(-1);
     }
 
     [Fact]
@@ -138,11 +118,8 @@ public sealed partial class MixedNarrowPhaseTests
         using GravitasWorldContext context = CreateMixedContext();
         ScenarioBody<LSCylinderCollider> cylinder = CreateCylinder3D(context, Vector3d.Zero);
         SolidBody2D circle = CreateBody2D(context, new LSCircleCollider2D(Fixed64.Half), Vector2d.Zero);
-        cylinder.Collider.LocalOffset = new Vector3d(
-            Fixed64.MaxValue - Fixed64.FromFraction(1, 4), Fixed64.Zero, Fixed64.Zero);
-        circle.Collider.LocalOffset = new Vector2d(Fixed64.MaxValue, Fixed64.Zero);
-        cylinder.Collider.RebuildRuntimeShapeOnly().Should().BeTrue();
-        circle.Collider.RebuildRuntimeShapeOnly().Should().BeTrue();
+        cylinder.Body.SetPosition(new Vector3d(Fixed64.MaxValue - Fixed64.FromFraction(1, 4), Fixed64.Zero, Fixed64.Zero));
+        circle.SetPosition(new Vector2d(Fixed64.MaxValue, Fixed64.Zero));
 
         CollisionDetectionMixed.TryCollide(cylinder.Collider, circle.Collider,
             out MixedContact contact).Should().BeTrue();

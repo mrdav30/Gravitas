@@ -86,6 +86,8 @@ public sealed class LSCuboidCollider : LSCollider
             snapshot.OwnerScale,
             snapshot.PartScale,
             Fixed64.Two);
+        SetPreparedGeometryReach(HasCommittedShape && halfExtents == _orientedBox.HalfExtents
+            ? CanonicalCenteredProxyRadius : ColliderGeometryPolicy.Magnitude(halfExtents));
         _preparedOrientedBox = new FixedOrientedBox(
             snapshot.Center,
             snapshot.Rotation,
@@ -185,15 +187,17 @@ public sealed class LSCuboidCollider : LSCollider
     private static Fixed64 GetProjectedFaceArea(
         Fixed64 firstHalfExtent,
         Fixed64 secondHalfExtent,
-        Fixed64 alignment) =>
-        Fixed64.TryMultiplyDivide(
+        Fixed64 alignment)
+    {
+        // Published half-extents are bounded by admission; a projected face fits Fixed64.
+        _ = Fixed64.TryMultiplyDivide(
             firstHalfExtent,
             secondHalfExtent,
             alignment,
             Fixed64.One / (Fixed64)4,
-            out Fixed64 area)
-            ? area
-            : Fixed64.MaxValue;
+            out Fixed64 area);
+        return area;
+    }
 
     private static Fixed64 GetScaledProduct(
         Fixed64 first,

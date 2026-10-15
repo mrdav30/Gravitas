@@ -42,11 +42,9 @@ public static partial class CollisionDetection
         // Containment increases penetration depth; the sphere still escapes
         // along the solid surface's outward normal, not toward the cylinder center.
         Vector3d normal = outwardNormal;
-        ResolvePenetrationDepth(
-            sphere.ScaledRadius,
-            signedDistance,
-            out Fixed64 penetrationDepth,
-            out bool depthIsClamped);
+        // Both admitted reaches are at most 4,096: containment depth is
+        // bounded by their sum, so the complete difference is representable.
+        Fixed64 penetrationDepth = sphere.ScaledRadius - signedDistance;
         pair.Manifold.SetContact(
             new ContactAnchor(cylinderAnchor),
             new ContactAnchor(
@@ -58,7 +56,7 @@ public static partial class CollisionDetection
                     -normal)),
             penetrationDepth,
             normal,
-            depthIsClamped);
+            depthIsClamped: false);
 
         return true;
     }
@@ -238,23 +236,6 @@ public static partial class CollisionDetection
             contact.Depth,
             contact.Normal,
             contact.DepthIsClamped);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void ResolvePenetrationDepth(
-        Fixed64 radius,
-        Fixed64 signedDistance,
-        out Fixed64 depth,
-        out bool depthIsClamped)
-    {
-        if (Fixed64.TrySubtract(radius, signedDistance, out depth))
-        {
-            depthIsClamped = false;
-            return;
-        }
-
-        depth = Fixed64.MaxValue;
-        depthIsClamped = true;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
