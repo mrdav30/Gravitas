@@ -130,12 +130,13 @@ internal static partial class FiniteSlabProjectionSweep
         }
 
         Fixed64 travelDistance = Fixed64.Zero;
+        Vector2d searchDirection = Vector2d.Zero;
         var segment = new FixedSegment2d(start, end);
         Vector2d displacement = end - start;
         for (int i = 0; i < maxConservativeAdvancementIterations; i++)
         {
             Vector2d point = segment.GetPointAtDistance(travelDistance, length);
-            PlanarGjkResult result = ComputeDistance(point, radius, target);
+            PlanarGjkResult result = ComputeDistance(point, radius, target, searchDirection);
 
             if (result.Distance <= SweepContactTolerance)
             {
@@ -144,6 +145,8 @@ internal static partial class FiniteSlabProjectionSweep
             }
 
             Vector2d normal = result.Normal;
+            // Reuse the resolved separating direction at the next nearby pose.
+            searchDirection = -normal;
             // Keep the authored chord over its distance denominator. A rounded
             // unit ray can enter a shape that the original segment only grazes.
             Signed320 closing = WideArithmetic.SubtractSigned320(default,
@@ -164,7 +167,7 @@ internal static partial class FiniteSlabProjectionSweep
                 || stepDistance > remainingDistance;
             if (reachedEndpoint)
             {
-                PlanarGjkResult endpoint = ComputeDistance(end, radius, target);
+                PlanarGjkResult endpoint = ComputeDistance(end, radius, target, searchDirection);
 
                 if (endpoint.Distance <= SweepContactTolerance)
                 {
@@ -184,18 +187,17 @@ internal static partial class FiniteSlabProjectionSweep
     private static PlanarGjkResult ComputeDistance(
         Vector2d point,
         Fixed64 expansionRadius,
-        ProjectionTarget target)
+        ProjectionTarget target,
+        Vector2d initialDirection)
     {
         Span<PlanarSupportPoint> simplex = stackalloc PlanarSupportPoint[3];
         int workingShift = target.SelectWorkingShift(point, expansionRadius);
         Fixed64 workingScale = GjkSimplexScale.GetCoordinateScale(workingShift);
-        Fixed64 workingScaleSqr = workingScale * workingScale;
         Fixed64 workingDistanceTolerance = DistanceTolerance * workingScale;
-        Fixed64 workingSegmentDegeneracyToleranceSqr = Fixed64.Epsilon * workingScaleSqr;
-        Fixed64 workingAreaTolerance = DistanceTolerance * workingScaleSqr;
-        Fixed64 workingCrossSignTolerance = Fixed64.Epsilon * workingScaleSqr;
         int simplexCount = 0;
-        Vector2d direction = GjkSimplexScale.CreateWorkingDifference(target.Center, point, workingShift);
+        Vector2d direction = initialDirection == Vector2d.Zero
+            ? GjkSimplexScale.CreateWorkingDifference(target.Center, point, workingShift)
+            : initialDirection;
         if (direction == Vector2d.Zero)
             direction = Vector2d.Right;
 
@@ -214,12 +216,7 @@ internal static partial class FiniteSlabProjectionSweep
                 break;
 
             simplex[simplexCount++] = support;
-            closest = SolveClosestSimplex(
-                simplex,
-                ref simplexCount,
-                workingSegmentDegeneracyToleranceSqr,
-                workingAreaTolerance,
-                workingCrossSignTolerance);
+            closest = SolveClosestSimplex(simplex, ref simplexCount);
             distanceIsRepresentable = Vector2d.TryGetMagnitude(closest.Point, out workingDistance);
             if (closest.Intersects
                 || (distanceIsRepresentable && workingDistance <= workingDistanceTolerance))
@@ -236,11 +233,11 @@ internal static partial class FiniteSlabProjectionSweep
 
             hasPreviousDistance = distanceIsRepresentable;
             previousDistance = workingDistance;
-            direction = -closest.Point;
+            direction = closest.SearchDirection;
         }
 
         Fixed64 distance = GjkSimplexScale.RestoreDistance(workingDistance, workingShift);
-        Vector2d normal = closest.Point.Normalized;
+        Vector2d normal = -WideNormalization.GetNormalized(closest.SearchDirection);
         return new PlanarGjkResult(distance, normal);
     }
 
@@ -251,7 +248,7 @@ internal static partial class FiniteSlabProjectionSweep
         Vector2d direction,
         int workingShift)
     {
-        Vector2d supportDirection = direction.Normalized;
+        Vector2d supportDirection = WideNormalization.GetNormalized(direction);
         Vector2d targetDirection = -supportDirection;
         // The initial right support established a nonempty slab intersection;
         // admission and the chosen chart bound every later directional support.
@@ -266,52 +263,32 @@ internal static partial class FiniteSlabProjectionSweep
 
     private static ClosestPlanarSimplexResult SolveClosestSimplex(
         Span<PlanarSupportPoint> simplex,
-        ref int count,
-        Fixed64 segmentDegeneracyToleranceSqr,
-        Fixed64 areaTolerance,
-        Fixed64 crossSignTolerance)
+        ref int count)
     {
         if (count == 1)
             return ClosestPlanarSimplexResult.FromPoint(simplex[0].Point);
 
         if (count == 2)
-            return ReduceSegment(simplex, ref count, segmentDegeneracyToleranceSqr);
+            return ReduceSegment(simplex, ref count);
 
-        return ReduceTriangle(
-            simplex,
-            ref count,
-            segmentDegeneracyToleranceSqr,
-            areaTolerance,
-            crossSignTolerance);
+        return ReduceTriangle(simplex, ref count);
     }
 
     private static ClosestPlanarSimplexResult ReduceSegment(
         Span<PlanarSupportPoint> simplex,
-        ref int count,
-        Fixed64 segmentDegeneracyToleranceSqr)
+        ref int count)
     {
         Vector2d a = simplex[0].Point;
         Vector2d b = simplex[1].Point;
-        Span<Vector2d> scaled = stackalloc Vector2d[2];
-        scaled[0] = a;
-        scaled[1] = b;
-        Fixed64 productScale = GjkSimplexScale.ScaleForProducts(scaled);
-        Vector2d scaledA = scaled[0];
-        Vector2d ab = scaled[1] - scaledA;
-        Fixed64 denominator = ab.MagnitudeSquared;
-        Fixed64 productScaleSqr = productScale * productScale;
-        Fixed64 denominatorTolerance = segmentDegeneracyToleranceSqr * productScaleSqr;
-        Fixed64 t = denominator <= denominatorTolerance
-            ? Fixed64.Zero
-            : FixedMath.Clamp(-Vector2d.Dot(scaledA, ab) / denominator, Fixed64.Zero, Fixed64.One);
+        Fixed64 t = Vector2d.GetClosestPointOnLineSegmentParameter(Vector2d.Zero, a, b);
 
-        if (t <= Fixed64.Epsilon)
+        if (t == Fixed64.Zero)
         {
             count = 1;
             return ClosestPlanarSimplexResult.FromPoint(a);
         }
 
-        if (t >= Fixed64.One - Fixed64.Epsilon)
+        if (t == Fixed64.One)
         {
             simplex[0] = simplex[1];
             count = 1;
@@ -319,20 +296,22 @@ internal static partial class FiniteSlabProjectionSweep
         }
 
         count = 2;
-        return ClosestPlanarSimplexResult.FromPoint(a * (Fixed64.One - t) + b * t);
+        return ClosestPlanarSimplexResult.FromSegment(new Vector2d(
+            FixedMath.Lerp(a.X, b.X, t), FixedMath.Lerp(a.Y, b.Y, t)), a, b);
     }
 
     private static ClosestPlanarSimplexResult ReduceTriangle(
         Span<PlanarSupportPoint> simplex,
-        ref int count,
-        Fixed64 segmentDegeneracyToleranceSqr,
-        Fixed64 areaTolerance,
-        Fixed64 crossSignTolerance)
+        ref int count)
     {
         Vector2d a = simplex[0].Point;
         Vector2d b = simplex[1].Point;
         Vector2d c = simplex[2].Point;
-        if (IsOriginInsideTriangle(a, b, c, areaTolerance, crossSignTolerance))
+        int winding = Vector2d.OrientationSign(a, b, c);
+        int ab = Vector2d.OrientationSign(a, b, Vector2d.Zero);
+        int bc = Vector2d.OrientationSign(b, c, Vector2d.Zero);
+        int ca = Vector2d.OrientationSign(c, a, Vector2d.Zero);
+        if (winding != 0 && ab != -winding && bc != -winding && ca != -winding)
         {
             count = 3;
             return ClosestPlanarSimplexResult.Intersection;
@@ -342,9 +321,14 @@ internal static partial class FiniteSlabProjectionSweep
         int bestFirst = 0;
         int bestSecond = 1;
         ClosestPlanarSimplexResult best = default;
-        EvaluateTriangleEdge(simplex, 0, 1, segmentDegeneracyToleranceSqr, ref best, ref hasBest, ref bestFirst, ref bestSecond);
-        EvaluateTriangleEdge(simplex, 1, 2, segmentDegeneracyToleranceSqr, ref best, ref hasBest, ref bestFirst, ref bestSecond);
-        EvaluateTriangleEdge(simplex, 2, 0, segmentDegeneracyToleranceSqr, ref best, ref hasBest, ref bestFirst, ref bestSecond);
+        // Only origin-facing edges can own a closest feature of a proper triangle.
+        // Collinear simplexes retain every edge because they have no interior side.
+        if (winding == 0 || ab != winding)
+            EvaluateTriangleEdge(simplex, 0, 1, ref best, ref hasBest, ref bestFirst, ref bestSecond);
+        if (winding == 0 || bc != winding)
+            EvaluateTriangleEdge(simplex, 1, 2, ref best, ref hasBest, ref bestFirst, ref bestSecond);
+        if (winding == 0 || ca != winding)
+            EvaluateTriangleEdge(simplex, 2, 0, ref best, ref hasBest, ref bestFirst, ref bestSecond);
 
         PlanarSupportPoint first = simplex[bestFirst];
         PlanarSupportPoint second = simplex[bestSecond];
@@ -358,7 +342,6 @@ internal static partial class FiniteSlabProjectionSweep
         Span<PlanarSupportPoint> simplex,
         int first,
         int second,
-        Fixed64 segmentDegeneracyToleranceSqr,
         ref ClosestPlanarSimplexResult best,
         ref bool hasBest,
         ref int bestFirst,
@@ -368,60 +351,14 @@ internal static partial class FiniteSlabProjectionSweep
         edge[0] = simplex[first];
         edge[1] = simplex[second];
         int edgeCount = 2;
-        ClosestPlanarSimplexResult candidate = ReduceSegment(edge, ref edgeCount, segmentDegeneracyToleranceSqr);
-        if (hasBest && !IsCloser(
-                candidate.DistanceSqr,
-                candidate.Point,
-                best.DistanceSqr,
-                best.Point))
+        ClosestPlanarSimplexResult candidate = ReduceSegment(edge, ref edgeCount);
+        if (hasBest && Vector2d.CompareMagnitudeSquared(candidate.Point, best.Point) >= 0)
             return;
 
         best = candidate;
         hasBest = true;
         bestFirst = first;
         bestSecond = second;
-    }
-
-    internal static bool IsCloser(
-        Fixed64 candidateDistanceSqr,
-        Vector2d candidatePoint,
-        Fixed64 bestDistanceSqr,
-        Vector2d bestPoint)
-    {
-        if (candidateDistanceSqr != bestDistanceSqr || candidateDistanceSqr != Fixed64.MaxValue)
-            return candidateDistanceSqr < bestDistanceSqr;
-
-        return Vector2d.CompareMagnitudeSquared(candidatePoint, bestPoint) < 0;
-    }
-
-    private static bool IsOriginInsideTriangle(
-        Vector2d a,
-        Vector2d b,
-        Vector2d c,
-        Fixed64 workingAreaTolerance,
-        Fixed64 workingCrossSignTolerance)
-    {
-        Span<Vector2d> scaled = stackalloc Vector2d[3];
-        scaled[0] = a;
-        scaled[1] = b;
-        scaled[2] = c;
-        Fixed64 productScale = GjkSimplexScale.ScaleForProducts(scaled);
-        a = scaled[0];
-        b = scaled[1];
-        c = scaled[2];
-
-        Fixed64 productScaleSqr = productScale * productScale;
-        Fixed64 areaTolerance = workingAreaTolerance * productScaleSqr;
-        if (Cross(a, b, c).Abs() <= areaTolerance)
-            return false;
-
-        Fixed64 ab = Cross(a, b, Vector2d.Zero);
-        Fixed64 bc = Cross(b, c, Vector2d.Zero);
-        Fixed64 ca = Cross(c, a, Vector2d.Zero);
-        Fixed64 signTolerance = workingCrossSignTolerance * productScaleSqr;
-        bool hasPositive = ab > signTolerance || bc > signTolerance || ca > signTolerance;
-        bool hasNegative = ab < -signTolerance || bc < -signTolerance || ca < -signTolerance;
-        return !(hasPositive && hasNegative);
     }
 
     private static bool ContainsSupportPoint(
@@ -526,9 +463,9 @@ internal static partial class FiniteSlabProjectionSweep
             return GjkSimplexScale.SelectFourTermShift(point, _center, -extent, extent, radius);
         }
 
-        public bool TrySupport(Vector2d direction, out Vector2d support, out bool translated)
+        public bool TrySupport(Vector2d unitDirection, out Vector2d support, out bool translated)
         {
-            Vector2d normal = direction.Normalized;
+            // Target support and circle expansion consume the same normalized direction.
             Vector3d center = _capsule?.Center ?? _cylinder?.Center ?? _cone!.Center;
             // Select the frame once; retrying every unavailable support repeats the expensive solve.
             translated = _useTranslatedSupport;
@@ -543,7 +480,7 @@ internal static partial class FiniteSlabProjectionSweep
                     _capsule.AxisLength,
                     _capsule.ScaledRadius,
                     _slabY,
-                    normal,
+                    unitDirection,
                     out support);
             }
 
@@ -555,7 +492,7 @@ internal static partial class FiniteSlabProjectionSweep
                     _cylinder.Height,
                     _cylinder.ScaledRadius,
                     _slabY,
-                    normal,
+                    unitDirection,
                     out support);
             }
 
@@ -565,7 +502,7 @@ internal static partial class FiniteSlabProjectionSweep
                 _cone!.Height,
                 _cone.ScaledRadius,
                 _slabY,
-                normal,
+                unitDirection,
                 out support);
         }
 
@@ -592,9 +529,5 @@ internal static partial class FiniteSlabProjectionSweep
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static Vector3d GetRigidUpAxis(FixedQuaternion rotation) =>
         (rotation * Vector3d.Up).Normalized;
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static Fixed64 Cross(Vector2d origin, Vector2d first, Vector2d second) =>
-        (first.X - origin.X) * (second.Y - origin.Y) - (first.Y - origin.Y) * (second.X - origin.X);
 
 }

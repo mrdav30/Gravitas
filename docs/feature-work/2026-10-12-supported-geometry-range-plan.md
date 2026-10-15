@@ -1121,8 +1121,22 @@ obsolete full-domain source-radius scans are removed. Full Release/Lean tests,
 raw 100% line/branch/method coverage and all six existing replay fixtures pass.
 The 14 native controls retain zero warmed allocations and no confirmed slowdown,
 including a fresh reversed check of the initially noisy compound pose control.
-Detailed evidence belongs to the two resolved tracker entries. Continue with
-#128/#129 before phase 3.
+Detailed evidence belongs to the two resolved tracker entries.
+
+**2026-10-14 projected-sweep follow-up (#128):** Exact segment/triangle reduction
+and edge-derived search normals preserve supported-scale curved entry accuracy;
+the radius-1,000/4,000 capsule diagnostics now have zero raw error. Reusing the
+resolved advancement direction and skipping non-facing triangle edges retains
+the warm baseline without increasing iteration budgets. Release/Lean builds,
+6,261/6,195 tests, raw 100% line/branch/method coverage and six existing replay
+fixtures pass. All 192 independently checked public entries meet the worker's
+accuracy bound; eight native controls retain 0 B/op with no confirmed slowdown.
+The clipped 64-target capsule/cylinder/cone workloads improve by approximately
+17%/6%/25% on this host. A maintained direct benchmark retains ordinary and
+supported-scale controls. Independent ponytail review clears the smaller runtime
+implementation. Detailed evidence belongs to resolved #128. Parity checks exposed
+pre-existing generic 3D cylinder accuracy defect #131; resolve #131, then #129,
+before phase 3. No upstream source or dependency pin changes are required.
 
 ## Phase 3: Close Query, Settings And Restore Bypasses
 

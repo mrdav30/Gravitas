@@ -2,7 +2,7 @@
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-131`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-132`.
 - Assign an ID when an issue enters this tracker, keep it through resolution,
   and never reuse an ID even if an entry is later removed. Check this file's Git
   history before advancing or repairing the counter.
@@ -44,37 +44,43 @@ and passes correctness, coverage, replay and warm performance checks. Resolve th
 focused correctness queue below before resuming phase 3's query, settings and
 restore admission:
 
-1. #128: supported-scale projected-sweep accuracy.
+1. #131: supported-scale generic 3D cylinder sweep accuracy.
 2. #129: detached polygon compound inspection.
 
 #111 remains an independent validation-tooling issue.
 #125 is a low-priority, non-blocking runtime crash observation; defer further
 investigation unless it recurs or a reliable reproducer becomes available.
 The remaining focused geometry issues reproduce on the original stack. Continue
-with #128 before resuming phase 3.
+with #131, then #129, before resuming phase 3.
 
-### GRV-Issue-128 - Projected capsule sweep entry error grows with supported geometry scale
+### GRV-Issue-131 - Generic 3D cylinder sweep reports early entry at supported scale
 
-- **Confirmed:** 2026-10-14 on the accepted pre-admission binaries and the
-  phase-2 candidate, with identical results and an exact horizontal world axis.
-- **Reproduction:** Capsule radius `1,000`, nonzero core length `2`, centered
-  at zero with axis `(-1, 0, 0)`. Sweep an X/Z point along Z from `-1,000` to
-  `1,000` through the zero-thickness Y=`600` slice. The analytic 3-4-5 section
-  has entry distance `200`. `FiniteSlabProjectionSweep` returns raw
-  `858993491192`, exceeding the expected `858993459200` by `31992` raw units
-  (`~7.45e-6`), above its nominal `1/1,048,576` distance tolerance. Radius `5`,
-  core `2`, Y=`3` and Z=`-5..5` returns the exact expected entry `1`.
-- **Boundary:** A hit is retained; no missed contact has been demonstrated.
-  The geometry fits the supported ceiling. This is distinct from world-frame
-  overflow or unsupported enormous colliders.
-- **Follow-up:** Audit projected GJK convergence, working-scale rounding and
-  final advancement error against an explicit world-unit accuracy bound. Keep
-  the nonzero-core oracle and ordinary-scale control; measure any refinement
-  against the existing warm query baseline.
-- **Evidence:** Ignored `artifacts/geometry-range/phase2/probe-projection/`
-  retains original/candidate output, exact axis values and binary hashes. The
-  maintained admission migration retains the exact small 3-4-5 control without
-  weakening its assertion tolerance.
+- **Confirmed:** 2026-10-14 during #128's whole-shape and dimensional parity
+  checks, with identical results on the frozen accepted and refined binaries.
+  The generic 3D sweep worker is unchanged by #128.
+- **Reproduction:** A cylinder centered at zero has radius `2,500`, height `2`
+  and exact horizontal axis `(-1, 0, 0)`. Prepare a zero-radius sphere source
+  through `ConvexSweepQueryWorker.PrepareSphereSource` at `(0, 1,500, -2,500)`
+  with displacement `(0, 0, 5,000)`, then call `TrySweepPreparedSource`.
+  The exact 3-4-5 section enters at distance `500` (raw `2147483648000`);
+  the worker reports raw `2147390072490`, approximately `0.021788` units early.
+  This exceeds its `1/4,096` contact tolerance (`1048576` raw units).
+- **Boundary:** The collider passes the supported conservative-reach policy.
+  A hit is retained; this is an accuracy defect, not a demonstrated missed hit.
+  Radius-`1,000` cylinder and corresponding capsule/cone controls remain within
+  that worker's tolerance. The finite-slab worker has a different simplex owner
+  and a tighter tolerance, so do not copy its planar changes into 3D blindly.
+- **Follow-up:** Trace generic 3D simplex reduction, convergence and advancement
+  against the analytic section. Preserve ordinary warm query and CCD costs,
+  deterministic ordering and full coverage; check source-radius, reversal,
+  translation and whole-shape parity around the owning fix.
+- **Evidence:** Ignored `artifacts/grv-128/parity/original.log` and
+  `candidate.log` retain all six shape/scale outputs. The probe builds explicitly
+  select the immutable accepted stack from
+  `artifacts/grv-128/perf/original-snapshot/` or the candidate test-runtime
+  directory. Accepted snapshot hashes are retained in
+  `artifacts/grv-128/perf/original-provenance.json`; the parity logs do not record
+  loaded-module hashes themselves.
 
 ### GRV-Issue-129 - Detached polygon compound reports a zero conservative proxy radius
 
@@ -188,6 +194,66 @@ with #128 before resuming phase 3.
 Remaining measured performance costs are tracked in the benchmark backlog.
 
 ## Resolved Issues
+
+### GRV-Issue-128 - Projected capsule sweep entry error grows with supported geometry scale
+
+- **Resolved:** 2026-10-14 in Gravitas; no upstream source, public API or
+  dependency-pin change is required.
+- **Confirmed:** The original accepted and phase-2 binaries both return raw
+  `858993491192` instead of `858993459200` for a radius-`1,000`, core-`2`
+  horizontal capsule sliced at Y=`600`, swept along Z=`-1,000..1,000`.
+  The exact 3-4-5 entry is `200`; the `31992`-raw late error exceeds the
+  worker's `4096`-raw (`1/1,048,576` world-unit) separation tolerance.
+  The radius-`5`, Y=`3`, Z=`-5..5` control enters at exactly `1`.
+- **Root cause:** Near contact, different closest-edge points can both have a
+  rounded squared distance of zero. Rounded ranking discards a better edge,
+  while rounded closest-point coordinates can erase a normal component.
+  A tie-only fix is insufficient at larger scales and shallow entries.
+- **Resolution:** Reuse exact segment parameters, fused interpolation, exact
+  orientation and squared-magnitude comparisons from FixedMathSharp. Interior
+  segment normals come from their edge perpendicular, normalized only when
+  consumed; preserve the wide-difference fallback. Carry the separating normal
+  into the next fresh conservative-advancement solve. Reuse exact triangle-side
+  tests to reduce only origin-facing edges, retaining all edges for collinear
+  simplexes. Remove obsolete rounded ranking and scaled tolerance plumbing;
+  iteration budgets and contact tolerance are unchanged. The two production
+  files contain fewer lines overall and introduce no new owner or persistent
+  cache. A local metric-cache experiment showed no benefit and was discarded.
+- **Verification:** Local-stack Release/Lean builds have zero warnings/errors;
+  **6,261 / 6,195** tests pass without failures or skips. Raw reachable coverage
+  is **100% line, branch and method** in both configurations:
+  `47,544 / 15,702 / 5,031` sequence/branch/method points in Release and
+  `47,542 / 15,702 / 5,030` in Lean. All six existing replay fixtures match
+  shared expectations and directly across Windows x64 Release/Lean.
+  Maintained regressions cover capsule/cylinder/cone scales, nonzero cores,
+  expanded-circle thick slabs, reversal, scalar-face translation, shallow cap
+  entry, ordinary tilted contacts, wide working edges and public mixed queries.
+  The radius-`1,000` and radius-`4,000` capsule diagnostics now have zero raw error.
+  Independent geometry and ponytail reviews found no actionable issues.
+- **Accuracy and performance:** All **192** public hit entries pass independent
+  high-precision clipped-shape and quaternion-basis geometry oracles; maximum
+  absolute entry error is approximately `0.630e-6` world units, below the
+  `0.954e-6` entry tolerance. This improves the original ordinary tilted results,
+  whose worst errors were approximately `11.4e-6`, `16.9e-6` and `16.0e-6` for
+  capsule, cylinder and cone. All **eight** matched native warm controls retain
+  **0 B/op**, with no confirmed slowdown outside measured 99.9% intervals.
+  Direct capsule/cylinder/cone means are `49.870 -> 50.211`, `53.016 -> 52.332`
+  and `51.435 -> 52.119 us`; their intervals overlap. Affected mixed CCD is
+  `144.962 -> 144.643 us`, and the unchanged pure 2D control is
+  `464.386 -> 458.002 us`. Public 64-target clipped capsule/cylinder/cone queries
+  improve from `21.482 -> 17.887`, `26.454 -> 24.843` and
+  `79.989 -> 60.375 ms`. These are bounded measurements on this host, not game
+  capacity claims. The earlier capsule slowdown was rejected and refined before
+  acceptance. The maintained direct benchmark retains all three shape controls
+  at scales `1`, `200` and `500`, with an independent analytic setup guard.
+- **Evidence:** Ignored `artifacts/grv-128/` retains the initial red cases,
+  `facing` full tests/raw coverage/replays, independent physical oracles and
+  rejected experiments. `perf/acceptance.json` and `accepted8-comparison.json`
+  bind the immutable original/final stack, 699 production and 75 fixture inputs,
+  unchanged upstream modules and actual generated-child hashes to the unique
+  eight-row comparison. Dimensional parity exposed the separate pre-existing
+  generic 3D cylinder accuracy defect #131, which remains queued before #129.
+  Native Linux/ARM64 and released-package validation are not claimed.
 
 ### GRV-Issue-126 - Pending compensated authoring mixes CCD proxy geometry epochs
 

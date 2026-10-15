@@ -1412,26 +1412,6 @@ public sealed partial class MixedQueryCcdTests
     }
 
     [Fact]
-    public void FiniteSlabProjectionSweep_SaturatedSimplexOrdering_ShouldUseExactMagnitudeAndRemainStable()
-    {
-        Vector2d closer = new(30_000, 40_000);
-        Vector2d farther = new(60_000, 80_000);
-        Vector2d unrepresentableShorter = new(Fixed64.MaxValue, Fixed64.MaxValue - Fixed64.One);
-        Vector2d unrepresentable = new(Fixed64.MaxValue, Fixed64.MaxValue);
-
-        FiniteSlabProjectionSweep.IsCloser((Fixed64)2, Vector2d.Zero, (Fixed64)3, Vector2d.Zero).Should().BeTrue();
-        FiniteSlabProjectionSweep.IsCloser((Fixed64)3, Vector2d.Zero, (Fixed64)2, Vector2d.Zero).Should().BeFalse();
-        FiniteSlabProjectionSweep.IsCloser((Fixed64)2, Vector2d.Zero, (Fixed64)2, Vector2d.Zero).Should().BeFalse();
-        FiniteSlabProjectionSweep.IsCloser(Fixed64.MaxValue, closer, Fixed64.MaxValue, farther).Should().BeTrue();
-        FiniteSlabProjectionSweep.IsCloser(Fixed64.MaxValue, farther, Fixed64.MaxValue, closer).Should().BeFalse();
-        FiniteSlabProjectionSweep.IsCloser(Fixed64.MaxValue, closer, Fixed64.MaxValue, unrepresentable).Should().BeTrue();
-        FiniteSlabProjectionSweep.IsCloser(Fixed64.MaxValue, unrepresentable, Fixed64.MaxValue, closer).Should().BeFalse();
-        FiniteSlabProjectionSweep.IsCloser(Fixed64.MaxValue, unrepresentableShorter, Fixed64.MaxValue, unrepresentable).Should().BeTrue();
-        FiniteSlabProjectionSweep.IsCloser(Fixed64.MaxValue, unrepresentable, Fixed64.MaxValue, unrepresentableShorter).Should().BeFalse();
-        FiniteSlabProjectionSweep.IsCloser(Fixed64.MaxValue, unrepresentable, Fixed64.MaxValue, unrepresentable).Should().BeFalse();
-    }
-
-    [Fact]
     public void FiniteSlabProjectionSweep_WithCylinderStartingInsideProjection_ShouldReturnZeroDistance()
     {
         using GravitasWorldContext context = CreateMixedContext();
