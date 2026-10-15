@@ -40,15 +40,21 @@
 Phase 1 of the supported-geometry plan confirmed in-range numerical defects on
 the original binaries. Integral, volume, overlap and mass-property fixes
 #113-#124 are resolved. **#096** collider/standalone-mesh admission is complete
-and passes correctness, coverage, replay and warm performance checks. Continue
-with query, settings and restore admission.
+and passes correctness, coverage, replay and warm performance checks. Resolve the
+focused correctness queue below before resuming phase 3's query, settings and
+restore admission:
+
+1. #126/#130 together: coherent body CCD proxies and rounded attachment enclosure.
+2. #128: supported-scale projected-sweep accuracy.
+3. #129: detached polygon compound inspection.
+
 #111 remains an independent validation-tooling issue.
 #125 is a low-priority, non-blocking runtime crash observation; defer further
 investigation unless it recurs or a reliable reproducer becomes available.
-#127 is a confirmed tiny-mass response defect; #126/#130 share the body CCD
+#127 is resolved across 2D, 3D and mixed response. #126/#130 share the body CCD
 proxy owner and should be resolved together. They cover pending-state coherence
 and published attachment rounding respectively. Neither blocks geometry
-admission. Address response correctness first, then the combined proxy work.
+admission. Continue with the combined proxy work.
 #128 tracks an independent projected-sweep precision discrepancy; #129 tracks
 detached planar compound inspection. Both reproduce on the original stack.
 
@@ -117,28 +123,6 @@ detached planar compound inspection. Both reproduce on the original stack.
   shape-family parity without adding a second geometry representation.
 - **Evidence:** Ignored `artifacts/geometry-range/phase2/probe-projection/`
   records the zero result on both binary snapshots.
-
-### GRV-Issue-127 - Tiny-mass planar positional correction consumes penetration slop
-
-- **Confirmed:** 2026-10-14 on both the accepted pre-admission binaries and the
-  phase-2 candidate. This is pre-existing response behavior, not a consequence
-  of the supported-geometry ceiling.
-- **Reproduction:** Two coincident planar circles of radius `4,095`, one static
-  and one dynamic with mass `Fixed64.FromRaw(3)`, have an ordinary rightward
-  contact of depth `8,190`. With the default penetration slop, direct
-  `CollisionResponse2D.Resolve` moves the dynamic circle by `8,190` rather than
-  `8,189.9900000002235`. Actual and expected X raw values are
-  `35175782154240` and `35175739204568`; the excess is exactly the slop.
-  Unit-mass and `MaxValue`-mass controls retain the expected distance.
-- **Boundary:** Geometry and the correction are representable. The confirmed
-  failure is pure 2D response in a mixed-capable context; 3D response parity
-  needs investigation before making a broader claim.
-- **Follow-up:** Trace the weighted positional correction and compact/exact
-  fallback normalization. Preserve the penetration-slop contract before and
-  after mass weighting, add the small-mass regression and parity controls, and
-  retain ordinary warm response cost.
-- **Evidence:** Ignored `artifacts/geometry-range/phase2/probe-response/` retains
-  the controlled source, original/candidate logs and binary provenance.
 
 ### GRV-Issue-126 - Pending compensated authoring mixes CCD proxy geometry epochs
 
@@ -257,6 +241,50 @@ detached planar compound inspection. Both reproduce on the original stack.
 Remaining measured performance costs are tracked in the benchmark backlog.
 
 ## Resolved Issues
+
+### GRV-Issue-127 - Tiny-mass planar positional correction consumes penetration slop
+
+- **Resolved:** 2026-10-14 across pure 2D, 3D and mixed response.
+- **Confirmed:** 2026-10-14 on accepted pre-admission and phase-2 binaries.
+  New production regressions reproduce the same rounding defect in all three
+  dimensional paths; the geometry admission work did not introduce it.
+- **Reproduction:** Two coincident planar circles of radius `4,095`, one static
+  and one dynamic with mass `Fixed64.FromRaw(3)`, have contact depth `8,190`.
+  `CollisionResponse2D.Resolve` moved the dynamic circle by `8,190` instead of
+  retaining slop at `8,189.9900000002235`: actual/expected X raw values
+  `35175782154240` / `35175739204568`. 3D and mixed response exhibit the same
+  error after applying their existing correction percentage.
+- **Root cause:** A shared Q32.32 correction scale was rounded before a large
+  inverse mass multiplied it back. Pure 2D/3D also rounded normal components
+  before that multiplication. Representability checks did not prevent this
+  precision amplification.
+- **Resolution:** Keep compact arithmetic when neither inverse mass exceeds one;
+  otherwise compute each bounded weighted distance before applying its normal.
+  Reduce exact zero/full/half shares directly. Reuse FixedMathSharp's two-factor
+  fused multiply-divide when the inverse-mass sum fits, retaining the existing
+  exact wide-sum fallback otherwise. Preserve correction percentages, contact
+  shares and prepare-both-before-publish position validation. The production
+  change stays in the existing shared helper with no upstream changes.
+- **Verification:** Local-stack Release/Lean builds have zero warnings/errors;
+  **6,202 / 6,136** tests pass without skips and retain **100% reachable line,
+  branch and method coverage**. Independent integer ratio oracles cover unequal
+  and extreme masses, overflowing sums, reversed participants, oblique normals
+  and half ties. Existing manifold/group tests also cover small masses; complete
+  host-loop regressions cover all three runtime modes. Six replay fixtures match
+  shared expectations and directly across Windows x64 Release/Lean. Independent
+  numerical and ponytail reviews clear the final change.
+- **Performance:** All **14** native workload gates retain **0 B/op**, with no
+  repeatable regression outside the measured 99.9% intervals; **17** correctness/
+  allocation guards pass. The guard-only variant's confirmed **5.02%** penalty
+  was rejected and refined here. Contemporaneous original/candidate repeats
+  distinguish host timing shifts, including a stronger static/sub-unit check
+  with three launches and eight measurements per launch. The unequal sub-unit
+  control measures `562.966` versus `561.178` us per 64 reset-and-resolve
+  operations. Native Linux/ARM64 and released package validation are not claimed.
+- **Evidence:** Ignored `artifacts/grv-127/` retains red/green tests, full raw
+  coverage, replay captures, immutable original/rejected/final snapshots, exact
+  native statistics and actual generated-child hashes. Original discovery probes
+  remain under `artifacts/geometry-range/phase2/probe-response/`.
 
 ### GRV-Issue-124 - Standalone polygon reference shifts omit the centroid residual
 

@@ -99,14 +99,21 @@ public sealed partial class MixedResponseTests
         context.MixedCollisions.ActivePairCount.Should().Be(1);
     }
 
-    [Fact]
-    public void MixedEqualNormalGroups_ShouldCorrectOnlyTheDeepestDirectionOnce()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void MixedEqualNormalGroups_ShouldCorrectOnlyTheDeepestDirectionOnce(bool tinyMass)
     {
         using GravitasWorldContext singleContext = CreateMixedContext();
         using GravitasWorldContext groupedContext = CreateMixedContext();
         CollisionPairMixed single = CreateMixedParallelWallPair(singleContext, Fixed64.Half);
         CollisionPairMixed grouped = CreateMixedParallelWallPair(groupedContext,
             Fixed64.FromFraction(3, 4), Fixed64.Half, Fixed64.Half);
+        if (tinyMass)
+        {
+            single.Collider2D.Body!.Mass = Fixed64.FromRaw(5);
+            grouped.Collider2D.Body!.Mass = Fixed64.FromRaw(5);
+        }
         grouped.Manifold.Count.Should().Be(3);
         grouped.Manifold[0].Depth.Should().Be(Fixed64.FromFraction(1, 4));
         grouped.Manifold.PrimaryContact.Depth.Should().Be(Fixed64.Half);
@@ -118,6 +125,9 @@ public sealed partial class MixedResponseTests
 
         // A shallower row authored first and a duplicate deepest row cannot multiply translation.
         grouped.Collider2D.Body!.Position.Should().Be(single.Collider2D.Body!.Position);
+        grouped.Collider2D.Body.Position.X.Should().Be(
+            (Fixed64.Half - CollisionResponseMixed.PenetrationSlop)
+            * CollisionResponseMixed.PenetrationCorrectionPercent);
         grouped.Collider2D.Body.Position.X.Should().BeGreaterThan(Fixed64.Zero);
         grouped.ResponseSnapshot.IsValid.Should().BeFalse();
     }

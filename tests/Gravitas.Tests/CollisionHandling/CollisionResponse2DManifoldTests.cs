@@ -585,11 +585,14 @@ public sealed class CollisionResponse2DManifoldTests
         velocity.Should().BeLessThan(Fixed64.Zero);
     }
 
-    [Fact]
-    public void Resolve_WithTwoContacts_ShouldApplyPositionCorrectionOnceForPair()
+    [Theory]
+    [InlineData(4294967296L)]
+    [InlineData(5L)]
+    public void Resolve_WithTwoContacts_ShouldApplyPositionCorrectionOnceForPair(long massRaw)
     {
         using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
         SolidBody2D moving = CreateBox(context, Vector2d.Zero);
+        moving.Mass = Fixed64.FromRaw(massRaw);
         SolidBody2D wall = CreateBox(context, new Vector2d((Fixed64)2, Fixed64.Zero), immovable: true);
         var pair = new CollisionPair2D(moving.Collider, wall.Collider);
         AddFaceContacts(pair, depth: Fixed64.Half);

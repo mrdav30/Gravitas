@@ -253,6 +253,15 @@ physics semantics consume FixedMathSharp's policy-neutral wide arithmetic
 through the intentional friend-assembly boundary and never enter Gravitas public
 signatures.
 
+Positional correction subtracts penetration slop and applies the dimensional
+correction percentage and contact share before distributing movement by
+constrained inverse mass. The compact shared scale retains ordinary rounding
+only when neither participant's inverse mass exceeds one; larger inverse masses
+would amplify rounding in that scale or its normal components. Those cases use
+the exact weighted-distance calculation before applying the contact normal, so
+small masses do not consume the correction margin. Both endpoint positions are
+checked before either correction is published.
+
 `ExactContactResponseKernel` is the sole owner of the exact normal,
 accumulated-normal, Coulomb-line, and Coulomb-disk response policy.
 `ExactContactLever3D` and `ExactContactLever2D` adapt body mobility and

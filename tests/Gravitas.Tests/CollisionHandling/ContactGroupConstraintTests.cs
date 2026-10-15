@@ -100,13 +100,16 @@ public sealed class ContactGroupConstraintTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void DuplicateCorrectionDirection_ShouldApplyOnlyDeepestDepthWithStableTies(bool deeperGroup)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public void DuplicateCorrectionDirection_ShouldApplyOnlyDeepestDepthWithStableTies(bool deeperGroup, bool tinyMass)
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         var wall = scenario.CreateCuboid(Vector3d.Zero, immovable: true);
         var actor = scenario.CreateCuboid(Vector3d.Right, preventAngularForces: true);
+        if (tinyMass) actor.Body.Mass = Fixed64.FromRaw(5);
         wall.Collider.Material = actor.Collider.Material = PhysicsMaterial.Frictionless;
         CollisionPair pair = scenario.CreatePair(wall.Collider, actor.Collider);
         // Equal-depth samples have distinct features and anchors inside one
