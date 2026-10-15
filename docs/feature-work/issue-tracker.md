@@ -2,7 +2,7 @@
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-132`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-134`.
 - Assign an ID when an issue enters this tracker, keep it through resolution,
   and never reuse an ID even if an entry is later removed. Check this file's Git
   history before advancing or repairing the counter.
@@ -37,58 +37,70 @@
 
 ### Ordered Queue
 
-Phase 1 of the supported-geometry plan confirmed in-range numerical defects on
-the original binaries. Integral, volume, overlap and mass-property fixes
-#113-#124 are resolved. **#096** collider/standalone-mesh admission is complete
-and passes correctness, coverage, replay and warm performance checks. The focused
-correctness follow-ups #126-#131, including detached polygon inspection #129, are
-resolved. Phase 3 query, settings and restore admission is complete with the same
-validation gates. Continue #096 phase 4's compatibility, terrain-migration and
-final closeout checks next.
+The supported-geometry contract and #096 are complete. Next resolve **#132**,
+bodyless 3D static response, then **#133**, artificial mesh-chunk seam response.
+Both are reproduced on pre-admission binaries and independent of the size cap.
+Keep physical-quality fixes ahead of the benchmark queue; combine work only
+where the response ownership actually overlaps.
 
 #111 remains an independent validation-tooling issue.
 #125 is a low-priority, non-blocking runtime crash observation; defer further
 investigation unless it recurs or a reliable reproducer becomes available.
 
-### GRV-Issue-096 - Extreme-scale capsule initial mesh sweep can miss a genuine overlap
+### GRV-Issue-132 - Bodyless 3D static geometry does not receive discrete blocking response
 
-- **Status:** Contract locked 2026-10-14 after phase 1 validation and independent
-  geometry/ponytail review: inclusive `4,096`-unit conservative reach, exact outward
-  attachment norms, explicit body/bodyless frames, mixed thickness after complete
-  planar reach, and exact vertex-mean query-polygon admission. In-range numerical
-  prerequisites #113-#124 and upstream scaled decomposition are resolved.
-  Collider/standalone-mesh admission is complete and passes full correctness,
-  coverage, replay and warm performance checks. Query, settings and restore
-  admission is also complete; compatibility, terrain-migration and final
-  closeout checks remain in the
-  [Supported Geometry Range Plan](2026-10-12-supported-geometry-range-plan.md).
-  This issue stays open until the complete admission contract is implemented.
-- **Confirmed:** 2026-10-07 in the isolated local-stack Release
-  `CapsuleInitialContact_WithUnavailableTriangleCharts_ShouldRetainGeometricFallback`
-  experiment. An ordinary-radius source control passes; the extreme
-  radius version returns false before initial-contact normal resolution.
-- **Reproduction:** Let `r = Fixed64.FromRaw(long.MaxValue / 2)` and `m` be
-  `Fixed64.MaxValue`. Initialize a capsule of radius `r`, full height `m`,
-  centered at `(m - 4, m - 4, 0)`. Initialize a concave triangle with local
-  vertices `(m, 0, -1)`, `(m, 0, 1)`, `(m, 5, 0)`, origin
-  `(-r - 3, m - 4, 0)` and identity rotation. Prepare a unit rightward source
-  sweep through `ConvexSweepQueryWorker`; `TrySweepPreparedSource` returns
-  false. Its plane is only `r - 1` from the capsule center, and all triangle
-  vertices lie strictly within the radial volume, proving initial overlap.
-- **Boundary:** Both collider centers and the proposed source center remain
-  representable. The capsule's core length is one raw unit. Its radius is
-  extreme, while the plane overlap is only one world unit; this is distinct
-  from #094's source-side and reduction defect. The generic candidate/GJK path
-  before that resolution is unchanged by #094.
-- **Follow-up:** Enforce the locked metric consistently across collider
-  preparation, effective scale and offsets, standalone meshes, queries, mixed
-  settings and restored state. Reject the original unsupported capsule before
-  narrow phase while preserving ordinary geometry at large coordinates. Preflight
-  failed live changes before publication/waking and retain the current warm
-  performance baseline; do not replace the miss with silent clamping or clearance.
-- **Evidence:** Ignored `artifacts/grv-issue-094/rotational-boundary-third.log`
-  retains the isolated failure. The experimental fixture was removed from the
-  maintained suite after recording this independent boundary.
+- **Confirmed:** 2026-10-15 during supported-geometry terrain migration checks.
+- **Affected area:** `CollisionHandling/Response/3D/CollisionResponse.cs`,
+  `TryCreateBodyPair`, and the host integration bodyless/static distinction.
+- **Reproduction:** A frictionless dynamic sphere (radius `0.5`) or vertical
+  capsule (radius `0.5`, full height `2`) starts touching a flat bodyless mesh.
+  With gravity `1`, frame rate `16` and complete host steps, it falls through.
+  Direct narrow phase reports upward contacts and a downward sphere sweep hits
+  the same floor. Replacing the floor with an explicit static `SolidBody`
+  restores blocking response.
+- **Root cause:** The 3D response owner rejects the pair if either collider's
+  body is null. This guard is also present in pre-plan commit `9752c9f`; it was
+  not introduced by geometry admission. The pure 2D response owner supports
+  bodyless static participants and has an existing regression for both orders.
+- **Follow-up:** Give 3D bodyless non-trigger static targets coherent response
+  using the existing body/response owners, retaining zero target mobility,
+  exact contact frames and dimensional parity. Cover both input orders,
+  primitive/mesh targets, full-loop support, events, replay and allocation.
+  Do not infer CCD or mixed behavior from this discrete-only reproduction.
+- **Evidence:** Ignored `artifacts/geometry-range/phase4/terrain-diagnose.log`
+  retains falling trajectories and successful direct contacts;
+  `terrain-static.log` demonstrates restored normal response with static bodies.
+  Host guidance now states the current limitation explicitly.
+
+### GRV-Issue-133 - Adjacent mesh collider rims alter frictionless seam-crossing response
+
+- **Confirmed:** 2026-10-15 during supported-geometry terrain migration checks.
+- **Reproduction:** Split a flat `16 x 8` floor at X=0 into two explicit static
+  mesh bodies, retaining exactly the same four global triangles as the single
+  mesh control. Set gravity `1`, frame rate `16`, frictionless materials, no
+  damping/air drag and frozen dynamic rotation. Settle a radius-`0.5` sphere or
+  radius-`0.5`, height-`2` capsule for 32 full frames at X=-2, then apply unit
+  rightward impulse and advance 64 full frames. The continuous control retains
+  unit horizontal speed; the chunked scene first loses speed at crossing frame
+  30, despite no friction. Its two independent mesh pairs expose finite rims
+  that the single mesh reduces as covered internal boundaries.
+- **Boundary:** Distinct collider/pair/event/query identities are expected.
+  Horizontal blocking from an artificial seam in otherwise identical flat
+  terrain is the physical-quality defect; chunking is not currently equivalent
+  to a continuous surface. Both representations are individually well inside
+  the geometry budget. The query control retains the same physical hit and
+  reports the two collider identities correctly.
+- **Pre-existing evidence:** The complete repeated trajectories and ordered
+  events are byte-identical on accepted pre-admission core `BE9347C7` and final
+  core `9C284E89`. Geometry admission did not create the response difference.
+  Ignored `artifacts/geometry-range/phase4/terrain-{original,candidate}.json`
+  and `terrain-comparison.json` retain all cases, repeats and runtime hashes.
+- **Follow-up:** Evaluate explicit cross-collider surface continuity ownership
+  before selecting a fix. Preserve real finite rims, holes, disconnected
+  geometry, deterministic pair identity and existing independent-body behavior.
+  Check sphere/capsule equivalence, whole-shape clearance, 2D/mixed counterparts,
+  CCD, support/grounding and response with matching seam/interior cost controls.
+  Do not indiscriminately weld neighboring colliders or erase real boundaries.
 
 ### GRV-Issue-111 - Local-stack benchmark hosts can omit FixedMathSharp compile references
 
@@ -143,6 +155,44 @@ investigation unless it recurs or a reliable reproducer becomes available.
 Remaining measured performance costs are tracked in the benchmark backlog.
 
 ## Resolved Issues
+
+### GRV-Issue-096 - Extreme-scale capsule initial mesh sweep can miss a genuine overlap
+
+- **Resolved:** 2026-10-15 through the implemented supported-geometry contract:
+  inclusive `4,096`-unit conservative reach, exact outward attachments,
+  body/bodyless frames, mixed thickness after complete planar reach, exact
+  query-polygon means and pre-publication admission across initialization,
+  live mutation, standalone meshes, query services, settings and restore.
+  See the [completed plan](done/2026-10-12-supported-geometry-range-plan.md).
+- **Confirmed:** 2026-10-07 in the isolated local-stack Release
+  `CapsuleInitialContact_WithUnavailableTriangleCharts_ShouldRetainGeometricFallback`
+  experiment. An ordinary-radius source control passes; the extreme
+  radius version returns false before initial-contact normal resolution.
+- **Reproduction:** Let `r = Fixed64.FromRaw(long.MaxValue / 2)` and `m` be
+  `Fixed64.MaxValue`. Initialize a capsule of radius `r`, full height `m`,
+  centered at `(m - 4, m - 4, 0)`. Initialize a concave triangle with local
+  vertices `(m, 0, -1)`, `(m, 0, 1)`, `(m, 5, 0)`, origin
+  `(-r - 3, m - 4, 0)` and identity rotation. Prepare a unit rightward source
+  sweep through `ConvexSweepQueryWorker`; `TrySweepPreparedSource` returns
+  false. Its plane is only `r - 1` from the capsule center, and all triangle
+  vertices lie strictly within the radial volume, proving initial overlap.
+- **Boundary:** Both collider centers and the proposed source center remain
+  representable. The capsule's core length is one raw unit. Its radius is
+  extreme, while the plane overlap is only one world unit; this is distinct
+  from #094's source-side and reduction defect. The generic candidate/GJK path
+  before that resolution is unchanged by #094.
+- **Resolution:** The exact original capsule now throws a descriptive admission
+  error before registration, partition publication or narrow phase. A maintained
+  regression also admits the original compact far-authored triangle after
+  recentering. Supported large-position, compensated-scale, attachment, mixed,
+  query, settings and restored-state regressions pass full correctness, raw
+  coverage, replay and allocation checks. Matched ordinary native controls
+  preserve the warm baseline within measured uncertainty. Separate pre-existing
+  terrain response limitations are #132/#133; chunking equivalence is not claimed.
+  Native Linux/ARM and released-package validation remain release gates.
+- **Evidence:** Ignored `artifacts/grv-issue-094/rotational-boundary-third.log`
+  retains the isolated failure. The experimental fixture was removed from the
+  maintained suite after recording this independent boundary.
 
 ### GRV-Issue-129 - Detached polygon compound reports a zero conservative proxy radius
 
@@ -516,7 +566,7 @@ Remaining measured performance costs are tracked in the benchmark backlog.
   rotations, detached/committed parity and actual body mass/scale refresh.
   Release/Lean retain raw 100% reachable line/branch/method coverage; shared replay
   expectations and warm correctness/allocation/performance gates pass. See the
-  dated closeout in the [Supported Geometry Range Plan](2026-10-12-supported-geometry-range-plan.md).
+  dated closeout in the [Supported Geometry Range Plan](done/2026-10-12-supported-geometry-range-plan.md).
 - **Evidence:** Ignored `artifacts/grv-124/` retains the failing regression,
   complete validation, immutable native comparisons and their loaded stack hashes.
   `artifacts/grv-119/probes/` retains the original standalone/compound discrepancy.
@@ -546,7 +596,7 @@ Remaining measured performance costs are tracked in the benchmark backlog.
   mass mutation. Both libraries retain raw 100% reachable line/branch/method
   coverage in Release/Lean; replay, warm allocation and matched performance
   gates pass. Changing-input cases are retained in the mesh benchmark class.
-  See the dated closeout in the [Supported Geometry Range Plan](2026-10-12-supported-geometry-range-plan.md).
+  See the dated closeout in the [Supported Geometry Range Plan](done/2026-10-12-supported-geometry-range-plan.md).
 - **Evidence:** #119's independent microcube integral regression verifies the
   corrected compound result. Ignored `artifacts/grv-119/probes/original.log` and
   `current.log` confirm the public outputs on frozen original and corrected
@@ -615,11 +665,11 @@ Remaining measured performance costs are tracked in the benchmark backlog.
   winding, scale, requested references and cache publication/rejection. Both
   libraries retain raw 100% reachable line/branch/method coverage in Release
   and Lean; replay and all warm allocation/comparison gates pass. See the
-  dated closeout in the [Supported Geometry Range Plan](2026-10-12-supported-geometry-range-plan.md).
+  dated closeout in the [Supported Geometry Range Plan](done/2026-10-12-supported-geometry-range-plan.md).
 - **Evidence:** Ignored `artifacts/grv-117-118/perf/` retains
   `original-child-share-probe.log`, `candidate-child-share-probe.log` and the
   public probe source, with loaded DLL hashes. The phase 1 refinement summary in
-  the [Supported Geometry Range Plan](2026-10-12-supported-geometry-range-plan.md)
+  the [Supported Geometry Range Plan](done/2026-10-12-supported-geometry-range-plan.md)
   records the separate prerequisite.
 
 ### GRV-Issue-120 - 3D inertia tensor transport reverses the geometry rotation
@@ -647,7 +697,7 @@ Remaining measured performance costs are tracked in the benchmark backlog.
   Release/Lean replay, raw full coverage and warmed integration gates pass.
 - **Evidence:** Ignored `artifacts/grv-119/red-frame.log` records four failing
   source-behavior tests before any transport owner was changed. The phase 1
-  design in the [Supported Geometry Range Plan](2026-10-12-supported-geometry-range-plan.md)
+  design in the [Supported Geometry Range Plan](done/2026-10-12-supported-geometry-range-plan.md)
   records the coupled contribution work.
 
 ### GRV-Issue-121 - Box inertia rounds separate axis terms before their sum
@@ -702,7 +752,7 @@ Remaining measured performance costs are tracked in the benchmark backlog.
 - **Regression coverage:** Equivalent and unequal-volume scaled compounds across
   all five primitive families, public COM and inertia before/after initialization.
   Combined verification and warm evidence are recorded in the phase 1 summary
-  of the [Supported Geometry Range Plan](2026-10-12-supported-geometry-range-plan.md).
+  of the [Supported Geometry Range Plan](done/2026-10-12-supported-geometry-range-plan.md).
 - **Evidence:** Ignored `artifacts/grv-115/parity-probe/` retains the public probe,
   frozen references and original/candidate raw results with loaded DLL hashes.
   The original Gravitas SHA256 is
@@ -742,7 +792,7 @@ Remaining measured performance costs are tracked in the benchmark backlog.
   is separately confirmed as #119; this fix does not claim to solve it.
 - **Verification:** Full local-stack Release/Lean suites, raw reachable coverage,
   shared replay and native warm gates are recorded in the phase 1 summary of the
-  [Supported Geometry Range Plan](2026-10-12-supported-geometry-range-plan.md).
+  [Supported Geometry Range Plan](done/2026-10-12-supported-geometry-range-plan.md).
 - **Evidence:** Ignored `artifacts/grv-115/inertia-probe/` retains public probes,
   a BigInteger oracle, frozen reference projects and original/final results.
   Original Gravitas SHA256 is
@@ -785,7 +835,7 @@ Remaining measured performance costs are tracked in the benchmark backlog.
   affected warm regression; all rows/guards allocate `0 B/op`. Independent
   numerical/ponytail review has no outstanding source findings.
 - **Evidence:** The dated phase 1 summary in the
-  [Supported Geometry Range Plan](2026-10-12-supported-geometry-range-plan.md)
+  [Supported Geometry Range Plan](done/2026-10-12-supported-geometry-range-plan.md)
   records counts, bounds and costs. Ignored `artifacts/grv-116/` retains original
   failures, rejected experiments, final coverage/replay and immutable native
   snapshots. Wrong original large-scale classifications are excluded from speed
@@ -823,7 +873,7 @@ Remaining measured performance costs are tracked in the benchmark backlog.
   arithmetic control. Independent numerical/ponytail review has no outstanding
   findings in this change.
 - **Evidence:** The dated phase 1 closeout in the
-  [Supported Geometry Range Plan](2026-10-12-supported-geometry-range-plan.md)
+  [Supported Geometry Range Plan](done/2026-10-12-supported-geometry-range-plan.md)
   records counts and measured costs. Ignored `artifacts/grv-115/` retains red
   failures, final coverage/replay, immutable binaries and rejected experiments.
   Native Linux/ARM64 and released-package validation remain pending.

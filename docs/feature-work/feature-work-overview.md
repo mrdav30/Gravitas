@@ -53,12 +53,14 @@ instead of burying it in notes.
 - [`Benchmark Signal Hardening`](benchmark-signal-hardening-backlog.md)
   - Reproduce and close confirmed release-relevant signals alongside the owning
     library change. Do not broaden this into speculative optimization work.
-- [`Supported Geometry Range`](2026-10-12-supported-geometry-range-plan.md)
-  - Define and enforce a validated effective-geometry budget across collider,
-    query and restored-state admission. Preserve ordinary shapes at large world
-    coordinates and keep generic mathematics in FixedMathSharp.
 
 ## Recently Completed
+
+- [`Supported Geometry Range`](done/2026-10-12-supported-geometry-range-plan.md)
+  - Effective scaled geometry, attachments, queries, settings and restored state
+    share an explicit conservative reach budget. Ordinary shapes retain
+    large-world positioning; migration guidance distinguishes admission from
+    terrain continuity and independent physical/numeric constraints.
 
 - [`Mixed Surface Contacts`](done/2026-10-12-mixed-surface-contact-plan.md)
   - Finite circle, stadium and polygonal slabs share grouped mesh-surface

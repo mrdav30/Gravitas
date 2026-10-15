@@ -172,7 +172,7 @@ Ignored `artifacts/grv-issue-108/isolated-baseline` and `final-confirmation`
 retain the matched measurements. The preliminary unisolated source capture
 and the pre-pruning correctness capture are not the retained comparison.
 
-### GRV-Benchmark-027 — Nonconvex Rotational CCD Step Cost
+### GRV-Benchmark-027 â€” Nonconvex Rotational CCD Step Cost
 
 **Discovered:** 2026-10-12 during GRV-Issue-101 validation.  
 **Status:** Correct first-impact timing retained; demanding angular fixtures
@@ -279,6 +279,18 @@ measurement support. It starts after complete replay stepping and a shared trace
 format. The plan owns implementation sequencing; this signal retains its measured
 cost context and decision gate. Neither scene capacity nor contact frequency is
 established merely by creating that plan.
+
+**Additional bounded evidence (2026-10-15):** The supported-geometry closeout's
+single-sphere, flat-mesh traversal measured `162.980 / 157.305 / 170.034 us`
+derived mean per frame for continuous floor / chunk interior / chunk seam,
+all at `0 B/op`. Each native observation times reset plus 64 full steps and
+excludes initialization, buffer priming and 32 settling frames. This is a small
+scene-cost sample, not capacity or frame-tail evidence. Pre-existing seam
+response differences are tracked as #133; physical outputs differ between
+layouts, so these means are not an equivalent-work optimization comparison.
+The [supported-geometry closeout](done/2026-10-12-supported-geometry-range-plan.md#phase-4-compatibility-performance-and-096-closeout)
+retains the bounded workload and timing provenance. Use it as context for the
+representative workload rather than creating a separate speculative signal.
 
 The final #020 two-launch fixture costs **696.036 / 699.465 microseconds** per
 complete mixed / 3D oblique query, at **0 B/op**, while ordinary cap/side/zero-core

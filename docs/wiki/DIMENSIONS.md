@@ -48,7 +48,7 @@ The context clock, coroutines, diagnostics, replay hash service, and lifecycle
 hooks remain shared. Runtime modes are validated exactly; `None` and arbitrary
 bit combinations are rejected as settings values.
 
-## Public Surface
+## Supported Geometry
 
 Collider preparation uses an inclusive maximum effective reach of `4,096`
 world units, exposed by `ColliderSettings.MaximumGeometryReach` and
@@ -69,6 +69,65 @@ detached scale. Change collider-owned mesh poses and scales through the collider
 body or host transform. Calling `PhysicsMesh.UpdatePosition` or `UpdateTransform`
 on a collider-owned mesh throws; independently constructed `PhysicsMesh`
 instances retain these transformation APIs and validate their own reach.
+
+The ceiling uses world units chosen by the host. It limits each runtime
+collider's conservative reach, rather than total world extent, ray length or
+swept travel. Position still has to satisfy each API's representability rules.
+It does not guarantee representable mass, inertia, speed or arbitrarily small
+features. Grid cell size and the number of covered cells remain independent
+memory and performance choices.
+
+Let `C(v)` mean the smallest Q32.32 value enclosing the exact length of `v`.
+The following measures use prepared effective dimensions and vertices after
+scale, retaining the existing final rounding:
+
+| Shape | Intrinsic reach |
+| --- | --- |
+| Sphere or circle | Radius. |
+| Capsule or stadium | Radius plus half the core length, rounding an odd raw half-length outward. |
+| Cuboid or AABB | `C(halfExtents)`. |
+| Cone or cylinder | `C([radius, outwardHalfHeight, radius])`, a conservative box diagonal. |
+| Mesh | Maximum `C(vertex)` in its recentered local frame. |
+| Polygon collider | Maximum `C(vertex)` about its local collider origin. |
+| Compound | Maximum of each part's outward attachment length plus its intrinsic reach. |
+
+Add the body-owned root's outward attachment length once to obtain complete
+reach `P`; a bodyless root adds zero. Attachment lengths retain exact scaled
+products until outward measurement. Opposed root/part offsets do not cancel:
+offsets `+3,000` and `-3,000` with radius `1` consume `6,001`, so normalize the
+authored frames to admit that physically compact arrangement. For mixed 2D
+slabs, require `C([P, physicalHalfThickness]) <= 4,096`. Half-thickness is
+unscaled physical Y thickness; host Y position does not consume reach.
+
+Unsupported effective geometry throws a descriptive argument/validation error
+before runtime publication; it is neither clamped nor reported as a collision
+miss. Failed live candidates preserve committed geometry and derived runtime
+state. Host-authored transforms and partially applied records have their own
+ownership boundaries; see [restored-state semantics](SERIALIZATION.md#ownership-contract).
+Context [query services](QUERY_SERVICES.md#query-geometry-admission) use the
+corresponding numeric-source rules, including the exact vertex mean for public
+world-polygon queries. Trusted internal CCD padding and lower-level geometry
+workers retain their separate contracts.
+
+### Terrain And Unit Migration
+
+Split terrain into spatial chunks whose individually prepared reach fits the
+budget. Recenter each chunk and retain its world placement. Adding huge offsets
+to a single body-owned compound still consumes attachment reach; it does not
+create a large-world bypass. A uniformly coarser host length unit is another
+option, but convert all length-dependent inputs and physical units consistently.
+Changing only collider scale changes the simulated scene.
+
+Separate chunks own separate collider IDs, partition memberships, collision pairs, contact
+events and query hits. Adjacent mesh colliders keep their finite boundaries;
+surface reduction within one mesh does not weld across collider IDs. Overlap at
+a chunk seam can therefore change response even when the union has the same
+triangles. Validate crossings with the intended shapes, grounding, friction and
+CCD settings rather than assuming chunking is physically or computationally free.
+For 3D discrete blocking terrain, use explicit static bodies as described in
+[host integration](HOST_INTEGRATION.md#bodyless-geometry).
+
+## Public Surface
 
 | Domain      | Bodies                    | Colliders                               | Constraints                      | Queries              |
 | ----------- | ------------------------- | --------------------------------------- | -------------------------------- | -------------------- |

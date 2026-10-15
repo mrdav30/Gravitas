@@ -1,5 +1,22 @@
 # Gravitas Migration Guide
 
+## Supported effective geometry
+
+Runtime colliders, standalone meshes and context query sources share an
+inclusive `4,096`-world-unit conservative reach budget. Effective scale is
+applied before admission, so large authored geometry can still be scaled down.
+World position and swept travel are independent of this size budget. The
+[supported geometry contract](wiki/DIMENSIONS.md#supported-geometry) lists the
+shape formulas, attachment frames and mixed-thickness rule.
+
+Split oversized terrain into admitted, recentered chunks or adopt consistent
+host length units. Do not group widely separated chunks under one body and
+expect their attachment offsets to disappear from the budget. Chunks retain
+separate contacts and finite mesh rims; validate seam crossings and pair/event
+costs against your intended workload. This is an admission guarantee, not a
+guarantee that chunked response equals one continuous mesh or that the maximum
+supported geometry is a real-time workload target.
+
 ## Query geometry and settings ownership
 
 Numeric query sources and explicit ground-probe radii enforce the supported

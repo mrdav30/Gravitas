@@ -32,6 +32,10 @@ renderer-neutral diagnostics.
   diagnostic events, and debug-draw commands make simulation behavior visible
   without changing it.
 
+Runtime geometry follows an explicit [supported size contract](docs/wiki/DIMENSIONS.md#supported-geometry):
+an inclusive `4,096`-unit conservative reach per collider or context query source,
+independent of world position and travel distance.
+
 ## Install
 
 ```bash

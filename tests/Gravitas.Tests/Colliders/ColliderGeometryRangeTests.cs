@@ -13,6 +13,50 @@ public sealed class ColliderGeometryRangeTests
     private static readonly Fixed64 Limit = (Fixed64)4096;
     private static readonly Fixed64 RawUnit = Fixed64.FromRaw(1);
 
+    [Fact]
+    public void OriginalExtremeCapsuleSweepSource_ShouldRejectBeforeRuntimePublication()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        Fixed64 maximum = Fixed64.MaxValue;
+        var capsule = new LSCapsuleCollider
+        {
+            Radius = Fixed64.FromRaw(long.MaxValue / 2),
+            Size = new Vector3d(Fixed64.One, maximum, Fixed64.One)
+        };
+        var agent = new TestMatterAgent(context, new FixedTransform(
+            new Vector3d(maximum - (Fixed64)4, maximum - (Fixed64)4, Fixed64.Zero),
+            FixedQuaternion.Identity, Vector3d.One));
+        uint version = capsule.RuntimeShapeVersion;
+
+        Action initialize = () => capsule.InitializeWithNoBody(agent);
+
+        initialize.Should().Throw<ArgumentException>().WithMessage("*4,096*");
+        capsule.RuntimeShapeVersion.Should().Be(version);
+        context.Physics.ColliderCount.Should().Be(0);
+        capsule.IsPartitioned.Should().BeFalse();
+    }
+
+    [Fact]
+    public void OriginalExtremeCapsuleTarget_ShouldRetainCompactRecenteredMeshAdmission()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        Fixed64 maximum = Fixed64.MaxValue;
+        Fixed64 radius = Fixed64.FromRaw(long.MaxValue / 2);
+        var mesh = new LSMeshCollider(new[]
+        {
+            new Vector3d(maximum, Fixed64.Zero, -Fixed64.One),
+            new Vector3d(maximum, Fixed64.Zero, Fixed64.One),
+            new Vector3d(maximum, (Fixed64)5, Fixed64.Zero)
+        }, new[] { 0, 1, 2 }, MeshColliderMode.Concave);
+
+        mesh.InitializeWithNoBody(new TestMatterAgent(context, new FixedTransform(
+            new Vector3d(-radius - (Fixed64)3, maximum - (Fixed64)4, Fixed64.Zero),
+            FixedQuaternion.Identity, Vector3d.One)));
+
+        mesh.CanonicalCenteredProxyRadius.Should().BeLessThan((Fixed64)4);
+        context.Physics.ColliderCount.Should().Be(1);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

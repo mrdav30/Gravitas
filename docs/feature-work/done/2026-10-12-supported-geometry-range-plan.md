@@ -9,15 +9,14 @@
 
 **Date:** 2026-10-12  
 **Contract locked:** 2026-10-14  
-**Status:** Phase 1 contract review complete: the inclusive `4,096`-unit
-conservative reach and measurement rules below are locked. Numerical
-prerequisites #113-#124 and the upstream scaled-decomposition prerequisite are
-resolved. Phase 2 collider admission is complete and passes correctness,
-coverage, replay and warm performance validation. Phase 3 query/settings/restore
-admission is complete and passes correctness, coverage, replay and warm performance
-validation. Phase 4 compatibility and final closeout remain; #096 stays open until
-the complete contract is verified. The ceiling is a supported-workload
-boundary, not a proof that every derived physics quantity is representable.  
+**Completed:** 2026-10-15  
+**Status:** Complete; #096 is resolved. The inclusive `4,096`-unit conservative
+reach contract is implemented across collider, standalone-mesh, query, settings
+and restored-state admission. Correctness, raw coverage, local full-loop replay
+and warm performance gates pass. The ceiling is a supported-workload boundary,
+not a proof that every derived physics quantity is representable. Pre-existing
+terrain-response gaps remain independently tracked as #132/#133; final native
+Linux/ARM and released-package validation remain release gates.  
 **Owner:** Gravitas geometry admission and lifecycle transactions.
 
 **Goal:** Close `GRV-Issue-096` with explicit, consistent admission of supported
@@ -37,7 +36,7 @@ This plan supersedes #096's open supported-range decision, not its reproduction.
 
 ## Evidence And Scope
 
-[#096](issue-tracker.md#grv-issue-096---extreme-scale-capsule-initial-mesh-sweep-can-miss-a-genuine-overlap)
+[#096](../issue-tracker.md#grv-issue-096---extreme-scale-capsule-initial-mesh-sweep-can-miss-a-genuine-overlap)
 uses capsule radius `Fixed64.FromRaw(long.MaxValue / 2)`, full height
 `Fixed64.MaxValue` and a triangle with large authored X coordinates but only a
 `5`-unit Y span and `2`-unit Z span. A genuine initial overlap is rejected before
@@ -314,18 +313,18 @@ supported safety claim or implementing around an assumed safe range:
 
 | Tracker | Confirmed boundary | Required outcome |
 | --- | --- | --- |
-| [#113](issue-tracker.md#grv-issue-113---authored-closed-mesh-integrals-saturate-before-normalization) | Side-128 authored cube publishes unit inertia `1,024` instead of `2,730⅔`; side-2,048 cube accepts an unrepresentable volume as `Valid`. | Resolved: exact/checked integration, centered cache and numeric fallback; retain the existing scaled-property guard. |
-| [#114](issue-tracker.md#grv-issue-114---polygon-moment-integrals-saturate-before-normalization) | Side-256 square publishes moment `2,730⅔` instead of `10,922⅔`; equivalent AABB remains correct. | Resolved: exact mass-applied normalization with geometry caching; retain the existing final-overflow policy. |
-| [#115](issue-tracker.md#grv-issue-115---cone-volume-saturates-before-final-division) | Radius/height `1,024`, reach `1,536`: representable cone volume was reduced from about `1.124B` to `715.8M`. | Resolved: round the complete fixed-Pi product/ratio once; saturate only genuinely unrepresentable final volume. |
-| [#116](issue-tracker.md#grv-issue-116---cone-overlap-gjk-loses-scale-and-rotation-invariance) | Length `4,096`, end radius `2,048`: public cone overlaps produce both false positives and false negatives. | Resolved: bounded scalar crosses and exact dot signs; wide simplex predicates where needed. Closest/all queries and shared contact callers pass. |
-| [#117](issue-tracker.md#grv-issue-117---detached-compound-cone-mass-weights-disagree-with-committed-geometry) | Equivalent Y-scaled cones have different detached weights despite identical prepared geometry; the parity audit found other primitive cache defaults. | Resolved: detached and prepared mass properties share effective dimensions across all five primitive families. |
-| [#118](issue-tracker.md#grv-issue-118---sphere-inertia-rounds-small-mass-before-radius-squared) | Radius `1,024`, three-raw-unit mass gives sphere inertia `1048576` instead of `1258291`; other curved moments also round too soon. | Resolved: exact coefficient/geometry/mass normalization, exact internal capsule weights and corrected 2D cap polar moment. |
-| [#119](issue-tracker.md#grv-issue-119---compound-inertia-quantizes-child-masses-before-applying-geometry) | Radius `512`/`1,024` spheres at `0`/`2,048`, total mass three raw units: child masses round to `0`/`3`, biasing the compound tensor. | Resolved: homogeneous child moments, exact reference reduction and one final parent-mass normalization, with warm geometry caching. |
-| [#120](issue-tracker.md#grv-issue-120---3d-inertia-tensor-transport-reverses-the-geometry-rotation) | Anisotropic tensors rotate opposite to geometry; principal-axis impulses produce perpendicular spin. | Resolved: consistent active transport in compound, body and sampled CCD owners. |
-| [#121](issue-tracker.md#grv-issue-121---box-inertia-rounds-separate-axis-terms-before-their-sum) | A unit cube/square at mass raw `6` gives zero rather than raw `1`. | Resolved: normalize each complete box diagonal/moment once; warmed primitive costs improve. |
-| [#122](issue-tracker.md#grv-issue-122---standalone-mesh-inertia-amplifies-rounded-unit-coefficients) | Microcube unit-tensor projection error grows with ordinary representable mass. | Resolved: retained runtime integrals, certified final rounding and exact refinement preserve public projections and warm costs. |
-| [#123](issue-tracker.md#grv-issue-123---detached-compound-meshes-omit-authored-part-scale-in-mass-properties) | A scale-two mesh part has fourfold different detached/committed inertia. | Resolved with #122: effective detached mesh geometry and current/prepared publication parity. |
-| [#124](issue-tracker.md#grv-issue-124---standalone-polygon-reference-shifts-omit-the-centroid-residual) | Standalone triangle reference shifts omit its rounded centroid's first moment. | Resolved: retained moments and exact reference reduction, with shared first-moment arithmetic and preserved warm costs. |
+| [#113](../issue-tracker.md#grv-issue-113---authored-closed-mesh-integrals-saturate-before-normalization) | Side-128 authored cube publishes unit inertia `1,024` instead of `2,730⅔`; side-2,048 cube accepts an unrepresentable volume as `Valid`. | Resolved: exact/checked integration, centered cache and numeric fallback; retain the existing scaled-property guard. |
+| [#114](../issue-tracker.md#grv-issue-114---polygon-moment-integrals-saturate-before-normalization) | Side-256 square publishes moment `2,730⅔` instead of `10,922⅔`; equivalent AABB remains correct. | Resolved: exact mass-applied normalization with geometry caching; retain the existing final-overflow policy. |
+| [#115](../issue-tracker.md#grv-issue-115---cone-volume-saturates-before-final-division) | Radius/height `1,024`, reach `1,536`: representable cone volume was reduced from about `1.124B` to `715.8M`. | Resolved: round the complete fixed-Pi product/ratio once; saturate only genuinely unrepresentable final volume. |
+| [#116](../issue-tracker.md#grv-issue-116---cone-overlap-gjk-loses-scale-and-rotation-invariance) | Length `4,096`, end radius `2,048`: public cone overlaps produce both false positives and false negatives. | Resolved: bounded scalar crosses and exact dot signs; wide simplex predicates where needed. Closest/all queries and shared contact callers pass. |
+| [#117](../issue-tracker.md#grv-issue-117---detached-compound-cone-mass-weights-disagree-with-committed-geometry) | Equivalent Y-scaled cones have different detached weights despite identical prepared geometry; the parity audit found other primitive cache defaults. | Resolved: detached and prepared mass properties share effective dimensions across all five primitive families. |
+| [#118](../issue-tracker.md#grv-issue-118---sphere-inertia-rounds-small-mass-before-radius-squared) | Radius `1,024`, three-raw-unit mass gives sphere inertia `1048576` instead of `1258291`; other curved moments also round too soon. | Resolved: exact coefficient/geometry/mass normalization, exact internal capsule weights and corrected 2D cap polar moment. |
+| [#119](../issue-tracker.md#grv-issue-119---compound-inertia-quantizes-child-masses-before-applying-geometry) | Radius `512`/`1,024` spheres at `0`/`2,048`, total mass three raw units: child masses round to `0`/`3`, biasing the compound tensor. | Resolved: homogeneous child moments, exact reference reduction and one final parent-mass normalization, with warm geometry caching. |
+| [#120](../issue-tracker.md#grv-issue-120---3d-inertia-tensor-transport-reverses-the-geometry-rotation) | Anisotropic tensors rotate opposite to geometry; principal-axis impulses produce perpendicular spin. | Resolved: consistent active transport in compound, body and sampled CCD owners. |
+| [#121](../issue-tracker.md#grv-issue-121---box-inertia-rounds-separate-axis-terms-before-their-sum) | A unit cube/square at mass raw `6` gives zero rather than raw `1`. | Resolved: normalize each complete box diagonal/moment once; warmed primitive costs improve. |
+| [#122](../issue-tracker.md#grv-issue-122---standalone-mesh-inertia-amplifies-rounded-unit-coefficients) | Microcube unit-tensor projection error grows with ordinary representable mass. | Resolved: retained runtime integrals, certified final rounding and exact refinement preserve public projections and warm costs. |
+| [#123](../issue-tracker.md#grv-issue-123---detached-compound-meshes-omit-authored-part-scale-in-mass-properties) | A scale-two mesh part has fourfold different detached/committed inertia. | Resolved with #122: effective detached mesh geometry and current/prepared publication parity. |
+| [#124](../issue-tracker.md#grv-issue-124---standalone-polygon-reference-shifts-omit-the-centroid-residual) | Standalone triangle reference shifts omit its rounded centroid's first moment. | Resolved: retained moments and exact reference reduction, with shared first-moment arithmetic and preserved warm costs. |
 
 These are prerequisites, not optimizations and not bugs introduced by admission.
 Do not reduce the candidate ceiling to hide failures at ordinary useful sizes.
@@ -1245,40 +1244,76 @@ validation remain unrun; phase 4 and #096 remain open.
 `HOST_INTEGRATION.md` and `QUERY_SERVICES.md`, `docs/MIGRATION.md`, README/API
 guidance when needed, and existing benchmark/replay evidence.
 
-- [ ] Publish the final metric, ceiling, units, rejection behavior and migration
+- [x] Publish the final metric, ceiling, units, rejection behavior and migration
       advice. Explain terrain chunking, host unit conventions, compound offsets,
       retained large-world positioning and independent mass/feature/cell-size
       constraints. Wiki guidance must stand alone without plan/artifact references.
-- [ ] Validate a representative terrain-chunk boundary migration against its
+- [x] Validate a representative terrain-chunk boundary migration against its
       continuous-surface control before claiming equivalent physical behavior.
       Chunking can add collider identities, contact boundaries and pair overhead;
       report those costs and any confirmed pre-existing seam issue. Do not add a
       cross-collider welding framework merely to advertise chunking as free.
-- [ ] Compare accepted ordinary initialization, unchanged stepping, geometry
+- [x] Compare accepted ordinary initialization, unchanged stepping, geometry
       rebuilds and representative queries with phase 1 controls. Require no added
       warmed allocations and no repeatable ordinary-path regression outside
       measurement uncertainty. Refine introduced costs now; a numerical maximum
       is not an advertised real-time workload size.
-- [ ] Complete both solution builds, core target frameworks, raw 100% reachable
+- [x] Complete both solution builds, core target frameworks, raw 100% reachable
       line/branch/method coverage, full-loop replay and the affected CCD/response
       allocation gates. Do not reduce coverage obligations by excluding the
       unsupported-geometry rejection paths.
-- [ ] Obtain final independent ponytail and focused geometry reviews. Summarize
+- [x] Obtain final independent ponytail and focused geometry reviews. Summarize
       code retained/removed, new runtime footprint, remaining boundaries and
       unchanged upstream ownership. Record native Windows/Linux x64/ARM64 CI
       results when available; local or emulated runs cannot imply native conformance.
-- [ ] Close #096 only after its reproducer rejects explicitly before entering
+- [x] Close #096 only after its reproducer rejects explicitly before entering
       narrow phase, every admission route is covered, and admitted large-position
       regressions remain green. Keep package-based validation as a release gate;
       release any genuinely necessary upstream math change before Gravitas.
-- [ ] Mark complete and archive this plan under `done/`, updating incoming links.
+- [x] Mark complete and archive this plan under `done/`, updating incoming links.
       Add concise dated validation to the phase summaries; keep volatile counts
       and artifact paths out of evergreen documentation.
 
 **Exit:** #096 is resolved by an implemented and documented supported-workload
 contract, not by hiding a miss or declaring the original input irrelevant.
 
-**Phase summary:** Pending.
+**Phase summary (2026-10-15):** Evergreen guidance now publishes the complete
+metric, units, attachment frames, large-world independence and migration limits.
+The exact #096 capsule rejects before registration/publication; its compact
+far-authored target remains admitted. New terrain tests preserve exact interior
+motion and physical boundary-query hits with distinct collider IDs.
+
+A 32-frame-settled, 64-frame crossing probe repeats identically on pre-admission
+and final binaries. Separate chunks increase peak contact pairs from one to two
+and cause a pre-existing 2.4248% horizontal speed loss, with up to 0.005457 units
+of height difference. Bodyless 3D floors also lack discrete blocking response on
+both stacks. These response gaps are #132/#133; chunking equivalence is not
+claimed and no welding framework was added. Phase 4 adds no runtime code/state
+or upstream changes. Existing transactions and FixedMathSharp math remain the
+owners; valid wide-world/CCD defenses are retained.
+
+Both local-stack solution builds and DocFX pass without warnings/errors:
+6,376 Release and 6,308 Lean tests, raw 100% line/branch/method coverage and six
+shared replay fixtures agreeing across Windows x64 profiles. All 20 fresh
+ordinary native controls pass at 0 B/op with no resolved slowdown. The only
+higher mean is unchanged 3D stepping, +1.06%, within overlapping 99.9% intervals.
+All 30 fresh CCD/response/lifecycle allocation guards pass. Fourteen phase-3 query
+controls carry forward with 941 production inputs and all 6,214 method bodies,
+signatures and layouts unchanged; only commit metadata differs.
+
+Cold registration of 64 colliders adds 1,544 bytes in 3D and 2,048 in 2D, without
+a resolved timing slowdown. Primed terrain traversal means are
+`162.980 / 157.305 / 170.034 us` per frame for continuous / chunk interior /
+chunk seam, all 0 B. These time reset plus 64 steps, exclude initialization,
+priming and settling, and are not frame-tail or equivalent-physics comparisons.
+Existing experimental signal #024 retains this bounded cost context.
+
+Ignored `artifacts/geometry-range/phase4/` retains raw coverage, replay and
+terrain traces; `perf/acceptance-final.json` binds native results, guards,
+frozen inputs and generated-child modules. Independent ponytail/geometry reviews
+approve. The latest [eight-lane CI run](https://github.com/mrdav30/Gravitas/actions/runs/38754941940)
+passes but predates phase 3; final Linux/ARM and released-package validation
+remain unrun release gates. #096 is resolved and this plan is archived.
 
 ## Verification Commands
 
