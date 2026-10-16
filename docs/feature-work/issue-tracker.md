@@ -2,7 +2,7 @@
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-139`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-140`.
 - Assign an ID when an issue enters this tracker, keep it through resolution,
   and never reuse an ID even if an entry is later removed. Check this file's Git
   history before advancing or repairing the counter.
@@ -41,7 +41,11 @@
 parity checks. Next resolve **#133**, artificial mesh-chunk seam response. It
 reproduces on earlier binaries and is independent of the size cap. Keep
 physical-quality fixes ahead of the benchmark queue; combine work where
-response ownership overlaps.
+response ownership overlaps. #133's investigation confirms **#139**, the pure
+2D counterpart. Review their shared explicit-static-continuity contract together
+in the existing surface plan, then resolve the dimensional owners before
+heightfield work. The user approved resolving both through that plan; begin its
+bounded geometry phase before publishing the new membership API.
 
 #111 remains an independent validation-tooling issue.
 #125 is a low-priority, non-blocking runtime crash observation; defer further
@@ -76,11 +80,50 @@ investigation unless it recurs or a reliable reproducer becomes available.
   Check sphere/capsule equivalence, whole-shape clearance, 2D/mixed counterparts,
   CCD, support/grounding and response with matching seam/interior cost controls.
   Do not indiscriminately weld neighboring colliders or erase real boundaries.
-- **Related feature work:** The deferred
-  [Static Surface Continuity And Heightfield Integration proposal](2026-10-15-static-surface-continuity-and-heightfield-plan.md)
-  captures later environment/heightfield integration. Any generic continuity
-  needed to resolve this issue remains #133's responsibility; terrain work
-  must reuse that foundation rather than delay or duplicate it.
+- **Current-stack investigation (2026-10-16):** On retained #138 core `8A7E5C4D`,
+  all repeated sphere/capsule cases reproduce the original loss, including
+  bodyless floors now given the same 32 settling frames as static bodies.
+  Maximum X-speed loss is `0.024248116184026003`; final X is
+  `1.9498989908024669`, versus `2` continuously. Independent review confirms
+  the boundary also affects face sampling/torque; filtering response normals
+  alone is incomplete. Mixed finite-slab contacts and CCD certification share
+  the single-mesh limitation; their runtime parity reproduction remains pending.
+  Ignored `artifacts/grv-issue-133/original-settled-terrain.json` and `perf/`
+  preserve the repeated traces and frozen eight-module baseline.
+- **Related feature work:** The
+  [Static Surface Continuity And Heightfield Integration plan](2026-10-15-static-surface-continuity-and-heightfield-plan.md)
+  now begins with the approved combined #133/#139 scope. Generic continuity
+  remains these issues' responsibility; later heightfield/index work stays
+  deferred and must reuse that foundation rather than delay or duplicate it.
+
+### GRV-Issue-139 - Adjacent 2D convex pieces introduce frictionless join resistance
+
+- **Confirmed:** 2026-10-16 during #133's dimensional parity investigation;
+  reproduces on the unchanged retained #138 stack, before any continuity changes.
+- **Reproduction:** At 16 Hz and planar gravity `1`, settle a radius-`0.5`
+  circle or radius-`0.5`, height-`2` capsule for 32 full frames on either one
+  floor or two exactly adjoining bodyless AABBs/convex polygons. Use frictionless
+  materials, frozen rotation, manual grounding mode with no accepted ground flag
+  (automatic ground queries disabled), and no ambient dissipation; apply
+  unit rightward impulse at X=-2 and advance 64 full frames.
+- **Observed:** All four split shape combinations first lose speed at frame 30,
+  finishing at X `1.9501529859844595`, velocity `0.9758317500818521`. Continuous
+  controls retain velocity `1` and finish at X `2`. All eight cases repeat
+  byte-identically; circle/capsule and AABB/polygon horizontal behavior agree.
+- **Ownership:** Each convex owner independently emits its finite corner contact.
+  There is no pure 2D mesh type or declared shared-boundary domain. This is the
+  same physical-quality problem as #133, with a different dimensional geometry
+  owner; it is not caused by the new proposed continuity implementation.
+- **Resolution direction:** Implement the explicit static-continuity contract with
+  #133 in the existing
+  [surface plan](2026-10-15-static-surface-continuity-and-heightfield-plan.md#generic-continuity-contract-proposed-for-133139).
+  Preserve true convex/concave boundaries, eligibility, materials, events and
+  independent bodies; do not auto-weld touching colliders or add a 2D mesh API.
+  Validate full-loop response, free rotation, whole-shape clearance, grounding,
+  CCD, lifetime changes, replay, coverage and the ordinary warm baseline.
+- **Evidence:** Ignored `artifacts/grv-issue-133/parity/{original,binding,source-hashes}.json`
+  retain the fixture, repeats and eight loaded-module hashes, including core
+  `8A7E5C4D`. No production changes or fix are claimed by this investigation.
 
 ### GRV-Issue-111 - Local-stack benchmark hosts can omit FixedMathSharp compile references
 

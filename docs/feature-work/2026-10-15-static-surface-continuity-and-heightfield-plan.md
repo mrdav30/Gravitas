@@ -1,9 +1,12 @@
 # Static Surface Continuity And Heightfield Integration
 
 **Date:** 2026-10-15  
-**Status:** Deferred architectural proposal; no implementation or new API approved.  
-**Order:** Resolve #132 and #133 before terrain-specific work. Reuse any generic
-continuity foundation required by #133 instead of implementing it twice.  
+**Status:** Generic-continuity scope approved, 2026-10-16; begin Phase 1 to resolve
+#133/#139 together. Heightfield and alternative-index work remain deferred;
+no new runtime API has been implemented.  
+**Order:** #132 is resolved. Resolve #133 and its confirmed pure 2D counterpart,
+#139, through the generic-continuity phases below before terrain-specific work.
+Keep one implementation plan rather than duplicate the prerequisite design.  
 **Goal:** Let hosts describe a continuous static environment using bounded,
 spatially indexed pieces, while evaluating reuse of existing deterministic
 height data for physics and navigation.
@@ -121,30 +124,232 @@ membership still supply that meaning to contact generation/reduction. Store
 that information alongside the selected index/owners without presupposing a
 second topology tree or a new broad-phase framework.
 
-## Design And Implementation Gates
+## Generic Continuity Contract Proposed For #133/#139
 
-1. **Prerequisites and reuse.** Close #132/#133, inspect their resulting ownership
-   and baseline, and identify the remaining work. A necessary generic #133 fix
-   belongs to that issue; this proposal must not defer it or duplicate it.
-2. **Continuity contract.** Define stable surface/member/border identities and
-   exact join validation. Cover real rims, holes, nonmanifold/ambiguous joins,
-   different materials/filters and unrelated adjacent objects. Decide behavior
-   for registration, removal, unloaded neighbors and geometry edits between
-   fixed steps, including cache invalidation and replay/restore compatibility.
-   Decide supported static ownership explicitly before accepting moving members.
-3. **Bounded integration.** Retain each collider's geometry admission and local
-   bounds while permitting a logical static surface to span the world. Validate
-   range-safe border comparisons and deterministic local-neighbor lookup. Surface
-   membership must not introduce an unbounded body frame or bypass the existing
-   compound reach contract. Define how continuity affects retained constraints
-   across pairs while preserving explicit contact provenance. Decide public
-   per-collider query/event semantics before changing or deduplicating them.
-4. **Physics conformance.** Compare a continuous control against equivalent
-   partitions: coplanar and sloped joins, corners, real gaps/rims, winding,
-   translated world limits and load/unload transitions. Exercise sphere/capsule
-   equivalence and whole-shape behavior through full stepping, response,
-   grounding, queries and CCD. Check pure 2D/mixed counterparts where applicable.
-5. **Optional heightfield decision.** Height-driven navigation and mesh physics
+The prerequisite is substantial: contact generation currently sees each member's
+finite boundary independently. Removing sideways normals in response would
+leave artificial face samples and torque, and would not fix mixed CCD. Advance
+this generic portion of the plan rather than implement a temporary seam filter
+and replace it during terrain work. The user approved resolving #133/#139
+together through this plan; final API naming and arithmetic feasibility remain
+Phase 1 decisions.
+
+- **Explicit membership:** Prefer a context-owned static-surface handle with
+  creation, atomic member replacement and disposal. Separate typed 3D mesh and
+  2D surface membership. Mixed contacts need both directions checked: 2D movers
+  against 3D surfaces and 3D movers against embedded 2D pieces. Host Y and slab
+  half-thickness must preserve real steps rather than assume planar continuity
+  proves identical embedded geometry. Use existing dimensional physics-service
+  ownership rather than add a second world registry.
+  One membership per collider initially. Final API names are not committed.
+  Membership permits geometric matching within that set; it does not assert
+  that all pieces touch. Disconnected members retain their genuine boundaries.
+- **Eligible pieces:** Bodyless and explicit-static colliders share the contract.
+  Independent kinematic/dynamic bodies remain independent. Start 3D admission
+  with concave mesh surface geometry and 2D with AABB/convex polygon pieces;
+  3D pieces form finite sheets; 2D pieces form a filled planar union whose
+  interior shared edges cease being perimeter. Do not reinterpret closed convex
+  volumes as thin sheets or invent a 2D mesh type. Audit compound leaves before
+  deciding whether they can join: do not silently merge a compound's own internal
+  boundaries as a side effect.
+- **Exact joins:** Validate actual committed boundary spans, including unequal
+  subdivision and partial edge coverage. Only a nonzero geometrically covered
+  span can cease being a boundary. Point-only touches, gaps, overlapping fills
+  and ambiguous/nonmanifold joins do not authorize erasing rims. Preserve real
+  creases at folded joins rather than smoothing normals. No proximity welding,
+  implicit snapping or tolerance based on rounded world vertices. Exactness is
+  relative to committed scaled-local geometry and stored rigid transforms,
+  before world-point materialization; visually equal rounded endpoints can
+  still describe a real gap under that metric.
+- **Local frames:** Retain each member's origin, rotation, admitted local data,
+  partitions and existing triangle BVH. Support independently transformed pieces
+  without a common-origin/rotation restriction. Do not build a giant combined
+  `PhysicsMesh`, narrow absolute-world differences or round neighboring vertices
+  into one chart before proving a join. A logical surface has no aggregate body
+  reach, mass or inertia. Its per-query work must follow local candidates and
+  admitted connectivity, not scan every member of a world-sized set.
+- **Physical domain:** Join finite-shape-admitted regions across validated
+  neighbors before selecting face samples and true-perimeter constraints.
+  Connectivity alone does not certify a whole-shape exit. Coverage must respect
+  the moving participant's filters, trigger policy and live neighbor state.
+  An excluded or unloaded piece cannot hide an eligible member's rim.
+- **Identity and materials:** Keep each collider, pair, query hit and geometric
+  overlap event distinct. Deduplicate physical constraints where appropriate
+  without manufacturing contact exits for an overlapping member. Every retained
+  witness keeps its supplying member's material and feature provenance; material
+  discontinuities alone are not holes. Define deterministic ownership at an
+  exactly shared feature before publishing reduction logic.
+- **Transactions and lifetime:** Change membership only between full fixed
+  steps. Rejected replacement preserves the previous usable state. Bind members
+  to collider lifetimes; deactivation removes membership, reactivation needs an
+  explicit declaration, and context reset/disposal invalidates its handles.
+  Geometry edits publish the affected join changes coherently: moving a member
+  can open a real gap. Invalidate affected neighbors' contact, support, warm-start
+  and CCD dependencies even when their own geometry did not change. Rebuild
+  locally rather than rebake every member after an edit.
+- **Replay and restore:** Membership is authoritative; adjacency is derived.
+  Include membership in replay hashes using stable identities, not addresses or
+  recycled collider IDs. Define explicit recording/reconstruction for host-created
+  handles and member lifetimes, following existing Chronicler patterns. Test
+  populate-existing and continuation; a disposable handle is not itself a saved
+  authoring identity. Keep derived caches out of the authored representation.
+
+## Generic Continuity Implementation Sequence
+
+Every runtime phase must preserve raw reachable 100% line/branch/method coverage
+in Release/Lean, relevant replay behavior, zero added warmed allocations and the
+ordinary warm baseline, using `UseLocalLsfStack=true`. Refine introduced costs
+before handoff and obtain independent ponytail review. Phase 4 consolidates the
+evidence; it does not postpone these requirements. Keep experimental membership
+internal until response, query/CCD and restore semantics are coherent.
+
+### Investigation - Complete, 2026-10-16
+
+On the unchanged committed stack, settle both explicit-static and bodyless
+floors for 32 frames, then repeat the original 64-frame sphere/capsule crossing.
+All four split controls first lose speed at frame 30: maximum X-speed loss
+`0.024248116184026003`, final X `1.9498989908024669` and velocity
+`0.975751883815974`. Continuous controls finish at X `2`, velocity `1`.
+Each case repeats byte-identically. This updates the earlier bodyless probe,
+which did not settle, to exercise #132's corrected support path equally.
+
+The pure 2D counterpart also reproduces: circle/capsule against either adjacent
+AABBs or convex polygons loses `0.02416824991814792` speed at frame 30 and
+finishes at X `1.9501529859844595`. Continuous controls again finish at X `2`,
+velocity `1`; all eight cases repeat identically. Record this as #139, with
+shared design review and dimensional implementation rather than a new mesh API.
+Mixed source tracing finds the same single-mesh domain in finite-slab contact
+generation and swept-circle certification; a mixed runtime reproduction remains
+an implementation gate, not a claimed test result.
+
+Independent ponytail and dimensional reviews traced face sampling, true-rim
+generation, event ownership, filters and neighbor invalidation. They reject a
+response-only normal filter. Existing exact rigid projections, anchored points,
+coplanar topology and finite-section machinery are the reuse starting point;
+their existence does not prove multi-frame reduction needs no math extension.
+
+Ignored `artifacts/grv-issue-133/original-settled-terrain.json` and
+`parity/{original,binding,source-hashes}.json` retain fixtures and loaded-module
+bindings. The eight-module baseline uses Gravitas `8A7E5C4D` and production inputs
+matching committed `fa7da28`; it is the retained tested #138 runtime, not a claim
+that binaries were rebuilt at this documentation commit. The frozen baseline and
+six terrain/five ordinary warm controls are under `artifacts/grv-issue-133/perf`.
+The six terrain baseline guards pass eight repeats each with zero warmed
+allocations. No candidate timings, new runtime behavior or coverage result is
+claimed here.
+
+### Phase 1 - Prove Bounded Cross-Member Geometry And Ownership
+
+- [x] Review the combined #133/#139 scope: the user approved resolving both
+  through this plan, with heightfields and new indexes deferred.
+- [ ] Add maintained full-loop regressions for the confirmed 3D and 2D crossings
+  and a vertical mixed surface with a planar response normal. Use existing
+  scenario helpers; do not test probe/report plumbing for coverage.
+- [ ] Demonstrate exact boundary coincidence, coplanarity, opposite-side fill,
+  partial coverage and shared-corner handling across independent member frames.
+  Extend existing `PhysicsMesh` topology and `MeshSurfaceConnectivity` access
+  only where needed; retain per-member feature identities. Use actual committed
+  collider centering/transforms in the runtime fixtures: an arithmetic proof
+  over synthetic frames does not establish chunk-authoring equivalence after
+  independently rounded poses or centering.
+- [ ] Prove face-region reduction across those frames before materialization,
+  with explicit width/rounding bounds and a correct material/sample owner.
+  Reuse FixedMathSharp's wide rigid projections and anchored geometry. If a
+  missing operation is policy-neutral math, add the narrow operation upstream;
+  keep connectivity, physics selection and failure policy in Gravitas.
+- [ ] Measure the two-member seam/interior path against the frozen control.
+  Refine introduced costs in this phase. Stop and revise the design if exact
+  multi-frame reduction requires a large parallel geometry solver, a global
+  mesh rebake or a resolved ordinary-path warm regression.
+
+Record a concise phase result here; keep #133/#139 open until their full runtime
+and lifecycle gates pass.
+
+**Progress, 2026-10-16:** Isolated experiments, independently rerun against frozen
+FixedMathSharp `5C26BDA7`, pass 24 named join cases with 109 symmetry/reversal
+evaluations and six three-member pair classifications. Existing anchored
+numerators suffice for exact coplanar span predicates, including partial spans,
+different frames and world-limit positions. Conservative 3D determinant/plane
+bounds fit `Signed576`; 2D determinants fit `Signed320`. Pairwise matches alone
+do not prove trusted topology: a valid subdivided join and ambiguous overlapping
+coverage can produce the same pairwise boolean matrix. Folded cases only prove
+that coplanar erasure is rejected; folded normal fans remain unimplemented.
+
+The capsule experiment reconstructs 48 native events and passes 36 exact
+cross-frame containment/outside checks, including irrational coordinates and
+unequal frame denominators. It matches 32 physical point pairs; 17 raw depth
+comparisons differ despite equivalent physical events. Existing comparisons are
+correct for their single-frame contract; pooling them unchanged is invalid.
+Reuse the moving-shape chart with retained member/frame provenance and add
+scale-aware exact comparison in the existing math owner. A rounded-depth oracle
+is diagnostic only. Partial boundary spans also need exact clipped parameters
+or framed endpoints, not rounded replacement segments. Cone/slab metrics require
+their own verification. `geometry-proof/` and `capsule-proof/` under the ignored
+artifact root retain source/binary bindings and root reruns. Maintained runtime,
+full topology/reduction, coverage and candidate cost gates remain open; Phase 1
+is not complete and neither issue is resolved.
+
+### Phase 2 - Integrate Static Membership And Contact Reduction
+
+- [ ] Implement the reviewed membership operations through existing dimensional
+  services and collider lifecycle owners. Cover invalid ownership/roles, atomic
+  replacement, removal, disposal/reset and ID/lifetime reuse.
+- [ ] Integrate the joined domain into 3D face-region and genuine-boundary
+  generation, including capsule/sphere and cone paths; establish cuboid,
+  cylinder, convex/concave mesh and compound-source behavior rather than assume
+  rounded-shape success covers them. Retire superseded local-only branches when
+  the shared domain can own both cases; preserve the independent-member fast path.
+- [ ] Implement #139's dimensional boundary reduction without projecting 3D
+  sheets into 2D volumes. Test circles, zero-core capsules, nonzero capsules and
+  polygonal bodies against connected convex pieces and genuine concave corners.
+- [ ] Apply the same ownership/eligibility contract to mixed finite slabs.
+  Verify connected 2D pieces as embedded mixed targets too, with matching and
+  differing host Y/thickness. Preserve per-member events and query identity
+  independently of solver rows, with deterministic ordering and correct material
+  provenance.
+- [ ] Exercise real ends, holes, gaps, partial spans, point touches, folded and
+  ambiguous joins, winding reversal and member-order reversal. Test free as well
+  as frozen rotation and complete-shape clearance behind the first witness.
+
+### Phase 3 - Continuation, Queries And Continuous Collision
+
+- [ ] Extend existing dependency invalidation to affected neighbors for geometry,
+  filtering, trigger state, removal and membership changes. Test sleeping contact
+  and query-grounded bodies, including expose-a-rim transitions without a local
+  pose change. Verify the current step uses one coherent committed topology.
+- [ ] Audit 3D sweep/initial-overlap and mixed query/CCD certification, and 2D CCD
+  against the same physical domain. Cover fast seam crossing, rotation, retained
+  tokens and true-edge impact; keep per-collider query results distinct.
+  A horizontal 3D floor cannot prove planar mixed sliding parity.
+- [ ] Complete authoritative membership hashing, explicit recording/restore and
+  host reconstruction, including unloaded/replaced members and context reuse.
+  Extend shared native replay conformance with reviewed expectations; do not
+  weaken existing unrelated fixtures to accommodate a seam correction.
+
+### Phase 4 - Close #133/#139 And Publish The Supported Contract
+
+- [ ] Validate Release/ReleaseLean, raw reachable 100% line/branch/method coverage,
+  relevant replay lanes and warmed allocation guards using `UseLocalLsfStack=true`.
+  Coordinate any upstream math change and preserve its same coverage guarantees.
+- [ ] Run repeated, bound seam/interior and unaffected 3D/2D/mixed/query controls.
+  Require zero added warmed allocations and no ordinary-path regression beyond
+  measured uncertainty. Broken seam response is not a speedup denominator;
+  document the corrected-work cost and refine introduced overhead before closeout.
+- [ ] Obtain independent geometry and ponytail reviews of the complete changes,
+  including deletion/reuse opportunities and every coordinated sibling change.
+- [ ] Update evergreen host/collision/dimensional/serialization guidance with the
+  implemented membership contract, exact joining requirements and finite edges.
+  Close each issue only after its dimensional behavior is covered. Leave
+  heightfields and optional index experiments deferred for a separate decision.
+
+## Later Terrain And Heightfield Gates
+
+1. **Reuse the completed foundation.** Close the generic continuity issues and
+   reuse their membership, geometry, lifecycle and conformance contracts. Do not
+   redesign border identity, query/event ownership or persistence for terrain.
+   Select member-level BVH experiments only if existing spatial lookup leaves a
+   measured workload gap, using the comparison requirements above.
+2. **Optional heightfield decision.** Height-driven navigation and mesh physics
    remain independently supported host choices. If a physics heightfield or
    shared-data workflow is needed, evaluate the existing `Trailblazer.Gravitas`
    adapter and a narrow authored-sample-to-mesh path before a specialized cell
@@ -152,13 +357,11 @@ second topology tree or a new broad-phase framework.
    costs with identical physical surfaces. No backend is selected in advance;
    no core-library coupling, shared mode switch or duplicate terrain math is
    required by the independent profiles.
-6. **Acceptance and guidance.** Require deterministic replay, zero added warmed
-   allocations and no ordinary-path regression beyond measured uncertainty.
-   Maintain raw 100% reachable line/branch/method coverage in Release and Lean,
-   including coordinated sibling changes. Validate with `UseLocalLsfStack=true`
-   and native conformance lanes; released packages remain the release gate.
-   Obtain independent ponytail/geometry review. Publish the actual continuity,
-   streaming and sampling contract in evergreen guides only after implementation.
+3. **Representation conformance.** Reuse Phase 4's correctness, determinism,
+   coverage and cost gates for any selected representation. Add explicit sample
+   quantization/diagonal agreement, streaming/edit churn and adapter validation
+   only where that representation introduces them. Publish its supported
+   contract after implementation; released packages remain the release gate.
 
 ## Boundaries
 
@@ -166,8 +369,8 @@ No engine-specific terrain API, renderer/LOD system, terrain editor, automatic
 global welding or new spatial-index framework is authorized by this proposal.
 Do not silently smooth real features or introduce a height-only substitute for
 rigid-body contacts. Record experiments and phase results here; keep one living
-design/plan rather than separate phase reports. Update this proposal with the
-reviewed design and implementation sequence after the prerequisites are resolved.
+design/plan rather than separate phase reports. Record reviewed contract changes
+and implementation results here as the generic prerequisites are resolved.
 
 ## Reference Context
 

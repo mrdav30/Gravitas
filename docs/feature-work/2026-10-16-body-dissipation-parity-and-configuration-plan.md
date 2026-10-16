@@ -1,7 +1,8 @@
 # Body Dissipation Parity And Configuration Plan
 
 **Date:** 2026-10-16  
-**Status:** Proposed; planning only, implementation awaits review.  
+**Status:** Plan reviewed; implementation deferred while the coordination
+trackers are cleared.  
 **Owner:** Gravitas dimensional body motion and configuration.  
 **Baseline:** Committed #137/#138 behavior; preserve the ordinary warm baseline.
 
@@ -13,9 +14,8 @@ coefficient validation/defaults, and add complete planar integration, recording,
 replay and lifecycle support. This document contains the design and phased plan;
 record concise results at each phase's end rather than create separate reports.
 
-The user requested this focused plan before implementation. It does not start
-#133 or change its issue-queue position. Review this plan before selecting its
-implementation slot; do not bundle mesh-seam work into dissipation.
+The user reviewed this focused plan and deferred its implementation. It does not
+change #133's issue-queue position; do not bundle mesh-seam work into dissipation.
 
 ## Retained Physics Contract
 

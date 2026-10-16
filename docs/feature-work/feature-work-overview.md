@@ -28,10 +28,11 @@ instead of burying it in notes.
 
 ## Active Coordination
 
-- [`Body Dissipation Parity And Configuration`](2026-10-16-body-dissipation-parity-and-configuration-plan.md)
-  - Align configurable drag/damping across 3D and pure/mixed 2D, including
-    coefficient validation, persistence and replay. Retain the empirical drag
-    law and existing default motion; preserve the measured warm baseline.
+- [`Static Surface Continuity And Heightfield Integration`](2026-10-15-static-surface-continuity-and-heightfield-plan.md)
+  - Implement the generic static-continuity contract needed to resolve artificial
+    boundaries across spatial pieces. Retain member identity, exact geometry and
+    existing spatial ownership; heightfields and alternative indexes remain
+    deferred until the continuity prerequisites are resolved.
 - **Lockstep Conformance And Workload Guidance**
   - Approved follow-up sequence after the confirmed benchmark signals close:
     strengthen complete-loop replay evidence, characterize an evolving strategy
@@ -60,11 +61,11 @@ instead of burying it in notes.
 
 ## Deferred Design
 
-- [`Static Surface Continuity And Heightfield Integration`](2026-10-15-static-surface-continuity-and-heightfield-plan.md)
-  - After the bodyless-response and mesh-seam prerequisites, define continuous
-    static surfaces across bounded spatial pieces and assess reuse of existing
-    height data. Preserve physics/navigation ownership, explicit surface
-    evaluation and existing spatial indexing; specialize only with evidence.
+- [`Body Dissipation Parity And Configuration`](2026-10-16-body-dissipation-parity-and-configuration-plan.md)
+  - Deferred while the coordination trackers are cleared. Align configurable
+    drag/damping across 3D and pure/mixed 2D, including coefficient validation,
+    persistence and replay. Retain the empirical drag law and existing default
+    motion; preserve the measured warm baseline.
 
 ## Recently Completed
 
