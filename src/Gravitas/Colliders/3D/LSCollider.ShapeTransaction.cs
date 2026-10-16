@@ -244,7 +244,18 @@ public abstract partial class LSCollider
         ColliderGeometryPolicy.ValidateReach(completeReach, nameof(snapshot));
     }
 
-    private void PublishPreparedShape()
+    // Broad-phase geometry also advances for accepted dynamic solver poses; those are not new contact stimuli.
+    internal uint ContactDependencyVersion { get; private set; }
+
+    private void MarkContactDependencyChanged()
+    {
+        LSCollider owner = this;
+        while (owner._compoundOwner != null)
+            owner = owner._compoundOwner;
+        owner.ContactDependencyVersion++;
+    }
+
+    private void PublishPreparedShape(bool contactDependencyChanged = true)
     {
         _committedCenter = _preparedSnapshot.Center;
         _committedRotation = _preparedSnapshot.Rotation;
@@ -267,6 +278,8 @@ public abstract partial class LSCollider
             ColliderCanonicalBounds.GetGroundProbeRadius(this);
         _runtimeShapeState.Commit(_preparedSnapshot);
         _hasCommittedShape = true;
+        if (contactDependencyChanged)
+            ContactDependencyVersion++;
     }
 
     internal bool TryPrepareBodyPose(
@@ -297,12 +310,13 @@ public abstract partial class LSCollider
 
     internal void PublishPreparedBodyPose()
     {
-        PublishPreparedShape();
+        PublishPreparedShape(contactDependencyChanged: false);
     }
 
-    internal void PublishPreparedExplicitBodyPose()
+    internal void PublishPreparedExplicitBodyPose(bool poseChanged)
     {
-        PublishPreparedShape();
+        PublishPreparedShape(contactDependencyChanged: poseChanged || _runtimeShapeState.IsDirty
+            || _preparedSnapshot.OwnerScale != _committedOwnerScale);
         _body!.RefreshMassPropertiesFromColliderShape();
     }
 

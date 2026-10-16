@@ -35,10 +35,6 @@ public abstract partial class LSCollider
             ThrowIfLoadedTriggerHasBody(nameof(IsTrigger));
             ApplyLoadedState();
         }
-        else
-        {
-            _runtimeShapeState.MarkDirty();
-        }
     }
 
     private void ApplyLoadedState()

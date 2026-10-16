@@ -108,17 +108,19 @@ public partial class SolidBody
         if (chronicler.Mode == SerializationMode.Loading)
         {
             ApplyLoadedMotionType(motionType);
-            _lastGroundCheckFrame = lastGroundCheckFrame;
             ContinuousCollisionMode = continuousCollisionMode;
             _rotation = _rotation.Normalized;
             _freezeAxes = freezeAxes;
             GroundingMode = groundingMode;
             GroundProbeMode = groundProbeMode;
             GroundProbeRadius = groundProbeRadius;
+            _lastGroundCheckFrame = lastGroundCheckFrame;
             // Restore the validated policy without waking or invalidating saved probe timing.
             _groundMinNormalDot = groundMinNormalDot;
             GravityScale = gravityScale;
             _hitPlatform = null;
+            _groundSupport = default;
+            _groundSupportVersion = 0;
         }
 
         Collider.RecordData(chronicler);
@@ -128,6 +130,7 @@ public partial class SolidBody
             ApplyLoadedState();
             if (!active || Collider.Id < 0)
                 Deactivate();
+            _groundingStateVersion++;
         }
     }
 

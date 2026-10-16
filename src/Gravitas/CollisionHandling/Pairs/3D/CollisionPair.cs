@@ -84,6 +84,8 @@ public partial class CollisionPair
     private SolidBody? _pendingBodyA;
     private SolidBody? _pendingBodyB;
     private long _lifetimeVersion;
+    private uint _lastColliderAContactDependencyVersion;
+    private uint _lastColliderBContactDependencyVersion;
 
     internal bool IsNotificationInProgress => _notificationInProgress;
 
@@ -142,6 +144,8 @@ public partial class CollisionPair
 
         LastCollidedFrame = Context.FrameCount;
         RefreshBroadPhaseVersions();
+        _lastColliderAContactDependencyVersion = ColliderA.ContactDependencyVersion;
+        _lastColliderBContactDependencyVersion = ColliderB.ContactDependencyVersion;
         PairVersion++;
         Active = true;
     }
@@ -220,8 +224,11 @@ public partial class CollisionPair
 
     private void ProcessCollision(CollisionResponseDispatchMode responseMode)
     {
+        bool contactChanged = RefreshPhysicalContactState();
         if (!ShouldPerformCollisionCheck())
         {
+            if (_isColliding && _doPhysics)
+                WakeSleepingContactParticipants();
             _isCollidingChanged = _isColliding;
             _isColliding = false;
             Manifold.Reset();
@@ -229,12 +236,14 @@ public partial class CollisionPair
             return;
         }
 
-        bool result = CheckCollision();
+        bool result = CheckCollision(contactChanged);
         if (result)
             Context.Diagnostics.EmitContact(this, result);
 
         if (result ^ _isColliding)
         {
+            if (_isColliding && _doPhysics)
+                WakeSleepingContactParticipants();
             _isColliding = result;
             _isCollidingChanged = true;
         }
@@ -479,8 +488,9 @@ public partial class CollisionPair
         if (!Manifold.HasContact)
             return false;
 
+        bool contactChanged = RefreshPhysicalContactState();
         // A sleeping participant does not make a moved or reshaped support's old manifold valid.
-        if (BroadPhaseVersionChanged())
+        if (contactChanged || BroadPhaseVersionChanged())
         {
             if (!BoundsOverlapInclusive(ColliderA, ColliderB)
                 || !CollisionDetection.DoCollisionCheck(this))
@@ -493,9 +503,45 @@ public partial class CollisionPair
         return true;
     }
 
-    private bool CheckCollision()
+    private bool RefreshPhysicalContactState()
     {
-        if (!BroadPhaseVersionChanged() && _isColliding)
+        bool doPhysics = (ColliderA.Body != null || ColliderB.Body != null)
+            && !ColliderA.IsTrigger && !ColliderB.IsTrigger;
+        bool contactChanged = _doPhysics != doPhysics
+            || ColliderA.ContactDependencyVersion != _lastColliderAContactDependencyVersion
+            || ColliderB.ContactDependencyVersion != _lastColliderBContactDependencyVersion;
+        // A changed solid constraint can carry frictional load even if its new geometry still overlaps.
+        if (_isColliding)
+        {
+            if (_doPhysics != doPhysics)
+            {
+                ClearWarmStart();
+                WakeSleepingContactParticipants();
+            }
+            else if (_doPhysics)
+            {
+                if (ColliderB.ContactDependencyVersion != _lastColliderBContactDependencyVersion)
+                    ColliderA.Body?.WakeForContactChange();
+                if (ColliderA.ContactDependencyVersion != _lastColliderAContactDependencyVersion)
+                    ColliderB.Body?.WakeForContactChange();
+            }
+        }
+        _doPhysics = doPhysics;
+        _lastColliderAContactDependencyVersion = ColliderA.ContactDependencyVersion;
+        _lastColliderBContactDependencyVersion = ColliderB.ContactDependencyVersion;
+        return contactChanged;
+    }
+
+    private void WakeSleepingContactParticipants()
+    {
+        ColliderA.Body?.WakeForContactChange();
+        ColliderB.Body?.WakeForContactChange();
+    }
+
+    private bool CheckCollision(bool contactChanged)
+    {
+        // Child material overrides are manifold data and can change without a bounds publication.
+        if (!contactChanged && !BroadPhaseVersionChanged() && _isColliding)
             return _isColliding;
 
         return CollisionDetection.DoCollisionCheck(this);
@@ -630,6 +676,8 @@ public partial class CollisionPair
     /// </summary>
     public void Deactivate()
     {
+        if (_isColliding && _doPhysics)
+            WakeSleepingContactParticipants();
         bool notifySeparation = _isColliding || _colliderANotified || _colliderBNotified;
         if (notifySeparation)
         {

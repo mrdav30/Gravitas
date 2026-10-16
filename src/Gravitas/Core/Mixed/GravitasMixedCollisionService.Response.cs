@@ -23,7 +23,7 @@ internal sealed partial class GravitasMixedCollisionService
         if (_mixedResponsePairs.Count == 1)
         {
             CollisionPairMixed pair = _mixedResponsePairs[0];
-            bool hasPlanarResponseCoupling = CollisionResponseMixed.HasPlanarResponseCoupling(pair);
+            bool hasPlanarResponseCoupling = CollisionResponseMixed.HasPlanarResponseCoupling(pair.Manifold);
             if (!ShouldSolveSingleMixedPair(pair, hasPlanarResponseCoupling))
                 return;
 
@@ -79,7 +79,7 @@ internal sealed partial class GravitasMixedCollisionService
             CollisionPairMixed pair = _mixedResponsePairs[i];
             int node3D = FindMixedIslandNode(pair.Collider3D.Body);
             int node2D = FindMixedIslandNode(pair.Collider2D.Body);
-            if (CollisionResponseMixed.HasPlanarResponseCoupling(pair)
+            if (CollisionResponseMixed.HasPlanarResponseCoupling(pair.Manifold)
                 && node3D >= 0
                 && node2D >= 0)
                 UnionMixedIslandNodes(node3D, node2D);

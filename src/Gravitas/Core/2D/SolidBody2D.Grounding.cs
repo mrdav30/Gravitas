@@ -23,6 +23,7 @@ public sealed partial class SolidBody2D
     private bool _useGravityDerivedGroundUpDirection = true;
     private Vector2d _groundUpDirection = DefaultGroundUpDirection;
     private Fixed64 _groundProbeRadius;
+    private Fixed64 _groundedDistanceRay = Fixed64.Half;
     private Fixed64 _groundMinNormalDot = Fixed64.Half;
     private long _lastGroundCheckFrame = -1;
     private const int GroundCheckFrameThreshold = 10;
@@ -37,7 +38,9 @@ public sealed partial class SolidBody2D
     private Vector2d _groundPoint;
     private Vector2d _lastGroundedPosition;
     private LSCollider2D? _groundCollider;
-    private uint _groundColliderBroadPhaseVersion;
+    private uint _groundColliderContactDependencyVersion;
+    private long _groundColliderLifetimeVersion;
+    private uint _groundOwnContactDependencyVersion;
 
     private bool _hasGroundContactCandidate;
     private Fixed64 _groundContactCandidateUpDot;
@@ -62,7 +65,13 @@ public sealed partial class SolidBody2D
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get => _groundProbeMode;
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        set => _groundProbeMode = value;
+        set
+        {
+            if (_groundProbeMode == value)
+                return;
+            _groundProbeMode = value;
+            _lastGroundCheckFrame = -1;
+        }
     }
 
     /// <summary>
@@ -117,14 +126,27 @@ public sealed partial class SolidBody2D
         {
             SwiftThrowHelper.ThrowIfArgument(value < Fixed64.Zero, nameof(value), "2D ground probe radius cannot be negative.");
             ColliderGeometryPolicy.ValidateReach(value, nameof(value));
+            if (_groundProbeRadius == value)
+                return;
             _groundProbeRadius = value;
+            _lastGroundCheckFrame = -1;
         }
     }
 
     /// <summary>
     /// Probe distance used while the body is already grounded.
     /// </summary>
-    public Fixed64 GroundedDistanceRay { get; set; } = Fixed64.Half;
+    public Fixed64 GroundedDistanceRay
+    {
+        get => _groundedDistanceRay;
+        set
+        {
+            if (_groundedDistanceRay == value)
+                return;
+            _groundedDistanceRay = value;
+            _lastGroundCheckFrame = -1;
+        }
+    }
 
     /// <summary>
     /// Probe distance used while the body is airborne.
@@ -374,6 +396,40 @@ public sealed partial class SolidBody2D
 
     internal void CheckGroundForSimulation() => CheckGround(force: false);
 
+    private bool RefreshAutomaticGroundSupportBeforeMotion()
+    {
+        if (_groundingMode != GroundingMode.Automatic || !_isGrounded)
+            return true;
+
+        // Reconstruct a loaded dependency and recheck changed support through
+        // the same query. Equivalent witnesses preserve saved sleep state.
+        if (_lastGroundCheckFrame < 0 || !HasCurrentGroundCollider())
+        {
+            var registration = new ColliderLifetimeToken2D(Collider);
+            CaptureGroundedStepState();
+            CheckGround(force: true);
+            return registration.IsActive;
+        }
+        return true;
+    }
+
+    private bool HasCurrentGroundCollider() =>
+        _groundCollider != null
+        && Collider.ContactDependencyVersion == _groundOwnContactDependencyVersion
+        && _groundCollider.LifetimeVersion == _groundColliderLifetimeVersion
+        && _groundCollider.ContactDependencyVersion == _groundColliderContactDependencyVersion
+        && IsValidGroundCollider(_groundCollider);
+
+    internal void WakeForContactChange()
+    {
+        if (!_isSleeping)
+            return;
+
+        if (_groundingMode == GroundingMode.Automatic)
+            _lastGroundCheckFrame = -1;
+        WakeFromCollision();
+    }
+
     internal Vector2d RemoveIntoGroundComponent(Vector2d value)
     {
         value = ProjectLinearMotion(value);
@@ -382,7 +438,8 @@ public sealed partial class SolidBody2D
 
         // Motion preparation precedes support refresh. A changed automatic
         // policy must not suppress motion using the previous support normal.
-        if (_groundingMode == GroundingMode.Automatic && !IsValidGroundNormal(_groundNormal, out _))
+        if (_groundingMode == GroundingMode.Automatic
+            && (_lastGroundCheckFrame < 0 || !IsValidGroundNormal(_groundNormal, out _)))
             return value;
 
         Fixed64 intoGround = Vector2d.Dot(value, _groundNormal);
@@ -405,12 +462,9 @@ public sealed partial class SolidBody2D
             return;
         }
 
-        LSCollider2D? cachedGroundCollider = _groundCollider;
         bool frameGuard = !force
             && _isGrounded
-            && cachedGroundCollider != null
-            && IsValidGroundCollider(cachedGroundCollider)
-            && cachedGroundCollider.BroadPhaseVersion == _groundColliderBroadPhaseVersion
+            && HasCurrentGroundCollider()
             && Vector2d.Distance(_lastGroundedPosition, _position) < _groundCheckPositionThreshold
             && _lastGroundCheckFrame >= 0
             && Context.FrameCount - _lastGroundCheckFrame < GroundCheckFrameThreshold;
@@ -568,12 +622,16 @@ public sealed partial class SolidBody2D
 
     private void ClearGrounding()
     {
+        if (_isGrounded && _groundingMode == GroundingMode.Automatic)
+            WakeFromCollision();
         _groundingStateVersion++;
         _groundNormal = Vector2d.Zero;
         _hasGroundPoint = false;
         _groundPoint = Vector2d.Zero;
         _groundCollider = null;
-        _groundColliderBroadPhaseVersion = 0;
+        _groundColliderContactDependencyVersion = 0;
+        _groundColliderLifetimeVersion = 0;
+        _groundOwnContactDependencyVersion = 0;
         IsGrounded = false;
     }
 
@@ -593,13 +651,22 @@ public sealed partial class SolidBody2D
         LSCollider2D? groundCollider,
         bool hasGroundPoint = true)
     {
+        bool changedSupport = _isGrounded
+            && (_groundNormal != groundNormal
+                || _hasGroundPoint != hasGroundPoint
+                || hasGroundPoint && _groundPoint != groundPoint);
         long groundingStateVersion = ++_groundingStateVersion;
         _hasGroundPoint = hasGroundPoint;
         _groundPoint = groundPoint;
         _groundNormal = groundNormal;
         _lastGroundedPosition = _position;
+        _lastGroundCheckFrame = Context.FrameCount;
         _groundCollider = groundCollider;
-        _groundColliderBroadPhaseVersion = groundCollider?.BroadPhaseVersion ?? 0;
+        _groundColliderContactDependencyVersion = groundCollider?.ContactDependencyVersion ?? 0;
+        _groundColliderLifetimeVersion = groundCollider?.LifetimeVersion ?? 0;
+        _groundOwnContactDependencyVersion = Collider.ContactDependencyVersion;
+        if (changedSupport && _groundingMode == GroundingMode.Automatic)
+            WakeFromCollision();
         IsGrounded = true;
         return groundingStateVersion;
     }
@@ -615,7 +682,9 @@ public sealed partial class SolidBody2D
         _groundPoint = Vector2d.Zero;
         _lastGroundedPosition = position;
         _groundCollider = null;
-        _groundColliderBroadPhaseVersion = 0;
+        _groundColliderContactDependencyVersion = 0;
+        _groundColliderLifetimeVersion = 0;
+        _groundOwnContactDependencyVersion = 0;
         _lastGroundCheckFrame = -1;
         ClearGroundContactCandidate();
     }
@@ -635,7 +704,8 @@ public sealed partial class SolidBody2D
             && (!bodyRegistration.IsActive
                 || !CanUseAutomaticGrounding
                 || !supportRegistration.IsActive
-                || !IsValidGroundCollider(supportRegistration.Collider)
+                || !HasCurrentGroundCollider()
+                || _lastGroundCheckFrame < 0
                 || !IsValidGroundNormal(_groundNormal, out _)))
         {
             ClearGrounding();

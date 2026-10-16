@@ -291,7 +291,7 @@ public abstract partial class LSCollider2D
                 max.Y));
     }
 
-    private void PublishPreparedShape()
+    private void PublishPreparedShape(bool contactDependencyChanged = true)
     {
         _committedCenter = _preparedSnapshot.Center;
         _committedRotation = _preparedSnapshot.Rotation;
@@ -321,6 +321,8 @@ public abstract partial class LSCollider2D
             ColliderCanonicalBounds2D.GetGroundProbeRadius(this);
         _runtimeShapeState.Commit(_preparedSnapshot);
         _hasCommittedShape = true;
+        if (contactDependencyChanged)
+            ContactDependencyVersion++;
     }
 
     internal bool TryPrepareBodyPose(
@@ -378,12 +380,16 @@ public abstract partial class LSCollider2D
 
     internal void PublishPreparedBodyPose()
     {
-        PublishPreparedShape();
+        PublishPreparedShape(contactDependencyChanged: false);
     }
 
-    internal void PublishPreparedExplicitBodyPose()
+    internal void PublishPreparedExplicitBodyPose(bool poseChanged = true)
     {
-        PublishPreparedShape();
+        bool contactDependencyChanged = poseChanged || _runtimeShapeState.IsDirty
+            || _preparedSnapshot.OwnerScale != _committedOwnerScale
+            || _preparedSnapshot.MixedSlabCenterY != _mixedSlabCenterY
+            || _preparedSnapshot.MixedHalfThickness != _mixedHalfThickness;
+        PublishPreparedShape(contactDependencyChanged);
         _body?.RefreshMassPropertiesFromColliderShape();
         if (_id >= 0)
             _context!.Collisions2D.RefreshColliderPartitionAfterShapeChange(this);

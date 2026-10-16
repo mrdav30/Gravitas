@@ -201,15 +201,15 @@ mutation contract.
 Automatic 3D grounding casts downward with the selected ray or swept-sphere
 probe and selects the nearest physically eligible static or kinematic support,
 with collider ID breaking equal-distance ties. Both colliders' ignored layers
-apply, and the source collider cannot support itself. Static and kinematic
-triggers remain eligible in 3D. `SolidBody.GroundMinNormalDot` compares the
+apply, and the source collider cannot support itself. Triggers do not provide
+automatic support in either dimension. `SolidBody.GroundMinNormalDot` compares the
 normalized candidate normal with world up. Its default of one half accepts
 slopes through 60 degrees; values in `[0, 1]` configure the slope limit, with
 an inclusive boundary. Zero permits any upward-facing normal. Horizontal, downward-facing
 and zero normals never supply automatic 3D support, even for probes starting
 inside or tangent to geometry. Manual grounding retains the host's supplied
-normal. Automatic 2D grounding excludes triggers and applies its planar
-support-normal policy against its resolved up direction.
+normal. Automatic 2D grounding applies its planar support-normal policy against
+its resolved up direction.
 
 Automatic 3D height snapping places the body origin at the support height.
 Author a feet-origin body with its collider above that origin, such as a sphere

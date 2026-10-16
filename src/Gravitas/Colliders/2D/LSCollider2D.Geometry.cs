@@ -446,11 +446,18 @@ public abstract partial class LSCollider2D
         if (!_runtimeShapeState.ShouldRebuild(snapshot))
             return false;
 
+        // Integration and solver correction publish dynamic pose without
+        // changing the accepted contact dependency. Authored geometry does.
+        bool contactDependencyChanged = _runtimeShapeState.IsDirty
+            || snapshot.OwnerScale != _committedOwnerScale
+            || snapshot.MixedSlabCenterY != _mixedSlabCenterY
+            || snapshot.MixedHalfThickness != _mixedHalfThickness
+            || _body?.IsDynamic != true;
         PrepareRuntimeShape(
             snapshot,
             includeBodyAttachment:
                 _body != null);
-        PublishPreparedShape();
+        PublishPreparedShape(contactDependencyChanged);
         _body?.RefreshMassPropertiesFromColliderShape();
         return true;
     }

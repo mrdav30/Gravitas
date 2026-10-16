@@ -31,10 +31,14 @@ public sealed partial class GravitasPhysics2DService
         _dirtyPlanarContinuousCollisionBodySet.Clear();
         _mixedContinuousCollisionCandidates.Clear();
         _dirtyMixedContinuousCollisionCandidates.Clear();
-        foreach (SolidBody2D body in _dynamicBodies)
+        int bodyLimit = _dynamicBodies.PeakCount;
+        for (int i = 0; i < bodyLimit; i++)
         {
-            body.EnsureContinuousCollisionFramePrepared(token);
-            AddContinuousCollisionCandidate(body, buildMixedIndex);
+            if (_dynamicBodies.TryGetValue(i, out SolidBody2D body)
+                && body.EnsureContinuousCollisionFramePrepared(token, refreshGroundSupport: true))
+            {
+                AddContinuousCollisionCandidate(body, buildMixedIndex);
+            }
         }
 
         _planarContinuousCollisionCandidates.Sort();

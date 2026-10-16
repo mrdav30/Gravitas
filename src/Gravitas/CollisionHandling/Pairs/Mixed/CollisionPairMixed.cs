@@ -6,6 +6,7 @@
 //=======================================================================
 
 using Gravitas.Colliders;
+using FixedMathSharp;
 using SwiftCollections;
 using System;
 using System.Runtime.CompilerServices;
@@ -25,6 +26,8 @@ internal sealed partial class CollisionPairMixed
     private bool _collider3DNotified;
     private bool _collider2DNotified;
     private long _lifetimeVersion;
+    private uint _lastCollider3DContactDependencyVersion;
+    private uint _lastCollider2DContactDependencyVersion;
 
     public CollisionPairMixed(LSCollider collider3D, LSCollider2D collider2D)
     {
@@ -79,6 +82,8 @@ internal sealed partial class CollisionPairMixed
         LastFrame = -1;
         LastVisitToken = -1;
         _isColliding = false;
+        _lastCollider3DContactDependencyVersion = 0;
+        _lastCollider2DContactDependencyVersion = 0;
         _isTriggerPair = collider3D.IsTrigger || collider2D.IsTrigger;
         _notificationInProgress = false;
         _separationPending = false;
@@ -166,6 +171,7 @@ internal sealed partial class CollisionPairMixed
 
     public void MarkResting(long frame)
     {
+        RefreshContactDependencies();
         LastFrame = frame;
         LastVisitToken = Context.LateSimulateToken;
         ClearSolveState();
@@ -180,6 +186,7 @@ internal sealed partial class CollisionPairMixed
 
     private void PublishContact(long frame, MixedContact contact)
     {
+        RefreshContactDependencies(incomingPlanar: contact.HasContact && contact.Normal3DTo2D.ToVector2d() != Vector2d.Zero);
         Manifold.BeginUpdate(frame);
         if (contact.HasContact)
             Manifold.AddContact(default, contact.ToManifoldContact());
@@ -190,6 +197,7 @@ internal sealed partial class CollisionPairMixed
     private void PublishManifold(long frame, ContactManifold source)
     {
         SwiftThrowHelper.ThrowIfNull(source, nameof(source));
+        RefreshContactDependencies(source);
         Manifold.CopyFrom(source, frame);
         Contact = Manifold.HasContact ? MixedContact.FromManifoldContact(Manifold.PrimaryContact) : default;
         ClearSolveState();
@@ -204,6 +212,8 @@ internal sealed partial class CollisionPairMixed
     }
     public void MarkSeparated()
     {
+        if (_isColliding && !_isTriggerPair)
+            WakeBodiesForContactChange();
         Manifold.Reset();
         ClearSolveState();
         Contact = default;
@@ -302,6 +312,47 @@ internal sealed partial class CollisionPairMixed
         }
 
         CollisionNotificationExceptions.ThrowIfAny(notificationExceptions);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void RefreshContactDependencies(ContactManifold? incoming = null, bool incomingPlanar = false)
+    {
+        uint version3D = Collider3D.ContactDependencyVersion;
+        uint version2D = Collider2D.ContactDependencyVersion;
+        bool triggerPair = Collider3D.IsTrigger || Collider2D.IsTrigger;
+        // Replacing a planar constraint with a vertical one still invalidates
+        // its former 2D dependency. Purely vertical rows never couple 2D wake.
+        if (_isColliding)
+        {
+            if (triggerPair != _isTriggerPair) WakeBodiesForContactChange(incoming, incomingPlanar);
+            else if (!triggerPair)
+            {
+                if (version2D != _lastCollider2DContactDependencyVersion) Collider3D.Body?.WakeForContactChange();
+                if (version3D != _lastCollider3DContactDependencyVersion)
+                    Wake2DBodyForContactChange(incoming, incomingPlanar);
+            }
+        }
+
+        _lastCollider3DContactDependencyVersion = version3D;
+        _lastCollider2DContactDependencyVersion = version2D;
+        _isTriggerPair = triggerPair;
+    }
+
+    private void WakeBodiesForContactChange(ContactManifold? incoming = null, bool incomingPlanar = false)
+    {
+        Collider3D.Body?.WakeForContactChange();
+        Wake2DBodyForContactChange(incoming, incomingPlanar);
+    }
+
+    private void Wake2DBodyForContactChange(ContactManifold? incoming, bool incomingPlanar)
+    {
+        SolidBody2D? body = Collider2D.Body;
+        if (body?.IsSleeping != true)
+            return;
+
+        if (incomingPlanar || CollisionResponseMixed.HasPlanarResponseCoupling(Manifold)
+            || (incoming != null && CollisionResponseMixed.HasPlanarResponseCoupling(incoming)))
+            body.WakeForContactChange();
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

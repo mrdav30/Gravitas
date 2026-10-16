@@ -2,7 +2,7 @@
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-136`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-138`.
 - Assign an ID when an issue enters this tracker, keep it through resolution,
   and never reuse an ID even if an entry is later removed. Check this file's Git
   history before advancing or repairing the counter.
@@ -37,44 +37,42 @@
 
 ### Ordered Queue
 
-The supported-geometry contract and #096 are complete. #132 now provides
-bodyless 3D static response, and #134 repairs stale separation notifications.
-Next resolve **#135**, waking sleeping bodies when their support disappears,
-before **#133**, artificial mesh-chunk seam response. Support invalidation and
-pair lifecycle should be sound before cross-collider surface continuity.
-Both remaining physical defects reproduce on earlier binaries and are
-independent of the size cap. Keep physical-quality fixes ahead of the benchmark
-queue; combine work only where the response ownership actually overlaps.
+#135/#136 are resolved together with the measured support-validation cost
+explicitly accepted. Next resolve **#137**, energy-adding angular ground
+friction, before **#133**, artificial mesh-chunk seam response. Both defects
+reproduce on earlier binaries and are independent of the size cap. Keep
+physical-quality fixes ahead of the benchmark queue; combine work where
+response ownership overlaps.
 
 #111 remains an independent validation-tooling issue.
 #125 is a low-priority, non-blocking runtime crash observation; defer further
 investigation unless it recurs or a reliable reproducer becomes available.
 
-### GRV-Issue-135 - Sleeping dynamic bodies can remain suspended after static support disappears
+### GRV-Issue-137 - Angular ground friction can reverse rotation and add energy
 
-- **Confirmed:** 2026-10-15 during #134's sleeping-contact review. This is a
-  pre-existing wake-policy defect, distinct from stale contact notifications.
-- **Reproduction:** At gravity `1` and frame rate `16`, settle a radius-`0.5`
-  sphere on an explicit-static or bodyless floor, then put it to sleep with a
-  live supporting contact. Use manual grounding with `IsGrounded=false` so no
-  host grounding flag can suppress gravity. Move the floor twelve units away
-  and advance eight complete steps. The body remains asleep at its original
-  position with zero velocity. An otherwise identical explicit `Wake()` control
-  falls. The original pre-#134 binary reproduces both ownership cases.
-- **Affected area:** Sleeping motion preparation skips gravity; separation and
-  pair retirement do not wake the surviving participant. The 2D and mixed
-  owners have corresponding source-level gaps; their physical reproductions
-  and automatic-grounding counterparts still need validation.
-- **Follow-up:** Define support/contact invalidation and wake propagation in the
-  dimensional owners. Cover moving, shrinking and deactivating support, automatic
-  and manual grounding, bodyless/static ownership and 2D/3D/mixed parity. Preserve
-  legitimate unchanged sleeping contacts, cache reuse, deterministic notification
-  order and the warm allocation/performance baseline. Do not make trigger exits
-  or every unrelated contact change wake a resting island indiscriminately.
-- **Evidence:** Ignored `artifacts/grv-issue-134/sleep-loss-probe/` retains the
-  isolated probe, frozen-stack module hashes and per-step original/candidate
-  states with explicit-wake controls. #134 corrects the event/manifold truth;
-  waking unsupported sleepers remains independent work here.
+- **Confirmed:** 2026-10-15 while expanding existing grounding-friction tests.
+  Both reproductions run on the unchanged accepted #134 eight-module stack,
+  independently of #135/#136.
+- **Reproduction:** Use a mass-one cuboid, gravity `1`, friction `1`, manual
+  ground point at the origin with up normal, no air drag or damping, and no
+  physical contacts. At `4 Hz`, a unit cube given angular impulse `Up / 16`
+  starts near `+0.375 rad/s`; one `LateSimulate` reverses it to approximately
+  `-1.125 rad/s`. At `64 Hz`, a `0.125`-unit cube given impulse `Up / 1024`
+  likewise changes from approximately `+0.375` to `-5.625 rad/s`. Squared speed
+  increases in both cases despite no driving torque in the step.
+- **Boundary:** This is a dissipative integration defect, not unsupported
+  geometry or only a low-frame-rate configuration. The existing angular
+  friction acceleration can step through rest without bounding the removable
+  angular momentum. Support dependency invalidation does not introduce it.
+- **Follow-up:** Make grounded friction dissipative across supported time steps,
+  body scales and inertia tensors. Check linear friction and dimensional parity
+  for the same defect before selecting the owning fix. Preserve directional
+  constraints and physically coherent torque; avoid an unrelated speed clamp.
+  Add exact deterministic regressions and retain warm allocation/time gates.
+- **Evidence:** Ignored
+  `artifacts/grv-issue-135/perf/angular-friction-probe/original.json` records both
+  one-step trajectories, signed velocities, squared speeds and all eight module
+  hashes; original Gravitas core `89C15FBD...`.
 
 ### GRV-Issue-133 - Adjacent mesh collider rims alter frictionless seam-crossing response
 
@@ -164,6 +162,114 @@ investigation unless it recurs or a reliable reproducer becomes available.
 Remaining measured performance costs are tracked in the benchmark backlog.
 
 ## Resolved Issues
+
+### GRV-Issue-135 - Sleeping dynamic bodies can remain suspended after static support disappears
+
+- **Status:** Resolved together with #136 on 2026-10-15. Correctness, replay,
+  coverage and allocation gates pass; the measured correctness cost was
+  explicitly accepted by the maintainer.
+- **Confirmed:** Removing a sleeping body's live solid support retired its
+  contact without waking it, so motion preparation kept skipping gravity.
+  Bodyless and explicit-static floors reproduced on earlier binaries;
+  correcting separation notifications alone did not repair the wake policy.
+- **Resolution:** Reuse committed collider revisions and existing pair owners
+  to track contact dependencies separately from ordinary dynamic integration
+  and accepted solver corrections. Wake a sleeping participant before losing
+  an established physical contact or when its counterpart's authored shape,
+  explicit pose, material or solid/trigger classification changes. Refresh
+  compound material overrides through narrow phase without rebuilding bounds.
+  Saving collider state no longer dirties geometry or invents a wake stimulus.
+- **Parity:** Pure 2D, 3D and mixed owners follow the same dependency rule.
+  Mixed 2D wake requires old or replacement planar coupling. Vertical-only
+  mixed constraints, equal assignments, unrelated trigger exits, unchanged
+  manifolds/warm starts and accepted solver poses preserve legitimate sleep.
+  Automatic support is invalidated before resumed motion; manual grounding
+  remains host-owned.
+- **Regression evidence:** Moved, shrunk, deactivated and still-overlapping
+  supports; both endpoint orders; static/bodyless ownership; material and
+  trigger transitions; compound child freshness; connected sleeping islands
+  with an unrelated sleeping control; mixed coupling transitions; read-only
+  saving; and query-only parity under #136. An independent ponytail review
+  found no remaining correctness or bloat issues. No upstream source changes
+  or new runtime support registry were required.
+- **Combined validation:** `UseLocalLsfStack=true`; full Release/ReleaseLean
+  solution builds pass with zero warnings/errors, and all 6,611/6,543 tests pass
+  with zero skips. Raw coverage visits all 47,901/47,899 sequence points,
+  16,108 branches each and 5,058/5,057 methods. All six shared replay fixtures
+  agree across Windows x64 Release/Lean. Fixture updates contain only hashes;
+  raw bodies, events, queries and clocks are unchanged.
+- **Replay semantics:** Pair hash sections record meaningful dependency
+  freshness rather than publication history. A noncontact pair that must check
+  immediately does not depend on its obsolete stamps; live contacts and
+  positively culled pairs retain meaningful freshness. Both cases have direct
+  regressions. Publication counters and grounding caches are not added to the
+  serialized body contract.
+- **Combined warm gate (accepted measured correctness cost):** All 33 warmed
+  behavior/allocation guards and all 12 native timing controls report `0 B`.
+  A balanced `ABBA/BAAB` comparison uses one identical benchmark engine and
+  fixture, four independent launches per stack/row and all six measurements
+  per launch. The 64-body query-only sleeping scene measures 459.155 to
+  465.837 microseconds in pure 3D (+6.682 microseconds, +1.455%); all four
+  paired changes are positive, with a paired 95% difference interval of
+  +0.142 to +13.222 microseconds. Mixed measures 836.462 to 843.653
+  microseconds (+0.860%), with an inconclusive -12.405 to +26.787 interval.
+  The earlier approximately 3.2% mixed increase did not reproduce. Do not
+  interpret overlapping individual intervals as proof of preservation.
+- **Refinement assessment:** Stable scenes issue no ground queries. Direct
+  measurement attributes approximately 1.49 microseconds per 128 owner checks
+  to validation, explaining some but not all of the observed frame increase.
+  Independent review found no safely redundant lifetime, dependency, probe or
+  current-filter checks. Separating preparation entry points passed all tests
+  but showed no repeatable timing benefit, so that experiment was removed.
+  The maintainer explicitly accepted the measured correctness cost and closing
+  both issues. This is a scoped acceptance of the reported increase, not a claim
+  of unchanged timing or a general relaxation of future performance gates.
+- **Evidence:** Ignored `artifacts/grv-issue-135/` retains red/focused/full logs,
+  raw coverage, replay comparisons and frozen eight-module provenance. The
+  `perf/` records preserve the initial and quiet repeat distributions, all 33
+  guards, actual generated-child hashes, production input bindings and reviewed
+  timed-method equivalence. Final core hash begins `E39EE16F`.
+
+### GRV-Issue-136 - Query-only automatic grounding can retain an unsupported sleeping body
+
+- **Status:** Resolved together with #135 on 2026-10-15, including explicit
+  acceptance of the shared measured correctness cost.
+- **Confirmed:** Reproduced on the unchanged accepted #134 stack. At gravity
+  `1` and frame rate `16`, a radius-`0.5` sphere with local offset Y=`1`, body
+  origin Y=`0` and floor top Y=`0` has automatic support across a real `0.5`
+  collider gap, without a physical contact manifold. After settling sixteen
+  steps and sleeping for two, moving the floor twelve units sideways leaves
+  the body sleeping, grounded and stationary for eight further steps.
+  Explicit-wake controls clear support and fall. Static and bodyless floors
+  reproduce; pure 2D has the same query-only gap.
+- **Resolution:** Keep accepted support in the existing grounding owner.
+  Before skipping sleeping motion, validate its collider lifetime, committed
+  dependency, own probe geometry and current eligibility/filtering. Unknown or
+  changed dependencies, mode, radius, origin or reach trigger a query; losing
+  or changing the accepted point/normal wakes the body, while an identical
+  witness preserves sleep. Loading reconstructs the derived cache through the
+  same rule without changing unchanged sleep or saved probe timing.
+- **Ownership and parity:** Preserve `WasGrounded` across the complete step.
+  Callbacks may deactivate/reinitialize, populate saved state, publish geometry
+  or take manual ownership; the old refresh cannot overwrite the newer state
+  or prepare the old lifetime. Callback-capable refresh runs only through body
+  and service owners. Triggers no longer supply automatic 3D support, matching
+  2D; public queries retain their caller-selected trigger policy.
+- **Regression evidence:** Query-only gaps in pure 2D, 3D and mixed runtimes;
+  static/bodyless removal, movement, shrinking, filters and lifetime reuse;
+  changed own probe geometry; direct body calls; callback ownership; equivalent
+  policy changes querying once; and unavailable/representable witnesses.
+  Restored continuations compare motion, support, `WasGrounded` and full
+  authoritative hashes. Positive-cull history remains distinguishable instead
+  of promising full solver-cache restoration from body-only populate.
+- **Warm evidence:** Six query-only stable-sleep and six repeated support-loss
+  guards are part of the combined 33; all allocate `0 B`. The three additional
+  query-only sleeping-population timing controls also report `0 B`; balanced
+  comparisons and the accepted cost are recorded under #135. Mixed mode uses supported
+  same-dimension grounding queries, without introducing mixed query grounding.
+- **Evidence:** The shared `artifacts/grv-issue-135/` root retains original
+  query-only reproductions, red/green regressions, combined full-suite coverage,
+  hash-only fixture review, balanced timing comparisons and runtime/input proofs.
 
 ### GRV-Issue-134 - Untouched 3D pairs retain stale contact notifications after separation
 

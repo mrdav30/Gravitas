@@ -17,7 +17,10 @@ public partial class CollisionPair
         ref ChronicleHashWriter writer,
         GravitasReplayHashMode mode)
     {
-        writer.WriteSection("pair.3d", 3);
+        writer.WriteSection("pair.3d", 4);
+        // Only an existing contact depends on these stamps; loading may republish noncontact geometry.
+        writer.WriteBool(!_isColliding || _lastColliderAContactDependencyVersion == ColliderA.ContactDependencyVersion);
+        writer.WriteBool(!_isColliding || _lastColliderBContactDependencyVersion == ColliderB.ContactDependencyVersion);
         writer.WriteBool(Active);
         writer.WriteInt32(ColliderA.ReplayOrdinal);
         writer.WriteInt32(ColliderB.ReplayOrdinal);
@@ -34,8 +37,10 @@ public partial class CollisionPair
         writer.WriteFixed64(_fastCollideDistance);
         writer.WriteFixed64(_fastDistance);
         writer.WriteFixed64(_fastDistanceOffset);
-        writer.WriteUInt32(_lastColliderABroadPhaseVersion);
-        writer.WriteUInt32(_lastColliderBBroadPhaseVersion);
+        // An unculled noncontact refreshes both stamps before using them; other pairs depend on freshness.
+        bool usesBroadPhaseCache = _isColliding || CullCounter > 0;
+        writer.WriteBool(!usesBroadPhaseCache || _lastColliderABroadPhaseVersion == ColliderA.BroadPhaseVersion);
+        writer.WriteBool(!usesBroadPhaseCache || _lastColliderBBroadPhaseVersion == ColliderB.BroadPhaseVersion);
         ContributeManifoldReplayHash(ref writer, Manifold);
         ContributeWarmStartReplayHash(ref writer, _warmStart);
 

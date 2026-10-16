@@ -86,11 +86,12 @@ public sealed partial class SolidBody2D
             !Collider.TryPrepareBodyPose(position, _rotation),
             nameof(position),
             "The requested 2D body position produces collider geometry outside the representable coordinate domain.");
-        if (_position != position)
+        bool poseChanged = _position != position;
+        if (poseChanged)
             Wake();
 
         _position = position;
-        Collider.PublishPreparedExplicitBodyPose();
+        Collider.PublishPreparedExplicitBodyPose(poseChanged);
         RefreshStaticColliderAfterExplicitPoseChange();
     }
 
@@ -103,11 +104,12 @@ public sealed partial class SolidBody2D
             !Collider.TryPrepareBodyPose(_position, canonicalRotation),
             nameof(rotation),
             "The requested 2D body rotation produces collider geometry outside the representable coordinate domain.");
-        if (_rotation != canonicalRotation)
+        bool poseChanged = _rotation != canonicalRotation;
+        if (poseChanged)
             Wake();
 
         _rotation = canonicalRotation;
-        Collider.PublishPreparedExplicitBodyPose();
+        Collider.PublishPreparedExplicitBodyPose(poseChanged);
         RefreshStaticColliderAfterExplicitPoseChange();
     }
 

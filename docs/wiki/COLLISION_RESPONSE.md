@@ -259,10 +259,26 @@ Deterministic wake stimuli include:
 - kinematic host motion.
 - host transform teleport.
 - collider shape mutation.
+- loss of an established solid contact, or a change to its counterpart's
+  committed shape, explicit pose, material, or solid/trigger classification.
 
 Waking refreshes the collider's awake membership across current partitions.
 Discrete response expands wake across connected dynamic contacts in
 deterministic body-ID order.
+
+Contact dependency changes invalidate cached automatic grounding before motion
+resumes. Manual grounding stays host-owned. Equal assignments, trigger-only
+separations and accepted solver corrections preserve unchanged sleeping
+contacts. A mixed contact affects 2D wake only when its old or replacement rows
+couple to planar motion.
+
+Query-derived automatic support uses the same wake outcome without requiring a
+contact pair. A changed collider lifetime, committed geometry, filter, or probe
+mode, radius, origin or reach revalidates the accepted point and normal. Losing
+or changing that result wakes the sleeper; an identical result retains sleep.
+Support caches are derived runtime state and are reconstructed after loading.
+Grounding callbacks may take manual ownership or replace a body; the old refresh
+must not overwrite that state or continue preparing the old lifetime's motion.
 
 ## Notifications
 

@@ -274,6 +274,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
                 return;
 
             _material = value;
+            MarkContactDependencyChanged();
             OnMaterialChanged();
             _body?.Wake();
         }
@@ -575,6 +576,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
         _active = true;
         _deactivationInProgress = false;
         BindContext(agent.Context);
+        ContactDependencyVersion = 0;
         PublishPreparedShape();
         Context.Physics.AssimilateCollider(this);
         _hierarchyState.Initialize(_agent.IsParent);
@@ -741,11 +743,13 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
         if (!_runtimeShapeState.ShouldRebuild(snapshot))
             return false;
 
+        bool contactDependencyChanged = _runtimeShapeState.IsDirty
+            || snapshot.OwnerScale != _committedOwnerScale || _body?.IsDynamic != true;
         PrepareRuntimeShape(
             snapshot,
             includeBodyAttachment:
                 _body != null);
-        PublishPreparedShape();
+        PublishPreparedShape(contactDependencyChanged);
         if (refreshMassProperties)
             _body?.RefreshMassPropertiesFromColliderShape();
         return true;

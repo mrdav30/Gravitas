@@ -122,7 +122,9 @@ public sealed partial class SolidBody2D
                 : Vector2d.Zero;
             _groundedTransitionCapturedForStep = false;
             _groundCollider = null;
-            _groundColliderBroadPhaseVersion = 0;
+            _groundColliderContactDependencyVersion = 0;
+            _groundColliderLifetimeVersion = 0;
+            _groundOwnContactDependencyVersion = 0;
             _lastGroundCheckFrame = -1;
             ClearGroundContactCandidate();
         }

@@ -156,6 +156,8 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
 
     internal uint BroadPhaseVersion => _partitionState.BroadPhaseVersion;
 
+    internal uint ContactDependencyVersion { get; private set; }
+
     internal uint RuntimeShapeVersion => _runtimeShapeState.RuntimeVersion;
 
     internal bool HasHostBinding => _agent != null;
@@ -298,6 +300,7 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
                 return;
 
             _material = value;
+            MarkContactDependencyChanged();
             OnMaterialChanged();
             _body?.Wake();
         }
@@ -480,6 +483,7 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
         _isActive = true;
         _queryState.Reset();
         _hierarchyState.Initialize(agent.IsParent);
+        ContactDependencyVersion = 0;
         PublishPreparedShape();
     }
 
@@ -831,6 +835,14 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
             ThrowIfCannotEnableTrigger(nameof(IsTrigger));
 
         _isTrigger = value;
+    }
+
+    private void MarkContactDependencyChanged()
+    {
+        LSCollider2D owner = this;
+        while (owner._compoundOwner != null)
+            owner = owner._compoundOwner;
+        owner.ContactDependencyVersion++;
     }
 
     private void ThrowIfCannotEnableTrigger(string operation)

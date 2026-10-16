@@ -16,7 +16,7 @@ this backlog.
 ## Intake Rules
 
 - Signal IDs use `GRV-Benchmark-NNN`. The next available ID is
-  `GRV-Benchmark-028`.
+  `GRV-Benchmark-029`.
 - Assign an ID at intake and never reuse it, including after a signal closes or
   moves into a dated plan. Check this file's Git history before advancing or
   repairing the counter.
@@ -250,6 +250,47 @@ outer conservative refinements separately from required response contacts.
 Preserve whole-shape separation, earliest frontiers, closing admission, matched
 anchors, authored ties and 0 B/op; never replace an unresolved interval with a
 sample-only miss or weaken the manifold to one support pair.
+
+### GRV-Benchmark-028 — Mixed Broad-Phase Work With An Empty Opposite Dimension
+
+**Discovered:** 2026-10-15 during #135/#136 warm validation.  
+**Status:** Profiled pre-existing opportunity; the benefit of a distribution
+gate has not been measured.  
+**Owner:** Gravitas mixed candidate distribution and partition maintenance.
+
+The isolated `QueryOnly136WarmBenchmarks.Stable64Frame(Domain: "Mixed")`
+contains 64 sleeping 3D spheres and their 3D static floors, with **zero 2D
+colliders**. Automatic support crosses a real collider gap without contact
+manifolds. The same fixture runs in pure 3D as a control. On the frozen
+pre-#135/#136 Windows x64 stack, a quiet native comparison measured about
+**438.6 us** for pure 3D and **804.4 us** for Mixed; both allocate `0 B`.
+
+EventPipe sampling attributes **43.98%** of original whole-frame CPU weight to
+`ProcessMixedContacts`; the candidate trace is similar at **44.65%**. These are
+inclusive sampled weights, not call counts or proof that all this work can be
+removed. Mixed indexing still serves queries and later population changes.
+However, `ProcessMixedContacts` also copies, sorts and distributes active
+partitions when one dimensional population is empty, so no mixed candidate can
+exist. Its untouched-pair cleanup and retained-partition retirement still need
+to run, including after callbacks remove the last opposite-dimension collider.
+
+The ignored isolated host can reproduce the row with the local stack:
+
+```powershell
+$env:UseLocalLsfStack = 'true'
+pwsh -NoProfile -File artifacts/grv-issue-135/perf/run-native.ps1 -Variant original -Label empty-dimension-repro -Filters '*QueryOnly136WarmBenchmarks*'
+```
+
+**Next isolation:** Promote the bounded fixture into the maintained benchmark
+suite, then measure skipping only impossible candidate distribution while
+preserving partition/query freshness, pair retirement, deterministic ordering
+and `0 B` warm behavior. Exercise both empty-dimension directions and repeated
+spawn/despawn transitions. Keep the #135/#136 regression gate independent of
+this pre-existing follow-up.
+
+Ignored `artifacts/grv-issue-135/perf/` retains the frozen original eight-module
+stack (`89C15FBD...` core), unchanged fixture inputs, native rows,
+`profile-attribution.json`, paired CPU traces and zero-ground-probe diagnostics.
 
 ## Experimental Signals
 

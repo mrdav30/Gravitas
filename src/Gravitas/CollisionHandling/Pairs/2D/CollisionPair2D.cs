@@ -26,6 +26,9 @@ internal sealed partial class CollisionPair2D
     private SolidBody2D? _pendingBodyA;
     private SolidBody2D? _pendingBodyB;
     private long _lifetimeVersion;
+    private uint _lastColliderAContactDependencyVersion;
+    private uint _lastColliderBContactDependencyVersion;
+    private bool _wasTriggerPair;
 
     public CollisionPair2D(LSCollider2D colliderA, LSCollider2D colliderB)
     {
@@ -123,6 +126,7 @@ internal sealed partial class CollisionPair2D
 
     public void MarkResting(long frame)
     {
+        RefreshContactDependencies();
         LastFrame = frame;
         LastVisitToken = ColliderA.Context.LateSimulateToken;
     }
@@ -130,6 +134,8 @@ internal sealed partial class CollisionPair2D
     public void MarkSeparated()
     {
         bool wasColliding = _isColliding;
+        if (wasColliding && !_wasTriggerPair)
+            WakeBodiesForContactChange();
         ResetCollisionState();
         if (!wasColliding)
             return;
@@ -168,6 +174,9 @@ internal sealed partial class CollisionPair2D
     private void ResetCollisionState()
     {
         _isColliding = false;
+        _lastColliderAContactDependencyVersion = 0;
+        _lastColliderBContactDependencyVersion = 0;
+        _wasTriggerPair = false;
         LastFrame = -1;
         LastVisitToken = -1;
         Manifold.Reset();
@@ -358,11 +367,44 @@ internal sealed partial class CollisionPair2D
 
     private bool MarkCollidingState(long frame)
     {
+        RefreshContactDependencies();
         bool changed = !_isColliding;
         _isColliding = true;
         LastFrame = frame;
         LastVisitToken = ColliderA.Context.LateSimulateToken;
         return changed;
+    }
+
+    private void RefreshContactDependencies()
+    {
+        uint versionA = ColliderA.ContactDependencyVersion;
+        uint versionB = ColliderB.ContactDependencyVersion;
+        bool triggerPair = ColliderA.IsTrigger || ColliderB.IsTrigger;
+        // Even continued overlap can replace a sleeping body's load-bearing
+        // normal or friction constraint; unchanged solid contacts retain sleep.
+        if (_isColliding)
+        {
+            if (triggerPair != _wasTriggerPair)
+            {
+                ClearWarmStart();
+                WakeBodiesForContactChange();
+            }
+            else if (!triggerPair)
+            {
+                if (versionB != _lastColliderBContactDependencyVersion) ColliderA.Body?.WakeForContactChange();
+                if (versionA != _lastColliderAContactDependencyVersion) ColliderB.Body?.WakeForContactChange();
+            }
+        }
+
+        _lastColliderAContactDependencyVersion = versionA;
+        _lastColliderBContactDependencyVersion = versionB;
+        _wasTriggerPair = triggerPair;
+    }
+
+    private void WakeBodiesForContactChange()
+    {
+        ColliderA.Body?.WakeForContactChange();
+        ColliderB.Body?.WakeForContactChange();
     }
 
     internal void WakeSleepingBodiesForCollision()

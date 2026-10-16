@@ -328,7 +328,7 @@ public sealed partial class SolidBody2DGroundingTests
     }
 
     [Fact]
-    public void AutomaticRefresh_ShouldReuseCachedGroundWithinFrameUntilForceProbe()
+    public void AutomaticRefresh_WithEqualPolicyAssignment_ShouldReuseCachedGroundUntilForceProbe()
     {
         using GravitasWorldContext context = CreateContext();
         CreateStaticFloor(context, layer: new PhysicsLayer(1));
@@ -337,17 +337,21 @@ public sealed partial class SolidBody2DGroundingTests
 
         body.CheckGround();
         body.IsGrounded.Should().BeTrue();
+        context.Diagnostics.Enable();
 
-        body.GroundedDistanceRay = Fixed64.Zero;
+        body.GroundedDistanceRay = body.GroundedDistanceRay;
         body.BeginAutomaticGroundingRefresh();
         body.CompleteAutomaticGroundingRefresh();
 
         body.IsGrounded.Should().BeTrue();
+        context.Diagnostics.Events.Should().BeEmpty();
 
         body.CheckGround();
 
-        body.IsGrounded.Should().BeFalse();
+        body.IsGrounded.Should().BeTrue();
         body.WasGrounded.Should().BeTrue();
+        context.Diagnostics.Events.Length.Should().Be(1);
+        context.Diagnostics.Events[0].Kind.Should().Be(GravitasDiagnosticEventKind.GroundProbe);
     }
 
     [Fact]
@@ -458,6 +462,15 @@ public sealed partial class SolidBody2DGroundingTests
         Action getGroundPoint = () => _ = body.GroundPoint;
         getGroundPoint.Should().Throw<InvalidOperationException>()
             .WithMessage("*TryGetGroundPoint*");
+
+        body.Sleep();
+        body.BeginAutomaticGroundingRefresh();
+        body.TryAcceptContactGroundCandidate(body.Collider, support, contact, ownColliderIsA: true);
+        body.CompleteAutomaticGroundingRefresh();
+
+        body.IsSleeping.Should().BeTrue();
+        body.IsGrounded.Should().BeTrue();
+        body.HasGroundPoint.Should().BeFalse();
     }
 
     [Fact]

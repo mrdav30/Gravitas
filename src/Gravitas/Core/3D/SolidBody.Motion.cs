@@ -305,11 +305,12 @@ public partial class SolidBody
             Rotation,
             nameof(position),
             "The requested body position produces collider geometry outside the representable coordinate domain.");
-        if (Position3d != position)
+        bool poseChanged = Position3d != position;
+        if (poseChanged)
             Wake();
 
         Position3d = position;
-        PublishExplicitBodyPose(preparedPose);
+        PublishExplicitBodyPose(preparedPose, poseChanged);
     }
 
     /// <summary>Sets the authoritative world-space Y coordinate.</summary>
@@ -324,11 +325,12 @@ public partial class SolidBody
             Rotation,
             nameof(height),
             "The requested body height produces collider geometry outside the representable coordinate domain.");
-        if (HeightPos != height)
+        bool poseChanged = HeightPos != height;
+        if (poseChanged)
             Wake();
 
         HeightPos = height;
-        PublishExplicitBodyPose(preparedPose);
+        PublishExplicitBodyPose(preparedPose, poseChanged);
     }
 
     /// <summary>Sets the authoritative world rotation and refreshes collider state.</summary>
@@ -342,11 +344,12 @@ public partial class SolidBody
             normalizedRotation,
             nameof(quaternion),
             "The requested body rotation produces collider geometry outside the representable coordinate domain.");
-        if (Rotation != normalizedRotation)
+        bool poseChanged = Rotation != normalizedRotation;
+        if (poseChanged)
             Wake();
 
         Rotation = normalizedRotation;
-        PublishExplicitBodyPose(preparedPose);
+        PublishExplicitBodyPose(preparedPose, poseChanged);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -367,12 +370,12 @@ public partial class SolidBody
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private void PublishExplicitBodyPose(bool preparedPose)
+    private void PublishExplicitBodyPose(bool preparedPose, bool poseChanged)
     {
         if (!preparedPose)
             return;
 
-        Collider.PublishPreparedExplicitBodyPose();
+        Collider.PublishPreparedExplicitBodyPose(poseChanged);
         RefreshPartitionMobility();
     }
 
@@ -432,7 +435,7 @@ public partial class SolidBody
 
     private void ApplyFrictionForce()
     {
-        if (!_isGrounded)
+        if (!HasCurrentGroundSupport)
             return;
 
         Vector2d horizontalVelocity = new(_linearVelocity.X, _linearVelocity.Z);
@@ -466,7 +469,7 @@ public partial class SolidBody
         _linearAccelerationStore = Vector3d.Zero;
 
         // Apply gravity only if not grounded
-        if (!IsGrounded && (_freezeAxes & BodyFreezeAxes3D.PositionY) != BodyFreezeAxes3D.PositionY)
+        if (!HasCurrentGroundSupport && (_freezeAxes & BodyFreezeAxes3D.PositionY) != BodyFreezeAxes3D.PositionY)
             _linearVelocity.Y -= environment.Gravity * _gravityScale * deltaTime;
 
         // Make sure we don't fall any faster than maxFallSpeed. This gives our character a terminal velocity
@@ -506,7 +509,7 @@ public partial class SolidBody
         Fixed64 angularDragMagnitude = AngularDragCoefficient * Context.Environment.AirDensity * Collider.GetFrontalArea(_angularDirection) * _angularSpeed;
         acceleration += -_angularDirection * angularDragMagnitude;
 
-        if (!IsGrounded)
+        if (!HasCurrentGroundSupport)
             return acceleration;
 
         // Calculate the friction force and convert it into a torque
@@ -639,7 +642,7 @@ public partial class SolidBody
 
         // Find out how much we need to push towards the ground to avoid loosing grounding
         // when walking down a step or over a sharp change in slope.
-        if (_isGrounded && (_freezeAxes & BodyFreezeAxes3D.PositionY) != BodyFreezeAxes3D.PositionY)
+        if (HasCurrentGroundSupport && (_freezeAxes & BodyFreezeAxes3D.PositionY) != BodyFreezeAxes3D.PositionY)
         {
             velocityVector.Y -= FixedMath.Max(StepOffset, velocityVector.Magnitude);
             _lastGroundedPosition = Position3d;

@@ -370,6 +370,29 @@ public sealed class SolidBodyGroundingTests
 
         body.IsGrounded.Should().BeTrue();
         body.HeightPos.Should().Be(Fixed64.Zero);
+
+        body.Sleep();
+        body.CheckGround();
+        body.IsSleeping.Should().BeTrue();
+        body.HasHitPoint.Should().BeFalse();
+
+        // Translate the same geometry into the scalar interior. A newly
+        // representable witness changes support, while its repeated query does not.
+        Vector3d interiorPosition = new(x - (Fixed64)2, Fixed64.Zero, Fixed64.Zero);
+        ground.Transform.TrySetWorldPosition(interiorPosition + Vector3d.Down * Fixed64.Half)
+            .Should().BeTrue();
+        ground.Simulate();
+        body.SetPosition(interiorPosition);
+        body.Sleep();
+        body.CheckGround();
+        body.IsSleeping.Should().BeFalse();
+        body.HasHitPoint.Should().BeTrue();
+        Vector3d interiorPoint = body.HitPoint;
+
+        body.Sleep();
+        body.CheckGround();
+        body.IsSleeping.Should().BeTrue();
+        body.HitPoint.Should().Be(interiorPoint);
     }
 
     private static StaticCollider<LSCuboidCollider> CreateGround(

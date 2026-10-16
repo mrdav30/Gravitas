@@ -18,12 +18,16 @@ internal sealed partial class CollisionPair2D
         ref ChronicleHashWriter writer,
         GravitasReplayHashMode mode)
     {
-        writer.WriteSection("pair.2d", 3);
+        writer.WriteSection("pair.2d", 4);
         writer.WriteInt32(ColliderA.ReplayOrdinal);
         writer.WriteInt32(ColliderB.ReplayOrdinal);
         writer.WriteEnum(CollisionType);
         writer.WriteInt64(LastFrame);
         writer.WriteBool(_isColliding);
+        // Only an existing contact depends on these stamps; loading may republish noncontact geometry.
+        writer.WriteBool(!_isColliding || _lastColliderAContactDependencyVersion == ColliderA.ContactDependencyVersion);
+        writer.WriteBool(!_isColliding || _lastColliderBContactDependencyVersion == ColliderB.ContactDependencyVersion);
+        writer.WriteBool(_wasTriggerPair);
         ContributeManifoldReplayHash(ref writer, Manifold);
         ContributeWarmStartReplayHash(ref writer, _warmStart);
     }

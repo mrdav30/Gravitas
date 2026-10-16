@@ -111,17 +111,20 @@ public sealed class SolidBodyMotionHardeningTests
         body.Body.Rotation.Should().Be(FixedQuaternion.Identity);
     }
 
-    [Fact]
-    public void LateSimulate_WhenGroundedAndRotating_ShouldApplyAngularFriction()
+    [Theory]
+    [InlineData(1)]
+    [InlineData(64)]
+    public void LateSimulate_WhenGroundedAndRotating_ShouldApplyAngularFriction(int impulseDenominator)
     {
         using PhysicsScenarioBuilder scenario = CreateMotionScenario();
+        scenario.Context.SetFrameRate(64);
         scenario.Context.Environment.Gravity = Fixed64.One;
         ScenarioBody<LSCuboidCollider> body = scenario.CreateCuboid(Vector3d.Zero);
         body.Collider.Material = PhysicsMaterialTestHelper.WithFrictionAndRestitution(Fixed64.One, Fixed64.Zero);
         body.Body.SetManualGrounding(Vector3d.Zero, Vector3d.Up);
 
         body.Body.IsGrounded.Should().BeTrue();
-        body.Body.AddAngularImpulse(Vector3d.Up);
+        body.Body.AddAngularImpulse(Vector3d.Up / (Fixed64)impulseDenominator);
         Fixed64 speedBeforeFriction = body.Body.AngularSpeed;
 
         scenario.Context.LateSimulate();

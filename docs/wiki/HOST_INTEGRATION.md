@@ -795,6 +795,23 @@ against planar resolved up for both probes and contact support. Actual changes
 to its limit or effective up direction invalidate automatic support and wake
 the body; manual grounding remains host-owned.
 
+An established solid contact is also a sleep dependency. Removing that contact,
+or changing the counterpart's committed shape, explicit pose, or material,
+wakes its sleeping participant. Automatic grounding is invalidated before the
+next motion step; manual grounding remains the host's responsibility. Trigger
+exits, equal assignments, and ordinary solver corrections do not invalidate an
+unchanged solid contact. Mixed contacts wake a 2D participant only when the old
+or replacement constraint couples to its planar motion.
+
+Automatic probes can also supply support without a physical contact. Their
+cached collider lifetime, committed geometry and current filtering are checked
+before sleeping motion is skipped. Changed dependencies or probe mode, radius,
+origin or reach trigger a fresh query. An identical ground point and normal
+preserve sleep; a changed or lost result wakes the body. Loading reconstructs
+this derived cache using the same rule. Triggers are excluded from automatic
+support in both dimensions; ordinary public queries retain their explicit
+trigger policy.
+
 Read [Query Services](QUERY_SERVICES.md) for the full query surface.
 
 ## Replay Contract

@@ -741,7 +741,8 @@ public sealed partial class SolidBody2D : IRecordable
             if (TryConsumeContinuousCollisionHandoff(updateSleepState, updateColliderState))
                 return;
 
-            EnsureContinuousCollisionFramePrepared(Context.LateSimulateToken);
+            if (!EnsureContinuousCollisionFramePrepared(Context.LateSimulateToken, refreshGroundSupport: true))
+                return;
 
             if (IsKinematic)
                 UpdateKinematicPositionAndRotation(updateColliderState);
@@ -792,7 +793,10 @@ public sealed partial class SolidBody2D : IRecordable
         }
         finally
         {
-            CompleteGroundedStepState();
+            // Service-owned motion defers the same step's grounding refresh
+            // until after response; retain its original transition snapshot.
+            if (updateSleepState)
+                CompleteGroundedStepState();
         }
     }
 

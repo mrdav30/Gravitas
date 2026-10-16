@@ -1,5 +1,6 @@
 using Chronicler.Timing;
 using FixedMathSharp;
+using Gravitas.Diagnostics;
 using Gravitas.Support;
 using Gravitas.Tests.Serialization;
 using Gravitas.Tests.Support;
@@ -21,18 +22,22 @@ public sealed partial class SolidBody2DGroundingTests
         context.Settings.GroundCheckLayerMask = PhysicsLayerMask.FromLayer(1);
         var body = CreateCircle(context, new Vector2d(Fixed64.Zero, Fixed64.One));
         Assert.True(body.IsGrounded);
-        body.GroundedDistanceRay = Fixed64.Zero;
+        context.Diagnostics.Enable();
 
         TimingTestUtility.SetClock(context, initialFrame + 9, new ChronicleTimestamp(2, 0));
         body.BeginAutomaticGroundingRefresh();
         body.CompleteAutomaticGroundingRefresh();
         Assert.True(body.IsGrounded);
+        Assert.DoesNotContain(context.Diagnostics.Events.ToArray(),
+            entry => entry.Kind == GravitasDiagnosticEventKind.GroundProbe);
 
         context.Simulate();
         body.BeginAutomaticGroundingRefresh();
         body.CompleteAutomaticGroundingRefresh();
-        Assert.False(body.IsGrounded);
+        Assert.True(body.IsGrounded);
         Assert.True(body.WasGrounded);
+        Assert.Single(context.Diagnostics.Events.ToArray(),
+            entry => entry.Kind == GravitasDiagnosticEventKind.GroundProbe);
     }
 
     public static TheoryData<GravitasSerializationTransport> TimingTransports => GravitasSerializationTransportCases.All();

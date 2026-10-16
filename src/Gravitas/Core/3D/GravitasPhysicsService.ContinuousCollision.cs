@@ -30,7 +30,8 @@ public sealed partial class GravitasPhysicsService
         {
             if (_dynamicBodies.TryGetValue(i, out SolidBody body))
             {
-                body.EnsureContinuousCollisionFramePrepared(token);
+                if (!body.EnsureContinuousCollisionFramePrepared(token, refreshGroundSupport: true))
+                    continue;
                 AddContinuousCollisionCandidate(body);
             }
         }

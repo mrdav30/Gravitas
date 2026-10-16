@@ -50,9 +50,9 @@ public static partial class CollisionResponseMixed
             body2D == null ? Fixed64.Zero : ResolveAngularVelocity(body2D));
     }
 
-    internal static bool HasPlanarResponseCoupling(CollisionPairMixed pair)
+    internal static bool HasPlanarResponseCoupling(ContactManifold manifold)
     {
-        foreach (ManifoldContact row in pair.Manifold)
+        foreach (ManifoldContact row in manifold)
             if (row.Normal.ToVector2d() != Vector2d.Zero) return true;
         return false;
     }

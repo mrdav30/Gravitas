@@ -41,7 +41,18 @@ public partial class SolidBody
     /// <summary>
     /// Selects the deterministic query primitive used for ground checks.
     /// </summary>
-    public GroundProbeMode GroundProbeMode { get; set; } = GroundProbeMode.Auto;
+    public GroundProbeMode GroundProbeMode
+    {
+        get => _groundProbeMode;
+        set
+        {
+            if (_groundProbeMode == value) return;
+            _groundProbeMode = value;
+            if (GroundingMode == GroundingMode.Automatic) _lastGroundCheckFrame = -1;
+        }
+    }
+
+    private GroundProbeMode _groundProbeMode = GroundProbeMode.Auto;
 
     /// <summary>
     /// Optional explicit radius for swept-sphere ground probes. Nonpositive values derive it from the collider.
@@ -53,7 +64,9 @@ public partial class SolidBody
         {
             SwiftThrowHelper.ThrowIfArgument(value > ColliderGeometryPolicy.MaximumGeometryReach,
                 nameof(value), "Ground probe radius must not exceed 4,096 world units.");
+            if (_groundProbeRadius == value) return;
             _groundProbeRadius = value;
+            if (GroundingMode == GroundingMode.Automatic) _lastGroundCheckFrame = -1;
         }
     }
 
@@ -99,6 +112,12 @@ public partial class SolidBody
     public Vector3d GroundNormal => _groundNormal;
 
     private FixedTransform? _hitPlatform;
+    private ColliderLifetimeToken _groundSupport;
+    private long _groundingStateVersion;
+    private uint _groundSupportVersion;
+    private uint _groundProbeShapeVersion;
+    private Fixed64 _groundSupportOriginOffset;
+    private Fixed64 _groundSupportProbeDistance;
     /// <summary>Gets the transform of the current supporting collider, if available.</summary>
     public FixedTransform? HitPlatform => _hitPlatform;
 
@@ -244,6 +263,47 @@ public partial class SolidBody
 
     private void CheckGroundForSimulation() => CheckGround(force: false);
 
+    private bool HasCurrentGroundSupport => _isGrounded
+        && (GroundingMode == GroundingMode.Manual || _lastGroundCheckFrame >= 0);
+
+    internal void WakeForContactChange()
+    {
+        if (!IsSleeping)
+            return;
+        if (GroundingMode == GroundingMode.Automatic)
+            _lastGroundCheckFrame = -1;
+        WakeFromCollision();
+    }
+
+    private bool RefreshAutomaticGroundSupport()
+    {
+        if (GroundingMode != GroundingMode.Automatic || !_isGrounded)
+            return true;
+
+        if (_lastGroundCheckFrame >= 0 && HasCurrentGroundSupportDependency())
+            return true;
+
+        var registration = new ColliderLifetimeToken(Collider);
+        long lastGroundCheckFrame = _lastGroundCheckFrame;
+        CaptureGroundedStepState();
+        CheckGround(force: true);
+        if (!registration.IsActive)
+            return false;
+
+        // Reconstructing a derived cache must not change an unchanged sleeper's saved probe clock.
+        if (lastGroundCheckFrame >= 0 && IsSleeping && GroundingMode == GroundingMode.Automatic)
+            _lastGroundCheckFrame = lastGroundCheckFrame;
+        return true;
+    }
+
+    private bool HasCurrentGroundSupportDependency() =>
+        _groundSupport.Collider != null && _groundSupport.IsActive
+        && _groundSupportVersion == _groundSupport.Collider.ContactDependencyVersion
+        && _groundProbeShapeVersion == Collider.ContactDependencyVersion
+        && _groundSupportOriginOffset == GroundOriginOffset
+        && _groundSupportProbeDistance == GroundedDistanceRay
+        && IsValidGroundCollider(_groundSupport.Collider);
+
     private void CaptureGroundedTransitionState()
     {
         _wasGrounded = _isGrounded;
@@ -303,7 +363,18 @@ public partial class SolidBody
             return;
         }
 
-        SetGroundingState(hit.Anchor, hit.Normal, hit.Collider!.Transform);
+        var registration = new ColliderLifetimeToken(Collider);
+        _groundSupport = new ColliderLifetimeToken(hit.Collider!);
+        _groundSupportVersion = hit.Collider!.ContactDependencyVersion;
+        _groundProbeShapeVersion = Collider.ContactDependencyVersion;
+        _groundSupportOriginOffset = GroundOriginOffset;
+        _groundSupportProbeDistance = GroundedDistanceRay;
+        long groundingStateVersion = SetGroundingState(hit.Anchor, hit.Normal, hit.Collider.Transform);
+        // Callbacks may replace this body, its support, or automatic grounding ownership.
+        if (registration.IsCurrentLifetime && _groundingStateVersion == groundingStateVersion
+            && GroundingMode == GroundingMode.Automatic
+            && (!registration.IsActive || _lastGroundCheckFrame < 0 || !HasCurrentGroundSupportDependency()))
+            ClearGrounding();
     }
 
     private bool TryFindGroundHit(
@@ -377,11 +448,7 @@ public partial class SolidBody
         if (ReferenceEquals(hitCollider, Collider))
             return false;
 
-        if (!ColliderCollisionFilter.AllowsPhysicalPair(Collider, hitCollider))
-            return false;
-
-        SolidBody? hitBody = hitCollider.Body;
-        if (!hitCollider.IsStatic && !hitBody!.IsKinematic)
+        if (!IsValidGroundCollider(hitCollider))
             return false;
 
         // A sweep can start tangent to a wall or inside geometry. Its valid
@@ -390,6 +457,12 @@ public partial class SolidBody
         return hit.Normal.Y > Fixed64.Zero
             && hit.Normal.Normalized.Y >= GroundMinNormalDot;
     }
+
+    private bool IsValidGroundCollider(LSCollider collider) =>
+        !collider.IsTrigger
+        && Context.Settings.GroundCheckLayerMask.Includes(collider.Layer)
+        && ColliderCollisionFilter.AllowsPhysicalPair(Collider, collider)
+        && (collider.IsStatic || collider.Body!.IsKinematic);
 
     private GroundProbeMode ResolveGroundProbeMode()
     {
@@ -424,8 +497,11 @@ public partial class SolidBody
 
     private void ClearGrounding()
     {
-        IsGrounded = false;
+        _groundingStateVersion++;
+        if (GroundingMode == GroundingMode.Automatic && _isGrounded)
+            WakeFromCollision();
         ResetGroundCalculations();
+        IsGrounded = false;
     }
 
     private void ApplyGroundedHeightOrReset()
@@ -442,6 +518,9 @@ public partial class SolidBody
 
     private void SetGroundingState(Vector3d hitPoint, Vector3d groundNormal, FixedTransform? hitPlatform)
     {
+        _groundingStateVersion++;
+        _groundSupport = default;
+        _groundSupportVersion = 0;
         _hitPlatform = hitPlatform;
         _hitPlatformPosition = _hitPlatform?.WorldPosition ?? Vector3d.Zero;
         _hitPoint = hitPoint;
@@ -452,15 +531,23 @@ public partial class SolidBody
         IsGrounded = true;
     }
 
-    private void SetGroundingState(ContactAnchor anchor, Vector3d groundNormal, FixedTransform hitPlatform)
+    private long SetGroundingState(ContactAnchor anchor, Vector3d groundNormal, FixedTransform hitPlatform)
     {
+        long groundingStateVersion = ++_groundingStateVersion;
+        bool hadPoint = _hasHitPoint;
+        Vector3d oldPoint = _hitPoint;
         _hitPlatform = hitPlatform;
         _hitPlatformPosition = hitPlatform.WorldPosition;
         _hasHitPoint = anchor.TryGetWorldPoint(out _hitPoint);
+        if (_isGrounded
+            && (_groundNormal != groundNormal || hadPoint != _hasHitPoint
+                || (_hasHitPoint && oldPoint != _hitPoint)))
+            WakeFromCollision();
         _groundNormal = groundNormal;
 
         RefreshGroundNormalForce();
         IsGrounded = true;
+        return groundingStateVersion;
     }
 
     private void RefreshGroundNormalForce()
@@ -479,6 +566,8 @@ public partial class SolidBody
     private void ResetGroundCalculations()
     {
         _hitPlatform = null;
+        _groundSupport = default;
+        _groundSupportVersion = 0;
         _hitPlatformPosition = Vector3d.Zero;
         _hitPoint = Vector3d.Zero;
         _hasHitPoint = false;

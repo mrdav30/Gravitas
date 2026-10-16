@@ -163,14 +163,19 @@ public sealed partial class SolidBody2D
         return segment.Displacement / remainingFraction;
     }
 
-    internal void EnsureContinuousCollisionFramePrepared(long token)
+    internal bool EnsureContinuousCollisionFramePrepared(long token, bool refreshGroundSupport = false)
     {
         if (_continuousCollisionFrameToken == token)
-            return;
+            return !refreshGroundSupport || RefreshAutomaticGroundSupportBeforeMotion();
 
         // Publish pending authoring before inertia integration and CCD indexing;
         // rotational samples must not introduce a different geometry epoch.
         Collider.Rebuild(geometryOnly: true);
+
+        // Only the body and service owners opt into grounding callbacks;
+        // target sampling remains a callback-free trajectory operation.
+        if (refreshGroundSupport && !RefreshAutomaticGroundSupportBeforeMotion())
+            return false;
 
         Vector2d startPosition = _position;
         Fixed64 startRotation = _rotation;
@@ -214,6 +219,7 @@ public sealed partial class SolidBody2D
             startRotation,
             angularDelta,
             angularVelocity));
+        return true;
     }
 
     private void PrepareMovableContinuousCollisionMotion()

@@ -707,6 +707,8 @@ public partial class SolidBody : IRecordable
             LastContinuousCollisionToiIterationCount = 0;
             LastContinuousCollisionToiIterationLimitReached = false;
 
+            if (!EnsureContinuousCollisionFramePrepared(Context.LateSimulateToken, refreshGroundSupport: true))
+                return;
             _lastPosition = Position3d;
             if (TryConsumeContinuousCollisionHandoff(updateSleepState, updateColliderState))
                 return;
@@ -889,8 +891,9 @@ public partial class SolidBody : IRecordable
         _rotationSpeed = Agent.IsInteracting
             ? InteractionRotationSpeed
             : DefaultRotationSpeed;
+        bool poseChanged = Rotation != normalizedRotation;
         Rotation = normalizedRotation;
-        PublishExplicitBodyPose(preparedPose);
+        PublishExplicitBodyPose(preparedPose, poseChanged);
     }
 
     /// <summary>
@@ -986,7 +989,7 @@ public partial class SolidBody : IRecordable
 
         _visualRotation = normalizedRotation;
 
-        PublishExplicitBodyPose(Active);
+        PublishExplicitBodyPose(Active, poseChanged: true);
         if (wasSleeping)
             RefreshPartitionAwakeState();
     }

@@ -86,7 +86,7 @@ public sealed class UntouchedCollisionPairMutationTests
     }
 
     [Fact]
-    public void ChangedSupportThatStillTouches_ShouldRefreshTheWitnessWithoutLosingTheWarmImpulse()
+    public void ChangedSupportThatStillTouches_ShouldRefreshTheWitnessAndWakeTheParticipant()
     {
         using PhysicsScenarioBuilder scene = CreateScene();
         var (target, mover) = AddContact(scene, Vector3d.Zero);
@@ -105,9 +105,8 @@ public sealed class UntouchedCollisionPairMutationTests
         pair.Active.Should().BeTrue();
         pair.Manifold.HasContact.Should().BeTrue();
         GetTargetWitness(pair, target).Should().Be(previousWitness + Vector3d.Right * shift);
-        pair.TryGetWarmStartImpulse(contactId, out ContactWarmStartImpulse retained).Should().BeTrue();
-        retained.Should().Be(impulse);
-        mover.IsSleeping.Should().BeTrue();
+        pair.TryGetWarmStartImpulse(contactId, out _).Should().BeTrue();
+        mover.IsSleeping.Should().BeFalse();
         exits.Should().Be(0);
     }
 

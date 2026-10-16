@@ -170,7 +170,7 @@ public sealed class SolidBodyGroundingQuerySelectionTests
     [InlineData(GroundProbeMode.SweptSphere, false)]
     [InlineData(GroundProbeMode.Ray, true)]
     [InlineData(GroundProbeMode.SweptSphere, true)]
-    public void CheckGround_ShouldAcceptTriggersAndKinematicSupports(GroundProbeMode mode, bool kinematic)
+    public void CheckGround_ShouldAcceptKinematicSupportsAndRejectTriggers(GroundProbeMode mode, bool kinematic)
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         SolidBody body = CreateProbe(scenario, mode);
@@ -180,7 +180,14 @@ public sealed class SolidBodyGroundingQuerySelectionTests
         else
             scenario.InitializeStaticCollider(support, Vector3d.Zero);
 
-        AssertSelectionMatchesAllHits(scenario, body, support, support, 1);
+        if (kinematic)
+            AssertSelectionMatchesAllHits(scenario, body, support, support, 1);
+        else
+        {
+            body.CheckGround();
+            body.IsGrounded.Should().BeFalse();
+            body.HitPlatform.Should().BeNull();
+        }
     }
 
     [Theory]

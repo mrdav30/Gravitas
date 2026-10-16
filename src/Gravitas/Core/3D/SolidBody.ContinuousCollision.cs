@@ -159,14 +159,17 @@ public partial class SolidBody
         return segment.Displacement / remainingFraction;
     }
 
-    internal void EnsureContinuousCollisionFramePrepared(long token)
+    internal bool EnsureContinuousCollisionFramePrepared(long token, bool refreshGroundSupport = false)
     {
         if (_continuousCollisionFrameToken == token)
-            return;
+            return !refreshGroundSupport || RefreshAutomaticGroundSupport();
 
         // Publish pending authoring before inertia integration and CCD indexing;
         // rotational samples must not introduce a different geometry epoch.
         Collider.RebuildRuntimeShapeOnly(geometryOnly: true);
+        // Grounding queries can invoke host callbacks; only body/service entry points opt in.
+        if (refreshGroundSupport && !RefreshAutomaticGroundSupport())
+            return false;
 
         Vector3d startPosition = Position3d;
         FixedQuaternion startRotation = Rotation;
@@ -246,6 +249,7 @@ public partial class SolidBody
             targetRotation,
             angularDistance,
             rotationPath));
+        return true;
     }
 
     private void InvalidateContinuousCollisionTrajectory()
