@@ -66,6 +66,7 @@ public sealed class GravitasRuntimeModeTests
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         scenario.Context.SetFrameRate(4);
+        scenario.Context.Environment.AirDensity = Fixed64.Zero;
         scenario.Context.Settings.RuntimeMode = PhysicsRuntimeMode.Both;
         ScenarioBody<LSSphereCollider> body3D = scenario.CreateSphere(Vector3d.Zero, mass: (Fixed64)2);
         SolidBody2D body2D = Create2DBody(scenario.Context, Vector3d.Zero);
@@ -136,6 +137,9 @@ public sealed class GravitasRuntimeModeTests
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         scenario.Context.SetFrameRate(4);
+        // Observe deferred driving input without ambient dissipation consuming it.
+        scenario.Context.Environment.AirDensity = Fixed64.Zero;
+        scenario.Context.Environment.DampingFactor = Fixed64.Zero;
         scenario.Context.Settings.RuntimeMode = runtimeMode;
         ScenarioBody<LSSphereCollider> body = scenario.CreateSphere(
             Vector3d.Zero,
@@ -200,6 +204,7 @@ public sealed class GravitasRuntimeModeTests
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         scenario.Context.SetFrameRate(4);
+        scenario.Context.Environment.AirDensity = Fixed64.Zero;
         scenario.Context.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
         ScenarioBody<LSSphereCollider> body3D = scenario.CreateSphere(Vector3d.Zero, mass: (Fixed64)2);
         SolidBody2D body2D = Create2DBody(scenario.Context, Vector3d.Zero);
@@ -255,6 +260,7 @@ public sealed class GravitasRuntimeModeTests
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         scenario.Context.SetFrameRate(4);
+        scenario.Context.Environment.AirDensity = Fixed64.Zero;
         scenario.Context.Settings.RuntimeMode = PhysicsRuntimeMode.ThreeD;
         ScenarioBody<LSSphereCollider> body3D = scenario.CreateSphere(Vector3d.Zero, mass: (Fixed64)2);
         SolidBody2D body2D = Create2DBody(scenario.Context, Vector3d.Zero);

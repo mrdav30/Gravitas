@@ -365,7 +365,7 @@ public sealed class SolidBodyMotionHardeningTests
 
         Action prepare = () => body.EnsureContinuousCollisionFramePrepared(scenario.Context.LateSimulateToken);
 
-        prepare.Should().Throw<OverflowException>().WithMessage("Ground friction produces an unrepresentable velocity.");
+        prepare.Should().Throw<OverflowException>().WithMessage("Dissipation produces an unrepresentable velocity.");
         body.AngularVelocity.Should().Be(before);
     }
 

@@ -313,6 +313,8 @@ public sealed partial class ContinuousCollision2DTests
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
         GravitasWorldContext context = scenario.Context;
         context.SetFrameRate(1);
+        context.Environment.AirDensity = Fixed64.Zero;
+        context.Environment.DampingFactor = Fixed64.Zero;
         context.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
         SolidBody2D source = CreateBody(context, new LSCircleCollider2D(Fixed64.Half),
             Vector2d.Zero, immovable: false, isKinematic: true);

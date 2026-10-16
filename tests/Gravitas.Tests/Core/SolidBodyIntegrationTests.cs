@@ -76,8 +76,9 @@ public sealed class SolidBodyIntegrationTests
         scenario.Context.LateSimulate();
         scenario.Context.LateSimulate();
 
-        body.Body.LinearVelocity.X.Should().Be(Fixed64.FromFraction(3, 4));
-        body.Body.Position3d.X.Should().Be(Fixed64.FromFraction(7, 16));
+        // Drag acts on the driven velocity immediately: 1 -> 3/4 -> 9/16.
+        body.Body.LinearVelocity.X.Should().Be(Fixed64.FromFraction(9, 16));
+        body.Body.Position3d.X.Should().Be(Fixed64.FromFraction(21, 64));
     }
 
     [Fact]

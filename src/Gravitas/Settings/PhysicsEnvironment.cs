@@ -12,6 +12,7 @@ namespace Gravitas;
 /// <summary>
 /// Stores world-local physical environment values used by deterministic simulation.
 /// </summary>
+/// <content>Defines physical coefficients, speed limits and collision-culling defaults.</content>
 public sealed partial class PhysicsEnvironment
 {
     /// <summary>
@@ -50,7 +51,7 @@ public sealed partial class PhysicsEnvironment
     public static readonly Fixed64 DefaultDecelerationMultiplier = (Fixed64)10f;
 
     /// <summary>
-    /// Angular velocity damping factor used by the standard environment.
+    /// Angular damping torque coefficient used by the standard environment.
     /// </summary>
     public static readonly Fixed64 DefaultDampingFactor = (Fixed64)0.95f;
 
@@ -140,7 +141,9 @@ public sealed partial class PhysicsEnvironment
     public Fixed64 DecelerationMultiplier { get; set; }
 
     /// <summary>
-    /// Gets or sets the damping factor applied to angular velocity.
+    /// Gets or sets the opposing torque per unit angular velocity. This is not a
+    /// per-frame retention factor: the body's inertia determines the response,
+    /// bounded at the kinetic-energy minimum for nonnegative damping.
     /// </summary>
     public Fixed64 DampingFactor { get; set; }
 

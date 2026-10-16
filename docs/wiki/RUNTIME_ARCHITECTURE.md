@@ -366,11 +366,20 @@ ignore.
 density, speed caps, friction transition speed, damping, and culling scores.
 Environment values are mutable per context.
 
-`SolidBody` drag is a deterministic integration model, not a full aerodynamic
-solver. The linear drag path uses body drag coefficient, air density, collider
-frontal area, and current speed to accumulate acceleration opposite motion. A
-quadratic drag model would be a deliberate physics change with tests,
-benchmarks, and clear units.
+`SolidBody` drag is an empirical, linear-in-speed model. Both linear and angular
+drag use the body coefficient, air density and collider frontal area to form
+a decay rate, independent of mass or inertia. After queued driving inputs,
+each step removes at most the remaining velocity, preserving its direction
+and frozen axes. Gravity retains its separate integration after linear drag
+and ground friction. This is not a quadratic aerodynamic model.
+
+Angular damping instead applies an opposing torque proportional to the current
+angular velocity, after angular drag and ground friction. `DampingFactor` is a
+torque coefficient, not a per-frame velocity-retention factor: inertia affects
+the response. Its impulse stops at the kinetic-energy minimum using the same
+tensor-aware bound as angular ground friction, including partially frozen axes.
+These dissipative guarantees require nonnegative coefficients, air density and
+damping. Pure 2D and mixed 2D bodies have no corresponding body-level terms.
 
 ## Coroutines And Hooks
 

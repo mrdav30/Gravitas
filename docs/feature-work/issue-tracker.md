@@ -37,43 +37,15 @@
 
 ### Ordered Queue
 
-#137 is resolved, including the matching 3D linear-friction defect and
-2D/mixed parity checks. Next resolve **#138**, independent drag/damping
-overshoot, before **#133**, artificial mesh-chunk seam response. Both remaining
-defects reproduce on earlier binaries and are independent of the size cap.
-Keep physical-quality fixes ahead of the benchmark queue; combine work where
+#137 and #138 are resolved, including the related linear terms and 2D/mixed
+parity checks. Next resolve **#133**, artificial mesh-chunk seam response. It
+reproduces on earlier binaries and is independent of the size cap. Keep
+physical-quality fixes ahead of the benchmark queue; combine work where
 response ownership overlaps.
 
 #111 remains an independent validation-tooling issue.
 #125 is a low-priority, non-blocking runtime crash observation; defer further
 investigation unless it recurs or a reliable reproducer becomes available.
-
-### GRV-Issue-138 - Explicit drag and angular damping can reverse motion and add energy
-
-- **Confirmed:** 2026-10-15 during #137's dissipative-term parity review, on the
-  frozen accepted #135/#136 stack (Gravitas core `E39EE16F...`). These cases use
-  no contacts, grounded friction or gravity; #137 does not introduce them.
-- **Reproduction:** Use a mass-one isotropic cuboid and one full
-  `Simulate`/`LateSimulate` step. With size `1/8`, `64 Hz`, default angular
-  damping `0.95`, no air drag and initial spin approximately `+0.375 rad/s`,
-  the result is approximately `-1.7625 rad/s` (22.09 times the energy).
-  At `4 Hz`, a unit cube with angular drag coefficient `1`, air density `64`
-  and no damping changes `+0.375` to `-4.125` (121 times the energy).
-  A unit cube with linear drag coefficient `1`, air density `16` and no
-  angular damping changes linear speed `+0.375` to `-1.125` (nine times
-  the energy). Other dissipative terms are disabled independently in each case.
-- **Boundary:** The existing explicit opposing acceleration/torque can consume
-  more motion than remains. This is separate from grounded material friction;
-  changing friction alone must not be presented as making every body
-  dissipative term unconditionally stable. Pure 2D has no corresponding body
-  drag/damping term; mixed 3D uses the same 3D owner.
-- **Follow-up:** Review the drag/damping integration and units together, reuse
-  the bounded friction work where appropriate, preserve driving forces and
-  constrained inertia, and retain deterministic replay and warm performance.
-  Add exact stopping, reversal, anisotropic-energy and frozen-axis regressions.
-- **Evidence:** Ignored `artifacts/grv-issue-137/dissipation-probe/` retains
-  source, build/run logs, raw signed trajectories and all eight verified loaded
-  module hashes for the unchanged original stack.
 
 ### GRV-Issue-133 - Adjacent mesh collider rims alter frictionless seam-crossing response
 
@@ -163,6 +135,55 @@ investigation unless it recurs or a reliable reproducer becomes available.
 Remaining measured performance costs are tracked in the benchmark backlog.
 
 ## Resolved Issues
+
+### GRV-Issue-138 - Explicit drag and angular damping can reverse motion and add energy
+
+- **Confirmed:** 2026-10-15; **resolved:** 2026-10-16. Reproduces on the accepted
+  #135/#136 stack, independently of #137. Contact-free original probes reverse
+  small-cube spin through default damping (22.09 times the energy), unit-cube
+  spin through angular drag (121 times) and linear motion through drag (nine
+  times). Angular drag uses the existing default coefficient `0.75`.
+- **Resolution:** Apply queued driving inputs before drag. Retain the empirical
+  linear-in-speed, mass/inertia-independent drag law, expressing it as radial
+  velocity decay bounded at rest. Recompute frontal-area direction when driving
+  changes motion. Preserve gravity's existing integration order.
+- **Angular damping:** Retain opposing torque proportional to current angular
+  velocity, after drag and ground friction. Reuse #137's tensor-aware energy
+  bound and exact partially frozen intermediate products; no second wide solver
+  or upstream change. Rename shared helpers and their overflow message to cover
+  dissipation generally. Damping remains a torque coefficient, not per-frame
+  retention; dissipative guarantees require nonnegative physical coefficients.
+- **Parity and regressions:** Thirty added cases cover 3D/mixed stopping in both
+  signs, driving from rest/cancellation/reversal, directional frontal area,
+  radial anisotropic drag, supported slender/frozen damping, same-token CCD
+  preparation/handoff, full-step allocation and six pure/mixed 2D cases. The 2D
+  owner intentionally has no corresponding empirical body-level terms. Update
+  the exact ordinary-drag oracle for its intentional first-driven-frame effect.
+- **Fixture correction:** Lifecycle and dedicated CCD fixtures explicitly
+  control ambient dissipation. Preserve reviewed default-air trajectories where
+  their exact assertions include drag. The alternating-impact fixture previously
+  relied on drag reversing its positive initial spin; prescribe negative spin
+  directly with air disabled, retaining registration-order equality and at least
+  two impacts. Collision/frontier numeric oracles and replay fixtures remain
+  unchanged.
+- **Validation:** `UseLocalLsfStack=true`; Release/ReleaseLean pass 6,683/6,615
+  tests with zero skips. Raw coverage visits all 47,958/47,956 sequence points,
+  16,146 branches each and 5,064/5,063 methods. Both full solution builds pass
+  with zero warnings/errors. Six shared replay fixtures retain their reviewed
+  expectations and agree across local Windows x64 Release/Lean.
+- **Warm gate:** Twelve native workloads and thirteen warmed guards report
+  `0 B`; a separate maintained mixed full-step drag/constrained-damping guard
+  also reports `0 B`. All five affected ordinary motion scenarios have lower
+  independent launch means; these are preservation evidence, not causal speedup
+  claims. The all-observation mixed-response difference is +0.048%, with launch
+  contrasts of opposite signs and uncertainty exceeding the difference. No
+  resolved regression remains; exact zero overhead is not claimed.
+- **Evidence:** Ignored `artifacts/grv-issue-138/` retains red/green/full logs,
+  raw coverage, captures and 288 actual native timing observations. The warm
+  evidence binds the accepted #137 baseline and final candidate to eight loaded
+  runtime modules and 941 production/project inputs. Maintained
+  `BodyDissipationBenchmarks` matches the measured five-case fixture; no new
+  runtime files or public API changes were needed.
 
 ### GRV-Issue-137 - Angular ground friction can reverse rotation and add energy
 

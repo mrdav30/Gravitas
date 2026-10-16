@@ -418,18 +418,18 @@ public partial class SolidBody
     {
         _linearAccelerationStore = ProjectLinearMotion(_deltaAcceleration);
         _deltaAcceleration = Vector3d.Zero;
-
-        if (_linearSpeed <= Fixed64.Zero)
-            return;
-
-        ApplyDragForce();
     }
 
-    private void ApplyDragForce()
+    private Vector3d ApplyDrag(Vector3d velocity, Fixed64 coefficient, Vector3d previousVelocity, Vector3d previousDirection)
     {
-        // Drag calculation and accumulation.
-        Fixed64 dragMagnitude = LinearDragCoefficient * Context.Environment.AirDensity * Collider.GetFrontalArea(_linearDirection) * _linearSpeed;
-        _linearAccelerationStore += (-_linearDirection * dragMagnitude);
+        Fixed64 density = Context.Environment.AirDensity;
+        if (coefficient == Fixed64.Zero || density == Fixed64.Zero || velocity == Vector3d.Zero)
+            return velocity;
+
+        Vector3d direction = velocity == previousVelocity ? previousDirection : velocity.Normalized;
+        Fixed64 fraction = coefficient * density * Collider.GetFrontalArea(direction) * Context.DeltaTime;
+        // The existing drag law is linear in speed. Bound its radial decay before it reverses motion.
+        return fraction >= Fixed64.One ? Vector3d.Zero : velocity * (Fixed64.One - fraction);
     }
 
     private void ApplyGroundLinearFriction()
@@ -444,7 +444,7 @@ public partial class SolidBody
             return;
 
         Fixed64 speed = Vector3d.Dot(_linearVelocity, direction);
-        _linearVelocity = ApplyBoundedGroundFriction(
+        _linearVelocity = ApplyBoundedDissipation(
             _linearVelocity, direction, direction, ResolveGroundFrictionImpulse(speed) * InverseMass);
     }
 
@@ -455,6 +455,7 @@ public partial class SolidBody
         Vector3d lastVelocity = _linearVelocity;
 
         _linearVelocity += ProjectLinearMotion(_linearAccelerationStore * deltaTime);
+        _linearVelocity = ApplyDrag(_linearVelocity, LinearDragCoefficient, lastVelocity, _linearDirection);
         ApplyGroundLinearFriction();
 
         // Reset stores for the next frame
@@ -486,22 +487,8 @@ public partial class SolidBody
 
     private void ApplyAngularTorques()
     {
-        _angularAccelerationStore = ResolveAngularAccelerationForStep();
+        _angularAccelerationStore = ProjectAngularMotion(_deltaTorque);
         _deltaTorque = Vector3d.Zero;
-    }
-
-    private Vector3d ResolveAngularAccelerationForStep()
-    {
-        Vector3d acceleration = ProjectAngularMotion(_deltaTorque);
-
-        if (_angularSpeed <= Fixed64.Zero)
-            return acceleration;
-
-        // Angular drag should also be proportional to the square of the angular velocity, just like linear drag.
-        Fixed64 angularDragMagnitude = AngularDragCoefficient * Context.Environment.AirDensity * Collider.GetFrontalArea(_angularDirection) * _angularSpeed;
-        acceleration += -_angularDirection * angularDragMagnitude;
-
-        return acceleration;
     }
 
     private Vector3d ApplyGroundAngularFriction(Vector3d velocity)
@@ -514,14 +501,37 @@ public partial class SolidBody
             return velocity;
 
         Vector3d direction = velocity == _angularVelocity ? _angularDirection : velocity.Normalized;
-        Vector3d response = ProjectAngularMotion(_inverseInertiaTensor * direction);
         Fixed64 impulse = ResolveGroundFrictionImpulse(speed);
-        return (_freezeAxes & BodyFreezeAxes3D.Rotation) != BodyFreezeAxes3D.None
-            ? ApplyConstrainedGroundAngularFriction(velocity, response, impulse)
-            : ApplyBoundedGroundFriction(velocity, direction, response, impulse);
+        return ApplyAngularDissipation(velocity, direction, impulse);
     }
 
-    private Vector3d ApplyConstrainedGroundAngularFriction(Vector3d velocity, Vector3d response, Fixed64 impulse)
+    private Vector3d ApplyAngularDamping(Vector3d velocity)
+    {
+        Fixed64 damping = Context.Environment.DampingFactor;
+        if (damping == Fixed64.Zero || velocity == Vector3d.Zero)
+            return velocity;
+
+        Vector3d direction = velocity;
+        Fixed64 speed;
+        if (velocity == _angularVelocity)
+        {
+            direction = _angularDirection;
+            speed = _angularSpeed;
+        }
+        else
+            direction.NormalizeInPlace(out speed);
+        return ApplyAngularDissipation(velocity, direction, damping * speed * Context.DeltaTime);
+    }
+
+    private Vector3d ApplyAngularDissipation(Vector3d velocity, Vector3d direction, Fixed64 impulse)
+    {
+        Vector3d response = ProjectAngularMotion(_inverseInertiaTensor * direction);
+        return (_freezeAxes & BodyFreezeAxes3D.Rotation) != BodyFreezeAxes3D.None
+            ? ApplyConstrainedAngularDissipation(velocity, response, impulse)
+            : ApplyBoundedDissipation(velocity, direction, response, impulse);
+    }
+
+    private Vector3d ApplyConstrainedAngularDissipation(Vector3d velocity, Vector3d response, Fixed64 impulse)
     {
         // Projection and rotated inertia do not commute. Keep M*r exact: supported
         // slender bodies can overflow both this intermediate and its energy dot products.
@@ -545,28 +555,28 @@ public partial class SolidBody
         if (WideArithmetic.SubtractSigned576(budget, minimum).Sign >= 0)
         {
             return new Vector3d(
-                ResolveConstrainedGroundFrictionVelocity(velocity.X, response.X, work, curvature),
-                ResolveConstrainedGroundFrictionVelocity(velocity.Y, response.Y, work, curvature),
-                ResolveConstrainedGroundFrictionVelocity(velocity.Z, response.Z, work, curvature));
+                ResolveConstrainedDissipativeVelocity(velocity.X, response.X, work, curvature),
+                ResolveConstrainedDissipativeVelocity(velocity.Y, response.Y, work, curvature),
+                ResolveConstrainedDissipativeVelocity(velocity.Z, response.Z, work, curvature));
         }
         return new Vector3d(
-            ResolveGroundFrictionVelocity(velocity.X, response.X, impulse, Fixed64.One),
-            ResolveGroundFrictionVelocity(velocity.Y, response.Y, impulse, Fixed64.One),
-            ResolveGroundFrictionVelocity(velocity.Z, response.Z, impulse, Fixed64.One));
+            ResolveDissipativeVelocity(velocity.X, response.X, impulse, Fixed64.One),
+            ResolveDissipativeVelocity(velocity.Y, response.Y, impulse, Fixed64.One),
+            ResolveDissipativeVelocity(velocity.Z, response.Z, impulse, Fixed64.One));
     }
 
-    private static Fixed64 ResolveConstrainedGroundFrictionVelocity(
+    private static Fixed64 ResolveConstrainedDissipativeVelocity(
         Fixed64 velocity, Fixed64 response, Signed320 work, Signed320 curvature)
     {
         Signed576 numerator = WideArithmetic.SubtractSigned576(
             WideArithmetic.MultiplySigned320(curvature, Signed192.Raw(velocity)),
             WideArithmetic.MultiplySigned320(work, Signed192.Raw(response)));
         if (!Fixed64.TryGetSignedRawRatio(numerator, Signed576.ExtendValue(curvature), out Fixed64 result))
-            throw new OverflowException("Ground friction produces an unrepresentable velocity.");
+            throw new OverflowException("Dissipation produces an unrepresentable velocity.");
         return result;
     }
 
-    private static Vector3d ApplyBoundedGroundFriction(
+    private static Vector3d ApplyBoundedDissipation(
         Vector3d velocity, Vector3d energyResponse, Vector3d response, Fixed64 impulse)
     {
         Fixed64 curvature = Vector3d.Dot(energyResponse, response);
@@ -583,12 +593,12 @@ public partial class SolidBody
             divisor = curvature;
         }
         return new Vector3d(
-            ResolveGroundFrictionVelocity(velocity.X, response.X, impulse, divisor),
-            ResolveGroundFrictionVelocity(velocity.Y, response.Y, impulse, divisor),
-            ResolveGroundFrictionVelocity(velocity.Z, response.Z, impulse, divisor));
+            ResolveDissipativeVelocity(velocity.X, response.X, impulse, divisor),
+            ResolveDissipativeVelocity(velocity.Y, response.Y, impulse, divisor),
+            ResolveDissipativeVelocity(velocity.Z, response.Z, impulse, divisor));
     }
 
-    private static Fixed64 ResolveGroundFrictionVelocity(
+    private static Fixed64 ResolveDissipativeVelocity(
         Fixed64 velocity, Fixed64 response, Fixed64 impulse, Fixed64 divisor)
     {
         Fixed64 result;
@@ -605,7 +615,7 @@ public partial class SolidBody
             if (Fixed64.TryGetSignedRawRatio(numerator, Signed192.Raw(divisor), out result))
                 return result;
         }
-        throw new OverflowException("Ground friction produces an unrepresentable velocity.");
+        throw new OverflowException("Dissipation produces an unrepresentable velocity.");
     }
 
     private void UpdateAngularVelocity()
@@ -623,9 +633,9 @@ public partial class SolidBody
         Fixed64 deltaTime = Context.DeltaTime;
         Vector3d velocity = startVelocity
             + ProjectAngularMotion(angularAcceleration * deltaTime);
+        velocity = ApplyDrag(velocity, AngularDragCoefficient, startVelocity, _angularDirection);
         velocity = ApplyGroundAngularFriction(velocity);
-        Vector3d dampingTorque = -Context.Environment.DampingFactor * velocity;
-        velocity += ProjectAngularMotion(_inverseInertiaTensor * dampingTorque * deltaTime);
+        velocity = ApplyAngularDamping(velocity);
         velocity = ProjectAngularMotion(velocity);
 
         Fixed64 desiredSpeed = velocity.Magnitude;

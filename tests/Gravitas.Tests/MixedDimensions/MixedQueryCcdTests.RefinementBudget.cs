@@ -526,8 +526,9 @@ public sealed partial class MixedQueryCcdTests
         using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
         context.Environment.Gravity = Fixed64.Zero;
         context.Settings.ContinuousCollisionMaxToiIterations = 1;
-        if (translationalOnly)
-            context.Environment.AirDensity = Fixed64.Zero;
+        // The reviewed rotational frontier includes ambient drag; exhaustion must
+        // preserve that already-integrated velocity, rather than applying drag again.
+        context.Environment.AirDensity = translationalOnly ? Fixed64.Zero : PhysicsEnvironment.DefaultAirDensity;
 
         Fixed64 startRotation =
             -FixedMath.DegToRad((Fixed64)45);

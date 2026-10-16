@@ -562,10 +562,10 @@ public partial class SolidBody : IRecordable
 
 
     /// <summary>
-    /// Represents a body's resistance to movement, akin to air resistance.
-    /// Higher values slow down the body more quickly in absence of other forces.
-    /// The effect is significant when bodies are expected to slow down or stop without sustained forces.
-    /// It's not constrained between 0 and 1, depends on the object's shape and the flow conditions.
+    /// Controls empirical linear-in-speed drag. Multiplied by air density and
+    /// frontal area, it forms a velocity-decay rate independent of mass.
+    /// Nonnegative values remove at most the remaining motion per fixed step;
+    /// the coefficient is not constrained to [0, 1].
     /// </summary>
     public Fixed64 LinearDragCoefficient = (Fixed64)0.75f;
 

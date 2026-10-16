@@ -346,7 +346,8 @@ public sealed partial class MixedQueryCcdTests
 
         sameTarget.Collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.One);
         mixedTarget.Collider.Material = PhysicsMaterialTestHelper.WithRestitution(Fixed64.One);
-        Fixed64 requestedAngularVelocity = (Fixed64)4;
+        // A modest prescribed spin reaches both targets after restitution without relying on drag reversal.
+        Fixed64 requestedAngularVelocity = -Fixed64.Half;
         blade.Body.AddAngularImpulse(
             Vector3d.Up
             * (requestedAngularVelocity / blade.Body.EffectiveInverseInertiaTensor.M22));

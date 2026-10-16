@@ -2878,6 +2878,8 @@ public sealed partial class ContinuousCollisionDetectionTests
         scenario.Context.SetFrameRate(1);
         scenario.Context.Environment.Gravity = Fixed64.Zero;
         scenario.Context.Environment.AirDensity = Fixed64.Zero;
+        // CCD fixtures prescribe trajectories independently of passive dissipation.
+        scenario.Context.Environment.DampingFactor = Fixed64.Zero;
         scenario.Context.Environment.MinSpeed = Fixed64.Zero;
         scenario.Context.Environment.MaxSpeed = (Fixed64)16;
         scenario.Context.Environment.MaxFallSpeed = (Fixed64)16;
@@ -2900,6 +2902,7 @@ public sealed partial class ContinuousCollisionDetectionTests
         context.SetFrameRate(1);
         context.Environment.Gravity = Fixed64.Zero;
         context.Environment.AirDensity = Fixed64.Zero;
+        context.Environment.DampingFactor = Fixed64.Zero;
         context.Environment.MinSpeed = Fixed64.Zero;
         context.Environment.MaxSpeed = (Fixed64)16;
         context.Environment.MaxFallSpeed = (Fixed64)16;

@@ -4212,6 +4212,8 @@ public sealed partial class MixedQueryCcdTests
     {
         using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
         context.Environment.Gravity = Fixed64.Zero;
+        // Preserve the reviewed target trajectory with ambient drag before the mixed impulse.
+        context.Environment.AirDensity = PhysicsEnvironment.DefaultAirDensity;
         Fixed64 smallOffset = Fixed64.Epsilon;
         Vector2d sourceStart = new(-Fixed64.One + Fixed64.Epsilon, smallOffset);
         SolidBody2D source = CreateCircle2D(context, sourceStart);
@@ -4271,6 +4273,8 @@ public sealed partial class MixedQueryCcdTests
     {
         using GravitasWorldContext context = CreateMixedContext(frameRate: 1);
         context.Environment.Gravity = Fixed64.Zero;
+        // Preserve the reviewed source trajectory with ambient drag before the mixed impulse.
+        context.Environment.AirDensity = PhysicsEnvironment.DefaultAirDensity;
         Fixed64 smallOffset = Fixed64.FromFraction(1, 65536);
         Vector3d sourceStart = new(-Fixed64.One, Fixed64.Zero, smallOffset);
         ScenarioBody<LSSphereCollider> source = CreateSphere3D(context, sourceStart);
@@ -5539,6 +5543,9 @@ public sealed partial class MixedQueryCcdTests
         GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         context.ApplySettings(new PhysicsSettings(frameRate, null));
         context.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
+        // Query/CCD fixtures isolate their imposed trajectories from ambient dissipation.
+        context.Environment.AirDensity = Fixed64.Zero;
+        context.Environment.DampingFactor = Fixed64.Zero;
         context.World.TryAddGrid(
             new GridConfiguration(
                 new Vector3d((Fixed64)(-8), (Fixed64)(-4), (Fixed64)(-8)),
