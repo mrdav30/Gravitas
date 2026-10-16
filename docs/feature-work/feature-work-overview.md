@@ -28,6 +28,10 @@ instead of burying it in notes.
 
 ## Active Coordination
 
+- [`Body Dissipation Parity And Configuration`](2026-10-16-body-dissipation-parity-and-configuration-plan.md)
+  - Align configurable drag/damping across 3D and pure/mixed 2D, including
+    coefficient validation, persistence and replay. Retain the empirical drag
+    law and existing default motion; preserve the measured warm baseline.
 - **Lockstep Conformance And Workload Guidance**
   - Approved follow-up sequence after the confirmed benchmark signals close:
     strengthen complete-loop replay evidence, characterize an evolving strategy
