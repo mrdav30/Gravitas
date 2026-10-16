@@ -1,7 +1,7 @@
 # Static Surface Continuity And Heightfield Integration
 
 **Date:** 2026-10-15  
-**Status:** Generic-continuity scope approved, 2026-10-16; begin Phase 1 to resolve
+**Status:** Phase 1 in progress, 2026-10-16, to resolve
 #133/#139 together. Heightfield and alternative-index work remain deferred;
 no new runtime API has been implemented.  
 **Order:** #132 is resolved. Resolve #133 and its confirmed pure 2D counterpart,
@@ -218,9 +218,16 @@ AABBs or convex polygons loses `0.02416824991814792` speed at frame 30 and
 finishes at X `1.9501529859844595`. Continuous controls again finish at X `2`,
 velocity `1`; all eight cases repeat identically. Record this as #139, with
 shared design review and dimensional implementation rather than a new mesh API.
-Mixed source tracing finds the same single-mesh domain in finite-slab contact
-generation and swept-circle certification; a mixed runtime reproduction remains
-an implementation gate, not a claimed test result.
+Mixed runtime probes now confirm the same defect in both directions. Planar
+circle/capsule movers crossing a split vertical 3D sheet first lose speed at
+frame 30 and stall or cross through the sheet. 3D sphere/capsule movers crossing
+adjoining embedded 2D AABB slabs stop at X=-0.5 at frame 23. Continuous controls
+finish at X=2 with unit X velocity. Bodyless and explicit-static floors agree.
+All 16 cases repeat identically; an independent rerun matches the complete
+`mixed-baseline/{results,root-rerun}.json` payload byte-for-byte against the same
+eight frozen modules. Reported contact rows are fresh post-step narrow-phase
+inspections, not retained solver-manifold captures. Mixed CCD remains a later
+implementation gate.
 
 Independent ponytail and dimensional reviews traced face sampling, true-rim
 generation, event ownership, filters and neighbor invalidation. They reject a
@@ -242,6 +249,9 @@ claimed here.
 
 - [x] Review the combined #133/#139 scope: the user approved resolving both
   through this plan, with heightfields and new indexes deferred.
+- [x] Supply exact capsule math prerequisites: member-scale depth ordering and
+  original-edge rational clipping with reconstructible events. Keep the joined
+  domain and final witness-ownership proof as the separate gates below.
 - [ ] Add maintained full-loop regressions for the confirmed 3D and 2D crossings
   and a vertical mixed surface with a planar response normal. Use existing
   scenario helpers; do not test probe/report plumbing for coverage.
@@ -288,6 +298,77 @@ their own verification. `geometry-proof/` and `capsule-proof/` under the ignored
 artifact root retain source/binary bindings and root reruns. Maintained runtime,
 full topology/reduction, coverage and candidate cost gates remain open; Phase 1
 is not complete and neither issue is resolved.
+
+**Implementation progress, 2026-10-16:** FixedMathSharp now provides exact
+coplanar capsule-depth comparison across member scales and closed rational
+segment clips for its existing plane-ray events. Physical depth is
+`t * sqrt(N·N) / (2D)`; raw `t` comparisons across different `D` are invalid.
+The new comparison requires the same capsule chart and certified coplanar
+primitive normals with the same squared metric. It compares rational/quadratic
+values and retained algebraic roots without rounding depths or re-isolating
+transformed polynomials. Positive divisor growth is included in the existing
+root-separation proof; scaled proportional-polynomial identity avoids refining
+exact ties to that worst-case bound. The ordinary entry retains its prior
+comparison path.
+
+Clips retain the original edge plus exact parameter bounds. They emit their
+own rational endpoints and filter original section/stationary events, including
+targeted reconstruction. Full intervals use the existing default path; point
+intervals remain closed. For normalized member/capsule rotations and full raw
+authored points, doubled transformed coordinates/differences are below 198
+bits. Combining them with positive rational bounds below 319 bits gives endpoint
+coordinate numerators below 518 bits, fitting `Signed576`; point-ray products
+remain within the existing 4096-bit fields and 3072-bit discriminant storage.
+Clipping does not change section/stationary polynomials or their radicands.
+Focused cases include opposite rays, zero/nonzero cores, exact endpoint ties,
+sub-raw distinct points/depths, rejected section/stationary replay and large
+coprime plane normals with independently rotated frames.
+
+Independent ponytail review removed a same-frame caller change that added no
+behavior. These are internal math prerequisites, not an integrated continuity
+feature: Gravitas still needs the prepared joined boundary domain, stable span
+and member provenance, aggregate normal fans and face-sample reduction. Do not
+add synthetic clipping calls to existing wholly exposed single-mesh edges.
+Cone/slab scale proofs, actual committed-collider fixtures and the corrected
+two-member runtime cost remain open before Phase 1 can close.
+
+Validation of this math increment uses `UseLocalLsfStack=true`: both complete
+solutions build without warnings in Release/ReleaseLean. FixedMathSharp passes
+5,912/5,891 core cases and 49 recording cases per profile; Gravitas passes
+6,683/6,615 cases. All four core coverage captures have 100% raw reachable
+line/branch/method coverage. Six native replay fixtures agree with shared
+expectations and directly across Windows x64 Release/Lean; other OS/architecture
+lanes were not run locally. Frozen inputs, raw captures and replay comparison
+are under `artifacts/grv-issue-133/phase1/{fms-warm-final,coverage,replay-warm-final}`.
+The expanded arithmetic/event guards pass 128 warmed repeats at 0 B, including
+all four quadratic/algebraic representation pairs and clipped event generation.
+Independent geometry and final ponytail reviews found no remaining source
+blocker; the existing complexity register records the arithmetic invariants.
+
+The final balanced original/candidate/candidate/original arithmetic experiment
+retains all 132 actual observations, four generated-child dependency/fixture
+bindings and 22 successful case launches. Mean microseconds per fixture batch:
+
+| Ordinary control | Frozen original | Final | Difference |
+| --- | ---: | ---: | ---: |
+| Same-frame depth comparison, 38 pairs | 34.846 | 33.904 | -2.7% |
+| Unchanged containment control | 151.246 | 151.395 | +0.1% |
+| Plane event production | 411.975 | 395.646 | -4.0% |
+| Segment event production | 398.938 | 385.343 | -3.4% |
+
+Both paired blocks are lower for the affected ordinary rows; containment has
+opposite block signs. With two launches per variant, accept baseline preservation
+at this measurement resolution rather than infer a causal or engine-wide gain.
+New-entry budgets per 38 comparisons are 36.526 us with matching frames and
+68.182 us across frames; clipped production is 58.372 us per batch. These are
+math-kernel costs, not corrected seam
+simulation costs. Every measured row allocates 0 B; the expanded 128-repeat
+guard also passes at 0 B against the actual Release/Lean math graphs. The final
+Release math is `7855DA98`, Lean `9341D618`;
+`perf/selection/acceptance-final.json` summarizes the accepted gate and
+`perf/selection/warm-final-*` retains
+actual child bindings, source manifests, all observations and the paired
+analysis. Earlier slow-tie and incomplete-binding runs are diagnostic only.
 
 ### Phase 2 - Integrate Static Membership And Contact Reduction
 

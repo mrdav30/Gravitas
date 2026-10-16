@@ -87,9 +87,18 @@ investigation unless it recurs or a reliable reproducer becomes available.
   `1.9498989908024669`, versus `2` continuously. Independent review confirms
   the boundary also affects face sampling/torque; filtering response normals
   alone is incomplete. Mixed finite-slab contacts and CCD certification share
-  the single-mesh limitation; their runtime parity reproduction remains pending.
+  the single-mesh limitation. Repeated mixed runtime probes now confirm both
+  directions: planar circle/capsule movers against a split vertical 3D sheet
+  lose speed at frame 30 and stall or cross through the sheet; sphere/capsule
+  movers against adjoining embedded 2D slabs stop at X=-0.5 at frame 23.
+  Continuous controls finish at X=2 with unit X velocity. Bodyless and
+  explicit-static floors agree; this remains part of #133/#139, not a new issue.
   Ignored `artifacts/grv-issue-133/original-settled-terrain.json` and `perf/`
-  preserve the repeated traces and frozen eight-module baseline.
+  preserve the repeated traces and frozen eight-module baseline. The 16-case
+  mixed probe repeats each trajectory and its independent rerun matches the
+  complete payload byte-for-byte in `mixed-baseline/{results,root-rerun}.json`.
+  Its contact rows are fresh post-step narrow-phase inspections, not retained
+  solver-manifold captures.
 - **Related feature work:** The
   [Static Surface Continuity And Heightfield Integration plan](2026-10-15-static-surface-continuity-and-heightfield-plan.md)
   now begins with the approved combined #133/#139 scope. Generic continuity
@@ -114,6 +123,10 @@ investigation unless it recurs or a reliable reproducer becomes available.
   There is no pure 2D mesh type or declared shared-boundary domain. This is the
   same physical-quality problem as #133, with a different dimensional geometry
   owner; it is not caused by the new proposed continuity implementation.
+  The mixed counterpart also reproduces with these pieces embedded as slabs:
+  a 3D sphere/capsule stops at the shared border while the continuous control
+  retains unit speed. Preserve actual host Y and slab thickness when validating
+  continuity; planar adjacency alone does not remove a real embedded step.
 - **Resolution direction:** Implement the explicit static-continuity contract with
   #133 in the existing
   [surface plan](2026-10-15-static-surface-continuity-and-heightfield-plan.md#generic-continuity-contract-proposed-for-133139).
