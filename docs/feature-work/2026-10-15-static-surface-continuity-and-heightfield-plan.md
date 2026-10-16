@@ -370,6 +370,90 @@ Release math is `7855DA98`, Lean `9341D618`;
 actual child bindings, source manifests, all observations and the paired
 analysis. Earlier slow-tie and incomplete-binding runs are diagnostic only.
 
+**Prepared boundary progress, 2026-10-16:** Gravitas now has an internal,
+reusable `MeshSurfaceBoundaryDomain` classifier for one canonical perimeter
+against an explicit bounded member set. It retains each original edge, exact rational parameter
+bounds, source pose and member/surface provenance. FixedMathSharp owns the
+neutral triangle clipping and framed predicates; no world vertices are merged
+or rounded into a common mesh. Normalized plain-point frames give coordinate
+numerators below 200 bits, clip bounds below 268 bits and sided cross products
+below 403 bits, within the existing math storage and capsule clip contract.
+
+The classifier partitions the edge at exact triangle intersections and counts
+filled half-neighborhoods by member and trusted surface owner. Exactly one fill
+on each side from different members establishes a local joined span. Same-side
+duplicates, a third filled interior and folded incident sheets retain ambiguous
+boundary spans. Point-only contact supplies no open-span coverage. Checking the
+source inward point distinguishes a folded incident sheet from coplanar fill;
+ignoring that third sheet would incorrectly certify a nonmanifold seam. Adjacent
+intervals coalesce only with compatible ownership, preserving canonical edges
+without artificial events at authored subdivisions. Preparation reuses the
+existing boundary fan: its exact unnormalized ray plus the source endpoint
+recovers the original inward vertex in wide arithmetic. The ordinary fan and
+all its callers remain unchanged, with no duplicated search or new hot call.
+The final fan also has identical normalized compiled instructions, locals and
+stack layout to the original baseline.
+
+Maintained cases exercise actual committed collider centering and independent
+quarter-turn poses, world limits, partial spans, winding, all projection axes,
+one-raw gaps, ambiguous/same-member geometry and provenance-preserving
+subdivisions. Math cases also pass produced non-lattice intervals directly into
+capsule event generation and reconstruct their witnesses exactly. These are
+local span proofs: endpoint fans, whole-component embedding, joined face/sample
+ownership, 2D reduction and full-loop runtime regressions remain open. No public
+membership or simulation behavior is enabled by this increment, and neither
+#133 nor #139 is resolved.
+
+For the next joined-capsule proof, reuse the bounded capsule chart for exact
+point deduplication and final Q32.32 sample ranking. Existing point projection
+and retained `FiniteSectionPoint` storage can supply this chart; member-native
+point/depth comparisons cannot be mixed unchanged. Retain each event's member,
+frame and span for witness reconstruction, align ray orientation across opposite
+windings, and use scale-aware depth comparison before copying the winning
+selection. Extend the existing plane-metric owner only if its exact-normal
+input and width proof are required; do not add a parallel sample reducer.
+Normalize member coordinate scales before cross-frame triangle admission, and
+join local contact regions only through a clipped span admitted by the finite
+shape. Static adjacency alone cannot connect those regions or enable the
+contained-section shortcut before embedding and normal-fan trust is established.
+
+This increment passes both complete solution builds without warnings using
+`UseLocalLsfStack=true`. Release/Lean pass 6,704/6,636 Gravitas tests and
+5,926/5,905 FixedMathSharp core tests, plus 49 recording cases per profile.
+All four raw core captures have 100% reachable line, branch and method coverage;
+the final math source hashes match. Six native replay fixtures match shared
+expectations and each other on Windows x64 Release/Lean. Other platform lanes
+and package-mode validation were not run locally. The final captures are under
+`artifacts/grv-issue-133/phase1/{boundary-domain-final,coverage,replay-boundary-domain-cold-final}`;
+the Gravitas coverage/build label is `boundary-domain-cold-final`.
+The final balanced ordinary-path window reports capsule `+0.7047%`
+(`+1.967 us`), cone `-0.6183%` and mixed `+0.3230%`, all at `0 B/op`.
+Both capsule launch pairs are positive; two independent pairs provide limited
+process-level evidence, but do not support a zero-cost claim. Existing ordinary
+source and normalized fan instructions are unchanged, with no identified added
+arithmetic, branch, allocation or call in that path. This does not rule out
+assembly layout, JIT or host effects. The strict warm-baseline gate remains
+**open within Phase 1**; neither an algorithmic regression nor an unchanged
+baseline is established. Preserve the frozen graphs and all observations under
+`artifacts/grv-issue-133/perf/boundary-domain/cold-final-*` rather than tune
+unrelated code to a particular layout. Earlier extraction/output-parameter
+experiments are diagnostic and are not the accepted source.
+
+New preparation budgets are about `15.9-36.0 us` for the five small fixtures
+and `710.3 us` for 32 collinear authored subedges against 35 target triangles.
+All reused preparation is `0 B`; fresh storage costs `4,664 B`, or `32,456 B`
+for `Collinear32`. These single-launch budgets are local preparation
+costs, not frame costs or large-topology acceptance. Runtime integration still
+requires bounded candidate work. The final `perf/boundary-domain/acceptance-final.json`
+retains source/module bindings and all 192 actual observations with an explicit
+**open** status; `preparation-budgets-final.json` retains all twelve cases.
+
+Independent whole-change ponytail review found no remaining source blocker and
+agrees that the residual timing gate must remain open.
+This is a coordinated internal-ABI change: commit FixedMathSharp first and
+advance Gravitas's develop-workflow dependency pin to that pushed revision;
+released-package validation still follows the upstream release.
+
 ### Phase 2 - Integrate Static Membership And Contact Reduction
 
 - [ ] Implement the reviewed membership operations through existing dimensional
