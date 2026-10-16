@@ -14,7 +14,8 @@ using System.Collections.Generic;
 namespace Gravitas.CollisionHandling;
 
 /// <summary>Retains each admitted capsule section's exact face direction and finite sample coverage.</summary>
-internal sealed class MeshCapsuleFaceRegions
+/// <content>Single-member gathering, exact point storage and final sample access.</content>
+internal sealed partial class MeshCapsuleFaceRegions
 {
     private ulong[] _values = Array.Empty<ulong>();
     private int[] _signs = Array.Empty<int>();
@@ -59,6 +60,7 @@ internal sealed class MeshCapsuleFaceRegions
     internal void Build(PhysicsMesh mesh, int surfaceTriangle, in CapsuleFiniteSectionFrame finite,
         Vector3d center, FixedQuaternion rotation, MeshSurfaceConnectivity connectivity)
     {
+        if (_joined != null) _joined.Active = false;
         RegionCount = connectivity.RegionCount;
         HasBoundaryIntersection = false;
         if (RegionCount == 0) return;

@@ -3,7 +3,7 @@
 **Date:** 2026-10-15  
 **Status:** Phase 1 in progress, 2026-10-16, to resolve
 #133/#139 together. Heightfield and alternative-index work remain deferred;
-no new runtime API has been implemented.  
+no public continuity API or joined response is enabled.  
 **Order:** #132 is resolved. Resolve #133 and its confirmed pure 2D counterpart,
 #139, through the generic-continuity phases below before terrain-specific work.
 Keep one implementation plan rather than duplicate the prerequisite design.  
@@ -252,10 +252,7 @@ claimed here.
 - [x] Supply exact capsule math prerequisites: member-scale depth ordering and
   original-edge rational clipping with reconstructible events. Keep the joined
   domain and final witness-ownership proof as the separate gates below.
-- [ ] Add maintained full-loop regressions for the confirmed 3D and 2D crossings
-  and a vertical mixed surface with a planar response normal. Use existing
-  scenario helpers; do not test probe/report plumbing for coverage.
-- [ ] Demonstrate exact boundary coincidence, coplanarity, opposite-side fill,
+- [x] Demonstrate exact boundary coincidence, coplanarity, opposite-side fill,
   partial coverage and shared-corner handling across independent member frames.
   Extend existing `PhysicsMesh` topology and `MeshSurfaceConnectivity` access
   only where needed; retain per-member feature identities. Use actual committed
@@ -267,7 +264,11 @@ claimed here.
   Reuse FixedMathSharp's wide rigid projections and anchored geometry. If a
   missing operation is policy-neutral math, add the narrow operation upstream;
   keep connectivity, physics selection and failure policy in Gravitas.
-- [ ] Measure the two-member seam/interior path against the frozen control.
+- [ ] Settle filled-2D deep-containment recovery before claiming the dimensional
+  proof complete. Ordinary contacts retain independent true-boundary normal
+  groups; nearest-corner projection alone does not certify a whole-union exit.
+- [x] Measure the bounded capsule two-member seam/interior proof against the
+  frozen ordinary control and matched complete single-member gathering.
   Refine introduced costs in this phase. Stop and revise the design if exact
   multi-frame reduction requires a large parallel geometry solver, a global
   mesh rebake or a resolved ordinary-path warm regression.
@@ -275,187 +276,202 @@ claimed here.
 Record a concise phase result here; keep #133/#139 open until their full runtime
 and lifecycle gates pass.
 
-**Progress, 2026-10-16:** Isolated experiments, independently rerun against frozen
-FixedMathSharp `5C26BDA7`, pass 24 named join cases with 109 symmetry/reversal
-evaluations and six three-member pair classifications. Existing anchored
-numerators suffice for exact coplanar span predicates, including partial spans,
-different frames and world-limit positions. Conservative 3D determinant/plane
-bounds fit `Signed576`; 2D determinants fit `Signed320`. Pairwise matches alone
-do not prove trusted topology: a valid subdivided join and ambiguous overlapping
-coverage can produce the same pairwise boolean matrix. Folded cases only prove
-that coplanar erasure is rejected; folded normal fans remain unimplemented.
+**Progress, 2026-10-16:** The maintained bounded proof now retains original
+member edges, exact rational clips and member/surface identities. It counts
+filled half-neighborhoods, rather than treating pairwise coincidence as trusted
+topology. Exactly one filled side per eligible member can join; point contacts,
+duplicate fill and folded/nonmanifold incidents retain boundaries. Compatible
+intervals coalesce across irrelevant triangulation cuts. Actual committed
+collider fixtures cover independent poses, centering, world limits, unequal
+subdivision, partial spans, gaps and opposite physical normal conventions.
 
-The capsule experiment reconstructs 48 native events and passes 36 exact
-cross-frame containment/outside checks, including irrational coordinates and
-unequal frame denominators. It matches 32 physical point pairs; 17 raw depth
-comparisons differ despite equivalent physical events. Existing comparisons are
-correct for their single-frame contract; pooling them unchanged is invalid.
-Reuse the moving-shape chart with retained member/frame provenance and add
-scale-aware exact comparison in the existing math owner. A rounded-depth oracle
-is diagnostic only. Partial boundary spans also need exact clipped parameters
-or framed endpoints, not rounded replacement segments. Cone/slab metrics require
-their own verification. `geometry-proof/` and `capsule-proof/` under the ignored
-artifact root retain source/binary bindings and root reruns. Maintained runtime,
-full topology/reduction, coverage and candidate cost gates remain open; Phase 1
-is not complete and neither issue is resolved.
+Pure 2D uses its actual scalar Sin/Cos geometry. Embedded mixed targets use
+the actual quaternion prism frames; equal host Y and half-thickness permit a
+full-height planar certificate, while differing slabs retain their steps.
+A mixed diamond-overlap regression verifies that its internal fan diagonal
+does not manufacture separate ambiguous boundary intervals. No 2D mesh API,
+combined world mesh or additional spatial index has been introduced.
 
-**Implementation progress, 2026-10-16:** FixedMathSharp now provides exact
-coplanar capsule-depth comparison across member scales and closed rational
-segment clips for its existing plane-ray events. Physical depth is
-`t * sqrt(N·N) / (2D)`; raw `t` comparisons across different `D` are invalid.
-The new comparison requires the same capsule chart and certified coplanar
-primitive normals with the same squared metric. It compares rational/quadratic
-values and retained algebraic roots without rounding depths or re-isolating
-transformed polynomials. Positive divisor growth is included in the existing
-root-separation proof; scaled proportional-polynomial identity avoids refining
-exact ties to that worst-case bound. The ordinary entry retains its prior
-comparison path.
+The joined capsule proof reuses existing finite connectivity, retained algebraic
+banks and the plane sample reducer. Input triangles normalize to unique surface
+owners and meshes. Finite admission joins local regions through certified
+spans; static adjacency alone cannot connect them. Intrinsic plane events are
+produced once per joined region and admitted against each member in its native
+frame. Event reconstruction retains the producer frame separately from the
+supplying owner, so anchors and materials cannot be inherited from the wrong
+member. Equal depth/point ties use stable supplying collider/owner identity;
+within that owner the existing fixed producer order suffices. Preparation reuse
+and opposite-normal fixtures check every sample, including nonseed suppliers.
+Representative exits touch the complete supplied geometry and separate one raw
+unit farther; anchor distance alone is not the exit assertion.
 
-Clips retain the original edge plus exact parameter bounds. They emit their
-own rational endpoints and filter original section/stationary events, including
-targeted reconstruction. Full intervals use the existing default path; point
-intervals remain closed. For normalized member/capsule rotations and full raw
-authored points, doubled transformed coordinates/differences are below 198
-bits. Combining them with positive rational bounds below 319 bits gives endpoint
-coordinate numerators below 518 bits, fitting `Signed576`; point-ray products
-remain within the existing 4096-bit fields and 3072-bit discriminant storage.
-Clipping does not change section/stationary polynomials or their radicands.
-Focused cases include opposite rays, zero/nonzero cores, exact endpoint ties,
-sub-raw distinct points/depths, rejected section/stationary replay and large
-coprime plane normals with independently rotated frames.
+Only the last supplied local member set retains static boundary preparation,
+keyed by collider reference, surface owner, lifetime and committed shape version.
+Any member change rebuilds that complete local preparation. Finite admission,
+frames, connectivity and samples are recomputed every call; this is not retained
+contact-result reuse. Mutation tests compare reused and fresh preparation after
+pose, scale, replacement, lifetime, owner, filtering and input-order changes.
 
-Independent ponytail review removed a same-frame caller change that added no
-behavior. These are internal math prerequisites, not an integrated continuity
-feature: Gravitas still needs the prepared joined boundary domain, stable span
-and member provenance, aggregate normal fans and face-sample reduction. Do not
-add synthetic clipping calls to existing wholly exposed single-mesh edges.
-Cone/slab scale proofs, actual committed-collider fixtures and the corrected
-two-member runtime cost remain open before Phase 1 can close.
+An endpoint fan follows only incident positive-length certified joins. An exact
+cut inside an original edge uses its interior sector, not an original endpoint's
+corner. Point-only neighbors remain separate; ambiguous incidents decline the
+certificate. Inward rays are combined in the source chart without rounding cuts.
+The contained-section shortcut checks the complete retained perimeter and one
+trusted region before using the existing strictly curved support. Full canonical
+shared edges with one finite region per side use exact segment admission rather
+than generating unrelated ray extrema. Other cases retain the general path.
 
-Validation of this math increment uses `UseLocalLsfStack=true`: both complete
-solutions build without warnings in Release/ReleaseLean. FixedMathSharp passes
-5,912/5,891 core cases and 49 recording cases per profile; Gravitas passes
-6,683/6,615 cases. All four core coverage captures have 100% raw reachable
-line/branch/method coverage. Six native replay fixtures agree with shared
-expectations and directly across Windows x64 Release/Lean; other OS/architecture
-lanes were not run locally. Frozen inputs, raw captures and replay comparison
-are under `artifacts/grv-issue-133/phase1/{fms-warm-final,coverage,replay-warm-final}`.
-The expanded arithmetic/event guards pass 128 warmed repeats at 0 B, including
-all four quadratic/algebraic representation pairs and clipped event generation.
-Independent geometry and final ponytail reviews found no remaining source
-blocker; the existing complexity register records the arithmetic invariants.
+**Arithmetic and rounding bounds:** Physical plane-ray depth is
+`t * sqrt(N·N) / (2D)`; raw member-native depths are not comparable across `D`.
+Capsule, cone and finite-slab comparisons retain exact frame scales. Slab compact
+parameters are converted with their existing rational/quadratic owners, including
+either quadratic branch, repeated roots and conditioning differences. Eliminated
+slab quadratics can require fewer than 2,133 coefficient bits; the adaptive
+comparison is tested beyond 4,096 discriminant bits. These operations do not
+replace the ordinary single-frame comparison path.
 
-The final balanced original/candidate/candidate/original arithmetic experiment
-retains all 132 actual observations, four generated-child dependency/fixture
-bindings and 22 successful case launches. Mean microseconds per fixture batch:
+Normalized framed point coordinates need fewer than 200 bits, triangle clip
+bounds fewer than 268 and sided cross products fewer than 403. Doubled capsule
+coordinates/differences stay below 198 bits; original-edge rational bounds below
+319 bits keep clipped endpoint numerators below 518, within Signed576. Rational
+endpoint incidence needs fewer than 589 bits within Signed832, with clipped-bound
+products compared at full width. Common-chart fan rays fit Signed320. Cross-frame
+admission and retained-point normalization add at most 132 denominator bits;
+three extra limbs preserve the fields. Point deduplication, connectivity, depth
+ordering and supplying provenance precede materialization. Coverage is ranked
+using exact plane metrics over once-rounded Q32.32 capsule-chart points; each
+coordinate has at most half a raw unit of nearest-even rounding. Supplier-relative
+anchors retain their own final coordinate rounding, without narrowing absolute
+world positions. Exact normals below 262 bits keep projected metrics in Signed832.
 
-| Ordinary control | Frozen original | Final | Difference |
+**Resolved prerequisite:** FMS-Issue-032 was reproduced on the frozen pre-work
+stack: two anchor projection forwarders dropped the retained sub-raw local term.
+Both now preserve it through cached-frame projection and final interpolation.
+Nine mirrored/world-limit and independently rotated real-support cases include
+an exact test-only rounding oracle. FixedMathSharp Release/Lean pass 5,985/5,964
+core cases and 49 recording cases each, with raw reachable 100% line, branch and
+method coverage and unchanged frozen source hashes. The existing complexity
+register records current arithmetic rationale; no separate report is maintained.
+Captures are under `artifacts/grv-issue-133/phase1/joined-preliminary`.
+
+**Performance evidence:** The earlier ordinary capsule `+1.967 us` hold was
+resolved through one bounded nine-block calibration: byte-identical accepted
+A0/A1 graphs reproduce `+1.964 us` with a process-level 95% interval of
+`-2.311..+6.238 us`. Candidate versus the within-block accepted mean is
+`-3.269 us`, interval `-6.733..+0.194 us`. All 432 actual observations allocate
+zero bytes, collect no generations and retain identical physical signatures.
+This supports baseline preservation at that resolution, without claiming an
+exact zero cost or a speedup. Earlier native BenchmarkDotNet observations remain
+unchanged; separate attribution evidence is under
+`perf/boundary-domain/calibration`. Prior arithmetic and boundary-preparation
+gates remain in `perf/{selection,boundary-domain}/acceptance-final.json`.
+
+New joined budgets distinguish the original pre-admitted-triangle face path
+from matched complete owner gathering: their different admission work is not
+pure joining overhead. Removing duplicated support/intrinsic work and retaining
+bounded static preparation reduced the initial sphere/axial/angled pilots from
+about `479/550/2,965 us` to `104/128/1,509 us`. The final native run retains all
+144 actual observations across nine cases and two launches per case:
+
+| Geometry | Pre-admitted single sheet | Gathered single sheet | Joined two members |
 | --- | ---: | ---: | ---: |
-| Same-frame depth comparison, 38 pairs | 34.846 | 33.904 | -2.7% |
-| Unchanged containment control | 151.246 | 151.395 | +0.1% |
-| Plane event production | 411.975 | 395.646 | -4.0% |
-| Segment event production | 398.938 | 385.343 | -3.4% |
+| Sphere | 25.36 us | 62.03 us | 90.70 us |
+| Axial capsule | 37.26 us | 79.47 us | 128.52 us |
+| Angled capsule | 1,032.70 us | 1,358.98 us | 1,421.56 us |
 
-Both paired blocks are lower for the affected ordinary rows; containment has
-opposite block signs. With two launches per variant, accept baseline preservation
-at this measurement resolution rather than infer a causal or engine-wide gain.
-New-entry budgets per 38 comparisons are 36.526 us with matching frames and
-68.182 us across frames; clipped production is 58.372 us per batch. These are
-math-kernel costs, not corrected seam
-simulation costs. Every measured row allocates 0 B; the expanded 128-repeat
-guard also passes at 0 B against the actual Release/Lean math graphs. The final
-Release math is `7855DA98`, Lean `9341D618`;
-`perf/selection/acceptance-final.json` summarizes the accepted gate and
-`perf/selection/warm-final-*` retains
-actual child bindings, source manifests, all observations and the paired
-analysis. Earlier slow-tie and incomplete-binding runs are diagnostic only.
+All warmed cases allocate zero bytes. These are bounded internal-kernel budgets
+over the same retained local member set, not frame-capacity claims or precise
+scaling guarantees. A fresh face owner over already committed meshes allocates
+49,280 bytes for sphere/axial and 68,520 for angled storage; that is distinct from
+warmed calls and whole-world startup. Preparation remains bounded by supplied
+local candidates, rather than scanning a world-sized membership set. Native
+observations, first-owner guards and source/module bindings remain under
+`perf/joined-face/final-feature-{budget,all-observations,guard}.json` and the
+corresponding native command/log records.
 
-**Prepared boundary progress, 2026-10-16:** Gravitas now has an internal,
-reusable `MeshSurfaceBoundaryDomain` classifier for one canonical perimeter
-against an explicit bounded member set. It retains each original edge, exact rational parameter
-bounds, source pose and member/surface provenance. FixedMathSharp owns the
-neutral triangle clipping and framed predicates; no world vertices are merged
-or rounded into a common mesh. Normalized plain-point frames give coordinate
-numerators below 200 bits, clip bounds below 268 bits and sided cross products
-below 403 bits, within the existing math storage and capsule clip contract.
+A separate final-source pilot alternates two equivalent two-member sets on one
+reused face owner, forcing static preparation to rebuild. Sphere/axial/angled
+means are `192.01/212.56/1,580.47 us`, across two fresh processes and 36 retained
+phases. All phases and 128-call warmed guards allocate zero bytes and collect no
+generations; both sets retain matching physical signatures and current-set
+suppliers. These fixed-loop pilot budgets are separate from the native same-set
+measurements. `final-churn-{budget,all-observations}.json` retains observations
+and exact module bindings. Last-set reuse therefore does not establish arbitrary
+world-level contact reuse. Runtime integration must measure changing candidate
+neighborhoods and reuse committed static preparation through its membership
+lifecycle, without building a world-sized surface or treating cold-owner timings
+as a warmed-allocation result.
 
-The classifier partitions the edge at exact triangle intersections and counts
-filled half-neighborhoods by member and trusted surface owner. Exactly one fill
-on each side from different members establishes a local joined span. Same-side
-duplicates, a third filled interior and folded incident sheets retain ambiguous
-boundary spans. Point-only contact supplies no open-span coverage. Checking the
-source inward point distinguishes a folded incident sheet from coplanar fill;
-ignoring that third sheet would incorrectly certify a nonmanifold seam. Adjacent
-intervals coalesce only with compatible ownership, preserving canonical edges
-without artificial events at authored subdivisions. Preparation reuses the
-existing boundary fan: its exact unnormalized ray plus the source endpoint
-recovers the original inward vertex in wide arithmetic. The ordinary fan and
-all its callers remain unchanged, with no duplicated search or new hot call.
-The final fan also has identical normalized compiled instructions, locals and
-stack layout to the original baseline.
+The final ordinary native ABBA gate uses identical ordinary-only host sources
+and timed-method IL, with live generated-child bindings to all eight runtime
+modules. All 128 actual measurements are retained. Mean changes are capsule
+`+0.48%`, cone `+0.71%`, mixed circle `+0.06%` and pure 2D capsule/polygon
+`+0.90%`; all warmed allocations are zero and physical outputs match exactly.
+Capsule, mixed and 2D paired contrasts reverse sign; cone's two are positive.
+All process-paired 95% intervals include both signs. Two paired launch blocks
+give wide uncertainty, so this passes the no-resolved-regression gate at the
+observed resolution, not a proof of zero overhead. No iteration samples were
+treated as independent process replications. Detailed observations, failed
+zero-benchmark startups and bindings remain in
+`perf/joined-face/final-ordinary-{assessment,all-observations}.json`, each
+`final-ordinary-bound-*-command.json` and the corresponding native logs.
 
-Maintained cases exercise actual committed collider centering and independent
-quarter-turn poses, world limits, partial spans, winding, all projection axes,
-one-raw gaps, ambiguous/same-member geometry and provenance-preserving
-subdivisions. Math cases also pass produced non-lattice intervals directly into
-capsule event generation and reconstruct their witnesses exactly. These are
-local span proofs: endpoint fans, whole-component embedding, joined face/sample
-ownership, 2D reduction and full-loop runtime regressions remain open. No public
-membership or simulation behavior is enabled by this increment, and neither
-#133 nor #139 is resolved.
+**Validation:** Frozen final source passes 6,778 Gravitas Release and 6,710 Lean
+cases, with raw reachable 100% line, branch and method coverage in both profiles.
+All six native replay fixtures agree between Windows x64 Release/Lean and their
+shared expected captures. Independent ponytail review of both repositories,
+connected owners and final regression additions has no outstanding findings.
+`phase1/{coverage-joined-closeout-summary,gaps-joined-closeout}.json` and
+`phase1/replay-joined-closeout-comparison.log` retain the local results. Linux,
+ARM and released-package validation were not executed here. This validation
+does not establish the remaining dimensional contracts below.
 
-For the next joined-capsule proof, reuse the bounded capsule chart for exact
-point deduplication and final Q32.32 sample ranking. Existing point projection
-and retained `FiniteSectionPoint` storage can supply this chart; member-native
-point/depth comparisons cannot be mixed unchanged. Retain each event's member,
-frame and span for witness reconstruction, align ray orientation across opposite
-windings, and use scale-aware depth comparison before copying the winning
-selection. Extend the existing plane-metric owner only if its exact-normal
-input and width proof are required; do not add a parallel sample reducer.
-Normalize member coordinate scales before cross-frame triangle admission, and
-join local contact regions only through a clipped span admitted by the finite
-shape. Static adjacency alone cannot connect those regions or enable the
-contained-section shortcut before embedding and normal-fan trust is established.
+**Remaining dimensional decision:** Actual committed AABB and polygon L-unions
+agree: a radius-0.5 circle at `(-1,-1)` pushed by nearest-corner distance plus
+radius ends near `(0.353553390596,0.353553390596)` and still penetrates both arms
+by about `0.146446609404`. Center `(0.5,0.5)` touches both; one raw unit farther
+on each axis separates. Ordinary exterior manifolds retain two circle, three
+capsule and four polygon rows across two independent real-boundary normal
+groups, each at depth 0.25. Preserve both supplier/normal groups; lowest-ID ties
+only deduplicate equivalent constraints. Polygon clipping must regenerate the
+missing endpoint `(0,0)` between an internal row `(-0.25,0)` and an exposed row
+`(0.75,0)`, rather than merely delete the covered row. The repeated frozen
+proof and eight-module bindings are under `artifacts/grv-issue-133/l-union-proof`.
+A separate pre-existing single/query witness defect is captured as #140; this
+proof uses the correct finite manifold path.
 
-This increment passes both complete solution builds without warnings using
-`UseLocalLsfStack=true`. Release/Lean pass 6,704/6,636 Gravitas tests and
-5,926/5,905 FixedMathSharp core tests, plus 49 recording cases per profile.
-All four raw core captures have 100% reachable line, branch and method coverage;
-the final math source hashes match. Six native replay fixtures match shared
-expectations and each other on Windows x64 Release/Lean. Other platform lanes
-and package-mode validation were not run locally. The final captures are under
-`artifacts/grv-issue-133/phase1/{boundary-domain-final,coverage,replay-boundary-domain-cold-final}`;
-the Gravitas coverage/build label is `boundary-domain-cold-final`.
-The final balanced ordinary-path window reports capsule `+0.7047%`
-(`+1.967 us`), cone `-0.6183%` and mixed `+0.3230%`, all at `0 B/op`.
-Both capsule launch pairs are positive; two independent pairs provide limited
-process-level evidence, but do not support a zero-cost claim. Existing ordinary
-source and normalized fan instructions are unchanged, with no identified added
-arithmetic, branch, allocation or call in that path. This does not rule out
-assembly layout, JIT or host effects. The strict warm-baseline gate remains
-**open within Phase 1**; neither an algorithmic regression nor an unchanged
-baseline is established. Preserve the frozen graphs and all observations under
-`artifacts/grv-issue-133/perf/boundary-domain/cold-final-*` rather than tune
-unrelated code to a particular layout. Earlier extraction/output-parameter
-experiments are diagnostic and are not the accepted source.
+The proposed deep-containment contract is bounded local certification with an
+explicit deterministic result when no whole-shape local exit can be certified.
+The alternative exact global minimum-exit solver needs expanded-obstacle
+boundary intersections and potentially a much wider search than the initially
+overlapping members. That decision remains open. Static edge clipping is not a
+complete filled-2D reducer. Cone and mixed finite-height slab witness ownership
+also need their own joined proofs; depth comparisons alone do not establish
+them. Their existing event owners do not yet consume retained partial-edge
+intervals. Cone cuts need endpoint events and reconstructible replay, while
+slab cuts need exact finite-domain constraints; filtering existing full-edge
+events alone cannot supply either proof. Reuse those family owners and the
+shared boundary/fan/connectivity data rather than introduce a parallel generic
+solver. Nonaxial slab exits must retain the existing full-owner physical-support
+search: a source point outside the initial section can enter the slab during
+translation, so initial triangle admission alone does not certify the exit.
+A capsule cannot substitute for an embedded slab. Phase 1 and #133/#139
+remain open, and no public membership or joined response is enabled.
 
-New preparation budgets are about `15.9-36.0 us` for the five small fixtures
-and `710.3 us` for 32 collinear authored subedges against 35 target triangles.
-All reused preparation is `0 B`; fresh storage costs `4,664 B`, or `32,456 B`
-for `Collinear32`. These single-launch budgets are local preparation
-costs, not frame costs or large-topology acceptance. Runtime integration still
-requires bounded candidate work. The final `perf/boundary-domain/acceptance-final.json`
-retains source/module bindings and all 192 actual observations with an explicit
-**open** status; `preparation-budgets-final.json` retains all twelve cases.
-
-Independent whole-change ponytail review found no remaining source blocker and
-agrees that the residual timing gate must remain open.
-This is a coordinated internal-ABI change: commit FixedMathSharp first and
-advance Gravitas's develop-workflow dependency pin to that pushed revision;
-released-package validation still follows the upstream release.
+This is a coordinated internal-ABI change: commit/push FixedMathSharp first,
+then pin Gravitas's develop workflow to that revision before pushing Gravitas.
+Released-package validation follows the upstream release. Full-loop crossing
+regressions belong to the runtime integration phase below; they cannot pass
+before membership and response are wired. Keep the existing baseline fixtures.
 
 ### Phase 2 - Integrate Static Membership And Contact Reduction
 
+- [ ] Turn the retained baseline crossing fixtures into maintained full-loop
+  regressions for 3D, pure 2D and both mixed directions, including a vertical
+  mixed sheet with a planar response normal. These require the membership and
+  response integration in this phase; Phase 1's direct geometry proof cannot
+  make the current independent-collider host loop continuous. Reuse scenario
+  helpers and assert physical behavior, rather than testing probe plumbing.
 - [ ] Implement the reviewed membership operations through existing dimensional
   services and collider lifecycle owners. Cover invalid ownership/roles, atomic
   replacement, removal, disposal/reset and ID/lifetime reuse.

@@ -2,7 +2,7 @@
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-140`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-141`.
 - Assign an ID when an issue enters this tracker, keep it through resolution,
   and never reuse an ID even if an entry is later removed. Check this file's Git
   history before advancing or repairing the counter.
@@ -46,6 +46,10 @@ response ownership overlaps. #133's investigation confirms **#139**, the pure
 in the existing surface plan, then resolve the dimensional owners before
 heightfield work. The user approved resolving both through that plan; begin its
 bounded geometry phase before publishing the new membership API.
+
+#140 follows that work: the existing 2D single-contact/query path discards finite
+witnesses even on one convex target. Keep its fix separate from joined-boundary
+reduction, while retaining the shared finite-witness lesson in both paths.
 
 #111 remains an independent validation-tooling issue.
 #125 is a low-priority, non-blocking runtime crash observation; defer further
@@ -137,6 +141,47 @@ investigation unless it recurs or a reliable reproducer becomes available.
 - **Evidence:** Ignored `artifacts/grv-issue-133/parity/{original,binding,source-hashes}.json`
   retain the fixture, repeats and eight loaded-module hashes, including core
   `8A7E5C4D`. No production changes or fix are claimed by this investigation.
+
+### GRV-Issue-140 - Convex 2D single contacts discard finite witnesses consumed by shape sweeps
+
+- **Confirmed:** 2026-10-16 during #133/#139's filled-union feasibility probe;
+  reproduces on retained #138 core `8A7E5C4D` and FixedMathSharp `5C26BDA7`,
+  before the continuity work or the exact-anchor projection correction.
+- **Reproduction:** Register a bodyless AABB of size `(8,4)` at planar center
+  `(0,-2)`, covering `[-4,4] x [-4,0]`. Register a convex rectangular polygon
+  with local vertices `(-.5,-1),(.5,-1),(.5,1),(-.5,1)` at `(.25,.75)`.
+  Its bounds are `[-.25,.75] x [-.25,1.75]`; the overlap depth is `.25`.
+  `CollisionDetection2D.TryCollide(mover, floor, out Contact2D)` returns
+  target anchor `(4,0)`, outside the mover and finite overlap. Calling the real
+  `QueryDetection2D.TrySweepMoverShape` worker with displacement `(1,0)`
+  publishes the same `(4,0)` witness at distance zero. Substituting an
+  equivalent polygon for the AABB floor preserves the failure.
+- **Control:** The manifold overload returns matched finite target witnesses
+  `(-.25,0)` and `(.75,0)`, with corresponding actor points at Y=`-.25`.
+  Circle/capsule controls retain finite initial-overlap witnesses. The bounded
+  probe repeats both member representations identically and verifies all eight
+  frozen module bindings; ignored
+  `artifacts/grv-issue-133/l-union-proof/{Program.cs,results.json,source-binding.json}`
+  retains complete committed geometry, single/manifold/query outputs and hashes.
+- **Root cause:** `CollisionDetection2D.TryConvexConvex(..., out Contact2D)`
+  computes `firstContactAnchors`/`secondContactAnchors` using
+  `FixedConvex2dRelations.TryGetConvexContacts`, then discards them and builds
+  the result from arbitrary support-feature endpoints. The manifold overload
+  already uses the computed finite anchors. Consumers include the initial
+  overlap branch of `QueryDetection2D.TrySweepConvexMoverAgainstConvex` and
+  `SolidBody2D`'s rotational contact search.
+- **Impact:** Confirmed shape-sweep witness outside the actual finite overlap;
+  this is not merely choosing a different valid representative contact.
+  Angular response or query consumers can receive an unrelated tangential lever.
+  A complete dynamic-target CCD trajectory difference has not been measured.
+  Ordinary discrete manifolds use the correct path and are not implicated by
+  this reproducer.
+- **Follow-up:** Reuse the already-computed finite contact anchors in the
+  single-contact result. Verify collider reversal, AABB/polygon parity,
+  initial-overlap sweeps and rotational CCD against the manifold geometry;
+  retain deterministic representative selection, material ownership and the
+  ordinary warm baseline. This issue remains separate from cross-member
+  continuity; current continuity proofs must use the finite manifold path.
 
 ### GRV-Issue-111 - Local-stack benchmark hosts can omit FixedMathSharp compile references
 
