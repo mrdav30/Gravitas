@@ -3,6 +3,7 @@ using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.Tests.Support;
+using System;
 using Xunit;
 
 namespace Gravitas.Tests.Core;
@@ -132,6 +133,53 @@ public sealed class SolidBodyMotionHardeningTests
         body.Body.AngularSpeed.Should().BeLessThan(speedBeforeFriction);
     }
 
+    [Theory]
+    [InlineData(4, 1, 16, PhysicsRuntimeMode.ThreeD)]
+    [InlineData(64, 8, 1024, PhysicsRuntimeMode.ThreeD)]
+    [InlineData(4, 1, 16, PhysicsRuntimeMode.Mixed)]
+    [InlineData(64, 8, 1024, PhysicsRuntimeMode.Mixed)]
+    public void LateSimulate_GroundAngularFriction_ShouldStopWithoutReversing(
+        int frameRate, int sizeDenominator, int impulseDenominator, PhysicsRuntimeMode mode)
+    {
+        using PhysicsScenarioBuilder scenario = CreateMotionScenario();
+        scenario.Context.Settings.RuntimeMode = mode;
+        scenario.Context.SetFrameRate(frameRate);
+        scenario.Context.Environment.Gravity = Fixed64.One;
+        ScenarioBody<LSCuboidCollider> body = scenario.CreateBody(
+            new LSCuboidCollider { Size = Vector3d.One / (Fixed64)sizeDenominator },
+            Vector3d.Zero, FixedQuaternion.Identity);
+        body.Collider.Material = PhysicsMaterialTestHelper.WithFrictionAndRestitution(Fixed64.One, Fixed64.Zero);
+        body.Body.SetManualGrounding(Vector3d.Zero, Vector3d.Up);
+        body.Body.AddAngularImpulse(Vector3d.Up / (Fixed64)impulseDenominator);
+
+        scenario.Context.Simulate();
+        scenario.Context.LateSimulate();
+
+        body.Body.AngularVelocity.Should().Be(Vector3d.Zero);
+    }
+
+    [Theory]
+    [InlineData(4, PhysicsRuntimeMode.ThreeD)]
+    [InlineData(64, PhysicsRuntimeMode.ThreeD)]
+    [InlineData(4, PhysicsRuntimeMode.Mixed)]
+    [InlineData(64, PhysicsRuntimeMode.Mixed)]
+    public void LateSimulate_GroundLinearFriction_ShouldStopWithoutReversing(int frameRate, PhysicsRuntimeMode mode)
+    {
+        using PhysicsScenarioBuilder scenario = CreateMotionScenario();
+        scenario.Context.Settings.RuntimeMode = mode;
+        scenario.Context.SetFrameRate(frameRate);
+        scenario.Context.Environment.Gravity = (Fixed64)64;
+        ScenarioBody<LSCuboidCollider> body = scenario.CreateCuboid(Vector3d.Zero);
+        body.Collider.Material = PhysicsMaterialTestHelper.WithFrictionAndRestitution(Fixed64.One, Fixed64.Zero);
+        body.Body.SetManualGrounding(Vector3d.Zero, Vector3d.Up);
+        body.Body.AddLinearImpulse(Vector3d.Right / (Fixed64)8);
+
+        scenario.Context.Simulate();
+        scenario.Context.LateSimulate();
+
+        body.Body.LinearVelocity.Should().Be(Vector3d.Zero);
+    }
+
     [Fact]
     public void LateSimulate_WithGroundedVerticalMotion_ShouldNotInventHorizontalFriction()
     {
@@ -147,6 +195,219 @@ public sealed class SolidBodyMotionHardeningTests
         body.Body.LinearVelocity.X.Should().Be(Fixed64.Zero);
         body.Body.LinearVelocity.Z.Should().Be(Fixed64.Zero);
         body.Body.LinearVelocity.Y.Should().BeGreaterThan(Fixed64.Zero);
+    }
+
+    [Theory]
+    [InlineData(-4)]
+    [InlineData(-1)]
+    [InlineData(0)]
+    public void GroundFriction_AfterDrivingMotionReversesOrStops_ShouldNotAddMotion(int drive)
+    {
+        using PhysicsScenarioBuilder scenario = CreateMotionScenario();
+        scenario.Context.Environment.Gravity = (Fixed64)64;
+        ScenarioBody<LSCuboidCollider> body = scenario.CreateCuboid(Vector3d.Zero);
+        body.Collider.Material = PhysicsMaterialTestHelper.WithFrictionAndRestitution(Fixed64.One, Fixed64.Zero);
+        body.Body.SetManualGrounding(Vector3d.Zero, Vector3d.Up);
+        body.Body.AddLinearImpulse(Vector3d.Right / (Fixed64)4);
+        body.Body.AddAngularImpulse(Vector3d.Up / (Fixed64)16);
+        body.Body.AddForce(Vector3d.Right * (Fixed64)drive);
+        body.Body.AddTorque(Vector3d.Up * Fixed64.FromFraction(drive, 4));
+
+        scenario.Context.Simulate();
+        scenario.Context.LateSimulate();
+
+        body.Body.LinearVelocity.Should().Be(Vector3d.Zero);
+        body.Body.AngularVelocity.Should().Be(Vector3d.Zero);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void GroundLinearFriction_ShouldPreserveSeparatingNormalMotion(bool freezeVertical)
+    {
+        using PhysicsScenarioBuilder scenario = CreateMotionScenario();
+        scenario.Context.Environment.Gravity = (Fixed64)64;
+        ScenarioBody<LSCuboidCollider> body = scenario.CreateCuboid(Vector3d.Zero);
+        body.Collider.Material = PhysicsMaterialTestHelper.WithFrictionAndRestitution(Fixed64.One, Fixed64.Zero);
+        body.Body.FreezeAxes = freezeVertical ? BodyFreezeAxes3D.PositionY : BodyFreezeAxes3D.None;
+        body.Body.SetManualGrounding(Vector3d.Zero,
+            freezeVertical ? new Vector3d(0, 3, 4) : Vector3d.Up);
+        Vector3d separatingVelocity = freezeVertical ? Vector3d.Forward : Vector3d.Up;
+        body.Body.AddLinearImpulse(Vector3d.Right + separatingVelocity);
+
+        scenario.Context.Simulate();
+        scenario.Context.LateSimulate();
+
+        body.Body.LinearVelocity.Should().Be(separatingVelocity);
+    }
+
+    [Fact]
+    public void GroundLinearFriction_WithTinyPermittedNormal_ShouldNotInventATangent()
+    {
+        using PhysicsScenarioBuilder scenario = CreateMotionScenario();
+        scenario.Context.Environment.Gravity = (Fixed64)64;
+        ScenarioBody<LSCuboidCollider> body = scenario.CreateCuboid(Vector3d.Zero);
+        body.Collider.Material = PhysicsMaterialTestHelper.WithFrictionAndRestitution(Fixed64.One, Fixed64.Zero);
+        body.Body.FreezeAxes = BodyFreezeAxes3D.PositionY | BodyFreezeAxes3D.PositionZ;
+        body.Body.SetManualGrounding(Vector3d.Zero,
+            new Vector3d(Fixed64.FromFraction(1, 8192), Fixed64.One, Fixed64.Zero));
+        body.Body.AddLinearImpulse(Vector3d.Right);
+
+        scenario.Context.Simulate();
+        scenario.Context.LateSimulate();
+
+        body.Body.LinearVelocity.Should().Be(Vector3d.Right);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void GroundAngularFriction_WithAnisotropicInertia_ShouldReduceEnergy(bool freezeVerticalRotation)
+    {
+        using PhysicsScenarioBuilder scenario = CreateMotionScenario();
+        scenario.Context.SetFrameRate(64);
+        scenario.Context.Environment.Gravity = Fixed64.One;
+        ScenarioBody<LSCuboidCollider> body = scenario.CreateBody(
+            new LSCuboidCollider { Size = new Vector3d(1, 2, 3) },
+            Vector3d.Zero, FixedQuaternion.FromEulerAnglesInDegrees((Fixed64)15, (Fixed64)30, (Fixed64)45));
+        body.Collider.Material = PhysicsMaterialTestHelper.WithFrictionAndRestitution(Fixed64.One, Fixed64.Zero);
+        body.Body.FreezeAxes = freezeVerticalRotation ? BodyFreezeAxes3D.RotationY : BodyFreezeAxes3D.None;
+        body.Body.SetManualGrounding(Vector3d.Zero, Vector3d.Up);
+        body.Body.AddAngularImpulse(new Vector3d(Fixed64.Half, Fixed64.Zero, Fixed64.Half));
+        Vector3d before = body.Body.AngularVelocity;
+        Fixed3x3 inertia = GetWorldInertia(body.Body);
+        Fixed64 energyBefore = Vector3d.Dot(before, inertia * before);
+
+        scenario.Context.Simulate();
+        scenario.Context.LateSimulate();
+
+        Vector3d after = body.Body.AngularVelocity;
+        inertia = GetWorldInertia(body.Body);
+        Vector3d.CompareMagnitudeSquared(after, Vector3d.Zero).Should().BeGreaterThan(0);
+        Vector3d.Dot(after, inertia * after).Should().BeLessThan(energyBefore);
+        if (freezeVerticalRotation)
+            after.Y.Should().Be(Fixed64.Zero);
+    }
+
+    [Theory]
+    [InlineData(10, 1, false)]
+    [InlineData(100, 100, true)]
+    [InlineData(1000, 1000, true)]
+    public void GroundAngularFriction_WithFrozenAxisAndRotatedLongBody_ShouldNotAddEnergy(
+        int length, int thicknessDenominator, bool isolateFriction)
+    {
+        using PhysicsScenarioBuilder scenario = CreateMotionScenario();
+        scenario.Context.SetFrameRate(64);
+        scenario.Context.Environment.Gravity = (Fixed64)64;
+        Vector3d longAxis = new Vector3d(1, 2, 1).Normalized;
+        FixedQuaternion rotation = FixedQuaternion.FromAxisAngle(
+            Vector3d.Cross(Vector3d.Right, longAxis).Normalized, FixedMath.Acos(longAxis.X));
+        ScenarioBody<LSCuboidCollider> body = scenario.CreateBody(
+            new LSCuboidCollider { Size = new Vector3d((Fixed64)length, Fixed64.FromFraction(1, thicknessDenominator), Fixed64.FromFraction(1, thicknessDenominator)) }, Vector3d.Zero, rotation);
+        body.Collider.Material = PhysicsMaterialTestHelper.WithFrictionAndRestitution(Fixed64.One, Fixed64.Zero);
+        body.Body.FreezeAxes = BodyFreezeAxes3D.RotationZ;
+        body.Body.SetManualGrounding(Vector3d.Zero, Vector3d.Up);
+        body.Body.ApplyCollisionAngularVelocityDelta(Vector3d.Right);
+        Fixed3x3 inertia = GetWorldInertia(body.Body);
+        Fixed64 before = Vector3d.Dot(body.Body.AngularVelocity, inertia * body.Body.AngularVelocity);
+
+        if (isolateFriction)
+        {
+            // Separate friction from the existing explicit gyroscopic integration at extreme aspect ratios.
+            body.Body.EnsureContinuousCollisionFramePrepared(scenario.Context.LateSimulateToken).Should().BeTrue();
+        }
+        else
+        {
+            scenario.Context.Simulate();
+            scenario.Context.LateSimulate();
+        }
+
+        inertia = GetWorldInertia(body.Body);
+        Vector3d after = body.Body.AngularVelocity;
+        Vector3d.Dot(after, inertia * after).Should().BeLessThan(before);
+        after.Z.Should().Be(Fixed64.Zero);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void GroundAngularFriction_WhenShapeQuantizationRemovesAnInertiaAxis_ShouldNotInventTorque(bool freezeOtherAxis)
+    {
+        using PhysicsScenarioBuilder scenario = CreateMotionScenario();
+        scenario.Context.SetFrameRate(64);
+        scenario.Context.Environment.Gravity = Fixed64.One;
+        ScenarioBody<LSCuboidCollider> body = scenario.CreateCuboid(Vector3d.Zero);
+        body.Collider.Material = PhysicsMaterialTestHelper.WithFrictionAndRestitution(Fixed64.One, Fixed64.Zero);
+        body.Body.SetManualGrounding(Vector3d.Zero, Vector3d.Up);
+        body.Body.FreezeAxes = freezeOtherAxis ? BodyFreezeAxes3D.RotationZ : BodyFreezeAxes3D.None;
+        body.Body.AddAngularImpulse(Vector3d.Right / (Fixed64)16);
+        Vector3d velocity = body.Body.AngularVelocity;
+        body.Collider.Size = new Vector3d(Fixed64.One, Fixed64.FromRaw(2), Fixed64.FromRaw(2));
+
+        scenario.Context.Simulate();
+        scenario.Context.LateSimulate();
+
+        body.Body.CanRotate.Should().BeTrue();
+        body.Body.InverseInertiaTensor.M11.Should().Be(Fixed64.Zero);
+        body.Body.AngularVelocity.Should().Be(velocity);
+    }
+
+    [Theory]
+    [InlineData(300000000, false)]
+    [InlineData(1000000000, false)]
+    [InlineData(1000000000, true)]
+    public void GroundAngularFriction_WithUnrepresentableCompletedVelocity_ShouldRejectNumericExhaustion(int friction, bool freezeOtherAxis)
+    {
+        using PhysicsScenarioBuilder scenario = CreateMotionScenario();
+        SolidBody body = CreateFastAnisotropicBody(scenario, 1000000000, friction);
+        body.FreezeAxes = freezeOtherAxis ? BodyFreezeAxes3D.RotationY : BodyFreezeAxes3D.None;
+        Vector3d before = body.AngularVelocity;
+
+        Action prepare = () => body.EnsureContinuousCollisionFramePrepared(scenario.Context.LateSimulateToken);
+
+        prepare.Should().Throw<OverflowException>().WithMessage("Ground friction produces an unrepresentable velocity.");
+        body.AngularVelocity.Should().Be(before);
+    }
+
+    [Fact]
+    public void GroundAngularFriction_WithOversizedCorrectionButFiniteVelocity_ShouldMaterializeOnlyTheResult()
+    {
+        using PhysicsScenarioBuilder scenario = CreateMotionScenario();
+        SolidBody body = CreateFastAnisotropicBody(scenario, 620000000, 1000000000);
+        Vector3d before = body.AngularVelocity;
+
+        body.EnsureContinuousCollisionFramePrepared(scenario.Context.LateSimulateToken).Should().BeTrue();
+
+        body.AngularVelocity.X.Should().BeGreaterThan(Fixed64.Zero);
+        body.AngularVelocity.Z.Should().BeLessThan(Fixed64.Zero);
+        Fixed64.TrySubtract(before.Z, body.AngularVelocity.Z, out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public void ConstrainedGroundFriction_ShouldNotAllocateAfterWarmup()
+    {
+        using PhysicsScenarioBuilder scenario = CreateMotionScenario();
+        scenario.Context.SetFrameRate(64);
+        scenario.Context.Environment.Gravity = (Fixed64)64;
+        FixedQuaternion rotation = FixedQuaternion.FromEulerAnglesInDegrees((Fixed64)15, (Fixed64)30, (Fixed64)45);
+        ScenarioBody<LSCuboidCollider> body = scenario.CreateBody(
+            new LSCuboidCollider { Size = new Vector3d(10, 1, 1) }, Vector3d.Zero, rotation);
+        body.Collider.Material = PhysicsMaterialTestHelper.WithFrictionAndRestitution(Fixed64.One, Fixed64.Zero);
+        body.Body.FreezeAxes = BodyFreezeAxes3D.RotationZ;
+        body.Body.SleepEnabled = false;
+
+        long allocated = AllocationTestHelper.MeasureSteadyState(() =>
+        {
+            body.Body.ResetPosition(Vector3d.Zero, rotation);
+            body.Body.SetManualGrounding(Vector3d.Zero, Vector3d.Up);
+            body.Body.AddAngularImpulse(Vector3d.Right);
+            scenario.Context.Simulate();
+            scenario.Context.LateSimulate();
+        }, measurementIterations: 128);
+
+        allocated.Should().Be(0);
+        body.Body.AngularVelocity.Z.Should().Be(Fixed64.Zero);
+        body.Body.AngularSpeed.Should().BeGreaterThan(Fixed64.Zero);
     }
 
     [Fact]
@@ -297,6 +558,28 @@ public sealed class SolidBodyMotionHardeningTests
         scenario.Context.Environment.MaxFallSpeed = (Fixed64)100;
         scenario.Context.Environment.DampingFactor = Fixed64.Zero;
         return scenario;
+    }
+
+    private static Fixed3x3 GetWorldInertia(SolidBody body) =>
+        body.Rotation.Conjugate().ToMatrix3x3()
+        * body.Collider.CalculateInertiaTensor(body.Mass, body.LocalCenterOfMassOffset)
+        * body.Rotation.ToMatrix3x3();
+
+    private static SolidBody CreateFastAnisotropicBody(PhysicsScenarioBuilder scenario, int speed, int friction)
+    {
+        scenario.Context.Environment.Gravity = (Fixed64)64;
+        scenario.Context.Environment.MaxSpeed = Fixed64.MaxValue;
+        var collider = new LSCuboidCollider
+        {
+            Size = new Vector3d(1, 1, 10),
+            Material = PhysicsMaterialTestHelper.WithFrictionAndRestitution((Fixed64)friction, Fixed64.Zero)
+        };
+        SolidBody body = scenario.CreateBody(collider, Vector3d.Zero, FixedQuaternion.Identity,
+            mass: Fixed64.FromFraction(1, 1024)).Body;
+        body.SetManualGrounding(Vector3d.Zero, Vector3d.Up);
+        Fixed3x3 inertia = collider.CalculateInertiaTensor(body.Mass, body.LocalCenterOfMassOffset);
+        body.AddAngularImpulse(inertia * new Vector3d((Fixed64)speed, Fixed64.Zero, Fixed64.FromFraction(speed, 8)));
+        return body;
     }
 
     private static AngularStepResult RunAnisotropicAngularStep(Vector3d torque)

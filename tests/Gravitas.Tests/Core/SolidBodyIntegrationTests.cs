@@ -93,8 +93,9 @@ public sealed class SolidBodyIntegrationTests
         scenario.Context.LateSimulate();
 
         body.Body.IsGrounded.Should().BeTrue();
-        body.Body.LinearVelocity.X.Should().Be(Fixed64.FromFraction(3, 4));
-        body.Body.Position3d.X.Should().Be(Fixed64.FromFraction(7, 16));
+        // Friction acts on the driven velocity in both steps: 1 -> 3/4 -> 1/2.
+        body.Body.LinearVelocity.X.Should().Be(Fixed64.Half);
+        body.Body.Position3d.X.Should().Be(Fixed64.FromFraction(5, 16));
     }
 
     [Fact]

@@ -192,6 +192,20 @@ through `EffectiveInverseInertiaTensor`. Neither impulse API applies `DeltaTime`
 or advances pose. `AddForce(...)` and `AddTorque(...)` instead queue continuous
 inputs whose acceleration is integrated during the next fixed step.
 
+Grounded 3D bodies also apply a material-driven friction term after queued
+driving forces and torques. Linear friction opposes motion tangent to the
+support within the body's permitted axes; it preserves separating normal
+motion. Angular friction retains the constrained inertia-tensor response.
+Each friction impulse is bounded at its kinetic-energy minimum, so increasing
+the time step or reducing inertia cannot make friction drive motion through
+rest and add energy. A constrained anisotropic body can retain residual spin.
+
+This body-level angular term uses the existing unit-world-length effective
+lever arm for its torque budget; it is an empirical grounding model, separate
+from contact-point Coulomb friction. An oversized intermediate correction is
+retained until the completed velocity is materialized. A genuinely
+unrepresentable completed velocity throws `OverflowException`.
+
 3D contact response uses full 3D COM-relative contact arms, `Fixed3x3` inverse
 inertia tensors, collider surface materials, normal impulses, tangent friction,
 deterministic warm-start caches, grounding state, and sleep/wake rules. Shape
@@ -336,6 +350,10 @@ moment, collider surface materials, normal impulses, tangent Coulomb friction,
 and deterministic warm-start caches. Convex/convex face contacts can resolve
 through a fixed two-contact `ContactManifold2D`; circle/circle and circle/convex
 contacts remain one-contact manifolds.
+
+Pure 2D and mixed 2D bodies obtain friction from physical contact impulses.
+Manual or query-only grounding does not add the 3D body's empirical friction
+torque or tangential deceleration term.
 
 `LSCollider2D.InitializeWithNoBody(IMatterAgent)` binds bodyless static geometry
 and bodyless trigger volumes to the same host contract. Bodyless 2D colliders

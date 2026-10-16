@@ -423,7 +423,6 @@ public partial class SolidBody
             return;
 
         ApplyDragForce();
-        ApplyFrictionForce();
     }
 
     private void ApplyDragForce()
@@ -433,28 +432,20 @@ public partial class SolidBody
         _linearAccelerationStore += (-_linearDirection * dragMagnitude);
     }
 
-    private void ApplyFrictionForce()
+    private void ApplyGroundLinearFriction()
     {
-        if (!HasCurrentGroundSupport)
+        if (!HasCurrentGroundSupport || Collider.Material.DynamicFriction == Fixed64.Zero)
             return;
 
-        Vector2d horizontalVelocity = new(_linearVelocity.X, _linearVelocity.Z);
-        Fixed64 horizontalSpeed = horizontalVelocity.Magnitude;
-        if (horizontalSpeed <= Fixed64.Zero)
+        // Project within the permitted axes so friction cannot consume separating normal motion.
+        Vector3d direction = Vector3d.GetNormalizedProjectionOnPlane(
+            _linearVelocity, ProjectLinearMotion(_groundNormal));
+        if (direction == Vector3d.Zero)
             return;
 
-        // Object is moving on ground, add the friction force to the accumulated force
-        // Adjust the friction with the normal force magnitude
-        PhysicsEnvironment environment = Context.Environment;
-        Fixed64 effectiveFriction = ResolveGroundDynamicFriction();
-        if (horizontalSpeed <= environment.FrictionTransitionSpeed)
-        {
-            Fixed64 proportion = horizontalSpeed / environment.FrictionTransitionSpeed;
-            effectiveFriction *= proportion;
-        }
-
-        Fixed64 frictionMagnitude = effectiveFriction * _normalForce.Magnitude;
-        _linearAccelerationStore += (-_linearDirection * frictionMagnitude) * InverseMass;
+        Fixed64 speed = Vector3d.Dot(_linearVelocity, direction);
+        _linearVelocity = ApplyBoundedGroundFriction(
+            _linearVelocity, direction, direction, ResolveGroundFrictionImpulse(speed) * InverseMass);
     }
 
     private void UpdateLinearVelocity()
@@ -464,6 +455,7 @@ public partial class SolidBody
         Vector3d lastVelocity = _linearVelocity;
 
         _linearVelocity += ProjectLinearMotion(_linearAccelerationStore * deltaTime);
+        ApplyGroundLinearFriction();
 
         // Reset stores for the next frame
         _linearAccelerationStore = Vector3d.Zero;
@@ -509,21 +501,111 @@ public partial class SolidBody
         Fixed64 angularDragMagnitude = AngularDragCoefficient * Context.Environment.AirDensity * Collider.GetFrontalArea(_angularDirection) * _angularSpeed;
         acceleration += -_angularDirection * angularDragMagnitude;
 
-        if (!HasCurrentGroundSupport)
-            return acceleration;
-
-        // Calculate the friction force and convert it into a torque
-        PhysicsEnvironment environment = Context.Environment;
-        Fixed64 effectiveFriction = ResolveGroundDynamicFriction();
-        if (_angularSpeed < environment.FrictionTransitionSpeed)
-        {
-            Fixed64 proportion = _angularSpeed / environment.FrictionTransitionSpeed;
-            effectiveFriction *= proportion;
-        }
-
-        Fixed64 frictionMagnitude = effectiveFriction * _normalForce.Magnitude;
-        acceleration += (-_angularDirection * frictionMagnitude) * _inverseInertiaTensor;
         return acceleration;
+    }
+
+    private Vector3d ApplyGroundAngularFriction(Vector3d velocity)
+    {
+        if (!HasCurrentGroundSupport || Collider.Material.DynamicFriction == Fixed64.Zero)
+            return velocity;
+
+        Fixed64 speed = velocity == _angularVelocity ? _angularSpeed : velocity.Magnitude;
+        if (speed <= Fixed64.Zero)
+            return velocity;
+
+        Vector3d direction = velocity == _angularVelocity ? _angularDirection : velocity.Normalized;
+        Vector3d response = ProjectAngularMotion(_inverseInertiaTensor * direction);
+        Fixed64 impulse = ResolveGroundFrictionImpulse(speed);
+        return (_freezeAxes & BodyFreezeAxes3D.Rotation) != BodyFreezeAxes3D.None
+            ? ApplyConstrainedGroundAngularFriction(velocity, response, impulse)
+            : ApplyBoundedGroundFriction(velocity, direction, response, impulse);
+    }
+
+    private Vector3d ApplyConstrainedGroundAngularFriction(Vector3d velocity, Vector3d response, Fixed64 impulse)
+    {
+        // Projection and rotated inertia do not commute. Keep M*r exact: supported
+        // slender bodies can overflow both this intermediate and its energy dot products.
+        Signed192 x = Signed192.Raw(response.X), y = Signed192.Raw(response.Y), z = Signed192.Raw(response.Z);
+        Signed192 mx = Signed192.NarrowProven(WideArithmetic.GetDotProduct3D(
+            Signed192.Raw(_worldInertiaTensor.M11), Signed192.Raw(_worldInertiaTensor.M12), Signed192.Raw(_worldInertiaTensor.M13), x, y, z));
+        Signed192 my = Signed192.NarrowProven(WideArithmetic.GetDotProduct3D(
+            Signed192.Raw(_worldInertiaTensor.M21), Signed192.Raw(_worldInertiaTensor.M22), Signed192.Raw(_worldInertiaTensor.M23), x, y, z));
+        Signed192 mz = Signed192.NarrowProven(WideArithmetic.GetDotProduct3D(
+            Signed192.Raw(_worldInertiaTensor.M31), Signed192.Raw(_worldInertiaTensor.M32), Signed192.Raw(_worldInertiaTensor.M33), x, y, z));
+        Signed320 work = WideArithmetic.GetDotProduct3D(
+            Signed192.Raw(velocity.X), Signed192.Raw(velocity.Y), Signed192.Raw(velocity.Z), mx, my, mz);
+        Signed320 curvature = WideArithmetic.GetDotProduct3D(x, y, z, mx, my, mz);
+        if ((work.Sign <= 0) | (curvature.Sign <= 0))
+            return velocity;
+
+        // Two-factor sums fit 130 bits; energy products fit 196 and completed
+        // velocity numerators fit 260. Existing fixed-width math owns all limbs/rounding.
+        Signed576 budget = WideArithmetic.MultiplySigned320(curvature, Signed192.Raw(impulse));
+        Signed576 minimum = WideArithmetic.MultiplySigned320(work, Signed192.One);
+        if (WideArithmetic.SubtractSigned576(budget, minimum).Sign >= 0)
+        {
+            return new Vector3d(
+                ResolveConstrainedGroundFrictionVelocity(velocity.X, response.X, work, curvature),
+                ResolveConstrainedGroundFrictionVelocity(velocity.Y, response.Y, work, curvature),
+                ResolveConstrainedGroundFrictionVelocity(velocity.Z, response.Z, work, curvature));
+        }
+        return new Vector3d(
+            ResolveGroundFrictionVelocity(velocity.X, response.X, impulse, Fixed64.One),
+            ResolveGroundFrictionVelocity(velocity.Y, response.Y, impulse, Fixed64.One),
+            ResolveGroundFrictionVelocity(velocity.Z, response.Z, impulse, Fixed64.One));
+    }
+
+    private static Fixed64 ResolveConstrainedGroundFrictionVelocity(
+        Fixed64 velocity, Fixed64 response, Signed320 work, Signed320 curvature)
+    {
+        Signed576 numerator = WideArithmetic.SubtractSigned576(
+            WideArithmetic.MultiplySigned320(curvature, Signed192.Raw(velocity)),
+            WideArithmetic.MultiplySigned320(work, Signed192.Raw(response)));
+        if (!Fixed64.TryGetSignedRawRatio(numerator, Signed576.ExtendValue(curvature), out Fixed64 result))
+            throw new OverflowException("Ground friction produces an unrepresentable velocity.");
+        return result;
+    }
+
+    private static Vector3d ApplyBoundedGroundFriction(
+        Vector3d velocity, Vector3d energyResponse, Vector3d response, Fixed64 impulse)
+    {
+        Fixed64 curvature = Vector3d.Dot(energyResponse, response);
+        Fixed64 work = Vector3d.Dot(velocity, energyResponse);
+        if ((curvature <= Fixed64.Zero) | (work <= Fixed64.Zero))
+            return velocity;
+
+        // For response r and energy metric M, energy is minimal at j = (v . M r) / (r . M r).
+        // Retain the tensor response: anisotropic inertia need not stop every component at once.
+        Fixed64 divisor = Fixed64.One;
+        if (impulse * curvature >= work)
+        {
+            impulse = work;
+            divisor = curvature;
+        }
+        return new Vector3d(
+            ResolveGroundFrictionVelocity(velocity.X, response.X, impulse, divisor),
+            ResolveGroundFrictionVelocity(velocity.Y, response.Y, impulse, divisor),
+            ResolveGroundFrictionVelocity(velocity.Z, response.Z, impulse, divisor));
+    }
+
+    private static Fixed64 ResolveGroundFrictionVelocity(
+        Fixed64 velocity, Fixed64 response, Fixed64 impulse, Fixed64 divisor)
+    {
+        Fixed64 result;
+        if (divisor == Fixed64.One)
+        {
+            if (Fixed64.TrySubtractProducts(velocity, Fixed64.One, response, impulse, out result))
+                return result;
+        }
+        else
+        {
+            // The correction may exceed Fixed64 even when the completed velocity fits.
+            Signed192 numerator = WideArithmetic.SubtractSigned192(
+                Fixed64.GetExactRawProduct(velocity, divisor), Fixed64.GetExactRawProduct(response, impulse));
+            if (Fixed64.TryGetSignedRawRatio(numerator, Signed192.Raw(divisor), out result))
+                return result;
+        }
+        throw new OverflowException("Ground friction produces an unrepresentable velocity.");
     }
 
     private void UpdateAngularVelocity()
@@ -541,6 +623,7 @@ public partial class SolidBody
         Fixed64 deltaTime = Context.DeltaTime;
         Vector3d velocity = startVelocity
             + ProjectAngularMotion(angularAcceleration * deltaTime);
+        velocity = ApplyGroundAngularFriction(velocity);
         Vector3d dampingTorque = -Context.Environment.DampingFactor * velocity;
         velocity += ProjectAngularMotion(_inverseInertiaTensor * dampingTorque * deltaTime);
         velocity = ProjectAngularMotion(velocity);
@@ -583,9 +666,14 @@ public partial class SolidBody
         return velocity;
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private Fixed64 ResolveGroundDynamicFriction() =>
-        Collider.Material.DynamicFriction;
+    private Fixed64 ResolveGroundFrictionImpulse(Fixed64 speed)
+    {
+        Fixed64 friction = Collider.Material.DynamicFriction;
+        Fixed64 transition = Context.Environment.FrictionTransitionSpeed;
+        if (speed < transition)
+            friction *= speed / transition;
+        return friction * _normalForce.Magnitude * Context.DeltaTime;
+    }
 
     private void NonKinematicUpdate(Vector3d angularVelocityStateStart)
     {

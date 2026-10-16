@@ -2,7 +2,7 @@
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-138`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-139`.
 - Assign an ID when an issue enters this tracker, keep it through resolution,
   and never reuse an ID even if an entry is later removed. Check this file's Git
   history before advancing or repairing the counter.
@@ -37,42 +37,43 @@
 
 ### Ordered Queue
 
-#135/#136 are resolved together with the measured support-validation cost
-explicitly accepted. Next resolve **#137**, energy-adding angular ground
-friction, before **#133**, artificial mesh-chunk seam response. Both defects
-reproduce on earlier binaries and are independent of the size cap. Keep
-physical-quality fixes ahead of the benchmark queue; combine work where
+#137 is resolved, including the matching 3D linear-friction defect and
+2D/mixed parity checks. Next resolve **#138**, independent drag/damping
+overshoot, before **#133**, artificial mesh-chunk seam response. Both remaining
+defects reproduce on earlier binaries and are independent of the size cap.
+Keep physical-quality fixes ahead of the benchmark queue; combine work where
 response ownership overlaps.
 
 #111 remains an independent validation-tooling issue.
 #125 is a low-priority, non-blocking runtime crash observation; defer further
 investigation unless it recurs or a reliable reproducer becomes available.
 
-### GRV-Issue-137 - Angular ground friction can reverse rotation and add energy
+### GRV-Issue-138 - Explicit drag and angular damping can reverse motion and add energy
 
-- **Confirmed:** 2026-10-15 while expanding existing grounding-friction tests.
-  Both reproductions run on the unchanged accepted #134 eight-module stack,
-  independently of #135/#136.
-- **Reproduction:** Use a mass-one cuboid, gravity `1`, friction `1`, manual
-  ground point at the origin with up normal, no air drag or damping, and no
-  physical contacts. At `4 Hz`, a unit cube given angular impulse `Up / 16`
-  starts near `+0.375 rad/s`; one `LateSimulate` reverses it to approximately
-  `-1.125 rad/s`. At `64 Hz`, a `0.125`-unit cube given impulse `Up / 1024`
-  likewise changes from approximately `+0.375` to `-5.625 rad/s`. Squared speed
-  increases in both cases despite no driving torque in the step.
-- **Boundary:** This is a dissipative integration defect, not unsupported
-  geometry or only a low-frame-rate configuration. The existing angular
-  friction acceleration can step through rest without bounding the removable
-  angular momentum. Support dependency invalidation does not introduce it.
-- **Follow-up:** Make grounded friction dissipative across supported time steps,
-  body scales and inertia tensors. Check linear friction and dimensional parity
-  for the same defect before selecting the owning fix. Preserve directional
-  constraints and physically coherent torque; avoid an unrelated speed clamp.
-  Add exact deterministic regressions and retain warm allocation/time gates.
-- **Evidence:** Ignored
-  `artifacts/grv-issue-135/perf/angular-friction-probe/original.json` records both
-  one-step trajectories, signed velocities, squared speeds and all eight module
-  hashes; original Gravitas core `89C15FBD...`.
+- **Confirmed:** 2026-10-15 during #137's dissipative-term parity review, on the
+  frozen accepted #135/#136 stack (Gravitas core `E39EE16F...`). These cases use
+  no contacts, grounded friction or gravity; #137 does not introduce them.
+- **Reproduction:** Use a mass-one isotropic cuboid and one full
+  `Simulate`/`LateSimulate` step. With size `1/8`, `64 Hz`, default angular
+  damping `0.95`, no air drag and initial spin approximately `+0.375 rad/s`,
+  the result is approximately `-1.7625 rad/s` (22.09 times the energy).
+  At `4 Hz`, a unit cube with angular drag coefficient `1`, air density `64`
+  and no damping changes `+0.375` to `-4.125` (121 times the energy).
+  A unit cube with linear drag coefficient `1`, air density `16` and no
+  angular damping changes linear speed `+0.375` to `-1.125` (nine times
+  the energy). Other dissipative terms are disabled independently in each case.
+- **Boundary:** The existing explicit opposing acceleration/torque can consume
+  more motion than remains. This is separate from grounded material friction;
+  changing friction alone must not be presented as making every body
+  dissipative term unconditionally stable. Pure 2D has no corresponding body
+  drag/damping term; mixed 3D uses the same 3D owner.
+- **Follow-up:** Review the drag/damping integration and units together, reuse
+  the bounded friction work where appropriate, preserve driving forces and
+  constrained inertia, and retain deterministic replay and warm performance.
+  Add exact stopping, reversal, anisotropic-energy and frozen-axis regressions.
+- **Evidence:** Ignored `artifacts/grv-issue-137/dissipation-probe/` retains
+  source, build/run logs, raw signed trajectories and all eight verified loaded
+  module hashes for the unchanged original stack.
 
 ### GRV-Issue-133 - Adjacent mesh collider rims alter frictionless seam-crossing response
 
@@ -162,6 +163,64 @@ investigation unless it recurs or a reliable reproducer becomes available.
 Remaining measured performance costs are tracked in the benchmark backlog.
 
 ## Resolved Issues
+
+### GRV-Issue-137 - Angular ground friction can reverse rotation and add energy
+
+- **Confirmed:** 2026-10-15; **resolved:** 2026-10-16.
+  Original unit-cube and small-cube cases reverse angular motion and increase
+  energy on the accepted pre-fix stack. The matching 3D linear term can also
+  step through rest, oppose separating normal motion and use an obsolete
+  direction after driving forces reverse motion.
+- **Resolution:** Apply grounded friction after queued driving forces/torques.
+  Resolve linear motion in the permitted support tangent space and cap the
+  removable motion. Angular friction retains the constrained inertia response
+  and stops at its kinetic-energy minimum, preserving valid anisotropic
+  residual spin instead of clamping all angular components.
+- **Constrained arithmetic:** Axis projection does not commute with rotated
+  inertia. Partially frozen angular motion therefore uses the actual world
+  inertia metric. Supported slender bodies require exact intermediate energy
+  products; reuse existing FixedMathSharp arithmetic until final velocity
+  materialization. Oversized corrections with finite completed velocities
+  succeed; genuinely unrepresentable completed velocities throw explicitly.
+  No upstream changes, public API changes or new runtime files were needed.
+- **Parity:** Pure 2D and mixed 2D bodies have no corresponding empirical
+  body-level friction term. Sixteen full-loop cases preserve manually grounded
+  motion without contacts and verify bounded physical-contact friction in
+  both directions at 4/64 Hz and unit/one-eighth scales. Explicit mixed-runtime
+  3D cases also verify angular and linear stopping through the corrected owner.
+- **Regression evidence:** Original angular and linear stopping cases;
+  driving cancellation/reversal; separating normals and slopes; tiny permitted
+  normals; partial freeze constraints; rotated anisotropic energy; supported
+  slender-body energy intermediates; quantized singular inertia; and numeric
+  exhaustion versus oversized intermediate corrections. The existing exact
+  integration expectation now includes friction on the first driven step.
+  Independent ponytail review has no outstanding findings.
+- **Validation:** `UseLocalLsfStack=true`; full Release/ReleaseLean suites pass
+  6,653/6,585 tests with zero skips. Raw coverage visits all 47,953/47,951
+  sequence points, 16,134 branches each and 5,063/5,062 methods. Builds pass
+  with zero warnings/errors. All six shared replay fixtures retain their
+  existing expectations and agree across Windows x64 Release/Lean.
+- **Warm gate:** Twelve unique native workloads and twelve ignored warmed
+  guards report `0 B`; a separate maintained full-step partial-freeze guard
+  also reports `0 B`. All existing response and stable-query controls preserve
+  the measured baseline. A contemporary motion comparison retaining all six
+  actual measurements per launch gives unit angular -0.004%, grounded linear
+  +0.372% and airborne control +0.392%. Independent launch-level differences
+  are unresolved at this measurement resolution; do not subtract the control
+  or claim exact zero overhead. Earlier apparent gains are retained as host/
+  window variation, not claimed optimizations. No resolved warm regression
+  remains in the validated workloads.
+- **Model and follow-up:** The existing empirical angular budget retains its
+  unit-world-length effective lever arm, documented in the evergreen dimension
+  guide. Independent drag/angular-damping instability is tracked as #138;
+  grounded-friction closeout does not claim to fix those terms.
+- **Evidence:** Ignored `artifacts/grv-issue-137/` retains red/green/full logs,
+  raw coverage, replay comparisons, original/candidate eight-module bindings,
+  all-observation launch analysis and native distributions. Maintained
+  `GroundFrictionBenchmarks` reproduces the four motion scenarios; its body
+  source matches the measured frozen fixture after only class-name and line-
+  ending normalization. Both benchmark configurations build, and all four
+  maintained scenarios execute in a Dry smoke run.
 
 ### GRV-Issue-135 - Sleeping dynamic bodies can remain suspended after static support disappears
 
