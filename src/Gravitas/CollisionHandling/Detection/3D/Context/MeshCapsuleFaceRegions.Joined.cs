@@ -8,6 +8,7 @@ using FixedMathSharp;
 using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
 using SwiftCollections;
+using SwiftCollections.Query;
 using System;
 using System.Collections.Generic;
 
@@ -18,9 +19,17 @@ internal sealed partial class MeshCapsuleFaceRegions
 {
     private JoinedState? _joined;
 
+    internal void ReleaseJoined()
+    {
+        _joined = null;
+        RegionCount = 0;
+    }
+
     /// <summary>Prepares unique committed surface owners from bounded input; membership/filter admission belongs to the caller.</summary>
     internal void BuildJoined(ReadOnlySpan<(LSMeshCollider Collider, int Triangle)> surfaces,
-        Vector3d center, FixedQuaternion rotation, Fixed64 coreLength, Fixed64 radius)
+        Vector3d center, FixedQuaternion rotation, Fixed64 coreLength, Fixed64 radius,
+        ReadOnlySpan<PhysicsMesh> preparedMeshes = default,
+        SwiftDictionary<(PhysicsMesh, int), MeshSurfaceBoundaryDomain>? prepared = null)
     {
         JoinedState state = _joined ??= new JoinedState(this);
         state.Active = true;
@@ -44,12 +53,20 @@ internal sealed partial class MeshCapsuleFaceRegions
         state.PreparedCount = -1;
         state.Meshes.FastClear(); state.Parents.FastClear(); state.Roots.FastClear(); state.RegionByRoot.FastClear(); state.NodeMembers.FastClear();
         _center = center; _rotation = coreLength == Fixed64.Zero ? FixedQuaternion.Identity : rotation;
+        FixedBoundBox box = FixedBoundBox.FromCenteredCapsuleClippedToDomain(center, _rotation, Vector3d.Up, coreLength, radius);
+        var bounds = new FixedBoundVolume(box.Min, box.Max);
         LSMeshCollider? previous = null;
         foreach (var input in state.Inputs.AsReadOnlySpan())
         {
             if (input.Collider != previous) state.Meshes.Add(input.Collider.Mesh);
             previous = input.Collider;
         }
+        if (prepared != null)
+        {
+            state.Meshes.FastClear();
+            foreach (PhysicsMesh mesh in preparedMeshes) state.Meshes.Add(mesh);
+        }
+        state.PreparedBoundaries.FastClear();
         int meshIndex = -1;
         for (int index = 0; index < state.Inputs.Count; index++)
         {
@@ -64,8 +81,8 @@ internal sealed partial class MeshCapsuleFaceRegions
             mesh.GetLocalTriangleVertices(member.Triangle, out Vector3d a, out Vector3d b, out Vector3d c);
             member.Frame = new CapsulePlaneRayFrame(new FixedTriangle(a, b, c), finite);
             member.Admitted.FastClear();
-            // shortcut: bounded proof scans supplied owners; runtime integration must use the mesh BVH.
-            for (int triangle = 0; triangle < mesh.TriangleCount; triangle++)
+            member.Collider.GetTrianglesInBounds(bounds, state.Candidates);
+            foreach (int triangle in state.Candidates.AsReadOnlySpan())
             {
                 if (mesh.GetManifoldSurfaceOwner(triangle) != member.Owner) continue;
                 mesh.GetLocalTriangleVertices(triangle, out a, out b, out c);
@@ -75,7 +92,9 @@ internal sealed partial class MeshCapsuleFaceRegions
             member.Offset = state.Parents.Count;
             for (int region = 0; region < member.Connectivity.RegionCount; region++)
             { state.Parents.Add(state.Parents.Count); state.RegionByRoot.Add(-1); state.NodeMembers.Add(index); }
-            if (!reuseBoundaries) member.Boundary.Build(state.Meshes.AsReadOnlySpan(), meshIndex, member.Triangle);
+            if (prepared != null) member.Boundary = prepared[(mesh, member.Owner)];
+            else if (!reuseBoundaries) member.Boundary.Build(state.Meshes.AsReadOnlySpan(), meshIndex, member.Triangle);
+            state.PreparedBoundaries.Add(member.Boundary);
             if (member.JoinedSpans.Length < member.Boundary.Spans.Length)
                 Array.Resize(ref member.JoinedSpans, member.Boundary.Spans.Length);
             Array.Clear(member.JoinedSpans, 0, member.Boundary.Spans.Length);
@@ -136,6 +155,68 @@ internal sealed partial class MeshCapsuleFaceRegions
             member.PreparedLifetime = member.Collider.LifetimeVersion;
         }
         state.PreparedCount = state.Inputs.Count;
+    }
+
+    internal CapsulePlaneRayFrame GetBoundaryFrame(LSMeshCollider collider, int triangle, out Vector3d normal)
+    {
+        if (_joined?.Active != true) { normal = _normal; return _frame; }
+        var frame = _joined.Members[_joined.MemberBySurface[(collider.Mesh, collider.Mesh.GetManifoldSurfaceOwner(triangle))]].Frame;
+        normal = frame.GetWorldNormal(collider.Mesh.Rotation);
+        return frame;
+    }
+
+    internal int GetBoundaryOrientation(LSMeshCollider collider, int triangle, int localRegion)
+    {
+        if (_joined?.Active != true) return GetOrientation(localRegion);
+        JoinedState state = _joined;
+        JoinedMember member = state.Members[state.MemberBySurface[(collider.Mesh, collider.Mesh.GetManifoldSurfaceOwner(triangle))]];
+        int region = state.RegionByRoot[FindJoinedRoot(state, member.Offset + localRegion)];
+        return WideAxis3.Dot(member.Frame.Normal, GetJoinedRegionFrame(state, region).Normal).Sign * _orientations[region];
+    }
+
+    internal bool IsJoinedEdge(LSMeshCollider collider, int triangle, int edge)
+    {
+        if (_joined?.Active != true) return false;
+        JoinedMember member = _joined.Members[_joined.MemberBySurface[(collider.Mesh, collider.Mesh.GetManifoldSurfaceOwner(triangle))]];
+        // Admission currently requires complete edges, hence one classified span per canonical edge.
+        return member.JoinedSpans[edge];
+    }
+
+    internal ReadOnlySpan<WideAxis3> GetJoinedCornerFan(LSMeshCollider collider, int triangle, Vector3d point, out bool suppress)
+    {
+        suppress = false;
+        if (_joined?.Active != true) return default;
+        JoinedState state = _joined;
+        JoinedMember member = state.Members[state.MemberBySurface[(collider.Mesh, collider.Mesh.GetManifoldSurfaceOwner(triangle))]];
+        bool trusted = state.Fan.BuildAtPoint(state.Meshes.AsReadOnlySpan(), member.Boundary.SourceMember, triangle,
+            point, state.PreparedBoundaries.AsReadOnlySpan());
+        suppress = trusted && !state.Fan.HasExposedBoundary;
+        // A shared true-rim endpoint is one physical feature. Keep its first
+        // eligible collider/surface, even though every member retains geometric overlap.
+        if (trusted)
+            foreach (var owner in state.Fan.Owners)
+                if (state.MemberBySurface.TryGetValue((state.Meshes[owner.Member], owner.Surface), out int other)
+                    && (state.Members[other].Collider.Id < collider.Id
+                        || state.Members[other].Collider == collider
+                        && collider.Mesh.GetCanonicalSurfaceOrdinal(owner.Surface) < collider.Mesh.GetCanonicalSurfaceOrdinal(member.Owner)))
+                    suppress = true;
+        return trusted ? state.Fan.Rays : default;
+    }
+
+    internal bool AppendJoinedBoundaries(LSMeshCollider collider, Gravitas.Materials.PhysicsMaterial material,
+        Vector3d center, FixedQuaternion rotation, Fixed64 coreLength, Fixed64 radius,
+        MeshCapsuleSurfaceBoundary boundary, ContactManifold manifold)
+    {
+        bool overlaps = false;
+        JoinedState state = _joined!;
+        foreach (JoinedMember member in state.Members.AsReadOnlySpan()[..state.Inputs.Count])
+        {
+            if (member.Collider != collider || member.Connectivity.RegionCount == 0) continue;
+            overlaps = true;
+            boundary.BuildSurfaceContacts(collider, material, center, rotation, coreLength, radius,
+                member.Triangle, member.Connectivity, this, manifold);
+        }
+        return overlaps;
     }
 
     private bool TryGatherContainedJoinedSupport(JoinedState state)
@@ -411,7 +492,7 @@ internal sealed partial class MeshCapsuleFaceRegions
         internal long PreparedLifetime;
         internal CapsulePlaneRayFrame Frame;
         internal readonly MeshSurfaceConnectivity Connectivity = new();
-        internal readonly MeshSurfaceBoundaryDomain Boundary = new();
+        internal MeshSurfaceBoundaryDomain Boundary = new();
         internal readonly SwiftList<int> Admitted = new();
         internal bool[] JoinedSpans = Array.Empty<bool>();
     }
@@ -420,6 +501,9 @@ internal sealed partial class MeshCapsuleFaceRegions
     {
         internal readonly SwiftList<(LSMeshCollider Collider, int Triangle)> Inputs = new();
         internal readonly SwiftList<PhysicsMesh> Meshes = new();
+        internal readonly SwiftList<int> Candidates = new();
+        internal readonly SwiftList<MeshSurfaceBoundaryDomain> PreparedBoundaries = new();
+        internal readonly MeshSurfaceBoundaryFan Fan = new();
         internal readonly SwiftDictionary<(PhysicsMesh Mesh, int Owner), int> MemberBySurface = new();
         internal readonly SwiftList<JoinedMember> Members = new();
         internal readonly SwiftList<int> Parents = new(), Roots = new(), RegionByRoot = new(), NodeMembers = new();

@@ -18,6 +18,7 @@ namespace Gravitas.Colliders;
 /// <summary>Represents a runtime 3D collider backed by deterministic triangle-mesh geometry.</summary>
 public sealed class LSMeshCollider : LSCollider
 {
+    internal StaticSurface? StaticSurface { get; set; }
     private readonly SwiftList<int> _triangleQueryBuffer = new();
     private bool _inertiaOriginValid, _inertiaOriginExact;
     private Vector3d _inertiaOriginOffset, _inertiaOriginScale, _inertiaOrigin;
@@ -130,8 +131,11 @@ public sealed class LSMeshCollider : LSCollider
         SetPreparedBounds(GeometryMesh.PreparedBounds);
     }
 
-    private protected override void PublishShape() =>
+    private protected override void PublishShape()
+    {
         GeometryMesh.PublishPreparedTransformation();
+        StaticSurface?.Invalidate(geometryChanged: true);
+    }
 
     internal override ExactMassWeight CalculateMassPropertyWeight()
     {

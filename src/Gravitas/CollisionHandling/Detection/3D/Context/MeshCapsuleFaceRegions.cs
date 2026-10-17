@@ -48,7 +48,6 @@ internal sealed partial class MeshCapsuleFaceRegions
 
     internal int RegionCount { get; private set; }
     internal bool HasBoundaryIntersection { get; private set; }
-    internal ref readonly CapsulePlaneRayFrame Frame => ref _frame;
 
     internal void Build(PhysicsMesh mesh, int surfaceTriangle, Vector3d center,
         FixedQuaternion rotation, Fixed64 coreLength, Fixed64 radius, MeshSurfaceConnectivity connectivity)

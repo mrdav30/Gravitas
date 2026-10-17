@@ -3,7 +3,9 @@
 **Date:** 2026-10-15  
 **Status:** Phase 1 complete, 2026-10-16; Phase 2 targeted rewrite in progress
 #133/#139 together. Heightfield and alternative-index work remain deferred;
-no public continuity API or joined response is enabled.  
+no public continuity API is enabled. The bounded internal 3D rounded-shape
+response checkpoint below is integrated; dimensional and continuation work
+remain incomplete.  
 **Order:** #132 is resolved. Resolve #133 and its confirmed pure 2D counterpart,
 #139, through the generic-continuity phases below before terrain-specific work.
 Keep one implementation plan rather than duplicate the prerequisite design.  
@@ -536,8 +538,8 @@ Released-package validation follows the upstream release. Full-loop crossing
 regressions belong to the runtime integration phase below; they cannot pass
 before membership and response are wired. Keep the existing baseline fixtures.
 
-**Proof-to-runtime ownership:** The caller audit confirms that joined capsule
-gathering, endpoint fans and planar boundary preparation are still exercised
+**Phase 1 proof-to-runtime ownership:** At closeout, the caller audit confirmed
+that joined capsule gathering, endpoint fans and planar boundary preparation were exercised
 through tests/benchmarks rather than public collision dispatch. They are bounded
 geometry proofs, not an enabled continuity feature. Their next consumers are:
 
@@ -607,7 +609,7 @@ before reducing face samples; retain real edges, partial coverage, creases,
 supplier anchors and materials. Prove the small workload before expanding shape
 coverage. Keep 100% reachable coverage and warmed allocation/performance gates.
 
-**Native rewrite checkpoint:** The working tree now adds 164 net runtime source
+**Committed native rewrite checkpoint:** That rewrite added 164 net runtime source
 lines in Gravitas and 343 in FixedMathSharp, across nine existing files with no
 new runtime files. The rejected parallel surface-generation pipeline remains
 stashed. The existing convex SAT owner supplies one solid exit; its finite
@@ -657,8 +659,8 @@ identical results and 0 B allocated. Retained evidence: `perf/rewrite-native-ord
 `perf/rewrite-native-rim-v1*`, `rewrite/rim-paired-probe/*-*.json` and
 `rewrite/public-sat-bound-v3*`, beneath the same ignored Phase 2 artifact root.
 Independent review found every new helper has a production caller. Joined
-membership and neighbor-aware response below remain unimplemented; this
-checkpoint does not close #133/#139.
+membership and neighbor-aware response were still unimplemented at that
+checkpoint; it did not close #133/#139.
 
 The new math internals are a coordinated compatibility change. Commit and push
 FixedMathSharp first, then advance the Gravitas develop CI pin to that fetchable
@@ -707,6 +709,99 @@ revision. Released-package validation still follows the upstream release.
 - [ ] Exercise real ends, holes, gaps, partial spans, point touches, folded and
   ambiguous joins, winding reversal and member-order reversal. Test free as well
   as frozen rotation and complete-shape clearance behind the first witness.
+
+**Bounded joined-response checkpoint, 2026-10-17:** The existing 3D rounded
+face and perimeter generators now consume the Phase 1 classified domain through
+an internal context-owned `StaticSurface`. Spheres, nonzero capsules and rounded
+compound leaves cross two complete-edge concave mesh members through the actual
+`Simulate`/`LateSimulate` response path. Bodyless and explicit-static members
+retain their individual overlap/event lifetimes. Face samples are reduced across
+the connected region before routing each row to its actual supplying pair;
+genuine outer edges/corners retain radial constraints. A shared corner has one
+eligible supplier ordered by collider ID and canonical surface ordinal, including
+disconnected owners joined through another collider.
+
+The integration reuses GridForge candidate gathering, each mesh's existing BVH,
+face-region connectivity, finite capsule contacts, boundary fans and pair
+ownership. Committed boundary preparation belongs to the declaration lifetime;
+warm gathering does not rebuild it. One exact-input/result entry avoids repeating
+the same joined face reduction in its member pairs; live eligibility is checked
+again before reuse. Single-owner neighborhoods retain the native producer. The
+pair owner avoids regenerating the same contact twice during one full step.
+Replacement is preflighted before publishing associations. Removal, role change,
+deactivation, reset/disposal, neighbor filters/triggers and geometry changes
+invalidate retained rows and release member references.
+
+This checkpoint adds **350 net runtime lines in Gravitas**, touching twelve
+existing source files and adding one membership-owner file; FixedMathSharp is
+unchanged. Independent ponytail review found and helped resolve duplicate
+endpoint ownership, stale-reference and invalidation cases, then found no
+remaining actionable source or bloat finding in this bounded path. The staged
+declaration remains internal: initial admission rejects clipped partial edges;
+atomic handling of later unsupported geometry placements, partial spans, other
+shape families, pure 2D/mixed continuity, density/scaling and Phase 3 continuation
+gates remain unfinished. This checkpoint does not close #133/#139 or Phase 2.
+
+Final-source local validation uses `UseLocalLsfStack=true` throughout:
+
+| Profile | Tests passed | Reachable lines | Branches | Methods |
+| --- | ---: | ---: | ---: | ---: |
+| Release | 6,906 | 48,863 / 48,863 | 16,932 / 16,932 | 5,153 / 5,153 |
+| ReleaseLean | 6,838 | 48,861 / 48,861 | 16,932 / 16,932 | 5,152 / 5,152 |
+
+The joined regressions cover free/frozen rotation, bodyless/static membership,
+compound leaves, steady 0 B allocation, declaration-order physical traces,
+finite anchors/materials, genuine rims, interior and concave vertex fans,
+shared-corner ownership, sleeping/waking and invalidation/lifetime cases. All six
+existing shared replay fixtures match their reviewed expectations and each other
+across Windows x64 Release/Lean; the joined trace is an additional maintained
+runtime regression, not yet a shared replay/restore fixture. Release also builds
+`netstandard2.1` and `net8.0` without warnings. A local Lean parallel build encountered a
+duplicate-output compiler lock; serialized project builds pass.
+
+Evidence lives under ignored `artifacts/grv-issue-133/phase2/rewrite/`:
+`joined-{release,lean}-final-source`, `joined-final-replay` and
+`joined-controls/final-source-manifest.json`. The manifest records dirty source
+hashes separately from the base commit recorded by replay provenance. Linux,
+ARM and released packages were not validated locally.
+
+The maintained moving fixture has one frictionless rounded body, a continuous
+two-triangle floor or two declared members with four triangles total, 16 Hz,
+gravity 1, frozen rotation and sleeping disabled. It repeatedly traverses the
+join with fresh body geometry and checks unit tangential speed every frame.
+BenchmarkDotNet in-process Release measurements (three warmups, eight measured
+iterations, one launch; Windows x64, i7-9700K, .NET 8.0.29) report mean full-step
+cost over the repeated crossing, not maximum frame latency:
+
+| Moving body | Continuous floor | Two joined members | Warm allocation |
+| --- | ---: | ---: | ---: |
+| Sphere | 81.56 us | 112.85 us | 0 B/step |
+| Capsule | 102.68 us | 146.49 us | 0 B/step |
+
+The extra pair and joined reduction cost 31.29/43.81 us respectively; the broken
+independent seam is not a speedup denominator. Early integrated joined timings
+were 171.53/222.30 us. Reusing exact shared geometry, retaining the single-owner
+fast path and removing duplicate per-step pair regeneration reduce that cost
+within this checkpoint. These one-body results do not establish population
+capacity or boundary-density scaling. Capture: `joined-final-perf`; immutable
+eight-module payload hashes: `joined-controls/final-payload-hashes.json`.
+
+Nine unchanged ordinary controls compare the committed-source core with the
+final core, using identical lower-stack payloads, warmed interleaved ABBA samples
+and reversed load orders. They cover rounded interior/rim contacts, 3D/mixed
+steady and host-moved native meshes, and a mixed circle rim. All benchmark
+outputs/checksums agree and allocate 0 B. Balanced means range from -2.16% to
++1.45%; the +1.45% sphere-interior signal receives four focused process repeats
+with longer sample batches. Those reverse with load order (-2.22% to +1.61%,
+approximately -0.3% balanced). The earlier separated-path capture also retained
+an adverse +1.39% mixed steady mean, which reverses in the final controls.
+These runs do not establish a reproducible ordinary-path regression at the
+observed resolution; they establish neither equivalence, zero overhead nor a
+speedup. No further timing repeat is justified by these observations. Retained
+captures: `joined-controls/{separated,final}-{baseline-current,current-baseline}.json`,
+`joined-controls/focused-sphere-{0,1,2,3}.json` and their summaries. Timings used immutable
+payloads with eight-module bindings; no competing build/test/profile run was
+active. The existing generated-host issue #111 remains outside this checkpoint.
 
 ### Phase 3 - Continuation, Queries And Continuous Collision
 

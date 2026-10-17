@@ -22,6 +22,9 @@ internal sealed class MeshSurfaceBoundaryFan
     private bool _trusted;
 
     internal int RayCount => _rays.Count;
+    internal ReadOnlySpan<WideAxis3> Rays => _rays.AsReadOnlySpan();
+    internal ReadOnlySpan<(int Member, int Surface)> Owners => _owners.AsReadOnlySpan();
+    internal bool HasExposedBoundary { get; private set; }
 
     internal bool BuildEndpoint(ReadOnlySpan<PhysicsMesh> members, MeshSurfaceBoundaryDomain source, int span, bool upper)
     {
@@ -33,15 +36,16 @@ internal sealed class MeshSurfaceBoundaryFan
             new FixedSegment(edge.Start, edge.End), n, d);
     }
 
-    internal bool BuildAtPoint(ReadOnlySpan<PhysicsMesh> members, int sourceMember, int sourceSurface, Vector3d point) =>
-        Build(members, sourceMember, sourceSurface, new FixedSegment(point, point), default, Signed320.One);
+    internal bool BuildAtPoint(ReadOnlySpan<PhysicsMesh> members, int sourceMember, int sourceSurface, Vector3d point,
+        ReadOnlySpan<MeshSurfaceBoundaryDomain> prepared = default) =>
+        Build(members, sourceMember, sourceSurface, new FixedSegment(point, point), default, Signed320.One, prepared);
 
     // The caller supplies an admitted point. Traverse only positive-length
     // certified joins incident to it; a point-only neighbor adds no sector.
     private bool Build(ReadOnlySpan<PhysicsMesh> members, int sourceMember, int sourceSurface,
-        FixedSegment source, Signed320 n, Signed320 d)
+        FixedSegment source, Signed320 n, Signed320 d, ReadOnlySpan<MeshSurfaceBoundaryDomain> prepared = default)
     {
-        _trusted = false; _owners.FastClear(); _visited.Clear(); _rays.FastClear();
+        _trusted = false; HasExposedBoundary = false; _owners.FastClear(); _visited.Clear(); _rays.FastClear();
         var first = (sourceMember, members[sourceMember].GetManifoldSurfaceOwner(sourceSurface));
         _owners.Add(first); _visited.Add(first);
         PhysicsMesh original = members[sourceMember];
@@ -49,12 +53,22 @@ internal sealed class MeshSurfaceBoundaryFan
         for (int index = 0; index < _owners.Count; index++)
         {
             var key = _owners[index]; PhysicsMesh mesh = members[key.Member];
-            _boundary.Build(members, key.Member, key.Surface);
-            foreach (var edge in _boundary.Spans)
+            MeshSurfaceBoundaryDomain boundary = _boundary;
+            if (prepared.IsEmpty) boundary.Build(members, key.Member, key.Surface);
+            else
+            {
+                MeshSurfaceBoundaryDomain? found = null;
+                foreach (var candidate in prepared)
+                    if (candidate.SourceMember == key.Member && candidate.SourceSurface == key.Surface) { found = candidate; break; }
+                if (found == null) { HasExposedBoundary = true; continue; }
+                boundary = found;
+            }
+            foreach (var edge in boundary.Spans)
             {
                 if (WideTriangleRelations.LocateEdgePoint(source, original.Origin, original.Rotation, n, d,
                     new FixedSegment(edge.Start, edge.End), mesh.Origin, mesh.Rotation, edge.Interval) < 0) continue;
                 if (edge.Kind == MeshSurfaceBoundaryDomain.SpanKind.Ambiguous) { _rays.FastClear(); return false; }
+                if (edge.Kind == MeshSurfaceBoundaryDomain.SpanKind.Exposed) HasExposedBoundary = true;
                 var neighbor = (edge.OtherMember, edge.OtherSurface);
                 if (edge.Kind == MeshSurfaceBoundaryDomain.SpanKind.Joined && _visited.Add(neighbor)) _owners.Add(neighbor);
             }

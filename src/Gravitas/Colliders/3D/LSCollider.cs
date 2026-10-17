@@ -69,6 +69,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
             }
 
             _active = false;
+            if (this is LSMeshCollider mesh) mesh.StaticSurface?.Remove(mesh);
             if (IsPartitioned)
                 _context.Collisions.ClearPartitionedObject(this, force: true);
 
@@ -237,7 +238,11 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get => _layer;
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        set => _layer = value;
+        set
+        {
+            _layer = value;
+            if (this is LSMeshCollider mesh) mesh.StaticSurface?.Invalidate();
+        }
     }
 
     /// <summary>
@@ -254,6 +259,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
                 return;
 
             _ignoredCollisionLayers = value;
+            if (this is LSMeshCollider mesh) mesh.StaticSurface?.Invalidate();
             _body?.Wake();
         }
     }

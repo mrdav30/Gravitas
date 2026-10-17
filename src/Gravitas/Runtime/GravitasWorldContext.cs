@@ -643,6 +643,7 @@ public sealed partial class GravitasWorldContext : IDisposable
 
             Constraints3D.Reset();
             Constraints2D.Reset();
+            Physics.ReleaseStaticSurfaces();
             World.OnChangeCommitted -= OnQueryPartitionWorldChange;
             Settings.Owner = null;
             _disposed = true;

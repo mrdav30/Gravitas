@@ -15,6 +15,7 @@ namespace Gravitas;
 /// <summary>
 /// Owns physics registration and collision-pair state for one <see cref="GravitasWorldContext"/>.
 /// </summary>
+/// <content>Context-owned registration, static-surface declarations and fixed-step orchestration.</content>
 public sealed partial class GravitasPhysicsService
 {
     private const int DefaultColliderSize = 2048;
@@ -49,6 +50,7 @@ public sealed partial class GravitasPhysicsService
     private readonly SwiftHashSet<SolidBody> _queuedContinuousCollisionHandoffBodies = new(DefaultBodySize);
     private readonly SwiftList<SolidBody> _continuousCollisionHandoffQueue = new(DefaultBodySize);
     private long _continuousCollisionPreparedToken = -1;
+    private readonly SwiftList<StaticSurface> _staticSurfaces = new();
 
     /// <summary>
     /// Initializes a new physics service for the supplied context.
@@ -207,6 +209,7 @@ public sealed partial class GravitasPhysicsService
     /// </summary>
     public void Reset()
     {
+        ReleaseStaticSurfaces();
         DiscardContinuousCollisionHandoffQueue();
         _dynamicBodies.Clear();
         _colliders.Clear();
@@ -234,6 +237,21 @@ public sealed partial class GravitasPhysicsService
         BodyCount = 0;
     }
 
+    internal StaticSurface CreateStaticSurface(System.ReadOnlySpan<LSMeshCollider> members)
+    {
+        var surface = new StaticSurface(_context, members);
+        _staticSurfaces.Add(surface);
+        return surface;
+    }
+
+    internal void RemoveStaticSurface(StaticSurface surface) => _staticSurfaces.Remove(surface);
+
+    internal void ReleaseStaticSurfaces()
+    {
+        foreach (StaticSurface surface in _staticSurfaces) surface.Release();
+        _staticSurfaces.FastClear();
+    }
+
     internal int AssimilateBody(SolidBody body, BodyMotionType motionType)
     {
         SwiftThrowHelper.ThrowIfNull(body, nameof(body));
@@ -258,6 +276,8 @@ public sealed partial class GravitasPhysicsService
         SolidBody body,
         BodyMotionType previousMotionType)
     {
+        if (body.MotionType != BodyMotionType.Static && body.Collider is LSMeshCollider mesh)
+            mesh.StaticSurface?.Remove(mesh);
         if (previousMotionType == BodyMotionType.Static)
         {
             int dynamicId = _dynamicBodies.Add(body);
@@ -312,6 +332,7 @@ public sealed partial class GravitasPhysicsService
             return;
         }
 
+        if (collider is LSMeshCollider mesh) mesh.StaticSurface?.Remove(mesh);
         if (collider.Body != null)
             _context.Constraints3D.RemoveJointsForBody(collider.Body);
         RemovePairsForCollider(collider);

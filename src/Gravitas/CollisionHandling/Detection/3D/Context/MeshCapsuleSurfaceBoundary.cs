@@ -17,6 +17,7 @@ namespace Gravitas.CollisionHandling;
 internal sealed class MeshCapsuleSurfaceBoundary
 {
     private readonly SwiftHashSet<int> _visitedCorners = new();
+    private WideAxis3[] _joinedFan = Array.Empty<WideAxis3>(), _transformedFan = Array.Empty<WideAxis3>();
     internal void BuildSurfaceContacts(LSMeshCollider collider, PhysicsMaterial otherMaterial,
         Vector3d center, FixedQuaternion rotation, Fixed64 coreLength, Fixed64 radius,
         int surfaceTriangle, MeshSurfaceConnectivity connectivity, MeshCapsuleFaceRegions faces,
@@ -27,6 +28,7 @@ internal sealed class MeshCapsuleSurfaceBoundary
         int surface = mesh.GetCanonicalSurfaceOrdinal(surfaceTriangle);
         ReadOnlySpan<int> boundary = mesh.GetCanonicalSurfaceBoundaryVertexPairs(surfaceTriangle);
         ReadOnlySpan<Vector3d> vertices = mesh.ScaledLocalVertices;
+        CapsulePlaneRayFrame frame = faces.GetBoundaryFrame(collider, surfaceTriangle, out Vector3d normal);
         _visitedCorners.Clear();
         for (int edge = 0; edge < boundary.Length; edge += 2)
         {
@@ -35,14 +37,15 @@ internal sealed class MeshCapsuleSurfaceBoundary
             // A straight edge's admitted interval needs no subedge routing
             // when the surface has just one connected finite region.
             int region = connectivity.RegionCount == 1
-                ? faces.Frame.Finite.IntersectsSegment(new FixedSegment(vertices[first], vertices[second])) ? 0 : -1
+                ? frame.Finite.IntersectsSegment(new FixedSegment(vertices[first], vertices[second])) ? 0 : -1
                 : MeshSurfaceBoundaryTopology.FindEdgeRegion(mesh, owner, first, second,
-                    connectivity, faces.Frame.Finite);
+                    connectivity, frame.Finite);
             if (region < 0) continue;
-            KeepFeature(first, second, feature, region, pointOnly: false);
-            if (_visitedCorners.Add(first) && faces.Frame.Finite.ContainsPoint(vertices[first]))
+            if (!faces.IsJoinedEdge(collider, surfaceTriangle, edge / 2))
+                KeepFeature(first, second, feature, region, pointOnly: false);
+            if (_visitedCorners.Add(first) && frame.Finite.ContainsPoint(vertices[first]))
                 KeepFeature(first, second, feature + 1, region, pointOnly: true);
-            if (_visitedCorners.Add(second) && faces.Frame.Finite.ContainsPoint(vertices[second]))
+            if (_visitedCorners.Add(second) && frame.Finite.ContainsPoint(vertices[second]))
                 KeepFeature(second, first, feature + 2, region, pointOnly: true);
         }
 
@@ -50,21 +53,30 @@ internal sealed class MeshCapsuleSurfaceBoundary
         {
             var triangle = new FixedTriangle(mesh.ScaledLocalVertices[first],
                 mesh.ScaledLocalVertices[pointOnly ? first : second], mesh.ScaledLocalVertices[pointOnly ? first : second]);
-            Vector3d fallback = faces.GetNormal(region);
+            int orientation = faces.GetBoundaryOrientation(collider, surfaceTriangle, region);
+            Vector3d fallback = -normal * orientation;
             if (!triangle.TryGetCenteredCapsuleContact(mesh.Origin, mesh.Rotation, center, rotation,
                     coreLength, radius, fallback, out FixedContactAnchors contact,
                     out AxisTriangleContactFeature feature, out _)
                 || !pointOnly && feature.TriangleVertex >= 0) return;
-            Span<WideAxis3> fan = stackalloc WideAxis3[5];
-            int count = MeshSurfaceBoundaryTopology.GetIncidentFan(mesh, owner, first, second, !pointOnly, fan);
+            bool suppress = false;
+            ReadOnlySpan<WideAxis3> joinedFan = pointOnly
+                ? faces.GetJoinedCornerFan(collider, surfaceTriangle, mesh.ScaledLocalVertices[first], out suppress) : default;
+            if (suppress) return;
+            if (joinedFan.Length + 1 > _joinedFan.Length && !joinedFan.IsEmpty)
+                Array.Resize(ref _joinedFan, Math.Max(joinedFan.Length + 1, 2 * _joinedFan.Length));
+            Span<WideAxis3> fan = joinedFan.IsEmpty ? stackalloc WideAxis3[5] : _joinedFan;
+            int count;
+            if (joinedFan.IsEmpty) count = MeshSurfaceBoundaryTopology.GetIncidentFan(mesh, owner, first, second, !pointOnly, fan);
+            else { joinedFan.CopyTo(fan); count = joinedFan.Length; }
             // A successful contact between admitted local envelopes keeps the
             // capsule center representable in the mesh chart (two reaches plus final rounding).
-            if (!SupportsFan(feature, fan[..count])
+            if (!SupportsFan(feature, fan[..count], !joinedFan.IsEmpty)
                 || !SupportsSelectedHemisphere(feature,
-                    faces.Frame.AuthoredNormal, faces.GetOrientation(region))) return;
-            fan[count++] = faces.GetOrientation(region) > 0 ? faces.Frame.AuthoredNormal : -faces.Frame.AuthoredNormal;
+                    frame.AuthoredNormal, orientation)) return;
+            fan[count++] = orientation > 0 ? frame.AuthoredNormal : -frame.AuthoredNormal;
             if (coreLength > Fixed64.Zero && feature.IsZeroSeparation
-                && TryGetPerpendicularFallback(faces.Frame.Finite, rotation, fan[..count], out fallback))
+                && TryGetPerpendicularFallback(frame.Finite, rotation, fan[..count], out fallback))
             {
                 // Select a perpendicular direction in the exact capsule chart,
                 // then construct the actual ray using its final Q32.32 normal.
@@ -80,12 +92,13 @@ internal sealed class MeshCapsuleSurfaceBoundary
         }
     }
 
-    private static bool SupportsFan(in AxisTriangleContactFeature feature, ReadOnlySpan<WideAxis3> fan)
+    private static bool SupportsFan(in AxisTriangleContactFeature feature, ReadOnlySpan<WideAxis3> fan, bool wide)
     {
         foreach (WideAxis3 inward in fan)
         {
-            if (feature.CompareSeparationProjection(Signed192.NarrowProven(inward.X),
-                Signed192.NarrowProven(inward.Y), Signed192.NarrowProven(inward.Z)) > 0) return false;
+            if ((wide ? feature.CompareSeparationProjection(inward)
+                : feature.CompareSeparationProjection(Signed192.NarrowProven(inward.X),
+                    Signed192.NarrowProven(inward.Y), Signed192.NarrowProven(inward.Z))) > 0) return false;
         }
         return true;
     }
@@ -98,12 +111,16 @@ internal sealed class MeshCapsuleSurfaceBoundary
             Signed192.NarrowProven(canonicalNormal.Z)) <= 0;
     }
 
-    private static bool TryGetPerpendicularFallback(in CapsuleFiniteSectionFrame finite,
+    private bool TryGetPerpendicularFallback(in CapsuleFiniteSectionFrame finite,
         FixedQuaternion rotation, ReadOnlySpan<WideAxis3> authoredFan, out Vector3d fallback)
     {
         fallback = default;
         var core = new WideAxis3(default, Signed320.ExtendValue(Signed192.Signed(1)), default);
-        Span<WideAxis3> fan = stackalloc WideAxis3[5];
+        if (authoredFan.Length > 5 && _transformedFan.Length < authoredFan.Length)
+            Array.Resize(ref _transformedFan, Math.Max(authoredFan.Length, 2 * _transformedFan.Length));
+        Span<WideAxis3> fan = authoredFan.Length <= 5 ? stackalloc WideAxis3[5] : _transformedFan;
+        // Admitted mesh edges span at most 8,192 units (<46 raw bits). A joined
+        // relative basis adds <132 bits, so the authored rays still fit Signed192.
         for (int index = 0; index < authoredFan.Length; index++)
             fan[index] = WideRigidProjection.TransformLocalAxis(
                 finite.ShapeFrame.Basis, Signed192.NarrowProven(authoredFan[index].X),

@@ -110,6 +110,26 @@ internal static class MeshTriangleContactGenerator
             capsule.AxisLength, capsule.ScaledRadius, CreateBounds(capsule.BoundsMin, capsule.BoundsMax), triangleBuffer);
     }
 
+    private static bool BuildJoinedRoundedManifold(CollisionWorkItem pair, LSMeshCollider collider,
+        StaticSurface surface, Vector3d center, FixedQuaternion rotation, Fixed64 coreLength, Fixed64 radius)
+    {
+        surface.BuildRounded(center, rotation, coreLength, radius);
+        MeshCapsuleFaceRegions faces = surface.Faces;
+        for (int region = 0; region < faces.RegionCount; region++)
+            for (int sample = 0; sample < faces.GetSampleCount(region); sample++)
+            {
+                bool found = faces.TryGetJoinedSample(region, sample, out FixedContactAnchors contact, out LSMeshCollider? supplier);
+                System.Diagnostics.Debug.Assert(found);
+                // Selected rows belong to their supplier's pair; other overlapping members still raise events.
+                if (supplier != collider) continue;
+                pair.Manifold.AddContact(new ContactAnchor(contact.FirstAnchor), new ContactAnchor(contact.SecondAnchor),
+                    contact.Depth, contact.Normal, collider.Material, pair.ColliderB.Material, contact.DepthIsClamped,
+                    group: new ContactGroupKey(0, 0, 0, 0, region));
+            }
+        return faces.AppendJoinedBoundaries(collider, pair.ColliderB.Material, center, rotation, coreLength,
+            radius, pair.Context.CollisionScratch.MeshCapsuleBoundary, pair.Manifold);
+    }
+
     private static bool TryBuildRoundedAxisManifold(CollisionWorkItem pair, LSMeshCollider collider,
         Vector3d center, FixedQuaternion rotation, Fixed64 coreLength, Fixed64 radius,
         FixedBoundVolume bounds, SwiftList<int> candidates)
@@ -118,6 +138,9 @@ internal static class MeshTriangleContactGenerator
         // Zero-core capsules are spheres: body spin must not rotate their
         // geometry frame and introduce a rounded off-center impulse lever.
         if (coreLength == Fixed64.Zero) rotation = FixedQuaternion.Identity;
+        if (collider.StaticSurface is { } staticSurface && !collider.IsTrigger && !pair.ColliderB.IsTrigger
+            && staticSurface.Gather(pair.ColliderB, bounds))
+            return BuildJoinedRoundedManifold(pair, collider, staticSurface, center, rotation, coreLength, radius);
         collider.GetTrianglesInBounds(bounds, candidates);
         CollisionSatScratch scratch = pair.Context.CollisionScratch;
         SwiftList<int> admitted = scratch.MeshTriangleCandidatesB;

@@ -485,12 +485,14 @@ public partial class CollisionPair
     {
         if (!_isColliding)
             return true;
-        if (!Manifold.HasContact)
-            return false;
-
+        bool joined = ColliderA is LSMeshCollider { StaticSurface: not null }
+            || ColliderB is LSMeshCollider { StaticSurface: not null };
         bool contactChanged = RefreshPhysicalContactState();
         // A sleeping participant does not make a moved or reshaped support's old manifold valid.
-        if (contactChanged || BroadPhaseVersionChanged())
+        // The broad-phase pass already checked live eligibility this frame.
+        // An overlap can legitimately leave its selected rows to another member.
+        if (LastFrame != Context.FrameCount && (!Manifold.HasContact || joined)
+            || contactChanged || BroadPhaseVersionChanged())
         {
             if (!BoundsOverlapInclusive(ColliderA, ColliderB)
                 || !CollisionDetection.DoCollisionCheck(this))
@@ -541,7 +543,9 @@ public partial class CollisionPair
     private bool CheckCollision(bool contactChanged)
     {
         // Child material overrides are manifold data and can change without a bounds publication.
-        if (!contactChanged && !BroadPhaseVersionChanged() && _isColliding)
+        if (!contactChanged && !BroadPhaseVersionChanged() && _isColliding
+            && ColliderA is not LSMeshCollider { StaticSurface: not null }
+            && ColliderB is not LSMeshCollider { StaticSurface: not null })
             return _isColliding;
 
         return CollisionDetection.DoCollisionCheck(this);
