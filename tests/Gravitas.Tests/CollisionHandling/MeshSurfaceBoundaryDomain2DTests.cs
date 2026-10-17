@@ -2,6 +2,7 @@ using FixedMathSharp;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Tests.Support;
+using FixedMathSharp.Geometry;
 using System;
 using Xunit;
 
@@ -240,6 +241,162 @@ public sealed class MeshSurfaceBoundaryDomain2DTests
         using var scene = PhysicsScenarioBuilder.Create();
         var source = Piece(scene.Context, false, new(4, 2), new(0, 1));
         Assert.Throws<ArgumentException>(() => new MeshSurfaceBoundaryDomain2D().Build(new LSCollider2D[] { source, new LSCircleCollider2D(Fixed64.One) }, 0));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void LUnion_ExposedEndpoint_ShouldSupplyTheMissingPolygonClipCut(bool reverseMembers)
+    {
+        using var scene = PhysicsScenarioBuilder.Create();
+        LSCollider2D bottom = Piece(scene.Context, true, new(8, 4), new(0, -2));
+        LSCollider2D left = Piece(scene.Context, true, new(4, 4), new(-2, 2));
+        var mover = Polygon(scene.Context, new[] { new Vector2d(-Fixed64.Half, -Fixed64.One),
+            new(Fixed64.Half, -Fixed64.One), new(Fixed64.Half, Fixed64.One), new(-Fixed64.Half, Fixed64.One) },
+            new(Fixed64.Quarter, Fixed64.One - Fixed64.Quarter), Fixed64.Zero);
+        var manifold = new ContactManifold2D();
+        Assert.True(CollisionDetection2D.TryCollide(new CollisionWorkItem2D(mover, bottom,
+            ColliderSettings2D.GetCollisionType(mover.Shape, bottom.Shape)), manifold, 0));
+        Assert.Equal(2, manifold.Count);
+        Vector2d[] incidentPoints = new Vector2d[2];
+        for (int i = 0; i < manifold.Count; i++)
+        {
+            Assert.True(manifold[i].AnchorB.TryGetWorldPoint(out incidentPoints[i]));
+            Assert.NotEqual(Vector2d.Zero, incidentPoints[i]);
+        }
+
+        LSCollider2D[] members = reverseMembers ? new[] { left, bottom } : new[] { bottom, left };
+        var domain = new MeshSurfaceBoundaryDomain2D();
+        domain.Build(members, reverseMembers ? 1 : 0);
+        Assert.Same(bottom, members[domain.SourceMember]);
+        int cutEndpoints = 0;
+        for (int i = 0; i < domain.Spans.Length; i++)
+        {
+            var span = domain.Spans[i];
+            if (span.First != 2) continue;
+            if (span.Kind == MeshSurfaceBoundaryDomain2D.SpanKind.Joined)
+            {
+                Assert.False(domain.TryGetExposedEndpoint(i, false, out _));
+                Assert.False(domain.TryGetExposedEndpoint(i, true, out _));
+                continue;
+            }
+            Assert.True(domain.TryGetExposedEndpoint(i, false, out Vector2d lower));
+            Assert.True(domain.TryGetExposedEndpoint(i, true, out Vector2d upper));
+            Assert.True(new ContactAnchor2D(domain.Origin, domain.Rotation, lower).TryGetWorldPoint(out Vector2d start));
+            Assert.True(new ContactAnchor2D(domain.Origin, domain.Rotation, upper).TryGetWorldPoint(out Vector2d end));
+            // Phase 2 can reclip the incident segment against this endpoint;
+            // deleting its covered row alone cannot regenerate the cut.
+            Assert.Equal(Vector2d.Zero, end);
+            Assert.Equal(new Vector2d(4, 0), start);
+            Assert.Equal(end, new FixedSegment2d(incidentPoints[0], incidentPoints[1]).ClosestPoint(end));
+            cutEndpoints++;
+        }
+        Assert.Equal(1, cutEndpoints);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ExposedEndpoints_ShouldStayInTheirSupplyingNativeFrame(bool mixed)
+    {
+        using var scene = PhysicsScenarioBuilder.Create();
+        Fixed64 angle = FixedMath.DegToRad((Fixed64)37);
+        var source = Polygon(scene.Context, new[] { new Vector2d(0, 0), new(4, 0), new(4, 2), new(0, 2) }, new(7, -3), angle);
+        var other = Polygon(scene.Context, new[] { new Vector2d(1, 0), new(3, 0), new(3, -2), new(1, -2) }, new(7, -3), angle);
+        var domain = new MeshSurfaceBoundaryDomain2D();
+        domain.Build(new LSCollider2D[] { other, source }, 1, mixed);
+        Assert.Equal(1, domain.SourceMember);
+        Assert.Equal(source.Center, domain.Origin);
+        Assert.Equal(source.ConvexRotation, domain.Rotation);
+        int endpoints = 0;
+        for (int i = 0; i < domain.Spans.Length; i++)
+        {
+            if (domain.Spans[i].First != 0 || domain.Spans[i].Kind != MeshSurfaceBoundaryDomain2D.SpanKind.Exposed) continue;
+            Assert.True(domain.TryGetExposedEndpoint(i, false, out Vector2d start));
+            Assert.True(domain.TryGetExposedEndpoint(i, true, out Vector2d end));
+            if (start == Vector2d.Zero) Assert.Equal(new Vector2d(1, 0), end);
+            else { Assert.Equal(new Vector2d(3, 0), start); Assert.Equal(new Vector2d(4, 0), end); }
+            endpoints += 2;
+        }
+        Assert.Equal(4, endpoints);
+    }
+
+    [Fact]
+    public void IndependentlyRotatedMembers_ShouldFinalizeCutsInTheSourceFrame()
+    {
+        using var scene = PhysicsScenarioBuilder.Create();
+        Fixed64 sourceAngle = FixedMath.DegToRad((Fixed64)37), otherAngle = FixedMath.DegToRad((Fixed64)(-23));
+        Vector2d Rotate(Vector2d point, Fixed64 angle)
+        {
+            Assert.True(Vector2d.TryRotate(point, angle, out Vector2d rotated));
+            return rotated;
+        }
+        var source = new LSPolygonCollider2D(Vector2d.Zero, Rotate(new(4, 0), otherAngle),
+            Rotate(new(4, 2), otherAngle), Rotate(new(0, 2), otherAngle));
+        var other = new LSPolygonCollider2D(Rotate(new(1, 0), sourceAngle), Rotate(new(3, 0), sourceAngle),
+            Rotate(new(3, -2), sourceAngle), Rotate(new(1, -2), sourceAngle));
+        new SolidBody2D(new TestMatterAgent(scene.Context), source).Initialize(new(7, -3), sourceAngle, BodyMotionType.Static);
+        new SolidBody2D(new TestMatterAgent(scene.Context), other).Initialize(new(7, -3), otherAngle, BodyMotionType.Static);
+        var domain = new MeshSurfaceBoundaryDomain2D();
+        domain.Build(new LSCollider2D[] { other, source }, 1);
+        int cutEndpoints = 0;
+        for (int i = 0; i < domain.Spans.Length; i++)
+        {
+            if (domain.Spans[i].First != 0 || domain.Spans[i].Kind != MeshSurfaceBoundaryDomain2D.SpanKind.Exposed) continue;
+            Assert.True(domain.TryGetExposedEndpoint(i, false, out Vector2d start));
+            Assert.True(domain.TryGetExposedEndpoint(i, true, out Vector2d end));
+            Vector2d cut = start == Vector2d.Zero ? end : start;
+            Assert.Equal(Rotate(start == Vector2d.Zero ? new(1, 0) : new(3, 0), otherAngle), cut);
+            Assert.True(new ContactAnchor2D(domain.Origin, domain.Rotation, cut).TryGetWorldPoint(out Vector2d point));
+            Assert.True(other.TryGetVertex(start == Vector2d.Zero ? 0 : 1, out Vector2d otherPoint));
+            Assert.Equal(otherPoint, point);
+            cutEndpoints++;
+        }
+        Assert.Equal(2, cutEndpoints);
+    }
+
+    [Fact]
+    public void SubRawCoverageCut_ShouldRetainItsSpanEvenWhenBothFinalEndpointsRoundToTheOriginalPoint()
+    {
+        using var scene = PhysicsScenarioBuilder.Create();
+        var source = Polygon(scene.Context, new[] { new Vector2d(0, 0), new(2, 0), new(2, 2), new(0, 2) }, Vector2d.Zero, Fixed64.Zero);
+        var crossing = Polygon(scene.Context, new[] { new Vector2d(0, -1), new(Fixed64.FromRaw(1), (Fixed64)2),
+            new(Fixed64.FromRaw(2), -Fixed64.One) }, Vector2d.Zero, Fixed64.Zero);
+        var domain = new MeshSurfaceBoundaryDomain2D();
+        domain.Build(new LSCollider2D[] { source, crossing }, 0);
+        Assert.Equal(MeshSurfaceBoundaryDomain2D.SpanKind.Exposed, domain.Spans[0].Kind);
+        Assert.Equal(0, domain.Spans[0].First);
+        Assert.Equal(new Vector2d(2, 0), domain.Spans[0].End);
+        Assert.True(domain.TryGetExposedEndpoint(0, false, out Vector2d start));
+        Assert.True(domain.TryGetExposedEndpoint(0, true, out Vector2d cut));
+        Assert.Equal(Vector2d.Zero, start);
+        Assert.Equal(start, cut);
+        Assert.Equal(MeshSurfaceBoundaryDomain2D.SpanKind.Ambiguous, domain.Spans[1].Kind);
+        Assert.False(domain.TryGetExposedEndpoint(1, false, out _));
+        Assert.False(domain.TryGetExposedEndpoint(1, true, out _));
+    }
+
+    [Fact]
+    public void WarmedExposedEndpointFinalization_ShouldAllocateZeroBytes()
+    {
+        using var scene = PhysicsScenarioBuilder.Create();
+        var source = Piece(scene.Context, true, new(4, 2), new(0, 1));
+        var other = Piece(scene.Context, true, new(2, 2), new(0, -1));
+        var domain = new MeshSurfaceBoundaryDomain2D();
+        domain.Build(new LSCollider2D[] { source, other }, 0);
+        for (int i = 0; i < 64; i++) domain.TryGetExposedEndpoint(0, true, out _);
+        long before = GC.GetAllocatedBytesForCurrentThread();
+        bool success = true;
+        Vector2d sum = Vector2d.Zero;
+        for (int i = 0; i < 128; i++)
+        {
+            success &= domain.TryGetExposedEndpoint(0, true, out Vector2d point);
+            sum += point;
+        }
+        long allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+        Assert.True(success);
+        Assert.Equal(new Vector2d(-128, -128), sum);
+        Assert.Equal(0, allocated);
     }
 
     private static LSPolygonCollider2D Polygon(GravitasWorldContext context, Vector2d[] vertices, Vector2d origin, Fixed64 angle)

@@ -43,6 +43,21 @@ internal sealed class MeshSurfaceBoundaryDomain2D
     internal Vector2d Origin { get; private set; }
     internal Fixed64 Rotation { get; private set; }
 
+    /// <summary>
+    /// Finalizes a true-boundary endpoint in the supplying member's native
+    /// local frame. SourceMember and the original span/interval retain feature
+    /// identity; this rounded point must not be reused for coverage decisions.
+    /// Pure and mixed callers materialize it with their own dimensional frame.
+    /// </summary>
+    internal bool TryGetExposedEndpoint(int spanIndex, bool upper, out Vector2d point)
+    {
+        BoundarySpan span = _spans[spanIndex];
+        point = default;
+        if (span.Kind != SpanKind.Exposed) return false;
+        point = span.Interval.GetEndpoint(new FixedSegment2d(span.Start, span.End), upper);
+        return true;
+    }
+
     internal void Build(ReadOnlySpan<LSCollider2D> members, int sourceMember, bool mixed = false)
     {
         foreach (LSCollider2D member in members)

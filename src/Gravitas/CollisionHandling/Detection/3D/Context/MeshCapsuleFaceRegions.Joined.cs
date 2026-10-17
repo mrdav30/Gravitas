@@ -64,6 +64,7 @@ internal sealed partial class MeshCapsuleFaceRegions
             mesh.GetLocalTriangleVertices(member.Triangle, out Vector3d a, out Vector3d b, out Vector3d c);
             member.Frame = new CapsulePlaneRayFrame(new FixedTriangle(a, b, c), finite);
             member.Admitted.FastClear();
+            // shortcut: bounded proof scans supplied owners; runtime integration must use the mesh BVH.
             for (int triangle = 0; triangle < mesh.TriangleCount; triangle++)
             {
                 if (mesh.GetManifoldSurfaceOwner(triangle) != member.Owner) continue;

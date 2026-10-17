@@ -31,6 +31,53 @@ internal sealed class MeshSlabFaceRegions
     internal int Orientation => _orientation;
     internal ref readonly FiniteSlabRayFrame Frame => ref _frame;
 
+    /// <summary>Finds a finite-boundary ray maximum from certified coplanar members in one slab chart.</summary>
+    /// <remarks>Orientation follows the first member's canonical plane. Retained spans belong to their supplied member;
+    /// sources preserve canonical boundary-span order within each member, which resolves same-member ties.
+    /// Geometry must be committed and admitted. This does not gather intrinsic face events or construct a complete face sample pool.</remarks>
+    internal static bool TryGetBoundaryWitness(
+        ReadOnlySpan<(LSMeshCollider Collider, int SurfaceTriangle, MeshSurfaceBoundaryDomain.BoundarySpan Span)> sources,
+        Vector3d center, FixedQuaternion rotation, Fixed64 length, Fixed64 radius, Fixed64 halfThickness,
+        ReadOnlySpan<Vector2d> prismOffsets, int orientation, out FixedContactAnchors contact, out int supplier)
+    {
+        contact = default; supplier = -1;
+        if (orientation != -1 && orientation != 1) throw new ArgumentOutOfRangeException(nameof(orientation));
+        Span<ulong> bestValues = stackalloc ulong[FiniteSlabRaySelection.StorageWords], values = stackalloc ulong[FiniteSlabRaySelection.StorageWords];
+        Span<sbyte> bestSigns = stackalloc sbyte[FiniteSlabRaySelection.SignCount], signs = stackalloc sbyte[FiniteSlabRaySelection.SignCount];
+        var best = new FiniteSlabRaySelection(bestValues, bestSigns);
+        var candidate = new FiniteSlabRaySelection(values, signs);
+        FiniteSlabRayFrame bestFrame = default; WideAxis3 commonNormal = default;
+        int chosen = -1;
+        for (int index = 0; index < sources.Length; index++)
+        {
+            ref readonly var input = ref sources[index]; PhysicsMesh mesh = input.Collider.Mesh;
+            mesh.GetLocalTriangleVertices(input.SurfaceTriangle, out Vector3d a, out Vector3d b, out Vector3d c);
+            var frame = new FiniteSlabRayFrame(new FixedTriangle(a, b, c), mesh.Origin, mesh.Rotation,
+                center, rotation, length, radius, halfThickness);
+            if (index == 0) commonNormal = frame.Plane.Normal;
+            if (input.Span.Kind == MeshSurfaceBoundaryDomain.SpanKind.Joined) continue;
+            int nativeOrientation = orientation * WideAxis3.Dot(frame.Plane.Normal, commonNormal).Sign;
+            candidate.Restore(default);
+            FiniteSlabRayExtrema.AccumulateSegment(frame, new FixedSegment(input.Span.Start, input.Span.End),
+                input.Span.Interval, prismOffsets, nativeOrientation, ref candidate);
+            if (!candidate.HasValue) continue;
+            if (best.HasValue)
+            {
+                int order = candidate.CompareDepthAcrossFrames(best, frame, bestFrame);
+                if (order < 0 || order == 0 && input.Collider.Id >= sources[chosen].Collider.Id) continue;
+            }
+            values.CopyTo(bestValues); signs.CopyTo(bestSigns); best.Restore(candidate.Metadata);
+            bestFrame = frame; chosen = index;
+        }
+        if (!best.HasValue) return false;
+        bool represented = best.TryGetContactAnchor(bestFrame, out Fixed64 depth, out bool clamped,
+            out Vector3d authored, out FixedPointAnchor exit);
+        PhysicsMesh supplierMesh = sources[chosen].Collider.Mesh;
+        contact = new FixedContactAnchors(new FixedPointAnchor(supplierMesh.Origin, supplierMesh.Rotation, authored),
+            exit, bestFrame.GetNormal(best.Metadata.Orientation), depth, clamped);
+        supplier = chosen; return represented;
+    }
+
     internal void Prepare(in FiniteSlabRayFrame frame, ReadOnlySpan<Vector2d> prismOffsets)
     {
         _frame = frame;

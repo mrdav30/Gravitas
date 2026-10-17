@@ -82,6 +82,7 @@ internal sealed class MeshSurfaceBoundaryDomain
         _coverage.FastClear(); _cuts.FastClear();
         _cuts.Add(Parameter.Zero); _cuts.Add(Parameter.One);
         PhysicsMesh source = members[sourceMember];
+        // shortcut: proof preparation scans supplied meshes; runtime membership must prepare adjacency on mutation.
         for (int member = 0; member < members.Length; member++)
         {
             PhysicsMesh target = members[member];
