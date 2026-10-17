@@ -3,6 +3,7 @@ using FixedMathSharp.Geometry;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
+using Gravitas.Materials;
 using Gravitas.Tests.Support;
 using System;
 using System.Linq;
@@ -12,6 +13,238 @@ namespace Gravitas.Tests.CollisionHandlingTests;
 
 public sealed class MeshTrianglePairContactTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ClosedHullAgainstSeparatedTrustedPatch_ShouldRejectOverlappingBounds(bool reverse)
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSMeshCollider hull = MeshTestFixtures.CreateConvexCube();
+        var sheet = new LSMeshCollider(new[]
+        {
+            new Vector3d(Fixed64.Half, Fixed64.One, -Fixed64.One), new(Fixed64.One, Fixed64.Half, -Fixed64.One),
+            new(Fixed64.One, Fixed64.Half, Fixed64.One), new(Fixed64.Half, Fixed64.One, Fixed64.One)
+        }, new[] { 0, 1, 2, 0, 2, 3 }, MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation);
+        InitializeStaticMesh(context, hull, Vector3d.One);
+        InitializeStaticMesh(context, sheet, Vector3d.One);
+        var manifold = new ContactManifold();
+
+        Assert.True(hull.Bounds.Intersects(sheet.Bounds));
+        Assert.False(sheet.Mesh.GetConvexCoplanarPatchCornerVertexIndices(0).IsEmpty);
+        Assert.False(CollisionDetection.DoCollisionCheck(CreateWorkItem(context,
+            reverse ? hull : sheet, reverse ? sheet : hull, manifold)));
+        Assert.False(manifold.HasContact);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void ClosedHullAgainstApexTouchingSheet_ShouldRetainTheFiniteZeroDepthContact(bool hullFirst, bool reverse)
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        var hull = new LSMeshCollider(new[] { new Vector3d(-1, -1, -1), new(1, -1, -1), new(0, 1, -1), new(0, 0, 1) },
+            new[] { 0, 2, 1, 0, 1, 3, 1, 2, 3, 2, 0, 3 }, MeshColliderMode.Convex)
+        { Material = PhysicsMaterial.Bouncy };
+        var sheet = new LSMeshCollider(new[] { new Vector3d(0, 0, 1), new(-1, -1, 3), new(0, -2, 5), new(1, -1, 3) },
+            new[] { 0, 1, 2, 0, 2, 3 }, MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation);
+        sheet.Material = PhysicsMaterial.Frictionless;
+        InitializeStaticMesh(context, hullFirst ? hull : sheet, Vector3d.One);
+        InitializeStaticMesh(context, hullFirst ? sheet : hull, Vector3d.One);
+        Assert.False(sheet.Mesh.GetConvexCoplanarPatchCornerVertexIndices(0).IsEmpty);
+        var manifold = new ContactManifold();
+
+        Assert.True(CollisionDetection.DoCollisionCheck(CreateWorkItem(context,
+            reverse ? hull : sheet, reverse ? sheet : hull, manifold)));
+        Assert.Equal(1, manifold.GroupCount);
+        Assert.NotEmpty(manifold);
+        foreach (ManifoldContact row in manifold)
+        {
+            Assert.Equal(Fixed64.Zero, row.Depth);
+            Assert.Equal(new Vector3d(0, 0, 1), row.PointA);
+            Assert.Equal(row.PointA, row.PointB);
+            Assert.True(row.HasMaterialOverride);
+            Assert.Equal(reverse ? hull.Material : sheet.Material, row.MaterialA);
+            Assert.Equal(reverse ? sheet.Material : hull.Material, row.MaterialB);
+        }
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void ClosedConcaveBoundaryAgainstConvexHull_ShouldRetainFiniteSurfaceContacts(bool hullFirst, bool reverse)
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        LSMeshCollider hull = MeshTestFixtures.CreateConvexCube();
+        LSMeshCollider boundary = MeshTestFixtures.CreateConvexCube(MeshColliderMode.Concave);
+        Vector3d boundaryCenter = Vector3d.Right * Fixed64.FromFraction(3, 4);
+        if (hullFirst) InitializeStaticMesh(context, hull, Vector3d.One);
+        InitializeStaticMesh(context, boundary, boundaryCenter, Vector3d.One);
+        if (!hullFirst) InitializeStaticMesh(context, hull, Vector3d.One);
+        Assert.True(hull.Mesh.IsClosedSurface);
+        Assert.True(boundary.Mesh.IsClosedSurface);
+        var manifold = new ContactManifold();
+
+        Assert.True(CollisionDetection.DoCollisionCheck(CreateWorkItem(context,
+            reverse ? hull : boundary, reverse ? boundary : hull, manifold)));
+        Assert.NotEmpty(manifold);
+        foreach (ManifoldContact row in manifold)
+        {
+            AssertOnCube(reverse ? row.PointA : row.PointB, Vector3d.Zero);
+            AssertOnCube(reverse ? row.PointB : row.PointA, boundaryCenter);
+            Assert.InRange(row.Depth.m_rawValue, 0, Fixed64.Quarter.m_rawValue);
+            Assert.False(row.HasMaterialOverride);
+        }
+
+        static void AssertOnCube(Vector3d point, Vector3d center)
+        {
+            Vector3d local = point - center;
+            Assert.InRange(local.X.m_rawValue, -Fixed64.Half.m_rawValue, Fixed64.Half.m_rawValue);
+            Assert.InRange(local.Y.m_rawValue, -Fixed64.Half.m_rawValue, Fixed64.Half.m_rawValue);
+            Assert.InRange(local.Z.m_rawValue, -Fixed64.Half.m_rawValue, Fixed64.Half.m_rawValue);
+            Assert.True(local.X.Abs() == Fixed64.Half || local.Y.Abs() == Fixed64.Half || local.Z.Abs() == Fixed64.Half);
+        }
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void ClosedHullAgainstConcaveAndConvexPatches_ShouldRetainBothOwnersAndMaterials(bool hullFirst, bool reverse)
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        var sheet = new LSMeshCollider(new[]
+        {
+            new Vector3d(-1, 0, -1), new(1, 0, -1), new(1, 0, 0), new(0, 0, 0), new(0, 0, 1), new(-1, 0, 1),
+            new Vector3d(Fixed64.Half, -Fixed64.One, -Fixed64.One), new(Fixed64.Half, Fixed64.One, -Fixed64.One),
+            new(Fixed64.Half, Fixed64.One, Fixed64.One), new(Fixed64.Half, -Fixed64.One, Fixed64.One)
+        }, new[] { 0, 1, 3, 1, 2, 3, 0, 3, 5, 3, 4, 5, 6, 7, 8, 6, 8, 9 },
+            MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation)
+        { Material = PhysicsMaterial.Frictionless };
+        LSMeshCollider hull = MeshTestFixtures.CreateConvexCube();
+        hull.Material = PhysicsMaterial.Bouncy;
+        Vector3d center = new(Fixed64.Quarter, Fixed64.Quarter, Fixed64.Quarter);
+        if (hullFirst) InitializeStaticMesh(context, hull, center, Vector3d.One);
+        InitializeStaticMesh(context, sheet, Vector3d.One);
+        if (!hullFirst) InitializeStaticMesh(context, hull, center, Vector3d.One);
+        Assert.True(sheet.Mesh.GetConvexCoplanarPatchCornerVertexIndices(0).IsEmpty);
+        Assert.False(sheet.Mesh.GetConvexCoplanarPatchCornerVertexIndices(4).IsEmpty);
+        var manifold = new ContactManifold();
+
+        Assert.True(CollisionDetection.DoCollisionCheck(CreateWorkItem(context,
+            reverse ? hull : sheet, reverse ? sheet : hull, manifold)));
+        Assert.Equal(2, manifold.GroupCount);
+        int concaveOrdinal = sheet.Mesh.GetCanonicalSurfaceOrdinal(0);
+        int convexOrdinal = sheet.Mesh.GetCanonicalSurfaceOrdinal(4);
+        Assert.NotEqual(concaveOrdinal, convexOrdinal);
+        for (int index = 0; index < manifold.GroupCount; index++)
+        {
+            ref ContactGroup group = ref manifold.GetGroup(index);
+            int ordinal = reverse ? group.Key.SurfaceB : group.Key.SurfaceA;
+            Assert.True(ordinal == concaveOrdinal || ordinal == convexOrdinal);
+            Assert.True(group.Count > 0);
+            for (int sample = 0; sample < group.Count; sample++)
+            {
+                ManifoldContact row = group[sample];
+                Vector3d target = reverse ? row.PointB : row.PointA;
+                Vector3d native = reverse ? row.PointA : row.PointB;
+                if (ordinal == concaveOrdinal)
+                {
+                    Assert.Equal(Fixed64.Zero, target.Y);
+                    Assert.InRange(target.X.m_rawValue, -Fixed64.One.m_rawValue, Fixed64.One.m_rawValue);
+                    Assert.InRange(target.Z.m_rawValue, -Fixed64.One.m_rawValue, Fixed64.One.m_rawValue);
+                    Assert.True(target.X <= Fixed64.Zero || target.Z <= Fixed64.Zero);
+                    // Triangle fallback retains its finite crossing depth; the cube extends 1/4 below the sheet.
+                    Assert.InRange(row.Depth.m_rawValue, 0, Fixed64.Quarter.m_rawValue);
+                }
+                else
+                {
+                    Assert.Equal(Fixed64.Half, target.X);
+                    Assert.InRange(target.Y.m_rawValue, -Fixed64.One.m_rawValue, Fixed64.One.m_rawValue);
+                    Assert.InRange(target.Z.m_rawValue, -Fixed64.One.m_rawValue, Fixed64.One.m_rawValue);
+                    Assert.Equal(Fixed64.Quarter, row.Depth);
+                }
+                Assert.InRange(native.X.m_rawValue, -Fixed64.Quarter.m_rawValue, Fixed64.FromFraction(3, 4).m_rawValue);
+                Assert.InRange(native.Y.m_rawValue, -Fixed64.Quarter.m_rawValue, Fixed64.FromFraction(3, 4).m_rawValue);
+                Assert.InRange(native.Z.m_rawValue, -Fixed64.Quarter.m_rawValue, Fixed64.FromFraction(3, 4).m_rawValue);
+                Assert.True(row.HasMaterialOverride);
+                Assert.Equal(reverse ? hull.Material : sheet.Material, row.MaterialA);
+                Assert.Equal(reverse ? sheet.Material : hull.Material, row.MaterialB);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(false, MeshColliderMode.Concave)]
+    [InlineData(true, MeshColliderMode.Concave)]
+    [InlineData(false, MeshColliderMode.Convex)]
+    [InlineData(true, MeshColliderMode.Convex)]
+    public void ClosedHullAgainstFiniteSheet_ShouldKeepTheSolidDepthAndMatchedPatch(bool reverse, MeshColliderMode mode)
+    {
+        using var scenario = PhysicsScenarioBuilder.Create();
+        var wall = new LSMeshCollider(new[] { new Vector3d(-4, -2, 0), new(4, -2, 0),
+            new(4, 2, 0), new(-4, 2, 0) }, new[] { 0, 1, 2, 0, 2, 3 },
+            mode, MeshInertiaPolicy.SurfaceApproximation);
+        scenario.CreateBody(wall, Vector3d.Zero, FixedQuaternion.Identity, immovable: true);
+        LSMeshCollider hull = MeshTestFixtures.CreateConvexCube();
+        scenario.CreateBody(hull, Vector3d.Forward * Fixed64.Quarter, FixedQuaternion.Identity);
+        CollisionPair pair = reverse ? scenario.CreatePair(hull, wall) : scenario.CreatePair(wall, hull);
+        Assert.True(CollisionDetection.DoCollisionCheck(pair));
+        Assert.Equal(1, pair.Manifold.GroupCount);
+        Assert.Equal(4, pair.Manifold.Count);
+        foreach (ManifoldContact row in pair.Manifold)
+        {
+            Assert.Equal(reverse ? Vector3d.Backward : Vector3d.Forward, row.Normal);
+            Assert.Equal(Fixed64.Quarter, row.Depth);
+            ContactAnchor native = reverse ? row.AnchorA : row.AnchorB;
+            ContactAnchor target = reverse ? row.AnchorB : row.AnchorA;
+            Assert.True(native.TryGetOffsetFrom(Vector3d.Zero, out Vector3d first));
+            Assert.True(target.TryGetOffsetFrom(Vector3d.Zero, out Vector3d second));
+            Assert.Equal(Vector3d.Forward * Fixed64.Quarter, second - first);
+            Assert.Equal(Fixed64.Half, first.X.Abs());
+            Assert.Equal(Fixed64.Half, first.Y.Abs());
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ClosedHullAgainstFloorAndWall_ShouldRetainBothPhysicalPatchGroups(bool reverse)
+    {
+        using var scenario = PhysicsScenarioBuilder.Create();
+        var corner = new LSMeshCollider(new[]
+        {
+            new Vector3d(-4, 0, 0), new(4, 0, 0), new(4, 4, 0), new(-4, 4, 0),
+            new Vector3d(-4, 0, 0), new(-4, 0, 4), new(4, 0, 4), new(4, 0, 0)
+        }, new[] { 0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7 },
+            MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation);
+        scenario.CreateBody(corner, Vector3d.Zero, FixedQuaternion.Identity, immovable: true);
+        LSMeshCollider hull = MeshTestFixtures.CreateConvexCube();
+        scenario.CreateBody(hull, new Vector3d(Fixed64.Zero, Fixed64.Quarter, Fixed64.Quarter), FixedQuaternion.Identity);
+        CollisionPair pair = reverse ? scenario.CreatePair(hull, corner) : scenario.CreatePair(corner, hull);
+
+        Assert.True(CollisionDetection.DoCollisionCheck(pair));
+        Assert.Equal(2, pair.Manifold.GroupCount);
+        Assert.Equal(8, pair.Manifold.Count);
+        Vector3d floorNormal = reverse ? Vector3d.Down : Vector3d.Up;
+        Vector3d wallNormal = reverse ? Vector3d.Backward : Vector3d.Forward;
+        Assert.Equal(4, pair.Manifold.Count(row => row.Normal == floorNormal));
+        Assert.Equal(4, pair.Manifold.Count(row => row.Normal == wallNormal));
+        foreach (ManifoldContact row in pair.Manifold)
+        {
+            Assert.Equal(Fixed64.Quarter, row.Depth);
+            ContactAnchor native = reverse ? row.AnchorA : row.AnchorB;
+            ContactAnchor target = reverse ? row.AnchorB : row.AnchorA;
+            Assert.True(native.TryGetOffsetFrom(Vector3d.Zero, out Vector3d first));
+            Assert.True(target.TryGetOffsetFrom(Vector3d.Zero, out Vector3d second));
+            Assert.Equal((reverse ? -row.Normal : row.Normal) * Fixed64.Quarter, second - first);
+        }
+    }
+
     [Fact]
     public void ConvexMeshMesh_ShouldForwardCanonicalContactInBothDispatchDirections()
     {

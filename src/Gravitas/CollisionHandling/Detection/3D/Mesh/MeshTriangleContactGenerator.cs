@@ -8,19 +8,88 @@
 using FixedMathSharp;
 using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
+using Gravitas.Materials;
 using SwiftCollections;
 using SwiftCollections.Query;
 using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
 namespace Gravitas.CollisionHandling;
 
 /// <summary>
-/// Builds deterministic triangle-level manifolds for mesh paths that cannot use
-/// whole-shape convex assumptions.
+/// Builds finite mesh manifolds, retaining closed convex solids where available
+/// and using triangle contacts for the remaining surface owners.
 /// </summary>
 internal static class MeshTriangleContactGenerator
 {
+    internal readonly struct HullSample : IPlaneContactSample
+    {
+        internal HullSample(FixedContactAnchors contact) => Contact = contact;
+        internal readonly FixedContactAnchors Contact;
+        public Vector3d Point => Contact.FirstAnchor.LocalPoint;
+    }
+
+    private static readonly IComparer<HullSample> HullSampleComparer = Comparer<HullSample>.Create(static (a, b) =>
+    {
+        int order = a.Contact.FirstAnchor.CompareLocalFeature(b.Contact.FirstAnchor);
+        return order != 0 ? order : a.Contact.SecondAnchor.CompareLocalFeature(b.Contact.SecondAnchor);
+    });
+
+    // True means the convex pair was handled, including separation; false requests finite triangle fallback.
+    internal static bool TryAppendHullContacts(LSMeshCollider hull, Vector3d origin, FixedQuaternion rotation,
+        ReadOnlySpan<Vector3d> vertices, ReadOnlySpan<int> triangles, ReadOnlySpan<int> edges,
+        ReadOnlySpan<int> satEdges, PhysicsMaterial material, ContactManifold manifold, bool reverse,
+        int namespaceA = 0, int namespaceB = 0, ContactGroupKey group = default)
+    {
+        PhysicsMesh mesh = hull.Mesh;
+        // Select the solid exit once; finite witnesses must belong to that support.
+        if (!WideOrientedBox.TryGetConvexHullPenetration(mesh.Origin, mesh.Rotation, mesh.ScaledLocalVertices,
+            mesh.Triangles, mesh.ConvexSatEdgeVertexPairs, origin, rotation, vertices, triangles, satEdges,
+            out WidePointSpanPenetration penetration, skipParallelDirections: true)) return true;
+        SwiftList<HullSample> samples = hull.Context.CollisionScratch.HullSamples;
+        samples.FastClear();
+        WideOrientedBox.VisitConvexHullContacts(mesh.Origin, mesh.Rotation, mesh.ScaledLocalVertices,
+            mesh.Triangles, mesh.ConvexSatEdgeVertexPairs, origin, rotation, vertices, triangles, edges,
+            penetration, samples, static (pool, contact) => pool.Add(new HullSample(contact)));
+        if (samples.Count == 0) return false;
+        samples.SortInPlace(HullSampleComparer);
+        Span<HullSample> pool = samples.AsSpan();
+        int unique = 1;
+        for (int index = 1; index < pool.Length; index++)
+            if (pool[index].Contact.FirstAnchor.CompareLocalFeature(pool[unique - 1].Contact.FirstAnchor) != 0)
+                pool[unique++] = pool[index];
+        pool = pool[..unique];
+        Span<int> chosen = stackalloc int[ContactManifold.MaxContactsPerGroup];
+        int count = Math.Min(pool.Length, chosen.Length);
+        for (int slot = 0; slot < count; slot++) chosen[slot] = slot;
+        if (pool.Length > chosen.Length)
+        {
+            Vector3d normal = pool[0].Contact.Normal;
+            var axis = new WideAxis3(Signed320.ExtendValue(Signed192.Raw(normal.X)),
+                Signed320.ExtendValue(Signed192.Raw(normal.Y)), Signed320.ExtendValue(Signed192.Raw(normal.Z)));
+            // Coverage ranks final representable samples; admission and witnesses stay exact.
+            // A 33-bit solver normal times the normalized basis fits well below 192 bits.
+            WideRigidProjection.GetLocalAxisProjections(axis, new WideRationalBasis3d(mesh.Rotation),
+                out Signed576 x, out Signed576 y, out Signed576 z);
+            var metrics = new WidePlaneMetrics(new WideAxis3(Signed320.NarrowValue(x),
+                Signed320.NarrowValue(y), Signed320.NarrowValue(z)));
+            for (int slot = 1; slot < count; slot++)
+                chosen[slot] = MeshPlaneSampleReduction.ChooseNext<HullSample>(pool, chosen[..slot], metrics, HullSampleComparer);
+            // A support line needs only its two extreme velocity levers.
+            if (metrics.GetAreaSquared(pool[0].Point, pool[chosen[1]].Point, pool[chosen[2]].Point).IsZero) count = 2;
+        }
+        for (int slot = 0; slot < count; slot++)
+        {
+            FixedContactAnchors contact = pool[chosen[slot]].Contact;
+            manifold.AddContact(new ContactAnchor(reverse ? contact.SecondAnchor : contact.FirstAnchor),
+                new ContactAnchor(reverse ? contact.FirstAnchor : contact.SecondAnchor), contact.Depth,
+                reverse ? -contact.Normal : contact.Normal, reverse ? material : hull.Material,
+                reverse ? hull.Material : material, contact.DepthIsClamped, namespaceA, namespaceB, group);
+        }
+        return true;
+    }
+
     public static bool TryBuildMeshSphereManifold(
         CollisionWorkItem pair,
         LSMeshCollider mesh,
@@ -133,6 +202,53 @@ internal static class MeshTriangleContactGenerator
         SwiftList<int> triangleBufferA,
         SwiftList<int> triangleBufferB)
     {
+        CollisionSatScratch scratch = pair.Context.CollisionScratch;
+        scratch.MeshSurfaces.Clear();
+        LSMeshCollider? surface = meshA.Mode == MeshColliderMode.Convex && meshA.Mesh.IsClosedSurface
+            && !meshB.Mesh.IsClosedSurface ? meshB
+            : meshB.Mode == MeshColliderMode.Convex && meshB.Mesh.IsClosedSurface
+                && !meshA.Mesh.IsClosedSurface ? meshA : null;
+        if (surface != null)
+        {
+            LSMeshCollider hull = surface == meshA ? meshB : meshA;
+            surface.GetTrianglesInBounds(CreateBounds(hull.BoundsMin, hull.BoundsMax), triangleBufferA);
+            foreach (int triangle in triangleBufferA.AsReadOnlySpan())
+            {
+                int owner = surface.Mesh.GetManifoldSurfaceOwner(triangle);
+                if (!scratch.MeshSurfaces.Add(owner)) continue;
+                int ordinal = surface.Mesh.GetCanonicalSurfaceOrdinal(triangle);
+                var group = new ContactGroupKey(0, 0, surface == meshA ? ordinal : 0, surface == meshB ? ordinal : 0);
+                ReadOnlySpan<int> corners = surface.Mesh.GetConvexCoplanarPatchCornerVertexIndices(triangle);
+                if (!corners.IsEmpty)
+                {
+                    int count = corners.Length;
+                    if (scratch.PolyhedronVertices.Length < count) Array.Resize(ref scratch.PolyhedronVertices, count);
+                    if (scratch.PolyhedronTriangles.Length < 3 * (count - 2)) Array.Resize(ref scratch.PolyhedronTriangles, 3 * (count - 2));
+                    if (scratch.PolyhedronEdges.Length < 2 * count) Array.Resize(ref scratch.PolyhedronEdges, 2 * count);
+                    Span<Vector3d> vertices = scratch.PolyhedronVertices.AsSpan(0, count);
+                    Span<int> triangles = scratch.PolyhedronTriangles.AsSpan(0, 3 * (count - 2));
+                    Span<int> edges = scratch.PolyhedronEdges.AsSpan(0, 2 * count);
+                    for (int index = 0; index < count; index++)
+                    {
+                        vertices[index] = surface.Mesh.ScaledLocalVertices[corners[index]];
+                        edges[2 * index] = index;
+                        edges[2 * index + 1] = (index + 1) % count;
+                        if (index < 2) continue;
+                        int face = 3 * (index - 2);
+                        triangles[face] = 0; triangles[face + 1] = index - 1; triangles[face + 2] = index;
+                    }
+                    // Use the trusted finite patch once, not its artificial triangle diagonals.
+                    if (TryAppendHullContacts(hull, surface.Mesh.Origin, surface.Mesh.Rotation,
+                        vertices, triangles, edges, edges, surface.Material, pair.Manifold, hull == meshB, group: group))
+                        continue;
+                }
+                foreach (int candidate in triangleBufferA.AsReadOnlySpan())
+                    if (surface.Mesh.GetManifoldSurfaceOwner(candidate) == owner)
+                        AppendMeshTriangleContacts(pair, surface, candidate, hull, triangleBufferB,
+                            surface == meshB, group);
+            }
+            return pair.Manifold.HasContact;
+        }
         bool reverseContact = meshA.Id > meshB.Id;
         LSMeshCollider firstMesh = reverseContact ? meshB : meshA;
         LSMeshCollider secondMesh = reverseContact ? meshA : meshB;
@@ -140,73 +256,43 @@ internal static class MeshTriangleContactGenerator
             CreateBounds(secondMesh.BoundsMin, secondMesh.BoundsMax),
             triangleBufferA);
         for (int i = 0; i < triangleBufferA.Count; i++)
-        {
-            int triangleA = triangleBufferA[i];
-            firstMesh.Mesh.GetLocalTriangleVertices(
-                triangleA,
-                out Vector3d firstVertex,
-                out Vector3d secondVertex,
-                out Vector3d thirdVertex);
-            var firstTriangle =
-                new FixedTriangle(firstVertex, secondVertex, thirdVertex);
-            GetTriangleBoundsInFrame(
-                firstTriangle.Bounds,
-                firstMesh.Mesh.Origin,
-                firstMesh.Mesh.Rotation,
-                secondMesh.Mesh.Origin,
-                secondMesh.Mesh.Rotation,
-                out FixedBoundVolume firstInSecondFrameBounds);
-            secondMesh.Mesh.GetTrianglesInLocalBounds(
-                firstInSecondFrameBounds,
-                triangleBufferB);
-
-            for (int j = 0; j < triangleBufferB.Count; j++)
-            {
-                int triangleB = triangleBufferB[j];
-                secondMesh.Mesh.GetLocalTriangleVertices(
-                    triangleB,
-                    out Vector3d secondFirstVertex,
-                    out Vector3d secondSecondVertex,
-                    out Vector3d secondThirdVertex);
-                var secondTriangle = new FixedTriangle(
-                    secondFirstVertex,
-                    secondSecondVertex,
-                    secondThirdVertex);
-                if (!firstTriangle.TryGetContact(
-                        firstMesh.Mesh.Origin,
-                        firstMesh.Mesh.Rotation,
-                        secondMesh.Mesh.Origin,
-                        secondMesh.Mesh.Rotation,
-                        secondTriangle,
-                        out FixedContactAnchors contact))
-                {
-                    continue;
-                }
-
-                if (reverseContact)
-                {
-                    AddContact(
-                        pair,
-                        new ContactAnchor(contact.SecondAnchor),
-                        new ContactAnchor(contact.FirstAnchor),
-                        contact.Depth,
-                        -contact.Normal,
-                        contact.DepthIsClamped);
-                }
-                else
-                {
-                    AddContact(
-                        pair,
-                        new ContactAnchor(contact.FirstAnchor),
-                        new ContactAnchor(contact.SecondAnchor),
-                        contact.Depth,
-                        contact.Normal,
-                        contact.DepthIsClamped);
-                }
-            }
-        }
+            AppendMeshTriangleContacts(pair, firstMesh, triangleBufferA[i], secondMesh, triangleBufferB, reverseContact);
 
         return pair.Manifold.HasContact;
+    }
+
+    private static void AppendMeshTriangleContacts(CollisionWorkItem pair, LSMeshCollider firstMesh,
+        int triangle, LSMeshCollider secondMesh, SwiftList<int> candidates, bool reverse,
+        ContactGroupKey? group = null)
+    {
+        firstMesh.Mesh.GetLocalTriangleVertices(triangle, out Vector3d a, out Vector3d b, out Vector3d c);
+        var firstTriangle = new FixedTriangle(a, b, c);
+        GetTriangleBoundsInFrame(firstTriangle.Bounds, firstMesh.Mesh.Origin, firstMesh.Mesh.Rotation,
+            secondMesh.Mesh.Origin, secondMesh.Mesh.Rotation, out FixedBoundVolume bounds);
+        secondMesh.Mesh.GetTrianglesInLocalBounds(bounds, candidates);
+        bool canonicalReverse = firstMesh.Id > secondMesh.Id;
+        for (int j = 0; j < candidates.Count; j++)
+        {
+            secondMesh.Mesh.GetLocalTriangleVertices(candidates[j], out a, out b, out c);
+            var secondTriangle = new FixedTriangle(a, b, c);
+            FixedContactAnchors contact;
+            bool intersects = canonicalReverse
+                ? secondTriangle.TryGetContact(secondMesh.Mesh.Origin, secondMesh.Mesh.Rotation,
+                    firstMesh.Mesh.Origin, firstMesh.Mesh.Rotation, firstTriangle, out contact)
+                : firstTriangle.TryGetContact(firstMesh.Mesh.Origin, firstMesh.Mesh.Rotation,
+                    secondMesh.Mesh.Origin, secondMesh.Mesh.Rotation, secondTriangle, out contact);
+            if (!intersects) continue;
+
+            ContactAnchor first = new(reverse != canonicalReverse ? contact.SecondAnchor : contact.FirstAnchor);
+            ContactAnchor second = new(reverse != canonicalReverse ? contact.FirstAnchor : contact.SecondAnchor);
+            Vector3d normal = reverse != canonicalReverse ? -contact.Normal : contact.Normal;
+            if (group.HasValue)
+            {
+                pair.Manifold.AddContact(first, second, contact.Depth, normal,
+                    pair.ColliderA.Material, pair.ColliderB.Material, contact.DepthIsClamped, group: group.Value);
+            }
+            else AddContact(pair, first, second, contact.Depth, normal, contact.DepthIsClamped);
+        }
     }
 
     private static void TryAddCuboidTriangleContact(

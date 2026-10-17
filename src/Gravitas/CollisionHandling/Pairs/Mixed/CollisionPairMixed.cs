@@ -28,6 +28,11 @@ internal sealed partial class CollisionPairMixed
     private long _lifetimeVersion;
     private uint _lastCollider3DContactDependencyVersion;
     private uint _lastCollider2DContactDependencyVersion;
+    private bool _hasManifoldCache;
+    private uint _manifold3DBroadPhaseVersion, _manifold2DBroadPhaseVersion;
+    private uint _manifold3DContactDependencyVersion, _manifold2DContactDependencyVersion;
+    private Vector2d _manifold2DCenter;
+    private Fixed64 _manifold2DRotation;
 
     public CollisionPairMixed(LSCollider collider3D, LSCollider2D collider2D)
     {
@@ -82,6 +87,7 @@ internal sealed partial class CollisionPairMixed
         LastFrame = -1;
         LastVisitToken = -1;
         _isColliding = false;
+        _hasManifoldCache = false;
         _lastCollider3DContactDependencyVersion = 0;
         _lastCollider2DContactDependencyVersion = 0;
         _isTriggerPair = collider3D.IsTrigger || collider2D.IsTrigger;
@@ -171,6 +177,7 @@ internal sealed partial class CollisionPairMixed
 
     public void MarkResting(long frame)
     {
+        _hasManifoldCache = false;
         RefreshContactDependencies();
         LastFrame = frame;
         LastVisitToken = Context.LateSimulateToken;
@@ -186,6 +193,7 @@ internal sealed partial class CollisionPairMixed
 
     private void PublishContact(long frame, MixedContact contact)
     {
+        _hasManifoldCache = false;
         RefreshContactDependencies(incomingPlanar: contact.HasContact && contact.Normal3DTo2D.ToVector2d() != Vector2d.Zero);
         Manifold.BeginUpdate(frame);
         if (contact.HasContact)
@@ -197,10 +205,34 @@ internal sealed partial class CollisionPairMixed
     private void PublishManifold(long frame, ContactManifold source)
     {
         SwiftThrowHelper.ThrowIfNull(source, nameof(source));
+        _hasManifoldCache = false;
         RefreshContactDependencies(source);
         Manifold.CopyFrom(source, frame);
         Contact = Manifold.HasContact ? MixedContact.FromManifoldContact(Manifold.PrimaryContact) : default;
+        _manifold3DBroadPhaseVersion = Collider3D.BroadPhaseVersion;
+        _manifold2DBroadPhaseVersion = Collider2D.BroadPhaseVersion;
+        _manifold3DContactDependencyVersion = Collider3D.ContactDependencyVersion;
+        _manifold2DContactDependencyVersion = Collider2D.ContactDependencyVersion;
+        _manifold2DCenter = Collider2D.Center;
+        _manifold2DRotation = Collider2D.Rotation;
+        _hasManifoldCache = Manifold.HasContact;
         ClearSolveState();
+    }
+
+    // Dynamic 2D pose can change without a partition or contact-dependency revision.
+    private bool HasCurrentManifoldCache => _isColliding && _hasManifoldCache && Manifold.HasContact
+        && _manifold3DBroadPhaseVersion == Collider3D.BroadPhaseVersion
+        && _manifold2DBroadPhaseVersion == Collider2D.BroadPhaseVersion
+        && _manifold3DContactDependencyVersion == Collider3D.ContactDependencyVersion
+        && _manifold2DContactDependencyVersion == Collider2D.ContactDependencyVersion
+        && _manifold2DCenter == Collider2D.Center
+        && _manifold2DRotation == Collider2D.Rotation;
+
+    internal bool TryCopyCachedManifold(long frame, ContactManifold target)
+    {
+        if (!HasCurrentManifoldCache) return false;
+        target.CopyFrom(Manifold, frame);
+        return true;
     }
 
     private void ClearSolveState()
@@ -212,6 +244,7 @@ internal sealed partial class CollisionPairMixed
     }
     public void MarkSeparated()
     {
+        _hasManifoldCache = false;
         if (_isColliding && !_isTriggerPair)
             WakeBodiesForContactChange();
         Manifold.Reset();

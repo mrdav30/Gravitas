@@ -200,6 +200,13 @@ investigation unless it recurs or a reliable reproducer becomes available.
   Ignored `existing-interval-bdn.log` retains the compiler failures and zero
   executed rows. Matched reflection timings of those unchanged methods do run;
   they are smoke measurements, not BenchmarkDotNet results.
+- **Reconfirmed, 2026-10-17:** The unchanged
+  `RotationalCcdIntervalBenchmarks.DenseUnresolved2DRotationalNearMiss` fails
+  the same stock local-stack Dry launch with `CS0246` and zero executed rows.
+  Phase 2 surface timings use an ignored child-only MSBuild reference import
+  bound to the tested eight-DLL snapshot; all live child bindings are verified.
+  This validates the captures without repairing the stock launcher. Current
+  evidence is under `artifacts/grv-issue-133/phase2/stock-existing-fixed64-launch*`.
 - **Follow-up:** Audit generated-host compile inputs and dependency-bearing
   benchmark signatures. Preserve coordinated assembly identities and source
   selection; do not globally restore transitive project references without

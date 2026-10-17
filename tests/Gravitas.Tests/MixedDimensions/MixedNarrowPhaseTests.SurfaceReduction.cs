@@ -14,6 +14,288 @@ namespace Gravitas.Tests.MixedDimensions;
 /// <content>Verifies finite mixed surface regions, real perimeters and their public/runtime consumers.</content>
 public sealed partial class MixedNarrowPhaseTests
 {
+    [Fact]
+    public void SubdividedNativeSupportLine_ShouldRetainOnlyItsTwoExtremeLevers()
+    {
+        using var scene = PhysicsScenarioBuilder.Create();
+        scene.Context.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
+        LSMeshCollider template = MeshTestFixtures.CreateConvexCube();
+        var points = template.Mesh.LocalVertices.ToArray().ToList();
+        for (int index = 1; index <= 5; index++)
+            points.Add(new Vector3d(Fixed64.Half, Fixed64.Half, -Fixed64.Half + Fixed64.FromFraction(index, 6)));
+        var triangles = new System.Collections.Generic.List<int>();
+        int[] original = template.Mesh.Triangles.ToArray();
+        for (int index = 0; index < original.Length; index += 3)
+        {
+            int[] face = original[index..(index + 3)];
+            if (!face.Contains(3) || !face.Contains(7)) triangles.AddRange(face);
+        }
+        // Split both incident faces along the same physical cube edge.
+        int previous = 3;
+        for (int index = 8; index <= 13; index++)
+        {
+            int next = index == 13 ? 7 : index;
+            triangles.AddRange(new[] { 5, previous, next, 6, next, previous });
+            previous = next;
+        }
+        var hull = new LSMeshCollider(points.ToArray(), triangles.ToArray(), MeshColliderMode.Convex,
+            MeshInertiaPolicy.RequireClosedVolume);
+        scene.CreateBody(hull, Vector3d.Zero, FixedQuaternion.Identity);
+        var target = new LSAABBoxCollider2D(Vector2d.One) { MixedHalfThicknessOverride = Fixed64.Half };
+        target.InitializeWithNoBody(new TestMatterAgent(scene.Context,
+            new FixedTransform(new Vector3d(1, 1, 0), FixedQuaternion.Identity, Vector3d.One)));
+        var manifold = new ContactManifold();
+        Assert.True(CollisionDetectionMixed.TryBuildManifold(hull, target, manifold));
+        Assert.Equal(2, manifold.Count);
+        foreach (ManifoldContact row in manifold)
+        {
+            Assert.Equal(Fixed64.Zero, row.Depth);
+            Assert.Equal(Vector3d.Right, row.Normal);
+            Assert.Equal(new Vector3d(Fixed64.Half, Fixed64.Half, row.AnchorA.LocalPoint.Z), row.AnchorA.LocalPoint);
+            Assert.Equal(Fixed64.Half, row.AnchorA.LocalPoint.Z.Abs());
+            Assert.True(row.AnchorA.TryGetOffsetFrom(row.AnchorB, out Vector3d gap));
+            Assert.Equal(Vector3d.Zero, gap);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ClosedHullPrismEdgeWinner_ShouldKeepMatchedSupportEdges(bool polygon)
+    {
+        using var scene = PhysicsScenarioBuilder.Create();
+        GravitasWorldContext context = scene.Context;
+        context.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
+        LSCollider2D target = polygon
+            ? new LSPolygonCollider2D(new(-Fixed64.Half, -Fixed64.Half), new(Fixed64.Half, -Fixed64.Half),
+                new(Fixed64.Half, Fixed64.Half), new(-Fixed64.Half, Fixed64.Half))
+            : new LSAABBoxCollider2D(Vector2d.One);
+        target.MixedHalfThicknessOverride = Fixed64.Half;
+        target.InitializeWithNoBody(new TestMatterAgent(context,
+            new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)));
+        LSMeshCollider hull = MeshTestFixtures.CreateConvexCube();
+        scene.CreateBody(hull, new Vector3d(Fixed64.FromFraction(-12, 10), -Fixed64.Half, Fixed64.FromFraction(-6, 10)),
+            FixedQuaternion.FromEulerAnglesInDegrees((Fixed64)15, (Fixed64)30, (Fixed64)45));
+        var manifold = new ContactManifold();
+        Assert.True(CollisionDetectionMixed.TryBuildManifold(hull, target, manifold));
+        Assert.Equal(1, manifold.Count);
+        ManifoldContact row = manifold.PrimaryContact;
+        Assert.True(row.Depth > Fixed64.Zero);
+        Assert.True(row.AnchorA.TryGetOffsetFrom(row.AnchorB, out Vector3d gap));
+        Assert.InRange(Vector3d.Cross(gap, row.Normal).Magnitude.m_rawValue, 0L, 64L);
+        Assert.InRange((Vector3d.Dot(gap, row.Normal) - row.Depth).Abs().m_rawValue, 0L, 64L);
+        foreach (Vector3d point in new[] { row.AnchorA.LocalPoint, row.AnchorB.LocalPoint })
+            Assert.Equal(2, Enumerable.Range(0, 3).Count(axis => point[axis].Abs() == Fixed64.Half));
+    }
+
+    [Fact]
+    public void PrismWhollyInsideClosedHull_ShouldRetainItsFullSolidExit()
+    {
+        using var scene = PhysicsScenarioBuilder.Create();
+        GravitasWorldContext context = scene.Context;
+        context.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
+        Fixed64 eighth = Fixed64.FromFraction(1, 8);
+        var embedded = new LSPolygonCollider2D(new(-eighth, -eighth), new(eighth, -eighth),
+            new(eighth, eighth), new(-eighth, eighth)) { MixedHalfThicknessOverride = eighth };
+        embedded.InitializeWithNoBody(new TestMatterAgent(context,
+            new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)));
+        LSMeshCollider hull = MeshTestFixtures.CreateConvexCube();
+        scene.CreateBody(hull, Vector3d.Zero, FixedQuaternion.Identity);
+        var manifold = new ContactManifold();
+        Assert.True(CollisionDetectionMixed.TryBuildManifold(hull, embedded, manifold));
+        Assert.Equal(1, manifold.GroupCount);
+        Assert.Equal(4, manifold.Count);
+        foreach (ManifoldContact row in manifold)
+        {
+            Assert.Equal(Fixed64.Half + eighth, row.Depth);
+            Assert.True(row.AnchorA.TryGetOffsetFrom(Vector3d.Zero, out Vector3d first));
+            Assert.True(row.AnchorB.TryGetOffsetFrom(Vector3d.Zero, out Vector3d second));
+            Assert.Equal(-row.Normal * row.Depth, second - first);
+        }
+    }
+
+    [Theory]
+    [InlineData(1, false)]
+    [InlineData(2, false)]
+    [InlineData(1, true)]
+    [InlineData(2, true)]
+    public void NativeCubeAgainstPrismWalls_ShouldRetainAWarmedPhysicalResponse(int pieces, bool hostMoves)
+    {
+        using var scene = PhysicsScenarioBuilder.Create();
+        GravitasWorldContext context = scene.Context;
+        context.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
+        context.SetFrameRate(16);
+        context.Environment.Gravity = context.Environment.AirDensity = context.Environment.DampingFactor = Fixed64.Zero;
+        context.Environment.MinSpeed = Fixed64.Zero;
+        for (int index = 0; index < pieces; index++)
+        {
+            Fixed64 half = pieces == 1 ? (Fixed64)8 : (Fixed64)4;
+            var wall = new LSPolygonCollider2D(new(-half, -Fixed64.One), new(half, -Fixed64.One),
+                new(half, Fixed64.One), new(-half, Fixed64.One))
+            { Material = PhysicsMaterial.Frictionless, MixedHalfThicknessOverride = Fixed64.Two };
+            wall.InitializeWithNoBody(new TestMatterAgent(context, new FixedTransform(
+                new Vector3d(pieces == 1 ? Fixed64.Zero : index == 0 ? (Fixed64)(-4) : (Fixed64)4, Fixed64.Zero, -Fixed64.One),
+                FixedQuaternion.Identity, Vector3d.One)));
+        }
+        LSMeshCollider hull = MeshTestFixtures.CreateConvexCube();
+        hull.Material = PhysicsMaterial.Frictionless;
+        SolidBody body = scene.CreateBody(hull, Vector3d.Forward * Fixed64.Half, FixedQuaternion.Identity).Body;
+        body.FreezeAxes = BodyFreezeAxes3D.Rotation;
+        body.SleepEnabled = false;
+        body.UseManualGrounding();
+        for (int frame = 0; frame < 96; frame++) Step();
+        Vector3d settled = body.Position3d;
+        long allocated = System.GC.GetAllocatedBytesForCurrentThread();
+        for (int frame = 0; frame < 128; frame++) Step();
+        allocated = System.GC.GetAllocatedBytesForCurrentThread() - allocated;
+        Assert.Equal(0, allocated);
+        Assert.True(settled.Z > Fixed64.Zero && settled.Z <= Fixed64.Half);
+        Assert.Equal(settled, body.Position3d);
+        Assert.Equal(Vector3d.Zero, body.LinearVelocity);
+        Assert.Equal(Vector3d.Zero, body.AngularVelocity);
+        Assert.Equal(FixedQuaternion.Identity, body.Rotation);
+
+        void Step()
+        {
+            if (hostMoves)
+            {
+                Vector3d position = body.Position3d;
+                position.X = position.X == Fixed64.Zero ? Fixed64.Quarter : Fixed64.Zero;
+                body.ResetPosition(position, FixedQuaternion.Identity);
+            }
+            body.AddForce(Vector3d.Backward); context.Simulate(); context.LateSimulate();
+        }
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void FreelyRotatingNativeCubeAgainstPrismWalls_ShouldMatchCuboidResponseQuality(int pieces)
+    {
+        var native = Run(native: true);
+        var cuboid = Run(native: false);
+        Assert.Equal(cuboid.InverseInertia, native.InverseInertia);
+        // One forced step contributes dt squared; correction removes only its configured fraction.
+        Fixed64 step = Fixed64.FromFraction(1, 16);
+        Fixed64 tolerance = CollisionResponseMixed.PenetrationSlop
+            + step * step / CollisionResponseMixed.PenetrationCorrectionPercent;
+        foreach (var result in new[] { native, cuboid })
+        {
+            Assert.InRange(result.Penetration.m_rawValue, 0L, tolerance.m_rawValue);
+            Assert.InRange(result.Position.Z.m_rawValue, (Fixed64.Half - tolerance).m_rawValue, (Fixed64.Half + tolerance).m_rawValue);
+        }
+        Assert.InRange(native.TangentialTravel.m_rawValue, 0L, CollisionResponseMixed.PenetrationSlop.m_rawValue);
+        Assert.True(native.TangentialTravel <= cuboid.TangentialTravel + tolerance);
+        Assert.InRange((native.Position.Z - cuboid.Position.Z).Abs().m_rawValue, 0L, tolerance.m_rawValue);
+
+        (Vector3d Position, Fixed3x3 InverseInertia, Fixed64 Penetration, Fixed64 TangentialTravel) Run(bool native)
+        {
+            using var scene = PhysicsScenarioBuilder.Create();
+            GravitasWorldContext context = scene.Context;
+            context.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
+            context.SetFrameRate(16);
+            context.Environment.Gravity = context.Environment.AirDensity = context.Environment.DampingFactor = Fixed64.Zero;
+            context.Environment.MinSpeed = Fixed64.Zero;
+            for (int index = 0; index < pieces; index++)
+            {
+                Fixed64 half = pieces == 1 ? (Fixed64)8 : (Fixed64)4;
+                var wall = new LSPolygonCollider2D(new(-half, -Fixed64.One), new(half, -Fixed64.One),
+                    new(half, Fixed64.One), new(-half, Fixed64.One))
+                { Material = PhysicsMaterial.Frictionless, MixedHalfThicknessOverride = Fixed64.Two };
+                wall.InitializeWithNoBody(new TestMatterAgent(context, new FixedTransform(
+                    new Vector3d(pieces == 1 ? Fixed64.Zero : index == 0 ? (Fixed64)(-4) : (Fixed64)4, Fixed64.Zero, -Fixed64.One),
+                    FixedQuaternion.Identity, Vector3d.One)));
+            }
+            LSCollider collider = native ? MeshTestFixtures.CreateConvexCube() : new LSCuboidCollider { Size = Vector3d.One };
+            collider.Material = PhysicsMaterial.Frictionless;
+            SolidBody body = scene.CreateBody(collider, Vector3d.Forward * Fixed64.Half, FixedQuaternion.Identity).Body;
+            Fixed3x3 inertia = body.InverseInertiaTensor;
+            body.SleepEnabled = false;
+            body.UseManualGrounding();
+            Fixed64 penetration = Fixed64.Zero, tangential = Fixed64.Zero;
+            Vector3d[] corners = MeshTestFixtures.CreateConvexCube().Mesh.LocalVertices.ToArray();
+            for (int frame = 0; frame < 224; frame++)
+            {
+                body.AddForce(Vector3d.Backward); context.Simulate(); context.LateSimulate();
+                if (frame < 96) continue;
+                tangential = FixedMath.Max(tangential, FixedMath.Max(body.Position3d.X.Abs(), body.Position3d.Y.Abs()));
+                foreach (Vector3d corner in corners)
+                    penetration = FixedMath.Max(penetration, -(body.Position3d + body.Rotation.Rotate(corner)).Z);
+            }
+            TestContext.Current.TestOutputHelper!.WriteLine($"native={native}, pieces={pieces}, position={body.Position3d}, rotation={body.Rotation}, velocity={body.LinearVelocity}, angular={body.AngularVelocity}, maxPenetration={penetration}, maxTangentialTravel={tangential}, inertia={inertia}");
+            return (body.Position3d, inertia, penetration, tangential);
+        }
+    }
+
+    [Fact]
+    public void ClosedNativeHullAgainstPrism_ShouldUseOneSolidFaceAndMatchedCorners()
+    {
+        using var scene = PhysicsScenarioBuilder.Create();
+        GravitasWorldContext context = scene.Context;
+        context.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
+        var wall = new LSPolygonCollider2D(new(-4, -1), new(4, -1), new(4, 1), new(-4, 1))
+        { MixedHalfThicknessOverride = Fixed64.Two };
+        wall.InitializeWithNoBody(new TestMatterAgent(context,
+            new FixedTransform(new Vector3d(0, 0, -1), FixedQuaternion.Identity, Vector3d.One)));
+        LSMeshCollider hull = MeshTestFixtures.CreateConvexCube();
+        scene.CreateBody(hull, new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.Quarter), FixedQuaternion.Identity);
+        var manifold = new ContactManifold();
+
+        Assert.True(CollisionDetectionMixed.TryBuildManifold(hull, wall, manifold));
+        Assert.Equal(1, manifold.GroupCount);
+        Assert.Equal(4, manifold.Count);
+        foreach (ManifoldContact row in manifold)
+        {
+            Assert.Equal(Vector3d.Backward, row.Normal);
+            Assert.Equal(Fixed64.Quarter, row.Depth);
+            Assert.True(row.AnchorA.TryGetOffsetFrom(Vector3d.Zero, out Vector3d first));
+            Assert.True(row.AnchorB.TryGetOffsetFrom(Vector3d.Zero, out Vector3d second));
+            Assert.Equal(new Vector3d(Fixed64.Zero, Fixed64.Zero, Fixed64.Quarter), second - first);
+            Assert.Equal(Fixed64.Half, first.X.Abs());
+            Assert.Equal(Fixed64.Half, first.Y.Abs());
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ClosedHullFaceClippedToEightCorners_ShouldRetainFourFiniteSupports(bool reverseWinding)
+    {
+        using var scene = PhysicsScenarioBuilder.Create();
+        GravitasWorldContext context = scene.Context;
+        context.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
+        Fixed64 reach = Fixed64.FromFraction(3, 4), inset = Fixed64.FromFraction(1, 8);
+        Vector2d[] vertices = { new(-reach, -inset), new(-inset, -reach), new(inset, -reach), new(reach, -inset),
+            new(reach, inset), new(inset, reach), new(-inset, reach), new(-reach, inset) };
+        if (reverseWinding) System.Array.Reverse(vertices);
+        var target = new LSPolygonCollider2D(vertices) { MixedHalfThicknessOverride = Fixed64.Half };
+        target.InitializeWithNoBody(new TestMatterAgent(context,
+            new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One)));
+        LSMeshCollider hull = MeshTestFixtures.CreateConvexCube();
+        scene.CreateBody(hull, Vector3d.Up * reach, FixedQuaternion.Identity);
+        var manifold = new ContactManifold();
+        Assert.True(CollisionDetectionMixed.TryBuildManifold(hull, target, manifold));
+        Assert.Equal(1, manifold.GroupCount);
+        Assert.Equal(4, manifold.Count);
+        Assert.Equal(4, manifold.Select(row => row.AnchorA.LocalPoint).Distinct().Count());
+        Vector3d[] retained = manifold.Select(row => row.AnchorA.LocalPoint).ToArray();
+        foreach (Vector3d point in retained)
+            Assert.Contains(retained, other => other.X == -point.X && other.Z == -point.Z);
+        foreach (ManifoldContact row in manifold)
+        {
+            Assert.Equal(Vector3d.Down, row.Normal);
+            Assert.Equal(Fixed64.Quarter, row.Depth);
+            Assert.True(row.AnchorA.TryGetOffsetFrom(Vector3d.Zero, out Vector3d first));
+            Assert.True(row.AnchorB.TryGetOffsetFrom(Vector3d.Zero, out Vector3d second));
+            Assert.Equal(Vector3d.Up * Fixed64.Quarter, second - first);
+            Assert.Equal(Fixed64.Quarter, first.Y);
+            Assert.Equal(Fixed64.Half, second.Y);
+            // Clipping x,z <= 1/2 by |x|+|z| <= 7/8 creates eight exact finite vertices.
+            Assert.Equal(Fixed64.Half, FixedMath.Max(first.X.Abs(), first.Z.Abs()));
+            Assert.Equal(reach + inset, first.X.Abs() + first.Z.Abs());
+        }
+    }
+
     [Theory]
     [InlineData(ColliderType2D.Circle, 0)]
     [InlineData(ColliderType2D.Circle, 1)]

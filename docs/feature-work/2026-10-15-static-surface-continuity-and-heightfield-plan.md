@@ -1,7 +1,7 @@
 # Static Surface Continuity And Heightfield Integration
 
 **Date:** 2026-10-15  
-**Status:** Phase 1 complete, 2026-10-16; Phase 2 ready to integrate
+**Status:** Phase 1 complete, 2026-10-16; Phase 2 targeted rewrite in progress
 #133/#139 together. Heightfield and alternative-index work remain deferred;
 no public continuity API or joined response is enabled.  
 **Order:** #132 is resolved. Resolve #133 and its confirmed pure 2D counterpart,
@@ -591,6 +591,78 @@ remaining runtime and continuation gates. Linux/ARM and released packages were
 not validated locally.
 
 ### Phase 2 - Integrate Static Membership And Contact Reduction
+
+**Rewrite checkpoint, 2026-10-17:** The first implementation passed correctness,
+coverage and replay gates but was rejected for size and native runtime cost:
+one cube against two wall pieces cost about 9 ms in 3D and 39 ms mixed. Preserve
+the prior correctness commits and Phase 1 foundation. The rejected implementation
+and regression fixtures are retained in Gravitas stash `84d84b7` and
+FixedMathSharp stash `434e6f9`, with an additional ignored checkpoint archive.
+Bring back only code consumed by the rewrite; do not retain a second pipeline.
+
+First establish correct, practical native convex contact generation using the
+existing exact SAT and finite-feature operations. Then extend existing face and
+perimeter consumers with the classified neighbor spans from Phase 1. Cross a join
+before reducing face samples; retain real edges, partial coverage, creases,
+supplier anchors and materials. Prove the small workload before expanding shape
+coverage. Keep 100% reachable coverage and warmed allocation/performance gates.
+
+**Native rewrite checkpoint:** The working tree now adds 164 net runtime source
+lines in Gravitas and 343 in FixedMathSharp, across nine existing files with no
+new runtime files. The rejected parallel surface-generation pipeline remains
+stashed. The existing convex SAT owner supplies one solid exit; its finite
+support witnesses feed the existing plane sample reducer. Trusted convex mesh
+patches and actual mixed polygon prisms share that producer. Nonconvex and
+untrusted owners retain their finite triangle fallback. Mixed pairs reuse
+unchanged manifolds through their existing publication and per-step solve reset.
+Independent ponytail review found no unused production helpers or avoidable
+runtime framework in this rewrite.
+
+The maintained native fixture contains one unit convex cube and two finite wall
+pieces, with frictionless forced response and frozen rotation at 16 Hz. It does
+not declare continuity yet. Two BenchmarkDotNet launches, six warmups and eight
+500 ms measurements per launch give:
+
+| Full-step fixture | 3D | Mixed | Warm allocation |
+| --- | ---: | ---: | ---: |
+| Forced response, unchanged committed contact geometry | 49.60 us | 77.85 us | 0 B/op |
+| Host moves the hull each step, requiring fresh geometry | 464.98 us | 583.09 us | 0 B/op |
+
+All eight timed child launches loaded the benchmark and eight runtime modules
+byte-identical to the validated Release payload. The moving case deliberately
+exposes regeneration cost; cached timings are not a moving-contact capacity
+claim. Captures and bindings are retained under ignored
+`artifacts/grv-issue-133/phase2/rewrite/native-cache-bound-basis-v2*`.
+This bound capture bypasses the stock generated-host build defect recorded as
+#111; it does not resolve that independent tooling issue.
+
+Full Release/ReleaseLean validation passes: Gravitas 6,864/6,796 tests,
+FixedMathSharp 6,032/6,011 core tests plus 49 Chronicler tests per profile, and
+raw 100% reachable line, branch and method coverage in both libraries. All six
+shared replay fixtures agree across the two Windows x64 profiles. Physical
+states, events and queries remain unchanged; only the eight mixed fixture hashes
+change with `pair.mixed` schema 9 and normalized geometry-cache freshness.
+Full coverage captures are `rewrite/gravitas-native-basis-final-v4` and
+`rewrite/fms-native-basis-final-v3`. Linux, ARM and released-package validation are
+not established by these local runs.
+
+Nine ordinary-path ABBA controls preserve exact physical outputs and 0 B/op,
+with all 36 timed child launches bound to their intended runtime payloads.
+Paired means range from -1.74% to +1.62%. The rim's +1.62% (+1.89% in a focused
+process repeat) reverses under interleaved load-order controls: -1.73% with the
+baseline loaded first, +1.62% with the candidate first, -0.07% balanced. No
+changed math helper executes that fixture; these captures do not establish a
+repeatable rim regression. Public scalar hull controls are +0.66%/-0.36%, with
+identical results and 0 B allocated. Retained evidence: `perf/rewrite-native-ordinary-v3*`,
+`perf/rewrite-native-rim-v1*`, `rewrite/rim-paired-probe/*-*.json` and
+`rewrite/public-sat-bound-v3*`, beneath the same ignored Phase 2 artifact root.
+Independent review found every new helper has a production caller. Joined
+membership and neighbor-aware response below remain unimplemented; this
+checkpoint does not close #133/#139.
+
+The new math internals are a coordinated compatibility change. Commit and push
+FixedMathSharp first, then advance the Gravitas develop CI pin to that fetchable
+revision. Released-package validation still follows the upstream release.
 
 - [ ] Turn the retained baseline crossing fixtures into maintained full-loop
   regressions for 3D, pure 2D and both mixed directions, including a vertical

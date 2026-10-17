@@ -6,6 +6,8 @@
 //=======================================================================
 
 using SwiftCollections;
+using FixedMathSharp;
+using System;
 
 namespace Gravitas.CollisionHandling;
 
@@ -14,6 +16,10 @@ namespace Gravitas.CollisionHandling;
 /// </summary>
 internal sealed class CollisionSatScratch
 {
+    internal Vector3d[] PolyhedronVertices = Array.Empty<Vector3d>();
+    internal int[] PolyhedronTriangles = Array.Empty<int>(), PolyhedronEdges = Array.Empty<int>();
+    internal SwiftList<MeshTriangleContactGenerator.HullSample> HullSamples { get; } = new(8);
+
     public SwiftList<int> MeshCylinderTriangles { get; } = new(8);
 
     public SwiftList<int> MeshTriangleCandidatesA { get; } = new(16);

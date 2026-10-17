@@ -228,6 +228,12 @@ capsule-slab query. Its flat caps, straight sides and rounded-end rims are
 distinct features; the shape is not a rounded 3D capsule or just two end
 cylinders. The selected paired anchors can lie in the middle of the core.
 
+Closed convex mesh contacts against a finite convex mesh patch or an embedded
+polygonal prism select the solid separating-axis exit once. Finite support
+faces and edges then supply paired anchors for that exit. The existing plane
+sample reducer retains up to four spread-out points, or two extreme points for
+a support line. Untrusted or nonconvex patches retain triangle-level contacts.
+
 Finite axes, oriented cuboids, and planar convex shapes retain center-relative
 canonical geometry through narrow phase. Contact witnesses use `ContactAnchor`
 or `ContactAnchor2D`: a representable origin, normalized frame rotation, and
@@ -354,6 +360,10 @@ Non-trigger contacts are solved through deterministic manifold response.
 Sequential rows read current velocities while restitution uses incoming motion
 captured before island warm starts. Multipoint pairs honor the configured solver
 budget even when they form the only pair in an island.
+Mixed pairs reuse retained geometry while committed poses and contact
+dependencies remain current. Reuse still checks collision eligibility and
+bounds, publishes the current frame, delivers notifications, and clears
+per-step impulses. It does not enable cross-frame mixed warm starts.
 Bodyless trigger volumes skip physical response and emit trigger notifications
 only when exactly one collider in the pair is a trigger and the other collider
 is body-owned. Both colliders in a valid trigger pair receive enter, stay, and

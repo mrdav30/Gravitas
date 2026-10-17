@@ -121,7 +121,8 @@ public static partial class CollisionDetection
     {
         var meshA = (LSMeshCollider)pair.ColliderA;
         var meshB = (LSMeshCollider)pair.ColliderB;
-        if (meshA.Mode == MeshColliderMode.Concave
+        if (meshA.Mesh.IsClosedSurface != meshB.Mesh.IsClosedSurface
+            || meshA.Mode == MeshColliderMode.Concave
             || meshB.Mode == MeshColliderMode.Concave)
         {
             return MeshTriangleContactGenerator.TryBuildMeshMeshManifold(

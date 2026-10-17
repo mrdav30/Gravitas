@@ -78,6 +78,9 @@ public static partial class CollisionDetectionMixed
     {
         PhysicsMesh mesh = collider.Mesh;
         CollisionSatScratch scratch = collider.Context.CollisionScratch;
+        if (mesh.Mode == MeshColliderMode.Convex && mesh.IsClosedSurface && !prismOffsets.IsEmpty
+            && TryAppendConvexMeshPrismContacts(collider, embedded!, center, rotation, halfThickness,
+                prismOffsets, manifold, namespace3D, namespace2D)) return;
         SwiftList<int> admitted = scratch.MeshTriangleCandidatesB;
         scratch.MeshSurfaces.Clear();
         var section = new FiniteSlabSectionFrame(mesh.Origin, mesh.Rotation, center, rotation,
@@ -115,4 +118,34 @@ public static partial class CollisionDetectionMixed
         }
     }
 
+    private static bool TryAppendConvexMeshPrismContacts(LSMeshCollider collider, LSCollider2D embedded,
+        Vector3d center, FixedQuaternion rotation, Fixed64 halfThickness, ReadOnlySpan<Vector2d> offsets,
+        ContactManifold manifold, int namespace3D, int namespace2D)
+    {
+        CollisionSatScratch scratch = collider.Context.CollisionScratch;
+        int count = offsets.Length, triangleCount = 12 * count - 12, edgeCount = 6 * count;
+        if (scratch.PolyhedronVertices.Length < 2 * count) Array.Resize(ref scratch.PolyhedronVertices, 2 * count);
+        if (scratch.PolyhedronTriangles.Length < triangleCount) Array.Resize(ref scratch.PolyhedronTriangles, triangleCount);
+        if (scratch.PolyhedronEdges.Length < edgeCount) Array.Resize(ref scratch.PolyhedronEdges, edgeCount);
+        Span<Vector3d> vertices = scratch.PolyhedronVertices.AsSpan(0, 2 * count);
+        Span<int> triangles = scratch.PolyhedronTriangles.AsSpan(0, triangleCount), edges = scratch.PolyhedronEdges.AsSpan(0, edgeCount);
+        int face = 0;
+        for (int index = 0; index < count; index++)
+        {
+            int bottom = 2 * index, next = 2 * ((index + 1) % count);
+            vertices[bottom] = new(offsets[index].X, -halfThickness, offsets[index].Y);
+            vertices[bottom + 1] = new(offsets[index].X, halfThickness, offsets[index].Y);
+            triangles[face++] = bottom; triangles[face++] = next; triangles[face++] = next + 1;
+            triangles[face++] = bottom; triangles[face++] = next + 1; triangles[face++] = bottom + 1;
+            int edge = 2 * index;
+            edges[edge] = bottom; edges[edge + 1] = next;
+            edges[2 * count + edge] = bottom; edges[2 * count + edge + 1] = bottom + 1;
+            edges[4 * count + edge] = bottom + 1; edges[4 * count + edge + 1] = next + 1;
+            if (index == 0 || index == count - 1) continue;
+            triangles[face++] = 0; triangles[face++] = bottom; triangles[face++] = next;
+            triangles[face++] = 1; triangles[face++] = next + 1; triangles[face++] = bottom + 1;
+        }
+        return MeshTriangleContactGenerator.TryAppendHullContacts(collider, center, rotation, vertices,
+            triangles, edges, edges[..(2 * count + 2)], embedded.Material, manifold, false, namespace3D, namespace2D);
+    }
 }

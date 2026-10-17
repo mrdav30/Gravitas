@@ -109,6 +109,8 @@ internal sealed partial class GravitasMixedCollisionService
 
         LSCollider resolved3D = collider3D!;
         LSCollider2D resolved2D = collider2D!;
+        if (!RequireCollisionPair(resolved3D, resolved2D) || !MixedBoundsOverlap(resolved3D, resolved2D))
+            return;
         bool hasPair = _pairs.TryGetValue(candidate.Key, out CollisionPairMixed pair);
         bool triggerPair = resolved3D.IsTrigger || resolved2D.IsTrigger;
         bool hasAwakeMovableParticipant = HasAwakeMovableParticipant(resolved3D, resolved2D);
@@ -116,7 +118,8 @@ internal sealed partial class GravitasMixedCollisionService
             return;
 
         ContactManifold manifold = _context.CollisionScratch.MixedManifold;
-        if (!CollisionDetectionMixed.TryBuildManifold(resolved3D, resolved2D, manifold))
+        if (!(hasPair && pair!.TryCopyCachedManifold(frame, manifold))
+            && !CollisionDetectionMixed.TryBuildManifold(resolved3D, resolved2D, manifold))
             return;
 
         if (!triggerPair && !hasAwakeMovableParticipant)
@@ -178,7 +181,8 @@ internal sealed partial class GravitasMixedCollisionService
         if ((!triggerPair && HasAwakeMovableParticipant(collider3D, collider2D))
             || !RequireCollisionPair(collider3D, collider2D)
             || !MixedBoundsOverlap(collider3D, collider2D)
-            || !CollisionDetectionMixed.TryBuildManifold(collider3D, collider2D, manifold))
+            || !(pair.TryCopyCachedManifold(frame, manifold)
+                || CollisionDetectionMixed.TryBuildManifold(collider3D, collider2D, manifold)))
         {
             return false;
         }
