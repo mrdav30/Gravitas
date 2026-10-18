@@ -139,7 +139,7 @@ internal static class MeshTriangleContactGenerator
         // geometry frame and introduce a rounded off-center impulse lever.
         if (coreLength == Fixed64.Zero) rotation = FixedQuaternion.Identity;
         if (collider.StaticSurface is { } staticSurface && !collider.IsTrigger && !pair.ColliderB.IsTrigger
-            && staticSurface.Gather(pair.ColliderB, bounds))
+            && staticSurface.Gather(pair.ColliderB, bounds) > 1)
             return BuildJoinedRoundedManifold(pair, collider, staticSurface, center, rotation, coreLength, radius);
         collider.GetTrianglesInBounds(bounds, candidates);
         CollisionSatScratch scratch = pair.Context.CollisionScratch;
@@ -198,7 +198,7 @@ internal static class MeshTriangleContactGenerator
         SwiftList<int> triangleBuffer)
     {
         if (mesh.StaticSurface is { } surface && !mesh.IsTrigger && !cuboid.IsTrigger
-            && surface.GatherSlab(cuboid))
+            && surface.GatherProjectedSupport(cuboid) > 1)
         {
             Vector3d half = cuboid.OrientedBox.HalfExtents;
             surface.BuildSlab(cuboid, Fixed64.Zero, half.Y, new(half.X, half.Z));
@@ -218,7 +218,7 @@ internal static class MeshTriangleContactGenerator
         SwiftList<int> triangleBuffer)
     {
         if (mesh.StaticSurface is { } surface && !mesh.IsTrigger && !cylinder.IsTrigger
-            && surface.GatherSlab(cylinder))
+            && surface.GatherProjectedSupport(cylinder) > 1)
         {
             surface.BuildSlab(cylinder, cylinder.ScaledRadius, cylinder.Height, default);
             return surface.SlabFaces.AppendJoinedContacts(mesh, cylinder, pair.Context.CollisionScratch.MeshSlabBoundary, pair.Manifold);
@@ -240,6 +240,14 @@ internal static class MeshTriangleContactGenerator
     {
         CollisionSatScratch scratch = pair.Context.CollisionScratch;
         scratch.MeshSurfaces.Clear();
+        LSMeshCollider? declared = meshA.StaticSurface != null ? meshA : meshB.StaticSurface != null ? meshB : null;
+        LSMeshCollider mover = declared == meshA ? meshB : meshA;
+        if (declared != null
+            && !meshA.IsTrigger && !meshB.IsTrigger && declared.StaticSurface!.GatherProjectedSupport(mover) > 0)
+        {
+            declared.StaticSurface.BuildHull(mover);
+            return declared.StaticSurface.HullContacts.Append(declared, mover, pair.Manifold, declared == meshB);
+        }
         LSMeshCollider? surface = meshA.Mode == MeshColliderMode.Convex && meshA.Mesh.IsClosedSurface
             && !meshB.Mesh.IsClosedSurface ? meshB
             : meshB.Mode == MeshColliderMode.Convex && meshB.Mesh.IsClosedSurface

@@ -22,6 +22,7 @@ internal class MeshJoinedSurfaceRegions<TFrame> where TFrame : struct
     internal readonly SwiftDictionary<(PhysicsMesh Mesh, int Owner), int> MemberBySurface = new();
     internal readonly SwiftList<Member> Members = new();
     internal readonly SwiftList<int> Parents = new(), Roots = new(), RegionByRoot = new(), NodeMembers = new();
+    private int[] _responseComponents = Array.Empty<int>(), _responseMembers = Array.Empty<int>();
     private readonly IComparer<(LSMeshCollider Collider, int Triangle)> _memberComparer =
         Comparer<(LSMeshCollider Collider, int Triangle)>.Create((a, b) =>
         { int order = a.Collider.Id.CompareTo(b.Collider.Id); return order != 0 ? order : a.Triangle.CompareTo(b.Triangle); });
@@ -89,6 +90,49 @@ internal class MeshJoinedSurfaceRegions<TFrame> where TFrame : struct
 
     internal void AddRegions(int index)
         => AddRegions(index, Members[index].Connectivity.RegionCount);
+
+    internal void PrepareResponseComponents()
+    {
+        if (_responseComponents.Length < Inputs.Count)
+        {
+            Array.Resize(ref _responseComponents, Inputs.Count);
+            Array.Resize(ref _responseMembers, Inputs.Count);
+        }
+        for (int index = 0; index < Inputs.Count; index++)
+        { _responseComponents[index] = index; _responseMembers[index] = -1; }
+        // Geometry certifies coverage independently of finite support admission.
+        // A covered rim stays covered even when its owner supplies no sample.
+        for (int index = 0; index < Inputs.Count; index++)
+        {
+            Member member = Members[index];
+            for (int span = 0; span < member.Boundary.Spans.Length; span++)
+            {
+                var edge = member.Boundary.Spans[span];
+                member.JoinedSpans[span] = member.BoundaryTrusted && edge.Kind == MeshSurfaceBoundaryDomain.SpanKind.Joined
+                    && MemberBySurface.TryGetValue((Meshes[edge.OtherMember], edge.OtherSurface), out int other)
+                    && Members[other].BoundaryTrusted;
+                if (!member.JoinedSpans[span]) continue;
+                int a = FindResponseComponent(index), b = FindResponseComponent(MemberBySurface[(Meshes[edge.OtherMember], edge.OtherSurface)]);
+                _responseComponents[Math.Max(a, b)] = Math.Min(a, b);
+            }
+        }
+    }
+
+    internal void AddAdmittedMember(int index)
+    {
+        int component = FindResponseComponent(index);
+        // Inputs are sorted, so the first genuine overlap is the stable carrier.
+        if (_responseMembers[component] < 0) _responseMembers[component] = index;
+    }
+
+    internal int FindResponseComponent(int index)
+    {
+        while (_responseComponents[index] != index)
+        { _responseComponents[index] = _responseComponents[_responseComponents[index]]; index = _responseComponents[index]; }
+        return index;
+    }
+
+    internal int GetResponseMember(int index) => _responseMembers[FindResponseComponent(index)];
 
     internal void AddRegions(int index, int count)
     {

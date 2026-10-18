@@ -99,7 +99,7 @@ public static partial class CollisionDetection
         var cone = (LSConeCollider)pair.ColliderB;
 
         if (mesh.StaticSurface is { } surface && !mesh.IsTrigger && !cone.IsTrigger
-            && surface.Gather(cone, new FixedBoundVolume(cone.BoundsMin, cone.BoundsMax)))
+            && surface.Gather(cone, new FixedBoundVolume(cone.BoundsMin, cone.BoundsMax)) > 1)
         {
             surface.BuildCone(cone);
             var faces = surface.ConeFaces;

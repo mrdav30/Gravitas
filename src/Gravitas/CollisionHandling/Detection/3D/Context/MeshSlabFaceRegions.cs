@@ -213,7 +213,7 @@ internal sealed partial class MeshSlabFaceRegions
         // a rim, whose real normal belongs to perimeter response, not this face.
         if (_intrinsicOnly && candidate.Metadata.DomainEdgeMask != 0
             || candidate.CompareDepth(BorrowPeak(_orientation)) != 0) return;
-        if (_member >= 0 && _completeSupports[FindComponent(_member)] && !ContainsSupportPoint(candidate)) return;
+        if (_member >= 0 && _completeSupports[_joined.FindResponseComponent(_member)] && !ContainsSupportPoint(candidate)) return;
         bool represented = candidate.TryGetContactAnchor(_frame, out Fixed64 depth, out bool clamped,
             out Vector3d point, out FixedPointAnchor exit);
         System.Diagnostics.Debug.Assert(represented);

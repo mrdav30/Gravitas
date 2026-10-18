@@ -153,9 +153,17 @@ internal sealed class MeshSurfaceConnectivity
     }
 
     internal void BuildSlabSupport(PhysicsMesh mesh, int surfaceTriangle, MeshSlabFaceRegions faces,
-        LSCollider2D? embedded, ReadOnlySpan<int> admittedTriangles)
+        LSCollider2D? embedded, ReadOnlySpan<int> admittedTriangles) =>
+        BuildSupport(mesh, surfaceTriangle, new SlabSupport(faces, embedded), admittedTriangles);
+
+    internal void BuildHullSupport(PhysicsMesh mesh, int surfaceTriangle, MeshHullSurfaceContacts faces,
+        ReadOnlySpan<int> admittedTriangles) =>
+        BuildSupport(mesh, surfaceTriangle, new HullSupport(faces), admittedTriangles);
+
+    private void BuildSupport<TSupport>(PhysicsMesh mesh, int surfaceTriangle, in TSupport support,
+        ReadOnlySpan<int> admittedTriangles) where TSupport : struct, ISupport
     {
-        BuildGraph(mesh, surfaceTriangle, new SlabSupport(faces, embedded), admittedTriangles);
+        BuildGraph(mesh, surfaceTriangle, support, admittedTriangles);
         _ordersSupport = true;
         if (_roots.Count > 1)
         {
@@ -165,8 +173,7 @@ internal sealed class MeshSurfaceConnectivity
             int owner = mesh.GetManifoldSurfaceOwner(surfaceTriangle);
             for (int edge = 0; edge < edges.Length; edge += 2)
             {
-                int region = MeshSurfaceBoundaryTopology.FindSupportEdgeRegion(mesh, owner, edges[edge], edges[edge + 1],
-                    this, faces, embedded);
+                int region = support.FindEdgeRegion(mesh, owner, edges[edge], edges[edge + 1], this);
                 if (region >= 0) _boundaryRanks[_roots[region]] = Math.Min(_boundaryRanks[_roots[region]], edge / 2);
             }
             // A convex support footprint meets a straight boundary span in one
@@ -289,7 +296,22 @@ internal sealed class MeshSurfaceConnectivity
         bool TryGetFirstSegmentPoint(FixedSegment segment, FiniteSectionPoint point);
     }
 
-    private readonly struct SlabSupport : IAdmission
+    private interface ISupport : IAdmission
+    {
+        int FindEdgeRegion(PhysicsMesh mesh, int owner, int first, int second, MeshSurfaceConnectivity connectivity);
+    }
+
+    private readonly struct HullSupport : ISupport
+    {
+        private readonly MeshHullSurfaceContacts faces;
+        internal HullSupport(MeshHullSurfaceContacts faces) => this.faces = faces;
+        public bool ContainsPoint(Vector3d point) => IntersectsSegment(new FixedSegment(point, point));
+        public bool IntersectsSegment(FixedSegment segment) => faces.IntersectsSupport(segment);
+        public int FindEdgeRegion(PhysicsMesh mesh, int owner, int first, int second, MeshSurfaceConnectivity connectivity) =>
+            MeshSurfaceBoundaryTopology.FindSupportEdgeRegion(mesh, owner, first, second, connectivity, faces);
+    }
+
+    private readonly struct SlabSupport : ISupport
     {
         private readonly MeshSlabFaceRegions faces;
         private readonly LSCollider2D? embedded;
@@ -302,6 +324,8 @@ internal sealed class MeshSurfaceConnectivity
             return faces.IntersectsSupport(segment, faces.PrismOffsets.IsEmpty
                 ? CollisionDetectionMixed.GetConvexPrismOffsets(embedded, box) : faces.PrismOffsets.Span);
         }
+        public int FindEdgeRegion(PhysicsMesh mesh, int owner, int first, int second, MeshSurfaceConnectivity connectivity) =>
+            MeshSurfaceBoundaryTopology.FindSupportEdgeRegion(mesh, owner, first, second, connectivity, faces, embedded);
     }
 
     private readonly struct ConeSection : ISection

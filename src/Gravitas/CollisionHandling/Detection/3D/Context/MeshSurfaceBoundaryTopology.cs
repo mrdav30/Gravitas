@@ -34,6 +34,10 @@ internal static class MeshSurfaceBoundaryTopology
         MeshSurfaceConnectivity connectivity, MeshSlabFaceRegions faces, LSCollider2D? embedded) =>
         FindEdgeRegion(mesh, owner, first, second, connectivity, new SlabSupport(faces, embedded));
 
+    internal static int FindSupportEdgeRegion(PhysicsMesh mesh, int owner, int first, int second,
+        MeshSurfaceConnectivity connectivity, MeshHullSurfaceContacts faces) =>
+        FindEdgeRegion(mesh, owner, first, second, connectivity, new HullSupport(faces));
+
     private static int FindEdgeRegion<TSection>(PhysicsMesh mesh, int owner, int first, int second,
         MeshSurfaceConnectivity connectivity, in TSection frame) where TSection : struct, ISection
     {
@@ -193,5 +197,12 @@ internal static class MeshSurfaceBoundaryTopology
             return faces.IntersectsSupport(segment, faces.PrismOffsets.IsEmpty
                 ? CollisionDetectionMixed.GetConvexPrismOffsets(embedded, box) : faces.PrismOffsets.Span);
         }
+    }
+
+    private readonly struct HullSupport : ISection
+    {
+        private readonly MeshHullSurfaceContacts faces;
+        internal HullSupport(MeshHullSurfaceContacts faces) => this.faces = faces;
+        public bool IntersectsSegment(FixedSegment segment) => faces.IntersectsSupport(segment);
     }
 }

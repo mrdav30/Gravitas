@@ -29,15 +29,19 @@ internal sealed class StaticSurface : IDisposable
     private Vector3d _center;
     private FixedQuaternion _rotation;
     private Fixed64 _coreLength, _radius;
-    private enum ContactFamily { Rounded, Cone, Slab }
+    private enum ContactFamily { Rounded, Cone, Slab, Hull }
     private ContactFamily _cachedFamily;
     private bool _facesCurrent;
     private Vector2d _halfFootprint;
     private MeshSlabFaceRegions? _slabFaces;
+    private MeshHullSurfaceContacts? _hullContacts;
+    private PhysicsMesh? _movingMesh;
+    private uint _movingVersion;
     private bool _dirty, _disposed;
     internal readonly MeshCapsuleFaceRegions Faces = new();
     internal readonly MeshConeFaceRegions ConeFaces = new();
     internal MeshSlabFaceRegions SlabFaces => _slabFaces ??= new();
+    internal MeshHullSurfaceContacts HullContacts => _hullContacts ??= new();
 
     internal StaticSurface(GravitasWorldContext context, ReadOnlySpan<LSMeshCollider> members)
     {
@@ -70,7 +74,7 @@ internal sealed class StaticSurface : IDisposable
         Invalidate();
         foreach (LSMeshCollider previous in _members) previous.StaticSurface = null;
         _members = next; _meshes = meshes;
-        Faces.ReleaseJoined(); ConeFaces.ReleaseJoined(); _slabFaces?.ReleaseJoined(); _surfaces.Clear(); _cachedOwners.Clear(); _owners.Clear();
+        Faces.ReleaseJoined(); ConeFaces.ReleaseJoined(); _slabFaces?.ReleaseJoined(); _hullContacts?.Release(); _movingMesh = null; _surfaces.Clear(); _cachedOwners.Clear(); _owners.Clear();
         _boundaries.Clear();
         foreach (var entry in prepared) _boundaries.Add(entry.Key, entry.Value);
         foreach (LSMeshCollider member in _members) member.StaticSurface = this;
@@ -114,14 +118,14 @@ internal sealed class StaticSurface : IDisposable
         if (index < 0) return;
         Invalidate(geometryChanged: true);
         member.StaticSurface = null;
-        Faces.ReleaseJoined(); ConeFaces.ReleaseJoined(); _slabFaces?.ReleaseJoined(); _surfaces.Clear(); _cachedOwners.Clear(); _owners.Clear(); _boundaries.Clear();
+        Faces.ReleaseJoined(); ConeFaces.ReleaseJoined(); _slabFaces?.ReleaseJoined(); _hullContacts?.Release(); _movingMesh = null; _surfaces.Clear(); _cachedOwners.Clear(); _owners.Clear(); _boundaries.Clear();
         Array.Copy(_members, index + 1, _members, index, _members.Length - index - 1);
         Array.Resize(ref _members, _members.Length - 1);
         _meshes = new PhysicsMesh[_members.Length];
         for (int i = 0; i < _members.Length; i++) _meshes[i] = _members[i].Mesh;
     }
 
-    internal bool Gather(LSCollider mover, FixedBoundVolume bounds)
+    internal int Gather(LSCollider mover, FixedBoundVolume bounds)
     {
         if (_dirty)
         {
@@ -145,10 +149,10 @@ internal sealed class StaticSurface : IDisposable
             foreach (int triangle in _triangles.AsReadOnlySpan())
                 if (_owners.Add((mesh.Mesh, mesh.Mesh.GetManifoldSurfaceOwner(triangle)))) _surfaces.Add((mesh, triangle));
         }
-        return _surfaces.Count > 1;
+        return _surfaces.Count;
     }
 
-    internal bool GatherSlab(LSCollider mover)
+    internal int GatherProjectedSupport(LSCollider mover)
     {
         // A support projected onto an intersecting plane is within sqrt(2) R
         // of the shape center. 2 R conservatively includes its finite supplier,
@@ -156,6 +160,22 @@ internal sealed class StaticSurface : IDisposable
         Fixed64 reach = mover.CanonicalCenteredProxyRadius * Fixed64.Two;
         FixedBoundBox bounds = FixedBoundBox.FromCenterAndScopeClippedToDomain(mover.Center, Vector3d.One * reach);
         return Gather(mover, new(bounds.Min, bounds.Max));
+    }
+
+    internal void BuildHull(LSMeshCollider mover)
+    {
+        bool reuse = _facesCurrent && _cachedFamily == ContactFamily.Hull && _movingMesh == mover.Mesh
+            && _movingVersion == mover.RuntimeShapeVersion && _center == mover.Center && _rotation == mover.Rotation
+            && _cachedOwners.Count == _owners.Count;
+        foreach (var owner in _cachedOwners.AsReadOnlySpan()) reuse &= _owners.Contains(owner);
+        if (reuse) return;
+        _facesCurrent = false; _cachedFamily = ContactFamily.Hull;
+        HullContacts.Build(_surfaces.AsReadOnlySpan(), mover, _meshes, _boundaries);
+        _cachedOwners.Clear();
+        foreach (var surface in _surfaces.AsReadOnlySpan())
+            _cachedOwners.Add((surface.Collider.Mesh, surface.Collider.Mesh.GetManifoldSurfaceOwner(surface.Triangle)));
+        _movingMesh = mover.Mesh; _movingVersion = mover.RuntimeShapeVersion;
+        _center = mover.Center; _rotation = mover.Rotation; _facesCurrent = true;
     }
 
     internal void BuildRounded(Vector3d center, FixedQuaternion rotation, Fixed64 coreLength, Fixed64 radius)
@@ -218,6 +238,6 @@ internal sealed class StaticSurface : IDisposable
         foreach (LSMeshCollider member in _members) member.StaticSurface = null;
         _members = Array.Empty<LSMeshCollider>(); _meshes = Array.Empty<PhysicsMesh>();
         _boundaries.Clear(); _surfaces.Clear(); _cachedOwners.Clear(); _owners.Clear();
-        Faces.ReleaseJoined(); ConeFaces.ReleaseJoined(); _slabFaces?.ReleaseJoined(); _disposed = true;
+        Faces.ReleaseJoined(); ConeFaces.ReleaseJoined(); _slabFaces?.ReleaseJoined(); _hullContacts?.Release(); _movingMesh = null; _disposed = true;
     }
 }

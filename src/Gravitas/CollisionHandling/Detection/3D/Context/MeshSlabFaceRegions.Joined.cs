@@ -20,7 +20,6 @@ internal sealed partial class MeshSlabFaceRegions
     private readonly MeshSurfaceConnectivity _boundaryConnectivity = new();
     private readonly Vector2d[] _boxOffsets = new Vector2d[4];
     private int[] _memberCounts = Array.Empty<int>(), _orientations = Array.Empty<int>(), _dimensions = Array.Empty<int>();
-    private int[] _components = Array.Empty<int>(), _responseMembers = Array.Empty<int>();
     private bool[] _completeSupports = Array.Empty<bool>();
     private int _member = -1, _otherMember;
     private FiniteSlabRayCandidateVisitor? _joinVisitor;
@@ -46,30 +45,11 @@ internal sealed partial class MeshSlabFaceRegions
         {
             Array.Resize(ref _memberCounts, _joined.Inputs.Count);
             Array.Resize(ref _orientations, _joined.Inputs.Count); Array.Resize(ref _dimensions, _joined.Inputs.Count);
-            Array.Resize(ref _components, _joined.Inputs.Count); Array.Resize(ref _responseMembers, _joined.Inputs.Count);
             Array.Resize(ref _completeSupports, _joined.Inputs.Count);
         }
+        _joined.PrepareResponseComponents();
         for (int index = 0; index < _joined.Inputs.Count; index++)
-        { _components[index] = index; _responseMembers[index] = -1; _memberCounts[index] = 0; _completeSupports[index] = true; }
-        // Geometry certifies coverage; finite support admission below decides
-        // connectivity. A covered rim cannot become exposed merely because its
-        // owner contributes no final face sample.
-        for (int index = 0; index < _joined.Inputs.Count; index++)
-        {
-            Member member = _joined.Members[index];
-            for (int span = 0; span < member.Boundary.Spans.Length; span++)
-            {
-                var edge = member.Boundary.Spans[span];
-                member.JoinedSpans[span] = member.BoundaryTrusted && edge.Kind == MeshSurfaceBoundaryDomain.SpanKind.Joined
-                    && _joined.MemberBySurface.TryGetValue((_joined.Meshes[edge.OtherMember], edge.OtherSurface), out int other)
-                    && _joined.Members[other].BoundaryTrusted;
-                if (member.JoinedSpans[span])
-                {
-                    int a = FindComponent(index), b = FindComponent(_joined.MemberBySurface[(_joined.Meshes[edge.OtherMember], edge.OtherSurface)]);
-                    _components[Math.Max(a, b)] = Math.Min(a, b);
-                }
-            }
-        }
+        { _memberCounts[index] = 0; _completeSupports[index] = true; }
         var bounds = new FixedBoundVolume(mover.BoundsMin, mover.BoundsMax);
         for (int index = 0; index < _joined.Inputs.Count; index++)
         {
@@ -84,11 +64,7 @@ internal sealed partial class MeshSlabFaceRegions
                 mesh.GetLocalTriangleVertices(triangle, out a, out b, out c);
                 if (member.Frame.Section.IntersectsTriangle(new FixedTriangle(a, b, c), PrismOffsets.Span)) member.Admitted.Add(triangle);
             }
-            if (member.Admitted.Count > 0)
-            {
-                int component = FindComponent(index);
-                if (_responseMembers[component] < 0) _responseMembers[component] = index;
-            }
+            if (member.Admitted.Count > 0) _joined.AddAdmittedMember(index);
         }
         CertifyCompleteSupports();
         for (int index = 0; index < _joined.Inputs.Count; index++)
@@ -97,9 +73,9 @@ internal sealed partial class MeshSlabFaceRegions
             // Only an actually intersected coplanar component owns response.
             // The carrier's pair remains an ordinary, genuine overlap; samples
             // keep their own finite supplier, material and provenance.
-            if (_responseMembers[FindComponent(index)] < 0) { _joined.AddRegions(index, 0); continue; }
+            if (_joined.GetResponseMember(index) < 0) { _joined.AddRegions(index, 0); continue; }
             PhysicsMesh mesh = member.Collider.Mesh;
-            if (_completeSupports[FindComponent(index)] && member.Admitted.Count == 0) { _joined.AddRegions(index, 0); continue; }
+            if (_completeSupports[_joined.FindResponseComponent(index)] && member.Admitted.Count == 0) { _joined.AddRegions(index, 0); continue; }
             member.Connectivity.BuildSlab(mesh, member.Triangle, member.Frame.Section, PrismOffsets, member.Admitted.AsReadOnlySpan());
             _member = index; PrepareFrame(member.Frame, PrismOffsets.Span);
             if (BorrowPeak(1).CompareDepth(BorrowPeak(-1)) == 0)
@@ -111,7 +87,7 @@ internal sealed partial class MeshSlabFaceRegions
                 _orientation = -sign;
             }
             _orientations[index] = _orientation; _dimensions[index] = _supportDimension;
-            if (_completeSupports[FindComponent(index)])
+            if (_completeSupports[_joined.FindResponseComponent(index)])
             {
                 _events.FastClear(); _region = 0; _intrinsicOnly = _usesSupportGraph = false;
                 // An admitted member without a pole still connects neighboring
@@ -137,7 +113,7 @@ internal sealed partial class MeshSlabFaceRegions
     {
         for (int index = 0; index < _joined.Inputs.Count; index++)
         {
-            Member member = _joined.Members[index]; int component = FindComponent(index);
+            Member member = _joined.Members[index]; int component = _joined.FindResponseComponent(index);
             if (!_completeSupports[component]) continue;
             if (!member.BoundaryTrusted || !member.Frame.Plane.Normal.X.IsZero || !member.Frame.Plane.Normal.Z.IsZero)
             { _completeSupports[component] = false; continue; }
@@ -162,13 +138,6 @@ internal sealed partial class MeshSlabFaceRegions
             if (candidate.ContainsTrianglePoint(member.Frame, new(a, b, c), member.Frame)) return true;
         }
         return false;
-    }
-
-    private int FindComponent(int member)
-    {
-        while (_components[member] != member)
-        { _components[member] = _components[_components[member]]; member = _components[member]; }
-        return member;
     }
 
     private void GatherJoinedBoundary(PhysicsMesh mesh, int triangle, MeshSurfaceConnectivity connectivity)
@@ -260,7 +229,7 @@ internal sealed partial class MeshSlabFaceRegions
         {
             int rootMember = _joined.NodeMembers[_joined.Roots[region]];
             Member root = _joined.Members[rootMember];
-            if (_joined.Members[_responseMembers[FindComponent(rootMember)]].Collider != collider) continue;
+            if (_joined.Members[_joined.GetResponseMember(rootMember)].Collider != collider) continue;
             int count = ReduceSamples(region, _joinedEvents.AsReadOnlySpan(),
                 new WidePlaneMetrics(root.Frame.SourcePlane, root.Collider.Mesh.Rotation), _dimensions[rootMember], chosen);
             for (int index = 0; index < count; index++)
@@ -277,7 +246,7 @@ internal sealed partial class MeshSlabFaceRegions
             Member source = _joined.Members[member];
             if (source.Admitted.Count == 0) continue;
             overlaps |= source.Collider == collider;
-            if (_joined.Members[_responseMembers[FindComponent(member)]].Collider != collider) continue;
+            if (_joined.Members[_joined.GetResponseMember(member)].Collider != collider) continue;
             SelectJoinedMember(member);
             // Keep the component's face and perimeter rows in one solver pass;
             // otherwise matching normals receive positional correction twice.

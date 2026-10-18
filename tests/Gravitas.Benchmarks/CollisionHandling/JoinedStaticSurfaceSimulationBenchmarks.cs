@@ -19,7 +19,7 @@ public class JoinedStaticSurfaceSimulationBenchmarks
     [Params(false, true)]
     public bool Joined { get; set; }
 
-    [Params("Sphere", "Capsule", "Cone", "Cuboid", "Cylinder")]
+    [Params("Sphere", "Capsule", "Cone", "Cuboid", "Cylinder", "ConvexMesh", "ConcaveMesh")]
     public string Shape { get; set; } = "Sphere";
 
     [Params("Small", "Partial", "Dense", "Members")]
@@ -47,6 +47,8 @@ public class JoinedStaticSurfaceSimulationBenchmarks
             "Cone" => new LSConeCollider(),
             "Cuboid" => new LSCuboidCollider(),
             "Cylinder" => new LSCylinderCollider(),
+            "ConvexMesh" => BenchmarkPhysicsScene.CreateCubeMesh(),
+            "ConcaveMesh" => BenchmarkPhysicsScene.CreateCubeMesh(MeshColliderMode.Concave),
             _ => new LSSphereCollider { Radius = Fixed64.Half }
         };
         collider.Material = PhysicsMaterial.Frictionless;

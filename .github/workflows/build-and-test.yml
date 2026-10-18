@@ -49,7 +49,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           repository: mrdav30/FixedMathSharp
-          ref: c094ebda28c58348f1657b920409cb1dd0c5b404
+          ref: d59457086a38dae86afa1579467c80657d658ded
           path: FixedMathSharp
           persist-credentials: false
       - if: env.UseLocalLsfStack == 'true'

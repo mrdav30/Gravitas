@@ -79,7 +79,7 @@ internal static class BenchmarkPhysicsScene
 
     public static LSMeshCollider CreateDynamicConvexCube(GravitasWorldContext context, Vector3d position)
     {
-        LSMeshCollider collider = CreateConvexCubeMesh();
+        LSMeshCollider collider = CreateCubeMesh();
         CreateDynamicBody(context, collider, position);
         return collider;
     }
@@ -357,13 +357,13 @@ internal static class BenchmarkPhysicsScene
         return body;
     }
 
-    private static LSMeshCollider CreateConvexCubeMesh()
+    internal static LSMeshCollider CreateCubeMesh(MeshColliderMode mode = MeshColliderMode.Convex)
     {
         CreateConvexCubeTopology(out Vector3d[] vertices, out int[] triangles);
         return new LSMeshCollider(
             vertices,
             triangles,
-            MeshColliderMode.Convex,
+            mode,
             MeshInertiaPolicy.SurfaceApproximation);
     }
 

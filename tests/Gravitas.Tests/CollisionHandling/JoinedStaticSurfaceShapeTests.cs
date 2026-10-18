@@ -13,12 +13,15 @@ namespace Gravitas.Tests;
 
 public sealed class JoinedStaticSurfaceShapeTests
 {
-    [Fact]
-    public void ConeCrossing_ShouldReplayEveryFrameAcrossDeclarationOrder()
+    [Theory]
+    [InlineData("Cone")]
+    [InlineData("ConvexMesh")]
+    [InlineData("ConcaveMesh")]
+    public void ShapeCrossing_ShouldReplayEveryFrameAcrossDeclarationOrder(string family)
     {
         Assert.Equal(Trace(false), Trace(true));
 
-        static List<ChronicleHash> Trace(bool reverse)
+        List<ChronicleHash> Trace(bool reverse)
         {
             using var scene = PhysicsScenarioBuilder.Create();
             scene.Context.SetFrameRate(16);
@@ -26,8 +29,14 @@ public sealed class JoinedStaticSurfaceShapeTests
             scene.Context.Environment.AirDensity = scene.Context.Environment.DampingFactor = scene.Context.Environment.MinSpeed = Fixed64.Zero;
             var members = new[] { Floor(scene, -8, 0), Floor(scene, 0, 8, 2) };
             using var surface = scene.Context.Physics.CreateStaticSurface(reverse ? new[] { members[1], members[0] } : members);
-            var cone = new LSConeCollider { Material = PhysicsMaterial.Frictionless };
-            var body = scene.CreateBody(cone, new((Fixed64)(-2), Fixed64.Half, Fixed64.Zero), FixedQuaternion.Identity,
+            LSCollider shape = family switch
+            {
+                "ConvexMesh" => MeshTestFixtures.CreateConvexCube(),
+                "ConcaveMesh" => MeshTestFixtures.CreateConvexCube(MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation),
+                _ => new LSConeCollider()
+            };
+            shape.Material = PhysicsMaterial.Frictionless;
+            var body = scene.CreateBody(shape, new((Fixed64)(-2), Fixed64.Half, Fixed64.Zero), FixedQuaternion.Identity,
                 preventAngularForces: true).Body;
             body.UseManualGrounding(); body.SleepEnabled = false;
             var hashes = new List<ChronicleHash>();
@@ -45,6 +54,7 @@ public sealed class JoinedStaticSurfaceShapeTests
     [InlineData("Cone")]
     [InlineData("Cylinder")]
     [InlineData("Cuboid")]
+    [InlineData("ConvexMesh")]
     [InlineData("ConcaveMesh")]
     public void JoinedInterior_ShouldRetainOnlyTheCompleteFloorExit(string family)
     {
@@ -57,6 +67,7 @@ public sealed class JoinedStaticSurfaceShapeTests
             "Cone" => new LSConeCollider(),
             "Cylinder" => new LSCylinderCollider(),
             "Cuboid" => new LSCuboidCollider(),
+            "ConvexMesh" => MeshTestFixtures.CreateConvexCube(),
             _ => MeshTestFixtures.CreateConvexCube(MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation)
         };
         scene.CreateBody(shape, new(Fixed64.Quarter, Fixed64.Quarter, Fixed64.Zero), FixedQuaternion.Identity);
@@ -88,6 +99,9 @@ public sealed class JoinedStaticSurfaceShapeTests
     [InlineData("Cylinder", false, false, false, 1, 2)]
     [InlineData("Cuboid", false, false, true, 1, 2)]
     [InlineData("Cylinder", false, false, true, 1, 2)]
+    [InlineData("ConvexMesh", false, false, false, 1, 2)]
+    [InlineData("ConvexMesh", true, true, true, 1, 2)]
+    [InlineData("ConcaveMesh", false, false, false, 1, 2)]
     public void JoinedShapeCrossing_ShouldPreserveFrictionlessMotion(string family, bool partial, bool reverse, bool compound, int divisions, int count)
     {
         using var scene = PhysicsScenarioBuilder.Create();
@@ -108,6 +122,11 @@ public sealed class JoinedStaticSurfaceShapeTests
                 PhysicsMaterial.Frictionless)) : new LSCuboidCollider(),
             "Cylinder" => compound ? new LSCompoundCollider(CompoundColliderPart.Cylinder(Fixed64.Half, Fixed64.One, Vector3d.Zero,
                 PhysicsMaterial.Frictionless)) : new LSCylinderCollider(),
+            "ConvexMesh" => compound ? new LSCompoundCollider(new CompoundColliderPart(
+                MeshTestFixtures.CreateConvexCubeDefinition(), Vector3d.Zero, FixedQuaternion.Identity,
+                Vector3d.One, PhysicsMaterial.Frictionless))
+                : MeshTestFixtures.CreateConvexCube(),
+            "ConcaveMesh" => MeshTestFixtures.CreateConvexCube(MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation),
             _ => compound ? new LSCompoundCollider(CompoundColliderPart.Cone(Fixed64.Half, Fixed64.One, Vector3d.Zero,
                 PhysicsMaterial.Frictionless)) : new LSConeCollider()
         };
