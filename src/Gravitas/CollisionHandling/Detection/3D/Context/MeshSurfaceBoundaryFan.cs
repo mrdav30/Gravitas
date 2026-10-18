@@ -26,14 +26,15 @@ internal sealed class MeshSurfaceBoundaryFan
     internal ReadOnlySpan<(int Member, int Surface)> Owners => _owners.AsReadOnlySpan();
     internal bool HasExposedBoundary { get; private set; }
 
-    internal bool BuildEndpoint(ReadOnlySpan<PhysicsMesh> members, MeshSurfaceBoundaryDomain source, int span, bool upper)
+    internal bool BuildEndpoint(ReadOnlySpan<PhysicsMesh> members, MeshSurfaceBoundaryDomain source, int span, bool upper,
+        ReadOnlySpan<MeshSurfaceBoundaryDomain> prepared = default)
     {
         var edge = source.Spans[span];
         Signed320 n = upper ? edge.Interval.UpperNumerator : edge.Interval.LowerNumerator;
         Signed320 d = upper ? edge.Interval.UpperDenominator : edge.Interval.LowerDenominator;
         if (!edge.Interval.IsClipped) { n = upper ? Signed320.One : default; d = Signed320.One; }
         return Build(members, source.SourceMember, source.SourceSurface,
-            new FixedSegment(edge.Start, edge.End), n, d);
+            new FixedSegment(edge.Start, edge.End), n, d, prepared);
     }
 
     internal bool BuildAtPoint(ReadOnlySpan<PhysicsMesh> members, int sourceMember, int sourceSurface, Vector3d point,

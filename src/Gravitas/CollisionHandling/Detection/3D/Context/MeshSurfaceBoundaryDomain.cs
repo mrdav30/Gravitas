@@ -8,6 +8,7 @@ using FixedMathSharp;
 using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
 using SwiftCollections;
+using SwiftCollections.Query;
 using System;
 
 namespace Gravitas.CollisionHandling;
@@ -23,6 +24,7 @@ internal sealed class MeshSurfaceBoundaryDomain
     private readonly SwiftList<BoundarySpan> _spans = new();
     private readonly SwiftList<Coverage> _coverage = new();
     private readonly SwiftList<Parameter> _cuts = new();
+    private readonly SwiftList<int> _triangles = new();
     private readonly SwiftHashSet<(int Member, int Surface)> _own = new(), _opposite = new();
 
     internal enum SpanKind { Exposed, Joined, Ambiguous }
@@ -82,11 +84,16 @@ internal sealed class MeshSurfaceBoundaryDomain
         _coverage.FastClear(); _cuts.FastClear();
         _cuts.Add(Parameter.Zero); _cuts.Add(Parameter.One);
         PhysicsMesh source = members[sourceMember];
-        // shortcut: proof preparation scans supplied meshes; runtime membership must prepare adjacency on mutation.
+        FixedBoundBox edgeBounds = new FixedSegment(face.A, face.B).Bounds;
         for (int member = 0; member < members.Length; member++)
         {
             PhysicsMesh target = members[member];
-            for (int triangle = 0; triangle < target.TriangleCount; triangle++)
+            // Use the existing local BVH, including when world endpoints cannot
+            // be materialized. Exact coverage still decides every candidate.
+            FixedBoundBox local = FixedBoundBox.FromRelativeRotatedBoundsClippedToDomain(source.Origin, source.Rotation,
+                edgeBounds.Min, edgeBounds.Max, target.Origin, target.Rotation);
+            target.GetTrianglesInLocalBounds(new FixedBoundVolume(local.Min, local.Max), _triangles);
+            foreach (int triangle in _triangles.AsReadOnlySpan())
             {
                 int surface = target.GetManifoldSurfaceOwner(triangle);
                 if (member == sourceMember && surface == owner) continue;

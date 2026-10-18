@@ -3,6 +3,7 @@ using Gravitas.Colliders;
 using Gravitas.Materials;
 using Gravitas.CollisionHandling;
 using Gravitas.Tests.Support;
+using GridForge.Configuration;
 using System;
 using System.Collections.Generic;
 using Xunit;
@@ -55,15 +56,19 @@ public sealed class JoinedStaticSurfaceTests
     }
 
     [Theory]
-    [InlineData(false, false, false)]
-    [InlineData(false, true, false)]
-    [InlineData(true, false, false)]
-    [InlineData(true, true, false)]
-    [InlineData(false, false, true)]
-    [InlineData(false, true, true)]
-    [InlineData(true, false, true)]
-    [InlineData(true, true, true)]
-    public void Crossing_ShouldPreserveTangentialMotion(bool capsule, bool staticBodies, bool compound)
+    [InlineData(false, false, false, false)]
+    [InlineData(false, true, false, false)]
+    [InlineData(true, false, false, false)]
+    [InlineData(true, true, false, false)]
+    [InlineData(false, false, true, false)]
+    [InlineData(false, true, true, false)]
+    [InlineData(true, false, true, false)]
+    [InlineData(true, true, true, false)]
+    [InlineData(false, false, false, true)]
+    [InlineData(true, true, false, true)]
+    [InlineData(false, false, true, true)]
+    [InlineData(true, true, true, true)]
+    public void Crossing_ShouldPreserveTangentialMotion(bool capsule, bool staticBodies, bool compound, bool partial)
     {
         using var scene = PhysicsScenarioBuilder.Create();
         scene.Context.SetFrameRate(16);
@@ -72,7 +77,7 @@ public sealed class JoinedStaticSurfaceTests
         scene.Context.Environment.DampingFactor = Fixed64.Zero;
         scene.Context.Environment.MinSpeed = Fixed64.Zero;
         LSMeshCollider left = Floor(scene, -8, 0, staticBodies);
-        LSMeshCollider right = Floor(scene, 0, 8, staticBodies);
+        LSMeshCollider right = Floor(scene, 0, 8, staticBodies, partial ? -2 : -4, partial ? 2 : 4);
         using var surface = scene.Context.Physics.CreateStaticSurface(capsule ? new[] { right, left } : new[] { left, right });
         int enters = 0, exits = 0;
         left.OnContactEnter += _ => enters++;
@@ -176,9 +181,11 @@ public sealed class JoinedStaticSurfaceTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void SharedCornerAcrossDisconnectedOwners_ShouldHaveOneRadialSupplier(bool capsule)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public void SharedCornerAcrossDisconnectedOwners_ShouldHaveOneRadialSupplier(bool capsule, bool middleFirst)
     {
         using var scene = PhysicsScenarioBuilder.Create();
         var vertices = new[] { Vector3d.Zero, new Vector3d(4, 0, 0), new(4, 0, 1), new(4, 0, 2), new(0, 0, 4) };
@@ -186,8 +193,8 @@ public sealed class JoinedStaticSurfaceTests
             MeshInertiaPolicy.SurfaceApproximation);
         var middle = new LSMeshCollider(new[] { vertices[0], vertices[3], vertices[2] }, new[] { 0, 1, 2 }, MeshColliderMode.Concave,
             MeshInertiaPolicy.SurfaceApproximation);
-        scene.InitializeStaticCollider(outer, Vector3d.Zero);
-        scene.InitializeStaticCollider(middle, Vector3d.Zero);
+        scene.InitializeStaticCollider(middleFirst ? middle : outer, Vector3d.Zero);
+        scene.InitializeStaticCollider(middleFirst ? outer : middle, Vector3d.Zero);
         using var surface = scene.Context.Physics.CreateStaticSurface(new[] { middle, outer });
         LSCollider shape = capsule ? new LSCapsuleCollider { Radius = Fixed64.Half, Size = new(1, 2, 1) }
             : new LSSphereCollider { Radius = Fixed64.Half };
@@ -203,7 +210,7 @@ public sealed class JoinedStaticSurfaceTests
                     if (row.Normal.X != Fixed64.Zero || row.Normal.Z != Fixed64.Zero)
                     {
                         radial++;
-                        Assert.Same(outer, member);
+                        Assert.Same(middleFirst ? middle : outer, member);
                         Assert.True(row.AnchorA.TryGetWorldPoint(out var point));
                         Assert.Equal(Vector3d.Zero, point);
                     }
@@ -213,7 +220,191 @@ public sealed class JoinedStaticSurfaceTests
     }
 
     [Fact]
-    public void Replacement_ShouldInvalidateRemovedMemberAndRejectPartialJoinAtomically()
+    public void MovingMemberToPartialJoin_ShouldPublishUsableGeometry()
+    {
+        using var scene = PhysicsScenarioBuilder.Create();
+        var left = Floor(scene, -8, 0, false);
+        var right = Floor(scene, 0, 8, false);
+        using var surface = scene.Context.Physics.CreateStaticSurface(new[] { left, right });
+        var sphere = new LSSphereCollider { Radius = Fixed64.Half };
+        scene.CreateBody(sphere, new(Fixed64.Zero, Fixed64.Quarter, Fixed64.Zero), FixedQuaternion.Identity);
+        right.Position = new Vector3d(0, 0, 1);
+        var pair = scene.CreatePair(left, sphere);
+        Assert.True(CollisionDetection.DoCollisionCheck(pair));
+        Assert.True(pair.Manifold.HasContact);
+        foreach (var row in pair.Manifold) Assert.Equal(Fixed64.Zero, row.Normal.X);
+    }
+
+    [Theory]
+    [InlineData(0, false)]
+    [InlineData(0, true)]
+    [InlineData(1, false)]
+    [InlineData(1, true)]
+    [InlineData(2, false)]
+    [InlineData(2, true)]
+    [InlineData(3, false)]
+    [InlineData(3, true)]
+    public void PartialJoin_ShouldPreserveRealRimsAndRejectCoveredCorners(int placement, bool capsule)
+    {
+        using var scene = PhysicsScenarioBuilder.Create();
+        var left = Floor(scene, -8, 0, false);
+        var right = Floor(scene, 0, 8, false, -2, 2);
+        using var surface = scene.Context.Physics.CreateStaticSurface(new[] { right, left });
+        Vector3d center = placement switch
+        {
+            0 => new(Fixed64.Zero, Fixed64.Quarter, Fixed64.Zero),
+            1 => new(-Fixed64.Quarter, Fixed64.Quarter, (Fixed64)2 + Fixed64.Quarter),
+            2 => new(Fixed64.Quarter, Fixed64.Quarter, (Fixed64)2 - Fixed64.Quarter),
+            _ => new(Fixed64.Quarter, Fixed64.Quarter, (Fixed64)2 + Fixed64.Quarter)
+        };
+        LSCollider shape = capsule ? new LSCapsuleCollider { Radius = Fixed64.Half, Size = new(1, 2, 1) }
+            : new LSSphereCollider { Radius = Fixed64.Half };
+        scene.CreateBody(shape, center, FixedQuaternion.Identity);
+        bool radialX = false, radialZ = false;
+        foreach (var member in new[] { left, right })
+        {
+            var pair = scene.CreatePair(member, shape);
+            Assert.True(CollisionDetection.DoCollisionCheck(pair));
+            foreach (var row in pair.Manifold)
+            {
+                Assert.True(row.AnchorA.TryGetWorldPoint(out var p));
+                Assert.Equal(Fixed64.Zero, p.Y);
+                Assert.InRange(p.X.m_rawValue, ((Fixed64)(member == left ? -8 : 0)).m_rawValue, ((Fixed64)(member == left ? 0 : 8)).m_rawValue);
+                Assert.InRange(p.Z.m_rawValue, ((Fixed64)(member == left ? -4 : -2)).m_rawValue, ((Fixed64)(member == left ? 4 : 2)).m_rawValue);
+                Assert.False(row.Normal.X != Fixed64.Zero && row.Normal.Z != Fixed64.Zero);
+                radialX |= row.Normal.X > Fixed64.Zero;
+                radialZ |= row.Normal.Z > Fixed64.Zero;
+            }
+        }
+        Assert.Equal(placement == 3, radialX);
+        Assert.Equal(placement == 3, radialZ);
+    }
+
+    [Fact]
+    public void ZeroCoreCapsule_ShouldMatchSphereAtPartialCutAndGenuineRims()
+    {
+        using var scene = PhysicsScenarioBuilder.Create();
+        var members = new[] { Floor(scene, -8, 0, false), Floor(scene, 0, 8, false, -2, 2) };
+        using var surface = scene.Context.Physics.CreateStaticSurface(members);
+        var center = new Vector3d(Fixed64.Quarter, Fixed64.Quarter, (Fixed64)2 + Fixed64.Quarter);
+        var sphere = new LSSphereCollider { Radius = Fixed64.Half };
+        var capsule = new LSCapsuleCollider { Radius = Fixed64.Half, Size = Vector3d.One };
+        scene.CreateBody(sphere, center, FixedQuaternion.Identity);
+        scene.CreateBody(capsule, center, new FixedQuaternion(Fixed64.One, Fixed64.One, Fixed64.One, Fixed64.One).Normalized);
+        var expected = Capture(sphere);
+        Assert.NotEmpty(expected);
+        Assert.Equal(expected, Capture(capsule));
+
+        List<(Vector3d, Vector3d, Vector3d, Fixed64)> Capture(LSCollider shape)
+        {
+            var result = new List<(Vector3d, Vector3d, Vector3d, Fixed64)>();
+            foreach (var member in members)
+            {
+                var pair = scene.CreatePair(member, shape);
+                Assert.True(CollisionDetection.DoCollisionCheck(pair));
+                foreach (var row in pair.Manifold)
+                {
+                    Assert.True(row.AnchorA.TryGetWorldPoint(out var a));
+                    Assert.True(row.AnchorB.TryGetWorldPoint(out var b));
+                    result.Add((a, b, row.Normal, row.Depth));
+                }
+            }
+            return result;
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ParallelCapsuleAtPartialRim_ShouldSelectAnInteriorWitnessOfTheRetainedFamily(bool reverseAxis)
+    {
+        using var scene = PhysicsScenarioBuilder.Create();
+        var left = Floor(scene, -8, 0, false);
+        var right = Floor(scene, 0, 8, false, -2, 2);
+        using var surface = scene.Context.Physics.CreateStaticSurface(new[] { right, left });
+        var capsule = new LSCapsuleCollider { Radius = Fixed64.Half, Size = new(1, 9, 1) };
+        var rotation = new FixedQuaternion(reverseAxis ? -Fixed64.One : Fixed64.One,
+            Fixed64.Zero, Fixed64.Zero, Fixed64.One).Normalized;
+        scene.CreateBody(capsule, new(Fixed64.Quarter, Fixed64.Zero, Fixed64.One), rotation);
+        var pair = scene.CreatePair(left, capsule);
+        Assert.True(CollisionDetection.DoCollisionCheck(pair));
+        bool interior = false;
+        foreach (var row in pair.Manifold)
+            if (row.Normal == Vector3d.Right)
+            {
+                Assert.True(row.AnchorA.TryGetWorldPoint(out var a));
+                interior |= a == new Vector3d(0, 0, 3);
+                Assert.Equal(Fixed64.Quarter, row.Depth);
+            }
+        Assert.True(interior);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    public void DeclinedJoins_ShouldPreserveIndependentPhysicalContacts(int variant)
+    {
+        using var scene = PhysicsScenarioBuilder.Create();
+        var left = Floor(scene, -2, 0, false);
+        var right = Floor(scene, 0, 2, false, variant == 0 ? 4 : -4, variant == 0 ? 6 : 4);
+        if (variant == 1) right.Position = Vector3d.Right * Fixed64.Epsilon;
+        if (variant == 2) right.Rotation = new FixedQuaternion(Fixed64.Zero, Fixed64.Zero, Fixed64.One, Fixed64.One).Normalized;
+        var members = variant == 3 ? new[] { left, right, Floor(scene, 0, 2, false) } : new[] { left, right };
+        var sphere = new LSSphereCollider { Radius = Fixed64.Half };
+        scene.CreateBody(sphere, variant == 0 ? new(-Fixed64.Quarter, Fixed64.Quarter, (Fixed64)4 - Fixed64.Quarter)
+            : new(Fixed64.Quarter, Fixed64.Quarter, Fixed64.Zero), FixedQuaternion.Identity);
+        var expected = Capture();
+        Assert.NotEmpty(expected);
+        using var surface = scene.Context.Physics.CreateStaticSurface(members);
+        Assert.Equal(expected, Capture());
+
+        List<string> Capture()
+        {
+            var result = new List<string>();
+            foreach (var member in members)
+            {
+                var pair = scene.CreatePair(member, sphere);
+                CollisionDetection.DoCollisionCheck(pair);
+                foreach (var row in pair.Manifold)
+                {
+                    Assert.True(row.AnchorA.TryGetWorldPoint(out var a));
+                    Assert.True(row.AnchorB.TryGetWorldPoint(out var b));
+                    result.Add($"{member.Id}:{row.Normal.X.m_rawValue},{row.Normal.Y.m_rawValue},{row.Normal.Z.m_rawValue}:"
+                        + $"{a.X.m_rawValue},{a.Y.m_rawValue},{a.Z.m_rawValue}:{b.X.m_rawValue},{b.Y.m_rawValue},{b.Z.m_rawValue}:{row.Depth.m_rawValue}");
+                }
+            }
+            result.Sort(StringComparer.Ordinal);
+            return result;
+        }
+    }
+
+    [Fact]
+    public void JoinedRing_ShouldPreserveItsHoleBoundary()
+    {
+        using var scene = PhysicsScenarioBuilder.Create();
+        var left = Floor(scene, -4, -1, false);
+        var pieces = new[] { left, Floor(scene, 1, 4, false), Floor(scene, -1, 1, false, -4, -1), Floor(scene, -1, 1, false, 1, 4) };
+        using var surface = scene.Context.Physics.CreateStaticSurface(pieces);
+        var sphere = new LSSphereCollider { Radius = Fixed64.One + Fixed64.Half };
+        scene.CreateBody(sphere, new(-Fixed64.One + Fixed64.Quarter, Fixed64.Quarter, Fixed64.Zero), FixedQuaternion.Identity);
+        var pair = scene.CreatePair(left, sphere);
+        Assert.True(CollisionDetection.DoCollisionCheck(pair));
+        bool rim = false;
+        foreach (var row in pair.Manifold)
+            if (row.Normal.X > Fixed64.Zero)
+            {
+                Assert.True(row.AnchorA.TryGetWorldPoint(out var p));
+                Assert.Equal(-Fixed64.One, p.X);
+                Assert.InRange(p.Z.m_rawValue, -Fixed64.One.m_rawValue, Fixed64.One.m_rawValue);
+                rim = true;
+            }
+        Assert.True(rim);
+    }
+
+    [Fact]
+    public void Replacement_ShouldInvalidateRemovedMemberAndAdmitPartialJoin()
     {
         using var scene = PhysicsScenarioBuilder.Create();
         LSMeshCollider left = Floor(scene, -8, 0, false), right = Floor(scene, 0, 8, false);
@@ -226,10 +417,10 @@ public sealed class JoinedStaticSurfaceTests
         var partial = new LSMeshCollider(new[] { new Vector3d(0, 0, -1), new(1, 0, -1), new(0, 0, 1) },
             new[] { 0, 2, 1 }, MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation);
         scene.InitializeStaticCollider(partial, Vector3d.Zero);
-        Assert.Throws<NotSupportedException>(() => surface.ReplaceMembers(new[] { left, partial }));
+        surface.ReplaceMembers(new[] { left, partial });
         Assert.Same(surface, left.StaticSurface);
-        Assert.Same(surface, right.StaticSurface);
-        Assert.Null(partial.StaticSurface);
+        Assert.Null(right.StaticSurface);
+        Assert.Same(surface, partial.StaticSurface);
     }
 
     [Theory]
@@ -513,10 +704,108 @@ public sealed class JoinedStaticSurfaceTests
         Assert.True(found);
     }
 
-    private static LSMeshCollider Floor(PhysicsScenarioBuilder scene, int left, int right, bool body, int near = -4, int far = 4)
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void IndependentlyFramedPartialJoin_ShouldPreserveFiniteContactsAtWorldLimits(bool limits, bool reversedWinding)
     {
-        var mesh = new LSMeshCollider(new[] { new Vector3d(left, 0, near), new(right, 0, near),
-            new(left, 0, far), new(right, 0, far) }, new[] { 0, 2, 1, 1, 2, 3 },
+        using var scene = PhysicsScenarioBuilder.Create();
+        Vector3d origin = limits ? new(Fixed64.MaxValue - (Fixed64)32, Fixed64.Zero, Fixed64.Zero) : Vector3d.Zero;
+        if (limits)
+            Assert.True(scene.Context.World.TryAddGrid(new GridConfiguration(
+                new(Fixed64.MaxValue - (Fixed64)64, (Fixed64)(-16), (Fixed64)(-16)),
+                new(Fixed64.MaxValue, (Fixed64)16, (Fixed64)16)), out _));
+        var left = Floor(scene, -8, 0, false);
+        left.Position += origin;
+        var right = new LSMeshCollider(new[] { new Vector3d(-2, 0, 0), new(2, 0, 0), new(-2, 0, 8), new(2, 0, 8) },
+            reversedWinding ? new[] { 0, 1, 2, 1, 3, 2 } : new[] { 0, 2, 1, 1, 2, 3 },
+            MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation);
+        var quarter = new FixedQuaternion(Fixed64.Zero, Fixed64.One, Fixed64.Zero, Fixed64.One).Normalized;
+        right.InitializeWithNoBody(new TestMatterAgent(scene.Context, new FixedTransform(origin, quarter, Vector3d.One)));
+        using var surface = scene.Context.Physics.CreateStaticSurface(new[] { right, left });
+        var capsule = new LSCapsuleCollider { Radius = Fixed64.Half, Size = new(1, 2, 1) };
+        scene.CreateBody(capsule, origin + Vector3d.Up * Fixed64.Quarter, FixedQuaternion.Identity);
+        int contacts = 0;
+        foreach (var member in new[] { left, right })
+        {
+            var pair = scene.CreatePair(member, capsule);
+            Assert.True(CollisionDetection.DoCollisionCheck(pair));
+            foreach (var row in pair.Manifold)
+            {
+                contacts++;
+                Assert.Equal(Fixed64.Zero, row.Normal.X);
+                Assert.Equal(Fixed64.Zero, row.Normal.Z);
+                Assert.True(row.AnchorA.TryGetWorldPoint(out var a));
+                Assert.True(row.AnchorB.TryGetWorldPoint(out _));
+                Assert.Equal(Fixed64.Zero, a.Y);
+            }
+        }
+        Assert.True(contacts > 0);
+    }
+
+    [Theory]
+    [InlineData(1, 2, false)]
+    [InlineData(1, 2, true)]
+    [InlineData(32, 2, false)]
+    [InlineData(32, 2, true)]
+    [InlineData(1, 16, false)]
+    [InlineData(1, 16, true)]
+    public void IncreasingDensityAndChangingNeighbors_ShouldPreserveMotionWithoutWarmAllocation(int divisions, int count, bool capsule)
+    {
+        using var scene = PhysicsScenarioBuilder.Create();
+        scene.Context.SetFrameRate(16);
+        scene.Context.Environment.Gravity = Fixed64.One;
+        scene.Context.Environment.AirDensity = Fixed64.Zero;
+        scene.Context.Environment.DampingFactor = Fixed64.Zero;
+        scene.Context.Environment.MinSpeed = Fixed64.Zero;
+        var members = new LSMeshCollider[count];
+        for (int i = 0; i < count; i++)
+            members[i] = Floor(scene, -8 + 16 * i / count, -8 + 16 * (i + 1) / count, false, divisions: divisions);
+        Array.Reverse(members);
+        using var surface = scene.Context.Physics.CreateStaticSurface(members);
+        LSCollider shape = capsule ? new LSCapsuleCollider { Radius = Fixed64.Half, Size = new(1, 2, 1) }
+            : new LSSphereCollider { Radius = Fixed64.Half };
+        shape.Material = PhysicsMaterial.Frictionless;
+        var body = scene.CreateBody(shape, new((Fixed64)(-2), capsule ? Fixed64.One : Fixed64.Half, Fixed64.Zero),
+            FixedQuaternion.Identity).Body;
+        body.SleepEnabled = false; body.UseManualGrounding(); body.FreezeAxes = BodyFreezeAxes3D.Rotation;
+        for (int i = 0; i < 32; i++) { scene.Context.Simulate(); scene.Context.LateSimulate(); }
+        body.AddLinearImpulse(Vector3d.Right);
+        bool valid = true;
+        long bytes = AllocationTestHelper.MeasureSteadyState(() =>
+        {
+            for (int i = 0; i < 128; i++)
+            {
+                if (body.Position3d.X >= Fixed64.Two && body.LinearVelocity.X > Fixed64.Zero)
+                    body.AddLinearImpulse(-Vector3d.Right * Fixed64.Two);
+                else if (body.Position3d.X <= -Fixed64.Two && body.LinearVelocity.X < Fixed64.Zero)
+                    body.AddLinearImpulse(Vector3d.Right * Fixed64.Two);
+                scene.Context.Simulate(); scene.Context.LateSimulate();
+                valid &= FixedMath.Abs(body.LinearVelocity.X) == Fixed64.One && body.LinearVelocity.Z == Fixed64.Zero
+                    && body.AngularVelocity == Vector3d.Zero;
+            }
+        }, warmupIterations: 4, stabilizationIterations: 2, measurementIterations: 4);
+        Assert.True(valid);
+        Assert.Equal(0, bytes);
+    }
+
+    private static LSMeshCollider Floor(PhysicsScenarioBuilder scene, int left, int right, bool body, int near = -4, int far = 4, int divisions = 1)
+    {
+        var vertices = new Vector3d[2 * (divisions + 1)];
+        var indices = new int[6 * divisions];
+        for (int i = 0; i <= divisions; i++)
+        {
+            Fixed64 x = left + (Fixed64)(right - left) * i / divisions;
+            vertices[2 * i] = new(x, Fixed64.Zero, (Fixed64)near);
+            vertices[2 * i + 1] = new(x, Fixed64.Zero, (Fixed64)far);
+            if (i == divisions) continue;
+            int v = 2 * i, t = 6 * i;
+            indices[t] = v; indices[t + 1] = v + 1; indices[t + 2] = v + 2;
+            indices[t + 3] = v + 2; indices[t + 4] = v + 1; indices[t + 5] = v + 3;
+        }
+        var mesh = new LSMeshCollider(vertices, indices,
             MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation)
         { Material = PhysicsMaterial.Frictionless };
         if (body) scene.CreateBody(mesh, Vector3d.Zero, FixedQuaternion.Identity, immovable: true);

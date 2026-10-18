@@ -84,9 +84,6 @@ internal sealed class StaticSurface : IDisposable
                 if (result.ContainsKey((mesh, owner))) continue;
                 var domain = new MeshSurfaceBoundaryDomain();
                 domain.Build(meshes, member, triangle);
-                foreach (var span in domain.Spans)
-                    if (span.Interval.IsClipped)
-                        throw new NotSupportedException("Partial-edge joins require the clipped radial contact consumer before admission.");
                 result.Add((mesh, owner), domain);
             }
         }

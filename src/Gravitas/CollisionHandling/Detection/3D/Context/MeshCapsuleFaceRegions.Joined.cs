@@ -174,22 +174,20 @@ internal sealed partial class MeshCapsuleFaceRegions
         return WideAxis3.Dot(member.Frame.Normal, GetJoinedRegionFrame(state, region).Normal).Sign * _orientations[region];
     }
 
-    internal bool IsJoinedEdge(LSMeshCollider collider, int triangle, int edge)
-    {
-        if (_joined?.Active != true) return false;
-        JoinedMember member = _joined.Members[_joined.MemberBySurface[(collider.Mesh, collider.Mesh.GetManifoldSurfaceOwner(triangle))]];
-        // Admission currently requires complete edges, hence one classified span per canonical edge.
-        return member.JoinedSpans[edge];
-    }
+    internal MeshSurfaceBoundaryDomain? GetJoinedBoundary(LSMeshCollider collider, int triangle) =>
+        _joined?.Active == true
+            ? _joined.Members[_joined.MemberBySurface[(collider.Mesh, collider.Mesh.GetManifoldSurfaceOwner(triangle))]].Boundary : null;
 
-    internal ReadOnlySpan<WideAxis3> GetJoinedCornerFan(LSMeshCollider collider, int triangle, Vector3d point, out bool suppress)
+    internal bool IsJoinedSpan(LSMeshCollider collider, int triangle, int span) =>
+        _joined!.Members[_joined.MemberBySurface[(collider.Mesh, collider.Mesh.GetManifoldSurfaceOwner(triangle))]].JoinedSpans[span];
+
+    internal ReadOnlySpan<WideAxis3> GetJoinedEndpointFan(LSMeshCollider collider, int triangle, int span, bool upper, out bool suppress)
     {
         suppress = false;
-        if (_joined?.Active != true) return default;
-        JoinedState state = _joined;
+        JoinedState state = _joined!;
         JoinedMember member = state.Members[state.MemberBySurface[(collider.Mesh, collider.Mesh.GetManifoldSurfaceOwner(triangle))]];
-        bool trusted = state.Fan.BuildAtPoint(state.Meshes.AsReadOnlySpan(), member.Boundary.SourceMember, triangle,
-            point, state.PreparedBoundaries.AsReadOnlySpan());
+        bool trusted = state.Fan.BuildEndpoint(state.Meshes.AsReadOnlySpan(), member.Boundary, span, upper,
+            state.PreparedBoundaries.AsReadOnlySpan());
         suppress = trusted && !state.Fan.HasExposedBoundary;
         // A shared true-rim endpoint is one physical feature. Keep its first
         // eligible collider/surface, even though every member retains geometric overlap.
@@ -213,8 +211,9 @@ internal sealed partial class MeshCapsuleFaceRegions
         {
             if (member.Collider != collider || member.Connectivity.RegionCount == 0) continue;
             overlaps = true;
-            boundary.BuildSurfaceContacts(collider, material, center, rotation, coreLength, radius,
-                member.Triangle, member.Connectivity, this, manifold);
+            if (HasBoundaryIntersection)
+                boundary.BuildSurfaceContacts(collider, material, center, rotation, coreLength, radius,
+                    member.Triangle, member.Connectivity, this, manifold);
         }
         return overlaps;
     }
@@ -232,7 +231,7 @@ internal sealed partial class MeshCapsuleFaceRegions
             if (member.Connectivity.RegionCount == 0) continue;
             ReadOnlySpan<MeshSurfaceBoundaryDomain.BoundarySpan> spans = member.Boundary.Spans;
             for (int span = 0; span < spans.Length; span++)
-                if (!member.JoinedSpans[span] && member.Frame.Finite.IntersectsSegment(new FixedSegment(spans[span].Start, spans[span].End)))
+                if (!member.JoinedSpans[span] && member.Frame.Finite.IntersectsSegment(new FixedSegment(spans[span].Start, spans[span].End), spans[span].Interval))
                     return false;
         }
         Span<ulong> values = stackalloc ulong[CapsulePlaneRaySelection.StorageWords];

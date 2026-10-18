@@ -1,11 +1,10 @@
 # Static Surface Continuity And Heightfield Integration
 
 **Date:** 2026-10-15  
-**Status:** Phase 1 complete, 2026-10-16; Phase 2 targeted rewrite in progress
-#133/#139 together. Heightfield and alternative-index work remain deferred;
-no public continuity API is enabled. The bounded internal 3D rounded-shape
-response checkpoint below is integrated; dimensional and continuation work
-remain incomplete.  
+**Status:** Phases 1–2 complete; Phase 3 (other 3D shape families) next, 2026-10-17
+#133/#139 remain coordinated. Heightfield and alternative-index work are deferred;
+no public continuity API is enabled. Internal 3D rounded response is complete;
+other shape families, dimensions and continuation remain in the phases below.  
 **Order:** #132 is resolved. Resolve #133 and its confirmed pure 2D counterpart,
 #139, through the generic-continuity phases below before terrain-specific work.
 Keep one implementation plan rather than duplicate the prerequisite design.  
@@ -148,7 +147,7 @@ contract and bounded arithmetic feasibility recorded below.
   `context.Physics2D.CreateStaticSurface(ReadOnlySpan<LSCollider2D>)`
   returning `StaticSurface2D`. Each handle has typed `ReplaceMembers(...)` and
   `Dispose()` operations; no additional registry service or common body wrapper
-  is needed. These are the Phase 2 API names, not implemented public members.
+  is needed. These are planned public API names; exposure follows the complete supported contract.
   One membership per collider initially; empty membership may retain a handle
   while its host streams pieces out. Disposal ends that handle's lifetime.
   Membership permits geometric matching within that set; it does not assert
@@ -233,7 +232,7 @@ contract and bounded arithmetic feasibility recorded below.
 Every runtime phase must preserve raw reachable 100% line/branch/method coverage
 in Release/Lean, relevant replay behavior, zero added warmed allocations and the
 ordinary warm baseline, using `UseLocalLsfStack=true`. Refine introduced costs
-before handoff and obtain independent ponytail review. Phase 4 consolidates the
+before handoff and obtain independent ponytail review. Phase 7 consolidates the
 evidence; it does not postpone these requirements. Keep experimental membership
 internal until response, query/CCD and restore semantics are coherent.
 
@@ -300,7 +299,7 @@ claimed here.
   keep connectivity, physics selection and failure policy in Gravitas.
   The complete capsule-region proof and cone/slab clipped-boundary/native-witness
   proofs establish this arithmetic feasibility gate; complete joined family face
-  pools are integrated in Phase 2.
+  pools are integrated by the owning shape/dimensional phases.
 - [x] Settle filled-2D deep-containment recovery before claiming the dimensional
   proof complete. Ordinary contacts retain independent true-boundary normal
   groups; nearest-corner projection alone does not certify a whole-union exit.
@@ -497,7 +496,7 @@ rotated component has error at most
 world point is materialized. Original intervals remain authoritative for
 coverage; rounded endpoints never replace them. Mixed callers receive native
 local endpoints and use their actual quaternion frames. Complete polygon
-reclipping and the dimensional-owner failure handling remain Phase 2 consumers,
+reclipping and dimensional-owner failure handling remain Phase 4 consumers,
 not new public APIs in this proof.
 
 **Cone and mixed-slab boundary proof:** Existing family owners now consume
@@ -530,7 +529,7 @@ Nonaxial slab integration must retain the existing full-owner
 physical-support search: a source outside the initial section can enter the
 slab during translation. These helpers reuse existing family owners without
 new production files, geometry frameworks or public APIs. Complete joined face
-pools and dispatch remain Phase 2 integration work.
+pools and dispatch remain Phase 3/5 integration work.
 
 This is a coordinated internal-ABI change: commit/push FixedMathSharp first,
 then pin Gravitas's develop workflow to that revision before pushing Gravitas.
@@ -585,14 +584,14 @@ executable bodies, layouts, constants and non-version configuration in both
 profiles; only declared version metadata differs. The retained proof is
 `perf/completion/fms-graph-proof/full-gate-to-gravitas-tested-proof.json`.
 
-Phase 2 consumes the bounded proofs through existing owners and deletes
+Phases 2–5 consume the bounded proofs through existing owners and delete
 superseded entry points. It must establish complete joined face pools, actual
 response, eligibility, membership lifetime and unsupported-placement handling;
 these are not enabled by a geometry-only proof. Keep #133/#139 open through the
 remaining runtime and continuation gates. Linux/ARM and released packages were
 not validated locally.
 
-### Phase 2 - Integrate Static Membership And Contact Reduction
+### Phase 2 - Complete 3D Rounded Static-Surface Response
 
 **Rewrite checkpoint, 2026-10-17:** The first implementation passed correctness,
 coverage and replay gates but was rejected for size and native runtime cost:
@@ -666,144 +665,143 @@ The new math internals are a coordinated compatibility change. Commit and push
 FixedMathSharp first, then advance the Gravitas develop CI pin to that fetchable
 revision. Released-package validation still follows the upstream release.
 
-- [ ] Turn the retained baseline crossing fixtures into maintained full-loop
-  regressions for 3D, pure 2D and both mixed directions, including a vertical
-  mixed sheet with a planar response normal. These require the membership and
-  response integration in this phase; Phase 1's direct geometry proof cannot
-  make the current independent-collider host loop continuous. Reuse scenario
-  helpers and assert physical behavior, rather than testing probe plumbing.
-- [ ] Implement the reviewed membership operations through existing dimensional
-  services and collider lifecycle owners. Cover invalid ownership/roles, atomic
-  replacement, removal, disposal/reset and ID/lifetime reuse.
-- [ ] Promote each retained geometry proof into an actual caller in its existing
-  family or dimensional owner; delete proof entry points that the integrated
-  path supersedes. Do not add adapters merely to preserve experimental APIs.
-  Replace proof-wide triangle scans with existing mesh BVH/local topology
-  gathering, and own committed boundary preparation through membership lifetime.
-  Measure triangle density as well as member count: two bounded members can each
-  contain many triangles. Repeated-set rectangle timings alone do not qualify
-  the runtime path, especially when candidate neighborhoods change.
-- [ ] Integrate the joined domain into 3D face-region and genuine-boundary
-  generation, including capsule/sphere and cone paths; establish cuboid,
-  cylinder, convex/concave mesh and compound-source behavior rather than assume
-  rounded-shape success covers them. Complete cone and mixed-slab joined face
-  pools using their intrinsic and retained clipped-boundary events; the bounded
-  boundary-witness proof alone is not a complete face reducer. Retire superseded local-only branches when
-  the shared domain can own both cases; preserve the independent-member fast path.
-- [ ] Implement #139's dimensional boundary reduction without projecting 3D
-  sheets into 2D volumes. Test circles, zero-core capsules, nonzero capsules and
-  polygonal bodies against connected convex pieces and genuine concave corners.
-  Reclip finite incident features against retained rational exposed spans before
-  finalizing endpoints; deleting covered samples alone is insufficient. Preserve
-  independent normal groups and supplier materials instead of imposing a global
-  two-row cap. Keep overlap truth separate from the available response rows.
-  Certify any full recovery against the final pose's complete eligible spatial
-  candidates. Wire the dimensional-owner deep-placement failure contract before
-  enabling response; verify triggers, query-only and immovable observations do
-  not acquire a physical-recovery requirement.
-- [ ] Apply the same ownership/eligibility contract to mixed finite slabs.
-  Verify connected 2D pieces as embedded mixed targets too, with matching and
-  differing host Y/thickness. Preserve per-member events and query identity
-  independently of solver rows, with deterministic ordering and correct material
-  provenance.
-- [ ] Exercise real ends, holes, gaps, partial spans, point touches, folded and
-  ambiguous joins, winding reversal and member-order reversal. Test free as well
-  as frozen rotation and complete-shape clearance behind the first witness.
+The original Phase 2 mixed multiple dimensional implementations and shape
+families. Its checklist is split into explicit phases below; completing this
+phase means completing the 3D rounded-shape runtime contract, not completing
+another exploratory checkpoint. Public exposure still waits for continuation
+and the supported dimensional contract.
 
-**Bounded joined-response checkpoint, 2026-10-17:** The existing 3D rounded
-face and perimeter generators now consume the Phase 1 classified domain through
-an internal context-owned `StaticSurface`. Spheres, nonzero capsules and rounded
-compound leaves cross two complete-edge concave mesh members through the actual
-`Simulate`/`LateSimulate` response path. Bodyless and explicit-static members
-retain their individual overlap/event lifetimes. Face samples are reduced across
-the connected region before routing each row to its actual supplying pair;
-genuine outer edges/corners retain radial constraints. A shared corner has one
-eligible supplier ordered by collider ID and canonical surface ordinal, including
-disconnected owners joined through another collider.
+- [x] Wire 3D membership and rounded face/boundary response through existing
+  owners. Cover spheres, zero/nonzero-core capsules and rounded compound leaves,
+  bodyless/static members, free/frozen rotation and per-member events/materials.
+- [x] Cover invalid ownership/roles, atomic membership replacement, removal,
+  disposal/reset, ID/lifetime reuse, live eligibility and sleeping invalidation.
+- [x] Consume exact partial exposed spans and their endpoint fans in the existing
+  rounded boundary generator. Preserve real rims, holes, T-junctions, gaps,
+  point touches, folds/ambiguity and reversed winding/member order. Remove the
+  complete-edge restriction through actual support, including geometry mutation
+  from a complete join to a partial join without a deferred preparation failure.
+- [x] Qualify local gathering with changing neighborhoods and increasing triangle
+  density/member count. Reuse existing BVH/topology and membership preparation;
+  refine introduced time/allocation costs here. Do not qualify scaling from a
+  repeated two-triangle rectangle alone.
+- [x] Run final Release/Lean raw 100% coverage, allocation, replay and bound
+  joined/interior/ordinary performance controls; obtain independent geometry and
+  ponytail review. Record results here and close this phase when all tasks pass.
 
-The integration reuses GridForge candidate gathering, each mesh's existing BVH,
-face-region connectivity, finite capsule contacts, boundary fans and pair
-ownership. Committed boundary preparation belongs to the declaration lifetime;
-warm gathering does not rebuild it. One exact-input/result entry avoids repeating
-the same joined face reduction in its member pairs; live eligibility is checked
-again before reuse. Single-owner neighborhoods retain the native producer. The
-pair owner avoids regenerating the same contact twice during one full step.
-Replacement is preflighted before publishing associations. Removal, role change,
-deactivation, reset/disposal, neighbor filters/triggers and geometry changes
-invalidate retained rows and release member references.
+**Committed complete-edge response checkpoint, 2026-10-17:** Existing rounded
+face/perimeter generators consume Phase 1 domains through context-owned internal
+`StaticSurface` membership. Connected samples reduce before routing to their
+supplying pairs; per-member events, materials and geometric overlap remain.
+Registration, replacement, mutation, sleep and lifetime invalidation are wired
+through existing owners. This checkpoint added 350 net Gravitas runtime lines
+and one membership file, with no math change; tests/coverage and independent
+review passed. The two-member sphere/capsule crossing cost 112.85/146.49 us/frame
+with 0 B. Captures: ignored `artifacts/grv-issue-133/phase2/rewrite/` under
+`joined-{release,lean}-final-source`, `joined-final-perf`, `joined-final-replay`
+and `joined-controls`. Its partial-edge restriction and missing scaling evidence
+are superseded by the completion below.
 
-This checkpoint adds **350 net runtime lines in Gravitas**, touching twelve
-existing source files and adding one membership-owner file; FixedMathSharp is
-unchanged. Independent ponytail review found and helped resolve duplicate
-endpoint ownership, stale-reference and invalidation cases, then found no
-remaining actionable source or bloat finding in this bounded path. The staged
-declaration remains internal: initial admission rejects clipped partial edges;
-atomic handling of later unsupported geometry placements, partial spans, other
-shape families, pure 2D/mixed continuity, density/scaling and Phase 3 continuation
-gates remain unfinished. This checkpoint does not close #133/#139 or Phase 2.
+**Phase 2 complete, 2026-10-17:** Rounded response now handles exact partial spans,
+cut endpoints and complete-to-partial mutation. Production regressions preserve
+real rims/holes, gaps/touches, folds/ambiguity, reversed frames/winding at world
+limits, sphere/zero-core equivalence, parallel axis reversal and disconnected
+sections. Existing closest-feature projection, finite-ray materialization, fans
+and local BVHs remain the owners; no second solver/index was added. Parallel
+families retain stable interior witnesses instead of denominator-weighted jumps.
 
-Final-source local validation uses `UseLocalLsfStack=true` throughout:
+Final serialized local-stack validation has no new coverage exclusions:
 
-| Profile | Tests passed | Reachable lines | Branches | Methods |
+| Core/profile | Tests passed | Covered sequence points | Covered branches | Covered methods |
 | --- | ---: | ---: | ---: | ---: |
-| Release | 6,906 | 48,863 / 48,863 | 16,932 / 16,932 | 5,153 / 5,153 |
-| ReleaseLean | 6,838 | 48,861 / 48,861 | 16,932 / 16,932 | 5,152 / 5,152 |
+| FixedMathSharp Release | 6,044 | 60,353 / 60,353 | 17,530 / 17,530 | 4,541 / 4,541 |
+| FixedMathSharp Lean | 6,023 | 60,345 / 60,345 | 17,530 / 17,530 | 4,537 / 4,537 |
+| Gravitas Release | 6,940 | 48,888 / 48,888 | 16,956 / 16,956 | 5,154 / 5,154 |
+| Gravitas Lean | 6,872 | 48,886 / 48,886 | 16,956 / 16,956 | 5,153 / 5,153 |
 
-The joined regressions cover free/frozen rotation, bodyless/static membership,
-compound leaves, steady 0 B allocation, declaration-order physical traces,
-finite anchors/materials, genuine rims, interior and concave vertex fans,
-shared-corner ownership, sleeping/waking and invalidation/lifetime cases. All six
-existing shared replay fixtures match their reviewed expectations and each other
-across Windows x64 Release/Lean; the joined trace is an additional maintained
-runtime regression, not yet a shared replay/restore fixture. Release also builds
-`netstandard2.1` and `net8.0` without warnings. A local Lean parallel build encountered a
-duplicate-output compiler lock; serialized project builds pass.
+Raw line/branch/method counts and the FluentAssertions companion are complete.
+Both 49-test Chronicler runs and both target-framework builds pass without
+warnings. Six shared fixtures match expectations and Windows x64 Release/Lean
+captures. Linux, ARM and released packages were not run locally.
 
-Evidence lives under ignored `artifacts/grv-issue-133/phase2/rewrite/`:
-`joined-{release,lean}-final-source`, `joined-final-replay` and
-`joined-controls/final-source-manifest.json`. The manifest records dirty source
-hashes separately from the base commit recorded by replay provenance. Linux,
-ARM and released packages were not validated locally.
+The one-body frictionless 16 Hz crossing checks tangential velocity throughout
+changing neighborhoods. Final Release BDN means use six warmups, eight iterations
+and 32 invocations of 64 frames each:
 
-The maintained moving fixture has one frictionless rounded body, a continuous
-two-triangle floor or two declared members with four triangles total, 16 Hz,
-gravity 1, frozen rotation and sleeping disabled. It repeatedly traverses the
-join with fresh body geometry and checks unit tangential speed every frame.
-BenchmarkDotNet in-process Release measurements (three warmups, eight measured
-iterations, one launch; Windows x64, i7-9700K, .NET 8.0.29) report mean full-step
-cost over the repeated crossing, not maximum frame latency:
-
-| Moving body | Continuous floor | Two joined members | Warm allocation |
+| Joined workload | Sphere us/frame | Capsule us/frame | Warm allocation |
 | --- | ---: | ---: | ---: |
-| Sphere | 81.56 us | 112.85 us | 0 B/step |
-| Capsule | 102.68 us | 146.49 us | 0 B/step |
+| Two full-edge members | 109.27 | 138.70 | 0 B/frame |
+| Partial join | 115.34 | 151.74 | 0 B/frame |
+| 32 strips/member (128 triangles) | 185.38 | 239.12 | 0 B/frame |
+| Sixteen two-triangle members | 207.32 | 263.29 | 0 B/frame |
 
-The extra pair and joined reduction cost 31.29/43.81 us respectively; the broken
-independent seam is not a speedup denominator. Early integrated joined timings
-were 171.53/222.30 us. Reusing exact shared geometry, retaining the single-owner
-fast path and removing duplicate per-step pair regeneration reduce that cost
-within this checkpoint. These one-body results do not establish population
-capacity or boundary-density scaling. Capture: `joined-final-perf`; immutable
-eight-module payload hashes: `joined-controls/final-payload-hashes.json`.
+Strict counters also retain 0 B. The short singleton BDN capture is diagnostic;
+the larger batch supersedes its allocation deltas/first-case warmup distortion.
+Frozen identical-fixture ABBA means are unchanged or lower (-0.66% to -6.81%);
+partial joins had no supported old baseline. Nine ordinary controls include
+reversed order; adverse short sphere/mixed rim means reverse in longer windows
+(-1.68%/-1.98%). No persistent regression, equivalence or zero overhead is proven.
+Cold declaration costs roughly 0.12–0.15 ms for two members and 3.24 ms for sixteen;
+preparation still visits member pairs. These are bounded setup measurements,
+not large-world capacity or frame-tail qualification.
 
-Nine unchanged ordinary controls compare the committed-source core with the
-final core, using identical lower-stack payloads, warmed interleaved ABBA samples
-and reversed load orders. They cover rounded interior/rim contacts, 3D/mixed
-steady and host-moved native meshes, and a mixed circle rim. All benchmark
-outputs/checksums agree and allocate 0 B. Balanced means range from -2.16% to
-+1.45%; the +1.45% sphere-interior signal receives four focused process repeats
-with longer sample batches. Those reverse with load order (-2.22% to +1.61%,
-approximately -0.3% balanced). The earlier separated-path capture also retained
-an adverse +1.39% mixed steady mean, which reverses in the final controls.
-These runs do not establish a reproducible ordinary-path regression at the
-observed resolution; they establish neither equivalence, zero overhead nor a
-speedup. No further timing repeat is justified by these observations. Retained
-captures: `joined-controls/{separated,final}-{baseline-current,current-baseline}.json`,
-`joined-controls/focused-sphere-{0,1,2,3}.json` and their summaries. Timings used immutable
-payloads with eight-module bindings; no competing build/test/profile run was
-active. The existing generated-host issue #111 remains outside this checkpoint.
+Growth is **59 net Gravitas runtime lines and 164 FixedMathSharp lines**, with
+one new math partial. Independent ponytail review found a lowest-ID real-corner
+supplier lost behind joined edges; retaining their endpoints fixes its regression.
+Final review has no outstanding correctness/bloat finding. Membership stays
+internal; remaining families/dimensions/continuation have phases below.
+#133/#139 remain open until that contract is complete.
 
-### Phase 3 - Continuation, Queries And Continuous Collision
+Ignored captures: `artifacts/grv-issue-133/phase2/rounded-completion/`, including
+`{fms,g}-final-{Release,ReleaseLean}`, `replay-comparison.log`, `bdn-warm-final`,
+short/adverse controls and source/eight-module hashes. Commit/push FixedMathSharp
+first, then advance Gravitas's develop CI pin; release it before package validation.
+
+### Phase 3 - Complete Other 3D Shape Families
+
+- [ ] Integrate cone joined face pools and genuine clipped-boundary events in the
+  existing cone owners. Boundary-witness proofs alone do not qualify the face
+  reducer or complete-shape response.
+- [ ] Establish cuboid, cylinder, convex/concave mesh and non-rounded compound
+  behavior against declared surfaces. Reuse the native convex SAT/finite-feature
+  producer and existing family reducers; retire superseded local-only branches
+  where the shared owner can cover both cases.
+- [ ] Verify complete-shape clearance, finite anchors/materials, genuine ends,
+  holes, ambiguous/folded joins, free rotation and order reversal. Maintain
+  ordinary fast paths, 0 B warm allocation and practical moving-contact costs.
+- [ ] Complete affected Release/Lean coverage, replay, allocation/performance and
+  independent review gates before closing this phase.
+
+### Phase 4 - Complete Pure 2D Static Continuity
+
+- [ ] Implement typed 2D membership through existing services/lifecycle owners;
+  retain the same ownership, transactional replacement and lifetime guarantees.
+- [ ] Implement #139's dimensional boundary reduction without projecting 3D
+  sheets into 2D volumes. Test circles, zero/nonzero-core capsules and polygonal
+  bodies against connected convex pieces and genuine concave corners.
+- [ ] Reclip finite incident features against exact exposed spans before final
+  endpoint materialization. Preserve independent normal groups, supplier
+  materials and overlap truth separately from response rows; no global two-row cap.
+- [ ] Certify full recovery against the final pose's complete eligible spatial
+  candidates and wire the dimensional deep-placement failure contract. Triggers,
+  query-only and immovable observations must not require physical recovery.
+- [ ] Verify full-loop baseline crossings, free rotation, real boundaries, order,
+  membership/filter changes and density/scaling; complete coverage, replay,
+  allocation/performance and independent review gates before closing this phase.
+
+### Phase 5 - Complete Mixed Static Continuity
+
+- [ ] Apply the same ownership/eligibility contract to mixed finite slabs in both
+  directions. Complete joined face pools through the existing mixed slab support
+  and clipped-boundary owners, including a vertical 3D sheet with a planar
+  response normal.
+- [ ] Verify connected 2D pieces as embedded targets with matching/differing host
+  Y and thickness. Planar adjacency must not erase a real step or finite rim.
+- [ ] Preserve per-member events/query identity, deterministic solver ordering,
+  materials and lifetime invalidation; cover actual full-loop crossings and
+  complete-shape response before the same coverage/performance/review closeout.
+
+### Phase 6 - Continuation, Queries And Continuous Collision
 
 - [ ] Extend existing dependency invalidation to affected neighbors for geometry,
   filtering, trigger state, removal and membership changes. Test sleeping contact
@@ -818,7 +816,7 @@ active. The existing generated-host issue #111 remains outside this checkpoint.
   Extend shared native replay conformance with reviewed expectations; do not
   weaken existing unrelated fixtures to accommodate a seam correction.
 
-### Phase 4 - Close #133/#139 And Publish The Supported Contract
+### Phase 7 - Close #133/#139 And Publish The Supported Contract
 
 - [ ] Validate Release/ReleaseLean, raw reachable 100% line/branch/method coverage,
   relevant replay lanes and warmed allocation guards using `UseLocalLsfStack=true`.
@@ -849,7 +847,7 @@ active. The existing generated-host issue #111 remains outside this checkpoint.
    costs with identical physical surfaces. No backend is selected in advance;
    no core-library coupling, shared mode switch or duplicate terrain math is
    required by the independent profiles.
-3. **Representation conformance.** Reuse Phase 4's correctness, determinism,
+3. **Representation conformance.** Reuse Phase 7's correctness, determinism,
    coverage and cost gates for any selected representation. Add explicit sample
    quantization/diagonal agreement, streaming/edit churn and adapter validation
    only where that representation introduces them. Publish its supported

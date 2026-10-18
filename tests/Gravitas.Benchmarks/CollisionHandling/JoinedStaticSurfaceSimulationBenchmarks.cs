@@ -13,12 +13,17 @@ public class JoinedStaticSurfaceSimulationBenchmarks
 {
     private GravitasWorldContext _context;
     private SolidBody _body;
+    private LSMeshCollider[] _members;
+    private StaticSurface _surface;
 
     [Params(false, true)]
     public bool Joined { get; set; }
 
     [Params(false, true)]
     public bool Capsule { get; set; }
+
+    [Params("Small", "Partial", "Dense", "Members")]
+    public string Workload { get; set; } = "Small";
 
     [GlobalSetup]
     public void Setup()
@@ -30,8 +35,12 @@ public class JoinedStaticSurfaceSimulationBenchmarks
         _context.Environment.AirDensity = Fixed64.Zero;
         _context.Environment.DampingFactor = Fixed64.Zero;
         _context.Environment.MinSpeed = Fixed64.Zero;
-        if (Joined) _context.Physics.CreateStaticSurface(new[] { Floor(-8, 0), Floor(0, 8) });
-        else Floor(-8, 8);
+        int count = Joined ? Workload == "Members" ? 16 : 2 : 1;
+        _members = new LSMeshCollider[count];
+        for (int i = 0; i < count; i++)
+            _members[i] = Floor(-8 + 16 * i / count, -8 + 16 * (i + 1) / count,
+                Workload == "Partial" && i == 1 ? 2 : 4, Workload == "Dense" ? 32 : 1);
+        if (Joined) _surface = _context.Physics.CreateStaticSurface(_members);
         LSCollider collider = Capsule
             ? new LSCapsuleCollider { Radius = Fixed64.Half, Size = new(1, 2, 1) }
             : new LSSphereCollider { Radius = Fixed64.Half };
@@ -62,10 +71,30 @@ public class JoinedStaticSurfaceSimulationBenchmarks
         }
     }
 
-    private LSMeshCollider Floor(int left, int right)
+    // Cold declaration cost includes ownership, exact boundary preparation and
+    // invalidation; it is deliberately separate from warmed simulation timing.
+    [Benchmark]
+    public void PrepareDeclaration()
     {
-        var collider = new LSMeshCollider(new[] { new Vector3d(left, 0, -4), new(right, 0, -4),
-            new(left, 0, 4), new(right, 0, 4) }, new[] { 0, 2, 1, 1, 2, 3 },
+        _surface?.Dispose();
+        _surface = _context.Physics.CreateStaticSurface(_members);
+    }
+
+    private LSMeshCollider Floor(int left, int right, int halfWidth, int divisions)
+    {
+        var vertices = new Vector3d[2 * (divisions + 1)];
+        var indices = new int[6 * divisions];
+        for (int i = 0; i <= divisions; i++)
+        {
+            Fixed64 x = left + (Fixed64)(right - left) * i / divisions;
+            vertices[2 * i] = new(x, Fixed64.Zero, (Fixed64)(-halfWidth));
+            vertices[2 * i + 1] = new(x, Fixed64.Zero, (Fixed64)halfWidth);
+            if (i == divisions) continue;
+            int v = 2 * i, t = 6 * i;
+            indices[t] = v; indices[t + 1] = v + 1; indices[t + 2] = v + 2;
+            indices[t + 3] = v + 2; indices[t + 4] = v + 1; indices[t + 5] = v + 3;
+        }
+        var collider = new LSMeshCollider(vertices, indices,
             MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation)
         { Material = PhysicsMaterial.Frictionless };
         collider.InitializeWithNoBody(new BenchmarkMatterAgent(_context, Vector3d.Zero));

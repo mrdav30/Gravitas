@@ -118,6 +118,37 @@ public sealed class CurvedMeshSurfaceRegionTests
         }
     }
 
+    [Fact]
+    public void JoiningOneCombTab_ShouldRetainAllFiveDisconnectedFiniteSections()
+    {
+        using var scenario = PhysicsScenarioBuilder.Create();
+        var comb = CreateComb(false, true);
+        Fixed64 low = Fixed64.FromFraction(-1, 16), high = Fixed64.FromFraction(1, 16), far = Fixed64.FromFraction(3, 8);
+        var neighbor = new LSMeshCollider(new[] { new Vector3d(low, Fixed64.Zero, Fixed64.Zero), new(high, Fixed64.Zero, Fixed64.Zero),
+            new(low, Fixed64.Zero, far), new(high, Fixed64.Zero, far) }, new[] { 0, 2, 1, 1, 2, 3 },
+            MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation);
+        scenario.InitializeStaticCollider(comb, Vector3d.Zero);
+        scenario.InitializeStaticCollider(neighbor, Vector3d.Zero);
+        using var surface = scenario.Context.Physics.CreateStaticSurface(new[] { neighbor, comb });
+        var sphere = new LSSphereCollider { Radius = Fixed64.One };
+        scenario.CreateBody(sphere, Vector3d.Up * Fixed64.Quarter, FixedQuaternion.Identity);
+        var regions = new HashSet<int>();
+        foreach (var member in new[] { comb, neighbor })
+        {
+            var pair = scenario.CreatePair(member, sphere);
+            Assert.True(CollisionDetection.DoCollisionCheck(pair));
+            for (int group = 0; group < pair.Manifold.GroupCount; group++)
+                if (pair.Manifold.GetGroup(group).Key.Region >= 0) regions.Add(pair.Manifold.GetGroup(group).Key.Region);
+            foreach (var row in pair.Manifold)
+            {
+                Assert.True(row.AnchorA.TryGetWorldPoint(out var a));
+                Assert.Equal(Fixed64.Zero, a.Y);
+                Assert.True(row.Depth >= Fixed64.Zero);
+            }
+        }
+        Assert.Equal(5, regions.Count);
+    }
+
     private static LSMeshCollider CreateComb(bool reverse, bool subdivide)
     {
         int[] numerators = { -13, -11, -7, -5, -1, 1, 5, 7, 11, 13 };
