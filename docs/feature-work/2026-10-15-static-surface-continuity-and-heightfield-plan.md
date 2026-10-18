@@ -474,8 +474,9 @@ only deduplicate equivalent constraints. Polygon clipping must regenerate the
 missing endpoint `(0,0)` between an internal row `(-0.25,0)` and an exposed row
 `(0.75,0)`, rather than merely delete the covered row. The repeated frozen
 proof and eight-module bindings are under `artifacts/grv-issue-133/l-union-proof`.
-A separate pre-existing single/query witness defect is captured as #140; this
-proof uses the correct finite manifold path.
+A separate pre-existing single/query witness defect was captured as #140; this
+proof uses the correct finite manifold path. The subsequent #140 correction
+retains the already-computed first finite pair in single-contact consumers too.
 
 The decision is local true-boundary contact groups with separately certified
 recovery, following the explicit failure contract above. Global minimum exit

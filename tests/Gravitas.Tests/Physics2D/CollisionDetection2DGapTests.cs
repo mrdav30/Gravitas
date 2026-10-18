@@ -176,9 +176,11 @@ public sealed class CollisionDetection2DGapTests
         collided.Should().BeTrue();
         contact.Normal.Should().Be(expectedNormal);
         contact.Depth.Should().BeGreaterThan(Fixed64.Zero);
-        contact.PointA.Should().Be(outer.GetSupportPoint(expectedNormal));
+        contact.PointA.Should().Be(new Vector2d(-Fixed64.Half, sign));
         contact.PointB.Should().Be(inner.GetSupportPoint(-expectedNormal));
         manifold.Count.Should().Be(1);
+        contact.PointA.Should().Be(manifold[0].PointA);
+        contact.PointB.Should().Be(manifold[0].PointB);
         Fixed64 reconstructedDepthTolerance = Fixed64.FromRaw(4);
         for (int i = 0; i < manifold.Count; i++)
         {
@@ -213,8 +215,8 @@ public sealed class CollisionDetection2DGapTests
         contact.Depth.Should().Be(Fixed64.Epsilon);
         contact.Normal.Should().Be(-Vector2d.Right);
         Fixed64 halfWidth = Fixed64.Epsilon * Fixed64.Half;
-        contact.PointA.Should().Be(new Vector2d(-halfWidth, Fixed64.One));
-        contact.PointB.Should().Be(new Vector2d(halfWidth, Fixed64.One));
+        contact.PointA.Should().Be(new Vector2d(-halfWidth, -Fixed64.One));
+        contact.PointB.Should().Be(new Vector2d(halfWidth, -Fixed64.One));
     }
 
     [Fact]
@@ -238,8 +240,8 @@ public sealed class CollisionDetection2DGapTests
         direct.Should().BeTrue();
         contact.Normal.Should().Be(-Vector2d.Right);
         contact.Depth.Should().Be(Fixed64.FromFraction(5, 2));
-        contact.PointA.Should().Be(new Vector2d((Fixed64)10, -Fixed64.One));
-        contact.PointB.Should().Be(new Vector2d(Fixed64.FromFraction(25, 2), (Fixed64)2));
+        contact.PointA.Should().Be(new Vector2d((Fixed64)10, Fixed64.One));
+        contact.PointB.Should().Be(new Vector2d(Fixed64.FromFraction(25, 2), Fixed64.One));
         forwardHit.Should().BeTrue();
         reverseHit.Should().BeTrue();
         forward.Count.Should().Be(2);
@@ -302,8 +304,8 @@ public sealed class CollisionDetection2DGapTests
         collided.Should().BeTrue();
         contact.Normal.Should().Be(-Vector2d.Right);
         contact.Depth.Should().Be((Fixed64)3);
-        contact.PointA.Should().Be(new Vector2d((Fixed64)10, -Fixed64.One));
-        contact.PointB.Should().Be(new Vector2d((Fixed64)13, (Fixed64)3));
+        contact.PointA.Should().Be(new Vector2d((Fixed64)10, Fixed64.One));
+        contact.PointB.Should().Be(new Vector2d((Fixed64)13, Fixed64.One));
     }
 
     [Theory]

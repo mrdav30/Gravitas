@@ -37,23 +37,16 @@
 
 ### Ordered Queue
 
-#137 and #138 are resolved, including the related linear terms and 2D/mixed
-parity checks. Next resolve **#133**, artificial mesh-chunk seam response. It
-reproduces on earlier binaries and is independent of the size cap. Keep
-physical-quality fixes ahead of the benchmark queue; combine work where
-response ownership overlaps. #133's investigation confirms **#139**, the pure
-2D counterpart. Review their shared explicit-static-continuity contract together
-in the existing surface plan, then resolve the dimensional owners before
-heightfield work. The user approved resolving both through that plan; begin its
-bounded geometry phase before publishing the new membership API.
+#140's finite single-contact correction is complete. Resolve **#141** before
+resuming Phase 6 of the #133/#139 static-surface continuity plan: recentering
+rotated mesh pieces can separate vertices authored in a common frame. Preserve
+exact shared geometry in its owning transform contract; do not add tolerance
+welding to continuity.
 
-#140 follows that work: the existing 2D single-contact/query path discards finite
-witnesses even on one convex target. Keep its fix separate from joined-boundary
-reduction, while retaining the shared finite-witness lesson in both paths.
-
-#141 is a separate mesh-authoring precision defect: recentering rotated pieces
-can separate vertices authored in a common frame. Preserve exact shared geometry
-in its owning transform contract; do not add tolerance welding to continuity.
+Then complete pure 2D continuity in Phase 6. Resolve **FMS-Issue-033** in
+FixedMathSharp before Phase 7's mixed continuity work; its curved-prism false
+positives do not block pure 2D. Keep physical-quality fixes ahead of the benchmark
+queue and finish generic continuity before heightfield work.
 
 #111 remains an independent validation-tooling issue.
 #125 is a low-priority, non-blocking runtime crash observation; defer further
@@ -145,47 +138,6 @@ investigation unless it recurs or a reliable reproducer becomes available.
 - **Evidence:** Ignored `artifacts/grv-issue-133/parity/{original,binding,source-hashes}.json`
   retain the fixture, repeats and eight loaded-module hashes, including core
   `8A7E5C4D`. No production changes or fix are claimed by this investigation.
-
-### GRV-Issue-140 - Convex 2D single contacts discard finite witnesses consumed by shape sweeps
-
-- **Confirmed:** 2026-10-16 during #133/#139's filled-union feasibility probe;
-  reproduces on retained #138 core `8A7E5C4D` and FixedMathSharp `5C26BDA7`,
-  before the continuity work or the exact-anchor projection correction.
-- **Reproduction:** Register a bodyless AABB of size `(8,4)` at planar center
-  `(0,-2)`, covering `[-4,4] x [-4,0]`. Register a convex rectangular polygon
-  with local vertices `(-.5,-1),(.5,-1),(.5,1),(-.5,1)` at `(.25,.75)`.
-  Its bounds are `[-.25,.75] x [-.25,1.75]`; the overlap depth is `.25`.
-  `CollisionDetection2D.TryCollide(mover, floor, out Contact2D)` returns
-  target anchor `(4,0)`, outside the mover and finite overlap. Calling the real
-  `QueryDetection2D.TrySweepMoverShape` worker with displacement `(1,0)`
-  publishes the same `(4,0)` witness at distance zero. Substituting an
-  equivalent polygon for the AABB floor preserves the failure.
-- **Control:** The manifold overload returns matched finite target witnesses
-  `(-.25,0)` and `(.75,0)`, with corresponding actor points at Y=`-.25`.
-  Circle/capsule controls retain finite initial-overlap witnesses. The bounded
-  probe repeats both member representations identically and verifies all eight
-  frozen module bindings; ignored
-  `artifacts/grv-issue-133/l-union-proof/{Program.cs,results.json,source-binding.json}`
-  retains complete committed geometry, single/manifold/query outputs and hashes.
-- **Root cause:** `CollisionDetection2D.TryConvexConvex(..., out Contact2D)`
-  computes `firstContactAnchors`/`secondContactAnchors` using
-  `FixedConvex2dRelations.TryGetConvexContacts`, then discards them and builds
-  the result from arbitrary support-feature endpoints. The manifold overload
-  already uses the computed finite anchors. Consumers include the initial
-  overlap branch of `QueryDetection2D.TrySweepConvexMoverAgainstConvex` and
-  `SolidBody2D`'s rotational contact search.
-- **Impact:** Confirmed shape-sweep witness outside the actual finite overlap;
-  this is not merely choosing a different valid representative contact.
-  Angular response or query consumers can receive an unrelated tangential lever.
-  A complete dynamic-target CCD trajectory difference has not been measured.
-  Ordinary discrete manifolds use the correct path and are not implicated by
-  this reproducer.
-- **Follow-up:** Reuse the already-computed finite contact anchors in the
-  single-contact result. Verify collider reversal, AABB/polygon parity,
-  initial-overlap sweeps and rotational CCD against the manifold geometry;
-  retain deterministic representative selection, material ownership and the
-  ordinary warm baseline. This issue remains separate from cross-member
-  continuity; current continuity proofs must use the finite manifold path.
 
 ### GRV-Issue-141 - Recentered rotated mesh pieces lose exact authored shared vertices
 
@@ -279,6 +231,41 @@ investigation unless it recurs or a reliable reproducer becomes available.
 Remaining measured performance costs are tracked in the benchmark backlog.
 
 ## Resolved Issues
+
+### GRV-Issue-140 - Convex 2D single contacts discard finite witnesses consumed by shape sweeps
+
+- **Confirmed:** 2026-10-16; **resolved:** 2026-10-18. A rectangle overlapping a
+  floor on X=`[-0.25,0.75]` reported the floor's support endpoint `(4,0)` in
+  single contacts, initial-overlap sweeps and rotational CCD samples. The
+  ordinary manifold already retained the correct finite witnesses.
+- **Fix:** Reuse the first paired anchors already computed by
+  `FixedConvex2dRelations.TryGetConvexContacts`, in existing deterministic order.
+  Classification, normal, depth and the manifold path are unchanged. Two anchor
+  substitutions remove the redundant support searches; no new runtime owner,
+  API, branch or upstream change is needed.
+- **Regression evidence:** All AABB/polygon representations, input reversal,
+  billion-unit translation, paired finite witnesses, exact convex clearance,
+  initial sweeps, retained rotational samples and full host continuation pass.
+  Five old assertions now retain finite matched endpoints rather than arbitrary
+  support corners. Mixed support corner tests preserve the surviving helper's
+  dimensional contract. Frozen original binaries fail the new geometry and
+  rotational regressions. Independent ponytail review found no outstanding
+  correctness or bloat concerns.
+- **Coverage:** Local-stack Release passes `7,138/7,138` and ReleaseLean
+  `7,070/7,070`. Raw reachable counts are `49,728/49,728` sequence points,
+  `17,804/17,804` branches and `5,260/5,260` methods in Release; Lean has
+  `49,726/49,726`, `17,804/17,804` and `5,259/5,259`, respectively.
+  Both target frameworks build in both profiles. All six shared replay fixtures
+  match their existing expectations and each other in Windows x64 Release/Lean.
+  Linux, ARM and released-package validation were not run locally.
+- **Warm evidence:** Balanced ABBA runs retain eight loaded-module hashes;
+  only Gravitas changes. Single contacts average `26.54 -> 25.87 us`, initial
+  sweeps `26.58 -> 25.80 us`, and one-body rotational full host steps
+  `472.09 -> 459.07 us`. Every measured window allocates zero bytes; depth,
+  sweep-distance and rotational-stop checksums agree. These bounded fixtures
+  show no measured regression, not general game-capacity qualification.
+  Ignored evidence is under `artifacts/grv-issue-140/`, including the failing
+  controls, frozen payloads, actual bindings, complete captures and coverage.
 
 ### GRV-Issue-138 - Explicit drag and angular damping can reverse motion and add energy
 

@@ -104,6 +104,12 @@ Narrow phase owns shape truth. Supported shape coverage includes:
 | 2D     | circle, capsule, AABB, convex polygon, compound                                    |
 | Mixed  | supported 3D shapes against embedded 2D circle/capsule/AABB/polygon/compound slabs |
 
+Pure 2D convex contacts retain paired anchors clipped to the finite contact
+features. Single-contact consumers, including initial-overlap shape sweeps and
+rotational CCD, use the first pair in deterministic geometric order. Reversing
+collider order may select a different valid endpoint; the witnesses belong to
+the selected finite features rather than unrelated support endpoints.
+
 Convex support predicates share one GJK simplex policy for 3D contacts and finite
 cone overlap queries. Region and face-orientation dot signs use exact products.
 Cross-product directions retain the scalar path within a proven component bound;

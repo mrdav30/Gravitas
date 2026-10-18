@@ -71,6 +71,25 @@ public sealed class MixedEmbedded2DGeometryTests
     }
 
     [Theory]
+    [InlineData(-1, -1)]
+    [InlineData(-1, 1)]
+    [InlineData(1, -1)]
+    [InlineData(1, 1)]
+    public void GetSupportAnchor_WithBoxQuadrants_ShouldRetainTheSelectedFiniteCorner(int x, int z)
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        SolidBody2D body = CreateBody(context,
+            new LSAABBoxCollider2D(new Vector2d(2, 4)), new Vector2d(3, -2), hostY: (Fixed64)4);
+
+        ContactAnchor anchor = MixedEmbedded2DGeometry.GetSupportAnchor(body.Collider, new Vector3d(x, 1, z));
+
+        anchor.TryGetWorldPoint(out Vector3d point).Should().BeTrue();
+        point.Should().Be(new Vector3d((Fixed64)(3 + x),
+            (Fixed64)4 + context.Settings.Mixed2DHalfThickness, (Fixed64)(-2 + 2 * z)));
+        body.Collider.GetSupportPoint(new Vector2d(x, z)).Should().Be(new Vector2d(3 + x, -2 + 2 * z));
+    }
+
+    [Theory]
     [InlineData(ColliderType2D.Circle)]
     [InlineData(ColliderType2D.Capsule)]
     public void GetSupportAnchor_WithSmallRepresentableDirection_ShouldHonorItsSign(

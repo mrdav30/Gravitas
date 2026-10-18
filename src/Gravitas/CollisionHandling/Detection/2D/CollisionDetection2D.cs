@@ -511,9 +511,11 @@ internal static partial class CollisionDetection2D
             return false;
         }
 
+        // Keep a matched finite witness pair; support endpoints can lie outside
+        // the overlap and give sweep/rotational CCD an unrelated lever arm.
         contact = new Contact2D(
-            new ContactAnchor2D(colliderA.GetConvexSupportAnchor(normal)),
-            new ContactAnchor2D(colliderB.GetConvexSupportAnchor(-normal)),
+            new ContactAnchor2D(firstContactAnchors[0]),
+            new ContactAnchor2D(secondContactAnchors[0]),
             normal,
             depth,
             depthIsClamped);
