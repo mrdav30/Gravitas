@@ -19,6 +19,8 @@ internal sealed class MeshConeSurfaceBoundary
     private readonly SwiftList<FamilyCandidate> _families = new();
     private readonly SwiftList<FamilySample> _familySamples = new();
     private readonly SwiftList<WideAxis3> _halfspaces = new();
+    private RationalSegmentInterval _clip;
+    private WideAxis3[] _joinedFan = Array.Empty<WideAxis3>();
     private ConeSurfaceFamilyEvent[] _familyStorage = Array.Empty<ConeSurfaceFamilyEvent>();
     private readonly SwiftHashSet<int> _visitedCorners = new();
     private readonly SwiftList<SurfaceSample> _surfacePool = new();
@@ -45,12 +47,42 @@ internal sealed class MeshConeSurfaceBoundary
         MeshSurfaceConnectivity connectivity, MeshConeFaceRegions faces, ContactManifold manifold)
     {
         PhysicsMesh mesh = meshCollider.Mesh;
-        ref readonly ConePlaneRayFrame frame = ref faces.Frame;
+        ConePlaneRayFrame frame = faces.GetBoundaryFrame(meshCollider, surfaceTriangle);
         WideAxis3 normal = frame.AuthoredNormal;
         int owner = mesh.GetManifoldSurfaceOwner(surfaceTriangle), surface = mesh.GetCanonicalSurfaceOrdinal(surfaceTriangle);
         ReadOnlySpan<int> boundary = mesh.GetCanonicalSurfaceBoundaryVertexPairs(surfaceTriangle);
         ReadOnlySpan<Vector3d> vertices = mesh.ScaledLocalVertices;
         _visitedCorners.Clear();
+        MeshSurfaceBoundaryDomain? domain = faces.GetJoinedBoundary(meshCollider, surfaceTriangle);
+        if (domain != null)
+        {
+            for (int span = 0; span < domain.Spans.Length; span++)
+            {
+                var piece = domain.Spans[span];
+                if (faces.IsJoinedSpan(meshCollider, surfaceTriangle, span) || !frame.IntersectsSegment(new FixedSegment(piece.Start, piece.End))) continue;
+                int region = connectivity.RegionCount == 1 ? 0
+                    : MeshSurfaceBoundaryTopology.FindEdgeRegion(mesh, owner, piece.First, piece.Second, connectivity, frame);
+                int feature = checked(3 * span);
+                RationalSegmentInterval clip = faces.GetRetainedBoundaryInterval(meshCollider, surfaceTriangle, ref span);
+                // An intersecting canonical perimeter belongs to an admitted incident triangle.
+                System.Diagnostics.Debug.Assert(region >= 0);
+                KeepSurfaceFeature(piece.First, piece.Second, feature, region, false, clip);
+            }
+            // A certified exposed/joined transition lies at an authored
+            // canonical vertex of an incident member, even across rigid frames.
+            // Visit those actual vertices; never round a rational cut into one.
+            for (int edge = 0; edge < boundary.Length; edge += 2)
+            {
+                int first = boundary[edge], second = boundary[edge + 1];
+                int region = MeshSurfaceBoundaryTopology.FindEdgeRegion(mesh, owner, first, second, connectivity, frame);
+                if (region < 0) continue;
+                if (_visitedCorners.Add(first) && frame.ContainsPoint(vertices[first]))
+                    KeepSurfaceFeature(first, second, checked(3 * (domain.Spans.Length + edge / 2) + 1), region, true);
+                if (_visitedCorners.Add(second) && frame.ContainsPoint(vertices[second]))
+                    KeepSurfaceFeature(second, first, checked(3 * (domain.Spans.Length + edge / 2) + 2), region, true);
+            }
+            return;
+        }
         for (int edge = 0; edge < boundary.Length; edge += 2)
         {
             int first = boundary[edge], second = boundary[edge + 1];
@@ -72,15 +104,20 @@ internal sealed class MeshConeSurfaceBoundary
             }
         }
 
-        void KeepSurfaceFeature(int first, int second, int feature, int region, bool pointOnly)
+        void KeepSurfaceFeature(int first, int second, int feature, int region, bool pointOnly,
+            in RationalSegmentInterval clip = default)
         {
+            bool suppress = false;
+            ReadOnlySpan<WideAxis3> fan = domain != null && pointOnly
+                ? faces.GetJoinedCornerFan(meshCollider, surfaceTriangle, first, out suppress) : default;
+            if (suppress) return;
             _isolated.FastClear(); _families.FastClear(); _familySamples.FastClear(); _halfspaces.FastClear();
-            WideAxis3 selectedExit = faces.GetOrientation(region) > 0 ? normal : Negate(normal);
+            WideAxis3 selectedExit = faces.GetBoundaryOrientation(meshCollider, surfaceTriangle, region) > 0 ? normal : Negate(normal);
             // Use a point segment for each corner exactly once. Adjacent edges
             // must not duplicate its support branches or multiply its pressure.
             Span<SegmentConeSurfaceCandidate> featureStorage = stackalloc SegmentConeSurfaceCandidate[SegmentConeSurfaceCandidates.MaximumCandidates];
             Accumulate(mesh, owner, first, second, mesh.ScaledLocalVertices, cone.Center, cone.Rotation,
-                cone.Height, cone.ScaledRadius, featureStorage, interiorOnly: !pointOnly, pointOnly, selectedExit);
+                cone.Height, cone.ScaledRadius, featureStorage, interiorOnly: !pointOnly, pointOnly, selectedExit, clip, fan);
             ReduceSurfaceFeature(meshCollider, cone, surface, feature, faces.SamplingOrigin, manifold);
         }
     }
@@ -183,8 +220,11 @@ internal sealed class MeshConeSurfaceBoundary
 
     private void Accumulate(PhysicsMesh mesh, int owner, int first, int second, ReadOnlySpan<Vector3d> vertices,
         Vector3d coneCenter, FixedQuaternion coneRotation, Fixed64 height, Fixed64 radius,
-        Span<SegmentConeSurfaceCandidate> storage, bool interiorOnly = false, bool pointOnly = false, WideAxis3? selectedExit = null)
+        Span<SegmentConeSurfaceCandidate> storage, bool interiorOnly = false, bool pointOnly = false, WideAxis3? selectedExit = null,
+        in RationalSegmentInterval clip = default, ReadOnlySpan<WideAxis3> joinedFan = default)
     {
+        // The boundary owner reduces one clipped feature before visiting the next.
+        _clip = clip;
         var selection = new ConeSurfaceSelection(storage);
         SegmentConeSurfaceCandidates.AccumulateSegmentConeSurfaceCandidates(
             new FixedSegment(vertices[first], vertices[pointOnly ? first : second]), mesh.Origin, mesh.Rotation,
@@ -198,19 +238,21 @@ internal sealed class MeshConeSurfaceBoundary
                 certificate = new SegmentConeSurfaceCandidate(certificate.Input, certificate.Feature, certificate.Family,
                     certificate.Chart, certificate.RootOrdinal, ConeSurfacePointLocation.Start);
             var candidate = new BoundaryCandidate(first, second, certificate);
+            if (clip.IsClipped && certificate.Family != ConeSurfaceFamily.SegmentInterval
+                && !certificate.IsInInterval(clip, interiorOnly)) continue;
             if (interiorOnly && candidate.Certificate.Family != ConeSurfaceFamily.SegmentInterval
                 && candidate.Certificate.PointLocation != ConeSurfacePointLocation.Interior) continue;
             if (candidate.Certificate.Family == ConeSurfaceFamily.None)
             {
-                if (SupportsIncidentFan(mesh, owner, candidate, vertices, selectedExit)) _isolated.Add(candidate);
+                if (SupportsIncidentFan(mesh, owner, candidate, vertices, selectedExit, joinedFan)) _isolated.Add(candidate);
             }
             else if (candidate.Certificate.Family == ConeSurfaceFamily.SegmentInterval)
             {
-                if (!interiorOnly) KeepFamily(mesh, owner, candidate, vertices, ConeSurfacePointLocation.Start, selectedExit);
-                if (!pointOnly) KeepFamily(mesh, owner, candidate, vertices, ConeSurfacePointLocation.Interior, selectedExit);
-                if (!interiorOnly && !pointOnly) KeepFamily(mesh, owner, candidate, vertices, ConeSurfacePointLocation.End, selectedExit);
+                if (!interiorOnly) KeepFamily(mesh, owner, candidate, vertices, ConeSurfacePointLocation.Start, selectedExit, clip, joinedFan);
+                if (!pointOnly) KeepFamily(mesh, owner, candidate, vertices, ConeSurfacePointLocation.Interior, selectedExit, clip, joinedFan);
+                if (!interiorOnly && !pointOnly) KeepFamily(mesh, owner, candidate, vertices, ConeSurfacePointLocation.End, selectedExit, clip, joinedFan);
             }
-            else KeepFamily(mesh, owner, candidate, vertices, candidate.Certificate.PointLocation, selectedExit);
+            else KeepFamily(mesh, owner, candidate, vertices, candidate.Certificate.PointLocation, selectedExit, clip, joinedFan);
         }
     }
 
@@ -219,7 +261,7 @@ internal sealed class MeshConeSurfaceBoundary
         FamilySample sample = _familySamples[index];
         FamilyCandidate family = _families[sample.Family];
         return sample.Event.GetContact(family.Candidate.Certificate,
-            _halfspaces.AsReadOnlySpan().Slice(family.Offset, family.Count));
+            _halfspaces.AsReadOnlySpan().Slice(family.Offset, family.Count), _clip);
     }
 
     internal bool TryGetFamilySampleWorldAnchors(int index, out Vector3d first, out Vector3d second)
@@ -229,22 +271,26 @@ internal sealed class MeshConeSurfaceBoundary
         FamilySample sample = _familySamples[index];
         FamilyCandidate family = _families[sample.Family];
         return sample.Event.TryGetWorldAnchors(family.Candidate.Certificate,
-            _halfspaces.AsReadOnlySpan().Slice(family.Offset, family.Count), out first, out second);
+            _halfspaces.AsReadOnlySpan().Slice(family.Offset, family.Count), _clip, out first, out second);
     }
 
     private void KeepFamily(PhysicsMesh mesh, int owner, BoundaryCandidate candidate,
-        ReadOnlySpan<Vector3d> vertices, ConeSurfacePointLocation location, WideAxis3? selectedExit = null)
+        ReadOnlySpan<Vector3d> vertices, ConeSurfacePointLocation location, WideAxis3? selectedExit = null,
+        in RationalSegmentInterval clip = default, ReadOnlySpan<WideAxis3> joinedFan = default)
     {
-        Span<WideAxis3> fan = stackalloc WideAxis3[5];
-        int count = MeshSurfaceBoundaryTopology.GetIncidentFan(mesh, owner,
+        if (!joinedFan.IsEmpty && _joinedFan.Length < joinedFan.Length + 1) Array.Resize(ref _joinedFan, joinedFan.Length + 1);
+        Span<WideAxis3> fan = joinedFan.IsEmpty ? stackalloc WideAxis3[5] : _joinedFan;
+        int count;
+        if (joinedFan.IsEmpty) count = MeshSurfaceBoundaryTopology.GetIncidentFan(mesh, owner,
             location == ConeSurfacePointLocation.End ? candidate.Second : candidate.First,
             location == ConeSurfacePointLocation.End ? candidate.First : candidate.Second,
             location == ConeSurfacePointLocation.Interior, fan);
+        else { joinedFan.CopyTo(fan); count = joinedFan.Length; }
         if (selectedExit.HasValue) fan[count++] = selectedExit.Value;
         int capacity = candidate.Certificate.GetMaximumFamilyEventCount(count);
         if (_familyStorage.Length < capacity) Array.Resize(ref _familyStorage, capacity);
         var selection = new ConeSurfaceFamilySelection(_familyStorage);
-        if (!candidate.Certificate.AccumulateFamilyEvents(fan[..count], location, ref selection)) return;
+        if (!candidate.Certificate.AccumulateFamilyEvents(fan[..count], location, clip, ref selection)) return;
         int family = _families.Count;
         _families.Add(new FamilyCandidate(candidate, _halfspaces.Count, count));
         _halfspaces.AddRange(fan[..count]);
@@ -253,15 +299,21 @@ internal sealed class MeshConeSurfaceBoundary
     }
 
     private static bool SupportsIncidentFan(PhysicsMesh mesh, int owner, BoundaryCandidate candidate,
-        ReadOnlySpan<Vector3d> vertices, WideAxis3? selectedExit = null)
+        ReadOnlySpan<Vector3d> vertices, WideAxis3? selectedExit = null, ReadOnlySpan<WideAxis3> joinedFan = default)
     {
-        Span<WideAxis3> fan = stackalloc WideAxis3[5];
-        int count = MeshSurfaceBoundaryTopology.GetIncidentFan(mesh, owner,
+        Span<WideAxis3> localFan = stackalloc WideAxis3[5];
+        int count = joinedFan.IsEmpty ? MeshSurfaceBoundaryTopology.GetIncidentFan(mesh, owner,
             candidate.Certificate.PointLocation == ConeSurfacePointLocation.End ? candidate.Second : candidate.First,
             candidate.Certificate.PointLocation == ConeSurfacePointLocation.End ? candidate.First : candidate.Second,
-            candidate.Certificate.PointLocation == ConeSurfacePointLocation.Interior, fan);
-        if (selectedExit.HasValue) fan[count++] = selectedExit.Value;
-        foreach (WideAxis3 ray in fan[..count])
+            candidate.Certificate.PointLocation == ConeSurfacePointLocation.Interior, localFan) : joinedFan.Length;
+        if (selectedExit.HasValue)
+        {
+            bool hasExit = candidate.Certificate.TryGetNormalDotSign(selectedExit.Value, out int exitSign);
+            System.Diagnostics.Debug.Assert(hasExit);
+            if (exitSign > 0) return false;
+        }
+        ReadOnlySpan<WideAxis3> fan = joinedFan.IsEmpty ? localFan[..count] : joinedFan;
+        foreach (WideAxis3 ray in fan)
         {
             bool hasNormal = candidate.Certificate.TryGetNormalDotSign(ray, out int sign);
             System.Diagnostics.Debug.Assert(hasNormal);

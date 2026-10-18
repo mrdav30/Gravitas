@@ -193,6 +193,12 @@ retains separate triangle domains. Covered triangulation edges in trusted
 coplanar domains never become surface constraints. Pose changes reuse this
 topology; scale changes publish geometry and topology together after validation.
 
+Joined cone domains keep each member's native rigid frame and supplying material.
+They pool admitted face events before reducing samples and omit only certified
+shared boundary interiors. An ambiguous canonical surface owner retains its
+native finite perimeter on both sides of a proposed join. Classification cuts
+inside a retained original edge do not create new physical corners.
+
 Exact triangle/cone admission precedes grouping. Triangles join only through a
 shared edge or vertex that actually meets the cone, so a connected authored
 surface can yield several independent contact regions. Each face region chooses

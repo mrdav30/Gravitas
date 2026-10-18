@@ -7,7 +7,7 @@ using System;
 
 namespace Gravitas.Benchmarks;
 
-/// <summary>One moving rounded body crossing a joined or equivalent continuous frictionless floor.</summary>
+/// <summary>One moving body crossing a joined or equivalent continuous frictionless floor.</summary>
 [MemoryDiagnoser]
 public class JoinedStaticSurfaceSimulationBenchmarks
 {
@@ -19,8 +19,8 @@ public class JoinedStaticSurfaceSimulationBenchmarks
     [Params(false, true)]
     public bool Joined { get; set; }
 
-    [Params(false, true)]
-    public bool Capsule { get; set; }
+    [Params("Sphere", "Capsule", "Cone")]
+    public string Shape { get; set; } = "Sphere";
 
     [Params("Small", "Partial", "Dense", "Members")]
     public string Workload { get; set; } = "Small";
@@ -41,11 +41,14 @@ public class JoinedStaticSurfaceSimulationBenchmarks
             _members[i] = Floor(-8 + 16 * i / count, -8 + 16 * (i + 1) / count,
                 Workload == "Partial" && i == 1 ? 2 : 4, Workload == "Dense" ? 32 : 1);
         if (Joined) _surface = _context.Physics.CreateStaticSurface(_members);
-        LSCollider collider = Capsule
-            ? new LSCapsuleCollider { Radius = Fixed64.Half, Size = new(1, 2, 1) }
-            : new LSSphereCollider { Radius = Fixed64.Half };
+        LSCollider collider = Shape switch
+        {
+            "Capsule" => new LSCapsuleCollider { Radius = Fixed64.Half, Size = new(1, 2, 1) },
+            "Cone" => new LSConeCollider(),
+            _ => new LSSphereCollider { Radius = Fixed64.Half }
+        };
         collider.Material = PhysicsMaterial.Frictionless;
-        var start = new Vector3d((Fixed64)(-2), Capsule ? Fixed64.One : Fixed64.Half, Fixed64.Zero);
+        var start = new Vector3d((Fixed64)(-2), Shape == "Capsule" ? Fixed64.One : Fixed64.Half, Fixed64.Zero);
         _body = new SolidBody(new BenchmarkMatterAgent(_context, start), collider)
         { Mass = Fixed64.One, FreezeAxes = BodyFreezeAxes3D.Rotation, SleepEnabled = false };
         _body.Initialize(start, FixedQuaternion.Identity, BodyMotionType.Dynamic);

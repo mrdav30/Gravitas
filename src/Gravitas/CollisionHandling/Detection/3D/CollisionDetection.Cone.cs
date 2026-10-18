@@ -98,6 +98,22 @@ public static partial class CollisionDetection
         var mesh = (LSMeshCollider)pair.ColliderA;
         var cone = (LSConeCollider)pair.ColliderB;
 
+        if (mesh.StaticSurface is { } surface && !mesh.IsTrigger && !cone.IsTrigger
+            && surface.Gather(cone, new FixedBoundVolume(cone.BoundsMin, cone.BoundsMax)))
+        {
+            surface.BuildCone(cone);
+            var faces = surface.ConeFaces;
+            for (int region = 0; region < faces.RegionCount; region++)
+                for (int sample = 0; sample < faces.GetSampleCount(region); sample++)
+                {
+                    FixedContactAnchors contact = faces.GetJoinedSample(region, sample, out LSMeshCollider supplier);
+                    if (supplier != mesh) continue;
+                    pair.Manifold.AddContact(new ContactAnchor(contact.FirstAnchor), new ContactAnchor(contact.SecondAnchor),
+                        contact.Depth, contact.Normal, mesh.Material, cone.Material, contact.DepthIsClamped,
+                        group: new ContactGroupKey(0, 0, 0, 0, region));
+                }
+            return faces.AppendJoinedBoundaries(mesh, cone, pair.Context.CollisionScratch.MeshConeBoundary, pair.Manifold);
+        }
         if (BuildMeshConeSurfaceContacts(mesh, cone, pair.Context.CollisionScratch, pair.Manifold))
             return true;
 

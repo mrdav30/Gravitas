@@ -11,6 +11,7 @@ using SwiftCollections;
 using SwiftCollections.Query;
 using System;
 using System.Collections.Generic;
+using JoinedMember = Gravitas.CollisionHandling.MeshJoinedSurfaceRegions<FixedMathSharp.Geometry.CapsulePlaneRayFrame>.Member;
 
 namespace Gravitas.CollisionHandling;
 
@@ -32,51 +33,14 @@ internal sealed partial class MeshCapsuleFaceRegions
         SwiftDictionary<(PhysicsMesh, int), MeshSurfaceBoundaryDomain>? prepared = null)
     {
         JoinedState state = _joined ??= new JoinedState(this);
-        state.Active = true;
-        state.Inputs.FastClear(); state.MemberBySurface.Clear();
-        foreach (var input in surfaces)
-        {
-            int owner = input.Collider.Mesh.GetManifoldSurfaceOwner(input.Triangle);
-            if (!state.MemberBySurface.TryAdd((input.Collider.Mesh, owner), 0)) continue;
-            state.Inputs.Add((input.Collider, owner));
-        }
-        state.Inputs.SortInPlace(state.MemberComparer);
-        bool reuseBoundaries = state.PreparedCount == state.Inputs.Count;
-        for (int index = 0; reuseBoundaries && index < state.Inputs.Count; index++)
-        {
-            JoinedMember member = state.Members[index]; var input = state.Inputs[index];
-            reuseBoundaries = member.Collider == input.Collider && member.Owner == input.Triangle
-                && member.PreparedLifetime == input.Collider.LifetimeVersion
-                && member.PreparedVersion == input.Collider.RuntimeShapeVersion;
-        }
-        // An incomplete rebuild must never qualify as the last prepared set.
-        state.PreparedCount = -1;
-        state.Meshes.FastClear(); state.Parents.FastClear(); state.Roots.FastClear(); state.RegionByRoot.FastClear(); state.NodeMembers.FastClear();
+        state.Prepare(surfaces, preparedMeshes, prepared);
         _center = center; _rotation = coreLength == Fixed64.Zero ? FixedQuaternion.Identity : rotation;
         FixedBoundBox box = FixedBoundBox.FromCenteredCapsuleClippedToDomain(center, _rotation, Vector3d.Up, coreLength, radius);
         var bounds = new FixedBoundVolume(box.Min, box.Max);
-        LSMeshCollider? previous = null;
-        foreach (var input in state.Inputs.AsReadOnlySpan())
-        {
-            if (input.Collider != previous) state.Meshes.Add(input.Collider.Mesh);
-            previous = input.Collider;
-        }
-        if (prepared != null)
-        {
-            state.Meshes.FastClear();
-            foreach (PhysicsMesh mesh in preparedMeshes) state.Meshes.Add(mesh);
-        }
-        state.PreparedBoundaries.FastClear();
-        int meshIndex = -1;
         for (int index = 0; index < state.Inputs.Count; index++)
         {
-            if (index == state.Members.Count) state.Members.Add(new JoinedMember());
             JoinedMember member = state.Members[index];
-            member.Collider = state.Inputs[index].Collider; member.Triangle = state.Inputs[index].Triangle;
             PhysicsMesh mesh = member.Collider.Mesh;
-            member.Owner = member.Triangle;
-            state.MemberBySurface[(mesh, member.Owner)] = index;
-            if (index == 0 || state.Inputs[index - 1].Collider != member.Collider) meshIndex++;
             var finite = new CapsuleFiniteSectionFrame(mesh.Origin, mesh.Rotation, center, _rotation, coreLength, radius);
             mesh.GetLocalTriangleVertices(member.Triangle, out Vector3d a, out Vector3d b, out Vector3d c);
             member.Frame = new CapsulePlaneRayFrame(new FixedTriangle(a, b, c), finite);
@@ -89,23 +53,10 @@ internal sealed partial class MeshCapsuleFaceRegions
                 if (CapsulePlaneRayEvents.IntersectsTriangle(finite, new FixedTriangle(a, b, c))) member.Admitted.Add(triangle);
             }
             member.Connectivity.BuildCapsule(mesh, member.Triangle, finite, member.Admitted.AsReadOnlySpan());
-            member.Offset = state.Parents.Count;
-            for (int region = 0; region < member.Connectivity.RegionCount; region++)
-            { state.Parents.Add(state.Parents.Count); state.RegionByRoot.Add(-1); state.NodeMembers.Add(index); }
-            if (prepared != null) member.Boundary = prepared[(mesh, member.Owner)];
-            else if (!reuseBoundaries) member.Boundary.Build(state.Meshes.AsReadOnlySpan(), meshIndex, member.Triangle);
-            state.PreparedBoundaries.Add(member.Boundary);
-            if (member.JoinedSpans.Length < member.Boundary.Spans.Length)
-                Array.Resize(ref member.JoinedSpans, member.Boundary.Spans.Length);
-            Array.Clear(member.JoinedSpans, 0, member.Boundary.Spans.Length);
+            state.AddRegions(index);
         }
         JoinFiniteSpans(state);
-        for (int node = 0; node < state.Parents.Count; node++)
-        {
-            int root = FindJoinedRoot(state, node);
-            if (state.RegionByRoot[root] >= 0) continue;
-            state.RegionByRoot[root] = state.Roots.Count; state.Roots.Add(root);
-        }
+        state.CompleteRegions();
         RegionCount = state.Roots.Count; HasBoundaryIntersection = false;
         Reserve(RegionCount);
         if (state.BoundaryHits.Length < RegionCount) Array.Resize(ref state.BoundaryHits, RegionCount);
@@ -113,12 +64,9 @@ internal sealed partial class MeshCapsuleFaceRegions
         Array.Clear(state.BoundaryHits, 0, RegionCount); Array.Fill(state.Trusted, true, 0, RegionCount);
         foreach (JoinedMember member in state.Members.AsReadOnlySpan()[..state.Inputs.Count])
         {
-            foreach (var span in member.Boundary.Spans)
-            {
-                if (span.Kind != MeshSurfaceBoundaryDomain.SpanKind.Ambiguous) continue;
-                for (int local = 0; local < member.Connectivity.RegionCount; local++)
-                    state.Trusted[state.RegionByRoot[FindJoinedRoot(state, member.Offset + local)]] = false;
-            }
+            if (member.BoundaryTrusted) continue;
+            for (int local = 0; local < member.Connectivity.RegionCount; local++)
+                state.Trusted[state.RegionByRoot[state.Find(member.Offset + local)]] = false;
         }
         if (state.Maximum.Length < 2 * RegionCount) Array.Resize(ref state.Maximum, 2 * RegionCount);
         if (state.MaximumPoint.Length < 2 * RegionCount) Array.Resize(ref state.MaximumPoint, 2 * RegionCount);
@@ -149,12 +97,7 @@ internal sealed partial class MeshCapsuleFaceRegions
             }
         }
         for (int region = 0; region < RegionCount; region++) ReduceJoinedSamples(state, region);
-        foreach (JoinedMember member in state.Members.AsReadOnlySpan()[..state.Inputs.Count])
-        {
-            member.PreparedVersion = member.Collider.RuntimeShapeVersion;
-            member.PreparedLifetime = member.Collider.LifetimeVersion;
-        }
-        state.PreparedCount = state.Inputs.Count;
+        state.Commit();
     }
 
     internal CapsulePlaneRayFrame GetBoundaryFrame(LSMeshCollider collider, int triangle, out Vector3d normal)
@@ -170,7 +113,7 @@ internal sealed partial class MeshCapsuleFaceRegions
         if (_joined?.Active != true) return GetOrientation(localRegion);
         JoinedState state = _joined;
         JoinedMember member = state.Members[state.MemberBySurface[(collider.Mesh, collider.Mesh.GetManifoldSurfaceOwner(triangle))]];
-        int region = state.RegionByRoot[FindJoinedRoot(state, member.Offset + localRegion)];
+        int region = state.RegionByRoot[state.Find(member.Offset + localRegion)];
         return WideAxis3.Dot(member.Frame.Normal, GetJoinedRegionFrame(state, region).Normal).Sign * _orientations[region];
     }
 
@@ -183,22 +126,7 @@ internal sealed partial class MeshCapsuleFaceRegions
 
     internal ReadOnlySpan<WideAxis3> GetJoinedEndpointFan(LSMeshCollider collider, int triangle, int span, bool upper, out bool suppress)
     {
-        suppress = false;
-        JoinedState state = _joined!;
-        JoinedMember member = state.Members[state.MemberBySurface[(collider.Mesh, collider.Mesh.GetManifoldSurfaceOwner(triangle))]];
-        bool trusted = state.Fan.BuildEndpoint(state.Meshes.AsReadOnlySpan(), member.Boundary, span, upper,
-            state.PreparedBoundaries.AsReadOnlySpan());
-        suppress = trusted && !state.Fan.HasExposedBoundary;
-        // A shared true-rim endpoint is one physical feature. Keep its first
-        // eligible collider/surface, even though every member retains geometric overlap.
-        if (trusted)
-            foreach (var owner in state.Fan.Owners)
-                if (state.MemberBySurface.TryGetValue((state.Meshes[owner.Member], owner.Surface), out int other)
-                    && (state.Members[other].Collider.Id < collider.Id
-                        || state.Members[other].Collider == collider
-                        && collider.Mesh.GetCanonicalSurfaceOrdinal(owner.Surface) < collider.Mesh.GetCanonicalSurfaceOrdinal(member.Owner)))
-                    suppress = true;
-        return trusted ? state.Fan.Rays : default;
+        return _joined!.GetEndpointFan(collider, triangle, span, upper, out suppress);
     }
 
     internal bool AppendJoinedBoundaries(LSMeshCollider collider, Gravitas.Materials.PhysicsMaterial material,
@@ -269,7 +197,7 @@ internal sealed partial class MeshCapsuleFaceRegions
                     // in one closed interval belonging to both unique regions.
                     if (source.Frame.Finite.IntersectsSegment(new FixedSegment(edge.Start, edge.End)))
                     {
-                        UnionJoinedRegions(state, source.Offset, target.Offset);
+                        state.Union(source.Offset, target.Offset);
                         source.JoinedSpans[span] = true;
                     }
                     continue;
@@ -294,24 +222,11 @@ internal sealed partial class MeshCapsuleFaceRegions
             {
                 second.Collider.Mesh.GetLocalTriangleVertices(b, out Vector3d ba, out Vector3d bb, out Vector3d bc);
                 if (!point.ContainsTrianglePoint(second.Frame, new FixedTriangle(ba, bb, bc), frame)) continue;
-                UnionJoinedRegions(state, first.Offset + first.Connectivity.GetRegionOrdinal(a),
+                state.Union(first.Offset + first.Connectivity.GetRegionOrdinal(a),
                     second.Offset + second.Connectivity.GetRegionOrdinal(b));
                 first.JoinedSpans[state.CurrentSpan] = true;
             }
         }
-    }
-
-    private static void UnionJoinedRegions(JoinedState state, int first, int second)
-    {
-        int rootA = FindJoinedRoot(state, first), rootB = FindJoinedRoot(state, second);
-        state.Parents[Math.Max(rootA, rootB)] = Math.Min(rootA, rootB);
-    }
-
-    private static int FindJoinedRoot(JoinedState state, int node)
-    {
-        while (state.Parents[node] != node)
-        { state.Parents[node] = state.Parents[state.Parents[node]]; node = state.Parents[node]; }
-        return node;
     }
 
     private void VisitJoinedSource(JoinedState state, in CapsulePlaneRayEventSource source, in RationalSegmentInterval clip)
@@ -333,7 +248,7 @@ internal sealed partial class MeshCapsuleFaceRegions
             JoinedMember member = state.Members[memberIndex];
             foreach (int triangle in member.Connectivity.TriangleIndices)
             {
-                int region = state.RegionByRoot[FindJoinedRoot(state, member.Offset + member.Connectivity.GetRegionOrdinal(triangle))];
+                int region = state.RegionByRoot[state.Find(member.Offset + member.Connectivity.GetRegionOrdinal(triangle))];
                 if (state.CurrentRegion >= 0 && region != state.CurrentRegion) continue;
                 member.Collider.Mesh.GetLocalTriangleVertices(triangle, out Vector3d a, out Vector3d b, out Vector3d c);
                 if (!candidate.ContainsTrianglePoint(member.Frame, new FixedTriangle(a, b, c), frame) || !state.VisitedRegions.Add(region)) continue;
@@ -483,44 +398,19 @@ internal sealed partial class MeshCapsuleFaceRegions
         { Member = member; FrameMember = frameMember; Source = source; Event = descriptor; Clip = clip; }
     }
 
-    private sealed class JoinedMember
+    private sealed class JoinedState : MeshJoinedSurfaceRegions<CapsulePlaneRayFrame>
     {
-        internal LSMeshCollider Collider = null!;
-        internal int Triangle, Owner, Offset;
-        internal uint PreparedVersion;
-        internal long PreparedLifetime;
-        internal CapsulePlaneRayFrame Frame;
-        internal readonly MeshSurfaceConnectivity Connectivity = new();
-        internal MeshSurfaceBoundaryDomain Boundary = new();
-        internal readonly SwiftList<int> Admitted = new();
-        internal bool[] JoinedSpans = Array.Empty<bool>();
-    }
-
-    private sealed class JoinedState
-    {
-        internal readonly SwiftList<(LSMeshCollider Collider, int Triangle)> Inputs = new();
-        internal readonly SwiftList<PhysicsMesh> Meshes = new();
-        internal readonly SwiftList<int> Candidates = new();
-        internal readonly SwiftList<MeshSurfaceBoundaryDomain> PreparedBoundaries = new();
-        internal readonly MeshSurfaceBoundaryFan Fan = new();
-        internal readonly SwiftDictionary<(PhysicsMesh Mesh, int Owner), int> MemberBySurface = new();
-        internal readonly SwiftList<JoinedMember> Members = new();
-        internal readonly SwiftList<int> Parents = new(), Roots = new(), RegionByRoot = new(), NodeMembers = new();
         internal readonly SwiftList<JoinedWitness> PointSources = new();
         internal readonly SwiftHashSet<int> VisitedRegions = new();
         internal JoinedWitness[] Maximum = Array.Empty<JoinedWitness>();
         internal int[] MaximumPoint = Array.Empty<int>();
         internal bool[] BoundaryHits = Array.Empty<bool>(), Trusted = Array.Empty<bool>();
-        internal readonly IComparer<(LSMeshCollider Collider, int Triangle)> MemberComparer;
         internal readonly IComparer<Sample> PointComparer;
         internal readonly CapsulePlaneRayEventVisitor Visitor, JoinVisitor;
-        internal int CurrentMember, OtherMember, CurrentSpan, CurrentRegion, PreparedCount = -1;
-        internal bool Active;
+        internal int CurrentMember, OtherMember, CurrentSpan, CurrentRegion;
         internal RationalSegmentInterval CurrentClip;
         internal JoinedState(MeshCapsuleFaceRegions owner)
         {
-            MemberComparer = Comparer<(LSMeshCollider Collider, int Triangle)>.Create((a, b) =>
-            { int order = a.Collider.Id.CompareTo(b.Collider.Id); return order != 0 ? order : a.Triangle.CompareTo(b.Triangle); });
             PointComparer = Comparer<Sample>.Create(owner.CompareJoinedPoints);
             Visitor = owner.AdmitJoinedPoint; JoinVisitor = owner.JoinAtPoint;
         }

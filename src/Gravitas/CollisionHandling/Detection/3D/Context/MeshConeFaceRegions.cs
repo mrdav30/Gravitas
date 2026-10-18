@@ -38,71 +38,7 @@ internal sealed partial class MeshConeFaceRegions
 
     internal int RegionCount { get; private set; }
     internal bool HasBoundaryIntersection { get; private set; }
-    internal ref readonly ConePlaneRayFrame Frame => ref _frame;
     internal Vector3d SamplingOrigin => _samplingOrigin;
-
-    /// <summary>Finds a finite-boundary ray maximum from certified coplanar members in one cone chart.</summary>
-    /// <remarks>Orientation follows the first member's canonical plane. Retained spans belong to their supplied member;
-    /// sources preserve canonical boundary-span order within each member, which resolves same-member ties.
-    /// Geometry must be committed and admitted. This does not gather intrinsic face events or construct a complete face sample pool.</remarks>
-    internal static bool TryGetBoundaryWitness(
-        ReadOnlySpan<(LSMeshCollider Collider, int SurfaceTriangle, MeshSurfaceBoundaryDomain.BoundarySpan Span)> sources,
-        LSConeCollider cone, int orientation, out FixedContactAnchors contact, out int supplier)
-    {
-        contact = default; supplier = -1;
-        if (orientation != -1 && orientation != 1) throw new ArgumentOutOfRangeException(nameof(orientation));
-        Span<ulong> bestValues = stackalloc ulong[ConePlaneRaySelection.StorageWords];
-        Span<int> bestSigns = stackalloc int[ConePlaneRaySelection.SignCount];
-        var best = new ConePlaneRaySelection(bestValues, bestSigns);
-        Span<ulong> pv = stackalloc ulong[ConePlaneRaySelection.StorageWords], nv = stackalloc ulong[ConePlaneRaySelection.StorageWords];
-        Span<int> ps = stackalloc int[ConePlaneRaySelection.SignCount], ns = stackalloc int[ConePlaneRaySelection.SignCount];
-        var positive = new ConePlaneRaySelection(pv, ps); var negative = new ConePlaneRaySelection(nv, ns);
-        Span<ulong> pointValues = stackalloc ulong[ConePlaneRayPoint.StorageWords], root = stackalloc ulong[ConePlaneRaySelection.RootWords];
-        Span<int> pointSigns = stackalloc int[ConePlaneRayPoint.SignCount];
-        var point = new ConePlaneRayPoint(pointValues, pointSigns);
-        Span<ConePlaneRayEvent> events = stackalloc ConePlaneRayEvent[ConePlaneRayEvents.BoundaryCapacity];
-        int count = ConePlaneRayEvents.GetBoundaryEvents(events), chosen = -1, chosenOrientation = 0;
-        ConePlaneRayFrame bestFrame = default; WideAxis3 commonNormal = default;
-        for (int index = 0; index < sources.Length; index++)
-        {
-            ref readonly var input = ref sources[index]; PhysicsMesh mesh = input.Collider.Mesh;
-            mesh.GetLocalTriangleVertices(input.SurfaceTriangle, out Vector3d a, out Vector3d b, out Vector3d c);
-            var frame = new ConePlaneRayFrame(new FixedTriangle(a, b, c), mesh.Origin, mesh.Rotation,
-                cone.Center, cone.Rotation, cone.Height, cone.ScaledRadius);
-            if (index == 0) commonNormal = frame.Normal;
-            if (input.Span.Kind == MeshSurfaceBoundaryDomain.SpanKind.Joined) continue;
-            int nativeOrientation = orientation * WideAxis3.Dot(frame.Normal, commonNormal).Sign;
-            var source = new ConePlaneRayEventSource(new FixedSegment(input.Span.Start, input.Span.End));
-            foreach (ConePlaneRayEvent descriptor in events[..count])
-            {
-                if (!ConePlaneRayEvents.TryEvaluateEvent(source, frame, descriptor, input.Span.Interval,
-                    point, root, ref positive, ref negative, nativeOrientation)) continue;
-                scoped ConePlaneRaySelection candidate = nativeOrientation > 0 ? positive : negative;
-                if (!candidate.HasValue) continue;
-                if (best.HasValue)
-                {
-                    int order = candidate.CompareDepth(best);
-                    if (order < 0 || order == 0 && input.Collider.Id >= sources[chosen].Collider.Id) continue;
-                }
-                candidate.Values.CopyTo(bestValues); candidate.Signs.CopyTo(bestSigns);
-                best.Restore(frame, candidate.MaximumSource, candidate.MaximumEvent);
-                bestFrame = frame; chosen = index; chosenOrientation = nativeOrientation;
-            }
-        }
-        // Clipped descriptors cannot enter the ordinary replay pool: retain
-        // the exact native point and exit fields through final materialization.
-        if (!best.HasValue) return false;
-        bool represented = best.TryGetRoundedMaximumDepth(out Fixed64 depth)
-            & ConePlaneRayPointMaterialization.TryGetAuthoredPoint(bestFrame, best.Point, best.Root, out Vector3d authored)
-            & ConePlaneRayPointMaterialization.TryGetExitConeLocalPoint(bestFrame, best.Point, best.Root,
-                ContactQuadratic.At(best.Values, best.Signs, 0, ConePlaneRaySelection.FieldWords),
-                ContactQuadratic.At(best.Values, best.Signs, 1, ConePlaneRaySelection.FieldWords), chosenOrientation, out Vector3d exit);
-        PhysicsMesh supplierMesh = sources[chosen].Collider.Mesh;
-        contact = new FixedContactAnchors(new FixedPointAnchor(supplierMesh.Origin, supplierMesh.Rotation, authored),
-            new FixedPointAnchor(cone.Center, cone.Rotation, exit),
-            -bestFrame.GetWorldNormal(supplierMesh.Rotation) * chosenOrientation, depth, false);
-        supplier = chosen; return represented;
-    }
 
     internal void Build(PhysicsMesh mesh, int surfaceTriangle, Vector3d coneCenter,
         FixedQuaternion coneRotation, Fixed64 height, Fixed64 radius,
@@ -124,19 +60,12 @@ internal sealed partial class MeshConeFaceRegions
     internal void Build(PhysicsMesh mesh, int surfaceTriangle, in ConePlaneRayFrame frame,
         MeshSurfaceConnectivity connectivity, ReadOnlySpan<int> admittedTriangles, Vector3d samplingOrigin = default)
     {
+        _joined = null;
+        _currentMember = _currentSupplier = _currentSpan = -1;
         RegionCount = connectivity.RegionCount;
         HasBoundaryIntersection = false;
         if (RegionCount == 0) return;
-        if (_regions.Length < RegionCount)
-        {
-            int capacity = Math.Max(RegionCount, _regions.Length * 2);
-            Array.Resize(ref _regions, capacity);
-            Array.Resize(ref _sampleCounts, capacity);
-            Array.Resize(ref _selectionValues, 2 * capacity * ConePlaneRaySelection.StorageWords);
-            Array.Resize(ref _selectionSigns, 2 * capacity * ConePlaneRaySelection.SignCount);
-            Array.Resize(ref _winners, 2 * capacity);
-            Array.Resize(ref _samples, capacity * ContactManifold.MaxContactsPerGroup);
-        }
+        Reserve(RegionCount);
         mesh.GetLocalTriangleVertices(surfaceTriangle, out Vector3d a, out Vector3d b, out Vector3d c);
         _frame = frame;
         _samplingOrigin = samplingOrigin;
@@ -150,6 +79,20 @@ internal sealed partial class MeshConeFaceRegions
         {
             ReduceRegion(region);
             ReduceSamples(region, metrics);
+        }
+    }
+
+    private void Reserve(int count)
+    {
+        if (_regions.Length < count)
+        {
+            int capacity = Math.Max(count, _regions.Length * 2);
+            Array.Resize(ref _regions, capacity);
+            Array.Resize(ref _sampleCounts, capacity);
+            Array.Resize(ref _selectionValues, 2 * capacity * ConePlaneRaySelection.StorageWords);
+            Array.Resize(ref _selectionSigns, 2 * capacity * ConePlaneRaySelection.SignCount);
+            Array.Resize(ref _winners, 2 * capacity);
+            Array.Resize(ref _samples, capacity * ContactManifold.MaxContactsPerGroup);
         }
     }
 
@@ -278,7 +221,7 @@ internal sealed partial class MeshConeFaceRegions
             _selectionValues.AsSpan(index * ConePlaneRaySelection.StorageWords, ConePlaneRaySelection.StorageWords),
             _selectionSigns.AsSpan(index * ConePlaneRaySelection.SignCount, ConePlaneRaySelection.SignCount));
         Winner winner = _winners[index];
-        if (winner.HasValue) selection.Restore(_frame, winner.Source, winner.Event);
+        if (winner.HasValue) selection.Restore(GetFrame(winner.Member), winner.Source, winner.Event);
         return selection;
     }
 
@@ -297,7 +240,7 @@ internal sealed partial class MeshConeFaceRegions
         // lies on its true boundary; authored internal seams add no extrema.
         // Shared normal metric and frame scale cancel in the exact comparison.
         System.Diagnostics.Debug.Assert(positive.HasValue && negative.HasValue);
-        int comparison = ContactQuadratic.CompareRatios(
+        int comparison = _joined?.Active == true ? positive.CompareDepth(negative) : ContactQuadratic.CompareRatios(
             ContactQuadratic.At(positive.Values, positive.Signs, 0, ConePlaneRaySelection.FieldWords),
             ContactQuadratic.At(positive.Values, positive.Signs, 1, ConePlaneRaySelection.FieldWords), positive.Root,
             ContactQuadratic.At(negative.Values, negative.Signs, 0, ConePlaneRaySelection.FieldWords),
@@ -308,7 +251,9 @@ internal sealed partial class MeshConeFaceRegions
 
     // The cone witness lies along the exit ray from the mesh. Response moves
     // the cone in the opposite direction, including at exact zero-depth touch.
-    internal Vector3d GetNormal(int region) => -_worldNormal * GetOrientation(region);
+    internal Vector3d GetNormal(int region) => _joined?.Active == true
+        ? -GetRegionFrame(region).GetWorldNormal(_joined.Members[_joined.NodeMembers[_joined.Roots[region]]].Collider.Mesh.Rotation) * GetOrientation(region)
+        : -_worldNormal * GetOrientation(region);
 
     internal int GetOrientation(int region) => _regions[ValidateRegion(region)].Orientation;
 
@@ -344,7 +289,10 @@ internal sealed partial class MeshConeFaceRegions
         internal readonly ConePlaneRayEventSource Source;
         internal readonly ConePlaneRayEvent Event;
         internal readonly bool HasValue;
-        internal Winner(ConePlaneRayEventSource source, ConePlaneRayEvent descriptor)
-        { Source = source; Event = descriptor; HasValue = true; }
+        internal readonly int Member, Supplier;
+        internal readonly int Span;
+        internal Winner(ConePlaneRayEventSource source, ConePlaneRayEvent descriptor,
+            int member = -1, int supplier = -1, int span = -1)
+        { Source = source; Event = descriptor; HasValue = true; Member = member; Supplier = supplier; Span = span; }
     }
 }

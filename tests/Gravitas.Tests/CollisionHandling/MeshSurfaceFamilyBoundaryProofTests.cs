@@ -13,77 +13,6 @@ namespace Gravitas.Tests;
 public sealed class MeshSurfaceFamilyBoundaryProofTests
 {
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void Cone_PartialJoin_ShouldProduceItsNewCutAndKeepTheNativeSupplier(bool independentNeighbor)
-    {
-        using var scene = PhysicsScenarioBuilder.Create();
-        LSMeshCollider source = Triangle(scene.Context, new[] { new Vector3d(-2, 0, 0), new(2, 0, 0), new(-2, 2, 0) });
-        LSMeshCollider neighbor = Triangle(scene.Context, new[] { new Vector3d(Fixed64.Quarter, Fixed64.Zero, Fixed64.Zero),
-            new(2, 0, 0), new(2, -2, 0) }, independentNeighbor);
-        var cone = new LSConeCollider { Radius = Fixed64.One, Size = new(2, 2, 2) };
-        cone.InitializeWithNoBody(new TestMatterAgent(scene.Context, new FixedTransform(Vector3d.Zero,
-            new FixedQuaternion(Fixed64.Zero, Fixed64.Zero, Fixed64.One, Fixed64.One).Normalized, Vector3d.One)));
-        var spans = Sources(new[] { source, neighbor }, sourceEdgeOnly: true);
-        Assert.Contains(spans, item => item.Span.Kind == MeshSurfaceBoundaryDomain.SpanKind.Joined);
-
-        Assert.True(MeshConeFaceRegions.TryGetBoundaryWitness(spans, cone, Orientation(spans[0].Collider, Vector3d.Forward),
-            out FixedContactAnchors witness, out int supplier));
-        Assert.Same(source, spans[supplier].Collider);
-        Assert.Equal(source.Mesh.Origin, witness.FirstAnchor.Origin);
-        Assert.Equal(source.Mesh.Rotation, witness.FirstAnchor.Rotation);
-        Assert.Equal(cone.Center, witness.SecondAnchor.Origin);
-        Assert.Equal(cone.Rotation, witness.SecondAnchor.Rotation);
-        Assert.True(witness.FirstAnchor.TryGetPoint(out Vector3d point));
-        Assert.Equal(new Vector3d(Fixed64.Quarter, Fixed64.Zero, Fixed64.Zero), point);
-        Assert.Equal(Fixed64.FromFraction(5, 8), witness.Depth);
-        Assert.Equal(-Vector3d.Forward, witness.Normal);
-        Assert.True(witness.SecondAnchor.TryGetPoint(out Vector3d exit));
-        Assert.Equal(point - witness.Normal * witness.Depth, exit);
-        bool valid = true;
-        long allocated = AllocationTestHelper.MeasureSteadyState(() => valid &= MeshConeFaceRegions.TryGetBoundaryWitness(
-            spans, cone, Orientation(spans[0].Collider, Vector3d.Forward), out _, out _),
-            warmupIterations: 2, stabilizationIterations: 2, measurementIterations: 4);
-        Assert.True(valid);
-        Assert.Equal(0, allocated);
-        // This is the maximum over retained boundary spans; the covered face
-        // interior can be deeper, so this case makes no whole-face exit claim.
-    }
-
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void Cone_BoundedCapExit_ShouldClearAllTrianglesAndKeepStableMaterialOwnership(bool duplicate)
-    {
-        using var scene = PhysicsScenarioBuilder.Create();
-        LSMeshCollider[] members = CapPatch(scene.Context, duplicate);
-        members[0].Material = PhysicsMaterial.Frictionless;
-        members[1].Material = PhysicsMaterial.Bouncy;
-        var cone = new LSConeCollider { Radius = Fixed64.One, Size = new(2, 2, 2) };
-        scene.InitializeStaticCollider(cone, new(Fixed64.Zero, Fixed64.Quarter, Fixed64.Zero));
-        Vector3d? selectedPoint = null;
-        foreach (bool reverse in new[] { false, true })
-        {
-            var spans = Sources(reverse ? new[] { members[1], members[0] } : members);
-            Assert.True(MeshConeFaceRegions.TryGetBoundaryWitness(spans, cone, Orientation(spans[0].Collider, Vector3d.Down),
-                out FixedContactAnchors witness, out int supplier));
-            Assert.Same(members[0], spans[supplier].Collider);
-            Assert.Equal(PhysicsMaterial.Frictionless, spans[supplier].Collider.Material);
-            Assert.Equal(members[0].Mesh.Origin, witness.FirstAnchor.Origin);
-            Assert.Equal(cone.Center, witness.SecondAnchor.Origin);
-            Assert.Equal(cone.Rotation, witness.SecondAnchor.Rotation);
-            Assert.True(witness.FirstAnchor.TryGetPoint(out Vector3d point));
-            if (selectedPoint.HasValue) Assert.Equal(selectedPoint.Value, point);
-            selectedPoint = point;
-            Assert.Equal(Fixed64.One - Fixed64.Quarter, witness.Depth);
-            Assert.Equal(Vector3d.Up, witness.Normal);
-            AssertWholeExit(members, cone.Center, witness, (mesh, triangle, center) =>
-                LocalTriangle(mesh, triangle).TryGetCenteredFiniteConeContact(mesh.Mesh.Origin, mesh.Mesh.Rotation,
-                    center, cone.Rotation, cone.Height, cone.ScaledRadius, out _));
-        }
-    }
-
-    [Theory]
     [InlineData(0)]
     [InlineData(1)]
     [InlineData(2)]
@@ -175,18 +104,13 @@ public sealed class MeshSurfaceFamilyBoundaryProofTests
     public void EmptyAndJoinedOnlySources_ShouldNotManufactureABoundaryWitness()
     {
         using var scene = PhysicsScenarioBuilder.Create();
-        var cone = new LSConeCollider();
-        scene.InitializeStaticCollider(cone, Vector3d.Zero);
         var empty = Array.Empty<(LSMeshCollider Collider, int SurfaceTriangle, MeshSurfaceBoundaryDomain.BoundarySpan Span)>();
-        Assert.False(MeshConeFaceRegions.TryGetBoundaryWitness(empty, cone, 1, out _, out _));
         LSCollider2D embedded = Embedded(scene.Context, 0, Vector3d.Zero, Fixed64.Zero, Fixed64.Half);
         Assert.False(SlabWitness(empty, embedded, 1, out _, out _));
-        Assert.Throws<ArgumentOutOfRangeException>(() => MeshConeFaceRegions.TryGetBoundaryWitness(empty, cone, 0, out _, out _));
         Assert.Throws<ArgumentOutOfRangeException>(() => SlabWitness(empty, embedded, 0, out _, out _));
         var spans = Sources(CapPatch(scene.Context, duplicate: false));
         var joined = Array.FindAll(spans, item => item.Span.Kind == MeshSurfaceBoundaryDomain.SpanKind.Joined);
         Assert.NotEmpty(joined);
-        Assert.False(MeshConeFaceRegions.TryGetBoundaryWitness(joined, cone, 1, out _, out _));
         Assert.False(SlabWitness(joined, embedded, 1, out _, out _));
     }
 

@@ -49,10 +49,15 @@ internal sealed partial class MeshConeFaceRegions
         _samplePool.FastClear();
         _sampleCounts[region] = 0;
         int orientation = _regions[region].Orientation;
-        var selected = BorrowWinner(2 * region + (orientation > 0 ? 0 : 1));
+        int peakSlot = 2 * region + (orientation > 0 ? 0 : 1);
+        Winner winner = _winners[peakSlot];
+        _currentMember = winner.Member; _currentSupplier = winner.Supplier; _currentSpan = winner.Span;
+        _frame = GetFrame(winner.Member);
+        int nativeOrientation = GetNativeOrientation(region, winner.Member, orientation);
+        var selected = BorrowWinner(peakSlot);
         if (!ConePlaneRayPointMaterialization.TryGetPointInFrame(_frame, selected.Point, selected.Root,
             _samplingOrigin, out Vector3d maximumPoint)
-            || !TryMaterializeSample(selected, orientation, maximumPoint, out Sample maximum))
+            || !TryMaterializeSample(selected, nativeOrientation, maximumPoint, out Sample maximum))
         { _sampleCounts[region] = -1; return; }
         // Keep the exact regional maximum first. The rest of this finite pool
         // uses intrinsic and true-boundary constructions, independent of seams.
@@ -74,7 +79,7 @@ internal sealed partial class MeshConeFaceRegions
         // exits/depths for the selected outputs, after validating every eligible
         // candidate's exact exit range. The exact maximum bounds all depths.
         for (int slot = 1; slot < count; slot++)
-            _samples[offset + slot] = MaterializeSelected(_samples[offset + slot], orientation);
+            _samples[offset + slot] = MaterializeSelected(_samples[offset + slot], GetNativeOrientation(region, _samples[offset + slot].Member, orientation));
         _sampleCounts[region] = count;
     }
 
@@ -84,11 +89,11 @@ internal sealed partial class MeshConeFaceRegions
         if (!ray.HasValue) return true;
         if (!ray.IsRepresentable) return false;
         Vector3d p = source.MeshPoint;
-        var sample = new Sample(ray.Source, ray.Event, p, default, default);
-        // Pool points are already exactly distinct; only the separately
-        // seeded maximum can coincide with a pool entry.
-        Sample maximum = _samplePool[0];
-        if (maximum.MeshPoint == p && ComparePoints(sample, maximum) == 0) return true;
+        var sample = new Sample(ray.Source, ray.Event, p, default, default, member: ray.Member, supplier: source.Supplier, span: ray.Span);
+        // Native cohorts and joined members can share an exact point.
+        // Deduplicate before coverage, retaining the first canonical supplier.
+        foreach (Sample existing in _samplePool.AsReadOnlySpan()[..(source.Member < 0 ? 1 : _samplePool.Count)])
+            if (existing.MeshPoint == p && ComparePoints(sample, existing) == 0) return true;
         _samplePool.Add(sample);
         return true;
     }
@@ -104,6 +109,7 @@ internal sealed partial class MeshConeFaceRegions
             int order = first.MeshPoint.X.CompareTo(second.MeshPoint.X);
             if (order != 0) return order;
         }
+        if (first.Member >= 0 || second.Member >= 0) return CompareJoinedPoints(first, second);
         return ConePlaneRayEvents.CompareEventAnchors(first.Source, first.Event, second.Source, second.Event,
             _frame, includeCoincidentProvenance: false);
     }
@@ -117,11 +123,13 @@ internal sealed partial class MeshConeFaceRegions
             _frame, selection.Point, selection.Root,
             ContactQuadratic.At(selection.Values, selection.Signs, 0, ConePlaneRaySelection.FieldWords),
             ContactQuadratic.At(selection.Values, selection.Signs, 1, ConePlaneRaySelection.FieldWords), orientation, _samplingOrigin));
-        return new Ray(selection.MaximumSource, selection.MaximumEvent, representable);
+        return new Ray(selection.MaximumSource, selection.MaximumEvent, representable, _currentMember, _currentSpan);
     }
 
     private Sample MaterializeSelected(Sample sample, int orientation)
     {
+        _currentMember = sample.Member; _currentSupplier = sample.Supplier; _currentSpan = sample.Span;
+        _frame = GetFrame(sample.Member);
         Span<ulong> pv = stackalloc ulong[ConePlaneRaySelection.StorageWords];
         Span<ulong> nv = stackalloc ulong[ConePlaneRaySelection.StorageWords];
         Span<int> ps = stackalloc int[ConePlaneRaySelection.SignCount];
@@ -131,7 +139,7 @@ internal sealed partial class MeshConeFaceRegions
         Span<int> pointSigns = stackalloc int[ConePlaneRayPoint.SignCount];
         var point = new ConePlaneRayPoint(pointValues, pointSigns);
         Span<ulong> root = stackalloc ulong[ConePlaneRaySelection.RootWords];
-        bool exists = ConePlaneRayEvents.TryEvaluateEvent(sample.Source, _frame, sample.Event, point, root,
+        bool exists = ConePlaneRayEvents.TryEvaluateEvent(sample.Source, _frame, sample.Event, GetClip(sample.Member, sample.Span), point, root,
             ref positive, ref negative, requestedOrientation: orientation);
         ConePlaneRaySelection selected = orientation > 0 ? positive : negative;
         System.Diagnostics.Debug.Assert(exists && selected.HasValue);
@@ -154,14 +162,15 @@ internal sealed partial class MeshConeFaceRegions
                 ContactQuadratic.At(selection.Values, selection.Signs, 0, ConePlaneRaySelection.FieldWords),
                 ContactQuadratic.At(selection.Values, selection.Signs, 1, ConePlaneRaySelection.FieldWords),
                 orientation, _samplingOrigin, out Vector3d exit, out Vector3d coneLocal)) return false;
-        bool meshLocal = ConePlaneRayPointMaterialization.TryGetAuthoredPoint(_frame, selection.Point, selection.Root,
-            out Vector3d p);
+        ref readonly ConePlaneRayFrame supplierFrame = ref GetFrame(_currentSupplier);
+        bool meshLocal = ConePlaneRayPointMaterialization.TryGetAuthoredPoint(supplierFrame, selection.Point, selection.Root,
+            _frame, out Vector3d p);
         // Round authored identity directly from the exact point. The paired
         // exit owner independently rounds its cone-local anchor; neither is
         // recovered by inverting the once-rounded common-frame outputs.
         System.Diagnostics.Debug.Assert(meshLocal);
         ulong identity = ContactManifold.CreateContactId(ContactAnchor.FromWorldPoint(p), 0, ContactAnchor.FromWorldPoint(coneLocal), 0);
-        sample = new Sample(selection.MaximumSource, selection.MaximumEvent, meshPoint, exit, depth, identity);
+        sample = new Sample(selection.MaximumSource, selection.MaximumEvent, meshPoint, exit, depth, identity, _currentMember, _currentSupplier, _currentSpan, p, coneLocal);
         return true;
     }
 
@@ -172,8 +181,11 @@ internal sealed partial class MeshConeFaceRegions
         internal readonly ConePlaneRayEventSource Source;
         internal readonly ConePlaneRayEvent Event;
         internal readonly bool HasValue, IsRepresentable;
-        internal Ray(ConePlaneRayEventSource source, ConePlaneRayEvent descriptor, bool representable)
-        { Source = source; Event = descriptor; HasValue = true; IsRepresentable = representable; }
+        internal readonly int Member;
+        internal readonly int Span;
+        internal Ray(ConePlaneRayEventSource source, ConePlaneRayEvent descriptor, bool representable,
+            int member = -1, int span = -1)
+        { Source = source; Event = descriptor; HasValue = true; IsRepresentable = representable; Member = member; Span = span; }
     }
 
     private readonly struct PoolEvent
@@ -183,8 +195,9 @@ internal sealed partial class MeshConeFaceRegions
         internal readonly int Region;
         internal readonly Vector3d MeshPoint;
         internal readonly Ray Positive, Negative;
-        internal PoolEvent(ConePlaneRayEventSource source, ConePlaneRayEvent descriptor, int region, Vector3d meshPoint, Ray positive, Ray negative)
-        { Source = source; Event = descriptor; Region = region; MeshPoint = meshPoint; Positive = positive; Negative = negative; }
+        internal readonly int Member, Supplier;
+        internal PoolEvent(ConePlaneRayEventSource source, ConePlaneRayEvent descriptor, int region, Vector3d meshPoint, Ray positive, Ray negative, int member = -1, int supplier = -1)
+        { Source = source; Event = descriptor; Region = region; MeshPoint = meshPoint; Positive = positive; Negative = negative; Member = member; Supplier = supplier; }
     }
 
     private readonly struct Sample : IPlaneContactSample
@@ -192,10 +205,15 @@ internal sealed partial class MeshConeFaceRegions
         public Vector3d Point => MeshPoint;
         internal readonly ConePlaneRayEventSource Source;
         internal readonly ConePlaneRayEvent Event;
-        internal readonly Vector3d MeshPoint, ConePoint;
+        internal readonly Vector3d MeshPoint, ConePoint, AuthoredPoint, ConeLocalPoint;
         internal readonly Fixed64 Depth;
         internal readonly ulong Identity;
-        internal Sample(ConePlaneRayEventSource source, ConePlaneRayEvent descriptor, Vector3d p, Vector3d q, Fixed64 depth, ulong identity = 0)
-        { Source = source; Event = descriptor; MeshPoint = p; ConePoint = q; Depth = depth; Identity = identity; }
+        internal readonly int Member, Supplier;
+        internal readonly int Span;
+        internal Sample(ConePlaneRayEventSource source, ConePlaneRayEvent descriptor, Vector3d p, Vector3d q, Fixed64 depth, ulong identity = 0,
+            int member = -1, int supplier = -1, int span = -1,
+            Vector3d authored = default, Vector3d coneLocal = default)
+        { Source = source; Event = descriptor; MeshPoint = p; ConePoint = q; Depth = depth; Identity = identity;
+            Member = member; Supplier = supplier; Span = span; AuthoredPoint = authored; ConeLocalPoint = coneLocal; }
     }
 }
