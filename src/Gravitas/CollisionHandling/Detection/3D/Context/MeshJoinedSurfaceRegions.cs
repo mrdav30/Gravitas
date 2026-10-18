@@ -88,9 +88,12 @@ internal class MeshJoinedSurfaceRegions<TFrame> where TFrame : struct
     }
 
     internal void AddRegions(int index)
+        => AddRegions(index, Members[index].Connectivity.RegionCount);
+
+    internal void AddRegions(int index, int count)
     {
         Member member = Members[index]; member.Offset = Parents.Count;
-        for (int region = 0; region < member.Connectivity.RegionCount; region++)
+        for (int region = 0; region < count; region++)
         { Parents.Add(Parents.Count); RegionByRoot.Add(-1); NodeMembers.Add(index); }
     }
 

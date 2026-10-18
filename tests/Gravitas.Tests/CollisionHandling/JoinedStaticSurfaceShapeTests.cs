@@ -44,6 +44,7 @@ public sealed class JoinedStaticSurfaceShapeTests
     [Theory]
     [InlineData("Cone")]
     [InlineData("Cylinder")]
+    [InlineData("Cuboid")]
     [InlineData("ConcaveMesh")]
     public void JoinedInterior_ShouldRetainOnlyTheCompleteFloorExit(string family)
     {
@@ -55,6 +56,7 @@ public sealed class JoinedStaticSurfaceShapeTests
         {
             "Cone" => new LSConeCollider(),
             "Cylinder" => new LSCylinderCollider(),
+            "Cuboid" => new LSCuboidCollider(),
             _ => MeshTestFixtures.CreateConvexCube(MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation)
         };
         scene.CreateBody(shape, new(Fixed64.Quarter, Fixed64.Quarter, Fixed64.Zero), FixedQuaternion.Identity);
@@ -76,13 +78,17 @@ public sealed class JoinedStaticSurfaceShapeTests
     }
 
     [Theory]
-    [InlineData(false, false, false, 1, 2)]
-    [InlineData(true, false, false, 1, 2)]
-    [InlineData(true, true, false, 1, 2)]
-    [InlineData(true, false, true, 1, 2)]
-    [InlineData(false, true, false, 32, 2)]
-    [InlineData(false, false, false, 1, 16)]
-    public void ConeCrossing_ShouldPreserveFrictionlessMotion(bool partial, bool reverse, bool compound, int divisions, int count)
+    [InlineData("Cone", false, false, false, 1, 2)]
+    [InlineData("Cone", true, false, false, 1, 2)]
+    [InlineData("Cone", true, true, false, 1, 2)]
+    [InlineData("Cone", true, false, true, 1, 2)]
+    [InlineData("Cone", false, true, false, 32, 2)]
+    [InlineData("Cone", false, false, false, 1, 16)]
+    [InlineData("Cuboid", false, false, false, 1, 2)]
+    [InlineData("Cylinder", false, false, false, 1, 2)]
+    [InlineData("Cuboid", false, false, true, 1, 2)]
+    [InlineData("Cylinder", false, false, true, 1, 2)]
+    public void JoinedShapeCrossing_ShouldPreserveFrictionlessMotion(string family, bool partial, bool reverse, bool compound, int divisions, int count)
     {
         using var scene = PhysicsScenarioBuilder.Create();
         scene.Context.SetFrameRate(16);
@@ -96,8 +102,15 @@ public sealed class JoinedStaticSurfaceShapeTests
                 partial && index == 1 ? 2 : 4, divisions);
         if (reverse) Array.Reverse(members);
         using var surface = scene.Context.Physics.CreateStaticSurface(members);
-        LSCollider shape = compound ? new LSCompoundCollider(CompoundColliderPart.Cone(Fixed64.Half, Fixed64.One, Vector3d.Zero,
-            PhysicsMaterial.Frictionless)) : new LSConeCollider();
+        LSCollider shape = family switch
+        {
+            "Cuboid" => compound ? new LSCompoundCollider(CompoundColliderPart.Cuboid(Vector3d.One, Vector3d.Zero,
+                PhysicsMaterial.Frictionless)) : new LSCuboidCollider(),
+            "Cylinder" => compound ? new LSCompoundCollider(CompoundColliderPart.Cylinder(Fixed64.Half, Fixed64.One, Vector3d.Zero,
+                PhysicsMaterial.Frictionless)) : new LSCylinderCollider(),
+            _ => compound ? new LSCompoundCollider(CompoundColliderPart.Cone(Fixed64.Half, Fixed64.One, Vector3d.Zero,
+                PhysicsMaterial.Frictionless)) : new LSConeCollider()
+        };
         shape.Material = PhysicsMaterial.Frictionless;
         var body = scene.CreateBody(shape, new((Fixed64)(-2), Fixed64.Half, Fixed64.Zero),
             FixedQuaternion.Identity, preventAngularForces: true).Body;

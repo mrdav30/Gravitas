@@ -1,7 +1,7 @@
 # Static Surface Continuity And Heightfield Integration
 
 **Date:** 2026-10-15  
-**Status:** Phases 1–3 complete; Phase 4 (remaining 3D families) next, 2026-10-18
+**Status:** Phases 1–3 complete; Phase 4 (3D extrusion continuity and response ownership) in progress, 2026-10-18
 #133/#139 remain coordinated. Heightfield and alternative-index work are deferred;
 no public continuity API is enabled. Internal 3D rounded and cone response is complete;
 other shape families, dimensions and continuation remain in the phases below.  
@@ -232,7 +232,7 @@ contract and bounded arithmetic feasibility recorded below.
 Every runtime phase must preserve raw reachable 100% line/branch/method coverage
 in Release/Lean, relevant replay behavior, zero added warmed allocations and the
 ordinary warm baseline, using `UseLocalLsfStack=true`. Refine introduced costs
-before handoff and obtain independent ponytail review. Phase 8 consolidates the
+before handoff and obtain independent ponytail review. Phase 9 consolidates the
 evidence; it does not postpone these requirements. Keep experimental membership
 internal until response, query/CCD and restore semantics are coherent.
 
@@ -496,7 +496,7 @@ rotated component has error at most
 world point is materialized. Original intervals remain authoritative for
 coverage; rounded endpoints never replace them. Mixed callers receive native
 local endpoints and use their actual quaternion frames. Complete polygon
-reclipping and dimensional-owner failure handling remain Phase 5 consumers,
+reclipping and dimensional-owner failure handling remain Phase 6 consumers,
 not new public APIs in this proof.
 
 **Cone and mixed-slab boundary proof:** Existing family owners now consume
@@ -529,7 +529,7 @@ Nonaxial slab integration must retain the existing full-owner
 physical-support search: a source outside the initial section can enter the
 slab during translation. These helpers reuse existing family owners without
 new production files, geometry frameworks or public APIs. Complete joined face
-pools and dispatch remain Phase 3/6 integration work.
+pools and dispatch remain Phase 3/7 integration work.
 
 This is a coordinated internal-ABI change: commit/push FixedMathSharp first,
 then pin Gravitas's develop workflow to that revision before pushing Gravitas.
@@ -584,7 +584,7 @@ executable bodies, layouts, constants and non-version configuration in both
 profiles; only declared version metadata differs. The retained proof is
 `perf/completion/fms-graph-proof/full-gate-to-gravitas-tested-proof.json`.
 
-Phases 2–5 consume the bounded proofs through existing owners and delete
+Phases 2–7 consume the bounded proofs through existing owners and delete
 superseded entry points. It must establish complete joined face pools, actual
 response, eligibility, membership lifetime and unsupported-placement handling;
 these are not enabled by a geometry-only proof. Keep #133/#139 open through the
@@ -834,24 +834,131 @@ Ignored evidence is under `artifacts/grv-issue-133/phase3/`: raw
 `bdn-warm-final`, paired/reversed controls, source and eight-module hashes.
 Linux, ARM and released packages were not run locally. Commit/push FixedMathSharp
 first, then advance Gravitas's develop CI pin. Membership remains internal;
-#133/#139 stay open for the remaining original checklist in Phases 4–8.
+#133/#139 stay open for the remaining original checklist in Phases 4–9.
 
-### Phase 4 - Complete Remaining 3D Shape Families
+### Phase 4 - Complete 3D Extrusion Continuity And Response Ownership - Complete, 2026-10-18
 
-- [ ] Establish cuboid, cylinder, convex/concave mesh and non-rounded compound
-  behavior against declared surfaces. Reuse the finite extrusion support owner
-  for cuboid/cylinder and native convex SAT/finite-feature producer for hulls;
+- [x] Establish cuboid, cylinder and their compound-leaf behavior against
+  declared surfaces. Reuse the finite extrusion support and boundary owners;
   retire superseded local-only branches where the shared owner covers both.
-  The initial two-member floor probe reproduces artificial +X exits for a
-  cuboid and closed convex cube at `(1/4,1/4,0)`; cylinder and concave cube pass
-  that probe. Preserve the failing cases when implementing their producers.
-- [ ] Verify complete-shape clearance, finite anchors/materials, genuine ends,
+- [x] Keep exact initial overlap and per-member events separate from response
+  supply. Gather projected supports outside the mover's initial AABB and carry
+  complete component face/perimeter rows through an actually overlapping member,
+  preserving finite supplier anchors, materials, provenance and warm-start
+  invalidation without changing the pair or solver model.
+- [x] Verify complete-shape clearance, finite anchors/materials, genuine ends,
   holes, ambiguous/folded joins, free rotation and order reversal. Maintain
   ordinary fast paths, 0 B warm allocation and practical moving-contact costs.
-- [ ] Complete affected Release/Lean coverage, replay, allocation/performance and
+- [x] Complete affected Release/Lean coverage, replay, allocation/performance and
   independent review gates before closing this phase.
 
-### Phase 5 - Complete Pure 2D Static Continuity
+**Closeout:** Cuboids, cylinders and actual compound leaves now reuse the native
+finite extrusion support, sample reducer and exact clipped-boundary owners.
+A support outside the mover's initial AABB keeps its finite supplying member;
+one genuinely overlapping member carries the coplanar component's face and
+perimeter rows. Events retain actual member overlap. Keeping those rows in one
+solver pass also prevents duplicate positional correction. Supplier identity is
+separate from compound leaf identity, and supplier changes clear carrier warm
+starts. Odd raw cylinder heights retain their exact caps before materialization.
+
+Profiling led to bounded scalar determinant scratch, exact zero/constant pruning
+and delayed radial scratch initialization in the existing math owner. An exact
+filled axial-section certificate reuses its intrinsic support producer; holes,
+partial rims and oblique cases retain the finite path. No solver or index layer
+was added. Avoiding whole warm-start group copies during key/count lookups
+resolved the introduced native-control increase without a new cache.
+
+Final local-stack validation:
+
+| Library/profile | Passed tests | Raw line points | Raw branches | Raw methods |
+| --- | ---: | ---: | ---: | ---: |
+| FixedMathSharp Release | 6,130 | 60,611 / 60,611 | 17,752 / 17,752 | 4,556 / 4,556 |
+| FixedMathSharp Lean | 6,109 | 60,603 / 60,603 | 17,752 / 17,752 | 4,552 / 4,552 |
+| Gravitas Release | 7,028 | 49,351 / 49,351 | 17,446 / 17,446 | 5,208 / 5,208 |
+| Gravitas Lean | 6,960 | 49,349 / 49,349 | 17,446 / 17,446 | 5,207 / 5,207 |
+
+FluentAssertions also retains complete raw coverage. Both target-framework builds
+and both 49-case Chronicler adapter runs pass without warnings. Six shared native
+replay fixtures agree across Windows x64 Release/Lean and reviewed expectations.
+Manifold/warm-start hash sections advance to 9/3 for supplier references; only
+expected hashes change in five fixtures, with identical body, event and query
+data. A single-supplier test normalizes registry references; reconstructed
+multi-supplier solver ordering remains Phase 8's continuation contract.
+
+The final moving one-body batch uses 64 complete frames per invocation at a
+configured 16 Hz, 24 warmed windows and four invocations/window on the
+Windows/i7-9700K/.NET 8.0.29 host:
+
+| Workload | Cuboid us/frame | Cylinder us/frame |
+| --- | ---: | ---: |
+| Unsplit small floor | 95.38 | 138.29 |
+| Two joined full-edge members | 401.67 | 505.54 |
+| Partial join | 1,079.20 | 1,032.72 |
+| 32 strips/member (128 triangles) | 665.53 | 854.53 |
+| Sixteen two-triangle members | 752.37 | 1,017.90 |
+
+All ten cases retain 0 B/frame and exact frictionless tangent velocity. These are
+bounded moving-contact budgets, not game-capacity or frame-tail qualification.
+Thirteen ordinary controls use frozen graphs, exact inspected physical outputs,
+actual eight-module bindings and two reversed-load processes. All warmed
+windows allocate zero bytes; mixed manifold means improve 14�56%. Initial native
+increases persist in longer windows, then disappear after the lookup refinement:
+long native 3D contrasts are +0.25%/-3.46%, mixed -2.13%/-4.20%. A later capsule
+increase changes sign in longer windows (+1.17%/-1.06%); pure 2D is lower in both.
+No persistent ordinary regression remains at this resolution; this is not exact
+equivalence or zero-overhead proof. All adverse and short runs are retained.
+
+Net runtime growth is **453 Gravitas lines, one new runtime file, and 229
+FixedMathSharp lines, no new runtime files**. Independent geometry and ponytail
+reviews have no outstanding findings. The separate rotated-mesh recentering
+defect is captured as [#141](issue-tracker.md#grv-issue-141---recentered-rotated-mesh-pieces-lose-exact-authored-shared-vertices);
+shared authored vertices need preservation, rather than tolerance welding.
+
+Ignored evidence is under `artifacts/grv-issue-133/phase4/`, including
+`{fms-final,g-accepted-ref}-{Release,ReleaseLean}`, `replay-ref-comparison.log`,
+`ordinary-ref-{ab,ba,assessment}.json`, `ref-*`, `final-long-*`,
+`extrusion-ref-final.json`, source hashes and frozen payloads. Linux, ARM and
+released packages were not run locally. Commit/push FixedMathSharp first, then
+advance Gravitas's develop CI pin. Membership stays internal; #133/#139 remain
+open for the original remaining family/dimensional/continuation checklist below.
+
+### Phase 5 - Complete Native Mesh Continuity
+
+The original remaining-3D checklist is split at the existing geometry owners.
+Extrusions use the finite slab support owner; native hull and triangle pairs
+need exact finite-source admission during axis selection. Complete Phase 4's
+small-workload performance and correctness gates before expanding these owners.
+
+- [ ] Establish convex/concave mesh and mesh compound-leaf behavior against
+  declared surfaces. Preserve closed convex volume semantics and open/concave
+  sheet semantics; reuse the native hull and triangle-pair producers rather
+  than convexifying members or creating another union solver.
+  The original two-member floor probe still reproduces an artificial +X exit
+  for a closed convex cube at `(1/4,1/4,0)`, captured in the ignored
+  `artifacts/grv-issue-133/phase4/repro.log`. Its cuboid counterpart belongs to
+  Phase 4. Cylinder and concave cube pass that initial probe; that result does
+  not establish complete mesh continuity.
+- [ ] Admit the exact finite source support before ranking response exits,
+  including candidates generated by the moving hull's own face axes. Assess
+  both signed directions independently and preserve every separation check;
+  dropping a covered winner afterward must not discard another valid exit.
+- [ ] Clip original finite support intervals before witness rounding. A partly
+  exposed edge is insufficient when all matched witnesses lie on its joined
+  portion. Extend the existing rational witness and finite-feature owners only
+  as needed for this implemented consumer; do not filter rounded anchors.
+- [ ] Preserve the native coplanar triangle-pair axes, including plane-normal
+  cross own-edge directions. Keep holes, genuine corners and ambiguous joins
+  finite; a degenerate hull substitution must not remove those separation axes.
+- [ ] Reuse component carriers, exact supplier anchors/materials, sample
+  reduction and lifetime invalidation. Retire superseded local-only branches
+  where the shared owner completely covers their contracts.
+- [ ] Verify complete-shape clearance, genuine ends, holes, folded/ambiguous
+  joins, free rotation, argument/declaration reversal and compound provenance.
+  Preserve ordinary fast paths and practical full-loop costs; complete the
+  same Release/Lean coverage, replay, zero warmed allocation, performance and
+  independent review gates before closing this phase.
+
+### Phase 6 - Complete Pure 2D Static Continuity
 
 - [ ] Implement typed 2D membership through existing services/lifecycle owners;
   retain the same ownership, transactional replacement and lifetime guarantees.
@@ -868,19 +975,20 @@ first, then advance Gravitas's develop CI pin. Membership remains internal;
   membership/filter changes and density/scaling; complete coverage, replay,
   allocation/performance and independent review gates before closing this phase.
 
-### Phase 6 - Complete Mixed Static Continuity
+### Phase 7 - Complete Mixed Static Continuity
 
 - [ ] Apply the same ownership/eligibility contract to mixed finite slabs in both
   directions. Complete joined face pools through the existing mixed slab support
   and clipped-boundary owners, including a vertical 3D sheet with a planar
-  response normal.
+  response normal. Retire the Phase 1 slab boundary-witness proof once the
+  production path covers its nonzero-core embedded cases.
 - [ ] Verify connected 2D pieces as embedded targets with matching/differing host
   Y and thickness. Planar adjacency must not erase a real step or finite rim.
 - [ ] Preserve per-member events/query identity, deterministic solver ordering,
   materials and lifetime invalidation; cover actual full-loop crossings and
   complete-shape response before the same coverage/performance/review closeout.
 
-### Phase 7 - Continuation, Queries And Continuous Collision
+### Phase 8 - Continuation, Queries And Continuous Collision
 
 - [ ] Extend existing dependency invalidation to affected neighbors for geometry,
   filtering, trigger state, removal and membership changes. Test sleeping contact
@@ -892,10 +1000,12 @@ first, then advance Gravitas's develop CI pin. Membership remains internal;
   A horizontal 3D floor cannot prove planar mixed sliding parity.
 - [ ] Complete authoritative membership hashing, explicit recording/restore and
   host reconstruction, including unloaded/replaced members and context reuse.
+  Settle supplier identity and solver-group ordering across reconstructed registry
+  slots; normalized hash references alone do not establish equivalent ordering.
   Extend shared native replay conformance with reviewed expectations; do not
   weaken existing unrelated fixtures to accommodate a seam correction.
 
-### Phase 8 - Close #133/#139 And Publish The Supported Contract
+### Phase 9 - Close #133/#139 And Publish The Supported Contract
 
 - [ ] Validate Release/ReleaseLean, raw reachable 100% line/branch/method coverage,
   relevant replay lanes and warmed allocation guards using `UseLocalLsfStack=true`.
@@ -926,7 +1036,7 @@ first, then advance Gravitas's develop CI pin. Membership remains internal;
    costs with identical physical surfaces. No backend is selected in advance;
    no core-library coupling, shared mode switch or duplicate terrain math is
    required by the independent profiles.
-3. **Representation conformance.** Reuse Phase 8's correctness, determinism,
+3. **Representation conformance.** Reuse Phase 9's correctness, determinism,
    coverage and cost gates for any selected representation. Add explicit sample
    quantization/diagonal agreement, streaming/edit churn and adapter validation
    only where that representation introduces them. Publish its supported

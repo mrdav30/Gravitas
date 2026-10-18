@@ -14,6 +14,47 @@ public sealed class ContactGroupCompoundTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public void JoinedSurfaceCarrier_ShouldPreserveTheActualSupplierMaterialThroughCompoundRemapping(bool reverseArguments)
+    {
+        using var scene = PhysicsScenarioBuilder.Create();
+        var left = Floor(-8, 0, PhysicsMaterial.Default);
+        var right = Floor(0, 8, PhysicsMaterial.Bouncy);
+        using var surface = scene.Context.Physics.CreateStaticSurface(new[] { left, right });
+        var compound = new LSCompoundCollider(CompoundColliderPart.Cuboid(Vector3d.One, Vector3d.Zero, PhysicsMaterial.Frictionless));
+        scene.CreateBody(compound, new Vector3d(Fixed64.Quarter, Fixed64.Quarter, Fixed64.Zero), FixedQuaternion.Identity);
+        var pair = reverseArguments ? scene.CreatePair(compound, left) : scene.CreatePair(left, compound);
+
+        CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
+
+        pair.ColliderA.Should().BeSameAs(compound);
+        bool foundLeft = false, foundRight = false;
+        for (int group = 0; group < pair.Manifold.GroupCount; group++)
+        {
+            ref var contacts = ref pair.Manifold.GetGroup(group);
+            int source = contacts.Key.SourceIdB;
+            source.Should().BeOneOf(left.Id + 1, right.Id + 1);
+            foundLeft |= source == left.Id + 1; foundRight |= source == right.Id + 1;
+            for (int index = 0; index < contacts.Count; index++)
+            {
+                contacts[index].MaterialA.Should().Be(PhysicsMaterial.Frictionless);
+                contacts[index].MaterialB.Should().Be(source == left.Id + 1 ? left.Material : right.Material);
+            }
+        }
+        foundLeft.Should().BeTrue(); foundRight.Should().BeTrue();
+
+        LSMeshCollider Floor(int minimum, int maximum, PhysicsMaterial material)
+        {
+            var mesh = new LSMeshCollider(new[] { new Vector3d(minimum, 0, -4), new(maximum, 0, -4),
+                new(minimum, 0, 4), new(maximum, 0, 4) }, new[] { 0, 2, 1, 1, 2, 3 },
+                MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation) { Material = material };
+            scene.InitializeStaticCollider(mesh, Vector3d.Zero);
+            return mesh;
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public void NineSpherePartsAgainstCuboid_ShouldPreserveEveryOwnerMaterialThroughPartReversal(bool reverseArguments)
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();

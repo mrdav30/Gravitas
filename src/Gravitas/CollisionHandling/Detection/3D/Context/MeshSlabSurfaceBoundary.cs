@@ -5,6 +5,7 @@
 using FixedMathSharp;
 using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
+using Gravitas.Materials;
 using SwiftCollections;
 using System;
 
@@ -68,7 +69,7 @@ internal sealed class MeshSlabSurfaceBoundary
 
     internal void BuildSurfaceContacts(LSMeshCollider collider, LSCollider2D? embedded,
         int surfaceTriangle, MeshSurfaceConnectivity connectivity, MeshSlabFaceRegions faces,
-        ContactManifold manifold, int namespace3D, int namespace2D)
+        ContactManifold manifold, int namespace3D, int namespace2D, PhysicsMaterial? targetMaterial = null)
     {
         PhysicsMesh mesh = collider.Mesh;
         int owner = mesh.GetManifoldSurfaceOwner(surfaceTriangle);
@@ -80,18 +81,49 @@ internal sealed class MeshSlabSurfaceBoundary
         Fixed64 radius = frame.RadiusValue;
         Fixed64 halfThickness = frame.HalfThickness;
         Span<Vector2d> box = stackalloc Vector2d[4];
-        ReadOnlySpan<Vector2d> offsets = embedded == null ? ReadOnlySpan<Vector2d>.Empty
+        ReadOnlySpan<Vector2d> offsets = !faces.PrismOffsets.IsEmpty ? faces.PrismOffsets.Span
             : CollisionDetectionMixed.GetConvexPrismOffsets(embedded, box);
         frame.SourcePlane.GetExactNormal(out Signed192 nx, out Signed192 ny, out Signed192 nz, out _);
         WideAxis3 normal = new(Signed320.ExtendValue(nx), Signed320.ExtendValue(ny), Signed320.ExtendValue(nz));
         _visitedCorners.Clear();
+        MeshSurfaceBoundaryDomain? domain = faces.JoinedBoundary;
+        if (domain != null)
+        {
+            for (int span = 0; span < domain.Spans.Length; span++)
+            {
+                var piece = domain.Spans[span];
+                if (faces.IsJoinedSpan(span) || !frame.Section.IntersectsSegment(new FixedSegment(piece.Start, piece.End), offsets)) continue;
+                int region = MeshSurfaceBoundaryTopology.FindEdgeRegion(mesh, owner, piece.First, piece.Second,
+                    connectivity, frame.Section, faces.PrismOffsets);
+                int feature = checked(3 * span);
+                RationalSegmentInterval clip = faces.GetRetainedInterval(ref span);
+                // An intersected trusted perimeter has an admitted incident triangle.
+                System.Diagnostics.Debug.Assert(region >= 0);
+                KeepFeature(piece.First, piece.Second, feature, region, false, offsets, clip);
+            }
+            for (int edge = 0; edge < boundary.Length; edge += 2)
+            {
+                int first = boundary[edge], second = boundary[edge + 1];
+                int region = MeshSurfaceBoundaryTopology.FindEdgeRegion(mesh, owner, first, second,
+                    connectivity, frame.Section, faces.PrismOffsets);
+                if (region < 0) continue;
+                int feature = checked(3 * (domain.Spans.Length + edge / 2));
+                if (_visitedCorners.Add(first) && frame.Section.ContainsPoint(vertices[first], offsets))
+                    KeepFeature(first, second, feature + 1, region, true, offsets);
+                if (_visitedCorners.Add(second) && frame.Section.ContainsPoint(vertices[second], offsets))
+                    KeepFeature(second, first, feature + 2, region, true, offsets);
+            }
+            return;
+        }
         for (int edge = 0; edge < boundary.Length; edge += 2)
         {
             int first = boundary[edge], second = boundary[edge + 1];
             int feature = checked(3 * (edge / 2));
             int region = connectivity.RegionCount == 1
                 ? frame.Section.IntersectsSegment(new FixedSegment(vertices[first], vertices[second]), offsets) ? 0 : -1
-                : MeshSurfaceBoundaryTopology.FindEdgeRegion(mesh, owner, first, second, connectivity, frame.Section, embedded);
+                : !faces.PrismOffsets.IsEmpty
+                    ? MeshSurfaceBoundaryTopology.FindEdgeRegion(mesh, owner, first, second, connectivity, frame.Section, faces.PrismOffsets)
+                    : MeshSurfaceBoundaryTopology.FindEdgeRegion(mesh, owner, first, second, connectivity, frame.Section, embedded);
             if (region < 0) continue;
             KeepFeature(first, second, feature, region, pointOnly: false, offsets);
             if (_visitedCorners.Add(first) && frame.Section.ContainsPoint(vertices[first], offsets))
@@ -100,10 +132,17 @@ internal sealed class MeshSlabSurfaceBoundary
                 KeepFeature(second, first, feature + 2, region, pointOnly: true, offsets);
         }
 
-        void KeepFeature(int first, int second, int ordinal, int region, bool pointOnly, ReadOnlySpan<Vector2d> prismOffsets)
+        void KeepFeature(int first, int second, int ordinal, int region, bool pointOnly, ReadOnlySpan<Vector2d> prismOffsets,
+            in RationalSegmentInterval clip = default)
         {
-            Span<WideAxis3> fan = stackalloc WideAxis3[5];
-            int count = MeshSurfaceBoundaryTopology.GetIncidentFan(mesh, owner, first, second, !pointOnly, fan);
+            bool suppress = false;
+            ReadOnlySpan<WideAxis3> joinedFan = domain != null && pointOnly
+                ? faces.GetJoinedCornerFan(collider, surfaceTriangle, first, out suppress) : default;
+            if (suppress) return;
+            Span<WideAxis3> fan = stackalloc WideAxis3[Math.Max(5, joinedFan.Length + 1)];
+            int count;
+            if (joinedFan.IsEmpty) count = MeshSurfaceBoundaryTopology.GetIncidentFan(mesh, owner, first, second, !pointOnly, fan);
+            else { joinedFan.CopyTo(fan); count = joinedFan.Length; }
             // Topology admits the contact normal p-q. The mathematics owner
             // admits the opposite exit ray q-p; negate its halfspaces once.
             for (int index = 0; index < count; index++) fan[index] = -fan[index];
@@ -112,10 +151,10 @@ internal sealed class MeshSlabSurfaceBoundary
                 mesh.ScaledLocalVertices[pointOnly ? first : second]);
             if (!SegmentSlabSurfaceContact.TryGetContact(segment, frame.Origin, frame.Rotation,
                 frame.Center, frame.SlabRotation, length, radius, halfThickness, prismOffsets, fan[..count],
-                interiorOnly: !pointOnly, out FixedContactAnchors contact)) return;
-            var group = new ContactGroupKey(namespace3D, namespace2D, surface, 0, checked(-ordinal - 1));
+                interiorOnly: !pointOnly, clip, out FixedContactAnchors contact, fullHeight: frame.FullHeight != Fixed64.Zero)) return;
+            var group = new ContactGroupKey(namespace3D, namespace2D, surface, 0, checked(-ordinal - 1), sourceIdA: faces.SourceId);
             manifold.AddContact(new ContactAnchor(contact.FirstAnchor), new ContactAnchor(contact.SecondAnchor),
-                contact.Depth, contact.Normal, collider.Material, embedded?.Material ?? collider.Material,
+                contact.Depth, contact.Normal, collider.Material, targetMaterial ?? embedded?.Material ?? collider.Material,
                 contact.DepthIsClamped, featureNamespaceA: namespace3D, featureNamespaceB: namespace2D, group: group);
         }
     }

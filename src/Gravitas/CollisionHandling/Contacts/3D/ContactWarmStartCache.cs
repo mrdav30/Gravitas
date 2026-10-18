@@ -174,7 +174,7 @@ internal struct ContactWarmStartCache
         get
         {
             int count = 0;
-            for (int i = 0; i < GroupCount; i++) count += GetGroup(i).Count;
+            for (int i = 0; i < GroupCount; i++) count += i == 0 ? first.Count : additional!.InnerArray[i - 1].Count;
             return count;
         }
     }
@@ -202,9 +202,16 @@ internal struct ContactWarmStartCache
     internal void Set(in ContactGroupKey key, ulong contactId, Vector3d normal,
         Fixed64 normalImpulse, Fixed64 tangentImpulse, Fixed64 secondaryTangentImpulse)
     {
-        int index = 0;
-        while (index < GroupCount && GetGroup(index).Key.CompareTo(key) < 0) index++;
-        if (index == GroupCount || GetGroup(index).Key.CompareTo(key) != 0)
+        int index = 0, order = -1;
+        while (index < GroupCount)
+        {
+            // Key lookup must not copy the group's four retained impulse rows.
+            ref readonly ContactWarmStartGroup candidate = ref (index == 0 ? ref first : ref additional!.InnerArray[index - 1]);
+            order = candidate.Key.CompareTo(key);
+            if (order >= 0) break;
+            index++;
+        }
+        if (index == GroupCount || order != 0)
         {
             if (GroupCount > 0)
             {
@@ -240,7 +247,7 @@ internal struct ContactWarmStartCache
         if (index < 0) return false;
         ref ContactWarmStartGroup current = ref (index == 0 ? ref first : ref additional!.InnerArray[index - 1]);
         if (!current.Remove(contactId)) return false;
-        if (GetGroup(index).Count == 0) RemoveGroup(index);
+        if (current.Count == 0) RemoveGroup(index);
         return true;
     }
 
@@ -248,13 +255,13 @@ internal struct ContactWarmStartCache
     {
         for (int group = GroupCount - 1; group >= 0; group--)
         {
-            int current = manifold.FindGroup(GetGroup(group).Key);
+            ref ContactWarmStartGroup cached = ref (group == 0 ? ref first : ref additional!.InnerArray[group - 1]);
+            int current = manifold.FindGroup(cached.Key);
             if (current < 0)
             {
                 RemoveGroup(group);
                 continue;
             }
-            ref ContactWarmStartGroup cached = ref (group == 0 ? ref first : ref additional!.InnerArray[group - 1]);
             ref ContactGroup admitted = ref manifold.GetGroup(current);
             for (int point = cached.Count - 1; point >= 0; point--)
             {
@@ -273,7 +280,8 @@ internal struct ContactWarmStartCache
         while (low <= high)
         {
             int middle = low + ((high - low) >> 1);
-            int order = GetGroup(middle).Key.CompareTo(key);
+            ref readonly ContactWarmStartGroup current = ref (middle == 0 ? ref first : ref additional!.InnerArray[middle - 1]);
+            int order = current.Key.CompareTo(key);
             if (order == 0) return middle;
             if (order < 0) low = middle + 1;
             else high = middle - 1;

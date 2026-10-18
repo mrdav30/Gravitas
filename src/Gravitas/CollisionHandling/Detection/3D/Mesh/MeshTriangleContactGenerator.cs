@@ -197,6 +197,13 @@ internal static class MeshTriangleContactGenerator
         LSCuboidCollider cuboid,
         SwiftList<int> triangleBuffer)
     {
+        if (mesh.StaticSurface is { } surface && !mesh.IsTrigger && !cuboid.IsTrigger
+            && surface.GatherSlab(cuboid))
+        {
+            Vector3d half = cuboid.OrientedBox.HalfExtents;
+            surface.BuildSlab(cuboid, Fixed64.Zero, half.Y, new(half.X, half.Z));
+            return surface.SlabFaces.AppendJoinedContacts(mesh, cuboid, pair.Context.CollisionScratch.MeshSlabBoundary, pair.Manifold);
+        }
         mesh.GetTrianglesInBounds(CreateBounds(cuboid.BoundsMin, cuboid.BoundsMax), triangleBuffer);
         for (int i = 0; i < triangleBuffer.Count; i++)
             TryAddCuboidTriangleContact(pair, mesh, triangleBuffer[i], cuboid);
@@ -210,6 +217,12 @@ internal static class MeshTriangleContactGenerator
         LSCylinderCollider cylinder,
         SwiftList<int> triangleBuffer)
     {
+        if (mesh.StaticSurface is { } surface && !mesh.IsTrigger && !cylinder.IsTrigger
+            && surface.GatherSlab(cylinder))
+        {
+            surface.BuildSlab(cylinder, cylinder.ScaledRadius, cylinder.Height, default);
+            return surface.SlabFaces.AppendJoinedContacts(mesh, cylinder, pair.Context.CollisionScratch.MeshSlabBoundary, pair.Manifold);
+        }
         mesh.GetTrianglesInBounds(CreateBounds(cylinder.BoundsMin, cylinder.BoundsMax), triangleBuffer);
         bool overlaps = false;
         for (int i = 0; i < triangleBuffer.Count; i++)

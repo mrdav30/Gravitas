@@ -41,7 +41,7 @@ public partial class CollisionPair
         bool usesBroadPhaseCache = _isColliding || CullCounter > 0;
         writer.WriteBool(!usesBroadPhaseCache || _lastColliderABroadPhaseVersion == ColliderA.BroadPhaseVersion);
         writer.WriteBool(!usesBroadPhaseCache || _lastColliderBBroadPhaseVersion == ColliderB.BroadPhaseVersion);
-        ContributeManifoldReplayHash(ref writer, Manifold);
+        ContributeManifoldReplayHash(ref writer, Context, Manifold);
         ContributeWarmStartReplayHash(ref writer, _warmStart);
 
         if (mode != GravitasReplayHashMode.AuthoritativeWithSolverCaches)
@@ -53,17 +53,18 @@ public partial class CollisionPair
 
     internal static void ContributeManifoldReplayHash(
         ref ChronicleHashWriter writer,
+        GravitasWorldContext context,
         ContactManifold manifold,
         string sectionName = "manifold.3d")
     {
-        writer.WriteSection(sectionName, 8);
+        writer.WriteSection(sectionName, 9);
         writer.WriteInt64(manifold.LastUpdatedFrame);
         writer.WriteInt32(manifold.Count);
         writer.WriteInt32(manifold.GroupCount);
         for (int groupIndex = 0; groupIndex < manifold.GroupCount; groupIndex++)
         {
             ref ContactGroup group = ref manifold.GetGroup(groupIndex);
-            WriteGroupKey(ref writer, group.Key);
+            WriteGroupKey(ref writer, context, group.Key);
             writer.WriteInt32(group.Count);
             for (int i = 0; i < group.Count; i++)
             {
@@ -103,17 +104,17 @@ public partial class CollisionPair
         writer.WriteEnum(material.RestitutionCombine);
     }
 
-    private static void ContributeWarmStartReplayHash(
+    private void ContributeWarmStartReplayHash(
         ref ChronicleHashWriter writer,
         ContactWarmStartCache warmStart)
     {
-        writer.WriteSection("warm-start.3d", 2);
+        writer.WriteSection("warm-start.3d", 3);
         writer.WriteInt32(warmStart.Count);
         writer.WriteInt32(warmStart.GroupCount);
         for (int groupIndex = 0; groupIndex < warmStart.GroupCount; groupIndex++)
         {
             ContactWarmStartGroup group = warmStart.GetGroup(groupIndex);
-            WriteGroupKey(ref writer, group.Key);
+            WriteGroupKey(ref writer, Context, group.Key);
             writer.WriteInt32(group.Count);
             for (int i = 0; i < group.Count; i++)
             {
@@ -127,12 +128,21 @@ public partial class CollisionPair
         }
     }
 
-    private static void WriteGroupKey(ref ChronicleHashWriter writer, in ContactGroupKey group)
+    private static void WriteGroupKey(ref ChronicleHashWriter writer, GravitasWorldContext context, in ContactGroupKey group)
     {
         writer.WriteInt32(group.NamespaceA);
         writer.WriteInt32(group.NamespaceB);
         writer.WriteInt32(group.SurfaceA);
         writer.WriteInt32(group.SurfaceB);
         writer.WriteInt32(group.Region);
+        WriteSource(ref writer, context, group.SourceIdA);
+        WriteSource(ref writer, context, group.SourceIdB);
+    }
+
+    private static void WriteSource(ref ChronicleHashWriter writer, GravitasWorldContext context, int source)
+    {
+        // Runtime identity is available before hashing assigns live replay ordinals.
+        writer.WriteInt32(source == 0 ? 0 : context.Physics.TryGetColliderById(source - 1, out var collider)
+            ? collider!.ReplayOrdinal + 1 : -1);
     }
 }

@@ -12,7 +12,8 @@ using System.Collections.Generic;
 namespace Gravitas.CollisionHandling;
 
 /// <summary>Clips physical slab supports to the filled finite mesh owner.</summary>
-internal sealed class MeshSlabFaceRegions
+/// <content>Native support charts and the shared finite sample reduction.</content>
+internal sealed partial class MeshSlabFaceRegions
 {
     private readonly ulong[] _values = new ulong[2 * FiniteSlabRaySelection.StorageWords];
     private readonly sbyte[] _signs = new sbyte[2 * FiniteSlabRaySelection.SignCount];
@@ -79,6 +80,13 @@ internal sealed class MeshSlabFaceRegions
     }
 
     internal void Prepare(in FiniteSlabRayFrame frame, ReadOnlySpan<Vector2d> prismOffsets)
+    {
+        _member = -1;
+        PrismOffsets = default;
+        PrepareFrame(frame, prismOffsets);
+    }
+
+    private void PrepareFrame(in FiniteSlabRayFrame frame, ReadOnlySpan<Vector2d> prismOffsets)
     {
         _frame = frame;
         for (int orientation = -1; orientation <= 1; orientation += 2)
@@ -151,6 +159,11 @@ internal sealed class MeshSlabFaceRegions
         // Only canonical real edges can add clipped support extrema; authored
         // diagonals must not change a flat support family's retained levers.
         _intrinsicOnly = false;
+        if (_member >= 0)
+        {
+            GatherJoinedBoundary(mesh, surfaceTriangle, connectivity);
+            return;
+        }
         int wholeOwner = mesh.GetManifoldSurfaceOwner(surfaceTriangle);
         for (int edge = 0; edge < boundary.Length; edge += 2)
         {
@@ -200,10 +213,17 @@ internal sealed class MeshSlabFaceRegions
         // a rim, whose real normal belongs to perimeter response, not this face.
         if (_intrinsicOnly && candidate.Metadata.DomainEdgeMask != 0
             || candidate.CompareDepth(BorrowPeak(_orientation)) != 0) return;
+        if (_member >= 0 && _completeSupports[FindComponent(_member)] && !ContainsSupportPoint(candidate)) return;
         bool represented = candidate.TryGetContactAnchor(_frame, out Fixed64 depth, out bool clamped,
             out Vector3d point, out FixedPointAnchor exit);
         System.Diagnostics.Debug.Assert(represented);
-        var sample = new Sample(_region, point, exit, depth, clamped);
+        Vector3d authored = point;
+        if (_member >= 0)
+        {
+            bool rounded = candidate.TryGetSourcePointInSamplingFrame(_frame, out point);
+            System.Diagnostics.Debug.Assert(rounded);
+        }
+        var sample = new Sample(_region, point, exit, depth, clamped, _member, authored);
         foreach (Sample retained in _events.AsReadOnlySpan())
             if (retained.Region == _region && ComparePoints(sample, retained) == 0) return;
         _events.Add(sample);
@@ -218,27 +238,7 @@ internal sealed class MeshSlabFaceRegions
         Span<int> chosen = stackalloc int[ContactManifold.MaxContactsPerGroup];
         for (int region = 0; region < RegionCount; region++)
         {
-            _pool.FastClear();
-            foreach (Sample sample in _events.AsReadOnlySpan())
-            {
-                if (sample.Region != region) continue;
-                bool duplicate = false;
-                foreach (Sample retained in _pool.AsReadOnlySpan()) if (ComparePoints(sample, retained) == 0) { duplicate = true; break; }
-                if (!duplicate) _pool.Add(sample);
-            }
-            // Every nonempty support region retains an intrinsic pole or a real boundary endpoint.
-            System.Diagnostics.Debug.Assert(_pool.Count > 0);
-            _pool.SortInPlace(PointComparer);
-            int count = _supportDimension == 0 ? 1 : _supportDimension == 1 ? Math.Min(2, _pool.Count)
-                : Math.Min(ContactManifold.MaxContactsPerGroup, _pool.Count);
-            // Along a genuine support line normal velocity and wrench are affine:
-            // its two extreme levers span every interior constraint, even across holes.
-            if (_supportDimension <= 1) { chosen[0] = 0; chosen[1] = _pool.Count - 1; }
-            else
-            {
-                chosen[0] = 0;
-                for (int slot = 1; slot < count; slot++) chosen[slot] = MeshPlaneSampleReduction.ChooseNext(_pool.AsReadOnlySpan(), chosen[..slot], metrics, PointComparer);
-            }
+            int count = ReduceSamples(region, _events.AsReadOnlySpan(), metrics, _supportDimension, chosen);
             var group = new ContactGroupKey(namespace3D, namespace2D, surface, 0, region);
             for (int slot = 0; slot < count; slot++)
             {
@@ -249,6 +249,31 @@ internal sealed class MeshSlabFaceRegions
                     featureNamespaceA: namespace3D, featureNamespaceB: namespace2D, group: group);
             }
         }
+    }
+
+    private int ReduceSamples(int region, ReadOnlySpan<Sample> events, WidePlaneMetrics metrics, int dimension, Span<int> chosen)
+    {
+        _pool.FastClear();
+        foreach (Sample sample in events)
+        {
+            if (sample.Region != region) continue;
+            bool duplicate = false;
+            foreach (Sample retained in _pool.AsReadOnlySpan()) if (ComparePoints(sample, retained) == 0) { duplicate = true; break; }
+            if (!duplicate) _pool.Add(sample);
+        }
+        // Every nonempty support region retains an intrinsic pole or a real boundary endpoint.
+        System.Diagnostics.Debug.Assert(_pool.Count > 0);
+        _pool.SortInPlace(PointComparer);
+        int count = dimension == 0 ? 1 : dimension == 1 ? Math.Min(2, _pool.Count)
+            : Math.Min(ContactManifold.MaxContactsPerGroup, _pool.Count);
+        // Normal velocity and wrench are affine along a genuine support line.
+        if (dimension <= 1) { chosen[0] = 0; chosen[1] = _pool.Count - 1; }
+        else
+        {
+            chosen[0] = 0;
+            for (int slot = 1; slot < count; slot++) chosen[slot] = MeshPlaneSampleReduction.ChooseNext(_pool.AsReadOnlySpan(), chosen[..slot], metrics, PointComparer);
+        }
+        return count;
     }
 
     private FiniteSlabRaySelection BorrowPeak(int orientation)
@@ -273,9 +298,11 @@ internal sealed class MeshSlabFaceRegions
         internal readonly FixedPointAnchor Exit;
         internal readonly Fixed64 Depth;
         internal readonly bool Clamped;
+        internal readonly int Member;
+        internal readonly Vector3d Authored;
         public Vector3d Point { get; }
-        internal Sample(int region, Vector3d point, FixedPointAnchor exit, Fixed64 depth, bool clamped)
-        { Region = region; Point = point; Exit = exit; Depth = depth; Clamped = clamped; }
-        internal Sample WithRegion(int region) => new(region, Point, Exit, Depth, Clamped);
+        internal Sample(int region, Vector3d point, FixedPointAnchor exit, Fixed64 depth, bool clamped, int member = -1, Vector3d authored = default)
+        { Region = region; Point = point; Exit = exit; Depth = depth; Clamped = clamped; Member = member; Authored = authored; }
+        internal Sample WithRegion(int region) => new(region, Point, Exit, Depth, Clamped, Member, Authored);
     }
 }

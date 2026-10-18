@@ -26,6 +26,10 @@ internal static class MeshSurfaceBoundaryTopology
         MeshSurfaceConnectivity connectivity, in FiniteSlabSectionFrame frame, LSCollider2D? embedded) =>
         FindEdgeRegion(mesh, owner, first, second, connectivity, new SlabSection(frame, embedded));
 
+    internal static int FindEdgeRegion(PhysicsMesh mesh, int owner, int first, int second,
+        MeshSurfaceConnectivity connectivity, in FiniteSlabSectionFrame frame, ReadOnlyMemory<Vector2d> offsets) =>
+        FindEdgeRegion(mesh, owner, first, second, connectivity, new SlabSection(frame, null, offsets));
+
     internal static int FindSupportEdgeRegion(PhysicsMesh mesh, int owner, int first, int second,
         MeshSurfaceConnectivity connectivity, MeshSlabFaceRegions faces, LSCollider2D? embedded) =>
         FindEdgeRegion(mesh, owner, first, second, connectivity, new SlabSupport(faces, embedded));
@@ -167,12 +171,13 @@ internal static class MeshSurfaceBoundaryTopology
     {
         private readonly FiniteSlabSectionFrame frame;
         private readonly LSCollider2D? embedded;
-        internal SlabSection(in FiniteSlabSectionFrame frame, LSCollider2D? embedded)
-        { this.frame = frame; this.embedded = embedded; }
+        private readonly ReadOnlyMemory<Vector2d> offsets;
+        internal SlabSection(in FiniteSlabSectionFrame frame, LSCollider2D? embedded, ReadOnlyMemory<Vector2d> offsets = default)
+        { this.frame = frame; this.embedded = embedded; this.offsets = offsets; }
         public bool IntersectsSegment(FixedSegment segment)
         {
             Span<Vector2d> box = stackalloc Vector2d[4];
-            return frame.IntersectsSegment(segment, CollisionDetectionMixed.GetConvexPrismOffsets(embedded, box));
+            return frame.IntersectsSegment(segment, offsets.IsEmpty ? CollisionDetectionMixed.GetConvexPrismOffsets(embedded, box) : offsets.Span);
         }
     }
 
@@ -185,7 +190,8 @@ internal static class MeshSurfaceBoundaryTopology
         public bool IntersectsSegment(FixedSegment segment)
         {
             Span<Vector2d> box = stackalloc Vector2d[4];
-            return faces.IntersectsSupport(segment, CollisionDetectionMixed.GetConvexPrismOffsets(embedded, box));
+            return faces.IntersectsSupport(segment, faces.PrismOffsets.IsEmpty
+                ? CollisionDetectionMixed.GetConvexPrismOffsets(embedded, box) : faces.PrismOffsets.Span);
         }
     }
 }

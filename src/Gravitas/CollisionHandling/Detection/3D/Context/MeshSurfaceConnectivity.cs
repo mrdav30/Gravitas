@@ -69,6 +69,10 @@ internal sealed class MeshSurfaceConnectivity
         LSCollider2D? embedded, ReadOnlySpan<int> admittedTriangles) =>
         Build(mesh, surfaceTriangle, new SlabSection(frame, embedded), admittedTriangles);
 
+    internal void BuildSlab(PhysicsMesh mesh, int surfaceTriangle, in FiniteSlabSectionFrame frame,
+        ReadOnlyMemory<Vector2d> offsets, ReadOnlySpan<int> admittedTriangles) =>
+        Build(mesh, surfaceTriangle, new SlabSection(frame, null, offsets), admittedTriangles);
+
     internal void Build(PhysicsMesh mesh, int surfaceTriangle, in ConePlaneRayFrame frame, ReadOnlySpan<int> admittedTriangles) =>
         Build(mesh, surfaceTriangle, new ConeSection(frame), admittedTriangles);
 
@@ -295,7 +299,8 @@ internal sealed class MeshSurfaceConnectivity
         public bool IntersectsSegment(FixedSegment segment)
         {
             Span<Vector2d> box = stackalloc Vector2d[4];
-            return faces.IntersectsSupport(segment, CollisionDetectionMixed.GetConvexPrismOffsets(embedded, box));
+            return faces.IntersectsSupport(segment, faces.PrismOffsets.IsEmpty
+                ? CollisionDetectionMixed.GetConvexPrismOffsets(embedded, box) : faces.PrismOffsets.Span);
         }
     }
 
@@ -323,23 +328,24 @@ internal sealed class MeshSurfaceConnectivity
     {
         private readonly FiniteSlabSectionFrame frame;
         private readonly LSCollider2D? embedded;
-        internal SlabSection(in FiniteSlabSectionFrame frame, LSCollider2D? embedded)
-        { this.frame = frame; this.embedded = embedded; }
+        private readonly ReadOnlyMemory<Vector2d> offsets;
+        internal SlabSection(in FiniteSlabSectionFrame frame, LSCollider2D? embedded, ReadOnlyMemory<Vector2d> offsets = default)
+        { this.frame = frame; this.embedded = embedded; this.offsets = offsets; }
         public bool ContainsPoint(Vector3d point)
         {
             Span<Vector2d> box = stackalloc Vector2d[4];
-            return frame.ContainsPoint(point, CollisionDetectionMixed.GetConvexPrismOffsets(embedded, box));
+            return frame.ContainsPoint(point, offsets.IsEmpty ? CollisionDetectionMixed.GetConvexPrismOffsets(embedded, box) : offsets.Span);
         }
         public bool IntersectsSegment(FixedSegment segment)
         {
             Span<Vector2d> box = stackalloc Vector2d[4];
-            return frame.IntersectsSegment(segment, CollisionDetectionMixed.GetConvexPrismOffsets(embedded, box));
+            return frame.IntersectsSegment(segment, offsets.IsEmpty ? CollisionDetectionMixed.GetConvexPrismOffsets(embedded, box) : offsets.Span);
         }
         public bool TryGetFirstSegmentPoint(FixedSegment segment, FiniteSectionPoint point)
         {
             Span<Vector2d> box = stackalloc Vector2d[4];
             return FiniteSectionPoint.TryGetFirstSegmentPoint(segment, frame,
-                CollisionDetectionMixed.GetConvexPrismOffsets(embedded, box), point);
+                offsets.IsEmpty ? CollisionDetectionMixed.GetConvexPrismOffsets(embedded, box) : offsets.Span, point);
         }
     }
 }

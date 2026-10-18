@@ -9,16 +9,21 @@ namespace Gravitas.CollisionHandling;
 internal readonly struct ContactGroupKey
 {
     internal ContactGroupKey(int namespaceA, int namespaceB, int surfaceA = 0,
-        int surfaceB = 0, int region = 0)
+        int surfaceB = 0, int region = 0, int sourceIdA = 0, int sourceIdB = 0)
     {
         NamespaceA = namespaceA;
         NamespaceB = namespaceB;
         SurfaceA = surfaceA;
         SurfaceB = surfaceB;
         Region = region;
+        SourceIdA = sourceIdA;
+        SourceIdB = sourceIdB;
     }
 
     internal readonly int NamespaceA, NamespaceB, SurfaceA, SurfaceB, Region;
+    // Compound namespaces identify leaves. Supplier registry IDs plus one are
+    // normalized to replay ordinals only when hashing; zero means no supplier.
+    internal readonly int SourceIdA, SourceIdB;
 
     internal int CompareTo(in ContactGroupKey other)
     {
@@ -29,10 +34,15 @@ internal readonly struct ContactGroupKey
         order = SurfaceA.CompareTo(other.SurfaceA);
         if (order != 0) return order;
         order = SurfaceB.CompareTo(other.SurfaceB);
-        return order != 0 ? order : Region.CompareTo(other.Region);
+        if (order != 0) return order;
+        order = Region.CompareTo(other.Region);
+        if (order != 0) return order;
+        order = SourceIdA.CompareTo(other.SourceIdA);
+        return order != 0 ? order : SourceIdB.CompareTo(other.SourceIdB);
     }
 
     internal ContactGroupKey Remap(int namespaceA, int namespaceB, bool reverse) =>
         new(namespaceA, namespaceB, reverse ? SurfaceB : SurfaceA,
-            reverse ? SurfaceA : SurfaceB, Region);
+            reverse ? SurfaceA : SurfaceB, Region,
+            reverse ? SourceIdB : SourceIdA, reverse ? SourceIdA : SourceIdB);
 }

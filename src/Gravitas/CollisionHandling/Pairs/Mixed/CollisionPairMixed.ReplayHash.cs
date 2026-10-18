@@ -26,7 +26,7 @@ internal sealed partial class CollisionPairMixed
         writer.WriteBool(!_isColliding || _lastCollider3DContactDependencyVersion == Collider3D.ContactDependencyVersion);
         writer.WriteBool(!_isColliding || _lastCollider2DContactDependencyVersion == Collider2D.ContactDependencyVersion);
         writer.WriteBool(!_isColliding || !_hasManifoldCache || HasCurrentManifoldCache);
-        CollisionPair.ContributeManifoldReplayHash(ref writer, Manifold, "manifold.mixed");
+        CollisionPair.ContributeManifoldReplayHash(ref writer, Context, Manifold, "manifold.mixed");
         // Per-step impulses are rebuilt before the next solve and cannot
         // affect future authoritative state, unlike cross-frame 3D warm starts.
     }

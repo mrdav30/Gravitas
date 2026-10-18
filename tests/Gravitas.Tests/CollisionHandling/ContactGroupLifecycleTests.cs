@@ -13,6 +13,86 @@ namespace Gravitas.Tests.CollisionHandlingTests;
 
 public sealed class ContactGroupLifecycleTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ReplayHash_ShouldRetainSupplierProvenanceAndDistinguishMissingSources(bool secondSide)
+    {
+        using var scene = PhysicsScenarioBuilder.Create();
+        var first = scene.CreateSphere(Vector3d.Zero);
+        var second = scene.CreateSphere(Vector3d.Right);
+        var supplier = scene.CreateSphere(Vector3d.Left * (Fixed64)4);
+        var alternate = scene.CreateSphere(Vector3d.Right * (Fixed64)4);
+        var pair = scene.CreatePair(first.Collider, second.Collider);
+        scene.Context.Physics.PrepareReplayColliders();
+        int source = supplier.Collider.Id + 1;
+        var baseline = PopulateAndHash(source);
+        PopulateAndHash(alternate.Collider.Id + 1).Should().NotBe(baseline);
+        PopulateAndHash(0).Should().NotBe(baseline);
+        supplier.Collider.Deactivate();
+        var missing = PopulateAndHash(source);
+        missing.Should().NotBe(baseline);
+        missing.Should().NotBe(PopulateAndHash(0));
+
+        ChronicleHash PopulateAndHash(int source)
+        {
+            pair.Manifold.BeginUpdate(0); pair.ClearWarmStart();
+            var key = new ContactGroupKey(0, 0, sourceIdA: secondSide ? 0 : source, sourceIdB: secondSide ? source : 0);
+            pair.Manifold.AddContact(key, Sample(42, Fixed64.One));
+            pair.StoreWarmStartImpulse(key, 42, Vector3d.Up, Fixed64.One, Fixed64.Half, Fixed64.Quarter);
+            return HashPair(pair);
+        }
+    }
+
+    [Fact]
+    public void ReplaySingleSupplierReference_ShouldNormalizeRegistrySlotOffsets()
+    {
+        Hash(false).Should().Be(Hash(true));
+
+        static ChronicleHash Hash(bool priorRegistration)
+        {
+            using var scene = PhysicsScenarioBuilder.Create();
+            var retired = priorRegistration ? scene.CreateSphere(Vector3d.Forward * (Fixed64)8).Collider : null;
+            var first = scene.CreateSphere(Vector3d.Zero);
+            var second = scene.CreateSphere(Vector3d.Right);
+            var supplier = scene.CreateSphere(Vector3d.Left * (Fixed64)4);
+            retired?.Deactivate();
+            scene.Context.Physics.PrepareReplayColliders();
+            var pair = scene.CreatePair(first.Collider, second.Collider);
+            var key = new ContactGroupKey(0, 0, sourceIdA: supplier.Collider.Id + 1);
+            pair.Manifold.AddContact(key, Sample(42, Fixed64.One));
+            pair.StoreWarmStartImpulse(key, 42, Vector3d.Up, Fixed64.One, Fixed64.Half, Fixed64.Quarter);
+            return HashPair(pair);
+        }
+    }
+
+    [Fact]
+    public void SupplierProvenance_ShouldSeparateIdenticalFeaturesAndSurviveCompoundRemapping()
+    {
+        ContactGroupKey[] keys = { new(1, 2, 3, 4, 5, 7, 8), new(1, 2, 3, 4, 5, 7, 9), new(1, 2, 3, 4, 5, 8, 8) };
+        var manifold = new ContactManifold();
+        var cache = new ContactWarmStartCache();
+        for (int index = keys.Length - 1; index >= 0; index--)
+        {
+            manifold.AddContact(keys[index], Sample(42, Fixed64.One));
+            cache.Set(keys[index], 42, Vector3d.Up, (Fixed64)(index + 1), Fixed64.Zero, Fixed64.Zero);
+        }
+        manifold.GroupCount.Should().Be(3);
+        for (int index = 0; index < keys.Length; index++)
+        {
+            manifold.GetGroup(index).Key.CompareTo(keys[index]).Should().Be(0);
+            cache.TryGet(keys[index], 42, out var impulse).Should().BeTrue();
+            impulse.NormalImpulse.Should().Be((Fixed64)(index + 1));
+        }
+        ContactGroupKey reversed = keys[0].Remap(11, 12, reverse: true);
+        reversed.NamespaceA.Should().Be(11); reversed.NamespaceB.Should().Be(12);
+        reversed.SurfaceA.Should().Be(4); reversed.SurfaceB.Should().Be(3);
+        reversed.SourceIdA.Should().Be(8); reversed.SourceIdB.Should().Be(7);
+        reversed.Region.Should().Be(5);
+        reversed.Remap(1, 2, reverse: true).CompareTo(keys[0]).Should().Be(0);
+        keys[0].Remap(1, 2, reverse: false).CompareTo(keys[0]).Should().Be(0);
+    }
+
     [Fact]
     public void NarrowPhaseRegeneration_WithoutResponse_ShouldRetireVanishedWarmStarts()
     {

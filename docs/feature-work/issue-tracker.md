@@ -2,7 +2,7 @@
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-141`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-142`.
 - Assign an ID when an issue enters this tracker, keep it through resolution,
   and never reuse an ID even if an entry is later removed. Check this file's Git
   history before advancing or repairing the counter.
@@ -50,6 +50,10 @@ bounded geometry phase before publishing the new membership API.
 #140 follows that work: the existing 2D single-contact/query path discards finite
 witnesses even on one convex target. Keep its fix separate from joined-boundary
 reduction, while retaining the shared finite-witness lesson in both paths.
+
+#141 is a separate mesh-authoring precision defect: recentering rotated pieces
+can separate vertices authored in a common frame. Preserve exact shared geometry
+in its owning transform contract; do not add tolerance welding to continuity.
 
 #111 remains an independent validation-tooling issue.
 #125 is a low-priority, non-blocking runtime crash observation; defer further
@@ -182,6 +186,38 @@ investigation unless it recurs or a reliable reproducer becomes available.
   retain deterministic representative selection, material ownership and the
   ordinary warm baseline. This issue remains separate from cross-member
   continuity; current continuity proofs must use the finite manifold path.
+
+### GRV-Issue-141 - Recentered rotated mesh pieces lose exact authored shared vertices
+
+- **Confirmed:** 2026-10-18 during Phase 4's projected-support supplier check.
+- **Reproduction:** Author two concave rectangular floor meshes with local X
+  domains `[-4,0.9]` and `[0.9,4]`, both with Z domain `[-4,4]` and Y=0.
+  Initialize them at the same host origin and 45-degree Z rotation. Their
+  authored X=0.9 edge is identical, but the committed boundary domains do not
+  certify a joined span and form two independent continuity components. An
+  upright `(4,1,2)` cuboid centered at `rotation * Up / 10` intersects the first
+  member while its plane-support projection belongs to the second; treating
+  them independently leaves neither member with an admitted global face support.
+- **Root cause:** `LSMeshCollider` initializes its offset from the local bounds
+  center. `LSCollider.CreateStandaloneSnapshot` rounds the transformed offset
+  into a scalar `Center`, which becomes `PhysicsMesh.Origin`.
+  `PhysicsMesh.PrepareScaledGeometry` separately retains centered local vertices.
+  Each piece therefore represents `round(M * center) + R * (vertex - center)`.
+  Different centers leave different rounding residuals, so the same authored
+  vertex need not have the same exact committed world position or plane.
+- **Pre-existing evidence:** These constructor, snapshot and mesh-scaling owners
+  are unchanged by Phase 4. Current runtime diagnostics confirm the two separate
+  components, first-member initial overlap and absent joined spans in ignored
+  `artifacts/grv-issue-133/phase4/slab-carrier-stages.log`. This attribution is
+  based on the executed current fixture and unchanged source; a frozen older
+  binary comparison has not been run.
+- **Follow-up:** Preserve common authored rigid geometry through recentering,
+  including the exact origin remainder, rather than treating nearby vertices
+  as equal. Regress exact shared vertices/planes and boundary certification for
+  differently centered rotated pieces, opposite winding, scale and compound
+  placement. Check dimensional counterparts and retain bounded geometry,
+  transactional mutation, finite anchors and the warm baseline. Resolve the
+  owning transform contract separately from Phase 4's joined support transport.
 
 ### GRV-Issue-111 - Local-stack benchmark hosts can omit FixedMathSharp compile references
 
