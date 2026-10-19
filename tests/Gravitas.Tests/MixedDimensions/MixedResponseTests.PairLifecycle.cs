@@ -13,6 +13,85 @@ namespace Gravitas.Tests.MixedDimensions;
 public sealed partial class MixedResponseTests
 {
     [Theory]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    public void Step_WithWholeShapeCurvedPrismSeparation_ShouldNotPublishOrResolveContact(bool cone, bool polygon)
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        FixedQuaternion rotation = cone ? FixedQuaternion.Identity
+            : FixedQuaternion.FromEulerAnglesInDegrees((Fixed64)22, (Fixed64)17, (Fixed64)9);
+        Vector3d normal = cone
+            ? new Vector3d(Fixed64.FromRaw(2716375826), Fixed64.FromRaw(1920767767), Fixed64.FromRaw(2716375826))
+            : new Vector3d(Fixed64.Zero, Fixed64.FromRaw(-3980925575), Fixed64.FromRaw(-1612133878));
+        Vector3d center = cone
+            ? new Vector3d(Fixed64.FromRaw(-565576967), Fixed64.FromRaw(-557169159), Fixed64.FromRaw(-565576967))
+            : new Vector3d(Fixed64.Quarter, Fixed64.FromFraction(3, 4), Fixed64.Quarter)
+                - normal * (Fixed64.FromRaw(1918558518) + Fixed64.FromFraction(1, 1024));
+        Fixed64 radius = cone ? Fixed64.Half : Fixed64.One;
+        Fixed64 halfHeight = cone ? Fixed64.Half : Fixed64.One;
+        Vector3d localNormal = rotation.Conjugate().Rotate(normal);
+        Fixed64 radialSupport = radius * FixedMath.Sqrt(
+            localNormal.X * localNormal.X + localNormal.Z * localNormal.Z);
+        Fixed64 maximum = Vector3d.Dot(center, normal) + (cone
+            ? FixedMath.Max(halfHeight * localNormal.Y, radialSupport - halfHeight * localNormal.Y)
+            : radialSupport + halfHeight * localNormal.Y.Abs());
+        Fixed64 minimum = cone ? Fixed64.Zero : normal.Z * Fixed64.Half;
+        // Whole-shape support proves strict separation independently of the dispatcher.
+        // All oracle values are below eight units; the >2-million-raw margin dwarfs rounding.
+        (minimum - maximum).Should().BeGreaterThan(Fixed64.FromFraction(1, 2048));
+
+        LSCollider curved = cone ? new LSConeCollider() : new LSCylinderCollider();
+        curved.Radius = radius;
+        curved.Size = new Vector3d(radius * Fixed64.Two, halfHeight * Fixed64.Two, radius * Fixed64.Two);
+        var spatial = new SolidBody(new TestMatterAgent(context,
+            new FixedTransform(center, rotation, Vector3d.One)), curved)
+        { Mass = Fixed64.One, SleepEnabled = false };
+        spatial.Initialize(center, rotation);
+        FixedQuaternion startRotation = spatial.Rotation;
+
+        Fixed64 halfX = cone ? Fixed64.Two : Fixed64.One;
+        Fixed64 halfZ = cone ? Fixed64.Two : Fixed64.Half;
+        LSCollider2D slab = polygon
+            ? new LSPolygonCollider2D(new Vector2d(-halfX, -halfZ), new Vector2d(halfX, -halfZ),
+                new Vector2d(halfX, halfZ), new Vector2d(-halfX, halfZ))
+            : new LSAABBoxCollider2D(new Vector2d(halfX * Fixed64.Two, halfZ * Fixed64.Two));
+        slab.MixedHalfThicknessOverride = cone ? Fixed64.One : (Fixed64)4;
+        Vector3d slabCenter = cone ? new Vector3d(2, 1, 2) : new Vector3d(0, -4, 0);
+        var planar = new SolidBody2D(new TestMatterAgent(context,
+            new FixedTransform(slabCenter, FixedQuaternion.Identity, Vector3d.One)), slab)
+        { Mass = Fixed64.One, SleepEnabled = false };
+        Vector2d planarPosition = slabCenter.ToVector2d();
+        planar.Initialize(planarPosition);
+
+        int notifications = 0;
+        curved.OnMixedContactEnter += _ => notifications++;
+        curved.OnMixedContact += _ => notifications++;
+        curved.OnMixedContactExit += _ => notifications++;
+        slab.OnMixedContactEnter += _ => notifications++;
+        slab.OnMixedContact += _ => notifications++;
+        slab.OnMixedContactExit += _ => notifications++;
+        bool reportedContact = CollisionDetectionMixed.TryCollide(curved, slab, out MixedContact contact);
+
+        Step(context);
+
+        Assert.Equal(1, context.MixedCollisions.LastBroadPhaseCandidateCount);
+        Assert.Equal(0, context.MixedCollisions.ActivePairCount);
+        notifications.Should().Be(0);
+        spatial.Position3d.Should().Be(center);
+        spatial.Rotation.Should().Be(startRotation);
+        spatial.LinearVelocity.Should().Be(Vector3d.Zero);
+        spatial.AngularVelocity.Should().Be(Vector3d.Zero);
+        planar.Position.Should().Be(planarPosition);
+        planar.Rotation.Should().Be(Fixed64.Zero);
+        planar.LinearVelocity.Should().Be(Vector2d.Zero);
+        planar.AngularVelocity.Should().Be(Fixed64.Zero);
+        reportedContact.Should().BeFalse();
+        contact.HasContact.Should().BeFalse();
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public void CachedMixedCandidate_WhenEarlierCallbackInvalidatesIt_ShouldNotPublishStaleContact(bool move)
