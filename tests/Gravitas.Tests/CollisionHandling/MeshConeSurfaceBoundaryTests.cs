@@ -43,7 +43,8 @@ public sealed class MeshConeSurfaceBoundaryTests
                 ManifoldContact contact = contacts[sample];
                 if (contact.Normal != Vector3d.Up) continue;
                 foundBoundary = true;
-                Assert.Equal(mesh.Center, contact.AnchorA.Origin);
+                Assert.True(contact.AnchorA.TryGetOffsetFrom(center, out Vector3d surfaceOffset));
+                Assert.InRange(surfaceOffset.Y.m_rawValue, -Fixed64.One.m_rawValue, 0L);
                 Assert.Equal(cone.Center, contact.AnchorB.Origin);
                 Assert.True(contact.TryGetPointA(out _));
                 // The chosen half-raw base endpoint crosses MinValue, but
@@ -151,8 +152,7 @@ public sealed class MeshConeSurfaceBoundaryTests
         scenario.InitializeStaticCollider(collider, new Vector3d(Fixed64.Zero, Fixed64.Half, Fixed64.Zero));
         var cone = new LSConeCollider();
         scenario.InitializeStaticCollider(cone, Vector3d.Zero);
-        collider.Mesh.GetLocalTriangleVertices(0, out Vector3d corner, out _, out _);
-        Assert.True(new FixedPointAnchor(collider.Mesh.Origin, collider.Mesh.Rotation, corner).TryGetPoint(out Vector3d worldCorner));
+        Assert.True(collider.Mesh.TryGetVertexWorld(0, out Vector3d worldCorner));
         Assert.Equal(cone.Center + cone.WorldAxis * (cone.Height / Fixed64.Two), worldCorner);
         var connectivity = new MeshSurfaceConnectivity();
         connectivity.Build(collider.Mesh, 0, cone.Center, cone.Rotation, cone.Height, cone.ScaledRadius, new[] { 0 });

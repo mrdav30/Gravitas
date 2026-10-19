@@ -246,6 +246,13 @@ faces and edges then supply paired anchors for that exit. The existing plane
 sample reducer retains up to four spread-out points, or two extreme points for
 a support line. Untrusted or nonconvex patches retain triangle-level contacts.
 
+Mesh collision and query consumers retain the same exact authored affine map.
+Recentering and separately rounded collider centers do not move their shared
+vertices or planes. Finite support, boundary certification and curved admission
+use that map before final contact-anchor rounding; public centered inspection
+vertices are not collision geometry. See the
+[mesh coordinate contract](COLLIDER_SHAPE_REFERENCE.md).
+
 Finite axes, oriented cuboids, and planar convex shapes retain center-relative
 canonical geometry through narrow phase. Contact witnesses use `ContactAnchor`
 or `ContactAnchor2D`: a representable origin, normalized frame rotation, and

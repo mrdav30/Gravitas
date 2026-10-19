@@ -32,20 +32,30 @@ internal sealed partial class MeshConeFaceRegions
         for (int index = 0; index < state.Inputs.Count; index++)
         {
             Member member = state.Members[index]; PhysicsMesh mesh = member.Collider.Mesh;
-            mesh.GetLocalTriangleVertices(member.Triangle, out Vector3d a, out Vector3d b, out Vector3d c);
-            member.Frame = new(new FixedTriangle(a, b, c), mesh.Origin, mesh.Rotation,
+            mesh.GetGeometryTriangleVertices(member.Triangle, out Vector3d a, out Vector3d b, out Vector3d c);
+            member.Frame = new(new FixedTriangle(a, b, c), mesh.GeometryFrame,
                 cone.Center, cone.Rotation, cone.Height, cone.ScaledRadius);
             member.Admitted.FastClear();
             member.Collider.GetTrianglesInBounds(bounds, state.Candidates);
             foreach (int triangle in state.Candidates.AsReadOnlySpan())
             {
                 if (mesh.GetManifoldSurfaceOwner(triangle) != member.Owner) continue;
-                mesh.GetLocalTriangleVertices(triangle, out a, out b, out c);
+                mesh.GetGeometryTriangleVertices(triangle, out a, out b, out c);
                 if (ConePlaneRayEvents.IntersectsTriangle(member.Frame, new FixedTriangle(a, b, c))) member.Admitted.Add(triangle);
             }
             member.Connectivity.Build(mesh, member.Triangle, member.Frame, member.Admitted.AsReadOnlySpan());
             state.AddRegions(index);
         }
+        bool wide = false;
+        foreach (Member member in state.Members.AsReadOnlySpan()[..state.Inputs.Count])
+        {
+            wide |= member.Frame.UsesWideBanks;
+            foreach (var span in member.Boundary.Spans) wide |= span.Interval.HasWideBounds;
+        }
+        if (wide)
+            foreach (Member member in state.Members.AsReadOnlySpan()[..state.Inputs.Count])
+                member.Frame = member.Frame.WithWideParameters();
+        _fieldWords = state.Members[0].Frame.FieldWords; _rootWords = state.Members[0].Frame.RootWords;
         JoinFiniteSpans();
         state.CompleteRegions();
         RegionCount = state.Roots.Count; HasBoundaryIntersection = false;
@@ -79,8 +89,8 @@ internal sealed partial class MeshConeFaceRegions
         {
             ReduceRegion(region);
             Member source = state.Members[state.NodeMembers[state.Roots[region]]];
-            source.Collider.Mesh.GetLocalTriangleVertices(source.Triangle, out Vector3d a, out Vector3d b, out Vector3d c);
-            ReduceSamples(region, new WidePlaneMetrics(new FixedTriangle(a, b, c), source.Collider.Mesh.Rotation));
+            source.Collider.Mesh.GetGeometryTriangleVertices(source.Triangle, out Vector3d a, out Vector3d b, out Vector3d c);
+            ReduceSamples(region, new WidePlaneMetrics(new FixedTriangle(a, b, c), source.Collider.Mesh.GeometryFrame));
         }
         state.Commit();
     }
@@ -122,11 +132,11 @@ internal sealed partial class MeshConeFaceRegions
         var state = _joined!; Member first = state.Members[_currentMember], second = state.Members[_otherMember];
         foreach (int a in first.Connectivity.TriangleIndices)
         {
-            first.Collider.Mesh.GetLocalTriangleVertices(a, out Vector3d aa, out Vector3d ab, out Vector3d ac);
+            first.Collider.Mesh.GetGeometryTriangleVertices(a, out Vector3d aa, out Vector3d ab, out Vector3d ac);
             if (!ConePlaneRayPointExits.ContainsTrianglePoint(new FixedTriangle(aa, ab, ac), first.Frame, point, root)) continue;
             foreach (int b in second.Connectivity.TriangleIndices)
             {
-                second.Collider.Mesh.GetLocalTriangleVertices(b, out Vector3d ba, out Vector3d bb, out Vector3d bc);
+                second.Collider.Mesh.GetGeometryTriangleVertices(b, out Vector3d ba, out Vector3d bb, out Vector3d bc);
                 if (!ConePlaneRayPointExits.ContainsTrianglePoint(new FixedTriangle(ba, bb, bc), second.Frame, point, root, frame)) continue;
                 state.Union(first.Offset + first.Connectivity.GetRegionOrdinal(a), second.Offset + second.Connectivity.GetRegionOrdinal(b));
                 first.JoinedSpans[_currentSpan] = true;
@@ -147,10 +157,10 @@ internal sealed partial class MeshConeFaceRegions
             {
                 int region = state.RegionByRoot[state.Find(target.Offset + target.Connectivity.GetRegionOrdinal(triangle))];
                 if (_currentRegion >= 0 && region != _currentRegion || _visitedJoinedRegions.Contains(region)) continue;
-                target.Collider.Mesh.GetLocalTriangleVertices(triangle, out Vector3d a, out Vector3d b, out Vector3d c);
+                target.Collider.Mesh.GetGeometryTriangleVertices(triangle, out Vector3d a, out Vector3d b, out Vector3d c);
                 if (!ConePlaneRayPointExits.ContainsTrianglePoint(new FixedTriangle(a, b, c), target.Frame, point, root, frame)) continue;
                 _visitedJoinedRegions.Add(region); _currentSupplier = member;
-                int aligned = WideAxis3.Dot(frame.Normal, GetRegionFrame(region).Normal).Sign;
+                int aligned = WideDirection3d.Dot(frame.Normal, GetRegionFrame(region).Normal).Sign;
                 KeepJoinedWinner(2 * region + (aligned > 0 ? 0 : 1), positive);
                 KeepJoinedWinner(2 * region + (aligned > 0 ? 1 : 0), negative);
                 bool represented = ConePlaneRayPointMaterialization.TryGetPointInFrame(frame, point, root, _samplingOrigin, out Vector3d p);
@@ -187,14 +197,14 @@ internal sealed partial class MeshConeFaceRegions
     private ref readonly ConePlaneRayFrame GetFrame(int member) => ref (member < 0 ? ref _frame : ref _joined!.Members[member].Frame);
     private ref readonly ConePlaneRayFrame GetRegionFrame(int region) => ref GetFrame(_joined!.NodeMembers[_joined.Roots[region]]);
     private int GetNativeOrientation(int region, int member, int orientation) => member < 0 ? orientation
-        : orientation * WideAxis3.Dot(GetFrame(member).Normal, GetRegionFrame(region).Normal).Sign;
+        : orientation * WideDirection3d.Dot(GetFrame(member).Normal, GetRegionFrame(region).Normal).Sign;
 
     private int CompareJoinedPoints(Sample first, Sample second)
     {
-        Span<ulong> a = stackalloc ulong[ConePlaneRayPoint.StorageWords], b = stackalloc ulong[ConePlaneRayPoint.StorageWords];
+        Span<ulong> a = stackalloc ulong[PointWords], b = stackalloc ulong[PointWords];
         Span<int> sa = stackalloc int[ConePlaneRayPoint.SignCount], sb = stackalloc int[ConePlaneRayPoint.SignCount];
-        Span<ulong> ra = stackalloc ulong[ConePlaneRaySelection.RootWords], rb = stackalloc ulong[ConePlaneRaySelection.RootWords];
-        var pa = new ConePlaneRayPoint(a, sa); var pb = new ConePlaneRayPoint(b, sb);
+        Span<ulong> ra = stackalloc ulong[_rootWords], rb = stackalloc ulong[_rootWords];
+        var pa = new ConePlaneRayPoint(a, sa, _fieldWords); var pb = new ConePlaneRayPoint(b, sb, _fieldWords);
         ref readonly ConePlaneRayFrame fa = ref GetFrame(first.Member);
         ref readonly ConePlaneRayFrame fb = ref GetFrame(second.Member);
         bool foundA = ConePlaneRayEvents.ReconstructPoint(first.Source, fa, first.Event, GetClip(first.Member, first.Span), pa, ra);
@@ -207,7 +217,7 @@ internal sealed partial class MeshConeFaceRegions
     {
         Sample sample = _samples[region * ContactManifold.MaxContactsPerGroup + index];
         supplier = _joined!.Members[sample.Supplier].Collider;
-        return new(new FixedPointAnchor(supplier.Mesh.Origin, supplier.Mesh.Rotation, sample.AuthoredPoint),
+        return new(new FixedPointAnchor(_samplingOrigin, FixedQuaternion.Identity, sample.MeshPoint),
             new FixedPointAnchor(_samplingOrigin, GetFrame(sample.Member).ConeRotation, sample.ConeLocalPoint), GetNormal(region), sample.Depth, false);
     }
 
@@ -223,7 +233,7 @@ internal sealed partial class MeshConeFaceRegions
         if (_joined?.Active != true) return GetOrientation(region);
         Member member = GetMember(collider, triangle);
         int joined = _joined.RegionByRoot[_joined.Find(member.Offset + region)];
-        return WideAxis3.Dot(member.Frame.Normal, GetRegionFrame(joined).Normal).Sign * GetOrientation(joined);
+        return WideDirection3d.Dot(member.Frame.Normal, GetRegionFrame(joined).Normal).Sign * GetOrientation(joined);
     }
     internal bool IsJoinedSpan(LSMeshCollider collider, int triangle, int span) => GetMember(collider, triangle).JoinedSpans[span];
     internal ReadOnlySpan<WideAxis3> GetJoinedCornerFan(LSMeshCollider collider, int triangle, int vertex, out bool suppress) =>

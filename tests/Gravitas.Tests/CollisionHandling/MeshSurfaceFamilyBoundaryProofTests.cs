@@ -16,6 +16,66 @@ public sealed class MeshSurfaceFamilyBoundaryProofTests
     [InlineData(0)]
     [InlineData(1)]
     [InlineData(2)]
+    public void AffineFilledFace_ShouldPublishPhysicalMixedManifoldAnchorsAndItsWholeShapeExit(int shape)
+    {
+        using var scene = PhysicsScenarioBuilder.Create();
+        var mesh = Triangle(scene.Context, new[] { new Vector3d(-16,0,-16), new Vector3d(16,0,-16), new Vector3d(0,0,18) });
+        mesh.Transform.LocalScale = Vector3d.One * Fixed64.Half;
+        mesh.Simulate();
+        LSCollider2D embedded = Embedded(scene.Context, shape, Vector3d.Up * Fixed64.Quarter, Fixed64.Zero, Fixed64.Half);
+        var manifold = new ContactManifold();
+        Assert.True(CollisionDetectionMixed.TryBuildManifold(mesh, embedded, manifold));
+        Assert.True(manifold.Count > 0);
+        for (int index = 0; index < manifold.Count; index++)
+        {
+            ManifoldContact row = manifold[index];
+            Assert.Equal(Vector3d.Up, row.Normal); Assert.Equal(Fixed64.Quarter, row.Depth);
+            Assert.True(row.TryGetPointA(out Vector3d source)); Assert.True(row.TryGetPointB(out Vector3d exit));
+            Assert.Equal(Fixed64.Zero, source.Y); Assert.Equal(-Fixed64.Quarter, exit.Y);
+            Assert.Equal(source.X, exit.X); Assert.Equal(source.Z, exit.Z);
+        }
+        embedded.Agent.Transform.LocalPosition = Vector3d.Up * (Fixed64.Half + Fixed64.MinIncrement);
+        embedded.Simulate();
+        Assert.False(CollisionDetectionMixed.TryBuildManifold(mesh, embedded, manifold));
+        Assert.Equal(0, manifold.Count);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void AffineBoundaryWitness_ShouldMatchTheSamePhysicalCircleStadiumAndPrism(int shape)
+    {
+        using var scene = PhysicsScenarioBuilder.Create();
+        Vector3d[] points = { new((Fixed64)3, -Fixed64.Half, Fixed64.Zero), new((Fixed64)4, -Fixed64.Half, Fixed64.Zero),
+            new((Fixed64)3, Fixed64.Half, Fixed64.Zero) };
+        LSCollider2D embedded = shape == 0 ? new LSCircleCollider2D((Fixed64)5)
+            : shape == 1 ? new LSCapsuleCollider2D((Fixed64)5, (Fixed64)12)
+            : new LSPolygonCollider2D(new(0, -5), new(5, 0), new(0, 5));
+        embedded.MixedHalfThicknessOverride = Fixed64.One;
+        embedded.InitializeWithNoBody(new TestMatterAgent(scene.Context));
+        LSMeshCollider rigid = Triangle(scene.Context, points);
+        LSMeshCollider affine = Triangle(scene.Context, Array.ConvertAll(points, p => p * Fixed64.Two));
+        affine.Transform.LocalScale = Vector3d.One * Fixed64.Half;
+        affine.Simulate();
+        var first = Sources(new[] { rigid }); var second = Sources(new[] { affine });
+        Assert.True(SlabWitness(first, embedded, Orientation(rigid, Vector3d.Forward), out var expected, out _));
+        Assert.True(SlabWitness(second, embedded, Orientation(affine, Vector3d.Forward), out var actual, out int supplier));
+        Assert.Same(affine, second[supplier].Collider);
+        Assert.Equal(expected.Normal, actual.Normal); Assert.Equal(expected.Depth, actual.Depth);
+        Assert.Equal(-Vector3d.Forward, actual.Normal);
+        Assert.Equal((Fixed64)(shape == 0 ? 4 : shape == 1 ? 5 : 2), actual.Depth);
+        Assert.True(expected.FirstAnchor.TryGetPoint(out Vector3d expectedFirst));
+        Assert.True(actual.FirstAnchor.TryGetPoint(out Vector3d actualFirst));
+        Assert.True(expected.SecondAnchor.TryGetPoint(out Vector3d expectedSecond));
+        Assert.True(actual.SecondAnchor.TryGetPoint(out Vector3d actualSecond));
+        Assert.Equal(expectedFirst, actualFirst); Assert.Equal(expectedSecond, actualSecond);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
     public void NonaxialEmbeddedSlabs_BoundaryControlledExit_ShouldClearEveryProvidedTriangle(int shape)
     {
         using var scene = PhysicsScenarioBuilder.Create();
@@ -154,7 +214,7 @@ public sealed class MeshSurfaceFamilyBoundaryProofTests
 
     private static FixedTriangle LocalTriangle(LSMeshCollider mesh, int triangle)
     {
-        mesh.Mesh.GetLocalTriangleVertices(triangle, out Vector3d a, out Vector3d b, out Vector3d c);
+        mesh.Mesh.GetGeometryTriangleVertices(triangle, out Vector3d a, out Vector3d b, out Vector3d c);
         return new FixedTriangle(a, b, c);
     }
 

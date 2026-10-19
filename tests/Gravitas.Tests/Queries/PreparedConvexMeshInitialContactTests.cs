@@ -72,15 +72,16 @@ public sealed class PreparedConvexMeshInitialContactTests
             Size = new Vector3d(Fixed64.FromFraction(1, 5), Fixed64.FromFraction(11, 5), Fixed64.FromFraction(1, 5)) };
         source.InitializeWithNoBody(new TestMatterAgent(scenario.Context, new FixedTransform(Vector3d.Right + Vector3d.Up * Fixed64.FromFraction(1, 10),
             FixedQuaternion.FromAxisAngle(Vector3d.Forward, -Fixed64.PiOver4), Vector3d.One)));
-        target.Mesh.GetLocalTriangleVertices(0, out Vector3d a, out Vector3d b, out Vector3d c);
+        target.Mesh.GetGeometryTriangleVertices(0, out Vector3d a, out Vector3d b, out Vector3d c);
         var sourceShape = new ConvexShape(source, Vector3d.Zero);
         var triangle = new ConvexShape(target, 0, a, b, c);
         // The lower support projects near X=.293 into the small triangle, but
         // the tilted capsule crosses Y=0 near X=.9, outside its finite extent.
         Vector3d planeNormal = triangle.GetInitialExitNormal(sourceShape, target.Mesh.GetFaceNormalWorld(0));
-        sourceShape.GetSupportAnchor(-planeNormal).TryGetLocalPointIn(target.Mesh.Origin,
-            target.Mesh.Rotation, out Vector3d support).Should().BeTrue();
-        new FixedTriangle(a, b, c).ContainsProjection(support).Should().BeTrue(
+        FixedPointAnchor supportAnchor = sourceShape.GetSupportAnchor(-planeNormal);
+        supportAnchor.TryGetPoint(out Vector3d support).Should().BeTrue();
+        target.Mesh.GetTriangleVertices(0, out Vector3d worldA, out Vector3d worldB, out Vector3d worldC);
+        new FixedTriangle(worldA, worldB, worldC).ContainsProjection(support).Should().BeTrue(
             "support {0} on exit {1}, core {2}, radius {3} must project inside the finite control", support, planeNormal, source.AxisLength, source.ScaledRadius);
         triangle.TryGetInitialMeshFaceContactNormal(sourceShape, out _, out _).Should().BeFalse();
         var worker = new ConvexSweepQueryWorker();
@@ -97,7 +98,7 @@ public sealed class PreparedConvexMeshInitialContactTests
         var source = new LSCapsuleCollider { Radius = Fixed64.Half, Size = new Vector3d(1, 2, 1) };
         scenario.InitializeStaticCollider(source,
             new Vector3d(Fixed64.FromFraction(3, 10), -Fixed64.Quarter, Fixed64.FromFraction(3, 10)));
-        target.Mesh.GetLocalTriangleVertices(0, out Vector3d a, out Vector3d b, out Vector3d c);
+        target.Mesh.GetGeometryTriangleVertices(0, out Vector3d a, out Vector3d b, out Vector3d c);
         var triangle = new ConvexShape(target, 0, a, b, c);
         var witness = new FixedPointAnchor(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.Zero);
         var result = new ConvexSweepQueryWorker.GjkResult(false, ConvexSweepQueryWorker.ContactTolerance,
@@ -286,7 +287,7 @@ public sealed class PreparedConvexMeshInitialContactTests
         var source = new LSCuboidCollider();
         scenario.InitializeStaticCollider(source,
             new Vector3d(Fixed64.FromFraction(5, 2) + Fixed64.FromRaw(1), Fixed64.Zero, Fixed64.Zero));
-        target.Mesh.GetLocalTriangleVertices(0, out Vector3d a, out Vector3d b, out Vector3d c);
+        target.Mesh.GetGeometryTriangleVertices(0, out Vector3d a, out Vector3d b, out Vector3d c);
         var sourceShape = new ConvexShape(source, Vector3d.Zero);
         var targetShape = new ConvexShape(target, 0, a, b, c);
         targetShape.TryGetInitialMeshContactNormal(sourceShape, allowHullFaceExit: true, out _, out _).Should().BeFalse();

@@ -295,70 +295,61 @@ public partial class SolidBody
         // above. A global supporting plane is valid for every mesh vertex even
         // when that source mesh uses concave triangle-surface collision policy.
         System.Diagnostics.Debug.Assert(Collider is LSMeshCollider || ConvexColliderSupport.IsSupported(Collider));
-        FixedPointAnchor sourceMin = Collider is LSMeshCollider
-            ? GetExactMeshSupportAnchor((LSMeshCollider)Collider, -normal)
-            : new ConvexShape(Collider, Vector3d.Zero).GetSupportAnchor(-normal);
-        if (!TryGetFullColliderSupportAnchor(hit.Collider, normal, out FixedPointAnchor targetMax))
+        RationalPoint3d sourceMin = Collider is LSMeshCollider
+            ? GetExactMeshSupportPoint((LSMeshCollider)Collider, -normal)
+            : RationalPoint3d.FromAnchor(new ConvexShape(Collider, Vector3d.Zero).GetSupportAnchor(-normal));
+        if (!TryGetFullColliderSupportPoint(hit.Collider, normal, out RationalPoint3d targetMax))
             return false;
-        var zero = new FixedPointAnchor(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.Zero);
         // Full-target support includes every concave vertex and compound leaf;
         // a later wall cannot hide behind the initial floor hit. A nonnegative
         // exact gap plus invariant support projection proves the entire path safe.
-        return WidePointAnchor3d.CompareProjectedOffsets(sourceMin, targetMax, zero, zero, normal) >= 0;
+        return RationalPoint3d.CompareProjection(sourceMin, targetMax, normal) >= 0;
     }
 
-    private static bool TryGetFullColliderSupportAnchor(LSCollider collider,
-        Vector3d direction, out FixedPointAnchor anchor)
+    private static bool TryGetFullColliderSupportPoint(LSCollider collider,
+        Vector3d direction, out RationalPoint3d point)
     {
         if (collider is LSCompoundCollider compound)
         {
-            if (!TryGetLeafColliderSupportAnchor(compound.GetPartCollider(0), direction, out anchor))
-                return false;
-            var zero = new FixedPointAnchor(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.Zero);
+            if (!TryGetLeafColliderSupportPoint(compound.GetPartCollider(0), direction, out point)) return false;
             for (int index = 1; index < compound.PartCount; index++)
             {
-                // Compound definitions contain leaves, so full support needs a
-                // single deterministic pass rather than recursive traversal.
-                if (!TryGetLeafColliderSupportAnchor(compound.GetPartCollider(index), direction,
-                        out FixedPointAnchor candidate))
-                    return false;
-                if (WidePointAnchor3d.CompareProjectedOffsets(candidate, anchor,
-                        zero, zero, direction) > 0)
-                    anchor = candidate;
+                if (!TryGetLeafColliderSupportPoint(compound.GetPartCollider(index), direction,
+                        out RationalPoint3d candidate)) return false;
+                if (RationalPoint3d.CompareProjection(candidate, point, direction) > 0) point = candidate;
             }
             return true;
         }
-        return TryGetLeafColliderSupportAnchor(collider, direction, out anchor);
+        return TryGetLeafColliderSupportPoint(collider, direction, out point);
     }
 
-    private static bool TryGetLeafColliderSupportAnchor(LSCollider collider,
-        Vector3d direction, out FixedPointAnchor anchor)
+    private static bool TryGetLeafColliderSupportPoint(LSCollider collider,
+        Vector3d direction, out RationalPoint3d point)
     {
         if (collider is LSMeshCollider mesh)
-        {
-            anchor = GetExactMeshSupportAnchor(mesh, direction);
-            return true;
-        }
+        { point = GetExactMeshSupportPoint(mesh, direction); return true; }
         if (collider is LSCuboidCollider)
         {
-            anchor = new ConvexShape(collider, Vector3d.Zero).GetSupportAnchor(direction);
+            point = RationalPoint3d.FromAnchor(new ConvexShape(collider, Vector3d.Zero).GetSupportAnchor(direction));
             return true;
         }
-        anchor = default;
+        point = default;
         return false;
     }
 
-    private static FixedPointAnchor GetExactMeshSupportAnchor(LSMeshCollider mesh, Vector3d direction)
+    private static RationalPoint3d GetExactMeshSupportPoint(LSMeshCollider collider, Vector3d direction)
     {
-        var vertices = mesh.Mesh.ScaledLocalVertices;
-        var anchor = new FixedPointAnchor(mesh.Mesh.Origin, mesh.Mesh.Rotation, vertices[0]);
-        var zero = new FixedPointAnchor(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.Zero);
+        PhysicsMesh mesh = collider.Mesh;
+        System.ReadOnlySpan<Vector3d> vertices = mesh.GeometryVertices;
+        RationalPoint3d support = mesh.GeometryFrame.GetPoint(vertices[0]);
+        // Exclusion needs the exact global extremum: rounding an inverse
+        // direction can select a lower vertex even on the compact rigid path.
         for (int index = 1; index < vertices.Length; index++)
         {
-            var candidate = new FixedPointAnchor(mesh.Mesh.Origin, mesh.Mesh.Rotation, vertices[index]);
-            if (WidePointAnchor3d.CompareProjectedOffsets(candidate, anchor, zero, zero, direction) > 0)
-                anchor = candidate;
+            RationalPoint3d candidate = mesh.GeometryFrame.GetPoint(vertices[index]);
+            if (RationalPoint3d.CompareProjection(candidate, support, direction) > 0)
+                support = candidate;
         }
-        return anchor;
+        return support;
     }
 }

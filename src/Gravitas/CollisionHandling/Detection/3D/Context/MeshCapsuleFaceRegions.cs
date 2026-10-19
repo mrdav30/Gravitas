@@ -31,6 +31,12 @@ internal sealed partial class MeshCapsuleFaceRegions
     private readonly CapsulePlaneRayEventVisitor _visitor;
     private readonly IComparer<Sample> _pointComparer;
     private CapsulePlaneRayFrame _frame;
+    private int _fieldWords = CapsulePlaneRaySelection.FieldWords, _rootWords = CapsulePlaneRaySelection.RootWords,
+        _valueWords = CapsulePlaneRayValue.PolynomialWords;
+    private int SelectionWords => CapsulePlaneRaySelection.GetStorageWords(_fieldWords, _rootWords, _valueWords);
+
+    private void SelectBanks(in CapsulePlaneRayFrame frame)
+    { _fieldWords = frame.FieldWords; _rootWords = frame.RootWords; _valueWords = frame.ValueWords; }
     private Vector3d _normal, _meshOrigin, _center;
     private FixedQuaternion _meshRotation, _rotation;
     private PhysicsMesh? _gatherMesh;
@@ -52,7 +58,7 @@ internal sealed partial class MeshCapsuleFaceRegions
     internal void Build(PhysicsMesh mesh, int surfaceTriangle, Vector3d center,
         FixedQuaternion rotation, Fixed64 coreLength, Fixed64 radius, MeshSurfaceConnectivity connectivity)
     {
-        var finite = new CapsuleFiniteSectionFrame(mesh.Origin, mesh.Rotation, center, rotation, coreLength, radius);
+        var finite = new CapsuleFiniteSectionFrame(mesh.GeometryFrame, center, rotation, coreLength, radius);
         Build(mesh, surfaceTriangle, finite, center, rotation, connectivity);
     }
 
@@ -63,15 +69,16 @@ internal sealed partial class MeshCapsuleFaceRegions
         RegionCount = connectivity.RegionCount;
         HasBoundaryIntersection = false;
         if (RegionCount == 0) return;
-        Reserve(RegionCount);
-        mesh.GetLocalTriangleVertices(surfaceTriangle, out Vector3d a, out Vector3d b, out Vector3d c);
-        _frame = new CapsulePlaneRayFrame(new FixedTriangle(a, b, c), finite);
+        mesh.GetGeometryTriangleVertices(surfaceTriangle, out Vector3d a, out Vector3d b, out Vector3d c);
+        _frame = new CapsulePlaneRayFrame(new FixedTriangle(a, b, c), mesh.GeometryFrame, finite);
+        SelectBanks(_frame); Reserve(RegionCount);
         // Sphere and axial rays share one radial height H(q): their signed
         // exits are H(q) +/- the plane offset, so every region chooses alike.
         _fixedOrientation = finite.Length == Fixed64.Zero || _frame.Normal.X.IsZero && _frame.Normal.Z.IsZero
             ? (_frame.PlaneConstant.Sign >= 0 ? 1 : -1) : 0;
         _normal = _frame.GetWorldNormal(mesh.Rotation);
-        _meshOrigin = mesh.Origin; _meshRotation = mesh.Rotation;
+        _meshOrigin = _frame.Finite.ShapeFrame.HasExactScale ? center : mesh.Origin;
+        _meshRotation = _frame.Finite.ShapeFrame.HasExactScale ? rotation : mesh.Rotation;
         _center = center; _rotation = rotation;
         Array.Clear(_winners, 0, 2 * RegionCount);
         _events.FastClear(); _points.FastClear(); _pointWordCount = 0;
@@ -95,14 +102,17 @@ internal sealed partial class MeshCapsuleFaceRegions
 
     private void Reserve(int count)
     {
-        if (_counts.Length >= count) return;
-        int capacity = Math.Max(count, 2 * _counts.Length);
-        Array.Resize(ref _counts, capacity); Array.Resize(ref _orientations, capacity);
-        Array.Resize(ref _samples, capacity * ContactManifold.MaxContactsPerGroup);
-        Array.Resize(ref _winners, 2 * capacity);
-        Array.Resize(ref _values, 2 * capacity * CapsulePlaneRaySelection.StorageWords);
-        Array.Resize(ref _signs, 2 * capacity * CapsulePlaneRaySelection.SignCount);
-        Array.Resize(ref _valueSigns, 2 * capacity * CapsulePlaneRaySelection.ValueSignCount);
+        if (_counts.Length < count)
+        {
+            int capacity = Math.Max(count, 2 * _counts.Length);
+            Array.Resize(ref _counts, capacity); Array.Resize(ref _orientations, capacity);
+            Array.Resize(ref _samples, capacity * ContactManifold.MaxContactsPerGroup);
+            Array.Resize(ref _winners, 2 * capacity);
+            Array.Resize(ref _signs, 2 * capacity * CapsulePlaneRaySelection.SignCount);
+            Array.Resize(ref _valueSigns, 2 * capacity * CapsulePlaneRaySelection.ValueSignCount);
+        }
+        if (_values.Length < 2 * _counts.Length * SelectionWords)
+            Array.Resize(ref _values, 2 * _counts.Length * SelectionWords);
     }
 
     private void Gather(PhysicsMesh mesh, int surfaceTriangle, MeshSurfaceConnectivity connectivity)
@@ -111,7 +121,7 @@ internal sealed partial class MeshCapsuleFaceRegions
         try
         {
             ReadOnlySpan<int> boundary = mesh.GetCanonicalSurfaceBoundaryVertexPairs(surfaceTriangle);
-            ReadOnlySpan<Vector3d> vertices = mesh.ScaledLocalVertices;
+            ReadOnlySpan<Vector3d> vertices = mesh.GeometryVertices;
             int first = 0;
             for (; first < boundary.Length; first += 2)
                 if (_frame.Finite.IntersectsSegment(new FixedSegment(vertices[boundary[first]],
@@ -131,10 +141,10 @@ internal sealed partial class MeshCapsuleFaceRegions
                 int endpoint = _frame.Finite.Length == Fixed64.Zero ? 0
                     : _fixedOrientation * _frame.Normal.Y.Sign > 0 ? 1 : 0;
                 var descriptor = new CapsulePlaneRayEvent(CapsulePlaneRayEventKind.Support, endpoint);
-                Span<ulong> values = stackalloc ulong[CapsulePlaneRaySelection.StorageWords];
+                Span<ulong> values = stackalloc ulong[SelectionWords];
                 Span<int> signs = stackalloc int[CapsulePlaneRaySelection.SignCount];
                 Span<sbyte> valueSigns = stackalloc sbyte[CapsulePlaneRaySelection.ValueSignCount];
-                var support = new CapsulePlaneRaySelection(values, signs, valueSigns);
+                var support = new CapsulePlaneRaySelection(values, signs, valueSigns, _fieldWords, _rootWords, _valueWords);
                 bool found = CapsulePlaneRayEvents.Reconstruct(CapsulePlaneRayEventSource.Plane,
                     _frame, descriptor, _fixedOrientation, ref support);
                 System.Diagnostics.Debug.Assert(found);
@@ -177,7 +187,7 @@ internal sealed partial class MeshCapsuleFaceRegions
             ? mesh.GetConvexCoplanarPatchCornerVertexIndices(_gatherSurface) : ReadOnlySpan<int>.Empty;
         if (!corners.IsEmpty)
         {
-            ReadOnlySpan<Vector3d> vertices = mesh.ScaledLocalVertices;
+            ReadOnlySpan<Vector3d> vertices = mesh.GeometryVertices;
             for (int corner = 1; corner < corners.Length - 1; corner++)
                 if (point.ContainsTrianglePoint(_frame, new FixedTriangle(vertices[corners[0]],
                     vertices[corners[corner]], vertices[corners[corner + 1]]))) return 0;
@@ -186,7 +196,7 @@ internal sealed partial class MeshCapsuleFaceRegions
         // Closed admitted intersections uniquely identify their connected region.
         foreach (int triangle in connectivity.TriangleIndices)
         {
-            mesh.GetLocalTriangleVertices(triangle, out Vector3d a, out Vector3d b, out Vector3d c);
+            mesh.GetGeometryTriangleVertices(triangle, out Vector3d a, out Vector3d b, out Vector3d c);
             if (point.ContainsTrianglePoint(_frame, new FixedTriangle(a, b, c)))
                 return connectivity.GetRegionOrdinal(triangle);
         }
@@ -207,7 +217,7 @@ internal sealed partial class MeshCapsuleFaceRegions
             if (retained.Region == region && retained.Source.IsSegment == source.IsSegment
                 && retained.Source.A == source.A && retained.Source.B == source.B
                 && retained.Event.Matches(descriptor)) return;
-        bool represented = candidate.TryGetAuthoredPoint(frame, _meshOrigin, _meshRotation, _center, _rotation, out Vector3d p);
+        bool represented = TryGetSamplingPoint(candidate, frame, out Vector3d p);
         // Admission makes q a convex combination of finite authored vertices.
         System.Diagnostics.Debug.Assert(represented);
         foreach (Sample retained in _events.AsReadOnlySpan())
@@ -215,12 +225,17 @@ internal sealed partial class MeshCapsuleFaceRegions
         _events.Add(new Sample(source, descriptor, region, p, RetainPoint(candidate)));
     }
 
+    private bool TryGetSamplingPoint(scoped in CapsulePlaneRaySelection selection, in CapsulePlaneRayFrame frame, out Vector3d point) =>
+        frame.Finite.ShapeFrame.HasExactScale
+            ? selection.TryGetPointInRigidFrame(frame, _meshOrigin, _meshRotation, _center, _rotation, out point)
+            : selection.TryGetAuthoredPoint(frame, _meshOrigin, _meshRotation, _center, _rotation, out point);
+
     private CapsulePlaneRaySelection BorrowWinner(int index)
     {
         var selection = new CapsulePlaneRaySelection(
-            _values.AsSpan(index * CapsulePlaneRaySelection.StorageWords, CapsulePlaneRaySelection.StorageWords),
+            _values.AsSpan(index * SelectionWords, SelectionWords),
             _signs.AsSpan(index * CapsulePlaneRaySelection.SignCount, CapsulePlaneRaySelection.SignCount),
-            _valueSigns.AsSpan(index * CapsulePlaneRaySelection.ValueSignCount, CapsulePlaneRaySelection.ValueSignCount));
+            _valueSigns.AsSpan(index * CapsulePlaneRaySelection.ValueSignCount, CapsulePlaneRaySelection.ValueSignCount), _fieldWords, _rootWords, _valueWords);
         selection.Restore(_winners[index]); return selection;
     }
 
@@ -242,7 +257,9 @@ internal sealed partial class MeshCapsuleFaceRegions
         Span<int> chosen = stackalloc int[ContactManifold.MaxContactsPerGroup]; chosen[0] = 0;
         for (int slot = 1; slot < count; slot++)
         {
-            int best = MeshPlaneSampleReduction.ChooseNext(_pool.AsReadOnlySpan(), chosen[..slot], metrics, _pointComparer);
+            int best = _frame.Finite.ShapeFrame.HasExactScale
+                ? MeshPlaneSampleReduction.ChooseNext(_pool.AsReadOnlySpan(), chosen[..slot], _frame.Normal, _pointComparer)
+                : MeshPlaneSampleReduction.ChooseNext(_pool.AsReadOnlySpan(), chosen[..slot], metrics, _pointComparer);
             chosen[slot] = best; _samples[offset + slot] = _pool[best];
         }
         _counts[region] = count;
@@ -255,7 +272,7 @@ internal sealed partial class MeshCapsuleFaceRegions
                 && sample.Source.A == maximum.MaximumSource.A && sample.Source.B == maximum.MaximumSource.B
                 && sample.Event.Matches(maximum.MaximumEvent)) return sample;
         // Exact-point deduplication can retain an equivalent event descriptor.
-        bool represented = maximum.TryGetAuthoredPoint(_frame, _meshOrigin, _meshRotation, _center, _rotation, out Vector3d p);
+        bool represented = TryGetSamplingPoint(maximum, _frame, out Vector3d p);
         System.Diagnostics.Debug.Assert(represented);
         return new Sample(maximum.MaximumSource, maximum.MaximumEvent, region, p, RetainPoint(maximum));
     }
@@ -328,10 +345,10 @@ internal sealed partial class MeshCapsuleFaceRegions
             var maximum = BorrowWinner(2 * region + (_orientations[region] > 0 ? 0 : 1));
             return TryCreateContact(region, sample.Point, maximum, out contact);
         }
-        Span<ulong> values = stackalloc ulong[CapsulePlaneRaySelection.StorageWords];
+        Span<ulong> values = stackalloc ulong[SelectionWords];
         Span<int> signs = stackalloc int[CapsulePlaneRaySelection.SignCount];
         Span<sbyte> valueSigns = stackalloc sbyte[CapsulePlaneRaySelection.ValueSignCount];
-        var selection = new CapsulePlaneRaySelection(values, signs, valueSigns);
+        var selection = new CapsulePlaneRaySelection(values, signs, valueSigns, _fieldWords, _rootWords, _valueWords);
         bool found = CapsulePlaneRayEvents.Reconstruct(sample.Source, _frame, sample.Event, _orientations[region], ref selection);
         System.Diagnostics.Debug.Assert(found);
         return TryCreateContact(region, sample.Point, selection, out contact);

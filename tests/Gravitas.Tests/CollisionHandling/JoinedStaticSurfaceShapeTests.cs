@@ -189,7 +189,8 @@ public sealed class JoinedStaticSurfaceShapeTests
                 Assert.Equal(member.Material, row.MaterialA);
                 Assert.True(row.AnchorA.TryGetWorldPoint(out var point));
                 Assert.InRange(point.Y.m_rawValue, -1, 1);
-                Assert.Equal(member.Mesh.Origin, row.AnchorA.Origin);
+                Assert.True(row.AnchorA.TryGetOffsetFrom(cone.Center, out Vector3d localSurfacePoint));
+                Assert.Equal(point - cone.Center, localSurfacePoint);
                 maximum = FixedMath.Max(maximum, row.Depth);
             }
         }
@@ -198,8 +199,8 @@ public sealed class JoinedStaticSurfaceShapeTests
         foreach (var member in new[] { left, right })
             for (int triangle = 0; triangle < member.Mesh.TriangleCount; triangle++)
             {
-                member.Mesh.GetLocalTriangleVertices(triangle, out var a, out var b, out var c);
-                Assert.False(new FixedTriangle(a, b, c).TryGetCenteredFiniteConeContact(member.Mesh.Origin, member.Mesh.Rotation,
+                Assert.True(member.Mesh.TryGetTriangleVertices(triangle, out var a, out var b, out var c));
+                Assert.False(new FixedTriangle(a, b, c).TryGetCenteredFiniteConeContact(Vector3d.Zero, FixedQuaternion.Identity,
                     outside, cone.Rotation, cone.Height, cone.ScaledRadius, out _));
             }
     }

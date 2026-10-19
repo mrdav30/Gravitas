@@ -189,7 +189,7 @@ public sealed class SweptSphereQueryWorker
         LSCylinderCollider cylinder,
         out Vector3d sphereCenterAtImpact,
         out Fixed64 impactDistance) =>
-        TrySweepCanonicalFiniteAxis(
+        TrySweepSupportMapped(
             cylinder,
             out sphereCenterAtImpact,
             out impactDistance);
@@ -198,21 +198,23 @@ public sealed class SweptSphereQueryWorker
         LSConeCollider cone,
         out Vector3d sphereCenterAtImpact,
         out Fixed64 impactDistance) =>
-        TrySweepCanonicalFiniteAxis(
+        TrySweepSupportMapped(
             cone,
             out sphereCenterAtImpact,
             out impactDistance);
 
-    private bool TrySweepCanonicalFiniteAxis(
+    private bool TrySweepSupportMapped(
         LSCollider target,
         out Vector3d sphereCenterAtImpact,
         out Fixed64 impactDistance)
     {
         sphereCenterAtImpact = Vector3d.Zero;
         impactDistance = Fixed64.Zero;
-        if (!_finiteAxisConvexSweep.TrySweepPreparedSource(
+        bool found = _finiteAxisConvexSweep.TrySweepPreparedSource(
                 target,
-                out Physics3DHit hit))
+                out Physics3DHit hit);
+        LastMeshTriangleCandidateCount += _finiteAxisConvexSweep.LastMeshTriangleCandidateCount;
+        if (!found)
         {
             return false;
         }
@@ -269,13 +271,16 @@ public sealed class SweptSphereQueryWorker
             _end,
             FixedQuaternion.Identity,
             Vector3d.Zero);
+        bool rigid = mesh.Mesh.GeometryFrame.IsRigid;
+        Vector3d chartOrigin = rigid ? mesh.Mesh.GeometryFrame.RigidOrigin : mesh.Mesh.Origin;
+        FixedQuaternion chartRotation = rigid ? mesh.Mesh.GeometryFrame.Rotation : FixedQuaternion.Identity;
         if (!startAnchor.TryGetLocalPointIn(
-                mesh.Mesh.Origin,
-                mesh.Mesh.Rotation,
+                chartOrigin,
+                chartRotation,
                 out Vector3d localStart)
             || !endAnchor.TryGetLocalPointIn(
-                mesh.Mesh.Origin,
-                mesh.Mesh.Rotation,
+                chartOrigin,
+                chartRotation,
                 out Vector3d localEnd))
         {
             return false;
@@ -285,12 +290,31 @@ public sealed class SweptSphereQueryWorker
         for (int i = 0; i < _meshTriangleBuffer.Count; i++)
         {
             int triangleIndex = _meshTriangleBuffer[i];
-            mesh.Mesh.GetLocalTriangleVertices(
+            mesh.Mesh.GetGeometryTriangleVertices(
                 triangleIndex,
                 out Vector3d first,
                 out Vector3d second,
                 out Vector3d third);
             Vector3d normal = mesh.Mesh.GetScaledLocalFaceNormal(triangleIndex);
+            if (!rigid)
+            {
+                var authoredTriangle = new FixedTriangle(first, second, third);
+                // Retain the analytic finite roots whenever the physical
+                // triangle is exactly representable in this translated chart.
+                // A failed exact division must never round its input geometry.
+                if (!mesh.Mesh.GeometryFrame.GetPoint(first).TryGetExactLocalPointIn(chartOrigin, chartRotation, out first)
+                    || !mesh.Mesh.GeometryFrame.GetPoint(second).TryGetExactLocalPointIn(chartOrigin, chartRotation, out second)
+                    || !mesh.Mesh.GeometryFrame.GetPoint(third).TryGetExactLocalPointIn(chartOrigin, chartRotation, out third))
+                {
+                    bool exactHit = WideTriangleRelations.TryGetSweptSphereDistance(authoredTriangle,
+                        mesh.Mesh.GeometryFrame, new FixedSegment(_start, _end), _length, _radius,
+                        out Fixed64 exactDistance);
+                    found |= TryKeepEarlierSweep(exactHit, default, exactDistance,
+                        ref sphereCenterAtImpact, ref impactDistance);
+                    continue;
+                }
+                normal = new FixedTriangle(first, second, third).Normal;
+            }
             found |= TryKeepEarlierSweep(
                 TrySweepTriangle(
                     first,

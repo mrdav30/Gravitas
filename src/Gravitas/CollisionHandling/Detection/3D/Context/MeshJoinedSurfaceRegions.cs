@@ -188,7 +188,7 @@ internal class MeshJoinedSurfaceRegions<TFrame> where TFrame : struct
     internal ReadOnlySpan<WideAxis3> GetCornerFan(LSMeshCollider collider, int triangle, int vertex, out bool suppress)
     {
         Member member = Members[MemberBySurface[(collider.Mesh, collider.Mesh.GetManifoldSurfaceOwner(triangle))]];
-        Vector3d point = collider.Mesh.ScaledLocalVertices[vertex];
+        Vector3d point = collider.Mesh.GeometryVertices[vertex];
         bool trusted = Fan.BuildAtPoint(Meshes.AsReadOnlySpan(), member.Boundary.SourceMember, member.Owner,
             point, PreparedBoundaries.AsReadOnlySpan());
         suppress = trusted && !Fan.HasExposedBoundary;
@@ -207,8 +207,8 @@ internal class MeshJoinedSurfaceRegions<TFrame> where TFrame : struct
                 for (int edge = 0; edge < edges.Length; edge += 2)
                 {
                     int location = WideTriangleRelations.LocateEdgePoint(new FixedSegment(point, point),
-                        collider.Mesh.Origin, collider.Mesh.Rotation, default, Signed320.One,
-                        new FixedSegment(mesh.ScaledLocalVertices[edges[edge]], mesh.ScaledLocalVertices[edges[edge + 1]]), mesh.Origin, mesh.Rotation);
+                        collider.Mesh.GeometryFrame, default(Signed832), Signed832.ExtendValue(Signed192.Signed(1)),
+                        new FixedSegment(mesh.GeometryVertices[edges[edge]], mesh.GeometryVertices[edges[edge + 1]]), mesh.GeometryFrame);
                     // Certified exposed/joined transitions are authored corners
                     // of some member. An interior-edge owner cannot supply one.
                     if (location == 0 || location == 2) { suppress = true; break; }
@@ -239,10 +239,10 @@ internal class MeshJoinedSurfaceRegions<TFrame> where TFrame : struct
             while (span + 1 < pieces.Length && pieces[span + 1].First == first.First && pieces[span + 1].Second == first.Second
                 && !JoinedSpans[span + 1]) span++;
             var last = pieces[span];
-            return new RationalSegmentInterval(first.Interval.IsClipped ? first.Interval.LowerNumerator : default,
-                first.Interval.IsClipped ? first.Interval.LowerDenominator : Signed320.One,
-                last.Interval.IsClipped ? last.Interval.UpperNumerator : Signed320.One,
-                last.Interval.IsClipped ? last.Interval.UpperDenominator : Signed320.One);
+            return new RationalSegmentInterval(first.Interval.IsClipped ? first.Interval.WideLowerNumerator : default,
+                first.Interval.IsClipped ? first.Interval.WideLowerDenominator : Signed832.ExtendValue(Signed192.Signed(1)),
+                last.Interval.IsClipped ? last.Interval.WideUpperNumerator : Signed832.ExtendValue(Signed192.Signed(1)),
+                last.Interval.IsClipped ? last.Interval.WideUpperDenominator : Signed832.ExtendValue(Signed192.Signed(1)));
         }
     }
 }

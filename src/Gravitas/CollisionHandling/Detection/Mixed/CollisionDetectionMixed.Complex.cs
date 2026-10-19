@@ -31,14 +31,14 @@ public static partial class CollisionDetectionMixed
         Fixed64 radius = embedded is LSCircleCollider2D circle ? circle.ScaledRadius
             : embedded is LSCapsuleCollider2D stadium ? stadium.ScaledRadius : Fixed64.Zero;
         Fixed64 yaw = embedded is LSAABBoxCollider2D ? Fixed64.Zero : embedded.Rotation;
-        var section = new FiniteSlabSectionFrame(mesh.Mesh.Origin, mesh.Mesh.Rotation,
+        var section = new FiniteSlabSectionFrame(mesh.Mesh.GeometryFrame,
             GetEmbeddedCenter3D(embedded), FixedQuaternion.FromAxisAngle(Vector3d.Up, -yaw),
             length, radius, embedded.MixedHalfThickness);
         Span<Vector2d> box = stackalloc Vector2d[4];
         ReadOnlySpan<Vector2d> offsets = GetConvexPrismOffsets(embedded, box);
         foreach (int triangle in candidates.AsReadOnlySpan())
         {
-            mesh.Mesh.GetLocalTriangleVertices(triangle, out Vector3d first, out Vector3d second, out Vector3d third);
+            mesh.Mesh.GetGeometryTriangleVertices(triangle, out Vector3d first, out Vector3d second, out Vector3d third);
             if (section.IntersectsTriangle(new FixedTriangle(first, second, third), offsets)) return true;
         }
         return false;
@@ -83,7 +83,7 @@ public static partial class CollisionDetectionMixed
                 prismOffsets, manifold, namespace3D, namespace2D)) return;
         SwiftList<int> admitted = scratch.MeshTriangleCandidatesB;
         scratch.MeshSurfaces.Clear();
-        var section = new FiniteSlabSectionFrame(mesh.Origin, mesh.Rotation, center, rotation,
+        var section = new FiniteSlabSectionFrame(mesh.GeometryFrame, center, rotation,
             length, radius, halfThickness);
         Span<int> singleton = stackalloc int[1];
         foreach (int triangle in candidates)
@@ -96,14 +96,14 @@ public static partial class CollisionDetectionMixed
             foreach (int candidate in domain)
             {
                 if (mesh.GetManifoldSurfaceOwner(candidate) != owner) continue;
-                mesh.GetLocalTriangleVertices(candidate, out Vector3d first, out Vector3d second, out Vector3d third);
+                mesh.GetGeometryTriangleVertices(candidate, out Vector3d first, out Vector3d second, out Vector3d third);
                 if (section.IntersectsTriangle(new FixedTriangle(first, second, third), prismOffsets)) admitted.Add(candidate);
             }
             if (admitted.Count == 0) continue;
             MeshSurfaceConnectivity connectivity = scratch.MeshConnectivity;
             connectivity.BuildSlab(mesh, triangle, section, embedded, admitted.AsReadOnlySpan());
-            mesh.GetLocalTriangleVertices(triangle, out Vector3d a, out Vector3d b, out Vector3d c);
-            var frame = new FiniteSlabRayFrame(new FixedTriangle(a, b, c), mesh.Origin, mesh.Rotation,
+            mesh.GetGeometryTriangleVertices(triangle, out Vector3d a, out Vector3d b, out Vector3d c);
+            var frame = new FiniteSlabRayFrame(new FixedTriangle(a, b, c), mesh.GeometryFrame,
                 center, rotation, length, radius, halfThickness);
             MeshSlabFaceRegions faces = scratch.MeshSlabFaces;
             faces.Prepare(frame, prismOffsets);
@@ -145,7 +145,7 @@ public static partial class CollisionDetectionMixed
             triangles[face++] = 0; triangles[face++] = bottom; triangles[face++] = next;
             triangles[face++] = 1; triangles[face++] = next + 1; triangles[face++] = bottom + 1;
         }
-        return MeshTriangleContactGenerator.TryAppendHullContacts(collider, center, rotation, vertices,
+        return MeshTriangleContactGenerator.TryAppendHullContacts(collider, ScaledRigidFrame3d.Rigid(center, rotation), center, vertices,
             triangles, edges, edges[..(2 * count + 2)], embedded.Material, manifold, false, namespace3D, namespace2D);
     }
 }

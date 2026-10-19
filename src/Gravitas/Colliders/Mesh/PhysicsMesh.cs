@@ -54,8 +54,7 @@ namespace Gravitas.Colliders
         /// offsets. Collision relations apply <see cref="Rotation"/> without
         /// materializing absolute world points.
         /// </summary>
-        internal ReadOnlySpan<Vector3d> ScaledLocalVertices =>
-            _scaledLocalVertices;
+        internal ReadOnlySpan<Vector3d> ScaledLocalVertices => _scaledLocalVertices;
 
         /// <summary>
         /// Number of vertices in the immutable local mesh topology.
@@ -107,7 +106,7 @@ namespace Gravitas.Colliders
         /// <summary>
         /// Gets the committed world-space origin of the mesh's rigid frame.
         /// </summary>
-        internal Vector3d Origin => _position;
+        internal Vector3d Origin => _geometryFrame.IsRigid ? _geometryFrame.RigidOrigin : _position;
 
         /// <summary>
         /// Gets the committed local-to-world mesh orientation.
@@ -172,8 +171,9 @@ namespace Gravitas.Colliders
 
             _localBounds = CalculateBounds(_localVertices);
 
-            // Topology uses exact source predicates; effective geometry is admitted during preparation.
-            int[] topologyTriangles = CreateTopologyTriangles(_localVertices, _triangles);
+            // Positive admitted scales preserve authored incidence and planar fill.
+            PrepareCoplanarPatches(_localVertices);
+            int[] topologyTriangles = _weldedTriangleVertices;
             _convexSatEdgeVertexPairs = Mode == MeshColliderMode.Convex
                 ? CreateConvexSatEdgeVertexPairs(_localVertices, topologyTriangles, _triangleCount)
                 : Array.Empty<int>();
@@ -181,6 +181,8 @@ namespace Gravitas.Colliders
             {
                 IsClosedSurface = EvaluateClosedVolumeTopology(topologyTriangles, out _surfaceClosureValidationResult);
             }
+
+            ReleaseTopologyPreparation();
 
             if (Mode == MeshColliderMode.Convex && _localVertices.Length > SupportTreeVertexThreshold)
             {
@@ -336,27 +338,15 @@ namespace Gravitas.Colliders
             out Vector3d second,
             out Vector3d third)
         {
-            GetLocalTriangleVertices(
+            GetGeometryTriangleVertices(
                 index,
                 out Vector3d localFirst,
                 out Vector3d localSecond,
                 out Vector3d localThird);
-            var firstAnchor = new FixedPointAnchor(
-                _position,
-                _rotation,
-                localFirst);
-            var secondAnchor = new FixedPointAnchor(
-                _position,
-                _rotation,
-                localSecond);
-            var thirdAnchor = new FixedPointAnchor(
-                _position,
-                _rotation,
-                localThird);
             bool representable =
-                firstAnchor.TryGetPoint(out first)
-                & secondAnchor.TryGetPoint(out second)
-                & thirdAnchor.TryGetPoint(out third);
+                _geometryFrame.TryGetPoint(localFirst, out first)
+                & _geometryFrame.TryGetPoint(localSecond, out second)
+                & _geometryFrame.TryGetPoint(localThird, out third);
             if (representable)
                 return true;
 
@@ -394,8 +384,7 @@ namespace Gravitas.Colliders
         public bool TryGetVertexWorld(int index, out Vector3d vertex)
         {
             SwiftThrowHelper.ThrowIfArrayIndexInvalid(index, _localVertices.Length, nameof(index));
-            return CreatePointAnchor(_scaledLocalVertices[index])
-                .TryGetPoint(out vertex);
+            return _sourceFrame.TryGetPoint(_localVertices[index], out vertex);
         }
 
         /// <summary>
@@ -424,7 +413,7 @@ namespace Gravitas.Colliders
             out Vector3d vertex)
         {
             Vector3d localPoint = GetSupportVertexLocal(direction);
-            return CreatePointAnchor(localPoint).TryGetPoint(out vertex);
+            return _geometryFrame.TryGetPoint(localPoint, out vertex);
         }
 
         /// <summary>
@@ -447,30 +436,49 @@ namespace Gravitas.Colliders
 
         internal Vector3d GetSupportVertexLocal(Vector3d direction)
         {
-            Vector3d localDirection = ConvertWorldDirectionToLocal(direction);
-            localDirection = localDirection != Vector3d.Zero
-                ? localDirection.Normalized
-                : Vector3d.Right;
-
+            SupportDirection localDirection;
+            if (!_geometryFrame.IsRigid)
+            {
+                WideAxis3 covector = _geometryFrame.GetSourceDirectionNumerators(direction);
+                if (covector.IsZero) covector = new WideAxis3(Signed320.ExtendValue(Signed192.Signed(1)), default, default);
+                localDirection = new SupportDirection(covector);
+            }
+            else
+            {
+                Vector3d compact = ConvertWorldDirectionToLocal(direction);
+                localDirection = new SupportDirection(compact != Vector3d.Zero ? compact.Normalized : Vector3d.Right);
+            }
             if (_supportTreeNodes != null && _supportVertexIndices != null)
-                return _scaledLocalVertices[FindSupportVertexIndex(localDirection)];
+                return GeometryVertices[FindSupportVertexIndex(localDirection)];
 
             int bestIndex = 0;
-            for (int i = 1; i < _scaledLocalVertices.Length; i++)
-            {
-                if (Vector3d.CompareProjection(
-                        _scaledLocalVertices[i],
-                        _scaledLocalVertices[bestIndex],
-                        localDirection) <= 0)
-                    continue;
-
-                bestIndex = i;
-            }
-
-            return _scaledLocalVertices[bestIndex];
+            for (int index = 1; index < VertexCount; index++)
+                if (localDirection.Compare(GeometryVertices[index], GeometryVertices[bestIndex]) > 0) bestIndex = index;
+            return GeometryVertices[bestIndex];
         }
 
-        private int FindSupportVertexIndex(Vector3d localDirection)
+        // Exact affine support changes the covector, not the source-space index.
+        // Compact calls retain their existing projection and tie behavior.
+        private readonly struct SupportDirection
+        {
+            private readonly Vector3d _compact;
+            private readonly WideAxis3 _exact;
+            private readonly bool _wide;
+            internal SupportDirection(Vector3d compact) { _compact = compact; _exact = default; _wide = false; }
+            internal SupportDirection(WideAxis3 exact) { _compact = default; _exact = exact; _wide = true; }
+            internal int Compare(Vector3d first, Vector3d second) => _wide
+                ? WideArithmetic.SubtractSigned576(Project(first), Project(second)).Sign
+                : Vector3d.CompareProjection(first, second, _compact);
+            internal Vector3d BoundsPoint(Vector3d min, Vector3d max) => _wide
+                ? new Vector3d(_exact.X.Sign >= 0 ? max.X : min.X, _exact.Y.Sign >= 0 ? max.Y : min.Y, _exact.Z.Sign >= 0 ? max.Z : min.Z)
+                : GetBoundsSupportPoint(min, max, _compact);
+            private Signed576 Project(Vector3d point) => WideArithmetic.AddSigned576(WideArithmetic.AddSigned576(
+                WideArithmetic.MultiplySigned320(_exact.X, Signed192.Raw(point.X)),
+                WideArithmetic.MultiplySigned320(_exact.Y, Signed192.Raw(point.Y))),
+                WideArithmetic.MultiplySigned320(_exact.Z, Signed192.Raw(point.Z)));
+        }
+
+        private int FindSupportVertexIndex(in SupportDirection localDirection)
         {
             int bestIndex = 0;
             Span<int> stack = stackalloc int[SupportTreeStackCapacity];
@@ -481,11 +489,8 @@ namespace Gravitas.Colliders
             {
                 int nodeIndex = stack[--stackCount];
                 SupportTreeNode node = _supportTreeNodes![nodeIndex];
-                Vector3d upperPoint = GetBoundsSupportPoint(node.Min, node.Max, localDirection);
-                int upperComparison = Vector3d.CompareProjection(
-                    upperPoint,
-                    _scaledLocalVertices[bestIndex],
-                    localDirection);
+                Vector3d upperPoint = localDirection.BoundsPoint(node.Min, node.Max);
+                int upperComparison = localDirection.Compare(upperPoint, GeometryVertices[bestIndex]);
                 if (upperComparison < 0 || (upperComparison == 0 && node.MinVertexIndex >= bestIndex))
                     continue;
 
@@ -514,17 +519,14 @@ namespace Gravitas.Colliders
 
         private void SearchSupportLeaf(
             SupportTreeNode node,
-            Vector3d localDirection,
+            in SupportDirection localDirection,
             ref int bestIndex)
         {
             for (int i = 0; i < node.Count; i++)
             {
                 int vertexIndex = _supportVertexIndices![node.Start + i];
-                Vector3d vertex = _scaledLocalVertices[vertexIndex];
-                int projectionComparison = Vector3d.CompareProjection(
-                    vertex,
-                    _scaledLocalVertices[bestIndex],
-                    localDirection);
+                Vector3d vertex = GeometryVertices[vertexIndex];
+                int projectionComparison = localDirection.Compare(vertex, GeometryVertices[bestIndex]);
                 if (projectionComparison < 0 || (projectionComparison == 0 && vertexIndex >= bestIndex))
                     continue;
 
@@ -535,15 +537,12 @@ namespace Gravitas.Colliders
         private void PushSupportNode(
             SupportTreeNode node,
             int bestIndex,
-            Vector3d localDirection,
+            in SupportDirection localDirection,
             Span<int> stack,
             ref int stackCount)
         {
-            Vector3d upperPoint = GetBoundsSupportPoint(node.Min, node.Max, localDirection);
-            int upperComparison = Vector3d.CompareProjection(
-                upperPoint,
-                _scaledLocalVertices[bestIndex],
-                localDirection);
+            Vector3d upperPoint = localDirection.BoundsPoint(node.Min, node.Max);
+            int upperComparison = localDirection.Compare(upperPoint, GeometryVertices[bestIndex]);
             if (upperComparison < 0 || (upperComparison == 0 && node.MinVertexIndex >= bestIndex))
                 return;
 
@@ -553,14 +552,11 @@ namespace Gravitas.Colliders
         private static bool ComesBeforeSupportNode(
             SupportTreeNode left,
             SupportTreeNode right,
-            Vector3d localDirection)
+            in SupportDirection localDirection)
         {
-            Vector3d leftPoint = GetBoundsSupportPoint(left.Min, left.Max, localDirection);
-            Vector3d rightPoint = GetBoundsSupportPoint(right.Min, right.Max, localDirection);
-            int projectionComparison = Vector3d.CompareProjection(
-                leftPoint,
-                rightPoint,
-                localDirection);
+            Vector3d leftPoint = localDirection.BoundsPoint(left.Min, left.Max);
+            Vector3d rightPoint = localDirection.BoundsPoint(right.Min, right.Max);
+            int projectionComparison = localDirection.Compare(leftPoint, rightPoint);
             if (projectionComparison != 0)
                 return projectionComparison > 0;
 
@@ -727,9 +723,13 @@ namespace Gravitas.Colliders
         public Vector3d GetFaceNormalWorld(int index)
         {
             SwiftThrowHelper.ThrowIfArrayIndexInvalid(index, _triangleCount, nameof(index));
-            _ = _rotation.TryRotate(
-                _scaledFaceNormals[index],
-                out Vector3d worldNormal);
+            if (!_scaleIsExact)
+            {
+                GetGeometryTriangleVertices(index, out Vector3d a, out Vector3d b, out Vector3d c);
+                return WideTriangleRelations.GetScaledTriangleLocalNormal(new FixedTriangle(a, b, c), _sourceFrame)
+                    .Transform(_sourceFrame.GeometryBasis).GetNormal(false);
+            }
+            _ = _rotation.TryRotate(_scaledFaceNormals[index], out Vector3d worldNormal);
             return worldNormal.Normalized;
         }
 
@@ -737,13 +737,22 @@ namespace Gravitas.Colliders
         public void GetTrianglesInWorldBounds(FixedBoundVolume worldBounds, SwiftList<int> result)
         {
             result.FastClear();
+            if (!_geometryFrame.IsRigid)
+            {
+                // Collider admission requires positive scale; inverse bounds
+                // clip to the source domain and cannot be singular here.
+                bool inverted = _sourceFrame.TryGetSourceBounds(worldBounds.Min, worldBounds.Max, out FixedBoundBox sourceBounds);
+                System.Diagnostics.Debug.Assert(inverted);
+                TriangleBVH.Query(new FixedBoundVolume(sourceBounds.Min, sourceBounds.Max), result);
+                return;
+            }
             FixedBoundBox localBounds =
                 FixedBoundBox.FromRelativeRotatedBoundsClippedToDomain(
                     Vector3d.Zero,
                     FixedQuaternion.Identity,
                     worldBounds.Min,
                     worldBounds.Max,
-                    _position,
+                    _geometryFrame.RigidOrigin,
                     _rotation);
             TriangleBVH.Query(
                 new FixedBoundVolume(localBounds.Min, localBounds.Max),
@@ -754,7 +763,13 @@ namespace Gravitas.Colliders
         public void GetTrianglesInLocalBounds(FixedBoundVolume localBounds, SwiftList<int> result)
         {
             result.FastClear();
-            TriangleBVH.Query(localBounds, result);
+            if (_geometryUsesSource)
+            {
+                bool inverted = _sourceFrame.TryGetSourceBoundsFromScaledLocal(localBounds.Min, localBounds.Max, out FixedBoundBox source);
+                System.Diagnostics.Debug.Assert(inverted);
+                TriangleBVH.Query(new FixedBoundVolume(source.Min, source.Max), result);
+            }
+            else TriangleBVH.Query(localBounds, result);
         }
 
         /// <summary>
@@ -764,14 +779,7 @@ namespace Gravitas.Colliders
         public bool TryConvertWorldToScaledLocal(
             Vector3d worldPoint,
             out Vector3d localPoint) =>
-            new FixedPointAnchor(
-                worldPoint,
-                FixedQuaternion.Identity,
-                Vector3d.Zero)
-            .TryGetLocalPointIn(
-                _position,
-                _rotation,
-                out localPoint);
+            _sourceFrame.TryGetScaledLocalPointIn(worldPoint, out localPoint);
 
         /// <summary>
         /// Expresses a world point in the committed scaled-local mesh frame.
@@ -795,7 +803,7 @@ namespace Gravitas.Colliders
         public bool TryConvertScaledLocalToWorld(
             Vector3d scaledLocalPoint,
             out Vector3d worldPoint) =>
-            CreatePointAnchor(scaledLocalPoint).TryGetPoint(out worldPoint);
+            _sourceFrame.GetScaledLocalPoint(scaledLocalPoint).TryGetPoint(out worldPoint);
 
         /// <summary>
         /// Materializes a scaled-local mesh point in world space.
@@ -818,11 +826,18 @@ namespace Gravitas.Colliders
         }
 
         internal FixedPointAnchor CreatePointAnchor(
-            Vector3d scaledLocalPoint) =>
-            new(
-                _position,
-                _rotation,
-                scaledLocalPoint);
+            Vector3d geometryPoint)
+        {
+            if (_geometryFrame.IsRigid)
+                return FixedPointAnchor.FromValidatedFrame(_geometryFrame.RigidOrigin, _rotation, geometryPoint);
+
+            // Production callers supply an admitted vertex or finite convex
+            // witness: its offset from the mesh center is bounded by reach.
+            bool represented = _geometryFrame.GetPoint(geometryPoint).TryGetLocalPointIn(_position,
+                FixedQuaternion.Identity, out Vector3d offset);
+            System.Diagnostics.Debug.Assert(represented);
+            return FixedPointAnchor.FromValidatedFrame(_position, FixedQuaternion.Identity, offset);
+        }
 
         /// <summary>
         /// Attempts to express a world-space direction in the committed

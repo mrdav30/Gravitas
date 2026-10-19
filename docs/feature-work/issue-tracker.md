@@ -2,7 +2,7 @@
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-142`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-143`.
 - Assign an ID when an issue enters this tracker, keep it through resolution,
   and never reuse an ID even if an entry is later removed. Check this file's Git
   history before advancing or repairing the counter.
@@ -37,13 +37,9 @@
 
 ### Ordered Queue
 
-#140's finite single-contact correction is complete. Resolve **#141** before
-resuming Phase 6 of the #133/#139 static-surface continuity plan: recentering
-rotated mesh pieces can separate vertices authored in a common frame. Preserve
-exact shared geometry in its owning transform contract; do not add tolerance
-welding to continuity.
-
-Then complete pure 2D continuity in Phase 6. Resolve **FMS-Issue-033** in
+#140's finite single-contact correction and #141's authored-mesh geometry
+correction are complete. Resume pure 2D continuity in Phase 6 of the #133/#139
+static-surface continuity plan. Resolve **FMS-Issue-033** in
 FixedMathSharp before Phase 7's mixed continuity work; its curved-prism false
 positives do not block pure 2D. Keep physical-quality fixes ahead of the benchmark
 queue and finish generic continuity before heightfield work.
@@ -139,37 +135,31 @@ investigation unless it recurs or a reliable reproducer becomes available.
   retain the fixture, repeats and eight loaded-module hashes, including core
   `8A7E5C4D`. No production changes or fix are claimed by this investigation.
 
-### GRV-Issue-141 - Recentered rotated mesh pieces lose exact authored shared vertices
+### GRV-Issue-142 - Single-mesh cylinder response can select a covered triangle diagonal
 
-- **Confirmed:** 2026-10-18 during Phase 4's projected-support supplier check.
-- **Reproduction:** Author two concave rectangular floor meshes with local X
-  domains `[-4,0.9]` and `[0.9,4]`, both with Z domain `[-4,4]` and Y=0.
-  Initialize them at the same host origin and 45-degree Z rotation. Their
-  authored X=0.9 edge is identical, but the committed boundary domains do not
-  certify a joined span and form two independent continuity components. An
-  upright `(4,1,2)` cuboid centered at `rotation * Up / 10` intersects the first
-  member while its plane-support projection belongs to the second; treating
-  them independently leaves neither member with an admitted global face support.
-- **Root cause:** `LSMeshCollider` initializes its offset from the local bounds
-  center. `LSCollider.CreateStandaloneSnapshot` rounds the transformed offset
-  into a scalar `Center`, which becomes `PhysicsMesh.Origin`.
-  `PhysicsMesh.PrepareScaledGeometry` separately retains centered local vertices.
-  Each piece therefore represents `round(M * center) + R * (vertex - center)`.
-  Different centers leave different rounding residuals, so the same authored
-  vertex need not have the same exact committed world position or plane.
-- **Pre-existing evidence:** These constructor, snapshot and mesh-scaling owners
-  are unchanged by Phase 4. Current runtime diagnostics confirm the two separate
-  components, first-member initial overlap and absent joined spans in ignored
-  `artifacts/grv-issue-133/phase4/slab-carrier-stages.log`. This attribution is
-  based on the executed current fixture and unchanged source; a frozen older
-  binary comparison has not been run.
-- **Follow-up:** Preserve common authored rigid geometry through recentering,
-  including the exact origin remainder, rather than treating nearby vertices
-  as equal. Regress exact shared vertices/planes and boundary certification for
-  differently centered rotated pieces, opposite winding, scale and compound
-  placement. Check dimensional counterparts and retain bounded geometry,
-  transactional mutation, finite anchors and the warm baseline. Resolve the
-  owning transform contract separately from Phase 4's joined support transport.
+- **Confirmed:** 2026-10-18 while validating authored-frame migration; pre-existing
+  on the frozen committed stack used for the #141 baseline.
+- **Reproduction:** Concave floor vertices `(-1,0,-1), (1.25,0,-1),
+  (-1,0,1), (1.25,0,1)`, indices `0,2,1, 1,2,3`, identity pose/unit scale,
+  surface inertia policy. Put an upright cylinder of radius `0.25`, full height
+  `1` at `(0,0.1,0)`. Set gravity, air density and damping to zero; freeze
+  rotation, disable sleep, and run both host phases.
+- **Observed:** Contact selects normal approximately `(0.66436384,0,0.74740932)`
+  and depth `0.33304548`, moving the body sideways to approximately
+  `(0.08827586,0.1,0.09931035)`. The actual flat patch still intersects it;
+  the internal triangle diagonal is covered and cannot be a physical rim.
+- **Attribution:** The original and current geometry produce identical normal,
+  depth and host displacement. A separately executed probe loaded the complete
+  frozen dependency stack, including FixedMathSharp; baseline SHA256 prefixes
+  are Gravitas `7DA03E71399F6260` and FixedMathSharp `E548E281230CBF83`.
+  This is independent of fractional-scale ingress. Disposable probe captures
+  are under `artifacts/grv-issue-141/cylinder-*`; the inputs above reproduce it
+  without those artifacts.
+- **Next action:** Reduce cylinder contacts over the actual trusted filled mesh
+  patch before selecting response, preserving real outer/hole rims and existing
+  finite-feature admission. Check both windings, triangle order/subdivision,
+  whole-shape clearance and mixed cylinder/slab parity. Keep this distinct from
+  FMS-Issue-033's curved-prism false-positive predicate.
 
 ### GRV-Issue-111 - Local-stack benchmark hosts can omit FixedMathSharp compile references
 
@@ -231,6 +221,42 @@ investigation unless it recurs or a reliable reproducer becomes available.
 Remaining measured performance costs are tracked in the benchmark backlog.
 
 ## Resolved Issues
+
+### GRV-Issue-141 - Recentered rotated mesh pieces lose exact authored shared vertices
+
+- **Confirmed:** 2026-10-18; **resolved:** 2026-10-18. Independently centered
+  floor pieces lost a common authored edge after rotation or fractional scale.
+  The committed pre-change stack reproduced missing joined cuboid response for
+  the 45-degree fixture and an artificial rim for unequal-width scaled pieces.
+- **Root cause:** Separately materializing transformed centers and centered
+  scaled vertices changed their common authored geometry. Earlier tests explicitly
+  expected resulting plane kinks and erased tiny corners, so coverage/replay
+  established consistency with an incorrect geometry invariant.
+- **Fix:** Retain exact authored placement and scale through the existing mesh
+  geometry frame. Collision, support, queries, CCD, bounds and mass consume that
+  same map; final physical witnesses round in bounded translated charts.
+  Source incidence is immutable under positive diagonal scale. Existing indexes,
+  finite geometry owners and wide integer families are reused.
+- **External review closeout:** Restore exact per-vertex support comparison in
+  the CCD exclusion certificate, including rigid frames whose rounded inverse
+  direction can select the wrong vertex. Materialize affine mixed-sweep witnesses
+  around the physical mesh origin rather than a potentially distant host. Both
+  reported counterexamples have maintained regressions; the public sweep has an
+  independent integer plane/entry/witness oracle and a controlled bad-chart run.
+  Independent incremental ponytail review found no remaining issue.
+- **Validation:** Local-stack Release/ReleaseLean suites, shared replay, restore
+  continuation, raw 100% line/branch/method coverage, both target frameworks and
+  adapter tests pass. Warm controls remain allocation-free. The user explicitly
+  accepted the documented approximately 4-11% ordinary curved-contact cost in
+  exchange for correctness; this is not a performance-neutral claim. The restored
+  exact certificate's approximately one-microsecond kernel cost is also recorded.
+- **Record:** The completed
+  [mesh authored-frame preservation plan](done/2026-10-18-mesh-authored-frame-preservation-plan.md)
+  retains the exact contract, RCA, source-growth review, raw validation counts,
+  measured costs and accepted tradeoff. Commit/push FixedMathSharp first, then
+  update Gravitas develop's immutable dependency pin; release FixedMathSharp
+  before Gravitas package validation. Cross-platform CI and released packages
+  were not validated locally.
 
 ### GRV-Issue-140 - Convex 2D single contacts discard finite witnesses consumed by shape sweeps
 

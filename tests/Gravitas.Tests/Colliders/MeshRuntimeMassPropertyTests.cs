@@ -296,6 +296,79 @@ public sealed class MeshRuntimeMassPropertyTests
         invalid.Should().Throw<InvalidOperationException>();
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void FractionalScale_ShouldRetainMassOfAnAdmittedSubRawThickness(bool reverse)
+    {
+        Vector3d[] vertices = { Vector3d.Zero, Vector3d.Right * (Fixed64)4096,
+            new(Fixed64.Zero, Fixed64.FromRaw(2), Fixed64.Zero) };
+        var mesh = new LSMeshCollider(vertices, reverse ? new[] { 0, 2, 1 } : new[] { 0, 1, 2 },
+            MeshColliderMode.Convex, MeshInertiaPolicy.SurfaceApproximation);
+        using var context = GravitasWorldContext.CreateOwned();
+        mesh.InitializeWithNoBody(new TestMatterAgent(context, new FixedTransform(Vector3d.Zero,
+            FixedQuaternion.Identity, new Vector3d(Fixed64.One, Fixed64.FromFraction(1, 5), Fixed64.One))));
+        mesh.Mesh.GetLocalTriangleVertices(0, out Vector3d a, out Vector3d b, out Vector3d c);
+        a.Y.Should().Be(b.Y).And.Be(c.Y);
+        mesh.Area.Should().BeGreaterThan(Fixed64.Epsilon);
+        mesh.Mesh.SurfaceMassWeight.IsZero.Should().BeFalse();
+        mesh.Mesh.SurfaceMassProperties.UnitMassInertiaTensor.M22.Should()
+            .Be(Rounded((BigInteger)4096 * 4096 * Fixed64.One.m_rawValue, 18));
+        mesh.Mesh.CalculateInertiaTensor(Fixed64.One, MeshInertiaPolicy.SurfaceApproximation)
+            .M22.Should().Be(mesh.Mesh.SurfaceMassProperties.UnitMassInertiaTensor.M22);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void FractionalOwnerAndPartScale_ShouldIntegrateTheAuthoredSolidOrShell(bool surface, bool reverse)
+    {
+        ColliderShapeDefinition cube = MeshTestFixtures.CreateConvexCubeDefinition(Policy(surface));
+        int[] indices = Enumerable.Range(0, cube.MeshTriangleIndexCount).Select(cube.GetMeshTriangleIndex).ToArray();
+        if (reverse)
+            for (int i = 0; i < indices.Length; i += 3) (indices[i + 1], indices[i + 2]) = (indices[i + 2], indices[i + 1]);
+        var definition = ColliderShapeDefinition.ConvexMesh(Enumerable.Range(0, cube.MeshVertexCount)
+            .Select(cube.GetMeshVertex).ToArray(), indices, Policy(surface));
+        Vector3d owner = new(Fixed64.FromFraction(2, 3), Fixed64.FromFraction(5, 7), Fixed64.FromFraction(7, 11));
+        Vector3d part = new(Fixed64.FromFraction(3, 5), Fixed64.FromFraction(7, 13), Fixed64.FromFraction(11, 17));
+        var compound = new LSCompoundCollider(new CompoundColliderPart(definition, Vector3d.Zero, FixedQuaternion.Identity, part));
+        using var context = GravitasWorldContext.CreateOwned();
+        var body = new SolidBody(new TestMatterAgent(context, new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, owner)), compound);
+        body.Initialize(Vector3d.Zero, FixedQuaternion.Identity);
+        PhysicsMesh mesh = ((LSMeshCollider)compound.GetPartCollider(0)).Mesh;
+        mesh.OwnerScale.Should().Be(owner);
+        mesh.PartScale.Should().Be(part);
+        BigInteger[] lengths = Raw(owner).Zip(Raw(part), (a, b) => a * b * Fixed64.One.m_rawValue).ToArray();
+        foreach (long mass in new[] { 3L, 6L, Fixed64.One.m_rawValue, 4294967296000000000L })
+            mesh.CalculateInertiaTensor(Fixed64.FromRaw(mass), Policy(surface), Vector3d.Zero)
+                .Should().Be(ScaledBoxTensor(lengths, mass, surface));
+        if (!surface)
+        {
+            mesh.TryGetClosedVolumeMassProperties(out MeshMassProperties properties, out _).Should().BeTrue();
+            properties.Volume.Should().Be(Rounded(lengths[0] * lengths[1] * lengths[2], BigInteger.One << 256));
+            properties.CenterOfMass.Should().Be(Vector3d.Zero);
+        }
+    }
+
+    private static Fixed3x3 ScaledBoxTensor(BigInteger[] s, long mass, bool surface)
+    {
+        BigInteger[] areas = { s[1] * s[2], s[0] * s[2], s[0] * s[1] };
+        BigInteger total = surface ? areas.Aggregate(BigInteger.Zero, (a, b) => a + b) : BigInteger.One;
+        Fixed64[] diagonal = new Fixed64[3];
+        for (int axis = 0; axis < 3; axis++)
+        {
+            int j = (axis + 1) % 3, k = (axis + 2) % 3;
+            BigInteger j2 = s[j] * s[j], k2 = s[k] * s[k];
+            BigInteger numerator = surface ? areas[axis] * (j2 + k2) + areas[j] * (3 * j2 + k2)
+                + areas[k] * (j2 + 3 * k2) : j2 + k2;
+            diagonal[axis] = Rounded(mass * numerator, 12 * total * (BigInteger.One << 192));
+        }
+        return new Fixed3x3(diagonal[0], Fixed64.Zero, Fixed64.Zero, Fixed64.Zero,
+            diagonal[1], Fixed64.Zero, Fixed64.Zero, Fixed64.Zero, diagonal[2]);
+    }
+
     private static MeshInertiaPolicy Policy(bool surface) => surface
         ? MeshInertiaPolicy.SurfaceApproximation : MeshInertiaPolicy.RequireClosedVolume;
 

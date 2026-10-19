@@ -11,6 +11,54 @@ namespace Gravitas.Tests.Colliders;
 
 public sealed class PhysicsMeshTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ScaleMutation_ShouldCeilTheActualRadiusForExactAndSubrawVertices(bool fractionalEndpoint)
+    {
+        Fixed64 extent = Fixed64.FromRaw(((long)4 << 32) + (fractionalEndpoint ? 1 : 2));
+        var mesh = new PhysicsMesh(new[]
+        {
+            Vector3d.Left * extent, Vector3d.Right * extent, Vector3d.Forward, Vector3d.Backward
+        }, new[] { 0, 2, 1, 0, 1, 3 }, Vector3d.Zero, FixedQuaternion.Identity, MeshColliderMode.Concave);
+
+        for (int iteration = 0; iteration < 2; iteration++)
+        {
+            mesh.UpdateTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One * Fixed64.Half);
+            // The four extremal vertices lie on coordinate axes. Both a
+            // half-raw excess and an exact one-raw excess ceil to this radius.
+            mesh.ScaledLocalRadius.Should().Be(Fixed64.Two + Fixed64.MinIncrement);
+            mesh.ScaledLocalVertices[1].X.Should().Be(fractionalEndpoint
+                ? Fixed64.Two : Fixed64.Two + Fixed64.MinIncrement);
+            mesh.UpdateTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One);
+            mesh.ScaledLocalRadius.Should().Be(extent);
+        }
+    }
+
+    [Fact]
+    public void ScaledLocalBoundsQuery_ShouldInverseMapTheCommittedAuthoredBvhWithoutRoundingItsGeometry()
+    {
+        using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
+        Fixed64 top = Fixed64.Two + Fixed64.MinIncrement;
+        var collider = new LSMeshCollider(new[]
+        {
+            new Vector3d(-3,0,0), new Vector3d(-1,0,0), new Vector3d((Fixed64)(-3), Fixed64.Zero, top),
+            new Vector3d(1,0,0), new Vector3d(3,0,0), new Vector3d((Fixed64)3, Fixed64.Zero, top)
+        }, new[] { 0,1,2,3,4,5 }, MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation);
+        collider.InitializeWithNoBody(new TestMatterAgent(context, new FixedTransform(Vector3d.Zero,
+            FixedQuaternion.Identity, new Vector3d(Fixed64.Two, Fixed64.One, Fixed64.Half))));
+        var triangles = new SwiftList<int>();
+        foreach (int side in new[] { -1, 1 })
+        {
+            triangles.Add(999);
+            Vector3d point = new(5 * side, 0, 0);
+            collider.Mesh.GetTrianglesInLocalBounds(new FixedBoundVolume(point, point), triangles);
+            triangles.Count.Should().Be(1); triangles[0].Should().Be(side < 0 ? 0 : 1);
+        }
+        collider.Mesh.GetTrianglesInLocalBounds(new FixedBoundVolume(Vector3d.Zero, Vector3d.Zero), triangles);
+        triangles.Count.Should().Be(0);
+    }
+
     [Fact]
     public void Constructor_ShouldRejectInvalidMeshInput()
     {

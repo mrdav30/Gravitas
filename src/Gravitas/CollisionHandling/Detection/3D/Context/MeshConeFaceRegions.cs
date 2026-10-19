@@ -22,6 +22,9 @@ internal sealed partial class MeshConeFaceRegions
     private ulong[] _selectionValues = Array.Empty<ulong>();
     private int[] _selectionSigns = Array.Empty<int>();
     private Winner[] _winners = Array.Empty<Winner>();
+    private int _fieldWords = ConePlaneRaySelection.FieldWords, _rootWords = ConePlaneRaySelection.RootWords;
+    private int SelectionWords => 12 * _fieldWords + _rootWords;
+    private int PointWords => 8 * _fieldWords;
     private readonly ConePlaneRayEventVisitor _eventVisitor;
     private PhysicsMesh? _gatherMesh;
     private MeshSurfaceConnectivity? _gatherConnectivity;
@@ -44,8 +47,8 @@ internal sealed partial class MeshConeFaceRegions
         FixedQuaternion coneRotation, Fixed64 height, Fixed64 radius,
         MeshSurfaceConnectivity connectivity, ReadOnlySpan<int> admittedTriangles, Vector3d samplingOrigin = default)
     {
-        mesh.GetLocalTriangleVertices(surfaceTriangle, out Vector3d a, out Vector3d b, out Vector3d c);
-        var frame = new ConePlaneRayFrame(new FixedTriangle(a, b, c), mesh.Origin, mesh.Rotation,
+        mesh.GetGeometryTriangleVertices(surfaceTriangle, out Vector3d a, out Vector3d b, out Vector3d c);
+        var frame = new ConePlaneRayFrame(new FixedTriangle(a, b, c), mesh.GeometryFrame,
             coneCenter, coneRotation, height, radius);
         Build(mesh, surfaceTriangle, frame, connectivity, admittedTriangles, samplingOrigin);
     }
@@ -65,13 +68,14 @@ internal sealed partial class MeshConeFaceRegions
         RegionCount = connectivity.RegionCount;
         HasBoundaryIntersection = false;
         if (RegionCount == 0) return;
+        _fieldWords = frame.FieldWords; _rootWords = frame.RootWords;
         Reserve(RegionCount);
-        mesh.GetLocalTriangleVertices(surfaceTriangle, out Vector3d a, out Vector3d b, out Vector3d c);
+        mesh.GetGeometryTriangleVertices(surfaceTriangle, out Vector3d a, out Vector3d b, out Vector3d c);
         _frame = frame;
         _samplingOrigin = samplingOrigin;
         _wholeConeSamplingRangeRepresentable = ConePlaneRayPointMaterialization.IsRangeRepresentable(_frame, samplingOrigin);
         _worldNormal = _frame.GetWorldNormal(mesh.Rotation);
-        var metrics = new WidePlaneMetrics(new FixedTriangle(a, b, c), mesh.Rotation);
+        var metrics = new WidePlaneMetrics(new FixedTriangle(a, b, c), mesh.GeometryFrame);
         Array.Clear(_winners, 0, 2 * RegionCount);
         _poolEvents.FastClear();
         GatherEvents(mesh, surfaceTriangle, connectivity);
@@ -89,11 +93,12 @@ internal sealed partial class MeshConeFaceRegions
             int capacity = Math.Max(count, _regions.Length * 2);
             Array.Resize(ref _regions, capacity);
             Array.Resize(ref _sampleCounts, capacity);
-            Array.Resize(ref _selectionValues, 2 * capacity * ConePlaneRaySelection.StorageWords);
             Array.Resize(ref _selectionSigns, 2 * capacity * ConePlaneRaySelection.SignCount);
             Array.Resize(ref _winners, 2 * capacity);
             Array.Resize(ref _samples, capacity * ContactManifold.MaxContactsPerGroup);
         }
+        int required = 2 * _regions.Length * SelectionWords;
+        if (_selectionValues.Length < required) Array.Resize(ref _selectionValues, required);
     }
 
     private void GatherEvents(PhysicsMesh mesh, int surfaceTriangle, MeshSurfaceConnectivity connectivity)
@@ -104,7 +109,7 @@ internal sealed partial class MeshConeFaceRegions
         try
         {
             ReadOnlySpan<int> boundary = mesh.GetCanonicalSurfaceBoundaryVertexPairs(surfaceTriangle);
-            ReadOnlySpan<Vector3d> vertices = mesh.ScaledLocalVertices;
+            ReadOnlySpan<Vector3d> vertices = mesh.GeometryVertices;
             int firstIntersectingEdge = 0;
             for (; firstIntersectingEdge < boundary.Length; firstIntersectingEdge += 2)
                 if (_frame.IntersectsSegment(new FixedSegment(vertices[boundary[firstIntersectingEdge]],
@@ -195,7 +200,7 @@ internal sealed partial class MeshConeFaceRegions
         if (_gatherContainsSection) return 0;
         if (!corners.IsEmpty)
         {
-            ReadOnlySpan<Vector3d> vertices = mesh.ScaledLocalVertices;
+            ReadOnlySpan<Vector3d> vertices = mesh.GeometryVertices;
             for (int corner = 1; corner < corners.Length - 1; corner++)
                 if (ConePlaneRayPointExits.ContainsTrianglePoint(new FixedTriangle(vertices[corners[0]],
                     vertices[corners[corner]], vertices[corners[corner + 1]]), _frame, point, root)) return 0;
@@ -208,7 +213,7 @@ internal sealed partial class MeshConeFaceRegions
         // use prepared incidence if measured large patches need it.
         foreach (int triangle in connectivity.TriangleIndices)
         {
-            mesh.GetLocalTriangleVertices(triangle, out Vector3d a, out Vector3d b, out Vector3d c);
+            mesh.GetGeometryTriangleVertices(triangle, out Vector3d a, out Vector3d b, out Vector3d c);
             if (ConePlaneRayPointExits.ContainsTrianglePoint(new FixedTriangle(a, b, c), _frame, point, root))
                 return connectivity.GetRegionOrdinal(triangle);
         }
@@ -218,8 +223,8 @@ internal sealed partial class MeshConeFaceRegions
     private ConePlaneRaySelection BorrowWinner(int index)
     {
         var selection = new ConePlaneRaySelection(
-            _selectionValues.AsSpan(index * ConePlaneRaySelection.StorageWords, ConePlaneRaySelection.StorageWords),
-            _selectionSigns.AsSpan(index * ConePlaneRaySelection.SignCount, ConePlaneRaySelection.SignCount));
+            _selectionValues.AsSpan(index * SelectionWords, SelectionWords),
+            _selectionSigns.AsSpan(index * ConePlaneRaySelection.SignCount, ConePlaneRaySelection.SignCount), _fieldWords, _rootWords);
         Winner winner = _winners[index];
         if (winner.HasValue) selection.Restore(GetFrame(winner.Member), winner.Source, winner.Event);
         return selection;
@@ -241,10 +246,10 @@ internal sealed partial class MeshConeFaceRegions
         // Shared normal metric and frame scale cancel in the exact comparison.
         System.Diagnostics.Debug.Assert(positive.HasValue && negative.HasValue);
         int comparison = _joined?.Active == true ? positive.CompareDepth(negative) : ContactQuadratic.CompareRatios(
-            ContactQuadratic.At(positive.Values, positive.Signs, 0, ConePlaneRaySelection.FieldWords),
-            ContactQuadratic.At(positive.Values, positive.Signs, 1, ConePlaneRaySelection.FieldWords), positive.Root,
-            ContactQuadratic.At(negative.Values, negative.Signs, 0, ConePlaneRaySelection.FieldWords),
-            ContactQuadratic.At(negative.Values, negative.Signs, 1, ConePlaneRaySelection.FieldWords), negative.Root);
+            ContactQuadratic.At(positive.Values, positive.Signs, 0, _fieldWords),
+            ContactQuadratic.At(positive.Values, positive.Signs, 1, _fieldWords), positive.Root,
+            ContactQuadratic.At(negative.Values, negative.Signs, 0, _fieldWords),
+            ContactQuadratic.At(negative.Values, negative.Signs, 1, _fieldWords), negative.Root);
         int orientation = comparison <= 0 ? 1 : -1;
         _regions[region] = new Region(orientation);
     }

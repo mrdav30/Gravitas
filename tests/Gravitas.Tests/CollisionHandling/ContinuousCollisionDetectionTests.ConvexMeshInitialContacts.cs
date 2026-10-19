@@ -569,6 +569,37 @@ public sealed partial class ContinuousCollisionDetectionTests
     }
 
     [Fact]
+    public void RotationalPlaneCertificate_WithSubRawRigidSupportDifference_ShouldRetainSearch()
+    {
+        using PhysicsScenarioBuilder scenario = CreateCcdScenario();
+        long fifth = Fixed64.One.m_rawValue / 5;
+        var rotation = new FixedQuaternion(Fixed64.Zero, Fixed64.Zero,
+            Fixed64.FromRaw(3 * fifth), Fixed64.FromRaw(4 * fifth));
+        var floor = new LSMeshCollider(new[]
+        {
+            Vector3d.Zero,
+            new Vector3d((Fixed64)7, (Fixed64)(-24) + Fixed64.FromRaw(14), Fixed64.Zero),
+            Vector3d.Forward
+        }, new[] { 0, 1, 2 }, MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation);
+        scenario.CreateBody(floor, Vector3d.Zero, rotation, immovable: true);
+        Vector3d start = new(Fixed64.One, Fixed64.Half, Fixed64.Quarter);
+        SolidBody source = scenario.CreateCuboid(start).Body;
+
+        // The exact 3:4 rotation puts B at Y=98/25 raw, above the cuboid's
+        // bottom. A rounded inverse direction instead selects A at Y=0.
+        floor.Mesh.TryGetVertexWorld(1, out Vector3d vertex).Should().BeTrue();
+        vertex.Y.Should().Be(Fixed64.FromRaw(4));
+        scenario.Context.Query3D.SweepCuboid((LSCuboidCollider)source.Collider, Vector3d.Right,
+            PhysicsLayerMask.All, out Physics3DHit hit, source.Collider).Should().BeTrue();
+        hit.Collider.Should().BeSameAs(floor);
+        hit.Normal.Should().Be(Vector3d.Up);
+        hit.Distance.Should().Be(Fixed64.Zero);
+
+        source.CanExcludeInvariantTangentialContact(hit, start, Vector3d.Right,
+            FixedQuaternion.Identity, PhysicsScenarioBuilder.Yaw(45), isKinematic: false).Should().BeFalse();
+    }
+
+    [Fact]
     public void RotationalPlaneCertificate_WithoutGeometricNormal_ShouldRetainConservativeSearch()
     {
         using PhysicsScenarioBuilder scenario = CreateCcdScenario();

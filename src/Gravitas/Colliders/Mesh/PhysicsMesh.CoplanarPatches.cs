@@ -6,26 +6,22 @@
 //=======================================================================
 
 using FixedMathSharp;
+using FixedMathSharp.Geometry;
 using SwiftCollections;
 using System;
 using System.Collections.Generic;
 
 namespace Gravitas.Colliders;
 
-/// <content>Retains exact coplanar seam ownership with each committed scaled mesh.</content>
+/// <content>Retains immutable authored seam ownership through positive affine mesh transforms.</content>
 public partial class PhysicsMesh
 {
     private int[] _coplanarPatchBoundaryOffsets = Array.Empty<int>();
     private int[] _coplanarPatchBoundaryVertexPairs = Array.Empty<int>();
     private int[] _convexCoplanarPatchCornerOffsets = Array.Empty<int>();
     private int[] _convexCoplanarPatchCornerVertexIndices = Array.Empty<int>();
-    private int[] _preparedCoplanarPatchIds = Array.Empty<int>();
-    private int[] _preparedCoplanarPatchBoundaryOffsets = Array.Empty<int>();
-    private int[] _preparedCoplanarPatchBoundaryVertexPairs = Array.Empty<int>();
-    private int[] _preparedConvexCoplanarPatchCornerOffsets = Array.Empty<int>();
-    private int[] _preparedConvexCoplanarPatchCornerVertexIndices = Array.Empty<int>();
-    // Authored counts are fixed. Mutable preparation scratch is never exposed
-    // through committed spans and only grows when a larger candidate needs it.
+    private int[] _patchIds = Array.Empty<int>();
+    // Construction scratch is separate from the immutable topology views.
     private readonly SwiftList<EdgeUse> _patchEdgeUses = new();
     private int[] _patchParents = Array.Empty<int>();
     private bool[] _patchRejected = Array.Empty<bool>();
@@ -54,10 +50,33 @@ public partial class PhysicsMesh
             Array.Resize(ref buffer, count);
     }
 
+    private void ReleaseTopologyPreparation()
+    {
+        // Positive affine transforms preserve the copied topology; construction
+        // scratch must not retain mesh-sized capacity for the runtime lifetime.
+        _patchIds = _patchParents = _patchCounts = Array.Empty<int>();
+        _patchRejected = Array.Empty<bool>();
+        _patchWalkedBoundary = Array.Empty<BoundaryVertex>();
+        _topologyRepresentativeIndices = _topologyWeldedTriangles = Array.Empty<int>();
+        _topologyBoundaryHull = _topologyStrictBoundary = Array.Empty<BoundaryVertex>();
+        _surfaceWriteOffsets = _surfaceKeyOffsets = _surfacePreviousByVertex = Array.Empty<int>();
+        _surfaceCycleVertices = _surfaceCycleOffsets = Array.Empty<int>();
+        _surfacePreparationVertices = Array.Empty<Vector3d>();
+        _surfaceBoundaryEdgeComparer = null;
+        _surfaceOrderComparer = null;
+        _patchEdgeUses.FastClear(); _patchEdgeUses.TrimExcessCapacity();
+        _patchBoundaryVertexUses.FastClear(); _patchBoundaryVertexUses.TrimExcessCapacity();
+        _topologyVertexUses.FastClear(); _topologyVertexUses.TrimExcessCapacity();
+        _topologySortedBoundary.FastClear(); _topologySortedBoundary.TrimExcessCapacity();
+        _surfaceNeighborPairs.FastClear(); _surfaceNeighborPairs.TrimExcessCapacity();
+        _surfaceBoundaryEdges.FastClear(); _surfaceBoundaryEdges.TrimExcessCapacity();
+        _surfaceOrder.FastClear(); _surfaceOrder.TrimExcessCapacity();
+    }
+
     private void PrepareCoplanarPatches(Vector3d[] vertices)
     {
-        // Scaling can round distinct positions together or destroy coplanarity.
-        // Weld and classify the candidate geometry, never the prior snapshot.
+        // Positive affine transforms preserve source incidence and coplanarity;
+        // classify once, independently of rounded inspection coordinates.
         int[] triangles = CreateTopologyTriangles(vertices, _triangles);
         PrepareWeldedSurfaceIncidence(triangles);
         _surfaceNeighborPairs.FastClear();
@@ -135,10 +154,10 @@ public partial class PhysicsMesh
         }
 
         RejectAmbiguousPatchBoundaryVertices(edgeUses, boundaryCount, rejected);
-        EnsureTopologyBuffer(ref _preparedCoplanarPatchIds, _triangleCount);
-        EnsureTopologyBuffer(ref _preparedCoplanarPatchBoundaryOffsets, _triangleCount + 1);
-        int[] ids = _preparedCoplanarPatchIds;
-        int[] offsets = _preparedCoplanarPatchBoundaryOffsets;
+        EnsureTopologyBuffer(ref _patchIds, _triangleCount);
+        EnsureTopologyBuffer(ref _coplanarPatchBoundaryOffsets, _triangleCount + 1);
+        int[] ids = _patchIds;
+        int[] offsets = _coplanarPatchBoundaryOffsets;
         Array.Clear(offsets, 0, _triangleCount + 1);
         for (int i = 0; i < ids.Length; i++)
             ids[i] = counts[parents[i]] > 1 && !rejected[parents[i]] ? parents[i] : -1;
@@ -150,8 +169,8 @@ public partial class PhysicsMesh
         }
         for (int i = 1; i < offsets.Length; i++)
             offsets[i] += offsets[i - 1];
-        EnsureTopologyBuffer(ref _preparedCoplanarPatchBoundaryVertexPairs, offsets[_triangleCount]);
-        int[] boundaries = _preparedCoplanarPatchBoundaryVertexPairs;
+        EnsureTopologyBuffer(ref _coplanarPatchBoundaryVertexPairs, offsets[_triangleCount]);
+        int[] boundaries = _coplanarPatchBoundaryVertexPairs;
         Array.Copy(offsets, counts, counts.Length);
         for (int i = 0; i < boundaryCount; i++)
         {
@@ -170,10 +189,10 @@ public partial class PhysicsMesh
     private void PrepareConvexCoplanarPatchCorners(Vector3d[] vertices, int[] triangles,
         int[] ids, int[] boundaryOffsets, int[] boundaries)
     {
-        EnsureTopologyBuffer(ref _preparedConvexCoplanarPatchCornerOffsets, _triangleCount + 1);
-        EnsureTopologyBuffer(ref _preparedConvexCoplanarPatchCornerVertexIndices, boundaryOffsets[_triangleCount] / 2);
-        int[] offsets = _preparedConvexCoplanarPatchCornerOffsets;
-        int[] corners = _preparedConvexCoplanarPatchCornerVertexIndices;
+        EnsureTopologyBuffer(ref _convexCoplanarPatchCornerOffsets, _triangleCount + 1);
+        EnsureTopologyBuffer(ref _convexCoplanarPatchCornerVertexIndices, boundaryOffsets[_triangleCount] / 2);
+        int[] offsets = _convexCoplanarPatchCornerOffsets;
+        int[] corners = _convexCoplanarPatchCornerVertexIndices;
         // Welding has finished consuming the representative map. Reuse its
         // vertex-sized storage for each patch's outgoing successor links.
         int[] nextByVertex = _topologyRepresentativeIndices;
@@ -233,12 +252,13 @@ public partial class PhysicsMesh
             first.StartVertexIndex, first.EndVertexIndex)];
         Vector3d secondOpposite = vertices[FindOppositeVertexIndex(triangles, second.TriangleIndex,
             first.StartVertexIndex, first.EndVertexIndex)];
-        // Prepared vertices have already passed the centered reach limit, so
-        // these local differences are bounded by twice that limit.
-        Vector3d edge = end - start;
-        Vector3d firstOffset = firstOpposite - start;
-        Vector3d secondOffset = secondOpposite - start;
-        if (Vector3d.ScalarTripleProductSign(edge, firstOffset, secondOffset) != 0)
+        // Source points may span the scalar domain even when scale admits a small mesh.
+        new FixedTriangle(start, end, firstOpposite).GetExactNormal(out Signed192 nx, out Signed192 ny, out Signed192 nz, out _);
+        Signed320 planeSide = WideArithmetic.AddSigned320(WideArithmetic.AddSigned320(
+            WideArithmetic.MultiplySigned192(nx, WideArithmetic.Difference(secondOpposite.X, start.X)),
+            WideArithmetic.MultiplySigned192(ny, WideArithmetic.Difference(secondOpposite.Y, start.Y))),
+            WideArithmetic.MultiplySigned192(nz, WideArithmetic.Difference(secondOpposite.Z, start.Z)));
+        if (!planeSide.IsZero)
             return 0;
 
         int droppedAxis = GetPatchProjectionAxis(start, end, firstOpposite);

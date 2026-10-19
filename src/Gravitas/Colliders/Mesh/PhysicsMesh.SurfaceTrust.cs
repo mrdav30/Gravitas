@@ -14,7 +14,6 @@ namespace Gravitas.Colliders;
 public partial class PhysicsMesh
 {
     private int[] _manifoldPatchIds = Array.Empty<int>();
-    private int[] _preparedManifoldPatchIds = Array.Empty<int>();
 
 
     /// <summary>Gets an embedded planar patch owner, or the individual declined triangle.</summary>
@@ -38,14 +37,14 @@ public partial class PhysicsMesh
     private void PrepareManifoldPatchTrust(Vector3d[] vertices, int[] triangles, int[] legacyIds,
         int[] boundaryOffsets, int[] boundaries)
     {
-        EnsureTopologyBuffer(ref _preparedManifoldPatchIds, _triangleCount);
+        EnsureTopologyBuffer(ref _manifoldPatchIds, _triangleCount);
         for (int patch = 0; patch < _triangleCount; patch++)
         {
             if (legacyIds[patch] != patch) continue;
             // A strict convex ring already proves unit winding. Other patches
             // use the same exact chain proof after reducing their full boundary.
-            bool trusted = _preparedConvexCoplanarPatchCornerOffsets[patch + 1]
-                > _preparedConvexCoplanarPatchCornerOffsets[patch];
+            bool trusted = _convexCoplanarPatchCornerOffsets[patch + 1]
+                > _convexCoplanarPatchCornerOffsets[patch];
             if (!trusted)
             {
                 int first = patch * 3;
@@ -60,7 +59,7 @@ public partial class PhysicsMesh
             _surfaceWriteOffsets[patch] = trusted ? patch : -1;
         }
         for (int triangle = 0; triangle < _triangleCount; triangle++)
-            _preparedManifoldPatchIds[triangle] = legacyIds[triangle] < 0 ? -1 : _surfaceWriteOffsets[legacyIds[triangle]];
+            _manifoldPatchIds[triangle] = legacyIds[triangle] < 0 ? -1 : _surfaceWriteOffsets[legacyIds[triangle]];
     }
 
     /// <summary>Certifies reduced directed planar cycles as the boundary of a domain with multiplicity zero or one.</summary>

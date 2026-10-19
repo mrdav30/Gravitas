@@ -335,20 +335,14 @@ public sealed partial class GravitasQuery3DService
         for (int i = 0; i < _meshTriangleCandidates.Count; i++)
         {
             int triangleIndex = _meshTriangleCandidates[i];
-            mesh.Mesh.GetLocalTriangleVertices(
+            mesh.Mesh.GetGeometryTriangleVertices(
                 triangleIndex,
                 out Vector3d first,
                 out Vector3d second,
                 out Vector3d third);
             Vector3d normal = mesh.Mesh.GetFaceNormalWorld(triangleIndex);
-            if (!new FixedTriangle(first, second, third).TryGetFiniteConeIntersectionMinimumAxialPoint(
-                    mesh.Mesh.Origin,
-                    mesh.Mesh.Rotation,
-                    origin,
-                    direction,
-                    length,
-                    endRadius,
-                    out FixedPointAnchor pointAnchor))
+            if (!WideTriangleConeIntersection.TryGetMinimumAxialPoint(new FixedTriangle(first, second, third),
+                    mesh.Mesh.GeometryFrame, origin, direction, length, endRadius, out FixedPointAnchor pointAnchor))
             {
                 continue;
             }

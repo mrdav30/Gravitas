@@ -162,7 +162,7 @@ internal static class ColliderPlanarProjection
         FixedTriangle bestGeometry = default;
         for (int index = 0; index < mesh.TriangleCount; index++)
         {
-            mesh.GetLocalTriangleVertices(
+            mesh.GetGeometryTriangleVertices(
                 index,
                 out Vector3d first,
                 out Vector3d second,
@@ -172,8 +172,7 @@ internal static class ColliderPlanarProjection
                     circleCenter,
                     circleRadius,
                     triangle,
-                    mesh.Origin,
-                    mesh.Rotation,
+                    mesh.GeometryFrame,
                     out PlanarProjectionRelation candidate)
                 || (found && ShouldKeepCurrent(candidate, best)))
             {
@@ -198,10 +197,17 @@ internal static class ColliderPlanarProjection
                 circleCenter),
             FixedQuaternion.Identity,
             Vector3d.Zero);
-        FixedPointAnchor contact = bestGeometry.GetClosestPointAnchor(
-            mesh.Origin,
-            mesh.Rotation,
-            queryAnchor);
+        FixedPointAnchor contact;
+        if (mesh.GeometryFrame.IsRigid)
+            contact = bestGeometry.GetClosestPointAnchor(mesh.Origin, mesh.Rotation, queryAnchor);
+        else
+        {
+            // A finite closest witness lies within the mesh's admitted reach;
+            // its offset from the rounded physical center always fits Q32.32.
+            bool represented = WideTriangleRelations.TryGetClosestPointAnchor(bestGeometry, mesh.GeometryFrame,
+                GetCanonicalQueryPoint(collider, circleCenter), mesh.Origin, out contact);
+            System.Diagnostics.Debug.Assert(represented);
+        }
         relation = new ProjectedSurfaceRelation(
             best.Distance,
             best.Offset,

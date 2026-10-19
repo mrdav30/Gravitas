@@ -1,4 +1,4 @@
-﻿//=======================================================================
+//=======================================================================
 // CollisionDetection.Mesh.cs
 //=======================================================================
 // MIT License, Copyright (c) 2026–present David Oravsky (mrdav30)
@@ -52,8 +52,8 @@ public static partial class CollisionDetection
     private static bool TrySetConvexMeshRoundedContact(CollisionWorkItem pair, PhysicsMesh mesh,
         Vector3d center, FixedQuaternion rotation, Fixed64 axisLength, Fixed64 radius)
     {
-        if (!FixedConvexHullRelations.TryGetCenteredCapsuleContact(mesh.Origin, mesh.Rotation,
-            mesh.ScaledLocalVertices, mesh.Triangles, mesh.ConvexSatEdgeVertexPairs,
+        if (!WideOrientedBox.TryGetConvexHullCenteredCapsuleContact(mesh.GeometryFrame, mesh.Origin,
+            mesh.GeometryVertices, mesh.Triangles, mesh.ConvexSatEdgeVertexPairs,
             center, rotation, Vector3d.Up, axisLength, radius, out FixedContactAnchors contact))
             return false;
         pair.Manifold.SetContact(new ContactAnchor(contact.FirstAnchor), new ContactAnchor(contact.SecondAnchor),
@@ -79,10 +79,10 @@ public static partial class CollisionDetection
             return false;
 
         PhysicsMesh physicsMesh = mesh.Mesh;
-        if (!cuboid.OrientedBox.TryGetConvexHullContact(
-                mesh.Center,
-                physicsMesh.Rotation,
-                physicsMesh.ScaledLocalVertices,
+        if (!WideOrientedBox.TryGetConvexHullContact(
+                cuboid.Center, cuboid.Rotation, cuboid.OrientedBox.HalfExtents,
+                physicsMesh.GeometryFrame, physicsMesh.Origin,
+                physicsMesh.GeometryVertices,
                 physicsMesh.Triangles,
                 physicsMesh.ConvexSatEdgeVertexPairs,
                 out FixedContactAnchors contact))
@@ -135,18 +135,15 @@ public static partial class CollisionDetection
 
         PhysicsMesh physicsMeshA = meshA.Mesh;
         PhysicsMesh physicsMeshB = meshB.Mesh;
-        bool hasContact = FixedConvexHullRelations.TryGetContact(
-            meshA.Center,
-            physicsMeshA.Rotation,
-            physicsMeshA.ScaledLocalVertices,
-            physicsMeshA.Triangles,
-            physicsMeshA.ConvexSatEdgeVertexPairs,
-            meshB.Center,
-            physicsMeshB.Rotation,
-            physicsMeshB.ScaledLocalVertices,
-            physicsMeshB.Triangles,
-            physicsMeshB.ConvexSatEdgeVertexPairs,
-            out FixedContactAnchors contact);
+        bool hasContact = physicsMeshA.GeometryFrame.IsRigid && physicsMeshB.GeometryFrame.IsRigid
+            ? FixedConvexHullRelations.TryGetContact(physicsMeshA.Origin, physicsMeshA.Rotation,
+                physicsMeshA.GeometryVertices, physicsMeshA.Triangles, physicsMeshA.ConvexSatEdgeVertexPairs,
+                physicsMeshB.Origin, physicsMeshB.Rotation, physicsMeshB.GeometryVertices,
+                physicsMeshB.Triangles, physicsMeshB.ConvexSatEdgeVertexPairs, out FixedContactAnchors contact)
+            : WideOrientedBox.TryGetConvexHullContact(physicsMeshA.GeometryFrame, physicsMeshA.Origin,
+                physicsMeshA.GeometryVertices, physicsMeshA.Triangles, physicsMeshA.ConvexSatEdgeVertexPairs,
+                physicsMeshB.GeometryFrame, physicsMeshB.Origin, physicsMeshB.GeometryVertices,
+                physicsMeshB.Triangles, physicsMeshB.ConvexSatEdgeVertexPairs, out contact);
         if (!hasContact)
             return false;
         if (contact.Depth <= Fixed64.Zero)

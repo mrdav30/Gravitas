@@ -59,7 +59,9 @@ public readonly struct MeshSurfaceMassProperties
         ReadOnlySpan<int> triangles,
         Fixed64 totalArea,
         out ExactMassWeight totalWeight,
-        out MeshMassIntegrals integrals)
+        out MeshMassIntegrals integrals,
+        in ScaledRigidFrame3d sourceFrame = default,
+        bool exactScale = false)
     {
         // The caller has admitted every vertex within MaximumGeometryReach and
         // every triangle above the degeneracy threshold. Positive shell weights
@@ -71,7 +73,7 @@ public readonly struct MeshSurfaceMassProperties
             out totalWeight,
             out Vector3d centerOfMass,
             out Fixed3x3 unitCenterTensor,
-            out integrals);
+            out integrals, sourceFrame, exactScale);
         System.Diagnostics.Debug.Assert(valid);
 
         return new MeshSurfaceMassProperties(

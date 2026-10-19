@@ -57,7 +57,7 @@ internal sealed class MeshSurfaceBoundaryDomain
         SourceMember = sourceMember; SourceSurface = owner;
         Origin = source.Origin; Rotation = source.Rotation;
         ReadOnlySpan<int> edges = source.GetCanonicalSurfaceBoundaryVertexPairs(owner);
-        ReadOnlySpan<Vector3d> vertices = source.ScaledLocalVertices;
+        ReadOnlySpan<Vector3d> vertices = source.GeometryVertices;
         Span<WideAxis3> fan = stackalloc WideAxis3[3];
         _spans.FastClear();
         for (int edge = 0; edge < edges.Length; edge += 2)
@@ -90,17 +90,28 @@ internal sealed class MeshSurfaceBoundaryDomain
             PhysicsMesh target = members[member];
             // Use the existing local BVH, including when world endpoints cannot
             // be materialized. Exact coverage still decides every candidate.
-            FixedBoundBox local = FixedBoundBox.FromRelativeRotatedBoundsClippedToDomain(source.Origin, source.Rotation,
-                edgeBounds.Min, edgeBounds.Max, target.Origin, target.Rotation);
-            target.GetTrianglesInLocalBounds(new FixedBoundVolume(local.Min, local.Max), _triangles);
+            FixedBoundBox worldBounds = source.GeometryFrame.GetWorldBounds(edgeBounds.Min, edgeBounds.Max);
+            target.GetTrianglesInWorldBounds(new FixedBoundVolume(worldBounds.Min, worldBounds.Max), _triangles);
             foreach (int triangle in _triangles.AsReadOnlySpan())
             {
                 int surface = target.GetManifoldSurfaceOwner(triangle);
                 if (member == sourceMember && surface == owner) continue;
-                target.GetLocalTriangleVertices(triangle, out Vector3d a, out Vector3d b, out Vector3d c);
-                if (!WideTriangleRelations.TryGetEdgeCoverage(face, source.Origin, source.Rotation,
-                    new FixedTriangle(a, b, c), target.Origin, target.Rotation, out RationalSegmentInterval interval,
-                    out int sides)) continue;
+                target.GetGeometryTriangleVertices(triangle, out Vector3d a, out Vector3d b, out Vector3d c);
+                RationalSegmentInterval interval;
+                int sides;
+                if (source.GeometryFrame.IsRigid && target.GeometryFrame.IsRigid)
+                {
+                    if (!WideTriangleRelations.TryGetEdgeCoverage(face, source.Origin, source.Rotation,
+                        new FixedTriangle(a, b, c), target.Origin, target.Rotation, out interval, out sides)) continue;
+                }
+                else
+                {
+                    if (!WideTriangleRelations.TryGetEdgeCoverage(face, source.GeometryFrame,
+                        new FixedTriangle(a, b, c), target.GeometryFrame,
+                        out Signed832 lowerN, out Signed832 lowerD, out Signed832 upperN, out Signed832 upperD,
+                        out sides)) continue;
+                    interval = new RationalSegmentInterval(lowerN, lowerD, upperN, upperD);
+                }
                 var lower = Parameter.Lower(interval); var upper = Parameter.Upper(interval);
                 // Closed point contacts do not fill an open half-neighborhood.
                 if (lower.CompareTo(upper) == 0) continue;
@@ -171,14 +182,14 @@ internal sealed class MeshSurfaceBoundaryDomain
 
     private readonly struct Parameter : IComparable<Parameter>
     {
-        internal readonly Signed320 N, D;
-        internal static Parameter Zero => new(default, Signed320.One);
-        internal static Parameter One => new(Signed320.One, Signed320.One);
-        private Parameter(Signed320 n, Signed320 d) { N = n; D = d; }
+        internal readonly Signed832 N, D;
+        internal static Parameter Zero => new(default, Signed832.ExtendValue(Signed192.One));
+        internal static Parameter One => new(Signed832.ExtendValue(Signed192.One), Signed832.ExtendValue(Signed192.One));
+        private Parameter(Signed832 n, Signed832 d) { N = n; D = d; }
         internal static Parameter Lower(in RationalSegmentInterval interval) => interval.IsClipped
-            ? new(interval.LowerNumerator, interval.LowerDenominator) : Zero;
+            ? new(interval.WideLowerNumerator, interval.WideLowerDenominator) : Zero;
         internal static Parameter Upper(in RationalSegmentInterval interval) => interval.IsClipped
-            ? new(interval.UpperNumerator, interval.UpperDenominator) : One;
-        public int CompareTo(Parameter other) => RationalSegmentInterval.CompareParameters(N, D, other.N, other.D);
+            ? new(interval.WideUpperNumerator, interval.WideUpperDenominator) : One;
+        public int CompareTo(Parameter other) => WideTriangleRelations.CompareCoreParameters(N, D, other.N, other.D);
     }
 }

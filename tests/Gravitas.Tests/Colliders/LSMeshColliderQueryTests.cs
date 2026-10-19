@@ -436,8 +436,10 @@ public sealed class LSMeshColliderQueryTests
         belowNormal.Should().Be(Vector3d.Backward);
     }
 
-    [Fact]
-    public void ClosestPointOnSurface_WhenExactAnchorCannotMaterialize_ShouldReject()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ClosestPointOnSurface_WhenExactAnchorCannotMaterialize_ShouldReject(bool fractional)
     {
         var mesh = new LSMeshCollider(
             new[]
@@ -460,7 +462,7 @@ public sealed class LSMeshColliderQueryTests
                 Fixed64.Zero,
                 Fixed64.Zero),
             FixedQuaternion.Identity,
-            Vector3d.One)));
+            fractional ? new Vector3d(Fixed64.FromRaw(2863311531), Fixed64.One, Fixed64.One) : Vector3d.One)));
 
         Action query = () => mesh.ClosestPointOnSurface(
             mesh.Mesh.Origin + Vector3d.Down * Fixed64.FromFraction(11, 2));

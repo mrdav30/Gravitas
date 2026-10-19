@@ -16,23 +16,14 @@ namespace Gravitas.Colliders;
 public partial class PhysicsMesh
 {
     private int[] _canonicalSurfaceOrdinals = Array.Empty<int>();
-    private int[] _preparedCanonicalSurfaceOrdinals = Array.Empty<int>();
     private int[] _coplanarNeighborOffsets = Array.Empty<int>();
-    private int[] _preparedCoplanarNeighborOffsets = Array.Empty<int>();
     private int[] _coplanarNeighbors = Array.Empty<int>();
-    private int[] _preparedCoplanarNeighbors = Array.Empty<int>();
     private int[] _weldedTriangleVertices = Array.Empty<int>();
-    private int[] _preparedWeldedTriangleVertices = Array.Empty<int>();
     private int[] _weldedVertexRepresentatives = Array.Empty<int>();
-    private int[] _preparedWeldedVertexRepresentatives = Array.Empty<int>();
     private int[] _weldedVertexTriangleOffsets = Array.Empty<int>();
-    private int[] _preparedWeldedVertexTriangleOffsets = Array.Empty<int>();
     private int[] _weldedVertexTriangles = Array.Empty<int>();
-    private int[] _preparedWeldedVertexTriangles = Array.Empty<int>();
     private int[] _canonicalBoundaryOffsets = Array.Empty<int>();
-    private int[] _preparedCanonicalBoundaryOffsets = Array.Empty<int>();
     private int[] _canonicalBoundaryVertices = Array.Empty<int>();
-    private int[] _preparedCanonicalBoundaryVertices = Array.Empty<int>();
 
     private readonly SwiftList<(int First, int Second)> _surfaceNeighborPairs = new();
     private readonly SwiftList<SurfaceBoundaryEdge> _surfaceBoundaryEdges = new();
@@ -96,14 +87,14 @@ public partial class PhysicsMesh
     {
         // Snapshot before convex/canonical boundary preparation borrows the
         // welding representative map as outgoing boundary-link scratch.
-        EnsureTopologyBuffer(ref _preparedWeldedTriangleVertices, triangles.Length);
-        EnsureTopologyBuffer(ref _preparedWeldedVertexRepresentatives, VertexCount);
-        EnsureTopologyBuffer(ref _preparedWeldedVertexTriangleOffsets, VertexCount + 1);
-        EnsureTopologyBuffer(ref _preparedWeldedVertexTriangles, triangles.Length);
+        EnsureTopologyBuffer(ref _weldedTriangleVertices, triangles.Length);
+        EnsureTopologyBuffer(ref _weldedVertexRepresentatives, VertexCount);
+        EnsureTopologyBuffer(ref _weldedVertexTriangleOffsets, VertexCount + 1);
+        EnsureTopologyBuffer(ref _weldedVertexTriangles, triangles.Length);
         EnsureTopologyBuffer(ref _surfaceWriteOffsets, Math.Max(VertexCount, _triangleCount) + 1);
-        Array.Copy(triangles, _preparedWeldedTriangleVertices, triangles.Length);
-        Array.Copy(_topologyRepresentativeIndices, _preparedWeldedVertexRepresentatives, VertexCount);
-        int[] offsets = _preparedWeldedVertexTriangleOffsets;
+        Array.Copy(triangles, _weldedTriangleVertices, triangles.Length);
+        Array.Copy(_topologyRepresentativeIndices, _weldedVertexRepresentatives, VertexCount);
+        int[] offsets = _weldedVertexTriangleOffsets;
         Array.Clear(offsets, 0, VertexCount + 1);
         for (int i = 0; i < triangles.Length; i++)
             offsets[triangles[i] + 1]++;
@@ -111,18 +102,18 @@ public partial class PhysicsMesh
             offsets[i] += offsets[i - 1];
         Array.Copy(offsets, _surfaceWriteOffsets, VertexCount);
         for (int i = 0; i < triangles.Length; i++)
-            _preparedWeldedVertexTriangles[_surfaceWriteOffsets[triangles[i]]++] = i / 3;
+            _weldedVertexTriangles[_surfaceWriteOffsets[triangles[i]]++] = i / 3;
     }
 
     private void PrepareSurfaceTopology(Vector3d[] vertices, int[] triangles,
         int[] patchIds, int[] boundaryOffsets, int[] boundaries)
     {
         PrepareManifoldPatchTrust(vertices, triangles, patchIds, boundaryOffsets, boundaries);
-        patchIds = _preparedManifoldPatchIds;
+        patchIds = _manifoldPatchIds;
         PrepareCoplanarNeighbors(patchIds);
         _surfacePreparationVertices = vertices;
-        _surfaceBoundaryEdgeComparer ??= Comparer<SurfaceBoundaryEdge>.Create(CompareSurfaceBoundaryEdges);
-        _surfaceOrderComparer ??= Comparer<int>.Create(CompareSurfaceDomains);
+        _surfaceBoundaryEdgeComparer = Comparer<SurfaceBoundaryEdge>.Create(CompareSurfaceBoundaryEdges);
+        _surfaceOrderComparer = Comparer<int>.Create(CompareSurfaceDomains);
         _surfaceBoundaryEdges.FastClear();
         int edgeCapacity = 0;
         for (int i = 0; i < _triangleCount; i++)
@@ -131,7 +122,7 @@ public partial class PhysicsMesh
             else if (patchIds[i] == i)
                 edgeCapacity += (boundaryOffsets[i + 1] - boundaryOffsets[i]) / 2;
         _surfaceBoundaryEdges.EnsureCapacity(edgeCapacity);
-        EnsureTopologyBuffer(ref _preparedCanonicalSurfaceOrdinals, _triangleCount);
+        EnsureTopologyBuffer(ref _canonicalSurfaceOrdinals, _triangleCount);
         EnsureTopologyBuffer(ref _surfaceKeyOffsets, _triangleCount + 1);
         _surfaceOrder.FastClear();
         _surfaceOrder.EnsureCapacity(_triangleCount);
@@ -161,14 +152,14 @@ public partial class PhysicsMesh
         // The ordering key already contains exactly the reduced exposed
         // segments needed for sampling. Snapshot it in the existing atomic
         // preparation/publication transaction; scratch is not committed data.
-        EnsureTopologyBuffer(ref _preparedCanonicalBoundaryOffsets, _triangleCount + 1);
-        EnsureTopologyBuffer(ref _preparedCanonicalBoundaryVertices, edges.Length * 2);
+        EnsureTopologyBuffer(ref _canonicalBoundaryOffsets, _triangleCount + 1);
+        EnsureTopologyBuffer(ref _canonicalBoundaryVertices, edges.Length * 2);
         for (int i = 0; i <= _triangleCount; i++)
-            _preparedCanonicalBoundaryOffsets[i] = _surfaceKeyOffsets[i] * 2;
+            _canonicalBoundaryOffsets[i] = _surfaceKeyOffsets[i] * 2;
         for (int i = 0; i < edges.Length; i++)
         {
-            _preparedCanonicalBoundaryVertices[i * 2] = edges[i].Start;
-            _preparedCanonicalBoundaryVertices[i * 2 + 1] = edges[i].End;
+            _canonicalBoundaryVertices[i * 2] = edges[i].Start;
+            _canonicalBoundaryVertices[i * 2 + 1] = edges[i].End;
         }
         _surfaceOrder.SortInPlace(_surfaceOrderComparer);
         int ordinal = 0;
@@ -176,17 +167,17 @@ public partial class PhysicsMesh
         {
             if (i > 0 && CompareSurfaceDomains(_surfaceOrder[i - 1], _surfaceOrder[i]) != 0)
                 ordinal++;
-            _preparedCanonicalSurfaceOrdinals[_surfaceOrder[i]] = ordinal;
+            _canonicalSurfaceOrdinals[_surfaceOrder[i]] = ordinal;
         }
         for (int i = 0; i < _triangleCount; i++)
             if (patchIds[i] >= 0)
-                _preparedCanonicalSurfaceOrdinals[i] = _preparedCanonicalSurfaceOrdinals[patchIds[i]];
+                _canonicalSurfaceOrdinals[i] = _canonicalSurfaceOrdinals[patchIds[i]];
     }
 
     private void PrepareCoplanarNeighbors(int[] patchIds)
     {
-        EnsureTopologyBuffer(ref _preparedCoplanarNeighborOffsets, _triangleCount + 1);
-        int[] offsets = _preparedCoplanarNeighborOffsets;
+        EnsureTopologyBuffer(ref _coplanarNeighborOffsets, _triangleCount + 1);
+        int[] offsets = _coplanarNeighborOffsets;
         Array.Clear(offsets, 0, _triangleCount + 1);
         ReadOnlySpan<(int First, int Second)> pairs = _surfaceNeighborPairs.AsReadOnlySpan();
         for (int i = 0; i < pairs.Length; i++)
@@ -199,18 +190,18 @@ public partial class PhysicsMesh
         }
         for (int i = 1; i <= _triangleCount; i++)
             offsets[i] += offsets[i - 1];
-        EnsureTopologyBuffer(ref _preparedCoplanarNeighbors, offsets[_triangleCount]);
+        EnsureTopologyBuffer(ref _coplanarNeighbors, offsets[_triangleCount]);
         Array.Copy(offsets, _surfaceWriteOffsets, _triangleCount);
         for (int i = 0; i < pairs.Length; i++)
         {
             (int first, int second) = pairs[i];
             if (patchIds[first] < 0)
                 continue;
-            _preparedCoplanarNeighbors[_surfaceWriteOffsets[first]++] = second;
-            _preparedCoplanarNeighbors[_surfaceWriteOffsets[second]++] = first;
+            _coplanarNeighbors[_surfaceWriteOffsets[first]++] = second;
+            _coplanarNeighbors[_surfaceWriteOffsets[second]++] = first;
         }
         for (int i = 0; i < _triangleCount; i++)
-            Array.Sort(_preparedCoplanarNeighbors, offsets[i], offsets[i + 1] - offsets[i]);
+            Array.Sort(_coplanarNeighbors, offsets[i], offsets[i + 1] - offsets[i]);
     }
 
     private void AddCanonicalPatchBoundary(int surface, int[] triangles, int[] offsets, int[] boundaries)
@@ -317,28 +308,6 @@ public partial class PhysicsMesh
             return comparison;
         comparison = first.Y.CompareTo(second.Y);
         return comparison != 0 ? comparison : first.Z.CompareTo(second.Z);
-    }
-
-    private void PublishPreparedSurfaceTopology()
-    {
-        (_canonicalBoundaryOffsets, _preparedCanonicalBoundaryOffsets) =
-            (_preparedCanonicalBoundaryOffsets, _canonicalBoundaryOffsets);
-        (_canonicalBoundaryVertices, _preparedCanonicalBoundaryVertices) =
-            (_preparedCanonicalBoundaryVertices, _canonicalBoundaryVertices);
-        (_manifoldPatchIds, _preparedManifoldPatchIds) = (_preparedManifoldPatchIds, _manifoldPatchIds);
-        (_canonicalSurfaceOrdinals, _preparedCanonicalSurfaceOrdinals) =
-            (_preparedCanonicalSurfaceOrdinals, _canonicalSurfaceOrdinals);
-        (_coplanarNeighborOffsets, _preparedCoplanarNeighborOffsets) =
-            (_preparedCoplanarNeighborOffsets, _coplanarNeighborOffsets);
-        (_coplanarNeighbors, _preparedCoplanarNeighbors) = (_preparedCoplanarNeighbors, _coplanarNeighbors);
-        (_weldedTriangleVertices, _preparedWeldedTriangleVertices) =
-            (_preparedWeldedTriangleVertices, _weldedTriangleVertices);
-        (_weldedVertexRepresentatives, _preparedWeldedVertexRepresentatives) =
-            (_preparedWeldedVertexRepresentatives, _weldedVertexRepresentatives);
-        (_weldedVertexTriangleOffsets, _preparedWeldedVertexTriangleOffsets) =
-            (_preparedWeldedVertexTriangleOffsets, _weldedVertexTriangleOffsets);
-        (_weldedVertexTriangles, _preparedWeldedVertexTriangles) =
-            (_preparedWeldedVertexTriangles, _weldedVertexTriangles);
     }
 
     private readonly struct SurfaceBoundaryEdge

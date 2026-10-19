@@ -121,8 +121,8 @@ internal sealed partial class MeshConeFaceRegions
         // An inconclusive bound retains the original exact per-ray range test.
         bool representable = pointRepresentable && (_wholeConeSamplingRangeRepresentable || ConePlaneRayPointMaterialization.IsExitPointRepresentable(
             _frame, selection.Point, selection.Root,
-            ContactQuadratic.At(selection.Values, selection.Signs, 0, ConePlaneRaySelection.FieldWords),
-            ContactQuadratic.At(selection.Values, selection.Signs, 1, ConePlaneRaySelection.FieldWords), orientation, _samplingOrigin));
+            ContactQuadratic.At(selection.Values, selection.Signs, 0, _fieldWords),
+            ContactQuadratic.At(selection.Values, selection.Signs, 1, _fieldWords), orientation, _samplingOrigin));
         return new Ray(selection.MaximumSource, selection.MaximumEvent, representable, _currentMember, _currentSpan);
     }
 
@@ -130,15 +130,15 @@ internal sealed partial class MeshConeFaceRegions
     {
         _currentMember = sample.Member; _currentSupplier = sample.Supplier; _currentSpan = sample.Span;
         _frame = GetFrame(sample.Member);
-        Span<ulong> pv = stackalloc ulong[ConePlaneRaySelection.StorageWords];
-        Span<ulong> nv = stackalloc ulong[ConePlaneRaySelection.StorageWords];
+        Span<ulong> pv = stackalloc ulong[SelectionWords];
+        Span<ulong> nv = stackalloc ulong[SelectionWords];
         Span<int> ps = stackalloc int[ConePlaneRaySelection.SignCount];
         Span<int> ns = stackalloc int[ConePlaneRaySelection.SignCount];
-        var positive = new ConePlaneRaySelection(pv, ps); var negative = new ConePlaneRaySelection(nv, ns);
-        Span<ulong> pointValues = stackalloc ulong[ConePlaneRayPoint.StorageWords];
+        var positive = new ConePlaneRaySelection(pv, ps, _fieldWords, _rootWords); var negative = new ConePlaneRaySelection(nv, ns, _fieldWords, _rootWords);
+        Span<ulong> pointValues = stackalloc ulong[PointWords];
         Span<int> pointSigns = stackalloc int[ConePlaneRayPoint.SignCount];
-        var point = new ConePlaneRayPoint(pointValues, pointSigns);
-        Span<ulong> root = stackalloc ulong[ConePlaneRaySelection.RootWords];
+        var point = new ConePlaneRayPoint(pointValues, pointSigns, _fieldWords);
+        Span<ulong> root = stackalloc ulong[_rootWords];
         bool exists = ConePlaneRayEvents.TryEvaluateEvent(sample.Source, _frame, sample.Event, GetClip(sample.Member, sample.Span), point, root,
             ref positive, ref negative, requestedOrientation: orientation);
         ConePlaneRaySelection selected = orientation > 0 ? positive : negative;
@@ -159,8 +159,8 @@ internal sealed partial class MeshConeFaceRegions
         // every selected depth fits Fixed64; the shared getter guards defects.
         Fixed64 depth = selection.GetRoundedMaximumDepth();
         if (!ConePlaneRayPointMaterialization.TryGetExitPointsInFrame(_frame, selection.Point, selection.Root,
-                ContactQuadratic.At(selection.Values, selection.Signs, 0, ConePlaneRaySelection.FieldWords),
-                ContactQuadratic.At(selection.Values, selection.Signs, 1, ConePlaneRaySelection.FieldWords),
+                ContactQuadratic.At(selection.Values, selection.Signs, 0, _fieldWords),
+                ContactQuadratic.At(selection.Values, selection.Signs, 1, _fieldWords),
                 orientation, _samplingOrigin, out Vector3d exit, out Vector3d coneLocal)) return false;
         ref readonly ConePlaneRayFrame supplierFrame = ref GetFrame(_currentSupplier);
         bool meshLocal = ConePlaneRayPointMaterialization.TryGetAuthoredPoint(supplierFrame, selection.Point, selection.Root,

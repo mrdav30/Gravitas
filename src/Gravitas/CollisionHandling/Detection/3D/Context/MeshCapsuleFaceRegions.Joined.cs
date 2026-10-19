@@ -41,20 +41,30 @@ internal sealed partial class MeshCapsuleFaceRegions
         {
             JoinedMember member = state.Members[index];
             PhysicsMesh mesh = member.Collider.Mesh;
-            var finite = new CapsuleFiniteSectionFrame(mesh.Origin, mesh.Rotation, center, _rotation, coreLength, radius);
-            mesh.GetLocalTriangleVertices(member.Triangle, out Vector3d a, out Vector3d b, out Vector3d c);
-            member.Frame = new CapsulePlaneRayFrame(new FixedTriangle(a, b, c), finite);
+            var finite = new CapsuleFiniteSectionFrame(mesh.GeometryFrame, center, _rotation, coreLength, radius);
+            mesh.GetGeometryTriangleVertices(member.Triangle, out Vector3d a, out Vector3d b, out Vector3d c);
+            member.Frame = new CapsulePlaneRayFrame(new FixedTriangle(a, b, c), mesh.GeometryFrame, finite);
             member.Admitted.FastClear();
             member.Collider.GetTrianglesInBounds(bounds, state.Candidates);
             foreach (int triangle in state.Candidates.AsReadOnlySpan())
             {
                 if (mesh.GetManifoldSurfaceOwner(triangle) != member.Owner) continue;
-                mesh.GetLocalTriangleVertices(triangle, out a, out b, out c);
+                mesh.GetGeometryTriangleVertices(triangle, out a, out b, out c);
                 if (CapsulePlaneRayEvents.IntersectsTriangle(finite, new FixedTriangle(a, b, c))) member.Admitted.Add(triangle);
             }
             member.Connectivity.BuildCapsule(mesh, member.Triangle, finite, member.Admitted.AsReadOnlySpan());
             state.AddRegions(index);
         }
+        bool wideBanks = false;
+        foreach (JoinedMember member in state.Members.AsReadOnlySpan()[..state.Inputs.Count])
+        {
+            wideBanks |= member.Frame.UsesWideBanks;
+            foreach (var span in member.Boundary.Spans) wideBanks |= span.Interval.HasWideBounds;
+        }
+        if (wideBanks)
+            foreach (JoinedMember member in state.Members.AsReadOnlySpan()[..state.Inputs.Count])
+                member.Frame = member.Frame.WithWideParameters();
+        SelectBanks(state.Members[0].Frame);
         JoinFiniteSpans(state);
         state.CompleteRegions();
         RegionCount = state.Roots.Count; HasBoundaryIntersection = false;
@@ -114,7 +124,7 @@ internal sealed partial class MeshCapsuleFaceRegions
         JoinedState state = _joined;
         JoinedMember member = state.Members[state.MemberBySurface[(collider.Mesh, collider.Mesh.GetManifoldSurfaceOwner(triangle))]];
         int region = state.RegionByRoot[state.Find(member.Offset + localRegion)];
-        return WideAxis3.Dot(member.Frame.Normal, GetJoinedRegionFrame(state, region).Normal).Sign * _orientations[region];
+        return WideDirection3d.Dot(member.Frame.Normal, GetJoinedRegionFrame(state, region).Normal).Sign * _orientations[region];
     }
 
     internal MeshSurfaceBoundaryDomain? GetJoinedBoundary(LSMeshCollider collider, int triangle) =>
@@ -162,14 +172,14 @@ internal sealed partial class MeshCapsuleFaceRegions
                 if (!member.JoinedSpans[span] && member.Frame.Finite.IntersectsSegment(new FixedSegment(spans[span].Start, spans[span].End), spans[span].Interval))
                     return false;
         }
-        Span<ulong> values = stackalloc ulong[CapsulePlaneRaySelection.StorageWords];
+        Span<ulong> values = stackalloc ulong[SelectionWords];
         Span<int> signs = stackalloc int[CapsulePlaneRaySelection.SignCount];
         Span<sbyte> valueSigns = stackalloc sbyte[CapsulePlaneRaySelection.ValueSignCount];
         state.CurrentRegion = 0; state.CurrentMember = state.NodeMembers[state.Roots[0]]; state.CurrentClip = default;
         _frame = state.Members[state.CurrentMember].Frame;
         for (int orientation = 1; orientation >= -1; orientation -= 2)
         {
-            var support = new CapsulePlaneRaySelection(values, signs, valueSigns);
+            var support = new CapsulePlaneRaySelection(values, signs, valueSigns, _fieldWords, _rootWords, _valueWords);
             int endpoint = _frame.Finite.Length == Fixed64.Zero ? 0 : orientation * _frame.Normal.Y.Sign > 0 ? 1 : 0;
             var descriptor = new CapsulePlaneRayEvent(CapsulePlaneRayEventKind.Support, endpoint);
             bool found = CapsulePlaneRayEvents.Reconstruct(CapsulePlaneRayEventSource.Plane, _frame, descriptor, orientation, ref support);
@@ -216,11 +226,11 @@ internal sealed partial class MeshCapsuleFaceRegions
         JoinedMember first = state.Members[state.CurrentMember], second = state.Members[state.OtherMember];
         foreach (int a in first.Connectivity.TriangleIndices)
         {
-            first.Collider.Mesh.GetLocalTriangleVertices(a, out Vector3d aa, out Vector3d ab, out Vector3d ac);
+            first.Collider.Mesh.GetGeometryTriangleVertices(a, out Vector3d aa, out Vector3d ab, out Vector3d ac);
             if (!point.ContainsTrianglePoint(frame, new FixedTriangle(aa, ab, ac))) continue;
             foreach (int b in second.Connectivity.TriangleIndices)
             {
-                second.Collider.Mesh.GetLocalTriangleVertices(b, out Vector3d ba, out Vector3d bb, out Vector3d bc);
+                second.Collider.Mesh.GetGeometryTriangleVertices(b, out Vector3d ba, out Vector3d bb, out Vector3d bc);
                 if (!point.ContainsTrianglePoint(second.Frame, new FixedTriangle(ba, bb, bc), frame)) continue;
                 state.Union(first.Offset + first.Connectivity.GetRegionOrdinal(a),
                     second.Offset + second.Connectivity.GetRegionOrdinal(b));
@@ -250,7 +260,7 @@ internal sealed partial class MeshCapsuleFaceRegions
             {
                 int region = state.RegionByRoot[state.Find(member.Offset + member.Connectivity.GetRegionOrdinal(triangle))];
                 if (state.CurrentRegion >= 0 && region != state.CurrentRegion) continue;
-                member.Collider.Mesh.GetLocalTriangleVertices(triangle, out Vector3d a, out Vector3d b, out Vector3d c);
+                member.Collider.Mesh.GetGeometryTriangleVertices(triangle, out Vector3d a, out Vector3d b, out Vector3d c);
                 if (!candidate.ContainsTrianglePoint(member.Frame, new FixedTriangle(a, b, c), frame) || !state.VisitedRegions.Add(region)) continue;
                 KeepJoinedPoint(state, memberIndex, region, source, frame, descriptor, orientation, candidate);
             }
@@ -260,7 +270,7 @@ internal sealed partial class MeshCapsuleFaceRegions
     private void KeepJoinedPoint(JoinedState state, int member, int region, in CapsulePlaneRayEventSource source,
         in CapsulePlaneRayFrame frame, CapsulePlaneRayEvent descriptor, int orientation, scoped in CapsulePlaneRaySelection candidate)
     {
-        bool represented = candidate.TryGetAuthoredPoint(frame, _center, _rotation, _center, _rotation, out Vector3d p);
+        bool represented = candidate.TryGetPointInRigidFrame(frame, _center, _rotation, _center, _rotation, out Vector3d p);
         System.Diagnostics.Debug.Assert(represented);
         int point = RetainJoinedPoint(candidate, frame);
         var provenance = new JoinedWitness(member, state.CurrentMember, source, descriptor, state.CurrentClip);
@@ -279,7 +289,7 @@ internal sealed partial class MeshCapsuleFaceRegions
         if (!retained) _events.Add(new Sample(source, descriptor, region, p, point));
         if (source.IsSegment) { HasBoundaryIntersection = true; state.BoundaryHits[region] = true; }
         ref readonly CapsulePlaneRayFrame common = ref GetJoinedRegionFrame(state, region);
-        int aligned = WideAxis3.Dot(frame.Normal, common.Normal).Sign * orientation;
+        int aligned = WideDirection3d.Dot(frame.Normal, common.Normal).Sign * orientation;
         int slot = 2 * region + (aligned > 0 ? 0 : 1);
         var winner = BorrowWinner(slot);
         int comparison = !winner.HasValue ? 1 : candidate.CompareCoplanarDepth(winner, frame,
@@ -301,7 +311,7 @@ internal sealed partial class MeshCapsuleFaceRegions
     private int RetainJoinedPoint(scoped in CapsulePlaneRaySelection point, in CapsulePlaneRayFrame frame)
     {
         int words = Math.Max(Math.Max(ContactQuadratic.ActiveWords(point.X), ContactQuadratic.ActiveWords(point.Y)),
-            Math.Max(ContactQuadratic.ActiveWords(point.Z), ContactQuadratic.ActiveWords(point.Denominator))) + 3;
+            Math.Max(ContactQuadratic.ActiveWords(point.Z), ContactQuadratic.ActiveWords(point.Denominator))) + 6;
         int rootWords = WideArithmetic.GetActiveMagnitudeLength(point.Root);
         int index = _points.Count, needed = _pointWordCount + 8 * words + rootWords;
         if (_pointValues.Length < needed) Array.Resize(ref _pointValues, Math.Max(needed, 2 * _pointValues.Length));
@@ -310,8 +320,8 @@ internal sealed partial class MeshCapsuleFaceRegions
         _points.Add(new PointStorage(_pointWordCount, words, rootWords)); _pointWordCount = needed;
         var retained = BorrowPoint(index);
         point.X.CopyTo(retained.Coordinate(0)); point.Y.CopyTo(retained.Coordinate(1)); point.Z.CopyTo(retained.Coordinate(2));
-        Signed192 d = frame.Finite.ShapeFrame.Denominator;
-        ContactQuadratic.Scale(point.Denominator, Signed576.ExtendValue(Signed320.ExtendValue(WideArithmetic.AddSigned192(d, d))), retained.Denominator);
+        Signed320 d = frame.Finite.ShapeFrame.CoordinateDenominator;
+        ContactQuadratic.Scale(point.Denominator, Signed576.ExtendValue(WideArithmetic.AddSigned320(d, d)), retained.Denominator);
         point.Root[..rootWords].CopyTo(retained.Root);
         return index;
     }
@@ -342,7 +352,9 @@ internal sealed partial class MeshCapsuleFaceRegions
         foreach (Sample sample in _events.AsReadOnlySpan())
             if (sample.Region == region && sample.ExactPoint != point) _pool.Add(sample);
         ref readonly CapsulePlaneRayFrame common = ref GetJoinedRegionFrame(state, region);
-        var metrics = new WidePlaneMetrics(common.Normal);
+        WidePlaneMetrics metrics = common.Finite.ShapeFrame.HasExactScale ? default : new WidePlaneMetrics(new WideAxis3(
+            Signed320.NarrowValue(common.Normal.X), Signed320.NarrowValue(common.Normal.Y), Signed320.NarrowValue(common.Normal.Z)));
+
         // A nonempty connected section cannot leave an embedded filled union
         // without crossing its complete retained boundary. Only that global
         // certificate permits dropping off-peak samples for a strictly curved support.
@@ -353,7 +365,9 @@ internal sealed partial class MeshCapsuleFaceRegions
         Span<int> chosen = stackalloc int[ContactManifold.MaxContactsPerGroup]; chosen[0] = 0;
         for (int index = 0; index < count; index++)
         {
-            if (index > 0) chosen[index] = MeshPlaneSampleReduction.ChooseNext(_pool.AsReadOnlySpan(), chosen[..index], metrics, state.PointComparer);
+            if (index > 0) chosen[index] = common.Finite.ShapeFrame.HasExactScale
+                ? MeshPlaneSampleReduction.ChooseNext(_pool.AsReadOnlySpan(), chosen[..index], common.Normal, state.PointComparer)
+                : MeshPlaneSampleReduction.ChooseNext(_pool.AsReadOnlySpan(), chosen[..index], metrics, state.PointComparer);
             _samples[region * ContactManifold.MaxContactsPerGroup + index] = _pool[chosen[index]];
         }
         _counts[region] = count;
@@ -369,20 +383,20 @@ internal sealed partial class MeshCapsuleFaceRegions
         JoinedMember member = _joined.Members[witness.Member]; supplier = member.Collider;
         JoinedMember producer = _joined.Members[witness.FrameMember];
         ref readonly CapsulePlaneRayFrame common = ref GetJoinedRegionFrame(_joined, region);
-        int orientation = WideAxis3.Dot(producer.Frame.Normal, common.Normal).Sign * _orientations[region];
-        Span<ulong> values = stackalloc ulong[CapsulePlaneRaySelection.StorageWords];
+        int orientation = WideDirection3d.Dot(producer.Frame.Normal, common.Normal).Sign * _orientations[region];
+        Span<ulong> values = stackalloc ulong[SelectionWords];
         Span<int> signs = stackalloc int[CapsulePlaneRaySelection.SignCount];
         Span<sbyte> valueSigns = stackalloc sbyte[CapsulePlaneRaySelection.ValueSignCount];
-        var selection = index == 0 ? BorrowWinner(slot) : new CapsulePlaneRaySelection(values, signs, valueSigns);
+        var selection = index == 0 ? BorrowWinner(slot) : new CapsulePlaneRaySelection(values, signs, valueSigns, _fieldWords, _rootWords, _valueWords);
         if (index != 0)
         {
             bool found = CapsulePlaneRayEvents.Reconstruct(witness.Source, producer.Frame, witness.Event, orientation, witness.Clip, ref selection);
             System.Diagnostics.Debug.Assert(found);
         }
         PhysicsMesh mesh = member.Collider.Mesh;
-        bool represented = selection.TryGetAuthoredPoint(producer.Frame, mesh.Origin, mesh.Rotation, _center, _rotation, out Vector3d authored)
+        bool represented = selection.TryGetPointInRigidFrame(producer.Frame, _center, _rotation, _center, _rotation, out Vector3d authored)
             & selection.TryGetExitAnchor(producer.Frame, orientation, _center, _rotation, out FixedPointAnchor exit, out Fixed64 depth, out bool clamped);
-        contact = new FixedContactAnchors(new FixedPointAnchor(mesh.Origin, mesh.Rotation, authored), exit,
+        contact = new FixedContactAnchors(new FixedPointAnchor(_center, _rotation, authored), exit,
             -producer.Frame.GetWorldNormal(producer.Collider.Mesh.Rotation) * orientation, depth, clamped);
         return represented;
     }

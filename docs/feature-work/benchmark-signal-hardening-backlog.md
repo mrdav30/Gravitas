@@ -16,7 +16,7 @@ this backlog.
 ## Intake Rules
 
 - Signal IDs use `GRV-Benchmark-NNN`. The next available ID is
-  `GRV-Benchmark-029`.
+  `GRV-Benchmark-030`.
 - Assign an ID at intake and never reuse it, including after a signal closes or
   moves into a dated plan. Check this file's Git history before advancing or
   repairing the counter.
@@ -291,6 +291,50 @@ this pre-existing follow-up.
 Ignored `artifacts/grv-issue-135/perf/` retains the frozen original eight-module
 stack (`89C15FBD...` core), unchanged fixture inputs, native rows,
 `profile-attribution.json`, paired CPU traces and zero-ground-probe diagnostics.
+
+### GRV-Benchmark-029 — Dense Mesh Sweep Cost After Exact Contact Hardening
+
+**Discovered:** 2026-10-18 during #141 ordinary-consumer validation.  
+**Status:** Confirmed on the complete frozen pre-#141 stack; ownership requires
+profiling. This is separate from #026's initially overlapping sources and #006's
+completed benchmark instrumentation.  
+**Owner:** Gravitas 3D/mixed mesh sweeps and the executed FixedMathSharp finite
+query operations.
+
+Existing `MeshQuery3DTriangleScalingBenchmarks` and
+`MixedMeshTriangleScalingBenchmarks` keep the physical quad fixed while changing
+subdivision from 8 to 32 (128 to 2,048 triangles). The sources travel from X=-3
+to X=3; sphere/circle radius is 0.5, and the mixed circle has half-thickness 0.5.
+The convex source is the maintained cube fixture. These are ordinary impacts,
+not initial overlap.
+
+Frozen-stack Release controls on Windows x64/.NET 8.0.29 measure approximately:
+
+| Public all-hit query | 128 triangles | 2,048 triangles |
+| --- | ---: | ---: |
+| Sphere against dense mesh | 2.1–2.3 ms | 28.8–30.2 ms |
+| Convex mesh against dense concave mesh | 5.5–5.7 ms | 88.6–92.0 ms |
+| Mixed circle against dense mesh | 3.0–3.2 ms | 46.1–47.3 ms |
+
+All warmed windows allocate 0 B. Matched #141 controls reproduce the same
+millisecond-scale cost; this entry does not defer an introduced regression. The
+ranges are independent run means, not frame-tail latency or capacity claims. Captures and complete
+loaded-module hashes are under `artifacts/grv-issue-141/consumer-{refined,final,witness}-*.json`.
+
+Reproduce the maintained fixtures with `UseLocalLsfStack=true`:
+
+```powershell
+$env:UseLocalLsfStack = 'true'
+dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -p:UseLocalLsfStack=true -- --filter '*MeshQuery3DTriangleScalingBenchmarks*' '*MixedMeshTriangleScalingBenchmarks*' --job short
+```
+
+**Next isolation:** Capture the existing collider/triangle candidate counters and
+profile ordinary query work separately from finite initial-contact recovery.
+Compare filled coplanar controls, genuine rims and false-positive candidates
+before proposing pruning or arithmetic changes. Preserve earliest distance,
+authored tie order, finite witnesses and zero warm allocation. Check the current
+math throughput owners directly before assigning the cost to an index or
+reopening the already-closed upstream signal.
 
 ## Experimental Signals
 

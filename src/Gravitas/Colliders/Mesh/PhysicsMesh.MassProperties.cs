@@ -131,6 +131,11 @@ public partial class PhysicsMesh
         out MeshMassProperties properties,
         out MeshVolumeValidationResult result)
     {
+        bool exactScale = !(usePreparedVertices ? _preparedScaleIsExact : _scaleIsExact);
+        if (exactScale)
+            return TryCalculateClosedVolumeMassProperties(_localVertices, _localBounds, out properties, out result,
+                sourceFrame: usePreparedVertices ? _preparedSourceFrame : _sourceFrame, exactScale: true);
+
         Fixed64 x = default;
         Fixed64 y = default;
         Fixed64 z = default;
@@ -312,18 +317,24 @@ public partial class PhysicsMesh
         FixedBoundBox bounds,
         out MeshMassProperties properties,
         out MeshVolumeValidationResult result,
-        bool recenter = false)
+        bool recenter = false,
+        in ScaledRigidFrame3d sourceFrame = default,
+        bool exactScale = false)
     {
-        Vector3d reference = bounds.Center;
+        Vector3d reference = exactScale ? Vector3d.Zero : bounds.Center;
         IntegrateClosedVolume(vertices, reference, out Signed576 signedVolume,
             out Signed576 firstX, out Signed576 firstY, out Signed576 firstZ,
             out Signed576 integralX2, out Signed576 integralY2, out Signed576 integralZ2,
-            out Signed576 integralXY, out Signed576 integralXZ, out Signed576 integralYZ);
+            out Signed576 integralXY, out Signed576 integralXZ, out Signed576 integralYZ,
+            sourceFrame, exactScale);
 
         Signed576 absoluteWeight = signedVolume.Sign < 0
             ? WideArithmetic.SubtractSigned576(default, signedVolume) : signedVolume;
         properties = default;
-        if (!Fixed64.TryGetSignedRawRatio(absoluteWeight, ClosedVolumeRawDenominator, out Fixed64 absoluteVolume))
+        Signed576 volumeDenominator = ClosedVolumeRawDenominator;
+        if (exactScale)
+            for (int index = 0; index < 6; index++) volumeDenominator = WideArithmetic.MultiplySigned576(volumeDenominator, Signed192.One);
+        if (!Fixed64.TryGetSignedRawRatio(absoluteWeight, volumeDenominator, out Fixed64 absoluteVolume))
         {
             result = MeshVolumeValidationResult.NonRepresentableVolume;
             return false;
@@ -338,9 +349,11 @@ public partial class PhysicsMesh
         // vertices. Rounding an authored centroid then subtracting its origin
         // loses half-even parity and makes equivalent authoring frames disagree.
         Vector3d outputReference = recenter ? Vector3d.Zero : reference;
-        Signed576 centerDenominator = WideArithmetic.MultiplySigned576(signedVolume, Signed192.Signed(4));
-        Signed576 diagonalDenominator = WideArithmetic.MultiplySigned576(signedVolume, Signed192.Signed(10), Signed192.One);
-        Signed576 productDenominator = WideArithmetic.MultiplySigned576(signedVolume, Signed192.Signed(20), Signed192.One);
+        Signed192 coordinateDivisor = exactScale ? new Signed192(0, 1, 0) : Signed192.Signed(1);
+        Signed192 squaredRawDivisor = exactScale ? new Signed192(1UL << 32, 0, 0) : Signed192.One;
+        Signed576 centerDenominator = WideArithmetic.MultiplySigned576(signedVolume, Signed192.Signed(4), coordinateDivisor);
+        Signed576 diagonalDenominator = WideArithmetic.MultiplySigned576(signedVolume, Signed192.Signed(10), squaredRawDivisor);
+        Signed576 productDenominator = WideArithmetic.MultiplySigned576(signedVolume, Signed192.Signed(20), squaredRawDivisor);
         // Signed ratios cancel winding. Add the reference before rounding so
         // half-even centroid ties depend on the final coordinate's raw parity.
         bool representable = TryGetIntegratedCenter(firstX, centerDenominator, outputReference.X, out Fixed64 centerX)
@@ -374,7 +387,8 @@ public partial class PhysicsMesh
         out Signed576 signedVolume,
         out Signed576 firstX, out Signed576 firstY, out Signed576 firstZ,
         out Signed576 integralX2, out Signed576 integralY2, out Signed576 integralZ2,
-        out Signed576 integralXY, out Signed576 integralXZ, out Signed576 integralYZ)
+        out Signed576 integralXY, out Signed576 integralXZ, out Signed576 integralYZ,
+        in ScaledRigidFrame3d sourceFrame = default, bool exactScale = false)
     {
         signedVolume = default;
         firstX = firstY = firstZ = default;
@@ -386,27 +400,25 @@ public partial class PhysicsMesh
         for (int i = 0; i < _triangleCount; i++)
         {
             int triangleIndex = i * 3;
-            // The bounds midpoint keeps each coordinate difference representable,
-            // including the full signed raw span; subsequent products stay wide.
-            var triangle = new FixedTriangle(
-                vertices[_triangles[triangleIndex]] - reference,
-                vertices[_triangles[triangleIndex + 1]] - reference,
-                vertices[_triangles[triangleIndex + 2]] - reference);
-            Signed320 weight = GetTetrahedronDeterminant(triangle);
-            signedVolume = WideArithmetic.AddSigned576(signedVolume, Signed576.ExtendValue(weight));
-            firstX = TriangleShellMassProperties.AddWeightedVertexSum(firstX, triangle.A.X, triangle.B.X, triangle.C.X, weight);
-            firstY = TriangleShellMassProperties.AddWeightedVertexSum(firstY, triangle.A.Y, triangle.B.Y, triangle.C.Y, weight);
-            firstZ = TriangleShellMassProperties.AddWeightedVertexSum(firstZ, triangle.A.Z, triangle.B.Z, triangle.C.Z, weight);
-
-            TriangleShellMassProperties.GetProductSums(triangle,
+            var triangle = exactScale
+                ? new FixedTriangle(vertices[_triangles[triangleIndex]], vertices[_triangles[triangleIndex + 1]], vertices[_triangles[triangleIndex + 2]])
+                : new FixedTriangle(vertices[_triangles[triangleIndex]] - reference,
+                    vertices[_triangles[triangleIndex + 1]] - reference, vertices[_triangles[triangleIndex + 2]] - reference);
+            var coordinates = new TriangleShellMassProperties.TriangleCoordinates(triangle, sourceFrame, exactScale);
+            Signed576 weight = GetTetrahedronDeterminant(coordinates);
+            signedVolume = WideArithmetic.AddSigned576(signedVolume, weight);
+            firstX = AddWeightedCoordinateSum(firstX, coordinates.AX, coordinates.BX, coordinates.CX, weight);
+            firstY = AddWeightedCoordinateSum(firstY, coordinates.AY, coordinates.BY, coordinates.CY, weight);
+            firstZ = AddWeightedCoordinateSum(firstZ, coordinates.AZ, coordinates.BZ, coordinates.CZ, weight);
+            TriangleShellMassProperties.GetProductSums(coordinates,
                 out Signed320 x2, out Signed320 y2, out Signed320 z2,
                 out Signed320 xy, out Signed320 xz, out Signed320 yz);
-            integralX2 = WideArithmetic.AddSigned576(integralX2, WideArithmetic.MultiplySigned320(weight, x2));
-            integralY2 = WideArithmetic.AddSigned576(integralY2, WideArithmetic.MultiplySigned320(weight, y2));
-            integralZ2 = WideArithmetic.AddSigned576(integralZ2, WideArithmetic.MultiplySigned320(weight, z2));
-            integralXY = WideArithmetic.AddSigned576(integralXY, WideArithmetic.MultiplySigned320(weight, xy));
-            integralXZ = WideArithmetic.AddSigned576(integralXZ, WideArithmetic.MultiplySigned320(weight, xz));
-            integralYZ = WideArithmetic.AddSigned576(integralYZ, WideArithmetic.MultiplySigned320(weight, yz));
+            integralX2 = AddWeighted(integralX2, weight, x2);
+            integralY2 = AddWeighted(integralY2, weight, y2);
+            integralZ2 = AddWeighted(integralZ2, weight, z2);
+            integralXY = AddWeighted(integralXY, weight, xy);
+            integralXZ = AddWeighted(integralXZ, weight, xz);
+            integralYZ = AddWeighted(integralYZ, weight, yz);
         }
 
     }
@@ -415,16 +427,23 @@ public partial class PhysicsMesh
         Fixed64.TryGetSignedRawRatio(WideArithmetic.AddSigned576(firstMoment,
             WideArithmetic.MultiplySigned576(denominator, Signed192.Raw(reference))), denominator, out center);
 
-    private static Signed320 GetTetrahedronDeterminant(in FixedTriangle triangle)
+    private static Signed576 AddWeightedCoordinateSum(Signed576 total, Signed192 a, Signed192 b, Signed192 c, Signed576 weight) =>
+        AddWeighted(total, weight, WideArithmetic.AddSigned320(WideArithmetic.AddSigned320(
+            Signed320.ExtendValue(a), Signed320.ExtendValue(b)), Signed320.ExtendValue(c)));
+
+    private static Signed576 AddWeighted(Signed576 total, Signed576 weight, Signed320 value) =>
+        WideArithmetic.AddSigned576(total, Signed576.NarrowValue(WideArithmetic.MultiplySigned576ToSigned832(weight, value)));
+
+    private static Signed576 GetTetrahedronDeterminant(in TriangleShellMassProperties.TriangleCoordinates t)
     {
-        Vector3d a = triangle.A, b = triangle.B, c = triangle.C;
-        Signed192 x = WideGeometry.GetDifferenceCrossProduct2D(b.Y, Fixed64.Zero, b.Z, Fixed64.Zero, c.Y, Fixed64.Zero, c.Z, Fixed64.Zero);
-        Signed192 y = WideGeometry.GetDifferenceCrossProduct2D(b.Z, Fixed64.Zero, b.X, Fixed64.Zero, c.Z, Fixed64.Zero, c.X, Fixed64.Zero);
-        Signed192 z = WideGeometry.GetDifferenceCrossProduct2D(b.X, Fixed64.Zero, b.Y, Fixed64.Zero, c.X, Fixed64.Zero, c.Y, Fixed64.Zero);
-        return WideArithmetic.AddSigned320(WideArithmetic.AddSigned320(
-            WideArithmetic.MultiplySigned192(Signed192.Raw(a.X), x),
-            WideArithmetic.MultiplySigned192(Signed192.Raw(a.Y), y)),
-            WideArithmetic.MultiplySigned192(Signed192.Raw(a.Z), z));
+        Signed320 x = WideArithmetic.SubtractSigned320(WideArithmetic.MultiplySigned192(t.BY, t.CZ), WideArithmetic.MultiplySigned192(t.BZ, t.CY));
+        Signed320 y = WideArithmetic.SubtractSigned320(WideArithmetic.MultiplySigned192(t.BZ, t.CX), WideArithmetic.MultiplySigned192(t.BX, t.CZ));
+        Signed320 z = WideArithmetic.SubtractSigned320(WideArithmetic.MultiplySigned192(t.BX, t.CY), WideArithmetic.MultiplySigned192(t.BY, t.CX));
+        // Admitted numerator coordinates are <2^109. Degree-five moments plus
+        // at most 2^17 triangle contributions stay below the 576-bit accumulator.
+        return WideArithmetic.AddSigned576(WideArithmetic.AddSigned576(
+            WideArithmetic.MultiplySigned320(x, t.AX), WideArithmetic.MultiplySigned320(y, t.AY)),
+            WideArithmetic.MultiplySigned320(z, t.AZ));
     }
 
     private static bool ContainsDuplicateTriangle(TriangleUse[] triangleUses)

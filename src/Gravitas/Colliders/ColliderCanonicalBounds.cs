@@ -66,6 +66,18 @@ internal static class ColliderCanonicalBounds
                 referenceOrigin,
                 referenceRotation);
         }
+        if (collider is LSMeshCollider affine && !affine.Mesh.GeometryFrame.IsRigid)
+        {
+            PhysicsMesh geometry = affine.Mesh;
+            // Enclose the exact authored map directly in the requested physical
+            // frame. Rounding inspection vertices before this transform can
+            // shrink the source enclosure by a lattice unit.
+            bool represented = geometry.GeometryFrame.TryGetBoundsIn(geometry.GeometryLocalBounds.Min,
+                geometry.GeometryLocalBounds.Max, ScaledRigidFrame3d.Rigid(referenceOrigin, referenceRotation),
+                out FixedBoundBox bounds);
+            System.Diagnostics.Debug.Assert(represented);
+            return bounds;
+        }
         if (!TryGetLocalBounds(
             collider,
             out Vector3d localMin,
@@ -202,8 +214,8 @@ internal static class ColliderCanonicalBounds
                     return true;
                 }
             case LSMeshCollider mesh:
-                minimum = mesh.Mesh.ScaledLocalBounds.Min;
-                maximum = mesh.Mesh.ScaledLocalBounds.Max;
+                minimum = mesh.Mesh.GeometryLocalBounds.Min;
+                maximum = mesh.Mesh.GeometryLocalBounds.Max;
                 return true;
             default:
                 minimum = default;

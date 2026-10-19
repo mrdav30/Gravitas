@@ -49,8 +49,8 @@ internal sealed class MeshSurfaceConnectivity
     internal void Build(PhysicsMesh mesh, int surfaceTriangle, Vector3d coneCenter,
         FixedQuaternion coneRotation, Fixed64 height, Fixed64 radius, ReadOnlySpan<int> admittedTriangles)
     {
-        mesh.GetLocalTriangleVertices(surfaceTriangle, out Vector3d a, out Vector3d b, out Vector3d c);
-        var frame = new ConePlaneRayFrame(new FixedTriangle(a, b, c), mesh.Origin, mesh.Rotation,
+        mesh.GetGeometryTriangleVertices(surfaceTriangle, out Vector3d a, out Vector3d b, out Vector3d c);
+        var frame = new ConePlaneRayFrame(new FixedTriangle(a, b, c), mesh.GeometryFrame,
             coneCenter, coneRotation, height, radius);
         Build(mesh, surfaceTriangle, frame, admittedTriangles);
     }
@@ -58,7 +58,7 @@ internal sealed class MeshSurfaceConnectivity
     internal void BuildCapsule(PhysicsMesh mesh, int surfaceTriangle, Vector3d capsuleCenter,
         FixedQuaternion capsuleRotation, Fixed64 coreLength, Fixed64 radius, ReadOnlySpan<int> admittedTriangles)
     {
-        var frame = new CapsuleFiniteSectionFrame(mesh.Origin, mesh.Rotation, capsuleCenter, capsuleRotation, coreLength, radius);
+        var frame = new CapsuleFiniteSectionFrame(mesh.GeometryFrame, capsuleCenter, capsuleRotation, coreLength, radius);
         Build(mesh, surfaceTriangle, new CapsuleSection(frame), admittedTriangles);
     }
 
@@ -195,7 +195,7 @@ internal sealed class MeshSurfaceConnectivity
         if (components == 1) return;
         // Exact admitted joins are transitive. Once every node is connected,
         // further feature tests cannot change the single region or its ordinal.
-        ReadOnlySpan<Vector3d> vertices = mesh.ScaledLocalVertices;
+        ReadOnlySpan<Vector3d> vertices = mesh.GeometryVertices;
         for (int node = 0; node < _triangles.Count; node++)
         {
             int triangle = _triangles[node];
@@ -233,7 +233,7 @@ internal sealed class MeshSurfaceConnectivity
         Span<int> signs = stackalloc int[FiniteSectionPoint.SignCount];
         var point = new FiniteSectionPoint(values, signs);
         ReadOnlySpan<int> pairs = mesh.GetManifoldSurfaceBoundaryVertexPairs(surfaceTriangle);
-        ReadOnlySpan<Vector3d> vertices = mesh.ScaledLocalVertices;
+        ReadOnlySpan<Vector3d> vertices = mesh.GeometryVertices;
         // Multiple regions require a certified patch with a true perimeter.
         // A declined owner contains only its single convex triangle section.
         System.Diagnostics.Debug.Assert(!pairs.IsEmpty);

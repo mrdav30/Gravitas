@@ -54,18 +54,27 @@ internal sealed partial class MeshSlabFaceRegions
         for (int index = 0; index < _joined.Inputs.Count; index++)
         {
             Member member = _joined.Members[index]; PhysicsMesh mesh = member.Collider.Mesh;
-            mesh.GetLocalTriangleVertices(member.Triangle, out Vector3d a, out Vector3d b, out Vector3d c);
-            member.Frame = new(new FixedTriangle(a, b, c), mesh.Origin, mesh.Rotation,
+            mesh.GetGeometryTriangleVertices(member.Triangle, out Vector3d a, out Vector3d b, out Vector3d c);
+            member.Frame = new(new FixedTriangle(a, b, c), mesh.GeometryFrame,
                 mover.Center, mover.Rotation, Fixed64.Zero, radius, halfThickness, fullHeight: mover is LSCylinderCollider);
             member.Admitted.FastClear(); member.Collider.GetTrianglesInBounds(bounds, _joined.Candidates);
             foreach (int triangle in _joined.Candidates.AsReadOnlySpan())
             {
                 if (mesh.GetManifoldSurfaceOwner(triangle) != member.Owner) continue;
-                mesh.GetLocalTriangleVertices(triangle, out a, out b, out c);
+                mesh.GetGeometryTriangleVertices(triangle, out a, out b, out c);
                 if (member.Frame.Section.IntersectsTriangle(new FixedTriangle(a, b, c), PrismOffsets.Span)) member.Admitted.Add(triangle);
             }
             if (member.Admitted.Count > 0) _joined.AddAdmittedMember(index);
         }
+        bool wideBanks = false;
+        foreach (Member member in _joined.Members.AsReadOnlySpan()[.._joined.Inputs.Count])
+        {
+            wideBanks |= member.Frame.UsesWideBanks;
+            foreach (var span in member.Boundary.Spans) wideBanks |= span.Interval.HasWideBounds;
+        }
+        if (wideBanks)
+            foreach (Member member in _joined.Members.AsReadOnlySpan()[.._joined.Inputs.Count])
+                member.Frame = member.Frame.WithWideParameters();
         CertifyCompleteSupports();
         for (int index = 0; index < _joined.Inputs.Count; index++)
         {
@@ -82,7 +91,7 @@ internal sealed partial class MeshSlabFaceRegions
             {
                 // All native charts share this physical slab chart. Resolve a
                 // symmetric exit before rounding, independent of mesh winding.
-                WideAxis3 normal = member.Frame.Plane.Normal;
+                WideDirection3d normal = member.Frame.Plane.Normal;
                 int sign = !normal.X.IsZero ? normal.X.Sign : !normal.Y.IsZero ? normal.Y.Sign : normal.Z.Sign;
                 _orientation = -sign;
             }
@@ -134,7 +143,7 @@ internal sealed partial class MeshSlabFaceRegions
         Member member = _joined.Members[_member];
         foreach (int triangle in member.Admitted.AsReadOnlySpan())
         {
-            member.Collider.Mesh.GetLocalTriangleVertices(triangle, out Vector3d a, out Vector3d b, out Vector3d c);
+            member.Collider.Mesh.GetGeometryTriangleVertices(triangle, out Vector3d a, out Vector3d b, out Vector3d c);
             if (candidate.ContainsTrianglePoint(member.Frame, new(a, b, c), member.Frame)) return true;
         }
         return false;
@@ -143,7 +152,7 @@ internal sealed partial class MeshSlabFaceRegions
     private void GatherJoinedBoundary(PhysicsMesh mesh, int triangle, MeshSurfaceConnectivity connectivity)
     {
         Member member = _joined.Members[_member];
-        Span<ulong> values = stackalloc ulong[FiniteSlabRaySelection.StorageWords];
+        Span<ulong> values = stackalloc ulong[SelectionWords];
         Span<sbyte> signs = stackalloc sbyte[FiniteSlabRaySelection.SignCount];
         for (int span = 0; span < member.Boundary.Spans.Length; span++)
         {
@@ -153,7 +162,7 @@ internal sealed partial class MeshSlabFaceRegions
             _region = _usesSupportGraph ? MeshSurfaceBoundaryTopology.FindSupportEdgeRegion(mesh, member.Owner,
                 piece.First, piece.Second, connectivity, this, null) : 0;
             if (_region < 0) continue;
-            var maximum = new FiniteSlabRaySelection(values, signs);
+            var maximum = new FiniteSlabRaySelection(values, signs, _fieldWords);
             FiniteSlabRayExtrema.AccumulateSegment(_frame, new FixedSegment(piece.Start, piece.End), clip,
                 PrismOffsets.Span, _orientation, ref maximum, _visitor);
         }
@@ -161,14 +170,15 @@ internal sealed partial class MeshSlabFaceRegions
 
     private void SelectJoinedMember(int index)
     {
-        _member = index; PrepareFrame(_joined.Members[index].Frame, PrismOffsets.Span);
+        _member = index; _frame = _joined.Members[index].Frame;
+        _fieldWords = _frame.FieldWords;
         _orientation = _orientations[index]; _supportDimension = _dimensions[index];
     }
 
     private void JoinSupportSpans()
     {
         _joinVisitor ??= JoinAtSupportPoint;
-        Span<ulong> values = stackalloc ulong[FiniteSlabRaySelection.StorageWords];
+        Span<ulong> values = stackalloc ulong[SelectionWords];
         Span<sbyte> signs = stackalloc sbyte[FiniteSlabRaySelection.SignCount];
         for (int index = 0; index < _joined.Inputs.Count; index++)
         {
@@ -180,7 +190,7 @@ internal sealed partial class MeshSlabFaceRegions
                 var edge = member.Boundary.Spans[span];
                 _otherMember = _joined.MemberBySurface[(_joined.Meshes[edge.OtherMember], edge.OtherSurface)];
                 if (_memberCounts[_otherMember] == 0) continue;
-                var maximum = new FiniteSlabRaySelection(values, signs);
+                var maximum = new FiniteSlabRaySelection(values, signs, _fieldWords);
                 FiniteSlabRayExtrema.AccumulateSegment(_frame, new FixedSegment(edge.Start, edge.End), edge.Interval,
                     PrismOffsets.Span, _orientation, ref maximum, _joinVisitor);
             }
@@ -206,14 +216,14 @@ internal sealed partial class MeshSlabFaceRegions
         {
             if (a >= 0)
             {
-                first.Collider.Mesh.GetLocalTriangleVertices(a, out Vector3d aa, out Vector3d ab, out Vector3d ac);
+                first.Collider.Mesh.GetGeometryTriangleVertices(a, out Vector3d aa, out Vector3d ab, out Vector3d ac);
                 if (!candidate.ContainsTrianglePoint(first.Frame, new(aa, ab, ac), _frame)) continue;
             }
             foreach (int b in secondDomain)
             {
                 if (b >= 0)
                 {
-                    second.Collider.Mesh.GetLocalTriangleVertices(b, out Vector3d ba, out Vector3d bb, out Vector3d bc);
+                    second.Collider.Mesh.GetGeometryTriangleVertices(b, out Vector3d ba, out Vector3d bb, out Vector3d bc);
                     if (!candidate.ContainsTrianglePoint(second.Frame, new(ba, bb, bc), _frame)) continue;
                 }
                 _joined.Union(first.Offset + (a < 0 ? 0 : first.Connectivity.GetRegionOrdinal(a)),
@@ -231,11 +241,11 @@ internal sealed partial class MeshSlabFaceRegions
             Member root = _joined.Members[rootMember];
             if (_joined.Members[_joined.GetResponseMember(rootMember)].Collider != collider) continue;
             int count = ReduceSamples(region, _joinedEvents.AsReadOnlySpan(),
-                new WidePlaneMetrics(root.Frame.SourcePlane, root.Collider.Mesh.Rotation), _dimensions[rootMember], chosen);
+                new WidePlaneMetrics(root.Frame.SourcePlane, root.Collider.Mesh.GeometryFrame), _dimensions[rootMember], chosen);
             for (int index = 0; index < count; index++)
             {
                 Sample sample = _pool[chosen[index]]; Member supplier = _joined.Members[sample.Member];
-                manifold.AddContact(new ContactAnchor(new FixedPointAnchor(supplier.Frame.Origin, supplier.Frame.Rotation, sample.Authored)),
+                manifold.AddContact(new ContactAnchor(new FixedPointAnchor(supplier.Frame.Center, FixedQuaternion.Identity, sample.Point)),
                     new ContactAnchor(sample.Exit), sample.Depth, root.Frame.GetNormal(_orientations[rootMember]), supplier.Collider.Material,
                     mover.Material, sample.Clamped, group: new ContactGroupKey(0, 0, supplier.Owner + 1, 0, region, sourceIdA: supplier.Collider.Id + 1));
             }

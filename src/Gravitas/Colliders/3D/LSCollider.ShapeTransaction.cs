@@ -149,10 +149,12 @@ public abstract partial class LSCollider
     {
         Vector3d ownerScale;
         Vector3d center;
+        Vector3d poseOrigin;
         FixedQuaternion rotation;
         if (useRequestedPose)
         {
             ownerScale = ColliderScalePolicy.CaptureScale(agent.Transform);
+            poseOrigin = requestedPosition;
             rotation = requestedRotation;
             SwiftThrowHelper.ThrowIfArgument(
                 !rotation.TryTransformScaledPoint(
@@ -169,6 +171,7 @@ public abstract partial class LSCollider
                 agent.Transform,
                 out Fixed4x4 worldMatrix,
                 out FixedQuaternion matrixRotation);
+            poseOrigin = worldMatrix.Translation;
             rotation = matrixRotation;
             SwiftThrowHelper.ThrowIfArgument(
                 !Fixed4x4.TryTransformAffinePoint(worldMatrix, _offset, out center),
@@ -183,7 +186,9 @@ public abstract partial class LSCollider
             Vector3d.One,
             _offset,
             _size,
-            _radius);
+            _radius,
+            poseOrigin,
+            rotation);
     }
 
     private ColliderShapeSnapshot CaptureShapeSnapshot()
@@ -224,7 +229,9 @@ public abstract partial class LSCollider
             localScale,
             _offset,
             _size,
-            _radius);
+            _radius,
+            ownerSnapshot.Center,
+            ownerSnapshot.Rotation);
     }
 
     private void PrepareRuntimeShape(
@@ -364,7 +371,9 @@ public abstract partial class LSCollider
             Vector3d.One,
             localOffset,
             definition.Size,
-            definition.Radius);
+            definition.Radius,
+            position,
+            rotation);
         PrepareRuntimeShape(
             snapshot,
             includeBodyAttachment: true);

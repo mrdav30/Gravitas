@@ -176,7 +176,7 @@ public sealed class PhysicsMeshSurfaceTopologyTests
     }
 
     [Fact]
-    public void PreparedCoplanarityChange_ShouldPublishMatchingNeighborsAndProvenanceTogether()
+    public void PreparedScale_ShouldKeepSourceNeighborsAndProvenanceTogether()
     {
         Vector3d[] vertices = { new(0, 0, 0), new(Fixed64.One, Fixed64.Quarter, Fixed64.Zero),
             new((Fixed64)3, Fixed64.FromFraction(3, 4), Fixed64.One), new(0, 0, 1) };
@@ -186,8 +186,8 @@ public sealed class PhysicsMeshSurfaceTopologyTests
         mesh.GetCoplanarTriangleNeighbors(0).ToArray().Should().Equal(1);
         mesh.GetCanonicalSurfaceOrdinal(0).Should().Be(mesh.GetCanonicalSurfaceOrdinal(1));
         mesh.PublishPreparedTransformation();
-        mesh.GetCoplanarTriangleNeighbors(0).IsEmpty.Should().BeTrue();
-        mesh.GetCanonicalSurfaceOrdinal(0).Should().NotBe(mesh.GetCanonicalSurfaceOrdinal(1));
+        mesh.GetCoplanarTriangleNeighbors(0).ToArray().Should().Equal(1);
+        mesh.GetCanonicalSurfaceOrdinal(0).Should().Be(mesh.GetCanonicalSurfaceOrdinal(1));
         mesh.GetWeldedVertexTriangleIndices(0).ToArray().Should().Equal(0, 1);
         mesh.UpdateTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One);
         mesh.GetCoplanarTriangleNeighbors(0).ToArray().Should().Equal(1);

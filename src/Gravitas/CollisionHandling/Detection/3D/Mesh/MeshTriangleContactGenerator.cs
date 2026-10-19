@@ -37,21 +37,34 @@ internal static class MeshTriangleContactGenerator
     });
 
     // True means the convex pair was handled, including separation; false requests finite triangle fallback.
-    internal static bool TryAppendHullContacts(LSMeshCollider hull, Vector3d origin, FixedQuaternion rotation,
+    internal static bool TryAppendHullContacts(LSMeshCollider hull, in ScaledRigidFrame3d frame, Vector3d origin,
         ReadOnlySpan<Vector3d> vertices, ReadOnlySpan<int> triangles, ReadOnlySpan<int> edges,
         ReadOnlySpan<int> satEdges, PhysicsMaterial material, ContactManifold manifold, bool reverse,
         int namespaceA = 0, int namespaceB = 0, ContactGroupKey group = default)
     {
         PhysicsMesh mesh = hull.Mesh;
         // Select the solid exit once; finite witnesses must belong to that support.
-        if (!WideOrientedBox.TryGetConvexHullPenetration(mesh.Origin, mesh.Rotation, mesh.ScaledLocalVertices,
-            mesh.Triangles, mesh.ConvexSatEdgeVertexPairs, origin, rotation, vertices, triangles, satEdges,
-            out WidePointSpanPenetration penetration, skipParallelDirections: true)) return true;
         SwiftList<HullSample> samples = hull.Context.CollisionScratch.HullSamples;
         samples.FastClear();
-        WideOrientedBox.VisitConvexHullContacts(mesh.Origin, mesh.Rotation, mesh.ScaledLocalVertices,
-            mesh.Triangles, mesh.ConvexSatEdgeVertexPairs, origin, rotation, vertices, triangles, edges,
-            penetration, samples, static (pool, contact) => pool.Add(new HullSample(contact)));
+        bool exact = !mesh.GeometryFrame.IsRigid || !frame.IsRigid;
+        if (exact)
+        {
+            if (!WideOrientedBox.TryGetConvexHullPenetration(mesh.GeometryFrame, mesh.GeometryVertices,
+                    mesh.Triangles, mesh.ConvexSatEdgeVertexPairs, frame, vertices, triangles, satEdges,
+                    out WideScaledHullPenetration penetration, skipParallelDirections: true)) return true;
+            WideOrientedBox.VisitConvexHullContacts(mesh.GeometryFrame, mesh.Origin, mesh.GeometryVertices,
+                mesh.Triangles, mesh.ConvexSatEdgeVertexPairs, frame, origin, vertices, triangles, edges,
+                penetration, samples, static (pool, contact) => pool.Add(new HullSample(contact)));
+        }
+        else
+        {
+            if (!WideOrientedBox.TryGetConvexHullPenetration(mesh.Origin, mesh.Rotation, mesh.GeometryVertices,
+                    mesh.Triangles, mesh.ConvexSatEdgeVertexPairs, origin, frame.Rotation, vertices, triangles, satEdges,
+                    out WidePointSpanPenetration penetration, skipParallelDirections: true)) return true;
+            WideOrientedBox.VisitConvexHullContacts(mesh.Origin, mesh.Rotation, mesh.GeometryVertices,
+                mesh.Triangles, mesh.ConvexSatEdgeVertexPairs, origin, frame.Rotation, vertices, triangles, edges,
+                penetration, samples, static (pool, contact) => pool.Add(new HullSample(contact)));
+        }
         if (samples.Count == 0) return false;
         samples.SortInPlace(HullSampleComparer);
         Span<HullSample> pool = samples.AsSpan();
@@ -70,10 +83,14 @@ internal static class MeshTriangleContactGenerator
                 Signed320.ExtendValue(Signed192.Raw(normal.Y)), Signed320.ExtendValue(Signed192.Raw(normal.Z)));
             // Coverage ranks final representable samples; admission and witnesses stay exact.
             // A 33-bit solver normal times the normalized basis fits well below 192 bits.
-            WideRigidProjection.GetLocalAxisProjections(axis, new WideRationalBasis3d(mesh.Rotation),
-                out Signed576 x, out Signed576 y, out Signed576 z);
-            var metrics = new WidePlaneMetrics(new WideAxis3(Signed320.NarrowValue(x),
-                Signed320.NarrowValue(y), Signed320.NarrowValue(z)));
+            WideAxis3 localAxis = axis;
+            if (!exact)
+            {
+                WideRigidProjection.GetLocalAxisProjections(axis, new WideRationalBasis3d(mesh.Rotation),
+                    out Signed576 x, out Signed576 y, out Signed576 z);
+                localAxis = new WideAxis3(Signed320.NarrowValue(x), Signed320.NarrowValue(y), Signed320.NarrowValue(z));
+            }
+            var metrics = new WidePlaneMetrics(localAxis);
             for (int slot = 1; slot < count; slot++)
                 chosen[slot] = MeshPlaneSampleReduction.ChooseNext<HullSample>(pool, chosen[..slot], metrics, HullSampleComparer);
             // A support line needs only its two extreme velocity levers.
@@ -145,7 +162,7 @@ internal static class MeshTriangleContactGenerator
         CollisionSatScratch scratch = pair.Context.CollisionScratch;
         SwiftList<int> admitted = scratch.MeshTriangleCandidatesB;
         scratch.MeshSurfaces.Clear();
-        var frame = new CapsuleFiniteSectionFrame(mesh.Origin, mesh.Rotation, center, rotation, coreLength, radius);
+        var frame = new CapsuleFiniteSectionFrame(mesh.GeometryFrame, center, rotation, coreLength, radius);
         Span<int> singleton = stackalloc int[1];
         foreach (int triangle in candidates.AsReadOnlySpan())
         {
@@ -160,7 +177,7 @@ internal static class MeshTriangleContactGenerator
             foreach (int candidate in surfaceCandidates)
             {
                 if (mesh.GetManifoldSurfaceOwner(candidate) != owner) continue;
-                mesh.GetLocalTriangleVertices(candidate, out Vector3d a, out Vector3d b, out Vector3d c);
+                mesh.GetGeometryTriangleVertices(candidate, out Vector3d a, out Vector3d b, out Vector3d c);
                 if (CapsulePlaneRayEvents.IntersectsTriangle(frame, new FixedTriangle(a, b, c))) admitted.Add(candidate);
             }
             if (admitted.Count == 0) continue;
@@ -197,8 +214,11 @@ internal static class MeshTriangleContactGenerator
         LSCuboidCollider cuboid,
         SwiftList<int> triangleBuffer)
     {
+        // Declared surface ownership still applies when only one piece is near
+        // the mover. Falling back to independent triangles exposes its internal
+        // diagonals as pressure boundaries and changes response mid-crossing.
         if (mesh.StaticSurface is { } surface && !mesh.IsTrigger && !cuboid.IsTrigger
-            && surface.GatherProjectedSupport(cuboid) > 1)
+            && surface.GatherProjectedSupport(cuboid) > 0)
         {
             Vector3d half = cuboid.OrientedBox.HalfExtents;
             surface.BuildSlab(cuboid, Fixed64.Zero, half.Y, new(half.X, half.Z));
@@ -218,7 +238,7 @@ internal static class MeshTriangleContactGenerator
         SwiftList<int> triangleBuffer)
     {
         if (mesh.StaticSurface is { } surface && !mesh.IsTrigger && !cylinder.IsTrigger
-            && surface.GatherProjectedSupport(cylinder) > 1)
+            && surface.GatherProjectedSupport(cylinder) > 0)
         {
             surface.BuildSlab(cylinder, cylinder.ScaledRadius, cylinder.Height, default);
             return surface.SlabFaces.AppendJoinedContacts(mesh, cylinder, pair.Context.CollisionScratch.MeshSlabBoundary, pair.Manifold);
@@ -248,6 +268,8 @@ internal static class MeshTriangleContactGenerator
             declared.StaticSurface.BuildHull(mover);
             return declared.StaticSurface.HullContacts.Append(declared, mover, pair.Manifold, declared == meshB);
         }
+        // The sole caller routes closed convex/closed convex pairs through
+        // its solid-hull owner before entering this finite-surface manifold.
         LSMeshCollider? surface = meshA.Mode == MeshColliderMode.Convex && meshA.Mesh.IsClosedSurface
             && !meshB.Mesh.IsClosedSurface ? meshB
             : meshB.Mode == MeshColliderMode.Convex && meshB.Mesh.IsClosedSurface
@@ -274,7 +296,7 @@ internal static class MeshTriangleContactGenerator
                     Span<int> edges = scratch.PolyhedronEdges.AsSpan(0, 2 * count);
                     for (int index = 0; index < count; index++)
                     {
-                        vertices[index] = surface.Mesh.ScaledLocalVertices[corners[index]];
+                        vertices[index] = surface.Mesh.GeometryVertices[corners[index]];
                         edges[2 * index] = index;
                         edges[2 * index + 1] = (index + 1) % count;
                         if (index < 2) continue;
@@ -282,7 +304,7 @@ internal static class MeshTriangleContactGenerator
                         triangles[face] = 0; triangles[face + 1] = index - 1; triangles[face + 2] = index;
                     }
                     // Use the trusted finite patch once, not its artificial triangle diagonals.
-                    if (TryAppendHullContacts(hull, surface.Mesh.Origin, surface.Mesh.Rotation,
+                    if (TryAppendHullContacts(hull, surface.Mesh.GeometryFrame, surface.Mesh.Origin,
                         vertices, triangles, edges, edges, surface.Material, pair.Manifold, hull == meshB, group: group))
                         continue;
                 }
@@ -309,16 +331,35 @@ internal static class MeshTriangleContactGenerator
         int triangle, LSMeshCollider secondMesh, SwiftList<int> candidates, bool reverse,
         ContactGroupKey? group = null)
     {
-        firstMesh.Mesh.GetLocalTriangleVertices(triangle, out Vector3d a, out Vector3d b, out Vector3d c);
+        firstMesh.Mesh.GetGeometryTriangleVertices(triangle, out Vector3d a, out Vector3d b, out Vector3d c);
         var firstTriangle = new FixedTriangle(a, b, c);
-        GetTriangleBoundsInFrame(firstTriangle.Bounds, firstMesh.Mesh.Origin, firstMesh.Mesh.Rotation,
-            secondMesh.Mesh.Origin, secondMesh.Mesh.Rotation, out FixedBoundVolume bounds);
-        secondMesh.Mesh.GetTrianglesInLocalBounds(bounds, candidates);
+        bool exact = !firstMesh.Mesh.GeometryFrame.IsRigid || !secondMesh.Mesh.GeometryFrame.IsRigid;
+        if (exact)
+        {
+            bool represented = firstMesh.Mesh.GeometryFrame.TryGetBoundsIn(firstTriangle.Bounds.Min, firstTriangle.Bounds.Max,
+                secondMesh.Mesh.GeometryFrame, out FixedBoundBox bounds);
+            // Collider admission guarantees nonzero target scale products;
+            // the bounds owner clips only final source-chart endpoints.
+            System.Diagnostics.Debug.Assert(represented);
+            secondMesh.Mesh.GetTrianglesInGeometryBounds(new FixedBoundVolume(bounds.Min, bounds.Max), candidates);
+        }
+        else
+        {
+            GetTriangleBoundsInFrame(firstTriangle.Bounds, firstMesh.Mesh.Origin, firstMesh.Mesh.Rotation,
+                secondMesh.Mesh.Origin, secondMesh.Mesh.Rotation, out FixedBoundVolume bounds);
+            secondMesh.Mesh.GetTrianglesInGeometryBounds(bounds, candidates);
+        }
         bool canonicalReverse = firstMesh.Id > secondMesh.Id;
         for (int j = 0; j < candidates.Count; j++)
         {
-            secondMesh.Mesh.GetLocalTriangleVertices(candidates[j], out a, out b, out c);
+            secondMesh.Mesh.GetGeometryTriangleVertices(candidates[j], out a, out b, out c);
             var secondTriangle = new FixedTriangle(a, b, c);
+            if (exact)
+            {
+                AppendExactTriangleContacts(pair, firstMesh, firstTriangle, secondMesh, secondTriangle,
+                    canonicalReverse, reverse, group);
+                continue;
+            }
             FixedContactAnchors contact;
             bool intersects = canonicalReverse
                 ? secondTriangle.TryGetContact(secondMesh.Mesh.Origin, secondMesh.Mesh.Rotation,
@@ -327,16 +368,36 @@ internal static class MeshTriangleContactGenerator
                     secondMesh.Mesh.Origin, secondMesh.Mesh.Rotation, secondTriangle, out contact);
             if (!intersects) continue;
 
-            ContactAnchor first = new(reverse != canonicalReverse ? contact.SecondAnchor : contact.FirstAnchor);
-            ContactAnchor second = new(reverse != canonicalReverse ? contact.FirstAnchor : contact.SecondAnchor);
-            Vector3d normal = reverse != canonicalReverse ? -contact.Normal : contact.Normal;
-            if (group.HasValue)
-            {
-                pair.Manifold.AddContact(first, second, contact.Depth, normal,
-                    pair.ColliderA.Material, pair.ColliderB.Material, contact.DepthIsClamped, group: group.Value);
-            }
-            else AddContact(pair, first, second, contact.Depth, normal, contact.DepthIsClamped);
+            AddMeshTriangleContact(pair, contact, reverse != canonicalReverse, group);
         }
+    }
+
+    private static void AppendExactTriangleContacts(CollisionWorkItem pair, LSMeshCollider firstMesh,
+        in FixedTriangle first, LSMeshCollider secondMesh, in FixedTriangle second,
+        bool canonicalReverse, bool reverse, ContactGroupKey? group)
+    {
+        ref readonly ScaledRigidFrame3d firstFrame = ref (canonicalReverse
+            ? ref secondMesh.Mesh.GeometryFrame : ref firstMesh.Mesh.GeometryFrame);
+        ref readonly ScaledRigidFrame3d secondFrame = ref (canonicalReverse
+            ? ref firstMesh.Mesh.GeometryFrame : ref secondMesh.Mesh.GeometryFrame);
+        FixedTriangle primary = canonicalReverse ? second : first, secondary = canonicalReverse ? first : second;
+        if (WideTriangleRelations.TryGetContact(primary, firstFrame,
+                canonicalReverse ? secondMesh.Mesh.Origin : firstMesh.Mesh.Origin,
+                secondary, secondFrame, canonicalReverse ? firstMesh.Mesh.Origin : secondMesh.Mesh.Origin,
+                out FixedContactAnchors contact))
+            AddMeshTriangleContact(pair, contact, reverse != canonicalReverse, group);
+    }
+
+    private static void AddMeshTriangleContact(CollisionWorkItem pair, FixedContactAnchors contact, bool reverse,
+        ContactGroupKey? group)
+    {
+        ContactAnchor first = new(reverse ? contact.SecondAnchor : contact.FirstAnchor);
+        ContactAnchor second = new(reverse ? contact.FirstAnchor : contact.SecondAnchor);
+        Vector3d normal = reverse ? -contact.Normal : contact.Normal;
+        if (group.HasValue)
+            pair.Manifold.AddContact(first, second, contact.Depth, normal,
+                pair.ColliderA.Material, pair.ColliderB.Material, contact.DepthIsClamped, group: group.Value);
+        else AddContact(pair, first, second, contact.Depth, normal, contact.DepthIsClamped);
     }
 
     private static void TryAddCuboidTriangleContact(
@@ -345,12 +406,29 @@ internal static class MeshTriangleContactGenerator
         int triangleIndex,
         LSCuboidCollider cuboid)
     {
-        mesh.Mesh.GetLocalTriangleVertices(
+        mesh.Mesh.GetGeometryTriangleVertices(
             triangleIndex,
             out Vector3d first,
             out Vector3d second,
             out Vector3d third);
         var triangle = new FixedTriangle(first, second, third);
+        if (!mesh.Mesh.GeometryFrame.IsRigid)
+        {
+            Span<Vector3d> box = stackalloc Vector3d[8];
+            WideOrientedBox.GetBoxHullVertices(cuboid.OrientedBox.HalfExtents, box);
+            ReadOnlySpan<Vector3d> points = stackalloc Vector3d[3] { first, second, third };
+            ReadOnlySpan<int> face = stackalloc int[3] { 0, 1, 2 };
+            ReadOnlySpan<int> edges = stackalloc int[6] { 0, 1, 1, 2, 2, 0 };
+            var boxFrame = ScaledRigidFrame3d.Rigid(cuboid.Center, cuboid.Rotation);
+            if (!WideOrientedBox.TryGetConvexHullPenetration(boxFrame, box,
+                    WideOrientedBox.BoxHullTriangles, WideOrientedBox.BoxHullEdges,
+                    mesh.Mesh.GeometryFrame, points, face, edges, out var penetration)) return;
+            WideOrientedBox.VisitConvexHullContacts(boxFrame, cuboid.Center, box,
+                WideOrientedBox.BoxHullTriangles, WideOrientedBox.BoxHullEdges, mesh.Mesh.GeometryFrame,
+                mesh.Mesh.Origin, points, face, edges, penetration, pair,
+                static (state, contact) => AddReversedBoxTriangleContact(state, contact));
+            return;
+        }
         Span<FixedContactLocalPoints> faceContacts =
             stackalloc FixedContactLocalPoints[4];
         if (!cuboid.OrientedBox.TryGetTriangleContact(
@@ -418,21 +496,15 @@ internal static class MeshTriangleContactGenerator
         int triangleIndex,
         LSCylinderCollider cylinder)
     {
-        mesh.Mesh.GetLocalTriangleVertices(
+        mesh.Mesh.GetGeometryTriangleVertices(
             triangleIndex,
             out Vector3d first,
             out Vector3d second,
             out Vector3d third);
         var triangle = new FixedTriangle(first, second, third);
-        if (!triangle.TryGetCenteredFiniteCylinderContact(
-                mesh.Mesh.Origin,
-                mesh.Mesh.Rotation,
-                cylinder.Center,
-                cylinder.Rotation,
-                cylinder.Height,
-                cylinder.ScaledRadius,
-                out FixedContactAnchors contact,
-                out bool isCapFaceContact))
+        if (!TriangleCylinderContact.TryGetContact(triangle, mesh.Mesh.GeometryFrame,
+                cylinder.Center, cylinder.Rotation, Signed192.Raw(cylinder.Height), cylinder.ScaledRadius,
+                out FixedContactAnchors contact, out bool isCapFaceContact))
         {
             return false;
         }
@@ -481,19 +553,20 @@ internal static class MeshTriangleContactGenerator
         Vector3d supportDirection,
         in FixedContactAnchors primary)
     {
-        if (!triangle.TryGetCenteredFiniteCylinderSupportContact(
-                mesh.Mesh.Origin,
-                mesh.Mesh.Rotation,
-                cylinder.Center,
-                cylinder.Rotation,
-                cylinder.Height,
-                cylinder.ScaledRadius,
-                supportDirection,
-                primary.Normal,
-                out FixedContactAnchors contact))
+        FixedContactAnchors contact;
+        bool found;
+        if (mesh.Mesh.GeometryFrame.IsRigid)
+            found = triangle.TryGetCenteredFiniteCylinderSupportContact(mesh.Mesh.Origin, mesh.Mesh.Rotation,
+                cylinder.Center, cylinder.Rotation, cylinder.Height, cylinder.ScaledRadius,
+                supportDirection, primary.Normal, out contact);
+        else
         {
-            return false;
+            FixedPointAnchor support = WideGeometry.GetCenteredCylinderSupportAnchor(cylinder.Center,
+                cylinder.Rotation, cylinder.Height, cylinder.ScaledRadius, supportDirection);
+            found = WideTriangleRelations.TryGetProjectedSupportContact(triangle, mesh.Mesh.GeometryFrame,
+                support, primary.Normal, mesh.Center, out contact);
         }
+        if (!found) return false;
 
         // Parallel cap/face samples share the selected exact plane gap.
         // The support query rounds into the triangle frame before measuring

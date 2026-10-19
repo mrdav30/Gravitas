@@ -120,7 +120,10 @@ public sealed class LSMeshCollider : LSCollider
             snapshot.Rotation,
             snapshot.OwnerScale,
             snapshot.PartScale,
-            InertiaPolicy);
+            InertiaPolicy,
+            new ScaledRigidFrame3d(snapshot.PoseOrigin, snapshot.PlacementRotation,
+                snapshot.LocalOffset, snapshot.OwnerScale, snapshot.Rotation,
+                GeometryMesh.LocalBounds.Center, snapshot.PartScale));
         if (CompoundOwner == null
             && !CalculatePreparedLocalMassPoint().TryGetPoint(out _))
         {
@@ -336,12 +339,13 @@ public sealed class LSMeshCollider : LSCollider
         out FixedPointAnchor closest,
         out Vector3d normal)
     {
-        if (!Mesh.TryConvertWorldToScaledLocal(
+        if (!Mesh.GeometryFrame.IsRigid || !Mesh.TryConvertWorldToRigidGeometry(
                 queryPoint,
                 out Vector3d localQueryPoint))
         {
             FindClosestPointWithoutLocalQuery(
                 queryPoint,
+                triangleBuffer,
                 out closest,
                 out normal);
             return;
@@ -377,7 +381,7 @@ public sealed class LSMeshCollider : LSCollider
         }
         else
         {
-            Mesh.GetTrianglesInLocalBounds(queryBounds, triangleBuffer);
+            Mesh.GetTrianglesInGeometryBounds(queryBounds, triangleBuffer);
             for (int i = 0; i < triangleBuffer.Count; i++)
             {
                 _ = KeepClosestPointOnTriangle(
@@ -395,6 +399,7 @@ public sealed class LSMeshCollider : LSCollider
 
     private void FindClosestPointWithoutLocalQuery(
         Vector3d queryPoint,
+        SwiftList<int> triangleBuffer,
         out FixedPointAnchor closest,
         out Vector3d normal)
     {
@@ -402,27 +407,47 @@ public sealed class LSMeshCollider : LSCollider
             queryPoint,
             FixedQuaternion.Identity,
             Vector3d.Zero);
+        bool exactRanking = !Mesh.GeometryFrame.IsRigid;
+        const int words = 36;
+        Span<ulong> values = stackalloc ulong[exactRanking ? 8 * words : 0];
+        Span<int> signs = stackalloc int[exactRanking ? 8 : 0];
+        ContactQuadratic bestNumerator = exactRanking ? ContactQuadratic.At(values, signs, 0, words) : default;
+        ContactQuadratic bestDenominator = exactRanking ? ContactQuadratic.At(values, signs, 1, words) : default;
+        ContactQuadratic candidateNumerator = exactRanking ? ContactQuadratic.At(values, signs, 2, words) : default;
+        ContactQuadratic candidateDenominator = exactRanking ? ContactQuadratic.At(values, signs, 3, words) : default;
         closest = GetClosestPointAnchorOnTriangle(
             0,
             queryAnchor,
+            bestNumerator,
+            bestDenominator,
             out normal);
-        for (int triangleIndex = 1;
-            triangleIndex < Mesh.TriangleCount;
-            triangleIndex++)
+        // The first finite witness bounds every possible winner in physical
+        // space. Inverse-map that outward box into the existing authored BVH.
+        FixedBoundVolume bounds = default;
+        bool bounded = closest.TryGetPoint(out Vector3d firstPoint)
+            && TryCreateClosestPointSearchBounds(queryPoint, firstPoint, out bounds);
+        if (bounded) Mesh.GetTrianglesInWorldBounds(bounds, triangleBuffer);
+        int bestTriangle = 0;
+        int count = bounded ? triangleBuffer.Count : Mesh.TriangleCount;
+        for (int index = 0; index < count; index++)
         {
+            int triangleIndex = bounded ? triangleBuffer[index] : index;
+            if (triangleIndex == 0) continue;
             FixedPointAnchor candidate = GetClosestPointAnchorOnTriangle(
-                triangleIndex,
-                queryAnchor,
-                out Vector3d candidateNormal);
-            int comparison =
-                queryAnchor.CompareSquaredDistance(candidate, closest);
-            if (comparison >= 0)
+                triangleIndex, queryAnchor, candidateNumerator, candidateDenominator, out Vector3d candidateNormal);
+            int comparison = exactRanking
+                ? ContactQuadratic.CompareRatios(candidateNumerator, candidateDenominator, ReadOnlySpan<ulong>.Empty,
+                    bestNumerator, bestDenominator, ReadOnlySpan<ulong>.Empty)
+                : queryAnchor.CompareSquaredDistance(candidate, closest);
+            if (comparison > 0 || comparison == 0 && triangleIndex >= bestTriangle) continue;
+            if (exactRanking)
             {
-                continue;
+                candidateNumerator.CopyTo(bestNumerator);
+                candidateDenominator.CopyTo(bestDenominator);
             }
-
             closest = candidate;
             normal = candidateNormal;
+            bestTriangle = triangleIndex;
         }
 
     }
@@ -430,18 +455,28 @@ public sealed class LSMeshCollider : LSCollider
     private FixedPointAnchor GetClosestPointAnchorOnTriangle(
         int triangleIndex,
         in FixedPointAnchor query,
+        scoped ContactQuadratic squaredDistanceNumerator,
+        scoped ContactQuadratic squaredDistanceDenominator,
         out Vector3d normal)
     {
-        Mesh.GetLocalTriangleVertices(
+        Mesh.GetGeometryTriangleVertices(
             triangleIndex,
             out Vector3d first,
             out Vector3d second,
             out Vector3d third);
         var triangle = new FixedTriangle(first, second, third);
-        FixedPointAnchor closest = triangle.GetClosestPointAnchor(
-            Mesh.Origin,
-            Mesh.Rotation,
-            query);
+        FixedPointAnchor closest;
+        if (Mesh.GeometryFrame.IsRigid)
+            closest = triangle.GetClosestPointAnchor(Mesh.Origin, Mesh.Rotation, query);
+        else
+        {
+            // This caller creates a scalar query with zero local displacement.
+            // Its finite closest witness stays within admitted mesh reach.
+            bool represented = WideTriangleRelations.TryGetClosestPointAnchor(triangle, Mesh.GeometryFrame,
+                RationalPoint3d.FromScalarPoint(query.Origin), Mesh.Origin,
+                squaredDistanceNumerator, squaredDistanceDenominator, out closest);
+            System.Diagnostics.Debug.Assert(represented);
+        }
         normal = OrientNormalTowardPoint(
             Mesh.GetFaceNormalWorld(triangleIndex),
             query,
@@ -543,7 +578,7 @@ public sealed class LSMeshCollider : LSCollider
         ref Vector3d closest,
         ref Vector3d normal)
     {
-        Mesh.GetLocalTriangleVertices(
+        Mesh.GetGeometryTriangleVertices(
             triangleIndex,
             out Vector3d first,
             out Vector3d second,

@@ -341,6 +341,8 @@ public sealed class MeshTrianglePairContactTests
         ContactManifold manifold = Collide(context, first, second);
 
         ManifoldContact contact = manifold.PrimaryContact;
+        // Exact lattice geometry retains the existing centered rigid witness
+        // contract: barycentric weights round before their point products.
         Fixed64 roundedThird = Fixed64.Half + Fixed64.MinIncrement;
         contact.AnchorA.Origin.Should().Be(new Vector3d(Fixed64.FromFraction(3, 2), Fixed64.FromFraction(3, 2), Fixed64.Zero));
         contact.AnchorA.LocalPoint.Should().Be(new Vector3d(-Fixed64.FromFraction(3, 2), -roundedThird, Fixed64.Zero));

@@ -295,7 +295,7 @@ internal sealed partial class ConvexSweepQueryWorker
             out Vector3d min,
             out Vector3d max);
 
-        mesh.Mesh.GetTrianglesInLocalBounds(
+        mesh.Mesh.GetTrianglesInGeometryBounds(
             new FixedBoundVolume(min, max),
             _triangleCandidates);
         LastMeshTriangleCandidateCount += _triangleCandidates.Count;
@@ -798,7 +798,7 @@ internal sealed partial class ConvexSweepQueryWorker
 
     private static ConvexShape CreateTriangleShape(LSMeshCollider mesh, int triangleIndex)
     {
-        mesh.Mesh.GetLocalTriangleVertices(
+        mesh.Mesh.GetGeometryTriangleVertices(
             triangleIndex,
             out Vector3d first,
             out Vector3d second,
@@ -818,6 +818,18 @@ internal sealed partial class ConvexSweepQueryWorker
         out Vector3d min,
         out Vector3d max)
     {
+        if (!mesh.Mesh.GeometryFrame.IsRigid)
+        {
+            _ = sourceShape.TryGetBoundsRelativeTo(mesh.Mesh.Origin, FixedQuaternion.Identity,
+                out Vector3d worldMin, out Vector3d worldMax);
+            SweepBoundsUtility.CreateSweptBounds(worldMin, worldMax, _displacement,
+                ContactTolerance, out worldMin, out worldMax);
+            bool represented = ScaledRigidFrame3d.Rigid(mesh.Mesh.Origin, FixedQuaternion.Identity)
+                .TryGetBoundsIn(worldMin, worldMax, mesh.Mesh.GeometryFrame, out FixedBoundBox bounds);
+            System.Diagnostics.Debug.Assert(represented);
+            min = bounds.Min; max = bounds.Max;
+            return;
+        }
         // Concave-target dispatch receives only the source's committed shape;
         // iterative chord offsets are introduced after broad-phase collection.
         _ = sourceShape.TryGetBoundsRelativeTo(

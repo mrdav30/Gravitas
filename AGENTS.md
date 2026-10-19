@@ -226,6 +226,14 @@ trusted internal CCD search padding. Explicit mixed queries in pure modes valida
 active target slabs from committed admission geometry before mixed indexing;
 preparation scratch is not a committed metric after a failed transaction.
 
+Mesh consumers must use `PhysicsMesh.GeometryFrame` and its matching
+`GeometryVertices`/BVH chart. Public `Center` and rounded centered inspection
+vertices do not define collision geometry. Preserve exact authored placement
+and scale through admission and selection; round only final physical witnesses.
+Positive diagonal scale preserves source topology. Pose changes must not rebuild
+the BVH; switching between equivalent compact and source charts must rebuild it.
+See the [mesh coordinate contract](docs/wiki/COLLIDER_SHAPE_REFERENCE.md).
+
 ## Lockstep Host Lifecycle
 
 The important contract is an engine-agnostic lockstep loop. Hosts own the outer

@@ -305,12 +305,25 @@ soups, bent open surfaces, and nonconvex shells as `Concave`; use deterministic
 convex decomposition when a moving or support-mapped collider needs multiple
 convex parts.
 
-Runtime mesh points follow one explicit centered transform contract:
-`origin + rotation * Scale(sourcePoint - authoredBoundsCenter, ownerScale, partScale)`.
-Rotation must be a normalized, representable quaternion. Owner and part scale
-factors remain separate until each final centered coordinate is formed, must be
-strictly positive and diagonally applied, and must preserve representable
-centered vertices, triangle areas, total area, and selected mass properties.
+Runtime meshes preserve the authored transformation before rounding:
+`poseOrigin + placementRotation * (localOffset * ownerScale)
+ + geometryRotation * ((sourcePoint - authoredBoundsCenter) * ownerScale * partScale)`.
+For a standalone collider both rotations are its committed rotation, part scale
+is one, and the default local offset is the authored bounds center. A compound
+part places its center using its parent's rotation and owner scale; geometry
+uses the existing normalized combined rotation and both scale factors. Direct
+`PhysicsMesh` placement specifies the centered mesh reference instead.
+
+Scale products, reference subtraction and placement remain exact through finite
+collision/query admission and selection. Only final physical witnesses are
+rounded to Q32.32 in their translated contact frame. Public `Center` remains a
+rounded placement summary, and `GetLocalTriangleVertices` remains a rounded,
+centered inspection view; neither replaces exact runtime geometry. Independently
+centered pieces under an identical authored map therefore keep identical shared
+edges without tolerance welding. Rotations must be normalized. Scale factors
+must be strictly positive and diagonal, and must preserve the supported reach,
+representable centered inspection coordinates, physical triangle areas, total
+area and selected mass properties.
 Invalid standalone meshes reject before collider registration. Compound owners
 prepare every mesh part before publishing any part, so a failed scale/rotation
 change cannot leave half-updated geometry.
@@ -335,10 +348,14 @@ Compound-part authoring reaches the same mesh path only after
 
 Source vertices, triangle indices, authored face normals, convex SAT edge
 topology, and support topology are immutable and exposed only through read-only
-views or internal query seams. Scale changes rebuild the scale-dependent local
-triangle BVH, bounds, support ordering, and face normal/area caches in prepared
-buffers before swapping them into committed state. World normals use the rigid
-rotation of the inverse-transpose-scaled local normal and are normalized before
+views or internal query seams. Positive diagonal scale and rigid pose preserve
+authored incidence, coplanarity and convex fill, so seam ownership is classified
+once from source geometry. Scale changes prepare bounds, support ordering and
+face normal/area caches before committing them together. The triangle BVH indexes
+authored coordinates when required by exact scale or placement, and uses the
+existing compact scaled chart when it represents identical geometry. Pose updates
+do not rebuild it. World normals use the rigid rotation of the
+inverse-transpose-scaled local normal and are normalized before
 projection. Frontal area is the positive projected physical triangle area and is
 invariant to direction magnitude.
 
@@ -346,9 +363,10 @@ Closed-volume integration retains signed tetrahedron weights and moment products
 until final volume, centered COM and unit tensor normalization. Source properties
 are cached in the recentered geometry frame. Diagonal scaling reuses analytic
 covariance when representable; if source properties or an intermediate cached
-scale cannot represent otherwise valid final geometry, the final scaled vertices
-are integrated and cached instead. `SurfaceApproximation` performs stable
-two-pass thin-shell integration:
+scale cannot represent otherwise valid final geometry, centered scaled source
+products are integrated before final public normalization. Compound integration
+retains the existing finite guard fractions after summing those products.
+`SurfaceApproximation` performs stable two-pass thin-shell integration:
 area-weighted COM relative to scaled bounds, then authored-order triangle
 central tensors plus parallel-axis shifts. Checked fixed-point arithmetic
 rejects volume collapse, saturation, and nonrepresentable COM/tensors rather

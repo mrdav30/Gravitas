@@ -34,7 +34,7 @@ internal sealed class MeshConeSurfaceBoundary
     {
         _isolated.FastClear(); _families.FastClear(); _familySamples.FastClear(); _halfspaces.FastClear();
         ReadOnlySpan<int> boundary = mesh.GetCanonicalSurfaceBoundaryVertexPairs(surfaceTriangle);
-        ReadOnlySpan<Vector3d> vertices = mesh.ScaledLocalVertices;
+        ReadOnlySpan<Vector3d> vertices = mesh.GeometryVertices;
         int owner = mesh.GetManifoldSurfaceOwner(surfaceTriangle);
         Span<SegmentConeSurfaceCandidate> storage = stackalloc SegmentConeSurfaceCandidate[SegmentConeSurfaceCandidates.MaximumCandidates];
         for (int edge = 0; edge < boundary.Length; edge += 2)
@@ -48,10 +48,11 @@ internal sealed class MeshConeSurfaceBoundary
     {
         PhysicsMesh mesh = meshCollider.Mesh;
         ConePlaneRayFrame frame = faces.GetBoundaryFrame(meshCollider, surfaceTriangle);
-        WideAxis3 normal = frame.AuthoredNormal;
+        WideDirection3d worldNormal = new WideDirection3d(frame.AuthoredNormal).Transform(mesh.GeometryFrame.GeometryBasis);
+        WideAxis3 normal = new(Signed320.NarrowValue(worldNormal.X), Signed320.NarrowValue(worldNormal.Y), Signed320.NarrowValue(worldNormal.Z));
         int owner = mesh.GetManifoldSurfaceOwner(surfaceTriangle), surface = mesh.GetCanonicalSurfaceOrdinal(surfaceTriangle);
         ReadOnlySpan<int> boundary = mesh.GetCanonicalSurfaceBoundaryVertexPairs(surfaceTriangle);
-        ReadOnlySpan<Vector3d> vertices = mesh.ScaledLocalVertices;
+        ReadOnlySpan<Vector3d> vertices = mesh.GeometryVertices;
         _visitedCorners.Clear();
         MeshSurfaceBoundaryDomain? domain = faces.GetJoinedBoundary(meshCollider, surfaceTriangle);
         if (domain != null)
@@ -116,7 +117,7 @@ internal sealed class MeshConeSurfaceBoundary
             // Use a point segment for each corner exactly once. Adjacent edges
             // must not duplicate its support branches or multiply its pressure.
             Span<SegmentConeSurfaceCandidate> featureStorage = stackalloc SegmentConeSurfaceCandidate[SegmentConeSurfaceCandidates.MaximumCandidates];
-            Accumulate(mesh, owner, first, second, mesh.ScaledLocalVertices, cone.Center, cone.Rotation,
+            Accumulate(mesh, owner, first, second, mesh.GeometryVertices, cone.Center, cone.Rotation,
                 cone.Height, cone.ScaledRadius, featureStorage, interiorOnly: !pointOnly, pointOnly, selectedExit, clip, fan);
             ReduceSurfaceFeature(meshCollider, cone, surface, feature, faces.SamplingOrigin, manifold);
         }
@@ -227,7 +228,7 @@ internal sealed class MeshConeSurfaceBoundary
         _clip = clip;
         var selection = new ConeSurfaceSelection(storage);
         SegmentConeSurfaceCandidates.AccumulateSegmentConeSurfaceCandidates(
-            new FixedSegment(vertices[first], vertices[pointOnly ? first : second]), mesh.Origin, mesh.Rotation,
+            new FixedSegment(vertices[first], vertices[pointOnly ? first : second]), mesh.GeometryFrame,
             coneCenter, coneRotation, height, radius, ref selection);
         for (int index = 0; index < selection.Count; index++)
         {
@@ -286,6 +287,8 @@ internal sealed class MeshConeSurfaceBoundary
             location == ConeSurfacePointLocation.End ? candidate.First : candidate.Second,
             location == ConeSurfacePointLocation.Interior, fan);
         else { joinedFan.CopyTo(fan); count = joinedFan.Length; }
+        if (joinedFan.IsEmpty)
+            for (int index = 0; index < count; index++) fan[index] = mesh.GeometryFrame.GetWorldDirectionNumerators(fan[index]);
         if (selectedExit.HasValue) fan[count++] = selectedExit.Value;
         int capacity = candidate.Certificate.GetMaximumFamilyEventCount(count);
         if (_familyStorage.Length < capacity) Array.Resize(ref _familyStorage, capacity);
@@ -306,6 +309,8 @@ internal sealed class MeshConeSurfaceBoundary
             candidate.Certificate.PointLocation == ConeSurfacePointLocation.End ? candidate.Second : candidate.First,
             candidate.Certificate.PointLocation == ConeSurfacePointLocation.End ? candidate.First : candidate.Second,
             candidate.Certificate.PointLocation == ConeSurfacePointLocation.Interior, localFan) : joinedFan.Length;
+        if (joinedFan.IsEmpty)
+            for (int index = 0; index < count; index++) localFan[index] = mesh.GeometryFrame.GetWorldDirectionNumerators(localFan[index]);
         if (selectedExit.HasValue)
         {
             bool hasExit = candidate.Certificate.TryGetNormalDotSign(selectedExit.Value, out int exitSign);

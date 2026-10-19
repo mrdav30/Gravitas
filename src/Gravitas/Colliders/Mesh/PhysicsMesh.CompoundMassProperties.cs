@@ -69,6 +69,8 @@ public partial class PhysicsMesh
         if (!valid)
         {
             Vector3d[] vertices = usePrepared ? _preparedScaledLocalVertices : _scaledLocalVertices;
+            bool exactScale = !(usePrepared ? _preparedScaleIsExact : _scaleIsExact);
+            ref readonly var frame = ref (usePrepared ? ref _preparedSourceFrame : ref _sourceFrame);
             // Public unit tensors are projections, not an input to mass-applied
             // moments. Evaluate once per effective geometry, never per mass/pose.
             if (policy == MeshInertiaPolicy.SurfaceApproximation)
@@ -76,18 +78,21 @@ public partial class PhysicsMesh
                 // Surface projection was already validated during preparation;
                 // the same immutable geometry supplies its unrounded integrals.
                 _ = TriangleShellMassProperties.TryCreateUniformShell(
-                    vertices, _triangles, out _, out _, out _, out integrals);
+                    exactScale ? _localVertices : vertices,
+                    _triangles, out _, out _, out _, out integrals,
+                    frame, exactScale);
             }
             else
             {
-                Vector3d reference = (usePrepared ? _preparedScaledLocalBounds : _scaledLocalBounds).Center;
-                IntegrateClosedVolume(vertices, reference,
+                Vector3d reference = exactScale ? Vector3d.Zero : (usePrepared ? _preparedScaledLocalBounds : _scaledLocalBounds).Center;
+                IntegrateClosedVolume(exactScale ? _localVertices : vertices, reference,
                     out Signed576 volume,
                     out Signed576 firstX, out Signed576 firstY, out Signed576 firstZ,
                     out Signed576 x2, out Signed576 y2, out Signed576 z2,
-                    out Signed576 xy, out Signed576 xz, out Signed576 yz);
+                    out Signed576 xy, out Signed576 xz, out Signed576 yz,
+                    frame, exactScale);
                 integrals = MeshMassIntegrals.FromSolid(reference, volume,
-                    firstX, firstY, firstZ, x2, y2, z2, xy, xz, yz);
+                    firstX, firstY, firstZ, x2, y2, z2, xy, xz, yz, exactScale ? 64 : 0);
             }
             valid = true;
         }

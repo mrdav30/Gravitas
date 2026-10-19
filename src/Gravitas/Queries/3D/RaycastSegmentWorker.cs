@@ -222,10 +222,28 @@ public sealed class RaycastSegmentWorker
         if (!_segmentIsValid)
             return false;
 
-        if (!meshCollider.Mesh.TryConvertWorldToScaledLocal(
+        if (!meshCollider.Mesh.GeometryFrame.IsRigid)
+        {
+            PhysicsMesh mesh = meshCollider.Mesh;
+            mesh.GetTrianglesInWorldBounds(CreateSegmentBounds(_cachedOrigin, _cachedEnd), _meshTriangleBuffer);
+            bool found = false;
+            foreach (int index in _meshTriangleBuffer.AsReadOnlySpan())
+            {
+                mesh.GetGeometryTriangleVertices(index, out Vector3d a, out Vector3d b, out Vector3d c);
+                if (!WideTriangleRelations.TryGetSegmentIntersection(new FixedTriangle(a, b, c), mesh.GeometryFrame,
+                    new FixedSegment(_cachedOrigin, _cachedEnd), out Vector3d entry, out Vector3d exit)) continue;
+                if (!_calculateIntersections) return true;
+                AddIntersectionPoint(entry, ref outputIntersectionPoints);
+                if (exit != entry) AddIntersectionPoint(exit, ref outputIntersectionPoints);
+                found = true;
+            }
+            return found;
+        }
+
+        if (!meshCollider.Mesh.TryConvertWorldToRigidGeometry(
                 _cachedOrigin,
                 out Vector3d localOrigin)
-            || !meshCollider.Mesh.TryConvertWorldToScaledLocal(
+            || !meshCollider.Mesh.TryConvertWorldToRigidGeometry(
                 _cachedEnd,
                 out Vector3d localEnd))
         {
@@ -237,12 +255,12 @@ public sealed class RaycastSegmentWorker
         Vector3d localSegmentDirection = localSegmentLength == Fixed64.Zero ? Vector3d.Zero : localSegment.Normalized;
 
         _meshTriangleBuffer.FastClear();
-        meshCollider.Mesh.GetTrianglesInLocalBounds(CreateSegmentBounds(localOrigin, localEnd), _meshTriangleBuffer);
+        meshCollider.Mesh.GetTrianglesInGeometryBounds(CreateSegmentBounds(localOrigin, localEnd), _meshTriangleBuffer);
         bool intersects = false;
         for (int i = 0; i < _meshTriangleBuffer.Count; i++)
         {
             int triangleIndex = _meshTriangleBuffer[i];
-            meshCollider.Mesh.GetLocalTriangleVertices(triangleIndex, out Vector3d first, out Vector3d second, out Vector3d third);
+            meshCollider.Mesh.GetGeometryTriangleVertices(triangleIndex, out Vector3d first, out Vector3d second, out Vector3d third);
             if (!TryAddLocalTriangleIntersection(
                     meshCollider.Mesh,
                     first,
@@ -362,9 +380,7 @@ public sealed class RaycastSegmentWorker
             }
 
             // localOrigin was obtained from this representable world endpoint.
-            _ = mesh.TryConvertScaledLocalToWorld(
-                localOrigin,
-                out Vector3d worldOrigin);
+            _ = mesh.GeometryFrame.TryGetPoint(localOrigin, out Vector3d worldOrigin);
 
             AddIntersectionPoint(worldOrigin, ref outputIntersectionPoints);
             return true;
@@ -379,9 +395,7 @@ public sealed class RaycastSegmentWorker
             bool found = false;
             if (triangle.ContainsProjection(localOrigin))
             {
-                _ = mesh.TryConvertScaledLocalToWorld(
-                    localOrigin,
-                    out Vector3d worldOrigin);
+                _ = mesh.GeometryFrame.TryGetPoint(localOrigin, out Vector3d worldOrigin);
 
                 AddIntersectionPoint(worldOrigin, ref outputIntersectionPoints);
                 found = true;
@@ -389,9 +403,7 @@ public sealed class RaycastSegmentWorker
 
             if (triangle.ContainsProjection(localEnd))
             {
-                _ = mesh.TryConvertScaledLocalToWorld(
-                    localEnd,
-                    out Vector3d worldEnd);
+                _ = mesh.GeometryFrame.TryGetPoint(localEnd, out Vector3d worldEnd);
 
                 AddIntersectionPoint(worldEnd, ref outputIntersectionPoints);
                 found = true;
@@ -410,9 +422,7 @@ public sealed class RaycastSegmentWorker
 
         // A point on the local segment maps to the same convex combination of
         // the already-representable world endpoints.
-        _ = mesh.TryConvertScaledLocalToWorld(
-            localPoint,
-            out Vector3d worldPoint);
+        _ = mesh.GeometryFrame.TryGetPoint(localPoint, out Vector3d worldPoint);
 
         AddIntersectionPoint(worldPoint, ref outputIntersectionPoints);
         return true;

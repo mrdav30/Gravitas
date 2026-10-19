@@ -23,7 +23,7 @@ internal sealed class MeshSlabSurfaceBoundary
     {
         PhysicsMesh mesh = collider.Mesh;
         ReadOnlySpan<int> boundary = mesh.GetCanonicalSurfaceBoundaryVertexPairs(surfaceTriangle);
-        ReadOnlySpan<Vector3d> vertices = mesh.ScaledLocalVertices;
+        ReadOnlySpan<Vector3d> vertices = mesh.GeometryVertices;
         FiniteSlabRayFrame frame = faces.Frame;
         _supportVertices.FastClear(); _visitedCorners.Clear();
         foreach (int vertex in boundary)
@@ -51,12 +51,13 @@ internal sealed class MeshSlabSurfaceBoundary
         {
             _supportFan.FastClear();
             foreach (int vertex in _supportVertices.AsReadOnlySpan())
-                if (vertex != first) _supportFan.Add(-MeshSurfaceBoundaryTopology.Ray(mesh.ScaledLocalVertices[first], mesh.ScaledLocalVertices[vertex]));
+                if (vertex != first) _supportFan.Add(-mesh.GeometryFrame.GetWorldDirectionNumerators(
+                    MeshSurfaceBoundaryTopology.Ray(mesh.GeometryVertices[first], mesh.GeometryVertices[vertex])));
             // Global support makes the matched exit a separating plane for the
             // whole fill; a local hole-edge exit need not clear another region.
             Span<Vector2d> localBox = stackalloc Vector2d[4];
-            if (!SegmentSlabSurfaceContact.TryGetFeaturePenetration(new FixedSegment(mesh.ScaledLocalVertices[first], mesh.ScaledLocalVertices[second]),
-                frame.Origin, frame.Rotation, frame.Center, frame.SlabRotation, frame.Section.RadialFrame.Length,
+            if (!SegmentSlabSurfaceContact.TryGetFeaturePenetration(new FixedSegment(mesh.GeometryVertices[first], mesh.GeometryVertices[second]),
+                mesh.GeometryFrame, frame.Center, frame.SlabRotation, frame.Section.RadialFrame.Length,
                 frame.RadiusValue, frame.HalfThickness, CollisionDetectionMixed.GetConvexPrismOffsets(embedded, localBox),
                 _supportFan.AsReadOnlySpan(), !pointOnly, out FixedContactAnchors contact)) return;
             if (found && (contact.DepthIsClamped && !best.DepthIsClamped
@@ -75,7 +76,7 @@ internal sealed class MeshSlabSurfaceBoundary
         int owner = mesh.GetManifoldSurfaceOwner(surfaceTriangle);
         int surface = mesh.GetCanonicalSurfaceOrdinal(surfaceTriangle);
         ReadOnlySpan<int> boundary = mesh.GetCanonicalSurfaceBoundaryVertexPairs(surfaceTriangle);
-        ReadOnlySpan<Vector3d> vertices = mesh.ScaledLocalVertices;
+        ReadOnlySpan<Vector3d> vertices = mesh.GeometryVertices;
         FiniteSlabRayFrame frame = faces.Frame;
         Fixed64 length = frame.Section.RadialFrame.Length;
         Fixed64 radius = frame.RadiusValue;
@@ -83,8 +84,9 @@ internal sealed class MeshSlabSurfaceBoundary
         Span<Vector2d> box = stackalloc Vector2d[4];
         ReadOnlySpan<Vector2d> offsets = !faces.PrismOffsets.IsEmpty ? faces.PrismOffsets.Span
             : CollisionDetectionMixed.GetConvexPrismOffsets(embedded, box);
-        frame.SourcePlane.GetExactNormal(out Signed192 nx, out Signed192 ny, out Signed192 nz, out _);
-        WideAxis3 normal = new(Signed320.ExtendValue(nx), Signed320.ExtendValue(ny), Signed320.ExtendValue(nz));
+        WideDirection3d worldNormal = WideTriangleRelations.GetScaledTriangleLocalNormal(frame.SourcePlane, mesh.GeometryFrame)
+            .Transform(mesh.GeometryFrame.GeometryBasis);
+        WideAxis3 normal = new(Signed320.NarrowValue(worldNormal.X), Signed320.NarrowValue(worldNormal.Y), Signed320.NarrowValue(worldNormal.Z));
         _visitedCorners.Clear();
         MeshSurfaceBoundaryDomain? domain = faces.JoinedBoundary;
         if (domain != null)
@@ -141,15 +143,20 @@ internal sealed class MeshSlabSurfaceBoundary
             if (suppress) return;
             Span<WideAxis3> fan = stackalloc WideAxis3[Math.Max(5, joinedFan.Length + 1)];
             int count;
-            if (joinedFan.IsEmpty) count = MeshSurfaceBoundaryTopology.GetIncidentFan(mesh, owner, first, second, !pointOnly, fan);
+            if (joinedFan.IsEmpty)
+            {
+                count = MeshSurfaceBoundaryTopology.GetIncidentFan(mesh, owner, first, second, !pointOnly, fan);
+                for (int index = 0; index < count; index++)
+                    fan[index] = mesh.GeometryFrame.GetWorldDirectionNumerators(fan[index]);
+            }
             else { joinedFan.CopyTo(fan); count = joinedFan.Length; }
             // Topology admits the contact normal p-q. The mathematics owner
             // admits the opposite exit ray q-p; negate its halfspaces once.
             for (int index = 0; index < count; index++) fan[index] = -fan[index];
             fan[count++] = faces.Orientation > 0 ? -normal : normal;
-            var segment = new FixedSegment(mesh.ScaledLocalVertices[first],
-                mesh.ScaledLocalVertices[pointOnly ? first : second]);
-            if (!SegmentSlabSurfaceContact.TryGetContact(segment, frame.Origin, frame.Rotation,
+            var segment = new FixedSegment(mesh.GeometryVertices[first],
+                mesh.GeometryVertices[pointOnly ? first : second]);
+            if (!SegmentSlabSurfaceContact.TryGetContact(segment, mesh.GeometryFrame,
                 frame.Center, frame.SlabRotation, length, radius, halfThickness, prismOffsets, fan[..count],
                 interiorOnly: !pointOnly, clip, out FixedContactAnchors contact, fullHeight: frame.FullHeight != Fixed64.Zero)) return;
             var group = new ContactGroupKey(namespace3D, namespace2D, surface, 0, checked(-ordinal - 1), sourceIdA: faces.SourceId);

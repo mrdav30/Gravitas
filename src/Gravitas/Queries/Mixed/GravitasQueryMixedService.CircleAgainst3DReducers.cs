@@ -326,22 +326,12 @@ public sealed partial class GravitasQueryMixedService
         bool requireClosingContact,
         out PhysicsMixedHit hit)
     {
-        CreateCircleSlabSweepBounds(
-            start,
-            end,
-            radius,
-            slabCenterY,
-            halfThickness,
-            out Vector3d min,
-            out Vector3d max);
-        mesh.GetTrianglesInBounds(new FixedBoundVolume(min, max), _meshTriangleCandidates);
-        LastMeshTriangleCandidateCount += _meshTriangleCandidates.Count;
-
         ContactManifold initial = _context.CollisionScratch.MeshSurfaceManifold;
         initial.BeginUpdate(_context.FrameCount);
         // Initial admission should not pay exact section tests for triangles
         // reached only later in the sweep. Keep the full list for impact search.
-        CreateCircleSlabSweepBounds(start, start, radius, slabCenterY, halfThickness, out min, out max);
+        CreateCircleSlabSweepBounds(start, start, radius, slabCenterY, halfThickness,
+            out Vector3d min, out Vector3d max);
         var initialTriangles = _context.CollisionScratch.MeshTriangleCandidatesA;
         mesh.GetTrianglesInBounds(new FixedBoundVolume(min, max), initialTriangles);
         bool initiallyOverlapping = CollisionDetectionMixed.AppendMeshCircleSlabContacts(mesh,
@@ -363,6 +353,9 @@ public sealed partial class GravitasQueryMixedService
             }
         }
 
+        CreateCircleSlabSweepBounds(start, end, radius, slabCenterY, halfThickness, out min, out max);
+        mesh.GetTrianglesInBounds(new FixedBoundVolume(min, max), _meshTriangleCandidates);
+        LastMeshTriangleCandidateCount += _meshTriangleCandidates.Count;
         bool found = false;
         Fixed64 bestDistance = Fixed64.MaxValue;
         int bestTriangleIndex = int.MaxValue;
@@ -371,28 +364,31 @@ public sealed partial class GravitasQueryMixedService
         for (int i = 0; i < _meshTriangleCandidates.Count; i++)
         {
             int triangleIndex = _meshTriangleCandidates[i];
-            mesh.Mesh.GetLocalTriangleVertices(
+            mesh.Mesh.GetGeometryTriangleVertices(
                 triangleIndex,
                 out Vector3d first,
                 out Vector3d second,
                 out Vector3d third);
-            var triangle = new FixedTriangle(
-                first,
-                second,
-                third);
-            if (!triangle.TryGetFiniteSlabProjectedCircleSweep(
-                mesh.Mesh.Origin,
-                mesh.Mesh.Rotation,
-                new FixedSegment2d(start, end),
-                length,
-                radius,
-                slabCenterY,
-                halfThickness,
-                out Fixed64 distance,
-                out FixedPointAnchor triangleContact))
+            bool rigid = mesh.Mesh.GeometryFrame.IsRigid;
+            Vector3d triangleOrigin = rigid ? mesh.Mesh.GeometryFrame.RigidOrigin : mesh.Mesh.Origin;
+            FixedQuaternion triangleRotation = rigid ? mesh.Mesh.GeometryFrame.Rotation : FixedQuaternion.Identity;
+            var triangle = new FixedTriangle(first, second, third);
+            bool exactLattice = rigid;
+            if (!rigid && mesh.Mesh.GeometryFrame.GetPoint(first).TryGetExactLocalPointIn(triangleOrigin, triangleRotation, out Vector3d localFirst)
+                && mesh.Mesh.GeometryFrame.GetPoint(second).TryGetExactLocalPointIn(triangleOrigin, triangleRotation, out Vector3d localSecond)
+                && mesh.Mesh.GeometryFrame.GetPoint(third).TryGetExactLocalPointIn(triangleOrigin, triangleRotation, out Vector3d localThird))
             {
-                continue;
+                triangle = new FixedTriangle(localFirst, localSecond, localThird);
+                exactLattice = true;
             }
+            bool swept = exactLattice
+                ? triangle.TryGetFiniteSlabProjectedCircleSweep(triangleOrigin, triangleRotation,
+                    new FixedSegment2d(start, end), length, radius, slabCenterY, halfThickness,
+                    out Fixed64 distance, out FixedPointAnchor triangleContact)
+                : WideOrientedBox.TryGetFiniteSlabProjectedCircleSweep(triangle, mesh.Mesh.GeometryFrame, triangleOrigin,
+                    new FixedSegment2d(start, end), length, radius, slabCenterY, halfThickness,
+                    out distance, out triangleContact);
+            if (!swept) continue;
 
             if (found
                 && (distance > bestDistance

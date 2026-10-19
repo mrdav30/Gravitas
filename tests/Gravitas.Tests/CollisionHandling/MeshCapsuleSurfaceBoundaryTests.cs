@@ -10,6 +10,55 @@ namespace Gravitas.Tests.CollisionHandlingTests;
 public sealed class MeshCapsuleSurfaceBoundaryTests
 {
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void FractionallyScaledAuthoredCorner_ShouldRetainItsPhysicalPerpendicularBoundaryRay(bool oblique)
+    {
+        using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
+        // The authored origin is an exact shared corner. The odd far extent
+        // and fractional scale require retained affine vertices rather than a
+        // rounded centered cache, without rounding the coincident core point.
+        Fixed64 extent = (Fixed64)4 + Fixed64.FromRaw(1);
+        var mesh = new LSMeshCollider(new[] { Vector3d.Zero, new Vector3d(extent, Fixed64.Zero, Fixed64.Zero),
+            new Vector3d(Fixed64.Zero, Fixed64.Zero, extent), new Vector3d(extent, Fixed64.Zero, extent) },
+            new[] { 0, 2, 1, 1, 2, 3 }, MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation);
+        scenario.InitializeStaticCollider(mesh, Vector3d.Zero);
+        FixedQuaternion meshRotation = oblique ? FixedQuaternion.FromEulerAnglesInDegrees((Fixed64)17,
+            (Fixed64)(-23), (Fixed64)45) : FixedQuaternion.Identity;
+        mesh.Transform.LocalScale = new(Fixed64.FromRaw(2863311531), Fixed64.One, Fixed64.FromRaw(2576980378));
+        mesh.Transform.LocalRotation = meshRotation;
+        mesh.Simulate();
+        FixedQuaternion rotation = (meshRotation * FixedQuaternion.LookRotation(new Vector3d(1, 0, 1).Normalized,
+            new Vector3d(1, 1, -1).Normalized)).Normalized;
+        var capsule = new LSCapsuleCollider { Radius = Fixed64.Half, Size = new(1, 2, 1) };
+        scenario.CreateBody(capsule, Vector3d.Zero, rotation, immovable: true);
+        CollisionPair pair = scenario.CreatePair(mesh, capsule);
+        CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
+        bool foundCorner = false;
+        Fixed64 tolerance = Fixed64.FromRaw(256);
+        for (int group = 0; group < pair.Manifold.GroupCount; group++)
+        {
+            ref ContactGroup contacts = ref pair.Manifold.GetGroup(group);
+            if (contacts.Key.Region >= 0) continue;
+            for (int index = 0; index < contacts.Count; index++)
+            {
+                ManifoldContact contact = contacts[index];
+                if (contact.PointA != Vector3d.Zero) continue;
+                foundCorner = true;
+                Vector3d sourceNormal = meshRotation.Inverse().Rotate(contact.Normal);
+                sourceNormal.X.Should().BeLessThanOrEqualTo(tolerance);
+                sourceNormal.Z.Should().BeLessThanOrEqualTo(tolerance);
+                (sourceNormal.X.Abs() <= tolerance || sourceNormal.Z.Abs() <= tolerance).Should().BeTrue();
+                rotation.Inverse().Rotate(contact.Normal).Y.Abs().Should().BeLessThanOrEqualTo(tolerance);
+                (contact.Depth - capsule.ScaledRadius).Abs().Should().BeLessThanOrEqualTo(tolerance);
+                Vector3d.Cross(contact.PointA - contact.PointB, contact.Normal).Magnitude
+                    .Should().BeLessThanOrEqualTo(tolerance);
+            }
+        }
+        foundCorner.Should().BeTrue("an actual affine perimeter corner retains its own admitted radial constraint");
+    }
+
+    [Theory]
     [InlineData(false, false, false)]
     [InlineData(false, false, true)]
     [InlineData(false, true, false)]

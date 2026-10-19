@@ -27,7 +27,9 @@ internal static class TriangleShellMassProperties
         out ExactMassWeight surfaceWeight,
         out Vector3d centerOfMass,
         out Fixed3x3 unitMassInertiaTensor,
-        out MeshMassIntegrals integrals)
+        out MeshMassIntegrals integrals,
+        in ScaledRigidFrame3d sourceFrame = default,
+        bool exactScale = false)
     {
         integrals = default;
         if (triangleIndices.Length % FixedTriangle.VertexCount != 0)
@@ -54,38 +56,46 @@ internal static class TriangleShellMassProperties
                 triangleIndices,
                 i,
                 out FixedTriangle triangle);
-            triangle.GetExactNormal(
-                out _,
-                out _,
-                out _,
-                out Signed320 squaredDoubleArea);
-            ExactMassWeight weight =
-                ExactMassProperties.CreateTriangleAreaWeight(
-                    squaredDoubleArea);
+            var coordinates = new TriangleCoordinates(triangle, sourceFrame, exactScale);
+            ExactMassWeight weight;
+            if (exactScale)
+            {
+                WideDirection3d normal = WideTriangleRelations.GetScaledTriangleLocalNormal(triangle, sourceFrame);
+                // Q128 area weights retain the exact scaled surface even when
+                // its Q32.32 inspection vertices would collapse to a line.
+                Signed576 root = WideArithmetic.GetFloorSquareRootOfProduct(normal.SquaredLength, Signed192.Signed(9));
+                Signed192 numerator = WideArithmetic.DivideSigned576ToSigned192(root, new Signed320(0, 0, 0, 1, 0));
+                weight = new ExactMassWeight(Signed320.ExtendValue(numerator));
+            }
+            else
+            {
+                triangle.GetExactNormal(out _, out _, out _, out Signed320 squaredDoubleArea);
+                weight = ExactMassProperties.CreateTriangleAreaWeight(squaredDoubleArea);
+            }
             Signed320 weightNumerator = weight.Numerator;
             totalWeight = WideArithmetic.AddSigned576(
                 totalWeight,
                 Signed576.ExtendValue(weightNumerator));
             firstMomentX = AddWeightedVertexSum(
                 firstMomentX,
-                triangle.A.X,
-                triangle.B.X,
-                triangle.C.X,
+                coordinates.AX,
+                coordinates.BX,
+                coordinates.CX,
                 weightNumerator);
             firstMomentY = AddWeightedVertexSum(
                 firstMomentY,
-                triangle.A.Y,
-                triangle.B.Y,
-                triangle.C.Y,
+                coordinates.AY,
+                coordinates.BY,
+                coordinates.CY,
                 weightNumerator);
             firstMomentZ = AddWeightedVertexSum(
                 firstMomentZ,
-                triangle.A.Z,
-                triangle.B.Z,
-                triangle.C.Z,
+                coordinates.AZ,
+                coordinates.BZ,
+                coordinates.CZ,
                 weightNumerator);
             GetProductSums(
-                triangle,
+                coordinates,
                 out Signed320 x2,
                 out Signed320 y2,
                 out Signed320 z2,
@@ -132,11 +142,11 @@ internal static class TriangleShellMassProperties
         integrals = MeshMassIntegrals.FromShell(surfaceWeight,
             firstMomentX, firstMomentY, firstMomentZ,
             secondMomentX, secondMomentY, secondMomentZ,
-            productMomentXY, productMomentXZ, productMomentYZ);
+            productMomentXY, productMomentXZ, productMomentYZ, exactScale ? 64 : 0);
         Signed576 centerDenominator =
             WideArithmetic.MultiplySigned576(
                 totalWeight,
-                Three);
+                exactScale ? Signed192.NarrowValue(WideArithmetic.MultiplySigned192(Three, new Signed192(0, 1, 0))) : Three);
         _ = Fixed64.TryGetSignedRawRatio(
             firstMomentX,
             centerDenominator,
@@ -149,47 +159,44 @@ internal static class TriangleShellMassProperties
             firstMomentZ,
             centerDenominator,
             out Fixed64 centerZ);
-        centerOfMass = new Vector3d(
-            centerX,
-            centerY,
-            centerZ);
+        centerOfMass = new Vector3d(centerX, centerY, centerZ);
 
         Signed576 centeredX = TranslateSquaredMoment(
             secondMomentX,
             firstMomentX,
             totalWeight,
-            centerX);
+            exactScale ? ScaleCoordinate(centerX) : Signed192.Raw(centerX));
         Signed576 centeredY = TranslateSquaredMoment(
             secondMomentY,
             firstMomentY,
             totalWeight,
-            centerY);
+            exactScale ? ScaleCoordinate(centerY) : Signed192.Raw(centerY));
         Signed576 centeredZ = TranslateSquaredMoment(
             secondMomentZ,
             firstMomentZ,
             totalWeight,
-            centerZ);
+            exactScale ? ScaleCoordinate(centerZ) : Signed192.Raw(centerZ));
         Signed576 centeredXY = TranslateProductMoment(
             productMomentXY,
             firstMomentX,
             firstMomentY,
             totalWeight,
-            centerX,
-            centerY);
+            exactScale ? ScaleCoordinate(centerX) : Signed192.Raw(centerX),
+            exactScale ? ScaleCoordinate(centerY) : Signed192.Raw(centerY));
         Signed576 centeredXZ = TranslateProductMoment(
             productMomentXZ,
             firstMomentX,
             firstMomentZ,
             totalWeight,
-            centerX,
-            centerZ);
+            exactScale ? ScaleCoordinate(centerX) : Signed192.Raw(centerX),
+            exactScale ? ScaleCoordinate(centerZ) : Signed192.Raw(centerZ));
         Signed576 centeredYZ = TranslateProductMoment(
             productMomentYZ,
             firstMomentY,
             firstMomentZ,
             totalWeight,
-            centerY,
-            centerZ);
+            exactScale ? ScaleCoordinate(centerY) : Signed192.Raw(centerY),
+            exactScale ? ScaleCoordinate(centerZ) : Signed192.Raw(centerZ));
         Signed576 inertiaXX =
             WideArithmetic.AddSigned576(centeredY, centeredZ);
         Signed576 inertiaYY =
@@ -200,12 +207,12 @@ internal static class TriangleShellMassProperties
         Signed576 diagonalDenominator =
             WideArithmetic.MultiplySigned576(
                 totalWeight,
-                Signed192.One,
+                exactScale ? new Signed192(1UL << 32, 0, 0) : Signed192.One,
                 Six);
         Signed576 productDenominator =
             WideArithmetic.MultiplySigned576(
                 totalWeight,
-                Signed192.One,
+                exactScale ? new Signed192(1UL << 32, 0, 0) : Signed192.One,
                 Twelve);
         bool representable = Fixed64.TryGetSignedRawRatio(
                 inertiaXX,
@@ -247,18 +254,10 @@ internal static class TriangleShellMassProperties
         return true;
     }
 
-    internal static Signed576 AddWeightedVertexSum(
-        Signed576 total,
-        Fixed64 first,
-        Fixed64 second,
-        Fixed64 third,
-        Signed320 weight)
+    internal static Signed576 AddWeightedVertexSum(Signed576 total, Signed192 first, Signed192 second, Signed192 third, Signed320 weight)
     {
-        Signed320 sum = WideArithmetic.AddSigned320(
-            WideArithmetic.AddSigned320(
-                Signed320.ExtendValue(Signed192.Raw(first)),
-                Signed320.ExtendValue(Signed192.Raw(second))),
-            Signed320.ExtendValue(Signed192.Raw(third)));
+        Signed320 sum = WideArithmetic.AddSigned320(WideArithmetic.AddSigned320(
+            Signed320.ExtendValue(first), Signed320.ExtendValue(second)), Signed320.ExtendValue(third));
         return AddWeighted(total, sum, weight);
     }
 
@@ -272,24 +271,12 @@ internal static class TriangleShellMassProperties
                 value,
                 weight));
 
-    internal static void GetProductSums(
-        FixedTriangle triangle,
-        out Signed320 x2,
-        out Signed320 y2,
-        out Signed320 z2,
-        out Signed320 xy,
-        out Signed320 xz,
-        out Signed320 yz)
+    internal static void GetProductSums(in TriangleCoordinates triangle,
+        out Signed320 x2, out Signed320 y2, out Signed320 z2, out Signed320 xy, out Signed320 xz, out Signed320 yz)
     {
-        Signed192 ax = Signed192.Raw(triangle.A.X);
-        Signed192 ay = Signed192.Raw(triangle.A.Y);
-        Signed192 az = Signed192.Raw(triangle.A.Z);
-        Signed192 bx = Signed192.Raw(triangle.B.X);
-        Signed192 by = Signed192.Raw(triangle.B.Y);
-        Signed192 bz = Signed192.Raw(triangle.B.Z);
-        Signed192 cx = Signed192.Raw(triangle.C.X);
-        Signed192 cy = Signed192.Raw(triangle.C.Y);
-        Signed192 cz = Signed192.Raw(triangle.C.Z);
+        Signed192 ax = triangle.AX, ay = triangle.AY, az = triangle.AZ;
+        Signed192 bx = triangle.BX, by = triangle.BY, bz = triangle.BZ;
+        Signed192 cx = triangle.CX, cy = triangle.CY, cz = triangle.CZ;
         x2 = SquaredBarycentricSum(ax, bx, cx);
         y2 = SquaredBarycentricSum(ay, by, cy);
         z2 = SquaredBarycentricSum(az, bz, cz);
@@ -350,9 +337,8 @@ internal static class TriangleShellMassProperties
         Signed576 secondMoment,
         Signed576 firstMoment,
         Signed576 totalWeight,
-        Fixed64 center)
+        Signed192 centerRaw)
     {
-        Signed192 centerRaw = Signed192.Raw(center);
         Signed576 shifted = WideArithmetic.SubtractSigned576(
             secondMoment,
             WideArithmetic.MultiplySigned576(
@@ -373,13 +359,9 @@ internal static class TriangleShellMassProperties
         Signed576 firstMoment,
         Signed576 secondMoment,
         Signed576 totalWeight,
-        Fixed64 firstCenter,
-        Fixed64 secondCenter)
+        Signed192 firstCenterRaw,
+        Signed192 secondCenterRaw)
     {
-        Signed192 firstCenterRaw =
-            Signed192.Raw(firstCenter);
-        Signed192 secondCenterRaw =
-            Signed192.Raw(secondCenter);
         Signed576 shifted = WideArithmetic.SubtractSigned576(
             productMoment,
             WideArithmetic.MultiplySigned576(
@@ -399,6 +381,29 @@ internal static class TriangleShellMassProperties
                 firstCenterRaw,
                 secondCenterRaw,
                 Twelve));
+    }
+
+    private static Signed192 ScaleCoordinate(Fixed64 value) => Signed192.NarrowValue(
+        WideArithmetic.MultiplySigned192(Signed192.Raw(value), new Signed192(0, 1, 0)));
+
+    internal readonly struct TriangleCoordinates
+    {
+        internal readonly Signed192 AX, AY, AZ, BX, BY, BZ, CX, CY, CZ;
+        internal TriangleCoordinates(in FixedTriangle triangle, in ScaledRigidFrame3d frame, bool exactScale)
+        {
+            if (exactScale)
+            {
+                frame.GetScaledLocalPointNumerators(triangle.A, out AX, out AY, out AZ);
+                frame.GetScaledLocalPointNumerators(triangle.B, out BX, out BY, out BZ);
+                frame.GetScaledLocalPointNumerators(triangle.C, out CX, out CY, out CZ);
+            }
+            else
+            {
+                AX = Signed192.Raw(triangle.A.X); AY = Signed192.Raw(triangle.A.Y); AZ = Signed192.Raw(triangle.A.Z);
+                BX = Signed192.Raw(triangle.B.X); BY = Signed192.Raw(triangle.B.Y); BZ = Signed192.Raw(triangle.B.Z);
+                CX = Signed192.Raw(triangle.C.X); CY = Signed192.Raw(triangle.C.Y); CZ = Signed192.Raw(triangle.C.Z);
+            }
+        }
     }
 
     private static void GetTriangle(

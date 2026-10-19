@@ -111,7 +111,7 @@ public static partial class CollisionDetection
         if (collider.Mode == MeshColliderMode.Convex && collider.IsClosedSurface)
         {
             return WideOrientedBox.DoesConvexHullCenteredCapsuleStrictlyOverlap(
-                mesh.Origin, mesh.Rotation, mesh.ScaledLocalVertices, mesh.Triangles,
+                mesh.GeometryFrame, mesh.GeometryVertices, mesh.Triangles,
                 mesh.ConvexSatEdgeVertexPairs, candidate.Center, candidate.Rotation,
                 Vector3d.Up, length, candidate.ScaledRadius);
         }
@@ -120,7 +120,7 @@ public static partial class CollisionDetection
         // Pass authored local vertices plus the exact rigid frame: transforming
         // triangle points into rounded world coordinates changes boundary truth.
         ReadOnlySpan<int> indices = mesh.Triangles;
-        ReadOnlySpan<Vector3d> points = mesh.ScaledLocalVertices;
+        ReadOnlySpan<Vector3d> points = mesh.GeometryVertices;
         Span<Vector3d> triangle = stackalloc Vector3d[3];
         ReadOnlySpan<int> face = stackalloc int[] { 0, 1, 2 };
         ReadOnlySpan<int> edges = stackalloc int[] { 0, 1, 1, 2, 2, 0 };
@@ -130,7 +130,7 @@ public static partial class CollisionDetection
             triangle[1] = points[indices[i + 1]];
             triangle[2] = points[indices[i + 2]];
             if (WideOrientedBox.DoesConvexHullCenteredCapsuleStrictlyOverlap(
-                mesh.Origin, mesh.Rotation, triangle, face, edges,
+                mesh.GeometryFrame, triangle, face, edges,
                 candidate.Center, candidate.Rotation, Vector3d.Up, length, candidate.ScaledRadius))
                 return true;
         }
@@ -144,16 +144,16 @@ public static partial class CollisionDetection
         {
             return WideOrientedBox.DoesCenteredCylinderPenetrateConvexHull(
                 cylinder.Center, cylinder.Rotation, cylinder.Height, cylinder.ScaledRadius,
-                mesh.Origin, mesh.Rotation, mesh.ScaledLocalVertices, mesh.Triangles, collider.IsClosedSurface);
+                mesh.GeometryFrame, mesh.GeometryVertices, mesh.Triangles, collider.IsClosedSurface);
         }
         ReadOnlySpan<int> indices = mesh.Triangles;
-        ReadOnlySpan<Vector3d> points = mesh.ScaledLocalVertices;
+        ReadOnlySpan<Vector3d> points = mesh.GeometryVertices;
         for (int i = 0; i < indices.Length; i += 3)
         {
             var triangle = new FixedTriangle(points[indices[i]], points[indices[i + 1]], points[indices[i + 2]]);
             if (WideOrientedBox.DoesCenteredCylinderPenetrateTriangle(
                 cylinder.Center, cylinder.Rotation, cylinder.Height, cylinder.ScaledRadius,
-                triangle, mesh.Origin, mesh.Rotation))
+                triangle, mesh.GeometryFrame))
                 return true;
         }
         return false;

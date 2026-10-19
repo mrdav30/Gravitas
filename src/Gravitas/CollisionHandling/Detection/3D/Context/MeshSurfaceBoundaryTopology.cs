@@ -41,12 +41,12 @@ internal static class MeshSurfaceBoundaryTopology
     private static int FindEdgeRegion<TSection>(PhysicsMesh mesh, int owner, int first, int second,
         MeshSurfaceConnectivity connectivity, in TSection frame) where TSection : struct, ISection
     {
-        ReadOnlySpan<Vector3d> vertices = mesh.ScaledLocalVertices;
+        ReadOnlySpan<Vector3d> vertices = mesh.GeometryVertices;
         // Reduced edges can span many authored subedges. Their first corner's
         // triangle need not touch the finite shape; locate an admitted piece.
         ReadOnlySpan<int> perimeter = mesh.GetManifoldSurfaceBoundaryVertexPairs(owner);
         if (perimeter.IsEmpty) return connectivity.GetRegionOrdinal(owner);
-        mesh.GetLocalTriangleVertices(owner, out Vector3d a, out Vector3d b, out Vector3d c);
+        mesh.GetGeometryTriangleVertices(owner, out Vector3d a, out Vector3d b, out Vector3d c);
         new FixedTriangle(a, b, c).GetExactNormal(out Signed192 nx, out Signed192 ny, out _, out _);
         int axis = !nx.IsZero ? 0 : !ny.IsZero ? 1 : 2;
         Vector2d p = Project(vertices[first], axis), q = Project(vertices[second], axis);
@@ -76,9 +76,9 @@ internal static class MeshSurfaceBoundaryTopology
     internal static int GetIncidentFan(PhysicsMesh mesh, int owner, int origin, int opposite,
         bool interior, Span<WideAxis3> fan)
     {
-        ReadOnlySpan<Vector3d> vertices = mesh.ScaledLocalVertices;
+        ReadOnlySpan<Vector3d> vertices = mesh.GeometryVertices;
         Vector3d p = vertices[origin], q = vertices[opposite];
-        mesh.GetLocalTriangleVertices(owner, out Vector3d a, out Vector3d b, out Vector3d c);
+        mesh.GetGeometryTriangleVertices(owner, out Vector3d a, out Vector3d b, out Vector3d c);
         new FixedTriangle(a, b, c).GetExactNormal(out Signed192 nx, out Signed192 ny, out _, out _);
         int axis = !nx.IsZero ? 0 : !ny.IsZero ? 1 : 2;
         Vector2d projectedOrigin = Project(p, axis), projectedOpposite = Project(q, axis);

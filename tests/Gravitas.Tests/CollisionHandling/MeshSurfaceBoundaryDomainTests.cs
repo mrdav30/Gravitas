@@ -20,8 +20,8 @@ public sealed class MeshSurfaceBoundaryDomainTests
         foreach (var span in domain.Spans)
         {
             if (span.First != 0 || span.Second != 1) continue;
-            Assert.Equal(source.ScaledLocalVertices[0], span.Start);
-            Assert.Equal(source.ScaledLocalVertices[1], span.End);
+            Assert.Equal(source.GeometryVertices[0], span.Start);
+            Assert.Equal(source.GeometryVertices[1], span.End);
             if (span.Kind == MeshSurfaceBoundaryDomain.SpanKind.Joined)
             {
                 Assert.Equal(1, span.OtherMember);

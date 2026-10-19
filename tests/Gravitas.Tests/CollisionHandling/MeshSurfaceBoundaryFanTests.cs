@@ -29,6 +29,8 @@ public sealed class MeshSurfaceBoundaryFanTests
     {
         PhysicsMesh[] meshes = { Quad(-2, 0, -2, 2), Quad(0, 2, 2, 4) };
         var fan = new MeshSurfaceBoundaryFan();
+        // The first member's centered geometry chart places world (0,0,2)
+        // at (1,0,2); point-only adjacency must still contribute no sector.
         Assert.True(fan.BuildAtPoint(meshes, 0, 0, new Vector3d(1, 0, 2)));
         Assert.Equal(2, fan.RayCount);
         Assert.True(fan.Supports(Vector3d.Right));

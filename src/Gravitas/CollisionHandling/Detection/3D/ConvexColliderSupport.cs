@@ -75,11 +75,9 @@ internal static class ConvexColliderSupport
         }
         if (collider is LSMeshCollider { Mode: MeshColliderMode.Convex } mesh)
         {
-            return new FixedPointAnchor(
-                mesh.Mesh.Origin,
-                mesh.Mesh.Rotation,
-                mesh.Mesh.GetSupportVertexLocal(normal))
-                .WithLocalTranslation(localTranslation);
+            FixedPointAnchor support = mesh.Mesh.CreatePointAnchor(mesh.Mesh.GetSupportVertexLocal(normal));
+            return support.WithLocalTranslation(support.Rotation == FixedQuaternion.Identity
+                ? originOffset : localTranslation);
         }
 
         throw new NotSupportedException(

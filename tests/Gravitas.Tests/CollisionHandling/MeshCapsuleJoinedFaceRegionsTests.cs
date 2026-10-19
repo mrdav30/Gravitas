@@ -115,13 +115,21 @@ public sealed class MeshCapsuleJoinedFaceRegionsTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void UnadmittedMember_ShouldNotChangeTheJoinedSupport(bool angled)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public void UnadmittedMember_ShouldNotChangeTheJoinedSupport(bool angled, bool affine)
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         LSMeshCollider left = Quad(context, (Fixed64)(-4), Fixed64.Zero), right = Quad(context, Fixed64.Zero, (Fixed64)4);
         LSMeshCollider far = Quad(context, (Fixed64)10, (Fixed64)12);
+        if (affine)
+            foreach (LSMeshCollider member in new[] { left, right, far })
+            {
+                member.Transform.LocalScale = new(Fixed64.FromRaw(2863311531), Fixed64.One, Fixed64.One);
+                member.Simulate();
+            }
         var joined = new MeshCapsuleFaceRegions();
         FixedQuaternion rotation = angled ? FixedQuaternion.LookRotation(
             new Vector3d(1, 0, 1).Normalized, new Vector3d(1, 1, -1).Normalized) : FixedQuaternion.Identity;

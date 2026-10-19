@@ -20,7 +20,9 @@ internal readonly struct ColliderShapeSnapshot : IEquatable<ColliderShapeSnapsho
         Vector3d partScale,
         Vector3d localOffset,
         Vector3d size,
-        Fixed64 radius)
+        Fixed64 radius,
+        Vector3d? poseOrigin = null,
+        FixedQuaternion? placementRotation = null)
     {
         Center = center;
         Rotation = rotation;
@@ -29,6 +31,8 @@ internal readonly struct ColliderShapeSnapshot : IEquatable<ColliderShapeSnapsho
         LocalOffset = localOffset;
         Size = size;
         Radius = radius;
+        PoseOrigin = poseOrigin ?? center;
+        PlacementRotation = placementRotation ?? rotation;
     }
 
     public Vector3d Center { get; }
@@ -45,6 +49,10 @@ internal readonly struct ColliderShapeSnapshot : IEquatable<ColliderShapeSnapsho
 
     public Fixed64 Radius { get; }
 
+    // Geometry retains placement before center rounding; public Center remains a scalar summary.
+    internal Vector3d PoseOrigin { get; }
+    internal FixedQuaternion PlacementRotation { get; }
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Equals(ColliderShapeSnapshot other) =>
         Center == other.Center
@@ -53,7 +61,9 @@ internal readonly struct ColliderShapeSnapshot : IEquatable<ColliderShapeSnapsho
         && PartScale == other.PartScale
         && LocalOffset == other.LocalOffset
         && Size == other.Size
-        && Radius == other.Radius;
+        && Radius == other.Radius
+        && PoseOrigin == other.PoseOrigin
+        && PlacementRotation == other.PlacementRotation;
 
     public override bool Equals(object? obj) =>
         obj is ColliderShapeSnapshot other && Equals(other);
@@ -73,6 +83,11 @@ internal readonly struct ColliderShapeSnapshot : IEquatable<ColliderShapeSnapsho
             hash = Mix(hash, LocalOffset);
             hash = Mix(hash, Size);
             hash = (hash * 31) + Radius.GetHashCode();
+            hash = Mix(hash, PoseOrigin);
+            hash = (hash * 31) + PlacementRotation.X.GetHashCode();
+            hash = (hash * 31) + PlacementRotation.Y.GetHashCode();
+            hash = (hash * 31) + PlacementRotation.Z.GetHashCode();
+            hash = (hash * 31) + PlacementRotation.W.GetHashCode();
             return hash;
         }
     }

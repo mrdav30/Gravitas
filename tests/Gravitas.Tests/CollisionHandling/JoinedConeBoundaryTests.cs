@@ -154,7 +154,8 @@ public sealed class JoinedConeBoundaryTests
                 rows++;
                 Assert.Equal(Vector3d.Up, row.Normal);
                 Assert.Equal(member.Material, row.MaterialA);
-                Assert.Equal(member.Mesh.Rotation, row.AnchorA.Rotation);
+                // The final surface witness uses the translated physical chart;
+                // supplier identity and material remain independent of that chart.
                 Assert.True(row.AnchorA.TryGetWorldPoint(out var p));
                 Assert.InRange(p.Y.m_rawValue, -1, 1);
                 maximum = FixedMath.Max(maximum, row.Depth);
@@ -197,8 +198,8 @@ public sealed class JoinedConeBoundaryTests
         {
             Vector3d offset = triangle < 2 ? Vector3d.Up * (up + Fixed64.FromRaw(32))
                 : -Vector3d.Right * (left + Fixed64.FromRaw(32));
-            corner.Mesh.GetLocalTriangleVertices(triangle, out var a, out var b, out var c);
-            Assert.False(new FixedTriangle(a, b, c).TryGetCenteredFiniteConeContact(corner.Mesh.Origin, corner.Mesh.Rotation,
+            Assert.True(corner.Mesh.TryGetTriangleVertices(triangle, out var a, out var b, out var c));
+            Assert.False(new FixedTriangle(a, b, c).TryGetCenteredFiniteConeContact(Vector3d.Zero, FixedQuaternion.Identity,
                 cone.Center + offset, cone.Rotation, cone.Height, cone.ScaledRadius, out _));
         }
     }
@@ -234,13 +235,48 @@ public sealed class JoinedConeBoundaryTests
         Assert.True(left && right);
     }
 
+    [Fact]
+    public void FractionallyScaledJoinedFaces_ShouldRetainOneCompletePhysicalConeExit()
+    {
+        using var scene = PhysicsScenarioBuilder.Create();
+        Vector3d scale = new(Fixed64.FromFraction(2, 3), Fixed64.One, Fixed64.FromFraction(3, 5));
+        var first = Mesh(scene, new[] { new Vector3d(-4,0,-4), new(-4,0,4), new(0,0,-4), new(0,0,4) },
+            new[] { 0,1,2,2,1,3 }, scale: scale);
+        var second = Mesh(scene, new[] { new Vector3d(0,0,-4), new(0,0,4), new(5,0,-4), new(5,0,4) },
+            new[] { 0,1,2,2,1,3 }, scale: scale);
+        using var surface = scene.Context.Physics.CreateStaticSurface(new[] { second, first });
+        var cone = new LSConeCollider();
+        Vector3d center = Vector3d.Up * Fixed64.Quarter;
+        var body = scene.CreateBody(cone, center, FixedQuaternion.Identity).Body;
+        int count = 0; Fixed64 maximum = Fixed64.Zero;
+        foreach (var member in new[] { first, second })
+        {
+            var pair = scene.CreatePair(member, cone);
+            Assert.True(CollisionDetection.DoCollisionCheck(pair));
+            foreach (var row in pair.Manifold)
+            {
+                count++;
+                Assert.Equal(Vector3d.Up, row.Normal);
+                Assert.True(row.AnchorA.TryGetWorldPoint(out Vector3d point));
+                Assert.InRange(point.Y.m_rawValue, -1L, 1L);
+                maximum = FixedMath.Max(maximum, row.Depth);
+            }
+        }
+        Assert.InRange(count, 1, ContactManifold.MaxContactsPerGroup);
+        Assert.Equal(Fixed64.Quarter, maximum);
+        body.SetPosition(center + Vector3d.Up * (maximum + Fixed64.FromRaw(32)));
+        cone.RebuildRuntimeShapeOnly();
+        foreach (var member in new[] { first, second })
+            Assert.False(CollisionDetection.DoCollisionCheck(scene.CreatePair(member, cone)));
+    }
+
     private static void AssertClear(LSMeshCollider[] members, LSConeCollider cone, Vector3d outside)
     {
         foreach (var member in members)
             for (int triangle = 0; triangle < member.Mesh.TriangleCount; triangle++)
             {
-                member.Mesh.GetLocalTriangleVertices(triangle, out var a, out var b, out var c);
-                Assert.False(new FixedTriangle(a, b, c).TryGetCenteredFiniteConeContact(member.Mesh.Origin, member.Mesh.Rotation,
+                Assert.True(member.Mesh.TryGetTriangleVertices(triangle, out var a, out var b, out var c));
+                Assert.False(new FixedTriangle(a, b, c).TryGetCenteredFiniteConeContact(Vector3d.Zero, FixedQuaternion.Identity,
                     outside, cone.Rotation, cone.Height, cone.ScaledRadius, out _));
             }
     }
@@ -250,11 +286,11 @@ public sealed class JoinedConeBoundaryTests
             new[] { 0, 1, 2, 2, 1, 3 });
 
     private static LSMeshCollider Mesh(PhysicsScenarioBuilder scene, Vector3d[] vertices, int[] triangles,
-        Vector3d position = default, FixedQuaternion? rotation = null)
+        Vector3d position = default, FixedQuaternion? rotation = null, Vector3d? scale = null)
     {
         var mesh = new LSMeshCollider(vertices, triangles, MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation);
         mesh.InitializeWithNoBody(new TestMatterAgent(scene.Context,
-            new FixedTransform(position, rotation ?? FixedQuaternion.Identity, Vector3d.One)));
+            new FixedTransform(position, rotation ?? FixedQuaternion.Identity, scale ?? Vector3d.One)));
         return mesh;
     }
 }

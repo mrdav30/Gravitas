@@ -99,12 +99,15 @@ internal static class ContinuousCollisionBounds
         if (mesh.Mode == MeshColliderMode.Convex && mesh.IsClosedSurface)
             return false;
 
+        if (!mesh.Mesh.GeometryFrame.IsRigid)
+            return IsScaledMeshSeparated(mesh, localBounds, motionBound, orientedBox);
+
         // The combined source/target motion ball fits in this midpoint-frame box.
         // Only mesh-local endpoints are clipped; all stored triangles lie in that domain.
         Vector3d expansion = Vector3d.One * motionBound;
         var candidates = mesh.Context.CollisionScratch.MeshTriangleCandidatesA;
         FixedBoundBox expanded = FixedBoundBox.FromMinMax(localBounds.Min - expansion, localBounds.Max + expansion);
-        mesh.Mesh.GetTrianglesInLocalBounds(new FixedBoundVolume(expanded.Min, expanded.Max), candidates);
+        mesh.Mesh.GetTrianglesInGeometryBounds(new FixedBoundVolume(expanded.Min, expanded.Max), candidates);
         if (candidates.Count == 0)
             return true;
 
@@ -140,7 +143,7 @@ internal static class ContinuousCollisionBounds
         }
         for (int i = 0; i < candidates.Count; i++)
         {
-            mesh.Mesh.GetLocalTriangleVertices(candidates[i], out Vector3d first, out Vector3d second, out Vector3d third);
+            mesh.Mesh.GetGeometryTriangleVertices(candidates[i], out Vector3d first, out Vector3d second, out Vector3d third);
             var triangle = new FixedTriangle(first, second, third);
             // Degeneracy is a distinct false result, so it cannot prove separation.
             if (triangle.IsDegenerate || box.TryGetTriangleContact(triangleOrigin, triangleRotation, triangle, out _))
@@ -148,4 +151,55 @@ internal static class ContinuousCollisionBounds
         }
         return true;
     }
+    private static bool IsScaledMeshSeparated(LSMeshCollider collider, FixedBoundBox physicalBounds,
+        Fixed64 motionBound, FixedOrientedBox? orientedBox)
+    {
+        PhysicsMesh mesh = collider.Mesh;
+        Vector3d expansion = Vector3d.One * motionBound;
+        FixedBoundBox expanded = FixedBoundBox.FromMinMax(physicalBounds.Min - expansion, physicalBounds.Max + expansion);
+        // Motion is a physical sphere. Expand before converting to the authored
+        // chart, where nonuniform scale would otherwise distort that sphere.
+        var physicalFrame = ScaledRigidFrame3d.Rigid(mesh.Origin, mesh.Rotation);
+        bool transformed = physicalFrame.TryGetBoundsIn(expanded.Min, expanded.Max, mesh.GeometryFrame,
+            out FixedBoundBox candidatesBounds);
+        // Collider scale admission guarantees an invertible target mapping.
+        System.Diagnostics.Debug.Assert(transformed);
+        var candidates = collider.Context.CollisionScratch.MeshTriangleCandidatesA;
+        mesh.GetTrianglesInGeometryBounds(new FixedBoundVolume(candidatesBounds.Min, candidatesBounds.Max), candidates);
+        if (candidates.Count == 0) return true;
+        ScaledRigidFrame3d boxFrame;
+        Vector3d scope;
+        if (orientedBox is FixedOrientedBox rigid)
+        {
+            if (!Vector3d.TryAdd(rigid.HalfExtents, expansion, out scope)) return false;
+            boxFrame = ScaledRigidFrame3d.Rigid(rigid.Center, rigid.Orientation);
+        }
+        else
+        {
+            Vector3d center = expanded.Center;
+            if (!Vector3d.TrySubtract(center, expanded.Min, out Vector3d lower)
+                || !Vector3d.TrySubtract(expanded.Max, center, out Vector3d upper)) return false;
+            scope = new Vector3d(FixedMath.Max(lower.X, upper.X), FixedMath.Max(lower.Y, upper.Y),
+                FixedMath.Max(lower.Z, upper.Z));
+            boxFrame = new ScaledRigidFrame3d(mesh.Origin, mesh.Rotation, center, Vector3d.One,
+                mesh.Rotation, Vector3d.Zero, Vector3d.One);
+        }
+        if (scope.X == Fixed64.Zero || scope.Y == Fixed64.Zero || scope.Z == Fixed64.Zero) return false;
+        System.Span<Vector3d> boxVertices = stackalloc Vector3d[8];
+        WideOrientedBox.GetBoxHullVertices(scope, boxVertices);
+        System.Span<Vector3d> points = stackalloc Vector3d[3];
+        System.ReadOnlySpan<int> face = stackalloc int[3] { 0, 1, 2 };
+        System.ReadOnlySpan<int> edges = stackalloc int[6] { 0, 1, 1, 2, 2, 0 };
+        for (int index = 0; index < candidates.Count; index++)
+        {
+            mesh.GetGeometryTriangleVertices(candidates[index], out points[0], out points[1], out points[2]);
+            // Authored mesh admission rejects degenerate triangles, and the
+            // positive-scale affine mapping preserves their exact nonzero area.
+            if (WideOrientedBox.TryGetConvexHullPenetration(boxFrame, boxVertices,
+                    WideOrientedBox.BoxHullTriangles, WideOrientedBox.BoxHullEdges, mesh.GeometryFrame,
+                    points, face, edges, out _)) return false;
+        }
+        return true;
+    }
+
 }

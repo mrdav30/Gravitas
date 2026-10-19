@@ -110,7 +110,8 @@ public static partial class CollisionDetection
                     if (supplier != mesh) continue;
                     pair.Manifold.AddContact(new ContactAnchor(contact.FirstAnchor), new ContactAnchor(contact.SecondAnchor),
                         contact.Depth, contact.Normal, mesh.Material, cone.Material, contact.DepthIsClamped,
-                        group: new ContactGroupKey(0, 0, 0, 0, region));
+                        group: new ContactGroupKey(0, 0, 0, 0, region),
+                        contactIdentity: faces.GetSampleIdentity(region, sample));
                 }
             return faces.AppendJoinedBoundaries(mesh, cone, pair.Context.CollisionScratch.MeshConeBoundary, pair.Manifold);
         }
@@ -158,8 +159,8 @@ public static partial class CollisionDetection
         {
             int owner = mesh.GetManifoldSurfaceOwner(triangleIndex);
             if (!scratch.MeshSurfaces.Add(owner)) continue;
-            mesh.GetLocalTriangleVertices(triangleIndex, out Vector3d a, out Vector3d b, out Vector3d c);
-            var frame = new ConePlaneRayFrame(new FixedTriangle(a, b, c), mesh.Origin, mesh.Rotation,
+            mesh.GetGeometryTriangleVertices(triangleIndex, out Vector3d a, out Vector3d b, out Vector3d c);
+            var frame = new ConePlaneRayFrame(new FixedTriangle(a, b, c), mesh.GeometryFrame,
                 cone.Center, cone.Rotation, cone.Height, cone.ScaledRadius);
             admitted.FastClear();
             // Reuse one exact plane frame per surface rather than rebuilding
@@ -169,7 +170,7 @@ public static partial class CollisionDetection
             foreach (int candidate in candidates.AsReadOnlySpan())
             {
                 if (mesh.GetManifoldSurfaceOwner(candidate) != owner) continue;
-                mesh.GetLocalTriangleVertices(candidate, out a, out b, out c);
+                mesh.GetGeometryTriangleVertices(candidate, out a, out b, out c);
                 if (ConePlaneRayEvents.IntersectsTriangle(frame, new FixedTriangle(a, b, c))) admitted.Add(candidate);
             }
             if (admitted.Count == 0) continue;

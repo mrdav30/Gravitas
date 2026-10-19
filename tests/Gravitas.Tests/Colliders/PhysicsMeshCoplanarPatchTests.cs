@@ -288,10 +288,10 @@ public sealed class PhysicsMeshCoplanarPatchTests
     }
 
     [Fact]
-    public void PreparedScale_ShouldPublishPatchOnlyWithItsMatchingGeometry()
+    public void PreparedScale_ShouldPreserveExactSourcePatchDuringPublication()
     {
-        // y=x/4 is exactly planar before scaling. Centered X/3 has half-raw
-        // products with different tie parity, breaking their common slope.
+        // X/3 rounds inspection coordinates differently, but cannot bend
+        // the authored plane or change its finite source topology.
         Vector3d[] vertices = { new(0, 0, 0), new(Fixed64.One, Fixed64.Quarter, Fixed64.Zero),
             new((Fixed64)3, Fixed64.FromFraction(3, 4), Fixed64.One), new(0, 0, 1) };
         PhysicsMesh mesh = Create(vertices, new[] { 0, 1, 2, 0, 2, 3 });
@@ -302,9 +302,9 @@ public sealed class PhysicsMeshCoplanarPatchTests
         mesh.GetManifoldSurfaceOwner(0).Should().Be(0);
         mesh.GetConvexCoplanarPatchCornerVertexIndices(0).ToArray().Should().Equal(0, 1, 2, 3);
         mesh.PublishPreparedTransformation();
-        mesh.GetManifoldSurfaceOwner(0).Should().NotBe(mesh.GetManifoldSurfaceOwner(1));
-        mesh.GetManifoldSurfaceBoundaryVertexPairs(0).IsEmpty.Should().BeTrue();
-        mesh.GetConvexCoplanarPatchCornerVertexIndices(0).IsEmpty.Should().BeTrue();
+        mesh.GetManifoldSurfaceOwner(0).Should().Be(mesh.GetManifoldSurfaceOwner(1));
+        mesh.GetManifoldSurfaceBoundaryVertexPairs(0).Length.Should().Be(8);
+        mesh.GetConvexCoplanarPatchCornerVertexIndices(0).ToArray().Should().Equal(0, 1, 2, 3);
         mesh.UpdateTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One);
         mesh.GetManifoldSurfaceOwner(0).Should().Be(0);
         mesh.GetConvexCoplanarPatchCornerVertexIndices(0).ToArray().Should().Equal(0, 1, 2, 3);
@@ -393,18 +393,17 @@ public sealed class PhysicsMeshCoplanarPatchTests
     }
 
     [Fact]
-    public void WarmedScaleQuantization_ShouldReuseBuffersWithoutExposingPreviousCornerTails()
+    public void WarmedFractionalScale_ShouldPreserveSubrawSourceCornersWithoutAllocating()
     {
-        // At unit scale, vertex zero protrudes by one raw unit and is a true
-        // corner. Halving Z rounds it onto the straight edge at a nearest-even
-        // midpoint, reducing the ring from five corners to four.
+        // The one-raw protrusion becomes subraw at half scale. Inspection
+        // rounding must not delete that genuine finite source corner.
         Vector3d[] vertices = { new(Fixed64.Zero, Fixed64.Zero, -Fixed64.One - Fixed64.MinIncrement),
             new(-1, 0, 1), new(1, 0, 1), new(1, 0, -1), new(-1, 0, -1), Vector3d.Zero };
         PhysicsMesh mesh = Create(vertices, new[] { 5, 0, 3, 5, 3, 2, 5, 2, 1, 5, 1, 4, 5, 4, 0 });
         Vector3d halfScale = new(Fixed64.One, Fixed64.One, Fixed64.Half);
         mesh.GetConvexCoplanarPatchCornerVertexIndices(0).ToArray().Should().Equal(0, 3, 2, 1, 4);
         mesh.UpdateTransform(Vector3d.Zero, FixedQuaternion.Identity, halfScale);
-        mesh.GetConvexCoplanarPatchCornerVertexIndices(0).ToArray().Should().Equal(1, 4, 3, 2);
+        mesh.GetConvexCoplanarPatchCornerVertexIndices(0).ToArray().Should().Equal(0, 3, 2, 1, 4);
         mesh.UpdateTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One);
         mesh.GetConvexCoplanarPatchCornerVertexIndices(0).ToArray().Should().Equal(0, 3, 2, 1, 4);
         mesh.UpdateTransform(Vector3d.Zero, FixedQuaternion.Identity, halfScale);
@@ -414,8 +413,8 @@ public sealed class PhysicsMeshCoplanarPatchTests
         for (int i = 0; i < 4; i++)
         {
             mesh.UpdateTransform(Vector3d.Zero, FixedQuaternion.Identity, halfScale);
-            if (mesh.GetConvexCoplanarPatchCornerVertexIndices(0).Length != 4)
-                throw new InvalidOperationException("Quantized ring retained a stale corner tail.");
+            if (mesh.GetConvexCoplanarPatchCornerVertexIndices(0).Length != 5)
+                throw new InvalidOperationException("Fractional scale lost a subraw source corner.");
             mesh.UpdateTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One);
             if (mesh.GetConvexCoplanarPatchCornerVertexIndices(0).Length != 5)
                 throw new InvalidOperationException("Restored ring lost its protruding corner.");

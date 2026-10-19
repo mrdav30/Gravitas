@@ -9,19 +9,16 @@ using FixedMathSharp;
 using FixedMathSharp.Geometry;
 using SwiftCollections.Query;
 using System;
-using static Gravitas.Colliders.MeshCheckedMath;
 
 namespace Gravitas.Colliders;
 
-/// <content>Prepares and atomically publishes scaled geometry and its derived topology.</content>
+/// <content>Prepares and atomically publishes scaled geometry and its derived caches.</content>
 public partial class PhysicsMesh
 {
     private Vector3d _position;
     private Vector3d _ownerScale = Vector3d.One;
     private Vector3d _partScale = Vector3d.One;
     private bool _scaleInitialized;
-    private bool _validatedRotationValid;
-    private FixedQuaternion _validatedRotation;
     private Fixed64[] _scaledFaceAreas;
     private Fixed64[] _preparedScaledFaceAreas;
     private Vector3d[] _scaledFaceNormals;
@@ -83,35 +80,14 @@ public partial class PhysicsMesh
             return _scaledLocalRadius;
         }
 
-        Vector3d sourceCenter = _localBounds.Center;
+        var frame = new ScaledRigidFrame3d(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.Zero,
+            ownerScale, FixedQuaternion.Identity, _localBounds.Center, partScale);
         Fixed64 radius = Fixed64.Zero;
-        for (int i = 0; i < _localVertices.Length; i++)
+        foreach (Vector3d vertex in _localVertices)
         {
-            Vector3d vertex = _localVertices[i];
-            if (!Fixed64.TryMultiplyDifference(
-                    vertex.X,
-                    sourceCenter.X,
-                    ownerScale.X,
-                    partScale.X,
-                    out Fixed64 x)
-                || !Fixed64.TryMultiplyDifference(
-                    vertex.Y,
-                    sourceCenter.Y,
-                    ownerScale.Y,
-                    partScale.Y,
-                    out Fixed64 y)
-                || !Fixed64.TryMultiplyDifference(
-                    vertex.Z,
-                    sourceCenter.Z,
-                    ownerScale.Z,
-                    partScale.Z,
-                    out Fixed64 z)
-                || !new Vector3d(x, y, z).TryGetMagnitudeCeiling(
-                    out Fixed64 vertexRadius))
-            {
+            frame.GetScaledLocalPointNumerators(vertex, out Signed192 x, out Signed192 y, out Signed192 z);
+            if (!WideGeometry.TryGetMagnitudeCeiling(x, y, z, new Signed192(0, 1, 0), out Fixed64 vertexRadius))
                 return Fixed64.MaxValue;
-            }
-
             radius = FixedMath.Max(radius, vertexRadius);
         }
 
@@ -135,13 +111,29 @@ public partial class PhysicsMesh
         Vector3d partScale,
         MeshInertiaPolicy? inertiaPolicy)
     {
+        var frame = new ScaledRigidFrame3d(position, FixedQuaternion.Identity,
+            Vector3d.Zero, ownerScale, rotation, _localBounds.Center, partScale);
+        PrepareTransformation(position, rotation, ownerScale, partScale, inertiaPolicy, frame);
+    }
+
+    internal void PrepareTransformation(
+        Vector3d position,
+        FixedQuaternion rotation,
+        Vector3d ownerScale,
+        Vector3d partScale,
+        MeshInertiaPolicy? inertiaPolicy,
+        in ScaledRigidFrame3d sourceFrame)
+    {
         ColliderScalePolicy.Validate(ownerScale);
         ColliderScalePolicy.Validate(partScale);
-        ValidateRotation(rotation);
+        _preparedSourceFrame = sourceFrame;
+        _preparedPosition = position;
+        _preparedRotation = rotation;
 
         bool geometryChanged = !_scaleInitialized
             || ownerScale != _ownerScale
-            || partScale != _partScale;
+            || partScale != _partScale
+            || (_scaleIsExact && _geometryUsesSource != sourceFrame.HasLocalPlacement);
         _preparedGeometryChanged = geometryChanged;
         for (CompoundMassCache? cache = _compoundMassCache; cache != null; cache = cache.Alternate)
         {
@@ -151,7 +143,10 @@ public partial class PhysicsMesh
         if (geometryChanged)
             PrepareScaledGeometry(ownerScale, partScale);
         else
+        {
             CopyCommittedGeometryCandidate();
+            SelectPreparedGeometryFrame(position, rotation);
+        }
 
         PrepareClosedVolumeMassProperties(
             inertiaPolicy,
@@ -163,14 +158,11 @@ public partial class PhysicsMesh
         _preparedRotation = rotation;
         _preparedOwnerScale = ownerScale;
         _preparedPartScale = partScale;
-        _preparedBounds =
-            FixedBoundBox.FromRelativeRotatedBoundsClippedToDomain(
-                position,
-                rotation,
-                _preparedScaledLocalBounds.Min,
-                _preparedScaledLocalBounds.Max,
-                Vector3d.Zero,
-                FixedQuaternion.Identity);
+        _preparedBounds = _preparedGeometryUsesSource
+            ? sourceFrame.GetWorldBounds(_localBounds.Min, _localBounds.Max)
+            : FixedBoundBox.FromRelativeRotatedBoundsClippedToDomain(
+                position, rotation, _preparedScaledLocalBounds.Min, _preparedScaledLocalBounds.Max,
+                Vector3d.Zero, FixedQuaternion.Identity);
     }
 
     internal void PublishPreparedTransformation()
@@ -185,15 +177,6 @@ public partial class PhysicsMesh
                 (_preparedScaledFaceNormals, _scaledFaceNormals);
             (_triangleBVH, _preparedTriangleBVH) =
                 (_preparedTriangleBVH, _triangleBVH);
-            (_coplanarPatchBoundaryOffsets, _preparedCoplanarPatchBoundaryOffsets) =
-                (_preparedCoplanarPatchBoundaryOffsets, _coplanarPatchBoundaryOffsets);
-            (_coplanarPatchBoundaryVertexPairs, _preparedCoplanarPatchBoundaryVertexPairs) =
-                (_preparedCoplanarPatchBoundaryVertexPairs, _coplanarPatchBoundaryVertexPairs);
-            (_convexCoplanarPatchCornerOffsets, _preparedConvexCoplanarPatchCornerOffsets) =
-                (_preparedConvexCoplanarPatchCornerOffsets, _convexCoplanarPatchCornerOffsets);
-            (_convexCoplanarPatchCornerVertexIndices, _preparedConvexCoplanarPatchCornerVertexIndices) =
-                (_preparedConvexCoplanarPatchCornerVertexIndices, _convexCoplanarPatchCornerVertexIndices);
-            PublishPreparedSurfaceTopology();
             if (_supportVertexIndices != null)
             {
                 (_supportTreeNodes, _preparedSupportTreeNodes) =
@@ -220,6 +203,10 @@ public partial class PhysicsMesh
         _rotation = _preparedRotation;
         _ownerScale = _preparedOwnerScale;
         _partScale = _preparedPartScale;
+        _sourceFrame = _preparedSourceFrame;
+        _geometryFrame = _preparedGeometryFrame;
+        _geometryUsesSource = _preparedGeometryUsesSource;
+        _scaleIsExact = _preparedScaleIsExact;
         _scaleInitialized = true;
         _bounds = _preparedBounds;
     }
@@ -248,30 +235,11 @@ public partial class PhysicsMesh
         }
     }
 
-    internal void ValidateRotation(FixedQuaternion rotation)
-    {
-        if (_validatedRotationValid & rotation == _validatedRotation)
-            return;
-
-        Fixed64 magnitudeSquared = rotation.MagnitudeSquared;
-        bool rotationValid = IsRepresentable(rotation.X)
-            & IsRepresentable(rotation.Y)
-            & IsRepresentable(rotation.Z)
-            & IsRepresentable(rotation.W)
-            & magnitudeSquared > Fixed64.Epsilon
-            & magnitudeSquared != Fixed64.MaxValue
-            & rotation.IsNormalized();
-        if (!rotationValid)
-            throw new ArgumentException("Mesh rotation must be a normalized representable quaternion.", nameof(rotation));
-
-        _validatedRotation = rotation;
-        _validatedRotationValid = true;
-    }
-
     private void PrepareScaledGeometry(Vector3d ownerScale, Vector3d partScale)
     {
         Vector3d sourceCenter = _localBounds.Center;
         _preparedScaledLocalRadius = Fixed64.Zero;
+        _preparedScaleIsExact = true;
         for (int i = 0; i < _localVertices.Length; i++)
         {
             Vector3d vertex = _localVertices[i];
@@ -301,8 +269,24 @@ public partial class PhysicsMesh
 
             Vector3d scaledVertex = new(x, y, z);
             _preparedScaledLocalVertices[i] = scaledVertex;
-            if (!scaledVertex.TryGetMagnitudeCeiling(
-                    out Fixed64 vertexRadius))
+            bool vertexIsExact = _preparedSourceFrame.IsScaledLocalPointExact(vertex, scaledVertex);
+            _preparedScaleIsExact &= vertexIsExact;
+            Fixed64 vertexRadius;
+            bool radiusRepresented;
+            if (vertexIsExact)
+            {
+                // Exact scalar vertices have the same norm as their retained
+                // affine numerators, so keep the compact integer square root.
+                radiusRepresented = scaledVertex.TryGetMagnitudeCeiling(out vertexRadius);
+            }
+            else
+            {
+                _preparedSourceFrame.GetScaledLocalPointNumerators(vertex,
+                    out Signed192 exactX, out Signed192 exactY, out Signed192 exactZ);
+                radiusRepresented = WideGeometry.TryGetMagnitudeCeiling(exactX, exactY, exactZ,
+                    new Signed192(0, 1, 0), out vertexRadius);
+            }
+            if (!radiusRepresented)
             {
                 _preparedScaledLocalRadius = Fixed64.MaxValue;
             }
@@ -323,8 +307,16 @@ public partial class PhysicsMesh
             Vector3d second = _preparedScaledLocalVertices[_triangles[triangleIndex + 1]];
             Vector3d third = _preparedScaledLocalVertices[_triangles[triangleIndex + 2]];
             var triangle = new FixedTriangle(first, second, third);
-            Vector3d normal = triangle.Normal;
-            Fixed64 area = triangle.Area;
+            Vector3d normal;
+            Fixed64 area;
+            if (_preparedScaleIsExact)
+            { normal = triangle.Normal; area = triangle.Area; }
+            else
+            {
+                var sourceTriangle = new FixedTriangle(_localVertices[_triangles[triangleIndex]],
+                    _localVertices[_triangles[triangleIndex + 1]], _localVertices[_triangles[triangleIndex + 2]]);
+                WideTriangleRelations.GetScaledAreaAndNormal(sourceTriangle, _preparedSourceFrame, out area, out normal);
+            }
             if (area <= Fixed64.Epsilon)
             {
                 throw new ArgumentException(
@@ -345,11 +337,11 @@ public partial class PhysicsMesh
         }
 
         _preparedSurfaceMassProperties = MeshSurfaceMassProperties.Create(
-            _preparedScaledLocalVertices,
+            _preparedScaleIsExact ? _preparedScaledLocalVertices : _localVertices,
             _triangles,
             _preparedScaledTotalArea,
             out _preparedScaledTotalAreaWeight,
-            out MeshMassIntegrals shellIntegrals);
+            out MeshMassIntegrals shellIntegrals, _preparedSourceFrame, exactScale: !_preparedScaleIsExact);
         for (CompoundMassCache? cache = _compoundMassCache; cache != null; cache = cache.Alternate)
         {
             if (cache.Policy != MeshInertiaPolicy.SurfaceApproximation) continue;
@@ -357,15 +349,17 @@ public partial class PhysicsMesh
             cache.PreparedValid = true;
         }
 
-        PrepareCoplanarPatches(_preparedScaledLocalVertices);
-        BuildTriangleBVH(_preparedTriangleBVH, _preparedScaledLocalVertices);
+        SelectPreparedGeometryFrame(_preparedPosition, _preparedRotation);
+        Vector3d[] geometryVertices = _preparedGeometryUsesSource
+            ? _localVertices : _preparedScaledLocalVertices;
+        BuildTriangleBVH(_preparedTriangleBVH, geometryVertices);
         if (_supportVertexIndices != null)
         {
             if (!_scaleInitialized)
             {
                 _supportTreeNodeCount = 0;
                 BuildSupportTreeNode(
-                    _preparedScaledLocalVertices,
+                    geometryVertices,
                     _supportVertexIndices,
                     _preparedSupportTreeNodes!,
                     new SupportVertexIndexComparer(),
@@ -376,7 +370,7 @@ public partial class PhysicsMesh
             else
             {
                 RefitSupportTree(
-                    _preparedScaledLocalVertices,
+                    geometryVertices,
                     _supportTreeNodes!,
                     _preparedSupportTreeNodes!);
             }
@@ -385,6 +379,7 @@ public partial class PhysicsMesh
 
     private void CopyCommittedGeometryCandidate()
     {
+        _preparedScaleIsExact = _scaleIsExact;
         _preparedScaledLocalBounds = _scaledLocalBounds;
         _preparedScaledTotalArea = _scaledTotalArea;
         _preparedScaledTotalAreaWeight =

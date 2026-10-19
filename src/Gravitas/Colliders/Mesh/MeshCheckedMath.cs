@@ -97,9 +97,6 @@ internal static class MeshCheckedMath
         out Fixed64 result) =>
         Fixed64.TrySubtract(Fixed64.Zero, value, out result);
 
-    internal static bool IsRepresentable(Fixed64 value) =>
-        value != Fixed64.MinValue & value != Fixed64.MaxValue;
-
     private static bool TryCreateMatrix(Fixed3x3 first, Fixed3x3 second, bool add, out Fixed3x3 result)
     {
         result = default;

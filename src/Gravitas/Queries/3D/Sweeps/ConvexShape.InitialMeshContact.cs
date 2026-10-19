@@ -45,7 +45,7 @@ internal readonly partial struct ConvexShape
             case LSCuboidCollider box:
                 hasContact = WideOrientedBox.TryGetConvexHullContact(
                     box.Center, box.Rotation, box.OrientedBox.HalfExtents,
-                    hull.Origin, hull.Rotation, hull.ScaledLocalVertices,
+                    hull.GeometryFrame, hull.Origin, hull.GeometryVertices,
                     hull.Triangles, hull.ConvexSatEdgeVertexPairs, out contact);
                 targetAnchor = contact.SecondAnchor;
                 normal = -contact.Normal;
@@ -60,11 +60,13 @@ internal readonly partial struct ConvexShape
                 break;
             case LSMeshCollider sourceMesh:
                 PhysicsMesh sourceHull = sourceMesh.Mesh;
-                hasContact = FixedConvexHullRelations.TryGetContact(
-                    hull.Origin, hull.Rotation, hull.ScaledLocalVertices,
-                    hull.Triangles, hull.ConvexSatEdgeVertexPairs,
-                    sourceHull.Origin, sourceHull.Rotation, sourceHull.ScaledLocalVertices,
-                    sourceHull.Triangles, sourceHull.ConvexSatEdgeVertexPairs, out contact);
+                hasContact = hull.GeometryFrame.IsRigid && sourceHull.GeometryFrame.IsRigid
+                    ? FixedConvexHullRelations.TryGetContact(hull.Origin, hull.Rotation, hull.GeometryVertices,
+                        hull.Triangles, hull.ConvexSatEdgeVertexPairs, sourceHull.Origin, sourceHull.Rotation,
+                        sourceHull.GeometryVertices, sourceHull.Triangles, sourceHull.ConvexSatEdgeVertexPairs, out contact)
+                    : WideOrientedBox.TryGetConvexHullContact(hull.GeometryFrame, hull.Origin, hull.GeometryVertices,
+                        hull.Triangles, hull.ConvexSatEdgeVertexPairs, sourceHull.GeometryFrame, sourceHull.Origin,
+                        sourceHull.GeometryVertices, sourceHull.Triangles, sourceHull.ConvexSatEdgeVertexPairs, out contact);
                 break;
             default:
                 if (source._kind == ConvexShapeKind.Sphere)
@@ -111,7 +113,16 @@ internal readonly partial struct ConvexShape
         if (WidePointAnchor3d.CompareProjectedOffsets(targetSupport, sourceSupport,
                 targetSupport, targetSupport, contact.Normal) <= 0)
             return false;
-        targetAnchor = triangle.GetClosestPointAnchor(mesh.Origin, mesh.Rotation, support);
+        if (mesh.GeometryFrame.IsRigid)
+            targetAnchor = triangle.GetClosestPointAnchor(mesh.Origin, mesh.Rotation, support);
+        else
+        {
+            // TryGetInitialSurfaceProjectionTriangle already certified this
+            // finite projection, whose mesh-center offset is reach-bounded.
+            bool represented = WideTriangleRelations.TryGetProjectedPointAnchor(triangle, mesh.GeometryFrame,
+                RationalPoint3d.FromAnchor(support), mesh.Origin, out targetAnchor);
+            Debug.Assert(represented);
+        }
         normal = planeNormal;
         return true;
     }
@@ -119,7 +130,7 @@ internal readonly partial struct ConvexShape
     private bool TryGetInitialSurfaceProjectionTriangle(
         PhysicsMesh mesh, in FixedPointAnchor support, ref FixedTriangle triangle)
     {
-        if (WideTriangleRelations.ContainsProjection(triangle, mesh.Origin, mesh.Rotation, support))
+        if (ContainsInitialProjection(mesh, triangle, support))
             return true;
         if (mesh.GetCoplanarTriangleNeighbors(_triangleIndex).IsEmpty)
             return false;
@@ -128,12 +139,12 @@ internal readonly partial struct ConvexShape
         if (!corners.IsEmpty)
         {
             // The prepared convex fill removes subdivision cost without filling holes or notches.
-            ReadOnlySpan<Vector3d> vertices = mesh.ScaledLocalVertices;
+            ReadOnlySpan<Vector3d> vertices = mesh.GeometryVertices;
             for (int corner = 1; corner < corners.Length - 1; corner++)
             {
                 triangle = new FixedTriangle(vertices[corners[0]], vertices[corners[corner]],
                     vertices[corners[corner + 1]]);
-                if (WideTriangleRelations.ContainsProjection(triangle, mesh.Origin, mesh.Rotation, support))
+                if (ContainsInitialProjection(mesh, triangle, support))
                     return true;
             }
             return false;
@@ -144,18 +155,26 @@ internal readonly partial struct ConvexShape
         {
             if (index == _triangleIndex || mesh.GetManifoldSurfaceOwner(index) != owner)
                 continue;
-            mesh.GetLocalTriangleVertices(index, out Vector3d a, out Vector3d b, out Vector3d c);
+            mesh.GetGeometryTriangleVertices(index, out Vector3d a, out Vector3d b, out Vector3d c);
             triangle = new FixedTriangle(a, b, c);
-            if (WideTriangleRelations.ContainsProjection(triangle, mesh.Origin, mesh.Rotation, support))
+            if (ContainsInitialProjection(mesh, triangle, support))
                 return true;
         }
         return false;
     }
 
+    private static bool ContainsInitialProjection(PhysicsMesh mesh, in FixedTriangle triangle,
+        in FixedPointAnchor support) => mesh.GeometryFrame.IsRigid
+        ? WideTriangleRelations.ContainsProjection(triangle, mesh.Origin, mesh.Rotation, support)
+        : WideTriangleRelations.ContainsProjection(triangle, mesh.GeometryFrame, RationalPoint3d.FromAnchor(support));
+
     private bool TryGetInitialTriangleContact(in ConvexShape source, FixedTriangle triangle,
         out FixedContactAnchors contact)
     {
         PhysicsMesh targetMesh = _triangleOwner!.Mesh;
+        if (!targetMesh.GeometryFrame.IsRigid
+            || source._collider is LSMeshCollider sourceMesh && !sourceMesh.Mesh.GeometryFrame.IsRigid)
+            return TryGetInitialScaledTriangleContact(source, triangle, targetMesh, out contact);
         if (source._kind == ConvexShapeKind.Sphere)
             return triangle.TryGetSphereContact(targetMesh.Origin, targetMesh.Rotation,
                 source._center, FixedQuaternion.Identity, source._radius, out contact);
@@ -195,8 +214,53 @@ internal readonly partial struct ConvexShape
                 ReadOnlySpan<int> edges = stackalloc int[6] { 0, 1, 1, 2, 2, 0 };
                 return FixedConvexHullRelations.TryGetContact(
                     targetMesh.Origin, targetMesh.Rotation, vertices, triangles, edges,
-                    sourceHull.Origin, sourceHull.Rotation, sourceHull.ScaledLocalVertices,
+                    sourceHull.Origin, sourceHull.Rotation, sourceHull.GeometryVertices,
                     sourceHull.Triangles, sourceHull.ConvexSatEdgeVertexPairs, out contact);
+        }
+    }
+
+    private bool TryGetInitialScaledTriangleContact(in ConvexShape source, in FixedTriangle triangle,
+        PhysicsMesh mesh, out FixedContactAnchors contact)
+    {
+        Vector3d fallback = GetInitialExitNormal(source, mesh.GetFaceNormalWorld(_triangleIndex));
+        if (source._kind == ConvexShapeKind.Sphere)
+            return triangle.TryGetCenteredCapsuleContact(mesh.GeometryFrame, source._center,
+                FixedQuaternion.Identity, Fixed64.Zero, source._radius, fallback, out contact, out _, out _);
+        if (source._kind == ConvexShapeKind.CircleSlab)
+            return TriangleCylinderContact.TryGetContact(triangle, mesh.GeometryFrame, source._center,
+                FixedQuaternion.Identity, WideArithmetic.AddSigned192(Signed192.Raw(source._halfHeight),
+                    Signed192.Raw(source._halfHeight)), source._radius, out contact, out _);
+        switch (source._collider)
+        {
+            case LSSphereCollider sphere:
+                return triangle.TryGetCenteredCapsuleContact(mesh.GeometryFrame, sphere.Center, sphere.Rotation,
+                    Fixed64.Zero, sphere.ScaledRadius, fallback, out contact, out _, out _);
+            case LSCapsuleCollider capsule:
+                return triangle.TryGetCenteredCapsuleContact(mesh.GeometryFrame, capsule.Center, capsule.Rotation,
+                    capsule.AxisLength, capsule.ScaledRadius, fallback, out contact, out _, out _);
+            case LSCuboidCollider box:
+                ReadOnlySpan<Vector3d> points = stackalloc Vector3d[3] { triangle.A, triangle.B, triangle.C };
+                ReadOnlySpan<int> triangles = stackalloc int[3] { 0, 1, 2 };
+                ReadOnlySpan<int> edges = stackalloc int[6] { 0, 1, 1, 2, 2, 0 };
+                bool found = WideOrientedBox.TryGetConvexHullContact(box.Center, box.Rotation, box.OrientedBox.HalfExtents,
+                    mesh.GeometryFrame, mesh.Origin, points, triangles, edges, out FixedContactAnchors reversed);
+                contact = new FixedContactAnchors(reversed.SecondAnchor, reversed.FirstAnchor, -reversed.Normal,
+                    reversed.Depth, reversed.DepthIsClamped);
+                return found;
+            case LSCylinderCollider cylinder:
+                return TriangleCylinderContact.TryGetContact(triangle, mesh.GeometryFrame, cylinder.Center,
+                    cylinder.Rotation, Signed192.Raw(cylinder.Height), cylinder.ScaledRadius, out contact, out _);
+            case LSConeCollider cone:
+                return TriangleConeContact.TryGetContact(triangle, mesh.GeometryFrame, cone.Center,
+                    cone.Rotation, cone.Height, cone.ScaledRadius, out contact);
+            default:
+                PhysicsMesh sourceHull = ((LSMeshCollider)source._collider!).Mesh;
+                ReadOnlySpan<Vector3d> targetPoints = stackalloc Vector3d[3] { triangle.A, triangle.B, triangle.C };
+                ReadOnlySpan<int> targetTriangles = stackalloc int[3] { 0, 1, 2 };
+                ReadOnlySpan<int> targetEdges = stackalloc int[6] { 0, 1, 1, 2, 2, 0 };
+                return WideOrientedBox.TryGetConvexHullContact(mesh.GeometryFrame, mesh.Origin, targetPoints,
+                    targetTriangles, targetEdges, sourceHull.GeometryFrame, sourceHull.Origin,
+                    sourceHull.GeometryVertices, sourceHull.Triangles, sourceHull.ConvexSatEdgeVertexPairs, out contact);
         }
     }
 
@@ -241,8 +305,8 @@ internal readonly partial struct ConvexShape
 
     private static bool TryGetHullCapsuleContact(PhysicsMesh hull, Vector3d center,
         FixedQuaternion rotation, Fixed64 axisLength, Fixed64 radius, out FixedContactAnchors contact) =>
-        FixedConvexHullRelations.TryGetCenteredCapsuleContact(
-            hull.Origin, hull.Rotation, hull.ScaledLocalVertices,
+        WideOrientedBox.TryGetConvexHullCenteredCapsuleContact(
+            hull.GeometryFrame, hull.Origin, hull.GeometryVertices,
             hull.Triangles, hull.ConvexSatEdgeVertexPairs,
             center, rotation, Vector3d.Up, axisLength, radius, out contact);
 }

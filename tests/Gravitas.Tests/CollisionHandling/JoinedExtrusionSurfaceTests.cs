@@ -183,6 +183,45 @@ public sealed class JoinedExtrusionSurfaceTests
     }
 
     [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void SingleAdmittedDeclaredPiece_ShouldKeepItsWholeSurfaceAcrossInternalDiagonal(bool cylinder, bool singleDeclaration)
+    {
+        using var scene = PhysicsScenarioBuilder.Create();
+        var z = new[] { (Fixed64)(-4), (Fixed64)4 };
+        var left = Patch(scene, new[] { (Fixed64)(-8), Fixed64.Zero }, z);
+        var right = Patch(scene, new[] { Fixed64.Zero, (Fixed64)8 }, z);
+        using var surface = scene.Context.Physics.CreateStaticSurface(singleDeclaration ? new[] { right } : new[] { left, right });
+        var shape = Extrusion(cylinder);
+        // Exact pose captured as the freely rotating body reached X+Z=4,
+        // the right piece's artificial triangle diagonal, far from its join.
+        var rotation = new FixedQuaternion(Fixed64.FromRaw(-5146721), Fixed64.FromRaw(567776),
+            Fixed64.FromRaw(4181090), Fixed64.FromRaw(4294962140));
+        Vector3d center = new((Fixed64)3, Fixed64.FromRaw(2110383359), Fixed64.Zero);
+        var body = scene.CreateBody(shape, center, rotation).Body;
+        var pair = scene.CreatePair(right, shape);
+        Assert.True(CollisionDetection.DoCollisionCheck(pair));
+        Fixed64 maximum = Fixed64.Zero;
+        foreach (var row in pair.Manifold)
+        {
+            Assert.Equal(Vector3d.Up, row.Normal);
+            Assert.True(row.AnchorA.TryGetWorldPoint(out Vector3d source));
+            Assert.InRange(source.Y.m_rawValue, -1L, 1L);
+            Assert.InRange(source.X.m_rawValue, 0L, ((Fixed64)8).m_rawValue);
+            Assert.InRange(source.Z.m_rawValue, ((Fixed64)(-4)).m_rawValue, ((Fixed64)4).m_rawValue);
+            maximum = FixedMath.Max(maximum, row.Depth);
+        }
+        Assert.True(maximum > Fixed64.Zero);
+        // The retained whole-owner exit clears both authored triangles, not
+        // merely the triangle whose diagonal selected the old false normal.
+        body.SetPosition(center + Vector3d.Up * (maximum + Fixed64.FromRaw(32)));
+        shape.RebuildRuntimeShapeOnly();
+        Assert.False(CollisionDetection.DoCollisionCheck(scene.CreatePair(right, shape)));
+    }
+
+    [Theory]
     [InlineData(0)]
     [InlineData(1)]
     [InlineData(2)]

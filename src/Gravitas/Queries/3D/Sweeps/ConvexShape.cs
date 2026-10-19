@@ -100,10 +100,7 @@ internal readonly partial struct ConvexShape
     {
         if (_kind == ConvexShapeKind.Triangle)
         {
-            return new FixedPointAnchor(
-                _triangleOwner!.Mesh.Origin,
-                _triangleOwner.Mesh.Rotation,
-                new Vector3d(
+            return _triangleOwner!.Mesh.CreatePointAnchor(new Vector3d(
                     FixedMath.Average(
                         _triangleA.X,
                         _triangleB.X,
@@ -157,14 +154,7 @@ internal readonly partial struct ConvexShape
             Vector3d localMax = Vector3d.Max(
                 _triangleA,
                 Vector3d.Max(_triangleB, _triangleC));
-            FixedBoundBox bounds =
-                FixedBoundBox.FromRelativeRotatedBoundsClippedToDomain(
-                    _triangleOwner!.Mesh.Origin,
-                    _triangleOwner.Mesh.Rotation,
-                    localMin,
-                    localMax,
-                    Vector3d.Zero,
-                    FixedQuaternion.Identity);
+            FixedBoundBox bounds = _triangleOwner!.Mesh.GeometryFrame.GetWorldBounds(localMin, localMax);
             min = bounds.Min;
             max = bounds.Max;
             return;
@@ -256,10 +246,7 @@ internal readonly partial struct ConvexShape
     {
         if (_kind == ConvexShapeKind.Triangle)
         {
-            return new FixedPointAnchor(
-                _triangleOwner!.Mesh.Origin,
-                _triangleOwner.Mesh.Rotation,
-                GetTriangleSupportLocalPoint(direction));
+            return _triangleOwner!.Mesh.CreatePointAnchor(GetTriangleSupportLocalPoint(direction));
         }
 
         if (_kind is ConvexShapeKind.CircleSlab or ConvexShapeKind.Sphere)
@@ -456,6 +443,14 @@ internal readonly partial struct ConvexShape
 
     private Vector3d GetTriangleSupportLocalPoint(Vector3d direction)
     {
+        if (!_triangleOwner!.Mesh.GeometryFrame.IsRigid)
+        {
+            WideAxis3 axis = _triangleOwner.Mesh.GeometryFrame.GetSourceDirectionNumerators(direction);
+            Vector3d selected = _triangleA;
+            if (Compare(_triangleB, selected, axis) > 0) selected = _triangleB;
+            if (Compare(_triangleC, selected, axis) > 0) selected = _triangleC;
+            return selected;
+        }
         Vector3d localDirection =
             _triangleOwner!.Mesh.Rotation.Inverse().Rotate(direction);
         Vector3d best = _triangleA;
@@ -466,5 +461,10 @@ internal readonly partial struct ConvexShape
             best = _triangleC;
 
         return best;
+
+        static int Compare(Vector3d point, Vector3d current, in WideAxis3 axis) => WideAxis3.Dot(axis, new WideAxis3(
+            Signed320.ExtendValue(WideArithmetic.Difference(point.X, current.X)),
+            Signed320.ExtendValue(WideArithmetic.Difference(point.Y, current.Y)),
+            Signed320.ExtendValue(WideArithmetic.Difference(point.Z, current.Z)))).Sign;
     }
 }
