@@ -92,6 +92,93 @@ public sealed class JoinedExtrusionSurfaceTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public void DuplicateFilledPieces_ShouldKeepTheirFiniteCapSupportsWithoutTrustedJoins(bool reverse)
+    {
+        using var scene = PhysicsScenarioBuilder.Create();
+        var extent = new[] { (Fixed64)(-2), (Fixed64)2 };
+        var first = Patch(scene, extent, extent);
+        var second = Patch(scene, extent, extent);
+        first.Material = PhysicsMaterial.Bouncy;
+        second.Material = PhysicsMaterial.Frictionless;
+        var members = new[] { first, second };
+        using var surface = scene.Context.Physics.CreateStaticSurface(reverse ? new[] { second, first } : members);
+        var cylinder = new LSCylinderCollider { Radius = Fixed64.Quarter, Size = Vector3d.One };
+        var body = scene.CreateBody(cylinder, Vector3d.Up * Fixed64.Quarter, FixedQuaternion.Identity).Body;
+        foreach (var member in members)
+        {
+            var pair = scene.CreatePair(member, cylinder);
+            Assert.True(CollisionDetection.DoCollisionCheck(pair));
+            Assert.NotEmpty(pair.Manifold);
+            for (int index = 0; index < pair.Manifold.GroupCount; index++)
+            {
+                var group = pair.Manifold.GetGroup(index);
+                bool fromFirst = group.Key.SourceIdA == first.Id + 1;
+                Assert.True(fromFirst || group.Key.SourceIdA == second.Id + 1);
+                for (int rowIndex = 0; rowIndex < group.Count; rowIndex++)
+                {
+                    var row = group[rowIndex];
+                    Assert.Equal(Vector3d.Up, row.Normal);
+                    Assert.Equal(Fixed64.Quarter, row.Depth);
+                    Assert.Equal(fromFirst ? first.Material : second.Material, row.MaterialA);
+                    Assert.True(row.AnchorA.TryGetWorldPoint(out Vector3d point));
+                    Assert.Equal(Fixed64.Zero, point.Y);
+                    Assert.True(point.X >= (Fixed64)(-2) && point.X <= (Fixed64)2);
+                    Assert.True(point.Z >= (Fixed64)(-2) && point.Z <= (Fixed64)2);
+                    Assert.True(row.AnchorB.TryGetWorldPoint(out Vector3d exit));
+                    Assert.Equal(-Fixed64.Quarter, exit.Y);
+                    Assert.Equal(point.X, exit.X);
+                    Assert.Equal(point.Z, exit.Z);
+                    Assert.True(exit.X * exit.X + exit.Z * exit.Z <= Fixed64.FromFraction(1, 16) + Fixed64.MinIncrement);
+                }
+            }
+        }
+        body.SetPosition(Vector3d.Up * (Fixed64.Half + Fixed64.MinIncrement));
+        cylinder.RebuildRuntimeShapeOnly();
+        Assert.True(cylinder.Center.Y - cylinder.Height / 2 > Fixed64.Zero);
+        foreach (var member in members)
+            Assert.False(CollisionDetection.DoCollisionCheck(scene.CreatePair(member, cylinder)));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ProjectedNeighborOutsideTheSection_ShouldNotSupplyAnUnclippedSupport(bool reverse)
+    {
+        using var scene = PhysicsScenarioBuilder.Create();
+        var z = new[] { -Fixed64.Half, Fixed64.Half };
+        var left = Patch(scene, new[] { (Fixed64)(-2), Fixed64.Zero }, z);
+        var right = Patch(scene, new[] { Fixed64.Zero, (Fixed64)2 }, z);
+        left.Material = PhysicsMaterial.Bouncy;
+        right.Material = PhysicsMaterial.Frictionless;
+        using var surface = scene.Context.Physics.CreateStaticSurface(reverse ? new[] { right, left } : new[] { left, right });
+        var cylinder = new LSCylinderCollider { Radius = Fixed64.Quarter, Size = Vector3d.One };
+        scene.CreateBody(cylinder, new(-Fixed64.Half, Fixed64.Quarter, Fixed64.FromFraction(2, 5)),
+            FixedQuaternion.Identity);
+        // Padding gathers the right piece, but the complete cylinder remains
+        // left of its fill; the real Z rim prevents whole-component promotion.
+        Assert.True(cylinder.BoundsMax.X < Fixed64.Zero);
+        Assert.True(cylinder.BoundsMax.Z > Fixed64.Half);
+        var pair = scene.CreatePair(left, cylinder);
+        Assert.True(CollisionDetection.DoCollisionCheck(pair));
+        Assert.NotEmpty(pair.Manifold);
+        for (int group = 0; group < pair.Manifold.GroupCount; group++)
+            Assert.Equal(left.Id + 1, pair.Manifold.GetGroup(group).Key.SourceIdA);
+        foreach (var row in pair.Manifold)
+        {
+            Assert.Equal(left.Material, row.MaterialA);
+            Assert.True(row.AnchorA.TryGetWorldPoint(out Vector3d point));
+            Assert.Equal(Fixed64.Zero, point.Y);
+            Assert.True(point.X >= (Fixed64)(-2) && point.X <= Fixed64.Zero);
+            Assert.True(point.Z >= -Fixed64.Half && point.Z <= Fixed64.Half);
+        }
+        var outside = scene.CreatePair(right, cylinder);
+        Assert.False(CollisionDetection.DoCollisionCheck(outside));
+        Assert.Empty(outside.Manifold);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public void TiltedFaceExit_ShouldClearTheWholeShapeAgainstEveryFiniteMember(bool cylinder)
     {
         using var scene = PhysicsScenarioBuilder.Create();

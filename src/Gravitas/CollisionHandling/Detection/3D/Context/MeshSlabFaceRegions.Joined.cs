@@ -104,7 +104,8 @@ internal sealed partial class MeshSlabFaceRegions
                 RegionCount = 1;
                 VisitPlane(PrismOffsets.Span);
             }
-            else Build(mesh, member.Triangle, member.Connectivity, PrismOffsets.Span, null);
+            else Build(mesh, member.Triangle, member.Connectivity, PrismOffsets.Span, null,
+                member.Admitted.Count > 0 && ContainsSection(mesh, member.Triangle, member.Frame, PrismOffsets.Span));
             _memberCounts[index] = RegionCount; _joined.AddRegions(index, RegionCount);
             foreach (Sample sample in _events.AsReadOnlySpan()) _joinedEvents.Add(sample.WithRegion(member.Offset + sample.Region));
         }

@@ -19,7 +19,8 @@ internal sealed class MeshSlabSurfaceBoundary
     private readonly SwiftList<WideAxis3> _supportFan = new();
 
     internal void AppendSupportFallback(LSMeshCollider collider, LSCollider2D? embedded,
-        int surfaceTriangle, MeshSlabFaceRegions faces, ContactManifold manifold, int namespace3D, int namespace2D)
+        int surfaceTriangle, MeshSlabFaceRegions faces, ContactManifold manifold, int namespace3D, int namespace2D,
+        PhysicsMaterial targetMaterial)
     {
         PhysicsMesh mesh = collider.Mesh;
         ReadOnlySpan<int> boundary = mesh.GetCanonicalSurfaceBoundaryVertexPairs(surfaceTriangle);
@@ -43,7 +44,7 @@ internal sealed class MeshSlabSurfaceBoundary
         // global support normal, so the complete vertex charts cannot be empty.
         System.Diagnostics.Debug.Assert(found);
         manifold.AddContact(new ContactAnchor(best.FirstAnchor), new ContactAnchor(best.SecondAnchor),
-            best.Depth, best.Normal, collider.Material, embedded?.Material ?? collider.Material, best.DepthIsClamped,
+            best.Depth, best.Normal, collider.Material, targetMaterial, best.DepthIsClamped,
             featureNamespaceA: namespace3D, featureNamespaceB: namespace2D,
             group: new ContactGroupKey(namespace3D, namespace2D, mesh.GetCanonicalSurfaceOrdinal(surfaceTriangle), 0, -bestFeature - 1));
 
@@ -59,7 +60,8 @@ internal sealed class MeshSlabSurfaceBoundary
             if (!SegmentSlabSurfaceContact.TryGetFeaturePenetration(new FixedSegment(mesh.GeometryVertices[first], mesh.GeometryVertices[second]),
                 mesh.GeometryFrame, frame.Center, frame.SlabRotation, frame.Section.RadialFrame.Length,
                 frame.RadiusValue, frame.HalfThickness, CollisionDetectionMixed.GetConvexPrismOffsets(embedded, localBox),
-                _supportFan.AsReadOnlySpan(), !pointOnly, out FixedContactAnchors contact)) return;
+                _supportFan.AsReadOnlySpan(), !pointOnly, out FixedContactAnchors contact,
+                fullHeight: frame.FullHeight != Fixed64.Zero)) return;
             if (found && (contact.DepthIsClamped && !best.DepthIsClamped
                 || contact.DepthIsClamped == best.DepthIsClamped && contact.Depth >= best.Depth)) return;
             // Only final depth ranking is Q32: unclamped candidate order differs
@@ -70,7 +72,7 @@ internal sealed class MeshSlabSurfaceBoundary
 
     internal void BuildSurfaceContacts(LSMeshCollider collider, LSCollider2D? embedded,
         int surfaceTriangle, MeshSurfaceConnectivity connectivity, MeshSlabFaceRegions faces,
-        ContactManifold manifold, int namespace3D, int namespace2D, PhysicsMaterial? targetMaterial = null)
+        ContactManifold manifold, int namespace3D, int namespace2D, PhysicsMaterial targetMaterial)
     {
         PhysicsMesh mesh = collider.Mesh;
         int owner = mesh.GetManifoldSurfaceOwner(surfaceTriangle);
@@ -84,8 +86,8 @@ internal sealed class MeshSlabSurfaceBoundary
         Span<Vector2d> box = stackalloc Vector2d[4];
         ReadOnlySpan<Vector2d> offsets = !faces.PrismOffsets.IsEmpty ? faces.PrismOffsets.Span
             : CollisionDetectionMixed.GetConvexPrismOffsets(embedded, box);
-        WideDirection3d worldNormal = WideTriangleRelations.GetScaledTriangleLocalNormal(frame.SourcePlane, mesh.GeometryFrame)
-            .Transform(mesh.GeometryFrame.GeometryBasis);
+        // Orientation belongs to the ray frame's canonical plane, not authored winding.
+        WideDirection3d worldNormal = new WideDirection3d(frame.Plane.AuthoredNormal).Transform(mesh.GeometryFrame.GeometryBasis);
         WideAxis3 normal = new(Signed320.NarrowValue(worldNormal.X), Signed320.NarrowValue(worldNormal.Y), Signed320.NarrowValue(worldNormal.Z));
         _visitedCorners.Clear();
         MeshSurfaceBoundaryDomain? domain = faces.JoinedBoundary;
@@ -161,7 +163,7 @@ internal sealed class MeshSlabSurfaceBoundary
                 interiorOnly: !pointOnly, clip, out FixedContactAnchors contact, fullHeight: frame.FullHeight != Fixed64.Zero)) return;
             var group = new ContactGroupKey(namespace3D, namespace2D, surface, 0, checked(-ordinal - 1), sourceIdA: faces.SourceId);
             manifold.AddContact(new ContactAnchor(contact.FirstAnchor), new ContactAnchor(contact.SecondAnchor),
-                contact.Depth, contact.Normal, collider.Material, targetMaterial ?? embedded?.Material ?? collider.Material,
+                contact.Depth, contact.Normal, collider.Material, targetMaterial,
                 contact.DepthIsClamped, featureNamespaceA: namespace3D, featureNamespaceB: namespace2D, group: group);
         }
     }

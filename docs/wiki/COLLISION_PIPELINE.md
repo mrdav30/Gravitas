@@ -180,18 +180,23 @@ their boundary chain consistently without changing the authored triangles.
 Overlapping, nonmanifold or otherwise ambiguous topology retains independent
 triangle domains. Convex-volume admission still requires consistent winding.
 
-Mesh/cylinder contacts delegate each admitted triangle to FixedMathSharp's
-finite-cylinder contact query. That query selects across triangle faces,
-edges and vertices and the cylinder's flat caps, side and curved rims; it does
-not infer contact from the triangle point closest to the cylinder center.
-Gravitas may enrich a selected parallel cap/triangle-face contact with support
-samples while preserving the selected exact depth and clamp flag. A nearly
-parallel rim contact keeps its own selected witnesses instead.
-Mixed mesh/circle-slab contacts use the same triangle/cylinder geometry.
-The analytic search shares squared support terms across opposite directions;
-reciprocal edge charts reuse their exact normalized algebra after each chart
-finishes. Both views retain complete admission checks, the earlier feature on
-exact ties, and paired witnesses rounded only at final materialization.
+Native cylinders and mixed circle/stadium slabs share the finite filled-surface
+reducer for trusted mesh patches. Covered diagonals cannot supply response;
+real outer and hole rims retain their finite-feature constraints. Axial contacts
+whose complete footprint is covered reuse one exact cap solve. Admission plus
+absence of a true boundary crossing certifies that coverage; a footprint wholly
+inside a hole supplies no contact. Distinct surface owners retain independent
+contact groups and the supplying collider's material.
+
+Isolated or ambiguous native cylinder triangles retain FixedMathSharp's complete
+finite-cylinder query. It considers triangle faces, edges and vertices against
+the cylinder's flat caps, side and curved rims, rather than inferring contact
+from the triangle point closest to the cylinder center. Gravitas may enrich a
+selected parallel cap/triangle-face contact with support samples while preserving
+the exact depth and clamp flag. A nearly parallel rim contact keeps its selected
+witnesses. General math sampling also retains an interior witness, which can be
+the only representable witness; a certified covered footprint needs only its boundary
+poles. Contact admission, depth and provenance precede final Q32.32 sampling.
 Mesh/cone contacts include the base disk, rim, apex and lateral generators.
 Prepared mesh geometry certifies coplanar surface domains from exact welded
 seams and their true boundary, including holes and notches. Ambiguous topology

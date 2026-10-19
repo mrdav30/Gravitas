@@ -2,14 +2,261 @@ using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
+using Gravitas.Materials;
 using Gravitas.Tests.Support;
 using System;
+using System.Linq;
 using Xunit;
 
 namespace Gravitas.Tests.CollisionHandlingTests;
 
 public sealed class CylinderTriangleContactRegressionTests
 {
+    [Fact]
+    public void CylinderOutsidePatchCorner_ShouldRejectDespiteOverlappingBounds()
+    {
+        using var scene = PhysicsScenarioBuilder.Create();
+        var mesh = new LSMeshCollider(new[]
+        {
+            new Vector3d(-1, 0, -1), new Vector3d(1, 0, -1),
+            new Vector3d(-1, 0, 1), new Vector3d(1, 0, 1)
+        }, new[] { 0, 2, 1, 1, 2, 3 }, MeshColliderMode.Concave);
+        scene.InitializeStaticCollider(mesh, Vector3d.Zero);
+        var cylinder = new LSCylinderCollider(ColliderShapeDefinition.Cylinder(Fixed64.Quarter, Fixed64.One));
+        Fixed64 coordinate = Fixed64.FromFraction(5, 4);
+        scene.InitializeStaticCollider(cylinder, new(coordinate, Fixed64.Quarter, coordinate));
+        mesh.Bounds.Intersects(cylinder.Bounds).Should().BeTrue();
+        var pair = scene.CreatePair(mesh, cylinder);
+        CollisionDetection.DoCollisionCheck(pair).Should().BeFalse();
+        pair.Manifold.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void FilledPatchScratch_ShouldNotRetainSamplesAcrossTiltAndDeclarationChanges()
+    {
+        using var scene = PhysicsScenarioBuilder.Create();
+        var floor = new LSMeshCollider(new[]
+        {
+            new Vector3d(-2, 0, -2), new Vector3d(2, 0, -2),
+            new Vector3d(-2, 0, 2), new Vector3d(2, 0, 2)
+        }, new[] { 0, 2, 1, 1, 2, 3 }, MeshColliderMode.Concave);
+        scene.InitializeStaticCollider(floor, Vector3d.Zero);
+        var cylinder = new LSCylinderCollider(ColliderShapeDefinition.Cylinder(Fixed64.Quarter, Fixed64.One));
+        SolidBody body = scene.CreateBody(cylinder, Vector3d.Up * Fixed64.Quarter, FixedQuaternion.Identity).Body;
+        var pair = scene.CreatePair(floor, cylinder);
+        CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
+        var expected = pair.Manifold.Select(row => (row.PointA, row.PointB, row.Normal, row.Depth)).ToArray();
+
+        body.SetRotation(FixedQuaternion.FromEulerAnglesInDegrees(Fixed64.Zero, Fixed64.Zero, (Fixed64)30));
+        cylinder.RebuildRuntimeShapeOnly();
+        CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
+        pair.Manifold.Should().OnlyContain(row => row.Normal == Vector3d.Up && row.Depth > Fixed64.Quarter);
+        using (scene.Context.Physics.CreateStaticSurface(new[] { floor }))
+            CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
+        body.SetRotation(FixedQuaternion.Identity);
+        cylinder.RebuildRuntimeShapeOnly();
+        CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
+        pair.Manifold.Select(row => (row.PointA, row.PointB, row.Normal, row.Depth)).Should().Equal(expected);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void TiltedCylinderOnAffinePatch_ShouldKeepFiniteSupportsAndClearTheWholePlane(bool tinyRadius)
+    {
+        using var scene = PhysicsScenarioBuilder.Create();
+        var mesh = new LSMeshCollider(new[]
+        {
+            new Vector3d(-1, 0, -1), new Vector3d(Fixed64.FromFraction(5, 4), Fixed64.Zero, -Fixed64.One),
+            new Vector3d(-1, 0, 1), new Vector3d(Fixed64.FromFraction(5, 4), Fixed64.Zero, Fixed64.One)
+        }, new[] { 0, 2, 1, 1, 2, 3 }, MeshColliderMode.Concave);
+        mesh.InitializeWithNoBody(new TestMatterAgent(scene.Context, new FixedTransform(Vector3d.Zero,
+            FixedQuaternion.Identity, new Vector3d(Fixed64.FromFraction(2, 3), Fixed64.One, Fixed64.FromFraction(3, 5)))));
+        var cylinder = new LSCylinderCollider(ColliderShapeDefinition.Cylinder(
+            tinyRadius ? Fixed64.MinIncrement : Fixed64.Quarter,
+            Fixed64.One + (tinyRadius ? Fixed64.FromRaw(3) : Fixed64.Zero)));
+        Vector3d start = Vector3d.Up * Fixed64.Quarter;
+        FixedQuaternion rotation = tinyRadius
+            ? FixedQuaternion.FromAxisAngle(Vector3d.Up, Fixed64.Pi / 4)
+            : FixedQuaternion.FromAxisAngle(Vector3d.Forward, Fixed64.Pi / 6);
+        SolidBody body = scene.CreateBody(cylinder, start, rotation).Body;
+        var pair = scene.CreatePair(mesh, cylinder);
+
+        CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
+        Fixed64 maximum = Fixed64.Zero;
+        foreach (ManifoldContact row in pair.Manifold)
+        {
+            row.Normal.Should().Be(Vector3d.Up);
+            row.PointA.Y.Should().Be(Fixed64.Zero);
+            row.PointA.X.Should().BeInRange(-Fixed64.FromFraction(2, 3), Fixed64.FromFraction(5, 6));
+            row.PointA.Z.Should().BeInRange(-Fixed64.FromFraction(3, 5), Fixed64.FromFraction(3, 5));
+            Vector3d local = rotation.Inverse() * (row.PointB - start);
+            local.Y.Abs().Should().BeLessThanOrEqualTo(Fixed64.Half + Fixed64.FromRaw(4));
+            local.X.Abs().Should().BeLessThanOrEqualTo(cylinder.ScaledRadius + Fixed64.FromRaw(4));
+            local.Z.Abs().Should().BeLessThanOrEqualTo(cylinder.ScaledRadius + Fixed64.FromRaw(4));
+            (local.X * local.X + local.Z * local.Z).Should().BeLessThanOrEqualTo(
+                cylinder.ScaledRadius * cylinder.ScaledRadius + Fixed64.FromRaw(4));
+            maximum = FixedMath.Max(maximum, row.Depth);
+        }
+        maximum.Should().BeGreaterThan(Fixed64.Zero);
+        body.SetPosition(start + Vector3d.Up * (maximum + Fixed64.FromRaw(2)));
+        cylinder.RebuildRuntimeShapeOnly();
+        CollisionDetection.DoCollisionCheck(scene.CreatePair(mesh, cylinder)).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CylinderOnPatchAndIsolatedWall_ShouldKeepBothSurfaceConstraints(bool splitFloor)
+    {
+        using var scene = PhysicsScenarioBuilder.Create();
+        var vertices = new[]
+        {
+            new Vector3d(-2, 0, -2), new Vector3d(2, 0, -2),
+            new Vector3d(-2, 0, 2), new Vector3d(2, 0, 2),
+            new Vector3d(0, -2, -2), new Vector3d(0, 2, -2), new Vector3d(0, 0, 2)
+        };
+        var mesh = new LSMeshCollider(splitFloor ? vertices : new[] { vertices[0], new Vector3d(4, 0, -2), new Vector3d(-2, 0, 4), vertices[4], vertices[5], vertices[6] }, splitFloor
+            ? new[] { 0, 2, 1, 1, 2, 3, 4, 5, 6 } : new[] { 0, 2, 1, 3, 4, 5 },
+            MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation);
+        scene.InitializeStaticCollider(mesh, Vector3d.Zero);
+        var cylinder = new LSCylinderCollider(ColliderShapeDefinition.Cylinder(Fixed64.Quarter, Fixed64.One));
+        scene.InitializeStaticCollider(cylinder, new(Fixed64.FromFraction(1, 16), Fixed64.Quarter, Fixed64.Zero));
+        var pair = scene.CreatePair(mesh, cylinder);
+
+        CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
+        pair.Manifold.GroupCount.Should().Be(2);
+        bool floor = false, wall = false;
+        foreach (ManifoldContact row in pair.Manifold)
+        {
+            floor |= row.Normal == Vector3d.Up;
+            wall |= row.Normal == Vector3d.Right;
+        }
+        floor.Should().BeTrue();
+        wall.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(1L, -1L, 2L)]
+    [InlineData(3L, 1L, 0L)]
+    public void CylinderOnFilledPatch_ShouldKeepExactOddHeightAndMaterials(
+        long heightOffset, long planeOffset, long depthRaw)
+    {
+        using var scene = PhysicsScenarioBuilder.Create();
+        Fixed64 y = (Fixed64)5 + Fixed64.FromRaw(planeOffset);
+        var floor = new LSMeshCollider(new[]
+        {
+            new Vector3d(-(Fixed64)2, y, -(Fixed64)2), new Vector3d((Fixed64)2, y, -(Fixed64)2),
+            new Vector3d(-(Fixed64)2, y, (Fixed64)2), new Vector3d((Fixed64)2, y, (Fixed64)2)
+        }, new[] { 0, 2, 1, 1, 2, 3 }, MeshColliderMode.Concave);
+        floor.Material = PhysicsMaterial.Default;
+        scene.InitializeStaticCollider(floor, Vector3d.Zero);
+        var cylinder = new LSCylinderCollider(ColliderShapeDefinition.Cylinder(Fixed64.Quarter,
+            (Fixed64)10 + Fixed64.FromRaw(heightOffset))) { Material = PhysicsMaterial.Frictionless };
+        scene.InitializeStaticCollider(cylinder, Vector3d.Zero);
+        var pair = scene.CreatePair(floor, cylinder);
+
+        CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
+        foreach (ManifoldContact row in pair.Manifold)
+        {
+            row.Normal.Should().Be(Vector3d.Down);
+            row.Depth.Should().Be(Fixed64.FromRaw(depthRaw));
+            row.MaterialA.Should().Be(floor.Material);
+            row.MaterialB.Should().Be(cylinder.Material);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CylinderInsideMeshHole_ShouldStaySeparatedAndKeepItsTrueRim(bool touchRim)
+    {
+        using var scene = PhysicsScenarioBuilder.Create();
+        var vertices = new System.Collections.Generic.List<Vector3d>();
+        var triangles = new System.Collections.Generic.List<int>();
+        Fixed64[] coordinates = { -Fixed64.Two, -Fixed64.Half, Fixed64.Half, Fixed64.Two };
+        foreach (Fixed64 z in coordinates)
+            foreach (Fixed64 x in coordinates) vertices.Add(new(x, Fixed64.Zero, z));
+        for (int z = 0; z < 3; z++)
+            for (int x = 0; x < 3; x++)
+            {
+                if (x == 1 && z == 1) continue;
+                int a = z * 4 + x;
+                triangles.AddRange(new[] { a, a + 4, a + 1, a + 1, a + 4, a + 5 });
+            }
+        var mesh = new LSMeshCollider(vertices.ToArray(), triangles.ToArray(), MeshColliderMode.Concave);
+        scene.InitializeStaticCollider(mesh, Vector3d.Zero);
+        var cylinder = new LSCylinderCollider(ColliderShapeDefinition.Cylinder(Fixed64.Quarter, Fixed64.One));
+        Vector3d start = new(touchRim ? Fixed64.FromFraction(3, 8) : Fixed64.Zero, Fixed64.Quarter, Fixed64.Zero);
+        SolidBody body = scene.CreateBody(cylinder, start, FixedQuaternion.Identity).Body;
+        var pair = scene.CreatePair(mesh, cylinder);
+
+        CollisionDetection.DoCollisionCheck(pair).Should().Be(touchRim);
+        if (!touchRim) return;
+        bool rim = false;
+        foreach (ManifoldContact row in pair.Manifold)
+        {
+            if (row.Normal != Vector3d.Left) continue;
+            rim = true;
+            row.Depth.Should().Be(Fixed64.FromFraction(1, 8));
+            row.PointA.X.Should().Be(Fixed64.Half);
+        }
+        rim.Should().BeTrue();
+        body.SetPosition(start + Vector3d.Left * (Fixed64.FromFraction(1, 8) + Fixed64.MinIncrement));
+        cylinder.RebuildRuntimeShapeOnly();
+        CollisionDetection.DoCollisionCheck(scene.CreatePair(mesh, cylinder)).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void CylinderOnFilledPatch_ShouldIgnoreTheCoveredDiagonalAndResolveVertically(bool reverseTriangles, bool reversePair)
+    {
+        using PhysicsScenarioBuilder scene = PhysicsScenarioBuilder.Create();
+        scene.Context.Environment.Gravity = scene.Context.Environment.AirDensity =
+            scene.Context.Environment.DampingFactor = Fixed64.Zero;
+        var floor = new LSMeshCollider(new[]
+        {
+            new Vector3d(-1, 0, -1), new Vector3d(Fixed64.FromFraction(5, 4), Fixed64.Zero, -(Fixed64)1),
+            new Vector3d(-1, 0, 1), new Vector3d(Fixed64.FromFraction(5, 4), Fixed64.Zero, Fixed64.One)
+        }, reverseTriangles ? new[] { 1, 2, 3, 0, 2, 1 } : new[] { 0, 2, 1, 1, 2, 3 },
+            MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation);
+        scene.InitializeStaticCollider(floor, Vector3d.Zero);
+        var cylinder = new LSCylinderCollider(ColliderShapeDefinition.Cylinder(Fixed64.Quarter, Fixed64.One))
+        { Material = PhysicsMaterial.Frictionless };
+        Vector3d start = Vector3d.Up * Fixed64.FromFraction(1, 10);
+        SolidBody body = scene.CreateBody(cylinder, start, FixedQuaternion.Identity, preventAngularForces: true).Body;
+        body.SleepEnabled = false;
+        body.UseManualGrounding();
+        CollisionPair pair = reversePair ? scene.CreatePair(cylinder, floor) : scene.CreatePair(floor, cylinder);
+
+        CollisionDetection.DoCollisionCheck(pair).Should().BeTrue();
+        Fixed64 depth = Fixed64.Half - start.Y;
+        foreach (ManifoldContact row in pair.Manifold)
+        {
+            row.Normal.Should().Be(Vector3d.Up);
+            row.Depth.Should().Be(depth);
+            row.PointA.Y.Should().Be(Fixed64.Zero);
+            row.PointB.Y.Should().Be(start.Y - Fixed64.Half);
+            (row.PointB.X * row.PointB.X + row.PointB.Z * row.PointB.Z)
+                .Should().BeLessThanOrEqualTo(Fixed64.Quarter * Fixed64.Quarter);
+        }
+        // The whole cylinder clears the filled plane after this exit, not
+        // merely one triangle. Its analytic bottom is then one raw unit above it.
+        body.SetPosition(start + Vector3d.Up * (depth + Fixed64.MinIncrement));
+        cylinder.RebuildRuntimeShapeOnly();
+        CollisionDetection.DoCollisionCheck(scene.CreatePair(floor, cylinder)).Should().BeFalse();
+        body.SetPosition(start);
+        cylinder.RebuildRuntimeShapeOnly();
+        scene.Context.Simulate();
+        scene.Context.LateSimulate();
+        body.Position3d.X.Should().Be(Fixed64.Zero);
+        body.Position3d.Z.Should().Be(Fixed64.Zero);
+        body.Position3d.Y.Should().BeGreaterThan(start.Y);
+    }
+
     [Fact]
     public void CylinderContact_ShouldFindTriangleIntrusionAwayFromCenterClosestPoint()
     {
@@ -224,10 +471,12 @@ public sealed class CylinderTriangleContactRegressionTests
     }
 
     [Theory]
-    [InlineData(3L, 1L, 0L)]
-    [InlineData(1L, -1L, 2L)]
+    [InlineData(3L, 1L, 0L, false)]
+    [InlineData(1L, -1L, 2L, false)]
+    [InlineData(3L, 1L, 0L, true)]
+    [InlineData(1L, -1L, 2L, true)]
     public void CylinderTriangle_EnrichedCap_ShouldRoundExactDepthOnlyOnce(
-        long heightRawOffset, long triangleRawOffset, long expectedDepthRaw)
+        long heightRawOffset, long triangleRawOffset, long expectedDepthRaw, bool affine)
     {
         using GravitasWorldContext context = GravitasWorldContext.CreateOwned();
         Fixed64 y = (Fixed64)5 + Fixed64.FromRaw(triangleRawOffset);
@@ -236,11 +485,15 @@ public sealed class CylinderTriangleContactRegressionTests
             new Vector3d((Fixed64)(-16), y, (Fixed64)(-16)),
             new Vector3d((Fixed64)16, y, (Fixed64)(-16)),
             new Vector3d(Fixed64.Zero, y, (Fixed64)16),
-            new Vector3d((Fixed64)8, -y, (Fixed64)8),
+            new Vector3d(affine ? Fixed64.FromFraction(17, 2) : (Fixed64)8, -y, (Fixed64)8),
             new Vector3d((Fixed64)12, -y, (Fixed64)8),
             new Vector3d((Fixed64)8, -y, (Fixed64)12)
         }, new[] { 0, 1, 2, 3, 4, 5 }, MeshColliderMode.Concave);
-        mesh.InitializeWithNoBody(new TestMatterAgent(context));
+        // The remote half-unit X needs fractional scaling to preserve a
+        // source frame, while the nearby horizontal face still fits the cap.
+        var transform = new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity,
+            affine ? new Vector3d(Fixed64.FromFraction(2, 3), Fixed64.One, Fixed64.One) : Vector3d.One);
+        mesh.InitializeWithNoBody(new TestMatterAgent(context, transform));
         var cylinder = new LSCylinderCollider(ColliderShapeDefinition.Cylinder(
             Fixed64.One, (Fixed64)10 + Fixed64.FromRaw(heightRawOffset)));
         cylinder.InitializeWithNoBody(new TestMatterAgent(context));

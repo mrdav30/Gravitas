@@ -9,6 +9,72 @@ namespace Gravitas.Tests.MixedDimensions;
 
 public sealed partial class MixedNarrowPhaseTests
 {
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(false, false, true)]
+    [InlineData(false, true, false)]
+    [InlineData(false, true, true)]
+    [InlineData(true, false, false)]
+    [InlineData(true, false, true)]
+    [InlineData(true, true, false)]
+    [InlineData(true, true, true)]
+    public void CircleSlabQuad_ShouldMatchTheWholeCylinderExitAcrossCoveredDiagonal(
+        bool stadium, bool reverseWinding, bool vertical)
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        var vertices = new[] { new Vector3d(-1, 0, -1), new Vector3d(Fixed64.FromFraction(5, 4), Fixed64.Zero, -Fixed64.One),
+            new Vector3d(-1, 0, 1), new Vector3d(Fixed64.FromFraction(5, 4), Fixed64.Zero, Fixed64.One) };
+        int[] indices = reverseWinding ? new[] { 1, 2, 0, 3, 2, 1 } : new[] { 0, 2, 1, 1, 2, 3 };
+        Vector3d normal = vertical ? Vector3d.Right : Vector3d.Up;
+        Vector3d origin = -normal * Fixed64.FromFraction(1, 10);
+        FixedQuaternion rotation = vertical
+            ? new FixedQuaternion(Fixed64.Zero, Fixed64.Zero, Fixed64.One, Fixed64.One).Normalized
+            : FixedQuaternion.Identity;
+        var mesh = CreateMesh3D(context,
+            new LSMeshCollider(vertices, indices, MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation),
+            origin, rotation);
+        LSCollider2D embedded = stadium ? new LSCapsuleCollider2D(Fixed64.Quarter, Fixed64.Half)
+            : new LSCircleCollider2D(Fixed64.Quarter);
+        embedded.MixedHalfThicknessOverride = Fixed64.Half;
+        CreateBody2D(context, embedded, Vector2d.Zero);
+        if (embedded is LSCapsuleCollider2D capsule) capsule.AxisLength.Should().Be(Fixed64.Zero);
+        var cylinder = CreateBody3D(context,
+            new LSCylinderCollider { Radius = Fixed64.Quarter, Size = Vector3d.One },
+            Vector3d.Zero, FixedQuaternion.Identity);
+        var native = new CollisionPair(mesh.Collider, cylinder.Collider);
+        var mixed = new ContactManifold();
+
+        CollisionDetection.DoCollisionCheck(native).Should().BeTrue();
+        CollisionDetectionMixed.TryBuildManifold(mesh.Collider, embedded, mixed).Should().BeTrue();
+        Fixed64 depth = (vertical ? Fixed64.Quarter : Fixed64.Half) - Fixed64.FromFraction(1, 10);
+        foreach (ContactManifold manifold in new[] { native.Manifold, mixed })
+        {
+            manifold.Count.Should().BeGreaterThan(0);
+            foreach (ManifoldContact row in manifold)
+            {
+                row.Normal.Should().Be(normal);
+                row.Depth.Should().Be(depth);
+                row.DepthIsClamped.Should().BeFalse();
+                row.TryGetPointA(out Vector3d source).Should().BeTrue();
+                row.TryGetPointB(out Vector3d exit).Should().BeTrue();
+                Vector3d.Dot(source - origin, normal).Should().Be(Fixed64.Zero);
+                (vertical ? source.Y : source.X).Should().BeInRange(-Fixed64.One, Fixed64.FromFraction(5, 4));
+                source.Z.Should().BeInRange(-Fixed64.One, Fixed64.One);
+                exit.Y.Abs().Should().BeLessThanOrEqualTo(Fixed64.Half);
+                (exit.X * exit.X + exit.Z * exit.Z).Should().BeLessThanOrEqualTo(
+                    Fixed64.FromFraction(1, 16) + Fixed64.MinIncrement);
+                Vector3d.Dot(exit, normal).Should().Be(vertical ? -Fixed64.Quarter : -Fixed64.Half);
+                (source - exit).Should().Be(normal * depth);
+            }
+        }
+        // Moving the finite patch beyond the analytic bottom/side support
+        // separates both representations, independently of triangle selection.
+        mesh.Body.SetPosition(origin - normal * (depth + Fixed64.MinIncrement));
+        mesh.Collider.RebuildRuntimeShapeOnly();
+        CollisionDetection.DoCollisionCheck(native).Should().BeFalse();
+        CollisionDetectionMixed.TryBuildManifold(mesh.Collider, embedded, mixed).Should().BeFalse();
+    }
+
     [Fact]
     public void CircleSlabTriangle_ObliqueRimGap_ShouldRejectDespiteOverlappingCandidateAxes()
     {

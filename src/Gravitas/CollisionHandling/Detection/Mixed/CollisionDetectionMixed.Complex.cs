@@ -81,40 +81,19 @@ public static partial class CollisionDetectionMixed
         if (mesh.Mode == MeshColliderMode.Convex && mesh.IsClosedSurface && !prismOffsets.IsEmpty
             && TryAppendConvexMeshPrismContacts(collider, embedded!, center, rotation, halfThickness,
                 prismOffsets, manifold, namespace3D, namespace2D)) return;
-        SwiftList<int> admitted = scratch.MeshTriangleCandidatesB;
+        var section = new FiniteSlabSectionFrame(mesh.GeometryFrame, center, rotation, length, radius, halfThickness);
         scratch.MeshSurfaces.Clear();
-        var section = new FiniteSlabSectionFrame(mesh.GeometryFrame, center, rotation,
-            length, radius, halfThickness);
-        Span<int> singleton = stackalloc int[1];
         foreach (int triangle in candidates)
         {
-            int owner = mesh.GetManifoldSurfaceOwner(triangle);
-            if (!scratch.MeshSurfaces.Add(owner)) continue;
-            admitted.FastClear();
-            singleton[0] = triangle;
-            ReadOnlySpan<int> domain = mesh.GetCoplanarTriangleNeighbors(triangle).IsEmpty ? singleton : candidates;
-            foreach (int candidate in domain)
-            {
-                if (mesh.GetManifoldSurfaceOwner(candidate) != owner) continue;
-                mesh.GetGeometryTriangleVertices(candidate, out Vector3d first, out Vector3d second, out Vector3d third);
-                if (section.IntersectsTriangle(new FixedTriangle(first, second, third), prismOffsets)) admitted.Add(candidate);
-            }
-            if (admitted.Count == 0) continue;
-            MeshSurfaceConnectivity connectivity = scratch.MeshConnectivity;
-            connectivity.BuildSlab(mesh, triangle, section, embedded, admitted.AsReadOnlySpan());
+            if (!scratch.MeshSurfaces.Add(mesh.GetManifoldSurfaceOwner(triangle))) continue;
+            if (!MeshTriangleContactGenerator.GatherMeshSlabSurfaceTriangles(mesh, triangle, section,
+                prismOffsets, candidates, scratch.MeshTriangleCandidatesB)) continue;
             mesh.GetGeometryTriangleVertices(triangle, out Vector3d a, out Vector3d b, out Vector3d c);
             var frame = new FiniteSlabRayFrame(new FixedTriangle(a, b, c), mesh.GeometryFrame,
                 center, rotation, length, radius, halfThickness);
-            MeshSlabFaceRegions faces = scratch.MeshSlabFaces;
-            faces.Prepare(frame, prismOffsets);
-            int contactCount = manifold.Count;
-            scratch.MeshSlabBoundary.BuildSurfaceContacts(collider, embedded, triangle,
-                connectivity, faces, manifold, namespace3D, namespace2D);
-            faces.Build(mesh, triangle, connectivity, prismOffsets, embedded);
-            faces.AppendContacts(collider, embedded, triangle, manifold, namespace3D, namespace2D);
-            if (manifold.Count == contactCount)
-                scratch.MeshSlabBoundary.AppendSupportFallback(collider, embedded, triangle, faces,
-                    manifold, namespace3D, namespace2D);
+            MeshTriangleContactGenerator.AppendMeshSlabSurfaceContacts(collider, embedded, triangle, frame,
+                prismOffsets, scratch.MeshTriangleCandidatesB.AsReadOnlySpan(),
+                MeshSlabFaceRegions.ContainsSection(mesh, triangle, frame, prismOffsets), manifold, namespace3D, namespace2D);
         }
     }
 

@@ -372,7 +372,9 @@ public sealed partial class MixedNarrowPhaseTests
         Fixed64 centerX = hole
             ? (touching ? Fixed64.Half : Fixed64.FromFraction(3, 4))
             : (touching ? Fixed64.FromFraction(5, 2) : Fixed64.FromFraction(19, 8));
-        SolidBody2D slab = CreateSurfaceReductionSlab(context, shape, new Vector2d(centerX, Fixed64.Zero));
+        // Center the caps on the plane so the asserted side exit is uniquely
+        // shorter; an offset cap can tie or beat a genuine perimeter exit.
+        SolidBody2D slab = CreateSurfaceReductionSlab(context, shape, new Vector2d(centerX, Fixed64.Zero), hostY: Fixed64.Zero);
         var manifold = new ContactManifold();
 
         CollisionDetectionMixed.TryBuildManifold(mesh, slab.Collider, manifold).Should().BeTrue();
@@ -387,6 +389,33 @@ public sealed partial class MixedNarrowPhaseTests
             row.PointA.X.Should().Be(hole ? Fixed64.One : (Fixed64)2);
             row.PointB.X.Should().Be(centerX + (hole ? Fixed64.Half : -Fixed64.Half));
         }
+    }
+
+    [Theory]
+    [InlineData(ColliderType2D.Circle)]
+    [InlineData(ColliderType2D.Capsule)]
+    [InlineData(ColliderType2D.AABox)]
+    [InlineData(ColliderType2D.ConvexPolygon)]
+    public void HoleRimAndCapAtEqualDepth_ShouldKeepAMatchedMinimumFeatureExit(ColliderType2D shape)
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        LSMeshCollider mesh = CreateSurfaceReductionRing();
+        CreateMesh3D(context, mesh, Vector3d.Zero);
+        SolidBody2D slab = CreateSurfaceReductionSlab(context, shape,
+            new Vector2d(Fixed64.FromFraction(3, 4), Fixed64.Zero));
+        var manifold = new ContactManifold();
+        CollisionDetectionMixed.TryBuildManifold(mesh, slab.Collider, manifold).Should().BeTrue();
+        bool found = false;
+        foreach (ManifoldContact row in manifold)
+        {
+            // The right hole edge X=1 and slab top Y=1/4 are equally near.
+            if (row.PointA.X != Fixed64.One || row.PointA.Z.Abs() > Fixed64.One) continue;
+            found = true;
+            row.Depth.Should().Be(Fixed64.Quarter);
+            (row.Normal == Vector3d.Down || row.Normal == Vector3d.Left).Should().BeTrue();
+            (row.PointA - row.PointB).Should().Be(row.Normal * row.Depth);
+        }
+        found.Should().BeTrue();
     }
 
     [Theory]

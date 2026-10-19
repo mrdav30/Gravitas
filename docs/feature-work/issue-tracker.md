@@ -37,8 +37,9 @@
 
 ### Ordered Queue
 
-#140's finite single-contact correction and #141's authored-mesh geometry
-correction are complete. Resume pure 2D continuity in Phase 6 of the #133/#139
+#140's finite single-contact correction, #141's authored-mesh geometry correction
+and #142's filled-surface cylinder response correction are complete. Resume pure
+2D continuity in Phase 6 of the #133/#139
 static-surface continuity plan. Resolve **FMS-Issue-033** in
 FixedMathSharp before Phase 7's mixed continuity work; its curved-prism false
 positives do not block pure 2D. Keep physical-quality fixes ahead of the benchmark
@@ -135,32 +136,6 @@ investigation unless it recurs or a reliable reproducer becomes available.
   retain the fixture, repeats and eight loaded-module hashes, including core
   `8A7E5C4D`. No production changes or fix are claimed by this investigation.
 
-### GRV-Issue-142 - Single-mesh cylinder response can select a covered triangle diagonal
-
-- **Confirmed:** 2026-10-18 while validating authored-frame migration; pre-existing
-  on the frozen committed stack used for the #141 baseline.
-- **Reproduction:** Concave floor vertices `(-1,0,-1), (1.25,0,-1),
-  (-1,0,1), (1.25,0,1)`, indices `0,2,1, 1,2,3`, identity pose/unit scale,
-  surface inertia policy. Put an upright cylinder of radius `0.25`, full height
-  `1` at `(0,0.1,0)`. Set gravity, air density and damping to zero; freeze
-  rotation, disable sleep, and run both host phases.
-- **Observed:** Contact selects normal approximately `(0.66436384,0,0.74740932)`
-  and depth `0.33304548`, moving the body sideways to approximately
-  `(0.08827586,0.1,0.09931035)`. The actual flat patch still intersects it;
-  the internal triangle diagonal is covered and cannot be a physical rim.
-- **Attribution:** The original and current geometry produce identical normal,
-  depth and host displacement. A separately executed probe loaded the complete
-  frozen dependency stack, including FixedMathSharp; baseline SHA256 prefixes
-  are Gravitas `7DA03E71399F6260` and FixedMathSharp `E548E281230CBF83`.
-  This is independent of fractional-scale ingress. Disposable probe captures
-  are under `artifacts/grv-issue-141/cylinder-*`; the inputs above reproduce it
-  without those artifacts.
-- **Next action:** Reduce cylinder contacts over the actual trusted filled mesh
-  patch before selecting response, preserving real outer/hole rims and existing
-  finite-feature admission. Check both windings, triangle order/subdivision,
-  whole-shape clearance and mixed cylinder/slab parity. Keep this distinct from
-  FMS-Issue-033's curved-prism false-positive predicate.
-
 ### GRV-Issue-111 - Local-stack benchmark hosts can omit FixedMathSharp compile references
 
 - **Confirmed:** 2026-10-12 during #101's unchanged rotational interval control.
@@ -217,10 +192,103 @@ investigation unless it recurs or a reliable reproducer becomes available.
 - **Artifacts:** Ignored `artifacts/grv-122-123/perf/accepted-cleanup-reverse.log`,
   `perf/accepted-rca-default-jit.log`, and `perf/rca/` under the same artifact
   root retain the failure, follow-up, dump, binary hashes and diagnostic notes.
+- **Additional observation, 2026-10-19:** One #142 two-payload timing launch
+  terminated with `Fatal error. Internal CLR error. (0x80131506)` before
+  producing results. An isolated retry, two complete paired runs and subsequent
+  identical-payload/order controls completed. The failed capture is invalid;
+  there is no dump or established cause, and no evidence connecting this CLR
+  failure to the earlier inertia access violation. Ignored
+  `artifacts/grv-issue-142/timing-accepted-a.log`, the retained
+  `candidate-before-domain-simplification/` snapshot, and
+  `timing-final-verified-*`, `timing-identical-*` and `timing-confirm-*`
+  preserve the failure and bounded follow-up. Do not infer a runtime fix from
+  the successful reruns.
 
 Remaining measured performance costs are tracked in the benchmark backlog.
 
 ## Resolved Issues
+
+### GRV-Issue-142 - Single-mesh cylinder response can select a covered triangle diagonal
+
+- **Confirmed:** 2026-10-18 while validating authored-frame migration; pre-existing
+  on the frozen committed stack used for the #141 baseline.
+- **Reproduction:** Concave floor vertices `(-1,0,-1), (1.25,0,-1),
+  (-1,0,1), (1.25,0,1)`, indices `0,2,1, 1,2,3`, identity pose/unit scale,
+  surface inertia policy. Put an upright cylinder of radius `0.25`, full height
+  `1` at `(0,0.1,0)`. Set gravity, air density and damping to zero; freeze
+  rotation, disable sleep, and run both host phases.
+- **Observed before the fix:** Contact selected normal approximately `(0.66436384,0,0.74740932)`
+  and depth `0.33304548`, moving the body sideways to approximately
+  `(0.08827586,0.1,0.09931035)`. The actual flat patch still intersects it;
+  the internal triangle diagonal is covered and cannot be a physical rim.
+- **Attribution:** The #141 baseline and accepted pre-#142 geometry produced
+  identical normal, depth and host displacement. A separate probe loaded the complete
+  frozen dependency stack, including FixedMathSharp; baseline SHA256 prefixes
+  are Gravitas `7DA03E71399F6260` and FixedMathSharp `E548E281230CBF83`.
+  This is independent of fractional-scale ingress. Disposable probe captures
+  are under `artifacts/grv-issue-141/cylinder-*`; the inputs above reproduce it
+  without those artifacts.
+- **Resolved:** 2026-10-19. Ordinary native cylinders now use the existing exact
+  filled-surface reducer for trusted multi-triangle patches. Isolated and declined
+  triangles retain their complete finite-triangle kernel. No new runtime owner,
+  geometry system or public API is introduced.
+- **Root cause:** Native response selected a complete exit independently for each
+  triangle, so a covered internal diagonal could win before the actual filled
+  patch was considered. Declared native surfaces and mixed slabs already had the
+  appropriate owner; this change shares that implementation with ordinary native
+  cylinders instead of adding another solver.
+- **Hardening:** Admission precedes use of the no-boundary-crossing proof; holes
+  and outside corners cannot manufacture a face. True perimeter normals follow
+  the canonical plane, independent surfaces retain their own groups, and samples
+  keep the supplying material. Full cylinder height and exact selected depth
+  survive odd-raw dimensions and affine cap enrichment. Covered axial supports
+  reuse one solve and skip geometric ranking when every point is retained.
+  FixedMathSharp adds a narrow internal sampling option for this proven covered
+  domain, retaining its general interior-witness default and extreme-frame tests.
+- **Regressions:** The reported host loop now selects Up with exact rounded depth
+  `0.5 - 0.1`; moving the whole cylinder by that exit plus one raw unit clears
+  the entire patch. Tests cover pair/triangle order, mixed winding/subdivision,
+  real rims, holes, independent floor/wall groups, affine/tiny-radius geometry,
+  native/mixed circle and zero-core-stadium parity, scratch reuse, duplicate
+  declared pieces, and nonoverlapping joined suppliers. Pure 2D has no
+  cylinder/mesh counterpart; its existing full-suite gates remain intact.
+- **Review and scope:** Independent ponytail review found no remaining correctness
+  or bloat findings. Runtime growth is 78 net Gravitas lines and four
+  FixedMathSharp lines across existing files; there are no new runtime files.
+  This is a coordinated internal ABI change: commit/push FixedMathSharp first,
+  then update Gravitas develop's immutable dependency pin. Release FixedMathSharp
+  first and revalidate Gravitas with that package before release. Phase 6 is not started.
+- **Validation:** Local-stack `Release` and `ReleaseLean` solution builds pass
+  for `netstandard2.1` and `net8.0` with no warnings/errors. Gravitas passes
+  7,310/7,241 tests, including full-lifecycle replay, restore and allocation
+  guards. Raw Release coverage is 50,101/50,101 lines, 18,284/18,284 branches
+  and 5,308/5,308 methods; Lean is 50,099/50,099 lines, 18,284/18,284 branches
+  and 5,307/5,307 methods. FixedMathSharp passes 6,538/6,517
+  core tests and 49 adapter tests in each configuration; raw line, branch and
+  method coverage is also 100%. All coordinated builds use
+  `UseLocalLsfStack=true`; cross-platform CI and released-package validation
+  remain release gates.
+- **Warm performance:** Frozen complete dependency stacks, Windows x64,
+  Release, one loaded stack per fresh process in ABBA order. Native cap contact
+  is `42.9 -> 42.0 us`, mixed cap contact `168.8 -> 87.6 us`; one-cylinder
+  full-loop simulation is `148.1 -> 139.4 us/frame` on the continuous floor and
+  `445.5 -> 440.8 us/frame` on its two declared pieces. Oblique and miss controls
+  are also flat or faster, with `0 B/op` throughout. The corrected small patch
+  costs `76.4 us` native and `84.9 us` mixed, with four valid cap supports; the
+  old incorrect contact is not a physically equivalent speed baseline.
+  Kernel witnesses match across all process captures. Paired equal-step controls
+  also match raw body state; independent time-based warmups may end at opposite
+  phases of the same periodic trajectory, and every measured full-step block
+  spans two complete round trips with unit tangential speed checked every frame.
+  Two co-resident stack contexts showed setup-order sensitivity, including
+  adverse differences up to about 5%; these captures are retained rather than
+  averaged into a claim of universal zero overhead. The independent-process
+  result preserves this host's warm baseline, not a cross-platform capacity claim.
+- **Evidence:** Ignored `artifacts/grv-issue-142/original-regression.log`,
+  `coverage-complete-{release,lean}/`, `fms-coverage-{release,lean}/`,
+  `timing-process-*`, `timing-complete-*`, `filled-patch-complete.json` and the
+  frozen `baseline-stack/` and `candidate-stack/` retain regression, raw coverage,
+  adverse/order controls, allocations, witnesses and loaded-module hashes.
 
 ### GRV-Issue-141 - Recentered rotated mesh pieces lose exact authored shared vertices
 

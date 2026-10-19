@@ -22,6 +22,8 @@ public sealed class MixedWindingMeshSurfaceContactTests
     [InlineData(1, true)]
     [InlineData(2, false)]
     [InlineData(2, true)]
+    [InlineData(3, false)]
+    [InlineData(3, true)]
     public void SelectivelyReversedInteriorFaces_ShouldPreserveTheCoherentSurfaceManifold(int shape, bool subdivide)
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
@@ -49,6 +51,8 @@ public sealed class MixedWindingMeshSurfaceContactTests
     [InlineData(1, true)]
     [InlineData(2, false)]
     [InlineData(2, true)]
+    [InlineData(3, false)]
+    [InlineData(3, true)]
     public void SelectivelyReversedFaces_ShouldPreserveTheGenuinePerimeterConstraint(int shape, bool subdivide)
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();
@@ -57,7 +61,7 @@ public sealed class MixedWindingMeshSurfaceContactTests
         scenario.InitializeStaticCollider(mixed, Vector3d.Zero);
         LSCollider curved = CreateShape(shape);
         scenario.InitializeStaticCollider(curved,
-            new(Fixed64.Two + Fixed64.FromFraction(1, 16), -Fixed64.Quarter, Fixed64.Zero));
+            new(Fixed64.Two + Fixed64.FromFraction(1, 16), shape == 3 ? Fixed64.Zero : -Fixed64.Quarter, Fixed64.Zero));
         CollisionPair baseline = scenario.CreatePair(coherent, curved), changed = scenario.CreatePair(mixed, curved);
         Assert.True(CollisionDetection.DoCollisionCheck(baseline));
         Assert.True(CollisionDetection.DoCollisionCheck(changed));
@@ -76,6 +80,8 @@ public sealed class MixedWindingMeshSurfaceContactTests
     [InlineData(1, true)]
     [InlineData(2, false)]
     [InlineData(2, true)]
+    [InlineData(3, false)]
+    [InlineData(3, true)]
     public void SelectivelyReversedFacesFullLoop_ShouldPreserveFrictionlessTangentialMotion(int shape, bool subdivide)
     {
         using PhysicsScenarioBuilder baseline = PhysicsScenarioBuilder.Create();
@@ -138,7 +144,8 @@ public sealed class MixedWindingMeshSurfaceContactTests
     {
         0 => new LSSphereCollider { Radius = Fixed64.Half },
         1 => new LSCapsuleCollider { Radius = Fixed64.Half, Size = new(1, 2, 1) },
-        _ => new LSConeCollider { Radius = Fixed64.Half, Size = Vector3d.One }
+        2 => new LSConeCollider { Radius = Fixed64.Half, Size = Vector3d.One },
+        _ => new LSCylinderCollider { Radius = Fixed64.Half, Size = Vector3d.One }
     };
 
     private static LSMeshCollider CreateFloor(bool mixed, bool subdivide)

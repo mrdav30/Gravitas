@@ -244,11 +244,78 @@ internal static class MeshTriangleContactGenerator
             return surface.SlabFaces.AppendJoinedContacts(mesh, cylinder, pair.Context.CollisionScratch.MeshSlabBoundary, pair.Manifold);
         }
         mesh.GetTrianglesInBounds(CreateBounds(cylinder.BoundsMin, cylinder.BoundsMax), triangleBuffer);
-        bool overlaps = false;
-        for (int i = 0; i < triangleBuffer.Count; i++)
-            overlaps |= TryAddCylinderTriangleContact(pair, mesh, triangleBuffer[i], cylinder);
+        CollisionSatScratch scratch = pair.Context.CollisionScratch;
+        scratch.MeshSurfaces.Clear();
+        foreach (int triangle in triangleBuffer.AsReadOnlySpan())
+        {
+            // Isolated/declined triangles have no covered diagonal and keep
+            // their complete finite-triangle kernel and existing warm cost.
+            if (mesh.Mesh.GetCoplanarTriangleNeighbors(triangle).IsEmpty)
+            {
+                TryAddCylinderTriangleContact(pair, mesh, triangle, cylinder);
+                continue;
+            }
+            if (!scratch.MeshSurfaces.Add(mesh.Mesh.GetManifoldSurfaceOwner(triangle))) continue;
+            AppendMeshCylinderSurfaceContacts(pair, mesh, triangle, cylinder, triangleBuffer.AsReadOnlySpan());
+        }
+        return pair.Manifold.HasContact;
+    }
 
-        return overlaps;
+    // Keep the wide frame's stack storage off the isolated-triangle hot path.
+    private static void AppendMeshCylinderSurfaceContacts(CollisionWorkItem pair, LSMeshCollider mesh,
+        int triangle, LSCylinderCollider cylinder, ReadOnlySpan<int> candidates)
+    {
+        mesh.Mesh.GetGeometryTriangleVertices(triangle, out Vector3d a, out Vector3d b, out Vector3d c);
+        var frame = new FiniteSlabRayFrame(new FixedTriangle(a, b, c), mesh.Mesh.GeometryFrame,
+            cylinder.Center, cylinder.Rotation, Fixed64.Zero, cylinder.ScaledRadius, cylinder.Height, fullHeight: true);
+        bool containsSection = MeshSlabFaceRegions.ContainsSection(mesh.Mesh, triangle, frame, ReadOnlySpan<Vector2d>.Empty);
+        SwiftList<int> admitted = pair.Context.CollisionScratch.MeshTriangleCandidatesB;
+        if (!GatherMeshSlabSurfaceTriangles(mesh.Mesh, triangle, frame.Section, ReadOnlySpan<Vector2d>.Empty,
+            candidates, admitted, containsSection)) return;
+        AppendMeshSlabSurfaceContacts(mesh, null, triangle, frame, ReadOnlySpan<Vector2d>.Empty,
+            admitted.AsReadOnlySpan(), containsSection, pair.Manifold, 0, 0, cylinder.Material);
+    }
+
+    internal static void AppendMeshSlabSurfaceContacts(LSMeshCollider collider, LSCollider2D? embedded,
+        int triangle, in FiniteSlabRayFrame frame, ReadOnlySpan<Vector2d> prismOffsets,
+        ReadOnlySpan<int> admitted, bool containsSection, ContactManifold manifold, int namespace3D, int namespace2D,
+        PhysicsMaterial? targetMaterial = null)
+    {
+        PhysicsMesh mesh = collider.Mesh;
+        CollisionSatScratch scratch = collider.Context.CollisionScratch;
+        MeshSurfaceConnectivity connectivity = scratch.MeshConnectivity;
+        connectivity.BuildSlab(mesh, triangle, frame.Section, embedded, admitted);
+        MeshSlabFaceRegions faces = scratch.MeshSlabFaces;
+        faces.Prepare(frame, prismOffsets, containsSection);
+        PhysicsMaterial material = targetMaterial ?? embedded?.Material ?? collider.Material;
+        int contactCount = manifold.Count;
+        // A covered axial footprint has no intersected physical rim. Reuse
+        // that proof rather than repeating the same exact boundary queries.
+        if (!containsSection)
+            scratch.MeshSlabBoundary.BuildSurfaceContacts(collider, embedded, triangle,
+                connectivity, faces, manifold, namespace3D, namespace2D, material);
+        faces.Build(mesh, triangle, connectivity, prismOffsets, embedded, containsSection);
+        faces.AppendContacts(collider, triangle, manifold, namespace3D, namespace2D, material);
+        if (manifold.Count == contactCount)
+            scratch.MeshSlabBoundary.AppendSupportFallback(collider, embedded, triangle, faces,
+                manifold, namespace3D, namespace2D, material);
+    }
+
+    internal static bool GatherMeshSlabSurfaceTriangles(PhysicsMesh mesh, int triangle,
+        in FiniteSlabSectionFrame section, ReadOnlySpan<Vector2d> prismOffsets,
+        ReadOnlySpan<int> candidates, SwiftList<int> admitted, bool stopAfterFirst = false)
+    {
+        admitted.FastClear();
+        int owner = mesh.GetManifoldSurfaceOwner(triangle);
+        foreach (int candidate in candidates)
+        {
+            if (mesh.GetManifoldSurfaceOwner(candidate) != owner) continue;
+            mesh.GetGeometryTriangleVertices(candidate, out Vector3d first, out Vector3d second, out Vector3d third);
+            if (!section.IntersectsTriangle(new FixedTriangle(first, second, third), prismOffsets)) continue;
+            admitted.Add(candidate);
+            if (stopAfterFirst) break;
+        }
+        return admitted.Count != 0;
     }
 
     public static bool TryBuildMeshMeshManifold(
@@ -511,19 +578,19 @@ internal static class MeshTriangleContactGenerator
 
         // Enrichment belongs only to a certified cap/triangle-face winner.
         // Nearly parallel rim contacts must retain their selected witnesses.
+        var group = new ContactGroupKey(0, 0, mesh.Mesh.GetCanonicalSurfaceOrdinal(triangleIndex), 0);
         if (isCapFaceContact && TryAddCylinderCapTriangleContacts(
-                pair, mesh, triangle, cylinder, contact))
+                pair, mesh, triangle, cylinder, contact, group))
         {
             return true;
         }
 
-        AddContact(
-            pair,
+        pair.Manifold.AddContact(
             new ContactAnchor(contact.FirstAnchor),
             new ContactAnchor(contact.SecondAnchor),
             contact.Depth,
             contact.Normal,
-            contact.DepthIsClamped);
+            mesh.Material, cylinder.Material, contact.DepthIsClamped, group: group);
         return true;
     }
 
@@ -532,17 +599,17 @@ internal static class MeshTriangleContactGenerator
         LSMeshCollider mesh,
         FixedTriangle triangle,
         LSCylinderCollider cylinder,
-        in FixedContactAnchors primary)
+        in FixedContactAnchors primary, in ContactGroupKey group)
     {
         Vector3d normal = primary.Normal;
         CylinderContactGeometry.GetCapBasis(cylinder, out Vector3d tangentA, out Vector3d tangentB);
         // A valid support can be deduplicated or lose the four-contact reduction.
         // Geometric success must not depend on whether the manifold count grew.
-        bool found = TryAddCylinderCapTriangleContact(pair, mesh, triangle, cylinder, -normal + tangentA, primary);
-        found |= TryAddCylinderCapTriangleContact(pair, mesh, triangle, cylinder, -normal - tangentA, primary);
-        found |= TryAddCylinderCapTriangleContact(pair, mesh, triangle, cylinder, -normal + tangentB, primary);
-        found |= TryAddCylinderCapTriangleContact(pair, mesh, triangle, cylinder, -normal - tangentB, primary);
-        return found || TryAddCylinderCapTriangleContact(pair, mesh, triangle, cylinder, -normal, primary);
+        bool found = TryAddCylinderCapTriangleContact(pair, mesh, triangle, cylinder, -normal + tangentA, primary, group);
+        found |= TryAddCylinderCapTriangleContact(pair, mesh, triangle, cylinder, -normal - tangentA, primary, group);
+        found |= TryAddCylinderCapTriangleContact(pair, mesh, triangle, cylinder, -normal + tangentB, primary, group);
+        found |= TryAddCylinderCapTriangleContact(pair, mesh, triangle, cylinder, -normal - tangentB, primary, group);
+        return found || TryAddCylinderCapTriangleContact(pair, mesh, triangle, cylinder, -normal, primary, group);
     }
 
     private static bool TryAddCylinderCapTriangleContact(
@@ -551,7 +618,7 @@ internal static class MeshTriangleContactGenerator
         FixedTriangle triangle,
         LSCylinderCollider cylinder,
         Vector3d supportDirection,
-        in FixedContactAnchors primary)
+        in FixedContactAnchors primary, in ContactGroupKey group)
     {
         FixedContactAnchors contact;
         bool found;
@@ -571,13 +638,12 @@ internal static class MeshTriangleContactGenerator
         // Parallel cap/face samples share the selected exact plane gap.
         // The support query rounds into the triangle frame before measuring
         // depth; keep it for anchors only, avoiding a second depth rounding.
-        AddContact(
-            pair,
+        pair.Manifold.AddContact(
             new ContactAnchor(contact.FirstAnchor),
             new ContactAnchor(contact.SecondAnchor),
             primary.Depth,
             primary.Normal,
-            primary.DepthIsClamped);
+            mesh.Material, cylinder.Material, primary.DepthIsClamped, group: group);
         return true;
     }
 

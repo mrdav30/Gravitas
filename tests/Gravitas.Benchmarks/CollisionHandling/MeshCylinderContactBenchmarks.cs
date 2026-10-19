@@ -14,7 +14,7 @@ public class MeshCylinderContactBenchmarks
     private LSMeshCollider _mesh;
     private LSCircleCollider2D _circle;
 
-    [Params("CapFace", "SideFace", "CapIntrusion", "InteriorRim", "ObliqueRim", "RimTouch", "RimGap")]
+    [Params("CapFace", "FilledPatch", "SideFace", "CapIntrusion", "InteriorRim", "ObliqueRim", "RimTouch", "RimGap")]
     public string Geometry { get; set; }
 
     [GlobalSetup]
@@ -26,6 +26,13 @@ public class MeshCylinderContactBenchmarks
         Vector3d[] vertices;
         switch (Geometry)
         {
+            case "FilledPatch":
+                vertices = new[]
+                {
+                    new Vector3d(-1, 0, -1), new Vector3d(Fixed64.FromFraction(5, 4), Fixed64.Zero, -Fixed64.One),
+                    new Vector3d(-1, 0, 1), new Vector3d(Fixed64.FromFraction(5, 4), Fixed64.Zero, Fixed64.One)
+                };
+                break;
             case "CapFace":
                 vertices = new[]
                 {
@@ -73,13 +80,17 @@ public class MeshCylinderContactBenchmarks
                 throw new InvalidOperationException("Unknown contact geometry.");
         }
 
-        _mesh = new LSMeshCollider(vertices, new[] { 0, 1, 2 }, MeshColliderMode.Concave);
+        bool patch = Geometry == "FilledPatch";
+        _mesh = new LSMeshCollider(vertices, patch ? new[] { 0, 2, 1, 1, 2, 3 } : new[] { 0, 1, 2 }, MeshColliderMode.Concave);
         _mesh.InitializeWithNoBody(new BenchmarkMatterAgent(_context, offset));
-        var cylinder = new LSCylinderCollider(ColliderShapeDefinition.Cylinder((Fixed64)5, (Fixed64)10));
-        cylinder.InitializeWithNoBody(new BenchmarkMatterAgent(_context, Vector3d.Zero));
+        Fixed64 radius = patch ? Fixed64.Quarter : (Fixed64)5;
+        Fixed64 height = patch ? Fixed64.One : (Fixed64)10;
+        Vector3d center = patch ? Vector3d.Up * Fixed64.FromFraction(1, 10) : Vector3d.Zero;
+        var cylinder = new LSCylinderCollider(ColliderShapeDefinition.Cylinder(radius, height));
+        cylinder.InitializeWithNoBody(new BenchmarkMatterAgent(_context, center));
         _pair = new CollisionPair(_mesh, cylinder);
-        _circle = new LSCircleCollider2D((Fixed64)5) { MixedHalfThicknessOverride = (Fixed64)5 };
-        _circle.InitializeWithNoBody(new BenchmarkMatterAgent(_context, Vector3d.Zero));
+        _circle = new LSCircleCollider2D(radius) { MixedHalfThicknessOverride = height * Fixed64.Half };
+        _circle.InitializeWithNoBody(new BenchmarkMatterAgent(_context, center));
 
         bool expected = Geometry != "RimGap";
         bool cylinderHit = CollisionDetection.DoCollisionCheck(_pair);
@@ -88,11 +99,13 @@ public class MeshCylinderContactBenchmarks
             throw new InvalidOperationException("Contact classification failed the benchmark preflight.");
         if (expected && Geometry != "CapIntrusion")
         {
-            Fixed64 depth = Geometry == "RimTouch" ? Fixed64.Zero
+            Fixed64 depth = patch ? Fixed64.Half - center.Y : Geometry == "RimTouch" ? Fixed64.Zero
                 : Geometry == "InteriorRim" ? Fixed64.FromFraction(13, 256)
                 : Geometry == "ObliqueRim" ? Fixed64.FromFraction(5, 16) : Fixed64.FromFraction(1, 4);
             if (_pair.Manifold.PrimaryContact.Depth != depth || mixed.Depth != depth)
                 throw new InvalidOperationException("Contact depth failed the benchmark preflight.");
+            if (patch && (_pair.Manifold.PrimaryContact.Normal != Vector3d.Up || mixed.Normal3DTo2D != Vector3d.Up))
+                throw new InvalidOperationException("A covered diagonal cannot replace the filled patch's vertical exit.");
         }
     }
 

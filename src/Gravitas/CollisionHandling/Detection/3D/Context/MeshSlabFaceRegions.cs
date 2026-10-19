@@ -5,6 +5,7 @@
 using FixedMathSharp;
 using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
+using Gravitas.Materials;
 using SwiftCollections;
 using System;
 using System.Collections.Generic;
@@ -27,7 +28,7 @@ internal sealed partial class MeshSlabFaceRegions
     private int _fieldWords = FiniteSlabPolynomial.Words;
     private int SelectionWords => FiniteSlabRaySelection.GetStorageWords(_fieldWords);
     private int _region, _orientation, _supportDimension;
-    private bool _intrinsicOnly, _usesSupportGraph;
+    private bool _intrinsicOnly, _usesSupportGraph, _hasPlaneSamples;
 
     internal MeshSlabFaceRegions() => _visitor = AdmitPoint;
     internal int RegionCount { get; private set; }
@@ -94,14 +95,14 @@ internal sealed partial class MeshSlabFaceRegions
         supplier = chosen; return represented;
     }
 
-    internal void Prepare(in FiniteSlabRayFrame frame, ReadOnlySpan<Vector2d> prismOffsets)
+    internal void Prepare(in FiniteSlabRayFrame frame, ReadOnlySpan<Vector2d> prismOffsets, bool coveredSection)
     {
         _member = -1;
         PrismOffsets = default;
-        PrepareFrame(frame, prismOffsets);
+        PrepareFrame(frame, prismOffsets, coveredSection);
     }
 
-    private void PrepareFrame(in FiniteSlabRayFrame frame, ReadOnlySpan<Vector2d> prismOffsets)
+    private void PrepareFrame(in FiniteSlabRayFrame frame, ReadOnlySpan<Vector2d> prismOffsets, bool coveredSection = false)
     {
         _frame = frame;
         _fieldWords = frame.FieldWords;
@@ -112,38 +113,60 @@ internal sealed partial class MeshSlabFaceRegions
         if (_values.Length < slots * SelectionWords) Array.Resize(ref _values, slots * SelectionWords);
         if (_signs.Length < slots * FiniteSlabRaySelection.SignCount) Array.Resize(ref _signs, slots * FiniteSlabRaySelection.SignCount);
         if (_peaks.Length < slots) Array.Resize(ref _peaks, slots);
+        _hasPlaneSamples = _member < 0 && coveredSection;
+        if (_member < 0) _events.FastClear();
+        // Axial caps are symmetric: the exact plane offset selects the nearer
+        // exit. Its constant-depth samples need only one intrinsic solve.
+        if (_hasPlaneSamples) { _orientation = frame.Plane.PlaneConstant.Sign < 0 ? -1 : 1; _region = 0; _intrinsicOnly = false; }
         for (int orientation = -1; orientation <= 1; orientation += 2)
         {
             var maximum = BorrowPeak(orientation);
             maximum.Restore(default);
-            FiniteSlabRayExtrema.AccumulatePlane(frame, prismOffsets, orientation, ref maximum);
+            if (!_hasPlaneSamples || orientation == _orientation)
+                FiniteSlabRayExtrema.AccumulatePlane(frame, prismOffsets, orientation, ref maximum,
+                    _hasPlaneSamples ? _visitor : null, includeInteriorSample: !_hasPlaneSamples);
             _peaks[2 * (_member + 1) + (orientation > 0 ? 0 : 1)] = maximum.Metadata;
         }
-        var positive = BorrowPeak(1); var negative = BorrowPeak(-1);
-        System.Diagnostics.Debug.Assert(positive.HasValue && negative.HasValue);
-        _orientation = positive.CompareDepth(negative) <= 0 ? 1 : -1;
+        if (!_hasPlaneSamples)
+        {
+            var positive = BorrowPeak(1); var negative = BorrowPeak(-1);
+            System.Diagnostics.Debug.Assert(positive.HasValue && negative.HasValue);
+            _orientation = positive.CompareDepth(negative) <= 0 ? 1 : -1;
+        }
         _supportDimension = frame.GetSupportDimension(prismOffsets, _orientation);
     }
 
-    internal void Build(PhysicsMesh mesh, int surfaceTriangle, MeshSurfaceConnectivity connectivity,
-        ReadOnlySpan<Vector2d> prismOffsets, LSCollider2D? embedded)
+    // With at least one admitted triangle, no boundary crossing certifies the
+    // entire connected axial footprint. Without admission it can lie in a hole.
+    internal static bool ContainsSection(PhysicsMesh mesh, int surfaceTriangle, in FiniteSlabRayFrame frame,
+        ReadOnlySpan<Vector2d> prismOffsets)
     {
-        _events.FastClear(); _admitted.FastClear();
-        _usesSupportGraph = false; RegionCount = 0; _region = 0;
-        _intrinsicOnly = _supportDimension == 2;
         ReadOnlySpan<int> boundary = mesh.GetCanonicalSurfaceBoundaryVertexPairs(surfaceTriangle);
         ReadOnlySpan<Vector3d> vertices = mesh.GeometryVertices;
-        bool containsSection = connectivity.RegionCount == 1 && _frame.RayNormal.X.IsZero && _frame.RayNormal.Z.IsZero;
+        bool containsSection = frame.RayNormal.X.IsZero && frame.RayNormal.Z.IsZero;
         for (int edge = 0; edge < boundary.Length && containsSection; edge += 2)
-            containsSection = !_frame.Section.IntersectsSegment(new FixedSegment(vertices[boundary[edge]], vertices[boundary[edge + 1]]), prismOffsets);
+            containsSection = !frame.Section.IntersectsSegment(new FixedSegment(vertices[boundary[edge]], vertices[boundary[edge + 1]]), prismOffsets);
+        return containsSection;
+    }
+
+    internal void Build(PhysicsMesh mesh, int surfaceTriangle, MeshSurfaceConnectivity connectivity,
+        ReadOnlySpan<Vector2d> prismOffsets, LSCollider2D? embedded, bool containsSection)
+    {
+        if (!_hasPlaneSamples) _events.FastClear();
+        _admitted.FastClear();
+        _usesSupportGraph = false; RegionCount = 0; _region = 0;
+        _intrinsicOnly = _supportDimension == 2;
         if (containsSection)
         {
             // An axial cap projects to the original footprint; no true-boundary
             // crossing certifies that its complete support is inside the fill.
-            VisitPlane(prismOffsets);
+            if (!_hasPlaneSamples) VisitPlane(prismOffsets);
             RegionCount = _events.Count == 0 ? 0 : 1;
             return;
         }
+        _events.FastClear(); _hasPlaneSamples = false;
+        ReadOnlySpan<int> boundary = mesh.GetCanonicalSurfaceBoundaryVertexPairs(surfaceTriangle);
+        ReadOnlySpan<Vector3d> vertices = mesh.GeometryVertices;
         ReadOnlySpan<int> corners = mesh.GetConvexCoplanarPatchCornerVertexIndices(surfaceTriangle);
         bool hasSupport = false;
         if (!corners.IsEmpty)
@@ -235,7 +258,7 @@ internal sealed partial class MeshSlabFaceRegions
         // A finite-domain ray maximum below the intrinsic peak is controlled by
         // a rim, whose real normal belongs to perimeter response, not this face.
         if (_intrinsicOnly && candidate.Metadata.DomainEdgeMask != 0
-            || candidate.CompareDepth(BorrowPeak(_orientation)) != 0) return;
+            || !_hasPlaneSamples && candidate.CompareDepth(BorrowPeak(_orientation)) != 0) return;
         if (_member >= 0 && _completeSupports[_joined.FindResponseComponent(_member)] && !ContainsSupportPoint(candidate)) return;
         bool represented = candidate.TryGetContactAnchor(_frame, out Fixed64 depth, out bool clamped,
             out Vector3d point, out FixedPointAnchor exit);
@@ -252,8 +275,8 @@ internal sealed partial class MeshSlabFaceRegions
         _events.Add(sample);
     }
 
-    internal void AppendContacts(LSMeshCollider collider, LSCollider2D? embedded, int surfaceTriangle,
-        ContactManifold manifold, int namespace3D = 0, int namespace2D = 0)
+    internal void AppendContacts(LSMeshCollider collider, int surfaceTriangle,
+        ContactManifold manifold, int namespace3D, int namespace2D, PhysicsMaterial targetMaterial)
     {
         collider.Mesh.GetGeometryTriangleVertices(surfaceTriangle, out Vector3d a, out Vector3d b, out Vector3d c);
         var metrics = _frame.Section.RadialFrame.ShapeFrame.HasExactScale
@@ -273,7 +296,7 @@ internal sealed partial class MeshSlabFaceRegions
                     : new FixedPointAnchor(_frame.Origin, _frame.Rotation, sample.Point);
                 manifold.AddContact(new ContactAnchor(source),
                     new ContactAnchor(sample.Exit), sample.Depth, _frame.GetNormal(_orientation),
-                    collider.Material, embedded?.Material ?? collider.Material, sample.Clamped,
+                    collider.Material, targetMaterial, sample.Clamped,
                     featureNamespaceA: namespace3D, featureNamespaceB: namespace2D, group: group);
             }
         }
@@ -294,6 +317,13 @@ internal sealed partial class MeshSlabFaceRegions
         _pool.SortInPlace(PointComparer);
         int count = dimension == 0 ? 1 : dimension == 1 ? Math.Min(2, _pool.Count)
             : Math.Min(ContactManifold.MaxContactsPerGroup, _pool.Count);
+        // Retaining every point needs no geometric ranking; the manifold
+        // publishes the same set in stable anchor order regardless of insertion.
+        if (count == _pool.Count)
+        {
+            for (int slot = 0; slot < count; slot++) chosen[slot] = slot;
+            return count;
+        }
         // Normal velocity and wrench are affine along a genuine support line.
         if (dimension <= 1) { chosen[0] = 0; chosen[1] = _pool.Count - 1; }
         else
