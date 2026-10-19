@@ -6,12 +6,181 @@ using Gravitas.Materials;
 using Gravitas.Queries;
 using Gravitas.Tests.Support;
 using SwiftCollections;
+using System.Collections.Generic;
 using Xunit;
 
 namespace Gravitas.Tests;
 
 public sealed class StaticSurfaceContinuityContract2DTests
 {
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void FreelyRotatingObliquePolygon_ShouldMatchTheContinuousFloor(bool polygonMembers, bool reverse)
+    {
+        var baseline = Trace(false);
+        var joined = Trace(true);
+        Fixed64 tolerance = Fixed64.FromFraction(1, 1000);
+        for (int frame = 0; frame < baseline.Count; frame++)
+            for (int component = 0; component < baseline[frame].Length; component++)
+                Assert.True(FixedMath.Abs(baseline[frame][component] - joined[frame][component]) <= tolerance,
+                    $"Frame {frame}, component {component}: {baseline[frame][component]} versus {joined[frame][component]}.");
+
+        List<Fixed64[]> Trace(bool declare)
+        {
+            using var context = Physics2DTestWorld.CreateContext(frameRate: 16);
+            context.Environment.Gravity = Fixed64.One;
+            context.Environment.AirDensity = Fixed64.Zero;
+            context.Environment.DampingFactor = Fixed64.Zero;
+            context.Environment.MinSpeed = Fixed64.Zero;
+            LSCollider2D[] members = declare
+                ? new[] { Rectangle(context, polygonMembers, new(8, 2), new(-4, -1)),
+                    Rectangle(context, polygonMembers, new(8, 2), new(4, -1)) }
+                : new[] { Rectangle(context, polygonMembers, new(16, 2), new(0, -1)) };
+            foreach (LSCollider2D member in members) member.Material = PhysicsMaterial.Frictionless;
+            using var surface = declare ? context.Physics2D.CreateStaticSurface(reverse
+                ? new[] { members[1], members[0] } : members) : null;
+            var polygon = new LSPolygonCollider2D(new(-Fixed64.Half, -Fixed64.Half),
+                new(Fixed64.Half, -Fixed64.Half), new(Fixed64.Half, Fixed64.Half), new(-Fixed64.Half, Fixed64.Half))
+            { Material = PhysicsMaterial.Frictionless };
+            var body = new SolidBody2D(new TestMatterAgent(context), polygon)
+            { Mass = Fixed64.One, SleepEnabled = false };
+            body.Initialize(new(-Fixed64.Quarter, Fixed64.One - Fixed64.Quarter), Fixed64.PiOver4 * Fixed64.Half);
+            body.UseManualGrounding();
+            body.AddLinearImpulse(new(Fixed64.One, -Fixed64.Quarter));
+            body.AddAngularImpulse(Fixed64.FromFraction(1, 64));
+            var trace = new List<Fixed64[]>();
+            bool rotated = false;
+            for (int frame = 0; frame < 64; frame++)
+            {
+                context.Simulate(); context.LateSimulate();
+                Assert.Equal(Fixed64.One, body.LinearVelocity.X);
+                rotated |= body.AngularVelocity != Fixed64.Zero;
+                trace.Add(new[] { body.Position.X, body.Position.Y, body.LinearVelocity.X,
+                    body.LinearVelocity.Y, body.Rotation, body.AngularVelocity });
+            }
+            Assert.True(rotated);
+            Assert.True(body.Position.X > Fixed64.One);
+            return trace;
+        }
+    }
+
+    [Fact]
+    public void EnterCallbackRemovingANeighbor_ShouldRefreshTheCarrierBeforeResponse()
+    {
+        using var context = Physics2DTestWorld.CreateContext();
+        context.Environment.Gravity = Fixed64.Zero;
+        context.Environment.AirDensity = Fixed64.Zero;
+        LSCollider2D left = Rectangle(context, false, new(4, 2), new(-2, -1));
+        LSCollider2D right = Rectangle(context, false, new(4, 2), new(2, -1));
+        using var surface = context.Physics2D.CreateStaticSurface(new[] { left, right });
+        var circle = new LSCircleCollider2D(Fixed64.Half);
+        var body = new SolidBody2D(new TestMatterAgent(context), circle)
+        { Mass = Fixed64.One, FreezeAxes = BodyFreezeAxes2D.Rotation, SleepEnabled = false };
+        body.Initialize(new(Fixed64.Quarter, Fixed64.Quarter));
+        body.UseManualGrounding();
+        int rightSupplier = right.Id + 1;
+        bool removed = false, supplied = false;
+        left.OnContactEnter += _ =>
+        {
+            CollisionPair2D pair = GetPair();
+            for (int group = 0; group < pair.Manifold.GroupCount; group++)
+            {
+                ContactGroupKey key = pair.Manifold.GetGroup(group).Key;
+                supplied |= key.SourceIdA == rightSupplier || key.SourceIdB == rightSupplier;
+            }
+            removed = true;
+            right.IsActive = false;
+        };
+        context.Simulate(); context.LateSimulate();
+        Assert.True(removed);
+        Assert.True(supplied);
+        CollisionPair2D current = GetPair();
+        Assert.True(current.Manifold.HasContact);
+        for (int group = 0; group < current.Manifold.GroupCount; group++)
+        {
+            ContactGroupKey key = current.Manifold.GetGroup(group).Key;
+            Assert.NotEqual(rightSupplier, key.SourceIdA);
+            Assert.NotEqual(rightSupplier, key.SourceIdB);
+        }
+
+        CollisionPair2D GetPair()
+        {
+            if (left.TryGetCollisionPair(circle.Id, out var pair)) return pair!;
+            Assert.True(circle.TryGetCollisionPair(left.Id, out pair));
+            return pair!;
+        }
+    }
+
+    [Theory]
+    [InlineData(false, false, 0)]
+    [InlineData(true, false, 0)]
+    [InlineData(false, true, 0)]
+    [InlineData(true, true, 0)]
+    [InlineData(false, false, 1)]
+    [InlineData(true, false, 1)]
+    [InlineData(false, true, 1)]
+    [InlineData(true, true, 1)]
+    [InlineData(false, false, 2)]
+    [InlineData(true, false, 2)]
+    [InlineData(false, true, 2)]
+    [InlineData(true, true, 2)]
+    public void JoinedFloorCrossing_ShouldMatchTheContinuousFullLoopTrace(
+        bool polygonMembers, bool staticBodies, int shape)
+    {
+        List<long> continuous = Trace(joined: false, reverse: false);
+        Assert.Equal(continuous, Trace(joined: true, reverse: false));
+        Assert.Equal(continuous, Trace(joined: true, reverse: true));
+
+        List<long> Trace(bool joined, bool reverse)
+        {
+            using var context = Physics2DTestWorld.CreateContext(frameRate: 16);
+            context.Environment.Gravity = Fixed64.One;
+            context.Environment.AirDensity = Fixed64.Zero;
+            context.Environment.DampingFactor = Fixed64.Zero;
+            context.Environment.MinSpeed = Fixed64.Zero;
+            LSCollider2D[] members = joined
+                ? new[] { Rectangle(context, polygonMembers, new(8, 2), new(-4, -1), staticBodies),
+                    Rectangle(context, polygonMembers, new(8, 2), new(4, -1), staticBodies) }
+                : new[] { Rectangle(context, polygonMembers, new(16, 2), new(0, -1), staticBodies) };
+            using var surface = joined ? context.Physics2D.CreateStaticSurface(reverse
+                ? new[] { members[1], members[0] } : members) : null;
+            int enters = 0, exits = 0;
+            foreach (LSCollider2D member in members)
+            {
+                member.Material = PhysicsMaterial.Frictionless;
+                member.OnContactEnter += _ => enters++;
+                member.OnContactExit += _ => exits++;
+            }
+            LSCollider2D mover = shape == 0 ? new LSCircleCollider2D(Fixed64.Half)
+                : new LSCapsuleCollider2D(Fixed64.Half, shape == 1 ? Fixed64.Two : Fixed64.One);
+            mover.Material = PhysicsMaterial.Frictionless;
+            var body = new SolidBody2D(new TestMatterAgent(context), mover)
+            { Mass = Fixed64.One, FreezeAxes = BodyFreezeAxes2D.Rotation, SleepEnabled = false };
+            body.Initialize(new(-Fixed64.Two, shape == 1 ? Fixed64.One : Fixed64.Half));
+            body.UseManualGrounding();
+            for (int frame = 0; frame < 32; frame++) Step();
+            body.AddLinearImpulse(Vector2d.Right);
+            var trace = new List<long>();
+            for (int frame = 0; frame < 64; frame++)
+            {
+                Step();
+                Assert.Equal(Fixed64.One, body.LinearVelocity.X);
+                Assert.Equal(Fixed64.Zero, body.AngularVelocity);
+                trace.Add(body.Position.X.m_rawValue); trace.Add(body.Position.Y.m_rawValue);
+                trace.Add(body.LinearVelocity.X.m_rawValue); trace.Add(body.LinearVelocity.Y.m_rawValue);
+            }
+            Assert.Equal(Fixed64.Two, body.Position.X);
+            Assert.Equal(joined ? 2 : 1, enters);
+            Assert.Equal(joined ? 1 : 0, exits);
+            return trace;
+
+            void Step() { context.Simulate(); context.LateSimulate(); }
+        }
+    }
+
     [Theory]
     [InlineData(false, ColliderType2D.Circle, 1, 1)]
     [InlineData(true, ColliderType2D.Circle, 1, 1)]
@@ -144,14 +313,21 @@ public sealed class StaticSurfaceContinuityContract2DTests
         return offsets;
     }
 
-    private static LSCollider2D Rectangle(GravitasWorldContext context, bool polygon, Vector2d size, Vector2d center)
+    private static LSCollider2D Rectangle(GravitasWorldContext context, bool polygon, Vector2d size, Vector2d center,
+        bool staticBody = false)
     {
         Vector2d half = size * Fixed64.Half;
         LSCollider2D member = polygon
             ? new LSPolygonCollider2D(new(-half.X, -half.Y), new(half.X, -half.Y), new(half.X, half.Y), new(-half.X, half.Y))
             : new LSAABBoxCollider2D(size);
-        member.InitializeWithNoBody(new TestMatterAgent(context,
-            new FixedTransform(new Vector3d(center.X, Fixed64.Zero, center.Y), FixedQuaternion.Identity, Vector3d.One)));
+        var agent = new TestMatterAgent(context,
+            new FixedTransform(new Vector3d(center.X, Fixed64.Zero, center.Y), FixedQuaternion.Identity, Vector3d.One));
+        if (staticBody)
+        {
+            var body = new SolidBody2D(agent, member) { Mass = Fixed64.One };
+            body.Initialize(center, motionType: BodyMotionType.Static);
+        }
+        else member.InitializeWithNoBody(agent);
         return member;
     }
 }

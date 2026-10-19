@@ -42,7 +42,8 @@ internal readonly struct ContactLever2D
 internal readonly struct SolverContact2D
 {
     public SolverContact2D(
-        int manifoldIndex,
+        int groupIndex,
+        int pointIndex,
         ulong contactId,
         ResponseBody2D bodyA,
         ResponseBody2D bodyB,
@@ -53,9 +54,12 @@ internal readonly struct SolverContact2D
         PhysicsMaterial materialA,
         PhysicsMaterial materialB,
         Fixed64 cachedNormalImpulse,
-        Fixed64 cachedTangentImpulse)
+        Fixed64 cachedTangentImpulse,
+        ContactGroupKey group = default)
     {
-        ManifoldIndex = manifoldIndex;
+        Group = group;
+        GroupIndex = groupIndex;
+        PointIndex = pointIndex;
         ContactId = contactId;
         A = bodyA;
         B = bodyB;
@@ -74,7 +78,12 @@ internal readonly struct SolverContact2D
         CachedTangentImpulse = cachedTangentImpulse;
     }
 
-    public int ManifoldIndex { get; }
+    // Cache provenance beside the row; repeated manifold lookups cost more than this small copy.
+    internal ContactGroupKey Group { get; }
+
+    public int GroupIndex { get; }
+
+    public int PointIndex { get; }
 
     public ulong ContactId { get; }
 

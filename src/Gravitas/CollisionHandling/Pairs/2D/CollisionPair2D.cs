@@ -19,6 +19,7 @@ internal sealed partial class CollisionPair2D
 {
     private bool _isColliding;
     private ContactWarmStartCache2D _warmStart;
+    internal CollisionResponse2D.GroupedSolveState? ResponseState;
     private bool _notificationInProgress;
     private bool _separationPending;
     private bool _colliderANotified;
@@ -29,6 +30,8 @@ internal sealed partial class CollisionPair2D
     private uint _lastColliderAContactDependencyVersion;
     private uint _lastColliderBContactDependencyVersion;
     private bool _wasTriggerPair;
+    private SolidBody2D? _recoveryBody;
+    private Vector2d _recoveryPosition;
 
     public CollisionPair2D(LSCollider2D colliderA, LSCollider2D colliderB)
     {
@@ -58,7 +61,41 @@ internal sealed partial class CollisionPair2D
 
     internal long LifetimeVersion => _lifetimeVersion;
 
+    internal bool ContactDependenciesChanged =>
+        _lastColliderAContactDependencyVersion != ColliderA.ContactDependencyVersion
+        || _lastColliderBContactDependencyVersion != ColliderB.ContactDependencyVersion;
+
     public ContactManifold2D Manifold { get; } = new();
+
+    internal bool HasRecovery => _recoveryBody != null;
+
+    internal bool HasResponse => Manifold.HasContact || HasRecovery;
+
+    internal void ClearRecovery() => _recoveryBody = null;
+
+    internal void SetRecovery(LSCollider2D mover, Vector2d center)
+    {
+        SolidBody2D body = mover.Body!;
+        // The immediately preceding certificate proved these bounded operations
+        // and the actual publishable body pose; no callback intervenes here.
+        _recoveryBody = body;
+        _recoveryPosition = body.Position + (center - mover.Center);
+    }
+
+    internal void ApplyRecovery()
+    {
+        if (_recoveryBody is not { } body) return;
+        if (!Vector2d.TrySubtract(_recoveryPosition, body.Position, out Vector2d delta)
+            || body.PrepareCollisionPositionCorrection(delta) != _recoveryPosition)
+            throw new InvalidOperationException("Pure 2D static-surface recovery is outside the movable body's supported pose.");
+        StaticSurface2D? surface = ColliderA.StaticSurface ?? ColliderB.StaticSurface;
+        // An earlier island response may have moved a final-pose blocker.
+        if (surface == null || !Vector2d.TryAdd(body.Collider.Center, delta, out Vector2d center)
+            || !surface.IsRecoveryClear(body.Collider, center))
+            throw new InvalidOperationException("Pure 2D static-surface recovery no longer has a certified clear final pose.");
+        ClearRecovery();
+        body.ApplyCollisionPositionState(_recoveryPosition);
+    }
 
     public void Initialize(LSCollider2D colliderA, LSCollider2D colliderB)
     {
@@ -101,7 +138,7 @@ internal sealed partial class CollisionPair2D
 
     public void MarkColliding(long frame)
     {
-        if (!Manifold.HasContact)
+        if (!Manifold.HasContact && ColliderA.StaticSurface == null && ColliderB.StaticSurface == null)
             return;
 
         bool changed = MarkCollidingState(frame);
@@ -117,7 +154,7 @@ internal sealed partial class CollisionPair2D
 
     internal void MarkCollidingDeferred(long frame)
     {
-        if (!Manifold.HasContact)
+        if (!Manifold.HasContact && ColliderA.StaticSurface == null && ColliderB.StaticSurface == null)
             return;
 
         bool changed = MarkCollidingState(frame);
@@ -127,6 +164,7 @@ internal sealed partial class CollisionPair2D
     public void MarkResting(long frame)
     {
         RefreshContactDependencies();
+        if (!Manifold.HasContact) ClearWarmStart();
         LastFrame = frame;
         LastVisitToken = ColliderA.Context.LateSimulateToken;
     }
@@ -151,14 +189,22 @@ internal sealed partial class CollisionPair2D
         NotifyColliders(isColliding: false, isChanged: true);
     }
 
-    internal void StoreWarmStartImpulse(ulong contactId, Fixed64 normalImpulse, Fixed64 tangentImpulse) =>
-        _warmStart.Set(contactId, normalImpulse, tangentImpulse);
+    internal void StoreWarmStartImpulse(in ContactGroupKey group, ulong contactId,
+        Fixed64 normalImpulse, Fixed64 tangentImpulse) =>
+        _warmStart.Set(group, contactId, normalImpulse, tangentImpulse);
 
-    internal bool TryGetWarmStartImpulse(ulong contactId, out ContactWarmStartImpulse impulse) =>
-        _warmStart.TryGet(contactId, out impulse);
+    internal bool TryGetWarmStartImpulse(in ContactGroupKey group, ulong contactId,
+        out ContactWarmStartImpulse impulse) => _warmStart.TryGet(group, contactId, out impulse);
 
-    internal void RemoveWarmStartImpulse(ulong contactId) =>
-        _warmStart.Remove(contactId);
+    internal void RemoveWarmStartImpulse(in ContactGroupKey group, ulong contactId) =>
+        _warmStart.Remove(group, contactId);
+
+    internal void RetainWarmStart() => _warmStart.Retain(Manifold);
+
+    internal void ClearResponseSnapshot()
+    {
+        if (ResponseState != null) ResponseState.Impact = default;
+    }
 
     internal void ClearWarmStart() => _warmStart.Clear();
 
@@ -173,6 +219,8 @@ internal sealed partial class CollisionPair2D
 
     private void ResetCollisionState()
     {
+        ClearRecovery();
+        ClearResponseSnapshot();
         _isColliding = false;
         _lastColliderAContactDependencyVersion = 0;
         _lastColliderBContactDependencyVersion = 0;
@@ -368,6 +416,7 @@ internal sealed partial class CollisionPair2D
     private bool MarkCollidingState(long frame)
     {
         RefreshContactDependencies();
+        if (!Manifold.HasContact) ClearWarmStart();
         bool changed = !_isColliding;
         _isColliding = true;
         LastFrame = frame;
@@ -375,7 +424,7 @@ internal sealed partial class CollisionPair2D
         return changed;
     }
 
-    private void RefreshContactDependencies()
+    internal void RefreshContactDependencies()
     {
         uint versionA = ColliderA.ContactDependencyVersion;
         uint versionB = ColliderB.ContactDependencyVersion;

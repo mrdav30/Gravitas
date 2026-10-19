@@ -448,11 +448,11 @@ public sealed class BodyMotionTypeTests
         var pair = new CollisionPair2D(firstCollider, secondCollider);
         firstCollider.TryAddCollisionPair(secondCollider.Id, pair).Should().BeTrue();
         secondCollider.TryAddCollisionPairHolder(firstCollider.Id).Should().BeTrue();
-        pair.StoreWarmStartImpulse(7, Fixed64.One, Fixed64.Half);
+        pair.StoreWarmStartImpulse(default, 7, Fixed64.One, Fixed64.Half);
 
         (transitionPairOwner ? first : second).SetMotionType(BodyMotionType.Kinematic);
 
-        pair.TryGetWarmStartImpulse(7, out _).Should().BeFalse();
+        pair.TryGetWarmStartImpulse(default, 7, out _).Should().BeFalse();
         firstCollider.TryGetCollisionPair(secondCollider.Id, out CollisionPair2D? retained).Should().BeTrue();
         retained.Should().BeSameAs(pair);
     }

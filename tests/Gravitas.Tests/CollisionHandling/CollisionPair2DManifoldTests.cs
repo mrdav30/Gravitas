@@ -42,7 +42,7 @@ public sealed class CollisionPair2DManifoldTests
         var pair = new CollisionPair2D(first, second.Collider);
         CollisionDetection2D.TryCollide(pair, pair.Manifold, frame: 7).Should().BeTrue();
         ulong contactId = pair.Manifold.PrimaryContact.ContactId;
-        pair.StoreWarmStartImpulse(contactId, Fixed64.One, Fixed64.Half);
+        pair.StoreWarmStartImpulse(default, contactId, Fixed64.One, Fixed64.Half);
         pair.MarkColliding(frame: 7);
 
         pair.MarkSeparated();
@@ -50,7 +50,7 @@ public sealed class CollisionPair2DManifoldTests
         pair.IsColliding.Should().BeFalse();
         pair.Manifold.HasContact.Should().BeFalse();
         pair.Manifold.LastUpdatedFrame.Should().Be(-1);
-        pair.TryGetWarmStartImpulse(contactId, out _).Should().BeFalse();
+        pair.TryGetWarmStartImpulse(default, contactId, out _).Should().BeFalse();
     }
 
     [Fact]
@@ -63,7 +63,7 @@ public sealed class CollisionPair2DManifoldTests
         var pair = new CollisionPair2D(first.Collider, second.Collider);
         CollisionDetection2D.TryCollide(pair, pair.Manifold, frame: 7).Should().BeTrue();
         ulong contactId = pair.Manifold.PrimaryContact.ContactId;
-        pair.StoreWarmStartImpulse(contactId, Fixed64.One, Fixed64.Half);
+        pair.StoreWarmStartImpulse(default, contactId, Fixed64.One, Fixed64.Half);
 
         pair.Initialize(first.Collider, third.Collider);
 
@@ -71,7 +71,7 @@ public sealed class CollisionPair2DManifoldTests
         pair.Id2.Should().Be(third.Collider.Id);
         pair.Manifold.HasContact.Should().BeFalse();
         pair.Manifold.LastUpdatedFrame.Should().Be(-1);
-        pair.TryGetWarmStartImpulse(contactId, out _).Should().BeFalse();
+        pair.TryGetWarmStartImpulse(default, contactId, out _).Should().BeFalse();
     }
 
     [Fact]

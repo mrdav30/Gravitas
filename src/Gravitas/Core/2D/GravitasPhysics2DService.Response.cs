@@ -14,6 +14,13 @@ public sealed partial class GravitasPhysics2DService
 {
     private void SolveDiscreteResponsePairs()
     {
+        // Later pair callbacks can retire a previously queued row's supplier.
+        for (int i = _discreteResponsePairs.Count - 1; i >= 0; i--)
+        {
+            CollisionPair2D pair = _discreteResponsePairs[i];
+            if (!IsCurrentResponsePair(CreatePairKey(pair.Id1, pair.Id2), pair))
+                _discreteResponsePairs.RemoveAt(i);
+        }
         bool hasJoints = _context.Constraints2D.HasActiveJoints;
         if (_discreteResponsePairs.Count == 0 && !hasJoints)
             return;
@@ -194,6 +201,15 @@ public sealed partial class GravitasPhysics2DService
             return;
         }
 
+        // Capture every grouped contact before another contact or joint changes
+        // a shared body's incoming restitution target.
+        for (int i = start; i < end; i++)
+        {
+            DiscreteIslandConstraint2D constraint = _discreteIslandConstraints[i];
+            if (constraint.Kind == DiscreteIslandConstraint2DKind.Contact && constraint.Pair.Manifold.GroupCount > 1)
+                CollisionResponse2D.PrepareSolve(constraint.Pair);
+        }
+
         int iterations = _context.Settings.DiscreteSolverIterations;
         for (int iteration = 0; iteration < iterations; iteration++)
         {
@@ -212,6 +228,12 @@ public sealed partial class GravitasPhysics2DService
                 else
                     JointSolver2D.Solve(constraint.Joint!, applyCachedImpulse);
             }
+        }
+        for (int i = start; i < end; i++)
+        {
+            DiscreteIslandConstraint2D constraint = _discreteIslandConstraints[i];
+            if (constraint.Kind == DiscreteIslandConstraint2DKind.Contact && constraint.Pair.Manifold.GroupCount > 1)
+                constraint.Pair.ClearResponseSnapshot();
         }
     }
 

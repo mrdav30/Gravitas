@@ -30,35 +30,61 @@ internal static partial class CollisionDetection2D
             {
                 LSCollider2D part = compound.GetPartCollider(i);
                 if (BoundsOverlap(candidate, part)
-                    && DoesPostureCapsulePenetrate(candidate, axisLength, radius, part))
+                    && DoesPostureCapsulePenetrate(candidate, candidate.Center, axisLength, radius, part))
                     return true;
             }
             return false;
         }
 
-        return DoesPostureCapsulePenetrate(candidate, axisLength, radius, other);
+        return DoesPostureCapsulePenetrate(candidate, candidate.Center, axisLength, radius, other);
+    }
+
+    // A recovery certificate tests the proposed center without publishing a
+    // transient collider pose, including polygons and all compound blockers.
+    internal static bool DoesPostureCandidatePenetrate(LSCollider2D candidate, Vector2d center, LSCollider2D other)
+    {
+        if (other is LSCompoundCollider2D compound)
+        {
+            for (int i = 0; i < compound.PartCount; i++)
+                if (DoesPostureCandidatePenetrate(candidate, center, compound.GetPartCollider(i))) return true;
+            return false;
+        }
+        if (candidate is LSCircleCollider2D circle)
+            return DoesPostureCapsulePenetrate(candidate, center, Fixed64.Zero, circle.ScaledRadius, other);
+        if (candidate is LSCapsuleCollider2D capsule)
+            return DoesPostureCapsulePenetrate(candidate, center, capsule.AxisLength, capsule.ScaledRadius, other);
+        Span<Vector2d> scratch = stackalloc Vector2d[4], otherScratch = stackalloc Vector2d[4];
+        ReadOnlySpan<Vector2d> vertices = GetConvexVertexOffsets(candidate, scratch);
+        if (other is LSCircleCollider2D otherCircle)
+            return FixedSegment2d.DoesCenteredCapsulePenetrateConvex(other.Center, other.Rotation, Fixed64.Zero,
+                otherCircle.ScaledRadius, center, candidate.ConvexRotation, vertices);
+        if (other is LSCapsuleCollider2D otherCapsule)
+            return FixedSegment2d.DoesCenteredCapsulePenetrateConvex(other.Center, other.Rotation, otherCapsule.AxisLength,
+                otherCapsule.ScaledRadius, center, candidate.ConvexRotation, vertices);
+        return WideConvex2dRelations.DoConvexesOverlap(center, candidate.ConvexRotation, vertices,
+            other.Center, other.ConvexRotation, GetConvexVertexOffsets(other, otherScratch));
     }
 
     private static bool DoesPostureCapsulePenetrate(
-        LSCollider2D candidate, Fixed64 axisLength, Fixed64 radius, LSCollider2D other)
+        LSCollider2D candidate, Vector2d center, Fixed64 axisLength, Fixed64 radius, LSCollider2D other)
     {
         if (other is LSCircleCollider2D circle)
         {
             return FixedSegment2d.DoCenteredCapsulesOverlapStrict(
-                candidate.Center, candidate.Rotation, axisLength, radius,
+                center, candidate.Rotation, axisLength, radius,
                 circle.Center, circle.Rotation, Fixed64.Zero, circle.ScaledRadius);
         }
         if (other is LSCapsuleCollider2D capsule)
         {
             return FixedSegment2d.DoCenteredCapsulesOverlapStrict(
-                candidate.Center, candidate.Rotation, axisLength, radius,
+                center, candidate.Rotation, axisLength, radius,
                 capsule.Center, capsule.Rotation, capsule.AxisLength, capsule.ScaledRadius);
         }
 
         Span<Vector2d> scratch = stackalloc Vector2d[4];
         ReadOnlySpan<Vector2d> vertices = GetConvexVertexOffsets(other, scratch);
         return FixedSegment2d.DoesCenteredCapsulePenetrateConvex(
-            candidate.Center, candidate.Rotation, axisLength, radius,
+            center, candidate.Rotation, axisLength, radius,
             other.Center, other.ConvexRotation, vertices);
     }
 }

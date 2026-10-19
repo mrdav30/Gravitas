@@ -20,7 +20,8 @@ internal readonly struct ContactResponseSnapshot
 
     internal ContactResponseSnapshot(Vector3d positionA, Vector3d positionB,
         ContactAnchor centerA, ContactAnchor centerB, Vector3d linearA,
-        Vector3d angularA, Vector3d linearB, Vector3d angularB, Fixed64 planarAngularB = default)
+        Vector3d angularA, Vector3d linearB, Vector3d angularB, Fixed64 planarAngularB = default,
+        Fixed64 planarAngularA = default)
     {
         IsValid = true;
         PositionA = positionA;
@@ -32,11 +33,12 @@ internal readonly struct ContactResponseSnapshot
         LinearB = linearB;
         AngularB = angularB;
         PlanarAngularB = planarAngularB;
+        PlanarAngularA = planarAngularA;
     }
 
     internal readonly bool IsValid;
     internal readonly Vector3d PositionA, PositionB, LinearA, AngularA, LinearB, AngularB;
     internal readonly ContactAnchor CenterA, CenterB;
-    // Mixed yaw retains its own signed domain: negating MinValue cannot fit a spatial Fixed64 Y.
-    internal readonly Fixed64 PlanarAngularB;
+    // Planar yaw retains its own signed domain: negating MinValue cannot fit a spatial Fixed64 Y.
+    internal readonly Fixed64 PlanarAngularA, PlanarAngularB;
 }

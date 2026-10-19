@@ -210,14 +210,14 @@ public sealed class SolidBodyMassMutationBoundaryTests
         Joint2D joint = CreateJoint(first, second);
         SolidBody2D changedBody = pairOwner ? first : second;
         changedBody.Sleep();
-        pair.StoreWarmStartImpulse(7, Fixed64.One, Fixed64.Half);
+        pair.StoreWarmStartImpulse(default, 7, Fixed64.One, Fixed64.Half);
         joint.SetCachedImpulse(0, Fixed64.One);
         joint.SetCachedImpulse(1, Fixed64.Half);
         joint.AccumulatedImpulseMagnitude = Fixed64.One;
 
         changedBody.Mass = noOp ? Fixed64.One : (Fixed64)2;
 
-        pair.TryGetWarmStartImpulse(7, out _).Should().Be(noOp);
+        pair.TryGetWarmStartImpulse(default, 7, out _).Should().Be(noOp);
         joint.GetCachedImpulse(0).Should().Be(noOp ? Fixed64.One : Fixed64.Zero);
         joint.GetCachedImpulse(1).Should().Be(noOp ? Fixed64.Half : Fixed64.Zero);
         joint.AccumulatedImpulseMagnitude.Should().Be(noOp ? Fixed64.One : Fixed64.Zero);
@@ -275,7 +275,7 @@ public sealed class SolidBodyMassMutationBoundaryTests
         object payload = GravitasSerializationHarness.Serialize(body, transport);
         body.Mass = Fixed64.One;
         body.IsSleeping.Should().BeFalse();
-        pair.StoreWarmStartImpulse(7, Fixed64.One, Fixed64.Half);
+        pair.StoreWarmStartImpulse(default, 7, Fixed64.One, Fixed64.Half);
         joint.SetCachedImpulse(0, Fixed64.One);
 
         GravitasSerializationHarness.Populate(body, payload, transport);
@@ -283,7 +283,7 @@ public sealed class SolidBodyMassMutationBoundaryTests
         body.Mass.Should().Be((Fixed64)2);
         body.InverseMomentOfInertia.Should().Be(recordedInertia);
         body.IsSleeping.Should().BeTrue();
-        pair.TryGetWarmStartImpulse(7, out _).Should().BeFalse();
+        pair.TryGetWarmStartImpulse(default, 7, out _).Should().BeFalse();
         joint.GetCachedImpulse(0).Should().Be(Fixed64.Zero);
         context.Constraints2D.TryGetJoint(joint.Id, out Joint2D? retainedJoint).Should().BeTrue();
         retainedJoint.Should().BeSameAs(joint);

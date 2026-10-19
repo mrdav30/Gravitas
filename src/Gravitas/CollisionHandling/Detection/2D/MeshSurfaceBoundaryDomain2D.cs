@@ -14,12 +14,13 @@ namespace Gravitas.CollisionHandling;
 
 /// <summary>
 /// Classifies original convex perimeters against explicitly supplied committed
-/// members. Ambiguous fill retains the boundary. This local span proof does not
-/// establish endpoint fans, global embedding, or runtime membership.
+/// members, preserving exact span provenance and ambiguous boundaries. The
+/// dimensional surface owner manages declarations, endpoint fans and response.
 /// </summary>
 internal sealed class MeshSurfaceBoundaryDomain2D
 {
     private readonly SwiftList<BoundarySpan> _spans = new();
+    private readonly SwiftList<FixedBoundArea> _vertexBounds = new();
     private readonly SwiftList<Coverage> _coverage = new();
     private readonly SwiftList<Parameter> _cuts = new();
     private readonly SwiftHashSet<int> _own = new(), _opposite = new();
@@ -31,32 +32,19 @@ internal sealed class MeshSurfaceBoundaryDomain2D
         internal readonly Vector2d Start, End;
         internal readonly RationalSegmentInterval Interval;
         internal readonly SpanKind Kind;
+        internal readonly FixedBoundArea Bounds;
         internal BoundarySpan(int first, int second, Vector2d start, Vector2d end,
-            in RationalSegmentInterval interval, SpanKind kind, int otherMember)
+            in RationalSegmentInterval interval, SpanKind kind, int otherMember, FixedBoundArea bounds)
         {
             First = first; Second = second; Start = start; End = end;
             Interval = interval; Kind = kind; OtherMember = otherMember;
+            Bounds = bounds;
         }
     }
     internal ReadOnlySpan<BoundarySpan> Spans => _spans.AsReadOnlySpan();
-    internal int SourceMember { get; private set; }
+    internal ReadOnlySpan<FixedBoundArea> VertexBounds => _vertexBounds.AsReadOnlySpan();
     internal Vector2d Origin { get; private set; }
     internal Fixed64 Rotation { get; private set; }
-
-    /// <summary>
-    /// Finalizes a true-boundary endpoint in the supplying member's native
-    /// local frame. SourceMember and the original span/interval retain feature
-    /// identity; this rounded point must not be reused for coverage decisions.
-    /// Pure and mixed callers materialize it with their own dimensional frame.
-    /// </summary>
-    internal bool TryGetExposedEndpoint(int spanIndex, bool upper, out Vector2d point)
-    {
-        BoundarySpan span = _spans[spanIndex];
-        point = default;
-        if (span.Kind != SpanKind.Exposed) return false;
-        point = span.Interval.GetEndpoint(new FixedSegment2d(span.Start, span.End), upper);
-        return true;
-    }
 
     internal void Build(ReadOnlySpan<LSCollider2D> members, int sourceMember, bool mixed = false)
     {
@@ -64,20 +52,26 @@ internal sealed class MeshSurfaceBoundaryDomain2D
             if (member is not (LSAABBoxCollider2D or LSPolygonCollider2D))
                 throw new ArgumentException("Boundary preparation requires committed AABB or convex polygon members.", nameof(members));
         LSCollider2D source = members[sourceMember];
-        SourceMember = sourceMember; Origin = source.Center; Rotation = source.ConvexRotation;
+        Origin = source.Center; Rotation = source.ConvexRotation;
         _spans.FastClear();
+        _vertexBounds.FastClear();
+        Span<Vector2d> points = stackalloc Vector2d[2];
         for (int first = 0; first < source.VertexCount; first++)
         {
             int second = (first + 1) % source.VertexCount;
             Vector2d start = source.GetScaledLocalVertexUnchecked(first), end = source.GetScaledLocalVertexUnchecked(second);
+            points[0] = start;
+            _vertexBounds.Add(WideConvex2dRelations.GetBoundsClippedToDomain(Origin, Rotation, points.Slice(0, 1)));
+            points[1] = end;
+            FixedBoundArea bounds = WideConvex2dRelations.GetBoundsClippedToDomain(Origin, Rotation, points);
             Vector2d inward = source.GetScaledLocalVertexUnchecked((first + 2) % source.VertexCount);
-            Gather(members, sourceMember, new FixedSegment2d(start, end), inward, mixed);
-            Classify(sourceMember, first, second, start, end);
+            Gather(members, sourceMember, new FixedSegment2d(start, end), inward, bounds, mixed);
+            Classify(sourceMember, first, second, start, end, bounds);
         }
     }
 
     private void Gather(ReadOnlySpan<LSCollider2D> members, int sourceMember, FixedSegment2d edge,
-        Vector2d inward, bool mixed)
+        Vector2d inward, FixedBoundArea bounds, bool mixed)
     {
         _coverage.FastClear(); _cuts.FastClear();
         _cuts.Add(Parameter.Zero); _cuts.Add(Parameter.One);
@@ -87,6 +81,9 @@ internal sealed class MeshSurfaceBoundaryDomain2D
         {
             if (member == sourceMember) continue;
             LSCollider2D target = members[member];
+            // Pure bounds use the same scalar Sin/Cos chart as exact coverage.
+            // Mixed prisms have a different quaternion chart and retain their proof.
+            if (!mixed && !bounds.Intersects(target.Bounds)) continue;
             // Equal extrusions allow a planar proof to cover their entire
             // height. Different slabs retain their real step/side boundaries.
             if (mixed && (source.MixedSlabCenterY != target.MixedSlabCenterY
@@ -132,7 +129,7 @@ internal sealed class MeshSurfaceBoundaryDomain2D
         _cuts.Add(lower); _cuts.Add(upper);
     }
 
-    private void Classify(int sourceMember, int first, int second, Vector2d start, Vector2d end)
+    private void Classify(int sourceMember, int first, int second, Vector2d start, Vector2d end, FixedBoundArea bounds)
     {
         int edgeStart = _spans.Count;
         Parameter lower = _cuts[0];
@@ -148,13 +145,13 @@ internal sealed class MeshSurfaceBoundaryDomain2D
                 {
                     var merged = new RationalSegmentInterval(Parameter.Lower(previous.Interval).N,
                         Parameter.Lower(previous.Interval).D, upper.N, upper.D);
-                    _spans[_spans.Count - 1] = new BoundarySpan(first, second, start, end, merged, kind, otherMember);
+                    _spans[_spans.Count - 1] = new BoundarySpan(first, second, start, end, merged, kind, otherMember, bounds);
                     lower = upper;
                     continue;
                 }
             }
             var interval = new RationalSegmentInterval(lower.N, lower.D, upper.N, upper.D);
-            _spans.Add(new BoundarySpan(first, second, start, end, interval, kind, otherMember));
+            _spans.Add(new BoundarySpan(first, second, start, end, interval, kind, otherMember, bounds));
             lower = upper;
         }
     }

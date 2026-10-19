@@ -347,9 +347,11 @@ zero applicable solver mobility.
 
 2D contact response uses planar COM-relative contact arms, scalar inverse
 moment, collider surface materials, normal impulses, tangent Coulomb friction,
-and deterministic warm-start caches. Convex/convex face contacts can resolve
-through a fixed two-contact `ContactManifold2D`; circle/circle and circle/convex
-contacts remain one-contact manifolds.
+and deterministic warm-start caches. `ContactManifold2D` retains up to two
+finite samples per independent surface group, with no pair-wide group limit.
+Inspect `GroupCount`, `GetGroupStartIndex` and `GetGroupContactCount` when group
+boundaries matter. Ordinary convex/convex face contacts use one group;
+circle/circle and circle/convex contacts ordinarily retain one sample.
 
 Pure 2D and mixed 2D bodies obtain friction from physical contact impulses.
 Manual or query-only grounding does not add the 3D body's empirical friction

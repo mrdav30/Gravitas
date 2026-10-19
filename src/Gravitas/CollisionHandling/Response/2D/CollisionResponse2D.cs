@@ -23,32 +23,128 @@ public static class CollisionResponse2D
     /// <summary>Fraction of excess penetration corrected by the solver.</summary>
     public static readonly Fixed64 PenetrationCorrectionPercent = Fixed64.One;
 
-    internal static void Resolve(CollisionPair2D pair) =>
-        Resolve(pair, applyCachedImpulse: true, applyPositionCorrection: true);
-
-    internal static void Resolve(
-        CollisionPair2D pair,
-        bool applyCachedImpulse,
-        bool applyPositionCorrection)
+    // Ordinary pairs retain only a null reference. Grouped pairs reuse their
+    // phase-local incoming motion and exact lever frames across island iterations.
+    internal sealed class GroupedSolveState
     {
+        internal ContactResponseSnapshot Impact;
+        internal ContactAnchor2D CenterA, CenterB;
+    }
+
+    internal static void PrepareSolve(CollisionPair2D pair)
+    {
+        pair.ClearResponseSnapshot();
+        if (pair.Manifold.GroupCount <= 1
+            || !TryCreateBodyPair(pair, out ResponseBody2D bodyA, out ResponseBody2D bodyB)) return;
+        pair.RetainWarmStart();
+        GroupedSolveState state = pair.ResponseState ??= new GroupedSolveState();
+        state.CenterA = bodyA.Body?.GetCenterOfMassAnchor() ?? default;
+        state.CenterB = bodyB.Body?.GetCenterOfMassAnchor() ?? default;
+        state.Impact = new ContactResponseSnapshot(
+            ExactContactLever2D.ToSpatial(bodyA.Body?.Position ?? Vector2d.Zero),
+            ExactContactLever2D.ToSpatial(bodyB.Body?.Position ?? Vector2d.Zero), default, default,
+            ExactContactLever2D.ToSpatial(ResolveLinearVelocity(bodyA.Body)), Vector3d.Zero,
+            ExactContactLever2D.ToSpatial(ResolveLinearVelocity(bodyB.Body)), Vector3d.Zero,
+            planarAngularB: ResolveAngularVelocity(bodyB.Body),
+            planarAngularA: ResolveAngularVelocity(bodyA.Body));
+    }
+
+    internal static void Resolve(CollisionPair2D pair)
+    {
+        bool grouped = pair.Manifold.GroupCount > 1;
+        if (grouped) PrepareSolve(pair);
+        Resolve(pair, applyCachedImpulse: true, applyPositionCorrection: true, iterateGroups: true);
+        if (grouped) pair.ClearResponseSnapshot();
+    }
+
+    internal static void Resolve(CollisionPair2D pair, bool applyCachedImpulse, bool applyPositionCorrection) =>
+        Resolve(pair, applyCachedImpulse, applyPositionCorrection, iterateGroups: false);
+
+    private static void Resolve(CollisionPair2D pair, bool applyCachedImpulse,
+        bool applyPositionCorrection, bool iterateGroups)
+    {
+        if (applyPositionCorrection) pair.ApplyRecovery();
         if (!TryCreateBodyPair(pair, out ResponseBody2D bodyA, out ResponseBody2D bodyB))
             return;
 
-        ContactAnchor2D responseCenterA = bodyA.Body?.GetCenterOfMassAnchor() ?? default;
-        ContactAnchor2D responseCenterB = bodyB.Body?.GetCenterOfMassAnchor() ?? default;
+        if (pair.Manifold.GroupCount == 1)
+        {
+            pair.RetainWarmStart();
+            ResolveGroup(pair, bodyA, bodyB, 0, applyCachedImpulse, applyPositionCorrection,
+                bodyA.Body?.GetCenterOfMassAnchor() ?? default,
+                bodyB.Body?.GetCenterOfMassAnchor() ?? default,
+                bodyA.Body?.Position ?? Vector2d.Zero,
+                bodyB.Body?.Position ?? Vector2d.Zero, default);
+            return;
+        }
+        ResolveGroups(pair, bodyA, bodyB, applyCachedImpulse, applyPositionCorrection, iterateGroups);
+    }
+
+    private static void ResolveGroups(CollisionPair2D pair, ResponseBody2D bodyA, ResponseBody2D bodyB,
+        bool applyCachedImpulse, bool applyPositionCorrection, bool iterateGroups)
+    {
+        // Standalone and island owners prepare the grouped incoming state
+        // before any row or joint changes a participating body's velocity.
+        GroupedSolveState state = pair.ResponseState!;
+        ContactAnchor2D centerA = state.CenterA, centerB = state.CenterB;
+        ref readonly ContactResponseSnapshot impact = ref state.Impact;
+        Vector2d positionA = ExactContactLever2D.ToPlanar(impact.PositionA);
+        Vector2d positionB = ExactContactLever2D.ToPlanar(impact.PositionB);
+        if (applyCachedImpulse || applyPositionCorrection)
+        {
+            // Warm all groups before solving any row: later warm starts must
+            // not overwrite the state against which an earlier group was solved.
+            for (int g = 0; g < pair.Manifold.GroupCount; g++)
+            {
+                ref ContactGroup2D group = ref pair.Manifold.GetGroup(g);
+                for (int point = 0; point < group.Count; point++)
+                {
+                    if (!TryCreateContact(pair, bodyA, bodyB, centerA, centerB,
+                            g, point, out SolverContact2D contact)) continue;
+                    if (applyPositionCorrection && IsCorrectionOwner(pair, contact))
+                        ApplyPositionCorrection(contact, Fixed64.One);
+                    if (applyCachedImpulse && !TryApplyCachedImpulse(pair, contact, positionA, positionB))
+                        pair.RemoveWarmStartImpulse(contact.Group, contact.ContactId);
+                }
+            }
+        }
+        int iterations = iterateGroups
+            ? pair.ColliderA.Context.Settings.DiscreteSolverIterations : 1;
+        for (int iteration = 0; iteration < iterations; iteration++)
+        {
+            for (int group = 0; group < pair.Manifold.GroupCount; group++)
+            {
+                ResolveGroup(pair, bodyA, bodyB, group,
+                    applyCachedImpulse: false, applyPositionCorrection: false,
+                    centerA, centerB, positionA, positionB, impact);
+            }
+        }
+    }
+
+    private static void ResolveGroup(
+        CollisionPair2D pair,
+        ResponseBody2D bodyA,
+        ResponseBody2D bodyB,
+        int groupIndex,
+        bool applyCachedImpulse,
+        bool applyPositionCorrection,
+        in ContactAnchor2D responseCenterA,
+        in ContactAnchor2D responseCenterB,
+        Vector2d responsePositionA,
+        Vector2d responsePositionB,
+        in ContactResponseSnapshot impact)
+    {
         SolverContactBuffer2D contacts = BuildContactBuffer(
             pair,
             bodyA,
             bodyB,
             responseCenterA,
-            responseCenterB);
+            responseCenterB, groupIndex);
         if (contacts.Count == 0)
             return;
 
-        Vector2d responsePositionA = bodyA.Body?.Position ?? Vector2d.Zero;
-        Vector2d responsePositionB = bodyB.Body?.Position ?? Vector2d.Zero;
         byte failedResponseMask = 0;
-        Fixed64 contactShare = Fixed64.One / (Fixed64)contacts.Count;
+        Fixed64 contactShare = impact.IsValid ? Fixed64.One : Fixed64.One / (Fixed64)contacts.Count;
         if (applyPositionCorrection)
         {
             for (int i = 0; i < contacts.Count; i++)
@@ -70,7 +166,7 @@ public static class CollisionResponse2D
                     continue;
                 }
 
-                pair.RemoveWarmStartImpulse(contact.ContactId);
+                pair.RemoveWarmStartImpulse(contact.Group, contact.ContactId);
                 rebuildContacts = true;
             }
 
@@ -81,7 +177,7 @@ public static class CollisionResponse2D
                     bodyA,
                     bodyB,
                     responseCenterA,
-                    responseCenterB);
+                    responseCenterB, groupIndex);
             }
         }
 
@@ -97,11 +193,19 @@ public static class CollisionResponse2D
         for (int i = 0; i < contacts.Count; i++)
         {
             SolverContact2D contact = contacts.GetContact(i);
+            if (impact.IsValid)
+            {
+                normalLinearVelocityA = ResolveLinearVelocity(bodyA.Body);
+                normalAngularVelocityA = ResolveAngularVelocity(bodyA.Body);
+                normalLinearVelocityB = ResolveLinearVelocity(bodyB.Body);
+                normalAngularVelocityB = ResolveAngularVelocity(bodyB.Body);
+            }
             SolidBody2D? contactBodyA = contact.A.Body;
             SolidBody2D? contactBodyB = contact.B.Body;
             bool normalResolved;
             ContactNormalImpulseResult2D normalResult = default;
-            if (contact.RelativeA.IsExact || contact.RelativeB.IsExact)
+            if (contact.RelativeA.IsExact || contact.RelativeB.IsExact
+                || impact.IsValid && contact.Restitution != Fixed64.Zero)
             {
                 normalResolved = TryCalculateExactNormalResult(
                     pair,
@@ -114,7 +218,7 @@ public static class CollisionResponse2D
                     normalAngularVelocityB,
                     restitutionVelocityThreshold,
                     contactShare,
-                    out normalResult);
+                    out normalResult, impact);
             }
             else
             {
@@ -150,10 +254,15 @@ public static class CollisionResponse2D
                         normalAngularVelocityB,
                         restitutionVelocityThreshold,
                         contactShare,
-                        out normalResult);
+                        out normalResult, impact);
                 }
             }
             if (!normalResolved)
+            {
+                RejectResponse(pair, contact, i, ref failedResponseMask);
+                continue;
+            }
+            if (impact.IsValid && !TryApplyNormalImpulse(contact, normalResult))
             {
                 RejectResponse(pair, contact, i, ref failedResponseMask);
                 continue;
@@ -163,7 +272,20 @@ public static class CollisionResponse2D
                 i,
                 normalImpulse,
                 normalResult);
+            if (impact.IsValid)
+            {
+                if (!TrySolveFrictionImpulse(pair, contact, responsePositionA, responsePositionB,
+                        normalLinearVelocityA, normalAngularVelocityA, normalLinearVelocityB,
+                        normalAngularVelocityB, restitutionVelocityThreshold, Fixed64.One,
+                        normalResult, normalImpulse, out Fixed64 tangentImpulse, impact))
+                {
+                    RejectResponse(pair, contact, i, ref failedResponseMask);
+                    continue;
+                }
+                pair.StoreWarmStartImpulse(contact.Group, contact.ContactId, normalImpulse, tangentImpulse);
+            }
         }
+        if (impact.IsValid) return;
 
         for (int i = 0; i < contacts.Count; i++)
         {
@@ -218,10 +340,29 @@ public static class CollisionResponse2D
 
             SolverContact2D contact = contacts.GetContact(i);
             pair.StoreWarmStartImpulse(
-                contact.ContactId,
+                contact.Group, contact.ContactId,
                 contacts.GetNormalImpulse(i),
                 contacts.GetTangentImpulse(i));
         }
+    }
+
+    private static bool IsCorrectionOwner(CollisionPair2D pair, SolverContact2D contact)
+    {
+        // Translation is shared by equal-normal samples; retain every velocity
+        // row, but apply the deepest directional correction only once.
+        for (int g = 0; g < pair.Manifold.GroupCount; g++)
+        {
+            ref ContactGroup2D group = ref pair.Manifold.GetGroup(g);
+            for (int point = 0; point < group.Count; point++)
+            {
+                ManifoldContact2D other = group[point];
+                if (ResolveContactNormal(pair, group.Key, other.Normal) != contact.Normal) continue;
+                if (other.Depth > contact.Depth
+                    || other.Depth == contact.Depth
+                    && (g < contact.GroupIndex || g == contact.GroupIndex && point < contact.PointIndex)) return false;
+            }
+        }
+        return true;
     }
 
     private static bool TryCreateBodyPair(
@@ -245,10 +386,11 @@ public static class CollisionResponse2D
         ResponseBody2D bodyA,
         ResponseBody2D bodyB,
         in ContactAnchor2D responseCenterA,
-        in ContactAnchor2D responseCenterB)
+        in ContactAnchor2D responseCenterB,
+        int groupIndex)
     {
         SolverContactBuffer2D contacts = default;
-        for (int i = 0; i < pair.Manifold.Count; i++)
+        for (int i = 0; i < pair.Manifold.GetGroup(groupIndex).Count; i++)
         {
             if (TryCreateContact(
                     pair,
@@ -256,7 +398,7 @@ public static class CollisionResponse2D
                     bodyB,
                     responseCenterA,
                     responseCenterB,
-                    i,
+                    groupIndex, i,
                     out SolverContact2D contact))
                 contacts.Add(contact);
         }
@@ -270,14 +412,15 @@ public static class CollisionResponse2D
         ResponseBody2D bodyB,
         in ContactAnchor2D responseCenterA,
         in ContactAnchor2D responseCenterB,
-        int contactIndex,
+        int groupIndex,
+        int pointIndex,
         out SolverContact2D contact)
     {
         contact = default;
-        ManifoldContact2D manifoldContact = pair.Manifold[contactIndex];
-        Vector2d normal = ResolveContactNormal(
-            manifoldContact.Normal,
-            pair.ColliderB.Center - pair.ColliderA.Center);
+        ref ContactGroup2D surface = ref pair.Manifold.GetGroup(groupIndex);
+        ManifoldContact2D manifoldContact = surface[pointIndex];
+        ContactGroupKey group = surface.Key;
+        Vector2d normal = ResolveContactNormal(pair, group, manifoldContact.Normal);
         if (normal == Vector2d.Zero)
             return false;
         ContactLever2D relativeA = bodyA.Body == null
@@ -299,14 +442,14 @@ public static class CollisionResponse2D
 
         Fixed64 cachedNormalImpulse = Fixed64.Zero;
         Fixed64 cachedTangentImpulse = Fixed64.Zero;
-        if (pair.TryGetWarmStartImpulse(manifoldContact.ContactId, out ContactWarmStartImpulse cached))
+        if (pair.TryGetWarmStartImpulse(group, manifoldContact.ContactId, out ContactWarmStartImpulse cached))
         {
             cachedNormalImpulse = cached.NormalImpulse;
             cachedTangentImpulse = cached.TangentImpulse;
         }
 
         contact = new SolverContact2D(
-            contactIndex,
+            groupIndex, pointIndex,
             manifoldContact.ContactId,
             bodyA,
             bodyB,
@@ -317,7 +460,7 @@ public static class CollisionResponse2D
             materialA,
             materialB,
             cachedNormalImpulse,
-            cachedTangentImpulse);
+            cachedTangentImpulse, group);
         return true;
     }
 
@@ -333,7 +476,8 @@ public static class CollisionResponse2D
         Fixed64 angularVelocityB,
         Fixed64 restitutionVelocityThreshold,
         Fixed64 contactShare,
-        out ContactNormalImpulseResult2D result)
+        out ContactNormalImpulseResult2D result,
+        in ContactResponseSnapshot impact = default)
     {
         GetExactLevers(
             pair,
@@ -357,7 +501,7 @@ public static class CollisionResponse2D
             contact.CachedNormalImpulse,
             contactShare,
             contactShare,
-            out result);
+            out result, impact);
     }
 
     private static void ApplyPositionCorrection(SolverContact2D contact, Fixed64 contactShare)
@@ -462,7 +606,8 @@ public static class CollisionResponse2D
         Fixed64 contactShare,
         ContactNormalImpulseResult2D normalResult,
         Fixed64 normalImpulseScalar,
-        out Fixed64 accumulated)
+        out Fixed64 accumulated,
+        in ContactResponseSnapshot impact = default)
     {
         accumulated = default;
         if (contact.RelativeA.IsExact
@@ -491,7 +636,7 @@ public static class CollisionResponse2D
                 normalAngularVelocityB,
                 restitutionVelocityThreshold,
                 contactShare,
-                out accumulated);
+                out accumulated, impact);
         }
 
         Fixed64 impulseScalar = Fixed64.Zero;
@@ -543,7 +688,7 @@ public static class CollisionResponse2D
                     normalAngularVelocityB,
                     restitutionVelocityThreshold,
                     contactShare,
-                    out accumulated);
+                    out accumulated, impact);
             }
             if (tangentVelocity.Abs() > Fixed64.Epsilon
                 && denominator > Fixed64.Zero
@@ -564,7 +709,7 @@ public static class CollisionResponse2D
                     normalAngularVelocityB,
                     restitutionVelocityThreshold,
                     contactShare,
-                    out accumulated);
+                    out accumulated, impact);
             }
         }
 
@@ -584,7 +729,7 @@ public static class CollisionResponse2D
                 normalAngularVelocityB,
                 restitutionVelocityThreshold,
                 contactShare,
-                out accumulated);
+                out accumulated, impact);
         }
         accumulated = desiredAccumulated >= -staticFrictionLimit
             && desiredAccumulated <= staticFrictionLimit
@@ -609,7 +754,7 @@ public static class CollisionResponse2D
                 normalAngularVelocityB,
                 restitutionVelocityThreshold,
                 contactShare,
-                out accumulated);
+                out accumulated, impact);
         }
         return impulseScalar == Fixed64.Zero
             || TryApplyContactImpulseCombination(
@@ -635,7 +780,8 @@ public static class CollisionResponse2D
         Fixed64 normalAngularVelocityB,
         Fixed64 restitutionVelocityThreshold,
         Fixed64 contactShare,
-        out Fixed64 accumulated)
+        out Fixed64 accumulated,
+        in ContactResponseSnapshot impact = default)
     {
         accumulated = default;
         GetExactLevers(
@@ -686,7 +832,7 @@ public static class CollisionResponse2D
                 contact.CachedTangentImpulse,
                 contact.StaticFriction,
                 contact.DynamicFriction,
-                out ExactCoulombResponse3D response))
+                out ExactCoulombResponse3D response, impact))
         {
             return false;
         }
@@ -892,6 +1038,11 @@ public static class CollisionResponse2D
                 ? body.SampleContinuousCollisionAngularVelocity(Fixed64.One)
                 : body.AngularVelocity;
 
+    private static Vector2d ResolveContactNormal(CollisionPair2D pair,
+        in ContactGroupKey group, Vector2d normal) =>
+        ResolveContactNormal(normal, group.SourceIdA != 0 || group.SourceIdB != 0
+            ? Vector2d.Zero : pair.ColliderB.Center - pair.ColliderA.Center);
+
     private static Vector2d ResolveContactNormal(Vector2d normal, Vector2d fallbackDirection)
     {
         Vector2d resolved = normal.MagnitudeSquared > Fixed64.Epsilon
@@ -918,7 +1069,7 @@ public static class CollisionResponse2D
         out ExactLever3D exactB)
     {
         ManifoldContact2D manifoldContact =
-            pair.Manifold[contact.ManifoldIndex];
+            pair.Manifold.GetGroup(contact.GroupIndex)[contact.PointIndex];
         ContactAnchor2D zero =
             ContactAnchor2D.FromWorldPoint(Vector2d.Zero);
         exactA = contact.A.Body == null
@@ -950,7 +1101,7 @@ public static class CollisionResponse2D
         ref byte failedResponseMask)
     {
         failedResponseMask |= (byte)(1 << contactIndex);
-        pair.RemoveWarmStartImpulse(contact.ContactId);
+        pair.RemoveWarmStartImpulse(contact.Group, contact.ContactId);
         GravitasLogger.Channel.Error(
             $"2D contact response is outside the representable velocity domain.");
     }

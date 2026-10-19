@@ -14,20 +14,79 @@ using System.Runtime.CompilerServices;
 namespace Gravitas.CollisionHandling;
 
 /// <summary>
-/// Fixed-capacity deterministic pure 2D contact manifold owned by one collision pair.
+/// Pair-owned deterministic contact manifold with up to two samples per
+/// geometric surface group and no fixed pair-wide group or contact limit.
 /// </summary>
+/// <remarks>
+/// Inspection flattens canonical structural group order, then ascending contact
+/// identity within each group. Index zero is not necessarily the deepest contact;
+/// use <see cref="PrimaryContact"/> for that purpose. Overflow capacity is retained
+/// across updates and resets; reaching a new high-water mark can allocate.
+/// </remarks>
 public sealed class ContactManifold2D : IEnumerable<ManifoldContact2D>
 {
-    /// <summary>Maximum number of contacts retained by a pure 2D manifold.</summary>
-    public const int MaxContactCount = 2;
+    /// <summary>Maximum number of point samples retained per geometric surface group.</summary>
+    public const int MaxContactsPerGroup = 2;
 
-    private ManifoldContact2D _contact0;
-    private ManifoldContact2D _contact1;
+    /// <summary>Maximum samples in the default group; independent groups have no pair-wide cap.</summary>
+    public const int MaxContactCount = MaxContactsPerGroup;
+
+    private ContactGroup2D _firstGroup;
+    private SwiftCollections.SwiftList<ContactGroup2D>? _additionalGroups;
     private int _count;
+    internal bool NeedsSurfaceRecovery;
     private long _lastUpdatedFrame = -1;
 
+    /// <summary>Number of independent surface regions currently retained; this has no fixed pair-wide cap.</summary>
+    public int GroupCount { get; private set; }
+
+    /// <summary>Gets the first flattened point index of a group in canonical structural order.</summary>
+    public int GetGroupStartIndex(int groupIndex)
+    {
+        SwiftThrowHelper.ThrowIfListIndexInvalid(groupIndex, GroupCount);
+        int start = 0;
+        for (int i = 0; i < groupIndex; i++)
+            start += GetGroup(i).Count;
+        return start;
+    }
+
+    /// <summary>Gets the number of retained samples in a group, from one through <see cref="MaxContactsPerGroup"/>.</summary>
+    public int GetGroupContactCount(int groupIndex)
+    {
+        SwiftThrowHelper.ThrowIfListIndexInvalid(groupIndex, GroupCount);
+        return GetGroup(groupIndex).Count;
+    }
+
+    internal ref ContactGroup2D GetGroup(int index)
+    {
+        if (index == 0) return ref _firstGroup;
+        return ref _additionalGroups!.InnerArray[index - 1];
+    }
+
+    internal int FindGroup(in ContactGroupKey key)
+    {
+        int low = 0, high = GroupCount - 1;
+        while (low <= high)
+        {
+            int middle = low + ((high - low) >> 1);
+            int order = GetGroup(middle).Key.CompareTo(key);
+            if (order == 0) return middle;
+            if (order < 0) low = middle + 1;
+            else high = middle - 1;
+        }
+        return -1;
+    }
+
+    internal void ReserveGroups(int capacity)
+    {
+        SwiftThrowHelper.ThrowIfNegative(capacity, nameof(capacity));
+        if (capacity <= 1) return;
+        _additionalGroups ??= new SwiftCollections.SwiftList<ContactGroup2D>(capacity - 1);
+        _additionalGroups.EnsureCapacity(capacity - 1);
+    }
+
     /// <summary>
-    /// Number of active contacts in this manifold.
+    /// Total number of active samples across all groups, without a fixed pair-wide cap.
     /// </summary>
     public int Count
     {
@@ -62,24 +121,34 @@ public sealed class ContactManifold2D : IEnumerable<ManifoldContact2D>
         {
             SwiftThrowHelper.ThrowIfListIndexInvalid(0, _count);
 
-            if (_count == 1)
-                return _contact0;
+            ManifoldContact2D best = _firstGroup[0];
+            foreach (ManifoldContact2D candidate in this)
+            {
+                if (candidate.Depth > best.Depth
+                    || candidate.Depth == best.Depth && (candidate.DepthIsClamped && !best.DepthIsClamped
+                    || candidate.DepthIsClamped == best.DepthIsClamped && candidate.ContactId < best.ContactId))
+                {
+                    best = candidate;
+                }
+            }
 
-            return IsDeeper(_contact1, _contact0)
-                || HasEqualDepth(_contact1, _contact0) && _contact1.ContactId < _contact0.ContactId
-                ? _contact1
-                : _contact0;
+            return best;
         }
     }
 
-    /// <summary>Gets the contact at the specified deterministic order index.</summary>
+    /// <summary>Gets a contact in flattened structural-group/ascending-contact-identity order.</summary>
     public ManifoldContact2D this[int index]
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get
         {
             SwiftThrowHelper.ThrowIfListIndexInvalid(index, _count);
-            return GetContactUnchecked(index);
+            for (int group = 0; ; group++)
+            {
+                ref ContactGroup2D current = ref GetGroup(group);
+                if (index < current.Count) return current[index];
+                index -= current.Count;
+            }
         }
     }
 
@@ -88,7 +157,7 @@ public sealed class ContactManifold2D : IEnumerable<ManifoldContact2D>
     /// </summary>
     public void BeginUpdate(long frame)
     {
-        _count = 0;
+        ClearContacts();
         _lastUpdatedFrame = frame;
     }
 
@@ -97,10 +166,8 @@ public sealed class ContactManifold2D : IEnumerable<ManifoldContact2D>
     /// </summary>
     public void Reset()
     {
-        _count = 0;
+        ClearContacts();
         _lastUpdatedFrame = -1;
-        _contact0 = default;
-        _contact1 = default;
     }
 
     /// <summary>
@@ -108,12 +175,12 @@ public sealed class ContactManifold2D : IEnumerable<ManifoldContact2D>
     /// </summary>
     public void SetContact(Vector2d pointA, Vector2d pointB, Fixed64 depth, Vector2d normal)
     {
-        _count = 0;
+        ClearContacts();
         AddContact(pointA, pointB, depth, normal);
     }
 
     /// <summary>
-    /// Replaces the manifold with one canonical rigid-frame planar contact.
+    /// Replaces the manifold with one rigid-frame contact.
     /// </summary>
     public void SetContact(
         ContactAnchor2D anchorA,
@@ -122,12 +189,12 @@ public sealed class ContactManifold2D : IEnumerable<ManifoldContact2D>
         Vector2d normal,
         bool depthIsClamped = false)
     {
-        _count = 0;
+        ClearContacts();
         AddContact(anchorA, anchorB, depth, normal, depthIsClamped);
     }
 
     /// <summary>
-    /// Adds a contact, keeping the deepest two contacts and exposing them by stable contact identity.
+    /// Adds a contact, keeping up to two samples in the default surface group and exposing them by stable contact identity.
     /// </summary>
     public void AddContact(Vector2d pointA, Vector2d pointB, Fixed64 depth, Vector2d normal)
     {
@@ -139,7 +206,7 @@ public sealed class ContactManifold2D : IEnumerable<ManifoldContact2D>
     }
 
     /// <summary>
-    /// Adds a canonical rigid-frame contact, keeping the deepest two contacts and
+    /// Adds a rigid-frame contact, keeping up to two samples in the default surface group and
     /// exposing them by stable anchor identity.
     /// </summary>
     public void AddContact(
@@ -193,7 +260,8 @@ public sealed class ContactManifold2D : IEnumerable<ManifoldContact2D>
         PhysicsMaterial materialB,
         bool depthIsClamped = false,
         int featureNamespaceA = 0,
-        int featureNamespaceB = 0)
+        int featureNamespaceB = 0,
+        ContactGroupKey group = default)
     {
         AddContactCore(
             anchorA,
@@ -205,7 +273,8 @@ public sealed class ContactManifold2D : IEnumerable<ManifoldContact2D>
             materialB,
             depthIsClamped,
             featureNamespaceA,
-            featureNamespaceB);
+            featureNamespaceB,
+            group);
     }
 
     private void AddContactCore(
@@ -218,7 +287,8 @@ public sealed class ContactManifold2D : IEnumerable<ManifoldContact2D>
         PhysicsMaterial materialB,
         bool depthIsClamped,
         int featureNamespaceA,
-        int featureNamespaceB)
+        int featureNamespaceB,
+        ContactGroupKey group = default)
     {
         ulong contactId = CreateContactId(
             anchorA,
@@ -238,92 +308,66 @@ public sealed class ContactManifold2D : IEnumerable<ManifoldContact2D>
             featureNamespaceA,
             featureNamespaceB);
 
-        for (int i = 0; i < _count; i++)
-        {
-            ManifoldContact2D existing = GetContactUnchecked(i);
-            if (existing.ContactId != contactId)
-                continue;
+        // Ordinary compound parts share the established two-sample owner pool;
+        // only declared structural groups retain independent constraints.
+        AddContact(group.CompareTo(default) == 0 ? default
+            : group.Remap(featureNamespaceA, featureNamespaceB, reverse: false), contact);
+    }
 
-            if (IsDeeper(contact, existing))
-                SetContactUnchecked(i, contact);
-            SortContactsById();
+    internal void AddContact(in ContactGroupKey key, in ManifoldContact2D contact)
+    {
+        if (GroupCount == 0)
+        {
+            // BeginUpdate already cleared the inline group; avoid clearing its
+            // two large anchors again on every ordinary first contact.
+            _firstGroup.Key = key;
+            _count = _firstGroup.Add(contact);
+            GroupCount = 1;
             return;
         }
-
-        if (_count < MaxContactCount)
+        int group = 0;
+        while (group < GroupCount && GetGroup(group).Key.CompareTo(key) < 0)
+            group++;
+        if (group == GroupCount || GetGroup(group).Key.CompareTo(key) != 0)
         {
-            SetContactUnchecked(_count, contact);
-            _count++;
-            SortContactsById();
-            return;
+            ReserveGroups(GroupCount + 1);
+            _additionalGroups!.Add(default);
+            for (int i = GroupCount; i > group; i--)
+                GetGroup(i) = GetGroup(i - 1);
+            GetGroup(group) = new ContactGroup2D { Key = key };
+            GroupCount++;
         }
+        _count += GetGroup(group).Add(contact);
+    }
 
-        int replaceIndex = FindShallowestReplacementIndex(contact);
-        if (replaceIndex < 0)
-            return;
+    internal void CopyFrom(ContactManifold2D source, long frame)
+    {
+        if (ReferenceEquals(this, source)) return;
+        BeginUpdate(frame);
+        ReserveGroups(source.GroupCount);
+        for (int i = 0; i < source.GroupCount; i++)
+        {
+            if (i == 0) _firstGroup = source.GetGroup(i);
+            else _additionalGroups!.Add(source.GetGroup(i));
+        }
+        GroupCount = source.GroupCount;
+        _count = source._count;
+        NeedsSurfaceRecovery = source.NeedsSurfaceRecovery;
+    }
 
-        SetContactUnchecked(replaceIndex, contact);
-        SortContactsById();
+    private void ClearContacts()
+    {
+        _count = GroupCount = 0;
+        NeedsSurfaceRecovery = false;
+        _firstGroup = default;
+        _additionalGroups?.FastClear();
     }
 
     /// <summary>Returns an allocation-free enumerator over the active contacts.</summary>
     public Enumerator GetEnumerator() => new(this);
 
     IEnumerator<ManifoldContact2D> IEnumerable<ManifoldContact2D>.GetEnumerator() => GetEnumerator();
-
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
-
-    private int FindShallowestReplacementIndex(ManifoldContact2D candidate)
-    {
-        int replaceIndex = !IsDeeper(_contact1, _contact0)
-            ? 1
-            : 0;
-
-        ManifoldContact2D shallowest = GetContactUnchecked(replaceIndex);
-        if (IsDeeper(candidate, shallowest))
-            return replaceIndex;
-
-        if (HasEqualDepth(candidate, shallowest) && candidate.ContactId < shallowest.ContactId)
-            return replaceIndex;
-
-        return -1;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool IsDeeper(ManifoldContact2D candidate, ManifoldContact2D existing) =>
-        candidate.Depth > existing.Depth
-        || candidate.Depth == existing.Depth
-        && candidate.DepthIsClamped
-        && !existing.DepthIsClamped;
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static bool HasEqualDepth(ManifoldContact2D left, ManifoldContact2D right) =>
-        left.Depth == right.Depth
-        && left.DepthIsClamped == right.DepthIsClamped;
-
-    private void SortContactsById()
-    {
-        if (_count < 2 || _contact0.ContactId <= _contact1.ContactId)
-            return;
-
-        (_contact0, _contact1) = (_contact1, _contact0);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private ManifoldContact2D GetContactUnchecked(int index) =>
-        index == 0 ? _contact0 : _contact1;
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private void SetContactUnchecked(int index, ManifoldContact2D contact)
-    {
-        if (index == 0)
-        {
-            _contact0 = contact;
-            return;
-        }
-
-        _contact1 = contact;
-    }
 
     private static ulong CreateContactId(
         ContactAnchor2D anchorA,
@@ -344,13 +388,9 @@ public sealed class ContactManifold2D : IEnumerable<ManifoldContact2D>
 
         ulong hash = 14695981039346656037UL;
         Mix(ref hash, featureNamespaceA);
-        Mix(
-            ref hash,
-            unchecked((long)anchorA.GetLocalFeatureHash64()));
+        MixLocalFeature(ref hash, anchorA);
         Mix(ref hash, featureNamespaceB);
-        Mix(
-            ref hash,
-            unchecked((long)anchorB.GetLocalFeatureHash64()));
+        MixLocalFeature(ref hash, anchorB);
         return hash;
     }
 
@@ -376,20 +416,38 @@ public sealed class ContactManifold2D : IEnumerable<ManifoldContact2D>
         }
     }
 
+    private static void MixLocalFeature(
+        ref ulong hash,
+        ContactAnchor2D anchor)
+    {
+        Mix(
+            ref hash,
+            unchecked((long)anchor.GetLocalFeatureHash64()));
+    }
+
     /// <summary>Enumerates the active contacts in deterministic order.</summary>
     public struct Enumerator : IEnumerator<ManifoldContact2D>
     {
         private readonly ContactManifold2D _manifold;
+        private int _group, _point;
         private int _index;
 
         internal Enumerator(ContactManifold2D manifold)
         {
             _manifold = manifold;
+            _group = _point = 0;
             _index = -1;
         }
 
         /// <summary>Gets the current contact.</summary>
-        public ManifoldContact2D Current => _manifold[_index];
+        public ManifoldContact2D Current
+        {
+            get
+            {
+                SwiftThrowHelper.ThrowIfListIndexInvalid(_index, _manifold.Count);
+                return _manifold.GetGroup(_group)[_point];
+            }
+        }
 
         object IEnumerator.Current => Current;
 
@@ -400,12 +458,21 @@ public sealed class ContactManifold2D : IEnumerable<ManifoldContact2D>
             if (next >= _manifold._count)
                 return false;
 
+            if (_index >= 0 && ++_point >= _manifold.GetGroup(_group).Count)
+            {
+                _group++;
+                _point = 0;
+            }
             _index = next;
             return true;
         }
 
         /// <summary>Resets the enumerator to its initial position.</summary>
-        public void Reset() => _index = -1;
+        public void Reset()
+        {
+            _group = _point = 0;
+            _index = -1;
+        }
 
         /// <summary>Releases enumerator resources.</summary>
         public void Dispose() { }

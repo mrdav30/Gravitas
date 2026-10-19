@@ -16,7 +16,7 @@ this backlog.
 ## Intake Rules
 
 - Signal IDs use `GRV-Benchmark-NNN`. The next available ID is
-  `GRV-Benchmark-030`.
+  `GRV-Benchmark-031`.
 - Assign an ID at intake and never reuse it, including after a signal closes or
   moves into a dated plan. Check this file's Git history before advancing or
   repairing the counter.
@@ -335,6 +335,50 @@ before proposing pruning or arithmetic changes. Preserve earliest distance,
 authored tie order, finite witnesses and zero warm allocation. Check the current
 math throughput owners directly before assigning the cost to an index or
 reopening the already-closed upstream signal.
+
+### GRV-Benchmark-030 — Pure 2D Bodyless Static Population Refresh Cost
+
+**Discovered:** 2026-10-19 during static-continuity Phase 6 density controls.  
+**Status:** Confirmed on the frozen pre-Phase-6 stack; not an introduced
+continuity regression. Detailed cost attribution remains open.  
+**Owner:** Gravitas pure 2D bodyless service refresh; involve GridForge or math
+owners only after profiling their executed contribution.
+
+One frictionless circle runs over one unchanged 16-unit floor at 16 Hz. Add
+63 remote bodyless two-unit static pieces, all loaded and outside its local
+contact neighborhood. Both counts use the same loaded world bounds, manual
+grounding, drive, 32 settling frames and 64 full host steps per invocation.
+No surface membership is declared in this control. Windows x64/.NET 8.0.29
+Release measurements, 24 warmed windows with zero allocation:
+
+| Stack | 1 static piece | 64 static pieces |
+| --- | ---: | ---: |
+| Frozen pre-Phase-6 | 21.57 us/frame | 77.09 us/frame |
+| Phase 6 final | 22.13 us/frame | 79.92 us/frame |
+
+Physical position/velocity/rotation witnesses match all four rows. This is a
+population-scaling signal, not a universal throughput or frame-tail claim.
+The original `PrepareCollisionPartitions` bodyless refresh loop and
+`LSCollider2D.Simulate` -> `Rebuild` path are unchanged by Phase 6. Loaded-module
+hashes identify the frozen pre-phase Gravitas payload (`B500F130...`), matching
+source `071b25ac2b758f6c1992a769e0713ed27b2c34dc`.
+
+Ignored `artifacts/static-surface/phase6/population/` holds the unchanged public
+consumer fixture; `population-{baseline,final}.json` contains the windows and
+module hashes. Capture command after building that consumer and copying it
+beside the appropriate frozen dependencies:
+
+```powershell
+$env:UseLocalLsfStack = 'true'
+dotnet artifacts/static-surface/phase6/host/bin/Release/net8.0/Host.dll single artifacts/static-surface/phase6/population-baseline artifacts/static-surface/phase6/population-baseline.json FullStepPopulation1,FullStepPopulation64
+```
+
+**Next isolation:** Promote the bounded population fixture into maintained
+benchmarks, profile refresh/rebuild separately from contact response, and compare
+bodyless with explicit-static owners in pure 2D, 3D and mixed mode. Preserve
+host-transform freshness, mutation/filter invalidation, deterministic order and
+zero warm allocation before changing refresh policy. Do not add another index
+or infer that an entire static rebuild can be skipped without that evidence.
 
 ## Experimental Signals
 

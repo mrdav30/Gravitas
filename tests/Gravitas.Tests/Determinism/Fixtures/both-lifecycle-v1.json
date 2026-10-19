@@ -532,7 +532,7 @@
     {
       "FrameCount": 1,
       "LateToken": 1,
-      "Authoritative": "3b56a4897bb23e5666c3236f2bae2d1b",
+      "Authoritative": "737ee0ba22e9ee044fb116417fe07146",
       "SolverCaches": null,
       "Bodies": [
         {
@@ -790,7 +790,7 @@
     {
       "FrameCount": 2,
       "LateToken": 2,
-      "Authoritative": "c8065b020a5b819d6da13a3eac768718",
+      "Authoritative": "c1b2c744383d568fb66f2aa115dc08b8",
       "SolverCaches": null,
       "Bodies": [
         {
@@ -1044,7 +1044,7 @@
     {
       "FrameCount": 3,
       "LateToken": 3,
-      "Authoritative": "3d3674c3e41e15ed261a9a0775f2abb5",
+      "Authoritative": "5053dc17333857d4c381dc8198137316",
       "SolverCaches": null,
       "Bodies": [
         {
@@ -1251,7 +1251,7 @@
     {
       "FrameCount": 4,
       "LateToken": 4,
-      "Authoritative": "c4dead701cc1aa3a4438c7a06eeeb1e9",
+      "Authoritative": "28700dc75329a1aa01f0d93572b3a2c0",
       "SolverCaches": null,
       "Bodies": [
         {
@@ -1503,7 +1503,7 @@
     {
       "FrameCount": 5,
       "LateToken": 5,
-      "Authoritative": "dcd1f11326273e70365d4da42ec8e93c",
+      "Authoritative": "c5c45f9b608187a782cb0944ff505911",
       "SolverCaches": null,
       "Bodies": [
         {
@@ -1755,7 +1755,7 @@
     {
       "FrameCount": 6,
       "LateToken": 6,
-      "Authoritative": "e464d90a1e32c31180df00f365891f1f",
+      "Authoritative": "4faecae538efabe579dafe180732d22a",
       "SolverCaches": null,
       "Bodies": [
         {
@@ -2007,7 +2007,7 @@
     {
       "FrameCount": 7,
       "LateToken": 7,
-      "Authoritative": "2df6b27893bc95c5251d6253b11a12ae",
+      "Authoritative": "82897b1322912c31cd86e9e891787ac1",
       "SolverCaches": null,
       "Bodies": [
         {
@@ -2256,7 +2256,7 @@
     {
       "FrameCount": 8,
       "LateToken": 8,
-      "Authoritative": "b9089be6e4b359cbff3cff3be32c047e",
+      "Authoritative": "a93a29d42cb631ba3c3ec22e1774ba0d",
       "SolverCaches": null,
       "Bodies": [
         {

@@ -152,20 +152,84 @@ public sealed class CollisionWarmStartTests
 
         ContactWarmStartCache2D cache2D = default;
         cache2D.Set(
-            11UL,
+            default, 11UL,
             Fixed64.One,
             Fixed64.Zero);
         cache2D.Set(
-            22UL,
+            default, 22UL,
             Fixed64.Two,
             Fixed64.Zero);
 
-        cache2D.Remove(11UL).Should().BeTrue();
+        cache2D.Remove(default, 11UL).Should().BeTrue();
 
         cache2D.Count.Should().Be(1);
-        cache2D.GetContactIdForReplayHash(0).Should().Be(22UL);
-        cache2D.TryGet(11UL, out _).Should().BeFalse();
-        cache2D.Remove(33UL).Should().BeFalse();
+        cache2D.GetGroup(0).GetContactId(0).Should().Be(22UL);
+        cache2D.TryGet(default, 11UL, out _).Should().BeFalse();
+        cache2D.Remove(default, 33UL).Should().BeFalse();
+    }
+
+    [Fact]
+    public void WarmStartCache2D_ShouldRetainIndependentGroupImpulsesAndPruneVanishedRows()
+    {
+        ContactWarmStartCache2D cache = default;
+        var manifold = new ContactManifold2D();
+        for (int g = 3; g >= 0; g--)
+        {
+            var key = new ContactGroupKey(0, 0, region: g);
+            cache.Set(key, 11UL, (Fixed64)(g + 1), Fixed64.Half);
+            cache.Set(key, 22UL, (Fixed64)(g + 2), Fixed64.Zero);
+            if (g == 2) continue;
+            manifold.AddContact(key, new ManifoldContact2D(11UL, Vector2d.Zero,
+                Vector2d.Right, Fixed64.One, Vector2d.Right));
+        }
+        cache.Count.Should().Be(8);
+        cache.Retain(manifold);
+        cache.GroupCount.Should().Be(3);
+        cache.Count.Should().Be(3);
+        for (int g = 0; g < 4; g++)
+        {
+            var key = new ContactGroupKey(0, 0, region: g);
+            cache.TryGet(key, 11UL, out var impulse).Should().Be(g != 2);
+            if (g != 2) impulse.NormalImpulse.Should().Be((Fixed64)(g + 1));
+            cache.TryGet(key, 22UL, out _).Should().BeFalse();
+        }
+        cache.GetGroup(2).GetContactId(0).Should().Be(11UL);
+        cache.GetGroup(2).GetImpulseUnchecked(0).NormalImpulse.Should().Be((Fixed64)4);
+        cache.Remove(new ContactGroupKey(0, 0, region: 1), 11UL).Should().BeTrue();
+        cache.Remove(new ContactGroupKey(0, 0, region: 1), 11UL).Should().BeFalse();
+        manifold.Reset();
+        cache.Retain(manifold);
+        cache.Count.Should().Be(0);
+        cache.GroupCount.Should().Be(0);
+        cache.Set(default, 11UL, Fixed64.One, Fixed64.Zero);
+        cache.Clear();
+        cache.Count.Should().Be(0);
+    }
+
+    [Fact]
+    public void WarmStartCache2D_WhenAContactIsReplaced_ShouldRetainTheOtherRowAndOtherGroups()
+    {
+        ContactWarmStartCache2D cache = default;
+        var key = new ContactGroupKey(0, 0, region: 1);
+        cache.Set(key, 11UL, Fixed64.One, Fixed64.Zero);
+        cache.Set(key, 22UL, Fixed64.Two, Fixed64.Half);
+        cache.Set(default, 22UL, (Fixed64)7, -Fixed64.One);
+
+        // Capacity belongs to each structural region; replacing its second
+        // row must preserve its first row and every independent region.
+        cache.Set(key, 33UL, (Fixed64)3, -Fixed64.Half);
+
+        cache.Count.Should().Be(3);
+        cache.GroupCount.Should().Be(2);
+        cache.TryGet(key, 11UL, out var first).Should().BeTrue();
+        first.NormalImpulse.Should().Be(Fixed64.One);
+        cache.TryGet(key, 22UL, out _).Should().BeFalse();
+        cache.TryGet(key, 33UL, out var replacement).Should().BeTrue();
+        replacement.NormalImpulse.Should().Be((Fixed64)3);
+        replacement.TangentImpulse.Should().Be(-Fixed64.Half);
+        cache.TryGet(default, 22UL, out var independent).Should().BeTrue();
+        independent.NormalImpulse.Should().Be((Fixed64)7);
+        independent.TangentImpulse.Should().Be(-Fixed64.One);
     }
 
     private static void StoreWarmStartNormalLoad(CollisionPair pair, Fixed64 normalImpulse)

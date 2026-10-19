@@ -43,6 +43,17 @@ public abstract partial class LSCollider2D
 
     internal FixedBoundArea PreparedShapeBounds => _preparedBounds;
 
+    internal bool TryPrepareRecoveryPose(Vector2d position, Fixed64 rotation, out Vector2d center)
+    {
+        center = default;
+        // Recovery may translate committed geometry, never combine a pending
+        // authored/host-scale change with the old collision shape.
+        if (_runtimeShapeState.IsDirty || !TryPrepareBodyPose(position, rotation)
+            || _preparedSnapshot.OwnerScale != _committedOwnerScale) return false;
+        center = _preparedSnapshot.Center;
+        return true;
+    }
+
     internal Fixed64 CanonicalCenteredProxyRadius =>
         _canonicalCenteredProxyRadius;
 
@@ -322,7 +333,10 @@ public abstract partial class LSCollider2D
         _runtimeShapeState.Commit(_preparedSnapshot);
         _hasCommittedShape = true;
         if (contactDependencyChanged)
+        {
             ContactDependencyVersion++;
+            StaticSurface?.Invalidate();
+        }
     }
 
     internal bool TryPrepareBodyPose(

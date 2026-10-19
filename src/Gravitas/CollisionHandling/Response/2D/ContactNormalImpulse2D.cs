@@ -421,7 +421,8 @@ internal static class ContactNormalImpulse2D
         Fixed64 accumulatedImpulse,
         Fixed64 positiveImpulseScale,
         Fixed64 negativeImpulseScale,
-        out ContactNormalImpulseResult2D result)
+        out ContactNormalImpulseResult2D result,
+        in ContactResponseSnapshot impact = default)
     {
         result = default;
         if (!ExactContactLever2D.TryGetAccumulatedNormalResponse(
@@ -439,7 +440,7 @@ internal static class ContactNormalImpulse2D
                 accumulatedImpulse,
                 positiveImpulseScale,
                 negativeImpulseScale,
-                out ExactNormalResponse3D response))
+                out ExactNormalResponse3D response, impact))
         {
             return false;
         }

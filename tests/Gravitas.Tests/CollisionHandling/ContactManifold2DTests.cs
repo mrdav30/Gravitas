@@ -403,6 +403,54 @@ public sealed class ContactManifold2DTests
         manifold.LastUpdatedFrame.Should().Be(-1);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void IndependentGroups_ShouldKeepTwoSamplesEachInStructuralOrder(bool reverse)
+    {
+        var manifold = new ContactManifold2D();
+        manifold.BeginUpdate(42);
+        var material = new PhysicsMaterial(Fixed64.Half, Fixed64.Zero, Fixed64.Zero);
+        for (int g = 0; g < 3; g++)
+        {
+            int group = reverse ? 2 - g : g;
+            for (int sample = 0; sample < 3; sample++)
+            {
+                var contact = new ManifoldContact2D((ulong)(10 + sample),
+                    Vector2d.Zero, Vector2d.Right, (Fixed64)(sample + 1),
+                    group == 1 ? Vector2d.Forward : Vector2d.Right,
+                    hasMaterialOverride: true, materialA: material,
+                    materialB: PhysicsMaterial.Default);
+                manifold.AddContact(new ContactGroupKey(0, 0, region: group), contact);
+            }
+        }
+
+        manifold.GroupCount.Should().Be(3);
+        manifold.Count.Should().Be(6);
+        for (int g = 0; g < 3; g++)
+        {
+            manifold.GetGroupStartIndex(g).Should().Be(g * 2);
+            manifold.GetGroupContactCount(g).Should().Be(2);
+            manifold.GetGroup(g).Key.Region.Should().Be(g);
+            manifold[g * 2].ContactId.Should().Be(11UL);
+            manifold[g * 2 + 1].ContactId.Should().Be(12UL);
+            manifold[g * 2].MaterialA.Should().Be(material);
+            manifold[g * 2].Normal.Should().Be(g == 1 ? Vector2d.Forward : Vector2d.Right);
+        }
+        manifold.PrimaryContact.Depth.Should().Be((Fixed64)3);
+        manifold.Select(c => c.ContactId).Should().Equal(11UL, 12UL, 11UL, 12UL, 11UL, 12UL);
+
+        var copy = new ContactManifold2D();
+        copy.CopyFrom(manifold, 43);
+        copy.CopyFrom(copy, 44);
+        copy.LastUpdatedFrame.Should().Be(43);
+        copy.Select(c => c.ContactId).Should().Equal(manifold.Select(c => c.ContactId));
+        copy.Reset();
+        copy.GroupCount.Should().Be(0);
+        copy.AddContact(Vector2d.Zero, Vector2d.Right, Fixed64.One, Vector2d.Right);
+        copy.GroupCount.Should().Be(1);
+    }
+
     private static ContactCandidate CreateCandidate(int x)
     {
         Vector2d pointA = new((Fixed64)x, Fixed64.Zero);

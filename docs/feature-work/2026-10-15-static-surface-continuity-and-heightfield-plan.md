@@ -1,11 +1,11 @@
 # Static Surface Continuity And Heightfield Integration
 
 **Date:** 2026-10-15  
-**Status:** Phases 1–5 complete, 2026-10-18
+**Status:** Phases 1–6 complete, 2026-10-19
 #133/#139 remain coordinated. Heightfield and alternative-index work are deferred;
 no public continuity API is enabled. Internal 3D discrete response covers rounded,
-cone, extrusion and native mesh families; pure 2D, mixed and continuation work
-remain in the phases below.  
+cone, extrusion and native mesh families, with pure 2D joined-solid response;
+mixed and continuation work remain in the phases below.  
 **Order:** #132 is resolved. Resolve #133 and its confirmed pure 2D counterpart,
 #139, through the generic-continuity phases below before terrain-specific work.
 Keep one implementation plan rather than duplicate the prerequisite design.  
@@ -1027,20 +1027,102 @@ locally. #133/#139 remain open for the following dimensional/continuation phases
 
 ### Phase 6 - Complete Pure 2D Static Continuity
 
-- [ ] Implement typed 2D membership through existing services/lifecycle owners;
+- [x] Implement typed 2D membership through existing services/lifecycle owners;
   retain the same ownership, transactional replacement and lifetime guarantees.
-- [ ] Implement #139's dimensional boundary reduction without projecting 3D
+- [x] Implement #139's dimensional boundary reduction without projecting 3D
   sheets into 2D volumes. Test circles, zero/nonzero-core capsules and polygonal
   bodies against connected convex pieces and genuine concave corners.
-- [ ] Reclip finite incident features against exact exposed spans before final
+- [x] Reclip finite incident features against exact exposed spans before final
   endpoint materialization. Preserve independent normal groups, supplier
   materials and overlap truth separately from response rows; no global two-row cap.
-- [ ] Certify full recovery against the final pose's complete eligible spatial
+- [x] Certify full recovery against the final pose's complete eligible spatial
   candidates and wire the dimensional deep-placement failure contract. Triggers,
   query-only and immovable observations must not require physical recovery.
-- [ ] Verify full-loop baseline crossings, free rotation, real boundaries, order,
+- [x] Verify full-loop baseline crossings, free rotation, real boundaries, order,
   membership/filter changes and density/scaling; complete coverage, replay,
   allocation/performance and independent review gates before closing this phase.
+
+**Completion, 2026-10-19:** Internal `StaticSurface2D` uses the existing spatial
+candidate collector and Phase 1 boundary-domain owner. Registered static AABB
+and convex-polygon members have transactional replacement, dependency
+invalidation and context/reset/disposal cleanup. Circles, zero/nonzero-core
+capsules and polygons retain exact finite face/vertex constraints, independent
+normal groups and supplying-member materials. Borrowed planes require connected
+solid spans; genuine rims, concave corners and gaps remain physical features.
+No new spatial index or public membership API was introduced.
+
+The existing 2D manifold, warm-start cache and solver now retain two samples per
+independent structural group. Ordinary compounds keep their existing default
+sample pool. Genuine member overlap/events remain separate from response rows;
+after callbacks, the final response boundary revalidates registry identity,
+eligibility and changed dependencies before selecting the current carrier.
+Recovery proposals are conservative and must clear the whole moving shape
+against fresh complete final-pose candidates, including newly encountered
+blockers and target compounds. Unsupported deep placement fails explicitly;
+observations and immovable pairs require no physical recovery. Existing cold
+invalidation clears full reference-array capacity, including stale tails beyond
+`Count`, so retained handles cannot retain ended collider lifetimes.
+
+Small full-host crossings, free rotation, rounded/polygonal shapes, bodyless and
+explicit-static members, reversed order, material/filter/geometry changes,
+callback-time carrier removal, recovery failures and lifetime reuse pass.
+Gravitas Release/Lean pass **7,441/7,372** tests; FixedMathSharp passes
+**6,624/6,603**, plus **49 recording-adapter tests per profile**. Raw reachable
+line, branch and method coverage is exactly **100% in all four library runs**,
+without new exclusions. Both target frameworks build in both profiles without
+warnings/errors. All six shared replay fixtures match their expectations and
+local Windows x64 Release/Lean captures. Only the two 2D-bearing fixtures'
+authoritative hashes change for the explicit manifold/warm-start group schema;
+physical, event and query expectations remain unchanged.
+
+Warm Release measurements use the maintained joined-surface fixtures through
+the verified timing host: one moving actor, 16 Hz, frictionless driven motion,
+64 complete `Simulate`/`LateSimulate` frames per invocation, Windows x64
+.NET 8.0.29, `UseLocalLsfStack=true`. Loaded module hashes accompany captures.
+Values below are **microseconds per complete frame**, all **0 B/frame**:
+
+| Moving shape | Continuous floor | 2 joined pieces | 16 joined pieces | 64 joined pieces |
+| --- | ---: | ---: | ---: | ---: |
+| Circle | 21.48 | 46.14 | 108.26 | 452.50 |
+| Capsule | 26.72 | 62.38 | 160.47 | 777.40 |
+| Polygon | 40.45 | 108.47 | 271.00 | 1,023.04 |
+
+All layouts cover the same 16-unit floor. Profiling dense capsule response
+identified repeated exact comparisons of disjoint finite features. Inclusive
+outward-bound rejection now precedes those comparisons, reusing existing edge
+bounds. Dense circle/capsule/polygon cost fell from approximately
+1,387/5,870/2,657 us without changing the mixed quaternion chart. Increasing
+remote loaded population to 64 raises both joined and continuous controls;
+their difference remains approximately 23/36/69 us, consistent with local
+membership gathering rather than a warm scan of every declared member. Broken
+independent-seam response is a diagnostic, never the acceptance denominator.
+The unchanged no-membership population fixture also reproduces 21.57 -> 77.09
+us/frame on the frozen pre-phase stack (one versus 64 loaded statics), with
+matching physical witnesses and zero warm allocation. This separate existing
+refresh-cost signal is recorded as GRV-Benchmark-030; no unrelated optimization
+was added to this phase.
+
+Balanced unaffected controls put the ordinary 64-pair 2D full step at
+**923.1 -> 941.0 us (+17.9 us, +1.94%)**, with **0 B/op**. The user explicitly
+accepted this measured correctness cost on 2026-10-19. Other controls range
+from -1.73% to +0.85%; these observations do not establish universal zero
+overhead or game-capacity/tail-latency guarantees. Earlier adverse runs and a
+slower attempted solver-row simplification remain in the capture set.
+
+Independent ponytail review has no outstanding findings after callback-carrier
+and retained-reference regressions were resolved. Net runtime growth is
+**1,117 lines / four new files in Gravitas** and **542 lines / three focused
+partials in FixedMathSharp**, excluding tests/docs. The existing boundary owner
+has its production consumer; obsolete endpoint materialization, unused source
+metadata and six redundant warm-cache forwarders were removed. Reports, raw
+coverage, module hashes, profiles and repeated timings remain under ignored
+`artifacts/static-surface/phase6/` rather than a separate phase report.
+
+Commit/push FixedMathSharp first, then advance Gravitas's develop CI pin from
+`8302f055fe28560109780b57579e97d8b44a8899` to the new fetchable commit before
+pushing Gravitas. Released-package, Linux and ARM validation were not run
+locally. #133/#139 remain open; mixed continuity, queries/CCD, membership
+recording/reconstruction and public-contract closeout remain Phases 7–9.
 
 ### Phase 7 - Complete Mixed Static Continuity
 
@@ -1079,7 +1161,8 @@ locally. #133/#139 remain open for the following dimensional/continuation phases
   Coordinate any upstream math change and preserve its same coverage guarantees.
 - [ ] Run repeated, bound seam/interior and unaffected 3D/2D/mixed/query controls.
   Require zero added warmed allocations and no ordinary-path regression beyond
-  measured uncertainty. Broken seam response is not a speedup denominator;
+  measured uncertainty against the accepted baseline, including the explicitly
+  accepted Phase 6 correctness cost. Broken seam response is not a speedup denominator;
   document the corrected-work cost and refine introduced overhead before closeout.
 - [ ] Obtain independent geometry and ponytail reviews of the complete changes,
   including deletion/reuse opportunities and every coordinated sibling change.

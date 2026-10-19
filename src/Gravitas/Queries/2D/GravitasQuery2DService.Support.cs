@@ -25,7 +25,7 @@ public sealed partial class GravitasQuery2DService
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private uint NextOverlapQueryVersion()
+    internal uint NextOverlapQueryVersion()
     {
         OverlapQueryVersion++;
         if (OverlapQueryVersion == 0)

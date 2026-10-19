@@ -5,14 +5,18 @@ using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Diagnostics;
 using Gravitas.Materials;
+using Gravitas.Support;
 using Gravitas.Tests.Support;
+using SwiftCollections;
 using SwiftCollections.Diagnostics;
 using System;
+using System.Reflection;
 using Xunit;
 
 namespace Gravitas.Tests.Response;
 
-public sealed class CollisionResponse2DManifoldTests
+/// <content>Planar contact-response regressions and shared fixtures; grouped cases live in the Groups partial.</content>
+public sealed partial class CollisionResponse2DManifoldTests
 {
     [Theory]
     [InlineData(true)]
@@ -119,7 +123,7 @@ public sealed class CollisionResponse2DManifoldTests
             .Should()
             .BeLessThan(tangentialVelocity);
         pair.TryGetWarmStartImpulse(
-                contactId,
+                default, contactId,
                 out ContactWarmStartImpulse impulse)
             .Should()
             .BeTrue();
@@ -163,8 +167,10 @@ public sealed class CollisionResponse2DManifoldTests
         moving.LinearVelocity.Y.Should().Be(Fixed64.Zero);
     }
 
-    [Fact]
-    public void Resolve_WhenExactNormalDeltaWouldOverflowCurrentVelocity_ShouldRejectAtomically()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Resolve_WhenExactNormalDeltaWouldOverflowCurrentVelocity_ShouldRejectAtomically(bool grouped)
     {
         using GravitasWorldContext context =
             Physics2DTestWorld.CreateContext();
@@ -188,6 +194,10 @@ public sealed class CollisionResponse2DManifoldTests
                 right.Position + Vector2d.Forward),
             Fixed64.Zero,
             Vector2d.Right);
+        ulong contactId = pair.Manifold.PrimaryContact.ContactId;
+        if (grouped)
+            pair.Manifold.AddContact(new ContactGroupKey(0, 0, region: 1, sourceIdB: right.Collider.Id + 1),
+                new ManifoldContact2D(1UL, Vector2d.Zero, Vector2d.Zero, Fixed64.Zero, Vector2d.Zero));
         Vector2d leftLinear = left.LinearVelocity;
         Fixed64 leftAngular = left.AngularVelocity;
         Vector2d rightLinear = right.LinearVelocity;
@@ -208,6 +218,7 @@ public sealed class CollisionResponse2DManifoldTests
                 errorCount++;
                 error = message;
             };
+            CollisionResponse2D.PrepareSolve(pair);
             CollisionResponse2D.Resolve(
                 pair,
                 applyCachedImpulse: false,
@@ -224,7 +235,7 @@ public sealed class CollisionResponse2DManifoldTests
         right.LinearVelocity.Should().Be(rightLinear);
         right.AngularVelocity.Should().Be(rightAngular);
         pair.TryGetWarmStartImpulse(
-                pair.Manifold.PrimaryContact.ContactId,
+                default, contactId,
                 out _)
             .Should()
             .BeFalse();
@@ -291,7 +302,7 @@ public sealed class CollisionResponse2DManifoldTests
         moving.LinearVelocity.Should().Be(velocity);
         moving.AngularVelocity.Should().Be(Fixed64.Zero);
         pair.TryGetWarmStartImpulse(
-                pair.Manifold.PrimaryContact.ContactId,
+                default, pair.Manifold.PrimaryContact.ContactId,
                 out _)
             .Should()
             .BeFalse();
@@ -449,7 +460,7 @@ public sealed class CollisionResponse2DManifoldTests
         frozenPair.Manifold.SetContact(Vector2d.Right, Vector2d.Right, Fixed64.Half, Vector2d.Right);
         CollisionResponse2D.Resolve(frozenPair);
         frozenPair.TryGetWarmStartImpulse(
-            frozenPair.Manifold.PrimaryContact.ContactId,
+            default, frozenPair.Manifold.PrimaryContact.ContactId,
             out _).Should().BeFalse();
     }
 
@@ -527,7 +538,7 @@ public sealed class CollisionResponse2DManifoldTests
         moving.Position.Should().Be(positionBefore);
         moving.LinearVelocity.Should().Be(Vector2d.Zero);
         pair.TryGetWarmStartImpulse(
-            pair.Manifold.PrimaryContact.ContactId,
+            default, pair.Manifold.PrimaryContact.ContactId,
             out ContactWarmStartImpulse impulse).Should().BeTrue();
         impulse.NormalImpulse.Should().Be(Fixed64.Zero);
         impulse.TangentImpulse.Should().Be(Fixed64.Zero);
@@ -565,7 +576,7 @@ public sealed class CollisionResponse2DManifoldTests
         var pair = new CollisionPair2D(moving.Collider, wall.Collider);
         pair.Manifold.SetContact(Vector2d.Right, Vector2d.Right, Fixed64.Zero, Vector2d.Right);
         pair.StoreWarmStartImpulse(
-            pair.Manifold.PrimaryContact.ContactId,
+            default, pair.Manifold.PrimaryContact.ContactId,
             Fixed64.One,
             Fixed64.Zero);
         Fixed64 tangentialVelocity = moving.LinearVelocity.Y;
@@ -617,8 +628,8 @@ public sealed class CollisionResponse2DManifoldTests
         pair.MarkColliding(context.FrameCount);
 
         moving.LinearVelocity.Y.Abs().Should().BeLessThan(tangentialSpeed);
-        pair.TryGetWarmStartImpulse(pair.Manifold[0].ContactId, out ContactWarmStartImpulse first).Should().BeTrue();
-        pair.TryGetWarmStartImpulse(pair.Manifold[1].ContactId, out ContactWarmStartImpulse second).Should().BeTrue();
+        pair.TryGetWarmStartImpulse(default, pair.Manifold[0].ContactId, out ContactWarmStartImpulse first).Should().BeTrue();
+        pair.TryGetWarmStartImpulse(default, pair.Manifold[1].ContactId, out ContactWarmStartImpulse second).Should().BeTrue();
         first.TangentImpulse.Abs().Should().BeGreaterThan(Fixed64.Zero);
         second.TangentImpulse.Abs().Should().BeGreaterThan(Fixed64.Zero);
     }
@@ -667,7 +678,7 @@ public sealed class CollisionResponse2DManifoldTests
         capsule.LinearVelocity.X.Abs().Should().BeLessThan(tangentialSpeed);
         for (int i = 0; i < pair.Manifold.Count; i++)
         {
-            pair.TryGetWarmStartImpulse(pair.Manifold[i].ContactId, out ContactWarmStartImpulse impulse).Should().BeTrue();
+            pair.TryGetWarmStartImpulse(default, pair.Manifold[i].ContactId, out ContactWarmStartImpulse impulse).Should().BeTrue();
             impulse.TangentImpulse.Abs().Should().BeGreaterThan(Fixed64.Zero);
         }
     }
@@ -771,7 +782,7 @@ public sealed class CollisionResponse2DManifoldTests
             () =>
             {
                 pair.StoreWarmStartImpulse(
-                    contactId,
+                    default, contactId,
                     Fixed64.Zero,
                     Fixed64.Half);
                 left.ApplyCollisionLinearVelocityDelta(
@@ -902,13 +913,13 @@ public sealed class CollisionResponse2DManifoldTests
         var pair = new CollisionPair2D(moving.Collider, wall.Collider);
         pair.Manifold.SetContact(Vector2d.Right, Vector2d.Right, Fixed64.Half, Vector2d.Right);
         ulong contactId = pair.Manifold.PrimaryContact.ContactId;
-        pair.StoreWarmStartImpulse(contactId, Fixed64.One, Fixed64.One);
+        pair.StoreWarmStartImpulse(default, contactId, Fixed64.One, Fixed64.One);
 
         pair.MarkColliding(context.FrameCount);
 
         moving.LinearVelocity.Should().Be(Vector2d.Zero);
         moving.AngularVelocity.Should().Be(Fixed64.Zero);
-        pair.TryGetWarmStartImpulse(contactId, out ContactWarmStartImpulse impulse).Should().BeTrue();
+        pair.TryGetWarmStartImpulse(default, contactId, out ContactWarmStartImpulse impulse).Should().BeTrue();
         impulse.NormalImpulse.Should().Be(Fixed64.Zero);
         impulse.TangentImpulse.Should().Be(Fixed64.Zero);
     }
@@ -939,7 +950,7 @@ public sealed class CollisionResponse2DManifoldTests
             Vector2d.Right);
         ulong contactId = pair.Manifold.PrimaryContact.ContactId;
         pair.StoreWarmStartImpulse(
-            contactId,
+            default, contactId,
             Fixed64.One,
             Fixed64.Zero);
 
@@ -952,7 +963,7 @@ public sealed class CollisionResponse2DManifoldTests
             Vector2d.Left * Fixed64.Two);
         moving.AngularVelocity.Should().Be(Fixed64.Zero);
         pair.TryGetWarmStartImpulse(
-                contactId,
+                default, contactId,
                 out ContactWarmStartImpulse impulse)
             .Should()
             .BeTrue();
@@ -985,7 +996,7 @@ public sealed class CollisionResponse2DManifoldTests
             Vector2d.Right);
         ulong contactId = pair.Manifold.PrimaryContact.ContactId;
         pair.StoreWarmStartImpulse(
-            contactId,
+            default, contactId,
             Fixed64.MaxValue,
             Fixed64.MaxValue);
         int errorCount = 0;
@@ -1013,7 +1024,7 @@ public sealed class CollisionResponse2DManifoldTests
 
         errorCount.Should().Be(0);
         pair.TryGetWarmStartImpulse(
-                contactId,
+                default, contactId,
                 out ContactWarmStartImpulse impulse)
             .Should()
             .BeTrue();
@@ -1050,7 +1061,7 @@ public sealed class CollisionResponse2DManifoldTests
             Vector2d.Right);
         ulong contactId = pair.Manifold.PrimaryContact.ContactId;
         pair.StoreWarmStartImpulse(
-            contactId,
+            default, contactId,
             Fixed64.Zero,
             Fixed64.MinValue);
 
@@ -1060,7 +1071,7 @@ public sealed class CollisionResponse2DManifoldTests
             applyPositionCorrection: false);
 
         pair.TryGetWarmStartImpulse(
-                contactId,
+                default, contactId,
                 out ContactWarmStartImpulse impulse)
             .Should()
             .BeTrue();
@@ -1144,7 +1155,7 @@ public sealed class CollisionResponse2DManifoldTests
             Vector2d.Right);
         ulong contactId = pair.Manifold.PrimaryContact.ContactId;
         pair.StoreWarmStartImpulse(
-            contactId,
+            default, contactId,
             Fixed64.One,
             Fixed64.Zero);
 
@@ -1156,7 +1167,7 @@ public sealed class CollisionResponse2DManifoldTests
         rotating.LinearVelocity.Should().Be(Vector2d.Zero);
         wall.LinearVelocity.Should().Be(Vector2d.Zero);
         pair.TryGetWarmStartImpulse(
-                contactId,
+                default, contactId,
                 out ContactWarmStartImpulse impulse)
             .Should()
             .BeTrue();
@@ -1193,7 +1204,7 @@ public sealed class CollisionResponse2DManifoldTests
             Vector2d.Right);
         ulong contactId = pair.Manifold.PrimaryContact.ContactId;
         pair.StoreWarmStartImpulse(
-            contactId,
+            default, contactId,
             Fixed64.One,
             Fixed64.Zero);
 
@@ -1209,10 +1220,12 @@ public sealed class CollisionResponse2DManifoldTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
     public void Resolve_WhenExactFrictionFinalDeltaOverflows_ShouldRejectAtomically(
-        bool minimumCache)
+        bool minimumCache, bool grouped)
     {
         using GravitasWorldContext context =
             Physics2DTestWorld.CreateContext();
@@ -1239,8 +1252,11 @@ public sealed class CollisionResponse2DManifoldTests
             Fixed64.Zero,
             Vector2d.Right);
         ulong contactId = pair.Manifold.PrimaryContact.ContactId;
+        if (grouped)
+            pair.Manifold.AddContact(new ContactGroupKey(0, 0, region: 1, sourceIdB: wall.Collider.Id + 1),
+                new ManifoldContact2D(1UL, Vector2d.Zero, Vector2d.Zero, Fixed64.Zero, Vector2d.Zero));
         pair.StoreWarmStartImpulse(
-            contactId,
+            default, contactId,
             Fixed64.One,
             minimumCache
                 ? Fixed64.MinValue
@@ -1257,6 +1273,7 @@ public sealed class CollisionResponse2DManifoldTests
                 if (level == DiagnosticLevel.Error)
                     errorCount++;
             };
+            CollisionResponse2D.PrepareSolve(pair);
             CollisionResponse2D.Resolve(
                 pair,
                 applyCachedImpulse: false,
@@ -1273,7 +1290,7 @@ public sealed class CollisionResponse2DManifoldTests
         moving.AngularVelocity.Should().Be(Fixed64.Zero);
         wall.LinearVelocity.Should().Be(Vector2d.Zero);
         wall.AngularVelocity.Should().Be(Fixed64.Zero);
-        pair.TryGetWarmStartImpulse(contactId, out _)
+        pair.TryGetWarmStartImpulse(default, contactId, out _)
             .Should()
             .BeFalse();
     }
@@ -1306,7 +1323,7 @@ public sealed class CollisionResponse2DManifoldTests
             Vector2d.Right);
         ulong contactId = pair.Manifold.PrimaryContact.ContactId;
         pair.StoreWarmStartImpulse(
-            contactId,
+            default, contactId,
             Fixed64.Zero,
             minimumCache
                 ? Fixed64.MinValue
@@ -1322,7 +1339,7 @@ public sealed class CollisionResponse2DManifoldTests
                 ? Vector2d.Backward
                 : Vector2d.Forward);
         pair.TryGetWarmStartImpulse(
-                contactId,
+                default, contactId,
                 out ContactWarmStartImpulse impulse)
             .Should()
             .BeTrue();
@@ -1330,8 +1347,10 @@ public sealed class CollisionResponse2DManifoldTests
         impulse.TangentImpulse.Should().Be(Fixed64.Zero);
     }
 
-    [Fact]
-    public void Resolve_WithUnrepresentableFirstWarmStart_ShouldColdSolveBothContacts()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Resolve_WithUnrepresentableFirstWarmStart_ShouldColdSolveBothContacts(bool grouped)
     {
         using GravitasWorldContext context =
             Physics2DTestWorld.CreateContext();
@@ -1353,17 +1372,21 @@ public sealed class CollisionResponse2DManifoldTests
             new Vector2d(Fixed64.One, -Fixed64.One),
             Fixed64.Zero,
             Vector2d.Right);
+        if (grouped)
+            pair.Manifold.AddContact(new ContactGroupKey(0, 0, region: 1, sourceIdB: wall.Collider.Id + 1),
+                new ManifoldContact2D(1UL, Vector2d.Zero, Vector2d.Zero, Fixed64.Zero, Vector2d.Zero));
         ulong firstId = pair.Manifold[0].ContactId;
         ulong secondId = pair.Manifold[1].ContactId;
         pair.StoreWarmStartImpulse(
-            firstId,
+            default, firstId,
             Fixed64.MaxValue,
             Fixed64.Zero);
         pair.StoreWarmStartImpulse(
-            secondId,
+            default, secondId,
             Fixed64.Zero,
             Fixed64.Zero);
 
+        CollisionResponse2D.PrepareSolve(pair);
         CollisionResponse2D.Resolve(
             pair,
             applyCachedImpulse: true,
@@ -1372,12 +1395,12 @@ public sealed class CollisionResponse2DManifoldTests
         moving.LinearVelocity.Should().Be(Vector2d.Zero);
         moving.AngularVelocity.Should().Be(Fixed64.Zero);
         pair.TryGetWarmStartImpulse(
-                firstId,
+                default, firstId,
                 out ContactWarmStartImpulse first)
             .Should()
             .BeTrue();
         pair.TryGetWarmStartImpulse(
-                secondId,
+                default, secondId,
                 out ContactWarmStartImpulse second)
             .Should()
             .BeTrue();
@@ -1412,7 +1435,7 @@ public sealed class CollisionResponse2DManifoldTests
             Vector2d.Right);
         ulong contactId = pair.Manifold.PrimaryContact.ContactId;
         pair.StoreWarmStartImpulse(
-            contactId,
+            default, contactId,
             Fixed64.Zero,
             crossIsUnrepresentable
                 ? Fixed64.MaxValue
@@ -1426,7 +1449,7 @@ public sealed class CollisionResponse2DManifoldTests
         moving.LinearVelocity.Should().Be(Vector2d.Zero);
         moving.AngularVelocity.Should().Be(Fixed64.Zero);
         pair.TryGetWarmStartImpulse(
-                contactId,
+                default, contactId,
                 out ContactWarmStartImpulse impulse)
             .Should()
             .BeTrue();
@@ -1459,7 +1482,7 @@ public sealed class CollisionResponse2DManifoldTests
             Vector2d.Right);
         ulong contactId = pair.Manifold.PrimaryContact.ContactId;
         pair.StoreWarmStartImpulse(
-            contactId,
+            default, contactId,
             Fixed64.One,
             Fixed64.Zero);
 
@@ -1471,7 +1494,7 @@ public sealed class CollisionResponse2DManifoldTests
         moving.LinearVelocity.X.Should().BeLessThan(Fixed64.Two);
         moving.AngularVelocity.Should().Be(Fixed64.Zero);
         pair.TryGetWarmStartImpulse(
-                contactId,
+                default, contactId,
                 out ContactWarmStartImpulse impulse)
             .Should()
             .BeTrue();
@@ -1491,7 +1514,7 @@ public sealed class CollisionResponse2DManifoldTests
 
         pair.MarkColliding(context.FrameCount);
 
-        pair.TryGetWarmStartImpulse(contactId, out ContactWarmStartImpulse impulse).Should().BeTrue();
+        pair.TryGetWarmStartImpulse(default, contactId, out ContactWarmStartImpulse impulse).Should().BeTrue();
         impulse.NormalImpulse.Should().BeGreaterThan(Fixed64.Zero);
     }
 
@@ -1589,6 +1612,20 @@ public sealed class CollisionResponse2DManifoldTests
         pair.MarkColliding(context.FrameCount);
 
         return moving.LinearVelocity.X;
+    }
+
+    private static SwiftList<CollisionPair2D> QueueResponsePair(GravitasWorldContext context, CollisionPair2D pair)
+    {
+        pair.RefreshContactDependencies();
+        object key = typeof(GravitasPhysics2DService).GetMethod("CreatePairKey",
+            BindingFlags.Static | BindingFlags.NonPublic)!.Invoke(null, new object[] { pair.Id1, pair.Id2 })!;
+        typeof(GravitasPhysics2DService).GetMethod("RegisterPair", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(context.Physics2D, new[] { key, (object)pair });
+        var queued = (SwiftList<CollisionPair2D>)typeof(GravitasPhysics2DService)
+            .GetField("_discreteResponsePairs", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(context.Physics2D)!;
+        queued.Add(pair);
+        return queued;
     }
 
     private static SolidBody2D CreateBox(

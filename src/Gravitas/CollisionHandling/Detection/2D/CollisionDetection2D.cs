@@ -16,6 +16,7 @@ namespace Gravitas.CollisionHandling;
 /// <summary>
 /// Deterministic pure 2D narrow-phase collision checks.
 /// </summary>
+/// <content>Owns planar shape dispatch, contact generation and pair-level recovery admission.</content>
 internal static partial class CollisionDetection2D
 {
     internal static bool TryCollide(LSCollider2D colliderA, LSCollider2D colliderB, out Contact2D contact)
@@ -30,7 +31,18 @@ internal static partial class CollisionDetection2D
     internal static bool TryCollide(CollisionPair2D pair, ContactManifold2D manifold, long frame)
     {
         SwiftThrowHelper.ThrowIfNull(pair, nameof(pair));
-        return TryCollide(CollisionWorkItem2D.Create(pair), manifold, frame);
+        pair.ClearRecovery();
+        bool overlaps = TryCollide(CollisionWorkItem2D.Create(pair), manifold, frame);
+        if (!overlaps || !manifold.NeedsSurfaceRecovery) return overlaps;
+        LSCollider2D member = pair.ColliderA.StaticSurface != null ? pair.ColliderA : pair.ColliderB;
+        LSCollider2D mover = member == pair.ColliderA ? pair.ColliderB : pair.ColliderA;
+        if (mover.Body is not { HasSolverMobility: true }) return overlaps;
+        StaticSurface2D surface = member.StaticSurface!;
+        // Noncarriers retain their overlap events; only the genuine carrier can recover the body.
+        if (mover is LSCompoundCollider2D || !surface.TryGetRecovery(mover, out Vector2d center))
+            throw new InvalidOperationException("Pure 2D static-surface overlap has no exposed response constraint or certified recovery.");
+        pair.SetRecovery(mover, center);
+        return true;
     }
 
     internal static bool TryCollide(CollisionWorkItem2D item, ContactManifold2D manifold, long frame)
@@ -112,6 +124,18 @@ internal static partial class CollisionDetection2D
         if (!BoundsOverlap(colliderA, colliderB))
             return false;
 
+        if (!colliderA.IsTrigger && !colliderB.IsTrigger && item.CollisionType != CollisionType2D.Compound)
+        {
+            StaticSurface2D? surface = colliderB.StaticSurface ?? colliderA.StaticSurface;
+            if (surface != null && (colliderA.StaticSurface == null || colliderB.StaticSurface == null))
+            {
+                bool reverse = colliderA.StaticSurface != null;
+                if (!HasSurfaceOverlap(reverse ? colliderB : colliderA, reverse ? colliderA : colliderB)) return false;
+                surface.Reduce(reverse ? colliderB : colliderA, reverse ? colliderA : colliderB, manifold, reverse);
+                return true;
+            }
+        }
+
         return item.CollisionType switch
         {
             CollisionType2D.Circle_Circle => TryCircleCircle((LSCircleCollider2D)colliderA, (LSCircleCollider2D)colliderB, manifold),
@@ -126,6 +150,26 @@ internal static partial class CollisionDetection2D
             CollisionType2D.Compound => TryCompound(colliderA, colliderB, manifold),
             _ => false
         };
+    }
+
+    // Declared pieces are committed convex filled polygons. Overlap truth needs
+    // exact classification, not discarded ordinary normals/depths/anchors.
+    internal static bool HasSurfaceOverlap(LSCollider2D mover, LSCollider2D member)
+    {
+        if (!BoundsOverlap(mover, member)) return false;
+        Span<Vector2d> targetBox = stackalloc Vector2d[4], movingBox = stackalloc Vector2d[4];
+        ReadOnlySpan<Vector2d> target = GetConvexVertexOffsets(member, targetBox);
+        if (mover is LSCircleCollider2D or LSCapsuleCollider2D)
+        {
+            Fixed64 core = mover is LSCapsuleCollider2D capsule ? capsule.AxisLength : Fixed64.Zero;
+            Fixed64 radius = mover is LSCircleCollider2D circle ? circle.ScaledRadius : ((LSCapsuleCollider2D)mover).ScaledRadius;
+            Vector2d axis = Vector2d.Forward;
+            if (core != Fixed64.Zero) _ = Vector2d.TryRotate(axis, mover.Rotation, out axis);
+            return WideCenteredCapsule2dRelations.DoesCapsuleOverlapConvex(mover.Center, axis, core, radius,
+                member.Center, member.ConvexRotation, target, strict: false);
+        }
+        return WideConvex2dRelations.DoConvexesOverlap(mover.Center, mover.ConvexRotation, GetConvexVertexOffsets(mover, movingBox),
+            member.Center, member.ConvexRotation, target, strict: false);
     }
 
     private static bool TryCircleCircle(LSCircleCollider2D colliderA, LSCircleCollider2D colliderB, out Contact2D contact)
@@ -742,19 +786,25 @@ internal static partial class CollisionDetection2D
         int featureNamespaceA,
         int featureNamespaceB)
     {
-        for (int i = 0; i < source.Count; i++)
+        destination.NeedsSurfaceRecovery |= source.NeedsSurfaceRecovery;
+        for (int groupIndex = 0; groupIndex < source.GroupCount; groupIndex++)
         {
-            ManifoldContact2D contact = source[i];
-            destination.AddContact(
-                contact.AnchorA,
-                contact.AnchorB,
-                contact.Depth,
-                contact.Normal,
-                contact.MaterialA,
-                contact.MaterialB,
-                contact.DepthIsClamped,
-                featureNamespaceA,
-                featureNamespaceB);
+            ref ContactGroup2D group = ref source.GetGroup(groupIndex);
+            for (int i = 0; i < group.Count; i++)
+            {
+                ManifoldContact2D contact = group[i];
+                destination.AddContact(
+                    contact.AnchorA,
+                    contact.AnchorB,
+                    contact.Depth,
+                    contact.Normal,
+                    contact.MaterialA,
+                    contact.MaterialB,
+                    contact.DepthIsClamped,
+                    featureNamespaceA,
+                    featureNamespaceB,
+                    group.Key);
+            }
         }
     }
 

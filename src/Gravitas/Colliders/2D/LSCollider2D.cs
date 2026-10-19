@@ -140,6 +140,12 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
 
     internal long LifetimeVersion => _lifetimeVersion;
 
+    internal StaticSurface2D? StaticSurface { get; set; }
+
+    internal bool IsDeactivationInProgress { get; set; }
+
+    internal LSCompoundCollider2D? CompoundOwner => _compoundOwner;
+
     internal int ServiceRefreshIndex => _serviceRefreshIndex;
 
     internal bool IsPartitioned => _partitionState.IsPartitioned;
@@ -237,6 +243,7 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
             }
             else
             {
+                StaticSurface?.Remove(this);
                 _isActive = false;
                 _context.Collisions2D.ClearPartitionedCollider(this, force: true);
                 if (IsMixedPartitioned)
@@ -264,8 +271,12 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get => _layer;
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        set => _layer = value;
+        set
+        {
+            if (_layer == value) return;
+            _layer = value;
+            StaticSurface?.Invalidate();
+        }
     }
 
     /// <summary>
@@ -282,6 +293,7 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
                 return;
 
             _ignoredCollisionLayers = value;
+            StaticSurface?.Invalidate();
             _body?.Wake();
         }
     }
@@ -835,14 +847,16 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
             ThrowIfCannotEnableTrigger(nameof(IsTrigger));
 
         _isTrigger = value;
+        StaticSurface?.Invalidate();
     }
 
-    private void MarkContactDependencyChanged()
+    internal void MarkContactDependencyChanged(bool notifySurface = true)
     {
         LSCollider2D owner = this;
         while (owner._compoundOwner != null)
             owner = owner._compoundOwner;
         owner.ContactDependencyVersion++;
+        if (notifySurface) owner.StaticSurface?.Invalidate();
     }
 
     private void ThrowIfCannotEnableTrigger(string operation)

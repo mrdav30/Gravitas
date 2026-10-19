@@ -408,6 +408,7 @@ internal static partial class ExactContactResponseKernel
         ExactLever3D.GetRelativePointVelocityRatio(impact.LinearA, impact.AngularA,
             first.Lever, impact.LinearB, impact.AngularB, second.Lever, normal,
             out Signed832 incoming, out Signed832 incomingDenominator,
+            firstPlanarAngularVelocity: first.PlanarAngularVelocity.HasValue ? impact.PlanarAngularA : null,
             secondPlanarAngularVelocity: second.PlanarAngularVelocity.HasValue ? impact.PlanarAngularB : null);
         bool representable = Fixed64.TryGetSignedRawRatio(incoming, incomingDenominator,
             0, out Fixed64 incomingVelocity);

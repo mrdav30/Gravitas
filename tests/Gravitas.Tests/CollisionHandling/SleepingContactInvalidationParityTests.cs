@@ -162,7 +162,7 @@ public sealed class SleepingContactInvalidationParityTests
             (planar!.Collider.TryGetCollisionPair(neighbor.Collider.Id, out pair)
                 || neighbor.Collider.TryGetCollisionPair(planar.Collider.Id, out pair)).Should().BeTrue();
             contactId = pair!.Manifold.PrimaryContact.ContactId;
-            pair.TryGetWarmStartImpulse(contactId, out impulse).Should().BeTrue();
+            pair.TryGetWarmStartImpulse(default, contactId, out impulse).Should().BeTrue();
         }
         neighbor.SleepEnabled = true;
         neighbor.Sleep();
@@ -189,7 +189,7 @@ public sealed class SleepingContactInvalidationParityTests
                 .Should().Be(firstPosition);
             if (pair != null)
             {
-                pair.TryGetWarmStartImpulse(contactId, out ContactWarmStartImpulse retained).Should().BeTrue();
+                pair.TryGetWarmStartImpulse(default, contactId, out ContactWarmStartImpulse retained).Should().BeTrue();
                 retained.Should().Be(impulse);
             }
         }

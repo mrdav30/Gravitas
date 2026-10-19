@@ -15,6 +15,7 @@ namespace Gravitas;
 /// <summary>
 /// Context-owned pure 2D body, broad-phase, narrow-phase, response, and query service.
 /// </summary>
+/// <content>Owns registration, static continuity, collision passes and dimensional solver lifecycle.</content>
 public sealed partial class GravitasPhysics2DService
 {
     private static readonly CollisionPair2DStableKeyComparer ResponsePairComparer = new();
@@ -25,6 +26,7 @@ public sealed partial class GravitasPhysics2DService
     private readonly SwiftBucket<SolidBody2D> _dynamicBodies = new();
     private readonly ColliderRegistry<LSCollider2D> _colliders = new();
     private readonly SwiftList<LSCollider2D> _serviceRefreshColliders = new();
+    private readonly SwiftList<StaticSurface2D> _staticSurfaces = new();
     private readonly SwiftHashSet<ulong> _processedPairKeys = new();
     private readonly SwiftDictionary<ulong, CollisionPair2D> _pairs = new();
     private readonly SwiftList<ulong> _pairsToRemove = new();
@@ -109,6 +111,7 @@ public sealed partial class GravitasPhysics2DService
         SolidBody2D body,
         BodyMotionType previousMotionType)
     {
+        if (!body.IsStatic) body.Collider.StaticSurface?.Remove(body.Collider);
         if (previousMotionType == BodyMotionType.Static)
         {
             body.DynamicId = _dynamicBodies.Add(body);
@@ -159,17 +162,41 @@ public sealed partial class GravitasPhysics2DService
     internal void DessimilateCollider(LSCollider2D collider)
     {
         SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
-        if (collider.Body != null)
-            _context.Constraints2D.RemoveJointsForBody(collider.Body);
-        RemovePairsForCollider(collider);
-        _context.MixedCollisions.RemovePairsFor2DCollider(collider);
-        if (collider.IsMixedPartitioned)
-            _context.MixedCollisions.ClearPartitioned2DCollider(collider, force: true);
-        if (collider.IsPartitioned)
-            _context.Collisions2D.ClearPartitionedCollider(collider, force: true);
+        collider.IsDeactivationInProgress = true;
+        try
+        {
+            collider.StaticSurface?.Remove(collider);
+            if (collider.Body != null)
+                _context.Constraints2D.RemoveJointsForBody(collider.Body);
+            RemovePairsForCollider(collider);
+            _context.MixedCollisions.RemovePairsFor2DCollider(collider);
+            if (collider.IsMixedPartitioned)
+                _context.MixedCollisions.ClearPartitioned2DCollider(collider, force: true);
+            if (collider.IsPartitioned)
+                _context.Collisions2D.ClearPartitionedCollider(collider, force: true);
 
-        RemoveServiceRefreshCollider(collider);
-        _colliders.Remove(collider);
+            RemoveServiceRefreshCollider(collider);
+            _colliders.Remove(collider);
+        }
+        finally
+        {
+            collider.IsDeactivationInProgress = false;
+        }
+    }
+
+    internal StaticSurface2D CreateStaticSurface(System.ReadOnlySpan<LSCollider2D> members)
+    {
+        var surface = new StaticSurface2D(_context, members);
+        _staticSurfaces.Add(surface);
+        return surface;
+    }
+
+    internal void RemoveStaticSurface(StaticSurface2D surface) => _staticSurfaces.Remove(surface);
+
+    internal void ReleaseStaticSurfaces()
+    {
+        foreach (StaticSurface2D surface in _staticSurfaces) surface.Release();
+        _staticSurfaces.FastClear();
     }
 
     /// <summary>Runs the authoritative pure 2D simulation phase.</summary>
@@ -274,6 +301,7 @@ public sealed partial class GravitasPhysics2DService
     /// <summary>Clears all context-local pure 2D registration and solver state.</summary>
     public void Reset()
     {
+        ReleaseStaticSurfaces();
         DiscardContinuousCollisionHandoffQueue();
         _dynamicBodies.Clear();
         _colliders.Clear();

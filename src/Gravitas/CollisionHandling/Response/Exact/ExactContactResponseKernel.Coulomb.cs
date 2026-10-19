@@ -35,7 +35,8 @@ internal static partial class ExactContactResponseKernel
         Fixed64 accumulatedTangentImpulse,
         Fixed64 staticFriction,
         Fixed64 dynamicFriction,
-        out ExactCoulombResponse3D response)
+        out ExactCoulombResponse3D response,
+        in ContactResponseSnapshot impact = default)
     {
         response = default;
         bool inputsValid =
@@ -65,7 +66,7 @@ internal static partial class ExactContactResponseKernel
         if (!TryGetCompletedNormalAccumulatorRatio(
                 normalConstraint,
                 normalNumerator,
-                normalDenominator))
+                normalDenominator, impact))
             return false;
         GetBilateralImpulseRatio(
             firstTangent,
@@ -718,7 +719,8 @@ internal static partial class ExactContactResponseKernel
     private static bool TryGetCompletedNormalAccumulatorRatio(
         in ExactNormalConstraint3D constraint,
         Span<ulong> numerator,
-        Span<ulong> denominator)
+        Span<ulong> denominator,
+        in ContactResponseSnapshot impact = default)
     {
         numerator.Clear();
         denominator.Clear();
@@ -759,7 +761,7 @@ internal static partial class ExactContactResponseKernel
             effectiveDenominator);
         int velocitySign =
             velocityNumerator.Sign * velocityDenominator.Sign;
-        if (velocitySign == 0
+        if (velocitySign == 0 && !impact.IsValid
             || WideArithmetic.IsZeroMagnitude(effectiveNumerator))
         {
             SetMagnitude(constraint.AccumulatedImpulse, numerator);
@@ -781,15 +783,27 @@ internal static partial class ExactContactResponseKernel
             : constraint.NegativeImpulseScale;
         Span<ulong> impulseNumerator = stackalloc ulong[MaxResponseWords];
         Span<ulong> impulseDenominator = stackalloc ulong[MaxResponseWords];
-        BuildImpulseRatio(
-            velocityNumerator,
-            velocityDenominator,
-            effectiveNumerator,
-            effectiveDenominator,
-            applyRestitution ? constraint.Restitution : Fixed64.Zero,
-            scale,
-            impulseNumerator,
-            impulseDenominator);
+        int impulseSign;
+        if (impact.IsValid)
+        {
+            impulseSign = BuildImpactImpulseRatio(first, second, constraint.Normal, impact,
+                constraint.Restitution, constraint.RestitutionVelocityThreshold,
+                velocityNumerator, velocityDenominator, effectiveNumerator, effectiveDenominator,
+                impulseNumerator, impulseDenominator);
+        }
+        else
+        {
+            BuildImpulseRatio(
+                velocityNumerator,
+                velocityDenominator,
+                effectiveNumerator,
+                effectiveDenominator,
+                applyRestitution ? constraint.Restitution : Fixed64.Zero,
+                scale,
+                impulseNumerator,
+                impulseDenominator);
+            impulseSign = -velocitySign;
+        }
 
         Span<ulong> accumulatorMagnitude =
             stackalloc ulong[MaxResponseWords];
@@ -800,7 +814,6 @@ internal static partial class ExactContactResponseKernel
             accumulatorMagnitude,
             impulseDenominator,
             accumulatorAtImpulseDenominator);
-        int impulseSign = -velocitySign;
         if (impulseSign < 0
             && WideArithmetic.CompareMagnitudeEqualLength(
                 impulseNumerator,

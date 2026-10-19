@@ -314,14 +314,49 @@ public sealed partial class ReplayHashBranchCoverageTests
         ChronicleHash contactOnly = HashPair2D(first);
         ChronicleHash materialOverride = HashPair2D(materialPair);
         ulong contactId = first.Manifold[0].ContactId;
-        first.StoreWarmStartImpulse(contactId, Fixed64.Half, Fixed64.FromFraction(1, 4));
-        second.StoreWarmStartImpulse(contactId, Fixed64.Half, Fixed64.FromFraction(1, 4));
+        first.StoreWarmStartImpulse(default, contactId, Fixed64.Half, Fixed64.FromFraction(1, 4));
+        second.StoreWarmStartImpulse(default, contactId, Fixed64.Half, Fixed64.FromFraction(1, 4));
         ChronicleHash warmStarted = HashPair2D(first);
 
         contactOnly.Should().NotBe(empty);
         materialOverride.Should().NotBe(contactOnly);
         warmStarted.Should().NotBe(contactOnly);
         HashPair2D(second).Should().Be(warmStarted);
+    }
+
+    [Fact]
+    public void CollisionPair2DReplayHash_ShouldEncodeEveryGroupAndItsSupplier()
+    {
+        using GravitasWorldContext context = Physics2DTestWorld.CreateContext();
+        LSCircleCollider2D first = CreateBodylessCircle2D(context, Vector2d.Zero);
+        SolidBody2D second = CreateBody2D(context, Vector2d.Right * Fixed64.Half);
+        context.Physics2D.PrepareReplayColliders();
+        var pair = new CollisionPair2D(first, second.Collider);
+        var reversed = new CollisionPair2D(first, second.Collider);
+        for (int g = 0; g < 3; g++)
+        {
+            var key = new ContactGroupKey(g, g + 1, g + 2, g + 3, g + 4,
+                first.Id + 1, second.Collider.Id + 1);
+            var contact = new ManifoldContact2D(11UL, Vector2d.Zero, Vector2d.Right,
+                Fixed64.One, Vector2d.Right);
+            pair.Manifold.AddContact(key, contact);
+            pair.StoreWarmStartImpulse(key, 11UL, (Fixed64)(g + 1), Fixed64.Half);
+            int r = 2 - g;
+            var reverseKey = new ContactGroupKey(r, r + 1, r + 2, r + 3, r + 4,
+                first.Id + 1, second.Collider.Id + 1);
+            reversed.Manifold.AddContact(reverseKey, contact);
+            reversed.StoreWarmStartImpulse(reverseKey, 11UL, (Fixed64)(r + 1), Fixed64.Half);
+        }
+        HashPair2D(pair).Should().Be(HashPair2D(reversed));
+        ChronicleHash full = HashPair2D(pair);
+        var last = new ContactGroupKey(2, 3, 4, 5, 6, first.Id + 1, second.Collider.Id + 1);
+        pair.StoreWarmStartImpulse(last, 11UL, Fixed64.One, Fixed64.Half);
+        HashPair2D(pair).Should().NotBe(full);
+        pair.ClearWarmStart();
+        ChronicleHash originalSupplier = HashPair2D(pair);
+        ref ContactGroup2D group = ref pair.Manifold.GetGroup(2);
+        group.Key = new ContactGroupKey(2, 3, 4, 5, 6, first.Id + 1, int.MaxValue);
+        HashPair2D(pair).Should().NotBe(originalSupplier);
     }
 
     [Fact]

@@ -149,7 +149,8 @@ internal static class ExactContactLever2D
         Fixed64 accumulatedImpulse,
         Fixed64 positiveImpulseScale,
         Fixed64 negativeImpulseScale,
-        out ExactNormalResponse3D response)
+        out ExactNormalResponse3D response,
+        in ContactResponseSnapshot impact = default)
     {
         Vector3d spatialNormal = ToSpatial(normal);
         ExactContactResponseOperand3D first = CreateResponseOperand(
@@ -173,7 +174,7 @@ internal static class ExactContactLever2D
             accumulatedImpulse,
             positiveImpulseScale,
             negativeImpulseScale,
-            out response);
+            out response, impact);
     }
 
     internal static Vector3d ToSpatial(Vector2d vector) =>

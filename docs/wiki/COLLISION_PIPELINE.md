@@ -110,6 +110,12 @@ rotational CCD, use the first pair in deterministic geometric order. Reversing
 collider order may select a different valid endpoint; the witnesses belong to
 the selected finite features rather than unrelated support endpoints.
 
+`ContactManifold2D` preserves independent finite surface groups, with up to two
+samples per group. Its flat enumeration follows structural group order, then
+contact identity. Group boundaries and supplier materials remain meaningful
+when several boundary normals constrain one body; the first sample is not
+necessarily the deepest representative. Use `PrimaryContact` for that purpose.
+
 Convex support predicates share one GJK simplex policy for 3D contacts and finite
 cone overlap queries. Region and face-orientation dot signs use exact products.
 Cross-product directions retain the scalar path within a proven component bound;

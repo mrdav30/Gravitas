@@ -134,9 +134,7 @@ public sealed partial class GravitasPhysics2DService
             RegisterPair(key, pair);
 
         pair.MarkCollidingDeferred(frame);
-        if (!IsCurrentResponsePair(key, pair))
-            return;
-
+        // Validate once after all notifications, including callbacks from later pairs.
         _discreteResponsePairs.Add(pair);
     }
 
@@ -229,9 +227,6 @@ public sealed partial class GravitasPhysics2DService
         else
             pair.MarkResting(frame);
 
-        if (!IsCurrentResponsePair(key, pair))
-            return;
-
         _discreteResponsePairs.Add(pair);
         AddDiscreteResponseBody(first.Body);
         AddDiscreteResponseBody(second.Body);
@@ -245,12 +240,21 @@ public sealed partial class GravitasPhysics2DService
         _discreteResponseBodyQueue.Add(body.DynamicId);
     }
 
-    private bool IsCurrentResponsePair(ulong key, CollisionPair2D pair) =>
-        _pairs.TryGetValue(key, out CollisionPair2D currentPair)
-        && ReferenceEquals(currentPair, pair)
-        && !pair.ColliderA.IsTrigger
-        && !pair.ColliderB.IsTrigger
-        && RequireCollisionPair(pair.ColliderA, pair.ColliderB);
+    private bool IsCurrentResponsePair(ulong key, CollisionPair2D pair)
+    {
+        if (!_pairs.TryGetValue(key, out CollisionPair2D currentPair)
+            || !ReferenceEquals(currentPair, pair)
+            || pair.ColliderA.IsTrigger || pair.ColliderB.IsTrigger
+            || !RequireCollisionPair(pair.ColliderA, pair.ColliderB)) return false;
+        // Notifications may remove a supplier that has no pair of its own.
+        // Rebuild from committed geometry before using the carrier's old rows.
+        if (pair.ContactDependenciesChanged)
+        {
+            if (!CollisionDetection2D.TryCollide(pair, pair.Manifold, _context.FrameCount)) return false;
+            pair.RefreshContactDependencies();
+        }
+        return pair.HasResponse;
+    }
 
     internal bool RequireCollisionPair(LSCollider2D first, LSCollider2D second)
     {
