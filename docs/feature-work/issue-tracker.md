@@ -55,15 +55,15 @@ resolutions or documented investigation closures.
 #140's finite single-contact correction, #141's authored-mesh geometry correction
 and #142's filled-surface cylinder response correction are complete. Resume pure
 2D continuity in Phase 6 of the #133/#139
-static-surface continuity plan. FMS-Issue-033 addresses closed curved-prism
-admission. Resolve **FMS-Issue-034** in FixedMathSharp before Phase 7's mixed
-continuity work: the cone/cylinder correctness repair and bounded throughput
-refinement pass coordinated Release/Lean validation with complete coverage.
-The unreleased patch and remaining oblique cost stay tracked upstream.
-FMS-Issue-035 additionally tracks the
-pre-existing contained sphere/capsule prism exit-orientation defect. Both
-upstream contact-quality issues must be resolved before mixed continuity;
-neither blocks pure 2D.
+static-surface continuity plan. FMS-Issue-033 and **FMS-Issue-034** are resolved
+in source: closed curved-prism admission and the cone/cylinder depth, normal and
+witness repair pass coordinated Release/Lean validation with complete coverage.
+The remaining penetrating oblique throughput cost is deferred in FixedMathSharp's
+benchmark backlog; its roughly 2 ms query times are not full-step acceptance.
+Released-package validation remains a release gate. **FMS-Issue-035** still
+tracks the pre-existing contained sphere/capsule prism exit-orientation defect
+and must be resolved before Phase 7's mixed continuity work. It does not block
+pure 2D.
 Keep physical-quality fixes ahead of the benchmark
 queue and finish generic continuity before heightfield work.
 
