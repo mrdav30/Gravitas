@@ -5,6 +5,14 @@ Its alias runner and deterministic fixtures cover context lifecycle,
 registration/partitioning, simulation, query services, replay hashing, and
 diagnostics.
 
+`curved-prism-contact` includes separated and penetrating cone/cylinder pairs,
+plus exactly touching cone apex, cone generator and horizontal cylinder side. The
+touching fixtures validate zero depth, normal orientation and coincident finite
+witnesses in setup. An exactly representable rotation preserves the cylinder's
+horizontal axis through transform preparation, keeping its supporting plane
+exact. Run all nine cases together when comparing contact optimizations so
+touching gains and penetrating/separated controls remain visible.
+
 `body-motion-type-transition` also measures registered 2D/3D mass changes.
 Each `ChangeMass` invocation assigns `0`, `2`, then `1` kilogram, including
 inertia refresh, cache/CCD invalidation, and awake membership synchronization.
