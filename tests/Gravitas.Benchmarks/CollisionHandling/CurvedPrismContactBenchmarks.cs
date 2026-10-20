@@ -12,6 +12,7 @@ public class CurvedPrismContactBenchmarks
     private GravitasWorldContext _context;
     private (LSCollider Curved, LSCollider2D Slab) _coneSeparated, _coneFace, _coneOblique;
     private (LSCollider Curved, LSCollider2D Slab) _cylinderSeparated, _cylinderFace, _cylinderOblique;
+    private (LSCollider Curved, LSCollider2D Slab) _coneApexTouch, _coneSideTouch, _cylinderSideTouch;
 
     [GlobalSetup]
     public void Setup()
@@ -48,6 +49,20 @@ public class CurvedPrismContactBenchmarks
         _coneOblique = CreateOverlap(true, true, obliqueRotation);
         _cylinderFace = CreateOverlap(false, false, obliqueRotation);
         _cylinderOblique = CreateOverlap(false, true, obliqueRotation);
+        _coneApexTouch = CreateTouch(true);
+        _cylinderSideTouch = CreateTouch(false);
+        _coneSideTouch = CreatePair(true, Vector3d.Zero, FixedQuaternion.Identity,
+            new LSAABBoxCollider2D(new Vector2d(Fixed64.Half, Fixed64.Two)),
+            new Vector3d(Fixed64.Half, Fixed64.One, Fixed64.Zero), Fixed64.One);
+        // The cone has 2X+Y<=1/2; the prism has 2X+Y>=1/2. Their
+        // unique common point is inside the smooth cone generator.
+        Vector3d sidePoint = new(Fixed64.Quarter, Fixed64.Zero, Fixed64.Zero);
+        Vector3d sideNormal = new(Fixed64.FromRaw(3_841_535_534L), Fixed64.FromRaw(1_920_767_767L), Fixed64.Zero);
+        if (!CollisionDetectionMixed.TryCollide(_coneSideTouch.Curved, _coneSideTouch.Slab, out MixedContact side)
+            || side.Depth != Fixed64.Zero || side.DepthIsClamped || side.Normal3DTo2D != sideNormal
+            || !side.TryGetPoint3D(out Vector3d first) || !side.TryGetPoint2D(out Vector3d second)
+            || first != sidePoint || second != sidePoint)
+            throw new InvalidOperationException("The cone/prism fixture must touch at its finite generator point.");
         // Separated queries intentionally have no expected-result gate here: their old
         // false positives must remain measurable in the pre-fix baseline.
     }
@@ -70,6 +85,15 @@ public class CurvedPrismContactBenchmarks
     [Benchmark]
     public bool CylinderOblique() => CollisionDetectionMixed.TryCollide(_cylinderOblique.Curved, _cylinderOblique.Slab, out _);
 
+    [Benchmark]
+    public bool ConeApexTouch() => CollisionDetectionMixed.TryCollide(_coneApexTouch.Curved, _coneApexTouch.Slab, out _);
+
+    [Benchmark]
+    public bool ConeSideTouch() => CollisionDetectionMixed.TryCollide(_coneSideTouch.Curved, _coneSideTouch.Slab, out _);
+
+    [Benchmark]
+    public bool CylinderSideTouch() => CollisionDetectionMixed.TryCollide(_cylinderSideTouch.Curved, _cylinderSideTouch.Slab, out _);
+
     [GlobalCleanup]
     public void Cleanup() => _context.Dispose();
 
@@ -84,6 +108,26 @@ public class CurvedPrismContactBenchmarks
         if (!CollisionDetectionMixed.TryCollide(pair.Curved, pair.Slab, out MixedContact contact)
             || contact.Depth <= Fixed64.Zero || contact.DepthIsClamped)
             throw new InvalidOperationException("The ordinary curved/prism fixture must penetrate.");
+        return pair;
+    }
+
+    private (LSCollider Curved, LSCollider2D Slab) CreateTouch(bool cone)
+    {
+        FixedQuaternion rotation = cone ? FixedQuaternion.Identity
+            : new(Fixed64.Half, Fixed64.Half, Fixed64.Half, Fixed64.Half);
+        // The cone apex is at Y=-1. This exactly representable rotation maps
+        // the cylinder axis to world Z and local X to world Up, keeping
+        // its bottom side exactly Y=2-radius=1 after transform preparation.
+        Vector3d center = Vector3d.Up * (cone ? Fixed64.FromFraction(-3, 2) : Fixed64.Two);
+        var pair = CreatePair(cone, center, rotation, new LSAABBoxCollider2D(new Vector2d(20, 20)),
+            Vector3d.Zero, Fixed64.One);
+        if (!CollisionDetectionMixed.TryCollide(pair.Curved, pair.Slab, out MixedContact contact)
+            || contact.Depth != Fixed64.Zero || contact.DepthIsClamped
+            || contact.Normal3DTo2D != (cone ? Vector3d.Up : Vector3d.Down)
+            || !contact.TryGetPoint3D(out Vector3d first) || !contact.TryGetPoint2D(out Vector3d second)
+            || first != second || first.Y != (cone ? -Fixed64.One : Fixed64.One)
+            || first.X.Abs() > Fixed64.One || first.Z.Abs() > Fixed64.One)
+            throw new InvalidOperationException("The curved/prism fixture must touch at its exact supporting plane.");
         return pair;
     }
 
