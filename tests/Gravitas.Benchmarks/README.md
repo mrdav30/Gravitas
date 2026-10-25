@@ -10,8 +10,10 @@ plus exactly touching cone apex, cone generator and horizontal cylinder side. Th
 touching fixtures validate zero depth, normal orientation and coincident finite
 witnesses in setup. An exactly representable rotation preserves the cylinder's
 horizontal axis through transform preparation, keeping its supporting plane
-exact. Run all nine cases together when comparing contact optimizations so
-touching gains and penetrating/separated controls remain visible.
+exact. Contained sphere and positive-core capsule controls require depth `3/4`,
+a Down normal and finite paired witnesses for their nearest upward exit. Run all
+eleven cases together when comparing contact optimizations so touching gains,
+containment and penetrating/separated controls remain visible.
 
 `body-motion-type-transition` also measures registered 2D/3D mass changes.
 Each `ChangeMass` invocation assigns `0`, `2`, then `1` kilogram, including

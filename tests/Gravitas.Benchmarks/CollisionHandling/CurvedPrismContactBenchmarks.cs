@@ -13,6 +13,7 @@ public class CurvedPrismContactBenchmarks
     private (LSCollider Curved, LSCollider2D Slab) _coneSeparated, _coneFace, _coneOblique;
     private (LSCollider Curved, LSCollider2D Slab) _cylinderSeparated, _cylinderFace, _cylinderOblique;
     private (LSCollider Curved, LSCollider2D Slab) _coneApexTouch, _coneSideTouch, _cylinderSideTouch;
+    private (LSCollider Curved, LSCollider2D Slab) _sphereContained, _capsuleContained;
 
     [GlobalSetup]
     public void Setup()
@@ -63,6 +64,8 @@ public class CurvedPrismContactBenchmarks
             || !side.TryGetPoint3D(out Vector3d first) || !side.TryGetPoint2D(out Vector3d second)
             || first != sidePoint || second != sidePoint)
             throw new InvalidOperationException("The cone/prism fixture must touch at its finite generator point.");
+        _sphereContained = CreateContained(false);
+        _capsuleContained = CreateContained(true);
         // Separated queries intentionally have no expected-result gate here: their old
         // false positives must remain measurable in the pre-fix baseline.
     }
@@ -94,8 +97,37 @@ public class CurvedPrismContactBenchmarks
     [Benchmark]
     public bool CylinderSideTouch() => CollisionDetectionMixed.TryCollide(_cylinderSideTouch.Curved, _cylinderSideTouch.Slab, out _);
 
+    [Benchmark]
+    public bool SphereContained() => CollisionDetectionMixed.TryCollide(_sphereContained.Curved, _sphereContained.Slab, out _);
+
+    [Benchmark]
+    public bool CapsuleContained() => CollisionDetectionMixed.TryCollide(_capsuleContained.Curved, _capsuleContained.Slab, out _);
+
     [GlobalCleanup]
     public void Cleanup() => _context.Dispose();
+
+    private (LSCollider Curved, LSCollider2D Slab) CreateContained(bool capsule)
+    {
+        LSCollider curved = capsule
+            ? new LSCapsuleCollider { Radius = Fixed64.Quarter,
+                Size = new Vector3d(Fixed64.Half, Fixed64.FromFraction(3, 2), Fixed64.Half) }
+            : new LSSphereCollider { Radius = Fixed64.Quarter };
+        var agent = new BenchmarkMatterAgent(_context, Vector3d.Up * Fixed64.Half);
+        if (capsule)
+            agent.Transform.LocalRotation = new(Fixed64.Half, Fixed64.Half, -Fixed64.Half, Fixed64.Half);
+        curved.InitializeWithNoBody(agent);
+        var slab = new LSAABBoxCollider2D(new Vector2d(4, 4)) { MixedHalfThicknessOverride = Fixed64.One };
+        slab.InitializeWithNoBody(new BenchmarkMatterAgent(_context, Vector3d.Zero));
+        // Both shapes have Y extent[1/4,3/4]. The perpendicular capsule core
+        // stays inside the prism, so its complete nearest exit is upward3/4.
+        if (!CollisionDetectionMixed.TryCollide(curved, slab, out MixedContact contact)
+            || contact.Depth != Fixed64.FromFraction(3, 4) || contact.DepthIsClamped
+            || contact.Normal3DTo2D != Vector3d.Down
+            || !contact.TryGetPoint3D(out Vector3d first) || !contact.TryGetPoint2D(out Vector3d second)
+            || first != Vector3d.Up * Fixed64.Quarter || second != Vector3d.Up)
+            throw new InvalidOperationException("The contained sphere/capsule must retain its nearest exit and finite paired witnesses.");
+        return (curved, slab);
+    }
 
     private (LSCollider Curved, LSCollider2D Slab) CreateOverlap(bool cone, bool oblique, FixedQuaternion rotation)
     {

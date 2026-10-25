@@ -1,3 +1,4 @@
+using Chronicler.Hashing;
 using FixedMathSharp;
 using FluentAssertions;
 using Gravitas.Colliders;
@@ -10,6 +11,127 @@ namespace Gravitas.Tests.MixedDimensions;
 
 public sealed partial class MixedResponseTests
 {
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void Step_WithContainedRoundPrismContact_ShouldResolveTheNearestExitAndReplay(bool capsule, bool moving3D)
+    {
+        var first = RunContainedRoundPrismSteps(capsule, moving3D);
+        var replay = RunContainedRoundPrismSteps(capsule, moving3D);
+        replay.Should().Be(first);
+    }
+
+    private static (ChronicleHash Corrected, ChronicleHash Touching, ChronicleHash Cleared,
+        int Enter, int Stay, int Exit) RunContainedRoundPrismSteps(bool capsule, bool moving3D)
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        Vector3d start = (moving3D ? Vector3d.Up : Vector3d.Right) * Fixed64.Half;
+        Vector3d normal = moving3D ? Vector3d.Down : Vector3d.Left;
+        // This exact axis permutation maps local Up to Right. The horizontal
+        // fixture instead keeps local Up, perpendicular to its X exit.
+        FixedQuaternion rotation = capsule && moving3D
+            ? new(Fixed64.Half, Fixed64.Half, -Fixed64.Half, Fixed64.Half)
+            : FixedQuaternion.Identity;
+        LSCollider curved = capsule
+            ? new LSCapsuleCollider { Radius = Fixed64.Quarter,
+                Size = new Vector3d(Fixed64.Half, Fixed64.FromFraction(3, 2), Fixed64.Half) }
+            : new LSSphereCollider { Radius = Fixed64.Quarter };
+        curved.Material = PhysicsMaterialTestHelper.WithFrictionAndRestitution(Fixed64.Zero, Fixed64.Zero);
+        var spatialAgent = new TestMatterAgent(context, new FixedTransform(start, rotation, Vector3d.One));
+        SolidBody? spatial = null;
+        if (moving3D)
+        {
+            spatial = new SolidBody(spatialAgent, curved)
+            {
+                Mass = Fixed64.One, SleepEnabled = false, FreezeAxes = BodyFreezeAxes3D.Rotation,
+                LinearDragCoefficient = Fixed64.Zero
+            };
+            spatial.Initialize(start, rotation);
+        }
+        else curved.InitializeWithNoBody(spatialAgent);
+        var slab = new LSAABBoxCollider2D(new Vector2d(moving3D ? (Fixed64)4 : Fixed64.Two, (Fixed64)4))
+        {
+            MixedHalfThicknessOverride = moving3D ? Fixed64.One : Fixed64.Two,
+            Material = PhysicsMaterialTestHelper.WithFrictionAndRestitution(Fixed64.Zero, Fixed64.Zero)
+        };
+        var planarAgent = new TestMatterAgent(context, new FixedTransform(Vector3d.Zero, FixedQuaternion.Identity, Vector3d.One));
+        SolidBody2D? planar = null;
+        if (moving3D) slab.InitializeWithNoBody(planarAgent);
+        else
+        {
+            planar = new SolidBody2D(planarAgent, slab)
+            {
+                Mass = Fixed64.One, SleepEnabled = false, FreezeAxes = BodyFreezeAxes2D.Rotation
+            };
+            planar.Initialize(Vector2d.Zero);
+        }
+        int entered = 0, stayed = 0, exited = 0;
+        curved.OnMixedContactEnter += _ => entered++;
+        slab.OnMixedContactEnter += _ => entered++;
+        curved.OnMixedContact += _ => stayed++;
+        slab.OnMixedContact += _ => stayed++;
+        curved.OnMixedContactExit += _ => exited++;
+        slab.OnMixedContactExit += _ => exited++;
+        bool initialHit = CollisionDetectionMixed.TryCollide(curved, slab, out MixedContact initial);
+
+        Step(context);
+
+        // The contained sphere/capsule has exit-axis extent[1/4,3/4].
+        // The nearest slab face is at1, so its complete first exit is3/4.
+        // The capsule core is perpendicular to this axis and remains finite.
+        initialHit.Should().BeTrue();
+        initial.Depth.Should().Be(Fixed64.FromFraction(3, 4));
+        initial.Normal3DTo2D.Should().Be(normal);
+        initial.DepthIsClamped.Should().BeFalse();
+        context.MixedCollisions.LastBroadPhaseCandidateCount.Should().Be(1);
+        context.MixedCollisions.ActivePairCount.Should().Be(1);
+        entered.Should().Be(2); stayed.Should().Be(2); exited.Should().Be(0);
+        // 3D response updates the authoritative body before its collider's next refresh.
+        Fixed64 correction = moving3D ? spatial!.Position3d.Y - start.Y : -slab.Center.X;
+        correction.Should().BeGreaterThan(Fixed64.Zero);
+        correction.Should().BeLessThan(initial.Depth); // Deliberate penetration slop remains.
+        (spatial?.Position3d ?? curved.Center).ToVector2d().Should().Be(moving3D ? Vector2d.Zero : start.ToVector2d());
+        curved.Rotation.Should().Be(rotation);
+        if (curved is LSCapsuleCollider finiteCapsule)
+        {
+            finiteCapsule.AxisLength.Should().Be(Fixed64.One);
+            finiteCapsule.WorldAxis.Should().Be(moving3D ? Vector3d.Right : Vector3d.Up);
+        }
+        planarAgent.Transform.WorldPosition.Y.Should().Be(Fixed64.Zero);
+        (spatial?.LinearVelocity ?? Vector3d.Zero).Should().Be(Vector3d.Zero);
+        (planar?.LinearVelocity ?? Vector2d.Zero).Should().Be(Vector2d.Zero);
+        ChronicleHash corrected = context.ComputeReplayHash(GravitasReplayHashMode.AuthoritativeWithSolverCaches);
+
+        // Author the independently known boundary, then run another complete
+        // step: exact touching must retain the pair without positional drift.
+        if (moving3D) spatial!.SetPosition(Vector3d.Up * Fixed64.FromFraction(5, 4));
+        else planar!.SetPosition(Vector2d.Left * Fixed64.FromFraction(3, 4));
+        Step(context);
+        (spatial?.Position3d ?? curved.Center).Should().Be(moving3D ? Vector3d.Up * Fixed64.FromFraction(5, 4) : start);
+        slab.Center.Should().Be(moving3D ? Vector2d.Zero : Vector2d.Left * Fixed64.FromFraction(3, 4));
+        CollisionDetectionMixed.TryCollide(curved, slab, out MixedContact touching).Should().BeTrue();
+        touching.Depth.Should().Be(Fixed64.Zero);
+        context.MixedCollisions.ActivePairCount.Should().Be(1);
+        entered.Should().Be(2); stayed.Should().Be(4); exited.Should().Be(0);
+        ChronicleHash touchHash = context.ComputeReplayHash(GravitasReplayHashMode.AuthoritativeWithSolverCaches);
+
+        if (moving3D) spatial!.AddLinearImpulse(Vector3d.Up);
+        else planar!.AddLinearImpulse(Vector2d.Left);
+        Step(context);
+        // These exact cardinal support planes separate the complete finite
+        // shapes; the narrow-phase miss is an additional behavior assertion.
+        Fixed64 clearance = moving3D ? spatial!.Position3d.Y - Fixed64.Quarter - Fixed64.One
+            : start.X - Fixed64.Quarter - (slab.Center.X + Fixed64.One);
+        clearance.Should().BeGreaterThan(Fixed64.FromFraction(1, 8));
+        CollisionDetectionMixed.TryCollide(curved, slab, out _).Should().BeFalse();
+        context.MixedCollisions.ActivePairCount.Should().Be(0);
+        entered.Should().Be(2); stayed.Should().Be(4); exited.Should().Be(2);
+        return (corrected, touchHash,
+            context.ComputeReplayHash(GravitasReplayHashMode.AuthoritativeWithSolverCaches), entered, stayed, exited);
+    }
+
     [Theory]
     [InlineData(false, false)]
     [InlineData(false, true)]

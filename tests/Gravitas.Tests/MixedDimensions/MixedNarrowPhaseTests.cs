@@ -798,9 +798,21 @@ public sealed partial class MixedNarrowPhaseTests
 
         collided.Should().BeTrue();
         contact.HasContact.Should().BeTrue();
-        contact.Normal3DTo2D.Should().Be(Vector3d.Right);
+        contact.Normal3DTo2D.Should().Be(Vector3d.Left);
+        contact.Point3D.Should().Be(new Vector3d(Fixed64.FromFraction(2, 5), Fixed64.Zero, Fixed64.Zero));
         contact.Point2D.Should().Be(new Vector3d(Fixed64.One, Fixed64.Zero, Fixed64.Zero));
         contact.Depth.Should().Be(Fixed64.FromFraction(3, 5));
+        contact.DepthIsClamped.Should().BeFalse();
+        (contact.Point3D - contact.Point2D).Should().Be(contact.Normal3DTo2D * contact.Depth);
+        // The box contains the radius-1/10 ball about the sphere center;
+        // adding its radius 1/2 proves the minimum 3/5, attained at the +X face.
+        Vector3d boundary = new(Fixed64.FromFraction(3, 2), Fixed64.Zero, Fixed64.Zero);
+        sphere.Body.SetPosition(boundary);
+        CollisionDetectionMixed.TryCollide(sphere.Collider, box.Collider, out MixedContact touching).Should().BeTrue();
+        touching.Depth.Should().Be(Fixed64.Zero);
+        sphere.Body.SetPosition(boundary + Vector3d.Right * Fixed64.FromRaw(1));
+        (sphere.Body.Position3d.X - sphere.Collider.ScaledRadius).Should().BeGreaterThan(Fixed64.One);
+        CollisionDetectionMixed.TryCollide(sphere.Collider, box.Collider, out _).Should().BeFalse();
     }
 
     [Fact]
@@ -816,9 +828,20 @@ public sealed partial class MixedNarrowPhaseTests
 
         collided.Should().BeTrue();
         contact.HasContact.Should().BeTrue();
-        contact.Normal3DTo2D.Should().Be(Vector3d.Up);
+        contact.Normal3DTo2D.Should().Be(Vector3d.Down);
+        contact.Point3D.Should().Be(new Vector3d(Fixed64.Zero, Fixed64.FromFraction(-1, 20), Fixed64.Zero));
         contact.Point2D.Should().Be(new Vector3d(Fixed64.Zero, Fixed64.Half, Fixed64.Zero));
         contact.Depth.Should().Be(Fixed64.FromFraction(11, 20));
+        contact.DepthIsClamped.Should().BeFalse();
+        (contact.Point3D - contact.Point2D).Should().Be(contact.Normal3DTo2D * contact.Depth);
+        // The box contains the radius-1/20 ball about the sphere center;
+        // adding its radius 1/2 proves the minimum 11/20, attained at the +Y cap.
+        sphere.Body.SetPosition(Vector3d.Up);
+        CollisionDetectionMixed.TryCollide(sphere.Collider, box.Collider, out MixedContact touching).Should().BeTrue();
+        touching.Depth.Should().Be(Fixed64.Zero);
+        sphere.Body.SetPosition(Vector3d.Up * (Fixed64.One + Fixed64.FromRaw(1)));
+        (sphere.Body.Position3d.Y - sphere.Collider.ScaledRadius).Should().BeGreaterThan(Fixed64.Half);
+        CollisionDetectionMixed.TryCollide(sphere.Collider, box.Collider, out _).Should().BeFalse();
     }
 
     [Fact]

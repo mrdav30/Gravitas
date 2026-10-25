@@ -60,10 +60,12 @@ in source: closed curved-prism admission and the cone/cylinder depth, normal and
 witness repair pass coordinated Release/Lean validation with complete coverage.
 The remaining penetrating oblique throughput cost is deferred in FixedMathSharp's
 benchmark backlog; its roughly 2 ms query times are not full-step acceptance.
-Released-package validation remains a release gate. **FMS-Issue-035** still
-tracks the pre-existing contained sphere/capsule prism exit-orientation defect
-and must be resolved before Phase 7's mixed continuity work. It does not block
-pure 2D.
+**FMS-Issue-035** is also resolved in source: contained sphere/capsule exits
+and full host response/replay pass coordinated Release/Lean validation with
+complete coverage. **FMS-Issue-036** tracks the separately confirmed pre-existing
+sphere/capsule finite witness matching defect and must be resolved before
+Phase 7's mixed continuity work. It does not block pure 2D. Released-package
+validation remains a release gate.
 Keep physical-quality fixes ahead of the benchmark
 queue and finish generic continuity before heightfield work.
 
