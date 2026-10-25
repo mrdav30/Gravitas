@@ -14,6 +14,8 @@ public class CurvedPrismContactBenchmarks
     private (LSCollider Curved, LSCollider2D Slab) _cylinderSeparated, _cylinderFace, _cylinderOblique;
     private (LSCollider Curved, LSCollider2D Slab) _coneApexTouch, _coneSideTouch, _cylinderSideTouch;
     private (LSCollider Curved, LSCollider2D Slab) _sphereContained, _capsuleContained;
+    private (LSCollider Curved, LSCollider2D Slab) _capsuleCrossingOffcenter, _sphereContainedOpposingFace;
+    private (LSCollider Curved, LSCollider2D Slab) _sphereHorizontalRim;
 
     [GlobalSetup]
     public void Setup()
@@ -66,6 +68,9 @@ public class CurvedPrismContactBenchmarks
             throw new InvalidOperationException("The cone/prism fixture must touch at its finite generator point.");
         _sphereContained = CreateContained(false);
         _capsuleContained = CreateContained(true);
+        _capsuleCrossingOffcenter = CreateFiniteWitnessPair(true);
+        _sphereContainedOpposingFace = CreateFiniteWitnessPair(false);
+        _sphereHorizontalRim = CreateHorizontalRim();
         // Separated queries intentionally have no expected-result gate here: their old
         // false positives must remain measurable in the pre-fix baseline.
     }
@@ -103,8 +108,70 @@ public class CurvedPrismContactBenchmarks
     [Benchmark]
     public bool CapsuleContained() => CollisionDetectionMixed.TryCollide(_capsuleContained.Curved, _capsuleContained.Slab, out _);
 
+    [Benchmark]
+    public bool CapsuleCrossingOffcenter() => CollisionDetectionMixed.TryCollide(_capsuleCrossingOffcenter.Curved, _capsuleCrossingOffcenter.Slab, out _);
+
+    [Benchmark]
+    public bool SphereContainedOpposingFace() => CollisionDetectionMixed.TryCollide(_sphereContainedOpposingFace.Curved, _sphereContainedOpposingFace.Slab, out _);
+
+    [Benchmark]
+    public bool SphereHorizontalRim() => CollisionDetectionMixed.TryCollide(_sphereHorizontalRim.Curved, _sphereHorizontalRim.Slab, out _);
+
     [GlobalCleanup]
     public void Cleanup() => _context.Dispose();
+
+    private (LSCollider Curved, LSCollider2D Slab) CreateHorizontalRim()
+    {
+        var sphere = new LSSphereCollider { Radius = Fixed64.Two };
+        sphere.InitializeWithNoBody(new BenchmarkMatterAgent(_context, new Vector3d(-1, -1, 1)));
+        var slab = new LSAABBoxCollider2D(new Vector2d(2, 2)) { MixedHalfThicknessOverride = Fixed64.One };
+        slab.InitializeWithNoBody(new BenchmarkMatterAgent(_context, Vector3d.One));
+        // The cube's closest point is (0,0,1), on its horizontal rim.
+        // Subtracting these irrational values from integers preserves nearest-even rounding.
+        Fixed64 rootTwo = FixedMath.Sqrt(Fixed64.Two);
+        Fixed64 normalComponent = FixedMath.Sqrt(Fixed64.Half);
+        Vector3d expectedNormal = new(normalComponent, normalComponent, Fixed64.Zero);
+        Vector3d expectedSpherePoint = new(rootTwo - Fixed64.One, rootTwo - Fixed64.One, Fixed64.One);
+        if (!CollisionDetectionMixed.TryCollide(sphere, slab, out MixedContact contact)
+            || contact.Depth != Fixed64.Two - rootTwo || contact.DepthIsClamped
+            || contact.Normal3DTo2D != expectedNormal
+            || !contact.TryGetPoint3D(out Vector3d first) || !contact.TryGetPoint2D(out Vector3d second)
+            || first != expectedSpherePoint || second != Vector3d.Forward)
+            throw new InvalidOperationException("The sphere must retain its finite horizontal-rim contact.");
+        return (sphere, slab);
+    }
+
+    private (LSCollider Curved, LSCollider2D Slab) CreateFiniteWitnessPair(bool capsule)
+    {
+        LSCollider curved = capsule
+            ? new LSCapsuleCollider { Radius = Fixed64.Quarter,
+                Size = new Vector3d(Fixed64.Half, Fixed64.FromFraction(21, 2), Fixed64.Half) }
+            : new LSSphereCollider { Radius = Fixed64.FromFraction(3, 4) };
+        var agent = new BenchmarkMatterAgent(_context, capsule ? Vector3d.Up * Fixed64.Half : Vector3d.Zero);
+        if (capsule)
+            agent.Transform.LocalRotation = new(Fixed64.Half, Fixed64.Half, -Fixed64.Half, Fixed64.Half);
+        curved.InitializeWithNoBody(agent);
+        var slab = new LSAABBoxCollider2D(capsule ? new Vector2d(1, 2) : new Vector2d(2, 6))
+        {
+            MixedHalfThicknessOverride = capsule ? Fixed64.One : Fixed64.Two
+        };
+        slab.InitializeWithNoBody(new BenchmarkMatterAgent(_context,
+            capsule ? Vector3d.Right * Fixed64.FromFraction(5, 2) : Vector3d.Zero));
+        // The capsule's finite paired side supports share X in [2,3]. The
+        // contained sphere instead pairs its -X surface with the prism's +X face.
+        if (!CollisionDetectionMixed.TryCollide(curved, slab, out MixedContact contact)
+            || contact.Depth != Fixed64.FromFraction(capsule ? 3 : 7, 4) || contact.DepthIsClamped
+            || contact.Normal3DTo2D != (capsule ? Vector3d.Down : Vector3d.Left)
+            || !contact.TryGetPoint3D(out Vector3d first) || !contact.TryGetPoint2D(out Vector3d second)
+            || (capsule
+                ? first.X < Fixed64.Two || first.X > (Fixed64)3
+                    || first.Y != Fixed64.Quarter || first.Z != Fixed64.Zero
+                    || second != new Vector3d(first.X, Fixed64.One, Fixed64.Zero)
+                : first != Vector3d.Left * Fixed64.FromFraction(3, 4) || second != Vector3d.Right)
+            || first - second != contact.Normal3DTo2D * contact.Depth)
+            throw new InvalidOperationException("The sphere/capsule must retain its finite opposing support witnesses.");
+        return (curved, slab);
+    }
 
     private (LSCollider Curved, LSCollider2D Slab) CreateContained(bool capsule)
     {

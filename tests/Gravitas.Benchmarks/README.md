@@ -12,8 +12,14 @@ witnesses in setup. An exactly representable rotation preserves the cylinder's
 horizontal axis through transform preparation, keeping its supporting plane
 exact. Contained sphere and positive-core capsule controls require depth `3/4`,
 a Down normal and finite paired witnesses for their nearest upward exit. Run all
-eleven cases together when comparing contact optimizations so touching gains,
+fourteen cases together when comparing contact optimizations so touching gains,
 containment and penetrating/separated controls remain visible.
+
+The off-center crossing capsule and contained sphere opposing-face cases require
+finite paired supports in setup: shared capsule/prism tangential coordinates,
+the sphere's opposing prism face, and exact normal-times-depth displacement.
+The sphere horizontal-rim case additionally checks the finite edge point,
+diagonal normal and nearest-even rounded depth `2-sqrt(2)`.
 
 `body-motion-type-transition` also measures registered 2D/3D mass changes.
 Each `ChangeMass` invocation assigns `0`, `2`, then `1` kilogram, including

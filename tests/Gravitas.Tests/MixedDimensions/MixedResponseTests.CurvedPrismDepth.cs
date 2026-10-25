@@ -11,6 +11,137 @@ namespace Gravitas.Tests.MixedDimensions;
 
 public sealed partial class MixedResponseTests
 {
+    [Fact]
+    public void Step_WithCapsuleCrossingAnOffcenterPrism_ShouldRetainItsRealNormalLeverAndReplay()
+    {
+        RunFinitePrismWitnessSteps(capsule: true).Should().Be(RunFinitePrismWitnessSteps(capsule: true));
+    }
+
+    [Fact]
+    public void Step_WithContainedSphere_ShouldApplyFrictionAtTheOpposingPrismFaceAndReplay()
+    {
+        RunFinitePrismWitnessSteps(capsule: false).Should().Be(RunFinitePrismWitnessSteps(capsule: false));
+    }
+
+    private static (ChronicleHash Impact, ChronicleHash Rotated, ChronicleHash Cleared,
+        int Enter, int Stay, int Exit) RunFinitePrismWitnessSteps(bool capsule)
+    {
+        using GravitasWorldContext context = CreateMixedContext(frameRate: 64);
+        context.Environment.AirDensity = Fixed64.Zero;
+        context.Environment.DampingFactor = Fixed64.Zero;
+        context.Environment.MinSpeed = Fixed64.Zero;
+        Vector3d center = capsule ? Vector3d.Up * Fixed64.Half : Vector3d.Zero;
+        FixedQuaternion rotation = capsule
+            ? new(Fixed64.Half, Fixed64.Half, -Fixed64.Half, Fixed64.Half)
+            : FixedQuaternion.Identity;
+        LSCollider curved = capsule
+            ? new LSCapsuleCollider { Radius = Fixed64.Quarter,
+                Size = new Vector3d(Fixed64.Half, Fixed64.FromFraction(21, 2), Fixed64.Half) }
+            : new LSSphereCollider { Radius = Fixed64.FromFraction(3, 4) };
+        curved.Material = PhysicsMaterialTestHelper.WithFrictionAndRestitution(
+            capsule ? Fixed64.Zero : Fixed64.One, Fixed64.Zero);
+        var spatialAgent = new TestMatterAgent(context, new FixedTransform(center, rotation, Vector3d.One));
+        SolidBody? spatial = null;
+        if (capsule)
+        {
+            spatial = new SolidBody(spatialAgent, curved)
+            {
+                Mass = Fixed64.One, SleepEnabled = false, LinearDragCoefficient = Fixed64.Zero,
+                FreezeAxes = BodyFreezeAxes3D.RotationX | BodyFreezeAxes3D.RotationY
+            };
+            spatial.Initialize(center, rotation);
+            spatial.UseManualGrounding();
+        }
+        else curved.InitializeWithNoBody(spatialAgent);
+        Vector3d slabCenter = capsule ? Vector3d.Right * Fixed64.FromFraction(5, 2) : Vector3d.Zero;
+        var slab = new LSAABBoxCollider2D(capsule ? new Vector2d(1, 2) : new Vector2d(2, 6))
+        {
+            MixedHalfThicknessOverride = capsule ? Fixed64.One : Fixed64.Two,
+            Material = curved.Material
+        };
+        var planarAgent = new TestMatterAgent(context, new FixedTransform(slabCenter, FixedQuaternion.Identity, Vector3d.One));
+        SolidBody2D? planar = null;
+        if (capsule) slab.InitializeWithNoBody(planarAgent);
+        else
+        {
+            planar = new SolidBody2D(planarAgent, slab) { Mass = Fixed64.One, SleepEnabled = false };
+            planar.Initialize(Vector2d.Zero);
+            planar.UseManualGrounding();
+        }
+        int entered = 0, stayed = 0, exited = 0;
+        curved.OnMixedContactEnter += _ => entered++;
+        slab.OnMixedContactEnter += _ => entered++;
+        curved.OnMixedContact += _ => stayed++;
+        slab.OnMixedContact += _ => stayed++;
+        curved.OnMixedContactExit += _ => exited++;
+        slab.OnMixedContactExit += _ => exited++;
+        bool initialHit = CollisionDetectionMixed.TryCollide(curved, slab, out MixedContact initial);
+        // Integration must reach the exact authored collision pose, rather than
+        // changing the face tie or off-center lever before narrow phase runs.
+        if (capsule)
+        {
+            spatial!.SetPosition(center + Vector3d.Up * context.DeltaTime);
+            spatial.AddLinearImpulse(Vector3d.Down);
+        }
+        else
+        {
+            Vector2d incoming = Vector2d.Right + Vector2d.Forward;
+            planar!.SetPosition(-incoming * context.DeltaTime);
+            planar.AddLinearImpulse(incoming);
+        }
+
+        Step(context);
+
+        initialHit.Should().BeTrue();
+        initial.Normal3DTo2D.Should().Be(capsule ? Vector3d.Down : Vector3d.Left);
+        initial.Depth.Should().Be(Fixed64.FromFraction(capsule ? 3 : 7, 4));
+        initial.DepthIsClamped.Should().BeFalse();
+        context.MixedCollisions.ActivePairCount.Should().Be(1);
+        entered.Should().Be(2); stayed.Should().Be(2); exited.Should().Be(0);
+        if (capsule)
+        {
+            // Every valid paired support has X in [2,3]. Its upward normal
+            // impulse has positive Z torque; the old midpoint at X=0 has none.
+            spatial!.AngularVelocity.Z.Should().BeGreaterThan(Fixed64.Zero);
+            spatial.Position3d.Y.Should().BeGreaterThan(center.Y);
+            spatial.LinearVelocity.Y.Should().BeGreaterThan(-Fixed64.One);
+            initial.Point3D.X.Should().BeInRange(Fixed64.Two, (Fixed64)3);
+            initial.Point3D.Y.Should().Be(Fixed64.Quarter);
+            initial.Point3D.Z.Should().Be(Fixed64.Zero);
+            initial.Point2D.Should().Be(new Vector3d(initial.Point3D.X, Fixed64.One, Fixed64.Zero));
+        }
+        else
+        {
+            // Friction opposes +Z at the prism's +X face: physical +Y torque
+            // is negative planar yaw. Choosing the -X face reverses that torque.
+            planar!.AngularVelocity.Should().BeLessThan(Fixed64.Zero);
+            planar.Position.X.Should().BeLessThan(Fixed64.Zero);
+            planar.LinearVelocity.Y.Should().BeLessThan(Fixed64.One);
+            initial.Point3D.Should().Be(Vector3d.Left * Fixed64.FromFraction(3, 4));
+            initial.Point2D.Should().Be(Vector3d.Right);
+        }
+        ChronicleHash impact = context.ComputeReplayHash(GravitasReplayHashMode.AuthoritativeWithSolverCaches);
+        Step(context);
+        if (capsule) spatial!.Rotation.Should().NotBe(rotation);
+        else planar!.Rotation.Should().BeLessThan(Fixed64.Zero);
+        ChronicleHash rotated = context.ComputeReplayHash(GravitasReplayHashMode.AuthoritativeWithSolverCaches);
+
+        if (capsule) spatial!.SetPosition(Vector3d.Up * (Fixed64)20);
+        else planar!.SetPosition(Vector2d.Right * (Fixed64)10);
+        Step(context);
+        // Rotation-independent support bounds: the capsule fits a radius-21/4
+        // ball; the prism's planar half diagonal sqrt(10) is less than four.
+        Fixed64 clearance = capsule
+            ? spatial!.Position3d.Y - Fixed64.FromFraction(21, 4) - Fixed64.One
+            : planar!.Position.X - (Fixed64)4 - Fixed64.FromFraction(3, 4);
+        clearance.Should().BeGreaterThan(Fixed64.One);
+        CollisionDetectionMixed.TryCollide(curved, slab, out _).Should().BeFalse();
+        context.MixedCollisions.ActivePairCount.Should().Be(0);
+        entered.Should().Be(2); stayed.Should().Be(4); exited.Should().Be(2);
+        return (impact, rotated, context.ComputeReplayHash(GravitasReplayHashMode.AuthoritativeWithSolverCaches),
+            entered, stayed, exited);
+    }
+
     [Theory]
     [InlineData(false, false)]
     [InlineData(false, true)]
