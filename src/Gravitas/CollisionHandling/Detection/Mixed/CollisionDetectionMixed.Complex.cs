@@ -108,6 +108,15 @@ public static partial class CollisionDetectionMixed
         if (scratch.PolyhedronEdges.Length < edgeCount) Array.Resize(ref scratch.PolyhedronEdges, edgeCount);
         Span<Vector3d> vertices = scratch.PolyhedronVertices.AsSpan(0, 2 * count);
         Span<int> triangles = scratch.PolyhedronTriangles.AsSpan(0, triangleCount), edges = scratch.PolyhedronEdges.AsSpan(0, edgeCount);
+        FillPrismGeometry(offsets, halfThickness, vertices, triangles, edges);
+        return MeshTriangleContactGenerator.TryAppendHullContacts(collider, ScaledRigidFrame3d.Rigid(center, rotation), center, vertices,
+            triangles, edges, edges[..(2 * count + 2)], embedded.Material, manifold, false, namespace3D, namespace2D);
+    }
+
+    internal static void FillPrismGeometry(ReadOnlySpan<Vector2d> offsets, Fixed64 halfThickness,
+        Span<Vector3d> vertices, Span<int> triangles, Span<int> edges)
+    {
+        int count = offsets.Length;
         int face = 0;
         for (int index = 0; index < count; index++)
         {
@@ -124,7 +133,5 @@ public static partial class CollisionDetectionMixed
             triangles[face++] = 0; triangles[face++] = bottom; triangles[face++] = next;
             triangles[face++] = 1; triangles[face++] = next + 1; triangles[face++] = bottom + 1;
         }
-        return MeshTriangleContactGenerator.TryAppendHullContacts(collider, ScaledRigidFrame3d.Rigid(center, rotation), center, vertices,
-            triangles, edges, edges[..(2 * count + 2)], embedded.Material, manifold, false, namespace3D, namespace2D);
     }
 }

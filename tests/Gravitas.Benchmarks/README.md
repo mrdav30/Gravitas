@@ -34,6 +34,12 @@ seam crossings; setup and every frame verify preserved tangential velocity.
 `OperationsPerInvoke` reports time/allocation per complete frame. A horizontal
 floor alone would not exercise a 2D participant's planar mixed response.
 
+`joined-static-solid-mixed-simulation` covers the reverse direction: one moving
+3D box or closed convex hull against a continuous embedded 2D wall or 2/16/64
+declared pieces of the same wall. It uses the same 64-frame, 16 Hz host loop,
+inward impulses and tangential-velocity guard. Values are per complete frame;
+these fixtures measure contact lifecycle cost rather than game capacity.
+
 ## Requirements
 
 - The SDK selected by the repository's `global.json`

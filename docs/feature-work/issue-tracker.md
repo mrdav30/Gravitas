@@ -5,7 +5,7 @@ resolutions or documented investigation closures.
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-143`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-144`.
 - Assign an ID when an issue enters this tracker and preserve it through
   closure; never delete or reuse it. Check Git history before advancing or
   repairing the counter. Unknown historical IDs stay reserved rather than
@@ -231,11 +231,12 @@ are historical, not a claim of a fresh rerun or package release.
 
 Each **Closeout** link pins the complete pre-compaction entry in committed Git
 history, preserving its reproducer, root cause, validation, tradeoffs and links
-to focused records. All 138 resolved entries are retained; no historical IDs are
-missing from the 001-142 sequence (111, 125, 133 and 139 remain active).
+to focused records. All 139 resolved entries are retained; no historical IDs are
+missing from the 001-143 sequence (111, 125, 133 and 139 remain active).
 
 | Issue                                                                                                                                 | Resolved/closed | Outcome                                                                                                                                                                                                        | Evidence                                                                                                                                                                                                                                     |
 | ------------------------------------------------------------------------------------------------------------------------------------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| <a id="grv-issue-143---completed-3d-queries-retain-their-last-excluded-collider"></a>GRV-Issue-143 | 2026-10-26 | Fixed: Released completed 3D query exclusion/source references on normal, exceptional and reset paths, preserving preparation within a source batch and removing duplicate preparation wrappers. Pre-existing bounded last-query retention on `b884cba`. | [Lifetime regressions](../../tests/Gravitas.Tests/Queries/QuerySourceLifetimeTests.cs): 15 weak-reference cases, matching hit witnesses and zero warm allocation. Repeated sphere/hull controls do not reproduce an adverse timing contrast. |
 | <a id="grv-issue-142---single-mesh-cylinder-response-can-select-a-covered-triangle-diagonal"></a>GRV-Issue-142                        | 2026-10-19      | Fixed: Reused exact filled-surface cylinder reduction for trusted patches, rejecting covered diagonals while preserving real perimeters, independent surfaces and isolated-triangle behavior.                  | [Closeout](https://github.com/mrdav30/Gravitas/blob/071b25ac2b758f6c1992a769e0713ed27b2c34dc/docs/feature-work/issue-tracker.md#grv-issue-142---single-mesh-cylinder-response-can-select-a-covered-triangle-diagonal)                        |
 | <a id="grv-issue-141---recentered-rotated-mesh-pieces-lose-exact-authored-shared-vertices"></a>GRV-Issue-141                          | 2026-10-18      | Fixed: Preserved exact authored mesh frames across collision, queries, CCD, bounds and mass; the documented ordinary-contact cost was explicitly accepted.                                                     | [Closeout](https://github.com/mrdav30/Gravitas/blob/071b25ac2b758f6c1992a769e0713ed27b2c34dc/docs/feature-work/issue-tracker.md#grv-issue-141---recentered-rotated-mesh-pieces-lose-exact-authored-shared-vertices)                          |
 | <a id="grv-issue-140---convex-2d-single-contacts-discard-finite-witnesses-consumed-by-shape-sweeps"></a>GRV-Issue-140                 | 2026-10-18      | Fixed: Reused paired finite manifold anchors in 2D single contacts and shape sweeps, preserving classification, normals, depths and deterministic order.                                                       | [Closeout](https://github.com/mrdav30/Gravitas/blob/071b25ac2b758f6c1992a769e0713ed27b2c34dc/docs/feature-work/issue-tracker.md#grv-issue-140---convex-2d-single-contacts-discard-finite-witnesses-consumed-by-shape-sweeps)                 |

@@ -49,7 +49,7 @@ public static partial class CollisionDetectionMixed
         return AppendManifold(collider3D, collider2D, manifold, 0, 0, true);
     }
 
-    private static bool AppendManifold(LSCollider collider3D, LSCollider2D collider2D,
+    internal static bool AppendManifold(LSCollider collider3D, LSCollider2D collider2D,
         ContactManifold manifold, int namespace3D, int namespace2D, bool surfaceResponse)
     {
         if (!collider3D.Bounds.Intersects(collider2D.MixedBounds3D))
@@ -69,6 +69,10 @@ public static partial class CollisionDetectionMixed
                 overlaps |= AppendManifold(collider3D, compound2D.GetPartCollider(i), manifold, namespace3D, -(i + 1), surfaceResponse);
             return overlaps;
         }
+        if (surfaceResponse && collider2D.StaticSurface is { } solidSurface
+            && !collider3D.IsTrigger && !collider2D.IsTrigger
+            && (collider3D is LSCuboidCollider || collider3D is LSMeshCollider { Mode: MeshColliderMode.Convex } hull && hull.Mesh.IsClosedSurface))
+            return solidSurface.AppendMixed(collider3D, collider2D, manifold, namespace3D, namespace2D);
         if (collider3D is LSMeshCollider mesh)
         {
             if (surfaceResponse && mesh.StaticSurface is { } surface && !mesh.IsTrigger && !collider2D.IsTrigger)

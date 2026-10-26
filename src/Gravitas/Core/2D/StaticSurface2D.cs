@@ -22,6 +22,8 @@ internal sealed partial class StaticSurface2D : IDisposable
     internal StaticSurface2D(GravitasWorldContext context, ReadOnlySpan<LSCollider2D> members)
     {
         _context = context;
+        _mixedAdmit = AdmitMixedAxis;
+        _mixedAdmitRigid = AdmitMixedRigidAxis;
         ReplaceMembers(members);
     }
 

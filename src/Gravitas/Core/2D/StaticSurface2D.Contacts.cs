@@ -29,6 +29,10 @@ internal sealed partial class StaticSurface2D
     partial void InvalidateGeometry()
     {
         _current = false;
+        _mixedCurrent = false;
+        _mixedMoving = null;
+        Array.Clear(_mixedLocal.InnerArray, 0, _mixedLocal.InnerArray.Length);
+        _mixedLocal.FastClear();
         _moving = _carrier = null;
         // FastClear leaves reference tails beyond Count; ended member lifetimes
         // must be released even when this declaration becomes empty or is retained after disposal.

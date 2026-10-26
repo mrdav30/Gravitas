@@ -46,7 +46,8 @@ internal sealed class MeshSurfaceBoundaryDomain2D
     internal Vector2d Origin { get; private set; }
     internal Fixed64 Rotation { get; private set; }
 
-    internal void Build(ReadOnlySpan<LSCollider2D> members, int sourceMember, bool mixed = false)
+    internal void Build(ReadOnlySpan<LSCollider2D> members, int sourceMember, bool mixed = false,
+        Fixed64? lowerHeight = null, Fixed64? upperHeight = null)
     {
         foreach (LSCollider2D member in members)
             if (member is not (LSAABBoxCollider2D or LSPolygonCollider2D))
@@ -65,13 +66,13 @@ internal sealed class MeshSurfaceBoundaryDomain2D
             points[1] = end;
             FixedBoundArea bounds = WideConvex2dRelations.GetBoundsClippedToDomain(Origin, Rotation, points);
             Vector2d inward = source.GetScaledLocalVertexUnchecked((first + 2) % source.VertexCount);
-            Gather(members, sourceMember, new FixedSegment2d(start, end), inward, bounds, mixed);
+            Gather(members, sourceMember, new FixedSegment2d(start, end), inward, bounds, mixed, lowerHeight, upperHeight);
             Classify(sourceMember, first, second, start, end, bounds);
         }
     }
 
     private void Gather(ReadOnlySpan<LSCollider2D> members, int sourceMember, FixedSegment2d edge,
-        Vector2d inward, FixedBoundArea bounds, bool mixed)
+        Vector2d inward, FixedBoundArea bounds, bool mixed, Fixed64? lowerHeight, Fixed64? upperHeight)
     {
         _coverage.FastClear(); _cuts.FastClear();
         _cuts.Add(Parameter.Zero); _cuts.Add(Parameter.One);
@@ -81,12 +82,21 @@ internal sealed class MeshSurfaceBoundaryDomain2D
         {
             if (member == sourceMember) continue;
             LSCollider2D target = members[member];
-            // Pure bounds use the same scalar Sin/Cos chart as exact coverage.
-            // Mixed prisms have a different quaternion chart and retain their proof.
-            if (!mixed && !bounds.Intersects(target.Bounds)) continue;
+            // Zero yaw shares the same exact chart in both paths. Nonzero mixed
+            // quaternion coverage cannot use scalar-yaw bounds as a rejection proof.
+            if ((!mixed || source.ConvexRotation == Fixed64.Zero && target.ConvexRotation == Fixed64.Zero)
+                && !bounds.Intersects(target.Bounds)) continue;
             // Equal extrusions allow a planar proof to cover their entire
             // height. Different slabs retain their real step/side boundaries.
-            if (mixed && (source.MixedSlabCenterY != target.MixedSlabCenterY
+            if (lowerHeight.HasValue)
+            {
+                if (source.MixedBounds3D.Max.Y <= target.MixedBounds3D.Min.Y
+                    || source.MixedBounds3D.Min.Y >= target.MixedBounds3D.Max.Y) continue;
+                Fixed64 delta = target.MixedSlabCenterY - source.MixedSlabCenterY;
+                if (delta + target.MixedHalfThickness <= lowerHeight.Value
+                    || delta - target.MixedHalfThickness >= upperHeight!.Value) continue;
+            }
+            else if (mixed && (source.MixedSlabCenterY != target.MixedSlabCenterY
                 || source.MixedHalfThickness != target.MixedHalfThickness)) continue;
             ReadOnlySpan<Vector2d> vertices = Offsets(target, box);
             if (!mixed)
@@ -103,9 +113,11 @@ internal sealed class MeshSurfaceBoundaryDomain2D
             FixedQuaternion sourceRotation = FixedQuaternion.FromAxisAngle(Vector3d.Up, -source.ConvexRotation);
             FixedQuaternion targetRotation = FixedQuaternion.FromAxisAngle(Vector3d.Up, -target.ConvexRotation);
             for (int triangle = 1; triangle < vertices.Length - 1; triangle++)
-                if (WideTriangleRelations.TryGetEdgeCoverage(face, MixedEmbedded2DGeometry.GetCenter3D(source), sourceRotation,
+                // Height bands classify actual extrusion overlap separately;
+                // footprint incidence uses one common Y plane even for offset slabs.
+                if (WideTriangleRelations.TryGetEdgeCoverage(face, new Vector3d(source.Center.X, Fixed64.Zero, source.Center.Y), sourceRotation,
                     new FixedTriangle(Embed(vertices[0]), Embed(vertices[triangle]), Embed(vertices[triangle + 1])),
-                    MixedEmbedded2DGeometry.GetCenter3D(target), targetRotation, out RationalSegmentInterval interval, out int sides))
+                    new Vector3d(target.Center.X, Fixed64.Zero, target.Center.Y), targetRotation, out RationalSegmentInterval interval, out int sides))
                     Include(member, interval, sides);
         }
         _cuts.SortInPlace();
