@@ -64,39 +64,46 @@ public sealed partial class GravitasQuery2DService
             return false;
         }
 
-        EnsureCandidateCapacity();
-        uint queryVersion = NextRaycastVersion();
-        _context.Collisions2D.CollectBoundsCandidates(
-            CreateSweepMin(start, end, radius),
-            CreateSweepMax(start, end, radius),
-            layerMask,
-            queryVersion,
-            raycastQuery: true,
-            _queryCandidates,
-            staticStyleOnly: groundingBody is not null);
-
-        LastQueryCandidateCount = _queryCandidates.Count;
-        bool found = false;
-        Physics2DHit closest = default;
-        for (int i = 0; i < _queryCandidates.Count; i++)
+        try
         {
-            LSCollider2D collider = _queryCandidates[i];
-            // Reduce compound parts before body policy; a rejected owner cannot
-            // contribute a later part just because that part has a support normal.
-            if (!IsEligibleSweepCandidate(collider, excludedCollider, includeTriggers)
-                || !QueryDetection2D.TrySweepCircle(start, end, segment, segmentLength, radius, collider, out Physics2DHit candidate)
-                || !PhysicsHitSelectionPolicy.ShouldReplace(candidate, found, closest)
-                || (groundingBody is not null && !groundingBody.IsValidGroundHit(candidate)))
+            EnsureCandidateCapacity();
+            uint queryVersion = NextRaycastVersion();
+            _context.Collisions2D.CollectBoundsCandidates(
+                CreateSweepMin(start, end, radius),
+                CreateSweepMax(start, end, radius),
+                layerMask,
+                queryVersion,
+                raycastQuery: true,
+                _queryCandidates,
+                staticStyleOnly: groundingBody is not null);
+
+            LastQueryCandidateCount = _queryCandidates.Count;
+            bool found = false;
+            Physics2DHit closest = default;
+            for (int i = 0; i < _queryCandidates.Count; i++)
             {
-                continue;
+                LSCollider2D collider = _queryCandidates[i];
+                // Reduce compound parts before body policy; a rejected owner cannot
+                // contribute a later part just because that part has a support normal.
+                if (!IsEligibleSweepCandidate(collider, excludedCollider, includeTriggers)
+                    || !QueryDetection2D.TrySweepCircle(start, end, segment, segmentLength, radius, collider, out Physics2DHit candidate)
+                    || !PhysicsHitSelectionPolicy.ShouldReplace(candidate, found, closest)
+                    || (groundingBody is not null && !groundingBody.IsValidGroundHit(candidate)))
+                {
+                    continue;
+                }
+
+                closest = candidate;
+                found = true;
             }
 
-            closest = candidate;
-            found = true;
+            hit = closest;
+            return found;
         }
-
-        hit = closest;
-        return found;
+        finally
+        {
+            EndQuery();
+        }
     }
 
     /// <summary>
@@ -165,7 +172,7 @@ public sealed partial class GravitasQuery2DService
         if (!staticTargetsOnly)
             ColliderGeometryPolicy.ValidateReach(radius, nameof(radius));
 
-        results.FastClear();
+        results.Clear();
         if (!Vector2d.TrySubtract(end, start, out Vector2d segment)
             || !Vector2d.TryGetMagnitude(segment, out Fixed64 segmentLength)
             || segmentLength <= Fixed64.Epsilon)
@@ -174,30 +181,37 @@ public sealed partial class GravitasQuery2DService
             return 0;
         }
 
-        EnsureCandidateCapacity();
-        uint queryVersion = NextRaycastVersion();
-        _context.Collisions2D.CollectBoundsCandidates(
-            CreateSweepMin(start, end, radius),
-            CreateSweepMax(start, end, radius),
-            layerMask,
-            queryVersion,
-            raycastQuery: true,
-            _queryCandidates,
-            staticStyleOnly: staticTargetsOnly);
-
-        LastQueryCandidateCount = _queryCandidates.Count;
-        for (int i = 0; i < _queryCandidates.Count; i++)
+        try
         {
-            LSCollider2D collider = _queryCandidates[i];
-            if (IsEligibleSweepCandidate(collider, excludedCollider, includeTriggers)
-                && QueryDetection2D.TrySweepCircle(start, end, segment, segmentLength, radius, collider, out Physics2DHit hit))
-            {
-                results.Add(hit);
-            }
-        }
+            EnsureCandidateCapacity();
+            uint queryVersion = NextRaycastVersion();
+            _context.Collisions2D.CollectBoundsCandidates(
+                CreateSweepMin(start, end, radius),
+                CreateSweepMax(start, end, radius),
+                layerMask,
+                queryVersion,
+                raycastQuery: true,
+                _queryCandidates,
+                staticStyleOnly: staticTargetsOnly);
 
-        Physics2DHitSorter.SortByDistance(results);
-        return results.Count;
+            LastQueryCandidateCount = _queryCandidates.Count;
+            for (int i = 0; i < _queryCandidates.Count; i++)
+            {
+                LSCollider2D collider = _queryCandidates[i];
+                if (IsEligibleSweepCandidate(collider, excludedCollider, includeTriggers)
+                    && QueryDetection2D.TrySweepCircle(start, end, segment, segmentLength, radius, collider, out Physics2DHit hit))
+                {
+                    results.Add(hit);
+                }
+            }
+
+            Physics2DHitSorter.SortByDistance(results);
+            return results.Count;
+        }
+        finally
+        {
+            EndQuery();
+        }
     }
 
 }

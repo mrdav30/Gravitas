@@ -132,63 +132,70 @@ public sealed partial class GravitasQueryMixedService
         Vector2d direction2D = segment.Normalized;
         Vector3d direction = new(direction2D.X, Fixed64.Zero, direction2D.Y);
         CreateCircleSlabSweepBounds(start, end, radius, slabCenterY, halfThickness, out Vector3d min, out Vector3d max);
-        _context.MixedCollisions.Collect3DCandidatesInMixedBounds(
-            min,
-            max,
-            layerMask,
-            _candidates3D,
-            staticStyleOnly: staticTargetsOnly,
-            cachePartitionRefresh: cacheTargetPartitions);
-        LastQueryCandidateCount = _candidates3D.Count;
-        LastMeshTriangleCandidateCount = 0;
-        bool captureReducerDiagnostics = _context.Diagnostics.Enabled;
-        QueryReducerCounters reducerCounters = default;
-        bool found = false;
-        PhysicsMixedHit best = default;
-
-        for (int i = 0; i < _candidates3D.Count; i++)
+        try
         {
-            if (!TrySweepCircleAgainst3DCandidate(
-                _candidates3D[i],
-                start,
-                end,
-                direction2D,
-                length,
+            _context.MixedCollisions.Collect3DCandidatesInMixedBounds(
+                min,
+                max,
+                layerMask,
+                _candidates3D,
+                staticStyleOnly: staticTargetsOnly,
+                cachePartitionRefresh: cacheTargetPartitions);
+            LastQueryCandidateCount = _candidates3D.Count;
+            LastMeshTriangleCandidateCount = 0;
+            bool captureReducerDiagnostics = _context.Diagnostics.Enabled;
+            QueryReducerCounters reducerCounters = default;
+            bool found = false;
+            PhysicsMixedHit best = default;
+
+            for (int i = 0; i < _candidates3D.Count; i++)
+            {
+                if (!TrySweepCircleAgainst3DCandidate(
+                    _candidates3D[i],
+                    start,
+                    end,
+                    direction2D,
+                    length,
+                    radius,
+                    slabCenterY,
+                    halfThickness,
+                    direction,
+                    excludedCollider,
+                    includeTriggers,
+                    staticTargetsOnly,
+                    captureReducerDiagnostics,
+                    ref reducerCounters,
+                    out PhysicsMixedHit candidate))
+                {
+                    continue;
+                }
+
+                if (PhysicsHitSelectionPolicy.ShouldReplace(candidate, found, best))
+                {
+                    best = candidate;
+                    found = true;
+                }
+            }
+
+            hit = found ? best : default;
+            EmitMixedSweepDiagnostics(
+                GravitasColliderDimension.TwoD,
+                GravitasColliderDimension.ThreeD,
+                start3D,
+                end3D,
                 radius,
-                slabCenterY,
-                halfThickness,
-                direction,
-                excludedCollider,
-                includeTriggers,
-                staticTargetsOnly,
+                layerMask.Bits,
+                found,
+                reducerCounters.AcceptedHits,
+                hit,
                 captureReducerDiagnostics,
-                ref reducerCounters,
-                out PhysicsMixedHit candidate))
-            {
-                continue;
-            }
-
-            if (PhysicsHitSelectionPolicy.ShouldReplace(candidate, found, best))
-            {
-                best = candidate;
-                found = true;
-            }
+                reducerCounters);
+            return found;
         }
-
-        hit = found ? best : default;
-        EmitMixedSweepDiagnostics(
-            GravitasColliderDimension.TwoD,
-            GravitasColliderDimension.ThreeD,
-            start3D,
-            end3D,
-            radius,
-            layerMask.Bits,
-            found,
-            reducerCounters.AcceptedHits,
-            hit,
-            captureReducerDiagnostics,
-            reducerCounters);
-        return found;
+        finally
+        {
+            EndQuery();
+        }
     }
 
     private int SweepCircleAgainst3DAllCore(
@@ -211,7 +218,7 @@ public sealed partial class GravitasQueryMixedService
         if (!staticTargetsOnly)
             ColliderGeometryPolicy.ValidateReach(new Vector2d(radius, halfThickness), nameof(radius));
 
-        results.FastClear();
+        results.Clear();
         if (!Vector2d.TrySubtract(end, start, out Vector2d segment)
             || !Vector2d.TryGetMagnitude(segment, out Fixed64 length)
             || length <= Fixed64.Epsilon)
@@ -225,58 +232,65 @@ public sealed partial class GravitasQueryMixedService
         Vector2d direction2D = segment.Normalized;
         Vector3d direction = new(direction2D.X, Fixed64.Zero, direction2D.Y);
         CreateCircleSlabSweepBounds(start, end, radius, slabCenterY, halfThickness, out Vector3d min, out Vector3d max);
-        _context.MixedCollisions.Collect3DCandidatesInMixedBounds(
-            min,
-            max,
-            layerMask,
-            _candidates3D,
-            staticStyleOnly: staticTargetsOnly,
-            cachePartitionRefresh: cacheTargetPartitions);
-        LastQueryCandidateCount = _candidates3D.Count;
-        LastMeshTriangleCandidateCount = 0;
-        bool captureReducerDiagnostics = _context.Diagnostics.Enabled;
-        QueryReducerCounters reducerCounters = default;
-
-        for (int i = 0; i < _candidates3D.Count; i++)
+        try
         {
-            if (!TrySweepCircleAgainst3DCandidate(
-                _candidates3D[i],
-                start,
-                end,
-                direction2D,
-                length,
-                radius,
-                slabCenterY,
-                halfThickness,
-                direction,
-                excludedCollider,
-                includeTriggers,
-                staticTargetsOnly,
-                captureReducerDiagnostics,
-                ref reducerCounters,
-                out PhysicsMixedHit candidate,
-                requireClosingContact))
+            _context.MixedCollisions.Collect3DCandidatesInMixedBounds(
+                min,
+                max,
+                layerMask,
+                _candidates3D,
+                staticStyleOnly: staticTargetsOnly,
+                cachePartitionRefresh: cacheTargetPartitions);
+            LastQueryCandidateCount = _candidates3D.Count;
+            LastMeshTriangleCandidateCount = 0;
+            bool captureReducerDiagnostics = _context.Diagnostics.Enabled;
+            QueryReducerCounters reducerCounters = default;
+
+            for (int i = 0; i < _candidates3D.Count; i++)
             {
-                continue;
+                if (!TrySweepCircleAgainst3DCandidate(
+                    _candidates3D[i],
+                    start,
+                    end,
+                    direction2D,
+                    length,
+                    radius,
+                    slabCenterY,
+                    halfThickness,
+                    direction,
+                    excludedCollider,
+                    includeTriggers,
+                    staticTargetsOnly,
+                    captureReducerDiagnostics,
+                    ref reducerCounters,
+                    out PhysicsMixedHit candidate,
+                    requireClosingContact))
+                {
+                    continue;
+                }
+
+                results.Add(candidate);
             }
 
-            results.Add(candidate);
+            PhysicsMixedHitSorter.SortByDistance(results);
+            EmitMixedSweepDiagnostics(
+                GravitasColliderDimension.TwoD,
+                GravitasColliderDimension.ThreeD,
+                start3D,
+                end3D,
+                radius,
+                layerMask.Bits,
+                results.Count > 0,
+                results.Count,
+                results.Count > 0 ? results[0] : default,
+                captureReducerDiagnostics,
+                reducerCounters);
+            return results.Count;
         }
-
-        PhysicsMixedHitSorter.SortByDistance(results);
-        EmitMixedSweepDiagnostics(
-            GravitasColliderDimension.TwoD,
-            GravitasColliderDimension.ThreeD,
-            start3D,
-            end3D,
-            radius,
-            layerMask.Bits,
-            results.Count > 0,
-            results.Count,
-            results.Count > 0 ? results[0] : default,
-            captureReducerDiagnostics,
-            reducerCounters);
-        return results.Count;
+        finally
+        {
+            EndQuery();
+        }
     }
 
 }

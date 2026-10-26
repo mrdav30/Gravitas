@@ -36,28 +36,35 @@ public sealed partial class GravitasQuery2DService
             || !Vector2d.TryAdd(centerMax, padding, out Vector2d max))
             return Physics2DSupportQueryStatus.Unrepresentable;
 
-        EnsureCandidateCapacity();
-        _context.Collisions2D.CollectBoundsCandidates(min, max, request.Layers,
-            NextRaycastVersion(), raycastQuery: true, _queryCandidates);
-        LastQueryCandidateCount = _queryCandidates.Count;
-        bool found = false;
-        Physics2DHit closest = default;
-        for (int i = 0; i < _queryCandidates.Count; i++)
+        try
         {
-            LSCollider2D collider = _queryCandidates[i];
-            if (ReferenceEquals(collider, request.Source) || collider.IsTrigger
-                || collider.Body?.MotionType == BodyMotionType.Dynamic
-                || !_context.Physics2D.RequireCollisionPair(request.Source, collider)
-                || !QueryDetection2D.TryFindSupport(request, end, collider, out Physics2DHit candidate)
-                || !PhysicsHitSelectionPolicy.ShouldReplace(candidate, found, closest))
-                continue;
-            closest = candidate;
-            found = true;
+            EnsureCandidateCapacity();
+            _context.Collisions2D.CollectBoundsCandidates(min, max, request.Layers,
+                NextRaycastVersion(), raycastQuery: true, _queryCandidates);
+            LastQueryCandidateCount = _queryCandidates.Count;
+            bool found = false;
+            Physics2DHit closest = default;
+            for (int i = 0; i < _queryCandidates.Count; i++)
+            {
+                LSCollider2D collider = _queryCandidates[i];
+                if (ReferenceEquals(collider, request.Source) || collider.IsTrigger
+                    || collider.Body?.MotionType == BodyMotionType.Dynamic
+                    || !_context.Physics2D.RequireCollisionPair(request.Source, collider)
+                    || !QueryDetection2D.TryFindSupport(request, end, collider, out Physics2DHit candidate)
+                    || !PhysicsHitSelectionPolicy.ShouldReplace(candidate, found, closest))
+                    continue;
+                closest = candidate;
+                found = true;
+            }
+            if (!found)
+                return Physics2DSupportQueryStatus.NoSupport;
+            support = new Physics2DSupportHit(closest, _context.FrameCount);
+            return Physics2DSupportQueryStatus.Found;
         }
-        if (!found)
-            return Physics2DSupportQueryStatus.NoSupport;
-        support = new Physics2DSupportHit(closest, _context.FrameCount);
-        return Physics2DSupportQueryStatus.Found;
+        finally
+        {
+            EndQuery();
+        }
     }
 }
 // MIT License, Copyright (c) 2026-present David Oravsky (mrdav30)

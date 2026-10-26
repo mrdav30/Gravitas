@@ -78,18 +78,20 @@ public sealed partial class GravitasQuery3DService
         SwiftThrowHelper.ThrowIfNull(hits, nameof(hits));
         ValidateRangeBatchOutput(requests.Length, ranges);
         ResetBatchCounters(requests.Length);
-        hits.FastClear();
+        hits.Clear();
 
         for (int i = 0; i < requests.Length; i++)
         {
-            int start = hits.Count;
-            PhysicsRaycast3DRequest request = requests[i];
-            int count = RaycastAllBatchRequest(request, _batch3DHits);
-            if (count > 0)
-                hits.AddRange(_batch3DHits.AsReadOnlySpan());
-
-            ranges[i] = new PhysicsQueryHitRange(start, count);
-            AccumulateBatchCounters(count);
+            try
+            {
+                PhysicsRaycast3DRequest request = requests[i];
+                int count = RaycastAllBatchRequest(request, _batch3DHits);
+                AppendRange(hits, ranges, i, count);
+            }
+            finally
+            {
+                _batch3DHits.Clear();
+            }
         }
 
         LastBatchHitCount = hits.Count;
@@ -135,13 +137,20 @@ public sealed partial class GravitasQuery3DService
         ValidateRangeBatchOutput(requests.Length, ranges);
         ValidateSweepSphereRequests(requests);
         ResetBatchCounters(requests.Length);
-        hits.FastClear();
+        hits.Clear();
 
         for (int i = 0; i < requests.Length; i++)
         {
-            PhysicsSweepSphere3DRequest request = requests[i];
-            int count = SweepSphereAllBatchRequest(request, _batch3DHits);
-            AppendRange(hits, ranges, i, count);
+            try
+            {
+                PhysicsSweepSphere3DRequest request = requests[i];
+                int count = SweepSphereAllBatchRequest(request, _batch3DHits);
+                AppendRange(hits, ranges, i, count);
+            }
+            finally
+            {
+                _batch3DHits.Clear();
+            }
         }
 
         LastBatchHitCount = hits.Count;
@@ -196,7 +205,7 @@ public sealed partial class GravitasQuery3DService
         SwiftThrowHelper.ThrowIfNull(hits, nameof(hits));
         ValidateRangeBatchOutput(requests.Length, ranges);
         ResetBatchCounters(requests.Length);
-        hits.FastClear();
+        hits.Clear();
 
         try
         {
@@ -204,17 +213,24 @@ public sealed partial class GravitasQuery3DService
             Vector3d preparedDisplacement = default;
             for (int i = 0; i < requests.Length; i++)
             {
-                PhysicsSweepCapsule3DRequest request = requests[i];
-                int count = SweepSourceAllBatchRequest(
-                    request.Source,
-                    request.Displacement,
-                    request.LayerMask,
-                    request.ExcludedCollider,
-                    request.IncludeTriggers,
-                    ref preparedSource,
-                    ref preparedDisplacement,
-                    _batch3DHits);
-                AppendRange(hits, ranges, i, count);
+                try
+                {
+                    PhysicsSweepCapsule3DRequest request = requests[i];
+                    int count = SweepSourceAllBatchRequest(
+                        request.Source,
+                        request.Displacement,
+                        request.LayerMask,
+                        request.ExcludedCollider,
+                        request.IncludeTriggers,
+                        ref preparedSource,
+                        ref preparedDisplacement,
+                        _batch3DHits);
+                    AppendRange(hits, ranges, i, count);
+                }
+                finally
+                {
+                    _batch3DHits.Clear();
+                }
             }
 
             LastBatchHitCount = hits.Count;
@@ -274,7 +290,7 @@ public sealed partial class GravitasQuery3DService
         SwiftThrowHelper.ThrowIfNull(hits, nameof(hits));
         ValidateRangeBatchOutput(requests.Length, ranges);
         ResetBatchCounters(requests.Length);
-        hits.FastClear();
+        hits.Clear();
 
         try
         {
@@ -282,17 +298,24 @@ public sealed partial class GravitasQuery3DService
             Vector3d preparedDisplacement = default;
             for (int i = 0; i < requests.Length; i++)
             {
-                PhysicsSweepCuboid3DRequest request = requests[i];
-                int count = SweepSourceAllBatchRequest(
-                    request.Source,
-                    request.Displacement,
-                    request.LayerMask,
-                    request.ExcludedCollider,
-                    request.IncludeTriggers,
-                    ref preparedSource,
-                    ref preparedDisplacement,
-                    _batch3DHits);
-                AppendRange(hits, ranges, i, count);
+                try
+                {
+                    PhysicsSweepCuboid3DRequest request = requests[i];
+                    int count = SweepSourceAllBatchRequest(
+                        request.Source,
+                        request.Displacement,
+                        request.LayerMask,
+                        request.ExcludedCollider,
+                        request.IncludeTriggers,
+                        ref preparedSource,
+                        ref preparedDisplacement,
+                        _batch3DHits);
+                    AppendRange(hits, ranges, i, count);
+                }
+                finally
+                {
+                    _batch3DHits.Clear();
+                }
             }
 
             LastBatchHitCount = hits.Count;
@@ -352,7 +375,7 @@ public sealed partial class GravitasQuery3DService
         SwiftThrowHelper.ThrowIfNull(hits, nameof(hits));
         ValidateRangeBatchOutput(requests.Length, ranges);
         ResetBatchCounters(requests.Length);
-        hits.FastClear();
+        hits.Clear();
 
         try
         {
@@ -360,17 +383,24 @@ public sealed partial class GravitasQuery3DService
             Vector3d preparedDisplacement = default;
             for (int i = 0; i < requests.Length; i++)
             {
-                PhysicsSweepCylinder3DRequest request = requests[i];
-                int count = SweepSourceAllBatchRequest(
-                    request.Source,
-                    request.Displacement,
-                    request.LayerMask,
-                    request.ExcludedCollider,
-                    request.IncludeTriggers,
-                    ref preparedSource,
-                    ref preparedDisplacement,
-                    _batch3DHits);
-                AppendRange(hits, ranges, i, count);
+                try
+                {
+                    PhysicsSweepCylinder3DRequest request = requests[i];
+                    int count = SweepSourceAllBatchRequest(
+                        request.Source,
+                        request.Displacement,
+                        request.LayerMask,
+                        request.ExcludedCollider,
+                        request.IncludeTriggers,
+                        ref preparedSource,
+                        ref preparedDisplacement,
+                        _batch3DHits);
+                    AppendRange(hits, ranges, i, count);
+                }
+                finally
+                {
+                    _batch3DHits.Clear();
+                }
             }
 
             LastBatchHitCount = hits.Count;
@@ -430,7 +460,7 @@ public sealed partial class GravitasQuery3DService
         SwiftThrowHelper.ThrowIfNull(hits, nameof(hits));
         ValidateRangeBatchOutput(requests.Length, ranges);
         ResetBatchCounters(requests.Length);
-        hits.FastClear();
+        hits.Clear();
 
         try
         {
@@ -438,17 +468,24 @@ public sealed partial class GravitasQuery3DService
             Vector3d preparedDisplacement = default;
             for (int i = 0; i < requests.Length; i++)
             {
-                PhysicsSweepCone3DRequest request = requests[i];
-                int count = SweepSourceAllBatchRequest(
-                    request.Source,
-                    request.Displacement,
-                    request.LayerMask,
-                    request.ExcludedCollider,
-                    request.IncludeTriggers,
-                    ref preparedSource,
-                    ref preparedDisplacement,
-                    _batch3DHits);
-                AppendRange(hits, ranges, i, count);
+                try
+                {
+                    PhysicsSweepCone3DRequest request = requests[i];
+                    int count = SweepSourceAllBatchRequest(
+                        request.Source,
+                        request.Displacement,
+                        request.LayerMask,
+                        request.ExcludedCollider,
+                        request.IncludeTriggers,
+                        ref preparedSource,
+                        ref preparedDisplacement,
+                        _batch3DHits);
+                    AppendRange(hits, ranges, i, count);
+                }
+                finally
+                {
+                    _batch3DHits.Clear();
+                }
             }
 
             LastBatchHitCount = hits.Count;
@@ -508,7 +545,7 @@ public sealed partial class GravitasQuery3DService
         SwiftThrowHelper.ThrowIfNull(hits, nameof(hits));
         ValidateRangeBatchOutput(requests.Length, ranges);
         ResetBatchCounters(requests.Length);
-        hits.FastClear();
+        hits.Clear();
 
         try
         {
@@ -516,17 +553,24 @@ public sealed partial class GravitasQuery3DService
             Vector3d preparedDisplacement = default;
             for (int i = 0; i < requests.Length; i++)
             {
-                PhysicsSweepConvexMesh3DRequest request = requests[i];
-                int count = SweepSourceAllBatchRequest(
-                    request.Source,
-                    request.Displacement,
-                    request.LayerMask,
-                    request.ExcludedCollider,
-                    request.IncludeTriggers,
-                    ref preparedSource,
-                    ref preparedDisplacement,
-                    _batch3DHits);
-                AppendRange(hits, ranges, i, count);
+                try
+                {
+                    PhysicsSweepConvexMesh3DRequest request = requests[i];
+                    int count = SweepSourceAllBatchRequest(
+                        request.Source,
+                        request.Displacement,
+                        request.LayerMask,
+                        request.ExcludedCollider,
+                        request.IncludeTriggers,
+                        ref preparedSource,
+                        ref preparedDisplacement,
+                        _batch3DHits);
+                    AppendRange(hits, ranges, i, count);
+                }
+                finally
+                {
+                    _batch3DHits.Clear();
+                }
             }
 
             LastBatchHitCount = hits.Count;
@@ -586,7 +630,7 @@ public sealed partial class GravitasQuery3DService
         SwiftThrowHelper.ThrowIfNull(hits, nameof(hits));
         ValidateRangeBatchOutput(requests.Length, ranges);
         ResetBatchCounters(requests.Length);
-        hits.FastClear();
+        hits.Clear();
 
         try
         {
@@ -594,17 +638,24 @@ public sealed partial class GravitasQuery3DService
             Vector3d preparedDisplacement = default;
             for (int i = 0; i < requests.Length; i++)
             {
-                PhysicsSweepCompound3DRequest request = requests[i];
-                int count = SweepSourceAllBatchRequest(
-                    request.Source,
-                    request.Displacement,
-                    request.LayerMask,
-                    request.ExcludedCollider,
-                    request.IncludeTriggers,
-                    ref preparedSource,
-                    ref preparedDisplacement,
-                    _batch3DHits);
-                AppendRange(hits, ranges, i, count);
+                try
+                {
+                    PhysicsSweepCompound3DRequest request = requests[i];
+                    int count = SweepSourceAllBatchRequest(
+                        request.Source,
+                        request.Displacement,
+                        request.LayerMask,
+                        request.ExcludedCollider,
+                        request.IncludeTriggers,
+                        ref preparedSource,
+                        ref preparedDisplacement,
+                        _batch3DHits);
+                    AppendRange(hits, ranges, i, count);
+                }
+                finally
+                {
+                    _batch3DHits.Clear();
+                }
             }
 
             LastBatchHitCount = hits.Count;
@@ -649,13 +700,20 @@ public sealed partial class GravitasQuery3DService
         ValidateRangeBatchOutput(requests.Length, ranges);
         ValidateOverlapCircleRequests(requests);
         ResetBatchCounters(requests.Length);
-        hits.FastClear();
+        hits.Clear();
 
         for (int i = 0; i < requests.Length; i++)
         {
-            PhysicsOverlapCircle3DRequest request = requests[i];
-            int count = OverlapCircleAllBatchRequest(request, _batch3DHits);
-            AppendRange(hits, ranges, i, count);
+            try
+            {
+                PhysicsOverlapCircle3DRequest request = requests[i];
+                int count = OverlapCircleAllBatchRequest(request, _batch3DHits);
+                AppendRange(hits, ranges, i, count);
+            }
+            finally
+            {
+                _batch3DHits.Clear();
+            }
         }
 
         LastBatchHitCount = hits.Count;
@@ -695,13 +753,20 @@ public sealed partial class GravitasQuery3DService
         ValidateRangeBatchOutput(requests.Length, ranges);
         ValidateOverlapConeEnvelopes(requests);
         ResetBatchCounters(requests.Length);
-        hits.FastClear();
+        hits.Clear();
 
         for (int i = 0; i < requests.Length; i++)
         {
-            PhysicsOverlapCone3DRequest request = requests[i];
-            int count = OverlapConeAllBatchRequest(request, _batch3DHits);
-            AppendRange(hits, ranges, i, count);
+            try
+            {
+                PhysicsOverlapCone3DRequest request = requests[i];
+                int count = OverlapConeAllBatchRequest(request, _batch3DHits);
+                AppendRange(hits, ranges, i, count);
+            }
+            finally
+            {
+                _batch3DHits.Clear();
+            }
         }
 
         LastBatchHitCount = hits.Count;
@@ -751,7 +816,7 @@ public sealed partial class GravitasQuery3DService
     private int RaycastAllBatchRequest(PhysicsRaycast3DRequest request, SwiftList<Physics3DHit> results)
     {
         _currentLayerMask = request.LayerMask;
-        results.FastClear();
+        results.Clear();
         if (!Vector3d.TrySubtract(request.End, request.Start, out Vector3d segment)
             || !Vector3d.TryGetMagnitude(segment, out Fixed64 segmentLength)
             || segmentLength == Fixed64.Zero)
@@ -768,7 +833,7 @@ public sealed partial class GravitasQuery3DService
 
     private int SweepSphereAllBatchRequest(PhysicsSweepSphere3DRequest request, SwiftList<Physics3DHit> results)
     {
-        results.FastClear();
+        results.Clear();
         if (!Vector3d.TrySubtract(request.End, request.Start, out Vector3d segment)
             || !Vector3d.TryGetMagnitude(segment, out Fixed64 segmentLength)
             || segmentLength <= Fixed64.Epsilon
@@ -830,7 +895,7 @@ public sealed partial class GravitasQuery3DService
         ref Vector3d preparedDisplacement,
         SwiftList<Physics3DHit> results)
     {
-        results.FastClear();
+        results.Clear();
         PrepareBatchConvexSweepSource(source, displacement, ref preparedSource, ref preparedDisplacement);
         LSCollider prepared = preparedSource!;
         if (!Vector3d.TryGetMagnitude(displacement, out Fixed64 displacementLength)
@@ -884,7 +949,7 @@ public sealed partial class GravitasQuery3DService
     {
         _currentLayerMask = request.LayerMask;
         ResetLastQueryCounters();
-        results.FastClear();
+        results.Clear();
 
         TraceCircleForAllHits(request.Position, request.Radius, results);
         Physics3DHitSorter.SortByDistance(results);

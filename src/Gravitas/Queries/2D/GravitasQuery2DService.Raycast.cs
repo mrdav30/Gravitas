@@ -50,36 +50,43 @@ public sealed partial class GravitasQuery2DService
             return false;
         }
 
-        EnsureCandidateCapacity();
-        uint queryVersion = NextRaycastVersion();
-        _context.Collisions2D.CollectBoundsCandidates(
-            CreateMin(start, end),
-            CreateMax(start, end),
-            layerMask,
-            queryVersion,
-            raycastQuery: true,
-            _queryCandidates);
-
-        LastQueryCandidateCount = _queryCandidates.Count;
-        bool found = false;
-        Physics2DHit closest = default;
-        for (int i = 0; i < _queryCandidates.Count; i++)
+        try
         {
-            // Only accepted witnesses enter closest. Ground policy is pure, so
-            // losing hits need no additional normal normalization or filtering.
-            if (!QueryDetection2D.TryRaycast(start, end, segment, segmentLength, _queryCandidates[i], out Physics2DHit candidate)
-                || !PhysicsHitSelectionPolicy.ShouldReplace(candidate, found, closest)
-                || (groundingBody is not null && !groundingBody.IsValidGroundHit(candidate)))
+            EnsureCandidateCapacity();
+            uint queryVersion = NextRaycastVersion();
+            _context.Collisions2D.CollectBoundsCandidates(
+                CreateMin(start, end),
+                CreateMax(start, end),
+                layerMask,
+                queryVersion,
+                raycastQuery: true,
+                _queryCandidates);
+
+            LastQueryCandidateCount = _queryCandidates.Count;
+            bool found = false;
+            Physics2DHit closest = default;
+            for (int i = 0; i < _queryCandidates.Count; i++)
             {
-                continue;
+                // Only accepted witnesses enter closest. Ground policy is pure, so
+                // losing hits need no additional normal normalization or filtering.
+                if (!QueryDetection2D.TryRaycast(start, end, segment, segmentLength, _queryCandidates[i], out Physics2DHit candidate)
+                    || !PhysicsHitSelectionPolicy.ShouldReplace(candidate, found, closest)
+                    || (groundingBody is not null && !groundingBody.IsValidGroundHit(candidate)))
+                {
+                    continue;
+                }
+
+                closest = candidate;
+                found = true;
             }
 
-            closest = candidate;
-            found = true;
+            hit = closest;
+            return found;
         }
-
-        hit = closest;
-        return found;
+        finally
+        {
+            EndQuery();
+        }
     }
 
     /// <summary>
@@ -97,7 +104,7 @@ public sealed partial class GravitasQuery2DService
     {
         SwiftThrowHelper.ThrowIfNull(results, nameof(results));
 
-        results.FastClear();
+        results.Clear();
         if (!Vector2d.TrySubtract(end, start, out Vector2d segment)
             || !Vector2d.TryGetMagnitude(segment, out Fixed64 segmentLength)
             || segmentLength == Fixed64.Zero)
@@ -106,23 +113,30 @@ public sealed partial class GravitasQuery2DService
             return 0;
         }
 
-        EnsureCandidateCapacity();
-        uint queryVersion = NextRaycastVersion();
-        _context.Collisions2D.CollectBoundsCandidates(
-            CreateMin(start, end),
-            CreateMax(start, end),
-            layerMask,
-            queryVersion,
-            raycastQuery: true,
-            _queryCandidates);
+        try
+        {
+            EnsureCandidateCapacity();
+            uint queryVersion = NextRaycastVersion();
+            _context.Collisions2D.CollectBoundsCandidates(
+                CreateMin(start, end),
+                CreateMax(start, end),
+                layerMask,
+                queryVersion,
+                raycastQuery: true,
+                _queryCandidates);
 
-        LastQueryCandidateCount = _queryCandidates.Count;
-        for (int i = 0; i < _queryCandidates.Count; i++)
-            if (QueryDetection2D.TryRaycast(start, end, segment, segmentLength, _queryCandidates[i], out Physics2DHit hit))
-                results.Add(hit);
+            LastQueryCandidateCount = _queryCandidates.Count;
+            for (int i = 0; i < _queryCandidates.Count; i++)
+                if (QueryDetection2D.TryRaycast(start, end, segment, segmentLength, _queryCandidates[i], out Physics2DHit hit))
+                    results.Add(hit);
 
-        Physics2DHitSorter.SortByDistance(results);
-        return results.Count;
+            Physics2DHitSorter.SortByDistance(results);
+            return results.Count;
+        }
+        finally
+        {
+            EndQuery();
+        }
     }
 
 }

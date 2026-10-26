@@ -85,11 +85,9 @@ public sealed partial class GravitasQuery3DService
         _bufferIntersectionPoints.FastClear();
         _meshTriangleCandidates.FastClear();
         _planarCircleCandidates.FastClear();
-        _batch3DHits.FastClear();
+        _batch3DHits.Clear();
         _redundantColliderCheck.Clear();
         _redundantVoxelCheck.Clear();
-        _coveredVoxels.FastClear();
-        _traceScratch.Clear();
     }
 
     /// <summary>
@@ -144,7 +142,7 @@ public sealed partial class GravitasQuery3DService
         SwiftThrowHelper.ThrowIfNull(results, nameof(results));
 
         _currentLayerMask = layerMask;
-        results.FastClear();
+        results.Clear();
 
         if (!Vector3d.TrySubtract(end3d, start3d, out Vector3d segment)
             || !Vector3d.TryGetMagnitude(segment, out Fixed64 segmentLength)
@@ -471,7 +469,7 @@ public sealed partial class GravitasQuery3DService
         SwiftThrowHelper.ThrowIfArgument(!staticTargetsOnly && radius > ColliderGeometryPolicy.MaximumGeometryReach,
             nameof(radius), "Effective geometry reach must not exceed 4,096 world units.");
 
-        results.FastClear();
+        results.Clear();
         if (!Vector3d.TrySubtract(end3d, start3d, out Vector3d segment)
             || !Vector3d.TryGetMagnitude(segment, out Fixed64 segmentLength)
             || segmentLength <= Fixed64.Epsilon
@@ -553,7 +551,7 @@ public sealed partial class GravitasQuery3DService
         try
         {
             PrepareConvexSweepSource(source, displacement);
-            results.FastClear();
+            results.Clear();
             if (!Vector3d.TryGetMagnitude(displacement, out Fixed64 displacementLength)
                 || displacementLength <= Fixed64.Epsilon)
             {
@@ -586,6 +584,8 @@ public sealed partial class GravitasQuery3DService
         _currentExcludedCollider = null;
         _currentSweepSourceCollider = null;
         _convexSweepWorker.ClearSource();
+        _coveredVoxels.Clear();
+        _traceScratch.Clear();
     }
 
     private void BeginConvexSweepTrace(

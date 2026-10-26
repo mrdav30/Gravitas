@@ -65,13 +65,20 @@ public sealed partial class GravitasQuery2DService
         SwiftThrowHelper.ThrowIfNull(hits, nameof(hits));
         ValidateRangeBatchOutput(requests.Length, ranges);
         ResetBatchCounters(requests.Length);
-        hits.FastClear();
+        hits.Clear();
 
         for (int i = 0; i < requests.Length; i++)
         {
-            PhysicsRaycast2DRequest request = requests[i];
-            int count = RaycastAll(request.Start, request.End, request.LayerMask, _batch2DHits);
-            AppendRange(hits, ranges, i, count);
+            try
+            {
+                PhysicsRaycast2DRequest request = requests[i];
+                int count = RaycastAll(request.Start, request.End, request.LayerMask, _batch2DHits);
+                AppendRange(hits, ranges, i, count);
+            }
+            finally
+            {
+                _batch2DHits.Clear();
+            }
         }
 
         LastBatchHitCount = hits.Count;
@@ -111,13 +118,20 @@ public sealed partial class GravitasQuery2DService
         ValidateRangeBatchOutput(requests.Length, ranges);
         ValidateOverlapCircleRequests(requests);
         ResetBatchCounters(requests.Length);
-        hits.FastClear();
+        hits.Clear();
 
         for (int i = 0; i < requests.Length; i++)
         {
-            PhysicsOverlapCircle2DRequest request = requests[i];
-            int count = OverlapCircleAll(request.Center, request.Radius, request.LayerMask, _batch2DHits);
-            AppendRange(hits, ranges, i, count);
+            try
+            {
+                PhysicsOverlapCircle2DRequest request = requests[i];
+                int count = OverlapCircleAll(request.Center, request.Radius, request.LayerMask, _batch2DHits);
+                AppendRange(hits, ranges, i, count);
+            }
+            finally
+            {
+                _batch2DHits.Clear();
+            }
         }
 
         LastBatchHitCount = hits.Count;
@@ -157,13 +171,20 @@ public sealed partial class GravitasQuery2DService
         ValidateRangeBatchOutput(requests.Length, ranges);
         ValidateOverlapAabbRequests(requests);
         ResetBatchCounters(requests.Length);
-        hits.FastClear();
+        hits.Clear();
 
         for (int i = 0; i < requests.Length; i++)
         {
-            PhysicsOverlapAabb2DRequest request = requests[i];
-            int count = OverlapAabbAll(request.Center, request.Size, request.LayerMask, _batch2DHits);
-            AppendRange(hits, ranges, i, count);
+            try
+            {
+                PhysicsOverlapAabb2DRequest request = requests[i];
+                int count = OverlapAabbAll(request.Center, request.Size, request.LayerMask, _batch2DHits);
+                AppendRange(hits, ranges, i, count);
+            }
+            finally
+            {
+                _batch2DHits.Clear();
+            }
         }
 
         LastBatchHitCount = hits.Count;
@@ -208,14 +229,21 @@ public sealed partial class GravitasQuery2DService
         ValidateRangeBatchOutput(requests.Length, ranges);
         ValidatePolygonRequestRanges(requests, vertices);
         ResetBatchCounters(requests.Length);
-        hits.FastClear();
+        hits.Clear();
 
         for (int i = 0; i < requests.Length; i++)
         {
-            PhysicsOverlapPolygon2DRequest request = requests[i];
-            ReadOnlySpan<Vector2d> polygon = vertices.Slice(request.VertexStart, request.VertexCount);
-            int count = OverlapPolygonAll(polygon, request.LayerMask, _batch2DHits);
-            AppendRange(hits, ranges, i, count);
+            try
+            {
+                PhysicsOverlapPolygon2DRequest request = requests[i];
+                ReadOnlySpan<Vector2d> polygon = vertices.Slice(request.VertexStart, request.VertexCount);
+                int count = OverlapPolygonAll(polygon, request.LayerMask, _batch2DHits);
+                AppendRange(hits, ranges, i, count);
+            }
+            finally
+            {
+                _batch2DHits.Clear();
+            }
         }
 
         LastBatchHitCount = hits.Count;
@@ -262,20 +290,27 @@ public sealed partial class GravitasQuery2DService
         ValidateRangeBatchOutput(requests.Length, ranges);
         ValidateSweepCircleRequests(requests);
         ResetBatchCounters(requests.Length);
-        hits.FastClear();
+        hits.Clear();
 
         for (int i = 0; i < requests.Length; i++)
         {
-            PhysicsSweepCircle2DRequest request = requests[i];
-            int count = SweepCircleAll(
-                request.Start,
-                request.End,
-                request.Radius,
-                request.LayerMask,
-                _batch2DHits,
-                request.ExcludedCollider,
-                request.IncludeTriggers);
-            AppendRange(hits, ranges, i, count);
+            try
+            {
+                PhysicsSweepCircle2DRequest request = requests[i];
+                int count = SweepCircleAll(
+                    request.Start,
+                    request.End,
+                    request.Radius,
+                    request.LayerMask,
+                    _batch2DHits,
+                    request.ExcludedCollider,
+                    request.IncludeTriggers);
+                AppendRange(hits, ranges, i, count);
+            }
+            finally
+            {
+                _batch2DHits.Clear();
+            }
         }
 
         LastBatchHitCount = hits.Count;

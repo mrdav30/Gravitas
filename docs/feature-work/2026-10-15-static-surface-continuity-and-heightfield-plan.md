@@ -1281,13 +1281,37 @@ Independent geometry and ponytail reviews are clear. Net source growth is
 helpers have production callers; no proxy collider, index or solver was added.
 The strict-convex topology invariant also removes the cap third-vertex search.
 
-**#143 is resolved alongside this phase:** a completed ground/query sweep could
-retain its last excluded collider, and a convex worker retained its prepared
-source. Shared finally/reset cleanup releases those roots while preserving
-within-batch preparation; six duplicate wrappers were removed (+66 net runtime
-lines). Fifteen direct weak-reference regressions cover successful/stationary
-queries, batches and exceptional second requests. Pure 2D/mixed have no matching
-stored exclusion/source fields requiring this change.
+**#143 query-lifetime closeout, 2026-10-26:** The initial 3D source/exclusion
+cleanup is committed in `93ae61f` (+66 runtime lines, six duplicate wrappers
+removed). Dimensional follow-up also releases 2D/mixed candidates, all three
+services' internal batch hits after each caller copy, and completed 3D voxel
+trace references. Hit-output replacement uses `Clear()` at the existing admission
+boundary: a smaller/empty query cannot hide older collider/body references, and
+current caller-owned hits remain valid. Capacity, counters and registered-source
+preparation within a batch are preserved; numeric/geometry scratch is unchanged.
+The parity revision adds 248 runtime lines across existing owners, two private
+cleanup methods, and no runtime file/type. Independent ponytail review is clear.
+
+All **48 lifetime cases** pass (33 buffer/output cases and the original 15 source
+cases). Full Gravitas Release/Lean suites pass **7,645/7,576** tests with exact
+raw line coverage **51,575/51,575** and **51,573/51,573**, branch coverage
+**19,612/19,612** in both, and methods **5,442/5,442** / **5,441/5,441**.
+Both target frameworks build without warnings. Six unchanged shared replay
+fixtures agree across local Windows x64 profiles; upstream source was not changed.
+
+Twelve frozen-payload query/frame controls preserve identical physical witnesses
+and **0 B/op**, including 16-request 3D/2D batches, 48-query area work, both mixed
+directions, 64-agent support/full-step work and the existing 64-pair 2D control.
+Normal/reversed broad contrasts range -7.09% to +5.38%; the adverse 2D contact
+frame +5.38% reverses to -1.84%, and the support frame +5.23% to -1.27%.
+Four fresh focused ABBA processes span **-3.06% to +2.37%**, without a persistent
+adverse contrast. This establishes no repeatable warm regression, not universal
+zero overhead; no new baseline tradeoff was accepted. Ignored
+`artifacts/grv-issue-143/` retains red/green lifetime evidence, exact coverage,
+replay, before/after payloads with module hashes, broad `timing-*` and focused
+`focused-*` captures. Pooled voxel survival was not used as a GC leak oracle:
+GridForge intentionally pools reset voxels; trace cleanup was audited and
+exercised through existing ray, cone, sphere and registered-source tests.
 
 Ignored `artifacts/static-surface/phase8/` retains `coverage-final-*`, math raw
 coverage, `native-closeout-*`, `controls-closeout-*`, earlier/adverse controls,

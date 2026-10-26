@@ -270,6 +270,12 @@ if (hit && rayHit.TryGetPoint(out Vector3d worldPoint))
 All-hit methods clear the caller-provided list, write sorted hits, and return
 the hit count.
 
+Services release candidate references when a query completes and internal batch
+hit references after copying each request's results, including exceptional
+exits. Reusable storage retains its capacity. Replacing caller-owned results
+releases the previous populated slots; the returned hits remain owned by the
+caller until that buffer is cleared, replaced, or released.
+
 ## Batch Pattern
 
 High-volume lockstep systems should prefer batch APIs when issuing many related

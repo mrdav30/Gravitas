@@ -74,33 +74,40 @@ public sealed partial class GravitasQuery2DService
         SwiftThrowHelper.ThrowIfArgument(radius < Fixed64.Zero, nameof(radius), "2D query radius cannot be negative.");
         ColliderGeometryPolicy.ValidateReach(radius, nameof(radius));
 
-        EnsureCandidateCapacity();
-        uint queryVersion = NextOverlapQueryVersion();
-        _context.Collisions2D.CollectBoundsCandidates(
-            new Vector2d(center.X - radius, center.Y - radius),
-            new Vector2d(center.X + radius, center.Y + radius),
-            layerMask,
-            queryVersion,
-            raycastQuery: false,
-            _queryCandidates);
-
-        LastQueryCandidateCount = _queryCandidates.Count;
-        bool found = false;
-        Physics2DHit closest = default;
-        for (int i = 0; i < _queryCandidates.Count; i++)
+        try
         {
-            if (!QueryDetection2D.TryOverlapCircle(center, radius, _queryCandidates[i], out Physics2DHit candidate)
-                || !PhysicsHitSelectionPolicy.ShouldReplace(candidate, found, closest))
+            EnsureCandidateCapacity();
+            uint queryVersion = NextOverlapQueryVersion();
+            _context.Collisions2D.CollectBoundsCandidates(
+                new Vector2d(center.X - radius, center.Y - radius),
+                new Vector2d(center.X + radius, center.Y + radius),
+                layerMask,
+                queryVersion,
+                raycastQuery: false,
+                _queryCandidates);
+
+            LastQueryCandidateCount = _queryCandidates.Count;
+            bool found = false;
+            Physics2DHit closest = default;
+            for (int i = 0; i < _queryCandidates.Count; i++)
             {
-                continue;
+                if (!QueryDetection2D.TryOverlapCircle(center, radius, _queryCandidates[i], out Physics2DHit candidate)
+                    || !PhysicsHitSelectionPolicy.ShouldReplace(candidate, found, closest))
+                {
+                    continue;
+                }
+
+                closest = candidate;
+                found = true;
             }
 
-            closest = candidate;
-            found = true;
+            hit = closest;
+            return found;
         }
-
-        hit = closest;
-        return found;
+        finally
+        {
+            EndQuery();
+        }
     }
 
     /// <summary>
@@ -219,31 +226,38 @@ public sealed partial class GravitasQuery2DService
         if (!staticTargetsOnly)
             ColliderGeometryPolicy.ValidateReach(radius, nameof(radius));
 
-        results.FastClear();
-        EnsureCandidateCapacity();
-        uint queryVersion = NextOverlapQueryVersion();
-        _context.Collisions2D.CollectBoundsCandidates(
-            new Vector2d(center.X - radius, center.Y - radius),
-            new Vector2d(center.X + radius, center.Y + radius),
-            layerMask,
-            queryVersion,
-            raycastQuery: false,
-            _queryCandidates,
-            staticStyleOnly: staticTargetsOnly);
-
-        LastQueryCandidateCount = _queryCandidates.Count;
-        for (int i = 0; i < _queryCandidates.Count; i++)
+        results.Clear();
+        try
         {
-            LSCollider2D collider = _queryCandidates[i];
-            if (IsEligibleSweepCandidate(collider, excludedCollider, includeTriggers)
-                && QueryDetection2D.TryOverlapCircle(center, radius, collider, out Physics2DHit hit))
-            {
-                results.Add(hit);
-            }
-        }
+            EnsureCandidateCapacity();
+            uint queryVersion = NextOverlapQueryVersion();
+            _context.Collisions2D.CollectBoundsCandidates(
+                new Vector2d(center.X - radius, center.Y - radius),
+                new Vector2d(center.X + radius, center.Y + radius),
+                layerMask,
+                queryVersion,
+                raycastQuery: false,
+                _queryCandidates,
+                staticStyleOnly: staticTargetsOnly);
 
-        Physics2DHitSorter.SortByDistance(results);
-        return results.Count;
+            LastQueryCandidateCount = _queryCandidates.Count;
+            for (int i = 0; i < _queryCandidates.Count; i++)
+            {
+                LSCollider2D collider = _queryCandidates[i];
+                if (IsEligibleSweepCandidate(collider, excludedCollider, includeTriggers)
+                    && QueryDetection2D.TryOverlapCircle(center, radius, collider, out Physics2DHit hit))
+                {
+                    results.Add(hit);
+                }
+            }
+
+            Physics2DHitSorter.SortByDistance(results);
+            return results.Count;
+        }
+        finally
+        {
+            EndQuery();
+        }
     }
 
     private bool OverlapAreaCore(
@@ -254,33 +268,40 @@ public sealed partial class GravitasQuery2DService
         PhysicsLayerMask layerMask,
         out Physics2DHit hit)
     {
-        EnsureCandidateCapacity();
-        uint queryVersion = NextOverlapQueryVersion();
-        _context.Collisions2D.CollectBoundsCandidates(
-            min,
-            max,
-            layerMask,
-            queryVersion,
-            raycastQuery: false,
-            _queryCandidates);
-
-        LastQueryCandidateCount = _queryCandidates.Count;
-        bool found = false;
-        Physics2DHit closest = default;
-        for (int i = 0; i < _queryCandidates.Count; i++)
+        try
         {
-            if (!QueryDetection2D.TryOverlapPolygon(vertices, center, _queryCandidates[i], out Physics2DHit candidate)
-                || !PhysicsHitSelectionPolicy.ShouldReplace(candidate, found, closest))
+            EnsureCandidateCapacity();
+            uint queryVersion = NextOverlapQueryVersion();
+            _context.Collisions2D.CollectBoundsCandidates(
+                min,
+                max,
+                layerMask,
+                queryVersion,
+                raycastQuery: false,
+                _queryCandidates);
+
+            LastQueryCandidateCount = _queryCandidates.Count;
+            bool found = false;
+            Physics2DHit closest = default;
+            for (int i = 0; i < _queryCandidates.Count; i++)
             {
-                continue;
+                if (!QueryDetection2D.TryOverlapPolygon(vertices, center, _queryCandidates[i], out Physics2DHit candidate)
+                    || !PhysicsHitSelectionPolicy.ShouldReplace(candidate, found, closest))
+                {
+                    continue;
+                }
+
+                closest = candidate;
+                found = true;
             }
 
-            closest = candidate;
-            found = true;
+            hit = closest;
+            return found;
         }
-
-        hit = closest;
-        return found;
+        finally
+        {
+            EndQuery();
+        }
     }
 
     private int OverlapAreaAllCore(
@@ -291,24 +312,31 @@ public sealed partial class GravitasQuery2DService
         PhysicsLayerMask layerMask,
         SwiftList<Physics2DHit> results)
     {
-        results.FastClear();
-        EnsureCandidateCapacity();
-        uint queryVersion = NextOverlapQueryVersion();
-        _context.Collisions2D.CollectBoundsCandidates(
-            min,
-            max,
-            layerMask,
-            queryVersion,
-            raycastQuery: false,
-            _queryCandidates);
+        results.Clear();
+        try
+        {
+            EnsureCandidateCapacity();
+            uint queryVersion = NextOverlapQueryVersion();
+            _context.Collisions2D.CollectBoundsCandidates(
+                min,
+                max,
+                layerMask,
+                queryVersion,
+                raycastQuery: false,
+                _queryCandidates);
 
-        LastQueryCandidateCount = _queryCandidates.Count;
-        for (int i = 0; i < _queryCandidates.Count; i++)
-            if (QueryDetection2D.TryOverlapPolygon(vertices, center, _queryCandidates[i], out Physics2DHit hit))
-                results.Add(hit);
+            LastQueryCandidateCount = _queryCandidates.Count;
+            for (int i = 0; i < _queryCandidates.Count; i++)
+                if (QueryDetection2D.TryOverlapPolygon(vertices, center, _queryCandidates[i], out Physics2DHit hit))
+                    results.Add(hit);
 
-        Physics2DHitSorter.SortByDistance(results);
-        return results.Count;
+            Physics2DHitSorter.SortByDistance(results);
+            return results.Count;
+        }
+        finally
+        {
+            EndQuery();
+        }
     }
 
 }

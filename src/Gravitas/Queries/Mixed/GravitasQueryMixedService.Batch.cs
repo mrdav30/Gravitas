@@ -81,20 +81,27 @@ public sealed partial class GravitasQueryMixedService
         ValidateRangeBatchOutput(requests.Length, ranges);
         ValidateSweepSphereAgainst2DRequests(requests);
         ResetBatchCounters(requests.Length);
-        hits.FastClear();
+        hits.Clear();
 
         for (int i = 0; i < requests.Length; i++)
         {
-            PhysicsSweepSphereAgainst2DRequest request = requests[i];
-            int count = SweepSphereAgainst2DAll(
-                request.Start,
-                request.End,
-                request.Radius,
-                request.LayerMask,
-                _batchMixedHits,
-                request.ExcludedCollider,
-                request.IncludeTriggers);
-            AppendRange(hits, ranges, i, count);
+            try
+            {
+                PhysicsSweepSphereAgainst2DRequest request = requests[i];
+                int count = SweepSphereAgainst2DAll(
+                    request.Start,
+                    request.End,
+                    request.Radius,
+                    request.LayerMask,
+                    _batchMixedHits,
+                    request.ExcludedCollider,
+                    request.IncludeTriggers);
+                AppendRange(hits, ranges, i, count);
+            }
+            finally
+            {
+                _batchMixedHits.Clear();
+            }
         }
 
         LastBatchHitCount = hits.Count;
@@ -145,22 +152,29 @@ public sealed partial class GravitasQueryMixedService
         ValidateRangeBatchOutput(requests.Length, ranges);
         ValidateSweepCircleAgainst3DRequests(requests);
         ResetBatchCounters(requests.Length);
-        hits.FastClear();
+        hits.Clear();
 
         for (int i = 0; i < requests.Length; i++)
         {
-            PhysicsSweepCircleAgainst3DRequest request = requests[i];
-            int count = SweepCircleAgainst3DAll(
-                request.Start,
-                request.End,
-                request.Radius,
-                request.SlabCenterY,
-                request.HalfThickness,
-                request.LayerMask,
-                _batchMixedHits,
-                request.ExcludedCollider,
-                request.IncludeTriggers);
-            AppendRange(hits, ranges, i, count);
+            try
+            {
+                PhysicsSweepCircleAgainst3DRequest request = requests[i];
+                int count = SweepCircleAgainst3DAll(
+                    request.Start,
+                    request.End,
+                    request.Radius,
+                    request.SlabCenterY,
+                    request.HalfThickness,
+                    request.LayerMask,
+                    _batchMixedHits,
+                    request.ExcludedCollider,
+                    request.IncludeTriggers);
+                AppendRange(hits, ranges, i, count);
+            }
+            finally
+            {
+                _batchMixedHits.Clear();
+            }
         }
 
         LastBatchHitCount = hits.Count;

@@ -28,14 +28,21 @@ public sealed partial class GravitasQuery3DService
         ref bool found,
         ref Physics3DHit closestHit)
     {
-        GridTracer.TraceLineInto(_context.World, start, end, _coveredVoxels, _traceScratch);
-        for (int i = 0; i < _coveredVoxels.Count; i++)
-            ProcessTraceVoxelForClosestHit(
-                _coveredVoxels[i],
-                start,
-                direction,
-                ref found,
-                ref closestHit);
+        try
+        {
+            GridTracer.TraceLineInto(_context.World, start, end, _coveredVoxels, _traceScratch);
+            for (int i = 0; i < _coveredVoxels.Count; i++)
+                ProcessTraceVoxelForClosestHit(
+                    _coveredVoxels[i],
+                    start,
+                    direction,
+                    ref found,
+                    ref closestHit);
+        }
+        finally
+        {
+            EndQuery();
+        }
     }
 
     private void TraceLineForAllHits(
@@ -44,9 +51,16 @@ public sealed partial class GravitasQuery3DService
         Vector3d direction,
         SwiftList<Physics3DHit> results)
     {
-        GridTracer.TraceLineInto(_context.World, start, end, _coveredVoxels, _traceScratch);
-        for (int i = 0; i < _coveredVoxels.Count; i++)
-            ProcessTraceVoxelForAllHits(_coveredVoxels[i], start, direction, results);
+        try
+        {
+            GridTracer.TraceLineInto(_context.World, start, end, _coveredVoxels, _traceScratch);
+            for (int i = 0; i < _coveredVoxels.Count; i++)
+                ProcessTraceVoxelForAllHits(_coveredVoxels[i], start, direction, results);
+        }
+        finally
+        {
+            EndQuery();
+        }
     }
 
     private void TraceSweepForClosestHit(

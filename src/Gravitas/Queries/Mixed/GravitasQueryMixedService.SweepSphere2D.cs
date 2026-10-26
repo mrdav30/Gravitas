@@ -114,60 +114,67 @@ public sealed partial class GravitasQueryMixedService
 
         Vector3d direction = segment.Normalized;
         CreateSweepBounds(start, end, radius, out Vector3d min, out Vector3d max);
-        _context.MixedCollisions.Collect2DCandidatesInMixedBounds(
-            min,
-            max,
-            layerMask,
-            _candidates2D,
-            staticStyleOnly: staticTargetsOnly,
-            cachePartitionRefresh: cacheTargetPartitions);
-        LastQueryCandidateCount = _candidates2D.Count;
-        LastMeshTriangleCandidateCount = 0;
-        bool captureReducerDiagnostics = _context.Diagnostics.Enabled;
-        QueryReducerCounters reducerCounters = default;
-        bool found = false;
-        PhysicsMixedHit best = default;
-
-        for (int i = 0; i < _candidates2D.Count; i++)
+        try
         {
-            if (!TrySweepSphereAgainst2DCandidate(
+            _context.MixedCollisions.Collect2DCandidatesInMixedBounds(
+                min,
+                max,
+                layerMask,
+                _candidates2D,
+                staticStyleOnly: staticTargetsOnly,
+                cachePartitionRefresh: cacheTargetPartitions);
+            LastQueryCandidateCount = _candidates2D.Count;
+            LastMeshTriangleCandidateCount = 0;
+            bool captureReducerDiagnostics = _context.Diagnostics.Enabled;
+            QueryReducerCounters reducerCounters = default;
+            bool found = false;
+            PhysicsMixedHit best = default;
+
+            for (int i = 0; i < _candidates2D.Count; i++)
+            {
+                if (!TrySweepSphereAgainst2DCandidate(
+                    start,
+                    end,
+                    direction,
+                    length,
+                    radius,
+                    _candidates2D[i],
+                    excludedCollider,
+                    includeTriggers,
+                    staticTargetsOnly,
+                    captureReducerDiagnostics,
+                    ref reducerCounters,
+                    out PhysicsMixedHit candidate))
+                {
+                    continue;
+                }
+
+                if (PhysicsHitSelectionPolicy.ShouldReplace(candidate, found, best))
+                {
+                    best = candidate;
+                    found = true;
+                }
+            }
+
+            hit = found ? best : default;
+            EmitMixedSweepDiagnostics(
+                GravitasColliderDimension.ThreeD,
+                GravitasColliderDimension.TwoD,
                 start,
                 end,
-                direction,
-                length,
                 radius,
-                _candidates2D[i],
-                excludedCollider,
-                includeTriggers,
-                staticTargetsOnly,
+                layerMask.Bits,
+                found,
+                reducerCounters.AcceptedHits,
+                hit,
                 captureReducerDiagnostics,
-                ref reducerCounters,
-                out PhysicsMixedHit candidate))
-            {
-                continue;
-            }
-
-            if (PhysicsHitSelectionPolicy.ShouldReplace(candidate, found, best))
-            {
-                best = candidate;
-                found = true;
-            }
+                reducerCounters);
+            return found;
         }
-
-        hit = found ? best : default;
-        EmitMixedSweepDiagnostics(
-            GravitasColliderDimension.ThreeD,
-            GravitasColliderDimension.TwoD,
-            start,
-            end,
-            radius,
-            layerMask.Bits,
-            found,
-            reducerCounters.AcceptedHits,
-            hit,
-            captureReducerDiagnostics,
-            reducerCounters);
-        return found;
+        finally
+        {
+            EndQuery();
+        }
     }
 
     private int SweepSphereAgainst2DAllCore(
@@ -191,61 +198,68 @@ public sealed partial class GravitasQueryMixedService
             || !Vector3d.TryGetMagnitude(segment, out Fixed64 length)
             || length <= Fixed64.Epsilon)
         {
-            results.FastClear();
+            results.Clear();
             ResetLastQueryCounters();
             return 0;
         }
 
         Vector3d direction = segment.Normalized;
         CreateSweepBounds(start, end, radius, out Vector3d min, out Vector3d max);
-        _context.MixedCollisions.Collect2DCandidatesInMixedBounds(
-            min,
-            max,
-            layerMask,
-            _candidates2D,
-            staticStyleOnly: staticTargetsOnly,
-            cachePartitionRefresh: cacheTargetPartitions);
-        results.FastClear();
-        LastQueryCandidateCount = _candidates2D.Count;
-        LastMeshTriangleCandidateCount = 0;
-        bool captureReducerDiagnostics = _context.Diagnostics.Enabled;
-        QueryReducerCounters reducerCounters = default;
-
-        for (int i = 0; i < _candidates2D.Count; i++)
+        try
         {
-            if (TrySweepSphereAgainst2DCandidate(
+            _context.MixedCollisions.Collect2DCandidatesInMixedBounds(
+                min,
+                max,
+                layerMask,
+                _candidates2D,
+                staticStyleOnly: staticTargetsOnly,
+                cachePartitionRefresh: cacheTargetPartitions);
+            results.Clear();
+            LastQueryCandidateCount = _candidates2D.Count;
+            LastMeshTriangleCandidateCount = 0;
+            bool captureReducerDiagnostics = _context.Diagnostics.Enabled;
+            QueryReducerCounters reducerCounters = default;
+
+            for (int i = 0; i < _candidates2D.Count; i++)
+            {
+                if (TrySweepSphereAgainst2DCandidate(
+                    start,
+                    end,
+                    direction,
+                    length,
+                    radius,
+                    _candidates2D[i],
+                    excludedCollider,
+                    includeTriggers,
+                    staticTargetsOnly,
+                    captureReducerDiagnostics,
+                    ref reducerCounters,
+                    out PhysicsMixedHit candidate,
+                    requireClosingContact))
+                {
+                    results.Add(candidate);
+                }
+            }
+
+            PhysicsMixedHitSorter.SortByDistance(results);
+            EmitMixedSweepDiagnostics(
+                GravitasColliderDimension.ThreeD,
+                GravitasColliderDimension.TwoD,
                 start,
                 end,
-                direction,
-                length,
                 radius,
-                _candidates2D[i],
-                excludedCollider,
-                includeTriggers,
-                staticTargetsOnly,
+                layerMask.Bits,
+                results.Count > 0,
+                results.Count,
+                results.Count > 0 ? results[0] : default,
                 captureReducerDiagnostics,
-                ref reducerCounters,
-                out PhysicsMixedHit candidate,
-                requireClosingContact))
-            {
-                results.Add(candidate);
-            }
+                reducerCounters);
+            return results.Count;
         }
-
-        PhysicsMixedHitSorter.SortByDistance(results);
-        EmitMixedSweepDiagnostics(
-            GravitasColliderDimension.ThreeD,
-            GravitasColliderDimension.TwoD,
-            start,
-            end,
-            radius,
-            layerMask.Bits,
-            results.Count > 0,
-            results.Count,
-            results.Count > 0 ? results[0] : default,
-            captureReducerDiagnostics,
-            reducerCounters);
-        return results.Count;
+        finally
+        {
+            EndQuery();
+        }
     }
 
 }

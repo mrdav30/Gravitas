@@ -132,7 +132,7 @@ public sealed partial class GravitasQuery3DService
         _currentLayerMask = layerMask;
         ResetLastQueryCounters();
 
-        results.FastClear();
+        results.Clear();
 
         TraceCircleForAllHits(position, radius, results);
 
@@ -161,7 +161,7 @@ public sealed partial class GravitasQuery3DService
     {
         SwiftThrowHelper.ThrowIfNull(results, nameof(results));
 
-        results.FastClear();
+        results.Clear();
         if (radius <= Fixed64.Zero)
         {
             ResetLastQueryCounters();

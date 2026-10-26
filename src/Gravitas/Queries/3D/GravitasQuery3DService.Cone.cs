@@ -83,7 +83,7 @@ public sealed partial class GravitasQuery3DService
         _currentLayerMask = layerMask;
         NextCircleVersion();
         ResetLastQueryCounters();
-        results.FastClear();
+        results.Clear();
         _redundantColliderCheck.Clear();
         _redundantVoxelCheck.Clear();
 
@@ -112,23 +112,30 @@ public sealed partial class GravitasQuery3DService
         ref Fixed64 closestDistance)
     {
         GetConeQueryBounds(origin, baseCenter, direction, endRadius, out Vector3d min, out Vector3d max);
-        GridTracer.GetCoveredVoxelsInto(_context.World, min, max, _coveredVoxels, _traceScratch);
-        for (int i = 0; i < _coveredVoxels.Count; i++)
+        try
         {
-            Voxel voxel = _coveredVoxels[i];
-            if (!GridTraversal.TryGetUniquePartition(voxel, _redundantVoxelCheck, out PhysicsPartition? partition))
-                continue;
+            GridTracer.GetCoveredVoxelsInto(_context.World, min, max, _coveredVoxels, _traceScratch);
+            for (int i = 0; i < _coveredVoxels.Count; i++)
+            {
+                Voxel voxel = _coveredVoxels[i];
+                if (!GridTraversal.TryGetUniquePartition(voxel, _redundantVoxelCheck, out PhysicsPartition? partition))
+                    continue;
 
-            ProcessConePartitionForClosestHit(
-                partition!,
-                origin,
-                baseCenter,
-                direction,
-                length,
-                endRadius,
-                ref found,
-                ref closestHit,
-                ref closestDistance);
+                ProcessConePartitionForClosestHit(
+                    partition!,
+                    origin,
+                    baseCenter,
+                    direction,
+                    length,
+                    endRadius,
+                    ref found,
+                    ref closestHit,
+                    ref closestDistance);
+            }
+        }
+        finally
+        {
+            EndQuery();
         }
     }
 
@@ -141,14 +148,21 @@ public sealed partial class GravitasQuery3DService
         SwiftList<Physics3DHit> results)
     {
         GetConeQueryBounds(origin, baseCenter, direction, endRadius, out Vector3d min, out Vector3d max);
-        GridTracer.GetCoveredVoxelsInto(_context.World, min, max, _coveredVoxels, _traceScratch);
-        for (int i = 0; i < _coveredVoxels.Count; i++)
+        try
         {
-            Voxel voxel = _coveredVoxels[i];
-            if (!GridTraversal.TryGetUniquePartition(voxel, _redundantVoxelCheck, out PhysicsPartition? partition))
-                continue;
+            GridTracer.GetCoveredVoxelsInto(_context.World, min, max, _coveredVoxels, _traceScratch);
+            for (int i = 0; i < _coveredVoxels.Count; i++)
+            {
+                Voxel voxel = _coveredVoxels[i];
+                if (!GridTraversal.TryGetUniquePartition(voxel, _redundantVoxelCheck, out PhysicsPartition? partition))
+                    continue;
 
-            ProcessConePartitionForAllHits(partition!, origin, baseCenter, direction, length, endRadius, results);
+                ProcessConePartitionForAllHits(partition!, origin, baseCenter, direction, length, endRadius, results);
+            }
+        }
+        finally
+        {
+            EndQuery();
         }
     }
 

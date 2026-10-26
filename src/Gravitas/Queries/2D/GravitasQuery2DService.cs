@@ -13,6 +13,7 @@ namespace Gravitas.Queries;
 /// <summary>
 /// Owns pure 2D query buffers and query dispatch for one <see cref="GravitasWorldContext"/>.
 /// </summary>
+/// <content>Owns context-local query buffers and their cleanup boundary.</content>
 public sealed partial class GravitasQuery2DService
 {
     private readonly GravitasWorldContext _context;
@@ -44,12 +45,19 @@ public sealed partial class GravitasQuery2DService
     {
         ResetColliderOverlapQueryVersions();
         ResetColliderRaycastVersions();
-        _queryCandidates.FastClear();
-        _batch2DHits.FastClear();
+        EndQuery();
+        _batch2DHits.Clear();
         LastQueryCandidateCount = 0;
         ResetBatchCounters(0);
         OverlapQueryVersion = 0;
         RaycastVersion = 0;
+    }
+
+    private void EndQuery()
+    {
+        // Every producer starts empty. Release its live slots now so a later
+        // smaller FastClear-based gather cannot leave a retained reference tail.
+        _queryCandidates.Clear();
     }
 
 }

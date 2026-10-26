@@ -13,6 +13,7 @@ namespace Gravitas.Queries;
 /// <summary>
 /// Owns explicit mixed 3D/2D query buffers for one <see cref="GravitasWorldContext"/>.
 /// </summary>
+/// <content>Owns mixed query dispatch and reusable candidate storage.</content>
 public sealed partial class GravitasQueryMixedService
 {
     private readonly GravitasWorldContext _context;
@@ -43,12 +44,18 @@ public sealed partial class GravitasQueryMixedService
     /// </summary>
     public void Reset()
     {
-        _candidates2D.FastClear();
-        _candidates3D.FastClear();
+        EndQuery();
         _meshTriangleCandidates.FastClear();
-        _batchMixedHits.FastClear();
+        _batchMixedHits.Clear();
         ResetLastQueryCounters();
         ResetBatchCounters(0);
+    }
+
+    private void EndQuery()
+    {
+        // Release populated references before any shorter query can hide a tail.
+        _candidates2D.Clear();
+        _candidates3D.Clear();
     }
 
 }
