@@ -58,6 +58,13 @@ internal sealed partial class ConvexSweepQueryWorker
         int maxConservativeAdvancementIterations = MaxConservativeAdvancementIterations) =>
         _maxConservativeAdvancementIterations = maxConservativeAdvancementIterations;
 
+    internal void ClearSource()
+    {
+        _source = null;
+        _sourceShape = default;
+        _hasSource = false;
+    }
+
     public void PrepareConvexMeshSource(LSMeshCollider source, Vector3d displacement)
     {
         SwiftThrowHelper.ThrowIfNull(source, nameof(source));

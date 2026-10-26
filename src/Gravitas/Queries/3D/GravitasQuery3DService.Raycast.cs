@@ -75,6 +75,7 @@ public sealed partial class GravitasQuery3DService
     /// </summary>
     public void Reset()
     {
+        EndQuery();
         ResetColliderRaycastVersions();
         ResetColliderCircleVersions();
         RaycastVersion = 0;
@@ -260,9 +261,7 @@ public sealed partial class GravitasQuery3DService
     {
         SwiftThrowHelper.ThrowIfNull(source, nameof(source));
         SwiftThrowHelper.ThrowIfNull(results, nameof(results));
-        EnsureSourceBelongsToContext(source);
-        PrepareConvexSweepSource(source, displacement);
-        return SweepPreparedConvexSourceAll(
+        return SweepRegisteredSourceAll(
             source,
             displacement,
             layerMask,
@@ -284,7 +283,7 @@ public sealed partial class GravitasQuery3DService
         bool includeTriggers = true)
     {
         SwiftThrowHelper.ThrowIfNull(source, nameof(source));
-        return SweepPrimitiveSource(source, displacement, layerMask, out sweepHit, excludedCollider, includeTriggers);
+        return SweepRegisteredSource(source, displacement, layerMask, out sweepHit, excludedCollider, includeTriggers);
     }
 
     /// <summary>
@@ -300,7 +299,7 @@ public sealed partial class GravitasQuery3DService
     {
         SwiftThrowHelper.ThrowIfNull(source, nameof(source));
         SwiftThrowHelper.ThrowIfNull(results, nameof(results));
-        return SweepPrimitiveSourceAll(source, displacement, layerMask, results, excludedCollider, includeTriggers);
+        return SweepRegisteredSourceAll(source, displacement, layerMask, results, excludedCollider, includeTriggers);
     }
 
     /// <summary>
@@ -315,7 +314,7 @@ public sealed partial class GravitasQuery3DService
         bool includeTriggers = true)
     {
         SwiftThrowHelper.ThrowIfNull(source, nameof(source));
-        return SweepPrimitiveSource(source, displacement, layerMask, out sweepHit, excludedCollider, includeTriggers);
+        return SweepRegisteredSource(source, displacement, layerMask, out sweepHit, excludedCollider, includeTriggers);
     }
 
     /// <summary>
@@ -331,7 +330,7 @@ public sealed partial class GravitasQuery3DService
     {
         SwiftThrowHelper.ThrowIfNull(source, nameof(source));
         SwiftThrowHelper.ThrowIfNull(results, nameof(results));
-        return SweepPrimitiveSourceAll(source, displacement, layerMask, results, excludedCollider, includeTriggers);
+        return SweepRegisteredSourceAll(source, displacement, layerMask, results, excludedCollider, includeTriggers);
     }
 
     /// <summary>
@@ -346,7 +345,7 @@ public sealed partial class GravitasQuery3DService
         bool includeTriggers = true)
     {
         SwiftThrowHelper.ThrowIfNull(source, nameof(source));
-        return SweepPrimitiveSource(source, displacement, layerMask, out sweepHit, excludedCollider, includeTriggers);
+        return SweepRegisteredSource(source, displacement, layerMask, out sweepHit, excludedCollider, includeTriggers);
     }
 
     /// <summary>
@@ -362,7 +361,7 @@ public sealed partial class GravitasQuery3DService
     {
         SwiftThrowHelper.ThrowIfNull(source, nameof(source));
         SwiftThrowHelper.ThrowIfNull(results, nameof(results));
-        return SweepPrimitiveSourceAll(source, displacement, layerMask, results, excludedCollider, includeTriggers);
+        return SweepRegisteredSourceAll(source, displacement, layerMask, results, excludedCollider, includeTriggers);
     }
 
     /// <summary>
@@ -377,7 +376,7 @@ public sealed partial class GravitasQuery3DService
         bool includeTriggers = true)
     {
         SwiftThrowHelper.ThrowIfNull(source, nameof(source));
-        return SweepPrimitiveSource(source, displacement, layerMask, out sweepHit, excludedCollider, includeTriggers);
+        return SweepRegisteredSource(source, displacement, layerMask, out sweepHit, excludedCollider, includeTriggers);
     }
 
     /// <summary>
@@ -393,7 +392,7 @@ public sealed partial class GravitasQuery3DService
     {
         SwiftThrowHelper.ThrowIfNull(source, nameof(source));
         SwiftThrowHelper.ThrowIfNull(results, nameof(results));
-        return SweepPrimitiveSourceAll(source, displacement, layerMask, results, excludedCollider, includeTriggers);
+        return SweepRegisteredSourceAll(source, displacement, layerMask, results, excludedCollider, includeTriggers);
     }
 
     /// <summary>
@@ -408,7 +407,7 @@ public sealed partial class GravitasQuery3DService
         bool includeTriggers = true)
     {
         SwiftThrowHelper.ThrowIfNull(source, nameof(source));
-        return SweepConvexMeshSource(source, displacement, layerMask, out sweepHit, excludedCollider, includeTriggers);
+        return SweepRegisteredSource(source, displacement, layerMask, out sweepHit, excludedCollider, includeTriggers);
     }
 
     /// <summary>
@@ -424,7 +423,7 @@ public sealed partial class GravitasQuery3DService
     {
         SwiftThrowHelper.ThrowIfNull(source, nameof(source));
         SwiftThrowHelper.ThrowIfNull(results, nameof(results));
-        return SweepConvexMeshSourceAll(source, displacement, layerMask, results, excludedCollider, includeTriggers);
+        return SweepRegisteredSourceAll(source, displacement, layerMask, results, excludedCollider, includeTriggers);
     }
 
     /// <summary>
@@ -439,7 +438,7 @@ public sealed partial class GravitasQuery3DService
         bool includeTriggers = true)
     {
         SwiftThrowHelper.ThrowIfNull(source, nameof(source));
-        return SweepCompoundSource(source, displacement, layerMask, out sweepHit, excludedCollider, includeTriggers);
+        return SweepRegisteredSource(source, displacement, layerMask, out sweepHit, excludedCollider, includeTriggers);
     }
 
     /// <summary>
@@ -455,85 +454,7 @@ public sealed partial class GravitasQuery3DService
     {
         SwiftThrowHelper.ThrowIfNull(source, nameof(source));
         SwiftThrowHelper.ThrowIfNull(results, nameof(results));
-        return SweepCompoundSourceAll(source, displacement, layerMask, results, excludedCollider, includeTriggers);
-    }
-
-    private bool SweepPrimitiveSource(
-        LSCollider source,
-        Vector3d displacement,
-        PhysicsLayerMask layerMask,
-        out Physics3DHit sweepHit,
-        LSCollider? excludedCollider,
-        bool includeTriggers)
-    {
-        EnsureSourceBelongsToContext(source);
-        _convexSweepWorker.PreparePrimitiveSource(source, displacement);
-        return SweepPreparedConvexSource(source, displacement, layerMask, out sweepHit, excludedCollider, includeTriggers);
-    }
-
-    private int SweepPrimitiveSourceAll(
-        LSCollider source,
-        Vector3d displacement,
-        PhysicsLayerMask layerMask,
-        SwiftList<Physics3DHit> results,
-        LSCollider? excludedCollider,
-        bool includeTriggers)
-    {
-        EnsureSourceBelongsToContext(source);
-        _convexSweepWorker.PreparePrimitiveSource(source, displacement);
-        return SweepPreparedConvexSourceAll(source, displacement, layerMask, results, excludedCollider, includeTriggers);
-    }
-
-    private bool SweepConvexMeshSource(
-        LSMeshCollider source,
-        Vector3d displacement,
-        PhysicsLayerMask layerMask,
-        out Physics3DHit sweepHit,
-        LSCollider? excludedCollider,
-        bool includeTriggers)
-    {
-        EnsureSourceBelongsToContext(source);
-        _convexSweepWorker.PrepareConvexMeshSource(source, displacement);
-        return SweepPreparedConvexSource(source, displacement, layerMask, out sweepHit, excludedCollider, includeTriggers);
-    }
-
-    private int SweepConvexMeshSourceAll(
-        LSMeshCollider source,
-        Vector3d displacement,
-        PhysicsLayerMask layerMask,
-        SwiftList<Physics3DHit> results,
-        LSCollider? excludedCollider,
-        bool includeTriggers)
-    {
-        EnsureSourceBelongsToContext(source);
-        _convexSweepWorker.PrepareConvexMeshSource(source, displacement);
-        return SweepPreparedConvexSourceAll(source, displacement, layerMask, results, excludedCollider, includeTriggers);
-    }
-
-    private bool SweepCompoundSource(
-        LSCompoundCollider source,
-        Vector3d displacement,
-        PhysicsLayerMask layerMask,
-        out Physics3DHit sweepHit,
-        LSCollider? excludedCollider,
-        bool includeTriggers)
-    {
-        EnsureSourceBelongsToContext(source);
-        _convexSweepWorker.PrepareCompoundSource(source, displacement);
-        return SweepPreparedConvexSource(source, displacement, layerMask, out sweepHit, excludedCollider, includeTriggers);
-    }
-
-    private int SweepCompoundSourceAll(
-        LSCompoundCollider source,
-        Vector3d displacement,
-        PhysicsLayerMask layerMask,
-        SwiftList<Physics3DHit> results,
-        LSCollider? excludedCollider,
-        bool includeTriggers)
-    {
-        EnsureSourceBelongsToContext(source);
-        _convexSweepWorker.PrepareCompoundSource(source, displacement);
-        return SweepPreparedConvexSourceAll(source, displacement, layerMask, results, excludedCollider, includeTriggers);
+        return SweepRegisteredSourceAll(source, displacement, layerMask, results, excludedCollider, includeTriggers);
     }
 
     private int SweepSphereAllCore(
@@ -560,21 +481,28 @@ public sealed partial class GravitasQuery3DService
             return 0;
         }
 
-        BeginSweepTrace(start3d, end3d, radius, layerMask, excludedCollider, includeTriggers, staticTargetsOnly);
-        AddAllSweepHits(start3d, end3d, segment.Normalized, radius, results);
-        Physics3DHitSorter.SortByDistance(results);
-        _context.Diagnostics.EmitRayQuery(
-            start3d,
-            end3d,
-            radius,
-            layerMask.Bits,
-            results.Count > 0,
-            results.Count,
-            results.Count > 0 ? results[0] : default);
-        return results.Count;
+        try
+        {
+            BeginSweepTrace(start3d, end3d, radius, layerMask, excludedCollider, includeTriggers, staticTargetsOnly);
+            AddAllSweepHits(start3d, end3d, segment.Normalized, radius, results);
+            Physics3DHitSorter.SortByDistance(results);
+            _context.Diagnostics.EmitRayQuery(
+                start3d,
+                end3d,
+                radius,
+                layerMask.Bits,
+                results.Count > 0,
+                results.Count,
+                results.Count > 0 ? results[0] : default);
+            return results.Count;
+        }
+        finally
+        {
+            EndQuery();
+        }
     }
 
-    private bool SweepPreparedConvexSource(
+    private bool SweepRegisteredSource(
         LSCollider source,
         Vector3d displacement,
         PhysicsLayerMask layerMask,
@@ -582,28 +510,37 @@ public sealed partial class GravitasQuery3DService
         LSCollider? excludedCollider,
         bool includeTriggers)
     {
-        sweepHit = default;
-        if (!Vector3d.TryGetMagnitude(displacement, out Fixed64 displacementLength)
-            || displacementLength <= Fixed64.Epsilon)
+        EnsureSourceBelongsToContext(source);
+        try
         {
-            ResetLastQueryCounters();
-            return false;
-        }
+            PrepareConvexSweepSource(source, displacement);
+            sweepHit = default;
+            if (!Vector3d.TryGetMagnitude(displacement, out Fixed64 displacementLength)
+                || displacementLength <= Fixed64.Epsilon)
+            {
+                ResetLastQueryCounters();
+                return false;
+            }
 
-        BeginConvexSweepTrace(source, layerMask, excludedCollider, includeTriggers);
-        bool hit = TryFindClosestConvexSweepHit(source, displacement, out sweepHit);
-        _context.Diagnostics.EmitRayQuery(
-            source.Center,
-            source.Center + displacement,
-            source.ScaledRadius,
-            layerMask.Bits,
-            hit,
-            hit ? 1 : 0,
-            sweepHit);
-        return hit;
+            BeginConvexSweepTrace(source, layerMask, excludedCollider, includeTriggers);
+            bool hit = TryFindClosestConvexSweepHit(source, displacement, out sweepHit);
+            _context.Diagnostics.EmitRayQuery(
+                source.Center,
+                source.Center + displacement,
+                source.ScaledRadius,
+                layerMask.Bits,
+                hit,
+                hit ? 1 : 0,
+                sweepHit);
+            return hit;
+        }
+        finally
+        {
+            EndQuery();
+        }
     }
 
-    private int SweepPreparedConvexSourceAll(
+    private int SweepRegisteredSourceAll(
         LSCollider source,
         Vector3d displacement,
         PhysicsLayerMask layerMask,
@@ -612,26 +549,43 @@ public sealed partial class GravitasQuery3DService
         bool includeTriggers,
         bool staticTargetsOnly = false)
     {
-        results.FastClear();
-        if (!Vector3d.TryGetMagnitude(displacement, out Fixed64 displacementLength)
-            || displacementLength <= Fixed64.Epsilon)
+        EnsureSourceBelongsToContext(source);
+        try
         {
-            ResetLastQueryCounters();
-            return 0;
-        }
+            PrepareConvexSweepSource(source, displacement);
+            results.FastClear();
+            if (!Vector3d.TryGetMagnitude(displacement, out Fixed64 displacementLength)
+                || displacementLength <= Fixed64.Epsilon)
+            {
+                ResetLastQueryCounters();
+                return 0;
+            }
 
-        BeginConvexSweepTrace(source, layerMask, excludedCollider, includeTriggers, staticTargetsOnly);
-        AddAllConvexSweepHits(source, displacement, results);
-        Physics3DHitSorter.SortByDistance(results);
-        _context.Diagnostics.EmitRayQuery(
-            source.Center,
-            source.Center + displacement,
-            source.ScaledRadius,
-            layerMask.Bits,
-            results.Count > 0,
-            results.Count,
-            results.Count > 0 ? results[0] : default);
-        return results.Count;
+            BeginConvexSweepTrace(source, layerMask, excludedCollider, includeTriggers, staticTargetsOnly);
+            AddAllConvexSweepHits(source, displacement, results);
+            Physics3DHitSorter.SortByDistance(results);
+            _context.Diagnostics.EmitRayQuery(
+                source.Center,
+                source.Center + displacement,
+                source.ScaledRadius,
+                layerMask.Bits,
+                results.Count > 0,
+                results.Count,
+                results.Count > 0 ? results[0] : default);
+            return results.Count;
+        }
+        finally
+        {
+            EndQuery();
+        }
+    }
+
+    private void EndQuery()
+    {
+        // Completed queries must not keep retired host object graphs alive.
+        _currentExcludedCollider = null;
+        _currentSweepSourceCollider = null;
+        _convexSweepWorker.ClearSource();
     }
 
     private void BeginConvexSweepTrace(
@@ -713,8 +667,15 @@ public sealed partial class GravitasQuery3DService
         }
 
         Vector3d direction = segment.Normalized;
-        BeginSweepTrace(start, end, radius, layerMask, excludedCollider);
-        return TryFindClosestSweepHit(start, end, radius, direction, out sweepHit);
+        try
+        {
+            BeginSweepTrace(start, end, radius, layerMask, excludedCollider);
+            return TryFindClosestSweepHit(start, end, radius, direction, out sweepHit);
+        }
+        finally
+        {
+            EndQuery();
+        }
     }
 
     private bool TryFindClosestSweepHit(

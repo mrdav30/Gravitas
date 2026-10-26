@@ -168,29 +168,36 @@ public sealed partial class GravitasQuery3DService
             return 0;
         }
 
-        _currentLayerMask = layerMask;
-        _currentExcludedCollider = excludedCollider;
-        _currentIncludeTriggers = includeTriggers;
-        _currentStaticSweepTargetsOnly = true;
-        NextCircleVersion();
-        ResetLastQueryCounters();
-        _redundantColliderCheck.Clear();
-        _redundantVoxelCheck.Clear();
-
-        Vector3d min = new(position.X - radius, position.Y - radius, position.Z - radius);
-        Vector3d max = new(position.X + radius, position.Y + radius, position.Z + radius);
-        GridTracer.GetCoveredVoxelsInto(_context.World, min, max, _coveredVoxels, _traceScratch);
-        for (int i = 0; i < _coveredVoxels.Count; i++)
+        try
         {
-            Voxel voxel = _coveredVoxels[i];
-            if (!GridTraversal.TryGetUniquePartition(voxel, _redundantVoxelCheck, out PhysicsPartition? partition))
-                continue;
+            _currentLayerMask = layerMask;
+            _currentExcludedCollider = excludedCollider;
+            _currentIncludeTriggers = includeTriggers;
+            _currentStaticSweepTargetsOnly = true;
+            NextCircleVersion();
+            ResetLastQueryCounters();
+            _redundantColliderCheck.Clear();
+            _redundantVoxelCheck.Clear();
 
-            ProcessPartitionForAllSphereHits(partition!, position, radius, results);
+            Vector3d min = new(position.X - radius, position.Y - radius, position.Z - radius);
+            Vector3d max = new(position.X + radius, position.Y + radius, position.Z + radius);
+            GridTracer.GetCoveredVoxelsInto(_context.World, min, max, _coveredVoxels, _traceScratch);
+            for (int i = 0; i < _coveredVoxels.Count; i++)
+            {
+                Voxel voxel = _coveredVoxels[i];
+                if (!GridTraversal.TryGetUniquePartition(voxel, _redundantVoxelCheck, out PhysicsPartition? partition))
+                    continue;
+
+                ProcessPartitionForAllSphereHits(partition!, position, radius, results);
+            }
+
+            Physics3DHitSorter.SortByDistance(results);
+            return results.Count;
         }
-
-        Physics3DHitSorter.SortByDistance(results);
-        return results.Count;
+        finally
+        {
+            EndQuery();
+        }
     }
 
     private void ProcessPartitionForAllSphereHits(
