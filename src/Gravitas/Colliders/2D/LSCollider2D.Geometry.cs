@@ -41,7 +41,7 @@ public abstract partial class LSCollider2D
         get
         {
             bool representable = TryGetLocalScale(out Vector2d scale);
-            SwiftThrowHelper.ThrowIfTrue(
+            ChronicleGuard.ThrowIfTrue(
                 !representable,
                 nameof(LocalScale),
                 "The combined 2D collider scale is outside the Fixed64 coordinate domain.");
@@ -351,7 +351,7 @@ public abstract partial class LSCollider2D
     public virtual Vector2d CalculateLocalCenterOfMassOffset()
     {
         ExactMassPoint2D point = CalculateLocalMassPoint();
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             !point.TryGetPoint(out Vector2d center),
             nameof(CalculateLocalCenterOfMassOffset),
             "The 2D collider's body-local center of mass is outside the Fixed64 coordinate domain.");
@@ -388,7 +388,7 @@ public abstract partial class LSCollider2D
 
         if (!massPoint.TryGetPoint(out Vector2d center))
         {
-            SwiftThrowHelper.ThrowIfTrue(
+            ChronicleGuard.ThrowIfTrue(
                 true,
                 nameof(localReferencePoint),
                 "The requested moment of inertia is outside the Fixed64 scalar domain.");

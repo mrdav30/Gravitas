@@ -101,7 +101,7 @@ public sealed partial class SolidBody2D
         get => _groundUpDirection;
         set
         {
-            SwiftThrowHelper.ThrowIfArgument(
+            ChronicleGuard.ThrowIfArgument(
                 value.MagnitudeSquared <= Fixed64.Epsilon,
                 nameof(value),
                 "2D ground up direction must be non-zero.");
@@ -124,7 +124,7 @@ public sealed partial class SolidBody2D
         get => _groundProbeRadius;
         set
         {
-            SwiftThrowHelper.ThrowIfArgument(value < Fixed64.Zero, nameof(value), "2D ground probe radius cannot be negative.");
+            ChronicleGuard.ThrowIfArgument(value < Fixed64.Zero, nameof(value), "2D ground probe radius cannot be negative.");
             ColliderGeometryPolicy.ValidateReach(value, nameof(value));
             if (_groundProbeRadius == value)
                 return;
@@ -266,7 +266,7 @@ public sealed partial class SolidBody2D
     /// </summary>
     public void SetManualGrounding(Vector2d groundPoint, Vector2d groundNormal)
     {
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             groundNormal.MagnitudeSquared <= Fixed64.Epsilon,
             nameof(groundNormal),
             "Manual 2D grounding normal must be non-zero.");
@@ -576,7 +576,7 @@ public sealed partial class SolidBody2D
     }
 
     private static void ValidateGroundMinNormalDot(Fixed64 value) =>
-        SwiftThrowHelper.ThrowIfArgument(value < Fixed64.Zero || value > Fixed64.One,
+        ChronicleGuard.ThrowIfArgument(value < Fixed64.Zero || value > Fixed64.One,
             nameof(value), "2D ground support normal threshold must be between zero and one.");
 
     private bool IsValidGroundNormal(Vector2d normalizedNormal, out Fixed64 upDot)

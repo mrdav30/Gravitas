@@ -71,7 +71,7 @@ public sealed partial class GravitasQuery2DService
     /// </summary>
     public bool OverlapCircle(Vector2d center, Fixed64 radius, PhysicsLayerMask layerMask, out Physics2DHit hit)
     {
-        SwiftThrowHelper.ThrowIfArgument(radius < Fixed64.Zero, nameof(radius), "2D query radius cannot be negative.");
+        ChronicleGuard.ThrowIfArgument(radius < Fixed64.Zero, nameof(radius), "2D query radius cannot be negative.");
         ColliderGeometryPolicy.ValidateReach(radius, nameof(radius));
 
         try
@@ -154,7 +154,7 @@ public sealed partial class GravitasQuery2DService
         PhysicsLayerMask layerMask,
         SwiftList<Physics2DHit> results)
     {
-        SwiftThrowHelper.ThrowIfNull(results, nameof(results));
+        ChronicleGuard.ThrowIfNull(results, nameof(results));
         Vector2d halfExtents = QueryDetection2D.ValidateAabbSize(size);
         Span<Vector2d> vertices = stackalloc Vector2d[4];
         CreateAabbVertices(center, halfExtents, vertices);
@@ -204,7 +204,7 @@ public sealed partial class GravitasQuery2DService
         PhysicsLayerMask layerMask,
         SwiftList<Physics2DHit> results)
     {
-        SwiftThrowHelper.ThrowIfNull(results, nameof(results));
+        ChronicleGuard.ThrowIfNull(results, nameof(results));
         QueryDetection2D.ValidateConvexQueryPolygon(vertices);
         Vector2d center = QueryDetection2D.CalculateAverageCenter(vertices);
         CalculateAreaBounds(vertices, out Vector2d min, out Vector2d max);
@@ -220,8 +220,8 @@ public sealed partial class GravitasQuery2DService
         LSCollider2D? excludedCollider = null,
         bool includeTriggers = true)
     {
-        SwiftThrowHelper.ThrowIfNull(results, nameof(results));
-        SwiftThrowHelper.ThrowIfArgument(radius < Fixed64.Zero, nameof(radius), "2D query radius cannot be negative.");
+        ChronicleGuard.ThrowIfNull(results, nameof(results));
+        ChronicleGuard.ThrowIfArgument(radius < Fixed64.Zero, nameof(radius), "2D query radius cannot be negative.");
         // CCD's internal search enclosure includes padding beyond admitted shape reach.
         if (!staticTargetsOnly)
             ColliderGeometryPolicy.ValidateReach(radius, nameof(radius));

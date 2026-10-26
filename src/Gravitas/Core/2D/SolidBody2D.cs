@@ -57,8 +57,8 @@ public sealed partial class SolidBody2D : IRecordable
     /// <summary>Creates a pure 2D body bound to a host agent and collider.</summary>
     public SolidBody2D(IMatterAgent agent, LSCollider2D collider)
     {
-        SwiftThrowHelper.ThrowIfNull(agent, nameof(agent));
-        SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
+        ChronicleGuard.ThrowIfNull(agent, nameof(agent));
+        ChronicleGuard.ThrowIfNull(collider, nameof(collider));
         Agent = agent;
         Context = agent.Context;
         Collider = collider;
@@ -95,7 +95,7 @@ public sealed partial class SolidBody2D : IRecordable
         get => _freezeAxes;
         set
         {
-            SwiftThrowHelper.ThrowIfArgument(
+            ChronicleGuard.ThrowIfArgument(
                 (value & ~BodyFreezeAxes2D.All) != BodyFreezeAxes2D.None,
                 nameof(value),
                 "Unsupported 2D freeze axis bits.");
@@ -224,11 +224,11 @@ public sealed partial class SolidBody2D : IRecordable
 
     private void ThrowIfRuntimeRegistrationMissing()
     {
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             !Active,
             nameof(SolidBody2D),
             "2D body runtime state cannot change before initialization or after deactivation.");
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             !Context.Physics2D.TryGetColliderById(Collider.Id, out LSCollider2D? registeredCollider)
                 || !ReferenceEquals(registeredCollider, Collider),
             nameof(SolidBody2D),
@@ -468,7 +468,7 @@ public sealed partial class SolidBody2D : IRecordable
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         set
         {
-            SwiftThrowHelper.ThrowIfArgument(
+            ChronicleGuard.ThrowIfArgument(
                 value < Fixed64.Zero,
                 nameof(value),
                 "2D gravity scale cannot be negative.");
@@ -501,7 +501,7 @@ public sealed partial class SolidBody2D : IRecordable
         get => _sleepFrameThreshold;
         set
         {
-            SwiftThrowHelper.ThrowIfNegative(value, nameof(value));
+            ChronicleGuard.ThrowIfNegative(value, nameof(value));
             _sleepFrameThreshold = value;
         }
     }
@@ -514,7 +514,7 @@ public sealed partial class SolidBody2D : IRecordable
         get => _sleepLinearSpeedThreshold;
         set
         {
-            SwiftThrowHelper.ThrowIfArgument(
+            ChronicleGuard.ThrowIfArgument(
                 value < Fixed64.Zero,
                 nameof(value),
                 "2D sleep linear speed threshold cannot be negative.");
@@ -532,7 +532,7 @@ public sealed partial class SolidBody2D : IRecordable
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         set
         {
-            SwiftThrowHelper.ThrowIfArgument(
+            ChronicleGuard.ThrowIfArgument(
                 value < Fixed64.Zero,
                 nameof(value),
                 "2D angular sleep threshold cannot be negative.");
@@ -552,8 +552,8 @@ public sealed partial class SolidBody2D : IRecordable
         BodyMotionType motionType = BodyMotionType.Dynamic)
     {
         motionType.ThrowIfInvalid(nameof(motionType));
-        SwiftThrowHelper.ThrowIfTrue(Active, nameof(SolidBody2D), "2D body is already initialized.");
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfTrue(Active, nameof(SolidBody2D), "2D body is already initialized.");
+        ChronicleGuard.ThrowIfArgument(
             Collider.Id >= 0
                 || (Collider.HasHostBinding && !ReferenceEquals(Collider.Body, this)),
             nameof(Collider),
@@ -589,7 +589,7 @@ public sealed partial class SolidBody2D : IRecordable
     public Vector2d GetWorldPoint(Vector2d point)
     {
         bool transformed = TryGetWorldPoint(point, out Vector2d result);
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             !transformed,
             nameof(Collider),
             "Cannot get the world point because the 2D collider has no committed scale or the final coordinate is not representable.");
@@ -621,7 +621,7 @@ public sealed partial class SolidBody2D : IRecordable
     public Vector2d GetLocalPoint(Vector2d point)
     {
         bool transformed = TryGetLocalPoint(point, out Vector2d result);
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             !transformed,
             nameof(Collider),
             "Cannot get the local point because the 2D collider has no committed scale, its scale is singular, or the final coordinate is not representable.");
@@ -656,7 +656,7 @@ public sealed partial class SolidBody2D : IRecordable
     {
         PreflightStaticPoseChange();
         Fixed64 canonicalRotation = CanonicalizeRotation(rotation);
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             !Collider.TryPrepareBodyPose(position, canonicalRotation),
             nameof(position),
             "The requested 2D body pose produces collider geometry outside the representable coordinate domain.");
@@ -874,7 +874,7 @@ public sealed partial class SolidBody2D : IRecordable
         Vector3d currentWorldPosition = transform.WorldPosition;
         Vector3d worldPosition = new(position.X, currentWorldPosition.Y, position.Y);
         FixedQuaternion worldRotation = FixedQuaternion.FromAxisAngle(Vector3d.Up, -rotation);
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             !transform.TrySetWorldPose(worldPosition, worldRotation),
             nameof(FixedTransform),
             "Host transform cannot represent the requested world-space 2D pose.");

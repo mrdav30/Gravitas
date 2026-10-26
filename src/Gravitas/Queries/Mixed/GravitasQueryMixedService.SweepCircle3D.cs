@@ -114,8 +114,8 @@ public sealed partial class GravitasQueryMixedService
         bool cacheTargetPartitions,
         out PhysicsMixedHit hit)
     {
-        SwiftThrowHelper.ThrowIfArgument(radius <= Fixed64.Zero, nameof(radius), "Mixed swept circle radius must be greater than zero.");
-        SwiftThrowHelper.ThrowIfArgument(halfThickness <= Fixed64.Zero, nameof(halfThickness), "Mixed swept circle half-thickness must be greater than zero.");
+        ChronicleGuard.ThrowIfArgument(radius <= Fixed64.Zero, nameof(radius), "Mixed swept circle radius must be greater than zero.");
+        ChronicleGuard.ThrowIfArgument(halfThickness <= Fixed64.Zero, nameof(halfThickness), "Mixed swept circle half-thickness must be greater than zero.");
         ColliderGeometryPolicy.ValidateReach(new Vector2d(radius, halfThickness), nameof(radius));
 
         if (!Vector2d.TrySubtract(end, start, out Vector2d segment)
@@ -212,9 +212,9 @@ public sealed partial class GravitasQueryMixedService
         bool cacheTargetPartitions = false,
         bool requireClosingContact = false)
     {
-        SwiftThrowHelper.ThrowIfNull(results, nameof(results));
-        SwiftThrowHelper.ThrowIfArgument(radius <= Fixed64.Zero, nameof(radius), "Mixed swept circle radius must be greater than zero.");
-        SwiftThrowHelper.ThrowIfArgument(halfThickness <= Fixed64.Zero, nameof(halfThickness), "Mixed swept circle half-thickness must be greater than zero.");
+        ChronicleGuard.ThrowIfNull(results, nameof(results));
+        ChronicleGuard.ThrowIfArgument(radius <= Fixed64.Zero, nameof(radius), "Mixed swept circle radius must be greater than zero.");
+        ChronicleGuard.ThrowIfArgument(halfThickness <= Fixed64.Zero, nameof(halfThickness), "Mixed swept circle half-thickness must be greater than zero.");
         if (!staticTargetsOnly)
             ColliderGeometryPolicy.ValidateReach(new Vector2d(radius, halfThickness), nameof(radius));
 

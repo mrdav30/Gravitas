@@ -77,7 +77,7 @@ public sealed partial class GravitasQueryMixedService
         SwiftList<PhysicsMixedHit> hits,
         Span<PhysicsQueryHitRange> ranges)
     {
-        SwiftThrowHelper.ThrowIfNull(hits, nameof(hits));
+        ChronicleGuard.ThrowIfNull(hits, nameof(hits));
         ValidateRangeBatchOutput(requests.Length, ranges);
         ValidateSweepSphereAgainst2DRequests(requests);
         ResetBatchCounters(requests.Length);
@@ -148,7 +148,7 @@ public sealed partial class GravitasQueryMixedService
         SwiftList<PhysicsMixedHit> hits,
         Span<PhysicsQueryHitRange> ranges)
     {
-        SwiftThrowHelper.ThrowIfNull(hits, nameof(hits));
+        ChronicleGuard.ThrowIfNull(hits, nameof(hits));
         ValidateRangeBatchOutput(requests.Length, ranges);
         ValidateSweepCircleAgainst3DRequests(requests);
         ResetBatchCounters(requests.Length);
@@ -227,7 +227,7 @@ public sealed partial class GravitasQueryMixedService
 
     private static void ValidateClosestBatchOutput(int requestCount, Span<PhysicsMixedHit> closestHits)
     {
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             closestHits.Length < requestCount,
             nameof(closestHits),
             "Closest-hit output span must contain at least one slot per request.");
@@ -235,7 +235,7 @@ public sealed partial class GravitasQueryMixedService
 
     private static void ValidateRangeBatchOutput(int requestCount, Span<PhysicsQueryHitRange> ranges)
     {
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             ranges.Length < requestCount,
             nameof(ranges),
             "Range output span must contain at least one slot per request.");
@@ -245,7 +245,7 @@ public sealed partial class GravitasQueryMixedService
     {
         for (int i = 0; i < requests.Length; i++)
         {
-            SwiftThrowHelper.ThrowIfArgument(
+            ChronicleGuard.ThrowIfArgument(
                 requests[i].Radius <= Fixed64.Zero,
                 nameof(requests),
                 "Mixed swept sphere radius must be greater than zero.");
@@ -257,11 +257,11 @@ public sealed partial class GravitasQueryMixedService
     {
         for (int i = 0; i < requests.Length; i++)
         {
-            SwiftThrowHelper.ThrowIfArgument(
+            ChronicleGuard.ThrowIfArgument(
                 requests[i].Radius <= Fixed64.Zero,
                 nameof(requests),
                 "Mixed swept circle radius must be greater than zero.");
-            SwiftThrowHelper.ThrowIfArgument(
+            ChronicleGuard.ThrowIfArgument(
                 requests[i].HalfThickness <= Fixed64.Zero,
                 nameof(requests),
                 "Mixed swept circle half-thickness must be greater than zero.");

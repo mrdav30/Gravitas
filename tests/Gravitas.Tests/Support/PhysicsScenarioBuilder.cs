@@ -3,7 +3,7 @@ using FluentAssertions;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using GridForge.Configuration;
-using SwiftCollections.Diagnostics;
+using Chronicler.Diagnostics;
 using System;
 
 namespace Gravitas.Tests.Support;
@@ -158,7 +158,7 @@ internal sealed class PhysicsScenarioBuilder : IDisposable
 
     public void InitializeStaticCollider(LSCollider collider, Vector3d position)
     {
-        SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
+        ChronicleGuard.ThrowIfNull(collider, nameof(collider));
         var transform = new FixedTransform(position, FixedQuaternion.Identity, Vector3d.One);
         var agent = new TestMatterAgent(Context, transform);
         collider.InitializeWithNoBody(agent);

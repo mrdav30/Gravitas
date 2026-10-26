@@ -25,7 +25,7 @@ public sealed partial class GravitasDiagnosticSink
         if (!Enabled)
             return;
 
-        SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
+        ChronicleGuard.ThrowIfNull(collider, nameof(collider));
         switch (collider)
         {
             case LSSphereCollider sphere:
@@ -97,7 +97,7 @@ public sealed partial class GravitasDiagnosticSink
         if (!Enabled)
             return;
 
-        SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
+        ChronicleGuard.ThrowIfNull(collider, nameof(collider));
         Vector3d center = new(collider.Center.X, collider.MixedSlabCenterY, collider.Center.Y);
         Fixed64 height = collider.MixedHalfThickness * 2;
         switch (collider)
@@ -146,7 +146,7 @@ public sealed partial class GravitasDiagnosticSink
         if (!Enabled)
             return;
 
-        SwiftThrowHelper.ThrowIfNull(joint, nameof(joint));
+        ChronicleGuard.ThrowIfNull(joint, nameof(joint));
         SolidBody bodyA = joint.BodyA;
         SolidBody bodyB = joint.BodyB;
         FixedQuaternion rotationA = (bodyA.Rotation * joint.LocalFrameA.Rotation).Normalized;
@@ -204,7 +204,7 @@ public sealed partial class GravitasDiagnosticSink
         if (!Enabled)
             return;
 
-        SwiftThrowHelper.ThrowIfNull(joint, nameof(joint));
+        ChronicleGuard.ThrowIfNull(joint, nameof(joint));
         SolidBody2D bodyA = joint.BodyA;
         SolidBody2D bodyB = joint.BodyB;
         Fixed64 y = bodyA.Agent.Transform.WorldPosition.Y;

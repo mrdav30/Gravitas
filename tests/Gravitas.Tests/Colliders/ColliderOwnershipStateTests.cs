@@ -7,7 +7,7 @@ using Gravitas.Support;
 using Gravitas.Tests.Support;
 using GridForge.Grids;
 using GridForge.Spatial;
-using SwiftCollections.Diagnostics;
+using Chronicler.Diagnostics;
 using System;
 using System.Collections.Generic;
 using Xunit;

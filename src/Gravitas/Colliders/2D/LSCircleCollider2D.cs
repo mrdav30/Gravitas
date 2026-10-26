@@ -45,7 +45,7 @@ public sealed class LSCircleCollider2D : LSCollider2D
         get => _radius;
         set
         {
-            SwiftThrowHelper.ThrowIfArgument(value <= Fixed64.Zero, nameof(value), "2D circle radius must be greater than zero.");
+            ChronicleGuard.ThrowIfArgument(value <= Fixed64.Zero, nameof(value), "2D circle radius must be greater than zero.");
             if (_radius == value)
                 return;
 
@@ -194,7 +194,7 @@ public sealed class LSCircleCollider2D : LSCollider2D
         RecordValues.Look(chronicler, ref radius, "Radius", Fixed64.Half);
         if (chronicler.Mode == SerializationMode.Loading)
         {
-            SwiftThrowHelper.ThrowIfArgument(radius <= Fixed64.Zero, nameof(radius), "2D circle radius must be greater than zero.");
+            ChronicleGuard.ThrowIfArgument(radius <= Fixed64.Zero, nameof(radius), "2D circle radius must be greater than zero.");
             _radius = radius;
         }
     }

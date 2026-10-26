@@ -3,7 +3,7 @@ using Chronicler.Hashing;
 using FixedMathSharp;
 using Gravitas.Colliders;
 using GridForge.Configuration;
-using SwiftCollections.Diagnostics;
+using Chronicler.Diagnostics;
 
 namespace Gravitas.Benchmarks;
 
@@ -96,56 +96,56 @@ public class ReplayHashBenchmarks
     [Benchmark(Description = "replay-hash-3d-sparse")]
     public ChronicleHash ReplayHash3DSparse()
     {
-        SwiftThrowHelper.ThrowIfTrue(_sparse3DBodyCount != ColliderCount);
+        ChronicleGuard.ThrowIfTrue(_sparse3DBodyCount != ColliderCount);
         return _sparse3DContext.ComputeReplayHash();
     }
 
     [Benchmark(Description = "replay-hash-3d-churned-ids")]
     public ChronicleHash ReplayHash3DChurnedIds()
     {
-        SwiftThrowHelper.ThrowIfTrue(_churned3DLiveColliderCount != ColliderCount);
+        ChronicleGuard.ThrowIfTrue(_churned3DLiveColliderCount != ColliderCount);
         return _churned3DContext.ComputeReplayHash();
     }
 
     [Benchmark(Description = "replay-hash-3d-dense")]
     public ChronicleHash ReplayHash3DDense()
     {
-        SwiftThrowHelper.ThrowIfTrue(_dense3DBodyCount != ColliderCount);
+        ChronicleGuard.ThrowIfTrue(_dense3DBodyCount != ColliderCount);
         return _dense3DContext.ComputeReplayHash();
     }
 
     [Benchmark(Description = "replay-hash-2d-sparse")]
     public ChronicleHash ReplayHash2DSparse()
     {
-        SwiftThrowHelper.ThrowIfTrue(_sparse2DBodyCount != ColliderCount);
+        ChronicleGuard.ThrowIfTrue(_sparse2DBodyCount != ColliderCount);
         return _sparse2DContext.ComputeReplayHash();
     }
 
     [Benchmark(Description = "replay-hash-2d-churned-ids")]
     public ChronicleHash ReplayHash2DChurnedIds()
     {
-        SwiftThrowHelper.ThrowIfTrue(_churned2DLiveColliderCount != ColliderCount);
+        ChronicleGuard.ThrowIfTrue(_churned2DLiveColliderCount != ColliderCount);
         return _churned2DContext.ComputeReplayHash();
     }
 
     [Benchmark(Description = "replay-hash-mixed")]
     public ChronicleHash ReplayHashMixed()
     {
-        SwiftThrowHelper.ThrowIfTrue(_mixedColliderCount != ColliderCount);
+        ChronicleGuard.ThrowIfTrue(_mixedColliderCount != ColliderCount);
         return _mixedContext.ComputeReplayHash();
     }
 
     [Benchmark(Description = "replay-hash-mixed-churned-ids")]
     public ChronicleHash ReplayHashMixedChurnedIds()
     {
-        SwiftThrowHelper.ThrowIfTrue(_churnedMixedColliderCount != ColliderCount);
+        ChronicleGuard.ThrowIfTrue(_churnedMixedColliderCount != ColliderCount);
         return _churnedMixedContext.ComputeReplayHash();
     }
 
     [Benchmark(Description = "replay-hash-with-solver-caches")]
     public ChronicleHash ReplayHashWithSolverCaches()
     {
-        SwiftThrowHelper.ThrowIfTrue(_solverCacheContactSeedCount != ColliderCount);
+        ChronicleGuard.ThrowIfTrue(_solverCacheContactSeedCount != ColliderCount);
         return _solverCacheContext.ComputeReplayHash(GravitasReplayHashMode.AuthoritativeWithSolverCaches);
     }
 
@@ -163,7 +163,7 @@ public class ReplayHashBenchmarks
         context.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
         context.Environment.Gravity = Fixed64.Zero;
 
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             !context.World.TryAddGrid(
                 new GridConfiguration(
                     new Vector3d(-4, -4, -4),

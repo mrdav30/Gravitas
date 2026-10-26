@@ -19,7 +19,7 @@ public partial class PhysicsMesh
     /// <summary>Gets an embedded planar patch owner, or the individual declined triangle.</summary>
     internal int GetManifoldSurfaceOwner(int triangleIndex)
     {
-        SwiftThrowHelper.ThrowIfArrayIndexInvalid(triangleIndex, _triangleCount, nameof(triangleIndex));
+        ChronicleGuard.ThrowIfArrayIndexInvalid(triangleIndex, _triangleCount, nameof(triangleIndex));
         int patch = _manifoldPatchIds[triangleIndex];
         return patch < 0 ? triangleIndex : patch;
     }
@@ -27,7 +27,7 @@ public partial class PhysicsMesh
     /// <summary>Gets the true perimeter of a certified manifold owner; empty means use the triangle's three edges.</summary>
     internal ReadOnlySpan<int> GetManifoldSurfaceBoundaryVertexPairs(int triangleIndex)
     {
-        SwiftThrowHelper.ThrowIfArrayIndexInvalid(triangleIndex, _triangleCount, nameof(triangleIndex));
+        ChronicleGuard.ThrowIfArrayIndexInvalid(triangleIndex, _triangleCount, nameof(triangleIndex));
         int patch = _manifoldPatchIds[triangleIndex];
         return patch < 0 ? ReadOnlySpan<int>.Empty
             : _coplanarPatchBoundaryVertexPairs.AsSpan(_coplanarPatchBoundaryOffsets[patch],

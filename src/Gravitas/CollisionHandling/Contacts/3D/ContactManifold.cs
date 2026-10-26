@@ -1,4 +1,4 @@
-﻿//=======================================================================
+//=======================================================================
 // ContactManifold.cs
 //=======================================================================
 // MIT License, Copyright (c) 2026–present David Oravsky (mrdav30)
@@ -39,7 +39,7 @@ public sealed class ContactManifold : IEnumerable<ManifoldContact>
     /// <summary>Gets the first flattened point index of a group in canonical structural order.</summary>
     public int GetGroupStartIndex(int groupIndex)
     {
-        SwiftThrowHelper.ThrowIfListIndexInvalid(groupIndex, GroupCount);
+        ChronicleGuard.ThrowIfListIndexInvalid(groupIndex, GroupCount);
         int start = 0;
         for (int i = 0; i < groupIndex; i++)
             start += GetGroup(i).Count;
@@ -49,7 +49,7 @@ public sealed class ContactManifold : IEnumerable<ManifoldContact>
     /// <summary>Gets the number of retained samples in a group, from one through <see cref="MaxContactsPerGroup"/>.</summary>
     public int GetGroupContactCount(int groupIndex)
     {
-        SwiftThrowHelper.ThrowIfListIndexInvalid(groupIndex, GroupCount);
+        ChronicleGuard.ThrowIfListIndexInvalid(groupIndex, GroupCount);
         return GetGroup(groupIndex).Count;
     }
 
@@ -75,7 +75,7 @@ public sealed class ContactManifold : IEnumerable<ManifoldContact>
 
     internal void ReserveGroups(int capacity)
     {
-        SwiftThrowHelper.ThrowIfNegative(capacity, nameof(capacity));
+        ChronicleGuard.ThrowIfNegative(capacity, nameof(capacity));
         if (capacity <= 1) return;
         _additionalGroups ??= new SwiftCollections.SwiftList<ContactGroup>(capacity - 1);
         _additionalGroups.EnsureCapacity(capacity - 1);
@@ -115,7 +115,7 @@ public sealed class ContactManifold : IEnumerable<ManifoldContact>
     {
         get
         {
-            SwiftThrowHelper.ThrowIfListIndexInvalid(0, _count);
+            ChronicleGuard.ThrowIfListIndexInvalid(0, _count);
 
             ManifoldContact best = _firstGroup[0];
             foreach (ManifoldContact candidate in this)
@@ -137,7 +137,7 @@ public sealed class ContactManifold : IEnumerable<ManifoldContact>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get
         {
-            SwiftThrowHelper.ThrowIfListIndexInvalid(index, _count);
+            ChronicleGuard.ThrowIfListIndexInvalid(index, _count);
             for (int group = 0; ; group++)
             {
                 ref ContactGroup current = ref GetGroup(group);
@@ -444,7 +444,7 @@ public sealed class ContactManifold : IEnumerable<ManifoldContact>
         {
             get
             {
-                SwiftThrowHelper.ThrowIfListIndexInvalid(_index, _manifold.Count);
+                ChronicleGuard.ThrowIfListIndexInvalid(_index, _manifold.Count);
                 return _manifold.GetGroup(_group)[_point];
             }
         }

@@ -28,7 +28,7 @@ public sealed partial class GravitasDiagnosticSink
 
     internal GravitasDiagnosticSink(GravitasWorldContext context)
     {
-        SwiftThrowHelper.ThrowIfNull(context, nameof(context));
+        ChronicleGuard.ThrowIfNull(context, nameof(context));
         _context = context;
     }
 

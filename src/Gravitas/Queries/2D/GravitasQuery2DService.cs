@@ -27,7 +27,7 @@ public sealed partial class GravitasQuery2DService
     /// <param name="context">The owning world context.</param>
     public GravitasQuery2DService(GravitasWorldContext context)
     {
-        SwiftThrowHelper.ThrowIfNull(context, nameof(context));
+        ChronicleGuard.ThrowIfNull(context, nameof(context));
         _context = context;
     }
 

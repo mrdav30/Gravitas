@@ -192,7 +192,7 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
     {
         get
         {
-            SwiftThrowHelper.ThrowIfTrue(
+            ChronicleGuard.ThrowIfTrue(
                 _agent == null,
                 nameof(LSCollider2D),
                 "2D collider is not bound to an IMatterAgent.");
@@ -207,7 +207,7 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
     {
         get
         {
-            SwiftThrowHelper.ThrowIfTrue(
+            ChronicleGuard.ThrowIfTrue(
                 _context == null,
                 nameof(LSCollider2D),
                 "2D collider is not bound to a GravitasWorldContext.");
@@ -409,7 +409,7 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
         {
             if (value.HasValue)
             {
-                SwiftThrowHelper.ThrowIfArgument(
+                ChronicleGuard.ThrowIfArgument(
                     value.Value <= Fixed64.Zero,
                     nameof(value),
                     "2D mixed half-thickness override must be greater than zero.");
@@ -446,8 +446,8 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
     public void InitializeWithNoBody(IMatterAgent agent)
     {
         ThrowIfCompoundPartLifecycle(nameof(InitializeWithNoBody));
-        SwiftThrowHelper.ThrowIfNull(agent, nameof(agent));
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfNull(agent, nameof(agent));
+        ChronicleGuard.ThrowIfArgument(
             Id >= 0 || (HasHostBinding && !ReferenceEquals(_agent, agent)),
             nameof(agent),
             "2D collider is already registered or bound to another host agent.");
@@ -462,7 +462,7 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
         Fixed64 requestedRotation)
     {
         ThrowIfCompoundPartLifecycle(nameof(Initialize));
-        SwiftThrowHelper.ThrowIfNull(body, nameof(body));
+        ChronicleGuard.ThrowIfNull(body, nameof(body));
         ThrowIfTriggerWouldAttachToBody(nameof(Initialize));
         PreflightInitialization(
             body.Agent,
@@ -477,7 +477,7 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
         Vector2d requestedPosition = default,
         Fixed64 requestedRotation = default)
     {
-        SwiftThrowHelper.ThrowIfNull(agent, nameof(agent));
+        ChronicleGuard.ThrowIfNull(agent, nameof(agent));
         OnBeforeInitialize(agent);
         PrepareStandaloneInitialization(
             agent,
@@ -504,9 +504,9 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
 
     internal void SetPhysicsState(int id, int serviceIndex, int replayOrder)
     {
-        SwiftThrowHelper.ThrowIfNegative(id, nameof(id));
-        SwiftThrowHelper.ThrowIfNegative(serviceIndex, nameof(serviceIndex));
-        SwiftThrowHelper.ThrowIfNegative(replayOrder, nameof(replayOrder));
+        ChronicleGuard.ThrowIfNegative(id, nameof(id));
+        ChronicleGuard.ThrowIfNegative(serviceIndex, nameof(serviceIndex));
+        ChronicleGuard.ThrowIfNegative(replayOrder, nameof(replayOrder));
         _id = id;
         _serviceIndex = serviceIndex;
         _replayOrder = replayOrder;
@@ -515,19 +515,19 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
 
     internal void SetServiceIndex(int serviceIndex)
     {
-        SwiftThrowHelper.ThrowIfNegative(serviceIndex, nameof(serviceIndex));
+        ChronicleGuard.ThrowIfNegative(serviceIndex, nameof(serviceIndex));
         _serviceIndex = serviceIndex;
     }
 
     internal void SetReplayOrdinal(int replayOrdinal)
     {
-        SwiftThrowHelper.ThrowIfNegative(replayOrdinal, nameof(replayOrdinal));
+        ChronicleGuard.ThrowIfNegative(replayOrdinal, nameof(replayOrdinal));
         _replayOrdinal = replayOrdinal;
     }
 
     internal void SetServiceRefreshIndex(int serviceRefreshIndex)
     {
-        SwiftThrowHelper.ThrowIfNegative(serviceRefreshIndex, nameof(serviceRefreshIndex));
+        ChronicleGuard.ThrowIfNegative(serviceRefreshIndex, nameof(serviceRefreshIndex));
         _serviceRefreshIndex = serviceRefreshIndex;
     }
 
@@ -756,8 +756,8 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal void BindContext(GravitasWorldContext context)
     {
-        SwiftThrowHelper.ThrowIfNull(context, nameof(context));
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfNull(context, nameof(context));
+        ChronicleGuard.ThrowIfArgument(
             _context != null && !ReferenceEquals(_context, context),
             nameof(context),
             "2D collider is already bound to a different GravitasWorldContext.");
@@ -769,12 +769,12 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
         Fixed64 localRotation,
         Vector2d localScale)
     {
-        SwiftThrowHelper.ThrowIfNull(owner, nameof(owner));
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfNull(owner, nameof(owner));
+        ChronicleGuard.ThrowIfArgument(
             HasHostBinding,
             nameof(owner),
             "2D compound collider parts cannot be initialized as standalone colliders.");
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             _compoundOwner != null && !ReferenceEquals(_compoundOwner, owner),
             nameof(owner),
             "2D compound collider part is already owned by another compound collider.");
@@ -787,7 +787,7 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void ThrowIfCompoundPartLifecycle(string operation)
     {
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             _compoundOwner != null,
             operation,
             "2D compound collider parts are geometry owned by LSCompoundCollider2D and cannot run standalone lifecycle operations.");
@@ -861,11 +861,11 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
 
     private void ThrowIfCannotEnableTrigger(string operation)
     {
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             _body != null,
             operation,
             "2D trigger colliders must be initialized without a SolidBody2D. Use InitializeWithNoBody for trigger volumes.");
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             _compoundOwner != null,
             operation,
             "2D compound collider parts are not trigger identities. Set IsTrigger on the owning compound collider.");
@@ -873,7 +873,7 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
 
     private void ThrowIfTriggerWouldAttachToBody(string operation)
     {
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             _isTrigger,
             operation,
             "2D trigger colliders must be initialized without a SolidBody2D. Use InitializeWithNoBody for trigger volumes.");
@@ -881,7 +881,7 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
 
     private void ThrowIfLoadedTriggerHasBody(string operation)
     {
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             _isTrigger && _body != null,
             operation,
             "Loaded 2D trigger state is invalid for a collider attached to a SolidBody2D.");
@@ -901,7 +901,7 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
 
         if (chronicler.Mode == SerializationMode.Loading)
         {
-            SwiftThrowHelper.ThrowIfArgument(_mixedHalfThicknessOverride <= Fixed64.Zero,
+            ChronicleGuard.ThrowIfArgument(_mixedHalfThicknessOverride <= Fixed64.Zero,
                 nameof(MixedHalfThicknessOverride), "2D mixed half-thickness override must be greater than zero.");
             ThrowIfLoadedTriggerHasBody(nameof(IsTrigger));
             ApplyLoadedState();

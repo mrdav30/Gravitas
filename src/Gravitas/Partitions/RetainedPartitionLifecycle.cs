@@ -60,7 +60,7 @@ internal static class RetainedPartitionLifecycle
                 && ReferenceEquals(attachedPartition, partition))
             {
                 bool removed = voxel.TryRemovePartition<TPartition>();
-                SwiftThrowHelper.ThrowIfTrue(!removed, partitionName, detachError);
+                ChronicleGuard.ThrowIfTrue(!removed, partitionName, detachError);
 
                 if (partition.IsOwnedBy(owner))
                     releasePartition(partition);
@@ -80,7 +80,7 @@ internal static class RetainedPartitionLifecycle
         string partitionName)
         where TPartition : class, IRetainedPhysicsPartition<TOwner>
     {
-        SwiftThrowHelper.ThrowIfNull(partition, nameof(partition));
+        ChronicleGuard.ThrowIfNull(partition, nameof(partition));
         // Tracking runs once per newly occupied voxel. Format validation details
         // only on failure, rather than allocating a message for every payload.
         if (partition.RetainedIndex >= 0)

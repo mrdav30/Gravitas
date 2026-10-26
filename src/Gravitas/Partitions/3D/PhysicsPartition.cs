@@ -84,7 +84,7 @@ public class PhysicsPartition : IVoxelPartition, IRetainedPhysicsPartition<Gravi
     {
         get
         {
-            SwiftThrowHelper.ThrowIfTrue(
+            ChronicleGuard.ThrowIfTrue(
                 _owner == null,
                 nameof(PhysicsPartition),
                 "PhysicsPartition is missing its owner collision service.");
@@ -101,7 +101,7 @@ public class PhysicsPartition : IVoxelPartition, IRetainedPhysicsPartition<Gravi
     /// <summary>Attaches this partition to a voxel.</summary>
     public void OnAddToVoxel(Voxel voxel)
     {
-        SwiftThrowHelper.ThrowIfTrue(_owner == null, nameof(PhysicsPartition), "PhysicsPartition is missing its owner collision service.");
+        ChronicleGuard.ThrowIfTrue(_owner == null, nameof(PhysicsPartition), "PhysicsPartition is missing its owner collision service.");
         WorldIndex = voxel.WorldIndex;
         IsPartitioned = true;
     }
@@ -140,7 +140,7 @@ public class PhysicsPartition : IVoxelPartition, IRetainedPhysicsPartition<Gravi
     /// <summary>Clears and fills caller-owned storage with all collider IDs in ascending order.</summary>
     public void CopyAllColliderIds(SwiftList<int> destination)
     {
-        SwiftThrowHelper.ThrowIfNull(destination, nameof(destination));
+        ChronicleGuard.ThrowIfNull(destination, nameof(destination));
         destination.FastClear();
         CopyIds(ContainedDynamicObjects, destination);
         CopyIds(ContainedKinematicObjects, destination);
@@ -181,7 +181,7 @@ public class PhysicsPartition : IVoxelPartition, IRetainedPhysicsPartition<Gravi
     /// <summary>Adds a dynamic collider ID to this partition.</summary>
     public void AddDynamicObject(int item)
     {
-        SwiftThrowHelper.ThrowIfNegative(item, nameof(item));
+        ChronicleGuard.ThrowIfNegative(item, nameof(item));
         ContainedDynamicObjects ??= new();
         if (!ContainedDynamicObjects.Add(item))
             return;
@@ -196,7 +196,7 @@ public class PhysicsPartition : IVoxelPartition, IRetainedPhysicsPartition<Gravi
     /// <summary>Adds a static collider ID to this partition.</summary>
     public void AddStaticObject(int item)
     {
-        SwiftThrowHelper.ThrowIfNegative(item, nameof(item));
+        ChronicleGuard.ThrowIfNegative(item, nameof(item));
         ContainedStaticObjects ??= new();
         if (ContainedStaticObjects.Add(item))
             MarkOccupied();
@@ -205,7 +205,7 @@ public class PhysicsPartition : IVoxelPartition, IRetainedPhysicsPartition<Gravi
     /// <summary>Adds a kinematic collider ID to this partition.</summary>
     public void AddKinematicObject(int item)
     {
-        SwiftThrowHelper.ThrowIfNegative(item, nameof(item));
+        ChronicleGuard.ThrowIfNegative(item, nameof(item));
         ContainedKinematicObjects ??= new();
         if (ContainedKinematicObjects.Add(item))
             MarkOccupied();
@@ -295,8 +295,8 @@ public class PhysicsPartition : IVoxelPartition, IRetainedPhysicsPartition<Gravi
 
     internal void SetOwner(GravitasCollisionService owner)
     {
-        SwiftThrowHelper.ThrowIfNull(owner, nameof(owner));
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfNull(owner, nameof(owner));
+        ChronicleGuard.ThrowIfArgument(
             _owner != null && !ReferenceEquals(_owner, owner),
             nameof(owner),
             "PhysicsPartition is already owned by a different collision service.");
@@ -309,7 +309,7 @@ public class PhysicsPartition : IVoxelPartition, IRetainedPhysicsPartition<Gravi
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal void SetRetainedIndex(int index)
     {
-        SwiftThrowHelper.ThrowIfNegative(index, nameof(index));
+        ChronicleGuard.ThrowIfNegative(index, nameof(index));
         _retainedIndex = index;
     }
 

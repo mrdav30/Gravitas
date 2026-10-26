@@ -40,7 +40,7 @@ internal static class BodyMotionTypeSupport
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static void ThrowIfInvalid(this BodyMotionType motionType, string parameterName)
     {
-        SwiftThrowHelper.ThrowIfArgumentOutOfRange(
+        ChronicleGuard.ThrowIfArgumentOutOfRange(
             !motionType.IsValid(),
             (int)motionType,
             parameterName,

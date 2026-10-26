@@ -1,4 +1,4 @@
-﻿//=======================================================================
+//=======================================================================
 // WaitForRealSeconds.cs
 //=======================================================================
 // MIT License, Copyright (c) 2026–present David Oravsky (mrdav30)
@@ -30,8 +30,8 @@ public readonly struct WaitForRealSeconds : ILockedYieldInstruction
     /// </summary>
     public WaitForRealSeconds(GravitasWorldContext context, Fixed64 seconds)
     {
-        SwiftThrowHelper.ThrowIfNull(context, nameof(context));
-        SwiftThrowHelper.ThrowIfArgument(seconds < Fixed64.Zero, nameof(seconds), "Wait duration cannot be negative.");
+        ChronicleGuard.ThrowIfNull(context, nameof(context));
+        ChronicleGuard.ThrowIfArgument(seconds < Fixed64.Zero, nameof(seconds), "Wait duration cannot be negative.");
 
         _context = context;
         _lifetime = context.CaptureClockLifetime();

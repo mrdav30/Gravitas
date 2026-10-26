@@ -1,4 +1,4 @@
-﻿//=======================================================================
+//=======================================================================
 // PhysicsMesh.cs
 //=======================================================================
 // MIT License, Copyright (c) 2026–present David Oravsky (mrdav30)
@@ -147,7 +147,7 @@ namespace Gravitas.Colliders
         internal PhysicsMesh(Vector3d[] vertices, int[] triangles, MeshColliderMode mode, bool colliderOwned)
         {
             _colliderOwned = colliderOwned;
-            SwiftThrowHelper.ThrowIfArgument(
+            ChronicleGuard.ThrowIfArgument(
                 mode != MeshColliderMode.Convex && mode != MeshColliderMode.Concave,
                 nameof(mode),
                 "Unsupported mesh collider mode.");
@@ -197,7 +197,7 @@ namespace Gravitas.Colliders
         /// <exception cref="InvalidOperationException">The mesh is owned by a collider.</exception>
         public void UpdatePosition(Vector3d position, FixedQuaternion rotation)
         {
-            SwiftThrowHelper.ThrowIfTrue(_colliderOwned, nameof(PhysicsMesh),
+            ChronicleGuard.ThrowIfTrue(_colliderOwned, nameof(PhysicsMesh),
                 "Collider-owned mesh transformations must be changed through the collider or its host transform.");
             PrepareTransformation(position, rotation, _ownerScale, _partScale, null);
             PublishPreparedTransformation();
@@ -209,7 +209,7 @@ namespace Gravitas.Colliders
         /// <exception cref="InvalidOperationException">The mesh is owned by a collider.</exception>
         public void UpdateTransform(Vector3d position, FixedQuaternion rotation, Vector3d scale)
         {
-            SwiftThrowHelper.ThrowIfTrue(_colliderOwned, nameof(PhysicsMesh),
+            ChronicleGuard.ThrowIfTrue(_colliderOwned, nameof(PhysicsMesh),
                 "Collider-owned mesh transformations must be changed through the collider or its host transform.");
             PrepareTransformation(position, rotation, scale, Vector3d.One, null);
             PublishPreparedTransformation();
@@ -217,14 +217,14 @@ namespace Gravitas.Colliders
 
         private static void ValidateInput(Vector3d[] vertices, int[] triangles)
         {
-            SwiftThrowHelper.ThrowIfNull(vertices, nameof(vertices));
-            SwiftThrowHelper.ThrowIfNull(triangles, nameof(triangles));
-            SwiftThrowHelper.ThrowIfArgument(vertices.Length < 3, nameof(vertices), "Mesh must contain at least three vertices.");
-            SwiftThrowHelper.ThrowIfArgument(triangles.Length == 0 || triangles.Length % 3 != 0, nameof(triangles), "Triangle index count must be a positive multiple of three.");
-            SwiftThrowHelper.ThrowIfArgumentOutOfRange(vertices.Length > MaxVertexCount, vertices.Length, nameof(vertices), "Mesh exceeds the deterministic vertex limit.");
+            ChronicleGuard.ThrowIfNull(vertices, nameof(vertices));
+            ChronicleGuard.ThrowIfNull(triangles, nameof(triangles));
+            ChronicleGuard.ThrowIfArgument(vertices.Length < 3, nameof(vertices), "Mesh must contain at least three vertices.");
+            ChronicleGuard.ThrowIfArgument(triangles.Length == 0 || triangles.Length % 3 != 0, nameof(triangles), "Triangle index count must be a positive multiple of three.");
+            ChronicleGuard.ThrowIfArgumentOutOfRange(vertices.Length > MaxVertexCount, vertices.Length, nameof(vertices), "Mesh exceeds the deterministic vertex limit.");
 
             int triangleCount = triangles.Length / 3;
-            SwiftThrowHelper.ThrowIfArgumentOutOfRange(triangleCount > MaxTriangleCount, triangleCount, nameof(triangles), "Mesh exceeds the deterministic triangle limit.");
+            ChronicleGuard.ThrowIfArgumentOutOfRange(triangleCount > MaxTriangleCount, triangleCount, nameof(triangles), "Mesh exceeds the deterministic triangle limit.");
 
             var referencedVertices = new bool[vertices.Length];
             for (int i = 0; i < triangleCount; i++)
@@ -233,11 +233,11 @@ namespace Gravitas.Colliders
                 int index1 = triangles[i * 3 + 1];
                 int index2 = triangles[i * 3 + 2];
 
-                SwiftThrowHelper.ThrowIfArgumentOutOfRange((uint)index0 >= (uint)vertices.Length, vertices.Length, nameof(triangles));
-                SwiftThrowHelper.ThrowIfArgumentOutOfRange((uint)index1 >= (uint)vertices.Length, vertices.Length, nameof(triangles));
-                SwiftThrowHelper.ThrowIfArgumentOutOfRange((uint)index2 >= (uint)vertices.Length, vertices.Length, nameof(triangles));
+                ChronicleGuard.ThrowIfArgumentOutOfRange((uint)index0 >= (uint)vertices.Length, vertices.Length, nameof(triangles));
+                ChronicleGuard.ThrowIfArgumentOutOfRange((uint)index1 >= (uint)vertices.Length, vertices.Length, nameof(triangles));
+                ChronicleGuard.ThrowIfArgumentOutOfRange((uint)index2 >= (uint)vertices.Length, vertices.Length, nameof(triangles));
 
-                SwiftThrowHelper.ThrowIfArgument(
+                ChronicleGuard.ThrowIfArgument(
                     index0 == index1 || index1 == index2 || index2 == index0,
                     nameof(triangles),
                     "Triangle indices must be unique within each triangle.");
@@ -246,7 +246,7 @@ namespace Gravitas.Colliders
                     vertices[index0],
                     vertices[index1],
                     vertices[index2]).Area;
-                SwiftThrowHelper.ThrowIfArgument(area <= Fixed64.Epsilon, nameof(triangles), "Degenerate triangles are not supported.");
+                ChronicleGuard.ThrowIfArgument(area <= Fixed64.Epsilon, nameof(triangles), "Degenerate triangles are not supported.");
 
                 referencedVertices[index0] = true;
                 referencedVertices[index1] = true;
@@ -254,7 +254,7 @@ namespace Gravitas.Colliders
             }
 
             for (int i = 0; i < referencedVertices.Length; i++)
-                SwiftThrowHelper.ThrowIfArgument(!referencedVertices[i], nameof(vertices), "Every mesh vertex must be referenced by at least one triangle.");
+                ChronicleGuard.ThrowIfArgument(!referencedVertices[i], nameof(vertices), "Every mesh vertex must be referenced by at least one triangle.");
         }
 
         private void BuildTriangleBVH(
@@ -361,7 +361,7 @@ namespace Gravitas.Colliders
         /// </summary>
         public void GetLocalTriangleVertices(int index, out Vector3d first, out Vector3d second, out Vector3d third)
         {
-            SwiftThrowHelper.ThrowIfArrayIndexInvalid(index, _triangleCount, nameof(index));
+            ChronicleGuard.ThrowIfArrayIndexInvalid(index, _triangleCount, nameof(index));
 
             int triangleIndex = index * 3;
             first = _scaledLocalVertices[_triangles[triangleIndex]];
@@ -374,7 +374,7 @@ namespace Gravitas.Colliders
         /// </summary>
         internal Vector3d GetScaledLocalFaceNormal(int index)
         {
-            SwiftThrowHelper.ThrowIfArrayIndexInvalid(index, _triangleCount, nameof(index));
+            ChronicleGuard.ThrowIfArrayIndexInvalid(index, _triangleCount, nameof(index));
             return _scaledFaceNormals[index];
         }
 
@@ -383,7 +383,7 @@ namespace Gravitas.Colliders
         /// </summary>
         public bool TryGetVertexWorld(int index, out Vector3d vertex)
         {
-            SwiftThrowHelper.ThrowIfArrayIndexInvalid(index, _localVertices.Length, nameof(index));
+            ChronicleGuard.ThrowIfArrayIndexInvalid(index, _localVertices.Length, nameof(index));
             return _sourceFrame.TryGetPoint(_localVertices[index], out vertex);
         }
 
@@ -722,7 +722,7 @@ namespace Gravitas.Colliders
         /// <summary>Gets a triangle face normal in world space.</summary>
         public Vector3d GetFaceNormalWorld(int index)
         {
-            SwiftThrowHelper.ThrowIfArrayIndexInvalid(index, _triangleCount, nameof(index));
+            ChronicleGuard.ThrowIfArrayIndexInvalid(index, _triangleCount, nameof(index));
             if (!_scaleIsExact)
             {
                 GetGeometryTriangleVertices(index, out Vector3d a, out Vector3d b, out Vector3d c);

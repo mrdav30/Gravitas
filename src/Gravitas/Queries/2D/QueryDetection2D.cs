@@ -25,7 +25,7 @@ internal static partial class QueryDetection2D
         LSCollider2D collider,
         out Physics2DHit hit)
     {
-        SwiftThrowHelper.ThrowIfArgument(radius < Fixed64.Zero, nameof(radius), "2D query radius cannot be negative.");
+        ChronicleGuard.ThrowIfArgument(radius < Fixed64.Zero, nameof(radius), "2D query radius cannot be negative.");
 
         if (collider is LSCompoundCollider2D compound)
             return TryOverlapCircleCompound(center, radius, compound, out hit);
@@ -148,7 +148,7 @@ internal static partial class QueryDetection2D
 
     internal static Vector2d ValidateAabbSize(Vector2d size)
     {
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             size.X <= Fixed64.Zero || size.Y <= Fixed64.Zero,
             nameof(size),
             "2D AABB query size components must be greater than zero.");
@@ -159,8 +159,8 @@ internal static partial class QueryDetection2D
 
     internal static void ValidateConvexQueryPolygon(ReadOnlySpan<Vector2d> vertices)
     {
-        SwiftThrowHelper.ThrowIfArgument(vertices.Length < 3, nameof(vertices), "2D polygon query must contain at least three vertices.");
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(vertices.Length < 3, nameof(vertices), "2D polygon query must contain at least three vertices.");
+        ChronicleGuard.ThrowIfArgument(
             !FixedConvex2dRelations.IsStrictlyConvex(vertices),
             nameof(vertices),
             "2D polygon query vertices must form a strictly convex boundary.");
@@ -325,8 +325,8 @@ internal static partial class QueryDetection2D
         LSCollider2D target,
         out Physics2DHit hit)
     {
-        SwiftThrowHelper.ThrowIfNull(mover, nameof(mover));
-        SwiftThrowHelper.ThrowIfNull(target, nameof(target));
+        ChronicleGuard.ThrowIfNull(mover, nameof(mover));
+        ChronicleGuard.ThrowIfNull(target, nameof(target));
 
         if (!Vector2d.TryGetMagnitude(displacement, out Fixed64 displacementLength)
             || displacementLength <= Fixed64.Epsilon)

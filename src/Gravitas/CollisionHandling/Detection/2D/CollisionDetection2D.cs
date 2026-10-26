@@ -21,8 +21,8 @@ internal static partial class CollisionDetection2D
 {
     internal static bool TryCollide(LSCollider2D colliderA, LSCollider2D colliderB, out Contact2D contact)
     {
-        SwiftThrowHelper.ThrowIfNull(colliderA, nameof(colliderA));
-        SwiftThrowHelper.ThrowIfNull(colliderB, nameof(colliderB));
+        ChronicleGuard.ThrowIfNull(colliderA, nameof(colliderA));
+        ChronicleGuard.ThrowIfNull(colliderB, nameof(colliderB));
 
         CollisionType2D collisionType = ColliderSettings2D.GetCollisionType(colliderA.Shape, colliderB.Shape);
         return TryCollide(new CollisionWorkItem2D(colliderA, colliderB, collisionType), out contact);
@@ -30,7 +30,7 @@ internal static partial class CollisionDetection2D
 
     internal static bool TryCollide(CollisionPair2D pair, ContactManifold2D manifold, long frame)
     {
-        SwiftThrowHelper.ThrowIfNull(pair, nameof(pair));
+        ChronicleGuard.ThrowIfNull(pair, nameof(pair));
         pair.ClearRecovery();
         bool overlaps = TryCollide(CollisionWorkItem2D.Create(pair), manifold, frame);
         if (!overlaps || !manifold.NeedsSurfaceRecovery) return overlaps;
@@ -47,7 +47,7 @@ internal static partial class CollisionDetection2D
 
     internal static bool TryCollide(CollisionWorkItem2D item, ContactManifold2D manifold, long frame)
     {
-        SwiftThrowHelper.ThrowIfNull(manifold, nameof(manifold));
+        ChronicleGuard.ThrowIfNull(manifold, nameof(manifold));
         manifold.BeginUpdate(frame);
         return TryCollide(item, manifold);
     }

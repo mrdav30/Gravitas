@@ -9,7 +9,7 @@ using GridForge.Configuration;
 using GridForge.Grids;
 using GridForge.Spatial;
 using SwiftCollections;
-using SwiftCollections.Diagnostics;
+using Chronicler.Diagnostics;
 using System;
 using System.Collections.Generic;
 using Xunit;

@@ -329,7 +329,7 @@ internal readonly partial struct ConvexShape
 
     public bool TryGetClosestPointOnSurface(Vector3d point, out Vector3d closest)
     {
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             _kind == ConvexShapeKind.Triangle,
             nameof(ConvexShape),
             "Triangle shapes are stationary mesh targets and cannot be sweep sources.");

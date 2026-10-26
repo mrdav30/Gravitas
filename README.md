@@ -93,6 +93,11 @@ creates the grid, host adapter, collider, and dynamic body behind that loop.
 | Queries       | Closest-hit, all-hit, overlap, raycast, swept-shape, cone-volume, mixed, and batch APIs                               |
 | Determinism   | Stable runtime ownership, replay hashes, explicit serialization boundaries, and caller-owned hot-path buffers         |
 
+Shared logging and exception guards come from the independent
+`Chronicler.Diagnostics` package. See the
+[migration guide](https://github.com/mrdav30/Gravitas/blob/main/docs/MIGRATION.md)
+for the updated imports and guard names.
+
 ## Documentation
 
 - [Getting Started](https://github.com/mrdav30/Gravitas/wiki/GETTING_STARTED) —

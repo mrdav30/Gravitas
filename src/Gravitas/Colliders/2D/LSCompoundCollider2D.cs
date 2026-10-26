@@ -38,8 +38,8 @@ public sealed class LSCompoundCollider2D : LSCollider2D
     /// <summary>Creates a runtime compound collider from authored pure 2D parts.</summary>
     public LSCompoundCollider2D(params CompoundColliderPart2D[] parts)
     {
-        SwiftThrowHelper.ThrowIfNull(parts, nameof(parts));
-        SwiftThrowHelper.ThrowIfArgument(parts.Length == 0, nameof(parts), "2D compound collider must contain at least one part.");
+        ChronicleGuard.ThrowIfNull(parts, nameof(parts));
+        ChronicleGuard.ThrowIfArgument(parts.Length == 0, nameof(parts), "2D compound collider must contain at least one part.");
 
         for (int i = 0; i < parts.Length; i++)
             ValidatePart(parts[i]);
@@ -91,14 +91,14 @@ public sealed class LSCompoundCollider2D : LSCollider2D
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public int GetPartId(int index)
     {
-        SwiftThrowHelper.ThrowIfArrayIndexInvalid(index, _parts.Length, nameof(index));
+        ChronicleGuard.ThrowIfArrayIndexInvalid(index, _parts.Length, nameof(index));
         return index;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal LSCollider2D GetPartCollider(int index)
     {
-        SwiftThrowHelper.ThrowIfArrayIndexInvalid(index, _parts.Length, nameof(index));
+        ChronicleGuard.ThrowIfArrayIndexInvalid(index, _parts.Length, nameof(index));
         return _partColliders[index];
     }
 
@@ -401,5 +401,5 @@ public sealed class LSCompoundCollider2D : LSCollider2D
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void ValidatePart(CompoundColliderPart2D part) =>
-        SwiftThrowHelper.ThrowIfArgument(part.IsDefault, nameof(part), "2D compound collider part cannot be default.");
+        ChronicleGuard.ThrowIfArgument(part.IsDefault, nameof(part), "2D compound collider part cannot be default.");
 }

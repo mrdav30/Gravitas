@@ -88,7 +88,7 @@ public sealed partial class GravitasPhysicsService
 
     internal void PoolForDeactivation(CollisionPair pair)
     {
-        SwiftThrowHelper.ThrowIfNull(pair, nameof(pair));
+        ChronicleGuard.ThrowIfNull(pair, nameof(pair));
         lock (_activeCollisionPairs)
             _activeCollisionPairs.Enqueue(new CollisionPairLifetimeToken(pair));
     }

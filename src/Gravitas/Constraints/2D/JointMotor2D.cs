@@ -89,14 +89,14 @@ public readonly struct JointMotor2D
 
     internal void Validate()
     {
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             Kind != JointMotorKind2D.Disabled
                 && Kind != JointMotorKind2D.Angular
                 && Kind != JointMotorKind2D.Linear,
             nameof(Kind),
             "Unsupported 2D joint motor kind.");
-        SwiftThrowHelper.ThrowIfArgument(DriveStrength < Fixed64.Zero, nameof(DriveStrength), "Joint motor drive strength cannot be negative.");
-        SwiftThrowHelper.ThrowIfArgument(Damping < Fixed64.Zero, nameof(Damping), "Joint motor damping cannot be negative.");
-        SwiftThrowHelper.ThrowIfArgument(MaximumMotorImpulse < Fixed64.Zero, nameof(MaximumMotorImpulse), "Joint motor maximum impulse cannot be negative.");
+        ChronicleGuard.ThrowIfArgument(DriveStrength < Fixed64.Zero, nameof(DriveStrength), "Joint motor drive strength cannot be negative.");
+        ChronicleGuard.ThrowIfArgument(Damping < Fixed64.Zero, nameof(Damping), "Joint motor damping cannot be negative.");
+        ChronicleGuard.ThrowIfArgument(MaximumMotorImpulse < Fixed64.Zero, nameof(MaximumMotorImpulse), "Joint motor maximum impulse cannot be negative.");
     }
 }

@@ -14,7 +14,7 @@ public sealed partial class GravitasPhysicsService
 {
     internal void QueueDiscreteResponsePair(CollisionPair pair)
     {
-        SwiftThrowHelper.ThrowIfNull(pair, nameof(pair));
+        ChronicleGuard.ThrowIfNull(pair, nameof(pair));
         _discreteResponsePairs.Add(pair);
     }
 

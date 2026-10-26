@@ -7,7 +7,7 @@
 
 using FixedMathSharp;
 using Gravitas.CollisionHandling;
-using SwiftCollections.Diagnostics;
+using Chronicler.Diagnostics;
 using System;
 using System.Runtime.CompilerServices;
 
@@ -48,7 +48,7 @@ public sealed partial class SolidBody2D
         get
         {
             bool succeeded = TryGetWorldCenterOfMass(out Vector2d center);
-            SwiftThrowHelper.ThrowIfTrue(
+            ChronicleGuard.ThrowIfTrue(
                 !succeeded,
                 nameof(WorldCenterOfMass),
                 "The world center of mass is outside the representable coordinate domain.");

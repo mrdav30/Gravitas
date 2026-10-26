@@ -114,7 +114,7 @@ public abstract partial class LSCollider
     {
         bool representable =
             TryGetCurrentScaledOffset(out Vector3d scaledOffset);
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             !representable,
             nameof(ScaledOffset),
             "The scaled collider offset is outside the Fixed64 coordinate domain.");
@@ -156,7 +156,7 @@ public abstract partial class LSCollider
             ownerScale = ColliderScalePolicy.CaptureScale(agent.Transform);
             poseOrigin = requestedPosition;
             rotation = requestedRotation;
-            SwiftThrowHelper.ThrowIfArgument(
+            ChronicleGuard.ThrowIfArgument(
                 !rotation.TryTransformScaledPoint(
                     requestedPosition,
                     _offset,
@@ -173,7 +173,7 @@ public abstract partial class LSCollider
                 out FixedQuaternion matrixRotation);
             poseOrigin = worldMatrix.Translation;
             rotation = matrixRotation;
-            SwiftThrowHelper.ThrowIfArgument(
+            ChronicleGuard.ThrowIfArgument(
                 !Fixed4x4.TryTransformAffinePoint(worldMatrix, _offset, out center),
                 nameof(agent),
                 "Collider center must be representable after applying the host transform.");
@@ -213,7 +213,7 @@ public abstract partial class LSCollider
         Vector3d localScale)
     {
         ColliderScalePolicy.Validate(localScale);
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             !ownerSnapshot.Rotation.TryTransformScaledPoint(
                 ownerSnapshot.Center,
                 _offset,
@@ -356,7 +356,7 @@ public abstract partial class LSCollider
         FixedQuaternion rotation)
     {
         Vector3d ownerScale = ColliderScalePolicy.CaptureScale(_agent!.Transform);
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             !rotation.TryTransformScaledPoint(
                 position,
                 localOffset,
@@ -413,7 +413,7 @@ public abstract partial class LSCollider
         Vector3d localScale,
         GravitasWorldContext context)
     {
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             _context != null && !ReferenceEquals(_context, context),
             nameof(context),
             "Compound collider part is already bound to a different GravitasWorldContext.");

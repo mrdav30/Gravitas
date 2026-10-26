@@ -1,4 +1,4 @@
-﻿//=======================================================================
+//=======================================================================
 // WaitForNextSimulate.cs
 //=======================================================================
 // MIT License, Copyright (c) 2026–present David Oravsky (mrdav30)
@@ -25,7 +25,7 @@ public readonly struct WaitForNextSimulate : ILockedYieldInstruction
     /// </summary>
     public WaitForNextSimulate(GravitasWorldContext context)
     {
-        SwiftThrowHelper.ThrowIfNull(context, nameof(context));
+        ChronicleGuard.ThrowIfNull(context, nameof(context));
 
         _context = context;
         _lifetime = context.CaptureClockLifetime();

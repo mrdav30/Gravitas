@@ -109,7 +109,7 @@ public sealed class Joint3D : IRecordable
         get => _isEnabled;
         set
         {
-            SwiftThrowHelper.ThrowIfTrue(
+            ChronicleGuard.ThrowIfTrue(
                 !IsActive,
                 nameof(Joint3D),
                 "Removed joints cannot mutate simulation state.");
@@ -145,7 +145,7 @@ public sealed class Joint3D : IRecordable
     /// </summary>
     public void SetMotor(JointMotor3D motor)
     {
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             !IsActive,
             nameof(Joint3D),
             "Removed joints cannot mutate simulation state.");
@@ -244,7 +244,7 @@ public sealed class Joint3D : IRecordable
     /// </summary>
     public void RecordData(IChronicler chronicler)
     {
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             !IsActive,
             nameof(Joint3D),
             "Removed joints cannot participate in serialization.");
@@ -283,9 +283,9 @@ public sealed class Joint3D : IRecordable
         if (chronicler.Mode != SerializationMode.Loading)
             return;
 
-        SwiftThrowHelper.ThrowIfArgument(!IsSupportedType(type), nameof(Type), "Unsupported 3D joint type.");
-        SwiftThrowHelper.ThrowIfArgument(!IsSupportedLimitKind(limitKind), nameof(Limits), "Unsupported joint limit kind.");
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(!IsSupportedType(type), nameof(Type), "Unsupported 3D joint type.");
+        ChronicleGuard.ThrowIfArgument(!IsSupportedLimitKind(limitKind), nameof(Limits), "Unsupported joint limit kind.");
+        ChronicleGuard.ThrowIfArgument(
             collisionPolicy != JointCollisionPolicy.SuppressLinked
                 && collisionPolicy != JointCollisionPolicy.Collide,
             nameof(CollisionPolicy),
@@ -327,19 +327,19 @@ public sealed class Joint3D : IRecordable
         JointType3D type,
         in JointLimit3D limits)
     {
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             type == JointType3D.Hinge
                 && limits.Kind != JointLimitKind3D.Unrestricted
                 && limits.Kind != JointLimitKind3D.Hinge,
             nameof(limits),
             "Hinge joints accept only hinge limits.");
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             type == JointType3D.ConeTwist
                 && limits.Kind != JointLimitKind3D.Unrestricted
                 && limits.Kind != JointLimitKind3D.ConeTwist,
             nameof(limits),
             "Cone-twist joints accept only cone-twist limits.");
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             (type == JointType3D.BallSocket || type == JointType3D.Fixed)
                 && limits.Kind != JointLimitKind3D.Unrestricted,
             nameof(limits),

@@ -40,7 +40,7 @@ internal sealed partial class MeshConeFaceRegions
 
     internal ulong GetSampleIdentity(int region, int index)
     {
-        SwiftThrowHelper.ThrowIfListIndexInvalid(index, GetSampleCount(region));
+        ChronicleGuard.ThrowIfListIndexInvalid(index, GetSampleCount(region));
         return _samples[region * ContactManifold.MaxContactsPerGroup + index].Identity;
     }
 

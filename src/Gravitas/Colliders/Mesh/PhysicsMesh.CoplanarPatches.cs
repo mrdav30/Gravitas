@@ -37,7 +37,7 @@ public partial class PhysicsMesh
     // The borrower obtains neighboring corner triplets by cyclic indexing.
     internal ReadOnlySpan<int> GetConvexCoplanarPatchCornerVertexIndices(int triangleIndex)
     {
-        SwiftThrowHelper.ThrowIfArrayIndexInvalid(triangleIndex, _triangleCount, nameof(triangleIndex));
+        ChronicleGuard.ThrowIfArrayIndexInvalid(triangleIndex, _triangleCount, nameof(triangleIndex));
         int patch = _manifoldPatchIds[triangleIndex];
         return patch < 0 ? ReadOnlySpan<int>.Empty
             : _convexCoplanarPatchCornerVertexIndices.AsSpan(_convexCoplanarPatchCornerOffsets[patch],

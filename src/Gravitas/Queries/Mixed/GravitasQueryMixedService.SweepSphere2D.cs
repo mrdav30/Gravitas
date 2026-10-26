@@ -100,7 +100,7 @@ public sealed partial class GravitasQueryMixedService
         bool cacheTargetPartitions,
         out PhysicsMixedHit hit)
     {
-        SwiftThrowHelper.ThrowIfArgument(radius <= Fixed64.Zero, nameof(radius), "Mixed swept sphere radius must be greater than zero.");
+        ChronicleGuard.ThrowIfArgument(radius <= Fixed64.Zero, nameof(radius), "Mixed swept sphere radius must be greater than zero.");
         ColliderGeometryPolicy.ValidateReach(radius, nameof(radius));
 
         if (!Vector3d.TrySubtract(end, start, out Vector3d segment)
@@ -189,8 +189,8 @@ public sealed partial class GravitasQueryMixedService
         bool cacheTargetPartitions = false,
         bool requireClosingContact = false)
     {
-        SwiftThrowHelper.ThrowIfNull(results, nameof(results));
-        SwiftThrowHelper.ThrowIfArgument(radius <= Fixed64.Zero, nameof(radius), "Mixed swept sphere radius must be greater than zero.");
+        ChronicleGuard.ThrowIfNull(results, nameof(results));
+        ChronicleGuard.ThrowIfArgument(radius <= Fixed64.Zero, nameof(radius), "Mixed swept sphere radius must be greater than zero.");
         if (!staticTargetsOnly)
             ColliderGeometryPolicy.ValidateReach(radius, nameof(radius));
 

@@ -82,7 +82,7 @@ public sealed partial class SolidBody2D
     public void SetPosition(Vector2d position)
     {
         PreflightStaticPoseChange();
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             !Collider.TryPrepareBodyPose(position, _rotation),
             nameof(position),
             "The requested 2D body position produces collider geometry outside the representable coordinate domain.");
@@ -100,7 +100,7 @@ public sealed partial class SolidBody2D
     {
         PreflightStaticPoseChange();
         Fixed64 canonicalRotation = CanonicalizeRotation(rotation);
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             !Collider.TryPrepareBodyPose(_position, canonicalRotation),
             nameof(rotation),
             "The requested 2D body rotation produces collider geometry outside the representable coordinate domain.");

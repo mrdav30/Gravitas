@@ -102,7 +102,7 @@ public sealed partial class GravitasQuery2DService
     /// </summary>
     public int RaycastAll(Vector2d start, Vector2d end, PhysicsLayerMask layerMask, SwiftList<Physics2DHit> results)
     {
-        SwiftThrowHelper.ThrowIfNull(results, nameof(results));
+        ChronicleGuard.ThrowIfNull(results, nameof(results));
 
         results.Clear();
         if (!Vector2d.TrySubtract(end, start, out Vector2d segment)

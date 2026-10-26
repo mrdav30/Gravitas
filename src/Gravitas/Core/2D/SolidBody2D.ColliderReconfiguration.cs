@@ -49,7 +49,7 @@ public sealed partial class SolidBody2D
         definition.EnsureDefined();
         ThrowIfRuntimeRegistrationMissing();
         Context.ThrowIfFixedStepMutationNotAllowed();
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             Context.Settings.RuntimeMode != PhysicsRuntimeMode.TwoD,
             nameof(Context.Settings.RuntimeMode),
             "Native 2D collider reconfiguration requires pure TwoD runtime mode.");
@@ -59,7 +59,7 @@ public sealed partial class SolidBody2D
             ColliderShapeDefinition2DKind.Capsule => ColliderType2D.Capsule,
             _ => ColliderType2D.None
         };
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             expectedShape == ColliderType2D.None || Collider.Shape != expectedShape,
             nameof(definition),
             "2D collider reconfiguration requires the existing circle or capsule family.");
@@ -67,7 +67,7 @@ public sealed partial class SolidBody2D
         FixedTransform transform = Agent.Transform;
         Vector3d worldPosition = new(position.X, transform.WorldPosition.Y, position.Y);
         FixedTransform? parent = transform.Parent;
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             parent != null && (!parent.TryInverseTransformPoint(worldPosition, out Vector3d localPosition)
                 || !parent.TryTransformPoint(localPosition, out Vector3d roundTrip)
                 || !roundTrip.FuzzyEqualAbsolute(worldPosition, Fixed64.Epsilon)),
@@ -109,7 +109,7 @@ public sealed partial class SolidBody2D
 
         // All geometry and mass work has succeeded on detached state. There are
         // no host callbacks until every authoritative view has been published.
-        SwiftThrowHelper.ThrowIfTrue(!transform.TrySetWorldPosition(worldPosition), nameof(position),
+        ChronicleGuard.ThrowIfTrue(!transform.TrySetWorldPosition(worldPosition), nameof(position),
             "The host transform cannot represent the requested 2D body-root position.");
         _position = position;
         Collider.PublishBodyReconfigurationCandidate(candidate);

@@ -8,7 +8,7 @@ using GridForge.Grids.Storage;
 using GridForge.Grids.Topology;
 using GridForge.Spatial;
 using SwiftCollections;
-using SwiftCollections.Diagnostics;
+using Chronicler.Diagnostics;
 
 namespace Gravitas.Benchmarks;
 
@@ -27,7 +27,7 @@ public class MixedSparseGridSpanBenchmarks
         _context.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
 
         Fixed64 extent = (Fixed64)100_000;
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             !_context.World.TryAddGrid(
                 new GridConfiguration(
                     new Vector3d(-extent, -extent, -extent),

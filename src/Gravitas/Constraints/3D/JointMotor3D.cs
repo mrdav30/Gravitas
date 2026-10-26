@@ -64,15 +64,15 @@ public readonly struct JointMotor3D
 
     internal void Validate()
     {
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             AngularDriveStrength < Fixed64.Zero,
             nameof(AngularDriveStrength),
             "Angular drive strength cannot be negative.");
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             AngularDriveDamping < Fixed64.Zero,
             nameof(AngularDriveDamping),
             "Angular drive damping cannot be negative.");
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             MaximumMotorImpulse < Fixed64.Zero,
             nameof(MaximumMotorImpulse),
             "Maximum motor impulse cannot be negative.");

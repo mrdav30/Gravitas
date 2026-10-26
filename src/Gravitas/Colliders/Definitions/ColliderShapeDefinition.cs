@@ -122,7 +122,7 @@ public readonly struct ColliderShapeDefinition : IEquatable<ColliderShapeDefinit
     {
         ValidateRadius(radius);
         ValidateHeight(height);
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             Fixed64.CompareProducts(
                 height,
                 Fixed64.One,
@@ -233,7 +233,7 @@ public readonly struct ColliderShapeDefinition : IEquatable<ColliderShapeDefinit
     public Vector3d GetMeshVertex(int index)
     {
         EnsureMeshDefinition();
-        SwiftThrowHelper.ThrowIfArrayIndexInvalid(index, _meshVertices!.Length, nameof(index));
+        ChronicleGuard.ThrowIfArrayIndexInvalid(index, _meshVertices!.Length, nameof(index));
         return _meshVertices[index];
     }
 
@@ -244,7 +244,7 @@ public readonly struct ColliderShapeDefinition : IEquatable<ColliderShapeDefinit
     public int GetMeshTriangleIndex(int index)
     {
         EnsureMeshDefinition();
-        SwiftThrowHelper.ThrowIfArrayIndexInvalid(index, _meshTriangles!.Length, nameof(index));
+        ChronicleGuard.ThrowIfArrayIndexInvalid(index, _meshTriangles!.Length, nameof(index));
         return _meshTriangles[index];
     }
 
@@ -288,7 +288,7 @@ public readonly struct ColliderShapeDefinition : IEquatable<ColliderShapeDefinit
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal void EnsureDefined()
     {
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             Kind == ColliderShapeDefinitionKind.Undefined,
             nameof(ColliderShapeDefinition),
             "Collider shape definition cannot be default.");
@@ -298,7 +298,7 @@ public readonly struct ColliderShapeDefinition : IEquatable<ColliderShapeDefinit
     internal void EnsureKind(ColliderShapeDefinitionKind expectedKind)
     {
         EnsureDefined();
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             Kind != expectedKind,
             nameof(ColliderShapeDefinition),
             $"Collider shape definition must be {expectedKind}.");
@@ -310,28 +310,28 @@ public readonly struct ColliderShapeDefinition : IEquatable<ColliderShapeDefinit
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void ValidateRadius(Fixed64 radius) =>
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             radius <= Fixed64.Zero,
             nameof(radius),
             "Collider radius must be greater than zero.");
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void ValidateHeight(Fixed64 height) =>
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             height <= Fixed64.Zero,
             nameof(height),
             "Collider height must be greater than zero.");
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void ValidateSize(Vector3d size) =>
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             size.X <= Fixed64.Zero || size.Y <= Fixed64.Zero || size.Z <= Fixed64.Zero,
             nameof(size),
             "Collider size components must be greater than zero.");
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void ValidateMeshInertiaPolicy(MeshInertiaPolicy inertiaPolicy) =>
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             inertiaPolicy != MeshInertiaPolicy.RequireClosedVolume &&
             inertiaPolicy != MeshInertiaPolicy.SurfaceApproximation,
             nameof(inertiaPolicy),
@@ -339,18 +339,18 @@ public readonly struct ColliderShapeDefinition : IEquatable<ColliderShapeDefinit
 
     private static void ValidateMeshInput(Vector3d[] vertices, int[] triangles)
     {
-        SwiftThrowHelper.ThrowIfNull(vertices, nameof(vertices));
-        SwiftThrowHelper.ThrowIfNull(triangles, nameof(triangles));
-        SwiftThrowHelper.ThrowIfArgument(vertices.Length < 3, nameof(vertices), "Mesh must contain at least three vertices.");
-        SwiftThrowHelper.ThrowIfArgument(triangles.Length < 3, nameof(triangles), "Mesh must contain at least one triangle.");
-        SwiftThrowHelper.ThrowIfArgument(triangles.Length % 3 != 0, nameof(triangles), "Triangle index count must be divisible by three.");
-        SwiftThrowHelper.ThrowIfArgument(vertices.Length > PhysicsMesh.MaxVertexCount, nameof(vertices), "Mesh vertex count exceeds the deterministic runtime limit.");
-        SwiftThrowHelper.ThrowIfArgument(triangles.Length / 3 > PhysicsMesh.MaxTriangleCount, nameof(triangles), "Mesh triangle count exceeds the deterministic runtime limit.");
+        ChronicleGuard.ThrowIfNull(vertices, nameof(vertices));
+        ChronicleGuard.ThrowIfNull(triangles, nameof(triangles));
+        ChronicleGuard.ThrowIfArgument(vertices.Length < 3, nameof(vertices), "Mesh must contain at least three vertices.");
+        ChronicleGuard.ThrowIfArgument(triangles.Length < 3, nameof(triangles), "Mesh must contain at least one triangle.");
+        ChronicleGuard.ThrowIfArgument(triangles.Length % 3 != 0, nameof(triangles), "Triangle index count must be divisible by three.");
+        ChronicleGuard.ThrowIfArgument(vertices.Length > PhysicsMesh.MaxVertexCount, nameof(vertices), "Mesh vertex count exceeds the deterministic runtime limit.");
+        ChronicleGuard.ThrowIfArgument(triangles.Length / 3 > PhysicsMesh.MaxTriangleCount, nameof(triangles), "Mesh triangle count exceeds the deterministic runtime limit.");
 
         for (int i = 0; i < triangles.Length; i++)
         {
             int vertexIndex = triangles[i];
-            SwiftThrowHelper.ThrowIfArgument(
+            ChronicleGuard.ThrowIfArgument(
                 vertexIndex < 0 || vertexIndex >= vertices.Length,
                 nameof(triangles),
                 "Triangle index references a vertex outside the source vertex array.");

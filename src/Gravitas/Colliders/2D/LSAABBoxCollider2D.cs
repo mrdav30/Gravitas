@@ -47,7 +47,7 @@ public sealed class LSAABBoxCollider2D : LSCollider2D, IConvexVertexSource2D
         get => _size;
         set
         {
-            SwiftThrowHelper.ThrowIfArgument(
+            ChronicleGuard.ThrowIfArgument(
                 value.X <= Fixed64.Zero || value.Y <= Fixed64.Zero,
                 nameof(value),
                 "2D AABB size components must be greater than zero.");
@@ -215,7 +215,7 @@ public sealed class LSAABBoxCollider2D : LSCollider2D, IConvexVertexSource2D
         RecordValues.Look(chronicler, ref size, "Size", Vector2d.One);
         if (chronicler.Mode == SerializationMode.Loading)
         {
-            SwiftThrowHelper.ThrowIfArgument(
+            ChronicleGuard.ThrowIfArgument(
                 size.X <= Fixed64.Zero || size.Y <= Fixed64.Zero,
                 nameof(size),
                 "2D AABB size components must be greater than zero.");

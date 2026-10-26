@@ -17,8 +17,8 @@ internal readonly struct MixedColliderKey
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public MixedColliderKey(int collider3DId, int collider2DId)
     {
-        SwiftThrowHelper.ThrowIfNegative(collider3DId, nameof(collider3DId));
-        SwiftThrowHelper.ThrowIfNegative(collider2DId, nameof(collider2DId));
+        ChronicleGuard.ThrowIfNegative(collider3DId, nameof(collider3DId));
+        ChronicleGuard.ThrowIfNegative(collider2DId, nameof(collider2DId));
         Collider3DId = collider3DId;
         Collider2DId = collider2DId;
         Key = CreateKey(collider3DId, collider2DId);

@@ -64,7 +64,7 @@ internal sealed partial class GravitasMixedCollisionService
 
     internal GravitasMixedCollisionService(GravitasWorldContext context)
     {
-        SwiftThrowHelper.ThrowIfNull(context, nameof(context));
+        ChronicleGuard.ThrowIfNull(context, nameof(context));
         _context = context;
         _releaseRetainedPartition = ReleasePartition;
     }

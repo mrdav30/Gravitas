@@ -100,7 +100,7 @@ public sealed class RagdollRuntime3D : IRecordable
     /// </summary>
     public void RecordData(IChronicler chronicler)
     {
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             !IsRegistered,
             nameof(RagdollRuntime3D),
             "Removed ragdolls cannot participate in serialization.");
@@ -114,7 +114,7 @@ public sealed class RagdollRuntime3D : IRecordable
 
     private void ApplyActivationState(bool isActive, bool emitDiagnostics)
     {
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             !IsRegistered,
             nameof(RagdollRuntime3D),
             "Removed ragdolls cannot mutate simulation state.");

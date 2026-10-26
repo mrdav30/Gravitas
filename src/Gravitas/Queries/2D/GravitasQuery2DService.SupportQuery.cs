@@ -16,8 +16,8 @@ public sealed partial class GravitasQuery2DService
     {
         support = default;
         LastQueryCandidateCount = 0;
-        SwiftThrowHelper.ThrowIfNull(request.Source, nameof(request));
-        SwiftThrowHelper.ThrowIfArgument(!request.Source.IsActive
+        ChronicleGuard.ThrowIfNull(request.Source, nameof(request));
+        ChronicleGuard.ThrowIfArgument(!request.Source.IsActive
             || !_context.Physics2D.TryGetColliderById(request.Source.Id, out var registered)
             || !ReferenceEquals(registered, request.Source), nameof(request),
             "Support source must be an active collider registered in this context.");

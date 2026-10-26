@@ -75,7 +75,7 @@ public sealed partial class GravitasQuery3DService
         SwiftList<Physics3DHit> hits,
         Span<PhysicsQueryHitRange> ranges)
     {
-        SwiftThrowHelper.ThrowIfNull(hits, nameof(hits));
+        ChronicleGuard.ThrowIfNull(hits, nameof(hits));
         ValidateRangeBatchOutput(requests.Length, ranges);
         ResetBatchCounters(requests.Length);
         hits.Clear();
@@ -133,7 +133,7 @@ public sealed partial class GravitasQuery3DService
         SwiftList<Physics3DHit> hits,
         Span<PhysicsQueryHitRange> ranges)
     {
-        SwiftThrowHelper.ThrowIfNull(hits, nameof(hits));
+        ChronicleGuard.ThrowIfNull(hits, nameof(hits));
         ValidateRangeBatchOutput(requests.Length, ranges);
         ValidateSweepSphereRequests(requests);
         ResetBatchCounters(requests.Length);
@@ -202,7 +202,7 @@ public sealed partial class GravitasQuery3DService
         SwiftList<Physics3DHit> hits,
         Span<PhysicsQueryHitRange> ranges)
     {
-        SwiftThrowHelper.ThrowIfNull(hits, nameof(hits));
+        ChronicleGuard.ThrowIfNull(hits, nameof(hits));
         ValidateRangeBatchOutput(requests.Length, ranges);
         ResetBatchCounters(requests.Length);
         hits.Clear();
@@ -287,7 +287,7 @@ public sealed partial class GravitasQuery3DService
         SwiftList<Physics3DHit> hits,
         Span<PhysicsQueryHitRange> ranges)
     {
-        SwiftThrowHelper.ThrowIfNull(hits, nameof(hits));
+        ChronicleGuard.ThrowIfNull(hits, nameof(hits));
         ValidateRangeBatchOutput(requests.Length, ranges);
         ResetBatchCounters(requests.Length);
         hits.Clear();
@@ -372,7 +372,7 @@ public sealed partial class GravitasQuery3DService
         SwiftList<Physics3DHit> hits,
         Span<PhysicsQueryHitRange> ranges)
     {
-        SwiftThrowHelper.ThrowIfNull(hits, nameof(hits));
+        ChronicleGuard.ThrowIfNull(hits, nameof(hits));
         ValidateRangeBatchOutput(requests.Length, ranges);
         ResetBatchCounters(requests.Length);
         hits.Clear();
@@ -457,7 +457,7 @@ public sealed partial class GravitasQuery3DService
         SwiftList<Physics3DHit> hits,
         Span<PhysicsQueryHitRange> ranges)
     {
-        SwiftThrowHelper.ThrowIfNull(hits, nameof(hits));
+        ChronicleGuard.ThrowIfNull(hits, nameof(hits));
         ValidateRangeBatchOutput(requests.Length, ranges);
         ResetBatchCounters(requests.Length);
         hits.Clear();
@@ -542,7 +542,7 @@ public sealed partial class GravitasQuery3DService
         SwiftList<Physics3DHit> hits,
         Span<PhysicsQueryHitRange> ranges)
     {
-        SwiftThrowHelper.ThrowIfNull(hits, nameof(hits));
+        ChronicleGuard.ThrowIfNull(hits, nameof(hits));
         ValidateRangeBatchOutput(requests.Length, ranges);
         ResetBatchCounters(requests.Length);
         hits.Clear();
@@ -627,7 +627,7 @@ public sealed partial class GravitasQuery3DService
         SwiftList<Physics3DHit> hits,
         Span<PhysicsQueryHitRange> ranges)
     {
-        SwiftThrowHelper.ThrowIfNull(hits, nameof(hits));
+        ChronicleGuard.ThrowIfNull(hits, nameof(hits));
         ValidateRangeBatchOutput(requests.Length, ranges);
         ResetBatchCounters(requests.Length);
         hits.Clear();
@@ -696,7 +696,7 @@ public sealed partial class GravitasQuery3DService
         SwiftList<Physics3DHit> hits,
         Span<PhysicsQueryHitRange> ranges)
     {
-        SwiftThrowHelper.ThrowIfNull(hits, nameof(hits));
+        ChronicleGuard.ThrowIfNull(hits, nameof(hits));
         ValidateRangeBatchOutput(requests.Length, ranges);
         ValidateOverlapCircleRequests(requests);
         ResetBatchCounters(requests.Length);
@@ -749,7 +749,7 @@ public sealed partial class GravitasQuery3DService
         SwiftList<Physics3DHit> hits,
         Span<PhysicsQueryHitRange> ranges)
     {
-        SwiftThrowHelper.ThrowIfNull(hits, nameof(hits));
+        ChronicleGuard.ThrowIfNull(hits, nameof(hits));
         ValidateRangeBatchOutput(requests.Length, ranges);
         ValidateOverlapConeEnvelopes(requests);
         ResetBatchCounters(requests.Length);
@@ -917,7 +917,7 @@ public sealed partial class GravitasQuery3DService
         ref LSCollider? preparedSource,
         ref Vector3d preparedDisplacement)
     {
-        SwiftThrowHelper.ThrowIfNull(source, nameof(source));
+        ChronicleGuard.ThrowIfNull(source, nameof(source));
         EnsureSourceBelongsToContext(source!);
 
         if (ReferenceEquals(source, preparedSource) && displacement.Equals(preparedDisplacement))
@@ -993,7 +993,7 @@ public sealed partial class GravitasQuery3DService
     {
         for (int i = 0; i < requests.Length; i++)
         {
-            SwiftThrowHelper.ThrowIfArgument(
+            ChronicleGuard.ThrowIfArgument(
                 requests[i].Radius < Fixed64.Zero,
                 nameof(requests),
                 "3D query radius cannot be negative.");
@@ -1006,7 +1006,7 @@ public sealed partial class GravitasQuery3DService
     {
         for (int i = 0; i < requests.Length; i++)
         {
-            SwiftThrowHelper.ThrowIfArgument(
+            ChronicleGuard.ThrowIfArgument(
                 requests[i].Radius < Fixed64.Zero,
                 nameof(requests),
                 "3D query radius cannot be negative.");
@@ -1018,7 +1018,7 @@ public sealed partial class GravitasQuery3DService
     {
         // Nonpositive radii retain the existing 3D miss contract.
         for (int i = 0; i < requests.Length; i++)
-            SwiftThrowHelper.ThrowIfArgument(requests[i].Radius > ColliderGeometryPolicy.MaximumGeometryReach,
+            ChronicleGuard.ThrowIfArgument(requests[i].Radius > ColliderGeometryPolicy.MaximumGeometryReach,
                 nameof(requests), "Effective geometry reach must not exceed 4,096 world units.");
     }
 
@@ -1085,7 +1085,7 @@ public sealed partial class GravitasQuery3DService
 
     private static void ValidateClosestBatchOutput(int requestCount, Span<Physics3DHit> closestHits)
     {
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             closestHits.Length < requestCount,
             nameof(closestHits),
             "Closest-hit output span must contain at least one slot per request.");
@@ -1093,7 +1093,7 @@ public sealed partial class GravitasQuery3DService
 
     private static void ValidateRangeBatchOutput(int requestCount, Span<PhysicsQueryHitRange> ranges)
     {
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             ranges.Length < requestCount,
             nameof(ranges),
             "Range output span must contain at least one slot per request.");

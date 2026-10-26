@@ -78,7 +78,7 @@ public sealed partial class GravitasQuery3DService
         PhysicsLayerMask layerMask,
         SwiftList<Physics3DHit> results)
     {
-        SwiftThrowHelper.ThrowIfNull(results, nameof(results));
+        ChronicleGuard.ThrowIfNull(results, nameof(results));
         Vector3d normalizedDirection = ValidateConeQuery(origin, direction, length, endRadius, out Vector3d end);
         _currentLayerMask = layerMask;
         NextCircleVersion();
@@ -472,21 +472,21 @@ public sealed partial class GravitasQuery3DService
         Fixed64 endRadius,
         out Vector3d end)
     {
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             direction == Vector3d.Zero,
             nameof(direction),
             "Cone query direction must be non-zero.");
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             length <= Fixed64.Zero,
             nameof(length),
             "Cone query length must be greater than zero.");
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             endRadius <= Fixed64.Zero,
             nameof(endRadius),
             "Cone query end radius must be greater than zero.");
 
         Vector3d normalizedDirection = direction.Normalized;
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             !new FixedRay(origin, normalizedDirection).TryGetPoint(length, out end),
             nameof(length),
             "Cone query endpoint must be representable without fixed-point saturation.");

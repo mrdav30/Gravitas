@@ -110,7 +110,7 @@ public sealed partial class PhysicsSettingsSaver : DefaultSaver
     /// </summary>
     public void BindContext(GravitasWorldContext context)
     {
-        SwiftThrowHelper.ThrowIfNull(context, nameof(context));
+        ChronicleGuard.ThrowIfNull(context, nameof(context));
         _context = context;
     }
 
@@ -119,7 +119,7 @@ public sealed partial class PhysicsSettingsSaver : DefaultSaver
     /// </summary>
     public void ApplyTo(GravitasWorldContext context)
     {
-        SwiftThrowHelper.ThrowIfNull(context, nameof(context));
+        ChronicleGuard.ThrowIfNull(context, nameof(context));
         context.ApplySettings(CreateSettings());
     }
 
@@ -160,7 +160,7 @@ public sealed partial class PhysicsSettingsSaver : DefaultSaver
     /// </summary>
     protected override void OnEarlyApply()
     {
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             _context == null,
             nameof(PhysicsSettingsSaver),
             "PhysicsSettingsSaver requires an explicit GravitasWorldContext. Call BindContext or ApplyTo before applying.");
@@ -178,7 +178,7 @@ public sealed partial class PhysicsSettingsSaver : DefaultSaver
         for (int i = 0; i < numberOfLayers; ++i)
         {
             bool[] row = CollisionMatrix[i].row;
-            SwiftThrowHelper.ThrowIfTrue(
+            ChronicleGuard.ThrowIfTrue(
                 row == null || row.Length != numberOfLayers,
                 nameof(CollisionMatrix),
                 "Physics settings collision matrix rows must be square.");

@@ -1,5 +1,5 @@
 using FluentAssertions;
-using SwiftCollections.Diagnostics;
+using Chronicler.Diagnostics;
 using System;
 using System.Collections.Generic;
 using System.IO;

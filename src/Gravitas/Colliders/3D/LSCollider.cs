@@ -124,7 +124,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
     {
         get
         {
-            SwiftThrowHelper.ThrowIfTrue(
+            ChronicleGuard.ThrowIfTrue(
                 _context == null,
                 nameof(LSCollider),
                 "Collider is not bound to a GravitasWorldContext.");
@@ -170,15 +170,15 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
             ?? throw new InvalidOperationException("Collider has no body or static transform.");
         set
         {
-            SwiftThrowHelper.ThrowIfTrue(
+            ChronicleGuard.ThrowIfTrue(
                 _compoundOwner != null,
                 nameof(Position),
                 "Compound collider parts inherit position from their owning compound collider.");
-            SwiftThrowHelper.ThrowIfTrue(
+            ChronicleGuard.ThrowIfTrue(
                 _agent == null,
                 nameof(Position),
                 "Collider is not bound to a static transform.");
-            SwiftThrowHelper.ThrowIfTrue(
+            ChronicleGuard.ThrowIfTrue(
                 _body != null,
                 nameof(Position),
                 "Body-owned collider positions must be changed through their SolidBody.");
@@ -198,15 +198,15 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
                 "Collider has no committed runtime shape.");
         set
         {
-            SwiftThrowHelper.ThrowIfTrue(
+            ChronicleGuard.ThrowIfTrue(
                 _compoundOwner != null,
                 nameof(Rotation),
                 "Compound collider parts inherit rotation from their owning compound collider.");
-            SwiftThrowHelper.ThrowIfTrue(
+            ChronicleGuard.ThrowIfTrue(
                 _agent == null,
                 nameof(Rotation),
                 "Collider is not bound to a static transform.");
-            SwiftThrowHelper.ThrowIfTrue(
+            ChronicleGuard.ThrowIfTrue(
                 _body != null,
                 nameof(Rotation),
                 "Body-owned collider rotations must be changed through their SolidBody.");
@@ -342,7 +342,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
         get => _radius;
         set
         {
-            SwiftThrowHelper.ThrowIfArgument(
+            ChronicleGuard.ThrowIfArgument(
                 value <= Fixed64.Zero,
                 nameof(value),
                 "Collider radius must be greater than zero.");
@@ -401,7 +401,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
         get
         {
             bool representable = TryGetLocalScale(out Vector3d scale);
-            SwiftThrowHelper.ThrowIfTrue(
+            ChronicleGuard.ThrowIfTrue(
                 !representable,
                 nameof(LocalScale),
                 "The combined 3D collider scale is outside the Fixed64 coordinate domain.");
@@ -533,8 +533,8 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
     public void InitializeWithNoBody(IMatterAgent agent)
     {
         ThrowIfCompoundPartLifecycle(nameof(InitializeWithNoBody));
-        SwiftThrowHelper.ThrowIfNull(agent, nameof(agent));
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfNull(agent, nameof(agent));
+        ChronicleGuard.ThrowIfArgument(
             Id >= 0 || (HasHostBinding && !ReferenceEquals(_agent, agent)),
             nameof(agent),
             "Collider is already registered or bound to another host agent.");
@@ -548,7 +548,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
         FixedQuaternion requestedRotation)
     {
         ThrowIfCompoundPartLifecycle(nameof(Initialize));
-        SwiftThrowHelper.ThrowIfNull(body, nameof(body));
+        ChronicleGuard.ThrowIfNull(body, nameof(body));
         ThrowIfTriggerWouldAttachToBody(nameof(Initialize));
         PreflightInitialization(
             body.Agent,
@@ -563,7 +563,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
         Vector3d requestedPosition = default,
         FixedQuaternion requestedRotation = default)
     {
-        SwiftThrowHelper.ThrowIfNull(agent, nameof(agent));
+        ChronicleGuard.ThrowIfNull(agent, nameof(agent));
         OnBeforeInitialize(agent);
         PrepareStandaloneInitialization(
             agent,
@@ -679,7 +679,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
         bool transformed = setRotation
             ? transform.TrySetWorldPose(transform.WorldPosition, rotation)
             : transform.TrySetWorldPosition(position);
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             !transformed,
             operation,
             setRotation
@@ -793,7 +793,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
 
     private static void ValidateSize(Vector3d value)
     {
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             value.X <= Fixed64.Zero || value.Y <= Fixed64.Zero || value.Z <= Fixed64.Zero,
             nameof(value),
             "Collider size components must be greater than zero.");
@@ -905,9 +905,9 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal void SetPhysicsState(int id, int serviceIndex, int replayOrder)
     {
-        SwiftThrowHelper.ThrowIfNegative(id, nameof(id));
-        SwiftThrowHelper.ThrowIfNegative(serviceIndex, nameof(serviceIndex));
-        SwiftThrowHelper.ThrowIfNegative(replayOrder, nameof(replayOrder));
+        ChronicleGuard.ThrowIfNegative(id, nameof(id));
+        ChronicleGuard.ThrowIfNegative(serviceIndex, nameof(serviceIndex));
+        ChronicleGuard.ThrowIfNegative(replayOrder, nameof(replayOrder));
         _id = id;
         _serviceIndex = serviceIndex;
         _replayOrder = replayOrder;
@@ -916,19 +916,19 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
 
     internal void SetServiceIndex(int serviceIndex)
     {
-        SwiftThrowHelper.ThrowIfNegative(serviceIndex, nameof(serviceIndex));
+        ChronicleGuard.ThrowIfNegative(serviceIndex, nameof(serviceIndex));
         _serviceIndex = serviceIndex;
     }
 
     internal void SetReplayOrdinal(int replayOrdinal)
     {
-        SwiftThrowHelper.ThrowIfNegative(replayOrdinal, nameof(replayOrdinal));
+        ChronicleGuard.ThrowIfNegative(replayOrdinal, nameof(replayOrdinal));
         _replayOrdinal = replayOrdinal;
     }
 
     internal void SetServiceRefreshIndex(int serviceRefreshIndex)
     {
-        SwiftThrowHelper.ThrowIfNegative(serviceRefreshIndex, nameof(serviceRefreshIndex));
+        ChronicleGuard.ThrowIfNegative(serviceRefreshIndex, nameof(serviceRefreshIndex));
         _serviceRefreshIndex = serviceRefreshIndex;
     }
 

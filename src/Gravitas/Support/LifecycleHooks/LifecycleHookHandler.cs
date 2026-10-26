@@ -39,7 +39,7 @@ public class LifecycleHookHandler
         if (string.IsNullOrWhiteSpace(owner))
             throw new ArgumentException("Lifecycle hook owner cannot be null or whitespace.", nameof(owner));
 
-        SwiftThrowHelper.ThrowIfNull(callback, nameof(callback));
+        ChronicleGuard.ThrowIfNull(callback, nameof(callback));
 
         lock (_lifecycleHookLock)
         {

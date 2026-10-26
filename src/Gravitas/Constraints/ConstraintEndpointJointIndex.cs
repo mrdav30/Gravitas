@@ -23,13 +23,13 @@ internal sealed class ConstraintEndpointJointIndex<TBody>
 
     internal void Add(TBody bodyA, TBody bodyB, int jointId)
     {
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             ReferenceEquals(bodyA, bodyB),
             nameof(bodyB),
             "A joint endpoint index requires two distinct bodies.");
         EnsureJointCapacity(jointId + 1);
         ref JointEndpoints endpoints = ref _endpointsByJoint[jointId];
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             endpoints.IsRegistered,
             nameof(jointId),
             "Joint endpoint ownership is already registered.");
@@ -92,7 +92,7 @@ internal sealed class ConstraintEndpointJointIndex<TBody>
     private void RemoveEndpoint(int jointId, ref EndpointLink endpoint)
     {
         TBody body = endpoint.Body!;
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             !_chainsByBody.TryGetValue(body, out EndpointChain chain),
             nameof(jointId),
             "Joint endpoint chain is missing its body.");
@@ -120,7 +120,7 @@ internal sealed class ConstraintEndpointJointIndex<TBody>
         if (ReferenceEquals(endpoints.EndpointA.Body, body))
             return ref endpoints.EndpointA;
 
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             !ReferenceEquals(endpoints.EndpointB.Body, body),
             nameof(body),
             "Joint endpoint chain references an unrelated body.");

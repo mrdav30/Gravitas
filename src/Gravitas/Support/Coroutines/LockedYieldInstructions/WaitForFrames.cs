@@ -1,4 +1,4 @@
-﻿//=======================================================================
+//=======================================================================
 // WaitForFrames.cs
 //=======================================================================
 // MIT License, Copyright (c) 2026–present David Oravsky (mrdav30)
@@ -25,8 +25,8 @@ public readonly struct WaitForFrames : ILockedYieldInstruction
     /// </summary>
     public WaitForFrames(GravitasWorldContext context, long numberOfFrames)
     {
-        SwiftThrowHelper.ThrowIfNull(context, nameof(context));
-        SwiftThrowHelper.ThrowIfArgumentOutOfRange(numberOfFrames < 0, null,
+        ChronicleGuard.ThrowIfNull(context, nameof(context));
+        ChronicleGuard.ThrowIfArgumentOutOfRange(numberOfFrames < 0, null,
             nameof(numberOfFrames), "Wait frame count cannot be negative.");
 
         _context = context;

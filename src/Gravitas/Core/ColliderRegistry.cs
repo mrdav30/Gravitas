@@ -39,7 +39,7 @@ internal sealed class ColliderRegistry<TCollider>
 
     public int Register(TCollider collider)
     {
-        SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
+        ChronicleGuard.ThrowIfNull(collider, nameof(collider));
 
         int id = _byId.Add(collider);
         int serviceIndex = _liveColliders.Count;
@@ -50,7 +50,7 @@ internal sealed class ColliderRegistry<TCollider>
 
     public bool Remove(TCollider collider)
     {
-        SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
+        ChronicleGuard.ThrowIfNull(collider, nameof(collider));
 
         int id = collider.Id;
         if (!TryGetById(id, out TCollider? registered) || !ReferenceEquals(registered, collider))

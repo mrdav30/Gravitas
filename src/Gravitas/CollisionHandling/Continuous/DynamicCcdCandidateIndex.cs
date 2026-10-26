@@ -55,7 +55,7 @@ internal sealed class DynamicCcdCandidateIndex
     public void AddOrUpdate(int dynamicId, FixedBoundVolume bounds)
     {
         SwiftDictionary<int, int>? entryIndices = _entryIndices;
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             entryIndices == null,
             nameof(DynamicCcdCandidateIndex),
             "Candidate index was not configured for updates.");
@@ -386,7 +386,7 @@ internal sealed class DynamicCcdCandidateIndex2D
     public void AddOrUpdate(int dynamicId, DynamicCcdPlanarBounds bounds)
     {
         SwiftDictionary<int, int>? entryIndices = _entryIndices;
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             entryIndices == null,
             nameof(DynamicCcdCandidateIndex2D),
             "Candidate index was not configured for updates.");

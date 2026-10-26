@@ -12,12 +12,12 @@ public readonly struct Physics2DSupportQuery
     public Physics2DSupportQuery(LSCollider2D source, Vector2d center, Fixed64 radius,
         Vector2d up, Fixed64 distance, Fixed64 minimumNormalDot, PhysicsLayerMask layers)
     {
-        SwiftThrowHelper.ThrowIfNull(source, nameof(source));
-        SwiftThrowHelper.ThrowIfArgument(radius <= Fixed64.Zero, nameof(radius), "Support radius must be positive.");
+        ChronicleGuard.ThrowIfNull(source, nameof(source));
+        ChronicleGuard.ThrowIfArgument(radius <= Fixed64.Zero, nameof(radius), "Support radius must be positive.");
         ColliderGeometryPolicy.ValidateReach(radius, nameof(radius));
-        SwiftThrowHelper.ThrowIfArgument(distance <= Fixed64.Zero, nameof(distance), "Support distance must be positive.");
-        SwiftThrowHelper.ThrowIfArgument(up == Vector2d.Zero, nameof(up), "Support up must be nonzero.");
-        SwiftThrowHelper.ThrowIfArgument(minimumNormalDot <= Fixed64.Zero || minimumNormalDot > Fixed64.One,
+        ChronicleGuard.ThrowIfArgument(distance <= Fixed64.Zero, nameof(distance), "Support distance must be positive.");
+        ChronicleGuard.ThrowIfArgument(up == Vector2d.Zero, nameof(up), "Support up must be nonzero.");
+        ChronicleGuard.ThrowIfArgument(minimumNormalDot <= Fixed64.Zero || minimumNormalDot > Fixed64.One,
             nameof(minimumNormalDot), "Support normal threshold must be in (0, 1].");
         Source = source;
         Center = center;

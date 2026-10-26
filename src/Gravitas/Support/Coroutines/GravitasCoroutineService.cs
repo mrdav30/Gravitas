@@ -31,7 +31,7 @@ public sealed class GravitasCoroutineService
     /// <param name="context">The owning world context.</param>
     public GravitasCoroutineService(GravitasWorldContext context)
     {
-        SwiftThrowHelper.ThrowIfNull(context, nameof(context));
+        ChronicleGuard.ThrowIfNull(context, nameof(context));
         _context = context;
     }
 
@@ -53,7 +53,7 @@ public sealed class GravitasCoroutineService
     /// </exception>
     public void Initialize()
     {
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             _resetting || _context.IsDisposed,
             nameof(GravitasCoroutineService),
             "Coroutine service cannot initialize while resetting or after its context is disposed.");
@@ -127,8 +127,8 @@ public sealed class GravitasCoroutineService
     /// </exception>
     public LSCoroutine StartCoroutine(IEnumerator<ILockedYieldInstruction> enumerator)
     {
-        SwiftThrowHelper.ThrowIfNull(enumerator, nameof(enumerator));
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfNull(enumerator, nameof(enumerator));
+        ChronicleGuard.ThrowIfTrue(
             _resetting || _deactivated || _context.IsDisposed,
             nameof(GravitasCoroutineService),
             "Coroutine service cannot start work while resetting, deactivated, or disposed.");
@@ -144,8 +144,8 @@ public sealed class GravitasCoroutineService
     /// <param name="coroutine">The coroutine to stop.</param>
     public void StopCoroutine(LSCoroutine coroutine)
     {
-        SwiftThrowHelper.ThrowIfNull(coroutine, nameof(coroutine));
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfNull(coroutine, nameof(coroutine));
+        ChronicleGuard.ThrowIfArgument(
             !ReferenceEquals(coroutine.Owner, this),
             nameof(coroutine),
             "Coroutine must be stopped through its owning coroutine service.");

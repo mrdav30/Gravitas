@@ -16,7 +16,7 @@ using Gravitas.Support;
 using Gravitas.Tests.Serialization;
 using Gravitas.Tests.Support;
 using GridForge.Spatial;
-using SwiftCollections.Diagnostics;
+using Chronicler.Diagnostics;
 using System;
 using Xunit;
 
@@ -368,7 +368,7 @@ public sealed class SolidBodyColliderReconfigurationTests
             callbacksObservedPublishedState &= synchronizedStatePublished
                 && actor.Body.Position3d == newPosition
                 && actor.Collider.ScaledRadius == newRadius;
-            SwiftThrowHelper.ThrowIfTrue(
+            ChronicleGuard.ThrowIfTrue(
                 true,
                 message: $"reconfiguration exit failure {exits}");
         };
@@ -384,7 +384,7 @@ public sealed class SolidBodyColliderReconfigurationTests
                 synchronizedStatePublished = true;
                 actor.Body.Position3d.Should().Be(newPosition);
                 actor.Collider.ScaledRadius.Should().Be(newRadius);
-                SwiftThrowHelper.ThrowIfTrue(
+                ChronicleGuard.ThrowIfTrue(
                     true,
                     message: "synchronized state publication failure");
             });
@@ -456,7 +456,7 @@ public sealed class SolidBodyColliderReconfigurationTests
             exits++;
             callbacksObservedPublishedState &= actor.Body.Position3d == newPosition
                 && actor.Collider.ScaledRadius == newRadius;
-            SwiftThrowHelper.ThrowIfTrue(
+            ChronicleGuard.ThrowIfTrue(
                 exits == 1,
                 message: "mixed reconfiguration exit failure");
         };

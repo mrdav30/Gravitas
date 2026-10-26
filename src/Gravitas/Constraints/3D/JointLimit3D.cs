@@ -72,7 +72,7 @@ public readonly struct JointLimit3D
 
     internal void Validate()
     {
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             Kind != JointLimitKind3D.Unrestricted
                 && Kind != JointLimitKind3D.Hinge
                 && Kind != JointLimitKind3D.ConeTwist,
@@ -84,5 +84,5 @@ public readonly struct JointLimit3D
     }
 
     private static void ValidateNonNegative(Fixed64 value, string name) =>
-        SwiftThrowHelper.ThrowIfArgument(value < Fixed64.Zero, name, "Joint limit angles cannot be negative.");
+        ChronicleGuard.ThrowIfArgument(value < Fixed64.Zero, name, "Joint limit angles cannot be negative.");
 }

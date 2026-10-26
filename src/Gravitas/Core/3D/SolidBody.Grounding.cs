@@ -62,7 +62,7 @@ public partial class SolidBody
         get => _groundProbeRadius;
         set
         {
-            SwiftThrowHelper.ThrowIfArgument(value > ColliderGeometryPolicy.MaximumGeometryReach,
+            ChronicleGuard.ThrowIfArgument(value > ColliderGeometryPolicy.MaximumGeometryReach,
                 nameof(value), "Ground probe radius must not exceed 4,096 world units.");
             if (_groundProbeRadius == value) return;
             _groundProbeRadius = value;
@@ -222,7 +222,7 @@ public partial class SolidBody
     /// </summary>
     public void SetManualGrounding(Vector3d hitPoint, Vector3d groundNormal, FixedTransform? hitPlatform = null)
     {
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             groundNormal.MagnitudeSquared <= Fixed64.Epsilon,
             nameof(groundNormal),
             "Manual grounding normal must be non-zero.");
@@ -258,7 +258,7 @@ public partial class SolidBody
     }
 
     private static void ValidateGroundMinNormalDot(Fixed64 value) =>
-        SwiftThrowHelper.ThrowIfArgument(value < Fixed64.Zero || value > Fixed64.One,
+        ChronicleGuard.ThrowIfArgument(value < Fixed64.Zero || value > Fixed64.One,
             nameof(value), "Ground support normal threshold must be between zero and one.");
 
     private void CheckGroundForSimulation() => CheckGround(force: false);

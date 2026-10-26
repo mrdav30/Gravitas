@@ -64,7 +64,7 @@ public partial class SolidBody
 
     private void SetPositionTransformWorldPosition(Vector3d position)
     {
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             !_positionTransform.TrySetWorldPosition(position),
             nameof(FixedTransform),
             "Position transform cannot represent the requested world position.");
@@ -72,7 +72,7 @@ public partial class SolidBody
 
     private void SetRotationTransformWorldRotation(FixedQuaternion rotation)
     {
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             !_rotationTransform.TrySetWorldPose(
                 _rotationTransform.WorldPosition,
                 rotation),

@@ -45,7 +45,7 @@ public sealed partial class SolidBody2D
         if (chronicler.Mode == SerializationMode.Loading)
         {
             PreflightLoadedMotionType(motionType);
-            SwiftThrowHelper.ThrowIfArgument(
+            ChronicleGuard.ThrowIfArgument(
                 (freezeAxes & ~BodyFreezeAxes2D.All) != BodyFreezeAxes2D.None,
                 nameof(freezeAxes),
                 "Unsupported 2D freeze axis bits.");
@@ -78,7 +78,7 @@ public sealed partial class SolidBody2D
         RecordValues.Look(chronicler, ref groundUpDirection, "GroundUpDirection", Vector2d.Forward);
         RecordValues.Look(chronicler, ref groundProbeRadius, "GroundProbeRadius");
         if (chronicler.Mode == SerializationMode.Loading)
-            SwiftThrowHelper.ThrowIfArgument(groundProbeRadius > ColliderGeometryPolicy.MaximumGeometryReach,
+            ChronicleGuard.ThrowIfArgument(groundProbeRadius > ColliderGeometryPolicy.MaximumGeometryReach,
                 nameof(GroundProbeRadius), "Ground probe radius must not exceed 4,096 world units.");
         RecordValues.Look(chronicler, ref groundedDistanceRay, "GroundedDistanceRay", Fixed64.Half);
         RecordValues.Look(chronicler, ref groundDownDistanceOnAir, "GroundDownDistanceOnAir", Fixed64.Half);

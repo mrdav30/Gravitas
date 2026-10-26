@@ -22,7 +22,7 @@ internal static class ColliderScalePolicy
         out Fixed64 worldRotation,
         bool captureRotation = true)
     {
-        SwiftThrowHelper.ThrowIfNull(transform, nameof(transform));
+        ChronicleGuard.ThrowIfNull(transform, nameof(transform));
         FixedTransform? current = transform;
         while (current != null)
         {
@@ -38,7 +38,7 @@ internal static class ColliderScalePolicy
                 out worldScale,
                 out worldRotation,
                 captureRotation);
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             !captured,
             nameof(transform),
             "2D collider transform hierarchy must compose to a representable, nonsheared X/Z transform.");
@@ -51,7 +51,7 @@ internal static class ColliderScalePolicy
         out Fixed4x4 worldMatrix,
         out FixedQuaternion worldRotation)
     {
-        SwiftThrowHelper.ThrowIfNull(transform, nameof(transform));
+        ChronicleGuard.ThrowIfNull(transform, nameof(transform));
         ValidateAncestry(transform);
 
         Vector3d worldScale = default;
@@ -62,7 +62,7 @@ internal static class ColliderScalePolicy
                 out _,
                 out worldRotation,
                 out worldScale);
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             !captured,
             nameof(transform),
             "Collider transform hierarchy must compose to a representable, nonsheared transform.");
@@ -84,7 +84,7 @@ internal static class ColliderScalePolicy
             out _,
             out _,
             out worldScale);
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             !(capturedMatrix & capturedScale),
             nameof(transform),
             "Collider transform hierarchy must compose to a representable, nonsheared transform.");
@@ -153,7 +153,7 @@ internal static class ColliderScalePolicy
 
     internal static void Validate(Vector2d scale)
     {
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             !IsPositive(scale),
             nameof(scale),
             "2D collider scale must be greater than zero on the X and Z axes throughout its transform ancestry.");
@@ -161,7 +161,7 @@ internal static class ColliderScalePolicy
 
     internal static void Validate(Vector3d scale)
     {
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             !IsPositive(scale),
             nameof(scale),
             "3D collider scale must be greater than zero on every axis throughout its transform ancestry.");
@@ -187,7 +187,7 @@ internal static class ColliderScalePolicy
         Fixed64 partScale,
         Fixed64 divisor)
     {
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             !Fixed64.TryMultiplyDivide(value, ownerScale, partScale, divisor, out Fixed64 result),
             nameof(value),
             "Scaled collider geometry must be representable.");
@@ -215,7 +215,7 @@ internal static class ColliderScalePolicy
         Fixed64 partScale)
     {
         Fixed64 result = Scale(dimension, ownerScale, partScale);
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             result <= Fixed64.Zero,
             nameof(dimension),
             "Scaled collider dimensions must remain greater than zero.");
@@ -248,7 +248,7 @@ internal static class ColliderScalePolicy
         Fixed64 divisor)
     {
         Fixed64 result = Scale(dimension, ownerScale, partScale, divisor);
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             result <= Fixed64.Zero,
             nameof(dimension),
             "Scaled collider dimensions must remain greater than zero.");

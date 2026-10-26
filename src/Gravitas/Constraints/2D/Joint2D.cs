@@ -107,7 +107,7 @@ public sealed class Joint2D : IRecordable
         get => _isEnabled;
         set
         {
-            SwiftThrowHelper.ThrowIfTrue(
+            ChronicleGuard.ThrowIfTrue(
                 !IsActive,
                 nameof(Joint2D),
                 "Removed joints cannot mutate simulation state.");
@@ -143,7 +143,7 @@ public sealed class Joint2D : IRecordable
     /// </summary>
     public void SetMotor(JointMotor2D motor)
     {
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             !IsActive,
             nameof(Joint2D),
             "Removed joints cannot mutate simulation state.");
@@ -247,7 +247,7 @@ public sealed class Joint2D : IRecordable
     /// </summary>
     public void RecordData(IChronicler chronicler)
     {
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             !IsActive,
             nameof(Joint2D),
             "Removed joints cannot participate in serialization.");
@@ -292,10 +292,10 @@ public sealed class Joint2D : IRecordable
         if (chronicler.Mode != SerializationMode.Loading)
             return;
 
-        SwiftThrowHelper.ThrowIfArgument(!IsSupportedType(type), nameof(Type), "Unsupported 2D joint type.");
-        SwiftThrowHelper.ThrowIfArgument(!IsSupportedLimitKind(limitKind), nameof(Limits), "Unsupported 2D joint limit kind.");
-        SwiftThrowHelper.ThrowIfArgument(!IsSupportedMotorKind(motorKind), nameof(Motor), "Unsupported 2D joint motor kind.");
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(!IsSupportedType(type), nameof(Type), "Unsupported 2D joint type.");
+        ChronicleGuard.ThrowIfArgument(!IsSupportedLimitKind(limitKind), nameof(Limits), "Unsupported 2D joint limit kind.");
+        ChronicleGuard.ThrowIfArgument(!IsSupportedMotorKind(motorKind), nameof(Motor), "Unsupported 2D joint motor kind.");
+        ChronicleGuard.ThrowIfArgument(
             collisionPolicy != JointCollisionPolicy.SuppressLinked
                 && collisionPolicy != JointCollisionPolicy.Collide,
             nameof(CollisionPolicy),
@@ -355,19 +355,19 @@ public sealed class Joint2D : IRecordable
         in JointLimit2D limits,
         in JointMotor2D motor)
     {
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             type == JointType2D.Distance
                 && limits.Kind != JointLimitKind2D.Unrestricted
                 && limits.Kind != JointLimitKind2D.Distance,
             nameof(limits),
             "Distance joints accept only distance limits.");
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             type == JointType2D.Prismatic
                 && limits.Kind != JointLimitKind2D.Unrestricted
                 && limits.Kind != JointLimitKind2D.Slider,
             nameof(limits),
             "Prismatic joints accept only slider limits.");
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             type != JointType2D.Prismatic
                 && motor.Kind == JointMotorKind2D.Linear,
             nameof(motor),

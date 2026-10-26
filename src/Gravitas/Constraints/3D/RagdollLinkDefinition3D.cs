@@ -19,7 +19,7 @@ public readonly struct RagdollLinkDefinition3D
     /// </summary>
     public RagdollLinkDefinition3D(int linkId, SolidBody body)
     {
-        SwiftThrowHelper.ThrowIfNull(body, nameof(body));
+        ChronicleGuard.ThrowIfNull(body, nameof(body));
 
         LinkId = linkId;
         Body = body;

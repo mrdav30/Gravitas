@@ -21,12 +21,12 @@ public partial class SolidBody
         int bodySchemaVersion = 1;
         RecordValues.Look(chronicler, ref bodySchemaVersion, "BodySchemaVersion", 0);
         if (chronicler.Mode == SerializationMode.Loading)
-            SwiftThrowHelper.ThrowIfTrue(bodySchemaVersion != 1, nameof(SolidBody),
+            ChronicleGuard.ThrowIfTrue(bodySchemaVersion != 1, nameof(SolidBody),
                 "The body schema is missing or unsupported.");
         long lastGroundCheckFrame = _lastGroundCheckFrame;
         RecordValues.Look(chronicler, ref lastGroundCheckFrame, "LastGroundCheckFrame", -1L);
         if (chronicler.Mode == SerializationMode.Loading)
-            SwiftThrowHelper.ThrowIfTrue(lastGroundCheckFrame < -1, nameof(SolidBody),
+            ChronicleGuard.ThrowIfTrue(lastGroundCheckFrame < -1, nameof(SolidBody),
                 "The grounding frame must be nonnegative or the unset value -1.");
 
         GroundingMode groundingMode = GroundingMode;
@@ -48,7 +48,7 @@ public partial class SolidBody
         if (chronicler.Mode == SerializationMode.Loading)
         {
             PreflightLoadedMotionType(motionType);
-            SwiftThrowHelper.ThrowIfArgument(
+            ChronicleGuard.ThrowIfArgument(
                 (freezeAxes & ~BodyFreezeAxes3D.All) != BodyFreezeAxes3D.None,
                 nameof(freezeAxes),
                 "Unsupported 3D freeze axis bits.");
@@ -65,7 +65,7 @@ public partial class SolidBody
         RecordValues.Look(chronicler, ref groundProbeMode, "GroundProbeMode", GroundProbeMode.Auto);
         RecordValues.Look(chronicler, ref groundProbeRadius, "GroundProbeRadius");
         if (chronicler.Mode == SerializationMode.Loading)
-            SwiftThrowHelper.ThrowIfArgument(groundProbeRadius > ColliderGeometryPolicy.MaximumGeometryReach,
+            ChronicleGuard.ThrowIfArgument(groundProbeRadius > ColliderGeometryPolicy.MaximumGeometryReach,
                 nameof(GroundProbeRadius), "Ground probe radius must not exceed 4,096 world units.");
         RecordValues.Look(chronicler, ref _skipGroundingCheck, "SkipGroundingCheck", false);
         RecordValues.Look(chronicler, ref StepOffset, "StepOffset");

@@ -129,7 +129,7 @@ public partial struct PhysicsLayer : IEquatable<PhysicsLayer>
 
     private static void ValidateIndex(int index, string paramName)
     {
-        SwiftThrowHelper.ThrowIfArgumentOutOfRange(
+        ChronicleGuard.ThrowIfArgumentOutOfRange(
             index < MinIndex || index > MaxIndex,
             index,
             paramName,

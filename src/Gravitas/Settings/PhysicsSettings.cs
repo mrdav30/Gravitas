@@ -116,7 +116,7 @@ public sealed partial class PhysicsSettings
         get => _retainedPartitionTimeToKillFrames;
         set
         {
-            SwiftThrowHelper.ThrowIfNegative(value, nameof(value));
+            ChronicleGuard.ThrowIfNegative(value, nameof(value));
             _retainedPartitionTimeToKillFrames = value;
         }
     }
@@ -130,7 +130,7 @@ public sealed partial class PhysicsSettings
         get => _retainedPartitionRetirementSweepBudget;
         set
         {
-            SwiftThrowHelper.ThrowIfNegative(value, nameof(value));
+            ChronicleGuard.ThrowIfNegative(value, nameof(value));
             _retainedPartitionRetirementSweepBudget = value;
         }
     }
@@ -160,7 +160,7 @@ public sealed partial class PhysicsSettings
         get => _continuousCollisionMaxToiIterations;
         set
         {
-            SwiftThrowHelper.ThrowIfNegativeOrZero(value, nameof(value));
+            ChronicleGuard.ThrowIfNegativeOrZero(value, nameof(value));
             _continuousCollisionMaxToiIterations = value;
         }
     }
@@ -175,7 +175,7 @@ public sealed partial class PhysicsSettings
         get => _discreteSolverIterations;
         set
         {
-            SwiftThrowHelper.ThrowIfNegativeOrZero(value, nameof(value));
+            ChronicleGuard.ThrowIfNegativeOrZero(value, nameof(value));
             _discreteSolverIterations = value;
         }
     }
@@ -188,7 +188,7 @@ public sealed partial class PhysicsSettings
         get => _restitutionVelocityThreshold;
         set
         {
-            SwiftThrowHelper.ThrowIfArgument(
+            ChronicleGuard.ThrowIfArgument(
                 value < Fixed64.Zero,
                 nameof(value),
                 "Restitution velocity threshold cannot be negative.");
@@ -204,7 +204,7 @@ public sealed partial class PhysicsSettings
         get => _mixed2DHalfThickness;
         set
         {
-            SwiftThrowHelper.ThrowIfArgument(
+            ChronicleGuard.ThrowIfArgument(
                 value <= Fixed64.Zero,
                 nameof(value),
                 "Mixed 2D half-thickness must be greater than zero.");
@@ -223,7 +223,7 @@ public sealed partial class PhysicsSettings
         get => _runtimeMode;
         set
         {
-            SwiftThrowHelper.ThrowIfArgument(
+            ChronicleGuard.ThrowIfArgument(
                 !value.IsValid(),
                 nameof(value),
                 "Physics runtime mode must be TwoD, ThreeD, Both, or Mixed.");
@@ -258,7 +258,7 @@ public sealed partial class PhysicsSettings
 
     internal static void ThrowIfInvalidFrameRate(int frameRate)
     {
-        SwiftThrowHelper.ThrowIfNegativeOrZero(frameRate, nameof(frameRate));
+        ChronicleGuard.ThrowIfNegativeOrZero(frameRate, nameof(frameRate));
         if (frameRate > MaxResolvableFrameRate)
         {
             throw new ArgumentOutOfRangeException(

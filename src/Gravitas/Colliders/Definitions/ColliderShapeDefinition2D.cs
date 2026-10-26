@@ -118,7 +118,7 @@ public readonly struct ColliderShapeDefinition2D : IEquatable<ColliderShapeDefin
     /// </summary>
     public static ColliderShapeDefinition2D ConvexPolygon(PhysicsMaterial? material, params Vector2d[] vertices)
     {
-        SwiftThrowHelper.ThrowIfNull(vertices, nameof(vertices));
+        ChronicleGuard.ThrowIfNull(vertices, nameof(vertices));
         LSPolygonCollider2D.ValidateConvexPolygon(vertices);
 
         var vertexSnapshot = new Vector2d[vertices.Length];
@@ -144,7 +144,7 @@ public readonly struct ColliderShapeDefinition2D : IEquatable<ColliderShapeDefin
     public Vector2d GetPolygonVertex(int index)
     {
         EnsurePolygonDefinition();
-        SwiftThrowHelper.ThrowIfArrayIndexInvalid(index, _polygonVertices!.Length, nameof(index));
+        ChronicleGuard.ThrowIfArrayIndexInvalid(index, _polygonVertices!.Length, nameof(index));
         return _polygonVertices[index];
     }
 
@@ -179,7 +179,7 @@ public readonly struct ColliderShapeDefinition2D : IEquatable<ColliderShapeDefin
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal void EnsureDefined()
     {
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             Kind == ColliderShapeDefinition2DKind.Undefined,
             nameof(ColliderShapeDefinition2D),
             "2D collider shape definition cannot be default.");
@@ -189,7 +189,7 @@ public readonly struct ColliderShapeDefinition2D : IEquatable<ColliderShapeDefin
     internal void EnsureKind(ColliderShapeDefinition2DKind expectedKind)
     {
         EnsureDefined();
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             Kind != expectedKind,
             nameof(ColliderShapeDefinition2D),
             $"2D collider shape definition must be {expectedKind}.");
@@ -201,14 +201,14 @@ public readonly struct ColliderShapeDefinition2D : IEquatable<ColliderShapeDefin
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void ValidateRadius(Fixed64 radius) =>
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             radius <= Fixed64.Zero,
             nameof(radius),
             "2D collider radius must be greater than zero.");
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void ValidateSize(Vector2d size) =>
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             size.X <= Fixed64.Zero || size.Y <= Fixed64.Zero,
             nameof(size),
             "2D collider size components must be greater than zero.");
@@ -217,7 +217,7 @@ public readonly struct ColliderShapeDefinition2D : IEquatable<ColliderShapeDefin
     private static void ValidateCapsule(Fixed64 radius, Fixed64 height)
     {
         ValidateRadius(radius);
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             height < radius * (Fixed64)2,
             nameof(height),
             "2D capsule height must be at least the capsule diameter.");

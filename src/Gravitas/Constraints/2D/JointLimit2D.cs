@@ -70,7 +70,7 @@ public readonly struct JointLimit2D
     /// </summary>
     public static JointLimit2D Distance(Fixed64 targetDistance)
     {
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             targetDistance < Fixed64.Zero,
             nameof(targetDistance),
             "Joint target distance cannot be negative.");
@@ -82,7 +82,7 @@ public readonly struct JointLimit2D
     /// </summary>
     public static JointLimit2D Slider(Fixed64 minTranslation, Fixed64 maxTranslation)
     {
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             minTranslation > maxTranslation,
             nameof(minTranslation),
             "Slider minimum translation cannot exceed maximum translation.");
@@ -94,7 +94,7 @@ public readonly struct JointLimit2D
     /// </summary>
     public static JointLimit2D Angular(Fixed64 minAngle, Fixed64 maxAngle)
     {
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             minAngle > maxAngle,
             nameof(minAngle),
             "Angular minimum angle cannot exceed maximum angle.");
@@ -103,15 +103,15 @@ public readonly struct JointLimit2D
 
     internal void Validate()
     {
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             Kind != JointLimitKind2D.Unrestricted
                 && Kind != JointLimitKind2D.Distance
                 && Kind != JointLimitKind2D.Slider
                 && Kind != JointLimitKind2D.Angular,
             nameof(Kind),
             "Unsupported 2D joint limit kind.");
-        SwiftThrowHelper.ThrowIfArgument(TargetDistance < Fixed64.Zero, nameof(TargetDistance), "Joint target distance cannot be negative.");
-        SwiftThrowHelper.ThrowIfArgument(MinTranslation > MaxTranslation, nameof(MinTranslation), "Slider minimum translation cannot exceed maximum translation.");
-        SwiftThrowHelper.ThrowIfArgument(MinAngle > MaxAngle, nameof(MinAngle), "Angular minimum angle cannot exceed maximum angle.");
+        ChronicleGuard.ThrowIfArgument(TargetDistance < Fixed64.Zero, nameof(TargetDistance), "Joint target distance cannot be negative.");
+        ChronicleGuard.ThrowIfArgument(MinTranslation > MaxTranslation, nameof(MinTranslation), "Slider minimum translation cannot exceed maximum translation.");
+        ChronicleGuard.ThrowIfArgument(MinAngle > MaxAngle, nameof(MinAngle), "Angular minimum angle cannot exceed maximum angle.");
     }
 }

@@ -35,7 +35,7 @@ public readonly struct JointFrame3D
 
     internal static JointFrame3D FromTransform(FixedTransform transform, string parameterName)
     {
-        SwiftThrowHelper.ThrowIfNull(transform, parameterName);
+        ChronicleGuard.ThrowIfNull(transform, parameterName);
         return new JointFrame3D(transform.LocalPosition, transform.LocalRotation);
     }
 }

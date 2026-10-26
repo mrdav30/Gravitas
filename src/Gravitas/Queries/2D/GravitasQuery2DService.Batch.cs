@@ -62,7 +62,7 @@ public sealed partial class GravitasQuery2DService
         SwiftList<Physics2DHit> hits,
         Span<PhysicsQueryHitRange> ranges)
     {
-        SwiftThrowHelper.ThrowIfNull(hits, nameof(hits));
+        ChronicleGuard.ThrowIfNull(hits, nameof(hits));
         ValidateRangeBatchOutput(requests.Length, ranges);
         ResetBatchCounters(requests.Length);
         hits.Clear();
@@ -114,7 +114,7 @@ public sealed partial class GravitasQuery2DService
         SwiftList<Physics2DHit> hits,
         Span<PhysicsQueryHitRange> ranges)
     {
-        SwiftThrowHelper.ThrowIfNull(hits, nameof(hits));
+        ChronicleGuard.ThrowIfNull(hits, nameof(hits));
         ValidateRangeBatchOutput(requests.Length, ranges);
         ValidateOverlapCircleRequests(requests);
         ResetBatchCounters(requests.Length);
@@ -167,7 +167,7 @@ public sealed partial class GravitasQuery2DService
         SwiftList<Physics2DHit> hits,
         Span<PhysicsQueryHitRange> ranges)
     {
-        SwiftThrowHelper.ThrowIfNull(hits, nameof(hits));
+        ChronicleGuard.ThrowIfNull(hits, nameof(hits));
         ValidateRangeBatchOutput(requests.Length, ranges);
         ValidateOverlapAabbRequests(requests);
         ResetBatchCounters(requests.Length);
@@ -225,7 +225,7 @@ public sealed partial class GravitasQuery2DService
         SwiftList<Physics2DHit> hits,
         Span<PhysicsQueryHitRange> ranges)
     {
-        SwiftThrowHelper.ThrowIfNull(hits, nameof(hits));
+        ChronicleGuard.ThrowIfNull(hits, nameof(hits));
         ValidateRangeBatchOutput(requests.Length, ranges);
         ValidatePolygonRequestRanges(requests, vertices);
         ResetBatchCounters(requests.Length);
@@ -286,7 +286,7 @@ public sealed partial class GravitasQuery2DService
         SwiftList<Physics2DHit> hits,
         Span<PhysicsQueryHitRange> ranges)
     {
-        SwiftThrowHelper.ThrowIfNull(hits, nameof(hits));
+        ChronicleGuard.ThrowIfNull(hits, nameof(hits));
         ValidateRangeBatchOutput(requests.Length, ranges);
         ValidateSweepCircleRequests(requests);
         ResetBatchCounters(requests.Length);
@@ -361,7 +361,7 @@ public sealed partial class GravitasQuery2DService
 
     private static void ValidateClosestBatchOutput(int requestCount, Span<Physics2DHit> closestHits)
     {
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             closestHits.Length < requestCount,
             nameof(closestHits),
             "Closest-hit output span must contain at least one slot per request.");
@@ -369,7 +369,7 @@ public sealed partial class GravitasQuery2DService
 
     private static void ValidateRangeBatchOutput(int requestCount, Span<PhysicsQueryHitRange> ranges)
     {
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             ranges.Length < requestCount,
             nameof(ranges),
             "Range output span must contain at least one slot per request.");
@@ -382,7 +382,7 @@ public sealed partial class GravitasQuery2DService
         for (int i = 0; i < requests.Length; i++)
         {
             PhysicsOverlapPolygon2DRequest request = requests[i];
-            SwiftThrowHelper.ThrowIfArgument(
+            ChronicleGuard.ThrowIfArgument(
                 request.VertexStart < 0
                 || request.VertexCount < 0
                 || request.VertexStart > vertices.Length
@@ -398,7 +398,7 @@ public sealed partial class GravitasQuery2DService
     {
         for (int i = 0; i < requests.Length; i++)
         {
-            SwiftThrowHelper.ThrowIfArgument(
+            ChronicleGuard.ThrowIfArgument(
                 requests[i].Radius < Fixed64.Zero,
                 nameof(requests),
                 "2D query radius cannot be negative.");
@@ -416,7 +416,7 @@ public sealed partial class GravitasQuery2DService
     {
         for (int i = 0; i < requests.Length; i++)
         {
-            SwiftThrowHelper.ThrowIfArgument(
+            ChronicleGuard.ThrowIfArgument(
                 requests[i].Radius <= Fixed64.Zero,
                 nameof(requests),
                 "2D sweep radius must be greater than zero.");

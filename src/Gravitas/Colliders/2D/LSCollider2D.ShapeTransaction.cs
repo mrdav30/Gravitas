@@ -126,7 +126,7 @@ public abstract partial class LSCollider2D
     {
         bool representable =
             TryGetCurrentScaledOffset(out Vector2d scaledOffset);
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             !representable,
             nameof(ScaledLocalOffset),
             "The scaled 2D collider offset is outside the Fixed64 coordinate domain.");
@@ -142,7 +142,7 @@ public abstract partial class LSCollider2D
             ownerScale,
             _compoundOwner?.Rotation ?? Rotation,
             out Vector2d center);
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             !representable,
             nameof(Center),
             "The 2D collider center is outside the Fixed64 coordinate domain.");
@@ -171,7 +171,7 @@ public abstract partial class LSCollider2D
                 ownerScale,
                 rotation,
                 out center);
-            SwiftThrowHelper.ThrowIfArgument(
+            ChronicleGuard.ThrowIfArgument(
                 !representable,
                 nameof(requestedPosition),
                 "2D collider center must be representable after applying the requested body pose.");
@@ -179,7 +179,7 @@ public abstract partial class LSCollider2D
         else
         {
             rotation = matrixRotation;
-            SwiftThrowHelper.ThrowIfArgument(
+            ChronicleGuard.ThrowIfArgument(
                 !Fixed4x4.TryTransformAffinePoint(
                     worldMatrix,
                     _localOffset.ToVector3d(Fixed64.Zero),
@@ -258,7 +258,7 @@ public abstract partial class LSCollider2D
             ownerSnapshot.OwnerScale,
             ownerSnapshot.Rotation,
             out Vector2d center);
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             !representable,
             nameof(_localOffset),
             "Compound-part center must be representable in the owner's world frame.");
@@ -377,7 +377,7 @@ public abstract partial class LSCollider2D
             _committedOwnerScale,
             rotation,
             out Vector2d center);
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             !representable,
             nameof(position),
             "2D collider center must be representable after applying the detached body pose.");
@@ -432,7 +432,7 @@ public abstract partial class LSCollider2D
         Vector2d localScale,
         GravitasWorldContext context)
     {
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             _context != null && !ReferenceEquals(_context, context),
             nameof(context),
             "2D compound collider part is already bound to a different GravitasWorldContext.");

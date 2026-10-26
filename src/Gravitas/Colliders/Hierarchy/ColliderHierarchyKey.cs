@@ -66,14 +66,14 @@ internal readonly struct ColliderHierarchyKey : IEquatable<ColliderHierarchyKey>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static ColliderHierarchyKey Create3D(int id)
     {
-        SwiftThrowHelper.ThrowIfNegative(id, nameof(id));
+        ChronicleGuard.ThrowIfNegative(id, nameof(id));
         return new ColliderHierarchyKey(ThreeDDimension, id);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static ColliderHierarchyKey Create2D(int id)
     {
-        SwiftThrowHelper.ThrowIfNegative(id, nameof(id));
+        ChronicleGuard.ThrowIfNegative(id, nameof(id));
         return new ColliderHierarchyKey(TwoDDimension, id);
     }
 

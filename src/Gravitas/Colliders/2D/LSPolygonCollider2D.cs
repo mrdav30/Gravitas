@@ -82,7 +82,7 @@ public sealed class LSPolygonCollider2D : LSCollider2D, IConvexVertexSource2D
     /// </summary>
     public bool TryGetWorldVertex(int index, out Vector2d vertex)
     {
-        SwiftThrowHelper.ThrowIfArrayIndexInvalid(
+        ChronicleGuard.ThrowIfArrayIndexInvalid(
             index,
             _scaledLocalVertices.Length,
             nameof(index));
@@ -280,8 +280,8 @@ public sealed class LSPolygonCollider2D : LSCollider2D, IConvexVertexSource2D
 
     private void SetLocalVertices(Vector2d[] vertices, bool markDirty)
     {
-        SwiftThrowHelper.ThrowIfNull(vertices, nameof(vertices));
-        SwiftThrowHelper.ThrowIfArgument(vertices.Length < 3, nameof(vertices), "2D polygon must contain at least three vertices.");
+        ChronicleGuard.ThrowIfNull(vertices, nameof(vertices));
+        ChronicleGuard.ThrowIfArgument(vertices.Length < 3, nameof(vertices), "2D polygon must contain at least three vertices.");
         ValidateConvexPolygon(vertices);
 
         if (_localVertices.Length != vertices.Length)
@@ -301,8 +301,8 @@ public sealed class LSPolygonCollider2D : LSCollider2D, IConvexVertexSource2D
 
     internal static void ValidateConvexPolygon(Vector2d[] vertices)
     {
-        SwiftThrowHelper.ThrowIfArgument(vertices.Length < 3, nameof(vertices), "2D polygon must contain at least three vertices.");
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(vertices.Length < 3, nameof(vertices), "2D polygon must contain at least three vertices.");
+        ChronicleGuard.ThrowIfArgument(
             !FixedConvex2dRelations.IsStrictlyConvex(vertices),
             nameof(vertices),
             "2D polygon vertices must form a strictly convex boundary.");

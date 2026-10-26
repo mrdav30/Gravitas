@@ -94,11 +94,11 @@ public sealed class LSCapsuleCollider : LSCollider
             snapshot.OwnerScale.Z,
             snapshot.PartScale.Z);
         radius = FixedMath.Max(radiusX, radiusZ);
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             !HasValidScaledDimensions(snapshot),
             nameof(snapshot),
             "Scaled capsule height must be at least the capsule diameter.");
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             !Fixed64.TryMultiplySubtractClamped(
                 snapshot.Size.Y,
                 snapshot.OwnerScale.Y,

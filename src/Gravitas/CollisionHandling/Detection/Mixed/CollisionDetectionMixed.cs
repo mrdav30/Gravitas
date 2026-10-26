@@ -23,8 +23,8 @@ public static partial class CollisionDetectionMixed
     /// <remarks>The representative is the deepest retained row, not a whole-owner escape. Use <see cref="TryBuildManifold"/> to inspect every constraint.</remarks>
     public static bool TryCollide(LSCollider collider3D, LSCollider2D collider2D, out MixedContact contact)
     {
-        SwiftThrowHelper.ThrowIfNull(collider3D, nameof(collider3D));
-        SwiftThrowHelper.ThrowIfNull(collider2D, nameof(collider2D));
+        ChronicleGuard.ThrowIfNull(collider3D, nameof(collider3D));
+        ChronicleGuard.ThrowIfNull(collider2D, nameof(collider2D));
         ContactManifold manifold = collider3D.Context.CollisionScratch.MixedManifold;
         bool found = TryBuildManifold(collider3D, collider2D, manifold);
         contact = found ? MixedContact.FromManifoldContact(manifold.PrimaryContact) : default;
@@ -35,9 +35,9 @@ public static partial class CollisionDetectionMixed
     /// <remarks>Compound leaves retain separate provenance and materials. The buffer is cleared even when the pair is separated.</remarks>
     public static bool TryBuildManifold(LSCollider collider3D, LSCollider2D collider2D, ContactManifold manifold)
     {
-        SwiftThrowHelper.ThrowIfNull(collider3D, nameof(collider3D));
-        SwiftThrowHelper.ThrowIfNull(collider2D, nameof(collider2D));
-        SwiftThrowHelper.ThrowIfNull(manifold, nameof(manifold));
+        ChronicleGuard.ThrowIfNull(collider3D, nameof(collider3D));
+        ChronicleGuard.ThrowIfNull(collider2D, nameof(collider2D));
+        ChronicleGuard.ThrowIfNull(manifold, nameof(manifold));
         manifold.BeginUpdate(collider3D.Context.FrameCount);
         AppendManifold(collider3D, collider2D, manifold, 0, 0, false);
         return manifold.HasContact;

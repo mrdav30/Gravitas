@@ -47,7 +47,7 @@ public partial class SolidBody : IRecordable
         get => _freezeAxes;
         set
         {
-            SwiftThrowHelper.ThrowIfArgument(
+            ChronicleGuard.ThrowIfArgument(
                 (value & ~BodyFreezeAxes3D.All) != BodyFreezeAxes3D.None,
                 nameof(value),
                 "Unsupported 3D freeze axis bits.");
@@ -177,11 +177,11 @@ public partial class SolidBody : IRecordable
 
     private void ThrowIfRuntimeRegistrationMissing()
     {
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             !Active,
             nameof(SolidBody),
             "Body runtime state cannot change before initialization or after deactivation.");
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             !Context.Physics.TryGetColliderById(Collider.Id, out LSCollider? registeredCollider)
                 || !ReferenceEquals(registeredCollider, Collider),
             nameof(SolidBody),
@@ -446,7 +446,7 @@ public partial class SolidBody : IRecordable
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         set
         {
-            SwiftThrowHelper.ThrowIfArgument(
+            ChronicleGuard.ThrowIfArgument(
                 value < Fixed64.Zero,
                 nameof(value),
                 "Gravity scale cannot be negative.");
@@ -495,7 +495,7 @@ public partial class SolidBody : IRecordable
         get => _sleepFrameThreshold;
         set
         {
-            SwiftThrowHelper.ThrowIfNegative(value, nameof(value));
+            ChronicleGuard.ThrowIfNegative(value, nameof(value));
             _sleepFrameThreshold = value;
         }
     }
@@ -508,7 +508,7 @@ public partial class SolidBody : IRecordable
         get => _sleepLinearSpeedThreshold;
         set
         {
-            SwiftThrowHelper.ThrowIfArgument(
+            ChronicleGuard.ThrowIfArgument(
                 value < Fixed64.Zero,
                 nameof(value),
                 "Sleep linear speed threshold cannot be negative.");
@@ -524,7 +524,7 @@ public partial class SolidBody : IRecordable
         get => _sleepAngularSpeedThreshold;
         set
         {
-            SwiftThrowHelper.ThrowIfArgument(
+            ChronicleGuard.ThrowIfArgument(
                 value < Fixed64.Zero,
                 nameof(value),
                 "Sleep angular speed threshold cannot be negative.");
@@ -604,12 +604,12 @@ public partial class SolidBody : IRecordable
     /// <summary>Creates a 3D body bound to a host agent and collider.</summary>
     public SolidBody(IMatterAgent agent, LSCollider collider)
     {
-        SwiftThrowHelper.ThrowIfNull(agent, nameof(agent));
-        SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
+        ChronicleGuard.ThrowIfNull(agent, nameof(agent));
+        ChronicleGuard.ThrowIfNull(collider, nameof(collider));
 
         GravitasWorldContext context = agent.Context;
-        SwiftThrowHelper.ThrowIfNull(context, nameof(agent.Context));
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfNull(context, nameof(agent.Context));
+        ChronicleGuard.ThrowIfArgument(
             collider.TryGetBoundContext(out GravitasWorldContext? colliderContext)
                 && !ReferenceEquals(colliderContext, context),
             nameof(collider),
@@ -634,7 +634,7 @@ public partial class SolidBody : IRecordable
         BodyMotionType motionType = BodyMotionType.Dynamic)
     {
         motionType.ThrowIfInvalid(nameof(motionType));
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             Collider.Id >= 0
                 || (Collider.HasHostBinding && !ReferenceEquals(Collider.Body, this)),
             nameof(Collider),
@@ -840,7 +840,7 @@ public partial class SolidBody : IRecordable
     {
         Vector3d originalLocalPosition = _positionTransform.LocalPosition;
         FixedQuaternion originalLocalRotation = _positionTransform.LocalRotation;
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             !_positionTransform.TrySetWorldPose(position, rotation),
             nameof(FixedTransform),
             "Host transform cannot represent the requested world pose.");
@@ -849,7 +849,7 @@ public partial class SolidBody : IRecordable
         {
             if (Active)
             {
-                SwiftThrowHelper.ThrowIfTrue(
+                ChronicleGuard.ThrowIfTrue(
                     !Collider.TryPrepareBodyPose(position, rotation),
                     nameof(position),
                     "The requested body pose produces collider geometry outside the representable coordinate domain.");
@@ -907,7 +907,7 @@ public partial class SolidBody : IRecordable
     public Vector3d GetWorldPoint(Vector3d point)
     {
         bool transformed = TryGetWorldPoint(point, out Vector3d result);
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             !transformed,
             nameof(Collider),
             "Cannot get the world point because the collider has no committed scale or the final coordinate is not representable.");
@@ -942,7 +942,7 @@ public partial class SolidBody : IRecordable
     public Vector3d GetLocalPoint(Vector3d point)
     {
         bool transformed = TryGetLocalPoint(point, out Vector3d result);
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             !transformed,
             nameof(Collider),
             "Cannot get the local point because the collider has no committed scale, its scale is singular, or the final coordinate is not representable.");

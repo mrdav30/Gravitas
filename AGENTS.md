@@ -933,3 +933,11 @@ Be especially careful when changing:
 - line/ray/circle query ordering.
 - 2D/3D dimension assumptions.
 - code guarded by `GRAVITAS_DISABLE_MEMORYPACK` or `#if DEBUG`.
+
+## Shared Diagnostics Ownership
+
+Use the independent `Chronicler.Diagnostics` package for diagnostic channels,
+lazy logging handlers, and `ChronicleGuard` guards. It does not depend on
+`Chronicler.Core`. Keep library-specific channels, formatters, and logger facades
+in their owning library. `UseLocalLsfStack=true` selects the sibling diagnostics
+project; standard and Lean builds use the same diagnostics package.

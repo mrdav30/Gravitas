@@ -55,7 +55,7 @@ public sealed partial class GravitasWorldContext : IDisposable
 
     internal void ThrowIfFixedStepMutationNotAllowed()
     {
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             _fixedStepOpen || _simulationPhaseDepth > 0,
             nameof(GravitasWorldContext),
             "Authoritative body roles, static poses, and loaded state can change only outside the Simulate-to-LateSimulate fixed-step transaction.");
@@ -280,7 +280,7 @@ public sealed partial class GravitasWorldContext : IDisposable
     internal void ValidateClockLifetime(object lifetime)
     {
         ThrowIfDisposed();
-        SwiftThrowHelper.ThrowIfTrue(!ReferenceEquals(lifetime, _clock.Lifetime),
+        ChronicleGuard.ThrowIfTrue(!ReferenceEquals(lifetime, _clock.Lifetime),
             nameof(GravitasWorldContext), "The wait belongs to a previous simulation lifetime.");
     }
 
@@ -328,7 +328,7 @@ public sealed partial class GravitasWorldContext : IDisposable
     /// <returns>A context bound to <paramref name="world"/>.</returns>
     public static GravitasWorldContext Attach(GridWorld world, bool takeOwnership = false)
     {
-        SwiftThrowHelper.ThrowIfNull(world, nameof(world));
+        ChronicleGuard.ThrowIfNull(world, nameof(world));
         return CreateRegistered(world, takeOwnership);
     }
 
@@ -493,7 +493,7 @@ public sealed partial class GravitasWorldContext : IDisposable
     }
 
     private void ThrowIfLateSimulateTokenExhausted() =>
-        SwiftThrowHelper.ThrowIfTrue(_lateSimulateToken == long.MaxValue,
+        ChronicleGuard.ThrowIfTrue(_lateSimulateToken == long.MaxValue,
             nameof(GravitasWorldContext), "The late-simulation phase counter is exhausted.");
 
     /// <summary>
@@ -565,8 +565,8 @@ public sealed partial class GravitasWorldContext : IDisposable
     public void ApplySettings(PhysicsSettings settings)
     {
         ThrowIfDisposed();
-        SwiftThrowHelper.ThrowIfNull(settings, nameof(settings));
-        SwiftThrowHelper.ThrowIfTrue(settings.Owner != null && !ReferenceEquals(settings.Owner, this),
+        ChronicleGuard.ThrowIfNull(settings, nameof(settings));
+        ChronicleGuard.ThrowIfTrue(settings.Owner != null && !ReferenceEquals(settings.Owner, this),
             nameof(settings), "Physics settings are already owned by another context.");
         ValidateMixedGeometry(settings.RuntimeMode, settings.Mixed2DHalfThickness);
         Settings.Owner = null;
@@ -671,7 +671,7 @@ public sealed partial class GravitasWorldContext : IDisposable
     {
         lock (_worldOwnershipLock)
         {
-            SwiftThrowHelper.ThrowIfTrue(
+            ChronicleGuard.ThrowIfTrue(
                 !world.IsActive,
                 nameof(GravitasWorldContext),
                 "GravitasWorldContext requires an active GridWorld.");
@@ -684,7 +684,7 @@ public sealed partial class GravitasWorldContext : IDisposable
 
     private static void ThrowIfWorldOwned(GridWorld world)
     {
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             _worldOwners.ContainsKey(world),
             nameof(GravitasWorldContext),
             "GridWorld is already attached to an active GravitasWorldContext.");
@@ -697,8 +697,8 @@ public sealed partial class GravitasWorldContext : IDisposable
 
     internal void ThrowIfDisposed()
     {
-        SwiftThrowHelper.ThrowIfDisposed(_disposed, nameof(GravitasWorldContext));
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfDisposed(_disposed, nameof(GravitasWorldContext));
+        ChronicleGuard.ThrowIfTrue(
             !World.IsActive,
             nameof(GravitasWorldContext),
             "GravitasWorldContext is bound to an inactive GridWorld.");

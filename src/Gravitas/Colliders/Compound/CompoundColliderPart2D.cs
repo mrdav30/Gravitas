@@ -201,7 +201,7 @@ public readonly struct CompoundColliderPart2D
 
     private static void ValidateScale(Vector2d localScale)
     {
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             localScale.X <= Fixed64.Zero || localScale.Y <= Fixed64.Zero,
             nameof(localScale),
             "2D compound collider part scale components must be greater than zero.");

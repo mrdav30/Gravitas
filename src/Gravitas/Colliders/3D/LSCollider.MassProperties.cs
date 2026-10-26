@@ -22,7 +22,7 @@ public abstract partial class LSCollider
     public virtual Vector3d CalculateLocalCenterOfMassOffset()
     {
         ExactMassPoint3D point = CalculateLocalMassPoint();
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             !point.TryGetPoint(out Vector3d center),
             nameof(CalculateLocalCenterOfMassOffset),
             "The collider's body-local center of mass is outside the Fixed64 coordinate domain.");
@@ -74,7 +74,7 @@ public abstract partial class LSCollider
         // scalar fallback and must remain checked.
         if (!massPoint.TryGetPoint(out Vector3d center))
         {
-            SwiftThrowHelper.ThrowIfTrue(
+            ChronicleGuard.ThrowIfTrue(
                 true,
                 nameof(localCenterOfMassOffset),
                 "The requested inertia tensor is outside the Fixed64 scalar domain.");

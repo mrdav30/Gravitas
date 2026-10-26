@@ -213,7 +213,7 @@ public partial class PhysicsMesh
 
     internal void ValidateSurfaceMassProperties(Vector3d scale)
     {
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             scale != _ownerScale || _partScale != Vector3d.One,
             nameof(scale),
             "Scale must match the committed standalone mesh scale.");
@@ -222,7 +222,7 @@ public partial class PhysicsMesh
 
     internal void ValidateClosedVolumeScaleRepresentability(Vector3d scale)
     {
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             scale != _ownerScale || _partScale != Vector3d.One,
             nameof(scale),
             "Scale must match the committed standalone mesh scale.");

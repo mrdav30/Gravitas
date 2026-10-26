@@ -54,7 +54,7 @@ public sealed class GravitasCollisionService
     /// <param name="context">The owning world context.</param>
     public GravitasCollisionService(GravitasWorldContext context)
     {
-        SwiftThrowHelper.ThrowIfNull(context, nameof(context));
+        ChronicleGuard.ThrowIfNull(context, nameof(context));
         _context = context;
         _releaseRetainedPartition = ReleasePartition;
     }
@@ -164,8 +164,8 @@ public sealed class GravitasCollisionService
         LSCollider collider,
         ref SwiftList<WorldVoxelIndex> partitionedCoordinates)
     {
-        SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfNull(collider, nameof(collider));
+        ChronicleGuard.ThrowIfArgument(
             !ReferenceEquals(collider.Context, _context),
             nameof(collider),
             "Collider must belong to this collision service context.");
@@ -232,7 +232,7 @@ public sealed class GravitasCollisionService
         if (!voxel.TryGetPartition(out PhysicsPartition? partition))
         {
             partition = RentPartition();
-            SwiftThrowHelper.ThrowIfTrue(
+            ChronicleGuard.ThrowIfTrue(
                 !voxel.TryAddPartition(partition),
                 nameof(GravitasCollisionService),
                 "Unable to attach 3D physics partition to voxel.");
@@ -248,8 +248,8 @@ public sealed class GravitasCollisionService
 
     internal bool ClearPartitionedObject(LSCollider collider, bool force = false)
     {
-        SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfNull(collider, nameof(collider));
+        ChronicleGuard.ThrowIfArgument(
             !ReferenceEquals(collider.Context, _context),
             nameof(collider),
             "Collider must belong to this collision service context.");
@@ -341,8 +341,8 @@ public sealed class GravitasCollisionService
 
     internal void RefreshPartitionAwakeState(LSCollider collider)
     {
-        SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfNull(collider, nameof(collider));
+        ChronicleGuard.ThrowIfArgument(
             !ReferenceEquals(collider.Context, _context),
             nameof(collider),
             "Collider must belong to this collision service context.");
@@ -461,8 +461,8 @@ public sealed class GravitasCollisionService
 
     internal int ActivatePartition(PhysicsPartition partition)
     {
-        SwiftThrowHelper.ThrowIfNull(partition, nameof(partition));
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfNull(partition, nameof(partition));
+        ChronicleGuard.ThrowIfArgument(
             !ReferenceEquals(partition.Owner, this),
             nameof(partition),
             "Partition must belong to this collision service.");
@@ -493,8 +493,8 @@ public sealed class GravitasCollisionService
 
     internal void ReleasePartition(PhysicsPartition partition)
     {
-        SwiftThrowHelper.ThrowIfNull(partition, nameof(partition));
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfNull(partition, nameof(partition));
+        ChronicleGuard.ThrowIfArgument(
             !ReferenceEquals(partition.Owner, this),
             nameof(partition),
             "Partition must be released through its owning collision service.");

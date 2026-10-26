@@ -8,7 +8,7 @@ using Gravitas.Materials;
 using Gravitas.Support;
 using Gravitas.Tests.Support;
 using SwiftCollections;
-using SwiftCollections.Diagnostics;
+using Chronicler.Diagnostics;
 using System;
 using System.Reflection;
 using Xunit;

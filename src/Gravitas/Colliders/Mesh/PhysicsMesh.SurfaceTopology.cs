@@ -44,7 +44,7 @@ public partial class PhysicsMesh
     /// </summary>
     internal int GetCanonicalSurfaceOrdinal(int triangleIndex)
     {
-        SwiftThrowHelper.ThrowIfArrayIndexInvalid(triangleIndex, _triangleCount, nameof(triangleIndex));
+        ChronicleGuard.ThrowIfArrayIndexInvalid(triangleIndex, _triangleCount, nameof(triangleIndex));
         return _canonicalSurfaceOrdinals[triangleIndex];
     }
 
@@ -59,7 +59,7 @@ public partial class PhysicsMesh
     /// <summary>Gets trusted coplanar shared-edge neighbors in authored triangle order.</summary>
     internal ReadOnlySpan<int> GetCoplanarTriangleNeighbors(int triangleIndex)
     {
-        SwiftThrowHelper.ThrowIfArrayIndexInvalid(triangleIndex, _triangleCount, nameof(triangleIndex));
+        ChronicleGuard.ThrowIfArrayIndexInvalid(triangleIndex, _triangleCount, nameof(triangleIndex));
         return _coplanarNeighbors.AsSpan(_coplanarNeighborOffsets[triangleIndex],
             _coplanarNeighborOffsets[triangleIndex + 1] - _coplanarNeighborOffsets[triangleIndex]);
     }
@@ -67,7 +67,7 @@ public partial class PhysicsMesh
     /// <summary>Gets the committed exactly welded representatives of a triangle's three vertices.</summary>
     internal ReadOnlySpan<int> GetWeldedTriangleVertexIndices(int triangleIndex)
     {
-        SwiftThrowHelper.ThrowIfArrayIndexInvalid(triangleIndex, _triangleCount, nameof(triangleIndex));
+        ChronicleGuard.ThrowIfArrayIndexInvalid(triangleIndex, _triangleCount, nameof(triangleIndex));
         return _weldedTriangleVertices.AsSpan(triangleIndex * 3, 3);
     }
 
@@ -77,7 +77,7 @@ public partial class PhysicsMesh
     /// </summary>
     internal ReadOnlySpan<int> GetWeldedVertexTriangleIndices(int vertexIndex)
     {
-        SwiftThrowHelper.ThrowIfArrayIndexInvalid(vertexIndex, VertexCount, nameof(vertexIndex));
+        ChronicleGuard.ThrowIfArrayIndexInvalid(vertexIndex, VertexCount, nameof(vertexIndex));
         int representative = _weldedVertexRepresentatives[vertexIndex];
         return _weldedVertexTriangles.AsSpan(_weldedVertexTriangleOffsets[representative],
             _weldedVertexTriangleOffsets[representative + 1] - _weldedVertexTriangleOffsets[representative]);

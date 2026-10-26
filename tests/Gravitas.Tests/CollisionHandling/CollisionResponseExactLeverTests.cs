@@ -5,7 +5,7 @@ using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using Gravitas.Materials;
 using Gravitas.Tests.Support;
-using SwiftCollections.Diagnostics;
+using Chronicler.Diagnostics;
 using System;
 using Xunit;
 

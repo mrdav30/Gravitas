@@ -249,7 +249,7 @@ public readonly struct CompoundColliderPart
 
     private static void ValidateScale(Vector3d localScale)
     {
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             localScale.X <= Fixed64.Zero || localScale.Y <= Fixed64.Zero || localScale.Z <= Fixed64.Zero,
             nameof(localScale),
             "Compound collider part scale components must be greater than zero.");

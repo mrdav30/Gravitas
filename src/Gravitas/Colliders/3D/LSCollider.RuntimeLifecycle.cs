@@ -103,8 +103,8 @@ public abstract partial class LSCollider
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal void BindContext(GravitasWorldContext context)
     {
-        SwiftThrowHelper.ThrowIfNull(context, nameof(context));
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfNull(context, nameof(context));
+        ChronicleGuard.ThrowIfArgument(
             _context != null && !ReferenceEquals(_context, context),
             nameof(context),
             "Collider is already bound to a different GravitasWorldContext.");
@@ -116,12 +116,12 @@ public abstract partial class LSCollider
         FixedQuaternion localRotation,
         Vector3d localScale)
     {
-        SwiftThrowHelper.ThrowIfNull(owner, nameof(owner));
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfNull(owner, nameof(owner));
+        ChronicleGuard.ThrowIfArgument(
             HasHostBinding,
             nameof(owner),
             "Compound collider parts cannot be initialized as standalone colliders.");
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             _compoundOwner != null && !ReferenceEquals(_compoundOwner, owner),
             nameof(owner),
             "Compound collider part is already owned by another compound collider.");
@@ -134,7 +134,7 @@ public abstract partial class LSCollider
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void ThrowIfCompoundPartLifecycle(string operation)
     {
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             _compoundOwner != null,
             operation,
             "Compound collider parts are geometry owned by LSCompoundCollider and cannot run standalone lifecycle operations.");
@@ -154,11 +154,11 @@ public abstract partial class LSCollider
 
     private void ThrowIfCannotEnableTrigger(string operation)
     {
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             _body != null,
             operation,
             "Trigger colliders must be initialized without a SolidBody. Use InitializeWithNoBody for trigger volumes.");
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             _compoundOwner != null,
             operation,
             "Compound collider parts are not trigger identities. Set IsTrigger on the owning compound collider.");
@@ -166,7 +166,7 @@ public abstract partial class LSCollider
 
     private void ThrowIfTriggerWouldAttachToBody(string operation)
     {
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             _isTrigger,
             operation,
             "Trigger colliders must be initialized without a SolidBody. Use InitializeWithNoBody for trigger volumes.");
@@ -174,7 +174,7 @@ public abstract partial class LSCollider
 
     private void ThrowIfLoadedTriggerHasBody(string operation)
     {
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             _isTrigger && _body != null,
             operation,
             "Loaded trigger state is invalid for a collider attached to a SolidBody.");

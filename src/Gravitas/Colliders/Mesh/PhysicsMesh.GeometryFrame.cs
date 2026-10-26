@@ -32,7 +32,7 @@ public partial class PhysicsMesh
     internal void GetGeometryTriangleVertices(int index,
         out Vector3d first, out Vector3d second, out Vector3d third)
     {
-        SwiftThrowHelper.ThrowIfArrayIndexInvalid(index, _triangleCount, nameof(index));
+        ChronicleGuard.ThrowIfArrayIndexInvalid(index, _triangleCount, nameof(index));
         ReadOnlySpan<Vector3d> vertices = GeometryVertices;
         int offset = index * 3;
         first = vertices[_triangles[offset]];

@@ -73,15 +73,15 @@ public partial class SolidBody
         ThrowIfRuntimeRegistrationMissing();
         Context.ThrowIfFixedStepMutationNotAllowed();
         ColliderType expectedShape = GetSupportedRuntimeShape(definition.Kind);
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             expectedShape == ColliderType.None,
             nameof(definition),
             "Collider reconfiguration supports only sphere, capsule, and finite-cylinder definitions.");
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             Collider.Shape != expectedShape,
             nameof(definition),
             "Collider reconfiguration cannot replace the existing collider family.");
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             !CanPublishRootPosition(position),
             nameof(position),
             "The host transform cannot represent the requested body-root position.");

@@ -75,8 +75,8 @@ internal sealed partial class CollisionPairMixed
 
     public void Initialize(LSCollider collider3D, LSCollider2D collider2D)
     {
-        SwiftThrowHelper.ThrowIfNull(collider3D, nameof(collider3D));
-        SwiftThrowHelper.ThrowIfNull(collider2D, nameof(collider2D));
+        ChronicleGuard.ThrowIfNull(collider3D, nameof(collider3D));
+        ChronicleGuard.ThrowIfNull(collider2D, nameof(collider2D));
 
         _lifetimeVersion++;
         Collider3D = collider3D;
@@ -204,7 +204,7 @@ internal sealed partial class CollisionPairMixed
 
     private void PublishManifold(long frame, ContactManifold source)
     {
-        SwiftThrowHelper.ThrowIfNull(source, nameof(source));
+        ChronicleGuard.ThrowIfNull(source, nameof(source));
         _hasManifoldCache = false;
         RefreshContactDependencies(source);
         Manifold.CopyFrom(source, frame);

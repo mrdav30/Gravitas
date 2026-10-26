@@ -117,7 +117,7 @@ public readonly struct ContactAnchor
         get
         {
             bool succeeded = TryGetOffset(out Vector3d offset);
-            SwiftThrowHelper.ThrowIfTrue(
+            ChronicleGuard.ThrowIfTrue(
                 !succeeded,
                 nameof(Offset),
                 "The contact offset is outside the representable coordinate domain.");

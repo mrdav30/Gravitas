@@ -104,7 +104,7 @@ public readonly struct ContactAnchor2D
         get
         {
             bool succeeded = TryGetOffset(out Vector2d offset);
-            SwiftThrowHelper.ThrowIfTrue(
+            ChronicleGuard.ThrowIfTrue(
                 !succeeded,
                 nameof(Offset),
                 "The planar contact offset is outside the representable coordinate domain.");

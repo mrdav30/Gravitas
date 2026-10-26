@@ -51,7 +51,7 @@ public sealed partial class GravitasQuery2DService
         Vector2d start, Vector2d end, Fixed64 radius, PhysicsLayerMask layerMask,
         out Physics2DHit hit, LSCollider2D? excludedCollider, bool includeTriggers, SolidBody2D? groundingBody)
     {
-        SwiftThrowHelper.ThrowIfArgument(radius <= Fixed64.Zero, nameof(radius), "2D sweep radius must be greater than zero.");
+        ChronicleGuard.ThrowIfArgument(radius <= Fixed64.Zero, nameof(radius), "2D sweep radius must be greater than zero.");
         if (groundingBody is null)
             ColliderGeometryPolicy.ValidateReach(radius, nameof(radius));
 
@@ -167,8 +167,8 @@ public sealed partial class GravitasQuery2DService
         bool includeTriggers,
         bool staticTargetsOnly)
     {
-        SwiftThrowHelper.ThrowIfNull(results, nameof(results));
-        SwiftThrowHelper.ThrowIfArgument(radius <= Fixed64.Zero, nameof(radius), "2D sweep radius must be greater than zero.");
+        ChronicleGuard.ThrowIfNull(results, nameof(results));
+        ChronicleGuard.ThrowIfArgument(radius <= Fixed64.Zero, nameof(radius), "2D sweep radius must be greater than zero.");
         if (!staticTargetsOnly)
             ColliderGeometryPolicy.ValidateReach(radius, nameof(radius));
 

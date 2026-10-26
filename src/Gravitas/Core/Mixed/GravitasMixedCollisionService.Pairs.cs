@@ -40,7 +40,7 @@ internal sealed partial class GravitasMixedCollisionService
 {
     internal void RemovePairsFor3DCollider(LSCollider collider)
     {
-        SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
+        ChronicleGuard.ThrowIfNull(collider, nameof(collider));
         int removalStart = QueuePairsFor3DCollider(collider);
         RemoveQueuedPairs(removalStart, _pairsToRemove.Count);
     }
@@ -49,7 +49,7 @@ internal sealed partial class GravitasMixedCollisionService
         LSCollider collider,
         ref SwiftList<Exception>? notificationExceptions)
     {
-        SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
+        ChronicleGuard.ThrowIfNull(collider, nameof(collider));
         int removalStart = QueuePairsFor3DCollider(collider);
         RemoveQueuedPairs(
             removalStart,
@@ -74,7 +74,7 @@ internal sealed partial class GravitasMixedCollisionService
 
     internal void RemovePairsFor2DCollider(LSCollider2D collider)
     {
-        SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
+        ChronicleGuard.ThrowIfNull(collider, nameof(collider));
         int removalStart = _pairsToRemove.Count;
         foreach (var pairEntry in _pairs)
         {

@@ -58,7 +58,7 @@ public sealed partial class GravitasPhysicsService
     /// <param name="context">The owning world context.</param>
     public GravitasPhysicsService(GravitasWorldContext context)
     {
-        SwiftThrowHelper.ThrowIfNull(context, nameof(context));
+        ChronicleGuard.ThrowIfNull(context, nameof(context));
         _context = context;
     }
 
@@ -254,8 +254,8 @@ public sealed partial class GravitasPhysicsService
 
     internal int AssimilateBody(SolidBody body, BodyMotionType motionType)
     {
-        SwiftThrowHelper.ThrowIfNull(body, nameof(body));
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfNull(body, nameof(body));
+        ChronicleGuard.ThrowIfArgument(
             !ReferenceEquals(body.Context, _context),
             nameof(body),
             "Body must belong to this physics service context.");
@@ -301,7 +301,7 @@ public sealed partial class GravitasPhysicsService
 
     internal int AssimilateCollider(LSCollider collider)
     {
-        SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
+        ChronicleGuard.ThrowIfNull(collider, nameof(collider));
         collider.BindContext(_context);
 
         int id = _colliders.Register(collider);
@@ -311,7 +311,7 @@ public sealed partial class GravitasPhysicsService
 
     internal void DessimilateBody(SolidBody body)
     {
-        SwiftThrowHelper.ThrowIfNull(body, nameof(body));
+        ChronicleGuard.ThrowIfNull(body, nameof(body));
         int dynamicId = body.DynamicId;
         if (!_dynamicBodies.TryRemoveAt(dynamicId))
             return;
@@ -323,7 +323,7 @@ public sealed partial class GravitasPhysicsService
 
     internal void DessimilateCollider(LSCollider collider)
     {
-        SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
+        ChronicleGuard.ThrowIfNull(collider, nameof(collider));
         int id = collider.Id;
 
         if (!_colliders.TryGetById(id, out LSCollider? registered) || !ReferenceEquals(registered, collider))
@@ -349,7 +349,7 @@ public sealed partial class GravitasPhysicsService
 
     internal void RefreshColliderServiceRefreshRegistration(LSCollider collider)
     {
-        SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
+        ChronicleGuard.ThrowIfNull(collider, nameof(collider));
 
         if (collider.RequiresServiceSideRefresh)
             AddServiceRefreshCollider(collider);

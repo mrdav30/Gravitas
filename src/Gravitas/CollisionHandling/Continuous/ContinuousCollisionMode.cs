@@ -45,7 +45,7 @@ internal static class ContinuousCollisionModeSupport
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static void ThrowIfInvalid(this ContinuousCollisionMode mode, string parameterName)
     {
-        SwiftThrowHelper.ThrowIfArgumentOutOfRange(
+        ChronicleGuard.ThrowIfArgumentOutOfRange(
             !mode.IsValid(),
             (int)mode,
             parameterName,

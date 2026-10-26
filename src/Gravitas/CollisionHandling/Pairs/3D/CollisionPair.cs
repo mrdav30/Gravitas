@@ -109,11 +109,11 @@ public partial class CollisionPair
     /// <param name="c2">The second collider.</param>
     internal void Initialize(LSCollider c1, LSCollider c2)
     {
-        SwiftThrowHelper.ThrowIfNull(c1, nameof(c1));
-        SwiftThrowHelper.ThrowIfNull(c2, nameof(c2));
-        SwiftThrowHelper.ThrowIfArgument(c1 == c2, nameof(c2), "Cannot create a CollisionPair with the same collider.");
+        ChronicleGuard.ThrowIfNull(c1, nameof(c1));
+        ChronicleGuard.ThrowIfNull(c2, nameof(c2));
+        ChronicleGuard.ThrowIfArgument(c1 == c2, nameof(c2), "Cannot create a CollisionPair with the same collider.");
         GravitasWorldContext context = c1.Context;
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             !ReferenceEquals(context, c2.Context),
             nameof(c2),
             "Colliders must be in the same context to create a CollisionPair.");

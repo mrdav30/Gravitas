@@ -47,7 +47,7 @@ public sealed partial class GravitasQuery3DService
     /// <param name="context">The owning world context.</param>
     public GravitasQuery3DService(GravitasWorldContext context)
     {
-        SwiftThrowHelper.ThrowIfNull(context, nameof(context));
+        ChronicleGuard.ThrowIfNull(context, nameof(context));
         _context = context;
     }
 
@@ -139,7 +139,7 @@ public sealed partial class GravitasQuery3DService
         PhysicsLayerMask layerMask,
         SwiftList<Physics3DHit> results)
     {
-        SwiftThrowHelper.ThrowIfNull(results, nameof(results));
+        ChronicleGuard.ThrowIfNull(results, nameof(results));
 
         _currentLayerMask = layerMask;
         results.Clear();
@@ -178,7 +178,7 @@ public sealed partial class GravitasQuery3DService
         PhysicsLayerMask layerMask,
         LSCollider? excludedCollider = null)
     {
-        SwiftThrowHelper.ThrowIfArgument(radius > ColliderGeometryPolicy.MaximumGeometryReach,
+        ChronicleGuard.ThrowIfArgument(radius > ColliderGeometryPolicy.MaximumGeometryReach,
             nameof(radius), "Effective geometry reach must not exceed 4,096 world units.");
         if (direction == Vector3d.Zero || maxDistance <= Fixed64.Zero)
         {
@@ -257,8 +257,8 @@ public sealed partial class GravitasQuery3DService
         LSCollider? excludedCollider = null,
         bool includeTriggers = true)
     {
-        SwiftThrowHelper.ThrowIfNull(source, nameof(source));
-        SwiftThrowHelper.ThrowIfNull(results, nameof(results));
+        ChronicleGuard.ThrowIfNull(source, nameof(source));
+        ChronicleGuard.ThrowIfNull(results, nameof(results));
         return SweepRegisteredSourceAll(
             source,
             displacement,
@@ -280,7 +280,7 @@ public sealed partial class GravitasQuery3DService
         LSCollider? excludedCollider = null,
         bool includeTriggers = true)
     {
-        SwiftThrowHelper.ThrowIfNull(source, nameof(source));
+        ChronicleGuard.ThrowIfNull(source, nameof(source));
         return SweepRegisteredSource(source, displacement, layerMask, out sweepHit, excludedCollider, includeTriggers);
     }
 
@@ -295,8 +295,8 @@ public sealed partial class GravitasQuery3DService
         LSCollider? excludedCollider = null,
         bool includeTriggers = true)
     {
-        SwiftThrowHelper.ThrowIfNull(source, nameof(source));
-        SwiftThrowHelper.ThrowIfNull(results, nameof(results));
+        ChronicleGuard.ThrowIfNull(source, nameof(source));
+        ChronicleGuard.ThrowIfNull(results, nameof(results));
         return SweepRegisteredSourceAll(source, displacement, layerMask, results, excludedCollider, includeTriggers);
     }
 
@@ -311,7 +311,7 @@ public sealed partial class GravitasQuery3DService
         LSCollider? excludedCollider = null,
         bool includeTriggers = true)
     {
-        SwiftThrowHelper.ThrowIfNull(source, nameof(source));
+        ChronicleGuard.ThrowIfNull(source, nameof(source));
         return SweepRegisteredSource(source, displacement, layerMask, out sweepHit, excludedCollider, includeTriggers);
     }
 
@@ -326,8 +326,8 @@ public sealed partial class GravitasQuery3DService
         LSCollider? excludedCollider = null,
         bool includeTriggers = true)
     {
-        SwiftThrowHelper.ThrowIfNull(source, nameof(source));
-        SwiftThrowHelper.ThrowIfNull(results, nameof(results));
+        ChronicleGuard.ThrowIfNull(source, nameof(source));
+        ChronicleGuard.ThrowIfNull(results, nameof(results));
         return SweepRegisteredSourceAll(source, displacement, layerMask, results, excludedCollider, includeTriggers);
     }
 
@@ -342,7 +342,7 @@ public sealed partial class GravitasQuery3DService
         LSCollider? excludedCollider = null,
         bool includeTriggers = true)
     {
-        SwiftThrowHelper.ThrowIfNull(source, nameof(source));
+        ChronicleGuard.ThrowIfNull(source, nameof(source));
         return SweepRegisteredSource(source, displacement, layerMask, out sweepHit, excludedCollider, includeTriggers);
     }
 
@@ -357,8 +357,8 @@ public sealed partial class GravitasQuery3DService
         LSCollider? excludedCollider = null,
         bool includeTriggers = true)
     {
-        SwiftThrowHelper.ThrowIfNull(source, nameof(source));
-        SwiftThrowHelper.ThrowIfNull(results, nameof(results));
+        ChronicleGuard.ThrowIfNull(source, nameof(source));
+        ChronicleGuard.ThrowIfNull(results, nameof(results));
         return SweepRegisteredSourceAll(source, displacement, layerMask, results, excludedCollider, includeTriggers);
     }
 
@@ -373,7 +373,7 @@ public sealed partial class GravitasQuery3DService
         LSCollider? excludedCollider = null,
         bool includeTriggers = true)
     {
-        SwiftThrowHelper.ThrowIfNull(source, nameof(source));
+        ChronicleGuard.ThrowIfNull(source, nameof(source));
         return SweepRegisteredSource(source, displacement, layerMask, out sweepHit, excludedCollider, includeTriggers);
     }
 
@@ -388,8 +388,8 @@ public sealed partial class GravitasQuery3DService
         LSCollider? excludedCollider = null,
         bool includeTriggers = true)
     {
-        SwiftThrowHelper.ThrowIfNull(source, nameof(source));
-        SwiftThrowHelper.ThrowIfNull(results, nameof(results));
+        ChronicleGuard.ThrowIfNull(source, nameof(source));
+        ChronicleGuard.ThrowIfNull(results, nameof(results));
         return SweepRegisteredSourceAll(source, displacement, layerMask, results, excludedCollider, includeTriggers);
     }
 
@@ -404,7 +404,7 @@ public sealed partial class GravitasQuery3DService
         LSCollider? excludedCollider = null,
         bool includeTriggers = true)
     {
-        SwiftThrowHelper.ThrowIfNull(source, nameof(source));
+        ChronicleGuard.ThrowIfNull(source, nameof(source));
         return SweepRegisteredSource(source, displacement, layerMask, out sweepHit, excludedCollider, includeTriggers);
     }
 
@@ -419,8 +419,8 @@ public sealed partial class GravitasQuery3DService
         LSCollider? excludedCollider = null,
         bool includeTriggers = true)
     {
-        SwiftThrowHelper.ThrowIfNull(source, nameof(source));
-        SwiftThrowHelper.ThrowIfNull(results, nameof(results));
+        ChronicleGuard.ThrowIfNull(source, nameof(source));
+        ChronicleGuard.ThrowIfNull(results, nameof(results));
         return SweepRegisteredSourceAll(source, displacement, layerMask, results, excludedCollider, includeTriggers);
     }
 
@@ -435,7 +435,7 @@ public sealed partial class GravitasQuery3DService
         LSCollider? excludedCollider = null,
         bool includeTriggers = true)
     {
-        SwiftThrowHelper.ThrowIfNull(source, nameof(source));
+        ChronicleGuard.ThrowIfNull(source, nameof(source));
         return SweepRegisteredSource(source, displacement, layerMask, out sweepHit, excludedCollider, includeTriggers);
     }
 
@@ -450,8 +450,8 @@ public sealed partial class GravitasQuery3DService
         LSCollider? excludedCollider = null,
         bool includeTriggers = true)
     {
-        SwiftThrowHelper.ThrowIfNull(source, nameof(source));
-        SwiftThrowHelper.ThrowIfNull(results, nameof(results));
+        ChronicleGuard.ThrowIfNull(source, nameof(source));
+        ChronicleGuard.ThrowIfNull(results, nameof(results));
         return SweepRegisteredSourceAll(source, displacement, layerMask, results, excludedCollider, includeTriggers);
     }
 
@@ -465,8 +465,8 @@ public sealed partial class GravitasQuery3DService
         bool includeTriggers,
         bool staticTargetsOnly)
     {
-        SwiftThrowHelper.ThrowIfNull(results, nameof(results));
-        SwiftThrowHelper.ThrowIfArgument(!staticTargetsOnly && radius > ColliderGeometryPolicy.MaximumGeometryReach,
+        ChronicleGuard.ThrowIfNull(results, nameof(results));
+        ChronicleGuard.ThrowIfArgument(!staticTargetsOnly && radius > ColliderGeometryPolicy.MaximumGeometryReach,
             nameof(radius), "Effective geometry reach must not exceed 4,096 world units.");
 
         results.Clear();
@@ -649,7 +649,7 @@ public sealed partial class GravitasQuery3DService
         LSCollider? excludedCollider,
         out Physics3DHit sweepHit)
     {
-        SwiftThrowHelper.ThrowIfArgument(radius > ColliderGeometryPolicy.MaximumGeometryReach,
+        ChronicleGuard.ThrowIfArgument(radius > ColliderGeometryPolicy.MaximumGeometryReach,
             nameof(radius), "Effective geometry reach must not exceed 4,096 world units.");
         sweepHit = default;
         if (radius <= Fixed64.Zero)
@@ -934,7 +934,7 @@ public sealed partial class GravitasQuery3DService
 
     private void EnsureSourceBelongsToContext(LSCollider source)
     {
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             !ReferenceEquals(source.Context, _context),
             nameof(source),
             "Sweep source collider must belong to this query service context.");

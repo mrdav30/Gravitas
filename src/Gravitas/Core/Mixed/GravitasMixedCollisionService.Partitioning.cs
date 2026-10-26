@@ -21,8 +21,8 @@ internal sealed partial class GravitasMixedCollisionService
 {
     internal bool Refresh3DColliderPartition(LSCollider collider)
     {
-        SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfNull(collider, nameof(collider));
+        ChronicleGuard.ThrowIfArgument(
             !ReferenceEquals(collider.Context, _context),
             nameof(collider),
             "3D collider must belong to this mixed collision service context.");
@@ -52,8 +52,8 @@ internal sealed partial class GravitasMixedCollisionService
 
     private bool Refresh2DColliderPartition(LSCollider2D collider, bool rebuildShape)
     {
-        SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfNull(collider, nameof(collider));
+        ChronicleGuard.ThrowIfArgument(
             !ReferenceEquals(collider.Context, _context),
             nameof(collider),
             "2D collider must belong to this mixed collision service context.");
@@ -83,7 +83,7 @@ internal sealed partial class GravitasMixedCollisionService
 
     internal bool ClearPartitioned3DCollider(LSCollider collider, bool force = false)
     {
-        SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
+        ChronicleGuard.ThrowIfNull(collider, nameof(collider));
         if (!collider.IsMixedPartitioned)
             return false;
 
@@ -126,7 +126,7 @@ internal sealed partial class GravitasMixedCollisionService
 
     internal bool ClearPartitioned2DCollider(LSCollider2D collider, bool force = false)
     {
-        SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
+        ChronicleGuard.ThrowIfNull(collider, nameof(collider));
         if (!collider.IsMixedPartitioned)
             return false;
 
@@ -169,7 +169,7 @@ internal sealed partial class GravitasMixedCollisionService
 
     internal void Refresh3DPartitionAwakeState(LSCollider collider)
     {
-        SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
+        ChronicleGuard.ThrowIfNull(collider, nameof(collider));
         if (!collider.IsMixedPartitioned)
             return;
 
@@ -195,7 +195,7 @@ internal sealed partial class GravitasMixedCollisionService
 
     internal void Refresh2DPartitionAwakeState(LSCollider2D collider)
     {
-        SwiftThrowHelper.ThrowIfNull(collider, nameof(collider));
+        ChronicleGuard.ThrowIfNull(collider, nameof(collider));
         if (!collider.IsMixedPartitioned)
             return;
 
@@ -244,7 +244,7 @@ internal sealed partial class GravitasMixedCollisionService
         bool staticStyleOnly = false,
         bool cachePartitionRefresh = false)
     {
-        SwiftThrowHelper.ThrowIfNull(candidates, nameof(candidates));
+        ChronicleGuard.ThrowIfNull(candidates, nameof(candidates));
         Refresh2DColliderPartitionsForQuery(cachePartitionRefresh);
         candidates.FastClear();
         FixedBoundBox queryBounds = FixedBoundBox.FromMinMax(min, max);
@@ -286,7 +286,7 @@ internal sealed partial class GravitasMixedCollisionService
         bool staticStyleOnly = false,
         bool cachePartitionRefresh = false)
     {
-        SwiftThrowHelper.ThrowIfNull(candidates, nameof(candidates));
+        ChronicleGuard.ThrowIfNull(candidates, nameof(candidates));
         Refresh3DColliderPartitionsForQuery(cachePartitionRefresh);
         candidates.FastClear();
         FixedBoundBox queryBounds = FixedBoundBox.FromMinMax(min, max);
@@ -323,8 +323,8 @@ internal sealed partial class GravitasMixedCollisionService
 
     internal int ActivatePartition(PhysicsMixedPartition partition)
     {
-        SwiftThrowHelper.ThrowIfNull(partition, nameof(partition));
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfNull(partition, nameof(partition));
+        ChronicleGuard.ThrowIfArgument(
             !ReferenceEquals(partition.Owner, this),
             nameof(partition),
             "Mixed partition must belong to this collision service.");
@@ -348,8 +348,8 @@ internal sealed partial class GravitasMixedCollisionService
 
     internal void ReleasePartition(PhysicsMixedPartition partition)
     {
-        SwiftThrowHelper.ThrowIfNull(partition, nameof(partition));
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfNull(partition, nameof(partition));
+        ChronicleGuard.ThrowIfArgument(
             !ReferenceEquals(partition.Owner, this),
             nameof(partition),
             "Mixed partition must be released through its owning collision service.");
@@ -633,7 +633,7 @@ internal sealed partial class GravitasMixedCollisionService
             return partition!;
 
         partition = RentPartition();
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             !voxel.TryAddPartition(partition),
             nameof(GravitasMixedCollisionService),
             "Unable to attach mixed physics partition to voxel.");

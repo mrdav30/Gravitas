@@ -26,7 +26,7 @@ public sealed partial class GravitasQueryMixedService
     /// </summary>
     public GravitasQueryMixedService(GravitasWorldContext context)
     {
-        SwiftThrowHelper.ThrowIfNull(context, nameof(context));
+        ChronicleGuard.ThrowIfNull(context, nameof(context));
         _context = context;
     }
 

@@ -100,7 +100,7 @@ internal sealed class PhysicsMixedPartition : IVoxelPartition, IRetainedPhysicsP
     {
         get
         {
-            SwiftThrowHelper.ThrowIfTrue(
+            ChronicleGuard.ThrowIfTrue(
                 _owner == null,
                 nameof(PhysicsMixedPartition),
                 "PhysicsMixedPartition is missing its owner collision service.");
@@ -110,7 +110,7 @@ internal sealed class PhysicsMixedPartition : IVoxelPartition, IRetainedPhysicsP
 
     public void OnAddToVoxel(Voxel voxel)
     {
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             _owner == null,
             nameof(PhysicsMixedPartition),
             "PhysicsMixedPartition is missing its owner collision service.");
@@ -169,7 +169,7 @@ internal sealed class PhysicsMixedPartition : IVoxelPartition, IRetainedPhysicsP
 
     public void AddDynamic3DObject(int id)
     {
-        SwiftThrowHelper.ThrowIfNegative(id, nameof(id));
+        ChronicleGuard.ThrowIfNegative(id, nameof(id));
         ContainedDynamic3DObjects ??= Owner.RentPartitionMembership();
         bool shouldActivate = MovableDynamicObjectCount == 0;
         if (!ContainedDynamic3DObjects.Add(id))
@@ -183,7 +183,7 @@ internal sealed class PhysicsMixedPartition : IVoxelPartition, IRetainedPhysicsP
 
     public void AddStatic3DObject(int id)
     {
-        SwiftThrowHelper.ThrowIfNegative(id, nameof(id));
+        ChronicleGuard.ThrowIfNegative(id, nameof(id));
         ContainedStatic3DObjects ??= Owner.RentPartitionMembership();
         if (ContainedStatic3DObjects.Add(id))
             MarkOccupied();
@@ -191,7 +191,7 @@ internal sealed class PhysicsMixedPartition : IVoxelPartition, IRetainedPhysicsP
 
     public void AddKinematic3DObject(int id)
     {
-        SwiftThrowHelper.ThrowIfNegative(id, nameof(id));
+        ChronicleGuard.ThrowIfNegative(id, nameof(id));
         ContainedKinematic3DObjects ??= Owner.RentPartitionMembership();
         if (ContainedKinematic3DObjects.Add(id))
             MarkOccupied();
@@ -199,7 +199,7 @@ internal sealed class PhysicsMixedPartition : IVoxelPartition, IRetainedPhysicsP
 
     public void AddDynamic2DObject(int id)
     {
-        SwiftThrowHelper.ThrowIfNegative(id, nameof(id));
+        ChronicleGuard.ThrowIfNegative(id, nameof(id));
         ContainedDynamic2DObjects ??= Owner.RentPartitionMembership();
         bool shouldActivate = MovableDynamicObjectCount == 0;
         if (!ContainedDynamic2DObjects.Add(id))
@@ -213,7 +213,7 @@ internal sealed class PhysicsMixedPartition : IVoxelPartition, IRetainedPhysicsP
 
     public void AddStatic2DObject(int id)
     {
-        SwiftThrowHelper.ThrowIfNegative(id, nameof(id));
+        ChronicleGuard.ThrowIfNegative(id, nameof(id));
         ContainedStatic2DObjects ??= Owner.RentPartitionMembership();
         if (ContainedStatic2DObjects.Add(id))
             MarkOccupied();
@@ -221,7 +221,7 @@ internal sealed class PhysicsMixedPartition : IVoxelPartition, IRetainedPhysicsP
 
     public void AddKinematic2DObject(int id)
     {
-        SwiftThrowHelper.ThrowIfNegative(id, nameof(id));
+        ChronicleGuard.ThrowIfNegative(id, nameof(id));
         ContainedKinematic2DObjects ??= Owner.RentPartitionMembership();
         if (ContainedKinematic2DObjects.Add(id))
             MarkOccupied();
@@ -322,8 +322,8 @@ internal sealed class PhysicsMixedPartition : IVoxelPartition, IRetainedPhysicsP
 
     internal void SetOwner(GravitasMixedCollisionService owner)
     {
-        SwiftThrowHelper.ThrowIfNull(owner, nameof(owner));
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfNull(owner, nameof(owner));
+        ChronicleGuard.ThrowIfArgument(
             _owner != null && !ReferenceEquals(_owner, owner),
             nameof(owner),
             "PhysicsMixedPartition is already owned by a different collision service.");
@@ -336,7 +336,7 @@ internal sealed class PhysicsMixedPartition : IVoxelPartition, IRetainedPhysicsP
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal void SetRetainedIndex(int index)
     {
-        SwiftThrowHelper.ThrowIfNegative(index, nameof(index));
+        ChronicleGuard.ThrowIfNegative(index, nameof(index));
         _retainedIndex = index;
     }
 
@@ -387,7 +387,7 @@ internal sealed class PhysicsMixedPartition : IVoxelPartition, IRetainedPhysicsP
     /// <summary>Clears and fills caller-owned storage with 3D collider IDs in ascending order.</summary>
     public void Copy3DColliderIds(SwiftList<int> destination)
     {
-        SwiftThrowHelper.ThrowIfNull(destination, nameof(destination));
+        ChronicleGuard.ThrowIfNull(destination, nameof(destination));
         destination.FastClear();
         AppendIds(ContainedDynamic3DObjects, destination);
         AppendIds(ContainedKinematic3DObjects, destination);
@@ -398,7 +398,7 @@ internal sealed class PhysicsMixedPartition : IVoxelPartition, IRetainedPhysicsP
     /// <summary>Clears and fills caller-owned storage with 2D collider IDs in ascending order.</summary>
     public void Copy2DColliderIds(SwiftList<int> destination)
     {
-        SwiftThrowHelper.ThrowIfNull(destination, nameof(destination));
+        ChronicleGuard.ThrowIfNull(destination, nameof(destination));
         destination.FastClear();
         AppendIds(ContainedDynamic2DObjects, destination);
         AppendIds(ContainedKinematic2DObjects, destination);

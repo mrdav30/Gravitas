@@ -2,7 +2,7 @@ using FixedMathSharp;
 using Gravitas.Colliders;
 using GridForge.Configuration;
 using SwiftCollections;
-using SwiftCollections.Diagnostics;
+using Chronicler.Diagnostics;
 using System;
 using System.Collections.Generic;
 
@@ -25,7 +25,7 @@ internal static class BenchmarkPhysicsScene
     {
         GravitasWorldContext context = BenchmarkEnvironment.PrepareOwnedContext(clearAllPools);
         context.Settings.RuntimeMode = PhysicsRuntimeMode.Mixed;
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             !context.World.TryAddGrid(
                 new GridConfiguration(
                     new Vector3d((Fixed64)(-8), (Fixed64)(-4), (Fixed64)(-8)),
@@ -205,7 +205,7 @@ internal static class BenchmarkPhysicsScene
         int subdivision,
         MeshColliderMode mode = MeshColliderMode.Convex)
     {
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             subdivision <= 0,
             nameof(subdivision),
             "Subdivision count must be greater than zero.");
@@ -248,7 +248,7 @@ internal static class BenchmarkPhysicsScene
 
     public static LSMeshCollider CreateRepeatedSlabClippedProxyOnlyTriangleMesh(int triangleCount)
     {
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             triangleCount <= 0,
             nameof(triangleCount),
             "Triangle count must be greater than zero.");
@@ -536,7 +536,7 @@ internal static class BenchmarkPhysicsScene
             new Vector3d(-DefaultGridPadding, -DefaultGridPadding, -DefaultGridPadding),
             new Vector3d(extent, DefaultGridPadding, extent));
 
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             !context.World.TryAddGrid(configuration, out _),
             message: "Unable to add benchmark GridForge grid.");
     }

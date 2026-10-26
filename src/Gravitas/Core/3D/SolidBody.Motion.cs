@@ -362,7 +362,7 @@ public partial class SolidBody
         if (!Active)
             return false;
 
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             !Collider.TryPrepareBodyPose(position, rotation),
             parameterName,
             message);

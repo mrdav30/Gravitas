@@ -35,7 +35,7 @@ public sealed class GravitasConstraint2DService
 
     internal GravitasConstraint2DService(GravitasWorldContext context)
     {
-        SwiftThrowHelper.ThrowIfNull(context, nameof(context));
+        ChronicleGuard.ThrowIfNull(context, nameof(context));
         _context = context;
     }
 
@@ -110,7 +110,7 @@ public sealed class GravitasConstraint2DService
         if (!TryGetJoint(jointId, out Joint2D? joint))
             return false;
 
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             joint!.OwningRagdoll?.IsRegistered == true,
             nameof(jointId),
             "Ragdoll-owned joints cannot be removed independently. Remove the owning ragdoll instead.");
@@ -263,16 +263,16 @@ public sealed class GravitasConstraint2DService
     public void SetRagdollPoseTargets(RagdollRuntime2D ragdoll, ReadOnlySpan<JointMotor2D> motors)
     {
         _context.ThrowIfDisposed();
-        SwiftThrowHelper.ThrowIfNull(ragdoll, nameof(ragdoll));
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfNull(ragdoll, nameof(ragdoll));
+        ChronicleGuard.ThrowIfArgument(
             !ReferenceEquals(ragdoll.Service, this),
             nameof(ragdoll),
             "Ragdoll targets must be applied through the owning 2D constraint service.");
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             !ragdoll.IsRegistered,
             nameof(ragdoll),
             "Removed ragdolls cannot mutate simulation state.");
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             motors.Length != ragdoll.JointCount,
             nameof(motors),
             "Ragdoll pose target count must match the ragdoll joint count.");
@@ -429,25 +429,25 @@ public sealed class GravitasConstraint2DService
 
     private void ValidateDefinition(in JointDefinition2D definition)
     {
-        SwiftThrowHelper.ThrowIfNull(definition.BodyA, nameof(definition.BodyA));
-        SwiftThrowHelper.ThrowIfNull(definition.BodyB, nameof(definition.BodyB));
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfNull(definition.BodyA, nameof(definition.BodyA));
+        ChronicleGuard.ThrowIfNull(definition.BodyB, nameof(definition.BodyB));
+        ChronicleGuard.ThrowIfArgument(
             ReferenceEquals(definition.BodyA, definition.BodyB),
             nameof(definition),
             "A 2D joint cannot link a body to itself.");
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             !ReferenceEquals(definition.BodyA.Context, _context) || !ReferenceEquals(definition.BodyB.Context, _context),
             nameof(definition),
             "Both 2D joint bodies must belong to this constraint service context.");
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             !definition.BodyA.Active || !definition.BodyB.Active,
             nameof(definition),
             "2D joint bodies must be active before registration.");
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             !Joint2D.IsSupportedType(definition.Type),
             nameof(definition.Type),
             "Unsupported 2D joint type.");
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             definition.CollisionPolicy != JointCollisionPolicy.SuppressLinked
                 && definition.CollisionPolicy != JointCollisionPolicy.Collide,
             nameof(definition.CollisionPolicy),
@@ -459,11 +459,11 @@ public sealed class GravitasConstraint2DService
 
     private void ValidateRagdollDefinition(RagdollDefinition2D definition)
     {
-        SwiftThrowHelper.ThrowIfNull(definition, nameof(definition));
-        SwiftThrowHelper.ThrowIfNull(definition.Links, nameof(definition.Links));
-        SwiftThrowHelper.ThrowIfNull(definition.Joints, nameof(definition.Joints));
-        SwiftThrowHelper.ThrowIfArgument(definition.Links.Length == 0, nameof(definition.Links), "A 2D ragdoll must contain at least one link.");
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfNull(definition, nameof(definition));
+        ChronicleGuard.ThrowIfNull(definition.Links, nameof(definition.Links));
+        ChronicleGuard.ThrowIfNull(definition.Joints, nameof(definition.Joints));
+        ChronicleGuard.ThrowIfArgument(definition.Links.Length == 0, nameof(definition.Links), "A 2D ragdoll must contain at least one link.");
+        ChronicleGuard.ThrowIfArgument(
             definition.SelfCollisionPolicy != RagdollSelfCollisionPolicy.SuppressAdjacentLinks
                 && definition.SelfCollisionPolicy != RagdollSelfCollisionPolicy.CollideAllLinks
                 && definition.SelfCollisionPolicy != RagdollSelfCollisionPolicy.SuppressAllLinks,
@@ -473,32 +473,32 @@ public sealed class GravitasConstraint2DService
         for (int i = 0; i < definition.Links.Length; i++)
         {
             RagdollLinkDefinition2D link = definition.Links[i];
-            SwiftThrowHelper.ThrowIfNull(link.Body, nameof(definition.Links));
-            SwiftThrowHelper.ThrowIfNull(link.Collider, nameof(definition.Links));
-            SwiftThrowHelper.ThrowIfArgument(
+            ChronicleGuard.ThrowIfNull(link.Body, nameof(definition.Links));
+            ChronicleGuard.ThrowIfNull(link.Collider, nameof(definition.Links));
+            ChronicleGuard.ThrowIfArgument(
                 !ReferenceEquals(link.Body.Context, _context),
                 nameof(definition.Links),
                 "All 2D ragdoll links must belong to this context.");
-            SwiftThrowHelper.ThrowIfArgument(
+            ChronicleGuard.ThrowIfArgument(
                 !link.Body.Active,
                 nameof(definition.Links),
                 "2D ragdoll links must have active 2D colliders.");
-            SwiftThrowHelper.ThrowIfArgument(
+            ChronicleGuard.ThrowIfArgument(
                 !ReferenceEquals(link.Body.Collider, link.Collider),
                 nameof(definition.Links),
                 "2D ragdoll link collider must match the link body's collider.");
-            SwiftThrowHelper.ThrowIfArgument(
+            ChronicleGuard.ThrowIfArgument(
                 _ragdollByBody.ContainsKey(link.Body),
                 nameof(definition.Links),
                 "A 2D body cannot belong to more than one registered ragdoll.");
 
             for (int j = i + 1; j < definition.Links.Length; j++)
             {
-                SwiftThrowHelper.ThrowIfArgument(
+                ChronicleGuard.ThrowIfArgument(
                     link.LinkId == definition.Links[j].LinkId,
                     nameof(definition.Links),
                     "2D ragdoll link IDs must be unique.");
-                SwiftThrowHelper.ThrowIfArgument(
+                ChronicleGuard.ThrowIfArgument(
                     ReferenceEquals(link.Body, definition.Links[j].Body),
                     nameof(definition.Links),
                     "2D ragdoll bodies must be unique.");
@@ -510,7 +510,7 @@ public sealed class GravitasConstraint2DService
             RagdollJointDefinition2D joint = definition.Joints[i];
             SolidBody2D bodyA = ResolveRagdollLink(definition.Links, joint.LinkAId);
             SolidBody2D bodyB = ResolveRagdollLink(definition.Links, joint.LinkBId);
-            SwiftThrowHelper.ThrowIfArgument(
+            ChronicleGuard.ThrowIfArgument(
                 joint.LinkAId == joint.LinkBId,
                 nameof(definition.Joints),
                 "A 2D ragdoll joint cannot link a body to itself.");

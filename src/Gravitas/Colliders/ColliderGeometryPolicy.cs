@@ -13,16 +13,16 @@ internal static class ColliderGeometryPolicy
     internal static readonly Fixed64 MaximumGeometryReach = (Fixed64)4096;
 
     internal static void ValidateReach(Fixed64 reach, string parameterName) =>
-        SwiftThrowHelper.ThrowIfArgument(reach < Fixed64.Zero || reach > MaximumGeometryReach,
+        ChronicleGuard.ThrowIfArgument(reach < Fixed64.Zero || reach > MaximumGeometryReach,
             parameterName, "Effective geometry reach must not exceed 4,096 world units.");
 
     internal static void ValidateReach(Vector2d envelope, string parameterName) =>
-        SwiftThrowHelper.ThrowIfArgument(Vector2d.CompareMagnitudeSquared(
+        ChronicleGuard.ThrowIfArgument(Vector2d.CompareMagnitudeSquared(
                 envelope, new Vector2d(MaximumGeometryReach, Fixed64.Zero)) > 0,
             parameterName, "Effective geometry reach must not exceed 4,096 world units.");
 
     internal static void ValidateFiniteAxisReach(Fixed64 radius, Fixed64 height, string parameterName) =>
-        SwiftThrowHelper.ThrowIfArgument(Fixed64.CompareMagnitudeSquared(
+        ChronicleGuard.ThrowIfArgument(Fixed64.CompareMagnitudeSquared(
                 radius, HalfCeiling(height), radius, Fixed64.Zero,
                 MaximumGeometryReach, Fixed64.Zero, Fixed64.Zero, Fixed64.Zero) > 0,
             parameterName, "Effective finite-axis geometry reach must not exceed 4,096 world units.");
@@ -46,7 +46,7 @@ internal static class ColliderGeometryPolicy
                 Fixed64.GetExactRawProduct(vertices[i].X, countRaw), sumX);
             Signed192 y = WideArithmetic.SubtractSigned192(
                 Fixed64.GetExactRawProduct(vertices[i].Y, countRaw), sumY);
-            SwiftThrowHelper.ThrowIfArgument(WideArithmetic.CompareMagnitude(
+            ChronicleGuard.ThrowIfArgument(WideArithmetic.CompareMagnitude(
                     WideArithmetic.AddProducts(x, x, y, y), limitSquared) > 0,
                 nameof(vertices), "Effective polygon geometry reach must not exceed 4,096 world units.");
         }

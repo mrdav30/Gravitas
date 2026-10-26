@@ -1,4 +1,4 @@
-﻿//=======================================================================
+//=======================================================================
 // ColliderHierarchyState.cs
 //=======================================================================
 // MIT License, Copyright (c) 2026–present David Oravsky (mrdav30)
@@ -44,22 +44,22 @@ internal struct ColliderHierarchyState
 
     public void SetParent(IColliderHierarchyNode owner, IColliderHierarchyNode parent)
     {
-        SwiftThrowHelper.ThrowIfNull(parent, nameof(parent));
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfNull(parent, nameof(parent));
+        ChronicleGuard.ThrowIfArgument(
             ReferenceEquals(owner, parent),
             nameof(parent),
             "Collider cannot be parented to itself.");
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             !owner.HierarchyKey.IsValid,
             nameof(owner),
             "Owner collider must have a valid hierarchy key before setting a parent.");
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             !parent.HierarchyKey.IsValid,
             nameof(parent),
             "Parent collider must have a valid hierarchy key before being assigned.");
 
         GravitasWorldContext ownerContext = owner.Context;
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             !ReferenceEquals(ownerContext, parent.Context),
             nameof(parent),
             "Parent collider must belong to the same GravitasWorldContext.");
@@ -107,7 +107,7 @@ internal struct ColliderHierarchyState
 
     public bool AddChild(ColliderHierarchyKey key)
     {
-        SwiftThrowHelper.ThrowIfArgument(!key.IsValid, nameof(key), "Child collider key must be valid.");
+        ChronicleGuard.ThrowIfArgument(!key.IsValid, nameof(key), "Child collider key must be valid.");
         _children ??= new();
         if (!_children.Add(key.Packed))
             return false;
@@ -148,7 +148,7 @@ internal struct ColliderHierarchyState
         while (current.HierarchyParent != null)
         {
             current = current.HierarchyParent;
-            SwiftThrowHelper.ThrowIfArgument(
+            ChronicleGuard.ThrowIfArgument(
                 ReferenceEquals(owner, current),
                 nameof(parent),
                 "Collider hierarchy cannot contain cycles.");

@@ -67,20 +67,20 @@ internal sealed partial class ConvexSweepQueryWorker
 
     public void PrepareConvexMeshSource(LSMeshCollider source, Vector3d displacement)
     {
-        SwiftThrowHelper.ThrowIfNull(source, nameof(source));
+        ChronicleGuard.ThrowIfNull(source, nameof(source));
         ThrowIfConcaveSource(source);
         Prepare(source, displacement);
     }
 
     public void PrepareCompoundSource(LSCompoundCollider source, Vector3d displacement)
     {
-        SwiftThrowHelper.ThrowIfNull(source, nameof(source));
+        ChronicleGuard.ThrowIfNull(source, nameof(source));
         Prepare(source, displacement);
     }
 
     public void PreparePrimitiveSource(LSCollider source, Vector3d displacement)
     {
-        SwiftThrowHelper.ThrowIfNull(source, nameof(source));
+        ChronicleGuard.ThrowIfNull(source, nameof(source));
         if (!ConvexColliderSupport.IsSupported(source))
             throw new NotSupportedException(
                 $"Convex swept queries do not support {source.GetType().Name} sources.");
@@ -90,8 +90,8 @@ internal sealed partial class ConvexSweepQueryWorker
 
     public void PrepareCircleSlabSource(Vector3d center, Fixed64 radius, Fixed64 halfHeight, Vector3d displacement)
     {
-        SwiftThrowHelper.ThrowIfArgument(radius <= Fixed64.Zero, nameof(radius), "Circle-slab sweep radius must be greater than zero.");
-        SwiftThrowHelper.ThrowIfArgument(halfHeight <= Fixed64.Zero, nameof(halfHeight), "Circle-slab sweep half-height must be greater than zero.");
+        ChronicleGuard.ThrowIfArgument(radius <= Fixed64.Zero, nameof(radius), "Circle-slab sweep radius must be greater than zero.");
+        ChronicleGuard.ThrowIfArgument(halfHeight <= Fixed64.Zero, nameof(halfHeight), "Circle-slab sweep half-height must be greater than zero.");
         _source = null;
         Prepare(ConvexShape.CreateCircleSlab(center, radius, halfHeight), displacement);
     }
@@ -101,7 +101,7 @@ internal sealed partial class ConvexSweepQueryWorker
         Fixed64 radius,
         Vector3d displacement)
     {
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             radius < Fixed64.Zero,
             nameof(radius),
             "Sphere sweep radius cannot be negative.");

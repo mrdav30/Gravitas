@@ -31,7 +31,7 @@ public sealed partial class GravitasQuery3DService
         out Physics3DHit raycastHit,
         PhysicsLayerMask layerMask)
     {
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             radius < Fixed64.Zero,
             nameof(radius),
             "3D query radius cannot be negative.");
@@ -72,7 +72,7 @@ public sealed partial class GravitasQuery3DService
         Fixed64 maxDistance,
         PhysicsLayerMask layerMask)
     {
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             radius < Fixed64.Zero,
             nameof(radius),
             "3D query radius cannot be negative.");
@@ -122,8 +122,8 @@ public sealed partial class GravitasQuery3DService
         PhysicsLayerMask layerMask,
         SwiftList<Physics3DHit> results)
     {
-        SwiftThrowHelper.ThrowIfNull(results, nameof(results));
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfNull(results, nameof(results));
+        ChronicleGuard.ThrowIfArgument(
             radius < Fixed64.Zero,
             nameof(radius),
             "3D query radius cannot be negative.");
@@ -159,7 +159,7 @@ public sealed partial class GravitasQuery3DService
         LSCollider? excludedCollider = null,
         bool includeTriggers = true)
     {
-        SwiftThrowHelper.ThrowIfNull(results, nameof(results));
+        ChronicleGuard.ThrowIfNull(results, nameof(results));
 
         results.Clear();
         if (radius <= Fixed64.Zero)
@@ -353,7 +353,7 @@ public sealed partial class GravitasQuery3DService
     {
         raycastHit = default;
         relation = default;
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             !_context.Physics.TryGetColliderById(colliderId, out LSCollider? current),
             nameof(GravitasQuery3DService),
             "Planar query index contained an unregistered collider.");

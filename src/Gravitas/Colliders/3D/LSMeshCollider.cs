@@ -505,7 +505,7 @@ public sealed class LSMeshCollider : LSCollider
 
     private static void ValidateInertiaPolicy(MeshInertiaPolicy inertiaPolicy)
     {
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             inertiaPolicy != MeshInertiaPolicy.RequireClosedVolume &&
             inertiaPolicy != MeshInertiaPolicy.SurfaceApproximation,
             nameof(inertiaPolicy),

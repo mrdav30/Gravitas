@@ -269,7 +269,7 @@ public sealed class LSCapsuleCollider2D : LSCollider2D
             ownerScale.Y,
             partScale.Y);
         radius = FixedMath.Max(radiusX, radiusY);
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             !HasValidScaledDimensions(
                 authoredRadius,
                 authoredHeight,
@@ -277,7 +277,7 @@ public sealed class LSCapsuleCollider2D : LSCollider2D
                 partScale),
             nameof(authoredHeight),
             "Scaled 2D capsule height must be at least the capsule diameter.");
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             !Fixed64.TryMultiplySubtractClamped(
                 authoredHeight,
                 ownerScale.Y,
@@ -357,7 +357,7 @@ public sealed class LSCapsuleCollider2D : LSCollider2D
             ownerScale.Y,
             partScale.Y);
         radius = FixedMath.Max(radiusX, radiusY);
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             !HasValidScaledDimensions(
                 _radius,
                 _height,
@@ -385,7 +385,7 @@ public sealed class LSCapsuleCollider2D : LSCollider2D
                 ownerScale.Y,
                 partScale.Y,
                 out Fixed64 axisLengthY);
-        SwiftThrowHelper.ThrowIfTrue(
+        ChronicleGuard.ThrowIfTrue(
             !representable,
             nameof(CalculateAreaForMassProperties),
             "Scaled 2D capsule center-axis length must be representable.");
@@ -445,8 +445,8 @@ public sealed class LSCapsuleCollider2D : LSCollider2D
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void ValidateDimensions(Fixed64 radius, Fixed64 height)
     {
-        SwiftThrowHelper.ThrowIfArgument(radius <= Fixed64.Zero, nameof(radius), "2D capsule radius must be greater than zero.");
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(radius <= Fixed64.Zero, nameof(radius), "2D capsule radius must be greater than zero.");
+        ChronicleGuard.ThrowIfArgument(
             Fixed64.CompareProducts(
                 height,
                 Fixed64.One,

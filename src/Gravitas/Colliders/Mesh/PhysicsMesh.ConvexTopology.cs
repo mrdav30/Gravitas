@@ -99,7 +99,7 @@ public partial class PhysicsMesh
             edgeUses[edgeIndex++] = EdgeUse.Create(index2, index0, i);
         }
 
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             ContainsDuplicateTriangle(triangleUses),
             nameof(triangles),
             "Convex mesh triangles must not contain duplicate faces.");
@@ -121,7 +121,7 @@ public partial class PhysicsMesh
         {
             int end = FindEdgeUseGroupEnd(edgeUses, start);
             int useCount = end - start;
-            SwiftThrowHelper.ThrowIfArgument(
+            ChronicleGuard.ThrowIfArgument(
                 useCount > 2,
                 nameof(triangles),
                 "Convex mesh edges must be manifold and used by at most two triangles.");
@@ -141,7 +141,7 @@ public partial class PhysicsMesh
             }
 
             EdgeUse second = edgeUses[start + 1];
-            SwiftThrowHelper.ThrowIfArgument(
+            ChronicleGuard.ThrowIfArgument(
                 first.Direction + second.Direction != 0,
                 nameof(triangles),
                 "Adjacent convex mesh triangles must use opposite shared-edge winding.");
@@ -150,7 +150,7 @@ public partial class PhysicsMesh
             int currentSign = CalculateSharedEdgeSide(vertices, triangles, first, second);
             if (currentSign != 0)
             {
-                SwiftThrowHelper.ThrowIfArgument(
+                ChronicleGuard.ThrowIfArgument(
                     dihedralSign != 0 && currentSign != dihedralSign,
                     nameof(triangles),
                     "Closed convex mesh triangles must not contain reflex edges.");
@@ -163,7 +163,7 @@ public partial class PhysicsMesh
         int root = Find(parents, 0);
         for (int i = 1; i < parents.Length; i++)
         {
-            SwiftThrowHelper.ThrowIfArgument(
+            ChronicleGuard.ThrowIfArgument(
                 Find(parents, i) != root,
                 nameof(triangles),
                 "Convex mesh triangles must form one edge-connected surface.");
@@ -175,18 +175,18 @@ public partial class PhysicsMesh
             : MeshVolumeValidationResult.BoundaryEdge;
         if (IsClosedSurface)
         {
-            SwiftThrowHelper.ThrowIfArgument(
+            ChronicleGuard.ThrowIfArgument(
                 dihedralSign == 0,
                 nameof(triangles),
                 "Closed convex mesh triangles must enclose nonzero volume.");
-            SwiftThrowHelper.ThrowIfArgument(
+            ChronicleGuard.ThrowIfArgument(
                 !HasSingleVertexLinks(triangles, edgeUses),
                 nameof(triangles),
                 "Closed convex mesh triangles must be manifold around every vertex.");
         }
         else
         {
-            SwiftThrowHelper.ThrowIfArgument(
+            ChronicleGuard.ThrowIfArgument(
                 dihedralSign != 0,
                 nameof(triangles),
                 "Open convex mesh triangles must form one coplanar surface.");
@@ -217,7 +217,7 @@ public partial class PhysicsMesh
             ? edgeUse.EndVertexIndex
             : edgeUse.StartVertexIndex;
 
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             boundaryNext[start] >= 0 || boundaryPrevious[end] >= 0,
             nameof(triangles),
             "Open convex mesh triangles must form one consistently wound boundary loop.");
@@ -268,7 +268,7 @@ public partial class PhysicsMesh
         int boundaryEdgeCount,
         int boundaryStart)
     {
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             boundaryStart < 0,
             nameof(triangles),
             "Open convex mesh triangles must form one boundary loop.");
@@ -286,14 +286,14 @@ public partial class PhysicsMesh
                 current);
             current = next;
             visitedEdges++;
-            SwiftThrowHelper.ThrowIfArgument(
+            ChronicleGuard.ThrowIfArgument(
                 visitedEdges > boundaryEdgeCount,
                 nameof(triangles),
                 "Open convex mesh triangles must form one boundary loop.");
         }
         while (current != boundaryStart);
 
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             visitedEdges != boundaryEdgeCount,
             nameof(triangles),
             "Open convex mesh triangles must form one boundary loop.");
@@ -331,7 +331,7 @@ public partial class PhysicsMesh
         BoundaryVertex[] authoredBoundary,
         int[] triangles)
     {
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             !TryGetStrictConvexBoundary(authoredBoundary, authoredBoundary.Length, out _, out _),
             nameof(triangles),
             "Open convex mesh triangles must have a nondegenerate convex boundary.");
@@ -401,11 +401,11 @@ public partial class PhysicsMesh
             if (surfaceOrientation == 0)
                 surfaceOrientation = orientation;
 
-            SwiftThrowHelper.ThrowIfArgument(
+            ChronicleGuard.ThrowIfArgument(
                 orientation != surfaceOrientation,
                 nameof(triangles),
                 "Open convex mesh triangles must fill their convex boundary without holes, overlap, or folds.");
-            SwiftThrowHelper.ThrowIfArgument(
+            ChronicleGuard.ThrowIfArgument(
                 !Fixed64.TryAdd(triangleArea, new FixedTriangle2d(first, second, third).Area, out triangleArea),
                 nameof(triangles),
                 "Open convex mesh projected area must be representable.");
@@ -419,14 +419,14 @@ public partial class PhysicsMesh
                 anchor,
                 boundary[i].Position,
                 boundary[i + 1].Position).Area;
-            SwiftThrowHelper.ThrowIfArgument(
+            ChronicleGuard.ThrowIfArgument(
                 !Fixed64.TryAdd(boundaryArea, area, out boundaryArea),
                 nameof(triangles),
                 "Open convex mesh projected boundary area must be representable.");
         }
 
         Fixed64 areaTolerance = Fixed64.Epsilon * (Fixed64)(triangleCount + boundary.Length);
-        SwiftThrowHelper.ThrowIfArgument(
+        ChronicleGuard.ThrowIfArgument(
             FixedMath.Abs(triangleArea - boundaryArea) > areaTolerance,
             nameof(triangles),
             "Open convex mesh triangles must fill their convex boundary without holes, overlap, or folds.");
