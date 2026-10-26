@@ -16,9 +16,9 @@ namespace Gravitas.CollisionHandling;
 /// <content>Native support charts and the shared finite sample reduction.</content>
 internal sealed partial class MeshSlabFaceRegions
 {
-    private ulong[] _values = new ulong[2 * FiniteSlabRaySelection.StorageWords];
-    private sbyte[] _signs = new sbyte[2 * FiniteSlabRaySelection.SignCount];
-    private FiniteSlabRaySelectionMetadata[] _peaks = new FiniteSlabRaySelectionMetadata[2];
+    private ulong[] _values = new ulong[FiniteSlabRaySelection.StorageWords];
+    private sbyte[] _signs = new sbyte[FiniteSlabRaySelection.SignCount];
+    private FiniteSlabRaySelectionMetadata[] _peaks = new FiniteSlabRaySelectionMetadata[1];
     private readonly SwiftList<Sample> _events = new(), _pool = new();
     private readonly SwiftList<int> _ownerTriangles = new(), _admitted = new();
     private readonly SwiftHashSet<int> _visitedTriangles = new();
@@ -35,66 +35,6 @@ internal sealed partial class MeshSlabFaceRegions
     internal int Orientation => _orientation;
     internal ref readonly FiniteSlabRayFrame Frame => ref _frame;
 
-    /// <summary>Finds a finite-boundary ray maximum from certified coplanar members in one slab chart.</summary>
-    /// <remarks>Orientation follows the first member's canonical plane. Retained spans belong to their supplied member;
-    /// sources preserve canonical boundary-span order within each member, which resolves same-member ties.
-    /// Geometry must be committed and admitted. This does not gather intrinsic face events or construct a complete face sample pool.</remarks>
-    internal static bool TryGetBoundaryWitness(
-        ReadOnlySpan<(LSMeshCollider Collider, int SurfaceTriangle, MeshSurfaceBoundaryDomain.BoundarySpan Span)> sources,
-        Vector3d center, FixedQuaternion rotation, Fixed64 length, Fixed64 radius, Fixed64 halfThickness,
-        ReadOnlySpan<Vector2d> prismOffsets, int orientation, out FixedContactAnchors contact, out int supplier)
-    {
-        contact = default; supplier = -1;
-        if (orientation != -1 && orientation != 1) throw new ArgumentOutOfRangeException(nameof(orientation));
-        int fieldWords = FiniteSlabPolynomial.Words;
-        foreach (var input in sources)
-            if (!input.Collider.Mesh.GeometryFrame.IsRigid || input.Span.Interval.HasWideBounds)
-                fieldWords = FiniteSlabPolynomial.AffineWords;
-        int selectionWords = FiniteSlabRaySelection.GetStorageWords(fieldWords);
-        Span<ulong> bestValues = stackalloc ulong[selectionWords], values = stackalloc ulong[selectionWords];
-        Span<sbyte> bestSigns = stackalloc sbyte[FiniteSlabRaySelection.SignCount], signs = stackalloc sbyte[FiniteSlabRaySelection.SignCount];
-        var best = new FiniteSlabRaySelection(bestValues, bestSigns, fieldWords);
-        var candidate = new FiniteSlabRaySelection(values, signs, fieldWords);
-        FiniteSlabRayFrame bestFrame = default; WideDirection3d commonNormal = default;
-        int chosen = -1;
-        for (int index = 0; index < sources.Length; index++)
-        {
-            ref readonly var input = ref sources[index]; PhysicsMesh mesh = input.Collider.Mesh;
-            mesh.GetGeometryTriangleVertices(input.SurfaceTriangle, out Vector3d a, out Vector3d b, out Vector3d c);
-            var frame = new FiniteSlabRayFrame(new FixedTriangle(a, b, c), mesh.GeometryFrame,
-                center, rotation, length, radius, halfThickness);
-            if (fieldWords != FiniteSlabPolynomial.Words) frame = frame.WithWideParameters();
-            if (index == 0) commonNormal = frame.Plane.Normal;
-            if (input.Span.Kind == MeshSurfaceBoundaryDomain.SpanKind.Joined) continue;
-            int nativeOrientation = orientation * WideDirection3d.Dot(frame.Plane.Normal, commonNormal).Sign;
-            candidate.Restore(default);
-            FiniteSlabRayExtrema.AccumulateSegment(frame, new FixedSegment(input.Span.Start, input.Span.End),
-                input.Span.Interval, prismOffsets, nativeOrientation, ref candidate);
-            if (!candidate.HasValue) continue;
-            if (best.HasValue)
-            {
-                int order = candidate.CompareDepthAcrossFrames(best, frame, bestFrame);
-                if (order < 0 || order == 0 && input.Collider.Id >= sources[chosen].Collider.Id) continue;
-            }
-            values.CopyTo(bestValues); signs.CopyTo(bestSigns); best.Restore(candidate.Metadata);
-            bestFrame = frame; chosen = index;
-        }
-        if (!best.HasValue) return false;
-        bool represented = best.TryGetContactAnchor(bestFrame, out Fixed64 depth, out bool clamped,
-            out Vector3d authored, out FixedPointAnchor exit);
-        PhysicsMesh supplierMesh = sources[chosen].Collider.Mesh;
-        FixedPointAnchor source;
-        if (bestFrame.Section.RadialFrame.ShapeFrame.HasExactScale)
-        {
-            represented &= best.TryGetSourcePointInSamplingFrame(bestFrame, out Vector3d physical);
-            source = new FixedPointAnchor(bestFrame.Center, FixedQuaternion.Identity, physical);
-        }
-        else source = new FixedPointAnchor(supplierMesh.Origin, supplierMesh.Rotation, authored);
-        contact = new FixedContactAnchors(source,
-            exit, bestFrame.GetNormal(best.Metadata.Orientation), depth, clamped);
-        supplier = chosen; return represented;
-    }
-
     internal void Prepare(in FiniteSlabRayFrame frame, ReadOnlySpan<Vector2d> prismOffsets, bool coveredSection)
     {
         _member = -1;
@@ -106,33 +46,32 @@ internal sealed partial class MeshSlabFaceRegions
     {
         _frame = frame;
         _fieldWords = frame.FieldWords;
-        // Slot zero serves an isolated owner. Joined members retain their two
-        // peaks only for this build, so switching suppliers does not solve the
+        // Slot zero serves an isolated owner. Joined members retain their chosen
+        // peak only for this build, so switching suppliers does not solve the
         // same intrinsic plane again. Every new build overwrites active slots.
-        int slots = 2 * (_member + 2);
+        int slots = _member + 2;
         if (_values.Length < slots * SelectionWords) Array.Resize(ref _values, slots * SelectionWords);
         if (_signs.Length < slots * FiniteSlabRaySelection.SignCount) Array.Resize(ref _signs, slots * FiniteSlabRaySelection.SignCount);
         if (_peaks.Length < slots) Array.Resize(ref _peaks, slots);
         _hasPlaneSamples = _member < 0 && coveredSection;
         if (_member < 0) _events.FastClear();
-        // Axial caps are symmetric: the exact plane offset selects the nearer
-        // exit. Its constant-depth samples need only one intrinsic solve.
-        if (_hasPlaneSamples) { _orientation = frame.Plane.PlaneConstant.Sign < 0 ? -1 : 1; _region = 0; _intrinsicOnly = false; }
-        for (int orientation = -1; orientation <= 1; orientation += 2)
+        // The admitted section intersects this plane. Exact support projections
+        // choose the nearer exit before either expensive witness construction.
+        int order = frame.ComparePlaneExitDepths(prismOffsets);
+        _orientation = order <= 0 ? 1 : -1;
+        if (_member >= 0 && order == 0)
         {
-            var maximum = BorrowPeak(orientation);
-            maximum.Restore(default);
-            if (!_hasPlaneSamples || orientation == _orientation)
-                FiniteSlabRayExtrema.AccumulatePlane(frame, prismOffsets, orientation, ref maximum,
-                    _hasPlaneSamples ? _visitor : null, includeInteriorSample: !_hasPlaneSamples);
-            _peaks[2 * (_member + 1) + (orientation > 0 ? 0 : 1)] = maximum.Metadata;
+            WideDirection3d normal = frame.Plane.Normal;
+            int sign = !normal.X.IsZero ? normal.X.Sign : !normal.Y.IsZero ? normal.Y.Sign : normal.Z.Sign;
+            _orientation = -sign;
         }
-        if (!_hasPlaneSamples)
-        {
-            var positive = BorrowPeak(1); var negative = BorrowPeak(-1);
-            System.Diagnostics.Debug.Assert(positive.HasValue && negative.HasValue);
-            _orientation = positive.CompareDepth(negative) <= 0 ? 1 : -1;
-        }
+        if (_hasPlaneSamples) { _region = 0; _intrinsicOnly = false; }
+        var maximum = BorrowPeak();
+        maximum.Restore(default);
+        FiniteSlabRayExtrema.AccumulatePlane(frame, prismOffsets, _orientation, ref maximum,
+            _hasPlaneSamples ? _visitor : null, includeInteriorSample: !_hasPlaneSamples);
+        _peaks[_member + 1] = maximum.Metadata;
+        System.Diagnostics.Debug.Assert(maximum.HasValue);
         _supportDimension = frame.GetSupportDimension(prismOffsets, _orientation);
     }
 
@@ -230,7 +169,7 @@ internal sealed partial class MeshSlabFaceRegions
         var maximum = new FiniteSlabRaySelection(values, signs, _fieldWords);
         FiniteSlabRayExtrema.AccumulateTriangle(_frame, new FixedTriangle(segment.Start, segment.End, segment.End),
             prismOffsets, _orientation, ref maximum);
-        return maximum.HasValue && maximum.CompareDepth(BorrowPeak(_orientation)) == 0;
+        return maximum.HasValue && maximum.CompareDepth(BorrowPeak()) == 0;
     }
 
     private bool VisitTriangle(FixedTriangle triangle, ReadOnlySpan<Vector2d> prismOffsets, bool boundary = false)
@@ -242,15 +181,15 @@ internal sealed partial class MeshSlabFaceRegions
             FiniteSlabRayExtrema.AccumulatePhysicalSupportTriangle(_frame, triangle, prismOffsets, _orientation, ref maximum, _visitor);
         else
             FiniteSlabRayExtrema.AccumulateTriangle(_frame, triangle, prismOffsets, _orientation, ref maximum, _visitor);
-        return maximum.HasValue && maximum.CompareDepth(BorrowPeak(_orientation)) == 0;
+        return maximum.HasValue && maximum.CompareDepth(BorrowPeak()) == 0;
     }
 
-    private void VisitPlane(ReadOnlySpan<Vector2d> prismOffsets)
+    private void VisitPlane(ReadOnlySpan<Vector2d> prismOffsets, FiniteSlabRayCandidateVisitor? visitor = null)
     {
         Span<ulong> values = stackalloc ulong[SelectionWords];
         Span<sbyte> signs = stackalloc sbyte[FiniteSlabRaySelection.SignCount];
         var maximum = new FiniteSlabRaySelection(values, signs, _fieldWords);
-        FiniteSlabRayExtrema.AccumulatePlane(_frame, prismOffsets, _orientation, ref maximum, _visitor);
+        FiniteSlabRayExtrema.AccumulatePlane(_frame, prismOffsets, _orientation, ref maximum, visitor ?? _visitor);
     }
 
     private void AdmitPoint(scoped in FiniteSlabRaySelection candidate)
@@ -258,7 +197,7 @@ internal sealed partial class MeshSlabFaceRegions
         // A finite-domain ray maximum below the intrinsic peak is controlled by
         // a rim, whose real normal belongs to perimeter response, not this face.
         if (_intrinsicOnly && candidate.Metadata.DomainEdgeMask != 0
-            || !_hasPlaneSamples && candidate.CompareDepth(BorrowPeak(_orientation)) != 0) return;
+            || !_hasPlaneSamples && candidate.CompareDepth(BorrowPeak()) != 0) return;
         if (_member >= 0 && _completeSupports[_joined.FindResponseComponent(_member)] && !ContainsSupportPoint(candidate)) return;
         bool represented = candidate.TryGetContactAnchor(_frame, out Fixed64 depth, out bool clamped,
             out Vector3d point, out FixedPointAnchor exit);
@@ -334,9 +273,9 @@ internal sealed partial class MeshSlabFaceRegions
         return count;
     }
 
-    private FiniteSlabRaySelection BorrowPeak(int orientation)
+    private FiniteSlabRaySelection BorrowPeak()
     {
-        int index = 2 * (_member + 1) + (orientation > 0 ? 0 : 1);
+        int index = _member + 1;
         var result = new FiniteSlabRaySelection(_values.AsSpan(index * SelectionWords, SelectionWords),
             _signs.AsSpan(index * FiniteSlabRaySelection.SignCount, FiniteSlabRaySelection.SignCount), _fieldWords);
         result.Restore(_peaks[index]); return result;

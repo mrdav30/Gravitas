@@ -215,12 +215,12 @@ internal sealed partial class CollisionPairMixed
         _manifold2DContactDependencyVersion = Collider2D.ContactDependencyVersion;
         _manifold2DCenter = Collider2D.Center;
         _manifold2DRotation = Collider2D.Rotation;
-        _hasManifoldCache = Manifold.HasContact;
+        _hasManifoldCache = true;
         ClearSolveState();
     }
 
     // Dynamic 2D pose can change without a partition or contact-dependency revision.
-    private bool HasCurrentManifoldCache => _isColliding && _hasManifoldCache && Manifold.HasContact
+    internal bool HasCurrentManifoldCache => _isColliding && _hasManifoldCache
         && _manifold3DBroadPhaseVersion == Collider3D.BroadPhaseVersion
         && _manifold2DBroadPhaseVersion == Collider2D.BroadPhaseVersion
         && _manifold3DContactDependencyVersion == Collider3D.ContactDependencyVersion

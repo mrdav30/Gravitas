@@ -5,6 +5,7 @@
 using FixedMathSharp;
 using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
+using Gravitas.Materials;
 using SwiftCollections;
 using SwiftCollections.Query;
 using System;
@@ -18,11 +19,14 @@ internal sealed partial class MeshSlabFaceRegions
     private MeshJoinedSurfaceRegions<FiniteSlabRayFrame> _joined = null!;
     private readonly SwiftList<Sample> _joinedEvents = new();
     private readonly MeshSurfaceConnectivity _boundaryConnectivity = new();
-    private readonly Vector2d[] _boxOffsets = new Vector2d[4];
+    private Vector2d[] _boxOffsets = new Vector2d[4];
     private int[] _memberCounts = Array.Empty<int>(), _orientations = Array.Empty<int>(), _dimensions = Array.Empty<int>();
     private bool[] _completeSupports = Array.Empty<bool>();
     private int _member = -1, _otherMember;
+    private FixedBoundVolume _slabBounds;
     private FiniteSlabRayCandidateVisitor? _joinVisitor;
+    private FiniteSlabRayCandidateVisitor? _convexSupportVisitor;
+    private bool _convexSupportCovered;
     internal ReadOnlyMemory<Vector2d> PrismOffsets { get; private set; }
     internal int SourceId => _member < 0 ? 0 : _joined.Members[_member].Collider.Id + 1;
 
@@ -32,13 +36,26 @@ internal sealed partial class MeshSlabFaceRegions
         LSCollider mover, Fixed64 radius, Fixed64 halfThickness, Vector2d halfFootprint,
         ReadOnlySpan<PhysicsMesh> meshes, SwiftDictionary<(PhysicsMesh, int), MeshSurfaceBoundaryDomain> boundaries)
     {
-        PrismOffsets = default;
+        Span<Vector2d> offsets = stackalloc Vector2d[4];
         if (halfFootprint != Vector2d.Zero)
         {
-            _boxOffsets[0] = -halfFootprint; _boxOffsets[1] = new(halfFootprint.X, -halfFootprint.Y);
-            _boxOffsets[2] = halfFootprint; _boxOffsets[3] = new(-halfFootprint.X, halfFootprint.Y);
-            PrismOffsets = _boxOffsets;
+            offsets[0] = -halfFootprint; offsets[1] = new(halfFootprint.X, -halfFootprint.Y);
+            offsets[2] = halfFootprint; offsets[3] = new(-halfFootprint.X, halfFootprint.Y);
         }
+        BuildJoined(sources, mover.Center, mover.Rotation, Fixed64.Zero, radius, halfThickness,
+            halfFootprint == Vector2d.Zero ? ReadOnlySpan<Vector2d>.Empty : offsets,
+            new(mover.BoundsMin, mover.BoundsMax), mover is LSCylinderCollider, meshes, boundaries);
+    }
+
+    internal void BuildJoined(ReadOnlySpan<(LSMeshCollider Collider, int Triangle)> sources,
+        Vector3d center, FixedQuaternion rotation, Fixed64 length, Fixed64 radius, Fixed64 halfThickness,
+        ReadOnlySpan<Vector2d> offsets, FixedBoundVolume bounds, bool fullHeight,
+        ReadOnlySpan<PhysicsMesh> meshes, SwiftDictionary<(PhysicsMesh, int), MeshSurfaceBoundaryDomain> boundaries)
+    {
+        _slabBounds = bounds;
+        if (_boxOffsets.Length < offsets.Length) Array.Resize(ref _boxOffsets, offsets.Length);
+        offsets.CopyTo(_boxOffsets);
+        PrismOffsets = _boxOffsets.AsMemory(0, offsets.Length);
         _joined ??= new();
         _joined.Prepare(sources, meshes, boundaries); _joinedEvents.FastClear();
         if (_memberCounts.Length < _joined.Inputs.Count)
@@ -50,13 +67,12 @@ internal sealed partial class MeshSlabFaceRegions
         _joined.PrepareResponseComponents();
         for (int index = 0; index < _joined.Inputs.Count; index++)
         { _memberCounts[index] = 0; _completeSupports[index] = true; }
-        var bounds = new FixedBoundVolume(mover.BoundsMin, mover.BoundsMax);
         for (int index = 0; index < _joined.Inputs.Count; index++)
         {
             Member member = _joined.Members[index]; PhysicsMesh mesh = member.Collider.Mesh;
             mesh.GetGeometryTriangleVertices(member.Triangle, out Vector3d a, out Vector3d b, out Vector3d c);
             member.Frame = new(new FixedTriangle(a, b, c), mesh.GeometryFrame,
-                mover.Center, mover.Rotation, Fixed64.Zero, radius, halfThickness, fullHeight: mover is LSCylinderCollider);
+                center, rotation, length, radius, halfThickness, fullHeight: fullHeight);
             member.Admitted.FastClear(); member.Collider.GetTrianglesInBounds(bounds, _joined.Candidates);
             foreach (int triangle in _joined.Candidates.AsReadOnlySpan())
             {
@@ -85,16 +101,10 @@ internal sealed partial class MeshSlabFaceRegions
             if (_joined.GetResponseMember(index) < 0) { _joined.AddRegions(index, 0); continue; }
             PhysicsMesh mesh = member.Collider.Mesh;
             if (_completeSupports[_joined.FindResponseComponent(index)] && member.Admitted.Count == 0) { _joined.AddRegions(index, 0); continue; }
+            if (!CanReachSupport(member.Frame, mesh, member.Collider.Bounds))
+            { _joined.AddRegions(index, 0); continue; }
             member.Connectivity.BuildSlab(mesh, member.Triangle, member.Frame.Section, PrismOffsets, member.Admitted.AsReadOnlySpan());
             _member = index; PrepareFrame(member.Frame, PrismOffsets.Span);
-            if (BorrowPeak(1).CompareDepth(BorrowPeak(-1)) == 0)
-            {
-                // All native charts share this physical slab chart. Resolve a
-                // symmetric exit before rounding, independent of mesh winding.
-                WideDirection3d normal = member.Frame.Plane.Normal;
-                int sign = !normal.X.IsZero ? normal.X.Sign : !normal.Y.IsZero ? normal.Y.Sign : normal.Z.Sign;
-                _orientation = -sign;
-            }
             _orientations[index] = _orientation; _dimensions[index] = _supportDimension;
             if (_completeSupports[_joined.FindResponseComponent(index)])
             {
@@ -104,7 +114,7 @@ internal sealed partial class MeshSlabFaceRegions
                 RegionCount = 1;
                 VisitPlane(PrismOffsets.Span);
             }
-            else Build(mesh, member.Triangle, member.Connectivity, PrismOffsets.Span, null,
+            else if (!TryUseConvexSupport(mesh, member.Triangle)) Build(mesh, member.Triangle, member.Connectivity, PrismOffsets.Span, null,
                 member.Admitted.Count > 0 && ContainsSection(mesh, member.Triangle, member.Frame, PrismOffsets.Span));
             _memberCounts[index] = RegionCount; _joined.AddRegions(index, RegionCount);
             foreach (Sample sample in _events.AsReadOnlySpan()) _joinedEvents.Add(sample.WithRegion(member.Offset + sample.Region));
@@ -117,6 +127,36 @@ internal sealed partial class MeshSlabFaceRegions
             _joinedEvents[index] = sample.WithRegion(_joined.RegionByRoot[_joined.Find(sample.Region)]);
         }
         _joined.Commit();
+    }
+
+    private bool TryUseConvexSupport(PhysicsMesh mesh, int triangle)
+    {
+        // A nonaxial extrusion support is a point, segment or rectangle. Its
+        // exact extremes inside one convex fill certify the entire support.
+        // Axial disk caps need the existing perimeter proof, not sampled poles.
+        if (mesh.GetConvexCoplanarPatchCornerVertexIndices(triangle).IsEmpty
+            || _frame.Plane.Normal.X.IsZero && _frame.Plane.Normal.Z.IsZero) return false;
+        _events.FastClear(); _region = 0; _intrinsicOnly = _usesSupportGraph = false;
+        _convexSupportCovered = true;
+        _convexSupportVisitor ??= AdmitConvexSupport;
+        VisitPlane(PrismOffsets.Span, _convexSupportVisitor);
+        if (!_convexSupportCovered || _events.Count == 0) { _events.FastClear(); return false; }
+        RegionCount = 1;
+        return true;
+    }
+
+    private void AdmitConvexSupport(scoped in FiniteSlabRaySelection candidate)
+    {
+        if (candidate.CompareDepth(BorrowPeak()) != 0) return;
+        Member member = _joined.Members[_member];
+        PhysicsMesh mesh = member.Collider.Mesh;
+        ReadOnlySpan<int> corners = mesh.GetConvexCoplanarPatchCornerVertexIndices(member.Triangle);
+        ReadOnlySpan<Vector3d> vertices = mesh.GeometryVertices;
+        for (int corner = 1; corner < corners.Length - 1; corner++)
+            if (candidate.ContainsTrianglePoint(member.Frame,
+                new(vertices[corners[0]], vertices[corners[corner]], vertices[corners[corner + 1]]), member.Frame))
+            { AdmitPoint(candidate); return; }
+        _convexSupportCovered = false;
     }
 
     private void CertifyCompleteSupports()
@@ -159,6 +199,9 @@ internal sealed partial class MeshSlabFaceRegions
         {
             var piece = member.Boundary.Spans[span];
             if (member.JoinedSpans[span]) continue;
+            FixedBoundBox bounds = mesh.GeometryFrame.GetWorldBounds(Vector3d.Min(piece.Start, piece.End),
+                Vector3d.Max(piece.Start, piece.End));
+            if (!CanReachSupport(member.Frame, mesh, bounds)) continue;
             RationalSegmentInterval clip = member.GetRetainedInterval(ref span);
             _region = _usesSupportGraph ? MeshSurfaceBoundaryTopology.FindSupportEdgeRegion(mesh, member.Owner,
                 piece.First, piece.Second, connectivity, this, null) : 0;
@@ -167,6 +210,16 @@ internal sealed partial class MeshSlabFaceRegions
             FiniteSlabRayExtrema.AccumulateSegment(_frame, new FixedSegment(piece.Start, piece.End), clip,
                 PrismOffsets.Span, _orientation, ref maximum, _visitor);
         }
+    }
+
+    private bool CanReachSupport(in FiniteSlabRayFrame frame, PhysicsMesh mesh, FixedBoundBox bounds)
+    {
+        // Translation along the exact plane normal leaves its zero components
+        // unchanged. Disjoint outward bounds on those axes cannot supply support.
+        WideDirection3d normal = new WideDirection3d(frame.Plane.AuthoredNormal).Transform(mesh.GeometryFrame.GeometryBasis);
+        return (!normal.X.IsZero || bounds.Max.X >= _slabBounds.Min.X && bounds.Min.X <= _slabBounds.Max.X)
+            && (!normal.Y.IsZero || bounds.Max.Y >= _slabBounds.Min.Y && bounds.Min.Y <= _slabBounds.Max.Y)
+            && (!normal.Z.IsZero || bounds.Max.Z >= _slabBounds.Min.Z && bounds.Min.Z <= _slabBounds.Max.Z);
     }
 
     private void SelectJoinedMember(int index)
@@ -200,7 +253,7 @@ internal sealed partial class MeshSlabFaceRegions
 
     private void JoinAtSupportPoint(scoped in FiniteSlabRaySelection candidate)
     {
-        if (candidate.CompareDepth(BorrowPeak(_orientation)) != 0) return;
+        if (candidate.CompareDepth(BorrowPeak()) != 0) return;
         Member first = _joined.Members[_member], second = _joined.Members[_otherMember];
         if (_memberCounts[_member] == 1 && _memberCounts[_otherMember] == 1)
         {
@@ -233,7 +286,8 @@ internal sealed partial class MeshSlabFaceRegions
         }
     }
 
-    internal bool AppendJoinedContacts(LSMeshCollider collider, LSCollider mover, MeshSlabSurfaceBoundary boundary, ContactManifold manifold)
+    internal bool AppendJoinedContacts(LSMeshCollider collider, PhysicsMaterial material, MeshSlabSurfaceBoundary boundary,
+        ContactManifold manifold, LSCollider2D? embedded = null, int namespace3D = 0, int namespace2D = 0)
     {
         Span<int> chosen = stackalloc int[ContactManifold.MaxContactsPerGroup];
         for (int region = 0; region < _joined.Roots.Count; region++)
@@ -248,7 +302,8 @@ internal sealed partial class MeshSlabFaceRegions
                 Sample sample = _pool[chosen[index]]; Member supplier = _joined.Members[sample.Member];
                 manifold.AddContact(new ContactAnchor(new FixedPointAnchor(supplier.Frame.Center, FixedQuaternion.Identity, sample.Point)),
                     new ContactAnchor(sample.Exit), sample.Depth, root.Frame.GetNormal(_orientations[rootMember]), supplier.Collider.Material,
-                    mover.Material, sample.Clamped, group: new ContactGroupKey(0, 0, supplier.Owner + 1, 0, region, sourceIdA: supplier.Collider.Id + 1));
+                    material, sample.Clamped, featureNamespaceA: namespace3D, featureNamespaceB: namespace2D,
+                    group: new ContactGroupKey(namespace3D, namespace2D, supplier.Owner + 1, 0, region, sourceIdA: supplier.Collider.Id + 1));
             }
         }
         bool overlaps = false;
@@ -262,7 +317,8 @@ internal sealed partial class MeshSlabFaceRegions
             // Keep the component's face and perimeter rows in one solver pass;
             // otherwise matching normals receive positional correction twice.
             _boundaryConnectivity.BuildSlab(source.Collider.Mesh, source.Triangle, source.Frame.Section, PrismOffsets, source.Admitted.AsReadOnlySpan());
-            boundary.BuildSurfaceContacts(source.Collider, null, source.Triangle, _boundaryConnectivity, this, manifold, 0, 0, mover.Material);
+            boundary.BuildSurfaceContacts(source.Collider, embedded, source.Triangle, _boundaryConnectivity, this,
+                manifold, namespace3D, namespace2D, material);
         }
         return overlaps;
     }

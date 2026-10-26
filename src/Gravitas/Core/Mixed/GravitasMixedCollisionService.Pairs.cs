@@ -119,7 +119,7 @@ internal sealed partial class GravitasMixedCollisionService
 
         ContactManifold manifold = _context.CollisionScratch.MixedManifold;
         if (!(hasPair && pair!.TryCopyCachedManifold(frame, manifold))
-            && !CollisionDetectionMixed.TryBuildManifold(resolved3D, resolved2D, manifold))
+            && !CollisionDetectionMixed.TryBuildDiscreteManifold(resolved3D, resolved2D, manifold))
             return;
 
         if (!triggerPair && !hasAwakeMovableParticipant)
@@ -182,7 +182,7 @@ internal sealed partial class GravitasMixedCollisionService
             || !RequireCollisionPair(collider3D, collider2D)
             || !MixedBoundsOverlap(collider3D, collider2D)
             || !(pair.TryCopyCachedManifold(frame, manifold)
-                || CollisionDetectionMixed.TryBuildManifold(collider3D, collider2D, manifold)))
+                || CollisionDetectionMixed.TryBuildDiscreteManifold(collider3D, collider2D, manifold)))
         {
             return false;
         }
@@ -270,6 +270,11 @@ internal sealed partial class GravitasMixedCollisionService
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void RecyclePair(CollisionPairMixed pair)
     {
+        // Later callbacks can reuse this object for a different pair in this pass.
+        // Retire its pending response before the pool can publish that new lifetime.
+        if (pair.LastVisitToken == _context.LateSimulateToken)
+            for (int i = _mixedResponsePairs.Count - 1; i >= 0; i--)
+                if (ReferenceEquals(_mixedResponsePairs[i], pair)) _mixedResponsePairs.RemoveAt(i);
         if (_context.Settings.PoolingEnabled && !pair.IsNotificationInProgress)
             _cachedPairs.Push(pair);
     }

@@ -47,8 +47,12 @@ public sealed partial class GravitasPhysics2DService
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void RemovePairReferences(CollisionPair2D pair)
+    private void RemovePairReferences(CollisionPair2D pair)
     {
+        // Separation resets the visit token; retire queued aliases before that reset and pooling.
+        if (pair.LastVisitToken == _context.LateSimulateToken)
+            for (int i = _discreteResponsePairs.Count - 1; i >= 0; i--)
+                if (ReferenceEquals(_discreteResponsePairs[i], pair)) _discreteResponsePairs.RemoveAt(i);
         pair.ColliderA.TryRemoveCollisionPair(pair.Id2, out _);
         pair.ColliderB.TryRemoveCollisionPairHolder(pair.Id1);
     }

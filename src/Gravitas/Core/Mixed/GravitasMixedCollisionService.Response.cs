@@ -17,6 +17,21 @@ internal sealed partial class GravitasMixedCollisionService
 {
     private void SolveMixedResponsePairs()
     {
+        // A later member callback can retire a previously queued carrier or supplier.
+        for (int i = _mixedResponsePairs.Count - 1; i >= 0; i--)
+        {
+            CollisionPairMixed pair = _mixedResponsePairs[i];
+            bool current = IsCurrentPair(new MixedPairLifetimeToken(pair))
+                && !pair.Collider3D.IsTrigger && !pair.Collider2D.IsTrigger
+                && RequireCollisionPair(pair.Collider3D, pair.Collider2D);
+            if (current && !pair.HasCurrentManifoldCache)
+            {
+                ContactManifold rebuilt = _context.CollisionScratch.MixedManifold;
+                current = CollisionDetectionMixed.TryBuildDiscreteManifold(pair.Collider3D, pair.Collider2D, rebuilt);
+                if (current) pair.MarkResting(_context.FrameCount, rebuilt);
+            }
+            if (!current || !pair.Manifold.HasContact) _mixedResponsePairs.RemoveAt(i);
+        }
         if (_mixedResponsePairs.Count == 0)
             return;
 

@@ -394,6 +394,12 @@ Mixed pairs reuse retained geometry while committed poses and contact
 dependencies remain current. Reuse still checks collision eligibility and
 bounds, publishes the current frame, delivers notifications, and clears
 per-step impulses. It does not enable cross-frame mixed warm starts.
+Pure 2D and mixed response revalidate pending pairs after contact callbacks.
+Changed geometry or eligibility rebuilds their constraints before solving;
+retiring a pair removes its pending response before its object can be pooled
+and reused. Physical overlap notifications remain independent of response-row
+ownership: a surface member can retain its events while another overlapping
+member carries shared constraints and their finite supplier materials.
 Bodyless trigger volumes skip physical response and emit trigger notifications
 only when exactly one collider in the pair is a trigger and the other collider
 is body-owned. Both colliders in a valid trigger pair receive enter, stay, and

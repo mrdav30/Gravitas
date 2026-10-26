@@ -12,6 +12,26 @@ namespace Gravitas.Tests.MixedDimensions;
 public sealed partial class MixedResponseTests
 {
     [Fact]
+    public void EmptyMixedManifold_ShouldLeaveBothBodiesUnchanged()
+    {
+        using GravitasWorldContext context = CreateMixedContext();
+        ScenarioBody<LSSphereCollider> spatial = CreateSphere3D(context, Vector3d.Zero, preventAngularForces: true);
+        SolidBody2D planar = CreateCircle2D(context, Vector2d.Zero);
+        spatial.Body.ApplyCollisionLinearVelocityDelta(Vector3d.Right);
+        planar.ApplyCollisionLinearVelocityDelta(Vector2d.Forward);
+        var pair = new CollisionPairMixed(spatial.Collider, planar.Collider);
+
+        CollisionResponseMixed.ResolveManifold(pair);
+
+        spatial.Body.Position3d.Should().Be(Vector3d.Zero);
+        planar.Position.Should().Be(Vector2d.Zero);
+        spatial.Body.LinearVelocity.Should().Be(Vector3d.Right);
+        planar.LinearVelocity.Should().Be(Vector2d.Forward);
+        pair.Manifold.HasContact.Should().BeFalse();
+        pair.ResponseSnapshot.IsValid.Should().BeFalse();
+    }
+
+    [Fact]
     public void MixedManifoldRestitution_ShouldUseExactMinimumYawAtTheIncomingLever()
     {
         using GravitasWorldContext context = CreateMixedContext();

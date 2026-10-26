@@ -39,40 +39,52 @@ public static partial class CollisionDetectionMixed
         SwiftThrowHelper.ThrowIfNull(collider2D, nameof(collider2D));
         SwiftThrowHelper.ThrowIfNull(manifold, nameof(manifold));
         manifold.BeginUpdate(collider3D.Context.FrameCount);
-        AppendManifold(collider3D, collider2D, manifold, 0, 0);
+        AppendManifold(collider3D, collider2D, manifold, 0, 0, false);
         return manifold.HasContact;
     }
 
-    private static void AppendManifold(LSCollider collider3D, LSCollider2D collider2D,
-        ContactManifold manifold, int namespace3D, int namespace2D)
+    internal static bool TryBuildDiscreteManifold(LSCollider collider3D, LSCollider2D collider2D, ContactManifold manifold)
+    {
+        manifold.BeginUpdate(collider3D.Context.FrameCount);
+        return AppendManifold(collider3D, collider2D, manifold, 0, 0, true);
+    }
+
+    private static bool AppendManifold(LSCollider collider3D, LSCollider2D collider2D,
+        ContactManifold manifold, int namespace3D, int namespace2D, bool surfaceResponse)
     {
         if (!collider3D.Bounds.Intersects(collider2D.MixedBounds3D))
-            return;
+            return false;
 
         if (collider3D is LSCompoundCollider compound3D)
         {
+            bool overlaps = false;
             for (int i = 0; i < compound3D.PartCount; i++)
-                AppendManifold(compound3D.GetPartCollider(i), collider2D, manifold, i + 1, namespace2D);
-            return;
+                overlaps |= AppendManifold(compound3D.GetPartCollider(i), collider2D, manifold, i + 1, namespace2D, surfaceResponse);
+            return overlaps;
         }
         if (collider2D is LSCompoundCollider2D compound2D)
         {
+            bool overlaps = false;
             for (int i = 0; i < compound2D.PartCount; i++)
-                AppendManifold(collider3D, compound2D.GetPartCollider(i), manifold, namespace3D, -(i + 1));
-            return;
+                overlaps |= AppendManifold(collider3D, compound2D.GetPartCollider(i), manifold, namespace3D, -(i + 1), surfaceResponse);
+            return overlaps;
         }
         if (collider3D is LSMeshCollider mesh)
         {
+            if (surfaceResponse && mesh.StaticSurface is { } surface && !mesh.IsTrigger && !collider2D.IsTrigger)
+                return surface.AppendMixed(mesh, collider2D, manifold, namespace3D, namespace2D);
+            int previous = manifold.Count;
             AppendMeshEmbedded2D(mesh, collider2D, manifold, namespace3D, namespace2D);
-            return;
+            return manifold.Count != previous;
         }
         if (!TryPrimitiveContact(collider3D, collider2D, out MixedContact contact))
-            return;
+            return false;
 
         if (namespace3D != 0 || namespace2D != 0)
             contact = contact.WithFallbackMaterials(collider3D.Material, collider2D.Material);
         ManifoldContact row = contact.ToManifoldContact(namespace3D, namespace2D);
         manifold.AddContact(new ContactGroupKey(namespace3D, namespace2D), row);
+        return true;
     }
 
     private static bool TryPrimitiveContact(LSCollider collider3D, LSCollider2D collider2D, out MixedContact contact) =>

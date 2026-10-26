@@ -16,7 +16,8 @@ using System;
 namespace Gravitas;
 
 /// <summary>Internal staged continuity declaration; public exposure requires query, CCD and restore parity.</summary>
-internal sealed class StaticSurface : IDisposable
+/// <content>Owns declared member lifetime and cached finite response families.</content>
+internal sealed partial class StaticSurface : IDisposable
 {
     private readonly GravitasWorldContext _context;
     private LSMeshCollider[] _members = Array.Empty<LSMeshCollider>();
@@ -104,6 +105,7 @@ internal sealed class StaticSurface : IDisposable
     {
         _dirty |= geometryChanged;
         _facesCurrent = false;
+        _mixedSlab = false;
         foreach (LSMeshCollider member in _members)
         {
             member.MarkContactDependencyChanged(notifySurface: false);
@@ -125,7 +127,9 @@ internal sealed class StaticSurface : IDisposable
         for (int i = 0; i < _members.Length; i++) _meshes[i] = _members[i].Mesh;
     }
 
-    internal int Gather(LSCollider mover, FixedBoundVolume bounds)
+    internal int Gather(LSCollider mover, FixedBoundVolume bounds) => Gather(mover, null, bounds);
+
+    private int Gather(LSCollider? mover, LSCollider2D? embedded, FixedBoundVolume bounds)
     {
         if (_dirty)
         {
@@ -135,7 +139,8 @@ internal sealed class StaticSurface : IDisposable
             _dirty = false;
         }
         _surfaces.Clear(); _owners.Clear();
-        LSCollider participant = mover.CompoundOwner ?? mover;
+        LSCollider? participant = mover?.CompoundOwner ?? mover;
+        LSCollider2D? planar = embedded?.CompoundOwner ?? embedded;
         // Reuse the committed index; Y rejection keeps its planar candidates conservative in 3D.
         _context.Collisions.QueryPlanarColliderCandidates(new(bounds.Min.X, bounds.Min.Z, bounds.Max.X, bounds.Max.Z), _candidates);
         foreach (int id in _candidates.AsReadOnlySpan())
@@ -143,7 +148,8 @@ internal sealed class StaticSurface : IDisposable
             _context.Physics.TryGetColliderById(id, out var candidate);
             if (candidate is not LSMeshCollider mesh
                 || mesh.StaticSurface != this || mesh.IsTrigger
-                || !_context.Physics.RequireCollisionPair(mesh, participant)
+                || (participant != null ? !_context.Physics.RequireCollisionPair(mesh, participant)
+                    : !_context.MixedCollisions.RequireCollisionPair(mesh, planar!))
                 || mesh.BoundsMax.Y < bounds.Min.Y || mesh.BoundsMin.Y > bounds.Max.Y) continue;
             mesh.GetTrianglesInBounds(bounds, _triangles);
             foreach (int triangle in _triangles.AsReadOnlySpan())
@@ -211,11 +217,12 @@ internal sealed class StaticSurface : IDisposable
 
     internal void BuildSlab(LSCollider mover, Fixed64 radius, Fixed64 halfThickness, Vector2d halfFootprint)
     {
-        bool reuse = _facesCurrent && _cachedFamily == ContactFamily.Slab && _center == mover.Center && _rotation == mover.Rotation
+        bool reuse = _facesCurrent && _cachedFamily == ContactFamily.Slab && !_mixedSlab && _center == mover.Center && _rotation == mover.Rotation
             && _coreLength == halfThickness && _radius == radius && _halfFootprint == halfFootprint && _cachedOwners.Count == _owners.Count;
         foreach (var owner in _cachedOwners.AsReadOnlySpan()) reuse &= _owners.Contains(owner);
         if (reuse) return;
         _facesCurrent = false; _cachedFamily = ContactFamily.Slab;
+        _mixedSlab = false;
         SlabFaces.BuildJoined(_surfaces.AsReadOnlySpan(), mover, radius, halfThickness, halfFootprint, _meshes, _boundaries);
         _cachedOwners.Clear();
         foreach (var surface in _surfaces.AsReadOnlySpan())

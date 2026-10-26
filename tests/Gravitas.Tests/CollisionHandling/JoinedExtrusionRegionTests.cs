@@ -10,6 +10,37 @@ namespace Gravitas.Tests;
 
 public sealed class JoinedExtrusionRegionTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void TiltedRemoteSpines_ShouldKeepDisconnectedSupports(bool tinyTilt)
+    {
+        using var scene = PhysicsScenarioBuilder.Create();
+        FixedQuaternion rotation = tinyTilt
+            ? new(Fixed64.Zero, Fixed64.Zero, Fixed64.FromRaw(1), Fixed64.One)
+            : FixedQuaternion.FromEulerAnglesInDegrees(Fixed64.Zero, Fixed64.Zero, (Fixed64)30);
+        var members = new[] { Patch(false, false), Patch(true, false) };
+        foreach (var member in members)
+            member.InitializeWithNoBody(new TestMatterAgent(scene.Context,
+                new FixedTransform(Vector3d.Zero, rotation, Vector3d.One)));
+        using var surface = scene.Context.Physics.CreateStaticSurface(members);
+        var box = new LSCuboidCollider { Size = new(2, 1, 2) };
+        scene.CreateBody(box, rotation * new Vector3d(Fixed64.Half, Fixed64.Quarter, Fixed64.Zero), rotation);
+        var pair = scene.CreatePair(members[0], box);
+        Assert.True(CollisionDetection.DoCollisionCheck(pair));
+        Assert.Equal(2, surface.SlabFaces.RegionCount);
+        Assert.NotEmpty(pair.Manifold);
+        // A nonzero normal coordinate, even a few raw units, cannot use the
+        // zero-axis bounds certificate to discard finite support candidates.
+        foreach (var row in pair.Manifold)
+        {
+            Assert.True(Vector3d.Distance(row.Normal, rotation * Vector3d.Up) < Fixed64.FromFraction(1, 100000));
+            Assert.True((row.Depth - Fixed64.Quarter).Abs() < Fixed64.FromFraction(1, 100000));
+            Assert.True(row.AnchorA.TryGetWorldPoint(out _));
+            Assert.True(row.AnchorB.TryGetWorldPoint(out _));
+        }
+    }
+
     [Fact]
     public void DuplicateFilledOwners_ShouldRetainTheirIndependentFiniteBoxRegions()
     {

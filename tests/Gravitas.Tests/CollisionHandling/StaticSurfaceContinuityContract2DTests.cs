@@ -7,12 +7,77 @@ using Gravitas.Queries;
 using Gravitas.Tests.Support;
 using SwiftCollections;
 using System.Collections.Generic;
+using System.Reflection;
 using Xunit;
 
 namespace Gravitas.Tests;
 
 public sealed class StaticSurfaceContinuityContract2DTests
 {
+    [Fact]
+    public void LaterCallbackReusingAnEarlierQueuedPair_ShouldSolveTheNewLifetimeOnlyOnce()
+    {
+        using var context = Physics2DTestWorld.CreateContext(frameRate: 16);
+        context.Settings.PoolingEnabled = true;
+        context.Settings.RestitutionVelocityThreshold = Fixed64.Zero;
+        context.Environment.Gravity = Fixed64.Zero;
+        context.Environment.AirDensity = Fixed64.Zero;
+        context.Environment.DampingFactor = Fixed64.Zero;
+        context.Environment.MinSpeed = Fixed64.Zero;
+        // All three candidates share the same first voxel. Registration order
+        // therefore places the retiring contact before the observer and replacement.
+        Vector2d floorCenter = new(Fixed64.FromFraction(19, 4), Fixed64.FromFraction(7, 2));
+        LSCollider2D first = Rectangle(context, false, new(2, 2), floorCenter);
+        var observer = new LSCircleCollider2D(Fixed64.One) { IsTrigger = true };
+        observer.InitializeWithNoBody(new TestMatterAgent(context, new FixedTransform(
+            new Vector3d(floorCenter.X, Fixed64.Zero, Fixed64.FromFraction(19, 4)),
+            FixedQuaternion.Identity, Vector3d.One)));
+        LSCollider2D replacement = Rectangle(context, false, new(2, 2), floorCenter);
+        replacement.Material = PhysicsMaterial.Bouncy;
+        var circle = new LSCircleCollider2D(Fixed64.Half) { Material = PhysicsMaterial.Bouncy };
+        var body = new SolidBody2D(new TestMatterAgent(context), circle)
+        {
+            Mass = Fixed64.One, SleepEnabled = false,
+            FreezeAxes = BodyFreezeAxes2D.PositionX | BodyFreezeAxes2D.Rotation
+        };
+        body.Initialize(new(floorCenter.X, Fixed64.FromFraction(19, 4)));
+        body.UseManualGrounding();
+        body.AddLinearImpulse(-Vector2d.Forward);
+        CollisionPair2D? original = null;
+        first.OnContactEnter += _ => original = Pair(first);
+        bool retired = false, reused = false;
+        observer.OnTriggerEnter += _ =>
+        {
+            Assert.NotNull(original);
+            Assert.NotEmpty(original.Manifold);
+            first.Deactivate();
+            retired = true;
+        };
+        replacement.OnContactEnter += _ =>
+        {
+            Assert.True(retired);
+            Assert.Same(original, Pair(replacement));
+            reused = true;
+        };
+
+        context.Simulate(); context.LateSimulate();
+
+        Assert.True(reused);
+        CollisionPair2D current = Pair(replacement);
+        var response = (SwiftList<CollisionPair2D>)typeof(GravitasPhysics2DService)
+            .GetField("_discreteResponsePairs", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(context.Physics2D)!;
+        Assert.Same(current, Assert.Single(response));
+        Assert.Equal(Vector2d.Forward, body.LinearVelocity);
+
+        CollisionPair2D Pair(LSCollider2D member)
+        {
+            if (member.TryGetCollisionPair(circle.Id, out CollisionPair2D? pair)) return pair!;
+            Assert.True(circle.TryGetCollisionPair(member.Id, out pair));
+            return pair!;
+        }
+    }
+
     [Theory]
     [InlineData(false, false)]
     [InlineData(false, true)]

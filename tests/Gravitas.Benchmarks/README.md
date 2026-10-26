@@ -26,6 +26,14 @@ Each `ChangeMass` invocation assigns `0`, `2`, then `1` kilogram, including
 inertia refresh, cache/CCD invalidation, and awake membership synchronization.
 These timings represent the complete three-assignment mutation cycle.
 
+`joined-static-surface-mixed-simulation` measures one moving circle, stadium or
+polygon against a vertical 3D wall represented by one continuous mesh or
+2/16/64 joined pieces. All layouts cover the same 16-unit wall. Each invocation
+runs 64 complete host frames at 16 Hz, with inward planar impulses and driven
+seam crossings; setup and every frame verify preserved tangential velocity.
+`OperationsPerInvoke` reports time/allocation per complete frame. A horizontal
+floor alone would not exercise a 2D participant's planar mixed response.
+
 ## Requirements
 
 - The SDK selected by the repository's `global.json`

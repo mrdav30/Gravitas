@@ -222,7 +222,7 @@ internal static class MeshTriangleContactGenerator
         {
             Vector3d half = cuboid.OrientedBox.HalfExtents;
             surface.BuildSlab(cuboid, Fixed64.Zero, half.Y, new(half.X, half.Z));
-            return surface.SlabFaces.AppendJoinedContacts(mesh, cuboid, pair.Context.CollisionScratch.MeshSlabBoundary, pair.Manifold);
+            return surface.SlabFaces.AppendJoinedContacts(mesh, cuboid.Material, pair.Context.CollisionScratch.MeshSlabBoundary, pair.Manifold);
         }
         mesh.GetTrianglesInBounds(CreateBounds(cuboid.BoundsMin, cuboid.BoundsMax), triangleBuffer);
         for (int i = 0; i < triangleBuffer.Count; i++)
@@ -241,7 +241,7 @@ internal static class MeshTriangleContactGenerator
             && surface.GatherProjectedSupport(cylinder) > 0)
         {
             surface.BuildSlab(cylinder, cylinder.ScaledRadius, cylinder.Height, default);
-            return surface.SlabFaces.AppendJoinedContacts(mesh, cylinder, pair.Context.CollisionScratch.MeshSlabBoundary, pair.Manifold);
+            return surface.SlabFaces.AppendJoinedContacts(mesh, cylinder.Material, pair.Context.CollisionScratch.MeshSlabBoundary, pair.Manifold);
         }
         mesh.GetTrianglesInBounds(CreateBounds(cylinder.BoundsMin, cylinder.BoundsMax), triangleBuffer);
         CollisionSatScratch scratch = pair.Context.CollisionScratch;

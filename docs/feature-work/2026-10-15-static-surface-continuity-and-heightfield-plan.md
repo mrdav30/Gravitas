@@ -1,11 +1,12 @@
 # Static Surface Continuity And Heightfield Integration
 
 **Date:** 2026-10-15  
-**Status:** Phases 1–6 complete, 2026-10-19
+**Status:** Phases 1–7 complete, 2026-10-25
 #133/#139 remain coordinated. Heightfield and alternative-index work are deferred;
 no public continuity API is enabled. Internal 3D discrete response covers rounded,
-cone, extrusion and native mesh families, with pure 2D joined-solid response;
-mixed and continuation work remain in the phases below.  
+cone, extrusion and native mesh families, pure 2D joined-solid response, and
+embedded 2D movers against joined 3D meshes. Reverse mixed response and
+continuation work remain in the phases below.  
 **Order:** #132 is resolved. Resolve #133 and its confirmed pure 2D counterpart,
 #139, through the generic-continuity phases below before terrain-specific work.
 Keep one implementation plan rather than duplicate the prerequisite design.  
@@ -233,7 +234,7 @@ contract and bounded arithmetic feasibility recorded below.
 Every runtime phase must preserve raw reachable 100% line/branch/method coverage
 in Release/Lean, relevant replay behavior, zero added warmed allocations and the
 ordinary warm baseline, using `UseLocalLsfStack=true`. Refine introduced costs
-before handoff and obtain independent ponytail review. Phase 9 consolidates the
+before handoff and obtain independent ponytail review. Phase 10 consolidates the
 evidence; it does not postpone these requirements. Keep experimental membership
 internal until response, query/CCD and restore semantics are coherent.
 
@@ -836,7 +837,7 @@ Ignored evidence is under `artifacts/grv-issue-133/phase3/`: raw
 `bdn-warm-final`, paired/reversed controls, source and eight-module hashes.
 Linux, ARM and released packages were not run locally. Commit/push FixedMathSharp
 first, then advance Gravitas's develop CI pin. Membership remains internal;
-#133/#139 stay open for the remaining original checklist in Phases 4–9.
+#133/#139 stay open for the remaining checklist in Phases 4–10.
 
 ### Phase 4 - Complete 3D Extrusion Continuity And Response Ownership - Complete, 2026-10-18
 
@@ -885,7 +886,7 @@ replay fixtures agree across Windows x64 Release/Lean and reviewed expectations.
 Manifold/warm-start hash sections advance to 9/3 for supplier references; only
 expected hashes change in five fixtures, with identical body, event and query
 data. A single-supplier test normalizes registry references; reconstructed
-multi-supplier solver ordering remains Phase 8's continuation contract.
+multi-supplier solver ordering remains Phase 9's continuation contract.
 
 The final moving one-body batch uses 64 complete frames per invocation at a
 configured 16 Hz, 24 warmed windows and four invocations/window on the
@@ -1122,22 +1123,103 @@ Commit/push FixedMathSharp first, then advance Gravitas's develop CI pin from
 `8302f055fe28560109780b57579e97d8b44a8899` to the new fetchable commit before
 pushing Gravitas. Released-package, Linux and ARM validation were not run
 locally. #133/#139 remain open; mixed continuity, queries/CCD, membership
-recording/reconstruction and public-contract closeout remain Phases 7–9.
+recording/reconstruction and public-contract closeout remain Phases 7–10.
 
-### Phase 7 - Complete Mixed Static Continuity
+### Phase 7 - Mixed Response Against Joined 3D Meshes
 
-- [ ] Apply the same ownership/eligibility contract to mixed finite slabs in both
-  directions. Complete joined face pools through the existing mixed slab support
+- [x] Apply the same ownership/eligibility contract to embedded 2D movers against
+  declared static 3D meshes. Complete joined face pools through the existing mixed slab support
   and clipped-boundary owners, including a vertical 3D sheet with a planar
   response normal. Retire the Phase 1 slab boundary-witness proof once the
   production path covers its nonzero-core embedded cases.
-- [ ] Verify connected 2D pieces as embedded targets with matching/differing host
-  Y and thickness. Planar adjacency must not erase a real step or finite rim.
-- [ ] Preserve per-member events/query identity, deterministic solver ordering,
+- [x] Preserve per-member events/query identity, deterministic solver ordering,
   materials and lifetime invalidation; cover actual full-loop crossings and
   complete-shape response before the same coverage/performance/review closeout.
 
-### Phase 8 - Continuation, Queries And Continuous Collision
+**Scope split, 2026-10-25:** The original Phase 7 combined two distinct physical
+owners. A moving embedded slab can reuse the joined mesh-face producer. Static
+2D members instead describe filled solid prisms; their ordinary contact owners
+select a whole-volume minimum and use native scalar yaw for primitive contacts.
+Removing a covered winning contact afterward cannot regenerate a valid exposed
+exit, and copied quaternion-oriented mesh proxies would not preserve the exact
+prism chart. Separate that work into Phase 8 below rather than adding another
+mesh/BVH representation or expanding this integration into several arithmetic
+families at once. Both directions remain required before issue closeout.
+
+**Completion, 2026-10-25:** Existing surface/slab owners now build mixed
+discrete manifolds for circles, zero/nonzero-core capsules, AABBs, convex
+polygons and compound leaves. Actual member overlap/events remain independent
+of supplier rows, materials and provenance. Final callback validation rejects
+retired carriers and rebuilds changed dependencies. Retirement clears queued
+aliases before pooling, including the confirmed pure 2D counterpart.
+
+Exact exit comparison retains one peak per member; support dimension follows
+the selected orientation. Existing arithmetic scratch is shared across active
+vertices with reentrant visitors covered. Exact-zero-normal bounds rejection
+skips unreachable spans/members; tiny nonzero tilts and suppliers outside the
+initial section retain the finite path. No new index, proxy or solver was added;
+the slab proof-only helper/tests were retired. Net runtime growth is **90
+lines/one new file in Gravitas** and **41 lines/no new files in FixedMathSharp**,
+excluding tests/docs. Independent geometry/ponytail review has no open findings.
+
+Gravitas Release/Lean pass **7,488/7,419** tests; FixedMathSharp passes
+**6,861/6,840**, plus **49 recording-adapter tests per profile**. All four
+captures have exact raw **100% line, branch and method coverage**, without new
+exclusions. Both target frameworks build in both profiles with zero warnings
+or errors. All six shared replay fixtures match their expectations and local
+Windows x64 Release/Lean captures; no expectation was changed.
+
+Warm Windows x64 .NET 8 measurements use one driven planar body crossing the
+same 16-unit vertical wall at 16 Hz, with 64 complete `Simulate`/`LateSimulate`
+frames per invocation. Values are **microseconds per frame**, all **0 B/frame**:
+
+| Moving shape | Continuous wall | 2 joined pieces | 16 joined pieces | 64 joined pieces |
+| --- | ---: | ---: | ---: | ---: |
+| Circle | 1,464.96 | 641.61 | 1,077.58 | 2,905.88 |
+| Capsule | 2,382.52 | 721.21 | 1,229.64 | 3,443.58 |
+| Polygon | 756.77 | 590.06 | 1,361.85 | 3,680.42 |
+
+Initial two-piece costs were approximately 2,923/5,483/1,446 us; initial
+64-piece costs were 6,158/10,651/7,295 us. Profiling led to the shared bounds
+proof rejecting unreachable members before support construction, preserving
+topology and identical raw body state through 512 additional frozen-payload
+frames per dense shape. Fragmentation remains costly; these are lifecycle
+fixtures, not game-capacity/frame-tail guarantees. Broken independent seams
+are not an acceptance denominator.
+
+Seven matched ordinary/previously joined controls retain exact physical
+witnesses and zero warm allocation. The existing joined 3D cylinder full step
+improves approximately 8.7%. Small ordinary contrasts change sign across fresh
+normal/reversed-load processes. An adverse 64-pair 2D contrast of +3.41% does
+not persist in four focused ABBA repeats (-1.06%, -0.28%, -0.17%, +2.04%);
+native mixed contrasts range -2.96% to +3.57% across six processes. These runs
+do not resolve an ordinary regression or prove universal zero overhead. The
+pre-phase payload already includes the explicitly accepted Phase 6 cost.
+
+Coverage, module hashes, state comparisons and adverse/refined timings remain
+under ignored `artifacts/static-surface/phase7/`, including
+`coverage-closeout-*`, `math-final-coverage-*`, `member-cull-state.json`,
+`controls-accepted-*`, `controls-focused-*` and `mixed-accepted-timing.json`.
+Commit/push FixedMathSharp first, then advance the develop CI pin to that
+fetchable commit before pushing Gravitas. Released-package, Linux and ARM
+validation were not run locally. #133/#139 remain open for Phases 8–10;
+per-collider query/CCD behavior remains unchanged for Phase 9.
+
+### Phase 8 - Mixed Response Against Joined 2D Solids
+
+- [ ] Reuse typed 2D membership and exact exposed boundary spans for static
+  embedded AABB/polygon members against moving 3D shapes. Preserve the actual
+  primitive and mesh charts; prove the small native crossing before broadening
+  families. Admit finite exposed features before contact selection, preserving
+  filled-solid containment and genuine cap/side/rim constraints.
+- [ ] Verify matching/differing host Y and half-thickness. Planar adjacency alone
+  must not erase a real step or finite rim; retain rational cuts through final
+  witness materialization and check whole-shape clearance.
+- [ ] Preserve member observations, supplier materials, independent solver
+  groups, mutations and lifetime invalidation. Complete full-host shape/order,
+  raw coverage, replay, warm allocation/performance and independent review gates.
+
+### Phase 9 - Continuation, Queries And Continuous Collision
 
 - [ ] Extend existing dependency invalidation to affected neighbors for geometry,
   filtering, trigger state, removal and membership changes. Test sleeping contact
@@ -1154,7 +1236,7 @@ recording/reconstruction and public-contract closeout remain Phases 7–9.
   Extend shared native replay conformance with reviewed expectations; do not
   weaken existing unrelated fixtures to accommodate a seam correction.
 
-### Phase 9 - Close #133/#139 And Publish The Supported Contract
+### Phase 10 - Close #133/#139 And Publish The Supported Contract
 
 - [ ] Validate Release/ReleaseLean, raw reachable 100% line/branch/method coverage,
   relevant replay lanes and warmed allocation guards using `UseLocalLsfStack=true`.
@@ -1186,7 +1268,7 @@ recording/reconstruction and public-contract closeout remain Phases 7–9.
    costs with identical physical surfaces. No backend is selected in advance;
    no core-library coupling, shared mode switch or duplicate terrain math is
    required by the independent profiles.
-3. **Representation conformance.** Reuse Phase 9's correctness, determinism,
+3. **Representation conformance.** Reuse Phase 10's correctness, determinism,
    coverage and cost gates for any selected representation. Add explicit sample
    quantization/diagonal agreement, streaming/edit churn and adapter validation
    only where that representation introduces them. Publish its supported

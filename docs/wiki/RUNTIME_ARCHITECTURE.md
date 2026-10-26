@@ -201,6 +201,12 @@ authoritative snapshot identity: each hash pass builds canonical live
 registration order and writes dense replay ordinals for collider, hierarchy, and
 pair identity.
 
+Pure 2D and mixed pair recycling removes queued response references before
+publishing the object to its pool. A later callback can otherwise reuse that
+object for a different registered pair during the same collision pass. The
+final response boundary also rechecks eligibility and changed contact
+dependencies after callbacks, keeping observations separate from retained rows.
+
 Both 3D and 2D physics services keep compact service-refresh lists for bodyless
 and explicit static colliders. Simulated-body buckets refresh dynamic and
 kinematic colliders, so fixed-step partition preparation only visits colliders
