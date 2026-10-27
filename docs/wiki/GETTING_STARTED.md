@@ -23,7 +23,7 @@ dotnet add package Gravitas.Lean
 ```
 
 Both variants expose the same core physics API and target `netstandard2.1` and
-`net8.0`.
+`net10.0`.
 
 ## 2. Give Gravitas A Host Object
 

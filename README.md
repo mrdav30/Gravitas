@@ -53,7 +53,7 @@ dotnet add package Gravitas.Lean
 | `Gravitas`      | Standard package with built-in MemoryPack support                      |
 | `Gravitas.Lean` | Same core physics API without the direct MemoryPack runtime dependency |
 
-Both packages target `netstandard2.1` and `net8.0`.
+Both packages target `netstandard2.1` and `net10.0`.
 
 ## The Core Loop
 

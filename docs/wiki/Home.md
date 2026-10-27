@@ -58,7 +58,7 @@ Already know what you need? Jump to a topic below.
 | `Gravitas` | Standard package with built-in MemoryPack support |
 | `Gravitas.Lean` | Same core physics API without the direct MemoryPack runtime dependency |
 
-Both variants target `netstandard2.1` and `net8.0`. Gravitas builds on
+Both variants target `netstandard2.1` and `net10.0`. Gravitas builds on
 [FixedMathSharp](https://github.com/mrdav30/FixedMathSharp),
 [SwiftCollections](https://github.com/mrdav30/SwiftCollections),
 [GridForge](https://github.com/mrdav30/GridForge), and

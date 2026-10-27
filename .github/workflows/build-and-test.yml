@@ -79,7 +79,6 @@ jobs:
         with:
           architecture: ${{ matrix.platform.arch }}
           dotnet-version: |
-            8.0.x
             10.0.x
 
       - name: Setup GitVersion

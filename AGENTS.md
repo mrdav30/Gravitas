@@ -108,7 +108,7 @@ libraries' documentation.
 
 | Path                                                               | Purpose                                                                                                            | Notes                                                                                                                                                          |
 | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`src/Gravitas`](src/Gravitas)                                     | Main library project                                                                                               | Multi-targets `netstandard2.1` and `net8.0`.                                                                                                                   |
+| [`src/Gravitas`](src/Gravitas)                                     | Main library project                                                                                               | Multi-targets `netstandard2.1` and `net10.0`.                                                                                                                   |
 | [`src/Gravitas/Core`](src/Gravitas/Core)                           | Shared host agent interface plus dimensional runtime folders                                                       | Start here for body/registration architecture changes.                                                                                                         |
 | [`src/Gravitas/Core/3D`](src/Gravitas/Core/3D)                     | 3D body, physics, collision, grounding, and inertia ownership                                                      | Keep 3D-only behavior out of pure 2D services.                                                                                                                 |
 | [`src/Gravitas/Core/2D`](src/Gravitas/Core/2D)                     | Pure 2D body, physics, collision, and planar CCD ownership                                                         | Keep 2D semantics first-class rather than accidental 3D projection.                                                                                            |
@@ -631,7 +631,7 @@ abstraction would hide ordering, units, or mutation rules.
 ## Testing Workflow
 
 [`global.json`](global.json) selects the .NET 10 SDK for solution tooling. Keep
-the .NET 8 runtime installed to execute the `net8.0` tests and benchmarks.
+the .NET 10 runtime installed to execute the `net10.0` tests and benchmarks.
 
 Use these baseline commands:
 
@@ -750,15 +750,15 @@ compound colliders, 2D, mixed broad phase, and CCD scaling.
 List available benchmark selections:
 
 ```bash
-dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0
-dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll list
+dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net10.0
+dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll list
 ```
 
 Run all benchmark groups when a broad performance pass is needed:
 
 ```bash
-dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0
-dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll all
+dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net10.0
+dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll all
 ```
 
 On Linux/WSL, prefer running the compiled benchmark DLL through the configured

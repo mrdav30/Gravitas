@@ -3,7 +3,7 @@
     {
       "src": [
         {
-          "files": ["src/Gravitas/bin/Release/net8.0/Gravitas.dll"],
+          "files": ["src/Gravitas/bin/Release/net10.0/Gravitas.dll"],
           "src": "../.."
         }
       ],

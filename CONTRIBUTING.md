@@ -11,7 +11,7 @@ Focused fixes can proceed directly through a pull request.
 ## Development Setup
 
 [`global.json`](global.json) selects the .NET SDK used for solution tooling.
-Keep the .NET 8 runtime installed for the `net8.0` tests and benchmarks.
+Keep the .NET 10 runtime installed for the `net10.0` tests and benchmarks.
 
 ```bash
 dotnet restore Gravitas.slnx

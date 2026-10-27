@@ -43,7 +43,7 @@ these fixtures measure contact lifecycle cost rather than game capacity.
 ## Requirements
 
 - The SDK selected by the repository's `global.json`
-- .NET 8 runtime for the `net8.0` benchmark executable
+- .NET 10 runtime for the `net10.0` benchmark executable
 - `Release` configuration for meaningful measurements
 
 Avoid measuring `Debug` builds except when diagnosing benchmark setup failures.
@@ -54,7 +54,7 @@ Build the benchmark runner first, then execute the compiled DLL through the
 configured `dotnet` host:
 
 ```bash
-dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0
+dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net10.0
 ```
 
 On Linux/WSL this avoids `dotnet run` launching a generated apphost that does
@@ -65,13 +65,13 @@ can use that capability.
 ### List available benchmark selections
 
 ```bash
-dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll list
+dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll list
 ```
 
 ### Run all benchmarks
 
 ```bash
-dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll all
+dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll all
 ```
 
 ### Run a selection by alias
@@ -83,13 +83,13 @@ For a class named `CollisionDetectionBenchmarks`, the selection alias is
 `collision-detection`:
 
 ```bash
-dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll collision-detection
+dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll collision-detection
 ```
 
 Multiple aliases can run together:
 
 ```bash
-dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll collision-detection collision-partition
+dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll collision-detection collision-partition
 ```
 
 ### Forward BenchmarkDotNet arguments
@@ -97,8 +97,8 @@ dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll coll
 Arguments after the selection are forwarded to BenchmarkDotNet:
 
 ```bash
-dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll all --list flat
-dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll collision-detection --filter "*Sphere*"
+dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll all --list flat
+dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll collision-detection --filter "*Sphere*"
 ```
 
 The launcher returns nonzero for malformed arguments, unmatched filters,
@@ -114,8 +114,8 @@ When validating unreleased sibling libraries, build the runner explicitly in
 source mode:
 
 ```powershell
-dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0 -p:UseLocalLsfStack=true -p:BuildInParallel=false -m:1
-dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll world-context --filter '*RunEmptySimulationFrame*' --job Dry
+dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net10.0 -p:UseLocalLsfStack=true -p:BuildInParallel=false -m:1
+dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll world-context --filter '*RunEmptySimulationFrame*' --job Dry
 ```
 
 The compiled runner carries source mode into generated benchmark builds,
@@ -133,7 +133,7 @@ verifies benchmark code compiles and produces plausible output without a full
 run:
 
 ```bash
-dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll all -j Short -i
+dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll all -j Short -i
 ```
 
 Do not treat short-run numbers as canonical measurements.
@@ -159,7 +159,7 @@ useful attribution evidence, not an exact measurement of any single stage.
 The `circle-contact` selection remains the individual-query geometry baseline.
 
 ```powershell
-dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll circle-contact-simulation --filter '*CellSize: 16)*' --launchCount 2 --warmupCount 5 --iterationCount 15 --iterationTime 500 --affinity 3 --exporters json --artifacts artifacts/circle-contact-coarse
+dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll circle-contact-simulation --filter '*CellSize: 16)*' --launchCount 2 --warmupCount 5 --iterationCount 15 --iterationTime 500 --affinity 3 --exporters json --artifacts artifacts/circle-contact-coarse
 ```
 
 ### Pure-2D partition scaling
@@ -183,7 +183,7 @@ traversal, filtering and duplicate suppression; it deliberately skips repeated
 narrow phase and response. Use `circle-contact-simulation` for full-step costs.
 
 ```powershell
-dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll cold-circle-registration circle-partition-maintenance --filter '*' --exporters json
+dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll cold-circle-registration circle-partition-maintenance --filter '*' --exporters json
 ```
 
 These are manual scaling selections. Fine-cell cold registration can be very
@@ -212,7 +212,7 @@ matrix decomposition and validation. The scale-only path represents body-owned
 poses that supply their own yaw; bodyless colliders still need host yaw.
 
 ```powershell
-dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll circle-automatic-grounding circle-ground-query-selection planar-scale-capture --filter '*' --exporters json
+dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll circle-automatic-grounding circle-ground-query-selection planar-scale-capture --filter '*' --exporters json
 ```
 
 `partition-membership` compares existing sparse, hash and packed collection
@@ -248,7 +248,7 @@ events outside timing. Both methods are warmed before measurement. Use
 fixture does not reset pose or advance a simulation step.
 
 ```powershell
-dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll ground-probe-selection3-d --filter '*' --exporters json
+dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll ground-probe-selection3-d --filter '*' --exporters json
 ```
 
 ### Capsule/circle-slab contacts
@@ -297,7 +297,7 @@ evidence for pure 2D, pure 3D, mixed full-runtime CCD, static query, dynamic
 candidate-index, relative sweep, and shape-exact attribution:
 
 ```bash
-dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll continuous-collision-evidence --filter "*Evidence*" --exporters json
+dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll continuous-collision-evidence --filter "*Evidence*" --exporters json
 ```
 
 Keep these evidence rows manual unless the repository adopts an explicit
@@ -308,7 +308,7 @@ of reducing one-, two-, and four-segment moving-target trajectories in the 2D
 and 3D translational narrow phase:
 
 ```bash
-dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll piecewise-translational-ccd --filter "*Piecewise*" --exporters json
+dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll piecewise-translational-ccd --filter "*Piecewise*" --exporters json
 ```
 
 Rows with `FullRuntime` in the method name include benchmark reset,
@@ -328,7 +328,7 @@ with `ContinuousCollisionMaxToiIterations` values of `1`, `2`, and `4`, so the
 old first-hit clamp shape remains measurable as the `1`-iteration configuration:
 
 ```bash
-dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll continuous-collision-toi-iteration --filter "*ToiIteration*" --exporters json
+dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll continuous-collision-toi-iteration --filter "*ToiIteration*" --exporters json
 ```
 
 ## Suggested Benchmark Areas
@@ -389,7 +389,7 @@ stop serving a Gravitas benchmark scenario.
 Before starting optimization work, capture a baseline:
 
 ```bash
-dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll all --exporters json
+dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll all --exporters json
 ```
 
 BenchmarkDotNet writes results to `BenchmarkDotNet.Artifacts/results/` by
@@ -401,7 +401,7 @@ regressions can be compared against known results.
 For quick allocation checks around steady-state hot paths, run:
 
 ```bash
-dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll query-service simulation-allocation continuous-collision collision-detection collision-response mixed-collision-response collision-partition partition-culling diagnostics physics-2d mixed-broad-phase replay-hash --filter "*" -j Short -i --exporters json
+dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll query-service simulation-allocation continuous-collision collision-detection collision-response mixed-collision-response collision-partition partition-culling diagnostics physics-2d mixed-broad-phase replay-hash --filter "*" -j Short -i --exporters json
 ```
 
 The short in-process job is not canonical timing evidence, but it is useful for
@@ -441,7 +441,7 @@ manual evidence selections rather than fast local guardrails.
 Collider shape work has a focused selection:
 
 ```bash
-dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll collider-shape --filter "*" -j Short -i --exporters json
+dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll collider-shape --filter "*" -j Short -i --exporters json
 ```
 
 ## CI Guidance
@@ -449,7 +449,7 @@ dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll coll
 Grouped 3D contacts have focused response and storage controls:
 
 ```bash
-dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll --filter "*CollisionResponseBenchmarks*Group*" "*ContactGroupStorageBenchmarks*" --job short --warmupCount 3 --iterationCount 5
+dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll --filter "*CollisionResponseBenchmarks*Group*" "*ContactGroupStorageBenchmarks*" --job short --warmupCount 3 --iterationCount 5
 ```
 
 `GroupSingle`, `GroupRedundant` and `GroupIndependent` prepare one normal row,

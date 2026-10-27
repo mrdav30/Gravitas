@@ -116,8 +116,8 @@ def validate_provenance(value, lane, fixture_identities):
     for field in ("OSDescription", "Framework", "RuntimeVersion", "SDKVersion"):
         require(isinstance(value.get(field), str) and value[field].strip(),
                 f"{context} {field} must be a nonempty string")
-    for field, pattern in (("Framework", r"\.NET 8\.0\.\d+"),
-                           ("RuntimeVersion", r"8\.0\.\d+"),
+    for field, pattern in (("Framework", r"\.NET 10\.0\.\d+"),
+                           ("RuntimeVersion", r"10\.0\.\d+"),
                            ("SDKVersion", r"10\.0\.\d+"),
                            ("SourceRevision", r"[0-9a-f]{40}")):
         require(isinstance(value.get(field), str) and re.fullmatch(pattern, value[field]),
