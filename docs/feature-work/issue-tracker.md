@@ -5,7 +5,7 @@ resolutions or documented investigation closures.
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-144`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-145`.
 - Assign an ID when an issue enters this tracker and preserve it through
   closure; never delete or reuse it. Check Git history before advancing or
   repairing the counter. Unknown historical IDs stay reserved rather than
@@ -58,6 +58,33 @@ resolutions or documented investigation closures.
 #111 remains an independent validation-tooling issue. #125 is a low-priority,
 non-blocking runtime crash observation; defer further investigation unless it
 recurs or a reliable reproducer becomes available.
+
+### GRV-Issue-144 - Context reset retains ended collider references in reusable storage
+
+- **Recorded:** 2026-10-27. **Priority:** P2. **Owner:** Gravitas context/service reset.
+- **Verified on:** `3f0b759` (.NET 10, coordinated local stack), before Phase 9
+  runtime changes. This is bounded retention through old capacity, not evidence
+  of an unbounded allocation leak or a collision-result defect.
+- **Reproducer:** Keep a `GravitasWorldContext` alive, initialize a dynamic 3D
+  sphere (or zero-core capsule) and bodyless static 2D members, obtain mixed
+  contacts, then call `context.Reset()` and retire the host references. A
+  no-inline factory returning weak collider references followed by
+  `GC.Collect()`, `GC.WaitForPendingFinalizers()`, `GC.Collect()` still finds the
+  retired mover alive. Explicit deactivation before disposal releases the same
+  fixture. Keeping a disposed internal declaration alive also retains its context
+  and exposes the same pre-existing reset ownership boundary.
+- **Cause:** `ColliderRegistry.Clear()` clears indexed lookup but uses
+  `_liveColliders.FastClear()`, retaining collider references in its backing
+  array. Dimensional service refresh/snapshot buffers also use `FastClear()`.
+  Declaration invalidation already releases its own cached mover/member roots;
+  clearing the declaration alone cannot release these context-owned roots.
+- **Impact:** A retained reusable context can keep ended collider/body/host
+  graphs alive until the old reference slots are overwritten or the context is
+  collected. Audit pure 2D, 3D and mixed reset parity together.
+- **Next action:** Reproduce registry/service ownership independently through
+  public lifecycle behavior, release populated reference slots at reset while
+  retaining capacity, and verify reset/reuse, pool ownership and warm baselines.
+  Do not broaden #143's completed-query contract into an unmeasured reset rewrite.
 
 ### GRV-Issue-133 - Adjacent mesh collider rims alter frictionless seam-crossing response
 
@@ -232,7 +259,7 @@ are historical, not a claim of a fresh rerun or package release.
 Each **Closeout** link pins the complete pre-compaction entry in committed Git
 history, preserving its reproducer, root cause, validation, tradeoffs and links
 to focused records. All 139 resolved entries are retained; no historical IDs are
-missing from the 001-143 sequence (111, 125, 133 and 139 remain active).
+missing from the 001-144 sequence (111, 125, 133, 139 and 144 remain active).
 
 | Issue                                                                                                                                 | Resolved/closed | Outcome                                                                                                                                                                                                        | Evidence                                                                                                                                                                                                                                     |
 | ------------------------------------------------------------------------------------------------------------------------------------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

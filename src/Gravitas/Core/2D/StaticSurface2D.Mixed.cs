@@ -71,7 +71,8 @@ internal sealed partial class StaticSurface2D : IScaledConvexHullContactDomain
                 : ScaledRigidFrame3d.Rigid(mover.Center, mover.Rotation);
             if (mover is LSCuboidCollider box) WideOrientedBox.GetBoxHullVertices(box.OrientedBox.HalfExtents, _mixedBox);
             _mixedRequestedReach = _mixedReach;
-            BuildMixed();
+            if (mover is LSSphereCollider or LSCapsuleCollider) BuildMixedSphere();
+            else BuildMixed();
             if (_mixedRequestedReach > _mixedReach)
             {
                 // A deep placement can project beyond the body's initial query.
@@ -85,6 +86,8 @@ internal sealed partial class StaticSurface2D : IScaledConvexHullContactDomain
         for (int member = 0; member < _mixedLocal.Count; member++)
             if (_mixedLocal[member] == overlap && !_mixedPrisms[member].Joined)
                 return CollisionDetectionMixed.AppendManifold(mover, overlap, destination, namespace3D, namespace2D, false);
+        if (mover is LSSphereCollider or LSCapsuleCollider)
+            return AppendMixedSphere(overlap, destination, namespace3D, namespace2D);
         Span<int> chosen = stackalloc int[ContactManifold.MaxContactsPerGroup];
         for (int group = 0; group < _mixedGroups.Count; group++)
         {
@@ -133,6 +136,7 @@ internal sealed partial class StaticSurface2D : IScaledConvexHullContactDomain
 
     private void PrepareMixed()
     {
+        _mixedSphereConcavityCurrent = false;
         _mixedPreparedCount = _mixedLocal.Count;
         if (_mixedComponents.Length < _mixedLocal.Count) Array.Resize(ref _mixedComponents, _mixedLocal.Count);
         for (int member = 0; member < _mixedLocal.Count; member++)
@@ -685,7 +689,7 @@ internal sealed partial class StaticSurface2D : IScaledConvexHullContactDomain
         internal ScaledRigidFrame3d Frame;
         internal ScaledRigidFrame3d FootFrame;
         internal NativePrismYawFrame3d NativeFrame, NativeFootFrame;
-        internal bool Rigid, Joined;
+        internal bool Rigid, Joined, SphereHasConcaveFace;
         private int _id;
         private long _lifetime;
         private uint _broad, _dependency;

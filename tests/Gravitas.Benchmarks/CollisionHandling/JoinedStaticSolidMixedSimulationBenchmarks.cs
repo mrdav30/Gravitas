@@ -14,7 +14,7 @@ public class JoinedStaticSolidMixedSimulationBenchmarks
     private SolidBody _body;
     private Fixed64 _direction;
 
-    [Params("Box", "Hull")]
+    [Params("Box", "Hull", "Sphere", "PointCapsule")]
     public string Shape { get; set; } = "Box";
 
     [Params("Continuous", "Joined2", "Joined16", "Joined64")]
@@ -54,6 +54,8 @@ public class JoinedStaticSolidMixedSimulationBenchmarks
         {
             "Box" => BenchmarkPhysicsScene.CreateDynamicCuboid(_context, start),
             "Hull" => BenchmarkPhysicsScene.CreateDynamicConvexCube(_context, start),
+            "Sphere" => CreateRounded(new LSSphereCollider { Radius = Fixed64.Half }),
+            "PointCapsule" => CreateRounded(new LSCapsuleCollider { Radius = Fixed64.Half, Size = Vector3d.One }),
             _ => throw new ArgumentException("Unknown moving shape.", nameof(Shape))
         };
         collider.Material = PhysicsMaterial.Frictionless;
@@ -78,6 +80,13 @@ public class JoinedStaticSolidMixedSimulationBenchmarks
             if (_body.LinearVelocity.X != _direction || _body.Position3d.Z <= Fixed64.Zero)
                 throw new InvalidOperationException("A mixed solid wall must preserve tangential motion and block inward penetration.");
         }
+    }
+
+    private LSCollider CreateRounded(LSCollider collider)
+    {
+        var body = new SolidBody(new BenchmarkMatterAgent(_context, new(-Fixed64.Two, Fixed64.Zero, Fixed64.Half)), collider) { Mass = Fixed64.One };
+        body.Initialize(new(-Fixed64.Two, Fixed64.Zero, Fixed64.Half), FixedQuaternion.Identity);
+        return collider;
     }
 
     private void Step()
