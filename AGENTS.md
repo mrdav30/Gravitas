@@ -570,7 +570,7 @@ Important rules:
 
 Observed project conventions:
 
-- `LangVersion` is `11.0`.
+- `LangVersion` defaults to `14.0` and is overridden to `11.0` for `netstandard2.1`.
 - `ImplicitUsings` are disabled.
 - Library nullable context is enabled.
 - Tests enable nullable context; benchmarks disable nullable context.
