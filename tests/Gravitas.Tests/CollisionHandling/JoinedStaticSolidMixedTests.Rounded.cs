@@ -507,7 +507,6 @@ public sealed partial class JoinedStaticSolidMixedTests
     }
 
     [Theory]
-    [InlineData("Capsule")]
     [InlineData("Cylinder")]
     [InlineData("Cone")]
     [InlineData("OpenHull")]
@@ -518,7 +517,6 @@ public sealed partial class JoinedStaticSolidMixedTests
         var members = new[] { Rectangle(scene, -4, 0, -2, 0, Fixed64.Two), Rectangle(scene, 0, 4, -2, 0, Fixed64.Two) };
         LSCollider mover = shape switch
         {
-            "Capsule" => new LSCapsuleCollider { Radius = Fixed64.Half, Size = new(1, 2, 1) },
             "Cylinder" => new LSCylinderCollider(),
             "Cone" => new LSConeCollider(),
             "OpenHull" => MeshTestFixtures.CreateConvexQuadFloor(),

@@ -5,7 +5,7 @@ resolutions or documented investigation closures.
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-145`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-146`.
 - Assign an ID when an issue enters this tracker and preserve it through
   closure; never delete or reuse it. Check Git history before advancing or
   repairing the counter. Unknown historical IDs stay reserved rather than
@@ -58,6 +58,42 @@ resolutions or documented investigation closures.
 #111 remains an independent validation-tooling issue. #125 is a low-priority,
 non-blocking runtime crash observation; defer further investigation unless it
 recurs or a reliable reproducer becomes available.
+
+### GRV-Issue-145 - Post-step 3D queries can read the pre-response collider pose
+
+- **Recorded:** 2026-10-27. **Priority:** P2. **Owner:** Gravitas 3D body/collider
+  pose publication and query preparation.
+- **Verified on:** Gravitas `3bd4574` with FixedMathSharp `10a2ae1`, before
+  Phase 10 changes, and on the Phase 10 candidate (.NET 10, Windows x64,
+  `UseLocalLsfStack=true`). The two frozen runtime payloads give identical results.
+- **Reproducer:** Use Mixed mode at 16 Hz, zero gravity/air/damping/minimum
+  velocity, frictionless materials, manual grounding and sleep disabled. Place a
+  mass-one 3D capsule (radius `0.5`, core length `2`, frozen Y translation and
+  rotation) at `(-2,0,0.5)` against one bodyless native 2D rectangle
+  `X=[-8,8], Z=[-2,0]`, mixed half-thickness `2`. Settle 32 complete
+  `Simulate`/`LateSimulate` frames, then run four 64-frame traversals with
+  tangential X velocity alternating `+1/-1`; add inward Z impulse `-1/16`
+  before every step. Immediately after the last step, call
+  `context.Query3D.Raycast(new Vector3d(body.Position3d.X, body.Position3d.Y, 2),
+  Vector3d.Backward, (Fixed64)4, out hit, PhysicsLayerMask.All)`.
+- **Observed:** Final body Z is raw `2100339672`, while `collider.Center.Z`
+  remains raw `2083562456`. The ray hits the capsule at distance raw
+  `4358888488`, instead of `4342111272` from its authoritative pose
+  (`2 - (body.Position3d.Z + capsule.ScaledRadius)`). The discrepancy is
+  `16777216` raw (`1/256` unit); the query does not change body pose.
+- **Cause:** 3D collision position correction publishes body pose and marks it
+  dirty without immediately rebuilding the collider. Query preparation does
+  not flush this general 3D pose change. Pure 2D's correction path rebuilds its
+  collider, so dimensional parity needs explicit review.
+- **Impact:** A public post-step 3D ray can report a stale hit point/distance.
+  Missing hits, other query types and pure 3D mode are not established by this
+  reproducer; audit them through the shared owner before claiming broader impact.
+- **Next action:** Add a public-query regression and make committed query geometry
+  coherent with final response pose, preserving solver snapshot ownership,
+  partition invalidation and warm performance. Handle independently of Phase 10's
+  new capsule continuity geometry. Supplemental frozen captures are
+  `artifacts/static-surface/phase10/probe-{baseline,candidate}-ray.json`; all
+  reproducer inputs and expected raw results are recorded above.
 
 ### GRV-Issue-144 - Context reset retains ended collider references in reusable storage
 

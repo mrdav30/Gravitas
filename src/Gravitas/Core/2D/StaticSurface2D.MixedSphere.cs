@@ -87,10 +87,22 @@ internal sealed partial class StaticSurface2D
         // A component wholly inside every exposed face half-plane cannot have
         // a concave face peak. Cache this sufficient certificate with its geometry;
         // uncertain/nonconvex pieces still use exact pointwise incident fans.
+        Span<Vector3d> corner = stackalloc Vector3d[1];
+        var world = new NativePrismYawFrame3d(Vector3d.Zero, Fixed64.Zero);
         for (int member = 0; member < _mixedLocal.Count; member++)
         {
             MixedPrism prism = _mixedPrisms[member]; prism.SphereHasConcaveFace = false;
             if (!prism.Joined) continue;
+            Vector3d minimum = _mixedLocal[member].MixedBounds3D.Min, maximum = _mixedLocal[member].MixedBounds3D.Max;
+            for (int other = 0; other < _mixedLocal.Count; other++)
+                if (_mixedComponents[other] == _mixedComponents[member])
+                {
+                    minimum = Vector3d.Min(minimum, _mixedLocal[other].MixedBounds3D.Min);
+                    maximum = Vector3d.Max(maximum, _mixedLocal[other].MixedBounds3D.Max);
+                }
+            bool bounded = true;
+            for (int axis = 0; axis < 3; axis++)
+                bounded &= minimum[axis] > Fixed64.MinValue && maximum[axis] < Fixed64.MaxValue;
             for (int face = -2; face < prism.Offsets.Length; face++)
             {
                 Vector3d reference; WideDirection3d normal;
@@ -112,6 +124,11 @@ internal sealed partial class StaticSurface2D
                     reference = footprint.A;
                     normal = prism.NativeFrame.GetInwardAxis(footprint, footprint.A, footprint.B);
                 }
+                // One conservative box corner can certify the entire component.
+                // Clipped domain bounds are uncertain; retain the exact vertex proof there.
+                corner[0] = new(normal.X.Sign < 0 ? maximum.X : minimum.X,
+                    normal.Y.Sign < 0 ? maximum.Y : minimum.Y, normal.Z.Sign < 0 ? maximum.Z : minimum.Z);
+                if (bounded && SupportsMixedFan(world, prism.NativeFrame, reference, corner, normal)) continue;
                 for (int other = 0; other < _mixedLocal.Count; other++)
                     if (other != member && _mixedComponents[other] == _mixedComponents[member]
                         && !SupportsMixedFan(_mixedPrisms[other].NativeFrame, prism.NativeFrame, reference,
@@ -247,6 +264,12 @@ internal sealed partial class StaticSurface2D
         // Exterior contacts require an actual finite boundary inside the sphere.
         // A far side through the solid is recovery, not another exterior row.
         if (!_mixedSphereInside && depth.Rational.Sign > 0) return false;
+        return AdmitMixedPrismSupportPoint(normal, depth, x, y, z, d);
+    }
+
+    private bool AdmitMixedPrismSupportPoint(in WideDirection3d normal, in WideConvexPrismRelations.ProjectionDepth depth,
+        scoped ContactQuadratic x, scoped ContactQuadratic y, scoped ContactQuadratic z, scoped ContactQuadratic d)
+    {
         MixedPrism prism = _mixedPrisms[_mixedMember];
         const int words = 32;
         Span<ulong> values = stackalloc ulong[12 * words]; Span<int> signs = stackalloc int[12];
@@ -271,6 +294,7 @@ internal sealed partial class StaticSurface2D
             return AdmitMixedSphereFan(new(new(a.X, Fixed64.Zero, a.Y), new(b.X, Fixed64.Zero, b.Y)),
                 parameter, divisor, y, d, normal);
         }
+        _mixedFan.FastClear(); _mixedFan.Add(_mixedMember);
         return true;
     }
 

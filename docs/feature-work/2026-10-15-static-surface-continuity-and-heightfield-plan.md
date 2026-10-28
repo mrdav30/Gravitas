@@ -1411,11 +1411,104 @@ open for Phases 10–14.
 
 ### Phase 10 - Nonzero-Core Capsules Against Joined 2D Solids
 
-- [ ] Reuse rounded selection with exact retained projected core intervals and
+- [x] Reuse rounded selection with exact retained projected core intervals and
   clipped closest-edge families. A covered midpoint must not discard a valid
   retained interval; preserve the complete capsule and its actual quaternion.
-- [ ] Complete whole-shape/full-host, mutations, suppliers, coverage, replay,
+- [x] Complete whole-shape/full-host, mutations, suppliers, coverage, replay,
   zero warm allocation/performance and independent review gates.
+
+**Completion, 2026-10-27:** Nonzero-core capsules reuse native prism charts,
+height bands, incident fans, adaptive gathering and response carriers. Exact
+projected intervals are retained before selection; original edges reuse finite
+closest-point matching, and concave lines/points reuse capsule events. Complete
+solid admission remains independent of exposure. Physical constraints precede
+recovery, which runs only for components without physical rows.
+
+Selected projection/clipping is prepared once. Physical free-core intervals
+retain the primary point and admitted extrema; fixed tips/recovery retain one
+point. Every sample refreshes its own incident fan immediately before emission.
+The existing four-point reducer preserves the deepest, lowest-lever physical
+point using the actual body COM, then ranks coverage; canonical contact IDs
+still determine solver order. Local connectivity, materials, suppliers, compound
+namespaces and member events remain explicit. Independent geometry/ponytail
+review has no remaining findings. Runtime growth: **515 net lines/two new files
+in Gravitas; 883 net lines/two new files in FixedMathSharp**. Every new internal
+helper has a production consumer.
+
+The 46 runtime and 69 focused math cases cover retained core intervals, native
+yaw/general quaternions, actual finite witnesses, oblique reselection, true rims,
+concave/ambiguous/disconnected regions, height cuts, remote recovery, scalar
+limits, callback invalidation and bodyless/off-center compound ownership.
+Repeated full-host crossings cover both orientations, frozen/free rotation and
+initial spin. Finite PGS iterations can leave angular residuals: free-angular
+whole-shape checks include incoming motion and actual rotation-induced reach,
+then require 80% correction with four raw rounding units. Frozen rotation keeps
+its stricter steady-state bound; zero angular equilibrium is not claimed.
+
+Both solution profiles build net10.0/C#14 and netstandard2.1/C#11 with zero
+warnings/errors, using `UseLocalLsfStack=true`. Final raw coverage:
+
+| Library/profile | Passing core tests | Lines | Branches | Methods |
+| --- | ---: | ---: | ---: | ---: |
+| Gravitas Release | 7,753 | 52,028/52,028 | 20,094/20,094 | 5,475/5,475 |
+| Gravitas ReleaseLean | 7,684 | 52,026/52,026 | 20,094/20,094 | 5,474/5,474 |
+| FixedMathSharp Release | 7,011 | 66,877/66,877 | 21,570/21,570 | 5,197/5,197 |
+| FixedMathSharp ReleaseLean | 6,990 | 66,970/66,970 | 21,570/21,570 | 5,193/5,193 |
+
+All 49 math recording-adapter cases pass in each profile. Six shared replay
+fixtures retain their expectations and agree between Windows x64 Release/Lean.
+
+Warm Release measurements use Windows x64/i7-9700K, .NET 10/SDK 10.0.302, one
+radius-0.5/core-length-2 capsule and a 16-unit wall divided into 1/2/16/64 pieces.
+Each invocation performs 64 full host steps at 16 Hz, with frictionless crossings
+and inward impulses. Mean time/frame over 24 windows, all **0 B/frame**:
+
+| Mover | Continuous wall | 2 pieces | 16 pieces | 64 pieces |
+| --- | ---: | ---: | ---: | ---: |
+| Upright capsule | 0.161 ms | 0.430 ms | 0.612 ms | 1.609 ms |
+| Horizontal capsule | 0.199 ms | 0.684 ms | 1.410 ms | 4.639 ms |
+
+Fresh-pose builds against two members cost **1.375 ms for the concave L** and
+**0.884 ms for the oblique height step**, both **0 B/build**. These include pose
+refresh and both manifold requests, rather than a full frame or cached contact.
+
+Refinement removes repeated clipping/unnecessary recovery, rejects distant edges
+before expensive admission, cancels equal radial coefficients, and accelerates
+the existing convexity certificate with a conservative AABB corner; clipped
+bounds retain exact vertex proof. The initial geometry prototype cost 4.503 ms
+per fresh L build and 6.297/8.828 ms per dense upright/horizontal frame. The
+slower dense direct-fan experiment is retained. Angular samples increase the
+small prototype's 0.419/0.612 ms costs to the table values; that prototype was
+not the accepted ordinary baseline.
+
+Final paired/reversed-order controls use identical drivers, exact witnesses and
+24 balanced windows/process, all **0 B/op**. Ordinary upright/horizontal capsule
+full steps improve **24.9–32.3%**; capsule/prism controls improve about **43%**,
+and joined spherical controls about **28%**. The earlier 20-control matrix is
+retained. Box/hull controls are +0.22%/-0.11%; the box paired delta is +0.89 us
+against 3.44 us window SD, while the hull contrast changes sign. This establishes
+neither a regression nor exact zero overhead; no game-capacity/frame-tail claim
+is made.
+
+All six reviewed joined layouts match their continuous-wall controls in pose
+and velocities at eight 64-frame checkpoints over 512 additional frames. An
+extra prototype comparison differs in horizontal Joined16 Z by -10,485,760 raw
+units, with matching velocity/rotation. The reviewed state matches the continuous
+control; exact preservation of every prototype state is not claimed. Changed
+carrier merging is a plausible explanation, not a confirmed prototype RCA.
+
+A public post-step ray reproduces stale 3D geometry on baseline and candidate;
+**#145** records the self-contained pre-existing defect. One intermediate
+profiler launch exited 0xC0000005 with a broken trace and is excluded. The same
+command then passed, a named profile passed, and three unprofiled 12-second
+repeats of that frozen payload passed. No cause or fix is attributed.
+
+`artifacts/static-surface/phase10/` retains Gravitas `*-final-*-e` and math
+`math-*-final-*-f` logs/raw coverage, replay, frozen binaries, paired/density
+captures, `closeout-audit.json`, representation checks and adverse captures.
+Linux/ARM, Unity runtime and released packages were not executed. Push the
+FixedMathSharp commit before advancing Gravitas's develop dependency pin.
+#133/#139 remain open for Phases 11–14; heightfields/index experiments stay deferred.
 
 ### Phase 11 - Cylinders And Cones Against Joined 2D Solids
 

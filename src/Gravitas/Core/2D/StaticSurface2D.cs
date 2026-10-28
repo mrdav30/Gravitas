@@ -24,6 +24,7 @@ internal sealed partial class StaticSurface2D : IDisposable
         _context = context;
         _mixedAdmit = AdmitMixedAxis;
         _mixedSphereAdmit = AdmitMixedSpherePoint;
+        _mixedCapsuleAdmit = AdmitMixedPrismSupportPoint;
         _mixedSphereBoundaryAdmit = AdmitMixedSphereBoundaryPoint;
         _mixedAdmitRigid = AdmitMixedRigidAxis;
         ReplaceMembers(members);

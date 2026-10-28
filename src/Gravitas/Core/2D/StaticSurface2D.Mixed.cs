@@ -71,7 +71,8 @@ internal sealed partial class StaticSurface2D : IScaledConvexHullContactDomain
                 : ScaledRigidFrame3d.Rigid(mover.Center, mover.Rotation);
             if (mover is LSCuboidCollider box) WideOrientedBox.GetBoxHullVertices(box.OrientedBox.HalfExtents, _mixedBox);
             _mixedRequestedReach = _mixedReach;
-            if (mover is LSSphereCollider or LSCapsuleCollider) BuildMixedSphere();
+            if (mover is LSCapsuleCollider capsule && capsule.AxisLength > Fixed64.Zero) BuildMixedCapsule();
+            else if (mover is LSSphereCollider or LSCapsuleCollider) BuildMixedSphere();
             else BuildMixed();
             if (_mixedRequestedReach > _mixedReach)
             {
@@ -86,6 +87,8 @@ internal sealed partial class StaticSurface2D : IScaledConvexHullContactDomain
         for (int member = 0; member < _mixedLocal.Count; member++)
             if (_mixedLocal[member] == overlap && !_mixedPrisms[member].Joined)
                 return CollisionDetectionMixed.AppendManifold(mover, overlap, destination, namespace3D, namespace2D, false);
+        if (mover is LSCapsuleCollider supportedCapsule && supportedCapsule.AxisLength > Fixed64.Zero)
+            return AppendMixedCapsule(overlap, destination, namespace3D, namespace2D);
         if (mover is LSSphereCollider or LSCapsuleCollider)
             return AppendMixedSphere(overlap, destination, namespace3D, namespace2D);
         Span<int> chosen = stackalloc int[ContactManifold.MaxContactsPerGroup];
@@ -137,6 +140,7 @@ internal sealed partial class StaticSurface2D : IScaledConvexHullContactDomain
     private void PrepareMixed()
     {
         _mixedSphereConcavityCurrent = false;
+        _mixedCapsuleLinesCurrent = false;
         _mixedPreparedCount = _mixedLocal.Count;
         if (_mixedComponents.Length < _mixedLocal.Count) Array.Resize(ref _mixedComponents, _mixedLocal.Count);
         for (int member = 0; member < _mixedLocal.Count; member++)
