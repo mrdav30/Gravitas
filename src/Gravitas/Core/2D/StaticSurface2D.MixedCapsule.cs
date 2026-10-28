@@ -33,7 +33,7 @@ internal sealed partial class StaticSurface2D : IPrismCapsuleContactDomain
                 if (FixedConvexPrismRelations.TryGetCenteredCapsuleContact(capsule.Center, capsule.Rotation, Vector3d.Up,
                     capsule.AxisLength, capsule.ScaledRadius, MixedEmbedded2DGeometry.GetCenter3D(member),
                     member.ConvexRotation, prism.Offsets, member.MixedHalfThickness, out var separate))
-                    RequestMixedCapsuleReach(separate.Depth);
+                    RequestMixedReach(separate.Depth);
                 if (_mixedRequestedReach > _mixedReach) return;
                 continue;
             }
@@ -136,13 +136,7 @@ internal sealed partial class StaticSurface2D : IPrismCapsuleContactDomain
                     && (_mixedSphereGroups[previous].Supplier == _mixedMember || _mixedFan.Contains(_mixedSphereGroups[previous].Supplier))
                     && TryIntersectMixedIntervals(_mixedCapsuleCore[group], _mixedCapsuleCore[previous], out _))
                     _mixedRegionParents[FindMixedRegion(group)] = FindMixedRegion(previous);
-        RequestMixedCapsuleReach(contact.Depth);
-    }
-
-    private void RequestMixedCapsuleReach(Fixed64 depth)
-    {
-        Fixed64 reach = _mixedMoving!.CanonicalCenteredProxyRadius + depth + Fixed64.MinIncrement + Fixed64.MinIncrement;
-        if (reach > _mixedRequestedReach) _mixedRequestedReach = reach;
+        RequestMixedReach(contact.Depth);
     }
 
     private int AddMixedCapsuleSample(in SphereGroup row, in RationalSegmentInterval core)
@@ -202,7 +196,7 @@ internal sealed partial class StaticSurface2D : IPrismCapsuleContactDomain
         _mixedSpherePhysicalComponents.Add(component);
         AddMixedCapsuleSample(new(component, _mixedLocal[_mixedMember].Id, _mixedMember, normal,
             MixedSupportPoint(prism.NativeFrame, prism, normal), default, contact), default);
-        RequestMixedCapsuleReach(contact.Depth);
+        RequestMixedReach(contact.Depth);
     }
 
     private void GetMixedCapsuleEdge(int vertex, int kind, out int start, out int end)
@@ -234,38 +228,7 @@ internal sealed partial class StaticSurface2D : IPrismCapsuleContactDomain
                     }
                 if (better) continue;
             }
-            _mixedPool.FastClear();
-            foreach (MixedSample sample in _mixedSamples.AsReadOnlySpan())
-                if (FindMixedRegion(sample.Group) == group)
-                {
-                    bool duplicate = false;
-                    foreach (MixedSample kept in _mixedPool.AsReadOnlySpan()) duplicate |= kept.Point == sample.Point;
-                    if (!duplicate) _mixedPool.Add(sample);
-                }
-            _mixedPool.SortInPlace(MixedPointOrder);
-            // Keep the deepest, lowest-lever physical point before reducing
-            // coverage; the manifold assigns its own canonical solver order.
-            int seed = 0;
-            for (int index = 1; index < _mixedPool.Count; index++)
-            {
-                FixedContactAnchors candidate = _mixedPool[index].Contact, current = _mixedPool[seed].Contact;
-                int depth = candidate.Depth.CompareTo(current.Depth);
-                if (depth > 0 || depth == 0 && center.CompareSquaredDistance(candidate.FirstAnchor, current.FirstAnchor) < 0)
-                    seed = index;
-            }
-            if (seed != 0) (_mixedPool[0], _mixedPool[seed]) = (_mixedPool[seed], _mixedPool[0]);
-            int count = Math.Min(chosen.Length, _mixedPool.Count);
-            for (int slot = 0; slot < count; slot++)
-                chosen[slot] = slot == 0 ? 0 : MeshPlaneSampleReduction.ChooseNext(_mixedPool.AsReadOnlySpan(), chosen[..slot], row.Axis, MixedPointOrder);
-            for (int slot = 0; slot < count; slot++)
-            {
-                MixedSample sample = _mixedPool[chosen[slot]];
-                FixedContactAnchors contact = sample.Contact; LSCollider2D supplier = _mixedLocal[sample.Supplier];
-                destination.AddContact(new ContactAnchor(contact.FirstAnchor), new ContactAnchor(contact.SecondAnchor),
-                    contact.Depth, contact.Normal, _mixedMoving!.Material, supplier.Material, contact.DepthIsClamped,
-                    featureNamespaceA: namespace3D, featureNamespaceB: namespace2D,
-                    group: new ContactGroupKey(namespace3D, namespace2D, region: group, sourceIdB: supplier.Id + 1));
-            }
+            AppendMixedRegionSamples(group, row.Axis, destination, namespace3D, namespace2D, chosen, center);
         }
         return _mixedOverlaps.Contains(overlap.Id);
     }

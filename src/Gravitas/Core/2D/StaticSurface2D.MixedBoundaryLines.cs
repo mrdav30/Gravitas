@@ -8,17 +8,17 @@ using SwiftCollections;
 
 namespace Gravitas;
 
-/// <content>Evaluates concave native boundary lines with the existing finite capsule event owner.</content>
+/// <content>Prepares exact concave boundary lines shared by native rounded-solid contacts.</content>
 internal sealed partial class StaticSurface2D
 {
-    private readonly SwiftList<CapsuleBoundaryLine> _mixedCapsuleLines = new();
+    private readonly SwiftList<MixedBoundaryLine> _mixedBoundaryLines = new();
     private readonly SwiftList<int> _mixedCapsuleLineGroups = new();
     private CapsulePrismBoundaryContacts? _mixedCapsuleBoundary;
-    private bool _mixedCapsuleLinesCurrent;
+    private bool _mixedBoundaryLinesCurrent;
 
-    private void PrepareMixedCapsuleLines()
+    private void PrepareMixedBoundaryLines()
     {
-        _mixedCapsuleLines.FastClear();
+        _mixedBoundaryLines.FastClear();
         if (!_mixedSphereConcavityCurrent) PrepareMixedSphereConcavity();
         for (_mixedMember = 0; _mixedMember < _mixedLocal.Count; _mixedMember++)
         {
@@ -30,7 +30,7 @@ internal sealed partial class StaticSurface2D
                 foreach (var span in band.Boundary.Spans)
                 {
                     if (span.Kind == MeshSurfaceBoundaryDomain2D.SpanKind.Joined) continue;
-                    GetMixedCapsuleBounds(span.Interval, out var ln, out var ld, out var un, out var ud);
+                    GetMixedBoundaryBounds(span.Interval, out var ln, out var ld, out var un, out var ud);
                     Probe(new(_mixedMember, span.First, 0, new(ln, ld, ln, ld), band.Lower, band.Upper));
                     Probe(new(_mixedMember, span.First, 0, new(un, ud, un, ud), band.Lower, band.Upper));
                     // A height step may cut only part of this exposed span.
@@ -58,20 +58,20 @@ internal sealed partial class StaticSurface2D
                     int vertical = cap == 0 ? 1 : -1;
                     if (span.Kind == MeshSurfaceBoundaryDomain2D.SpanKind.Joined)
                         Probe(new(_mixedMember, span.First, vertical, span.Interval, y, y));
-                    GetMixedCapsuleBounds(span.Interval, out var ln, out var ld, out var un, out var ud);
+                    GetMixedBoundaryBounds(span.Interval, out var ln, out var ld, out var un, out var ud);
                     Probe(new(_mixedMember, span.First, vertical, new(ln, ld, ln, ld), y, y));
                     Probe(new(_mixedMember, span.First, vertical, new(un, ud, un, ud), y, y));
                 }
             }
         }
-        _mixedCapsuleLinesCurrent = true;
+        _mixedBoundaryLinesCurrent = true;
 
-        void Probe(in CapsuleBoundaryLine line)
+        void Probe(in MixedBoundaryLine line)
         {
             MixedPrism prism = _mixedPrisms[line.Member];
             Vector2d a = prism.Offsets[line.Edge], b = prism.Offsets[(line.Edge + 1) % prism.Offsets.Length];
-            WideDirection3d normal = MixedCapsuleLineNormal(line);
-            GetMixedCapsuleBounds(line.Clip, out var ln, out var ld, out var un, out var ud);
+            WideDirection3d normal = MixedBoundaryLineNormal(line);
+            GetMixedBoundaryBounds(line.Clip, out var ln, out var ld, out var un, out var ud);
             const int words = 32;
             System.Span<ulong> values = stackalloc ulong[8 * words]; System.Span<int> signs = stackalloc int[8];
             var n = ContactQuadratic.At(values, signs, 0, words); var d = ContactQuadratic.At(values, signs, 1, words);
@@ -82,43 +82,43 @@ internal sealed partial class StaticSurface2D
             y.Set(Signed576.ExtendValue(WideArithmetic.AddSigned192(Signed192.Raw(line.Lower), Signed192.Raw(line.Upper))));
             yd.Set(Signed576.ExtendValue(Signed192.Signed(2)));
             if (AdmitMixedSphereFan(new(new(a.X, Fixed64.Zero, a.Y), new(b.X, Fixed64.Zero, b.Y)), n, d, y, yd, normal)) return;
-            KeepMixedCapsuleLine(line);
+            KeepMixedBoundaryLine(line);
         }
     }
 
-    private void KeepMixedCapsuleLine(CapsuleBoundaryLine line)
+    private void KeepMixedBoundaryLine(MixedBoundaryLine line)
     {
         // Remove artificial height-band cuts before selecting a peak, so a
         // remote neighbor cannot change the sampling of one continuous line.
-        for (int index = _mixedCapsuleLines.Count - 1; index >= 0; index--)
+        for (int index = _mixedBoundaryLines.Count - 1; index >= 0; index--)
         {
-            CapsuleBoundaryLine old = _mixedCapsuleLines[index];
+            MixedBoundaryLine old = _mixedBoundaryLines[index];
             if (line.Member != old.Member || line.Edge != old.Edge || line.Vertical != old.Vertical) continue;
-            bool sameTangent = SameMixedCapsuleInterval(line.Clip, old.Clip);
+            bool sameTangent = SameMixedBoundaryInterval(line.Clip, old.Clip);
             if (sameTangent && line.Lower <= old.Upper && old.Lower <= line.Upper)
             {
                 line = new(line.Member, line.Edge, line.Vertical, line.Clip,
                     FixedMath.Min(line.Lower, old.Lower), FixedMath.Max(line.Upper, old.Upper));
-                _mixedCapsuleLines.RemoveAt(index); continue;
+                _mixedBoundaryLines.RemoveAt(index); continue;
             }
             if (line.Lower != line.Upper || old.Lower != old.Upper || line.Lower != old.Lower
                 || !TryIntersectMixedIntervals(line.Clip, old.Clip, out _)) continue;
-            GetMixedCapsuleBounds(line.Clip, out var ln, out var ld, out var un, out var ud);
-            GetMixedCapsuleBounds(old.Clip, out var oln, out var oldd, out var oun, out var oud);
+            GetMixedBoundaryBounds(line.Clip, out var ln, out var ld, out var un, out var ud);
+            GetMixedBoundaryBounds(old.Clip, out var oln, out var oldd, out var oun, out var oud);
             if (RationalSegmentInterval.CompareParameters(ln, ld, oln, oldd) > 0) { ln = oln; ld = oldd; }
             if (RationalSegmentInterval.CompareParameters(un, ud, oun, oud) < 0) { un = oun; ud = oud; }
             line = new(line.Member, line.Edge, line.Vertical, new(ln, ld, un, ud), line.Lower, line.Upper);
-            _mixedCapsuleLines.RemoveAt(index);
+            _mixedBoundaryLines.RemoveAt(index);
         }
-        _mixedCapsuleLines.Add(line);
+        _mixedBoundaryLines.Add(line);
     }
 
     private void AppendMixedCapsuleBoundaryPeaks(LSCapsuleCollider capsule)
     {
-        if (!_mixedCapsuleLinesCurrent) PrepareMixedCapsuleLines();
+        if (!_mixedBoundaryLinesCurrent) PrepareMixedBoundaryLines();
         _mixedCapsuleLineGroups.FastClear();
         int supportCount = _mixedSphereGroups.Count;
-        foreach (CapsuleBoundaryLine line in _mixedCapsuleLines.AsReadOnlySpan())
+        foreach (MixedBoundaryLine line in _mixedBoundaryLines.AsReadOnlySpan())
         {
             _mixedCapsuleLineGroups.Add(-1);
             _mixedMember = line.Member;
@@ -129,7 +129,7 @@ internal sealed partial class StaticSurface2D
                 MixedEmbedded2DGeometry.GetCenter3D(member), member.ConvexRotation, prism.Offsets[line.Edge],
                 prism.Offsets[(line.Edge + 1) % prism.Offsets.Length], prism.Offsets[(line.Edge + 2) % prism.Offsets.Length],
                 line.Clip, line.Lower, line.Upper, line.Vertical, out var contact)) continue;
-            WideDirection3d normal = MixedCapsuleLineNormal(line);
+            WideDirection3d normal = MixedBoundaryLineNormal(line);
             int component = _mixedComponents[line.Member]; _mixedSpherePhysicalComponents.Add(component);
             int group = AddMixedCapsuleSample(new(component, member.Id, line.Member, normal,
                 MixedSupportPoint(prism.NativeFrame, prism, normal), default, contact), default);
@@ -143,14 +143,14 @@ internal sealed partial class StaticSurface2D
             {
                 int other = _mixedCapsuleLineGroups[previous];
                 if (other < 0 || FindMixedRegion(group) == FindMixedRegion(other) || !SameMixedCapsulePlane(group, other)) continue;
-                CapsuleBoundaryLine old = _mixedCapsuleLines[previous];
+                MixedBoundaryLine old = _mixedBoundaryLines[previous];
                 // Same-source strata meet at a rational native point. Test the
                 // actual finite capsule there; a rounded peak is not connectivity evidence.
                 if (line.Member == old.Member && line.Edge == old.Edge
                     && FixedMath.Max(line.Lower, old.Lower) <= FixedMath.Min(line.Upper, old.Upper)
                     && TryIntersectMixedIntervals(line.Clip, old.Clip, out var clip))
                 {
-                    GetMixedCapsuleBounds(clip, out var n, out var d, out _, out _);
+                    GetMixedBoundaryBounds(clip, out var n, out var d, out _, out _);
                     if (_mixedCapsuleBoundary.ContainsPoint(n, d, FixedMath.Max(line.Lower, old.Lower)))
                         _mixedRegionParents[FindMixedRegion(group)] = FindMixedRegion(other);
                 }
@@ -170,14 +170,14 @@ internal sealed partial class StaticSurface2D
 
         static bool ContainsEndpoint(in RationalSegmentInterval clip, bool upper)
         {
-            GetMixedCapsuleBounds(clip, out var ln, out var ld, out var un, out var ud);
+            GetMixedBoundaryBounds(clip, out var ln, out var ld, out var un, out var ud);
             Signed320 n = upper ? Signed320.One : default;
             return RationalSegmentInterval.CompareParameters(ln, ld, n, Signed320.One) <= 0
                 && RationalSegmentInterval.CompareParameters(un, ud, n, Signed320.One) >= 0;
         }
     }
 
-    private WideDirection3d MixedCapsuleLineNormal(in CapsuleBoundaryLine line)
+    private WideDirection3d MixedBoundaryLineNormal(in MixedBoundaryLine line)
     {
         if (line.Vertical != 0) return new(default, Signed576.ExtendValue(Signed192.Signed(line.Vertical)), default);
         MixedPrism prism = _mixedPrisms[line.Member];
@@ -187,7 +187,7 @@ internal sealed partial class StaticSurface2D
         return prism.NativeFrame.GetInwardAxis(triangle, triangle.A, triangle.B);
     }
 
-    private static void GetMixedCapsuleBounds(in RationalSegmentInterval clip,
+    private static void GetMixedBoundaryBounds(in RationalSegmentInterval clip,
         out Signed320 ln, out Signed320 ld, out Signed320 un, out Signed320 ud)
     {
         Signed320 one = Signed320.One;
@@ -195,20 +195,20 @@ internal sealed partial class StaticSurface2D
         un = clip.IsClipped ? clip.UpperNumerator : one; ud = clip.IsClipped ? clip.UpperDenominator : one;
     }
 
-    private static bool SameMixedCapsuleInterval(in RationalSegmentInterval a, in RationalSegmentInterval b)
+    private static bool SameMixedBoundaryInterval(in RationalSegmentInterval a, in RationalSegmentInterval b)
     {
-        GetMixedCapsuleBounds(a, out var ln, out var ld, out var un, out var ud);
-        GetMixedCapsuleBounds(b, out var bln, out var bld, out var bun, out var bud);
+        GetMixedBoundaryBounds(a, out var ln, out var ld, out var un, out var ud);
+        GetMixedBoundaryBounds(b, out var bln, out var bld, out var bun, out var bud);
         return RationalSegmentInterval.CompareParameters(ln, ld, bln, bld) == 0
             && RationalSegmentInterval.CompareParameters(un, ud, bun, bud) == 0;
     }
 
-    private readonly struct CapsuleBoundaryLine
+    private readonly struct MixedBoundaryLine
     {
         internal readonly int Member, Edge, Vertical;
         internal readonly RationalSegmentInterval Clip;
         internal readonly Fixed64 Lower, Upper;
-        internal CapsuleBoundaryLine(int member, int edge, int vertical, RationalSegmentInterval clip, Fixed64 lower, Fixed64 upper)
+        internal MixedBoundaryLine(int member, int edge, int vertical, RationalSegmentInterval clip, Fixed64 lower, Fixed64 upper)
         { Member = member; Edge = edge; Vertical = vertical; Clip = clip; Lower = lower; Upper = upper; }
     }
 }

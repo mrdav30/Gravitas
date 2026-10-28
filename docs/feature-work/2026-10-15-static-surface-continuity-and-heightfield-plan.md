@@ -1,13 +1,14 @@
 # Static Surface Continuity And Heightfield Integration
 
 **Date:** 2026-10-15  
-**Status:** Phases 1–9 complete, 2026-10-27
+**Status:** Phases 1–11 complete, 2026-10-28
 #133/#139 remain coordinated. Heightfield and alternative-index work are deferred;
 no public continuity API is enabled. Internal 3D discrete response covers rounded,
 cone, extrusion and native mesh families, pure 2D joined-solid response,
-embedded 2D movers against joined 3D meshes, and native 3D boxes/closed convex
-hulls against joined 2D solids. Remaining reverse mixed families and continuation
-work remain in the phases below.  
+embedded 2D movers against joined 3D meshes, and native 3D boxes, closed convex
+hulls, spheres, capsules, cylinders and cones against joined 2D solids.
+Remaining reverse mixed families and continuation work remain in the phases
+below.  
 **Order:** #132 is resolved. Resolve #133 and its confirmed pure 2D counterpart,
 #139, through the generic-continuity phases below before terrain-specific work.
 Keep one implementation plan rather than duplicate the prerequisite design.  
@@ -1512,11 +1513,143 @@ FixedMathSharp commit before advancing Gravitas's develop dependency pin.
 
 ### Phase 11 - Cylinders And Cones Against Joined 2D Solids
 
-- [ ] Extend the existing exact curved-prism finite owners with exposure before
+- [x] Extend the existing exact curved-prism finite owners with exposure before
   analytic/rim selection. Keep full solid admission and ensure any minimum
   certificate accounts for the retained physical domain, not the original prism.
-- [ ] Complete whole-shape/full-host, mutations, suppliers, coverage, replay,
+- [x] Complete whole-shape/full-host, mutations, suppliers, coverage, replay,
   zero warm allocation/performance and independent review gates.
+
+**Completion, 2026-10-28:** Physical response requires actual original-
+source overlap; a different eligible member may supply the finite witness.
+Complete exposed supports certify native minimum candidates. An own containing
+parent window suppresses its redundant subset line; a borrowed coplanar proof
+remains a native bound, not that line's parent. Each source compares its whole-
+source native exit exactly with the maximum of its complete independent finite
+cut set, retaining the native alternative on a tie. Published cut normals/depths
+also undergo a source-local translation-compatibility check; incompatible rows
+prefer the existing native/far alternative. Existing finite-slab active sets and
+cone ray events own line maxima and witness materialization. Geometry admission
+and depth ranking use exact source charts rather than rounded anchors.
+
+Face windows, lines and supplier certificates remain eagerly available. Exact
+edge/fan inventories prepare only for visited response sources and reuse the
+existing topology lifetime; pose admission and local fan transforms refresh
+each visit. The lazy owner clears interrupted inventories before retrying.
+
+Real-edge strata distinguish closed endpoints from open interiors and use exact
+quaternion-transpose incident fans. Finite shared-stratum admission connects
+coplanar physical patches before the existing bounded sample reducer; ambiguous
+and disconnected patches stay separate. Regression tests cover canonical full-
+interval denominators and clipping signed collinear bounds before nonnegative
+ratio comparison, plus suppliers, mutation, representations, bodyless/compound
+movers and source-family selection. Local/far constraints do not certify global
+escape from arbitrary nonconvex unions. Open meshes remain Phase 12;
+continuation/queries/CCD remain Phase 13; publication and #133/#139 closeout remain
+Phase 14.
+
+**Adverse deep-placement comparison:** All six prism centers have Y=0. Their X/Z
+footprints are `[-1,0] x [-2,-1/4]` and `[0,1] x [-2,-1/4]` with half-height
+`1/4`; `[-1,1] x [-1/4,2]`, `[-3,-1] x [-2,-1/4]` and
+`[1,3] x [-2,-1/4]` with half-height `2`; and `[-1,0] x [-4,-2]` with
+half-height `1/8`. A unit-mass cylinder of full height `6`, radius `1/2`, starts
+at `(0,0,0)` with local Up rotated to world -X by a +90-degree Z quaternion.
+Rotation is frozen, translation is free, materials are frictionless, sleep is
+disabled, and gravity/air/damping/minimum speed are zero. Run 32 complete
+`Simulate`/`LateSimulate` frames at 16 Hz with no forces. The retained
+`CylinderDeepOpposedMemberPlacement` test verifies finite actual-supplier anchors,
+positive opposed Z constraints from distinct suppliers/regions and repeated
+state/event traces. The residual overlap below is a captured observation, not
+an assertion that would require later implementations to preserve the stall.
+
+The frozen pre-phase stack (`Gravitas 9d51836`, `FixedMathSharp f975035`) ends at
+raw Q32.32 position `(0,0,10694468568)`, with maximum ordinary penetration
+`42949672` raw. The phase's `current-d` capture ends at `(0,0,-929887622)`, with
+maximum penetration `2291337850` raw; both velocities are zero. This is an
+observable behavior change and a limit of local stabilization. The legacy escape
+mechanism has not been established; neither result proves a globally preferred
+exit. The isolated wide control removes the side walls, uses lower slabs
+`[-4,0]`/`[0,4] x [-2,-1/4]` and front `[-4,4] x [-1/4,2]`, and clears every
+ordinary penetration to `PenetrationSlop + 8 raw` after 32 frames. Independent
+review accepts this source-local scope boundary. The separately reproduced
+pre-existing capsule failure remains [#146](issue-tracker.md#grv-issue-146---joined-mixed-capsule-contacts-can-eject-a-body-along-an-unrelated-axis);
+the cylinder comparison is not classified as pre-existing.
+
+Both solution profiles build net10.0/C#14 and netstandard2.1/C#11 with zero
+warnings/errors using `UseLocalLsfStack=true`. Final raw coverage:
+
+| Library/profile | Passing core tests | Sequence points | Branches | Methods |
+| --- | ---: | ---: | ---: | ---: |
+| Gravitas Release | 7,836 | 52,367/52,367 | 20,446/20,446 | 5,508/5,508 |
+| Gravitas ReleaseLean | 7,767 | 52,365/52,365 | 20,446/20,446 | 5,507/5,507 |
+| FixedMathSharp Release | 7,146 | 67,805/67,805 | 22,250/22,250 | 5,279/5,279 |
+| FixedMathSharp ReleaseLean | 7,125 | 67,898/67,898 | 22,250/22,250 | 5,275/5,275 |
+
+All 49 math recording-adapter cases pass in each profile. Six existing shared
+replay fixtures retain their expectations and agree between Windows x64
+Release/Lean. Independent geometry and ponytail review has no remaining
+findings. Runtime growth is **695 net lines in Gravitas** (three new files and
+the existing 214-line boundary owner's zero-net rename), and **1,685 net lines
+in FixedMathSharp** (nine new files). Counts include comments and exclude tests/docs.
+New internal entry points have production consumers; native curved minimum,
+finite-slab active sets, cone events, boundary preparation and sample reduction
+retain their existing owners. Obsolete cap-edge certificate options and the
+redundant far-depth scan were removed.
+
+Warm Release measurements use Windows x64/i7-9700K, SDK 10.0.302/runtime 10.0.10,
+one radius-0.5/full-height-2 mover, and a 16-unit wall split into 1/2/16/64
+members. At 16 Hz, frictionless inward impulses accompany alternating unit
+tangential velocity, with Y translation and rotation frozen. Each invocation
+performs 64 complete host steps. Mean milliseconds/frame, all **0 B/frame**:
+
+| Mover | Continuous wall | 2 pieces | 16 pieces | 64 pieces |
+| --- | ---: | ---: | ---: | ---: |
+| Cylinder | 0.483 | 0.467 | 1.014 | 3.561 |
+| Cone | 0.593 | 0.478 | 1.053 | 3.711 |
+
+Continuous/two-piece measurements use 24 windows of four invocations; dense
+measurements use 12 windows of one invocation. Fresh pose/contact builds against
+both members cost **2.020/1.460 ms for the concave L** and **1.842/1.062 ms for
+the oblique height step**, cylinder/cone respectively, all **0 B/build** across
+24 windows of 16 invocations. These build measurements include pose refresh and
+both manifold requests, rather than a solver frame or stationary cached result.
+The committed `JoinedStaticSolidMixedSimulationBenchmarks` and
+`JoinedStaticRoundedMixedContactBenchmarks` define the fixtures.
+
+The initial validated 64-piece costs were **8.887/9.145 ms/frame**. A sampled
+cylinder full-step profile attributed about 67% to eager edge/fan preparation
+when the nearby roster changed. Preparing only visited source inventories
+reduces the final dense costs by about **60%**, preserving all supplier faces
+and certificates. Native line LP fields also retain their proven 64-word banks.
+First activation can allocate cold buffers; warmed motion and roster changes
+were measured at zero allocation. These are single-mover mean costs, not
+many-body capacity or gameplay-frame tail-latency budgets.
+
+Eighty refinement comparisons retain complete body states or every finite
+contact's identity, normal, depth and both anchors. Forty-eight additional
+checkpoints match all 2/16/64-piece layouts to their continuous-wall controls
+over 512 further frames per layout. The matched deep-placement comparison also
+preserves the previously captured cylinder and capsule outcomes; the test does
+not require later implementations to preserve residual overlap.
+
+Seven ordinary query/contact/full-step controls use identical drivers,
+authoritative states before/after timing, 24 balanced windows and both load
+orders, all **0 B/op**. Final contrasts range from -2.13% to +2.61%; the largest
+positive sphere contrast changes sign in the opposite order. A bounded focused
+repeat measures that sphere at -0.34%/-0.70%, while identical-payload controls
+vary +0.78%/-1.19%. The earlier seven-control matrix is retained as well.
+No persistent ordinary regression is established at this resolution; exact
+zero overhead is not claimed.
+
+`artifacts/static-surface/phase11/` retains math `math-*-final-*-f`, Gravitas
+`*-final-*-g`, raw coverage, replay, baseline/source/module hashes, final `*-h`
+timings and state checks, the dense profile and adverse captures. Baselines are
+Gravitas `9d51836` and FixedMathSharp `f975035`; frozen matched-driver payloads
+verify executed dependencies. Reproduction uses the named benchmark fixtures
+and both core test projects in Release/ReleaseLean with
+`-p:UseLocalLsfStack=true`. Linux/ARM, Unity runtime and released packages were
+not executed. Push FixedMathSharp before advancing Gravitas's develop pin; the
+user's existing pin edit is preserved. Resolve #146 before Phase 12; #144/#145
+remain independent. #133/#139 remain coordinated through Phases 12–14.
 
 ### Phase 12 - Open Mesh Movers Against Joined 2D Solids
 

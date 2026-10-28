@@ -507,18 +507,14 @@ public sealed partial class JoinedStaticSolidMixedTests
     }
 
     [Theory]
-    [InlineData("Cylinder")]
-    [InlineData("Cone")]
     [InlineData("OpenHull")]
     [InlineData("OpenPatch")]
-    public void DeferredMovingFamilies_ShouldPreserveTheirExistingPerMemberContact(string shape)
+    public void DeferredOpenMeshFamilies_ShouldPreserveTheirExistingPerMemberContact(string shape)
     {
         using var scene = PhysicsScenarioBuilder.Create(); Configure(scene.Context);
         var members = new[] { Rectangle(scene, -4, 0, -2, 0, Fixed64.Two), Rectangle(scene, 0, 4, -2, 0, Fixed64.Two) };
         LSCollider mover = shape switch
         {
-            "Cylinder" => new LSCylinderCollider(),
-            "Cone" => new LSConeCollider(),
             "OpenHull" => MeshTestFixtures.CreateConvexQuadFloor(),
             _ => MeshTestFixtures.CreateConvexQuadFloor(MeshColliderMode.Concave)
         };

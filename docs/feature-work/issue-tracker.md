@@ -5,7 +5,7 @@ resolutions or documented investigation closures.
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-146`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-147`.
 - Assign an ID when an issue enters this tracker and preserve it through
   closure; never delete or reuse it. Check Git history before advancing or
   repairing the counter. Unknown historical IDs stay reserved rather than
@@ -55,9 +55,48 @@ resolutions or documented investigation closures.
 
 ### Ordered Queue
 
+#146 is a confirmed joined mixed-capsule response defect; resolve it before
+expanding continuity to another mover family. #144/#145 remain independent.
 #111 remains an independent validation-tooling issue. #125 is a low-priority,
 non-blocking runtime crash observation; defer further investigation unless it
 recurs or a reliable reproducer becomes available.
+
+### GRV-Issue-146 - Joined mixed capsule contacts can eject a body along an unrelated axis
+
+- **Recorded:** 2026-10-28. **Priority:** P2. **Owner:** Gravitas joined mixed
+  capsule response selection, including native contacts and boundary peaks.
+- **Verified before the current changes:** Gravitas
+  `9d5183618072f5f2cf068a6af355517b8f389ef7` with FixedMathSharp
+  `f975035692c9543127a1d614ee1c4da7663089ed`, Windows x64/.NET 10 Release.
+  Frozen committed runtime binaries and the current runtime produce identical
+  first-frame raw positions below. This is a pre-existing capsule defect;
+  the analogous cylinder defect introduced during Phase 11 stays in that phase.
+- **Reproducer:** In a Mixed context running at 16 Hz, use zero gravity, air
+  density, damping and minimum speed, frictionless materials and a grid covering
+  the fixture. Declare continuity between these bodyless AABB 2D members (X/Z
+  size `(2,2)`, center expressed in world X/Y/Z): left at `(-1,0,-1)` with
+  half-thickness `3`; right at `(1,1.5,-1)` with half-thickness `1`; remote back
+  neighbor at `(-1,-2,-3)` with half-thickness `1`. Initialize a mass-one 3D
+  capsule with radius `0.5`, size `(1,6,1)`, identity rotation and center
+  `(0,0,0.25)`. Freeze rotation, leave translation free, disable sleep and use
+  manual grounding. Add `Vector3d.Backward / 16` as a linear impulse, then call
+  `Simulate()` and `LateSimulate()` once.
+- **Observed:** Position becomes raw
+  `(1461129359,10307921664,1895020115)`: approximately `(0.3402,2.4,0.4412)`.
+  Linear velocity is zero. The vertical and lateral displacement have no
+  corresponding external force or necessary wall correction. Before stepping,
+  each overlapping ordinary member selects Back with depth `0.25`. Moving the
+  complete capsule to `(0,0,0.5)` touches the union; one raw unit farther in Z
+  separates it from every member. These whole-shape probes run after the measured
+  frame so their identities cannot change its pair order.
+- **Next action:** Add an unfrozen-translation full-host regression and correct
+  source-level response selection. Audit native callbacks and supplemental peaks
+  together; boundary membership alone does not prove simultaneous constraints
+  are physically required. Preserve exact comparisons, independent concave
+  regions, suppliers and warm allocations/performance. Include a tall L corner
+  and disconnected/asymmetric cut windows to reject blanket suppression or a
+  component-wide minimum. The current continuity plan's cylinder/cone correction
+  provides related context, not proof that the capsule path has been fixed.
 
 ### GRV-Issue-145 - Post-step 3D queries can read the pre-response collider pose
 

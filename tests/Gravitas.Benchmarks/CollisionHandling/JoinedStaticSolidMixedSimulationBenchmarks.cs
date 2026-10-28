@@ -14,7 +14,7 @@ public class JoinedStaticSolidMixedSimulationBenchmarks
     private SolidBody _body;
     private Fixed64 _direction;
 
-    [Params("Box", "Hull", "Sphere", "PointCapsule", "Capsule", "HorizontalCapsule")]
+    [Params("Box", "Hull", "Sphere", "PointCapsule", "Capsule", "HorizontalCapsule", "Cylinder", "Cone")]
     public string Shape { get; set; } = "Box";
 
     [Params("Continuous", "Joined2", "Joined16", "Joined64")]
@@ -58,6 +58,8 @@ public class JoinedStaticSolidMixedSimulationBenchmarks
             "PointCapsule" => CreateRounded(new LSCapsuleCollider { Radius = Fixed64.Half, Size = Vector3d.One }),
             "Capsule" => CreateRounded(new LSCapsuleCollider { Radius = Fixed64.Half, Size = new(1, 3, 1) }),
             "HorizontalCapsule" => CreateRounded(new LSCapsuleCollider { Radius = Fixed64.Half, Size = new(1, 3, 1) }, true),
+            "Cylinder" => CreateRounded(new LSCylinderCollider { Radius = Fixed64.Half, Size = new(1, 2, 1) }),
+            "Cone" => CreateRounded(new LSConeCollider { Radius = Fixed64.Half, Size = new(1, 2, 1) }),
             _ => throw new ArgumentException("Unknown moving shape.", nameof(Shape))
         };
         collider.Material = PhysicsMaterial.Frictionless;
@@ -104,16 +106,19 @@ public class JoinedStaticSolidMixedSimulationBenchmarks
 }
 
 
-/// <summary>Pose refresh and finite capsule contact generation at a concave join or oblique height step.</summary>
+/// <summary>Pose refresh and finite rounded-solid contact generation at a concave join or oblique height step.</summary>
 [MemoryDiagnoser]
-public class JoinedStaticCapsuleMixedContactBenchmarks
+public class JoinedStaticRoundedMixedContactBenchmarks
 {
     private GravitasWorldContext _context;
-    private LSCapsuleCollider _capsule;
+    private LSCollider _moving;
     private LSCollider2D[] _members;
     private readonly Gravitas.CollisionHandling.ContactManifold _manifold = new();
     private Vector3d _position;
     private bool _alternate;
+
+    [Params("Capsule", "Cylinder", "Cone")]
+    public string Shape { get; set; } = "Capsule";
 
     [Params("ConcaveL", "HeightStep")]
     public string Layout { get; set; } = "ConcaveL";
@@ -125,7 +130,7 @@ public class JoinedStaticCapsuleMixedContactBenchmarks
         {
             "ConcaveL" => false,
             "HeightStep" => true,
-            _ => throw new ArgumentException("Unknown joined capsule layout.", nameof(Layout))
+            _ => throw new ArgumentException("Unknown joined rounded-solid layout.", nameof(Layout))
         };
         _context = BenchmarkPhysicsScene.CreateMixedContext(16, 8);
         var left = new LSAABBoxCollider2D(new Vector2d(2, step ? 2 : 4))
@@ -141,8 +146,14 @@ public class JoinedStaticCapsuleMixedContactBenchmarks
         FixedQuaternion rotation = step
             ? new FixedQuaternion(Fixed64.Zero, Fixed64.Zero, Fixed64.One, Fixed64.Two).Normalized
             : FixedQuaternion.Identity;
-        _capsule = BenchmarkPhysicsScene.CreateDynamicCapsule(_context, _position, rotation);
-        _capsule.Material = PhysicsMaterial.Frictionless;
+        _moving = Shape switch
+        {
+            "Capsule" => BenchmarkPhysicsScene.CreateDynamicCapsule(_context, _position, rotation),
+            "Cylinder" => BenchmarkPhysicsScene.CreateDynamicCylinder(_context, _position, rotation),
+            "Cone" => BenchmarkPhysicsScene.CreateDynamicCone(_context, _position, rotation),
+            _ => throw new ArgumentException("Unknown joined rounded solid.", nameof(Shape))
+        };
+        _moving.Material = PhysicsMaterial.Frictionless;
         _alternate = false;
         for (int i = 0; i < 32; i++) BuildContacts();
     }
@@ -153,18 +164,18 @@ public class JoinedStaticCapsuleMixedContactBenchmarks
         // Refresh a real pose each invocation; timing a stationary cached
         // manifold would omit the finite boundary work this fixture measures.
         _alternate = !_alternate;
-        _capsule.Body!.SetPosition(_position + Vector3d.Right * (_alternate ? Fixed64.MinIncrement : -Fixed64.MinIncrement));
+        _moving.Body!.SetPosition(_position + Vector3d.Right * (_alternate ? Fixed64.MinIncrement : -Fixed64.MinIncrement));
         int count = 0;
         foreach (LSCollider2D member in _members)
         {
-            Gravitas.CollisionHandling.CollisionDetectionMixed.TryBuildDiscreteManifold(_capsule, member, _manifold);
+            Gravitas.CollisionHandling.CollisionDetectionMixed.TryBuildDiscreteManifold(_moving, member, _manifold);
             foreach (var row in _manifold)
                 if (row.Normal == Vector3d.Zero || row.Depth < Fixed64.Zero || row.DepthIsClamped
                     || !row.AnchorA.TryGetWorldPoint(out _) || !row.AnchorB.TryGetWorldPoint(out _))
-                    throw new InvalidOperationException("Joined capsule contacts must retain finite physical response rows.");
+                    throw new InvalidOperationException("Joined rounded-solid contacts must retain finite physical response rows.");
             count += _manifold.Count;
         }
-        if (count == 0) throw new InvalidOperationException("The joined capsule fixture must keep its boundary contacts.");
+        if (count == 0) throw new InvalidOperationException("The joined rounded-solid fixture must keep its boundary contacts.");
         return count;
     }
 

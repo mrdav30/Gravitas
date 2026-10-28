@@ -73,6 +73,7 @@ internal sealed partial class StaticSurface2D : IScaledConvexHullContactDomain
             _mixedRequestedReach = _mixedReach;
             if (mover is LSCapsuleCollider capsule && capsule.AxisLength > Fixed64.Zero) BuildMixedCapsule();
             else if (mover is LSSphereCollider or LSCapsuleCollider) BuildMixedSphere();
+            else if (mover is LSCylinderCollider or LSConeCollider) BuildMixedCurved();
             else BuildMixed();
             if (_mixedRequestedReach > _mixedReach)
             {
@@ -91,6 +92,8 @@ internal sealed partial class StaticSurface2D : IScaledConvexHullContactDomain
             return AppendMixedCapsule(overlap, destination, namespace3D, namespace2D);
         if (mover is LSSphereCollider or LSCapsuleCollider)
             return AppendMixedSphere(overlap, destination, namespace3D, namespace2D);
+        if (mover is LSCylinderCollider or LSConeCollider)
+            return AppendMixedCurved(overlap, destination, namespace3D, namespace2D);
         Span<int> chosen = stackalloc int[ContactManifold.MaxContactsPerGroup];
         for (int group = 0; group < _mixedGroups.Count; group++)
         {
@@ -114,6 +117,12 @@ internal sealed partial class StaticSurface2D : IScaledConvexHullContactDomain
             }
         }
         return _mixedOverlaps.Contains(overlap.Id);
+    }
+
+    private void RequestMixedReach(Fixed64 depth)
+    {
+        Fixed64 reach = _mixedMoving!.CanonicalCenteredProxyRadius + depth + Fixed64.MinIncrement + Fixed64.MinIncrement;
+        if (reach > _mixedRequestedReach) _mixedRequestedReach = reach;
     }
 
     private void GatherMixed(LSCollider mover, Fixed64 reach)
@@ -140,7 +149,8 @@ internal sealed partial class StaticSurface2D : IScaledConvexHullContactDomain
     private void PrepareMixed()
     {
         _mixedSphereConcavityCurrent = false;
-        _mixedCapsuleLinesCurrent = false;
+        _mixedBoundaryLinesCurrent = false;
+        _mixedCurvedDomainsCurrent = false;
         _mixedPreparedCount = _mixedLocal.Count;
         if (_mixedComponents.Length < _mixedLocal.Count) Array.Resize(ref _mixedComponents, _mixedLocal.Count);
         for (int member = 0; member < _mixedLocal.Count; member++)

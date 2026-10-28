@@ -71,7 +71,7 @@ public static partial class CollisionDetectionMixed
         }
         if (surfaceResponse && collider2D.StaticSurface is { } solidSurface
             && !collider3D.IsTrigger && !collider2D.IsTrigger
-            && (collider3D is LSCuboidCollider or LSSphereCollider
+            && (collider3D is LSCuboidCollider or LSSphereCollider or LSCylinderCollider or LSConeCollider
                 || collider3D is LSCapsuleCollider
                 || collider3D is LSMeshCollider { Mode: MeshColliderMode.Convex } hull && hull.Mesh.IsClosedSurface))
             return solidSurface.AppendMixed(collider3D, collider2D, manifold, namespace3D, namespace2D);

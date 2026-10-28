@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 using FixedMathSharp;
 using FixedMathSharp.Geometry;
+using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using SwiftCollections;
 using System;
@@ -77,6 +78,45 @@ internal sealed partial class StaticSurface2D
                 if (_mixedSamples[index].Group == _mixedSamples[previous].Group
                     && _mixedSamples[index].Point == _mixedSamples[previous].Point)
                 { _mixedSamples.RemoveAt(index); break; }
+    }
+
+    // Capsule and curved-solid response retain the same bounded final pool.
+    // Geometry, connectivity, carrier and far-boundary policy stay with callers.
+    private void AppendMixedRegionSamples(int group, in WideDirection3d axis, ContactManifold destination,
+        int namespace3D, int namespace2D, scoped Span<int> chosen, in FixedPointAnchor center)
+    {
+        _mixedPool.FastClear();
+        foreach (MixedSample sample in _mixedSamples.AsReadOnlySpan())
+            if (FindMixedRegion(sample.Group) == group)
+            {
+                bool duplicate = false;
+                foreach (MixedSample kept in _mixedPool.AsReadOnlySpan()) duplicate |= kept.Point == sample.Point;
+                if (!duplicate) _mixedPool.Add(sample);
+            }
+        _mixedPool.SortInPlace(MixedPointOrder);
+        // Keep the deepest, lowest-lever physical point before reducing
+        // coverage; the manifold assigns its own canonical solver order.
+        int seed = 0;
+        for (int index = 1; index < _mixedPool.Count; index++)
+        {
+            FixedContactAnchors candidate = _mixedPool[index].Contact, current = _mixedPool[seed].Contact;
+            int depth = candidate.Depth.CompareTo(current.Depth);
+            if (depth > 0 || depth == 0 && center.CompareSquaredDistance(candidate.FirstAnchor, current.FirstAnchor) < 0)
+                seed = index;
+        }
+        if (seed != 0) (_mixedPool[0], _mixedPool[seed]) = (_mixedPool[seed], _mixedPool[0]);
+        int count = Math.Min(chosen.Length, _mixedPool.Count);
+        for (int slot = 0; slot < count; slot++)
+            chosen[slot] = slot == 0 ? 0 : MeshPlaneSampleReduction.ChooseNext(_mixedPool.AsReadOnlySpan(), chosen[..slot], axis, MixedPointOrder);
+        for (int slot = 0; slot < count; slot++)
+        {
+            MixedSample sample = _mixedPool[chosen[slot]];
+            FixedContactAnchors contact = sample.Contact; LSCollider2D supplier = _mixedLocal[sample.Supplier];
+            destination.AddContact(new ContactAnchor(contact.FirstAnchor), new ContactAnchor(contact.SecondAnchor),
+                contact.Depth, contact.Normal, _mixedMoving!.Material, supplier.Material, contact.DepthIsClamped,
+                featureNamespaceA: namespace3D, featureNamespaceB: namespace2D,
+                group: new ContactGroupKey(namespace3D, namespace2D, region: group, sourceIdB: supplier.Id + 1));
+        }
     }
 
     private int FindMixedRegion(int index)
