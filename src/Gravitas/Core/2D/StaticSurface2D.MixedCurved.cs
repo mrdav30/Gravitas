@@ -147,6 +147,7 @@ internal sealed partial class StaticSurface2D
         bool up = false, down = false, positiveUp = false, positiveDown = false, positiveHorizontal = false;
         foreach (var sample in samples)
         {
+            if (sample.GeometryOnly) continue;
             Vector3d normal = sample.Contact.Normal; bool positive = sample.Contact.Depth > Fixed64.Zero;
             if (normal.Y > Fixed64.Zero) { up = true; positiveUp |= positive; }
             else if (normal.Y < Fixed64.Zero) { down = true; positiveDown |= positive; }
@@ -157,6 +158,7 @@ internal sealed partial class StaticSurface2D
         bool semicircle = false;
         foreach (var first in samples)
         {
+            if (first.GeometryOnly) continue;
             Vector3d normal = first.Contact.Normal;
             if (normal.Y != Fixed64.Zero) continue;
             var axis = new WideDirection3d(Signed576.ExtendValue(Signed192.Raw(normal.X)), default,
@@ -164,6 +166,7 @@ internal sealed partial class StaticSurface2D
             bool contains = true;
             foreach (var second in samples)
             {
+                if (second.GeometryOnly) continue;
                 Vector3d other = second.Contact.Normal;
                 if (other.Y != Fixed64.Zero) continue;
                 var candidate = new WideDirection3d(Signed576.ExtendValue(Signed192.Raw(other.X)), default,
@@ -185,9 +188,10 @@ internal sealed partial class StaticSurface2D
     private readonly struct CurvedBoundarySample
     {
         internal readonly int Ordinal, CompareToNative;
+        internal readonly bool GeometryOnly;
         internal readonly FixedContactAnchors Contact;
-        internal CurvedBoundarySample(int ordinal, FixedContactAnchors contact, int compareToNative)
-        { Ordinal = ordinal; Contact = contact; CompareToNative = compareToNative; }
+        internal CurvedBoundarySample(int ordinal, FixedContactAnchors contact, int compareToNative, bool geometryOnly = false)
+        { Ordinal = ordinal; Contact = contact; CompareToNative = compareToNative; GeometryOnly = geometryOnly; }
     }
     private void AddMixedCurvedSample(in FixedContactAnchors contact, int face, bool physical,
         RationalSegmentInterval clip = default, Fixed64 lower = default, Fixed64 upper = default, int boundaryEdge = -1)

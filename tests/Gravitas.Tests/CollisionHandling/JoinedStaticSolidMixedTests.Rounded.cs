@@ -646,7 +646,7 @@ public sealed partial class JoinedStaticSolidMixedTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void SphericalConcaveCapVertex_ShouldKeepOnePeakPerPhysicalFace(bool capsule)
+    public void SphericalConcaveCapVertex_ShouldPreferCompleteAdjacentExitsOverTheDeeperCapCut(bool capsule)
     {
         using var scene = PhysicsScenarioBuilder.Create(); Configure(scene.Context);
         var lower = Rectangle(scene, -2, 0, -2, 0, Fixed64.One);
@@ -655,10 +655,19 @@ public sealed partial class JoinedStaticSolidMixedTests
         using var surface = scene.Context.Physics2D.CreateStaticSurface(members);
         LSCollider mover = SphericalMover(scene, capsule,
             new(Fixed64.Quarter, Fixed64.FromFraction(9, 10), Fixed64.Quarter), Fixed64.Half);
-        var cap = Rows(mover, members).Where(sample => sample.Supplier == lower.Id + 1 && sample.Row.Normal == Vector3d.Down).ToArray();
-        Assert.Single(cap);
-        Assert.True(cap[0].Row.AnchorB.TryGetWorldPoint(out Vector3d point));
-        Assert.Equal(Vector3d.Up, point);
+        var rows = Rows(mover, members);
+        Assert.Equal(2, rows.Count);
+        Assert.DoesNotContain(rows, sample => sample.Supplier == lower.Id + 1 && sample.Row.Normal == Vector3d.Down);
+        var back = Assert.Single(rows, sample => sample.Row.Normal == Vector3d.Backward);
+        var left = Assert.Single(rows, sample => sample.Row.Normal == Vector3d.Left);
+        Assert.Equal(members[1].Id + 1, back.Supplier);
+        Assert.Equal(members[2].Id + 1, left.Supplier);
+        Assert.Equal(Fixed64.Quarter, back.Row.Depth);
+        Assert.Equal(Fixed64.Quarter, left.Row.Depth);
+        // Each adjacent face supplies a complete source exit at .25. The
+        // lower member's deeper cap cut is an alternative, not a third response.
+        AssertWholeShapeExit(mover, members,
+            new(Fixed64.Half, Fixed64.FromFraction(9, 10), Fixed64.Half), Vector3d.Right + Vector3d.Forward);
     }
 
     private static LSCollider SphericalMover(PhysicsScenarioBuilder scene, bool capsule, Vector3d position, Fixed64 radius)

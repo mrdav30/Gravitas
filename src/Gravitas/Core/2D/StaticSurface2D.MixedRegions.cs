@@ -93,6 +93,9 @@ internal sealed partial class StaticSurface2D
                 foreach (MixedSample kept in _mixedPool.AsReadOnlySpan()) duplicate |= kept.Point == sample.Point;
                 if (!duplicate) _mixedPool.Add(sample);
             }
+        // A capsule region can retain admitted connectivity geometry while
+        // every solver sample in that region belongs to the other alternative.
+        if (_mixedPool.Count == 0) return;
         _mixedPool.SortInPlace(MixedPointOrder);
         // Keep the deepest, lowest-lever physical point before reducing
         // coverage; the manifold assigns its own canonical solver order.

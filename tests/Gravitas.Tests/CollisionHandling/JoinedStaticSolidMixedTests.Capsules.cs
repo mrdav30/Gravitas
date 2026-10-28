@@ -714,7 +714,7 @@ public sealed partial class JoinedStaticSolidMixedTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void CapsuleSeparateCapCuts_ShouldRetainTheirOwnFinitePeaks(bool oppositeCuts)
+    public void CapsuleSeparateCapCuts_ShouldKeepTheirAdmittedParentCap(bool oppositeCuts)
     {
         using var scene = PhysicsScenarioBuilder.Create(); Configure(scene.Context);
         int left = oppositeCuts ? -4 : -2;
@@ -731,29 +731,16 @@ public sealed partial class JoinedStaticSolidMixedTests
             Material = PhysicsMaterial.Frictionless };
         scene.CreateBody(mover, new(x, Fixed64.FromFraction(9, 10), z), FixedQuaternion.Identity);
         Assert.Equal(Fixed64.Quarter, mover.AxisLength);
-        var regions = new HashSet<int>(); bool first = false, second = false, interior = false;
-        foreach (var sample in Rows(mover, lower))
-        {
-            if (sample.Row.Normal != Vector3d.Down) continue;
-            Assert.Equal(lower.Id + 1, sample.Supplier);
-            Assert.True(sample.Row.AnchorB.TryGetWorldPoint(out Vector3d source));
-            Assert.Equal(Fixed64.One, source.Y);
-            Assert.False((source.X == Fixed64.Zero || source.X == (Fixed64)left)
-                && (source.Z == Fixed64.Zero || source.Z == -Fixed64.Two),
-                "No original cap corner lies inside the capsule's radial extent.");
-            Fixed64 dx = source.X - x, dz = source.Z - z;
-            Fixed64 radial = radius * radius - dx * dx - dz * dz;
-            Assert.True(radial >= Fixed64.Zero);
-            Fixed64 depth = Fixed64.One - (Fixed64.FromFraction(9, 10) - Fixed64.FromFraction(1, 8)) + FixedMath.Sqrt(radial);
-            Assert.InRange(sample.Row.Depth.m_rawValue, depth.m_rawValue - 4, depth.m_rawValue + 4);
-            first |= oppositeCuts ? source.X == x && source.Z == Fixed64.Zero
-                : source.X == Fixed64.Zero && source.Z == z;
-            second |= oppositeCuts ? source.X == x && source.Z == -Fixed64.Two
-                : source.X == x && source.Z == Fixed64.Zero;
-            interior |= source.X == x && source.Z == z;
-            regions.Add(sample.Region);
-        }
-        Assert.True(first && second && interior); Assert.Equal(3, regions.Count);
+        var selected = Assert.Single(Rows(mover, lower));
+        Assert.Equal(Vector3d.Down, selected.Row.Normal);
+        Assert.Equal(lower.Id + 1, selected.Supplier);
+        Assert.True(selected.Row.AnchorB.TryGetWorldPoint(out Vector3d source));
+        Assert.Equal(new Vector3d(x, Fixed64.One, z), source);
+        Fixed64 depth = Fixed64.One - (Fixed64.FromFraction(9, 10) - Fixed64.FromFraction(1, 8)) + radius;
+        Assert.Equal(depth, selected.Row.Depth);
+        // Both finite rim cuts lie inside the same admitted full cap. Retain
+        // its maximum once, rather than adding its shallower subset constraints.
+        AssertWholeShapeExit(mover, new[] { lower }, new(x, Fixed64.One + Fixed64.FromFraction(1, 8) + radius, z), Vector3d.Up);
     }
 
     [Fact]

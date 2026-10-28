@@ -18,22 +18,28 @@ internal sealed partial class StaticSurface2D
 
     private readonly SwiftList<SphereGroup> _mixedSphereGroups = new();
     private readonly SwiftList<SpherePeak> _mixedSpherePeaks = new();
+    private readonly SwiftList<int> _mixedSphereSourceGroups = new();
+    private readonly SwiftList<bool> _mixedSphereSelectedGroups = new();
     private readonly SwiftHashSet<int> _mixedSphereInsideComponents = new();
     private readonly SwiftHashSet<int> _mixedSpherePhysicalComponents = new();
-    private bool _mixedSphereInside, _mixedSphereConcavityCurrent;
+    private bool _mixedSphereInside, _mixedSphereConcavityCurrent, _mixedSphereChooseSources;
 
     private void BuildMixedSphere()
     {
         if (!_mixedSphereConcavityCurrent) PrepareMixedSphereConcavity();
         _mixedSphereGroups.FastClear(); _mixedSpherePeaks.FastClear(); _mixedOverlaps.Clear(); _mixedSphereInsideComponents.Clear(); _mixedSpherePhysicalComponents.Clear();
+        _mixedSphereSourceGroups.FastClear(); _mixedSphereSelectedGroups.FastClear(); _mixedSphereChooseSources = false;
         Fixed64 radius = _mixedMoving is LSSphereCollider sphere ? sphere.ScaledRadius : ((LSCapsuleCollider)_mixedMoving!).ScaledRadius;
         for (int member = 0; member < _mixedLocal.Count; member++)
         {
             LSCollider2D source = _mixedLocal[member];
+            _mixedSphereChooseSources |= _mixedPrisms[member].SphereHasConcaveFace;
             if (source.ContainsPoint(new(_mixedMoving!.Center.X, _mixedMoving.Center.Z))
                 && MixedEmbedded2DGeometry.ContainsPointInSlab(source, _mixedMoving.Center.Y))
                 _mixedSphereInsideComponents.Add(_mixedComponents[member]);
         }
+        if (_mixedSphereChooseSources)
+            for (int member = 0; member < _mixedLocal.Count; member++) _mixedSphereSourceGroups.Add(-1);
         for (_mixedMember = 0; _mixedMember < _mixedLocal.Count; _mixedMember++)
         {
             LSCollider2D member = _mixedLocal[_mixedMember];
@@ -60,7 +66,6 @@ internal sealed partial class StaticSurface2D
             if (overlaps) _mixedOverlaps.Add(member.Id);
             bool physical = found && WideConvexPrismRelations.IsSphereProjectionWithinRadius(depth);
             if (physical) _mixedSpherePhysicalComponents.Add(component);
-            if (prism.SphereHasConcaveFace) AppendMixedSphereFacePeaks(radius);
             if (!found) continue;
             Fixed64 reach = radius + contact.Depth + Fixed64.MinIncrement + Fixed64.MinIncrement;
             if (reach > _mixedRequestedReach) { _mixedRequestedReach = reach; return; }
@@ -76,10 +81,65 @@ internal sealed partial class StaticSurface2D
                         reference, previous.Reference, Signed192.Signed(1))).IsZero) break;
             }
             var row = new SphereGroup(component, member.Id, _mixedMember, axis, reference, depth, contact, !physical);
-            if (group == _mixedSphereGroups.Count) _mixedSphereGroups.Add(row);
+            if (group == _mixedSphereGroups.Count)
+            {
+                _mixedSphereGroups.Add(row);
+                if (_mixedSphereChooseSources) _mixedSphereSelectedGroups.Add(false);
+            }
             else if (!physical && WideConvexPrismRelations.CompareProjectionDepths(depth, _mixedSphereGroups[group].Depth) < 0)
                 _mixedSphereGroups[group] = row;
+            if (_mixedSphereChooseSources) _mixedSphereSourceGroups[_mixedMember] = group;
         }
+        if (_mixedSphereChooseSources) SelectMixedSphereSources(radius);
+    }
+
+    private void SelectMixedSphereSources(Fixed64 radius)
+    {
+        _mixedSpherePhysicalComponents.Clear();
+        for (_mixedMember = 0; _mixedMember < _mixedLocal.Count; _mixedMember++)
+        {
+            int own = _mixedSphereSourceGroups[_mixedMember];
+            MixedPrism prism = _mixedPrisms[_mixedMember];
+            if (!prism.SphereHasConcaveFace || !_mixedOverlaps.Contains(_mixedLocal[_mixedMember].Id))
+            {
+                if (own >= 0) _mixedSphereSelectedGroups[own] = true;
+                continue;
+            }
+            int native = own >= 0 && !_mixedSphereGroups[own].Recovery ? own : -1;
+            // A physical witness on another member can certify this convex
+            // source's complete exit only on one of its original support planes.
+            for (int candidate = 0; candidate < _mixedSphereGroups.Count; candidate++)
+            {
+                SphereGroup proof = _mixedSphereGroups[candidate];
+                if (candidate == native || proof.Recovery || proof.Component != _mixedComponents[_mixedMember]) continue;
+                for (int face = -2; face < prism.Offsets.Length; face++)
+                {
+                    GetMixedCurvedPlane(_mixedMember, face, out var axis, out var reference);
+                    if (!SameMixedCurvedPlane(axis, reference, proof.Axis, proof.Reference)) continue;
+                    if (native < 0 || WideConvexPrismRelations.CompareProjectionDepths(proof.Depth, _mixedSphereGroups[native].Depth) < 0)
+                        native = candidate;
+                    break;
+                }
+            }
+            int peakStart = _mixedSpherePeaks.Count;
+            _mixedCurvedBoundarySamples.FastClear();
+            AppendMixedSphereFacePeaks(radius, native);
+            var cuts = _mixedCurvedBoundarySamples.AsReadOnlySpan();
+            bool useCuts = !cuts.IsEmpty;
+            foreach (var cut in cuts)
+                if (cut.CompareToNative >= 0) { useCuts = false; break; }
+            if (useCuts && !AreMixedCurvedCutRowsCompatible(cuts)) useCuts = false;
+            if (useCuts) _mixedSpherePhysicalComponents.Add(_mixedComponents[_mixedMember]);
+            else
+            {
+                for (int peak = _mixedSpherePeaks.Count - 1; peak >= peakStart; peak--) _mixedSpherePeaks.RemoveAt(peak);
+                int selected = native >= 0 ? native : own;
+                if (selected >= 0) _mixedSphereSelectedGroups[selected] = true;
+            }
+        }
+        for (int group = 0; group < _mixedSphereGroups.Count; group++)
+            if (_mixedSphereSelectedGroups[group] && !_mixedSphereGroups[group].Recovery)
+                _mixedSpherePhysicalComponents.Add(_mixedSphereGroups[group].Component);
     }
 
     private void PrepareMixedSphereConcavity()
@@ -145,6 +205,7 @@ internal sealed partial class StaticSurface2D
         for (int group = 0; group < _mixedSphereGroups.Count; group++)
         {
             SphereGroup row = _mixedSphereGroups[group];
+            if (_mixedSphereChooseSources && !_mixedSphereSelectedGroups[group]) continue;
             if (row.Carrier != overlap.Id || row.Recovery && _mixedSpherePhysicalComponents.Contains(row.Component)) continue;
             Append(row.Contact, row.Supplier, group);
         }
@@ -197,7 +258,7 @@ internal sealed partial class StaticSurface2D
         }
     }
 
-    private void AppendMixedSphereFacePeaks(Fixed64 radius)
+    private void AppendMixedSphereFacePeaks(Fixed64 radius, int native)
     {
         MixedPrism prism = _mixedPrisms[_mixedMember];
         LSCollider2D member = _mixedLocal[_mixedMember];
@@ -230,9 +291,8 @@ internal sealed partial class StaticSurface2D
             bool found = WideConvexPrismRelations.TryGetSphereBoundaryFaceContact(_mixedMoving!.Center, radius,
                 MixedEmbedded2DGeometry.GetCenter3D(member), member.ConvexRotation, span.Start, span.End,
                 prism.Offsets[(span.Second + 1) % prism.Offsets.Length], span.Interval, lower, upper,
-                ref retained, out _, out var contact, out var parameter, out Fixed64 localY, vertical, _mixedSphereBoundaryAdmit);
+                ref retained, out var ray, out var contact, out var parameter, out Fixed64 localY, vertical, _mixedSphereBoundaryAdmit);
             if (!found) return;
-            int component = _mixedComponents[_mixedMember]; _mixedSpherePhysicalComponents.Add(component);
             // Height bands may share the same finite peak. Only an identical
             // point on the same original face is redundant; coplanar regions are not.
             var candidate = new SpherePeak(_mixedMember, span.First, span.Second, vertical, localY, parameter, contact);
@@ -241,6 +301,9 @@ internal sealed partial class StaticSurface2D
                     && peak.Height == candidate.Height && RationalSegmentInterval.CompareParameters(
                         peak.Numerator, peak.Denominator, candidate.Numerator, candidate.Denominator) == 0) return;
             _mixedSpherePeaks.Add(candidate);
+            int comparison = native < 0 ? -1
+                : new CapsulePrismContactDepth(_mixedSphereGroups[native].Depth).Compare(retained, ray);
+            _mixedCurvedBoundarySamples.Add(new(_mixedSpherePeaks.Count - 1, contact, comparison));
         }
     }
 

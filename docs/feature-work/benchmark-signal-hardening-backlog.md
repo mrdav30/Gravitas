@@ -421,6 +421,19 @@ The [supported-geometry closeout](done/2026-10-12-supported-geometry-range-plan.
 retains the bounded workload and timing provenance. Use it as context for the
 representative workload rather than creating a separate speculative signal.
 
+**Additional bounded evidence (2026-10-28):** #146's corrected mixed capsule
+reproducer costs **1.997 ms per warm reset plus one complete 16-Hz host step**,
+at **0 B/op**, for one six-unit capsule and three unequal-height static members.
+Every invocation resets to quarter-unit penetration, so this measures forced
+contact reconstruction rather than a settled scene. Named maintained
+`JoinedStaticRoundedMixedContactBenchmarks` capsule `ConcaveL` / `HeightStep`
+fixtures additionally measured **1.440 / 0.942 ms per pose-refresh/contact build**
+at `0 B/op`. The [#146 record](2026-10-15-static-surface-continuity-and-heightfield-plan.md#grv-issue-146-closeout)
+retains the complete reproducible geometry, original/corrected behavior,
+regressions, frozen dependencies and measurement protocol. These costs extend
+this existing frequency/capacity signal; they do not establish a representative
+game workload or justify comparing incorrect responses as speed baselines.
+
 The final #020 two-launch fixture costs **696.036 / 699.465 microseconds** per
 complete mixed / 3D oblique query, at **0 B/op**, while ordinary cap/side/zero-core
 contacts cost roughly 10–11.5 microseconds. #021 retains roughly 0.53–1.05 ms

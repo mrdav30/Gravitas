@@ -1648,8 +1648,101 @@ verify executed dependencies. Reproduction uses the named benchmark fixtures
 and both core test projects in Release/ReleaseLean with
 `-p:UseLocalLsfStack=true`. Linux/ARM, Unity runtime and released packages were
 not executed. Push FixedMathSharp before advancing Gravitas's develop pin; the
-user's existing pin edit is preserved. Resolve #146 before Phase 12; #144/#145
+user's existing pin edit is preserved. The rounded follow-up below closes #146; #144/#145
 remain independent. #133/#139 remain coordinated through Phases 12–14.
+
+<a id="grv-issue-146-closeout"></a>
+
+#### GRV-Issue-146 - Rounded Source Selection Fast Follow
+
+**2026-10-28:** Capsule response previously published native exits and supplemental
+finite cuts together, although they describe alternative source responses. The
+same defect affected spheres and zero-core capsules. Exact boundary admission
+and correct individual witnesses did not establish that every row should be
+solved simultaneously. Earlier geometry/count assertions retained those redundant
+rows; wall benchmarks froze vertical translation, hiding the resulting ejection.
+
+The original reproducer predates Phase 11 (`9d51836` / FixedMathSharp `f975035`).
+A clean rerun at Gravitas `a857430`, FixedMathSharp `accbfd3`, SwiftCollections
+`89dfa23`, GridForge `89c69f6` and Chronicler `c547e5c` confirms the same result.
+Use Mixed mode at 16 Hz, zero gravity/air/damping/minimum speed, frictionless
+materials and a grid covering the scene. Join three bodyless rectangles:
+X/Z `[-2,0]/[-2,0]`, Y center/half-thickness `0/3`; `[0,2]/[-2,0]`, `1.5/1`;
+and `[-2,0]/[-4,-2]`, `-2/1`. A mass-one, identity capsule with radius `0.5`,
+size `(1,6,1)` and center `(0,0,0.25)` freezes rotation only, disables sleep and
+uses manual grounding. Apply `Back/16`, then `Simulate()` and `LateSimulate()`.
+The old raw position `(1461129359,10307921664,1895020115)` becomes
+`(0,0,1895020115)`, with zero velocity. After capturing the measured frame,
+the complete capsule touches the union at `(0,0,0.5)` and separates one raw Z
+unit farther; probe identities cannot perturb the measured response.
+
+The fix extends the existing exact native-MIN versus independent-cut-MAX choice
+to rounded movers, preserving native ties, actual suppliers and source overlap
+events. Parent-covered portions are removed before ranking a cut maximum; full
+line geometry remains available for region connectivity. Only selected samples
+participate in response and suppress recovery. Spheres can borrow an admitted
+physical support only on an exact, cooriented original source plane. Existing
+arithmetic compares native support/closest-pair depths with finite ray roots
+before rounding; no new solver or public API was introduced.
+
+The [capsule regressions](../../tests/Gravitas.Tests/CollisionHandling/JoinedStaticSolidMixedTests.CapsuleSelection.cs)
+and [rounded-point regressions](../../tests/Gravitas.Tests/CollisionHandling/JoinedStaticSolidMixedTests.RoundedSelection.cs)
+cover free-translation full steps, member-order and remote-piece
+controls, point-capsule parity, tall/asymmetric corners, exact ties, partial
+parent windows in both orientations, deepest-sample retention, whole-shape exits
+and exact per-member overlap events. Corrected assertions reject redundant
+alternatives rather than preserving their old row counts. Independent ponytail
+review found no remaining correctness or bloat issue. Net runtime growth is
+**189 Gravitas and 123 FixedMathSharp lines**, with **no new runtime files**.
+
+Both target frameworks build with zero warnings/errors using
+`UseLocalLsfStack=true`. Full test/coverage gates are:
+
+| Project/profile | Tests | Sequence points | Branch points | Methods |
+| --- | ---: | ---: | ---: | ---: |
+| Gravitas Release | 7,860 | 52,491/52,491 | 20,590/20,590 | 5,511/5,511 |
+| Gravitas ReleaseLean | 7,791 | 52,489/52,489 | 20,590/20,590 | 5,510/5,510 |
+| FixedMathSharp Release | 7,168 | 67,873/67,873 | 22,266/22,266 | 5,286/5,286 |
+| FixedMathSharp ReleaseLean | 7,147 | 67,966/67,966 | 22,266/22,266 | 5,282/5,282 |
+
+The 49 math-adapter tests pass in each profile. Six existing replay fixtures
+match their shared expectations and each other across local Windows x64
+Release/Lean captures. Linux/ARM, Unity runtime and released-package validation
+were not executed. Raw coverage, matched frozen payloads, source revisions,
+profiles and timing windows are retained under `artifacts/grv-issue-146/`;
+regressions and the complete reproducer above remain tracked independently.
+Matched original/candidate payloads use the same benchmark driver and frozen
+dependencies. Ordinary controls use `JoinedStaticSolidMixedSimulationBenchmarks`:
+one radius-0.5/core-2 capsule against a two-piece flat wall, with Y translation
+and rotation frozen; the horizontal case rotates the core into X. Each invocation
+advances 64 full 16-Hz steps after initialization/settling; means below divide
+elapsed time by 64. Normal/reversed payload load order each retain 24 alternating
+paired windows, matching physical witnesses/checksums
+before and after timing and requiring zero warm allocation.
+
+| Ordinary capsule wall | Original us/frame | Corrected us/frame | Difference |
+| --- | ---: | ---: | ---: |
+| Vertical capsule, joined two-piece wall | 461.90 | 462.09 | +0.19 us / +0.04% |
+| Horizontal capsule, joined two-piece wall | 698.18 | 705.45 | +7.27 us / +1.04% |
+
+The horizontal difference is +0.70%/+1.38% in the two load orders. Initial
+captures measured +2.17%; removing dead physical-set writes and guarding the
+larger selection owner before repeated/trivial callback visits reduced the
+remaining cost. A descriptor-hoisting experiment did not improve its paired
+controls and was discarded. Other final controls vary from -1.23% to +0.90%,
+with load-order variation, matching outputs and zero warm allocation. Exact
+zero overhead is not claimed. On 2026-10-28 the user accepted the small measured
+correctness cost rather than expanding this fix into a broader rewrite;
+**GRV-Issue-146 is closed**.
+
+The adverse reproducer's warm reset-plus-one-full-step fixture costs **1.997 ms**
+at **0 B/op**: one six-unit capsule, three unequal-height members and a reset
+to quarter-unit penetration before every 16-Hz host step. This is forced contact
+reconstruction, not a settled-scene or game-capacity measurement. The old broken
+response cost about 1.964 ms but is not an equivalent-work speed baseline.
+The existing curved-workload signal #024 retains this budget context. Future
+work should use representative workload frequency and stage attribution rather
+than broadening this correctness closeout into speculative tuning.
 
 ### Phase 12 - Open Mesh Movers Against Joined 2D Solids
 

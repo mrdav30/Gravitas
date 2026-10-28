@@ -115,25 +115,37 @@ internal sealed partial class StaticSurface2D
 
     private void AppendMixedCapsuleBoundaryPeaks(LSCapsuleCollider capsule)
     {
-        if (!_mixedBoundaryLinesCurrent) PrepareMixedBoundaryLines();
         _mixedCapsuleLineGroups.FastClear();
         int supportCount = _mixedSphereGroups.Count;
-        foreach (MixedBoundaryLine line in _mixedBoundaryLines.AsReadOnlySpan())
+        int sampleIndex = 0;
+        for (int ordinal = 0; ordinal < _mixedBoundaryLines.Count; ordinal++)
         {
+            MixedBoundaryLine line = _mixedBoundaryLines[ordinal];
             _mixedCapsuleLineGroups.Add(-1);
+            if (sampleIndex == _mixedCurvedBoundarySamples.Count || _mixedCurvedBoundarySamples[sampleIndex].Ordinal != ordinal) continue;
+            var sample = _mixedCurvedBoundarySamples[sampleIndex++];
+            FixedContactAnchors contact = sample.Contact;
             _mixedMember = line.Member;
             LSCollider2D member = _mixedLocal[line.Member]; MixedPrism prism = _mixedPrisms[line.Member];
-            if (!_mixedOverlaps.Contains(member.Id)) continue;
-            _mixedCapsuleBoundary ??= new();
-            if (!_mixedCapsuleBoundary.TryGetContact(capsule.Center, capsule.Rotation, capsule.AxisLength, capsule.ScaledRadius,
+            bool prepared = _mixedCapsuleBoundary!.PrepareSource(capsule.Center, capsule.Rotation, capsule.AxisLength, capsule.ScaledRadius,
                 MixedEmbedded2DGeometry.GetCenter3D(member), member.ConvexRotation, prism.Offsets[line.Edge],
                 prism.Offsets[(line.Edge + 1) % prism.Offsets.Length], prism.Offsets[(line.Edge + 2) % prism.Offsets.Length],
-                line.Clip, line.Lower, line.Upper, line.Vertical, out var contact)) continue;
+                line.Clip, line.Lower, line.Upper, line.Vertical, out _);
+            System.Diagnostics.Debug.Assert(prepared);
             WideDirection3d normal = MixedBoundaryLineNormal(line);
-            int component = _mixedComponents[line.Member]; _mixedSpherePhysicalComponents.Add(component);
+            int component = _mixedComponents[line.Member];
             int group = AddMixedCapsuleSample(new(component, member.Id, line.Member, normal,
-                MixedSupportPoint(prism.NativeFrame, prism, normal), default, contact), default);
+                MixedSupportPoint(prism.NativeFrame, prism, normal), default, contact), default,
+                _mixedCapsuleUseCuts[line.Member] && !sample.GeometryOnly);
             _mixedCapsuleLineGroups[_mixedCapsuleLineGroups.Count - 1] = group;
+            while (sampleIndex < _mixedCurvedBoundarySamples.Count && _mixedCurvedBoundarySamples[sampleIndex].Ordinal == ordinal)
+            {
+                var cut = _mixedCurvedBoundarySamples[sampleIndex++];
+                int fragment = AddMixedCapsuleSample(new(component, member.Id, line.Member, normal,
+                    MixedSupportPoint(prism.NativeFrame, prism, normal), default, cut.Contact), default,
+                    _mixedCapsuleUseCuts[line.Member]);
+                _mixedRegionParents[fragment] = FindMixedRegion(group);
+            }
             for (int support = 0; support < supportCount; support++)
                 if (_mixedSphereGroups[support].Supplier == line.Member
                     && SameMixedCapsulePlane(group, support)
