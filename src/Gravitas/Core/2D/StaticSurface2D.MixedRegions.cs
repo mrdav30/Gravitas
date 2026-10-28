@@ -46,6 +46,7 @@ internal sealed partial class StaticSurface2D
             {
                 MixedRegion a = _mixedRegions[first], b = _mixedRegions[second];
                 if (a.Group != b.Group || FindMixedRegion(first) == FindMixedRegion(second)) continue;
+                if (_mixedMovingFeature != _mixedGroups[a.Group].Feature) SetMixedMovingFeature(_mixedGroups[a.Group].Feature);
                 // One exact plane cannot mix horizontal caps with side faces,
                 // but it can meet another prism only along its vertical edge.
                 bool connected = a.Face < 0

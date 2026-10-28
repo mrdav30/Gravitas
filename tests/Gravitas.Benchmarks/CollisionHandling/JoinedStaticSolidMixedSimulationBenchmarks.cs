@@ -14,7 +14,7 @@ public class JoinedStaticSolidMixedSimulationBenchmarks
     private SolidBody _body;
     private Fixed64 _direction;
 
-    [Params("Box", "Hull", "Sphere", "PointCapsule", "Capsule", "HorizontalCapsule", "Cylinder", "Cone")]
+    [Params("Box", "Hull", "Sphere", "PointCapsule", "Capsule", "HorizontalCapsule", "Cylinder", "Cone", "OpenMesh", "ConcaveMesh")]
     public string Shape { get; set; } = "Box";
 
     [Params("Continuous", "Joined2", "Joined16", "Joined64")]
@@ -60,6 +60,15 @@ public class JoinedStaticSolidMixedSimulationBenchmarks
             "HorizontalCapsule" => CreateRounded(new LSCapsuleCollider { Radius = Fixed64.Half, Size = new(1, 3, 1) }, true),
             "Cylinder" => CreateRounded(new LSCylinderCollider { Radius = Fixed64.Half, Size = new(1, 2, 1) }),
             "Cone" => CreateRounded(new LSConeCollider { Radius = Fixed64.Half, Size = new(1, 2, 1) }),
+            "OpenMesh" => CreateRounded(new LSMeshCollider(new[] { new Vector3d(-Fixed64.Half, Fixed64.Zero, -Fixed64.Half),
+                new(Fixed64.Half, Fixed64.Zero, -Fixed64.Half), new(-Fixed64.Half, Fixed64.Zero, Fixed64.Half),
+                new(Fixed64.Half, Fixed64.Zero, Fixed64.Half) }, new[] { 0, 2, 1, 1, 2, 3 },
+                MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation)),
+            "ConcaveMesh" => CreateRounded(new LSMeshCollider(new[] { new Vector3d(-Fixed64.Half, Fixed64.Zero, -Fixed64.Half),
+                new(Fixed64.Half, Fixed64.Zero, -Fixed64.Half), new(Fixed64.Half, Fixed64.Zero, Fixed64.Zero), Vector3d.Zero,
+                new(Fixed64.Zero, Fixed64.Zero, Fixed64.Half), new(-Fixed64.Half, Fixed64.Zero, Fixed64.Half) },
+                new[] { 0, 3, 1, 1, 3, 2, 0, 5, 3, 3, 5, 4 },
+                MeshColliderMode.Concave, MeshInertiaPolicy.SurfaceApproximation)),
             _ => throw new ArgumentException("Unknown moving shape.", nameof(Shape))
         };
         collider.Material = PhysicsMaterial.Frictionless;
@@ -82,7 +91,7 @@ public class JoinedStaticSolidMixedSimulationBenchmarks
             _body.AddLinearImpulse(Vector3d.Right * (_direction - _body.LinearVelocity.X));
             Step();
             if (_body.LinearVelocity.X != _direction || _body.Position3d.Z <= Fixed64.Zero)
-                throw new InvalidOperationException("A mixed solid wall must preserve tangential motion and block inward penetration.");
+                throw new InvalidOperationException($"A mixed solid wall must preserve tangential motion and block inward penetration: {Shape}/{Layout}, frame {frame}, position {_body.Position3d}, velocity {_body.LinearVelocity}, direction {_direction}.");
         }
     }
 

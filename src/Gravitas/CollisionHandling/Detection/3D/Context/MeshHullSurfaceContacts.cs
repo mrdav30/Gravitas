@@ -144,7 +144,7 @@ internal sealed class MeshHullSurfaceContacts : IConvexHullContactDomain, IScale
         FillPatch(_joined.Members[_member].Collider.Mesh, corners, _points, _triangles, _edges);
     }
 
-    private static void FillPatch(PhysicsMesh mesh, ReadOnlySpan<int> corners, SwiftList<Vector3d> points,
+    internal static void FillPatch(PhysicsMesh mesh, ReadOnlySpan<int> corners, SwiftList<Vector3d> points,
         SwiftList<int> triangles, SwiftList<int> edges)
     {
         points.FastClear(); triangles.FastClear(); edges.FastClear();

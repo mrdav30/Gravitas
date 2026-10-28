@@ -1746,10 +1746,89 @@ than broadening this correctness closeout into speculative tuning.
 
 ### Phase 12 - Open Mesh Movers Against Joined 2D Solids
 
-- [ ] Cover moving open/concave mesh patches through the existing native patch
+- [x] Cover moving open/concave mesh patches through the existing native patch
   owners. Preserve independent disconnected regions and actual finite suppliers.
-- [ ] Complete whole-shape/full-host, mutations, suppliers, coverage, replay,
+- [x] Complete whole-shape/full-host, mutations, suppliers, coverage, replay,
   zero warm allocation/performance and independent review gates.
+
+**Completion, 2026-10-28:** Mixed response reuses Phase 5's native moving-mesh
+inventory: one support per trusted convex coplanar patch, otherwise original
+finite triangles. The existing prism admission, exact depth selection, finite
+suppliers, connected-region reduction and response carriers remain the owners.
+Groups retain moving-feature identity, and connectivity restores that feature's
+geometry before comparing saved regions. No whole-mesh convexification, new
+geometry solver or index was added. Gravitas grows by **65 net runtime lines
+and one runtime partial**; FixedMathSharp is unchanged. Independent geometry
+and ponytail review has no remaining findings.
+
+The small host-loop regression exposed an algorithm switch: after crossing the
+join, a shrinking local neighborhood reverted to ordinary individual-triangle
+contacts and stopped tangential motion. Open/concave movers now keep the same
+native patch inventory on unjoined local members of the declaration. Existing
+single-member declarations and ordinary per-collider queries retain their
+contracts. Closed hulls and other mover families retain their prior fallback.
+Both convex-mode and concave-mode open-sheet regressions failed against the
+committed dispatch before integration.
+
+Thirteen new cases cover winding/retriangulation, disconnected sheets, L-shaped
+and holed missing areas, actual suppliers/materials, compound namespaces and
+offset centers of mass, rigid/affine/rigid chart mutation, deep adaptive search,
+whole-shape touching/one-raw-unit separation, and 256 complete host steps across
+the join in both directions. The old deferred-family cases now assert the
+implemented joined exit while preserving per-member overlap/query identity.
+Pure 3D already uses this native inventory; filled pure 2D has no open-mesh
+mover counterpart. Query/CCD and continuation scope remains Phase 13.
+
+Both target frameworks build without warnings/errors using
+`UseLocalLsfStack=true`. Final raw coverage is:
+
+| Profile | Tests | Sequence points | Branch points | Methods |
+| --- | ---: | ---: | ---: | ---: |
+| Release | 7,873 | 52,525/52,525 | 20,620/20,620 | 5,515/5,515 |
+| ReleaseLean | 7,804 | 52,523/52,523 | 20,620/20,620 | 5,514/5,514 |
+
+All six shared replay expectations agree across local Windows x64 Release/Lean
+captures. Linux/ARM, Unity runtime and released-package validation were not run.
+
+The existing evolving wall benchmark now includes a unit open quad and a
+four-triangle nonconvex L sheet. Each invocation advances 64 full 16-Hz host
+steps, with inward impulse, alternating tangential motion, frozen Y/rotation,
+manual grounding and sleep disabled. Final .NET 10 Release/i7-9700K means,
+16 warmed windows of two invocations each, are:
+
+| Moving sheet | 2 joined members | 16 joined members | 64 joined members |
+| --- | ---: | ---: | ---: |
+| Open quad | 258.83 us/frame | 516.49 us/frame | 2.169 ms/frame |
+| Nonconvex L | 602.37 us/frame | 1.045 ms/frame | 3.628 ms/frame |
+
+All six rows retain tangential motion, block inward travel and allocate **0 B**
+warm. Dense local joins and independent finite triangles have a measurable
+cost; these are bounded contact workloads, not game-capacity or tail-latency
+claims. The former broken joined response is not a speedup denominator.
+
+Ten frozen committed/candidate controls use the same driver and dependencies:
+3D/2D/mixed query batches, 64-agent support, 64-pair 2D response, ordinary native
+mixed steps, and joined box/hull/sphere/horizontal-capsule steps. Normal/reversed
+load orders each contain 24 alternating paired windows, matching physical
+witnesses/checksums before and after timing and requiring zero allocation.
+Combined contrasts range **-2.31% to +0.28%**; order-sensitive differences do
+not establish a repeatable warm regression or universal zero overhead. No new
+performance tradeoff was accepted. Ignored `artifacts/static-surface/phase12/`
+retains red/green tests, source/module hashes, raw coverage, replay captures,
+`native-final.json` and `controls-{normal,reverse}.json`; maintained regressions
+and fixtures make the behavior reproducible without those captures.
+
+An additional ordinary open-mesh/no-membership control confirms a pre-existing
+**4.7 ms/frame** cost on the committed runtime. Normal/reversed paired means
+are 4.682/4.736 ms before/after; a fresh process gives 4.717/4.754 ms. The
+0.74%/1.60%/0.79% contrasts are comparable to an identical-baseline A/A
+comparison's **+1.29%** (4.721/4.782 ms), exposing load-context/code-placement
+variation at this scale. Both payloads use the same driver; review found no
+additional executed ordinary collision work. This does not establish a new
+runtime overhead or prove exact zero overhead. Matching physical witnesses
+and zero allocation hold in every capture. The existing unjoined cost is now
+[GRV-Benchmark-031](benchmark-signal-hardening-backlog.md#grv-benchmark-031--ordinary-open-mesh-mixed-full-step-cost),
+with inputs and a maintained fixture; it is not deferred Phase 12 work.
 
 ### Phase 13 - Continuation, Queries And Continuous Collision
 

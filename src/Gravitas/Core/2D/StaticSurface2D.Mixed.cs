@@ -47,11 +47,11 @@ internal sealed partial class StaticSurface2D : IScaledConvexHullContactDomain
     });
 
     private ReadOnlySpan<Vector3d> MixedMovingPoints => _mixedMoving is LSMeshCollider mesh
-        ? mesh.Mesh.GeometryVertices : _mixedBox;
+        ? _mixedMovingFeature >= 0 ? _mixedPatchPoints.AsReadOnlySpan() : mesh.Mesh.GeometryVertices : _mixedBox;
     private ReadOnlySpan<int> MixedMovingTriangles => _mixedMoving is LSMeshCollider mesh
-        ? mesh.Mesh.Triangles : WideOrientedBox.BoxHullTriangles;
+        ? _mixedMovingFeature >= 0 ? _mixedPatchTriangles.AsReadOnlySpan() : mesh.Mesh.Triangles : WideOrientedBox.BoxHullTriangles;
     private ReadOnlySpan<int> MixedMovingEdges => _mixedMoving is LSMeshCollider mesh
-        ? mesh.Mesh.ConvexSatEdgeVertexPairs : WideOrientedBox.BoxHullEdges;
+        ? _mixedMovingFeature >= 0 ? _mixedPatchEdges.AsReadOnlySpan() : mesh.Mesh.ConvexSatEdgeVertexPairs : WideOrientedBox.BoxHullEdges;
 
     internal bool AppendMixed(LSCollider mover, LSCollider2D overlap, ContactManifold destination,
         int namespace3D, int namespace2D)
@@ -71,6 +71,7 @@ internal sealed partial class StaticSurface2D : IScaledConvexHullContactDomain
                 : ScaledRigidFrame3d.Rigid(mover.Center, mover.Rotation);
             if (mover is LSCuboidCollider box) WideOrientedBox.GetBoxHullVertices(box.OrientedBox.HalfExtents, _mixedBox);
             _mixedRequestedReach = _mixedReach;
+            _mixedMovingFeature = -1;
             if (mover is LSCapsuleCollider capsule && capsule.AxisLength > Fixed64.Zero) BuildMixedCapsule();
             else if (mover is LSSphereCollider or LSCapsuleCollider) BuildMixedSphere();
             else if (mover is LSCylinderCollider or LSConeCollider) BuildMixedCurved();
@@ -86,7 +87,9 @@ internal sealed partial class StaticSurface2D : IScaledConvexHullContactDomain
             break;
         }
         for (int member = 0; member < _mixedLocal.Count; member++)
-            if (_mixedLocal[member] == overlap && !_mixedPrisms[member].Joined)
+            // Keep a mesh's native patch inventory when it leaves the seam's
+            // neighborhood; switching back to individual triangles changes response.
+            if (_mixedLocal[member] == overlap && !_mixedPrisms[member].Joined && _mixedMovingFeature < 0)
                 return CollisionDetectionMixed.AppendManifold(mover, overlap, destination, namespace3D, namespace2D, false);
         if (mover is LSCapsuleCollider supportedCapsule && supportedCapsule.AxisLength > Fixed64.Zero)
             return AppendMixedCapsule(overlap, destination, namespace3D, namespace2D);
@@ -113,7 +116,9 @@ internal sealed partial class StaticSurface2D : IScaledConvexHullContactDomain
                 destination.AddContact(new ContactAnchor(contact.FirstAnchor), new ContactAnchor(contact.SecondAnchor),
                     contact.Depth, contact.Normal, mover.Material, supplier.Material, contact.DepthIsClamped,
                     featureNamespaceA: namespace3D, featureNamespaceB: namespace2D,
-                    group: new ContactGroupKey(namespace3D, namespace2D, region: group, sourceIdB: supplier.Id + 1));
+                    group: new ContactGroupKey(namespace3D, namespace2D,
+                        surfaceA: response.Feature < 0 ? 0 : ((LSMeshCollider)mover).Mesh.GetCanonicalSurfaceOrdinal(response.Feature) + 1,
+                        region: group, sourceIdB: supplier.Id + 1));
             }
         }
         return _mixedOverlaps.Contains(overlap.Id);
@@ -202,6 +207,14 @@ internal sealed partial class StaticSurface2D : IScaledConvexHullContactDomain
     {
         _mixedSamples.FastClear(); _mixedGroups.FastClear(); _mixedOverlaps.Clear();
         _mixedRegions.FastClear(); _mixedRegionParents.FastClear();
+        if (_mixedMoving is LSMeshCollider mesh && (mesh.Mode != MeshColliderMode.Convex || !mesh.Mesh.IsClosedSurface))
+            BuildMixedMesh(mesh.Mesh);
+        else BuildMixedPart();
+        CompleteMixedRegions();
+    }
+
+    private void BuildMixedPart()
+    {
         for (_mixedMember = 0; _mixedMember < _mixedLocal.Count; _mixedMember++)
         {
             MixedPrism prism = _mixedPrisms[_mixedMember];
@@ -210,7 +223,7 @@ internal sealed partial class StaticSurface2D : IScaledConvexHullContactDomain
                 : FindMixedPenetration(prism.NativeFrame, prism, out penetration);
             if (!hit) continue;
             _mixedOverlaps.Add(_mixedLocal[_mixedMember].Id);
-            if (!prism.Joined) { HasMixedReach(penetration); continue; }
+            if (!prism.Joined && _mixedMovingFeature < 0) { HasMixedReach(penetration); continue; }
             if (!AdmitMixedAxis(penetration))
             {
                 if (_mixedRequestedReach > _mixedReach) return;
@@ -222,10 +235,9 @@ internal sealed partial class StaticSurface2D : IScaledConvexHullContactDomain
             _mixedGroup = FindMixedGroup(penetration);
             if (IsMixedFaceAxis(penetration) && HasMixedFaceRegion(_mixedGroup)) continue;
             if (_mixedGroup == _mixedGroups.Count)
-                _mixedGroups.Add(new(_mixedComponents[_mixedMember], _mixedLocal[_mixedMember].Id, penetration));
+                _mixedGroups.Add(new(_mixedComponents[_mixedMember], _mixedLocal[_mixedMember].Id, penetration, _mixedMovingFeature));
             VisitMixed(penetration, false);
         }
-        CompleteMixedRegions();
     }
 
     private bool FindMixedPenetration<TFrame>(in TFrame frame, MixedPrism prism, out WideScaledHullPenetration penetration,
@@ -525,7 +537,8 @@ internal sealed partial class StaticSurface2D : IScaledConvexHullContactDomain
         for (int group = 0; group < _mixedGroups.Count; group++)
         {
             MixedGroup existing = _mixedGroups[group];
-            if (existing.Component == _mixedComponents[_mixedMember] && WideDirection3d.AreParallel(axis, existing.Axis)
+            if (existing.Component == _mixedComponents[_mixedMember] && existing.Feature == _mixedMovingFeature
+                && WideDirection3d.AreParallel(axis, existing.Axis)
                 && WideDirection3d.Dot(axis, existing.Axis).Sign > 0
                 && !existing.Penetration.ShouldReplace(penetration.Overlap, penetration.SquaredAxisLength, penetration.CommonDenominator)
                 && !penetration.ShouldReplace(existing.Penetration.Overlap, existing.Penetration.SquaredAxisLength,
@@ -686,11 +699,11 @@ internal sealed partial class StaticSurface2D : IScaledConvexHullContactDomain
 
     private readonly struct MixedGroup
     {
-        internal readonly int Component, Carrier;
+        internal readonly int Component, Carrier, Feature;
         internal readonly WideScaledHullPenetration Penetration;
         internal WideDirection3d Axis => Penetration.Negate ? -Penetration.Axis : Penetration.Axis;
-        internal MixedGroup(int component, int carrier, WideScaledHullPenetration penetration)
-        { Component = component; Carrier = carrier; Penetration = penetration; }
+        internal MixedGroup(int component, int carrier, WideScaledHullPenetration penetration, int feature)
+        { Component = component; Carrier = carrier; Penetration = penetration; Feature = feature; }
     }
 
     private sealed class MixedPrism

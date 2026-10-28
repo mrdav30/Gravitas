@@ -16,7 +16,7 @@ this backlog.
 ## Intake Rules
 
 - Signal IDs use `GRV-Benchmark-NNN`. The next available ID is
-  `GRV-Benchmark-031`.
+  `GRV-Benchmark-032`.
 - Assign an ID at intake and never reuse it, including after a signal closes or
   moves into a dated plan. Check this file's Git history before advancing or
   repairing the counter.
@@ -37,19 +37,19 @@ this backlog.
 Build the benchmark project before capturing evidence:
 
 ```powershell
-dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net8.0
+dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -f net10.0
 ```
 
 List the continuous-collision evidence rows:
 
 ```powershell
-dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll continuous-collision-evidence --list flat
+dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll continuous-collision-evidence --list flat
 ```
 
 Run the current continuous-collision evidence smoke:
 
 ```powershell
-dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll continuous-collision-evidence --filter "*Evidence*" -j Short -i
+dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll continuous-collision-evidence --filter "*Evidence*" -j Short -i
 ```
 
 After runtime changes, validate the package paths:
@@ -379,6 +379,57 @@ bodyless with explicit-static owners in pure 2D, 3D and mixed mode. Preserve
 host-transform freshness, mutation/filter invalidation, deterministic order and
 zero warm allocation before changing refresh policy. Do not add another index
 or infer that an entire static rebuild can be skipped without that evidence.
+
+### GRV-Benchmark-031 — Ordinary Open-Mesh Mixed Full-Step Cost
+
+**Discovered:** 2026-10-28 during static-continuity Phase 12 validation.  
+**Status:** Measured on the committed pre-phase runtime; attribution open.  
+**Owner:** Gravitas ordinary mixed mesh/prism contact generation and response;
+involve FixedMathSharp after profiling the executed contribution.
+
+`JoinedStaticSolidMixedSimulationBenchmarks`, `Shape=OpenMesh`,
+`Layout=Continuous`, costs about **4.7 ms per complete host step at 0 B/frame**
+on Windows x64/i7-9700K, .NET 10 Release with `UseLocalLsfStack=true`. The
+frozen Gravitas `5e60c61` and Phase 12 candidate use the same benchmark driver
+and FixedMathSharp `8fd9ea7`; both preserve the same position, velocity and
+rotation witnesses before/after 24 alternating paired timing windows. This
+establishes a pre-existing workload cost, not an introduced joined-surface
+regression or a scene-capacity measurement.
+
+Normal/reversed paired means are **4.682/4.736 ms** before/after, and a fresh
+process gives **4.717/4.754 ms**. An identical-baseline A/A control measures
+**4.721/4.782 ms (+1.29%)**, comparable to the 0.74%/1.60%/0.79% contrasts.
+This exposes load-context/code-placement uncertainty; it proves neither new
+runtime overhead nor exact zero overhead. The joined selection branch is not
+executed in this row, and review found no additional ordinary collision work.
+
+The workload is one mass-one, frictionless, open two-triangle X/Z quad with
+local coordinates `X/Z=+-0.5`, concave mode and surface-approximation inertia.
+It starts at `(-2,0,0.5)` against one bodyless rectangle
+`X=[-8,8], Z=[-2,0]`, mixed half-thickness `2`, without continuity membership.
+Use Mixed mode at 16 Hz, zero gravity/air/damping/minimum speed, frozen Y and
+rotation, manual grounding and sleep disabled. Settle 32 full host frames, then
+advance 64 frames per invocation: X velocity alternates `+1/-1` at `X=+-2`,
+with inward Z impulse `-1/16` before every `Simulate`/`LateSimulate` step.
+Initialization and settling are outside the warmed window.
+
+The maintained fixture includes the ordinary row and native joined controls:
+
+```powershell
+$env:UseLocalLsfStack = 'true'
+dotnet build tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -p:UseLocalLsfStack=true -m:1
+dotnet tests/Gravitas.Benchmarks/bin/Release/net10.0/Gravitas.Benchmarks.dll --filter '*JoinedStaticSolidMixedSimulationBenchmarks*' --job short --warmupCount 3 --iterationCount 5
+```
+
+**Next isolation:** Profile the ordinary `AppendMeshEmbedded2D` path, separating
+native patch selection, finite witnesses and response. Check whether existing
+trusted convex-patch inventory removes repeated triangle work without changing
+finite suppliers, nonconvex holes, exposed edges, per-member query/event
+identity or deterministic ordering. Check 3D parity through its existing owner;
+do not add a second contact solver or infer identical response from timing.
+Supplemental paired windows and loaded-module hashes are retained in ignored
+`artifacts/static-surface/phase12/ordinary-openmesh*.json`; the inputs above
+and maintained fixture are sufficient to reproduce the workload.
 
 ## Experimental Signals
 

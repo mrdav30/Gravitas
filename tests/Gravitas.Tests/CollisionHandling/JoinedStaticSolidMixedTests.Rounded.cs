@@ -509,7 +509,7 @@ public sealed partial class JoinedStaticSolidMixedTests
     [Theory]
     [InlineData("OpenHull")]
     [InlineData("OpenPatch")]
-    public void DeferredOpenMeshFamilies_ShouldPreserveTheirExistingPerMemberContact(string shape)
+    public void OpenMeshFamilies_ShouldPreserveMemberOverlapAndSelectTheJoinedExit(string shape)
     {
         using var scene = PhysicsScenarioBuilder.Create(); Configure(scene.Context);
         var members = new[] { Rectangle(scene, -4, 0, -2, 0, Fixed64.Two), Rectangle(scene, 0, 4, -2, 0, Fixed64.Two) };
@@ -530,9 +530,16 @@ public sealed partial class JoinedStaticSolidMixedTests
         {
             Assert.Equal(expected[index].Hit, CollisionDetectionMixed.TryBuildDiscreteManifold(mover, members[index], ordinary));
             if (!expected[index].Hit) continue;
+            Assert.True(CollisionDetectionMixed.TryBuildManifold(mover, members[index], ordinary));
             Assert.Equal(expected[index].Row.Normal, ordinary.PrimaryContact.Normal);
             Assert.Equal(expected[index].Row.Depth, ordinary.PrimaryContact.Depth);
         }
+        foreach (var sample in Rows(mover, members))
+        {
+            Assert.Equal(Vector3d.Backward, sample.Row.Normal);
+            Assert.Equal(7 * Fixed64.Quarter, sample.Row.Depth);
+        }
+        AssertWholeShapeExit(mover, members, new(-Fixed64.Quarter, Fixed64.Zero, Fixed64.Two), Vector3d.Forward);
     }
 
     [Theory]
