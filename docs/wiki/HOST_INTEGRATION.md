@@ -319,6 +319,52 @@ deactivation or context reset, during an open fixed-step transaction, and from
 simulation callbacks. Ragdoll role changes use their atomic runtime operation
 rather than transitioning links individually.
 
+### Continuous Static Surfaces
+
+Declare continuity explicitly after registering the colliders. Use
+`context.Physics.CreateStaticSurface(ReadOnlySpan<LSMeshCollider>)` for 3D
+meshes using triangle-surface mode (`MeshColliderMode.Concave`), or
+`context.Physics2D.CreateStaticSurface(ReadOnlySpan<LSCollider2D>)` for 2D AABB
+and convex polygon pieces:
+
+```csharp
+// Each piece is already active and registered with this context.
+using StaticSurface floor = context.Physics.CreateStaticSurface(
+    new LSMeshCollider[] { leftMesh, rightMesh });
+using StaticSurface2D wall = context.Physics2D.CreateStaticSurface(
+    new LSCollider2D[] { leftPiece, rightPiece });
+
+// Replace the complete declaration when streaming pieces between fixed steps.
+floor.ReplaceMembers(new LSMeshCollider[] { rightMesh, nextMesh });
+```
+
+`Concave` names the collision policy, not a requirement that the geometry be
+nonconvex. A flat convex panel or closed convex-shaped shell can use this mode.
+Closed shells retain triangle-surface behavior rather than filled convex-volume
+behavior; see [mesh modes and closed topology](COLLIDER_SHAPE_REFERENCE.md#mesh-policy).
+
+Members must be distinct, independent colliders in the owning context, either
+bodyless or owned by explicit static bodies. A collider belongs to at most one
+surface. Dynamic and kinematic bodies, compound parts, convex 3D mesh volumes,
+and 2D circles or capsules are not eligible members. The handle declares which
+pieces may join; geometric validation decides which boundary spans actually do.
+See [continuous static surface geometry](COLLISION_PIPELINE.md#continuous-static-surfaces)
+for exact joins, genuine edges, materials, and deep-placement limits.
+
+Create, replace, load membership, and dispose only between complete fixed steps,
+after `LateSimulate()` and before the next `Simulate()`. `ReplaceMembers(...)`
+publishes the complete candidate set atomically; invalid membership leaves the
+previous declaration usable. Empty membership is allowed, so a host can retain
+the handle while all pieces are streamed out. Geometry and filtering changes
+invalidate dependent contacts and support; moving a piece can open a real gap.
+
+Deactivating or unregistering a member, or changing it away from static ownership,
+removes its membership. Reactivation requires an explicit declaration again.
+`Dispose()` removes the declaration without deactivating its colliders; repeated
+disposal is harmless. Context reset or disposal invalidates every owned surface
+handle. Create a new handle for the new context lifetime. Restore uses
+[host-created handles and typed collider links](SERIALIZATION.md#static-surface-membership).
+
 ### Runtime mass changes
 
 Assign `SolidBody.Mass` or `SolidBody2D.Mass` between complete fixed steps. An

@@ -5,7 +5,7 @@ resolutions or documented investigation closures.
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-147`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-148`.
 - Assign an ID when an issue enters this tracker and preserve it through
   closure; never delete or reuse it. Check Git history before advancing or
   repairing the counter. Unknown historical IDs stay reserved rather than
@@ -121,96 +121,43 @@ resolutions or documented investigation closures.
   Do not broaden #143's completed-query contract into an unmeasured reset
   rewrite.
 
-### GRV-Issue-133 - Adjacent mesh collider rims alter frictionless seam-crossing response
+### GRV-Issue-147 - Closed convex mesh containment is missed for cylinders
 
-- **Confirmed:** 2026-10-15 during supported-geometry terrain migration checks.
-- **Reproduction:** Split a flat `16 x 8` floor at X=0 into two explicit static
-  mesh bodies, retaining exactly the same four global triangles as the single
-  mesh control. Set gravity `1`, frame rate `16`, frictionless materials, no
-  damping/air drag and frozen dynamic rotation. Settle a radius-`0.5` sphere or
-  radius-`0.5`, height-`2` capsule for 32 full frames at X=-2, then apply unit
-  rightward impulse and advance 64 full frames. The continuous control retains
-  unit horizontal speed; the chunked scene first loses speed at crossing frame
-  30, despite no friction. Its two independent mesh pairs expose finite rims
-  that the single mesh reduces as covered internal boundaries.
-- **Boundary:** Distinct collider/pair/event/query identities are expected.
-  Horizontal blocking from an artificial seam in otherwise identical flat
-  terrain is the physical-quality defect; chunking is not currently equivalent
-  to a continuous surface. Both representations are individually well inside the
-  geometry budget. The query control retains the same physical hit and reports
-  the two collider identities correctly.
-- **Pre-existing evidence:** The complete repeated trajectories and ordered
-  events are byte-identical on accepted pre-admission core `BE9347C7` and final
-  core `9C284E89`. Geometry admission did not create the response difference.
-  Ignored `artifacts/geometry-range/phase4/terrain-{original,candidate}.json`
-  and `terrain-comparison.json` retain all cases, repeats and runtime hashes.
-- **Follow-up:** Evaluate explicit cross-collider surface continuity ownership
-  before selecting a fix. Preserve real finite rims, holes, disconnected
-  geometry, deterministic pair identity and existing independent-body behavior.
-  Check sphere/capsule equivalence, whole-shape clearance, 2D/mixed
-  counterparts, CCD, support/grounding and response with matching seam/interior
-  cost controls. Do not indiscriminately weld neighboring colliders or erase
-  real boundaries.
-- **Current-stack investigation (2026-10-16):** On retained #138 core
-  `8A7E5C4D`, all repeated sphere/capsule cases reproduce the original loss,
-  including bodyless floors now given the same 32 settling frames as static
-  bodies. Maximum X-speed loss is `0.024248116184026003`; final X is
-  `1.9498989908024669`, versus `2` continuously. Independent review confirms the
-  boundary also affects face sampling/torque; filtering response normals alone
-  is incomplete. Mixed finite-slab contacts and CCD certification share the
-  single-mesh limitation. Repeated mixed runtime probes now confirm both
-  directions: planar circle/capsule movers against a split vertical 3D sheet
-  lose speed at frame 30 and stall or cross through the sheet; sphere/capsule
-  movers against adjoining embedded 2D slabs stop at X=-0.5 at frame 23.
-  Continuous controls finish at X=2 with unit X velocity. Bodyless and
-  explicit-static floors agree; this remains part of #133/#139, not a new issue.
-  Ignored `artifacts/grv-issue-133/original-settled-terrain.json` and `perf/`
-  preserve the repeated traces and frozen eight-module baseline. The 16-case
-  mixed probe repeats each trajectory and its independent rerun matches the
-  complete payload byte-for-byte in `mixed-baseline/{results,root-rerun}.json`.
-  Its contact rows are fresh post-step narrow-phase inspections, not retained
-  solver-manifold captures.
-- **Related feature work:** The
-  [Static Surface Continuity And Heightfield Integration plan](2026-10-15-static-surface-continuity-and-heightfield-plan.md)
-  now begins with the approved combined #133/#139 scope. Generic continuity
-  remains these issues' responsibility; later heightfield/index work stays
-  deferred and must reuse that foundation rather than delay or duplicate it.
-
-### GRV-Issue-139 - Adjacent 2D convex pieces introduce frictionless join resistance
-
-- **Confirmed:** 2026-10-16 during #133's dimensional parity investigation;
-  reproduces on the unchanged retained #138 stack, before any continuity
-  changes.
-- **Reproduction:** At 16 Hz and planar gravity `1`, settle a radius-`0.5`
-  circle or radius-`0.5`, height-`2` capsule for 32 full frames on either one
-  floor or two exactly adjoining bodyless AABBs/convex polygons. Use
-  frictionless materials, frozen rotation, manual grounding mode with no
-  accepted ground flag (automatic ground queries disabled), and no ambient
-  dissipation; apply unit rightward impulse at X=-2 and advance 64 full frames.
-- **Observed:** All four split shape combinations first lose speed at frame 30,
-  finishing at X `1.9501529859844595`, velocity `0.9758317500818521`. Continuous
-  controls retain velocity `1` and finish at X `2`. All eight cases repeat
-  byte-identically; circle/capsule and AABB/polygon horizontal behavior agree.
-- **Ownership:** Each convex owner independently emits its finite corner
-  contact. There is no pure 2D mesh type or declared shared-boundary domain.
-  This is the same physical-quality problem as #133, with a different
-  dimensional geometry owner; it is not caused by the new proposed continuity
-  implementation. The mixed counterpart also reproduces with these pieces
-  embedded as slabs: a 3D sphere/capsule stops at the shared border while the
-  continuous control retains unit speed. Preserve actual host Y and slab
-  thickness when validating continuity; planar adjacency alone does not remove a
-  real embedded step.
-- **Resolution direction:** Implement the explicit static-continuity contract
-  with #133 in the existing
-  [surface plan](2026-10-15-static-surface-continuity-and-heightfield-plan.md#generic-continuity-contract-proposed-for-133139).
-  Preserve true convex/concave boundaries, eligibility, materials, events and
-  independent bodies; do not auto-weld touching colliders or add a 2D mesh API.
-  Validate full-loop response, free rotation, whole-shape clearance, grounding,
-  CCD, lifetime changes, replay, coverage and the ordinary warm baseline.
-- **Evidence:** Ignored
-  `artifacts/grv-issue-133/parity/{original,binding,source-hashes}.json` retain
-  the fixture, repeats and eight loaded-module hashes, including core
-  `8A7E5C4D`. No production changes or fix are claimed by this investigation.
+- **Recorded:** 2026-10-29. **Priority:** P2. **Owner:** ordinary 3D closed-convex
+  mesh/cylinder narrow phase.
+- **Verified on:** Frozen Gravitas `9175653` and the Phase 14 public-API candidate
+  based on `2ee3af9`, Windows x64/.NET 10 Release. No static-surface declaration
+  is involved. This predates the documentation clarification and Phase 13/14.
+- **Reproducer:** Use pure 3D at 16 Hz, grid `[-8,8]` on every axis, zero gravity,
+  air density, damping and minimum speed. Register a bodyless unit-transform
+  `LSMeshCollider` in `MeshColliderMode.Convex`: take the cube vertices/indices
+  from `MeshTestFixtures.CreateConvexCube` and multiply its authored vertex
+  coordinates by two, giving bounds `[-1,1]` on every axis. Place a mass-one
+  dynamic cylinder at the origin, radius `0.25`, height `0.5`, frozen rotation,
+  sleep disabled and manual grounding. Advance `Simulate` plus `LateSimulate`.
+- **Observed:** The cylinder remains at raw position `(0,0,0)`, wholly within
+  the filled convex hull. An otherwise identical radius-0.25 sphere receives
+  response and moves to raw `(0,0,-4260607622)`. Exterior controls starting at
+  X=`1.125`, Y=Z=0 receive wall response for both shapes, ending at raw
+  `(5226975206,0,0)`. The original/current captures agree exactly.
+- **Cause:** `DoMeshCylinderCheck` unconditionally uses
+  `MeshTriangleContactGenerator.TryBuildMeshCylinderManifold`; that owner gathers
+  only triangles intersecting the cylinder bounds and has no closed-convex
+  volume fallback. The enclosed cylinder reaches no wall triangles. Sphere
+  dispatch explicitly selects whole-hull volume contact for closed `Convex`
+  meshes. Concave-mode closed-shell behavior is a different, intentional policy.
+- **Impact:** Initial cylinder containment in a closed convex mesh receives no
+  discrete response. No claim of observed sweep tunneling or mixed-mode failure
+  is made by this reproduction.
+- **Next action:** Add the contained/exterior controls as production regressions;
+  establish filled-volume cylinder/hull contact through the appropriate existing
+  math/physics owners. Preserve open/Concave surface semantics, exact witnesses,
+  reversed order, transformed whole-shape checks and warm performance; audit
+  corresponding mixed/query behavior before extending the claimed defect.
+- **Evidence:** Supplemental public host-loop controls and original/current logs
+  are under `artifacts/static-surface/mode-clarification/cylinder-control/`.
+  Reproduction inputs above and the maintained cube fixture are sufficient
+  without those temporary files.
 
 ### GRV-Issue-111 - Local-stack benchmark hosts can omit FixedMathSharp compile references
 
@@ -297,16 +244,18 @@ to focused records.
 
 | Issue                                                                                                                                                                                           | Resolved/closed | Outcome                                                                                                                                                                                                                                                                                               | Evidence                                                                                                                                                                                                                                                                                                                                         |
 | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| <a id="grv-issue-146---joined-mixed-capsule-contacts-can-eject-a-body-along-an-unrelated-axis"></a>GRV-Issue-146                                                                                | 2026-10-28      | Fixed: Choose coherent exact native/finite-cut responses for capsules, spheres and zero-core capsules; retain independent regions, actual suppliers, overlap events and selected-only recovery. The small measured warm correctness cost was explicitly accepted.                                     | [Closeout](2026-10-15-static-surface-continuity-and-heightfield-plan.md#grv-issue-146-closeout)                                                                                                                                                                                                                                                  |
+| <a id="grv-issue-146---joined-mixed-capsule-contacts-can-eject-a-body-along-an-unrelated-axis"></a>GRV-Issue-146                                                                                | 2026-10-28      | Fixed: Choose coherent exact native/finite-cut responses for capsules, spheres and zero-core capsules; retain independent regions, actual suppliers, overlap events and selected-only recovery. The small measured warm correctness cost was explicitly accepted.                                     | [Closeout](done/2026-10-15-static-surface-continuity-and-heightfield-plan.md#grv-issue-146-closeout)                                                                                                                                                                                                                                                  |
 | <a id="grv-issue-143---completed-3d-queries-retain-their-last-excluded-collider"></a><a id="grv-issue-143---query-services-retain-retired-colliders-through-reusable-scratch"></a>GRV-Issue-143 | 2026-10-26      | Fixed: Released query source/exclusion, 2D/mixed candidates, all-dimensional batch-hit and 3D trace references at completion/reset, including exceptions. Replacing outputs releases prior hits without hidden tails; current caller results, batch preparation, counters and capacity remain intact. | [Buffer lifetime regressions](../../tests/Gravitas.Tests/Queries/QueryBufferLifetimeTests.cs), [source lifetime regressions](../../tests/Gravitas.Tests/Queries/QuerySourceLifetimeTests.cs): 48 GC/ownership cases; exact full coverage, unchanged replay and zero warm allocation. Detailed validation follows Phase 8 in the continuity plan. |
 | <a id="grv-issue-142---single-mesh-cylinder-response-can-select-a-covered-triangle-diagonal"></a>GRV-Issue-142                                                                                  | 2026-10-19      | Fixed: Reused exact filled-surface cylinder reduction for trusted patches, rejecting covered diagonals while preserving real perimeters, independent surfaces and isolated-triangle behavior.                                                                                                         | [Closeout](https://github.com/mrdav30/Gravitas/blob/071b25ac2b758f6c1992a769e0713ed27b2c34dc/docs/feature-work/issue-tracker.md#grv-issue-142---single-mesh-cylinder-response-can-select-a-covered-triangle-diagonal)                                                                                                                            |
 | <a id="grv-issue-141---recentered-rotated-mesh-pieces-lose-exact-authored-shared-vertices"></a>GRV-Issue-141                                                                                    | 2026-10-18      | Fixed: Preserved exact authored mesh frames across collision, queries, CCD, bounds and mass; the documented ordinary-contact cost was explicitly accepted.                                                                                                                                            | [Closeout](https://github.com/mrdav30/Gravitas/blob/071b25ac2b758f6c1992a769e0713ed27b2c34dc/docs/feature-work/issue-tracker.md#grv-issue-141---recentered-rotated-mesh-pieces-lose-exact-authored-shared-vertices)                                                                                                                              |
 | <a id="grv-issue-140---convex-2d-single-contacts-discard-finite-witnesses-consumed-by-shape-sweeps"></a>GRV-Issue-140                                                                           | 2026-10-18      | Fixed: Reused paired finite manifold anchors in 2D single contacts and shape sweeps, preserving classification, normals, depths and deterministic order.                                                                                                                                              | [Closeout](https://github.com/mrdav30/Gravitas/blob/071b25ac2b758f6c1992a769e0713ed27b2c34dc/docs/feature-work/issue-tracker.md#grv-issue-140---convex-2d-single-contacts-discard-finite-witnesses-consumed-by-shape-sweeps)                                                                                                                     |
+| <a id="grv-issue-139---adjacent-2d-convex-pieces-introduce-frictionless-join-resistance"></a>GRV-Issue-139 | 2026-10-29 | Fixed: Public StaticSurface2D joins exact filled-piece boundaries through pure/mixed response and CCD, with independent events/materials, certified recovery and transactional restore. Undeclared pieces remain independent. | [Closeout](done/2026-10-15-static-surface-continuity-and-heightfield-plan.md#phase-14-closeout) |
 | <a id="grv-issue-138---explicit-drag-and-angular-damping-can-reverse-motion-and-add-energy"></a>GRV-Issue-138                                                                                   | 2026-10-16      | Fixed: Bounded drag at rest and damping at its tensor-aware energy minimum after driving inputs; dissipative guarantees require nonnegative coefficients.                                                                                                                                             | [Closeout](https://github.com/mrdav30/Gravitas/blob/071b25ac2b758f6c1992a769e0713ed27b2c34dc/docs/feature-work/issue-tracker.md#grv-issue-138---explicit-drag-and-angular-damping-can-reverse-motion-and-add-energy)                                                                                                                             |
 | <a id="grv-issue-137---angular-ground-friction-can-reverse-rotation-and-add-energy"></a>GRV-Issue-137                                                                                           | 2026-10-16      | Fixed: Bounded grounded linear/angular friction after driving inputs, preventing reversal and energy injection while preserving constrained anisotropic residual spin.                                                                                                                                | [Closeout](https://github.com/mrdav30/Gravitas/blob/071b25ac2b758f6c1992a769e0713ed27b2c34dc/docs/feature-work/issue-tracker.md#grv-issue-137---angular-ground-friction-can-reverse-rotation-and-add-energy)                                                                                                                                     |
 | <a id="grv-issue-136---query-only-automatic-grounding-can-retain-an-unsupported-sleeping-body"></a>GRV-Issue-136                                                                                | 2026-10-15      | Fixed: Validated cached query-only support before skipping sleeping motion, waking on lost/changed witnesses while preserving callback ownership and accepting the shared measured cost.                                                                                                              | [Closeout](https://github.com/mrdav30/Gravitas/blob/071b25ac2b758f6c1992a769e0713ed27b2c34dc/docs/feature-work/issue-tracker.md#grv-issue-136---query-only-automatic-grounding-can-retain-an-unsupported-sleeping-body)                                                                                                                          |
 | <a id="grv-issue-135---sleeping-dynamic-bodies-can-remain-suspended-after-static-support-disappears"></a>GRV-Issue-135                                                                          | 2026-10-15      | Fixed: Woke sleeping bodies when established physical support dependencies changed or vanished, preserving legitimate sleep; the measured correctness cost was accepted.                                                                                                                              | [Closeout](https://github.com/mrdav30/Gravitas/blob/071b25ac2b758f6c1992a769e0713ed27b2c34dc/docs/feature-work/issue-tracker.md#grv-issue-135---sleeping-dynamic-bodies-can-remain-suspended-after-static-support-disappears)                                                                                                                    |
 | <a id="grv-issue-134---untouched-3d-pairs-retain-stale-contact-notifications-after-separation"></a>GRV-Issue-134                                                                                | 2026-10-15      | Fixed: Revalidated stale contacts and delivered separation after culled checks; late-step tokens also repair late-only 2D/mixed cleanup without replay-clock changes.                                                                                                                                 | [Closeout](https://github.com/mrdav30/Gravitas/blob/071b25ac2b758f6c1992a769e0713ed27b2c34dc/docs/feature-work/issue-tracker.md#grv-issue-134---untouched-3d-pairs-retain-stale-contact-notifications-after-separation)                                                                                                                          |
+| <a id="grv-issue-133---adjacent-mesh-collider-rims-alter-frictionless-seam-crossing-response"></a>GRV-Issue-133 | 2026-10-29 | Fixed: Public StaticSurface removes artificial rims only across declared exact eligible mesh joins. Native response/CCD preserve finite boundaries, actual suppliers and member identity; lifecycle, replay and restore are verified. | [Closeout](done/2026-10-15-static-surface-continuity-and-heightfield-plan.md#phase-14-closeout) |
 | <a id="grv-issue-132---bodyless-3d-static-geometry-does-not-receive-discrete-blocking-response"></a>GRV-Issue-132                                                                               | 2026-10-15      | Fixed: Enabled discrete response against bodyless 3D geometry using existing immobile-endpoint impulse math, while keeping unrelated dynamic islands separate.                                                                                                                                        | [Closeout](https://github.com/mrdav30/Gravitas/blob/071b25ac2b758f6c1992a769e0713ed27b2c34dc/docs/feature-work/issue-tracker.md#grv-issue-132---bodyless-3d-static-geometry-does-not-receive-discrete-blocking-response)                                                                                                                         |
 | <a id="grv-issue-131---generic-3d-cylinder-sweep-reports-early-entry-at-supported-scale"></a>GRV-Issue-131                                                                                      | 2026-10-15      | Fixed: Certified 3D GJK tetrahedra and convergence with exact signs/gaps, correcting cylinder sweep entry and normals within the existing contact tolerance.                                                                                                                                          | [Closeout](https://github.com/mrdav30/Gravitas/blob/071b25ac2b758f6c1992a769e0713ed27b2c34dc/docs/feature-work/issue-tracker.md#grv-issue-131---generic-3d-cylinder-sweep-reports-early-entry-at-supported-scale)                                                                                                                                |
 | <a id="grv-issue-130---rotated-body-attachments-can-under-enclose-the-published-ccd-proxy"></a>GRV-Issue-130                                                                                    | 2026-10-14      | Fixed: Published rotation-independent pivot enclosures accounting for rounded attachments and vertices, repairing CCD proxy non-enclosure without claiming previously missed collisions.                                                                                                              | [Closeout](https://github.com/mrdav30/Gravitas/blob/071b25ac2b758f6c1992a769e0713ed27b2c34dc/docs/feature-work/issue-tracker.md#grv-issue-130---rotated-body-attachments-can-under-enclose-the-published-ccd-proxy)                                                                                                                              |

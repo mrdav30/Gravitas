@@ -4,7 +4,7 @@
 
 **Completed:** 2026-10-18. **GRV-Issue-141 is resolved**, clearing its prerequisite
 for Phase 6 of the
-[static-surface continuity plan](../2026-10-15-static-surface-continuity-and-heightfield-plan.md).
+[static-surface continuity plan](2026-10-15-static-surface-continuity-and-heightfield-plan.md).
 The defect is reproduced on committed Gravitas `0662abef6d342ca074b2865990eb96f1161e7983`.
 Implementation, consumer migration, final simplification and independent reviews
 are complete. On 2026-10-18 the user explicitly accepted the measured 4-11%

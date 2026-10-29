@@ -26,6 +26,9 @@ renderer-neutral diagnostics.
 - **A complete collision stack.** Build with primitives, convex and concave
   meshes, compounds, materials, manifolds, response islands, CCD, joints, and
   ragdolls.
+- **Continuous static environments.** Declare exact continuity between bounded
+  mesh or planar pieces while retaining collider identities, materials and
+  spatial partitions. See [static surfaces](docs/wiki/HOST_INTEGRATION.md#continuous-static-surfaces).
 - **No engine lock-in.** Hosts provide transforms and lifecycle calls through a
   small adapter boundary; Gravitas owns no renderer, scene graph, or ECS.
 - **Tools without hidden state.** Context-local queries, replay hashes,

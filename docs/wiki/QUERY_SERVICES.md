@@ -229,6 +229,18 @@ Compounds retain their existing reduction: equal-distance part hits keep the
 first authored part and report the compound owner. Closest and all-hit query
 ordering across colliders still uses distance, then collider ID.
 
+## Continuous Static Surface Queries
+
+[Static-surface membership](HOST_INTEGRATION.md#continuous-static-surfaces)
+preserves each member as a separate query target. All-hit queries can report
+several members of one surface; closest-hit ordering still uses the ordinary
+distance and collider identity rules. Membership does not merge hits or fill
+holes, and an initially overlapping sweep still reports zero travel distance.
+Physical CCD admission uses the
+[validated finite surface domain](COLLISION_PIPELINE.md#continuous-static-surfaces)
+to distinguish covered joins from real rims. Query-grounded bodies invalidate
+dependent support when membership, geometry, or eligibility changes.
+
 ## Common Usage
 
 ```csharp

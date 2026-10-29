@@ -15,9 +15,17 @@ using System;
 
 namespace Gravitas;
 
-/// <summary>Internal mesh continuity declaration with shared response, continuation and membership.</summary>
+/// <summary>Declares continuity between registered static meshes using triangle-surface collision in one context.</summary>
+/// <remarks>
+/// Exact shared boundary spans participate in one physical surface while members
+/// retain their collider identities, materials, queries and overlap events.
+/// Members require <see cref="MeshColliderMode.Concave"/>; their geometry may be
+/// convex or closed, but a closed shell is not treated as a filled convex volume.
+/// Create declarations through <see cref="GravitasPhysicsService.CreateStaticSurface"/>.
+/// Context reset or disposal ends the declaration's lifetime.
+/// </remarks>
 /// <content>Owns declared member lifetime and cached finite response families.</content>
-internal sealed partial class StaticSurface : IDisposable, Chronicler.IRecordable
+public sealed partial class StaticSurface : IDisposable, Chronicler.IRecordable
 {
     private readonly GravitasWorldContext _context;
     private LSMeshCollider[] _members = Array.Empty<LSMeshCollider>();
@@ -54,7 +62,17 @@ internal sealed partial class StaticSurface : IDisposable, Chronicler.IRecordabl
         ReplaceMembers(members);
     }
 
-    internal void ReplaceMembers(ReadOnlySpan<LSMeshCollider> members)
+    /// <summary>Atomically replaces the registered members of this declaration.</summary>
+    /// <param name="members">Distinct active meshes in <see cref="MeshColliderMode.Concave"/> with bodyless or explicit-static ownership in this context. May be empty.</param>
+    /// <remarks>
+    /// Call between complete fixed steps. Rejection preserves the previous membership.
+    /// Membership permits exact joining; disconnected pieces retain their boundaries.
+    /// Deactivated members must be explicitly added again after reinitialization.
+    /// </remarks>
+    /// <exception cref="ArgumentException">A member is ineligible or belongs to another declaration.</exception>
+    /// <exception cref="ObjectDisposedException">This declaration or its context has ended.</exception>
+    /// <exception cref="InvalidOperationException">A fixed step is in progress.</exception>
+    public void ReplaceMembers(ReadOnlySpan<LSMeshCollider> members)
     {
         _context.ThrowIfDisposed();
         _context.ThrowIfFixedStepMutationNotAllowed();
@@ -278,6 +296,9 @@ internal sealed partial class StaticSurface : IDisposable, Chronicler.IRecordabl
         _facesCurrent = true;
     }
 
+    /// <summary>Ends this declaration and restores independent member response.</summary>
+    /// <remarks>Call between complete fixed steps. Members remain registered. Repeated disposal is harmless.</remarks>
+    /// <exception cref="InvalidOperationException">A fixed step is in progress.</exception>
     public void Dispose()
     {
         if (_disposed) return;

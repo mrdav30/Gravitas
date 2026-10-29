@@ -9,7 +9,7 @@ using System;
 namespace Gravitas;
 
 /// <content>Visits native moving mesh patches without filling concavities or holes.</content>
-internal sealed partial class StaticSurface2D
+public sealed partial class StaticSurface2D
 {
     private readonly SwiftList<Vector3d> _mixedPatchPoints = new();
     private readonly SwiftList<int> _mixedPatchTriangles = new(), _mixedPatchEdges = new();

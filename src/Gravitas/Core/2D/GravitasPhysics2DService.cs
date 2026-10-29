@@ -184,7 +184,14 @@ public sealed partial class GravitasPhysics2DService
         }
     }
 
-    internal StaticSurface2D CreateStaticSurface(System.ReadOnlySpan<LSCollider2D> members)
+    /// <summary>Creates a context-owned continuity declaration for static filled planar pieces.</summary>
+    /// <param name="members">Distinct active bodyless or explicit-static AABB or convex polygon colliders registered in this context. May be empty.</param>
+    /// <returns>A declaration that retains each member's collider identity and joins only exact shared boundary spans.</returns>
+    /// <remarks>Call between complete fixed steps. Compound roots/leaves are ineligible. Context reset or disposal expires the returned handle.</remarks>
+    /// <exception cref="System.ArgumentException">A member is ineligible or already belongs to a declaration.</exception>
+    /// <exception cref="System.ObjectDisposedException">The context has ended.</exception>
+    /// <exception cref="System.InvalidOperationException">A fixed step is in progress.</exception>
+    public StaticSurface2D CreateStaticSurface(System.ReadOnlySpan<LSCollider2D> members)
     {
         var surface = new StaticSurface2D(_context, members);
         _staticSurfaces.Add(surface);

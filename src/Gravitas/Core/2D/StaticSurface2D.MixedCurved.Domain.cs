@@ -10,7 +10,7 @@ using SwiftCollections;
 namespace Gravitas;
 
 /// <content>Reuses prepared native boundary strata and their exact incident support fans.</content>
-internal sealed partial class StaticSurface2D
+public sealed partial class StaticSurface2D
 {
     private readonly SwiftList<MixedCurvedDomain> _mixedCurvedDomains = new();
     private readonly SwiftList<RationalSegmentInterval> _mixedCurvedCuts = new();

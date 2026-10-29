@@ -22,5 +22,11 @@ public enum MeshColliderMode : byte
     /// Mesh may contain arbitrary open or closed triangle surfaces and is treated as
     /// authored triangle collision data rather than a support-mapped convex hull.
     /// </summary>
+    /// <remarks>
+    /// The geometry may itself be convex. Closed topology does not give this mode
+    /// filled-volume collision semantics: a shape wholly inside a shell can be
+    /// clear of every triangle. <see cref="LSMeshCollider.IsClosedSurface"/> describes
+    /// topology independently of this collision policy.
+    /// </remarks>
     Concave
 }

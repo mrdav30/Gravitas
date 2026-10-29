@@ -13,9 +13,16 @@ using System;
 
 namespace Gravitas;
 
-/// <summary>Internal filled-planar continuity declaration with shared response, continuation and membership.</summary>
+/// <summary>Declares continuity between registered static AABB or convex polygon colliders in one context.</summary>
+/// <remarks>
+/// Exact shared boundary spans participate in one filled planar surface while members
+/// retain their collider identities, materials, queries and overlap events.
+/// Mixed contacts also preserve each member's finite embedded height and thickness.
+/// Create declarations through <see cref="GravitasPhysics2DService.CreateStaticSurface"/>.
+/// Context reset or disposal ends the declaration's lifetime.
+/// </remarks>
 /// <content>Owns typed member lifetime, transactional replacement and contact invalidation.</content>
-internal sealed partial class StaticSurface2D : IDisposable, Chronicler.IRecordable
+public sealed partial class StaticSurface2D : IDisposable, Chronicler.IRecordable
 {
     private readonly GravitasWorldContext _context;
     private LSCollider2D[] _members = Array.Empty<LSCollider2D>();
@@ -35,7 +42,17 @@ internal sealed partial class StaticSurface2D : IDisposable, Chronicler.IRecorda
         ReplaceMembers(members);
     }
 
-    internal void ReplaceMembers(ReadOnlySpan<LSCollider2D> members)
+    /// <summary>Atomically replaces the registered members of this declaration.</summary>
+    /// <param name="members">Distinct active AABB or convex polygon colliders with bodyless or explicit-static ownership in this context. May be empty.</param>
+    /// <remarks>
+    /// Call between complete fixed steps. Compound roots and leaves are ineligible.
+    /// Rejection preserves the previous membership; disconnected pieces retain their boundaries.
+    /// Deactivated members must be explicitly added again after reinitialization.
+    /// </remarks>
+    /// <exception cref="ArgumentException">A member is ineligible or belongs to another declaration.</exception>
+    /// <exception cref="ObjectDisposedException">This declaration or its context has ended.</exception>
+    /// <exception cref="InvalidOperationException">A fixed step is in progress.</exception>
+    public void ReplaceMembers(ReadOnlySpan<LSCollider2D> members)
     {
         _context.ThrowIfDisposed();
         _context.ThrowIfFixedStepMutationNotAllowed();
@@ -113,6 +130,9 @@ internal sealed partial class StaticSurface2D : IDisposable, Chronicler.IRecorda
         Array.Resize(ref _memberBounds, _members.Length);
     }
 
+    /// <summary>Ends this declaration and restores independent member response.</summary>
+    /// <remarks>Call between complete fixed steps. Members remain registered. Repeated disposal is harmless.</remarks>
+    /// <exception cref="InvalidOperationException">A fixed step is in progress.</exception>
     public void Dispose()
     {
         if (_disposed) return;

@@ -241,6 +241,22 @@ disposed.
 same context. `CollisionPair.Initialize(...)` rejects colliders from different
 contexts. These checks are core invariants.
 
+### Static Surface Ownership
+
+The dimensional physics services own `StaticSurface` and `StaticSurface2D`
+handles and bind membership to current collider lifetimes. They reuse existing
+spatial candidate gathering and per-mesh triangle BVHs; members retain their
+native frames and partitions. Derived joins and shared contact reductions do
+not create a combined body or an additional world-level spatial index.
+
+Membership publication and teardown occur between complete fixed steps.
+Geometry, filter, trigger, role, and membership changes invalidate affected
+neighbor contacts, support, and CCD dependencies, including rows carried by a
+different member. Context reset/disposal releases every handle. See
+[host configuration and lifetime](HOST_INTEGRATION.md#continuous-static-surfaces),
+[contact geometry](COLLISION_PIPELINE.md#continuous-static-surfaces), and
+[membership restore](SERIALIZATION.md#static-surface-membership).
+
 ## Body State
 
 ### `SolidBody`

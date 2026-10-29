@@ -200,6 +200,14 @@ The runtime uses explicit world-context ownership:
 - `CollisionDetection`, `CollisionResponse`, `CollisionPair`, `ContactPoint`,
   and context structs form the narrow-phase and response layer.
 
+`StaticSurface` and `StaticSurface2D` are context-owned continuity declarations,
+created by their dimensional physics services. Keep member identity, eligibility,
+supplier materials and finite boundaries distinct from response ownership.
+Membership is authoritative and recorded through typed links; joins and caches
+are derived. Preserve atomic replacement and neighbor/supplier invalidation.
+See the [host contract](docs/wiki/HOST_INTEGRATION.md#continuous-static-surfaces)
+and [exact geometry contract](docs/wiki/COLLISION_PIPELINE.md#continuous-static-surfaces).
+
 Treat this architecture as intentionally evolvable. Context ownership, collider
 IDs, partition reuse, collision-pair ownership, and simulation phase ordering
 are high-risk areas.

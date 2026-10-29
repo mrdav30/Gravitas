@@ -10,7 +10,7 @@ using SwiftCollections;
 namespace Gravitas;
 
 /// <content>Retains native cylinder/cone supports on exposed prism face windows.</content>
-internal sealed partial class StaticSurface2D
+public sealed partial class StaticSurface2D
 {
     private ConePrismBoundaryContacts? _mixedConeBoundary;
     private readonly SwiftList<CurvedGroup> _mixedCurvedGroups = new();

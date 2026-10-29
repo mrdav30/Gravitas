@@ -12,7 +12,7 @@ using System.Collections.Generic;
 namespace Gravitas;
 
 /// <content>Admits finite exposed prism supports before native mixed response selection.</content>
-internal sealed partial class StaticSurface2D : IScaledConvexHullContactDomain
+public sealed partial class StaticSurface2D : IScaledConvexHullContactDomain
 {
     private readonly SwiftList<LSCollider2D> _mixedLocal = new();
     private readonly SwiftList<MixedPrism> _mixedPrisms = new();

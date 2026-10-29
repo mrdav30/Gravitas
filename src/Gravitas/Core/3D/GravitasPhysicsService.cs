@@ -237,7 +237,14 @@ public sealed partial class GravitasPhysicsService
         BodyCount = 0;
     }
 
-    internal StaticSurface CreateStaticSurface(System.ReadOnlySpan<LSMeshCollider> members)
+    /// <summary>Creates a context-owned continuity declaration for static meshes using triangle-surface collision.</summary>
+    /// <param name="members">Distinct active bodyless or explicit-static meshes in <see cref="MeshColliderMode.Concave"/> registered in this context. May be empty.</param>
+    /// <returns>A declaration that retains each member's collider identity and joins only exact shared boundary spans.</returns>
+    /// <remarks>Call between complete fixed steps. Context reset or disposal expires the returned handle.</remarks>
+    /// <exception cref="System.ArgumentException">A member is ineligible or already belongs to a declaration.</exception>
+    /// <exception cref="System.ObjectDisposedException">The context has ended.</exception>
+    /// <exception cref="System.InvalidOperationException">A fixed step is in progress.</exception>
+    public StaticSurface CreateStaticSurface(System.ReadOnlySpan<LSMeshCollider> members)
     {
         var surface = new StaticSurface(_context, members);
         _staticSurfaces.Add(surface);

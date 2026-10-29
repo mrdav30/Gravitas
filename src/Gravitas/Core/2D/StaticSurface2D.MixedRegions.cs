@@ -10,7 +10,7 @@ using System;
 namespace Gravitas;
 
 /// <content>Separates projected finite supports before reducing their response samples.</content>
-internal sealed partial class StaticSurface2D
+public sealed partial class StaticSurface2D
 {
     private readonly SwiftList<MixedRegion> _mixedRegions = new();
     private readonly SwiftList<int> _mixedRegionParents = new(), _mixedRegionOrdinals = new();

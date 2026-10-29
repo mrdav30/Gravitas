@@ -32,6 +32,7 @@ testing, and replay tools.
 | Concrete `LSCollider` and `LSCollider2D` types             | Active/trigger state for bodyless trigger volumes, layer, local ignored physical layers, material, local offset, shape inputs, mixed half-thickness override. |
 | Compound runtime shells and private part colliders         | Authored shape/part values needed to rebuild deterministic geometry.                                                                                          |
 | Existing registered `Joint3D`, `Joint2D`, ragdoll runtimes | Joint enabled state, type, frames, limits, motors, linked collision policy, ragdoll activation state.                                                         |
+| Existing `StaticSurface`, `StaticSurface2D` handles       | Declared membership through typed links to registered collider lifetimes.                                                                                      |
 | Renderer, ECS, networking, pooling, editor state           | Nothing. These remain host-owned.                                                                                                                             |
 
 Runtime-owned state that should not be serialized:
@@ -112,6 +113,7 @@ there is no live-world rewind API.
 | `PhysicsSettingsSaver`                  | Frame rate, collision matrix, ground mask, CCD settings, restitution threshold, retained partition cleanup, runtime mode, mixed 2D thickness.                                                           | Runtime service state.                                           |
 | `Joint3D` / `Joint2D`                   | Mutable joint continuation state: enabled flag, type, frames/anchors, limits, motors, linked-collider policy.                                                                                           | Body link construction, service joint IDs, solver caches.        |
 | `RagdollRuntime3D` / `RagdollRuntime2D` | Runtime activation state for existing handles.                                                                                                                                                          | Definitions, link bodies, colliders, joint ownership.            |
+| `StaticSurface` / `StaticSurface2D`      | Versioned membership and typed member links through `IRecordable`.                                                                                                                                        | Collider construction, derived joins, contacts, spatial indexes. |
 | `PhysicsLayer` / `PhysicsLayerMask`     | JSON/MemoryPack-friendly value fields.                                                                                                                                                                  | Chronicler graph identity.                                       |
 
 Collider geometry can derive default COM/mass properties for new shells, but
@@ -144,6 +146,28 @@ save and load operations instead of applying state to a later pooled body or
 collider lifetime. Context reset and disposal invalidate those handles by the
 same rule.
 
+## Static Surface Membership
+
+The host creates [surface handles](HOST_INTEGRATION.md#continuous-static-surfaces)
+through the owning dimensional physics service and supplies Chronicler's typed
+links to existing registered collider lifetimes. `RecordData(...)` records
+`SurfaceSchemaVersion = 1`, the member count, and those links. Restore body and
+collider state first, then populate the existing surface handle between fixed
+steps. An empty handle can serve as the reconstruction target.
+
+Loading resolves and validates the complete candidate membership before
+publishing it. Missing, foreign, stale, duplicate, ineligible, or already-owned
+members reject without replacing the previous declaration. Context reset,
+disposal, and disposed handles cannot be restored into a new lifetime; create a
+new handle and resolve links to the reconstructed colliders. Reactivation alone
+does not restore lost membership.
+
+Membership affects authoritative replay hashes through canonical live
+registration identity, independently of input member order or recycled collider
+IDs. Derived adjacency, surface geometry caches, and contact ownership caches
+are rebuilt rather than recorded. A recorded declaration does not reconstruct
+its collider geometry or host objects.
+
 ## Replay Workflow
 
 A deterministic replay or rollback restore should follow this shape:
@@ -156,7 +180,8 @@ A deterministic replay or rollback restore should follow this shape:
    `ColliderShapeDefinition`, `ColliderShapeDefinition2D`, and compound part
    data before binding.
 4. Populate settings first when the snapshot includes `PhysicsSettingsSaver`.
-5. Populate body/collider/joint/ragdoll state into existing shells.
+5. Populate body/collider/joint/ragdoll state into existing shells, then restore
+   static-surface membership links when used.
 6. Continue fixed-step simulation from the restored frame using the same ordered
    input commands.
 

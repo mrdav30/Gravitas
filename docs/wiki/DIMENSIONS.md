@@ -118,14 +118,23 @@ create a large-world bypass. A uniformly coarser host length unit is another
 option, but convert all length-dependent inputs and physical units consistently.
 Changing only collider scale changes the simulated scene.
 
-Separate chunks own separate collider IDs, partition memberships, collision pairs, contact
-events and query hits. Adjacent mesh colliders keep their finite boundaries;
-surface reduction within one mesh does not weld across collider IDs. Overlap at
-a chunk seam can therefore change response even when the union has the same
-triangles. Validate crossings with the intended shapes, grounding, friction and
-CCD settings rather than assuming chunking is physically or computationally free.
-For 3D discrete blocking terrain, use explicit static bodies as described in
-[host integration](HOST_INTEGRATION.md#bodyless-geometry).
+Separate chunks retain their collider IDs, partition memberships, collision
+pairs, contact events, and query hits. Use a
+[continuous static surface](HOST_INTEGRATION.md#continuous-static-surfaces) to
+declare intended joins across 3D triangle-surface mesh pieces (`Concave` mode)
+or 2D AABB/convex polygon pieces. Bodyless and explicit-static members are both
+supported. Undeclared
+pieces retain independent finite boundaries; declared membership removes only
+[geometrically certified internal spans](COLLISION_PIPELINE.md#continuous-static-surfaces).
+Chunking still has preparation and runtime costs; validate the intended shapes,
+grounding, friction, and CCD settings.
+
+In mixed mode, 2D movers can contact joined 3D sheets and 3D movers can contact
+joined embedded 2D solids. Planar adjacency alone does not erase differences in
+host Y or slab thickness: only shared finite spans join, while real vertical
+steps and exposed caps remain physical boundaries. `Both` still has no
+cross-dimensional contacts. These APIs use existing collider geometry; Gravitas
+has no specialized heightfield backend.
 
 ## Public Surface
 

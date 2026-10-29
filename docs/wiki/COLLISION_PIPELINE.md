@@ -363,6 +363,47 @@ selecting a host rate or workload capacity.
 For shape state, pair matrices, SAT invariants, mesh policy, and compound
 ownership details, read [Collider Shape Reference](COLLIDER_SHAPE_REFERENCE.md).
 
+## Continuous Static Surfaces
+
+`StaticSurface` and `StaticSurface2D` extend contact reduction across explicitly
+declared static members. [Host integration](HOST_INTEGRATION.md#continuous-static-surfaces)
+owns creation, eligible members, replacement, and lifetime. A 3D declaration joins
+finite triangle surfaces authored in `MeshColliderMode.Concave`; the geometry
+may itself be convex or closed. A 2D declaration joins the filled planar union of
+AABB and convex polygon pieces. Members keep their own collider identity,
+transforms, bounded geometry, spatial partitions, and mesh triangle BVHs. A
+surface has no combined body, mass, inertia, or world-sized collider radius.
+
+Only an exactly covered, nonzero boundary span can lose its internal rim.
+Unequal subdivision and partial edge coverage can join; point-only touches,
+gaps, overlapping fills, and ambiguous or nonmanifold joins cannot erase edges.
+Matching uses committed scaled-local geometry and stored rigid transforms before
+world-point rounding. Equal rounded endpoints do not prove a join. There is no
+proximity welding or snapping. Real creases, outer edges, finite endpoints,
+holes, and disconnected regions retain their physical geometry.
+
+Finite-shape admission precedes connected-region reduction. A filtered,
+trigger-only, inactive, or unloaded neighbor cannot hide an eligible member's
+rim. Retained constraints preserve independent genuine-boundary groups and the
+actual supplying member's material and feature identity, even when another
+member carries those solver rows. Material changes alone do not create holes.
+Geometric overlap events remain per member; sharing response constraints does
+not manufacture contact exits. [Queries](QUERY_SERVICES.md#continuous-static-surface-queries)
+also retain per-collider hits. CCD uses the same admitted physical boundaries
+without treating a covered internal edge as a blocker.
+
+Local penetration stabilization does not promise a one-step whole-surface exit
+or a global minimum translation. Pure 2D primitive recovery certifies the final
+representable pose against its complete eligible spatial neighborhood, including
+geometry absent from the initial overlap set. Endpoint clearance does not promise
+a clear path to that endpoint. Deep compound recovery is unsupported: clearing
+one leaf does not establish clearance for its owner. If a response-required
+movable, nontrigger 2D overlap has neither genuine boundary rows nor certified
+recovery, the runtime throws a deterministic `InvalidOperationException`.
+Trigger, query-only, and static/static observations retain geometric results.
+Stop a failed fixed step and restore or reinitialize a known valid state before
+stepping again; the step has no rollback guarantee.
+
 ## Continuous Collision Detection
 
 CCD is opt-in per body or through context defaults. The runtime supports:

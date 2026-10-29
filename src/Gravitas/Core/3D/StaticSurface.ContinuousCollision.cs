@@ -11,7 +11,7 @@ using System;
 namespace Gravitas;
 
 /// <content>Admits CCD witness normals against the existing exact incident surface sectors.</content>
-internal sealed partial class StaticSurface
+public sealed partial class StaticSurface
 {
     private readonly MeshSurfaceBoundaryFan _continuousFan = new();
     private readonly SwiftList<MeshSurfaceBoundaryDomain> _continuousBoundaries = new();

@@ -9,6 +9,10 @@ colliders, collision response, constraints, queries, replay state, and
 renderer-neutral diagnostics. Simulation timing uses long frame stamps and
 Chronicler wide timestamps while fixed-point step integration stays in Fixed64.
 
+[StaticSurface](xref:Gravitas.StaticSurface) and
+[StaticSurface2D](xref:Gravitas.StaticSurface2D) declare continuity between bounded
+static pieces while retaining collider identities, finite boundaries and materials.
+
 Gravitas is the physics layer of the Lockstep Simulation Framework. It builds on
 [FixedMathSharp](https://github.com/mrdav30/FixedMathSharp),
 [SwiftCollections](https://github.com/mrdav30/SwiftCollections),

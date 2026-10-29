@@ -9,7 +9,7 @@ using SwiftCollections;
 namespace Gravitas;
 
 /// <content>Shares exact boundary and declared-surface ownership with continuous collision.</content>
-internal sealed partial class StaticSurface2D
+public sealed partial class StaticSurface2D
 {
     private readonly SwiftList<LSCollider2D> _continuousMixedMembers = new();
     private ContactManifold? _continuousMixedContacts;

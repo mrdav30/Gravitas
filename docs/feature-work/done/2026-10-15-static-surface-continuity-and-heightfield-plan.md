@@ -1,17 +1,15 @@
 # Static Surface Continuity And Heightfield Integration
 
 **Date:** 2026-10-15  
-**Status:** Phases 1–13 complete; Phase 14 next, 2026-10-29
-#133/#139 remain coordinated. Heightfield and alternative-index work are deferred;
-no public continuity API is enabled. Internal 3D discrete response covers rounded,
-cone, extrusion and native mesh families, pure 2D joined-solid response,
-embedded 2D movers against joined 3D meshes, and native 3D boxes, closed convex
-hulls, spheres, capsules, cylinders, cones and native open/concave meshes against
-joined 2D solids. Continuation, query/CCD and membership restore are integrated;
-public contract publication and #133/#139 closeout remain in Phase 14.  
-**Order:** #132 is resolved. Resolve #133 and its confirmed pure 2D counterpart,
-#139, through the generic-continuity phases below before terrain-specific work.
-Keep one implementation plan rather than duplicate the prerequisite design.  
+**Status:** Generic static continuity complete, 2026-10-29. #133/#139 are
+resolved in source. Heightfields and alternative indexes remain deferred; see
+[the later representation gates](#later-terrain-and-heightfield-gates).
+Public 3D mesh and filled 2D declarations support native discrete response,
+queries, CCD, membership recording and deterministic reconstruction, including
+both mixed contact directions. Native CI and released-package promotion remain
+separate validation gates.  
+**Scope:** Generic continuity resolved #133/#139 after #132. Terrain-specific
+representation and indexing decisions remain deferred.  
 **Goal:** Let hosts describe a continuous static environment using bounded,
 spatially indexed pieces, while evaluating reuse of existing deterministic
 height data for physics and navigation.
@@ -35,12 +33,12 @@ height data for physics and navigation.
 
 ## Current Evidence And Ownership
 
-[#132](issue-tracker.md#grv-issue-132---bodyless-3d-static-geometry-does-not-receive-discrete-blocking-response)
+[#132](../issue-tracker.md#grv-issue-132---bodyless-3d-static-geometry-does-not-receive-discrete-blocking-response)
 resolved missing bodyless 3D discrete response using the existing solver and
 zero-mobility endpoints. Bodyless and explicit-static support now agree.
-[#133](issue-tracker.md#grv-issue-133---adjacent-mesh-collider-rims-alter-frictionless-seam-crossing-response)
+[#133](../issue-tracker.md#grv-issue-133---adjacent-mesh-collider-rims-alter-frictionless-seam-crossing-response)
 owns the artificial-rim response difference across separate mesh colliders.
-The [supported-geometry closeout](done/2026-10-12-supported-geometry-range-plan.md#phase-4-compatibility-performance-and-096-closeout)
+The [supported-geometry closeout](2026-10-12-supported-geometry-range-plan.md#phase-4-compatibility-performance-and-096-closeout)
 retains the continuous/chunked comparison, repeated original/final traces and
 bounded cost controls. It does not establish physically equivalent chunking.
 
@@ -151,7 +149,7 @@ contract and bounded arithmetic feasibility recorded below.
   `context.Physics2D.CreateStaticSurface(ReadOnlySpan<LSCollider2D>)`
   returning `StaticSurface2D`. Each handle has typed `ReplaceMembers(...)` and
   `Dispose()` operations; no additional registry service or common body wrapper
-  is needed. These are planned public API names; exposure follows the complete supported contract.
+  is needed. These public APIs retain the existing dimensional service ownership.
   One membership per collider initially; empty membership may retain a handle
   while its host streams pieces out. Disposal ends that handle's lifetime.
   Membership permits geometric matching within that set; it does not assert
@@ -237,8 +235,9 @@ Every runtime phase must preserve raw reachable 100% line/branch/method coverage
 in Release/Lean, relevant replay behavior, zero added warmed allocations and the
 ordinary warm baseline, using `UseLocalLsfStack=true`. Refine introduced costs
 before handoff and obtain independent ponytail review. Phase 14 consolidates the
-evidence; it does not postpone these requirements. Keep experimental membership
-internal until response, query/CCD and restore semantics are coherent.
+evidence; it does not postpone these requirements. The implementation phases kept experimental membership
+internal until response, query/CCD and restore semantics were coherent; Phase 14
+publishes the completed contract.
 
 ### Investigation - Complete, 2026-10-16
 
@@ -916,7 +915,7 @@ equivalence or zero-overhead proof. All adverse and short runs are retained.
 Net runtime growth is **453 Gravitas lines, one new runtime file, and 229
 FixedMathSharp lines, no new runtime files**. Independent geometry and ponytail
 reviews have no outstanding findings. The separate rotated-mesh recentering
-defect is captured as [#141](issue-tracker.md#grv-issue-141---recentered-rotated-mesh-pieces-lose-exact-authored-shared-vertices);
+defect is captured as [#141](../issue-tracker.md#grv-issue-141---recentered-rotated-mesh-pieces-lose-exact-authored-shared-vertices);
 shared authored vertices need preservation, rather than tolerance welding.
 
 Ignored evidence is under `artifacts/grv-issue-133/phase4/`, including
@@ -1571,7 +1570,7 @@ exit. The isolated wide control removes the side walls, uses lower slabs
 `[-4,0]`/`[0,4] x [-2,-1/4]` and front `[-4,4] x [-1/4,2]`, and clears every
 ordinary penetration to `PenetrationSlop + 8 raw` after 32 frames. Independent
 review accepts this source-local scope boundary. The separately reproduced
-pre-existing capsule failure remains [#146](issue-tracker.md#grv-issue-146---joined-mixed-capsule-contacts-can-eject-a-body-along-an-unrelated-axis);
+pre-existing capsule failure remains [#146](../issue-tracker.md#grv-issue-146---joined-mixed-capsule-contacts-can-eject-a-body-along-an-unrelated-axis);
 the cylinder comparison is not classified as pre-existing.
 
 Both solution profiles build net10.0/C#14 and netstandard2.1/C#11 with zero
@@ -1685,8 +1684,8 @@ physical support only on an exact, cooriented original source plane. Existing
 arithmetic compares native support/closest-pair depths with finite ray roots
 before rounding; no new solver or public API was introduced.
 
-The [capsule regressions](../../tests/Gravitas.Tests/CollisionHandling/JoinedStaticSolidMixedTests.CapsuleSelection.cs)
-and [rounded-point regressions](../../tests/Gravitas.Tests/CollisionHandling/JoinedStaticSolidMixedTests.RoundedSelection.cs)
+The [capsule regressions](../../../tests/Gravitas.Tests/CollisionHandling/JoinedStaticSolidMixedTests.CapsuleSelection.cs)
+and [rounded-point regressions](../../../tests/Gravitas.Tests/CollisionHandling/JoinedStaticSolidMixedTests.RoundedSelection.cs)
 cover free-translation full steps, member-order and remote-piece
 controls, point-capsule parity, tall/asymmetric corners, exact ties, partial
 parent windows in both orientations, deepest-sample retention, whole-shape exits
@@ -1827,7 +1826,7 @@ variation at this scale. Both payloads use the same driver; review found no
 additional executed ordinary collision work. This does not establish a new
 runtime overhead or prove exact zero overhead. Matching physical witnesses
 and zero allocation hold in every capture. The existing unjoined cost is now
-[GRV-Benchmark-031](benchmark-signal-hardening-backlog.md#grv-benchmark-031--ordinary-open-mesh-mixed-full-step-cost),
+[GRV-Benchmark-031](../benchmark-signal-hardening-backlog.md#grv-benchmark-031--ordinary-open-mesh-mixed-full-step-cost),
 with inputs and a maintained fixture; it is not deferred Phase 12 work.
 
 ### Phase 13 - Continuation, Queries And Continuous Collision
@@ -1928,22 +1927,105 @@ raw coverage (`bf` Gravitas, `aa` math), replay captures, ordinary paired runs,
 Maintained tests/fixtures and the workload descriptions above preserve the
 reproduction contract independently of those temporary captures.
 
+<a id="phase-14-closeout"></a>
+
 ### Phase 14 - Close #133/#139 And Publish The Supported Contract
 
-- [ ] Validate Release/ReleaseLean, raw reachable 100% line/branch/method coverage,
+- [x] Validate Release/ReleaseLean, raw reachable 100% line/branch/method coverage,
   relevant replay lanes and warmed allocation guards using `UseLocalLsfStack=true`.
   Coordinate any upstream math change and preserve its same coverage guarantees.
-- [ ] Run repeated, bound seam/interior and unaffected 3D/2D/mixed/query controls.
+- [x] Run repeated, bound seam/interior and unaffected 3D/2D/mixed/query controls.
   Require zero added warmed allocations and no ordinary-path regression beyond
   measured uncertainty against the accepted baseline, including the explicitly
   accepted Phase 6 correctness cost. Broken seam response is not a speedup denominator;
   document the corrected-work cost and refine introduced overhead before closeout.
-- [ ] Obtain independent geometry and ponytail reviews of the complete changes,
+- [x] Obtain independent geometry and ponytail reviews of the complete changes,
   including deletion/reuse opportunities and every coordinated sibling change.
-- [ ] Update evergreen host/collision/dimensional/serialization guidance with the
+- [x] Update evergreen host/collision/dimensional/serialization guidance with the
   implemented membership contract, exact joining requirements and finite edges.
   Close each issue only after its dimensional behavior is covered. Leave
   heightfields and optional index experiments deferred for a separate decision.
+
+**Completion, 2026-10-29:** Published the existing `StaticSurface` and
+`StaticSurface2D` handles, dimensional `CreateStaticSurface(...)` factories and
+typed `ReplaceMembers(...)`. Constructors and geometry/response helpers remain
+internal. `Dispose()` and Chronicler `RecordData(...)` retain the implemented
+lifetime and recording contracts. Runtime changes are access modifiers and XML
+only; executable statements are unchanged and no runtime files were added.
+
+The evergreen host, collision, dimension, query, architecture and serialization
+guides describe exact joins, genuine boundaries, member identity/materials,
+transactional streaming, restore and supported deep-placement limits. README,
+namespace/API documentation and contributor ownership guidance agree. Independent
+geometry and ponytail reviews have no remaining findings. DocFX builds with
+warnings as errors; generated public surface pages expose only the intended
+operations and omit internal math interfaces/types.
+
+Fresh `UseLocalLsfStack=true` builds cover both target frameworks with zero
+warnings/errors. Raw production coverage is complete:
+
+| Profile | Tests | Sequence points | Branch points | Methods |
+| --- | ---: | ---: | ---: | ---: |
+| Release | 8,144 | 53,342/53,342 | 21,588/21,588 | 5,587/5,587 |
+| ReleaseLean | 8,073 | 53,340/53,340 | 21,588/21,588 | 5,586/5,586 |
+
+FixedMathSharp `03f6cbf` is unchanged here; all ten coordinated file hashes match
+Phase 13's validated source, whose Release/Lean raw coverage remains applicable.
+All eight shared fixtures match reviewed expectations and each other in local
+Windows x64 Release/Lean captures. The other six native OS/architecture/profile
+lanes require CI after review/commit; this is not a claim of a completed native
+matrix. Released dependencies remain the package-promotion gate.
+
+An external .NET consumer without friend access fails to compile against frozen
+`2ee3af9` (`CS0122`/inaccessible factories), then compiles with the public API.
+It creates both declaration types, exercises typed replacement, empty membership,
+`IRecordable` and disposal, and preserves unit tangential velocity through 64
+complete 16-Hz joined-planar host frames in both Release and Lean. A separate
+`netstandard2.1` consumer compiles the public API with C# 11. Existing production
+regressions cover the broader geometry, shape, lifecycle and recording behavior.
+
+Frozen committed/current payloads use identical consumer code and record actual
+loaded-module hashes. Fifteen ordinary/cached/query/CCD controls use 24 alternating
+paired windows in each load order after ten-second warmup. Thirteen bounded
+small/dense full-step rows use eight paired windows per order after three-second
+warmup; maintained fixtures cover 3D sphere floors (small and subdivided), 2D
+circles and both mixed directions with continuous, two-piece and 64-piece layouts.
+Every row preserves physical witnesses/checksums and allocates **0 B warm**.
+
+Ordinary combined contrasts range -2.65% to +1.40%. The initially +2.77% small
+2D joined row is order-sensitive (+5.89%/-0.49%); ten-second/24-window repeats
+measure **41.80 -> 41.96 us/frame (+0.38%)**, while an identical-baseline
+comparison varies by **+1.53%**. Cached 2D and CCD repeats differ by +0.64% and
++0.31%. These small launch/order effects establish neither a material introduced
+warm regression nor universal zero overhead; no new tradeoff was accepted.
+
+Representative current discrete host costs, per full frame at 0 B, are:
+
+| Moving source / declared target | Small join | Dense/member-heavy join |
+| --- | ---: | ---: |
+| 3D sphere / 3D meshes | 115.81 us | 197.86 us (128 target triangles) |
+| 2D circle / 2D pieces | 41.96 us (longer repeat) | 415.59 us (64 members) |
+| 2D circle / 3D meshes | 635.25 us | 2.841 ms (64 members) |
+| 3D sphere / embedded 2D pieces | 345.27 us | 1.250 ms (64 members) |
+
+Use the existing `JoinedStaticSurfaceSimulationBenchmarks` (`Sphere`,
+`Small`/`Dense`) and dimensional `JoinedStaticSurface2DSimulationBenchmarks`,
+`JoinedStaticSurfaceMixedSimulationBenchmarks`,
+`JoinedStaticSolidMixedSimulationBenchmarks` (`Circle`/`Sphere`,
+`Continuous`/`Joined` or `Joined2`/`Joined64`). Each invocation advances 64
+`Simulate`/`LateSimulate` frames with the fixture's frictionless driven motion,
+manual grounding and frozen rotation. Cold declaration preparation is separate.
+These bounded means are not game-capacity or frame-tail latency guarantees;
+Phase 13's distinct CCD costs and existing benchmark signals still apply.
+
+Ignored `artifacts/static-surface/phase14/` retains coverage, replay, public-consumer
+red/green evidence, source/module hashes and paired captures (`ordinary-*`,
+`final-*`, `confirm-*`, `same-baseline-control.json`). The source regressions,
+shared fixtures, public examples and maintained benchmark rows preserve the
+behavior and reproduction inputs independently of those supplemental captures.
+#133/#139 are closed through the published opt-in continuity contract;
+undeclared pieces keep their independent boundaries. Heightfield backends,
+Trailblazer adapter policy and alternate indexes remain explicitly deferred.
 
 ## Later Terrain And Heightfield Gates
 

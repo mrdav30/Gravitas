@@ -8,7 +8,7 @@ using System.Globalization;
 namespace Gravitas;
 
 /// <content>Records declared membership using host-resolved links to existing collider lifetimes.</content>
-internal sealed partial class StaticSurface
+public sealed partial class StaticSurface
 {
     /// <inheritdoc/>
     public void RecordData(IChronicler chronicler)

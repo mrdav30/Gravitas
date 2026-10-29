@@ -9,7 +9,7 @@ using Gravitas.CollisionHandling;
 namespace Gravitas;
 
 /// <content>Connects exact finite source strata before reducing curved response samples.</content>
-internal sealed partial class StaticSurface2D
+public sealed partial class StaticSurface2D
 {
     private void AddMixedCurvedCertificatePlane(int selected, bool physical)
     {

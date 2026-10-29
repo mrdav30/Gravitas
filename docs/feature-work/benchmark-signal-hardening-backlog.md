@@ -564,7 +564,7 @@ Every invocation resets to quarter-unit penetration, so this measures forced
 contact reconstruction rather than a settled scene. Named maintained
 `JoinedStaticRoundedMixedContactBenchmarks` capsule `ConcaveL` / `HeightStep`
 fixtures additionally measured **1.440 / 0.942 ms per pose-refresh/contact build**
-at `0 B/op`. The [#146 record](2026-10-15-static-surface-continuity-and-heightfield-plan.md#grv-issue-146-closeout)
+at `0 B/op`. The [#146 record](done/2026-10-15-static-surface-continuity-and-heightfield-plan.md#grv-issue-146-closeout)
 retains the complete reproducible geometry, original/corrected behavior,
 regressions, frozen dependencies and measurement protocol. These costs extend
 this existing frequency/capacity signal; they do not establish a representative

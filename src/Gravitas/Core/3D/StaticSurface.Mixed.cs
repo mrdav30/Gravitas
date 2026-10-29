@@ -10,7 +10,7 @@ using SwiftCollections.Query;
 namespace Gravitas;
 
 /// <content>Reuses joined finite-slab response for an embedded planar participant.</content>
-internal sealed partial class StaticSurface
+public sealed partial class StaticSurface
 {
     private bool _mixedSlab;
     private Fixed64 _mixedLength;

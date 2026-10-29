@@ -10,7 +10,7 @@ using SwiftCollections;
 namespace Gravitas;
 
 /// <content>Retains finite capsule support intervals on original native prism faces.</content>
-internal sealed partial class StaticSurface2D : IPrismCapsuleContactDomain
+public sealed partial class StaticSurface2D : IPrismCapsuleContactDomain
 {
     private readonly PrismPointAdmission _mixedCapsuleAdmit;
     private readonly SwiftList<RationalSegmentInterval> _mixedCapsuleCore = new();

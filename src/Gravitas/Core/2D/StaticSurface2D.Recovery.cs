@@ -10,7 +10,7 @@ using System;
 namespace Gravitas;
 
 /// <content>Conservative deep-placement proposals certified against the complete final spatial neighborhood.</content>
-internal sealed partial class StaticSurface2D
+public sealed partial class StaticSurface2D
 {
     internal bool TryGetRecovery(LSCollider2D mover, out Vector2d center)
     {

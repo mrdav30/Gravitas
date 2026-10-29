@@ -12,7 +12,7 @@ using System.Collections.Generic;
 namespace Gravitas;
 
 /// <content>Local filled-boundary contacts; member overlap remains independent of response ownership.</content>
-internal sealed partial class StaticSurface2D
+public sealed partial class StaticSurface2D
 {
     private static readonly IComparer<LSCollider2D> SurfaceMemberOrder = Comparer<LSCollider2D>.Create(static (a, b) =>
         ((IPhysicsColliderRegistryItem)a).ReplayOrder.CompareTo(((IPhysicsColliderRegistryItem)b).ReplayOrder));

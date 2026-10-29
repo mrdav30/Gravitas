@@ -10,7 +10,7 @@ using SwiftCollections;
 namespace Gravitas;
 
 /// <content>Admits rounded point supports against the existing exposed prism domain.</content>
-internal sealed partial class StaticSurface2D
+public sealed partial class StaticSurface2D
 {
     private readonly PrismPointAdmission _mixedSphereAdmit;
     private readonly PrismSphereBoundaryAdmission _mixedSphereBoundaryAdmit;

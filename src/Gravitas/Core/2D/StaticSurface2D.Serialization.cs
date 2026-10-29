@@ -8,7 +8,7 @@ using System.Globalization;
 namespace Gravitas;
 
 /// <content>Records planar membership independently of derived joins and contact caches.</content>
-internal sealed partial class StaticSurface2D
+public sealed partial class StaticSurface2D
 {
     /// <inheritdoc/>
     public void RecordData(IChronicler chronicler)

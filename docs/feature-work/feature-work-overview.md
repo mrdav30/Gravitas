@@ -28,11 +28,6 @@ instead of burying it in notes.
 
 ## Active Coordination
 
-- [`Static Surface Continuity And Heightfield Integration`](2026-10-15-static-surface-continuity-and-heightfield-plan.md)
-  - Implement the generic static-continuity contract needed to resolve artificial
-    boundaries across spatial pieces. Retain member identity, exact geometry and
-    existing spatial ownership; heightfields and alternative indexes remain
-    deferred until the continuity prerequisites are resolved.
 - **Lockstep Conformance And Workload Guidance**
   - Approved follow-up sequence after the confirmed benchmark signals close:
     strengthen complete-loop replay evidence, characterize an evolving strategy
@@ -67,7 +62,18 @@ instead of burying it in notes.
     persistence and replay. Retain the empirical drag law and existing default
     motion; preserve the measured warm baseline.
 
+- **Terrain Representation And Optional Member Indexes**
+  - Reuse the completed continuity contract. Specialized heightfields, navigation
+    adapter policy and alternate indexes require a concrete workload and measured
+    benefit; retain the [representation gates](done/2026-10-15-static-surface-continuity-and-heightfield-plan.md#later-terrain-and-heightfield-gates).
+
 ## Recently Completed
+
+- [`Static Surface Continuity`](done/2026-10-15-static-surface-continuity-and-heightfield-plan.md)
+  - Context-owned mesh and filled-planar declarations preserve exact finite joins,
+    member identity/materials, dimensional response and CCD, transactional
+    membership and replay/restore ordering. Heightfields and alternative indexes
+    remain separate, evidence-gated decisions.
 
 - [`Supported Geometry Range`](done/2026-10-12-supported-geometry-range-plan.md)
   - Effective scaled geometry, attachments, queries, settings and restored state

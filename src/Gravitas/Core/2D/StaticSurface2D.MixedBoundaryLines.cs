@@ -9,7 +9,7 @@ using SwiftCollections;
 namespace Gravitas;
 
 /// <content>Prepares exact concave boundary lines shared by native rounded-solid contacts.</content>
-internal sealed partial class StaticSurface2D
+public sealed partial class StaticSurface2D
 {
     private readonly SwiftList<MixedBoundaryLine> _mixedBoundaryLines = new();
     private readonly SwiftList<int> _mixedCapsuleLineGroups = new();

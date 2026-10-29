@@ -269,14 +269,31 @@ welded only in the temporary topology view so common hard-normal and UV seam
 exports validate without changing authored vertices, triangle order, or query
 tie-breaking.
 
-`MeshColliderMode.Concave` supports arbitrary nonconvex open surfaces, closed
-shells, and disconnected triangle surfaces. Both modes reject unreferenced
+`MeshColliderMode.Concave` selects authored triangle-surface collision; the
+geometry may itself be convex or nonconvex, open or closed, or disconnected.
+Both modes reject unreferenced
 vertices. `PhysicsMesh.IsClosedSurface` and `LSMeshCollider.IsClosedSurface`
 cache whether the complete exact-position-welded surface is one connected,
 consistently wound, closed two-manifold. The property describes topology only;
 `TryGetClosedVolumeMassProperties(...)` remains the richer volume and
 representability contract. `MeshVolumeValidationResult.NonManifoldVertex`
 distinguishes a pinched or disconnected vertex fan from an ordinary open edge.
+
+Closed topology does not imply a filled collision volume. For sphere contacts, a
+closed `Convex` mesh provides convex-volume collision; the same vertices and
+triangles constructed in `Concave` mode retain triangle-surface contacts.
+For example, a radius-0.25 sphere
+centered inside a closed cube spanning `[-1,1]` on every axis does not touch any
+triangle in `Concave` mode, while `Convex` mode detects its containment. A sphere
+overlapping a wall can contact that wall in either mode. Closure and volume-based
+mass-property validation remain separate from the collision mode.
+
+[StaticSurface membership](HOST_INTEGRATION.md#continuous-static-surfaces) requires
+`Concave` mode and accepts eligible closed shells as well as open panels. It does
+not convert those shells into filled volumes or establish a Boolean union of
+closed solids. Exact join validation still determines which boundary spans join.
+Convex-mode meshes can collide with a declared surface as moving participants,
+but cannot be its members.
 
 Exact concave mesh/mesh contact is supported, but dense overlapping tessellated
 surface pairs are an experimental, capacity-sensitive per-step workload. Cost
