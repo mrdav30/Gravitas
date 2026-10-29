@@ -240,8 +240,10 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         set
         {
+            if (_layer == value) return;
             _layer = value;
-            if (this is LSMeshCollider mesh) mesh.StaticSurface?.Invalidate();
+            MarkContactDependencyChanged();
+            _body?.Wake();
         }
     }
 
@@ -259,7 +261,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
                 return;
 
             _ignoredCollisionLayers = value;
-            if (this is LSMeshCollider mesh) mesh.StaticSurface?.Invalidate();
+            MarkContactDependencyChanged();
             _body?.Wake();
         }
     }
@@ -280,7 +282,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
                 return;
 
             _material = value;
-            MarkContactDependencyChanged();
+            MarkContactDependencyChanged(surfaceNeighborsChanged: false);
             OnMaterialChanged();
             _body?.Wake();
         }
@@ -713,21 +715,33 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
     public void SetParent(LSCollider parent)
     {
         ThrowIfCompoundPartLifecycle(nameof(SetParent));
-        _hierarchyState.SetParent(this, parent);
+        if (_hierarchyState.SetParent(this, parent))
+        {
+            MarkContactDependencyChanged();
+            _body?.Wake();
+        }
     }
 
     /// <summary>Assigns a 2D hierarchy parent used for mixed collision exclusion.</summary>
     public void SetParent(LSCollider2D parent)
     {
         ThrowIfCompoundPartLifecycle(nameof(SetParent));
-        _hierarchyState.SetParent(this, parent);
+        if (_hierarchyState.SetParent(this, parent))
+        {
+            MarkContactDependencyChanged();
+            _body?.Wake();
+        }
     }
 
     /// <summary>Removes this collider from its current hierarchy parent.</summary>
     public void ClearParent()
     {
         ThrowIfCompoundPartLifecycle(nameof(ClearParent));
-        _hierarchyState.ClearParent(this);
+        if (_hierarchyState.ClearParent(this))
+        {
+            MarkContactDependencyChanged();
+            _body?.Wake();
+        }
     }
 
     /// <summary>Gets whether hierarchy rules exclude collision with another 3D collider.</summary>
@@ -879,7 +893,14 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
         _hierarchyState.RemoveChild(key);
     }
 
-    void IColliderHierarchyNode.ClearParentReference() => _hierarchyState.ClearParentReference();
+    void IColliderHierarchyNode.ClearParentReference()
+    {
+        if (_hierarchyState.ClearParentReference())
+        {
+            MarkContactDependencyChanged();
+            _body?.Wake();
+        }
+    }
 
     bool IColliderHierarchyNode.TryGetHierarchyColliderByKey(ColliderHierarchyKey key, out IColliderHierarchyNode? collider)
     {

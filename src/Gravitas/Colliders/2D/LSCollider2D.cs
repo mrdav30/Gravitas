@@ -275,7 +275,8 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
         {
             if (_layer == value) return;
             _layer = value;
-            StaticSurface?.Invalidate();
+            MarkContactDependencyChanged();
+            _body?.Wake();
         }
     }
 
@@ -293,7 +294,7 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
                 return;
 
             _ignoredCollisionLayers = value;
-            StaticSurface?.Invalidate();
+            MarkContactDependencyChanged();
             _body?.Wake();
         }
     }
@@ -312,7 +313,7 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
                 return;
 
             _material = value;
-            MarkContactDependencyChanged();
+            MarkContactDependencyChanged(surfaceNeighborsChanged: false);
             OnMaterialChanged();
             _body?.Wake();
         }
@@ -626,21 +627,33 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
     public void SetParent(LSCollider2D parent)
     {
         ThrowIfCompoundPartLifecycle(nameof(SetParent));
-        _hierarchyState.SetParent(this, parent);
+        if (_hierarchyState.SetParent(this, parent))
+        {
+            MarkContactDependencyChanged();
+            _body?.Wake();
+        }
     }
 
     /// <summary>Assigns a 3D hierarchy parent used for mixed collision exclusion.</summary>
     public void SetParent(LSCollider parent)
     {
         ThrowIfCompoundPartLifecycle(nameof(SetParent));
-        _hierarchyState.SetParent(this, parent);
+        if (_hierarchyState.SetParent(this, parent))
+        {
+            MarkContactDependencyChanged();
+            _body?.Wake();
+        }
     }
 
     /// <summary>Removes this collider from its current hierarchy parent.</summary>
     public void ClearParent()
     {
         ThrowIfCompoundPartLifecycle(nameof(ClearParent));
-        _hierarchyState.ClearParent(this);
+        if (_hierarchyState.ClearParent(this))
+        {
+            MarkContactDependencyChanged();
+            _body?.Wake();
+        }
     }
 
     /// <summary>Gets whether hierarchy rules exclude collision with another 2D collider.</summary>
@@ -847,16 +860,16 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
             ThrowIfCannotEnableTrigger(nameof(IsTrigger));
 
         _isTrigger = value;
-        StaticSurface?.Invalidate();
+        StaticSurface?.Invalidate(this);
     }
 
-    internal void MarkContactDependencyChanged(bool notifySurface = true)
+    internal void MarkContactDependencyChanged(bool notifySurface = true, bool surfaceNeighborsChanged = true)
     {
         LSCollider2D owner = this;
         while (owner._compoundOwner != null)
             owner = owner._compoundOwner;
         owner.ContactDependencyVersion++;
-        if (notifySurface) owner.StaticSurface?.Invalidate();
+        if (notifySurface) owner.StaticSurface?.Invalidate(owner, includeNeighbors: surfaceNeighborsChanged);
     }
 
     private void ThrowIfCannotEnableTrigger(string operation)

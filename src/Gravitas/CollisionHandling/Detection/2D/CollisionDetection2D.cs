@@ -31,6 +31,15 @@ internal static partial class CollisionDetection2D
     internal static bool TryCollide(CollisionPair2D pair, ContactManifold2D manifold, long frame)
     {
         ChronicleGuard.ThrowIfNull(pair, nameof(pair));
+        ChronicleGuard.ThrowIfNull(manifold, nameof(manifold));
+        var previous = pair.BeginCollisionLayerUpdate(manifold);
+        bool overlaps = TryCollidePairCore(pair, manifold, frame);
+        pair.CompleteCollisionLayerUpdate(manifold, previous);
+        return overlaps;
+    }
+
+    private static bool TryCollidePairCore(CollisionPair2D pair, ContactManifold2D manifold, long frame)
+    {
         pair.ClearRecovery();
         bool overlaps = TryCollide(CollisionWorkItem2D.Create(pair), manifold, frame);
         if (!overlaps || !manifold.NeedsSurfaceRecovery) return overlaps;

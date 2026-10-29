@@ -172,6 +172,27 @@ Ignored `artifacts/grv-issue-108/isolated-baseline` and `final-confirmation`
 retain the matched measurements. The preliminary unisolated source capture
 and the pre-pruning correctness capture are not the retained comparison.
 
+**2026-10-29 small mixed CCD control:** A millisecond-scale capacity boundary
+also appears without dense subdivision. The existing
+`JoinedStaticSurfaceMixedSimulationBenchmarks`, `Shape=Circle`,
+`Layout=Continuous`, with its body switched to `ContinuousCollisionMode.Continuous`
+after setup, costs **6.607/6.896 ms per full frame** on committed Gravitas
+`9175653` and **6.816/6.772 ms** on the Phase 13 candidate in normal/reversed
+paired runs. Both use the same driver, preserve physical witnesses and allocate
+**0 B/frame**; the combined difference is +0.63%, with opposite order effects.
+This records an existing cost, not a Phase 13 regression or a speedup claim.
+
+The source is a radius-0.5 circle slab, half-thickness 0.5, centered at host
+Y=0.25, sliding against one bodyless two-triangle wall at Z=0,
+X=[-8,8], Y=[-2,2]. Use the fixture's 16-Hz Mixed settings, frozen rotation,
+manual grounding, disabled sleep and alternating X speed +/-1 with inward
+impulse -1/16; advance 64 complete host frames per invocation. Windows x64,
+i7-9700K, .NET 10.0.10 Release and `UseLocalLsfStack=true`; each order uses
+24 alternating paired windows after warmup. Profile the complete mixed CCD
+call chain before attributing this to initial-contact math or indexing.
+Ignored `artifacts/static-surface/phase13/ccd-controls-ba-{forward,reverse}.json`
+retains loaded module hashes and raw windows.
+
 ### GRV-Benchmark-027 — Nonconvex Rotational CCD Step Cost
 
 **Discovered:** 2026-10-12 during GRV-Issue-101 validation.  
@@ -250,6 +271,70 @@ outer conservative refinements separately from required response contacts.
 Preserve whole-shape separation, earliest frontiers, closing admission, matched
 anchors, authored ties and 0 B/op; never replace an unresolved interval with a
 sample-only miss or weaken the manifold to one support pair.
+
+**Small-angle isolation, 2026-10-28:** The static-continuity CCD regressions
+also reproduce limited progress on the unchanged `9175653` payload, without
+any continuity declaration. Use one bodyless concave quad at Z=0, X in
+`[-8,8]`, Y in `[-2,2]` (vertices bottom-left, top-left, bottom-right,
+top-right; triangles `0,1,2,2,1,3`). In Mixed mode at 16 Hz, place a mass-one
+planar capsule of radius `1/2`, total height 2 and mixed half-thickness `1/2`
+at `(-1/4,1)` with zero yaw. Disable gravity, air drag and damping, use manual
+grounding, disable sleep, enable continuous mode and use frictionless materials.
+Apply X impulse 1 and angular impulse `1/64` once, then planar Y impulse
+`-1/16` before each of 12 complete host steps.
+
+The committed control and the coordinated implementation before T0 contact
+sampling both ended at
+`(0.125, 0.999922429677099)`, yaw `0.01788772107101977`, with velocity
+`(1, -0.00038653193041682243)`. Uninterrupted free tangential integration
+would reach X=0.5. The trace retains real floor witnesses but repeatedly reaches
+the fixed interval-depth frontier; the documented conservative terminal clamp
+can consume the remaining frame while retaining momentum. This is an existing
+refinement/capacity limit, not evidence of a new missed collision or a new issue
+ID. The maintained continuity regression supplies the workload; ignored
+`artifacts/static-surface/phase13/rotation-unsplit-committed-control.log` and
+`rotation-frontier.txt` supplement these inputs. Test-run elapsed time is not a
+benchmark: isolate warm frame time, allocation and limit frequency before
+making a cost claim or changing the search budget.
+
+The same isolation also covers a **3D capsule against embedded 2D solids**.
+Declare two bodyless AABBs with X ranges `[-8,0]` and `[0,8]`, planar Z range
+`[-2,0]`, and mixed Y half-thickness 2. In Mixed mode at 16 Hz, initialize a
+mass-one 3D capsule with radius `1/2`, total height 2, identity rotation and
+position `(-1/4,0,1/2)`. Freeze **PositionY only**; leave every rotation free.
+Disable gravity, air density, damping and sleep, use manual grounding and
+frictionless materials, and enable continuous mode. Apply X impulse 1 and Z
+angular impulse `1/64` once, then Z impulse `-1/16` before each of 12 complete
+host steps. The unsplit control replaces the declaration with one AABB spanning
+X `[-8,8]`, with the same Z range and finite Y band.
+
+All values below are exact Q32.32 raw integers:
+
+| Payload and geometry | Final X | Final Z | Final angular velocity (X,Y,Z) | Conservative limits |
+| --- | ---: | ---: | --- | --- |
+| Committed `9175653`, declared split | -1073741824 | 2147483648 | (53,0,221847484) | All 12 frames |
+| Committed `9175653`, unsplit | 2147483648 | 2147459072 | (0,0,221847484) | None |
+| Phase 13, declared split | -1073348608 | 2147483648 | (1,-19,221847484) | All 12 frames |
+
+The committed split control never advances from its initial X or identity
+orientation. Phase 13 advances X to raw `-1073709056` in frame 0, then reaches
+small conservative frontiers; its final quaternion is
+`(0,0,10152,4294967296)`, final velocity is `(4294967296,0,1)`, and its last
+frame consumes two TOI iterations. It retains Z angular velocity instead of
+inventing a stopping impulse from a geometric witness with no closing row.
+Small transverse angular velocities can still change an intermediate quaternion
+by one raw unit while the contact speed remains below the existing response
+deadband, defeating the exact invariant-plane certificate and limiting progress.
+
+This **pre-existing general rotational-refinement capacity limit remains
+unsolved**; it is not a newly introduced deferral. The maintained
+`SpatialCapsuleWithFreeTransverseRotation_ShouldRetainMomentumAtConservativeFrontiers`
+regression preserves the linear and angular velocity, floor blocking and limit
+checks. Separate parallel-rotation and raised-wall regressions freeze RotationX
+and RotationY and require actual seam crossing and a later closing wall response.
+The inputs and raw states above are the retained reproduction; ignored
+`artifacts/static-surface/phase13/rotational-control-baseline-p.txt` and
+`free-capsule-after-t0.txt` contain the supplemental traces.
 
 ### GRV-Benchmark-028 — Mixed Broad-Phase Work With An Empty Opposite Dimension
 

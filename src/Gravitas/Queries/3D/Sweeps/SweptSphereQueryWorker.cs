@@ -251,11 +251,22 @@ public sealed class SweptSphereQueryWorker
         return true;
     }
 
+    internal bool TrySweepMeshForContinuousCollision(LSMeshCollider mesh,
+        ContinuousSurfaceTriangleAdmission admit, out Physics3DHit hit)
+    {
+        LastMeshTriangleCandidateCount = 0;
+        return TrySweepMesh(mesh, out _, out _, out hit, admit);
+    }
+
     private bool TrySweepMesh(
         LSMeshCollider mesh,
         out Vector3d sphereCenterAtImpact,
-        out Fixed64 impactDistance)
+        out Fixed64 impactDistance) => TrySweepMesh(mesh, out sphereCenterAtImpact, out impactDistance, out _, null);
+
+    private bool TrySweepMesh(LSMeshCollider mesh, out Vector3d sphereCenterAtImpact, out Fixed64 impactDistance,
+        out Physics3DHit admittedHit, ContinuousSurfaceTriangleAdmission? admit)
     {
+        admittedHit = default;
         sphereCenterAtImpact = Vector3d.Zero;
         impactDistance = Fixed64.MaxValue;
 
@@ -296,6 +307,8 @@ public sealed class SweptSphereQueryWorker
                 out Vector3d second,
                 out Vector3d third);
             Vector3d normal = mesh.Mesh.GetScaledLocalFaceNormal(triangleIndex);
+            bool triangleFound;
+            Fixed64 triangleDistance;
             if (!rigid)
             {
                 var authoredTriangle = new FixedTriangle(first, second, third);
@@ -306,29 +319,57 @@ public sealed class SweptSphereQueryWorker
                     || !mesh.Mesh.GeometryFrame.GetPoint(second).TryGetExactLocalPointIn(chartOrigin, chartRotation, out second)
                     || !mesh.Mesh.GeometryFrame.GetPoint(third).TryGetExactLocalPointIn(chartOrigin, chartRotation, out third))
                 {
-                    bool exactHit = WideTriangleRelations.TryGetSweptSphereDistance(authoredTriangle,
+                    triangleFound = WideTriangleRelations.TryGetSweptSphereDistance(authoredTriangle,
                         mesh.Mesh.GeometryFrame, new FixedSegment(_start, _end), _length, _radius,
-                        out Fixed64 exactDistance);
-                    found |= TryKeepEarlierSweep(exactHit, default, exactDistance,
-                        ref sphereCenterAtImpact, ref impactDistance);
-                    continue;
+                        out triangleDistance);
+                    goto SelectTriangle;
                 }
                 normal = new FixedTriangle(first, second, third).Normal;
             }
-            found |= TryKeepEarlierSweep(
-                TrySweepTriangle(
+            triangleFound = TrySweepTriangle(
                     first,
                     second,
                     third,
                     normal,
                     localStart,
                     localEnd,
-                    out Vector3d triangleHit,
-                    out Fixed64 triangleDistance),
-                triangleHit,
-                triangleDistance,
-                ref sphereCenterAtImpact,
-                ref impactDistance);
+                    out _, out triangleDistance);
+        SelectTriangle:
+            if (!triangleFound || triangleDistance >= impactDistance) continue;
+            Physics3DHit candidate = default;
+            if (admit != null)
+            {
+                Vector3d center = new FixedSegment(_start, _end).GetPointAtDistance(triangleDistance, _length);
+                mesh.Mesh.GetGeometryTriangleVertices(triangleIndex, out var a, out var b, out var c);
+                // A finite closest point stays in the admitted small physical
+                // mesh envelope. Its bounds center supplies a nearby chart even
+                // at clipped scalar faces; the authored origin may be far away.
+                bool represented = WideTriangleRelations.TryGetClosestPointAnchor(new(a, b, c), mesh.Mesh.GeometryFrame,
+                    center, mesh.Bounds.Center, out FixedPointAnchor anchor);
+                System.Diagnostics.Debug.Assert(represented);
+                RationalPoint3d point = RationalPoint3d.FromAnchor(anchor);
+                WideDirection3d axis = WideTriangleRelations.GetScaledPointDifference(RationalPoint3d.FromScalarPoint(center),
+                    point, WideArithmetic.TruncateSigned320By64(point.Denominator));
+                RationalPoint3d centerPoint = RationalPoint3d.FromScalarPoint(center);
+                if (axis.IsZero || WideTriangleRelations.ContainsProjection(new(a, b, c), mesh.Mesh.GeometryFrame, centerPoint))
+                {
+                    // A face projection has its exact plane normal even when
+                    // rounding the final point moves it onto an authored seam.
+                    axis = WideTriangleRelations.GetScaledTriangleLocalNormal(new(a, b, c), mesh.Mesh.GeometryFrame)
+                        .Transform(mesh.Mesh.GeometryFrame.GeometryBasis);
+                    var sweep = new WideAxis3(Signed320.ExtendValue(WideArithmetic.Difference(_end.X, _start.X)),
+                        Signed320.ExtendValue(WideArithmetic.Difference(_end.Y, _start.Y)),
+                        Signed320.ExtendValue(WideArithmetic.Difference(_end.Z, _start.Z)));
+                    int side = WideDirection3d.Dot(axis, WideTriangleRelations.GetScaledPointDifference(centerPoint,
+                        mesh.Mesh.GeometryFrame.GetPoint(a), mesh.Mesh.GeometryFrame.RotationDenominator)).Sign;
+                    if (side < 0 || side == 0 && WideDirection3d.Dot(axis, sweep).Sign > 0) axis = -axis;
+                }
+                candidate = new(mesh, new ContactAnchor(anchor), axis.GetNormal(false), triangleDistance, (_end - _start).Normalized);
+                if (!admit(triangleIndex, ref candidate, axis)) continue;
+            }
+            found = true;
+            impactDistance = triangleDistance;
+            admittedHit = candidate;
         }
 
         if (found)

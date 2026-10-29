@@ -40,6 +40,16 @@ public sealed partial class GravitasPhysicsService
             }
         }
 
+        bool membership = false;
+        foreach (StaticSurface surface in _staticSurfaces) membership |= surface.ReplayMembership != 0;
+        if (membership)
+        {
+            writer.WriteSection("physics.3d.surfaces", 1);
+            writer.WriteInt32(replayColliders.Count);
+            foreach (LSCollider collider in replayColliders.AsReadOnlySpan())
+                writer.WriteInt32(collider is LSMeshCollider mesh ? mesh.StaticSurface?.ReplayMembership ?? 0 : 0);
+        }
+
         writer.WriteSection("physics.3d.pairs", 2);
         for (int i = 0; i < replayColliders.Count; i++)
         {

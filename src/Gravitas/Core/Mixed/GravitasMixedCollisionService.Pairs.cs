@@ -99,6 +99,38 @@ internal sealed partial class GravitasMixedCollisionService
             && !_context.Physics.IsLayerCollisionDisabled(collider3D.Layer, collider2D.Layer);
     }
 
+    internal void InvalidateSurfaceContacts(StaticSurface? spatial, StaticSurface2D? planar,
+        SwiftHashSet<int> changedSuppliers)
+    {
+        if (_pairs.Count == 0 || changedSuppliers.Count == 0) return;
+        bool sourceIsPlanar = planar != null;
+        SwiftHashSet<int> movers = _surfaceChangedMovers ??= new();
+        movers.Clear();
+        foreach (var entry in _pairs)
+        {
+            CollisionPairMixed pair = entry.Value;
+            if (!OwnsSurface(pair)) continue;
+            int supplier = (sourceIsPlanar ? pair.Collider2DId : pair.Collider3DId) + 1;
+            if (!changedSuppliers.Contains(supplier)
+                && !pair.Manifold.ReferencesSuppliers(changedSuppliers, !sourceIsPlanar, supplier)) continue;
+            pair.InvalidateSurfaceContact(wake: true);
+            movers.Add(sourceIsPlanar ? pair.Collider3DId : pair.Collider2DId);
+        }
+        // Response can move to an existing empty noncarrier. Discard its old
+        // empty snapshot too, without waking unrelated users of the surface.
+        foreach (var entry in _pairs)
+        {
+            CollisionPairMixed pair = entry.Value;
+            if (OwnsSurface(pair) && movers.Contains(sourceIsPlanar ? pair.Collider3DId : pair.Collider2DId))
+                pair.InvalidateSurfaceContact(wake: false);
+        }
+        movers.Clear();
+
+        bool OwnsSurface(CollisionPairMixed pair) => sourceIsPlanar
+            ? pair.Collider2D.StaticSurface == planar
+            : pair.Collider3D is LSMeshCollider mesh && mesh.StaticSurface == spatial;
+    }
+
     private void ProcessCandidate(MixedColliderKey candidate, long frame)
     {
         if (!_context.Physics.TryGetColliderById(candidate.Collider3DId, out LSCollider? collider3D)

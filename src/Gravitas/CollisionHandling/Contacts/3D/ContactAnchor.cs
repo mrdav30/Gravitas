@@ -22,6 +22,7 @@ namespace Gravitas.CollisionHandling;
 public readonly struct ContactAnchor
 {
     private readonly FixedPointAnchor _point;
+    internal FixedPointAnchor GeometryPoint => _point;
 
     /// <summary>
     /// Creates a contact anchor in an identity-rotation rigid frame.

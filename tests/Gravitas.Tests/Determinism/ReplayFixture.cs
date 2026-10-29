@@ -110,6 +110,9 @@ internal sealed class ReplayFixture
             Require(actor.MassRaw > 0, $"Actor {actor.Id} MassRaw must be positive.");
             Require(actor.MotionType is BodyMotionType.Dynamic or BodyMotionType.Kinematic or BodyMotionType.Static,
                 $"Actor {actor.Id} MotionType is unsupported.");
+            Require(actor.SurfaceGroup == 0 || actor.SurfaceGroup > 0 && actor.StartActive
+                && actor.MotionType == BodyMotionType.Static && (actor.Dimension == "2D" || actor.Shape == "Mesh"),
+                $"Actor {actor.Id} joined membership requires an initially active static surface piece.");
         }
 
         int previousFrame = -1;
@@ -198,6 +201,7 @@ internal sealed class ReplayActor
     public bool StartActive { get; set; } = true;
     public bool Frictionless { get; set; }
     public bool PreventAngularForces { get; set; }
+    public int SurfaceGroup { get; set; }
     public long[][] VerticesRaw { get; set; } = Array.Empty<long[]>();
     public int[] Triangles { get; set; } = Array.Empty<int>();
 }

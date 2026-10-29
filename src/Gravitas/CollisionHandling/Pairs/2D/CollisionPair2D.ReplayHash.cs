@@ -27,6 +27,11 @@ internal sealed partial class CollisionPair2D
         // Only an existing contact depends on these stamps; loading may republish noncontact geometry.
         writer.WriteBool(!_isColliding || _lastColliderAContactDependencyVersion == ColliderA.ContactDependencyVersion);
         writer.WriteBool(!_isColliding || _lastColliderBContactDependencyVersion == ColliderB.ContactDependencyVersion);
+        // Only retained response consumes supplier freshness; omit rebuildable
+        // snapshot history while preserving a pending borrowed-contact refresh.
+        if (_isColliding && (_surfaceContactChanged ||
+            _surfaceCollisionLayers.HasValue && _surfaceCollisionLayers != CurrentSurfaceCollisionLayers))
+            writer.WriteSection("pair.2d.surface", 1);
         writer.WriteBool(_wasTriggerPair);
         ContributeManifoldReplayHash(ref writer, ColliderA.Context, Manifold);
         ContributeWarmStartReplayHash(ref writer, _warmStart);

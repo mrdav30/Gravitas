@@ -149,16 +149,23 @@ public sealed class JoinedConeBoundaryTests
         {
             var pair = scene.CreatePair(member, cone);
             Assert.True(CollisionDetection.DoCollisionCheck(pair));
-            foreach (var row in pair.Manifold)
+            for (int groupIndex = 0; groupIndex < pair.Manifold.GroupCount; groupIndex++)
             {
-                rows++;
-                Assert.Equal(Vector3d.Up, row.Normal);
-                Assert.Equal(member.Material, row.MaterialA);
-                // The final surface witness uses the translated physical chart;
-                // supplier identity and material remain independent of that chart.
-                Assert.True(row.AnchorA.TryGetWorldPoint(out var p));
-                Assert.InRange(p.Y.m_rawValue, -1, 1);
-                maximum = FixedMath.Max(maximum, row.Depth);
+                ref ContactGroup group = ref pair.Manifold.GetGroup(groupIndex);
+                Assert.True(group.Key.SourceIdA == first.Id + 1 || group.Key.SourceIdA == second.Id + 1);
+                LSMeshCollider supplier = group.Key.SourceIdA == first.Id + 1 ? first : second;
+                for (int pointIndex = 0; pointIndex < group.Count; pointIndex++)
+                {
+                    ManifoldContact row = group[pointIndex];
+                    rows++;
+                    Assert.Equal(Vector3d.Up, row.Normal);
+                    Assert.Equal(supplier.Material, row.MaterialA);
+                    // Carrier ownership does not change the finite supplying surface.
+                    Assert.True(row.AnchorA.TryGetWorldPoint(out var p));
+                    Assert.InRange(p.Y.m_rawValue, -1, 1);
+                    Assert.InRange(p.X.m_rawValue, supplier.BoundsMin.X.m_rawValue - 1, supplier.BoundsMax.X.m_rawValue + 1);
+                    maximum = FixedMath.Max(maximum, row.Depth);
+                }
             }
         }
         Assert.InRange(rows, 1, ContactManifold.MaxContactsPerGroup);

@@ -137,7 +137,7 @@ public sealed class LSMeshCollider : LSCollider
     private protected override void PublishShape()
     {
         GeometryMesh.PublishPreparedTransformation();
-        StaticSurface?.Invalidate(geometryChanged: true);
+        StaticSurface?.Invalidate(geometryChanged: true, changed: this);
     }
 
     internal override ExactMassWeight CalculateMassPropertyWeight()

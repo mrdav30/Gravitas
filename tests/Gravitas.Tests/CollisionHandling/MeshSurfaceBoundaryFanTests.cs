@@ -1,4 +1,5 @@
 using FixedMathSharp;
+using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
 using Gravitas.CollisionHandling;
 using System;
@@ -45,6 +46,38 @@ public sealed class MeshSurfaceBoundaryFanTests
         Assert.Equal(4, fan.RayCount);
         Assert.True(fan.Supports(Vector3d.Up));
         Assert.False(fan.Supports(Vector3d.Right));
+    }
+
+    [Fact]
+    public void RoundedWitness_ShouldRecoverItsCoplanarNeighborAndDeclineUnprovedIncidence()
+    {
+        PhysicsMesh[] meshes = { Quad(-2, 2, -2, 2) };
+        var boundary = new MeshSurfaceBoundaryDomain(); boundary.Build(meshes, 0, 0);
+        MeshSurfaceBoundaryDomain[] prepared = { boundary };
+        var fan = new MeshSurfaceBoundaryFan();
+        // The canonical owner is shared by both triangles. Rounding across its
+        // authored diagonal must retain the filled neighbor's plane support.
+        Vector3d acrossDiagonal = new(Fixed64.Zero, Fixed64.Zero, Fixed64.MinIncrement);
+        Assert.True(Build(acrossDiagonal));
+        Assert.True(fan.Supports(Vector3d.Up));
+        Assert.False(fan.Supports(Vector3d.Right));
+        Assert.True(Build(new(Fixed64.MinIncrement, Fixed64.Zero, Fixed64.Zero)));
+        foreach (Vector3d roundedOutside in new[]
+        {
+            new Vector3d(Fixed64.Zero, Fixed64.MinIncrement, Fixed64.Zero),
+            new Vector3d(Fixed64.Two + Fixed64.MinIncrement, Fixed64.Zero, Fixed64.Zero)
+        })
+        {
+            // Neither an off-plane point nor a point just beyond the original
+            // rim proves an interior plane. Never reuse the preceding fan.
+            Assert.False(Build(roundedOutside));
+            Assert.Equal(0, fan.RayCount);
+            Assert.False(fan.Supports(Vector3d.Up));
+            Assert.True(Build(acrossDiagonal));
+        }
+
+        bool Build(Vector3d point) => fan.BuildAtAnchor(meshes, 0, 0,
+            new FixedPointAnchor(Vector3d.Zero, FixedQuaternion.Identity, point), prepared);
     }
 
     [Theory]

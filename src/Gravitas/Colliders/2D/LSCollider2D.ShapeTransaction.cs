@@ -335,7 +335,7 @@ public abstract partial class LSCollider2D
         if (contactDependencyChanged)
         {
             ContactDependencyVersion++;
-            StaticSurface?.Invalidate();
+            StaticSurface?.Invalidate(this);
         }
     }
 

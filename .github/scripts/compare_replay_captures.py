@@ -15,6 +15,8 @@ FULL_MATRIX = tuple(
     for configuration in ("Release", "ReleaseLean")
 )
 FIXTURE_NAMES = (
+    "joined-mixed-surfaces-v1",
+    "joined-surfaces-v1",
     "both-lifecycle-v1", "mixed-lifecycle-v1", "three-d-caches-v1",
     "three-d-lifecycle-v1", "three-d-surface-contacts-v1", "two-d-lifecycle-v1",
 )

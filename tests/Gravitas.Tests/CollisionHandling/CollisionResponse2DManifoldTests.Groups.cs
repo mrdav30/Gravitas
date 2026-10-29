@@ -274,9 +274,9 @@ public sealed partial class CollisionResponse2DManifoldTests
                 pair.ContactDependenciesChanged.Should().BeTrue();
                 break;
         }
-        // Ordinary trigger and filter changes do not alter geometry stamps.
-        // Queue validation must still check current eligibility and identity.
-        if (mutation != "separated") pair.ContactDependenciesChanged.Should().BeFalse();
+        // Filters now invalidate contact dependencies without changing geometry.
+        // Queue validation must also reject retired identity and trigger changes.
+        pair.ContactDependenciesChanged.Should().Be(mutation is "filter" or "separated");
 
         typeof(GravitasPhysics2DService).GetMethod("SolveDiscreteResponsePairs",
             BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(context.Physics2D, null);

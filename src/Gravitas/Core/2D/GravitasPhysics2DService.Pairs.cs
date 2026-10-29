@@ -379,13 +379,16 @@ public sealed partial class GravitasPhysics2DService
             _pairsPendingSeparation.FastClear();
     }
 
-    internal void ClearWarmStartCachesForCollider(LSCollider2D collider)
+    internal void ClearWarmStartCachesForCollider(LSCollider2D collider, SwiftHashSet<int>? changedSuppliers = null)
     {
         SwiftDictionary<int, CollisionPair2D>? collisionPairs = collider.CollisionPairs;
         if (collisionPairs != null)
         {
             foreach (var pairEntry in collisionPairs)
-                pairEntry.Value.ClearWarmStart();
+            {
+                if (changedSuppliers == null) pairEntry.Value.ClearWarmStart();
+                else pairEntry.Value.InvalidateSurfaceContact(collider, changedSuppliers);
+            }
         }
 
         SwiftHashSet<int>? collisionPairHolders = collider.CollisionPairHolders;
@@ -397,7 +400,8 @@ public sealed partial class GravitasPhysics2DService
             if (TryGetColliderById(holderId, out LSCollider2D? holder)
                 && holder!.TryGetCollisionPair(collider.Id, out CollisionPair2D? pair))
             {
-                pair!.ClearWarmStart();
+                if (changedSuppliers == null) pair!.ClearWarmStart();
+                else pair!.InvalidateSurfaceContact(collider, changedSuppliers);
             }
         }
     }

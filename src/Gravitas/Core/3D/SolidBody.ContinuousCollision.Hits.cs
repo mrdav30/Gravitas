@@ -17,6 +17,9 @@ namespace Gravitas;
 
 public partial class SolidBody
 {
+    private ContinuousSurfaceTriangleAdmission? _admitContinuousSurfaceTriangle;
+    private Vector3d _continuousSurfaceStart, _continuousSurfaceEnd, _continuousSurfaceBodyStart;
+
     private bool TryGetFirstContinuousCollisionHit(
         Vector3d startPosition,
         Vector3d proposedPosition,
@@ -165,7 +168,22 @@ public partial class SolidBody
                 continue;
 
             Physics3DHit refined;
-            if (hitsAreShapeExact)
+            // Other convex sources already apply native admission in their
+            // exact candidate query; sphere candidates use the proxy collector.
+            bool surfaceHit = Collider is LSSphereCollider
+                && candidate.Collider is LSMeshCollider { StaticSurface: not null };
+            if (surfaceHit)
+            {
+                _continuousSurfaceBodyStart = startPosition;
+                _continuousSurfaceStart = Collider.Center;
+                _continuousSurfaceEnd = Collider.Center + displacement;
+                var admission = _admitContinuousSurfaceTriangle ??= AdmitContinuousSurfaceTriangle;
+                _shapeExactContinuousSweepWorker.Prepare(_continuousSurfaceStart, _continuousSurfaceEnd, Collider.ScaledRadius);
+                if (!_shapeExactContinuousSweepWorker.TrySweepMeshForContinuousCollision((LSMeshCollider)candidate.Collider!,
+                    admission, out refined)) continue;
+                refined = ApplyShapeExactContinuousContactSlop(refined);
+            }
+            else if (hitsAreShapeExact)
                 refined = ApplyShapeExactContinuousContactSlop(candidate);
             else if (TryRefineShapeExactContinuousCollisionHit(candidate, displacement, direction, out Physics3DHit exactHit, out bool exactSupported))
                 refined = exactHit;
@@ -174,8 +192,7 @@ public partial class SolidBody
             else
                 refined = candidate;
 
-            Vector3d closingNormal = hitsAreShapeExact
-                ? candidate.Normal
+            Vector3d closingNormal = hitsAreShapeExact ? candidate.Normal
                 : refined.Normal;
 
             if (!IsClosingContinuousCollisionHit(displacement, closingNormal))
@@ -192,6 +209,41 @@ public partial class SolidBody
         return found;
     }
 
+    private bool AdmitContinuousSurfaceTriangle(int triangle, ref Physics3DHit hit, WideDirection3d? exactNormal)
+    {
+        var target = (LSMeshCollider)hit.Collider!;
+        Vector3d displacement = _continuousSurfaceEnd - _continuousSurfaceStart;
+        Vector3d center = new FixedSegment(_continuousSurfaceStart, _continuousSurfaceEnd)
+            .GetPointAtDistance(hit.Distance, displacement.Magnitude);
+        Vector3d original = Position3d;
+        bool positionMutated = _positionMutated;
+        try
+        {
+            Position3d = _continuousSurfaceBodyStart + (center - _continuousSurfaceStart);
+            Collider.RebuildRuntimeShapeOnly(refreshMassProperties: false);
+            // Filled joined contact owners remove authored diagonals before a
+            // triangle's conservative sweep witness can select response.
+            if (TryBuildContinuousCollisionManifold(target))
+            {
+                OrderRotationalContinuousCollisionPair(target, out _, out _, out bool sourceIsA);
+                foreach (ManifoldContact row in _rotationalContinuousCollisionManifold)
+                {
+                    Vector3d normal = ResolveSourceOutwardContactNormal(target, row);
+                    if (!IsClosingContinuousCollisionHit(displacement, normal)) continue;
+                    hit = new(target, sourceIsA ? row.AnchorB : row.AnchorA, normal, hit.Distance, hit.Direction);
+                    return true;
+                }
+                return false;
+            }
+            return IsClosingContinuousCollisionHit(displacement, hit.Normal)
+                && target.StaticSurface!.AdmitContinuousWitness(Collider, null, center, target, triangle, hit.Anchor, exactNormal);
+        }
+        finally
+        {
+            Position3d = original; Collider.RebuildRuntimeShapeOnly(refreshMassProperties: false);
+            _positionMutated = positionMutated;
+        }
+    }
     private int QueryStaticContinuousCollisionHits(
         Vector3d startPosition,
         Vector3d proposedPosition,
@@ -202,13 +254,17 @@ public partial class SolidBody
         if (Collider is not LSSphereCollider && IsExactConvexSourceSupported(Collider))
         {
             hitsAreShapeExact = true;
+            _continuousSurfaceBodyStart = startPosition;
+            _continuousSurfaceStart = Collider.Center;
+            _continuousSurfaceEnd = Collider.Center + displacement;
             return Context.Query3D.SweepExactSourceAgainstStaticAll(
                 Collider,
                 displacement,
                 PhysicsLayerMask.All,
                 _continuousCollisionHits,
                 Collider,
-                includeTriggers: false);
+                includeTriggers: false,
+                surfaceAdmission: _admitContinuousSurfaceTriangle ??= AdmitContinuousSurfaceTriangle);
         }
 
         hitsAreShapeExact = false;
@@ -234,6 +290,8 @@ public partial class SolidBody
             PhysicsMixedHit candidate = _continuousMixedCollisionHits[i];
             if (!IsValidMixedContinuousCollisionHit(candidate.Collider2D!))
                 continue;
+            bool exactSphere = candidate.Collider2D!.StaticSurface != null && GravitasQueryMixedService.TryResolveExactSphereSourceFor2D(Collider,
+                candidate.Collider2D!, displacement, out _, out _, out _);
 
             if (UsesMixedStaticManifold(candidate.Collider2D!))
             {
@@ -250,6 +308,17 @@ public partial class SolidBody
                         closing.Anchor2D, closing.Normal3DTo2D, candidate.ReducerKind,
                         candidate.Distance, candidate.Direction3D);
                 }
+                else if (exactSphere && candidate.Collider2D!.StaticSurface is { } surface)
+                {
+                    Vector3d original = Position3d;
+                    try
+                    {
+                        SetMixedContinuousCollisionSamplePose(position, Rotation);
+                        if (!surface.AdmitMixedContinuousWitness(Collider, Collider.Center, candidate.Collider2D,
+                            candidate.Anchor2D)) continue;
+                    }
+                    finally { SetMixedContinuousCollisionSamplePose(original, Rotation); }
+                }
             }
             if (!IsClosingContinuousCollisionHit(displacement, candidate.NormalFor3DSource))
                 continue;
@@ -263,7 +332,7 @@ public partial class SolidBody
     }
 
     private bool UsesMixedStaticManifold(LSCollider2D target)
-        => target is LSCompoundCollider2D || Collider is LSCompoundCollider or LSMeshCollider;
+        => target.StaticSurface != null || target is LSCompoundCollider2D || Collider is LSCompoundCollider or LSMeshCollider;
 
     private bool TryBuildStaticMixedContinuousCollisionManifold(LSCollider2D target,
         Vector3d position, FixedQuaternion rotation)
@@ -275,7 +344,7 @@ public partial class SolidBody
             SetMixedContinuousCollisionSamplePose(position, rotation);
             // Translational moving-target searches overwrite Known only; the
             // mutually exclusive rotational path owns this same accepted buffer.
-            return CollisionDetectionMixed.TryBuildManifold(Collider, target, _rotationalMixedEarliestManifold);
+            return CollisionDetectionMixed.TryBuildDiscreteManifold(Collider, target, _rotationalMixedEarliestManifold);
         }
         finally
         {

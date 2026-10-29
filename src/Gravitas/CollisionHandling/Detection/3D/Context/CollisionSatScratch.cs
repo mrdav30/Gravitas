@@ -47,4 +47,10 @@ internal sealed class CollisionSatScratch
     public ContactManifold CompoundPartManifold { get; } = new();
 
     public ContactManifold MixedManifold { get; } = new();
+
+    // Pair refreshes borrow these only during synchronous narrow phase after a matrix edit.
+    private ContactManifold? _surfaceContactSnapshot3D;
+    internal ContactManifold SurfaceContactSnapshot3D => _surfaceContactSnapshot3D ??= new();
+    private ContactManifold2D? _surfaceContactSnapshot2D;
+    internal ContactManifold2D SurfaceContactSnapshot2D => _surfaceContactSnapshot2D ??= new();
 }

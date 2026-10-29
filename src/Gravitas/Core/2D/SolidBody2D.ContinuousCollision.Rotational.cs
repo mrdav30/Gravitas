@@ -159,6 +159,7 @@ public sealed partial class SolidBody2D
         Fixed64 originalRotation = _rotation;
         LSCollider2D? originalIgnoredCollider = _continuousCollisionHandoffIgnoredCollider2D;
         LSCollider? originalIgnoredMixedCollider = _continuousCollisionHandoffIgnoredCollider3D;
+        _resolvedMixedSurfaceFamilies?.Clear();
         bool resolved = false;
         Vector2d currentPosition = startPosition;
         Fixed64 currentRotation = startRotation;
@@ -321,7 +322,8 @@ public sealed partial class SolidBody2D
                 if (!canResolveMovingPair)
                 {
                     bool unresolvedInterval = !responseWitnessIsEarliest
-                        || !(useMixed ? mixedHit.HasContact : hasContact);
+                        || !(useMixed ? mixedHit.HasContact : hasContact)
+                        || useMixed && !mixedHit.HasClosingContact;
                     if (unresolvedInterval)
                     {
                         // A later witness cannot supply a response at this frontier.
@@ -371,6 +373,7 @@ public sealed partial class SolidBody2D
                 }
                 else
                 {
+                    _resolvedMixedSurfaceFamilies?.Clear();
                     _continuousCollisionHandoffIgnoredCollider2D = target;
                     _continuousCollisionHandoffIgnoredCollider3D = null;
                 }
@@ -394,6 +397,7 @@ public sealed partial class SolidBody2D
         }
         finally
         {
+            _resolvedMixedSurfaceFamilies?.Clear();
             _continuousCollisionHandoffIgnoredCollider2D = originalIgnoredCollider;
             _position = originalPosition;
             _rotation = originalRotation;

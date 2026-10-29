@@ -182,16 +182,24 @@ public sealed class JoinedStaticSurfaceShapeTests
         {
             var pair = scene.CreatePair(member, cone);
             Assert.True(CollisionDetection.DoCollisionCheck(pair));
-            foreach (var row in pair.Manifold)
+            for (int groupIndex = 0; groupIndex < pair.Manifold.GroupCount; groupIndex++)
             {
-                count++;
-                Assert.Equal(Vector3d.Up, row.Normal);
-                Assert.Equal(member.Material, row.MaterialA);
-                Assert.True(row.AnchorA.TryGetWorldPoint(out var point));
-                Assert.InRange(point.Y.m_rawValue, -1, 1);
-                Assert.True(row.AnchorA.TryGetOffsetFrom(cone.Center, out Vector3d localSurfacePoint));
-                Assert.Equal(point - cone.Center, localSurfacePoint);
-                maximum = FixedMath.Max(maximum, row.Depth);
+                ref ContactGroup group = ref pair.Manifold.GetGroup(groupIndex);
+                Assert.True(group.Key.SourceIdA == left.Id + 1 || group.Key.SourceIdA == right.Id + 1);
+                LSMeshCollider supplier = group.Key.SourceIdA == left.Id + 1 ? left : right;
+                for (int pointIndex = 0; pointIndex < group.Count; pointIndex++)
+                {
+                    ManifoldContact row = group[pointIndex];
+                    count++;
+                    Assert.Equal(Vector3d.Up, row.Normal);
+                    Assert.Equal(supplier.Material, row.MaterialA);
+                    Assert.True(row.AnchorA.TryGetWorldPoint(out var point));
+                    Assert.InRange(point.Y.m_rawValue, -1, 1);
+                    Assert.InRange(point.X.m_rawValue, supplier.BoundsMin.X.m_rawValue - 1, supplier.BoundsMax.X.m_rawValue + 1);
+                    Assert.True(row.AnchorA.TryGetOffsetFrom(cone.Center, out Vector3d localSurfacePoint));
+                    Assert.Equal(point - cone.Center, localSurfacePoint);
+                    maximum = FixedMath.Max(maximum, row.Depth);
+                }
             }
         }
         Assert.InRange(count, 1, ContactManifold.MaxContactsPerGroup);
@@ -373,10 +381,18 @@ public sealed class JoinedStaticSurfaceShapeTests
             var result = new List<(Vector3d, Fixed64, Vector3d, Vector3d)>();
             var pair = scene.CreatePair(source, cone);
             Assert.True(CollisionDetection.DoCollisionCheck(pair));
-            foreach (var row in pair.Manifold)
+            for (int groupIndex = 0; groupIndex < pair.Manifold.GroupCount; groupIndex++)
             {
-                Assert.True(row.AnchorA.TryGetWorldPoint(out var a)); Assert.True(row.AnchorB.TryGetWorldPoint(out var b));
-                result.Add((row.Normal, row.Depth, a, b));
+                ref ContactGroup group = ref pair.Manifold.GetGroup(groupIndex);
+                // A canonical response carrier can also retain its neighbor's
+                // rows. This regression compares this source owner's domain.
+                if (group.Key.SourceIdA != 0 && group.Key.SourceIdA != source.Id + 1) continue;
+                for (int index = 0; index < group.Count; index++)
+                {
+                    ManifoldContact row = group[index];
+                    Assert.True(row.AnchorA.TryGetWorldPoint(out var a)); Assert.True(row.AnchorB.TryGetWorldPoint(out var b));
+                    result.Add((row.Normal, row.Depth, a, b));
+                }
             }
             return result;
         }
@@ -407,10 +423,16 @@ public sealed class JoinedStaticSurfaceShapeTests
             var result = new List<(Vector3d, Fixed64, Vector3d, Vector3d)>();
             var pair = scene.CreatePair(source, cone);
             Assert.True(CollisionDetection.DoCollisionCheck(pair));
-            foreach (var row in pair.Manifold)
+            for (int groupIndex = 0; groupIndex < pair.Manifold.GroupCount; groupIndex++)
             {
-                Assert.True(row.AnchorA.TryGetWorldPoint(out var a)); Assert.True(row.AnchorB.TryGetWorldPoint(out var b));
-                result.Add((row.Normal, row.Depth, a, b));
+                ref ContactGroup group = ref pair.Manifold.GetGroup(groupIndex);
+                if (group.Key.SourceIdA != 0 && group.Key.SourceIdA != source.Id + 1) continue;
+                for (int index = 0; index < group.Count; index++)
+                {
+                    ManifoldContact row = group[index];
+                    Assert.True(row.AnchorA.TryGetWorldPoint(out var a)); Assert.True(row.AnchorB.TryGetWorldPoint(out var b));
+                    result.Add((row.Normal, row.Depth, a, b));
+                }
             }
             return result;
         }

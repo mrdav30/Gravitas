@@ -39,7 +39,7 @@ internal sealed partial class StaticSurface2D
                     prism.Offsets, member.MixedHalfThickness)) continue;
             _mixedOverlaps.Add(member.Id);
             int component = _mixedComponents[_mixedMember], carrier = _mixedCurvedCarriers[component];
-            if (carrier < 0 || member.Id < carrier) _mixedCurvedCarriers[component] = member.Id;
+            if (carrier < 0) _mixedCurvedCarriers[component] = member.Id;
         }
         if (!_mixedBoundaryLinesCurrent) PrepareMixedBoundaryLines();
         PrepareMixedCurvedCertificates(cone, height, vertices);

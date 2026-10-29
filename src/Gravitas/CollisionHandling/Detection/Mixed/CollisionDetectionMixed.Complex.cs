@@ -19,25 +19,52 @@ public static partial class CollisionDetectionMixed
 {
     // Interval probes need exact admission; depth, anchors and closing rows are
     // materialized once at the retained witness using the ordinary manifold path.
-    internal static bool IntersectsForContinuousCollision(LSCollider collider3D, LSCollider2D embedded)
+    internal static bool IntersectsForContinuousCollision(LSCollider collider3D, LSCollider2D embedded,
+        Fixed64 padding = default, int surfaceOwner = -1, MeshSlabFaceRegions? handledFaces = null)
     {
         if (collider3D is not LSMeshCollider mesh
-            || embedded is not (LSCircleCollider2D or LSCapsuleCollider2D or LSAABBoxCollider2D or LSPolygonCollider2D))
-            return TryBuildManifold(collider3D, embedded, collider3D.Context.CollisionScratch.MixedManifold);
-        if (!mesh.Bounds.Intersects(embedded.MixedBounds3D)) return false;
-        SwiftList<int> candidates = mesh.Context.CollisionScratch.MeshTriangleCandidatesA;
-        mesh.GetTrianglesInBounds(new FixedBoundVolume(embedded.MixedBounds3D.Min, embedded.MixedBounds3D.Max), candidates);
+            || embedded is not (LSCircleCollider2D or LSCapsuleCollider2D or LSAABBoxCollider2D or LSPolygonCollider2D)
+            || mesh.Mode == MeshColliderMode.Convex && mesh.IsClosedSurface)
+            // A boundary-only query cannot exclude a solid hull's interior.
+            return padding > Fixed64.Zero || TryBuildManifold(collider3D, embedded, collider3D.Context.CollisionScratch.MixedManifold);
         Fixed64 length = embedded is LSCapsuleCollider2D capsule ? capsule.AxisLength : Fixed64.Zero;
         Fixed64 radius = embedded is LSCircleCollider2D circle ? circle.ScaledRadius
             : embedded is LSCapsuleCollider2D stadium ? stadium.ScaledRadius : Fixed64.Zero;
+        Fixed64 halfThickness = embedded.MixedHalfThickness;
+        Vector3d center = GetEmbeddedCenter3D(embedded);
+        FixedBoundBox bounds = embedded.MixedBounds3D;
+        if (padding > Fixed64.Zero)
+        {
+            // This is an interval enclosure, never physical admission. A world
+            // motion ball fits inside a stadium enlarged radially and at both caps.
+            if (embedded is not (LSCircleCollider2D or LSCapsuleCollider2D)
+                || !Fixed64.TryAdd(radius, padding, out radius)
+                || !Fixed64.TryAdd(halfThickness, padding, out halfThickness)
+                || !Fixed64.TryAdd(embedded.CanonicalCenteredProxyRadius, padding, out Fixed64 reach)) return true;
+            // The existing affine section kernel proves these widths. Wider
+            // trusted search padding remains unresolved rather than being capped.
+            if (!mesh.Mesh.GeometryFrame.IsRigid && (radius > ColliderGeometryPolicy.MaximumGeometryReach
+                || halfThickness > ColliderGeometryPolicy.MaximumGeometryReach)) return true;
+            Vector3d scope = new(reach, halfThickness, reach);
+            if (!Vector3d.TrySubtract(center, scope, out Vector3d minimum)
+                || !Vector3d.TryAdd(center, scope, out Vector3d maximum)) return true;
+            bounds = FixedBoundBox.FromMinMax(minimum, maximum);
+        }
+        if (!mesh.Bounds.Intersects(bounds)) return false;
         Fixed64 yaw = embedded is LSAABBoxCollider2D ? Fixed64.Zero : embedded.Rotation;
         var section = new FiniteSlabSectionFrame(mesh.Mesh.GeometryFrame,
-            GetEmbeddedCenter3D(embedded), FixedQuaternion.FromAxisAngle(Vector3d.Up, -yaw),
-            length, radius, embedded.MixedHalfThickness);
+            center, FixedQuaternion.FromAxisAngle(Vector3d.Up, -yaw), length, radius, halfThickness);
         Span<Vector2d> box = stackalloc Vector2d[4];
         ReadOnlySpan<Vector2d> offsets = GetConvexPrismOffsets(embedded, box);
+        // A solved face still owns its true finite perimeter. Curved sections
+        // admit exact retained subsegments; unknown prism cuts stay unresolved.
+        if (handledFaces != null)
+            return !offsets.IsEmpty || handledFaces.IntersectsContinuousBoundary(mesh, surfaceOwner, section);
+        SwiftList<int> candidates = mesh.Context.CollisionScratch.MeshTriangleCandidatesA;
+        mesh.GetTrianglesInBounds(new FixedBoundVolume(bounds.Min, bounds.Max), candidates);
         foreach (int triangle in candidates.AsReadOnlySpan())
         {
+            if (surfaceOwner >= 0 && mesh.Mesh.GetManifoldSurfaceOwner(triangle) != surfaceOwner) continue;
             mesh.Mesh.GetGeometryTriangleVertices(triangle, out Vector3d first, out Vector3d second, out Vector3d third);
             if (section.IntersectsTriangle(new FixedTriangle(first, second, third), offsets)) return true;
         }

@@ -1,0 +1,2267 @@
+{
+  "Version": 1,
+  "Name": "joined-surfaces-v1",
+  "RuntimeMode": "Both",
+  "FrameCount": 12,
+  "FrameRate": 16,
+  "SolverIterations": 6,
+  "MaxSpeedRaw": 274877906944,
+  "Actors": [
+    {
+      "Id": 10,
+      "Dimension": "3D",
+      "Shape": "Mesh",
+      "PositionRaw": [
+        0,
+        0,
+        0
+      ],
+      "SizeRaw": [],
+      "MassRaw": 4294967296,
+      "MotionType": "Static",
+      "Continuous": false,
+      "Frictionless": true,
+      "PreventAngularForces": true,
+      "SurfaceGroup": 1,
+      "VerticesRaw": [
+        [
+          -17179869184,
+          0,
+          25769803776
+        ],
+        [
+          -17179869184,
+          0,
+          42949672960
+        ],
+        [
+          0,
+          0,
+          25769803776
+        ],
+        [
+          0,
+          0,
+          42949672960
+        ]
+      ],
+      "Triangles": [
+        0,
+        1,
+        2,
+        2,
+        1,
+        3
+      ]
+    },
+    {
+      "Id": 11,
+      "Dimension": "3D",
+      "Shape": "Mesh",
+      "PositionRaw": [
+        0,
+        0,
+        0
+      ],
+      "SizeRaw": [],
+      "MassRaw": 4294967296,
+      "MotionType": "Static",
+      "Continuous": false,
+      "Frictionless": true,
+      "PreventAngularForces": true,
+      "SurfaceGroup": 1,
+      "VerticesRaw": [
+        [
+          0,
+          0,
+          25769803776
+        ],
+        [
+          0,
+          0,
+          42949672960
+        ],
+        [
+          17179869184,
+          0,
+          25769803776
+        ],
+        [
+          17179869184,
+          0,
+          42949672960
+        ]
+      ],
+      "Triangles": [
+        0,
+        1,
+        2,
+        2,
+        1,
+        3
+      ]
+    },
+    {
+      "Id": 12,
+      "Dimension": "3D",
+      "Shape": "Sphere",
+      "PositionRaw": [
+        -536870912,
+        2104533975,
+        34359738368
+      ],
+      "SizeRaw": [],
+      "MassRaw": 4294967296,
+      "MotionType": "Dynamic",
+      "Continuous": true,
+      "Frictionless": true,
+      "PreventAngularForces": true
+    },
+    {
+      "Id": 20,
+      "Dimension": "2D",
+      "Shape": "Box",
+      "PositionRaw": [
+        -8589934592,
+        0,
+        -2147483648
+      ],
+      "SizeRaw": [
+        17179869184,
+        4294967296,
+        4294967296
+      ],
+      "MassRaw": 4294967296,
+      "MotionType": "Static",
+      "Continuous": false,
+      "Frictionless": true,
+      "PreventAngularForces": true,
+      "SurfaceGroup": 2
+    },
+    {
+      "Id": 21,
+      "Dimension": "2D",
+      "Shape": "Box",
+      "PositionRaw": [
+        8589934592,
+        0,
+        -2147483648
+      ],
+      "SizeRaw": [
+        17179869184,
+        4294967296,
+        4294967296
+      ],
+      "MassRaw": 4294967296,
+      "MotionType": "Static",
+      "Continuous": false,
+      "Frictionless": true,
+      "PreventAngularForces": true,
+      "SurfaceGroup": 2
+    },
+    {
+      "Id": 22,
+      "Dimension": "2D",
+      "Shape": "Sphere",
+      "PositionRaw": [
+        -536870912,
+        0,
+        2104533975
+      ],
+      "SizeRaw": [],
+      "MassRaw": 4294967296,
+      "MotionType": "Dynamic",
+      "Continuous": true,
+      "Frictionless": true,
+      "PreventAngularForces": true
+    }
+  ],
+  "Commands": [
+    {
+      "Frame": 0,
+      "Operation": "Impulse",
+      "Actor": 12,
+      "ValueRaw": [
+        4294967296,
+        0,
+        0
+      ]
+    },
+    {
+      "Frame": 0,
+      "Operation": "Impulse",
+      "Actor": 22,
+      "ValueRaw": [
+        4294967296,
+        0,
+        0
+      ]
+    },
+    {
+      "Frame": 0,
+      "Operation": "Impulse",
+      "Actor": 12,
+      "ValueRaw": [
+        0,
+        -268435456,
+        0
+      ]
+    },
+    {
+      "Frame": 0,
+      "Operation": "Impulse",
+      "Actor": 22,
+      "ValueRaw": [
+        0,
+        0,
+        -268435456
+      ]
+    },
+    {
+      "Frame": 1,
+      "Operation": "Impulse",
+      "Actor": 12,
+      "ValueRaw": [
+        0,
+        -268435456,
+        0
+      ]
+    },
+    {
+      "Frame": 1,
+      "Operation": "Impulse",
+      "Actor": 22,
+      "ValueRaw": [
+        0,
+        0,
+        -268435456
+      ]
+    },
+    {
+      "Frame": 2,
+      "Operation": "Impulse",
+      "Actor": 12,
+      "ValueRaw": [
+        0,
+        -268435456,
+        0
+      ]
+    },
+    {
+      "Frame": 2,
+      "Operation": "Impulse",
+      "Actor": 22,
+      "ValueRaw": [
+        0,
+        0,
+        -268435456
+      ]
+    },
+    {
+      "Frame": 3,
+      "Operation": "Impulse",
+      "Actor": 12,
+      "ValueRaw": [
+        0,
+        -268435456,
+        0
+      ]
+    },
+    {
+      "Frame": 3,
+      "Operation": "Impulse",
+      "Actor": 22,
+      "ValueRaw": [
+        0,
+        0,
+        -268435456
+      ]
+    },
+    {
+      "Frame": 4,
+      "Operation": "Impulse",
+      "Actor": 12,
+      "ValueRaw": [
+        0,
+        -268435456,
+        0
+      ]
+    },
+    {
+      "Frame": 4,
+      "Operation": "Impulse",
+      "Actor": 22,
+      "ValueRaw": [
+        0,
+        0,
+        -268435456
+      ]
+    },
+    {
+      "Frame": 5,
+      "Operation": "Impulse",
+      "Actor": 12,
+      "ValueRaw": [
+        0,
+        -268435456,
+        0
+      ]
+    },
+    {
+      "Frame": 5,
+      "Operation": "Impulse",
+      "Actor": 22,
+      "ValueRaw": [
+        0,
+        0,
+        -268435456
+      ]
+    },
+    {
+      "Frame": 6,
+      "Operation": "Impulse",
+      "Actor": 12,
+      "ValueRaw": [
+        0,
+        -268435456,
+        0
+      ]
+    },
+    {
+      "Frame": 6,
+      "Operation": "Impulse",
+      "Actor": 22,
+      "ValueRaw": [
+        0,
+        0,
+        -268435456
+      ]
+    },
+    {
+      "Frame": 7,
+      "Operation": "Impulse",
+      "Actor": 12,
+      "ValueRaw": [
+        0,
+        -268435456,
+        0
+      ]
+    },
+    {
+      "Frame": 7,
+      "Operation": "Impulse",
+      "Actor": 22,
+      "ValueRaw": [
+        0,
+        0,
+        -268435456
+      ]
+    },
+    {
+      "Frame": 8,
+      "Operation": "Impulse",
+      "Actor": 12,
+      "ValueRaw": [
+        0,
+        -268435456,
+        0
+      ]
+    },
+    {
+      "Frame": 8,
+      "Operation": "Impulse",
+      "Actor": 22,
+      "ValueRaw": [
+        0,
+        0,
+        -268435456
+      ]
+    },
+    {
+      "Frame": 9,
+      "Operation": "Impulse",
+      "Actor": 12,
+      "ValueRaw": [
+        0,
+        -268435456,
+        0
+      ]
+    },
+    {
+      "Frame": 9,
+      "Operation": "Impulse",
+      "Actor": 22,
+      "ValueRaw": [
+        0,
+        0,
+        -268435456
+      ]
+    },
+    {
+      "Frame": 10,
+      "Operation": "Impulse",
+      "Actor": 12,
+      "ValueRaw": [
+        0,
+        -268435456,
+        0
+      ]
+    },
+    {
+      "Frame": 10,
+      "Operation": "Impulse",
+      "Actor": 22,
+      "ValueRaw": [
+        0,
+        0,
+        -268435456
+      ]
+    },
+    {
+      "Frame": 11,
+      "Operation": "Impulse",
+      "Actor": 12,
+      "ValueRaw": [
+        0,
+        -268435456,
+        0
+      ]
+    },
+    {
+      "Frame": 11,
+      "Operation": "Impulse",
+      "Actor": 22,
+      "ValueRaw": [
+        0,
+        0,
+        -268435456
+      ]
+    }
+  ],
+  "Expected": [
+    {
+      "FrameCount": 1,
+      "LateToken": 1,
+      "Authoritative": "544b79103558e7b0fd715863a42d0cec",
+      "SolverCaches": null,
+      "Bodies": [
+        {
+          "Actor": 10,
+          "PositionRaw": [
+            0,
+            0,
+            0
+          ],
+          "RotationRaw": [
+            0,
+            0,
+            0,
+            4294967296
+          ],
+          "VelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 11,
+          "PositionRaw": [
+            0,
+            0,
+            0
+          ],
+          "RotationRaw": [
+            0,
+            0,
+            0,
+            4294967296
+          ],
+          "VelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 12,
+          "PositionRaw": [
+            -268435456,
+            2104533976,
+            34359738368
+          ],
+          "RotationRaw": [
+            0,
+            0,
+            0,
+            4294967296
+          ],
+          "VelocityRaw": [
+            4294967296,
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 1
+        },
+        {
+          "Actor": 20,
+          "PositionRaw": [
+            -8589934592,
+            -2147483648
+          ],
+          "RotationRaw": [
+            0
+          ],
+          "VelocityRaw": [
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 21,
+          "PositionRaw": [
+            8589934592,
+            -2147483648
+          ],
+          "RotationRaw": [
+            0
+          ],
+          "VelocityRaw": [
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 22,
+          "PositionRaw": [
+            -268435456,
+            2104533976
+          ],
+          "RotationRaw": [
+            0
+          ],
+          "VelocityRaw": [
+            4294967296,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        }
+      ],
+      "Events": [
+        "enter:10:12",
+        "contact:10:12",
+        "enter:12:10",
+        "contact:12:10",
+        "enter:11:12",
+        "contact:11:12",
+        "enter:12:11",
+        "contact:12:11",
+        "enter:20:22",
+        "contact:20:22",
+        "enter:22:20",
+        "contact:22:20",
+        "enter:21:22",
+        "contact:21:22",
+        "enter:22:21",
+        "contact:22:21"
+      ],
+      "Queries": []
+    },
+    {
+      "FrameCount": 2,
+      "LateToken": 2,
+      "Authoritative": "a765a0adc1f6c9088e173989c62222a0",
+      "SolverCaches": null,
+      "Bodies": [
+        {
+          "Actor": 10,
+          "PositionRaw": [
+            0,
+            0,
+            0
+          ],
+          "RotationRaw": [
+            0,
+            0,
+            0,
+            4294967296
+          ],
+          "VelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 11,
+          "PositionRaw": [
+            0,
+            0,
+            0
+          ],
+          "RotationRaw": [
+            0,
+            0,
+            0,
+            4294967296
+          ],
+          "VelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 12,
+          "PositionRaw": [
+            0,
+            2104533976,
+            34359738368
+          ],
+          "RotationRaw": [
+            0,
+            0,
+            0,
+            4294967296
+          ],
+          "VelocityRaw": [
+            4294967296,
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 1
+        },
+        {
+          "Actor": 20,
+          "PositionRaw": [
+            -8589934592,
+            -2147483648
+          ],
+          "RotationRaw": [
+            0
+          ],
+          "VelocityRaw": [
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 21,
+          "PositionRaw": [
+            8589934592,
+            -2147483648
+          ],
+          "RotationRaw": [
+            0
+          ],
+          "VelocityRaw": [
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 22,
+          "PositionRaw": [
+            0,
+            2104533976
+          ],
+          "RotationRaw": [
+            0
+          ],
+          "VelocityRaw": [
+            4294967296,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        }
+      ],
+      "Events": [
+        "contact:10:12",
+        "contact:12:10",
+        "contact:11:12",
+        "contact:12:11",
+        "contact:20:22",
+        "contact:22:20",
+        "contact:21:22",
+        "contact:22:21"
+      ],
+      "Queries": []
+    },
+    {
+      "FrameCount": 3,
+      "LateToken": 3,
+      "Authoritative": "811ac8b15d75bd4643d4d13cdecd9fa9",
+      "SolverCaches": null,
+      "Bodies": [
+        {
+          "Actor": 10,
+          "PositionRaw": [
+            0,
+            0,
+            0
+          ],
+          "RotationRaw": [
+            0,
+            0,
+            0,
+            4294967296
+          ],
+          "VelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 11,
+          "PositionRaw": [
+            0,
+            0,
+            0
+          ],
+          "RotationRaw": [
+            0,
+            0,
+            0,
+            4294967296
+          ],
+          "VelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 12,
+          "PositionRaw": [
+            268435456,
+            2104533976,
+            34359738368
+          ],
+          "RotationRaw": [
+            0,
+            0,
+            0,
+            4294967296
+          ],
+          "VelocityRaw": [
+            4294967296,
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 1
+        },
+        {
+          "Actor": 20,
+          "PositionRaw": [
+            -8589934592,
+            -2147483648
+          ],
+          "RotationRaw": [
+            0
+          ],
+          "VelocityRaw": [
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 21,
+          "PositionRaw": [
+            8589934592,
+            -2147483648
+          ],
+          "RotationRaw": [
+            0
+          ],
+          "VelocityRaw": [
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 22,
+          "PositionRaw": [
+            268435456,
+            2104533976
+          ],
+          "RotationRaw": [
+            0
+          ],
+          "VelocityRaw": [
+            4294967296,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        }
+      ],
+      "Events": [
+        "contact:10:12",
+        "contact:12:10",
+        "contact:11:12",
+        "contact:12:11",
+        "contact:20:22",
+        "contact:22:20",
+        "contact:21:22",
+        "contact:22:21"
+      ],
+      "Queries": []
+    },
+    {
+      "FrameCount": 4,
+      "LateToken": 4,
+      "Authoritative": "08a826f03fdde1ed94ebf486608bad0e",
+      "SolverCaches": null,
+      "Bodies": [
+        {
+          "Actor": 10,
+          "PositionRaw": [
+            0,
+            0,
+            0
+          ],
+          "RotationRaw": [
+            0,
+            0,
+            0,
+            4294967296
+          ],
+          "VelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 11,
+          "PositionRaw": [
+            0,
+            0,
+            0
+          ],
+          "RotationRaw": [
+            0,
+            0,
+            0,
+            4294967296
+          ],
+          "VelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 12,
+          "PositionRaw": [
+            536870912,
+            2104533976,
+            34359738368
+          ],
+          "RotationRaw": [
+            0,
+            0,
+            0,
+            4294967296
+          ],
+          "VelocityRaw": [
+            4294967296,
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 1
+        },
+        {
+          "Actor": 20,
+          "PositionRaw": [
+            -8589934592,
+            -2147483648
+          ],
+          "RotationRaw": [
+            0
+          ],
+          "VelocityRaw": [
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 21,
+          "PositionRaw": [
+            8589934592,
+            -2147483648
+          ],
+          "RotationRaw": [
+            0
+          ],
+          "VelocityRaw": [
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 22,
+          "PositionRaw": [
+            536870912,
+            2104533976
+          ],
+          "RotationRaw": [
+            0
+          ],
+          "VelocityRaw": [
+            4294967296,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        }
+      ],
+      "Events": [
+        "exit:10:12",
+        "exit:12:10",
+        "contact:11:12",
+        "contact:12:11",
+        "contact:21:22",
+        "contact:22:21",
+        "exit:20:22",
+        "exit:22:20"
+      ],
+      "Queries": []
+    },
+    {
+      "FrameCount": 5,
+      "LateToken": 5,
+      "Authoritative": "c65a607d55cf60cfca197d61c16e785e",
+      "SolverCaches": null,
+      "Bodies": [
+        {
+          "Actor": 10,
+          "PositionRaw": [
+            0,
+            0,
+            0
+          ],
+          "RotationRaw": [
+            0,
+            0,
+            0,
+            4294967296
+          ],
+          "VelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 11,
+          "PositionRaw": [
+            0,
+            0,
+            0
+          ],
+          "RotationRaw": [
+            0,
+            0,
+            0,
+            4294967296
+          ],
+          "VelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 12,
+          "PositionRaw": [
+            805306368,
+            2104533976,
+            34359738368
+          ],
+          "RotationRaw": [
+            0,
+            0,
+            0,
+            4294967296
+          ],
+          "VelocityRaw": [
+            4294967296,
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 1
+        },
+        {
+          "Actor": 20,
+          "PositionRaw": [
+            -8589934592,
+            -2147483648
+          ],
+          "RotationRaw": [
+            0
+          ],
+          "VelocityRaw": [
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 21,
+          "PositionRaw": [
+            8589934592,
+            -2147483648
+          ],
+          "RotationRaw": [
+            0
+          ],
+          "VelocityRaw": [
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 22,
+          "PositionRaw": [
+            805306368,
+            2104533976
+          ],
+          "RotationRaw": [
+            0
+          ],
+          "VelocityRaw": [
+            4294967296,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        }
+      ],
+      "Events": [
+        "contact:11:12",
+        "contact:12:11",
+        "contact:21:22",
+        "contact:22:21"
+      ],
+      "Queries": []
+    },
+    {
+      "FrameCount": 6,
+      "LateToken": 6,
+      "Authoritative": "e14d72139328aaa59a617f5847a3eb53",
+      "SolverCaches": null,
+      "Bodies": [
+        {
+          "Actor": 10,
+          "PositionRaw": [
+            0,
+            0,
+            0
+          ],
+          "RotationRaw": [
+            0,
+            0,
+            0,
+            4294967296
+          ],
+          "VelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 11,
+          "PositionRaw": [
+            0,
+            0,
+            0
+          ],
+          "RotationRaw": [
+            0,
+            0,
+            0,
+            4294967296
+          ],
+          "VelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 12,
+          "PositionRaw": [
+            1073741824,
+            2104533976,
+            34359738368
+          ],
+          "RotationRaw": [
+            0,
+            0,
+            0,
+            4294967296
+          ],
+          "VelocityRaw": [
+            4294967296,
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 1
+        },
+        {
+          "Actor": 20,
+          "PositionRaw": [
+            -8589934592,
+            -2147483648
+          ],
+          "RotationRaw": [
+            0
+          ],
+          "VelocityRaw": [
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 21,
+          "PositionRaw": [
+            8589934592,
+            -2147483648
+          ],
+          "RotationRaw": [
+            0
+          ],
+          "VelocityRaw": [
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 22,
+          "PositionRaw": [
+            1073741824,
+            2104533976
+          ],
+          "RotationRaw": [
+            0
+          ],
+          "VelocityRaw": [
+            4294967296,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        }
+      ],
+      "Events": [
+        "contact:11:12",
+        "contact:12:11",
+        "contact:21:22",
+        "contact:22:21"
+      ],
+      "Queries": []
+    },
+    {
+      "FrameCount": 7,
+      "LateToken": 7,
+      "Authoritative": "eb7081b752656d37aa080c68f01df167",
+      "SolverCaches": null,
+      "Bodies": [
+        {
+          "Actor": 10,
+          "PositionRaw": [
+            0,
+            0,
+            0
+          ],
+          "RotationRaw": [
+            0,
+            0,
+            0,
+            4294967296
+          ],
+          "VelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 11,
+          "PositionRaw": [
+            0,
+            0,
+            0
+          ],
+          "RotationRaw": [
+            0,
+            0,
+            0,
+            4294967296
+          ],
+          "VelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 12,
+          "PositionRaw": [
+            1342177280,
+            2104533976,
+            34359738368
+          ],
+          "RotationRaw": [
+            0,
+            0,
+            0,
+            4294967296
+          ],
+          "VelocityRaw": [
+            4294967296,
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 1
+        },
+        {
+          "Actor": 20,
+          "PositionRaw": [
+            -8589934592,
+            -2147483648
+          ],
+          "RotationRaw": [
+            0
+          ],
+          "VelocityRaw": [
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 21,
+          "PositionRaw": [
+            8589934592,
+            -2147483648
+          ],
+          "RotationRaw": [
+            0
+          ],
+          "VelocityRaw": [
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 22,
+          "PositionRaw": [
+            1342177280,
+            2104533976
+          ],
+          "RotationRaw": [
+            0
+          ],
+          "VelocityRaw": [
+            4294967296,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        }
+      ],
+      "Events": [
+        "contact:11:12",
+        "contact:12:11",
+        "contact:21:22",
+        "contact:22:21"
+      ],
+      "Queries": []
+    },
+    {
+      "FrameCount": 8,
+      "LateToken": 8,
+      "Authoritative": "f5efb54a0e5d9d07dfe5e92fb3ae69f5",
+      "SolverCaches": null,
+      "Bodies": [
+        {
+          "Actor": 10,
+          "PositionRaw": [
+            0,
+            0,
+            0
+          ],
+          "RotationRaw": [
+            0,
+            0,
+            0,
+            4294967296
+          ],
+          "VelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 11,
+          "PositionRaw": [
+            0,
+            0,
+            0
+          ],
+          "RotationRaw": [
+            0,
+            0,
+            0,
+            4294967296
+          ],
+          "VelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 12,
+          "PositionRaw": [
+            1610612736,
+            2104533976,
+            34359738368
+          ],
+          "RotationRaw": [
+            0,
+            0,
+            0,
+            4294967296
+          ],
+          "VelocityRaw": [
+            4294967296,
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 1
+        },
+        {
+          "Actor": 20,
+          "PositionRaw": [
+            -8589934592,
+            -2147483648
+          ],
+          "RotationRaw": [
+            0
+          ],
+          "VelocityRaw": [
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 21,
+          "PositionRaw": [
+            8589934592,
+            -2147483648
+          ],
+          "RotationRaw": [
+            0
+          ],
+          "VelocityRaw": [
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 22,
+          "PositionRaw": [
+            1610612736,
+            2104533976
+          ],
+          "RotationRaw": [
+            0
+          ],
+          "VelocityRaw": [
+            4294967296,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        }
+      ],
+      "Events": [
+        "contact:11:12",
+        "contact:12:11",
+        "contact:21:22",
+        "contact:22:21"
+      ],
+      "Queries": []
+    },
+    {
+      "FrameCount": 9,
+      "LateToken": 9,
+      "Authoritative": "17efbdddb675895d9d7ad6ba1c55dc67",
+      "SolverCaches": null,
+      "Bodies": [
+        {
+          "Actor": 10,
+          "PositionRaw": [
+            0,
+            0,
+            0
+          ],
+          "RotationRaw": [
+            0,
+            0,
+            0,
+            4294967296
+          ],
+          "VelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 11,
+          "PositionRaw": [
+            0,
+            0,
+            0
+          ],
+          "RotationRaw": [
+            0,
+            0,
+            0,
+            4294967296
+          ],
+          "VelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 12,
+          "PositionRaw": [
+            1879048192,
+            2104533976,
+            34359738368
+          ],
+          "RotationRaw": [
+            0,
+            0,
+            0,
+            4294967296
+          ],
+          "VelocityRaw": [
+            4294967296,
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 1
+        },
+        {
+          "Actor": 20,
+          "PositionRaw": [
+            -8589934592,
+            -2147483648
+          ],
+          "RotationRaw": [
+            0
+          ],
+          "VelocityRaw": [
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 21,
+          "PositionRaw": [
+            8589934592,
+            -2147483648
+          ],
+          "RotationRaw": [
+            0
+          ],
+          "VelocityRaw": [
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 22,
+          "PositionRaw": [
+            1879048192,
+            2104533976
+          ],
+          "RotationRaw": [
+            0
+          ],
+          "VelocityRaw": [
+            4294967296,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        }
+      ],
+      "Events": [
+        "contact:11:12",
+        "contact:12:11",
+        "contact:21:22",
+        "contact:22:21"
+      ],
+      "Queries": []
+    },
+    {
+      "FrameCount": 10,
+      "LateToken": 10,
+      "Authoritative": "17545c543f677897a9442d2821031054",
+      "SolverCaches": null,
+      "Bodies": [
+        {
+          "Actor": 10,
+          "PositionRaw": [
+            0,
+            0,
+            0
+          ],
+          "RotationRaw": [
+            0,
+            0,
+            0,
+            4294967296
+          ],
+          "VelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 11,
+          "PositionRaw": [
+            0,
+            0,
+            0
+          ],
+          "RotationRaw": [
+            0,
+            0,
+            0,
+            4294967296
+          ],
+          "VelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 12,
+          "PositionRaw": [
+            2147483648,
+            2104533976,
+            34359738368
+          ],
+          "RotationRaw": [
+            0,
+            0,
+            0,
+            4294967296
+          ],
+          "VelocityRaw": [
+            4294967296,
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 1
+        },
+        {
+          "Actor": 20,
+          "PositionRaw": [
+            -8589934592,
+            -2147483648
+          ],
+          "RotationRaw": [
+            0
+          ],
+          "VelocityRaw": [
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 21,
+          "PositionRaw": [
+            8589934592,
+            -2147483648
+          ],
+          "RotationRaw": [
+            0
+          ],
+          "VelocityRaw": [
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 22,
+          "PositionRaw": [
+            2147483648,
+            2104533976
+          ],
+          "RotationRaw": [
+            0
+          ],
+          "VelocityRaw": [
+            4294967296,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        }
+      ],
+      "Events": [
+        "contact:11:12",
+        "contact:12:11",
+        "contact:21:22",
+        "contact:22:21"
+      ],
+      "Queries": []
+    },
+    {
+      "FrameCount": 11,
+      "LateToken": 11,
+      "Authoritative": "5de3b44f746b2df27fb59f254333421b",
+      "SolverCaches": null,
+      "Bodies": [
+        {
+          "Actor": 10,
+          "PositionRaw": [
+            0,
+            0,
+            0
+          ],
+          "RotationRaw": [
+            0,
+            0,
+            0,
+            4294967296
+          ],
+          "VelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 11,
+          "PositionRaw": [
+            0,
+            0,
+            0
+          ],
+          "RotationRaw": [
+            0,
+            0,
+            0,
+            4294967296
+          ],
+          "VelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 12,
+          "PositionRaw": [
+            2415919104,
+            2104533976,
+            34359738368
+          ],
+          "RotationRaw": [
+            0,
+            0,
+            0,
+            4294967296
+          ],
+          "VelocityRaw": [
+            4294967296,
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 1
+        },
+        {
+          "Actor": 20,
+          "PositionRaw": [
+            -8589934592,
+            -2147483648
+          ],
+          "RotationRaw": [
+            0
+          ],
+          "VelocityRaw": [
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 21,
+          "PositionRaw": [
+            8589934592,
+            -2147483648
+          ],
+          "RotationRaw": [
+            0
+          ],
+          "VelocityRaw": [
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 22,
+          "PositionRaw": [
+            2415919104,
+            2104533976
+          ],
+          "RotationRaw": [
+            0
+          ],
+          "VelocityRaw": [
+            4294967296,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        }
+      ],
+      "Events": [
+        "contact:11:12",
+        "contact:12:11",
+        "contact:21:22",
+        "contact:22:21"
+      ],
+      "Queries": []
+    },
+    {
+      "FrameCount": 12,
+      "LateToken": 12,
+      "Authoritative": "624ab52c55afccdc3cdd59991d43f175",
+      "SolverCaches": null,
+      "Bodies": [
+        {
+          "Actor": 10,
+          "PositionRaw": [
+            0,
+            0,
+            0
+          ],
+          "RotationRaw": [
+            0,
+            0,
+            0,
+            4294967296
+          ],
+          "VelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 11,
+          "PositionRaw": [
+            0,
+            0,
+            0
+          ],
+          "RotationRaw": [
+            0,
+            0,
+            0,
+            4294967296
+          ],
+          "VelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 12,
+          "PositionRaw": [
+            2684354560,
+            2104533976,
+            34359738368
+          ],
+          "RotationRaw": [
+            0,
+            0,
+            0,
+            4294967296
+          ],
+          "VelocityRaw": [
+            4294967296,
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0,
+            0,
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 1
+        },
+        {
+          "Actor": 20,
+          "PositionRaw": [
+            -8589934592,
+            -2147483648
+          ],
+          "RotationRaw": [
+            0
+          ],
+          "VelocityRaw": [
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 21,
+          "PositionRaw": [
+            8589934592,
+            -2147483648
+          ],
+          "RotationRaw": [
+            0
+          ],
+          "VelocityRaw": [
+            0,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        },
+        {
+          "Actor": 22,
+          "PositionRaw": [
+            2684354560,
+            2104533976
+          ],
+          "RotationRaw": [
+            0
+          ],
+          "VelocityRaw": [
+            4294967296,
+            0
+          ],
+          "AngularVelocityRaw": [
+            0
+          ],
+          "Sleeping": false,
+          "ToiIterations": 0
+        }
+      ],
+      "Events": [
+        "contact:11:12",
+        "contact:12:11",
+        "contact:21:22",
+        "contact:22:21"
+      ],
+      "Queries": []
+    }
+  ]
+}

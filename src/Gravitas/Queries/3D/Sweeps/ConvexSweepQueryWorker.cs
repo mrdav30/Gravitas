@@ -16,6 +16,8 @@ using System.Runtime.CompilerServices;
 
 namespace Gravitas.Queries;
 
+internal delegate bool ContinuousSurfaceTriangleAdmission(int triangle, ref Physics3DHit hit, WideDirection3d? exactNormal);
+
 /// <summary>
 /// Performs deterministic translational convex-source sweeps against 3D query
 /// targets using support-mapped conservative advancement.
@@ -44,6 +46,8 @@ internal sealed partial class ConvexSweepQueryWorker
     private ConvexShape _sourceShape;
     private bool _hasSource;
     private bool _requireClosingInitialContact;
+    private ContinuousSurfaceTriangleAdmission? _admitTriangle;
+    private WideDirection3d? _admissionNormal;
     private Vector3d _displacement;
     private Vector3d _outputDirection;
     private Vector3d _sweptSourceBoundsMin;
@@ -63,6 +67,7 @@ internal sealed partial class ConvexSweepQueryWorker
         _source = null;
         _sourceShape = default;
         _hasSource = false;
+        _admitTriangle = null;
     }
 
     public void PrepareConvexMeshSource(LSMeshCollider source, Vector3d displacement)
@@ -110,9 +115,10 @@ internal sealed partial class ConvexSweepQueryWorker
     }
 
     public bool TrySweepPreparedSource(LSCollider target, out Physics3DHit hit,
-        bool requireClosingInitialContact = false)
+        bool requireClosingInitialContact = false, ContinuousSurfaceTriangleAdmission? admitTriangle = null)
     {
         _requireClosingInitialContact = requireClosingInitialContact;
+        _admitTriangle = admitTriangle;
         LastMeshTriangleCandidateCount = 0;
         hit = default;
         if (!_hasSource
@@ -331,6 +337,7 @@ internal sealed partial class ConvexSweepQueryWorker
                     mesh,
                     out Physics3DHit candidate,
                     out Fixed64 candidateNumerator)
+                || _admitTriangle != null && !_admitTriangle(triangleIndex, ref candidate, _admissionNormal)
                 || !ComesBeforeReducerCandidate(
                     candidateNumerator,
                     triangleIndex,
@@ -520,6 +527,7 @@ internal sealed partial class ConvexSweepQueryWorker
     {
         hit = default;
         hitNumerator = default;
+        _admissionNormal = null;
         // u is retained as travelNumerator / _length. Keeping the common
         // denominator exact preserves small chord components and physical
         // distance resolution without exposing wide arithmetic.
@@ -565,14 +573,15 @@ internal sealed partial class ConvexSweepQueryWorker
                     else if (_requireClosingInitialContact && hasMaterializedPoint)
                         hitNormal = targetCollider.GetNormalAtPoint(point);
 
-                    // Admit contacts while the selected source leaf and target
-                    // feature still exist. Reducing first can hide a closing
-                    // sibling behind an earlier separating zero-distance hit.
-                    if (_requireClosingInitialContact
-                        && Vector3d.Dot(_displacement, hitNormal) >= -Fixed64.Epsilon)
-                        return false;
                 }
-
+                if (travelNumerator == Fixed64.Zero) _admissionNormal = null;
+                RetainCapsuleNormal(movedSource, targetShape, anchor, ref hitNormal);
+                // Admission precedes leaf/triangle reduction so a separating
+                // initial feature cannot hide a later closing sibling.
+                // A declared surface selects closing response from its full
+                // native region; one triangle's tied exit cannot preempt it.
+                if (travelNumerator == Fixed64.Zero && _requireClosingInitialContact && _admitTriangle == null
+                    && Vector3d.Dot(_displacement, hitNormal) >= -Fixed64.Epsilon) return false;
                 hit = new Physics3DHit(
                     targetCollider,
                     anchor,
@@ -698,6 +707,7 @@ internal sealed partial class ConvexSweepQueryWorker
             fallbackNormal,
             hasRefinedSurfaceNormal,
             hasMaterializedPoint);
+        RetainCapsuleNormal(upperSource, targetShape, anchor, ref hitNormal);
         hit = new Physics3DHit(
             targetCollider,
             anchor,
@@ -706,6 +716,13 @@ internal sealed partial class ConvexSweepQueryWorker
             _outputDirection);
         hitNumerator = upperNumerator;
         return true;
+    }
+
+    private void RetainCapsuleNormal(in ConvexShape source, in ConvexShape target, in ContactAnchor anchor, ref Vector3d normal)
+    {
+        if (_admitTriangle == null || !source.TryGetCapsuleTriangleNormalAxis(target, anchor.GeometryPoint, out WideDirection3d axis)) return;
+        _admissionNormal = axis;
+        normal = axis.GetNormal(false);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -785,7 +802,20 @@ internal sealed partial class ConvexSweepQueryWorker
         bool preserveOrientation = false)
     {
         Vector3d planarNormal = Vector3d.Zero;
-        if (hasMaterializedPoint)
+        // Retain the selected triangle plane before the hit policy normalizes
+        // its already rounded inspection normal. Unknown/initial replacements
+        // cannot authorize a continuity exclusion.
+        if (_admitTriangle != null)
+        {
+            // The only production hook targets declared concave meshes;
+            // its plane does not depend on a scalar world witness. Such a
+            // witness may lie beyond a scalar face despite bounded geometry.
+            System.Diagnostics.Debug.Assert(!hasRefinedSurfaceNormal);
+            targetShape.TryGetPlanarSurfaceNormal(point, out planarNormal);
+            WideDirection3d plane = targetShape.GetTriangleNormalAxis();
+            _admissionNormal = !preserveOrientation && Vector3d.CompareProjection(planarNormal, Vector3d.Zero, _displacement) > 0 ? -plane : plane;
+        }
+        else if (hasMaterializedPoint)
             targetShape.TryGetPlanarSurfaceNormal(point, out planarNormal);
         return ConvexSweepHitPolicy.ResolveHitNormal(
             targetCollider,

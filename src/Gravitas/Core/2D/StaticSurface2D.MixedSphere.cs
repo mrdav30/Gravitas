@@ -220,7 +220,8 @@ internal sealed partial class StaticSurface2D
             destination.AddContact(new ContactAnchor(contact.FirstAnchor), new ContactAnchor(contact.SecondAnchor),
                 contact.Depth, contact.Normal, _mixedMoving!.Material, supplier.Material, contact.DepthIsClamped,
                 featureNamespaceA: namespace3D, featureNamespaceB: namespace2D,
-                group: new ContactGroupKey(namespace3D, namespace2D, region: group, sourceIdB: supplier.Id + 1));
+                group: new ContactGroupKey(namespace3D, namespace2D, region: group, sourceIdB: supplier.Id + 1,
+                    sourceOrderB: ((IPhysicsColliderRegistryItem)supplier).ReplayOrder + 1));
         }
         return _mixedOverlaps.Contains(overlap.Id);
     }

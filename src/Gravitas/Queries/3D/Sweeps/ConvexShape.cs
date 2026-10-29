@@ -422,6 +422,33 @@ internal readonly partial struct ConvexShape
         return _collider!.TryGetPlanarSurfaceNormal(point, out normal);
     }
 
+    internal WideDirection3d GetTriangleNormalAxis()
+    {
+        // The CCD admission hook only receives admitted concave-mesh triangles;
+        // mesh construction and scale admission reject degenerate triangles.
+        System.Diagnostics.Debug.Assert(_kind == ConvexShapeKind.Triangle);
+        var frame = _triangleOwner!.Mesh.GeometryFrame;
+        return WideTriangleRelations.GetScaledTriangleLocalNormal(new(_triangleA, _triangleB, _triangleC), frame)
+            .Transform(frame.GeometryBasis);
+    }
+
+    internal bool TryGetCapsuleTriangleNormalAxis(in ConvexShape target, in FixedPointAnchor point, out WideDirection3d axis)
+    {
+        axis = default;
+        if (_collider is not LSCapsuleCollider capsule) return false;
+        // CanTranslateCenter validates both chord endpoints for every source
+        // leaf before the worker samples any intermediate translation.
+        Vector3d center = capsule.Center + _offset;
+        axis = WideFiniteAxisIntersection.GetPointToCenteredCapsuleCoreDirection(point, center,
+            capsule.Rotation, Vector3d.Up, capsule.AxisLength);
+        // A materialized target witness may no longer be the closest point.
+        // Replace the selected face normal only when both finite features
+        // support this exact core-to-triangle direction.
+        System.Diagnostics.Debug.Assert(target._kind == ConvexShapeKind.Triangle);
+        return !axis.IsZero && MeshSurfaceBoundaryFan.SupportsTriangle(target._triangleOwner!.Mesh,
+            target._triangleIndex, RationalPoint3d.FromAnchor(point), axis);
+    }
+
     private Vector3d GetCircleSlabSupportLocalPoint(Vector3d direction)
     {
         Vector3d radial = new(direction.X, Fixed64.Zero, direction.Z);

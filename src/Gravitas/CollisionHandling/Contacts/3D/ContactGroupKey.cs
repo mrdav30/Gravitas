@@ -9,21 +9,27 @@ namespace Gravitas.CollisionHandling;
 internal readonly struct ContactGroupKey
 {
     internal ContactGroupKey(int namespaceA, int namespaceB, int surfaceA = 0,
-        int surfaceB = 0, int region = 0, int sourceIdA = 0, int sourceIdB = 0)
+        int surfaceB = 0, int region = 0, int sourceIdA = 0, int sourceIdB = 0,
+        int sourceOrderA = 0, int sourceOrderB = 0)
     {
         NamespaceA = namespaceA;
         NamespaceB = namespaceB;
         SurfaceA = surfaceA;
         SurfaceB = surfaceB;
         Region = region;
-        SourceIdA = sourceIdA;
-        SourceIdB = sourceIdB;
+        _orderedSourceA = ((ulong)(uint)sourceOrderA << 32) | (uint)sourceIdA;
+        _orderedSourceB = ((ulong)(uint)sourceOrderB << 32) | (uint)sourceIdB;
     }
 
     internal readonly int NamespaceA, NamespaceB, SurfaceA, SurfaceB, Region;
     // Compound namespaces identify leaves. Supplier registry IDs plus one are
     // normalized to replay ordinals only when hashing; zero means no supplier.
-    internal readonly int SourceIdA, SourceIdB;
+    internal int SourceIdA => (int)(uint)_orderedSourceA;
+    internal int SourceIdB => (int)(uint)_orderedSourceB;
+    // Joined suppliers sort by live logical registration, independently of recycled
+    // registry slots. Keep the actual ID as the low-word uniqueness/lookup key;
+    // ordinary groups retain their existing order and two source comparisons.
+    private readonly ulong _orderedSourceA, _orderedSourceB;
 
     internal int CompareTo(in ContactGroupKey other)
     {
@@ -37,12 +43,14 @@ internal readonly struct ContactGroupKey
         if (order != 0) return order;
         order = Region.CompareTo(other.Region);
         if (order != 0) return order;
-        order = SourceIdA.CompareTo(other.SourceIdA);
-        return order != 0 ? order : SourceIdB.CompareTo(other.SourceIdB);
+        order = _orderedSourceA.CompareTo(other._orderedSourceA);
+        return order != 0 ? order : _orderedSourceB.CompareTo(other._orderedSourceB);
     }
 
     internal ContactGroupKey Remap(int namespaceA, int namespaceB, bool reverse) =>
         new(namespaceA, namespaceB, reverse ? SurfaceB : SurfaceA,
             reverse ? SurfaceA : SurfaceB, Region,
-            reverse ? SourceIdB : SourceIdA, reverse ? SourceIdA : SourceIdB);
+            reverse ? SourceIdB : SourceIdA, reverse ? SourceIdA : SourceIdB,
+            (int)((reverse ? _orderedSourceB : _orderedSourceA) >> 32),
+            (int)((reverse ? _orderedSourceA : _orderedSourceB) >> 32));
 }

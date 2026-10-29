@@ -328,7 +328,8 @@ internal sealed partial class MeshCapsuleFaceRegions
 
     private static int CompareJoinedWitness(JoinedState state, JoinedWitness first, JoinedWitness second)
     {
-        int order = state.Members[first.Member].Collider.Id.CompareTo(state.Members[second.Member].Collider.Id);
+        int order = ((IPhysicsColliderRegistryItem)state.Members[first.Member].Collider).ReplayOrder
+            .CompareTo(((IPhysicsColliderRegistryItem)state.Members[second.Member].Collider).ReplayOrder);
         if (order != 0) return order;
         return state.Members[first.Member].Owner.CompareTo(state.Members[second.Member].Owner);
     }

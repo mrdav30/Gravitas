@@ -118,7 +118,8 @@ internal sealed partial class StaticSurface2D : IScaledConvexHullContactDomain
                     featureNamespaceA: namespace3D, featureNamespaceB: namespace2D,
                     group: new ContactGroupKey(namespace3D, namespace2D,
                         surfaceA: response.Feature < 0 ? 0 : ((LSMeshCollider)mover).Mesh.GetCanonicalSurfaceOrdinal(response.Feature) + 1,
-                        region: group, sourceIdB: supplier.Id + 1));
+                        region: group, sourceIdB: supplier.Id + 1,
+                        sourceOrderB: ((IPhysicsColliderRegistryItem)supplier).ReplayOrder + 1));
             }
         }
         return _mixedOverlaps.Contains(overlap.Id);
@@ -134,13 +135,8 @@ internal sealed partial class StaticSurface2D : IScaledConvexHullContactDomain
     {
         FixedBoundBox bounds = FixedBoundBox.FromCenterAndScopeClippedToDomain(mover.Center,
             Vector3d.One * reach);
-        _context.MixedCollisions.Collect2DCandidatesInMixedBounds(bounds.Min, bounds.Max, PhysicsLayerMask.All,
-            _candidates, staticStyleOnly: true, cachePartitionRefresh: true);
         int previous = _mixedLocal.Count;
-        _mixedLocal.FastClear();
-        foreach (LSCollider2D candidate in _candidates.AsReadOnlySpan())
-            if (candidate.StaticSurface == this && !candidate.IsTrigger
-                && _context.MixedCollisions.RequireCollisionPair(mover.CompoundOwner ?? mover, candidate)) _mixedLocal.Add(candidate);
+        GatherMixedMembers(mover, bounds, _mixedLocal);
         if (previous != _mixedLocal.Count) _mixedCurrent = false;
         bool quaternion = mover is LSMeshCollider;
         bool prepared = _mixedQuaternion == quaternion && _mixedPreparedCount == _mixedLocal.Count;
@@ -149,6 +145,17 @@ internal sealed partial class StaticSurface2D : IScaledConvexHullContactDomain
             prepared &= _mixedPrisms[member].Matches(_mixedLocal[member]);
         if (!prepared) { _mixedQuaternion = quaternion; PrepareMixed(); _mixedCurrent = false; }
 
+    }
+
+    private void GatherMixedMembers(LSCollider mover, FixedBoundBox bounds, SwiftList<LSCollider2D> destination)
+    {
+        _context.MixedCollisions.Collect2DCandidatesInMixedBounds(bounds.Min, bounds.Max, PhysicsLayerMask.All,
+            _candidates, staticStyleOnly: true, cachePartitionRefresh: true);
+        destination.FastClear();
+        foreach (LSCollider2D candidate in _candidates.AsReadOnlySpan())
+            if (candidate.StaticSurface == this && !candidate.IsTrigger
+                && _context.MixedCollisions.RequireCollisionPair(mover.CompoundOwner ?? mover, candidate)) destination.Add(candidate);
+        destination.SortInPlace(SurfaceMemberOrder);
     }
 
     private void PrepareMixed()

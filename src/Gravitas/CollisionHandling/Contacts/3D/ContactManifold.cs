@@ -347,6 +347,45 @@ public sealed class ContactManifold : IEnumerable<ManifoldContact>
         _count = source._count;
     }
 
+    internal bool HasSameContacts(ContactManifold source)
+    {
+        if (GroupCount != source.GroupCount) return false;
+        for (int group = 0; group < GroupCount; group++)
+        {
+            ref ContactGroup previous = ref GetGroup(group);
+            ref ContactGroup incoming = ref source.GetGroup(group);
+            if (previous.Key.CompareTo(incoming.Key) != 0 || previous.Count != incoming.Count) return false;
+            for (int index = 0; index < previous.Count; index++)
+                if (!SameConstraint(previous[index], incoming[index])) return false;
+        }
+        return true;
+    }
+
+    private static bool SameConstraint(in ManifoldContact previous, in ManifoldContact incoming) =>
+        previous.ContactId == incoming.ContactId && previous.FeatureNamespaceA == incoming.FeatureNamespaceA
+        && previous.FeatureNamespaceB == incoming.FeatureNamespaceB && previous.Normal == incoming.Normal
+        && previous.Depth == incoming.Depth && previous.DepthIsClamped == incoming.DepthIsClamped
+        && previous.HasMaterialOverride == incoming.HasMaterialOverride
+        && previous.MaterialA == incoming.MaterialA && previous.MaterialB == incoming.MaterialB
+        && SamePoint(previous.AnchorA, incoming.AnchorA) && SamePoint(previous.AnchorB, incoming.AnchorB);
+
+    private static bool SamePoint(in ContactAnchor previous, in ContactAnchor incoming)
+    {
+        ExactLever3D delta = previous.GetLeverFrom(incoming);
+        return delta.XNumerator.IsZero && delta.YNumerator.IsZero && delta.ZNumerator.IsZero;
+    }
+
+    internal bool ReferencesSuppliers(SwiftCollections.SwiftHashSet<int> suppliers, bool first, int fallbackSource)
+    {
+        for (int group = 0; group < GroupCount; group++)
+        {
+            ContactGroupKey key = GetGroup(group).Key;
+            int source = first ? key.SourceIdA : key.SourceIdB;
+            if (suppliers.Contains(source == 0 ? fallbackSource : source)) return true;
+        }
+        return false;
+    }
+
     private void ClearContacts()
     {
         _count = GroupCount = 0;

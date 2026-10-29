@@ -83,6 +83,14 @@ public sealed partial class GravitasQueryMixedService
         }
 
         candidate = default;
+        if (requireClosingContact && staticTargetsOnly && excludedCollider != null
+            && TryResolveExactSphereSourceFor2D(excludedCollider, collider, end - start,
+                out Vector3d exactStart, out Vector3d exactEnd, out Fixed64 exactRadius))
+        {
+            // The outer query remains a conservative broad phase. Refine in
+            // the actual source chart before an initial proxy cut can win.
+            start = exactStart; end = exactEnd; radius = exactRadius;
+        }
         bool initialClosing = requireClosingContact && excludedCollider != null
             && TryGetInitialMixedCcdHit(excludedCollider, collider, direction, source3D: true, out candidate);
         if (!initialClosing && !TrySweepSphereAgainst2D(start, end, direction, length, radius, collider,

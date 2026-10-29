@@ -263,7 +263,8 @@ public partial class SolidBody
 
                 LastContinuousCollisionToiIterationCount++;
                 bool unresolvedInterval = !responseWitnessIsEarliest
-                    || !(useMixed ? mixedHit.HasContact : hasContact);
+                    || !(useMixed ? mixedHit.HasContact : hasContact)
+                    || (useMixed && !mixedHit.HasClosingContact);
                 if (unresolvedInterval)
                 {
                     // A later witness cannot supply a response at this frontier.
@@ -517,7 +518,8 @@ public partial class SolidBody
                 // segment before this terminal clamp, so the validated positive
                 // TOI budget always admits this single replacement tail.
                 bool unresolvedInterval = !responseWitnessIsEarliest
-                    || !(useMixed ? mixedHit.HasContact : hasContact);
+                    || !(useMixed ? mixedHit.HasContact : hasContact)
+                    || (useMixed && !mixedHit.HasClosingContact);
                 if (unresolvedInterval)
                 {
                     LastContinuousCollisionToiIterationLimitReached =
@@ -862,6 +864,14 @@ public partial class SolidBody
     {
         contact = default;
         contactIsClosing = false;
+        if (!TryBuildContinuousCollisionManifold(target)) return false;
+        contactIsClosing = TrySelectRotationalClosingContact(target,
+            _rotationalContinuousCollisionManifold, frameFraction, out contact);
+        return true;
+    }
+
+    private bool TryBuildContinuousCollisionManifold(LSCollider target)
+    {
         OrderRotationalContinuousCollisionPair(
             target,
             out LSCollider colliderA,
@@ -875,15 +885,8 @@ public partial class SolidBody
             colliderB,
             collisionType,
             _rotationalContinuousCollisionManifold);
-        if (!CollisionDetection.DoCollisionCheck(workItem)
-            || !_rotationalContinuousCollisionManifold.HasContact)
-        {
-            return false;
-        }
-
-        contactIsClosing = TrySelectRotationalClosingContact(target,
-            _rotationalContinuousCollisionManifold, frameFraction, out contact);
-        return true;
+        return CollisionDetection.DoCollisionCheck(workItem)
+            && _rotationalContinuousCollisionManifold.HasContact;
     }
 
     internal bool TrySelectRotationalClosingContact(LSCollider target,

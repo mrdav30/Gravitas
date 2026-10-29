@@ -86,6 +86,43 @@ public partial class CollisionPair
     private long _lifetimeVersion;
     private uint _lastColliderAContactDependencyVersion;
     private uint _lastColliderBContactDependencyVersion;
+    private bool _surfaceContactChanged;
+    private ulong? _surfaceCollisionLayers;
+
+    private bool ContactDependenciesChanged => _surfaceContactChanged
+        || ColliderA.ContactDependencyVersion != _lastColliderAContactDependencyVersion
+        || ColliderB.ContactDependencyVersion != _lastColliderBContactDependencyVersion
+        || _surfaceCollisionLayers.HasValue && _surfaceCollisionLayers != CurrentSurfaceCollisionLayers;
+
+    private ulong? CurrentSurfaceCollisionLayers
+    {
+        get
+        {
+            if (ColliderA.IsTrigger || ColliderB.IsTrigger) return null;
+            LSCollider? mover = ColliderA is LSMeshCollider { StaticSurface: not null } ? ColliderB
+                : ColliderB is LSMeshCollider { StaticSurface: not null } ? ColliderA : null;
+            return mover == null ? null : Context.Settings.GetCollisionLayerMask(default, mover.Layer, false, true);
+        }
+    }
+
+    internal (ulong? Layers, ContactManifold? Before) BeginCollisionLayerUpdate()
+    {
+        ulong? layers = CurrentSurfaceCollisionLayers;
+        if (!_isColliding || !layers.HasValue || !_surfaceCollisionLayers.HasValue || layers == _surfaceCollisionLayers)
+            return (layers, null);
+        ContactManifold before = Context.CollisionScratch.SurfaceContactSnapshot3D;
+        before.CopyFrom(Manifold, Manifold.LastUpdatedFrame);
+        return (layers, before);
+    }
+
+    internal void CompleteCollisionLayerUpdate((ulong? Layers, ContactManifold? Before) previous)
+    {
+        if (previous.Before != null && !previous.Before.HasSameContacts(Manifold))
+        {
+            ClearWarmStart(); WakeSleepingContactParticipants();
+        }
+        _surfaceCollisionLayers = previous.Layers;
+    }
 
     internal bool IsNotificationInProgress => _notificationInProgress;
 
@@ -146,6 +183,7 @@ public partial class CollisionPair
         RefreshBroadPhaseVersions();
         _lastColliderAContactDependencyVersion = ColliderA.ContactDependencyVersion;
         _lastColliderBContactDependencyVersion = ColliderB.ContactDependencyVersion;
+        _surfaceContactChanged = false;
         PairVersion++;
         Active = true;
     }
@@ -194,7 +232,7 @@ public partial class CollisionPair
         UpdateLastFrame();
         DeactivateAndPoolIfRequired();
 
-        if (IsCullStateInvalidated())
+        if (CullCounter > 0 && IsCullStateInvalidated())
             CullCounter = 0;
 
         if (CullCounter <= 0)
@@ -509,9 +547,7 @@ public partial class CollisionPair
     {
         bool doPhysics = (ColliderA.Body != null || ColliderB.Body != null)
             && !ColliderA.IsTrigger && !ColliderB.IsTrigger;
-        bool contactChanged = _doPhysics != doPhysics
-            || ColliderA.ContactDependencyVersion != _lastColliderAContactDependencyVersion
-            || ColliderB.ContactDependencyVersion != _lastColliderBContactDependencyVersion;
+        bool contactChanged = _doPhysics != doPhysics || ContactDependenciesChanged;
         // A changed solid constraint can carry frictional load even if its new geometry still overlaps.
         if (_isColliding)
         {
@@ -531,6 +567,7 @@ public partial class CollisionPair
         _doPhysics = doPhysics;
         _lastColliderAContactDependencyVersion = ColliderA.ContactDependencyVersion;
         _lastColliderBContactDependencyVersion = ColliderB.ContactDependencyVersion;
+        _surfaceContactChanged = false;
         return contactChanged;
     }
 
@@ -555,7 +592,7 @@ public partial class CollisionPair
     {
         return ColliderA.PartitionChanged
             || ColliderB.PartitionChanged
-            || BroadPhaseVersionChanged();
+            || BroadPhaseVersionChanged() || ContactDependenciesChanged;
     }
 
     private bool BroadPhaseVersionChanged()
@@ -637,6 +674,7 @@ public partial class CollisionPair
         Manifold.Reset();
         ClearWarmStart();
         _isColliding = false;
+        _surfaceCollisionLayers = null;
         _isCollidingChanged = false;
         _isPooledForDeactivation = false;
         _notificationInProgress = false;
@@ -660,6 +698,14 @@ public partial class CollisionPair
     {
         _warmStart.Clear();
         ResponseSnapshot = default;
+    }
+
+    internal void InvalidateSurfaceContact(LSCollider member, SwiftHashSet<int> suppliers)
+    {
+        if (!Manifold.ReferencesSuppliers(suppliers, ColliderA == member, member.Id + 1)) return;
+        _surfaceContactChanged = true;
+        ClearWarmStart();
+        if (_isColliding && _doPhysics) WakeSleepingContactParticipants();
     }
 
     internal void StoreWarmStartImpulse(in ContactGroupKey group, ulong contactId,

@@ -28,6 +28,11 @@ internal sealed partial class MeshConeFaceRegions
     {
         var state = _joined ??= new();
         state.Prepare(sources, meshes, boundaries);
+        state.PrepareResponseComponents();
+        // Response batching does not certify complete finite cone exits.
+        // The trusted finite-region union below owns perimeter suppression.
+        foreach (Member member in state.Members.AsReadOnlySpan()[..state.Inputs.Count])
+            Array.Clear(member.JoinedSpans, 0, member.Boundary.Spans.Length);
         var bounds = new FixedBoundVolume(cone.BoundsMin, cone.BoundsMax);
         for (int index = 0; index < state.Inputs.Count; index++)
         {
@@ -44,6 +49,7 @@ internal sealed partial class MeshConeFaceRegions
                 if (ConePlaneRayEvents.IntersectsTriangle(member.Frame, new FixedTriangle(a, b, c))) member.Admitted.Add(triangle);
             }
             member.Connectivity.Build(mesh, member.Triangle, member.Frame, member.Admitted.AsReadOnlySpan());
+            if (member.Connectivity.RegionCount > 0) state.AddAdmittedMember(index);
             state.AddRegions(index);
         }
         bool wide = false;
@@ -101,8 +107,9 @@ internal sealed partial class MeshConeFaceRegions
         for (int member = 0; member < state.Inputs.Count; member++)
         {
             Member source = state.Members[member];
-            // Ambiguity declines continuity for this canonical owner on both
-            // sides; its original finite perimeter remains an independent domain.
+            // Finite face exits require a complete canonical-owner domain.
+            // A certified span can still suppress its seam and share response,
+            // but ambiguous owner coverage cannot merge the exit regions.
             if (!source.BoundaryTrusted) continue;
             ReadOnlySpan<MeshSurfaceBoundaryDomain.BoundarySpan> spans = source.Boundary.Spans;
             for (int span = 0; span < spans.Length; span++)
@@ -213,10 +220,14 @@ internal sealed partial class MeshConeFaceRegions
         return pa.CompareTo(pb, ra, rb, fa, fb);
     }
 
-    internal FixedContactAnchors GetJoinedSample(int region, int index, out LSMeshCollider supplier)
+    internal bool IsResponseCarrier(LSMeshCollider collider, int region) =>
+        _joined!.Members[_joined.GetResponseMember(_joined.NodeMembers[_joined.Roots[region]])].Collider == collider;
+
+    internal FixedContactAnchors GetJoinedSample(int region, int index, out LSMeshCollider supplier, out int owner)
     {
         Sample sample = _samples[region * ContactManifold.MaxContactsPerGroup + index];
         supplier = _joined!.Members[sample.Supplier].Collider;
+        owner = _joined.Members[sample.Supplier].Owner;
         return new(new FixedPointAnchor(_samplingOrigin, FixedQuaternion.Identity, sample.MeshPoint),
             new FixedPointAnchor(_samplingOrigin, GetFrame(sample.Member).ConeRotation, sample.ConeLocalPoint), GetNormal(region), sample.Depth, false);
     }
@@ -242,11 +253,14 @@ internal sealed partial class MeshConeFaceRegions
     internal bool AppendJoinedBoundaries(LSMeshCollider collider, LSConeCollider cone, MeshConeSurfaceBoundary boundary, ContactManifold manifold)
     {
         bool overlaps = false;
-        foreach (Member member in _joined!.Members.AsReadOnlySpan()[.._joined.Inputs.Count])
+        for (int index = 0; index < _joined!.Inputs.Count; index++)
         {
-            if (member.Collider != collider || member.Connectivity.RegionCount == 0) continue;
-            overlaps = true;
-            if (HasBoundaryIntersection) boundary.BuildSurfaceContacts(collider, cone, member.Triangle, member.Connectivity, this, manifold);
+            Member member = _joined.Members[index];
+            if (member.Connectivity.RegionCount == 0) continue;
+            overlaps |= member.Collider == collider;
+            if (_joined.Members[_joined.GetResponseMember(index)].Collider != collider) continue;
+            // Face samples and their finite perimeter share one solver pass.
+            if (HasBoundaryIntersection) boundary.BuildSurfaceContacts(member.Collider, cone, member.Triangle, member.Connectivity, this, manifold);
         }
         return overlaps;
     }

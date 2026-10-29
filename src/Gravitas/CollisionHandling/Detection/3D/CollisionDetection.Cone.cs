@@ -104,15 +104,18 @@ public static partial class CollisionDetection
             surface.BuildCone(cone);
             var faces = surface.ConeFaces;
             for (int region = 0; region < faces.RegionCount; region++)
+            {
+                if (!faces.IsResponseCarrier(mesh, region)) continue;
                 for (int sample = 0; sample < faces.GetSampleCount(region); sample++)
                 {
-                    FixedContactAnchors contact = faces.GetJoinedSample(region, sample, out LSMeshCollider supplier);
-                    if (supplier != mesh) continue;
+                    FixedContactAnchors contact = faces.GetJoinedSample(region, sample, out LSMeshCollider supplier, out int owner);
                     pair.Manifold.AddContact(new ContactAnchor(contact.FirstAnchor), new ContactAnchor(contact.SecondAnchor),
-                        contact.Depth, contact.Normal, mesh.Material, cone.Material, contact.DepthIsClamped,
-                        group: new ContactGroupKey(0, 0, 0, 0, region),
+                        contact.Depth, contact.Normal, supplier.Material, cone.Material, contact.DepthIsClamped,
+                        group: new ContactGroupKey(0, 0, owner + 1, 0, region, sourceIdA: supplier.Id + 1,
+                            sourceOrderA: ((IPhysicsColliderRegistryItem)supplier).ReplayOrder + 1),
                         contactIdentity: faces.GetSampleIdentity(region, sample));
                 }
+            }
             return faces.AppendJoinedBoundaries(mesh, cone, pair.Context.CollisionScratch.MeshConeBoundary, pair.Manifold);
         }
         if (BuildMeshConeSurfaceContacts(mesh, cone, pair.Context.CollisionScratch, pair.Manifold))

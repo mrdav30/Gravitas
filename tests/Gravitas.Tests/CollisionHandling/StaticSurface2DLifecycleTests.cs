@@ -263,6 +263,7 @@ public sealed class StaticSurface2DLifecycleTests
         LSCollider2D first = Member(context), neighbor = Member(context, true);
         using var surface = context.Physics2D.CreateStaticSurface(new[] { first, neighbor });
         uint before = first.ContactDependencyVersion;
+        uint editedBefore = neighbor.ContactDependencyVersion;
         if (change == 0) neighbor.Material = PhysicsMaterial.Bouncy;
         if (change == 1) neighbor.Layer = new PhysicsLayer(1);
         if (change == 2) neighbor.IgnoredCollisionLayers = PhysicsLayerMask.All;
@@ -272,7 +273,10 @@ public sealed class StaticSurface2DLifecycleTests
             neighbor.LocalOffset = Vector2d.Right;
             neighbor.Simulate();
         }
-        Assert.True(first.ContactDependencyVersion > before);
+        Assert.True(neighbor.ContactDependencyVersion > editedBefore);
+        // Materials invalidate their actual borrowed rows, not every neighbor's geometry.
+        if (change == 0) Assert.Equal(before, first.ContactDependencyVersion);
+        else Assert.True(first.ContactDependencyVersion > before);
         uint unchanged = first.ContactDependencyVersion;
         neighbor.Material = neighbor.Material;
         neighbor.Layer = neighbor.Layer;

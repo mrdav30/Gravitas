@@ -237,25 +237,34 @@ public readonly struct MixedContact
         ContactAnchor center2D, Vector2d linear2D, Fixed64 angular2D, out MixedContact contact,
         LSCollider2D? owner2D = null)
     {
-        // Preserve a geometric witness for conservative stopping even when every row separates.
+        // Preserve a geometric witness for conservative trajectory bounding even when every row separates.
         contact = manifold.HasContact ? FromManifoldContact(manifold.PrimaryContact) : default;
         Vector3d spatialLinear2D = ExactContactLever2D.ToSpatial(linear2D);
         Vector3d spatialAngular2D = new(Fixed64.Zero, -angular2D, Fixed64.Zero);
         foreach (ManifoldContact row in manifold)
         {
-            ContactAnchor normalAnchor2D = owner2D == null ? row.AnchorB
-                : ExactContactLever2D.GetDetectedNormalAnchor(owner2D, row.FeatureNamespaceB, center2D, row.AnchorB);
-            ExactLever3D.GetRelativePointVelocityRatio(linear3D, angular3D,
-                row.AnchorA.GetLeverFrom(center3D), spatialLinear2D, spatialAngular2D,
-                normalAnchor2D.GetLeverFrom(center2D), row.Normal,
-                out Signed832 numerator, out Signed832 denominator, secondPlanarAngularVelocity: angular2D);
-            // A is always 3D and B is always 2D. Negative relative normal speed closes the row.
-            if (numerator.Sign >= 0 || (Fixed64.TryGetSignedRawRatio(numerator, denominator, 0,
-                    out Fixed64 speed) && speed >= -Fixed64.Epsilon)) continue;
+            if (!IsClosingContact(row, center3D, linear3D, angular3D, center2D,
+                spatialLinear2D, spatialAngular2D, angular2D, owner2D)) continue;
             contact = FromManifoldContact(row);
             return true;
         }
         return false;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static bool IsClosingContact(in ManifoldContact row, in ContactAnchor center3D,
+        Vector3d linear3D, Vector3d angular3D, in ContactAnchor center2D,
+        Vector3d spatialLinear2D, Vector3d spatialAngular2D, Fixed64 angular2D, LSCollider2D? owner2D)
+    {
+        ContactAnchor normalAnchor2D = owner2D == null ? row.AnchorB
+            : ExactContactLever2D.GetDetectedNormalAnchor(owner2D, row.FeatureNamespaceB, center2D, row.AnchorB);
+        ExactLever3D.GetRelativePointVelocityRatio(linear3D, angular3D,
+            row.AnchorA.GetLeverFrom(center3D), spatialLinear2D, spatialAngular2D,
+            normalAnchor2D.GetLeverFrom(center2D), row.Normal,
+            out Signed832 numerator, out Signed832 denominator, secondPlanarAngularVelocity: angular2D);
+        // A is always 3D and B is always 2D. Negative relative normal speed closes the row.
+        return numerator.Sign < 0 && (!Fixed64.TryGetSignedRawRatio(numerator, denominator, 0,
+            out Fixed64 speed) || speed < -Fixed64.Epsilon);
     }
 
     internal static bool IsClosingProjection(Vector3d displacement, Vector3d outwardNormal)

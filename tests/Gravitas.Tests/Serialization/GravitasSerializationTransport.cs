@@ -31,28 +31,28 @@ internal static class GravitasSerializationTransportCases
 
 internal static class GravitasSerializationHarness
 {
-    public static object Serialize(IRecordable target, GravitasSerializationTransport transport)
+    public static object Serialize(IRecordable target, GravitasSerializationTransport transport, ChronicleContext? context = null)
     {
         return transport switch
         {
-            GravitasSerializationTransport.Json => JsonRecordSerializer.Serialize(target, writeIndented: true),
+            GravitasSerializationTransport.Json => JsonRecordSerializer.Serialize(target, context, writeIndented: true),
 #if !GRAVITAS_DISABLE_MEMORYPACK
-            GravitasSerializationTransport.MemoryPack => MemoryPackRecordSerializer.Serialize(target),
+            GravitasSerializationTransport.MemoryPack => MemoryPackRecordSerializer.Serialize(target, context),
 #endif
             _ => throw new System.ArgumentOutOfRangeException(nameof(transport), transport, null)
         };
     }
 
-    public static void Populate(IRecordable target, object payload, GravitasSerializationTransport transport)
+    public static void Populate(IRecordable target, object payload, GravitasSerializationTransport transport, ChronicleContext? context = null)
     {
         switch (transport)
         {
             case GravitasSerializationTransport.Json:
-                JsonRecordSerializer.Populate(target, (string)payload);
+                JsonRecordSerializer.Populate(target, (string)payload, context);
                 break;
 #if !GRAVITAS_DISABLE_MEMORYPACK
             case GravitasSerializationTransport.MemoryPack:
-                MemoryPackRecordSerializer.Populate(target, (byte[])payload);
+                MemoryPackRecordSerializer.Populate(target, (byte[])payload, context);
                 break;
 #endif
             default:

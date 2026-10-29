@@ -43,6 +43,8 @@ public sealed class SharedReplayFixtureTests
     [InlineData("mixed-lifecycle-v1")]
     [InlineData("three-d-caches-v1")]
     [InlineData("three-d-surface-contacts-v1")]
+    [InlineData("joined-surfaces-v1")]
+    [InlineData("joined-mixed-surfaces-v1")]
     public void OrderedCommands_MatchSharedExpectedFramesAndRepeatedRuns(string name)
     {
         ReplayFixture fixture = ReplayFixture.Read(Path.Combine(AppContext.BaseDirectory, "Determinism", "Fixtures", name + ".json"));
@@ -79,6 +81,56 @@ public sealed class SharedReplayFixtureTests
 
     private static void AssertScenarioSemantics(ReplayFixture fixture, ReplayFrame[] frames, ReplayFixtureRunner runner)
     {
+        if (fixture.Name == "joined-mixed-surfaces-v1")
+        {
+            foreach (var (actor, seam, normalIndex, members) in new[]
+            {
+                (12, 0, 1, new[] { 10, 11 }),
+                (22, 16, 2, new[] { 20, 21 })
+            })
+            {
+                long previousX = fixture.Actors.Single(value => value.Id == actor).PositionRaw[0];
+                foreach (ReplayFrame frame in frames)
+                {
+                    ReplayBodyState mover = Body(frame, actor);
+                    Assert.True(mover.PositionRaw[0] > previousX, "Joined mixed contacts must preserve tangential progress.");
+                    Assert.InRange(mover.PositionRaw[normalIndex], Fixed64.FromFraction(49, 100).m_rawValue,
+                        Fixed64.FromFraction(51, 100).m_rawValue);
+                    Assert.Equal(Fixed64.Two.m_rawValue, mover.VelocityRaw[0]);
+                    previousX = mover.PositionRaw[0];
+                }
+                Assert.True(previousX > ((Fixed64)seam + Fixed64.Half).m_rawValue,
+                    "The complete mixed mover must clear its joined seam.");
+                foreach (int member in members)
+                    Assert.Contains(frames.SelectMany(frame => frame.Events), value => value == $"mixed-enter:{actor}:{member}");
+            }
+            string[] pairs = { "12:10", "10:12", "12:11", "11:12", "22:20", "20:22", "22:21", "21:22" };
+            foreach (string value in frames.SelectMany(frame => frame.Events))
+            {
+                Assert.StartsWith("mixed-", value);
+                Assert.Contains(value[(value.IndexOf(':') + 1)..], pairs);
+            }
+            return;
+        }
+        if (fixture.Name == "joined-surfaces-v1")
+        {
+            foreach (int actor in new[] { 12, 22 })
+            {
+                long previousX = fixture.Actors.Single(value => value.Id == actor).PositionRaw[0];
+                foreach (ReplayFrame frame in frames)
+                {
+                    ReplayBodyState mover = Body(frame, actor);
+                    Assert.True(mover.PositionRaw[0] > previousX, "A covered seam must not stop tangential motion.");
+                    Assert.True(mover.PositionRaw[1] >= Fixed64.FromFraction(49, 100).m_rawValue,
+                        "Both joined floors must keep the complete rounded mover above their physical surface.");
+                    Assert.Equal(Fixed64.One.m_rawValue, mover.VelocityRaw[0]);
+                    previousX = mover.PositionRaw[0];
+                }
+                Assert.True(previousX > Fixed64.Half.m_rawValue, "The complete rounded mover must clear the join.");
+            }
+            Assert.DoesNotContain(frames.SelectMany(frame => frame.Events), value => value.StartsWith("mixed-", StringComparison.Ordinal));
+            return;
+        }
         if (fixture.Name == "three-d-surface-contacts-v1")
         {
             ReplayBodyState walls = Body(frames[0], 81);

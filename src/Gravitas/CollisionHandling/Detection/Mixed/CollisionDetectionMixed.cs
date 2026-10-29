@@ -86,10 +86,15 @@ public static partial class CollisionDetectionMixed
         if (!TryPrimitiveContact(collider3D, collider2D, out MixedContact contact))
             return false;
 
-        if (namespace3D != 0 || namespace2D != 0)
+        // Declared-domain CCD can aggregate several ordinary member contacts.
+        // Preserve each supplier before its rows share a manifold and response owner.
+        bool declaredSupplier = collider2D.StaticSurface != null;
+        if (namespace3D != 0 || namespace2D != 0 || declaredSupplier)
             contact = contact.WithFallbackMaterials(collider3D.Material, collider2D.Material);
         ManifoldContact row = contact.ToManifoldContact(namespace3D, namespace2D);
-        manifold.AddContact(new ContactGroupKey(namespace3D, namespace2D), row);
+        manifold.AddContact(new ContactGroupKey(namespace3D, namespace2D,
+            sourceIdB: declaredSupplier ? collider2D.Id + 1 : 0,
+            sourceOrderB: declaredSupplier ? ((IPhysicsColliderRegistryItem)collider2D).ReplayOrder + 1 : 0), row);
         return true;
     }
 

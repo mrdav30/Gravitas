@@ -209,13 +209,16 @@ public sealed partial class GravitasPhysicsService
         }
     }
 
-    internal void ClearWarmStartCachesForCollider(LSCollider collider)
+    internal void ClearWarmStartCachesForCollider(LSCollider collider, SwiftHashSet<int>? changedSuppliers = null)
     {
         SwiftDictionary<int, CollisionPair>? collisionPairs = collider.CollisionPairs;
         if (collisionPairs != null)
         {
             foreach (var pairEntry in collisionPairs)
-                pairEntry.Value.ClearWarmStart();
+            {
+                if (changedSuppliers == null) pairEntry.Value.ClearWarmStart();
+                else pairEntry.Value.InvalidateSurfaceContact(collider, changedSuppliers);
+            }
         }
 
         SwiftHashSet<int>? collisionPairHolders = collider.CollisionPairHolders;
@@ -227,7 +230,8 @@ public sealed partial class GravitasPhysicsService
             if (TryGetColliderById(holderId, out LSCollider? holder)
                 && holder!.TryGetCollisionPair(collider.Id, out CollisionPair? pair))
             {
-                pair!.ClearWarmStart();
+                if (changedSuppliers == null) pair!.ClearWarmStart();
+                else pair!.InvalidateSurfaceContact(collider, changedSuppliers);
             }
         }
     }

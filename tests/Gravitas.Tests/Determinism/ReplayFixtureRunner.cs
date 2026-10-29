@@ -9,6 +9,7 @@ using Gravitas.Tests.Serialization;
 using Gravitas.Tests.Support;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Xunit;
 
 namespace Gravitas.Tests.Determinism;
@@ -48,6 +49,14 @@ internal sealed class ReplayFixtureRunner : IDisposable
         foreach (ReplayActor actor in fixture.Actors)
             if (actor.StartActive)
                 Spawn(actor);
+        foreach (var group in fixture.Actors.Where(actor => actor.SurfaceGroup != 0)
+            .GroupBy(actor => (actor.Dimension, actor.SurfaceGroup)))
+        {
+            if (group.Key.Dimension == "3D")
+                Context.Physics.CreateStaticSurface(group.Select(actor => (LSMeshCollider)_bodies3D[actor.Id].Collider).ToArray());
+            else
+                Context.Physics2D.CreateStaticSurface(group.Select(actor => _bodies2D[actor.Id].Collider).ToArray());
+        }
     }
 
     public GravitasWorldContext Context => _scenario.Context;

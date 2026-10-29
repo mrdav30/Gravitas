@@ -18,6 +18,29 @@ namespace Gravitas.Queries;
 /// </summary>
 public sealed partial class GravitasQueryMixedService
 {
+    internal static bool TryResolveExactSphereSourceFor2D(LSCollider source, LSCollider2D target,
+        Vector3d displacement, out Vector3d start, out Vector3d end, out Fixed64 radius)
+    {
+        start = source.Center; radius = source.ScaledRadius;
+        if (!Vector3d.TryAdd(start, displacement, out end)) return false;
+        // Tiny angular arcs can deliberately fall back to the linear arbiter.
+        // Refine only unchanged geometry, including a kinematic host's goal.
+        if (source.Body is { HasRotationInvariantCollider: false } body
+            && (body.AngularVelocity != Vector3d.Zero
+                || body.SampleContinuousCollisionAngularVelocity(Fixed64.Zero) != Vector3d.Zero
+                || body.IsKinematic && body.Agent.Transform.WorldRotation != body.Rotation)) return false;
+        if (source is LSSphereCollider) return true;
+        if (source is not LSCapsuleCollider capsule) return false;
+        if (capsule.AxisLength == Fixed64.Zero) return true;
+        var basis = new WideRationalBasis3d(capsule.Rotation);
+        // A vertical core and a center inside the target's finite Y band
+        // supply exactly the same X/Z disk as this true-radius sphere.
+        // Check the complete chord; arbitrary/inflated proxies remain unknown.
+        return basis.Yx.IsZero && basis.Yz.IsZero
+            && MixedEmbedded2DGeometry.ContainsPointInSlab(target, start.Y)
+            && MixedEmbedded2DGeometry.ContainsPointInSlab(target, end.Y);
+    }
+
     private static bool TrySweepSphereAgainst2D(
         Vector3d start, Vector3d end, Vector3d direction, Fixed64 length,
         Fixed64 radius, LSCollider2D collider, out PhysicsMixedHit hit,

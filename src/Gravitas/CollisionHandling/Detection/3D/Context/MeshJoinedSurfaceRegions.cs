@@ -24,8 +24,11 @@ internal class MeshJoinedSurfaceRegions<TFrame> where TFrame : struct
     internal readonly SwiftList<int> Parents = new(), Roots = new(), RegionByRoot = new(), NodeMembers = new();
     private int[] _responseComponents = Array.Empty<int>(), _responseMembers = Array.Empty<int>();
     private readonly IComparer<(LSMeshCollider Collider, int Triangle)> _memberComparer =
-        Comparer<(LSMeshCollider Collider, int Triangle)>.Create((a, b) =>
-        { int order = a.Collider.Id.CompareTo(b.Collider.Id); return order != 0 ? order : a.Triangle.CompareTo(b.Triangle); });
+        Comparer<(LSMeshCollider Collider, int Triangle)>.Create(static (a, b) =>
+        {
+            int order = ((IPhysicsColliderRegistryItem)a.Collider).ReplayOrder.CompareTo(((IPhysicsColliderRegistryItem)b.Collider).ReplayOrder);
+            return order != 0 ? order : a.Triangle.CompareTo(b.Triangle);
+        });
     internal int PreparedCount = -1;
     internal bool Active;
 
@@ -108,9 +111,10 @@ internal class MeshJoinedSurfaceRegions<TFrame> where TFrame : struct
             for (int span = 0; span < member.Boundary.Spans.Length; span++)
             {
                 var edge = member.Boundary.Spans[span];
-                member.JoinedSpans[span] = member.BoundaryTrusted && edge.Kind == MeshSurfaceBoundaryDomain.SpanKind.Joined
-                    && MemberBySurface.TryGetValue((Meshes[edge.OtherMember], edge.OtherSurface), out int other)
-                    && Members[other].BoundaryTrusted;
+                // Coverage certifies this span independently. An ambiguous or
+                // folded edge elsewhere still keeps its own native perimeter.
+                member.JoinedSpans[span] = edge.Kind == MeshSurfaceBoundaryDomain.SpanKind.Joined
+                    && MemberBySurface.TryGetValue((Meshes[edge.OtherMember], edge.OtherSurface), out int other);
                 if (!member.JoinedSpans[span]) continue;
                 int a = FindResponseComponent(index), b = FindResponseComponent(MemberBySurface[(Meshes[edge.OtherMember], edge.OtherSurface)]);
                 _responseComponents[Math.Max(a, b)] = Math.Min(a, b);
@@ -179,7 +183,7 @@ internal class MeshJoinedSurfaceRegions<TFrame> where TFrame : struct
         if (trusted)
             foreach (var owner in Fan.Owners)
                 if (MemberBySurface.TryGetValue((Meshes[owner.Member], owner.Surface), out int other)
-                    && (Members[other].Collider.Id < collider.Id || Members[other].Collider == collider
+                    && (((IPhysicsColliderRegistryItem)Members[other].Collider).ReplayOrder < ((IPhysicsColliderRegistryItem)collider).ReplayOrder || Members[other].Collider == collider
                         && collider.Mesh.GetCanonicalSurfaceOrdinal(owner.Surface) < collider.Mesh.GetCanonicalSurfaceOrdinal(member.Owner)))
                     suppress = true;
         return trusted ? Fan.Rays : default;
@@ -192,6 +196,8 @@ internal class MeshJoinedSurfaceRegions<TFrame> where TFrame : struct
         bool trusted = Fan.BuildAtPoint(Meshes.AsReadOnlySpan(), member.Boundary.SourceMember, member.Owner,
             point, PreparedBoundaries.AsReadOnlySpan());
         suppress = trusted && !Fan.HasExposedBoundary;
+        // A finite canonical-owner corner can borrow a fan only when every
+        // incident owner's complete perimeter retains its classification.
         if (trusted)
             foreach (var owner in Fan.Owners)
                 if (MemberBySurface.TryGetValue((Meshes[owner.Member], owner.Surface), out int incident) && !Members[incident].BoundaryTrusted)
@@ -200,7 +206,7 @@ internal class MeshJoinedSurfaceRegions<TFrame> where TFrame : struct
             foreach (var owner in Fan.Owners)
             {
                 if (!MemberBySurface.TryGetValue((Meshes[owner.Member], owner.Surface), out int other)
-                    || Members[other].Collider.Id > collider.Id || Members[other].Collider == collider
+                    || ((IPhysicsColliderRegistryItem)Members[other].Collider).ReplayOrder > ((IPhysicsColliderRegistryItem)collider).ReplayOrder || Members[other].Collider == collider
                     && collider.Mesh.GetCanonicalSurfaceOrdinal(owner.Surface) >= collider.Mesh.GetCanonicalSurfaceOrdinal(member.Owner)) continue;
                 PhysicsMesh mesh = Members[other].Collider.Mesh;
                 ReadOnlySpan<int> edges = mesh.GetCanonicalSurfaceBoundaryVertexPairs(owner.Surface);

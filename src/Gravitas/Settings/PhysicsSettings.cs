@@ -10,6 +10,7 @@ using Gravitas.Support;
 using SwiftCollections;
 using System;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace Gravitas;
 
@@ -87,6 +88,39 @@ public sealed partial class PhysicsSettings
     /// Gets the layer-to-layer physical collision enablement matrix.
     /// </summary>
     public bool[,] CollisionMatrix => _collisionMatrix;
+
+    // Raw matrix edits have no setter notification. Retained joined contacts
+    // need the exact eligible-layer bits, including enabled out-of-table layers.
+    internal ulong GetCollisionLayerMask(PhysicsLayer row, PhysicsLayer column,
+        bool watchRow, bool watchColumn)
+    {
+        ulong mask = 0;
+        int rows = _collisionMatrix.GetLength(0), columns = _collisionMatrix.GetLength(1);
+        // CLR rectangular arrays are contiguous in row-major order. Read the
+        // same cells with one-dimensional bounds checks; empty tables enable all layers.
+        ReadOnlySpan<bool> cells = _collisionMatrix.Length == 0 ? default
+            : MemoryMarshal.CreateReadOnlySpan(ref _collisionMatrix[0, 0], _collisionMatrix.Length);
+        if (watchRow)
+        {
+            uint enabled = uint.MaxValue;
+            if (row.Index < rows)
+            {
+                ReadOnlySpan<bool> values = cells.Slice(row.Index * columns, Math.Min(columns, MaxLayers));
+                for (int layer = 0; layer < values.Length; layer++)
+                    if (!values[layer]) enabled &= ~(1u << layer);
+            }
+            mask = enabled;
+        }
+        if (watchColumn)
+        {
+            uint enabled = uint.MaxValue;
+            if (column.Index < columns)
+                for (int layer = 0; layer < Math.Min(rows, MaxLayers); layer++)
+                    if (!cells[layer * columns + column.Index]) enabled &= ~(1u << layer);
+            mask |= (ulong)enabled << MaxLayers;
+        }
+        return mask;
+    }
 
     /// <summary>
     /// Gets or sets whether reusable runtime collision objects are pooled.

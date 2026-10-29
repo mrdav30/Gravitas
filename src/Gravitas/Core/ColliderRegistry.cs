@@ -126,7 +126,7 @@ internal sealed class ColliderRegistry<TCollider>
         _liveColliders.RemoveAt(lastIndex);
     }
 
-    private readonly struct ReplayOrderComparer : IComparer<TCollider>
+    internal readonly struct ReplayOrderComparer : IComparer<TCollider>
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public int Compare(TCollider? x, TCollider? y) =>

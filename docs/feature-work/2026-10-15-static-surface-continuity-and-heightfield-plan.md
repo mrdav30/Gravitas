@@ -1,14 +1,14 @@
 # Static Surface Continuity And Heightfield Integration
 
 **Date:** 2026-10-15  
-**Status:** Phases 1–11 complete, 2026-10-28
+**Status:** Phases 1–13 complete; Phase 14 next, 2026-10-29
 #133/#139 remain coordinated. Heightfield and alternative-index work are deferred;
 no public continuity API is enabled. Internal 3D discrete response covers rounded,
 cone, extrusion and native mesh families, pure 2D joined-solid response,
 embedded 2D movers against joined 3D meshes, and native 3D boxes, closed convex
-hulls, spheres, capsules, cylinders and cones against joined 2D solids.
-Remaining reverse mixed families and continuation work remain in the phases
-below.  
+hulls, spheres, capsules, cylinders, cones and native open/concave meshes against
+joined 2D solids. Continuation, query/CCD and membership restore are integrated;
+public contract publication and #133/#139 closeout remain in Phase 14.  
 **Order:** #132 is resolved. Resolve #133 and its confirmed pure 2D counterpart,
 #139, through the generic-continuity phases below before terrain-specific work.
 Keep one implementation plan rather than duplicate the prerequisite design.  
@@ -1832,20 +1832,101 @@ with inputs and a maintained fixture; it is not deferred Phase 12 work.
 
 ### Phase 13 - Continuation, Queries And Continuous Collision
 
-- [ ] Extend existing dependency invalidation to affected neighbors for geometry,
+- [x] Extend existing dependency invalidation to affected neighbors for geometry,
   filtering, trigger state, removal and membership changes. Test sleeping contact
   and query-grounded bodies, including expose-a-rim transitions without a local
   pose change. Verify the current step uses one coherent committed topology.
-- [ ] Audit 3D sweep/initial-overlap and mixed query/CCD certification, and 2D CCD
+- [x] Audit 3D sweep/initial-overlap and mixed query/CCD certification, and 2D CCD
   against the same physical domain. Cover fast seam crossing, rotation, retained
   tokens and true-edge impact; keep per-collider query results distinct.
   A horizontal 3D floor cannot prove planar mixed sliding parity.
-- [ ] Complete authoritative membership hashing, explicit recording/restore and
+- [x] Complete authoritative membership hashing, explicit recording/restore and
   host reconstruction, including unloaded/replaced members and context reuse.
   Settle supplier identity and solver-group ordering across reconstructed registry
   slots; normalized hash references alone do not establish equivalent ordering.
   Extend shared native replay conformance with reviewed expectations; do not
   weaken existing unrelated fixtures to accommodate a seam correction.
+
+**Completion, 2026-10-29:** Selective invalidation now follows changed bounds
+and borrowed suppliers across geometry, filters, trigger state, hierarchy,
+removal and membership changes. Collision-matrix edits refresh affected contact
+rows while equivalent contacts and disconnected sleepers remain asleep.
+Query-grounded bodies retain valid witnesses and release excluded supports.
+
+Linear and rotational CCD reuse native response owners across 3D, 2D and both
+mixed directions. Admission validates the actual source at the sampled pose,
+retains later physical hits after covered candidates, and certifies radial axes
+against their original finite features. Exact framed incidence, bounded physical
+witness charts and complete clipped slab segments preserve rotated seams,
+compensated authored origins, finite rims, holes and offset/core-bearing sources.
+Rotational searches preserve searchable exposed boundaries and require exact
+separation before omitting handled members. Public queries retain member identity.
+Remote folded geometry no longer revokes independently certified local joins;
+cone regions retain one response carrier with actual supplier/material provenance.
+
+Membership uses transactional typed Chronicler links and normalized authoritative
+hashing. Reconstruction covers replaced/unloaded members, context/registry-slot
+reuse and stable solver-group ordering. Two reviewed joined replay fixtures,
+including both mixed owners, extend the six unchanged existing expectations.
+
+Final Release/Lean builds cover both target frameworks without warnings/errors,
+using `UseLocalLsfStack=true`. Raw coverage is complete:
+
+| Library/profile | Tests | Sequence points | Branch points | Methods |
+| --- | ---: | ---: | ---: | ---: |
+| Gravitas Release | 8,144 | 53,342/53,342 | 21,588/21,588 | 5,587/5,587 |
+| Gravitas ReleaseLean | 8,073 | 53,340/53,340 | 21,588/21,588 | 5,586/5,586 |
+| FixedMathSharp Release | 7,197 + 49 adapter | 67,926/67,926 | 22,292/22,292 | 5,293/5,293 |
+| FixedMathSharp ReleaseLean | 7,176 + 49 adapter | 68,019/68,019 | 22,292/22,292 | 5,289/5,289 |
+
+All eight shared fixtures match reviewed expectations and each other on Windows
+x64 Release/Lean. Linux/ARM, Unity execution and released packages await their
+respective validation lanes. Commit/push the coordinated FixedMathSharp change
+before updating the develop CI dependency pin.
+
+A measured introduced circle-CCD cost was refined here. The retained solution
+rejects nonwinning hits before native work and reuses an identical centered-circle
+sweep only when the actual collector radius matches the current physical radius.
+Retained declared hits still receive native admission. The grounding-callback radius
+shrink regression passes; removing the radius check incorrectly stops velocity.
+The experimental exposed-face shortcut and its helper-only tests were deleted.
+
+Frozen pre-phase Gravitas `9175653` and current payloads use the same driver,
+with loaded dependency hashes and matching physical witnesses/checksums. Windows
+x64/i7-9700K, .NET 10.0.10 Release, 16-Hz host-loop results are:
+
+| Complete CCD step | Before | After | Combined change |
+| --- | ---: | ---: | ---: |
+| Circle, two joined 2D solids | 87.73 us/frame | 85.70 us/frame | -2.31% |
+| Circle, one continuous 2D solid | 45.00 us/frame | 44.59 us/frame | -0.93% |
+
+Each row combines normal/reversed load order, 24 alternating paired windows per
+order, 10-second warmup and 16 invocations of 64 frames per window. All allocate
+0 B warm. Thirteen ordinary step, cached-contact and query controls also retain
+physical outputs and zero allocation. Their initial contrasts range -1.67% to
++2.88%; fresh balanced repeats of the sensitive cylinder, 2D sweep and 2D response
+controls give +0.55%, +0.15% and +0.68%. These order-sensitive small differences
+establish neither a repeatable material regression nor universal zero overhead.
+
+Corrected joined CCD capacity controls measure 362.09 us/frame in 3D,
+511.59 us/frame for a 3D sphere against joined 2D solids, and 4.817 ms/frame for
+a 2D circle against joined 3D meshes, all at 0 B. Broken committed joined
+responses are excluded as timing denominators. The ordinary mixed-circle CCD
+control already costs 6.6–6.9 ms/frame on the committed runtime; its repeated
+measurement extends existing `GRV-Benchmark-026`. General free-axis rotational
+capacity remains in `GRV-Benchmark-027`; constrained parallel-rotation regressions
+pass while unproved stationary tails preserve momentum. These are bounded
+workloads, not game-capacity or frame-tail latency guarantees.
+
+Independent geometry and ponytail reviews have no remaining findings. Net runtime
+growth is 1,450 Gravitas lines with four owner-specific CCD/serialization partials,
+and 109 FixedMathSharp lines in six existing files. Existing topology, spatial
+lookup, exact arithmetic and response owners remain in use. Ignored captures in
+`artifacts/static-surface/phase13/` retain source/module hashes, red/green controls,
+raw coverage (`bf` Gravitas, `aa` math), replay captures, ordinary paired runs,
+`ccd-stable-bf-{forward,reverse}.json` and corrected-work capacity controls.
+Maintained tests/fixtures and the workload descriptions above preserve the
+reproduction contract independently of those temporary captures.
 
 ### Phase 14 - Close #133/#139 And Publish The Supported Contract
 

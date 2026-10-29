@@ -149,7 +149,7 @@ public abstract partial class LSCollider
             ThrowIfCannotEnableTrigger(nameof(IsTrigger));
 
         _isTrigger = value;
-        if (this is LSMeshCollider mesh) mesh.StaticSurface?.Invalidate();
+        if (this is LSMeshCollider mesh) mesh.StaticSurface?.Invalidate(changed: mesh);
     }
 
     private void ThrowIfCannotEnableTrigger(string operation)

@@ -101,7 +101,7 @@ public sealed partial class SolidBody2D
                     requireClosingContact: true)
                 : 0;
 
-            bool found2D = TryGetFirstValidContinuousCollisionHit(startPosition, proposedPosition, hitCount, out Physics2DHit hit2D);
+            bool found2D = TryGetFirstValidContinuousCollisionHit(startPosition, proposedPosition, proxyRadius, hitCount, out Physics2DHit hit2D);
             bool foundMixed = TryGetFirstValidMixedContinuousCollisionHit(startPosition, proposedPosition, mixedHitCount, out PhysicsMixedHit hitMixed);
             if (found2D
                 && (!foundMixed

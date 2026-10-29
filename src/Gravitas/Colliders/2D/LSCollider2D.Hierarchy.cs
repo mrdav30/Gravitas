@@ -43,8 +43,14 @@ public abstract partial class LSCollider2D
         _hierarchyState.RemoveChild(key);
     }
 
-    void IColliderHierarchyNode.ClearParentReference() =>
-        _hierarchyState.ClearParentReference();
+    void IColliderHierarchyNode.ClearParentReference()
+    {
+        if (_hierarchyState.ClearParentReference())
+        {
+            MarkContactDependencyChanged();
+            _body?.Wake();
+        }
+    }
 
     bool IColliderHierarchyNode.TryGetHierarchyColliderByKey(
         ColliderHierarchyKey key,

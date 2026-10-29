@@ -268,23 +268,8 @@ public partial class SolidBody
             || (hit.Collider!.Body is SolidBody targetBody && !targetBody.IsStatic))
             return false;
         Vector3d normal = hit.Normal;
-        int axis = normal.X != Fixed64.Zero ? 0 : normal.Y != Fixed64.Zero ? 1 : 2;
-        // This is a certificate for every rounded intermediate pose, rather
-        // than an approximate parallel-axis or endpoint-only check. Integration,
-        // Slerp and normalization preserve these literal zero components. General
-        // rotations still require the conservative interval search.
-        if (Vector3d.CompareProjection(displacement, Vector3d.Zero, normal) < 0)
+        if (!HasInvariantContinuousProjection(normal, displacement, startRotation, targetRotation, isKinematic))
             return false;
-        for (int offset = 1; offset <= 2; offset++)
-        {
-            int transverse = (axis + offset) % 3;
-            bool preservesProjection = normal[transverse] == Fixed64.Zero
-                & startRotation[transverse] == Fixed64.Zero
-                & targetRotation[transverse] == Fixed64.Zero
-                & (isKinematic | _angularVelocity[transverse] == Fixed64.Zero);
-            if (!preservesProjection)
-                return false;
-        }
 
         // Earlier candidate searches leave the source at their last sampled
         // pose. The separating plane must be proved from this segment's start.
@@ -304,6 +289,30 @@ public partial class SolidBody
         // a later wall cannot hide behind the initial floor hit. A nonnegative
         // exact gap plus invariant support projection proves the entire path safe.
         return RationalPoint3d.CompareProjection(sourceMin, targetMax, normal) >= 0;
+    }
+
+    private bool HasInvariantContinuousProjection(Vector3d normal, Vector3d displacement,
+        FixedQuaternion startRotation, FixedQuaternion targetRotation, bool isKinematic)
+    {
+        int axis = normal.X != Fixed64.Zero ? 0 : normal.Y != Fixed64.Zero ? 1 : 2;
+        // This is a certificate for every rounded intermediate pose, rather
+        // than an approximate parallel-axis or endpoint-only check. Integration,
+        // Slerp and normalization preserve these literal zero components. General
+        // rotations still require the conservative interval search.
+        if (Vector3d.CompareProjection(displacement, Vector3d.Zero, normal) < 0)
+            return false;
+        for (int offset = 1; offset <= 2; offset++)
+        {
+            int transverse = (axis + offset) % 3;
+            bool preservesProjection = normal[transverse] == Fixed64.Zero
+                & startRotation[transverse] == Fixed64.Zero
+                & targetRotation[transverse] == Fixed64.Zero
+                & (isKinematic | _angularVelocity[transverse] == Fixed64.Zero);
+            if (!preservesProjection)
+                return false;
+        }
+
+        return true;
     }
 
     private static bool TryGetFullColliderSupportPoint(LSCollider collider,

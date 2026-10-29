@@ -119,15 +119,16 @@ internal sealed class MeshSlabSurfaceBoundary
             }
             return;
         }
+        // Joined prism frames always retain their prepared boundary above.
+        // Isolated Prepare clears this member-owned offset memory.
+        System.Diagnostics.Debug.Assert(faces.PrismOffsets.IsEmpty);
         for (int edge = 0; edge < boundary.Length; edge += 2)
         {
             int first = boundary[edge], second = boundary[edge + 1];
             int feature = checked(3 * (edge / 2));
             int region = connectivity.RegionCount == 1
                 ? frame.Section.IntersectsSegment(new FixedSegment(vertices[first], vertices[second]), offsets) ? 0 : -1
-                : !faces.PrismOffsets.IsEmpty
-                    ? MeshSurfaceBoundaryTopology.FindEdgeRegion(mesh, owner, first, second, connectivity, frame.Section, faces.PrismOffsets)
-                    : MeshSurfaceBoundaryTopology.FindEdgeRegion(mesh, owner, first, second, connectivity, frame.Section, embedded);
+                : MeshSurfaceBoundaryTopology.FindEdgeRegion(mesh, owner, first, second, connectivity, frame.Section, embedded);
             if (region < 0) continue;
             KeepFeature(first, second, feature, region, pointOnly: false, offsets);
             if (_visitedCorners.Add(first) && frame.Section.ContainsPoint(vertices[first], offsets))
@@ -161,7 +162,8 @@ internal sealed class MeshSlabSurfaceBoundary
             if (!SegmentSlabSurfaceContact.TryGetContact(segment, mesh.GeometryFrame,
                 frame.Center, frame.SlabRotation, length, radius, halfThickness, prismOffsets, fan[..count],
                 interiorOnly: !pointOnly, clip, out FixedContactAnchors contact, fullHeight: frame.FullHeight != Fixed64.Zero)) return;
-            var group = new ContactGroupKey(namespace3D, namespace2D, surface, 0, checked(-ordinal - 1), sourceIdA: faces.SourceId);
+            var group = new ContactGroupKey(namespace3D, namespace2D, surface, 0, checked(-ordinal - 1),
+                sourceIdA: faces.SourceId, sourceOrderA: faces.SourceOrder);
             manifold.AddContact(new ContactAnchor(contact.FirstAnchor), new ContactAnchor(contact.SecondAnchor),
                 contact.Depth, contact.Normal, collider.Material, targetMaterial,
                 contact.DepthIsClamped, featureNamespaceA: namespace3D, featureNamespaceB: namespace2D, group: group);

@@ -27,6 +27,13 @@ public sealed partial class SolidBody2D
     private ExactContactImpulseState?[]? _mixedContinuousCollisionExactImpulses;
     private readonly SwiftList<LSCollider> _rotationalMixedStatic3DCandidates = new();
     private readonly SwiftList<int> _rotationalMixedMoving3DCandidateIds = new();
+    private SwiftHashSet<StaticSurface>? _rotationalMixedSurfaceCandidates;
+    private SwiftList<(LSMeshCollider Supplier, int Owner)>? _resolvedMixedSurfaceFamilies;
+
+    private ReadOnlySpan<(LSMeshCollider Supplier, int Owner)> ResolvedMixedSurfaceFamilies(StaticSurface surface) =>
+        _resolvedMixedSurfaceFamilies is { } families
+            && _continuousCollisionHandoffIgnoredCollider3D is LSMeshCollider previous
+            && previous.StaticSurface == surface ? families.AsReadOnlySpan() : default;
 
     internal void SetMixedContinuousCollisionSamplePose(
         Vector2d position,
@@ -101,82 +108,90 @@ public sealed partial class SolidBody2D
         if (!Context.Settings.RuntimeMode.RunsMixedContacts())
             return false;
 
-        if (!reuseCandidates)
-            GatherMixedRotationalContinuousCollisionCandidates(
-                startPosition,
-                displacement,
-                pivotRadius);
-
-        bool found = false;
-        Fixed64 earliestTime = Fixed64.One;
-        int earliestId = int.MaxValue;
-        MixedContact earliestContact = default;
-        bool earliestHasContact = false;
-        Fixed64 earliestContactTime = Fixed64.Zero;
-        LSCollider? earliestTarget = null;
-
-        for (int i = 0; i < _rotationalMixedStatic3DCandidates.Count; i++)
+        _rotationalMixedSurfaceCandidates?.Clear();
+        try
         {
-            LSCollider target = _rotationalMixedStatic3DCandidates[i];
-            ConsiderMixedRotationalContinuousCollisionCandidate(
-                target,
-                startPosition,
-                displacement,
-                startRotation,
-                angularDelta,
-                angularDistance,
-                pivotRadius,
-                elapsedTime,
-                remainingTime,
-                ref found,
-                ref earliestTime,
-                ref earliestId,
-                ref earliestContact,
-                ref earliestHasContact,
-                ref earliestContactTime,
-                ref earliestTarget);
-        }
+            if (!reuseCandidates)
+                GatherMixedRotationalContinuousCollisionCandidates(
+                    startPosition,
+                    displacement,
+                    pivotRadius);
 
-        for (int i = 0; i < _rotationalMixedMoving3DCandidateIds.Count; i++)
-        {
-            SolidBody targetBody = Context.Physics.GetContinuousCollisionCandidate(
-                _rotationalMixedMoving3DCandidateIds[i]);
-            if (!IsMovingMixedRotationalContinuousCollisionTarget(targetBody))
+            bool found = false;
+            Fixed64 earliestTime = Fixed64.One;
+            int earliestOrder = int.MaxValue;
+            MixedContact earliestContact = default;
+            bool earliestHasContact = false;
+            Fixed64 earliestContactTime = Fixed64.Zero;
+            LSCollider? earliestTarget = null;
+
+            for (int i = 0; i < _rotationalMixedStatic3DCandidates.Count; i++)
             {
-                continue;
+                LSCollider target = _rotationalMixedStatic3DCandidates[i];
+                if (target is LSMeshCollider { StaticSurface: { } surface }
+                    && (!IsValidMixedRotationalContinuousCollisionTarget(target)
+                        || !(_rotationalMixedSurfaceCandidates ??= new()).Add(surface))) continue;
+                ConsiderMixedRotationalContinuousCollisionCandidate(
+                    target,
+                    startPosition,
+                    displacement,
+                    startRotation,
+                    angularDelta,
+                    angularDistance,
+                    pivotRadius,
+                    elapsedTime,
+                    remainingTime,
+                    ref found,
+                    ref earliestTime,
+                    ref earliestOrder,
+                    ref earliestContact,
+                    ref earliestHasContact,
+                    ref earliestContactTime,
+                    ref earliestTarget);
             }
 
-            ConsiderMixedRotationalContinuousCollisionCandidate(
-                targetBody.Collider,
-                startPosition,
-                displacement,
-                startRotation,
-                angularDelta,
-                angularDistance,
-                pivotRadius,
-                elapsedTime,
-                remainingTime,
-                ref found,
-                ref earliestTime,
-                ref earliestId,
-                ref earliestContact,
-                ref earliestHasContact,
-                ref earliestContactTime,
-                ref earliestTarget);
+            for (int i = 0; i < _rotationalMixedMoving3DCandidateIds.Count; i++)
+            {
+                SolidBody targetBody = Context.Physics.GetContinuousCollisionCandidate(
+                    _rotationalMixedMoving3DCandidateIds[i]);
+                if (!IsMovingMixedRotationalContinuousCollisionTarget(targetBody))
+                {
+                    continue;
+                }
+
+                ConsiderMixedRotationalContinuousCollisionCandidate(
+                    targetBody.Collider,
+                    startPosition,
+                    displacement,
+                    startRotation,
+                    angularDelta,
+                    angularDistance,
+                    pivotRadius,
+                    elapsedTime,
+                    remainingTime,
+                    ref found,
+                    ref earliestTime,
+                    ref earliestOrder,
+                    ref earliestContact,
+                    ref earliestHasContact,
+                    ref earliestContactTime,
+                    ref earliestTarget);
+            }
+
+            if (!found)
+                return false;
+
+            hit = new RotationalMixed3DHit(
+                earliestTime,
+                earliestContact,
+                earliestHasContact,
+                _rotationalMixedEarliestContactIsClosing,
+                earliestContactTime,
+                earliestTarget!,
+                _rotationalMixedEarliestManifold);
+            return true;
         }
-
-        if (!found)
-            return false;
-
-        hit = new RotationalMixed3DHit(
-            earliestTime,
-            earliestContact,
-            earliestHasContact,
-            _rotationalMixedEarliestContactIsClosing,
-            earliestContactTime,
-            earliestTarget!,
-            _rotationalMixedEarliestManifold);
-        return true;
+        finally { _rotationalMixedSurfaceCandidates?.Clear(); }
     }
 
     private void GatherMixedRotationalContinuousCollisionCandidates(
@@ -208,6 +223,7 @@ public sealed partial class SolidBody2D
             _rotationalMixedStatic3DCandidates,
             staticStyleOnly: true,
             cachePartitionRefresh: true);
+        _rotationalMixedStatic3DCandidates.SortInPlace(default(ColliderRegistry<LSCollider>.ReplayOrderComparer));
 
         SwiftList<int> candidateIds =
             Context.Physics.QueryContinuousCollisionCandidates(bounds);
@@ -228,7 +244,7 @@ public sealed partial class SolidBody2D
         Fixed64 remainingTime,
         ref bool found,
         ref Fixed64 earliestTime,
-        ref int earliestId,
+        ref int earliestOrder,
         ref MixedContact earliestContact,
         ref bool earliestHasContact,
         ref Fixed64 earliestContactTime,
@@ -236,6 +252,8 @@ public sealed partial class SolidBody2D
     {
         // Kinematic clamps against immovable targets consume geometry/time only;
         // dynamic stopping and movable-target response still require full contacts.
+        int candidateOrder = target is LSMeshCollider { StaticSurface: { } surface }
+            ? surface.ContinuousOrder : ((IPhysicsColliderRegistryItem)target).ReplayOrder;
         if (!IsValidMixedRotationalContinuousCollisionTarget(target)
             || !TryFindEarliestMixedRotationalContinuousCollisionAgainstTarget(
                 target,
@@ -256,17 +274,17 @@ public sealed partial class SolidBody2D
                 out Fixed64 candidateContactTime)
             || !ContinuousCollisionMath.ShouldReplaceContinuousCollisionHit(
                 candidateTime,
-                target.Id,
+                candidateOrder,
                 found,
                 earliestTime,
-                earliestId))
+                earliestOrder))
         {
             return;
         }
 
         found = true;
         earliestTime = candidateTime;
-        earliestId = target.Id;
+        earliestOrder = candidateOrder;
         earliestContact = candidateContact;
         earliestHasContact = candidateHasContact;
         earliestContactTime = candidateContactTime;
@@ -299,6 +317,9 @@ public sealed partial class SolidBody2D
         contactTime = Fixed64.Zero;
         _rotationalMixedKnownManifold.BeginUpdate(Context.FrameCount);
         _rotationalMixedKnownContactIsClosing = false;
+        StaticSurface? surface = (target as LSMeshCollider)?.StaticSurface;
+        ReadOnlySpan<(LSMeshCollider Supplier, int Owner)> resolved = surface == null
+            ? default : ResolvedMixedSurfaceFamilies(surface);
         SolidBody? targetBody = target.Body;
         bool samplesTargetMotion = targetBody != null
             && IsMovingMixedRotationalContinuousCollisionTarget(targetBody);
@@ -310,6 +331,24 @@ public sealed partial class SolidBody2D
 
         try
         {
+            SampleMixedRotationalContinuousPairPose(startPosition, displacement, startRotation, angularDelta,
+                searchStart, elapsedTime, remainingTime, targetBody, samplesTargetMotion);
+            // Resolve an actual closing start before midpoint refinement can
+            // introduce penetration. Retain the complete native matched rows.
+            if (needsResponseContact && (surface?.IntersectsMixedContinuous(Collider, resolved: resolved)
+                    ?? CollisionDetectionMixed.IntersectsForContinuousCollision(target, Collider)))
+            {
+                BuildMixedRotationalContinuousContact(target,
+                    ResolveRotationalFrameFraction(elapsedTime, remainingTime, searchStart),
+                    out contact, out _rotationalMixedKnownContactIsClosing);
+                if (_rotationalMixedKnownContactIsClosing)
+                {
+                    _rotationalMixedKnownManifold.CopyFrom(Context.CollisionScratch.MixedManifold, Context.FrameCount);
+                    safeTime = contactTime = searchStart;
+                    hasContact = true;
+                    return true;
+                }
+            }
             Span<ContinuousCollisionMath.RotationalInterval> intervals =
                 stackalloc ContinuousCollisionMath.RotationalInterval[
                     ContinuousCollisionMath.RotationalIntervalMaxDepth + 2];
@@ -370,7 +409,8 @@ public sealed partial class SolidBody2D
                     hasMotionBound = targetBoundResolved & combinedBoundResolved;
                 }
 
-                bool sampleHasContact = CollisionDetectionMixed.IntersectsForContinuousCollision(target, Collider);
+                bool sampleHasContact = surface != null ? surface.IntersectsMixedContinuous(Collider, resolved: resolved)
+                    : CollisionDetectionMixed.IntersectsForContinuousCollision(target, Collider);
                 if (sampleHasContact
                     && (!hasKnownContact || midpoint < knownContactTime))
                 {
@@ -378,11 +418,13 @@ public sealed partial class SolidBody2D
                     knownContactTime = midpoint;
                 }
 
-                bool hasShapeGap = CollisionDetectionMixed.TryGetRotationalSeparationGap(
+                Fixed64 shapeGap = default;
+                bool shapeGapSupported = false;
+                bool hasShapeGap = surface == null && CollisionDetectionMixed.TryGetRotationalSeparationGap(
                     target,
                     Collider,
-                    out Fixed64 shapeGap,
-                    out bool shapeGapSupported);
+                    out shapeGap,
+                    out shapeGapSupported);
                 Fixed64 characteristicScale = target is LSSphereCollider sphere
                     ? FixedMath.Max(pivotRadius, sphere.ScaledRadius)
                     : pivotRadius;
@@ -394,7 +436,9 @@ public sealed partial class SolidBody2D
                         out Fixed64 conservativeShapeGap)
                     && conservativeShapeGap > motionBound;
                 bool fallbackBoundsCertifySeparation = !sampleHasContact && hasMotionBound && !shapeGapSupported
-                    && ContinuousCollisionBounds.AreSeparated(target, Collider, motionBound);
+                    && (surface != null ? !surface.IntersectsMixedContinuous(Collider, motionBound, resolved)
+                        : ContinuousCollisionBounds.AreSeparated(target, Collider, motionBound)
+                            || !CollisionDetectionMixed.IntersectsForContinuousCollision(target, Collider, motionBound));
                 if (!sampleHasContact
                     && hasMotionBound
                     && (shapeGapCertifiesSeparation || fallbackBoundsCertifySeparation))
@@ -639,7 +683,12 @@ public sealed partial class SolidBody2D
         contact = default;
         contactIsClosing = false;
         // Admission already retained this geometric witness; closing rows only authorize response.
-        CollisionDetectionMixed.TryBuildManifold(target, Collider, manifold);
+        if (target is LSMeshCollider { StaticSurface: { } surface })
+        {
+            manifold.BeginUpdate(Context.FrameCount);
+            surface.AppendMixedContinuousContacts(Collider, manifold, ResolvedMixedSurfaceFamilies(surface));
+        }
+        else CollisionDetectionMixed.TryBuildDiscreteManifold(target, Collider, manifold);
         SolidBody? other = target.Body;
         ContactAnchor center3D = other?.GetCenterOfMassAnchor() ?? ContactAnchor.FromWorldPoint(target.Center);
         var center2D = new ContactAnchor(new Vector3d(_position.X, Collider.MixedSlabCenterY, _position.Y),
@@ -654,11 +703,13 @@ public sealed partial class SolidBody2D
 
     private bool IsValidMixedRotationalContinuousCollisionTarget(LSCollider target)
     {
+        bool resolvedDomain = target is LSMeshCollider { StaticSurface: { } surface }
+            && !ResolvedMixedSurfaceFamilies(surface).IsEmpty;
         return target.IsActive
             && !target.IsTrigger
-            && !ContinuousCollisionCandidateOrdering.IsIgnoredTarget(
+            && (resolvedDomain || !ContinuousCollisionCandidateOrdering.IsIgnoredTarget(
                 target,
-                _continuousCollisionHandoffIgnoredCollider3D)
+                _continuousCollisionHandoffIgnoredCollider3D))
             && Context.MixedCollisions.RequireCollisionPair(target, Collider);
     }
 
@@ -815,6 +866,13 @@ public sealed partial class SolidBody2D
             RefreshLinearSpeed();
             RefreshAngularSpeed();
         }
+
+        // This static-target path has no host callbacks between response and
+        // the next search. Retain only closing, producer-certified face families;
+        // the prepared local mapping keeps unknown provenance conservative.
+        _resolvedMixedSurfaceFamilies?.Clear();
+        if (targetCollider is LSMeshCollider { StaticSurface: { } surface })
+            surface.CaptureMixedContinuousFamilies(manifold, impact, Collider, _resolvedMixedSurfaceFamilies ??= new());
 
         return true;
     }

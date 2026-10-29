@@ -5,19 +5,24 @@
 // See LICENSE file in the project root for full license information.
 //=======================================================================
 
+using FixedMathSharp;
+using FixedMathSharp.Geometry;
 using Gravitas.Colliders;
 using SwiftCollections;
 using System;
 
 namespace Gravitas;
 
-/// <summary>Internal filled-planar continuity declaration pending query, CCD and restore parity.</summary>
+/// <summary>Internal filled-planar continuity declaration with shared response, continuation and membership.</summary>
 /// <content>Owns typed member lifetime, transactional replacement and contact invalidation.</content>
-internal sealed partial class StaticSurface2D : IDisposable
+internal sealed partial class StaticSurface2D : IDisposable, Chronicler.IRecordable
 {
     private readonly GravitasWorldContext _context;
     private LSCollider2D[] _members = Array.Empty<LSCollider2D>();
+    private FixedBoundBox[] _memberBounds = Array.Empty<FixedBoundBox>();
+    private readonly SwiftHashSet<int> _changedSuppliers = new();
     private bool _disposed;
+    internal int ReplayMembership => _members.Length == 0 ? 0 : _members[0].ReplayOrdinal + 1;
 
     internal StaticSurface2D(GravitasWorldContext context, ReadOnlySpan<LSCollider2D> members)
     {
@@ -47,24 +52,52 @@ internal sealed partial class StaticSurface2D : IDisposable
                 || member.StaticSurface != null && member.StaticSurface != this)
                 throw new ArgumentException("Members must be distinct registered static AABB or convex polygon colliders in this context.", nameof(members));
         }
+        bool unchanged = next.Length == _members.Length;
+        foreach (LSCollider2D member in _members) unchanged &= unique.Contains(member);
+        if (unchanged) return;
+        Array.Sort(next, static (first, second) => ((IPhysicsColliderRegistryItem)first).ReplayOrder
+            .CompareTo(((IPhysicsColliderRegistryItem)second).ReplayOrder));
         // Publish associations only after every candidate has passed admission.
-        Invalidate();
-        foreach (LSCollider2D previous in _members) previous.StaticSurface = null;
-        _members = next;
+        var bounds = new FixedBoundBox[next.Length];
+        for (int index = 0; index < next.Length; index++) bounds[index] = next[index].MixedBounds3D;
+        LSCollider2D[] previousMembers = _members;
+        foreach (LSCollider2D previous in previousMembers)
+            if (!unique.Contains(previous)) Invalidate(previous);
+        foreach (LSCollider2D previous in previousMembers) previous.StaticSurface = null;
+        _members = next; _memberBounds = bounds;
         foreach (LSCollider2D member in _members) member.StaticSurface = this;
-        Invalidate();
+        foreach (LSCollider2D member in _members)
+            if (Array.IndexOf(previousMembers, member) < 0) Invalidate(member);
     }
 
-    internal void Invalidate()
+    internal void Invalidate(LSCollider2D? changed = null, bool includeNeighbors = true)
     {
         InvalidateGeometry();
-        foreach (LSCollider2D member in _members)
+        _changedSuppliers.Clear();
+        FixedBoundBox before = default, after = default;
+        if (changed != null)
         {
-            member.MarkContactDependencyChanged(notifySurface: false);
-            // A genuine overlap carrier may retain a different member's support row.
-            _context.Physics2D.ClearWarmStartCachesForCollider(member);
+            int index = Array.IndexOf(_members, changed);
+            before = _memberBounds[index]; after = changed.MixedBounds3D;
+            _memberBounds[index] = after;
         }
+        for (int index = 0; index < _members.Length; index++)
+            if (changed == null || _members[index] == changed || includeNeighbors
+                && (Touches(_memberBounds[index], before) || Touches(_memberBounds[index], after)))
+            {
+                _changedSuppliers.Add(_members[index].Id + 1);
+                _members[index].MarkContactDependencyChanged(notifySurface: false);
+            }
+        foreach (LSCollider2D member in _members)
+            _context.Physics2D.ClearWarmStartCachesForCollider(member, _changedSuppliers);
+        _context.MixedCollisions.InvalidateSurfaceContacts(null, this, _changedSuppliers);
+        _changedSuppliers.Clear();
     }
+
+    private bool Touches(in FixedBoundBox first, in FixedBoundBox second) =>
+        _context.Settings.RuntimeMode == PhysicsRuntimeMode.Mixed ? first.Intersects(second)
+        : FixedBoundArea.FromMinMax(new(first.Min.X, first.Min.Z), new(first.Max.X, first.Max.Z)).Intersects(
+            FixedBoundArea.FromMinMax(new(second.Min.X, second.Min.Z), new(second.Max.X, second.Max.Z)));
 
     partial void InvalidateGeometry();
 
@@ -72,10 +105,12 @@ internal sealed partial class StaticSurface2D : IDisposable
     {
         int index = Array.IndexOf(_members, member);
         if (index < 0) return;
-        Invalidate();
+        Invalidate(member);
         member.StaticSurface = null;
         Array.Copy(_members, index + 1, _members, index, _members.Length - index - 1);
+        Array.Copy(_memberBounds, index + 1, _memberBounds, index, _memberBounds.Length - index - 1);
         Array.Resize(ref _members, _members.Length - 1);
+        Array.Resize(ref _memberBounds, _members.Length);
     }
 
     public void Dispose()
@@ -91,6 +126,7 @@ internal sealed partial class StaticSurface2D : IDisposable
         Invalidate();
         foreach (LSCollider2D member in _members) member.StaticSurface = null;
         _members = Array.Empty<LSCollider2D>();
+        _memberBounds = Array.Empty<FixedBoundBox>();
         _disposed = true;
     }
 }

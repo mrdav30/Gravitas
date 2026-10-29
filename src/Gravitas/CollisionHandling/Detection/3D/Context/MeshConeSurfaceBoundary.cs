@@ -174,7 +174,10 @@ internal sealed class MeshConeSurfaceBoundary
         // rounded coverage never feeds back into exact admission or depth selection.
         // Coverage ranks only the admitted finite pool: normal spread first
         // (a touch family can share both anchors), then mesh/cone anchor spread.
-        var key = new ContactGroupKey(0, 0, surface, 0, checked(-feature - 1));
+        bool joined = mesh.StaticSurface != null;
+        var key = new ContactGroupKey(0, 0, surface, 0, checked(-feature - 1),
+            sourceIdA: joined ? mesh.Id + 1 : 0,
+            sourceOrderA: joined ? ((IPhysicsColliderRegistryItem)mesh).ReplayOrder + 1 : 0);
         for (int slot = 0; slot < count; slot++)
         {
             FixedContactAnchors contact = _surfacePool[chosen[slot]].Contact;

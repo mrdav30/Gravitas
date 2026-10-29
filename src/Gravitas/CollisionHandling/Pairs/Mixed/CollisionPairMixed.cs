@@ -33,6 +33,8 @@ internal sealed partial class CollisionPairMixed
     private uint _manifold3DContactDependencyVersion, _manifold2DContactDependencyVersion;
     private Vector2d _manifold2DCenter;
     private Fixed64 _manifold2DRotation;
+    private bool _watchSpatialLayerRow, _watchPlanarLayerColumn;
+    private ulong _manifoldCollisionLayers;
 
     public CollisionPairMixed(LSCollider collider3D, LSCollider2D collider2D)
     {
@@ -88,6 +90,8 @@ internal sealed partial class CollisionPairMixed
         LastVisitToken = -1;
         _isColliding = false;
         _hasManifoldCache = false;
+        _watchSpatialLayerRow = _watchPlanarLayerColumn = false;
+        _manifoldCollisionLayers = 0;
         _lastCollider3DContactDependencyVersion = 0;
         _lastCollider2DContactDependencyVersion = 0;
         _isTriggerPair = collider3D.IsTrigger || collider2D.IsTrigger;
@@ -205,6 +209,15 @@ internal sealed partial class CollisionPairMixed
     private void PublishManifold(long frame, ContactManifold source)
     {
         ChronicleGuard.ThrowIfNull(source, nameof(source));
+        bool solid = !Collider3D.IsTrigger && !Collider2D.IsTrigger;
+        bool watchRow = solid && Collider2D.StaticSurface != null;
+        bool watchColumn = solid && Collider3D is LSMeshCollider { StaticSurface: not null };
+        ulong layers = watchRow || watchColumn
+            ? Context.Settings.GetCollisionLayerMask(Collider3D.Layer, Collider2D.Layer, watchRow, watchColumn) : 0;
+        // An edited but locally unused matrix bit must not wake an unchanged
+        // sleeper. Compare the rebuilt physical rows before publishing them.
+        if (_isColliding && _hasManifoldCache && layers != _manifoldCollisionLayers && !Manifold.HasSameContacts(source))
+            WakeBodiesForContactChange(source);
         _hasManifoldCache = false;
         RefreshContactDependencies(source);
         Manifold.CopyFrom(source, frame);
@@ -215,6 +228,8 @@ internal sealed partial class CollisionPairMixed
         _manifold2DContactDependencyVersion = Collider2D.ContactDependencyVersion;
         _manifold2DCenter = Collider2D.Center;
         _manifold2DRotation = Collider2D.Rotation;
+        _watchSpatialLayerRow = watchRow; _watchPlanarLayerColumn = watchColumn;
+        _manifoldCollisionLayers = layers;
         _hasManifoldCache = true;
         ClearSolveState();
     }
@@ -226,13 +241,23 @@ internal sealed partial class CollisionPairMixed
         && _manifold3DContactDependencyVersion == Collider3D.ContactDependencyVersion
         && _manifold2DContactDependencyVersion == Collider2D.ContactDependencyVersion
         && _manifold2DCenter == Collider2D.Center
-        && _manifold2DRotation == Collider2D.Rotation;
+        && _manifold2DRotation == Collider2D.Rotation
+        && (!_watchSpatialLayerRow && !_watchPlanarLayerColumn || _manifoldCollisionLayers ==
+            Context.Settings.GetCollisionLayerMask(Collider3D.Layer, Collider2D.Layer,
+                _watchSpatialLayerRow, _watchPlanarLayerColumn));
 
     internal bool TryCopyCachedManifold(long frame, ContactManifold target)
     {
         if (!HasCurrentManifoldCache) return false;
         target.CopyFrom(Manifold, frame);
         return true;
+    }
+
+    internal void InvalidateSurfaceContact(bool wake)
+    {
+        _hasManifoldCache = false;
+        ClearSolveState();
+        if (wake && _isColliding && !_isTriggerPair) WakeBodiesForContactChange();
     }
 
     private void ClearSolveState()

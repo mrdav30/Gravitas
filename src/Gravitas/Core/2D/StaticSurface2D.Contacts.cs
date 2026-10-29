@@ -7,12 +7,15 @@ using Gravitas.CollisionHandling;
 using Gravitas.Support;
 using SwiftCollections;
 using System;
+using System.Collections.Generic;
 
 namespace Gravitas;
 
 /// <content>Local filled-boundary contacts; member overlap remains independent of response ownership.</content>
 internal sealed partial class StaticSurface2D
 {
+    private static readonly IComparer<LSCollider2D> SurfaceMemberOrder = Comparer<LSCollider2D>.Create(static (a, b) =>
+        ((IPhysicsColliderRegistryItem)a).ReplayOrder.CompareTo(((IPhysicsColliderRegistryItem)b).ReplayOrder));
     private readonly SwiftList<LSCollider2D> _candidates = new(), _local = new(), _prepared = new();
     private readonly SwiftList<MeshSurfaceBoundaryDomain2D> _domains = new();
     private readonly SwiftList<(int Member, int Span)> _admitted = new();
@@ -83,6 +86,7 @@ internal sealed partial class StaticSurface2D
         foreach (LSCollider2D candidate in _candidates.AsReadOnlySpan())
             if (candidate.StaticSurface == this && !candidate.IsTrigger
                 && _context.Physics2D.RequireCollisionPair(mover.CompoundOwner ?? mover, candidate)) _local.Add(candidate);
+        _local.SortInPlace(SurfaceMemberOrder);
     }
 
     private void Prepare()
@@ -234,7 +238,8 @@ internal sealed partial class StaticSurface2D
         LSCollider2D supplier = _local[member];
         _contacts.AddContact(new ContactAnchor2D(row.FirstAnchor), new ContactAnchor2D(row.SecondAnchor), row.Depth, row.Normal,
             mover.Material, supplier.Material, row.DepthIsClamped,
-            group: new ContactGroupKey(0, 0, surfaceB: feature, region: vertex ? 1 : 0, sourceIdB: supplier.Id + 1));
+            group: new ContactGroupKey(0, 0, surfaceB: feature, region: vertex ? 1 : 0, sourceIdB: supplier.Id + 1,
+                sourceOrderB: ((IPhysicsColliderRegistryItem)supplier).ReplayOrder + 1));
     }
 
     private static ReadOnlySpan<Vector2d> Offsets(LSCollider2D collider, Span<Vector2d> box)

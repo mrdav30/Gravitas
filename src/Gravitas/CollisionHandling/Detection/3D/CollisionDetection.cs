@@ -10,13 +10,16 @@ using Gravitas.Colliders;
 namespace Gravitas.CollisionHandling;
 
 /// <summary>Provides deterministic 3D narrow-phase collision checks.</summary>
+/// <content>Owns 3D pair manifold refresh and narrow-phase shape dispatch.</content>
 public static partial class CollisionDetection
 {
     /// <summary>Rebuilds and tests the contact manifold for a collision pair.</summary>
     public static bool DoCollisionCheck(CollisionPair pair)
     {
+        var previous = pair.BeginCollisionLayerUpdate();
         pair.Manifold.BeginUpdate(pair.Context.FrameCount);
         bool collided = DoCollisionCheck(CollisionWorkItem.Create(pair));
+        pair.CompleteCollisionLayerUpdate(previous);
         // Regeneration retires vanished features even if sleeping/frozen bodies
         // skip response. A later reappearing feature must not revive an old load.
         pair.RetainWarmStarts();

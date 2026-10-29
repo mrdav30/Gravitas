@@ -38,6 +38,7 @@ public sealed partial class GravitasQuery3DService
     private PhysicsLayerMask _currentLayerMask;
     private LSCollider? _currentExcludedCollider;
     private LSCollider? _currentSweepSourceCollider;
+    private ContinuousSurfaceTriangleAdmission? _currentSurfaceAdmission;
     private bool _currentStaticSweepTargetsOnly;
     private bool _currentIncludeTriggers;
 
@@ -255,7 +256,8 @@ public sealed partial class GravitasQuery3DService
         PhysicsLayerMask layerMask,
         SwiftList<Physics3DHit> results,
         LSCollider? excludedCollider = null,
-        bool includeTriggers = true)
+        bool includeTriggers = true,
+        ContinuousSurfaceTriangleAdmission? surfaceAdmission = null)
     {
         ChronicleGuard.ThrowIfNull(source, nameof(source));
         ChronicleGuard.ThrowIfNull(results, nameof(results));
@@ -266,7 +268,8 @@ public sealed partial class GravitasQuery3DService
             results,
             excludedCollider,
             includeTriggers,
-            staticTargetsOnly: true);
+            staticTargetsOnly: true,
+            surfaceAdmission: surfaceAdmission);
     }
 
     /// <summary>
@@ -545,11 +548,13 @@ public sealed partial class GravitasQuery3DService
         SwiftList<Physics3DHit> results,
         LSCollider? excludedCollider,
         bool includeTriggers,
-        bool staticTargetsOnly = false)
+        bool staticTargetsOnly = false,
+        ContinuousSurfaceTriangleAdmission? surfaceAdmission = null)
     {
         EnsureSourceBelongsToContext(source);
         try
         {
+            _currentSurfaceAdmission = surfaceAdmission;
             PrepareConvexSweepSource(source, displacement);
             results.Clear();
             if (!Vector3d.TryGetMagnitude(displacement, out Fixed64 displacementLength)
@@ -583,6 +588,7 @@ public sealed partial class GravitasQuery3DService
         // Completed queries must not keep retired host object graphs alive.
         _currentExcludedCollider = null;
         _currentSweepSourceCollider = null;
+        _currentSurfaceAdmission = null;
         _convexSweepWorker.ClearSource();
         _coveredVoxels.Clear();
         _traceScratch.Clear();
@@ -776,7 +782,8 @@ public sealed partial class GravitasQuery3DService
         }
 
         bool found = _convexSweepWorker.TrySweepPreparedSource(current!, out hit,
-            requireClosingInitialContact: _currentStaticSweepTargetsOnly);
+            requireClosingInitialContact: _currentStaticSweepTargetsOnly,
+            admitTriangle: current is LSMeshCollider { StaticSurface: not null } ? _currentSurfaceAdmission : null);
         LastMeshTriangleCandidateCount += _convexSweepWorker.LastMeshTriangleCandidateCount;
         return found;
     }

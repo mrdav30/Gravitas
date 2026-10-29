@@ -465,7 +465,8 @@ internal sealed class MeshHullSurfaceContacts : IConvexHullContactDomain, IScale
                 FixedContactAnchors contact = sample.Contact;
                 int movingSurface = response.Feature < 0 ? 0 : _movingMesh.GetCanonicalSurfaceOrdinal(response.Feature) + 1;
                 var key = new ContactGroupKey(0, 0, supplier.Collider.Mesh.GetCanonicalSurfaceOrdinal(supplier.Owner) + 1,
-                    movingSurface, group, sourceIdA: supplier.Collider.Id + 1);
+                    movingSurface, group, sourceIdA: supplier.Collider.Id + 1,
+                    sourceOrderA: ((IPhysicsColliderRegistryItem)supplier.Collider).ReplayOrder + 1);
                 manifold.AddContact(new ContactAnchor(reverse ? contact.FirstAnchor : contact.SecondAnchor),
                     new ContactAnchor(reverse ? contact.SecondAnchor : contact.FirstAnchor), contact.Depth,
                     reverse ? contact.Normal : -contact.Normal, reverse ? mover.Material : supplier.Collider.Material,
@@ -487,7 +488,6 @@ internal sealed class MeshHullSurfaceContacts : IConvexHullContactDomain, IScale
         if (first) return FullInterval;
         if (_supportQuery) return _supportClip;
         var member = _joined.Members[_member];
-        if (!member.BoundaryTrusted) return FullInterval;
         // Face visitation uses the filled supplier directly; only nonface
         // candidates and the support-query branch above borrow this domain.
         _intervals.FastClear();
@@ -531,7 +531,6 @@ internal sealed class MeshHullSurfaceContacts : IConvexHullContactDomain, IScale
                 clip.WideUpperNumerator, clip.WideUpperDenominator) <= 0;
         }
         var member = _joined.Members[_member];
-        if (!member.BoundaryTrusted) return true;
         int a = _vertices[start], b = _vertices[end];
         if (start == end || numerator.IsZero || WideArithmetic.SubtractSigned832(denominator, numerator).IsZero)
         {
@@ -568,7 +567,6 @@ internal sealed class MeshHullSurfaceContacts : IConvexHullContactDomain, IScale
             return !clip.IsClipped || clip.Contains(numerator, denominator, ReadOnlySpan<ulong>.Empty);
         }
         var member = _joined.Members[_member];
-        if (!member.BoundaryTrusted) return true;
         int a = _vertices[start], b = _vertices[end];
         bool atStart = numerator.Signs[0] == 0;
         bool atEnd = CompareBorrowedParameter(numerator, denominator, Signed832.ExtendValue(Signed192.One),
@@ -620,8 +618,7 @@ internal sealed class MeshHullSurfaceContacts : IConvexHullContactDomain, IScale
         // Failed or ineligible neighbor certificates preserve the native feature.
         if (!built) return true;
         foreach (var owner in _joined.Fan.Owners)
-            if (!_joined.MemberBySurface.TryGetValue((_joined.Meshes[owner.Member], owner.Surface), out int member)
-                || !_joined.Members[member].BoundaryTrusted) return true;
+            if (!_joined.MemberBySurface.ContainsKey((_joined.Meshes[owner.Member], owner.Surface))) return true;
         return Supports(_joined.Fan.Rays, normal);
     }
 

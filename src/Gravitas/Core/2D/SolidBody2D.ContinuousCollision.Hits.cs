@@ -17,6 +17,8 @@ namespace Gravitas;
 
 public sealed partial class SolidBody2D
 {
+    private ContactManifold2D? _surfaceContinuousCollisionManifold;
+
     private bool TryGetFirstContinuousCollisionHit(
         Vector2d startPosition,
         Vector2d proposedPosition,
@@ -57,7 +59,7 @@ public sealed partial class SolidBody2D
                     requireClosingContact: true)
                 : 0;
 
-            bool found2D = TryGetFirstValidContinuousCollisionHit(startPosition, proposedPosition, hitCount, out Physics2DHit hit2D);
+            bool found2D = TryGetFirstValidContinuousCollisionHit(startPosition, proposedPosition, proxyRadius, hitCount, out Physics2DHit hit2D);
             ContinuousCollisionTargetKind hit2DKind = found2D
                 ? ContinuousCollisionTargetKind.Static2D
                 : ContinuousCollisionTargetKind.None;
@@ -147,10 +149,13 @@ public sealed partial class SolidBody2D
     private bool TryGetFirstValidContinuousCollisionHit(
         Vector2d startPosition,
         Vector2d proposedPosition,
+        Fixed64 proxyRadius,
         int hitCount,
         out Physics2DHit hit)
     {
         Vector2d displacement = proposedPosition - startPosition;
+        bool exactCircleSource = Collider is LSCircleCollider2D circle && circle.LocalOffset == Vector2d.Zero
+            && proxyRadius == circle.ScaledRadius;
         bool found = false;
         Physics2DHit best = default;
         for (int i = 0; i < hitCount; i++)
@@ -159,11 +164,19 @@ public sealed partial class SolidBody2D
             if (!IsValidContinuousCollisionHit(candidate))
                 continue;
 
-            if (!QueryDetection2D.TrySweepMoverShape(Collider, displacement, candidate.Collider, out Physics2DHit refined)
-                || !IsClosingContinuousCollisionHit(displacement, refined.Normal))
+            // A centered circle's collector uses this same physical circle;
+            // its declared-target hit needs admission, not a duplicate sweep.
+            Physics2DHit refined = candidate;
+            if (!(exactCircleSource && candidate.Collider.StaticSurface != null)
+                && !QueryDetection2D.TrySweepMoverShape(Collider, displacement, candidate.Collider, out refined))
                 continue;
-
+            // Admission can replace anchors/normals, never this ordering key.
             if (found && !Physics2DHitSorter.ComesBefore(refined, best))
+                continue;
+            if (candidate.Collider.StaticSurface != null
+                && !AdmitStaticSurfaceContinuousCollisionHit(ref refined, startPosition, proposedPosition, displacement))
+                continue;
+            if (!IsClosingContinuousCollisionHit(displacement, refined.Normal))
                 continue;
 
             best = refined;
@@ -172,6 +185,31 @@ public sealed partial class SolidBody2D
 
         hit = best;
         return found;
+    }
+
+    private bool AdmitStaticSurfaceContinuousCollisionHit(ref Physics2DHit hit,
+        Vector2d start, Vector2d end, Vector2d displacement)
+    {
+        Vector2d original = _position;
+        try
+        {
+            _position = new FixedSegment2d(start, end).GetPointAtDistance(hit.Distance, displacement.Magnitude);
+            Collider.RebuildRuntimeShapeOnly();
+            ContactManifold2D manifold = _surfaceContinuousCollisionManifold ??= new();
+            bool overlaps = CollisionDetection2D.TryCollide(new CollisionWorkItem2D(Collider, hit.Collider,
+                    ColliderSettings2D.GetCollisionType(Collider.Shape, hit.Collider.Shape)), manifold, Context.FrameCount);
+            if (!overlaps)
+                return hit.Collider.StaticSurface!.AdmitContinuousWitness(Collider, hit.Collider, hit.Anchor);
+            foreach (ManifoldContact2D row in manifold)
+            {
+                Vector2d normal = -row.Normal;
+                if (!IsClosingContinuousCollisionHit(displacement, normal)) continue;
+                hit = new(hit.Collider, row.AnchorB, normal, hit.Distance);
+                return true;
+            }
+            return false;
+        }
+        finally { _position = original; Collider.RebuildRuntimeShapeOnly(); }
     }
 
     private bool TryGetFirstValidMixedContinuousCollisionHit(
@@ -228,7 +266,7 @@ public sealed partial class SolidBody2D
             SetMixedContinuousCollisionSamplePose(position, rotation);
             // Translational moving-target searches overwrite Known only; the
             // mutually exclusive rotational path owns this same accepted buffer.
-            return CollisionDetectionMixed.TryBuildManifold(target, Collider, _rotationalMixedEarliestManifold);
+            return CollisionDetectionMixed.TryBuildDiscreteManifold(target, Collider, _rotationalMixedEarliestManifold);
         }
         finally
         {

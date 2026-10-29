@@ -29,6 +29,8 @@ internal sealed partial class CollisionPair2D
     private long _lifetimeVersion;
     private uint _lastColliderAContactDependencyVersion;
     private uint _lastColliderBContactDependencyVersion;
+    private bool _surfaceContactChanged;
+    private ulong? _surfaceCollisionLayers;
     private bool _wasTriggerPair;
     private SolidBody2D? _recoveryBody;
     private Vector2d _recoveryPosition;
@@ -62,8 +64,45 @@ internal sealed partial class CollisionPair2D
     internal long LifetimeVersion => _lifetimeVersion;
 
     internal bool ContactDependenciesChanged =>
-        _lastColliderAContactDependencyVersion != ColliderA.ContactDependencyVersion
-        || _lastColliderBContactDependencyVersion != ColliderB.ContactDependencyVersion;
+        _surfaceContactChanged || _lastColliderAContactDependencyVersion != ColliderA.ContactDependencyVersion
+        || _lastColliderBContactDependencyVersion != ColliderB.ContactDependencyVersion
+        || _surfaceCollisionLayers.HasValue && _surfaceCollisionLayers != CurrentSurfaceCollisionLayers;
+
+    private ulong? CurrentSurfaceCollisionLayers
+    {
+        get
+        {
+            if (ColliderA.IsTrigger || ColliderB.IsTrigger) return null;
+            LSCollider2D? mover = ColliderA.StaticSurface != null ? ColliderB
+                : ColliderB.StaticSurface != null ? ColliderA : null;
+            return mover == null ? null : ColliderA.Context.Settings.GetCollisionLayerMask(mover.Layer, default, true, false);
+        }
+    }
+
+    internal (ulong? Layers, ContactManifold2D? Before, Vector2d? Recovery) BeginCollisionLayerUpdate(ContactManifold2D target)
+    {
+        ulong? layers = CurrentSurfaceCollisionLayers;
+        if (!_isColliding || !layers.HasValue || !_surfaceCollisionLayers.HasValue || layers == _surfaceCollisionLayers)
+            return (layers, null, null);
+        ContactManifold2D before = ColliderA.Context.CollisionScratch.SurfaceContactSnapshot2D;
+        before.CopyFrom(target, target.LastUpdatedFrame);
+        return (layers, before, HasRecovery ? _recoveryPosition : null);
+    }
+
+    internal void CompleteCollisionLayerUpdate(ContactManifold2D target,
+        (ulong? Layers, ContactManifold2D? Before, Vector2d? Recovery) previous)
+    {
+        if (previous.Before != null)
+        {
+            Vector2d? recovery = HasRecovery ? _recoveryPosition : null;
+            if (!previous.Before.HasSameContacts(target) || previous.Recovery != recovery)
+            {
+                ClearWarmStart(); ClearResponseSnapshot();
+                WakeBodiesForContactChange();
+            }
+        }
+        _surfaceCollisionLayers = previous.Layers;
+    }
 
     public ContactManifold2D Manifold { get; } = new();
 
@@ -208,6 +247,15 @@ internal sealed partial class CollisionPair2D
 
     internal void ClearWarmStart() => _warmStart.Clear();
 
+    internal void InvalidateSurfaceContact(LSCollider2D member, SwiftHashSet<int> suppliers)
+    {
+        if (!Manifold.ReferencesSuppliers(suppliers, ColliderA == member, member.Id + 1)) return;
+        _surfaceContactChanged = true;
+        ClearWarmStart();
+        ClearResponseSnapshot();
+        if (_isColliding && !_wasTriggerPair) WakeBodiesForContactChange();
+    }
+
     private void ResetPairState()
     {
         ResetCollisionState();
@@ -224,6 +272,8 @@ internal sealed partial class CollisionPair2D
         _isColliding = false;
         _lastColliderAContactDependencyVersion = 0;
         _lastColliderBContactDependencyVersion = 0;
+        _surfaceContactChanged = false;
+        _surfaceCollisionLayers = null;
         _wasTriggerPair = false;
         LastFrame = -1;
         LastVisitToken = -1;
@@ -447,6 +497,7 @@ internal sealed partial class CollisionPair2D
 
         _lastColliderAContactDependencyVersion = versionA;
         _lastColliderBContactDependencyVersion = versionB;
+        _surfaceContactChanged = false;
         _wasTriggerPair = triggerPair;
     }
 

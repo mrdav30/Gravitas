@@ -434,6 +434,13 @@ public sealed partial class GravitasQueryMixedService
             if (!filledHit)
                 candidate = BuildCircleAgainst3DHit(mesh, triangleContact, sweepCenter, direction3D,
                     radius, slabCenterY, halfThickness, PhysicsQueryReducerKind.Exact, distance, sourceCollider);
+            if (requireClosingContact && mesh.StaticSurface is { } surface)
+            {
+                // Internal CCD admission always supplies its registered source.
+                System.Diagnostics.Debug.Assert(sourceCollider != null);
+                if (!surface.AdmitContinuousWitness(null, sourceCollider, sweepCenter, mesh, triangleIndex,
+                    candidate.Anchor3D, circleSlabHalfThickness: filledHit ? null : halfThickness)) continue;
+            }
             if (requireClosingContact
                 && !MixedContact.IsClosingProjection(ExactContactLever2D.ToSpatial(end - start), candidate.Normal3DTo2D))
                 continue;

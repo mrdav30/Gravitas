@@ -39,6 +39,16 @@ public sealed partial class GravitasPhysics2DService
             }
         }
 
+        bool membership = false;
+        foreach (StaticSurface2D surface in _staticSurfaces) membership |= surface.ReplayMembership != 0;
+        if (membership)
+        {
+            writer.WriteSection("physics.2d.surfaces", 1);
+            writer.WriteInt32(replayColliders.Count);
+            foreach (LSCollider2D collider in replayColliders.AsReadOnlySpan())
+                writer.WriteInt32(collider.StaticSurface?.ReplayMembership ?? 0);
+        }
+
         writer.WriteSection("physics.2d.pairs", 2);
         for (int i = 0; i < replayColliders.Count; i++)
         {

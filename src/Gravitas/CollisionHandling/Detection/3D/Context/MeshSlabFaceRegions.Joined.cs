@@ -17,6 +17,7 @@ namespace Gravitas.CollisionHandling;
 internal sealed partial class MeshSlabFaceRegions
 {
     private MeshJoinedSurfaceRegions<FiniteSlabRayFrame> _joined = null!;
+
     private readonly SwiftList<Sample> _joinedEvents = new();
     private readonly MeshSurfaceConnectivity _boundaryConnectivity = new();
     private Vector2d[] _boxOffsets = new Vector2d[4];
@@ -29,6 +30,7 @@ internal sealed partial class MeshSlabFaceRegions
     private bool _convexSupportCovered;
     internal ReadOnlyMemory<Vector2d> PrismOffsets { get; private set; }
     internal int SourceId => _member < 0 ? 0 : _joined.Members[_member].Collider.Id + 1;
+    internal int SourceOrder => _member < 0 ? 0 : ((IPhysicsColliderRegistryItem)_joined.Members[_member].Collider).ReplayOrder + 1;
 
     internal void ReleaseJoined() { _joined = null!; _member = -1; _joinedEvents.FastClear(); }
 
@@ -303,7 +305,8 @@ internal sealed partial class MeshSlabFaceRegions
                 manifold.AddContact(new ContactAnchor(new FixedPointAnchor(supplier.Frame.Center, FixedQuaternion.Identity, sample.Point)),
                     new ContactAnchor(sample.Exit), sample.Depth, root.Frame.GetNormal(_orientations[rootMember]), supplier.Collider.Material,
                     material, sample.Clamped, featureNamespaceA: namespace3D, featureNamespaceB: namespace2D,
-                    group: new ContactGroupKey(namespace3D, namespace2D, supplier.Owner + 1, 0, region, sourceIdA: supplier.Collider.Id + 1));
+                    group: new ContactGroupKey(namespace3D, namespace2D, supplier.Owner + 1, 0, region, sourceIdA: supplier.Collider.Id + 1,
+                        sourceOrderA: ((IPhysicsColliderRegistryItem)supplier.Collider).ReplayOrder + 1));
             }
         }
         bool overlaps = false;
@@ -323,10 +326,51 @@ internal sealed partial class MeshSlabFaceRegions
         return overlaps;
     }
 
-    internal MeshSurfaceBoundaryDomain? JoinedBoundary => _member < 0 || !_joined.Members[_member].BoundaryTrusted
-        ? null : _joined.Members[_member].Boundary;
+    internal MeshSurfaceBoundaryDomain? JoinedBoundary => _member < 0 ? null : _joined.Members[_member].Boundary;
     internal bool IsJoinedSpan(int span) => _joined.Members[_member].JoinedSpans[span];
     internal RationalSegmentInterval GetRetainedInterval(ref int span) => _joined.Members[_member].GetRetainedInterval(ref span);
     internal ReadOnlySpan<WideAxis3> GetJoinedCornerFan(LSMeshCollider collider, int triangle, int vertex, out bool suppress) =>
         _joined.GetCornerFan(collider, triangle, vertex, out suppress);
+
+    internal bool TryGetContinuousFamily(in ContactGroupKey group, out LSMeshCollider supplier, out int owner)
+    {
+        supplier = null!; owner = -1;
+        System.Diagnostics.Debug.Assert(_joined != null && _joined.Active);
+        // This producer's nonnegative regions are native face groups. Boundary
+        // groups use negative regions and different surface ordinals.
+        if (group.Region < 0 || group.Region >= _joined.Roots.Count) return false;
+        for (int index = 0; index < _joined.Inputs.Count; index++)
+        {
+            Member member = _joined.Members[index];
+            if (member.Collider.Id + 1 != group.SourceIdA || member.Owner + 1 != group.SurfaceA) continue;
+            int rootMember = _joined.NodeMembers[_joined.Roots[group.Region]];
+            if (_joined.FindResponseComponent(index) != _joined.FindResponseComponent(rootMember)) return false;
+            supplier = member.Collider; owner = member.Owner; return true;
+        }
+        return false;
+    }
+
+    internal bool IsSameContinuousFamily(LSMeshCollider collider, int owner, LSMeshCollider supplier, int supplierOwner)
+    {
+        System.Diagnostics.Debug.Assert(_joined != null && _joined.Active);
+        if (!_joined.MemberBySurface.TryGetValue((collider.Mesh, owner), out int member)
+            || !_joined.MemberBySurface.TryGetValue((supplier.Mesh, supplierOwner), out int resolved)) return false;
+        // The caller's handoff is phase-local and callback-free. Prepare owns
+        // cross-step geometry/lifetime validation; missing local owners stay unknown.
+        return _joined.FindResponseComponent(member) == _joined.FindResponseComponent(resolved);
+    }
+
+    internal bool IntersectsContinuousBoundary(LSMeshCollider collider, int owner, in FiniteSlabSectionFrame section)
+    {
+        Member member = _joined.Members[_joined.MemberBySurface[(collider.Mesh, owner)]];
+        ReadOnlySpan<MeshSurfaceBoundaryDomain.BoundarySpan> pieces = member.Boundary.Spans;
+        for (int span = 0; span < pieces.Length; span++)
+        {
+            if (member.JoinedSpans[span]) continue;
+            var piece = pieces[span];
+            RationalSegmentInterval clip = member.GetRetainedInterval(ref span);
+            if (section.IntersectsSegment(new FixedSegment(piece.Start, piece.End), clip)) return true;
+        }
+        return false;
+    }
 }

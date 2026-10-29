@@ -42,7 +42,7 @@ internal struct ColliderHierarchyState
         _children?.Clear();
     }
 
-    public void SetParent(IColliderHierarchyNode owner, IColliderHierarchyNode parent)
+    public bool SetParent(IColliderHierarchyNode owner, IColliderHierarchyNode parent)
     {
         ChronicleGuard.ThrowIfNull(parent, nameof(parent));
         ChronicleGuard.ThrowIfArgument(
@@ -76,10 +76,12 @@ internal struct ColliderHierarchyState
         IsChild = true;
         if (topParentChanged)
             topParent.AddChild(owner.HierarchyKey);
+        return topParentChanged;
     }
 
-    public void ClearParent(IColliderHierarchyNode owner)
+    public bool ClearParent(IColliderHierarchyNode owner)
     {
+        bool changed = ParentKey.IsValid;
         if (ParentKey.IsValid)
             TopParent!.RemoveChild(owner.HierarchyKey);
 
@@ -87,15 +89,18 @@ internal struct ColliderHierarchyState
         TopParent = null;
         ParentKey = ColliderHierarchyKey.None;
         IsChild = !_configuredAsParent;
+        return changed;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void ClearParentReference()
+    public bool ClearParentReference()
     {
+        bool changed = ParentKey.IsValid;
         Parent = null;
         TopParent = null;
         ParentKey = ColliderHierarchyKey.None;
         IsChild = !_configuredAsParent;
+        return changed;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

@@ -11,6 +11,47 @@ namespace Gravitas.Tests.CollisionHandlingTests;
 
 public sealed class ContactManifoldTests
 {
+    [Theory]
+    [InlineData("")] [InlineData("EquivalentFrame")]
+    [InlineData("Count")] [InlineData("Groups")] [InlineData("GroupKey")]
+    [InlineData("Id")] [InlineData("FeatureA")] [InlineData("FeatureB")]
+    [InlineData("Normal")] [InlineData("Depth")] [InlineData("Clamped")]
+    [InlineData("Override")] [InlineData("MaterialA")] [InlineData("MaterialB")]
+    [InlineData("PointA.X")] [InlineData("PointA.Y")] [InlineData("PointA.Z")]
+    [InlineData("PointB.X")] [InlineData("PointB.Y")] [InlineData("PointB.Z")]
+    public void ContactEquality_ShouldCompareTheCompletePhysicalConstraintAcrossAnchorFrames(string change)
+    {
+        var first = Build(""); var second = Build(change);
+        bool equal = change is "" or "EquivalentFrame";
+        Assert.Equal(equal, first.HasSameContacts(second));
+        Assert.Equal(equal, second.HasSameContacts(first));
+
+        static ContactManifold Build(string change)
+        {
+            var manifold = new ContactManifold();
+            ContactAnchor a = Point("PointA"), b = Point("PointB");
+            var row = new ManifoldContact(change == "Id" ? 2UL : 1UL, a, b,
+                change == "Depth" ? Fixed64.Two : Fixed64.One,
+                change == "Normal" ? Vector3d.Right : Vector3d.Up, change != "Override",
+                change == "MaterialA" ? PhysicsMaterial.Bouncy : PhysicsMaterial.Frictionless,
+                change == "MaterialB" ? PhysicsMaterial.Bouncy : PhysicsMaterial.Frictionless,
+                change == "Clamped", change == "FeatureA" ? 1 : 0, change == "FeatureB" ? 1 : 0);
+            manifold.AddContact(new ContactGroupKey(change == "GroupKey" ? 1 : 0, 0), row);
+            if (change == "Count") manifold.AddContact(default, new ManifoldContact(3, Vector3d.One, Vector3d.One, Fixed64.One, Vector3d.Up));
+            if (change == "Groups") manifold.AddContact(new ContactGroupKey(2, 0), row);
+            return manifold;
+
+            ContactAnchor Point(string prefix)
+            {
+                if (change == "EquivalentFrame") return new ContactAnchor(Vector3d.One, -Vector3d.One);
+                Vector3d point = change == prefix + ".X" ? Vector3d.Right * Fixed64.Epsilon
+                    : change == prefix + ".Y" ? Vector3d.Up * Fixed64.Epsilon
+                    : change == prefix + ".Z" ? Vector3d.Forward * Fixed64.Epsilon : Vector3d.Zero;
+                return ContactAnchor.FromWorldPoint(point);
+            }
+        }
+    }
+
     [Fact]
     public void CopyFrom_ShouldPreserveOrderedGroupsWithoutSharingTheirLifetime()
     {

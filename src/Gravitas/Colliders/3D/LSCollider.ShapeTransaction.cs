@@ -254,13 +254,14 @@ public abstract partial class LSCollider
     // Broad-phase geometry also advances for accepted dynamic solver poses; those are not new contact stimuli.
     internal uint ContactDependencyVersion { get; private set; }
 
-    internal void MarkContactDependencyChanged(bool notifySurface = true)
+    internal void MarkContactDependencyChanged(bool notifySurface = true, bool surfaceNeighborsChanged = true)
     {
         LSCollider owner = this;
         while (owner._compoundOwner != null)
             owner = owner._compoundOwner;
         owner.ContactDependencyVersion++;
-        if (notifySurface && owner is LSMeshCollider mesh) mesh.StaticSurface?.Invalidate();
+        if (notifySurface && owner is LSMeshCollider mesh)
+            mesh.StaticSurface?.Invalidate(changed: mesh, includeNeighbors: surfaceNeighborsChanged);
     }
 
     private void PublishPreparedShape(bool contactDependencyChanged = true)

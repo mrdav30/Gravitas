@@ -41,6 +41,11 @@ public partial class CollisionPair
         bool usesBroadPhaseCache = _isColliding || CullCounter > 0;
         writer.WriteBool(!usesBroadPhaseCache || _lastColliderABroadPhaseVersion == ColliderA.BroadPhaseVersion);
         writer.WriteBool(!usesBroadPhaseCache || _lastColliderBBroadPhaseVersion == ColliderB.BroadPhaseVersion);
+        // Borrowed suppliers can stale a retained contact or distance-cull decision
+        // without changing either endpoint. Fresh snapshots have no authoritative history.
+        if (usesBroadPhaseCache && (_surfaceContactChanged ||
+            _surfaceCollisionLayers.HasValue && _surfaceCollisionLayers != CurrentSurfaceCollisionLayers))
+            writer.WriteSection("pair.3d.surface", 1);
         ContributeManifoldReplayHash(ref writer, Context, Manifold);
         ContributeWarmStartReplayHash(ref writer, _warmStart);
 

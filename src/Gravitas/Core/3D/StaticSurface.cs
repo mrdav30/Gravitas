@@ -15,13 +15,16 @@ using System;
 
 namespace Gravitas;
 
-/// <summary>Internal staged continuity declaration; public exposure requires query, CCD and restore parity.</summary>
+/// <summary>Internal mesh continuity declaration with shared response, continuation and membership.</summary>
 /// <content>Owns declared member lifetime and cached finite response families.</content>
-internal sealed partial class StaticSurface : IDisposable
+internal sealed partial class StaticSurface : IDisposable, Chronicler.IRecordable
 {
     private readonly GravitasWorldContext _context;
     private LSMeshCollider[] _members = Array.Empty<LSMeshCollider>();
     private PhysicsMesh[] _meshes = Array.Empty<PhysicsMesh>();
+    private FixedBoundBox[] _memberBounds = Array.Empty<FixedBoundBox>();
+    private readonly SwiftHashSet<int> _changedSuppliers = new();
+    private readonly SwiftHashSet<PhysicsMesh> _dirtyMeshes = new();
     private readonly SwiftDictionary<(PhysicsMesh, int), MeshSurfaceBoundaryDomain> _boundaries = new();
     private readonly SwiftList<int> _candidates = new(), _triangles = new();
     private readonly SwiftList<(LSMeshCollider Collider, int Triangle)> _surfaces = new();
@@ -43,6 +46,7 @@ internal sealed partial class StaticSurface : IDisposable
     internal readonly MeshConeFaceRegions ConeFaces = new();
     internal MeshSlabFaceRegions SlabFaces => _slabFaces ??= new();
     internal MeshHullSurfaceContacts HullContacts => _hullContacts ??= new();
+    internal int ReplayMembership => _members.Length == 0 ? 0 : _members[0].ReplayOrdinal + 1;
 
     internal StaticSurface(GravitasWorldContext context, ReadOnlySpan<LSMeshCollider> members)
     {
@@ -68,18 +72,30 @@ internal sealed partial class StaticSurface : IDisposable
                 || member.Mode != MeshColliderMode.Concave
                 || member.StaticSurface != null && member.StaticSurface != this)
                 throw new ArgumentException("Members must be distinct registered static concave meshes in this context.", nameof(members));
-            meshes[index] = member.Mesh;
         }
+        bool unchanged = next.Length == _members.Length;
+        foreach (LSMeshCollider member in _members) unchanged &= unique.Contains(member);
+        if (unchanged) return;
+        // Logical live registration order survives recycled registry-slot layouts.
+        Array.Sort(next, static (first, second) => ((IPhysicsColliderRegistryItem)first).ReplayOrder
+            .CompareTo(((IPhysicsColliderRegistryItem)second).ReplayOrder));
+        for (int index = 0; index < next.Length; index++) meshes[index] = next[index].Mesh;
         // Prepare before publishing associations so failed admission leaves the old declaration usable.
         var prepared = PrepareBoundaries(meshes);
-        Invalidate();
-        foreach (LSMeshCollider previous in _members) previous.StaticSurface = null;
-        _members = next; _meshes = meshes;
-        Faces.ReleaseJoined(); ConeFaces.ReleaseJoined(); _slabFaces?.ReleaseJoined(); _hullContacts?.Release(); _movingMesh = null; _surfaces.Clear(); _cachedOwners.Clear(); _owners.Clear();
+        var bounds = new FixedBoundBox[next.Length];
+        for (int index = 0; index < next.Length; index++) bounds[index] = next[index].Bounds;
+        LSMeshCollider[] previousMembers = _members;
+        foreach (LSMeshCollider previous in previousMembers)
+            if (!unique.Contains(previous)) Invalidate(changed: previous);
+        foreach (LSMeshCollider previous in previousMembers) previous.StaticSurface = null;
+        _members = next; _meshes = meshes; _memberBounds = bounds;
+        _dirtyMeshes.Clear();
+        _continuousBoundaries.Clear(); Faces.ReleaseJoined(); ConeFaces.ReleaseJoined(); _slabFaces?.ReleaseJoined(); _hullContacts?.Release(); _movingMesh = null; _surfaces.Clear(); _cachedOwners.Clear(); _owners.Clear();
         _boundaries.Clear();
         foreach (var entry in prepared) _boundaries.Add(entry.Key, entry.Value);
         foreach (LSMeshCollider member in _members) member.StaticSurface = this;
-        Invalidate();
+        foreach (LSMeshCollider member in _members)
+            if (Array.IndexOf(previousMembers, member) < 0) Invalidate(changed: member);
         _dirty = false;
     }
 
@@ -101,30 +117,50 @@ internal sealed partial class StaticSurface : IDisposable
         return result;
     }
 
-    internal void Invalidate(bool geometryChanged = false)
+    internal void Invalidate(bool geometryChanged = false, LSMeshCollider? changed = null, bool includeNeighbors = true)
     {
         _dirty |= geometryChanged;
         _facesCurrent = false;
         _mixedSlab = false;
-        foreach (LSMeshCollider member in _members)
+        _changedSuppliers.Clear();
+        FixedBoundBox before = default, after = default;
+        if (changed != null)
         {
-            member.MarkContactDependencyChanged(notifySurface: false);
-            // A carrier can cache a supplier's row without sharing its pair.
-            _context.Physics.ClearWarmStartCachesForCollider(member);
+            int index = Array.IndexOf(_members, changed);
+            before = _memberBounds[index]; after = changed.Bounds;
+            _memberBounds[index] = after;
         }
+        for (int index = 0; index < _members.Length; index++)
+            if (changed == null || _members[index] == changed || includeNeighbors
+                && (_memberBounds[index].Intersects(before) || _memberBounds[index].Intersects(after)))
+            {
+                _changedSuppliers.Add(_members[index].Id + 1);
+                _members[index].MarkContactDependencyChanged(notifySurface: false);
+                if (geometryChanged) _dirtyMeshes.Add(_meshes[index]);
+            }
+        // Borrowed rows can live on a carrier without an overlap pair for the
+        // edited supplier. Scan existing references only when a member changes.
+        foreach (LSMeshCollider member in _members)
+            _context.Physics.ClearWarmStartCachesForCollider(member, _changedSuppliers);
+        _context.MixedCollisions.InvalidateSurfaceContacts(this, null, _changedSuppliers);
+        _changedSuppliers.Clear();
     }
 
     internal void Remove(LSMeshCollider member)
     {
         int index = Array.IndexOf(_members, member);
         if (index < 0) return;
-        Invalidate(geometryChanged: true);
+        Invalidate(geometryChanged: true, changed: member);
         member.StaticSurface = null;
-        Faces.ReleaseJoined(); ConeFaces.ReleaseJoined(); _slabFaces?.ReleaseJoined(); _hullContacts?.Release(); _movingMesh = null; _surfaces.Clear(); _cachedOwners.Clear(); _owners.Clear(); _boundaries.Clear();
+        _continuousBoundaries.Clear(); Faces.ReleaseJoined(); ConeFaces.ReleaseJoined(); _slabFaces?.ReleaseJoined(); _hullContacts?.Release(); _movingMesh = null; _surfaces.Clear(); _cachedOwners.Clear(); _owners.Clear(); _boundaries.Clear();
         Array.Copy(_members, index + 1, _members, index, _members.Length - index - 1);
+        Array.Copy(_memberBounds, index + 1, _memberBounds, index, _memberBounds.Length - index - 1);
         Array.Resize(ref _members, _members.Length - 1);
+        Array.Resize(ref _memberBounds, _members.Length);
         _meshes = new PhysicsMesh[_members.Length];
         for (int i = 0; i < _members.Length; i++) _meshes[i] = _members[i].Mesh;
+        _dirtyMeshes.Clear();
+        foreach (PhysicsMesh mesh in _meshes) _dirtyMeshes.Add(mesh);
     }
 
     internal int Gather(LSCollider mover, FixedBoundVolume bounds) => Gather(mover, null, bounds);
@@ -133,9 +169,20 @@ internal sealed partial class StaticSurface : IDisposable
     {
         if (_dirty)
         {
-            var prepared = PrepareBoundaries(_meshes);
-            _boundaries.Clear();
-            foreach (var entry in prepared) _boundaries.Add(entry.Key, entry.Value);
+            for (int member = 0; member < _meshes.Length; member++)
+            {
+                PhysicsMesh mesh = _meshes[member];
+                if (!_dirtyMeshes.Contains(mesh)) continue;
+                for (int triangle = 0; triangle < mesh.TriangleCount; triangle++)
+                {
+                    int owner = mesh.GetManifoldSurfaceOwner(triangle);
+                    if (owner != triangle) continue;
+                    if (!_boundaries.TryGetValue((mesh, owner), out MeshSurfaceBoundaryDomain domain))
+                        _boundaries.Add((mesh, owner), domain = new());
+                    domain.Build(_meshes, member, triangle);
+                }
+            }
+            _dirtyMeshes.Clear();
             _dirty = false;
         }
         _surfaces.Clear(); _owners.Clear();
@@ -244,7 +291,8 @@ internal sealed partial class StaticSurface : IDisposable
         Invalidate();
         foreach (LSMeshCollider member in _members) member.StaticSurface = null;
         _members = Array.Empty<LSMeshCollider>(); _meshes = Array.Empty<PhysicsMesh>();
+        _memberBounds = Array.Empty<FixedBoundBox>(); _dirtyMeshes.Clear();
         _boundaries.Clear(); _surfaces.Clear(); _cachedOwners.Clear(); _owners.Clear();
-        Faces.ReleaseJoined(); ConeFaces.ReleaseJoined(); _slabFaces?.ReleaseJoined(); _hullContacts?.Release(); _movingMesh = null; _disposed = true;
+        _continuousBoundaries.Clear(); Faces.ReleaseJoined(); ConeFaces.ReleaseJoined(); _slabFaces?.ReleaseJoined(); _hullContacts?.Release(); _movingMesh = null; _disposed = true;
     }
 }
