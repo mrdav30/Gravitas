@@ -25,9 +25,9 @@ public sealed class PhysicsPartitionPerformanceShapeTests
         scenario.Context.Simulate();
         scenario.Context.LateSimulate();
 
-        second.Collider.Bounds.Center.X.Should().Be(teleportedPosition.X);
-        second.Collider.Bounds.Center.Z.Should().Be(teleportedPosition.Z);
-        second.Collider.PartitionChanged.Should().BeTrue();
+        second.Body.Position3d.X.Should().BeGreaterThan(teleportedPosition.X);
+        second.Collider.Bounds.Center.Should().Be(second.Body.Position3d);
+        second.Collider.IsPartitioned.Should().BeTrue();
         first.Collider.TryGetCollisionPair(second.Collider.Id, out CollisionPair? pair).Should().BeTrue();
         pair!.Manifold.HasContact.Should().BeTrue();
     }

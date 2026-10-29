@@ -438,6 +438,7 @@ public sealed partial class GravitasWorldContext : IDisposable
             ExitSimulationPhase();
             _fixedStepOpen = false;
         }
+        Physics.PublishCollisionPositionStates();
         RefreshQueryPartitions();
     }
 

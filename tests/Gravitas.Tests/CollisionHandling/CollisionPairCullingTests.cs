@@ -11,6 +11,26 @@ namespace Gravitas.Tests.CollisionHandlingTests;
 public sealed class CollisionPairCullingTests
 {
     [Fact]
+    public void UpdateCollision_WithUnchangedMeshTrigger_ShouldRetainItsContactWithoutMovingBodies()
+    {
+        using PhysicsScenarioBuilder scene = PhysicsScenarioBuilder.Create();
+        var mover = scene.CreateBody(MeshTestFixtures.CreateConvexCube(), Vector3d.Zero, FixedQuaternion.Identity);
+        var mesh = MeshTestFixtures.CreateConvexCube();
+        mesh.IsTrigger = true;
+        scene.InitializeStaticCollider(mesh, Vector3d.Right * Fixed64.Half);
+        CollisionPair pair = scene.CreatePair(mover.Collider, mesh);
+        pair.UpdateCollision();
+        pair.Manifold.HasContact.Should().BeTrue();
+        var contact = pair.Manifold[0];
+
+        ClearPartitionFlags(mover.Collider, mesh);
+        pair.UpdateCollision();
+
+        pair.Manifold[0].Should().Be(contact);
+        mover.Body.Position3d.Should().Be(Vector3d.Zero);
+    }
+
+    [Fact]
     public void UpdateCollision_AfterPairDeactivation_ShouldBeCompleteNoOp()
     {
         using PhysicsScenarioBuilder scenario = PhysicsScenarioBuilder.Create();

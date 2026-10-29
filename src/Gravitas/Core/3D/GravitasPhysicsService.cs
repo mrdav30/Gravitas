@@ -51,6 +51,7 @@ public sealed partial class GravitasPhysicsService
     private readonly SwiftList<SolidBody> _continuousCollisionHandoffQueue = new(DefaultBodySize);
     private long _continuousCollisionPreparedToken = -1;
     private readonly SwiftList<StaticSurface> _staticSurfaces = new();
+    private bool _collisionPositionPublicationPending;
 
     /// <summary>
     /// Initializes a new physics service for the supplied context.
@@ -136,6 +137,7 @@ public sealed partial class GravitasPhysicsService
 
             ProcessQueuedContinuousCollisionHandoffs();
             CompleteLateSimulatePhysicsStep();
+            PublishCollisionPositionStates();
         }
         finally
         {
@@ -175,6 +177,17 @@ public sealed partial class GravitasPhysicsService
         UpdateSleepStatesAfterPhysicsStep();
     }
 
+    internal void MarkCollisionPositionPublicationPending() => _collisionPositionPublicationPending = true;
+
+    internal void PublishCollisionPositionStates()
+    {
+        if (!_collisionPositionPublicationPending)
+            return;
+        _collisionPositionPublicationPending = false;
+        foreach (SolidBody body in _dynamicBodies)
+            body.PublishCollisionPositionState();
+    }
+
     private void RunDiscreteCollisionStep()
     {
         _discreteResponsePairs.FastClear();
@@ -209,6 +222,7 @@ public sealed partial class GravitasPhysicsService
     /// </summary>
     public void Reset()
     {
+        _collisionPositionPublicationPending = false;
         ReleaseStaticSurfaces();
         DiscardContinuousCollisionHandoffQueue();
         _dynamicBodies.Clear();

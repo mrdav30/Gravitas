@@ -630,7 +630,9 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
     }
 
     /// <summary>Refreshes bodyless collider shape and broad-phase state for one simulation step.</summary>
-    public void Simulate()
+    public void Simulate() => Simulate(skipUnchangedMassProperties: false);
+
+    internal void Simulate(bool skipUnchangedMassProperties)
     {
         ThrowIfCompoundPartLifecycle(nameof(Simulate));
         if (!IsActive)
@@ -642,7 +644,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
             return;
         }
 
-        bool refreshPartition = RebuildRuntimeShapeState()
+        bool refreshPartition = RebuildRuntimeShapeState(skipUnchangedMassProperties: skipUnchangedMassProperties)
             || Context.Collisions.IsPartitionRefreshRequired(this);
         PartitionChanged = false;
         if (refreshPartition)
@@ -753,7 +755,8 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
     internal bool ExcludesMixedCollisionWith(LSCollider2D other) =>
         _hierarchyState.ExcludesCollisionWith(other.HierarchyState, HierarchyKey, other.HierarchyKey);
 
-    private bool RebuildRuntimeShapeState(bool refreshMassProperties = true, bool geometryOnly = false)
+    private bool RebuildRuntimeShapeState(bool refreshMassProperties = true, bool geometryOnly = false,
+        bool skipUnchangedMassProperties = false)
     {
         ColliderShapeSnapshot snapshot = CaptureShapeSnapshot();
         // CCD needs pending geometry, not an extra pose-only publication that
@@ -770,7 +773,7 @@ public abstract partial class LSCollider : IRecordable, IColliderHierarchyNode, 
             includeBodyAttachment:
                 _body != null);
         PublishPreparedShape(contactDependencyChanged);
-        if (refreshMassProperties)
+        if (refreshMassProperties && (!skipUnchangedMassProperties || contactDependencyChanged))
             _body?.RefreshMassPropertiesFromColliderShape();
         return true;
     }

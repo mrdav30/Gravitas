@@ -497,11 +497,15 @@ internal sealed partial class GravitasMixedCollisionService
 
         var traversal = new GridTraversalState(world, GridTraversalPaddingMode.MaxCellEdge);
         _nextCoveredCoordinates.Clear();
+        int coveredCount = 0;
         for (int i = 0; i < _coveredVoxels.Count; i++)
         {
             Voxel voxel = _coveredVoxels[i];
             if (collider.IsPositionInBounds(traversal.GetCellEdge(voxel), voxel.WorldPosition))
+            {
                 _nextCoveredCoordinates.Add(voxel.WorldIndex);
+                _coveredVoxels[coveredCount++] = voxel;
+            }
         }
 
         // Remove departures in the previous coordinate order, then publish the
@@ -509,8 +513,8 @@ internal sealed partial class GravitasMixedCollisionService
         MixedPartitionMobilityKind previousKind = GetStoredMobilityKind(collider.MixedPartitionKind);
         Remove3DPartitionMemberships(collider, coordinates, previousKind, previousKind == kind);
         coordinates.FastClear();
-        for (int i = 0; i < _coveredVoxels.Count; i++)
-            TryPartition3DVoxel(collider, coordinates, _coveredVoxels[i], kind);
+        for (int i = 0; i < coveredCount; i++)
+            Partition3DVoxel(collider, coordinates, _coveredVoxels[i], kind);
     }
 
     private void ScanCovered2DMixedVoxels(
@@ -593,15 +597,12 @@ internal sealed partial class GravitasMixedCollisionService
         }
     }
 
-    private void TryPartition3DVoxel(
+    private void Partition3DVoxel(
         LSCollider collider,
         SwiftList<WorldVoxelIndex> coordinates,
         Voxel voxel,
         MixedPartitionMobilityKind kind)
     {
-        if (!_nextCoveredCoordinates.Contains(voxel.WorldIndex))
-            return;
-
         PhysicsMixedPartition partition = GetOrCreatePartition(voxel);
         coordinates.Add(voxel.WorldIndex);
         Add3DObject(partition, collider.Id, kind);

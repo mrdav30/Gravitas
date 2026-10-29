@@ -204,11 +204,15 @@ public sealed class GravitasCollisionService
 
         var traversal = new GridTraversalState(world, GridTraversalPaddingMode.MaxCellEdge);
         _nextCoveredCoordinates.Clear();
+        int coveredCount = 0;
         for (int i = 0; i < _coveredVoxels.Count; i++)
         {
             Voxel voxel = _coveredVoxels[i];
             if (collider.IsPositionInBounds(traversal.GetCellEdge(voxel), voxel.WorldPosition))
+            {
                 _nextCoveredCoordinates.Add(voxel.WorldIndex);
+                _coveredVoxels[coveredCount++] = voxel;
+            }
         }
 
         // Preserve surviving memberships without changing tracer order or raw
@@ -216,19 +220,16 @@ public sealed class GravitasCollisionService
         PhysicsPartitionMobilityKind previousKind = GetStoredMobilityKind(collider.PartitionKind);
         RemovePartitionMemberships(collider, partitionedCoordinates, previousKind, previousKind == kind);
         partitionedCoordinates.FastClear();
-        for (int i = 0; i < _coveredVoxels.Count; i++)
-            TryPartitionVoxel(collider, partitionedCoordinates, _coveredVoxels[i], kind);
+        for (int i = 0; i < coveredCount; i++)
+            PartitionVoxel(collider, partitionedCoordinates, _coveredVoxels[i], kind);
     }
 
-    private void TryPartitionVoxel(
+    private void PartitionVoxel(
         LSCollider collider,
         SwiftList<WorldVoxelIndex> partitionedCoordinates,
         Voxel voxel,
         PhysicsPartitionMobilityKind kind)
     {
-        if (!_nextCoveredCoordinates.Contains(voxel.WorldIndex))
-            return;
-
         if (!voxel.TryGetPartition(out PhysicsPartition? partition))
         {
             partition = RentPartition();

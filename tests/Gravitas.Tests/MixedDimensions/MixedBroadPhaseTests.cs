@@ -369,6 +369,12 @@ public sealed partial class MixedBroadPhaseTests
         SwiftList<WorldVoxelIndex> coordinates2D = body2D.Collider.MixedPartitionCoordinates!;
         context.World.TryGetVoxel(coordinates3D[0], out Voxel? voxel).Should().BeTrue();
         voxel!.TryRemovePartition<PhysicsMixedPartition>().Should().BeTrue();
+        // Response can move the two owners into different first voxels.
+        if (coordinates2D[0] != coordinates3D[0])
+        {
+            context.World.TryGetVoxel(coordinates2D[0], out Voxel? planarVoxel).Should().BeTrue();
+            planarVoxel!.TryRemovePartition<PhysicsMixedPartition>().Should().BeTrue();
+        }
         coordinates3D.Add(default);
         coordinates2D.Add(default);
 

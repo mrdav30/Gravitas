@@ -382,6 +382,12 @@ world changes are combined into one refresh, while ordinary queries and
 obstacle-only events do not trigger a registry-wide rebuild. Callback-deferred
 2D partition updates finish at the completed fixed-step boundary.
 
+After `LateSimulate()` returns, 3D collider geometry and partition membership
+include the final positional corrections from pure 3D and mixed response.
+Publication follows response and retained-contact bookkeeping, preserving the
+solver's contact snapshots. Post-step raycasts, sweeps, overlaps, and batch or
+explicit mixed queries therefore sample the completed body pose.
+
 Do not sample physical support during `Simulate`/`LateSimulate`, their open
 transaction, or a grid-change callback whose committed change has not reached
 the context. `QuerySupport` returns `WorldNotReady` at those boundaries.

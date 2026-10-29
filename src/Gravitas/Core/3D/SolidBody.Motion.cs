@@ -279,11 +279,26 @@ public partial class SolidBody
             ? AddPositionDisplacement(Position3d, ProjectLinearMotion(positionCorrection))
             : Position3d;
 
+    private bool _collisionPositionPublicationPending;
+
     internal void ApplyCollisionPositionState(Vector3d position)
     {
         if (Position3d == position)
             return;
         Position3d = position;
+        _collisionPositionPublicationPending = true;
+        Context.Physics.MarkCollisionPositionPublicationPending();
+    }
+
+    internal void PublishCollisionPositionState()
+    {
+        if (!_collisionPositionPublicationPending)
+            return;
+        _collisionPositionPublicationPending = false;
+        // Publish after response bookkeeping; translation alone preserves inertia.
+        Collider.Simulate(skipUnchangedMassProperties: true);
+        if (Context.Settings.RuntimeMode.RunsMixedContacts())
+            Context.MixedCollisions.Refresh3DColliderPartition(Collider);
     }
 
     // Callers project frozen axes first; numeric exhaustion is not a physical wall.

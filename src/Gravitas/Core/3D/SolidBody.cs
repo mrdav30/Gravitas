@@ -644,6 +644,7 @@ public partial class SolidBody : IRecordable
 
         _motionType = motionType;
         Active = true;
+        _collisionPositionPublicationPending = false;
 
         InvalidateContinuousCollisionTrajectory();
         ClearMotionForSleep();
