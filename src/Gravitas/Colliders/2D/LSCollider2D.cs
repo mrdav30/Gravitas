@@ -616,7 +616,8 @@ public abstract partial class LSCollider2D : IRecordable, IColliderHierarchyNode
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal bool RebuildRuntimeShapeOnly() => RebuildRuntimeShapeState();
+    internal bool RebuildRuntimeShapeOnly(bool skipUnchangedMassProperties = false) =>
+        RebuildRuntimeShapeState(skipUnchangedMassProperties: skipUnchangedMassProperties);
 
     internal void ValidateCurrentRuntimeTransform() =>
         PrepareRuntimeShape(

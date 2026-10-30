@@ -382,11 +382,16 @@ world changes are combined into one refresh, while ordinary queries and
 obstacle-only events do not trigger a registry-wide rebuild. Callback-deferred
 2D partition updates finish at the completed fixed-step boundary.
 
-After `LateSimulate()` returns, 3D collider geometry and partition membership
-include the final positional corrections from pure 3D and mixed response.
-Publication follows response and retained-contact bookkeeping, preserving the
-solver's contact snapshots. Post-step raycasts, sweeps, overlaps, and batch or
-explicit mixed queries therefore sample the completed body pose.
+After `LateSimulate()` returns, both dimensional indexes include final
+positional corrections from pure and mixed response. Both physics services
+coalesce correction membership updates through service/body publication flags.
+3D publishes geometry after response and retained-contact bookkeeping to
+preserve the solver's contact snapshots. 2D updates geometry immediately for
+recovery, then publishes membership before collision distribution, an indexed
+2D query, or successful step completion. A pending correction can therefore
+trigger a body scan during an internal 2D query; ordinary post-step queries
+already have current membership. Raycasts, sweeps, overlaps, and batch or
+explicit mixed queries after completion sample the completed body pose.
 
 Do not sample physical support during `Simulate`/`LateSimulate`, their open
 transaction, or a grid-change callback whose committed change has not reached

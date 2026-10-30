@@ -187,12 +187,27 @@ public sealed partial class SolidBody2D
             ? AddPositionDisplacement(_position, ProjectLinearMotion(positionCorrection))
             : _position;
 
+    private bool _collisionPositionPublicationPending;
+
     internal void ApplyCollisionPositionState(Vector2d position)
     {
         if (_position == position)
             return;
         _position = position;
-        Collider.Rebuild();
+        // Recovery needs current geometry; spatial membership can coalesce until publication or a query.
+        Collider.RebuildRuntimeShapeOnly(skipUnchangedMassProperties: true);
+        _collisionPositionPublicationPending = true;
+        Context.Physics2D.MarkCollisionPositionPublicationPending();
+    }
+
+    internal void PublishCollisionPositionState()
+    {
+        if (!_collisionPositionPublicationPending)
+            return;
+        _collisionPositionPublicationPending = false;
+        Context.Collisions2D.RefreshColliderPartition(Collider);
+        if (Context.Settings.RuntimeMode.RunsMixedContacts())
+            Context.MixedCollisions.Refresh2DColliderPartition(Collider, rebuildShape: false);
     }
 
     // Callers project frozen axes first; numeric exhaustion is not a physical wall.

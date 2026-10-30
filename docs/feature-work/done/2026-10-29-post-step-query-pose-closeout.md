@@ -11,7 +11,9 @@ collider retained the pose prepared before response. Query preparation refreshed
 grid topology and deferred 2D membership, but did not publish this 3D pose.
 The defect reproduced in pure 3D, Both, Mixed and direct 3D service stepping.
 Post-step queries could return stale distances or miss newly covered voxels.
-Pure 2D already rebuilt its corrected collider and required no runtime change.
+Pure 2D already rebuilt its corrected collider and required no runtime change
+for the original stale-geometry defect. The light 2D follow-up below aligns
+correction membership publication after that fix.
 
 The original report was verified on Gravitas `3bd4574` with FixedMathSharp
 `10a2ae1` and reproduced against the frozen current base `cdc0acd`:
@@ -181,3 +183,92 @@ maintained regressions above are sufficient without those temporary artifacts.
 Reopen for an observable query/body pose mismatch after successful completion,
 missed newly covered voxels, altered solver/supplier behavior or new warm
 allocations, retaining the exact fixture and dependency revisions.
+
+## Light 2D Publication Follow-Up
+
+The fast follow to committed #145 (`f6fe03a`) aligns spatial publication with
+the existing 3D service/body flags. It adds 41 runtime lines and removes five,
+with no new production files, queues, dependencies or public APIs.
+2D geometry still updates immediately: static-surface recovery reads current
+collider geometry during response. Native and mixed membership instead coalesce
+until collision distribution, indexed 2D candidate gathering, or successful
+context/service completion. Mixed publication uses committed geometry without
+rebuilding, preserving any prepared recovery proposal. Translation-only
+corrections retain mass properties; pending shape/scale/slab changes still
+refresh them. Existing CCD callers keep their previous mass-refresh behavior.
+
+This is mechanism alignment, not a new pure-2D stale-query defect. The original
+3D geometry timing remains necessary for retained-contact bookkeeping. A
+pending internal 2D query may flush flagged bodies; ordinary post-step queries
+already have current membership.
+
+Ten cases in
+[`ResponsePosePublication2DTests`](../../../tests/Gravitas.Tests/Physics2D/ResponsePosePublication2DTests.cs)
+cover immediate geometry with coalesced native/mixed membership, query flush,
+pre-distribution discovery, completion in TwoD/Both/Mixed and standalone service
+steps, dirty-shape COM/inertia, and zero warm allocation. Removing the new
+pre-distribution flush makes the voxel-crossing contact regression fail
+(`0` contact enters instead of `1`); restoring it passes. The focused recovery
+and shared-replay selection also passes without changing fixture expectations.
+
+The performance comparison reuses existing `FullStep` fixtures with
+`Layout="Continuous"`: `JoinedStaticSurface2DSimulationBenchmarks` and
+`JoinedStaticSurfaceMixedSimulationBenchmarks`. Each has one moving circle,
+capsule or square polygon against one bodyless wall, frictionless materials,
+manual grounding, disabled sleep and frozen rotation at 16 Hz. The native floor
+is one 16-by-2 rectangle, with gravity `1`. The mixed wall is a vertical
+two-triangle 3D mesh, with zero gravity, a 2D slab half-thickness of `0.5` and
+inward impulse `1/16` each step. Tangential X drive alternates `+1/-1` at
+X=`-2/+2`. The circle radius is `0.5`, the capsule uses constructor arguments
+`(0.5, 2)`, and the polygon is a unit square. Air density, damping and minimum
+speed are zero. These are complete-step timings without an added query.
+
+**Median microseconds per complete host step, one mover and one wall:**
+
+| Mode | Mover | Committed #145 us/step | Follow-up us/step | Change us/step | Change |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Native 2D | Circle | 25.34 | 25.21 | -0.13 | -0.5% |
+| Native 2D | Capsule | 29.74 | 30.04 | +0.30 | +1.0% |
+| Native 2D | Polygon | 43.17 | 43.21 | +0.04 | +0.1% |
+| Mixed | Circle | 1,571.55 | 1,584.81 | +13.26 | +0.8% |
+| Mixed | Capsule | 2,542.32 | 2,552.91 | +10.59 | +0.4% |
+| Mixed | Polygon | 793.48 | 816.97 | +23.49 | +3.0% |
+
+All 24 fresh processes completed: six workloads, two payloads and two runs,
+reversing payload order on the second run. Each process uses the fixture's
+32-step settling and four 64-step warmup invocations, then 16 additional warmup
+invocations. Nine samples each measure eight invocations, or 512 complete
+steps. Medians pool 18 samples per payload/workload. Fully optimized JIT code
+uses `DOTNET_TieredCompilation=0`; no builds, tests or profilers compete.
+Only `Gravitas.dll` changes between frozen payloads. Loaded runtime SHA-256
+identities match the selected variants; benchmark and FixedMathSharp hashes
+are identical. The committed runtime hash starts `E08B35A74A5C556F`, and the
+follow-up starts `C84B3DD9C8D7EBA2`.
+
+All measured warm allocations are zero. Final raw position, rotation,
+linear/angular velocity, mass, inertia and COM offset match across variants
+and runs; the existing fixtures assert tangential velocity every step. Shared
+replay fixtures pass unchanged. Small/inconsistent differences are not evidence
+of a speedup or exact equivalence. The mixed polygon increase appears in both
+orders (`+19.29` and `+22.74` us using individual-run medians). The follow-up
+adds mixed membership publication at correction completion, while the old
+2D correction path refreshed only its native membership immediately.
+The measured cost is retained under the user's delegated judgment: the largest
+row is `+23.49` us on a `793.48` us complete step, and keeping this focused
+alignment avoids a broader spatial-index redesign. These synthetic local
+controls establish neither large-scene scaling nor gameplay-frame percentiles.
+
+Follow-up validation uses the same Windows x64/.NET/local-stack environment
+listed above, now based on Gravitas `f6fe03a`. Both full suites pass without
+skips, with exact raw coverage:
+
+| Profile | Tests passed | Raw lines covered | Raw branches covered | Methods covered |
+| --- | ---: | ---: | ---: | ---: |
+| Release | 8,165 / 8,165 | 53,386 / 53,386 | 21,604 / 21,604 | 5,594 / 5,594 |
+| ReleaseLean | 8,094 / 8,094 | 53,384 / 53,384 | 21,604 / 21,604 | 5,593 / 5,593 |
+
+The `netstandard2.1` library and net10 benchmark builds pass with zero warnings.
+Independent `ponytail-review` found no actionable source, test or documentation
+defect. Source-stack validation does not add package or cross-platform evidence
+to the limits recorded above. Follow-up captures live under
+`artifacts/grv-145/2d-followup/`.

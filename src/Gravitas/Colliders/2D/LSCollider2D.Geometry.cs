@@ -435,7 +435,7 @@ public abstract partial class LSCollider2D
         _body?.Wake();
     }
 
-    private bool RebuildRuntimeShapeState(bool geometryOnly = false)
+    private bool RebuildRuntimeShapeState(bool geometryOnly = false, bool skipUnchangedMassProperties = false)
     {
         ColliderShapeSnapshot2D snapshot = CaptureShapeSnapshot();
         // Preserve pose-only publication and solver-cache lifetime at the normal
@@ -458,7 +458,8 @@ public abstract partial class LSCollider2D
             includeBodyAttachment:
                 _body != null);
         PublishPreparedShape(contactDependencyChanged);
-        _body?.RefreshMassPropertiesFromColliderShape();
+        if (!skipUnchangedMassProperties || contactDependencyChanged)
+            _body?.RefreshMassPropertiesFromColliderShape();
         return true;
     }
 

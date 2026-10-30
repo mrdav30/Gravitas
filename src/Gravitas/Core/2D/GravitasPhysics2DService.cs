@@ -234,6 +234,7 @@ public sealed partial class GravitasPhysics2DService
 
             ProcessQueuedContinuousCollisionHandoffs();
             CompleteLateSimulatePhysicsStep();
+            PublishCollisionPositionStates();
         }
         finally
         {
@@ -266,6 +267,19 @@ public sealed partial class GravitasPhysics2DService
         PrepareCollisionPartitions();
         RunDiscreteCollisionStep();
         UpdateSleepStatesAfterPhysicsStep();
+    }
+
+    private bool _collisionPositionPublicationPending;
+
+    internal void MarkCollisionPositionPublicationPending() => _collisionPositionPublicationPending = true;
+
+    internal void PublishCollisionPositionStates()
+    {
+        if (!_collisionPositionPublicationPending)
+            return;
+        _collisionPositionPublicationPending = false;
+        foreach (SolidBody2D body in _dynamicBodies)
+            body.PublishCollisionPositionState();
     }
 
     private void PrepareCollisionPartitions()
@@ -308,6 +322,7 @@ public sealed partial class GravitasPhysics2DService
     /// <summary>Clears all context-local pure 2D registration and solver state.</summary>
     public void Reset()
     {
+        _collisionPositionPublicationPending = false;
         ReleaseStaticSurfaces();
         DiscardContinuousCollisionHandoffQueue();
         _dynamicBodies.Clear();

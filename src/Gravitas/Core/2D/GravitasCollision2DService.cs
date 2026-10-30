@@ -251,6 +251,7 @@ public sealed class GravitasCollision2DService
 
     internal void CheckAndDistributeCollisions()
     {
+        _context.Physics2D.PublishCollisionPositionStates();
         RefreshDeferredColliderPartitions();
         Version++;
 
@@ -286,6 +287,7 @@ public sealed class GravitasCollision2DService
         bool staticStyleOnly = false)
     {
         _context.RefreshQueryPartitions();
+        _context.Physics2D.PublishCollisionPositionStates();
         RefreshDeferredColliderPartitions();
         candidates.FastClear();
 

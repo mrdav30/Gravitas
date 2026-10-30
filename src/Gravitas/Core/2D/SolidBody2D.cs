@@ -574,6 +574,7 @@ public sealed partial class SolidBody2D : IRecordable
         _isSleeping = false;
         _motionType = motionType;
         _sleepFrameCount = 0;
+        _collisionPositionPublicationPending = false;
         InvalidateContinuousCollisionFrame();
         ResetGroundingForInitialize(position);
         Active = true;

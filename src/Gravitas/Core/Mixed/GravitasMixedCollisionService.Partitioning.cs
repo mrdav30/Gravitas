@@ -50,7 +50,7 @@ internal sealed partial class GravitasMixedCollisionService
     internal bool Refresh2DColliderPartition(LSCollider2D collider) =>
         Refresh2DColliderPartition(collider, rebuildShape: true);
 
-    private bool Refresh2DColliderPartition(LSCollider2D collider, bool rebuildShape)
+    internal bool Refresh2DColliderPartition(LSCollider2D collider, bool rebuildShape)
     {
         ChronicleGuard.ThrowIfNull(collider, nameof(collider));
         ChronicleGuard.ThrowIfArgument(
