@@ -108,6 +108,16 @@ public static partial class CollisionDetectionMixed
         if (mesh.Mode == MeshColliderMode.Convex && mesh.IsClosedSurface && !prismOffsets.IsEmpty
             && TryAppendConvexMeshPrismContacts(collider, embedded!, center, rotation, halfThickness,
                 prismOffsets, manifold, namespace3D, namespace2D)) return;
+        if (mesh.Mode == MeshColliderMode.Convex && mesh.IsClosedSurface && prismOffsets.IsEmpty
+            && ConvexHullCylinderContact.TryGetContactWithContainedCenter(mesh.GeometryFrame,
+                mesh.GeometryVertices, mesh.Triangles, center, rotation, halfThickness * Fixed64.Two, radius,
+                out FixedContactAnchors contact, Vector2d.Forward, length))
+        {
+            manifold.AddContact(new ContactAnchor(contact.FirstAnchor), new ContactAnchor(contact.SecondAnchor),
+                contact.Depth, contact.Normal, collider.Material, embedded?.Material ?? collider.Material,
+                contact.DepthIsClamped, namespace3D, namespace2D);
+            return;
+        }
         var section = new FiniteSlabSectionFrame(mesh.GeometryFrame, center, rotation, length, radius, halfThickness);
         scratch.MeshSurfaces.Clear();
         foreach (int triangle in candidates)

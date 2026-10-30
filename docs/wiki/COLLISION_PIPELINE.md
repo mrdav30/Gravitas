@@ -201,8 +201,12 @@ against the cylinder's finite caps, side and rims before rounding; the matched
 witnesses lie on both finite shapes. This keeps repeated corrections moving
 out of the filled hull while the cylinder reaches a wall. Exterior centers
 retain the ordinary finite-surface manifolds. Open and `Concave` meshes retain
-their surface semantics. Mixed circle and stadium slabs currently retain the
-surface path and do not yet resolve complete enclosure in a closed convex mesh.
+their surface semantics. Mixed circle and stadium slabs use the same
+contained-center volume rule. Positive-core slabs retain both rounded ends and
+the finite straight section, with exact paired witnesses and whole-hull depth
+selection. Circle queries and mixed continuous admission share that geometry.
+The mixed response constraints still apply: a vertical minimum cannot move a
+planar-only participant when the 3D participant is immobile.
 
 Isolated or ambiguous native cylinder triangles retain FixedMathSharp's complete
 finite-cylinder query. It considers triangle faces, edges and vertices against

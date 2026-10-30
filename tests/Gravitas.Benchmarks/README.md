@@ -47,6 +47,14 @@ resets the body to its fixture position, then calls `Simulate` and
 a contained sphere distinguish newly corrected volume response from existing
 surface and control costs. Values are per reset-and-step invocation.
 
+`convex-mesh-curved-slab-containment` measures the corresponding mixed path:
+one planar mover and one bodyless closed convex cube, with circle, zero-core
+capsule, aligned positive-core capsule and yawed positive-core capsule cases.
+Odd authored vertices with odd source scale also exercise the affine path.
+Exterior and separated controls retain the surface path. Every invocation
+resets position and runs both host phases; the original contained payload
+misses response and therefore performs different work from the corrected one.
+
 ## Requirements
 
 - The SDK selected by the repository's `global.json`
