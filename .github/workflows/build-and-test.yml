@@ -102,10 +102,11 @@ jobs:
             ${{ runner.os }}-${{ runner.arch }}-lsf-${{ env.UseLocalLsfStack }}-nuget-
 
       - name: Restore dependencies
-        run: dotnet restore Gravitas.slnx --property:Configuration=${{ matrix.configuration }} -p:UseLocalLsfStack=${{ env.UseLocalLsfStack }}
+        # Inferred sibling references lose identity metadata and can compile the same output concurrently.
+        run: dotnet restore Gravitas.slnx --property:Configuration=${{ matrix.configuration }} -p:UseLocalLsfStack=${{ env.UseLocalLsfStack }} -p:DisableTransitiveProjectReferences=${{ env.UseLocalLsfStack }}
 
       - name: Build Solution
-        run: dotnet build Gravitas.slnx --configuration ${{ matrix.configuration }} --no-restore -p:UseLocalLsfStack=${{ env.UseLocalLsfStack }}
+        run: dotnet build Gravitas.slnx --configuration ${{ matrix.configuration }} --no-restore -p:UseLocalLsfStack=${{ env.UseLocalLsfStack }} -p:DisableTransitiveProjectReferences=${{ env.UseLocalLsfStack }}
 
       - name: Record source and SDK provenance
         shell: pwsh
@@ -127,12 +128,13 @@ jobs:
           "GRAVITAS_REPLAY_DEPENDENCY_REVISIONS=$($dependencies | ConvertTo-Json -Compress)" >> $env:GITHUB_ENV
 
       - name: Run Tests and capture replay observations
+        id: tests
         # A discovery crash must fail this step even when VSTest reports no tests.
-        run: dotnet test Gravitas.slnx --configuration ${{ matrix.configuration }} --no-build --no-restore -p:UseLocalLsfStack=${{ env.UseLocalLsfStack }} --verbosity normal -- RunConfiguration.TreatNoTestsAsError=true
+        run: dotnet test Gravitas.slnx --configuration ${{ matrix.configuration }} --no-build --no-restore -p:UseLocalLsfStack=${{ env.UseLocalLsfStack }} -p:DisableTransitiveProjectReferences=${{ env.UseLocalLsfStack }} --verbosity normal -- RunConfiguration.TreatNoTestsAsError=true
 
       - name: Retain replay observations and actual process provenance
-        if: always()
-        uses: actions/upload-artifact@v4
+        if: ${{ always() && (steps.tests.outcome == 'success' || steps.tests.outcome == 'failure') }}
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.platform.os }}-${{ matrix.platform.arch }}-${{ matrix.configuration }}
           path: artifacts/replay/${{ matrix.platform.os }}-${{ matrix.platform.arch }}-${{ matrix.configuration }}
@@ -144,11 +146,16 @@ jobs:
     if: always()
     runs-on: ubuntu-24.04
     steps:
+      - name: Require successful native validation
+        if: needs.validate-dotnet.result != 'success'
+        run: |
+          echo "::error::Native validation did not succeed (${{ needs.validate-dotnet.result }}); replay comparison cannot run."
+          exit 1
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
       - name: Download native replay captures
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: "*-*-Release*"
           path: artifacts/replay

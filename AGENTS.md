@@ -449,8 +449,8 @@ When coordinated lower-stack validation is required, use the repository's
 `UseLocalLsfStack` MSBuild property instead of editing project references:
 
 ```bash
-dotnet restore Gravitas.slnx -p:UseLocalLsfStack=true
-dotnet test Gravitas.slnx --configuration Release -p:UseLocalLsfStack=true
+dotnet restore Gravitas.slnx -p:UseLocalLsfStack=true -p:DisableTransitiveProjectReferences=true
+dotnet test Gravitas.slnx --configuration Release -p:UseLocalLsfStack=true -p:DisableTransitiveProjectReferences=true
 ```
 
 This mode expects the sibling LSF repositories, including Chronicler, at the
@@ -686,10 +686,16 @@ Important notes:
   follows the target branch, so `develop` -> `main` validates packages. Update
   source pins deliberately as compatibility changes and release upstream
   packages before promoting to `main`; never fall back to source when package
-  validation fails. Source/package NuGet caches are separated.
-- Every build lane retains the shared replay observations plus actual process,
-  SDK/runtime, source, dependency and fixture provenance. The final comparison
-  job requires all eight lanes, checks shared expectations and directly compares
+  validation fails. Source/package NuGet caches are separated. Source restore,
+  build and test commands pass `DisableTransitiveProjectReferences=true` as a
+  global MSBuild property so inferred sibling references cannot lose explicit
+  version metadata and compile the same output concurrently.
+- Lanes retain captures once tests have run, including test failures. A failed
+  build skips capture upload. The final gate still runs and fails explicitly if
+  native validation did not succeed. Executed lanes retain shared replay
+  observations plus actual process, SDK/runtime, source, dependency and fixture
+  provenance. After successful native validation, comparison requires all eight
+  lanes, checks shared expectations and directly compares
   raw frames and ordered observations. Missing, emulated or mixed source/package
   lanes fail the gate. Source captures require sibling commit IDs; package
   captures use an empty source map and compare loaded release identities. An
