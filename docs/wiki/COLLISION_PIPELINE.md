@@ -194,6 +194,16 @@ absence of a true boundary crossing certifies that coverage; a footprint wholly
 inside a hole supplies no contact. Distinct surface owners retain independent
 contact groups and the supplying collider's material.
 
+A native cylinder whose center is inside or on a closed `Convex` mesh uses a
+whole-volume exit before surface response. Exact hull half-spaces admit that
+path, including boundary centers. Hull faces, edges and vertices are ranked
+against the cylinder's finite caps, side and rims before rounding; the matched
+witnesses lie on both finite shapes. This keeps repeated corrections moving
+out of the filled hull while the cylinder reaches a wall. Exterior centers
+retain the ordinary finite-surface manifolds. Open and `Concave` meshes retain
+their surface semantics. Mixed circle and stadium slabs currently retain the
+surface path and do not yet resolve complete enclosure in a closed convex mesh.
+
 Isolated or ambiguous native cylinder triangles retain FixedMathSharp's complete
 finite-cylinder query. It considers triangle faces, edges and vertices against
 the cylinder's flat caps, side and curved rims, rather than inferring contact

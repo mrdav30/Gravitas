@@ -40,6 +40,13 @@ declared pieces of the same wall. It uses the same 64-frame, 16 Hz host loop,
 inward impulses and tangential-velocity guard. Values are per complete frame;
 these fixtures measure contact lifecycle cost rather than game capacity.
 
+`convex-mesh-cylinder-containment` measures one complete 16 Hz host step with
+one moving cylinder or sphere and one closed convex cube. Each invocation
+resets the body to its fixture position, then calls `Simulate` and
+`LateSimulate`. Contained, exterior-overlap and separated-cylinder cases plus
+a contained sphere distinguish newly corrected volume response from existing
+surface and control costs. Values are per reset-and-step invocation.
+
 ## Requirements
 
 - The SDK selected by the repository's `global.json`

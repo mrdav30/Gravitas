@@ -5,7 +5,7 @@ resolutions or documented investigation closures.
 
 ## Tracker Rules
 
-- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-148`.
+- Issue IDs use `GRV-Issue-NNN`. The next available ID is `GRV-Issue-149`.
 - Assign an ID when an issue enters this tracker and preserve it through
   closure; never delete or reuse it. Check Git history before advancing or
   repairing the counter. Unknown historical IDs stay reserved rather than
@@ -55,43 +55,35 @@ resolutions or documented investigation closures.
 
 ### Ordered Queue
 
-### GRV-Issue-147 - Closed convex mesh containment is missed for cylinders
+### GRV-Issue-148 - Closed convex mesh containment is missed for mixed circle and capsule slabs
 
-- **Recorded:** 2026-10-29. **Priority:** P2. **Owner:** ordinary 3D closed-convex
-  mesh/cylinder narrow phase.
-- **Verified on:** Frozen Gravitas `9175653` and the Phase 14 public-API candidate
-  based on `2ee3af9`, Windows x64/.NET 10 Release. No static-surface declaration
-  is involved. This predates the documentation clarification and Phase 13/14.
-- **Reproducer:** Use pure 3D at 16 Hz, grid `[-8,8]` on every axis, zero gravity,
-  air density, damping and minimum speed. Register a bodyless unit-transform
-  `LSMeshCollider` in `MeshColliderMode.Convex`: take the cube vertices/indices
-  from `MeshTestFixtures.CreateConvexCube` and multiply its authored vertex
-  coordinates by two, giving bounds `[-1,1]` on every axis. Place a mass-one
-  dynamic cylinder at the origin, radius `0.25`, height `0.5`, frozen rotation,
-  sleep disabled and manual grounding. Advance `Simulate` plus `LateSimulate`.
-- **Observed:** The cylinder remains at raw position `(0,0,0)`, wholly within
-  the filled convex hull. An otherwise identical radius-0.25 sphere receives
-  response and moves to raw `(0,0,-4260607622)`. Exterior controls starting at
-  X=`1.125`, Y=Z=0 receive wall response for both shapes, ending at raw
-  `(5226975206,0,0)`. The original/current captures agree exactly.
-- **Cause:** `DoMeshCylinderCheck` unconditionally uses
-  `MeshTriangleContactGenerator.TryBuildMeshCylinderManifold`; that owner gathers
-  only triangles intersecting the cylinder bounds and has no closed-convex
-  volume fallback. The enclosed cylinder reaches no wall triangles. Sphere
-  dispatch explicitly selects whole-hull volume contact for closed `Convex`
-  meshes. Concave-mode closed-shell behavior is a different, intentional policy.
-- **Impact:** Initial cylinder containment in a closed convex mesh receives no
-  discrete response. No claim of observed sweep tunneling or mixed-mode failure
-  is made by this reproduction.
-- **Next action:** Add the contained/exterior controls as production regressions;
-  establish filled-volume cylinder/hull contact through the appropriate existing
-  math/physics owners. Preserve open/Concave surface semantics, exact witnesses,
-  reversed order, transformed whole-shape checks and warm performance; audit
-  corresponding mixed/query behavior before extending the claimed defect.
-- **Evidence:** Supplemental public host-loop controls and original/current logs
-  are under `artifacts/static-surface/mode-clarification/cylinder-control/`.
-  Reproduction inputs above and the maintained cube fixture are sufficient
-  without those temporary files.
+- **Recorded:** 2026-10-30. **Priority:** P2. **Owner:** mixed mesh/curved-slab
+  narrow phase, `CollisionDetectionMixed.AppendMeshSlabContacts`.
+- **Verified on:** Frozen Gravitas `b4115b4`, Windows x64/.NET 10 Release with
+  its matching local-stack binaries. Found during #147's dimensional audit;
+  the ordinary 3D cylinder dispatch change does not reach this owner.
+- **Reproducer:** Create a Mixed context and a bodyless unit-transform closed
+  `Convex` mesh cube with bounds `[-1,1]`, using the doubled
+  `MeshTestFixtures.CreateConvexCube` vertices and its triangle indices. At the
+  origin initialize either `new LSCircleCollider2D(Fixed64.Quarter)` or
+  `new LSCapsuleCollider2D(Fixed64.Quarter, Fixed64.Half)`, with
+  `MixedHalfThicknessOverride = Fixed64.Quarter` and an identity unit-scale
+  `TestMatterAgent` transform. Call
+  `CollisionDetectionMixed.TryCollide(mesh, embedded, out _)`.
+- **Observed:** Both calls return false although the complete slab is contained
+  in the filled hull. This is a narrow-phase classification reproduction;
+  sweep tunneling and completed mixed host response have not been established.
+- **Cause:** Only nonempty polygon-prism offsets select whole-hull volume
+  contact. Circle and capsule offsets are empty, so both shapes gather nearby
+  surface triangles; the contained slabs reach none.
+- **Next action:** Retain both regressions and implement coherent whole-volume
+  mixed curved-slab contact, preserving finite witnesses, X/Z response
+  constraints, surface semantics, completed steps and CCD/query parity. #147's
+  finite-cylinder math can support circle slabs; capsule slabs additionally
+  need their finite planar core and must not be approximated by a cylinder.
+- **Evidence:** The reproduction above is independent of temporary files.
+  Supplemental frozen-assembly failures are in
+  `artifacts/grv-147/baseline-audit.log` and `baseline-audit.trx`.
 
 ### GRV-Issue-111 - Local-stack benchmark hosts can omit FixedMathSharp compile references
 
@@ -178,6 +170,7 @@ validation, tradeoffs and links to focused records.
 
 | Issue                                                                                                                                                                                           | Resolved/closed | Outcome                                                                                                                                                                                                                                                                                               | Evidence                                                                                                                                                                                                                                                                                                                                         |
 | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| <a id="grv-issue-147---closed-convex-mesh-containment-is-missed-for-cylinders"></a><a id="grv-issue-147"></a>GRV-Issue-147 | 2026-10-30 | Fixed: Select exact whole-hull finite-cylinder contact for interior/boundary centers, preserving exterior and open/Concave surface behavior. Exact early certification reduces common contained-step cost; mixed curved-slab containment remains tracked as #148. | [Closeout](done/2026-10-30-convex-mesh-cylinder-containment-closeout.md), [host-step and witness regressions](../../tests/Gravitas.Tests/CollisionHandling/ConvexMeshCylinderContactTests.cs) |
 | <a id="grv-issue-146---joined-mixed-capsule-contacts-can-eject-a-body-along-an-unrelated-axis"></a>GRV-Issue-146                                                                                | 2026-10-28      | Fixed: Choose coherent exact native/finite-cut responses for capsules, spheres and zero-core capsules; retain independent regions, actual suppliers, overlap events and selected-only recovery. The small measured warm correctness cost was explicitly accepted.                                     | [Closeout](done/2026-10-15-static-surface-continuity-and-heightfield-plan.md#grv-issue-146-closeout)                                                                                                                                                                                                                                                  |
 | <a id="grv-issue-144---context-reset-retains-ended-collider-references-in-reusable-storage"></a><a id="grv-issue-144"></a>GRV-Issue-144 | 2026-10-29 | Fixed: Reset releases registry, response, grounding and CCD reference tails across 2D/3D/Mixed while preserving reusable capacity and the existing 24-byte clock-token allocation. Normal-step clearing is unchanged. | [Closeout](done/2026-10-29-context-reset-reference-closeout.md), [lifetime regressions](../../tests/Gravitas.Tests/Runtime/ContextResetLifetimeTests.cs) |
 | <a id="grv-issue-145---post-step-3d-queries-can-read-the-pre-response-collider-pose"></a><a id="grv-issue-145"></a>GRV-Issue-145 | 2026-10-29 | Fixed: Publish corrected 3D poses and spatial membership after response bookkeeping; remove repeated coverage checks while preserving solver snapshots, replay observations and zero warm allocations. Remaining measured cost retained under delegated judgment. Light follow-up aligns 2D membership publication while retaining immediate recovery geometry. | [Closeout](done/2026-10-29-post-step-query-pose-closeout.md), [3D query regressions](../../tests/Gravitas.Tests/Queries/PostResponseQueryPoseTests.cs), [2D publication regressions](../../tests/Gravitas.Tests/Physics2D/ResponsePosePublication2DTests.cs) |

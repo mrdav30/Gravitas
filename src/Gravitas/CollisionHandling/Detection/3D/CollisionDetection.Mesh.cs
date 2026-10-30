@@ -105,10 +105,18 @@ public static partial class CollisionDetection
         var mesh = (LSMeshCollider)pair.ColliderA;
         var cylinder = (LSCylinderCollider)pair.ColliderB;
 
-        return MeshTriangleContactGenerator.TryBuildMeshCylinderManifold(
-            pair,
-            mesh,
-            cylinder,
+        // An interior/boundary center needs the filled hull's exit, even when
+        // it already reaches a wall whose two-sided surface would push inward.
+        if (mesh.Mode == MeshColliderMode.Convex && mesh.Mesh.IsClosedSurface
+            && ConvexHullCylinderContact.TryGetContactWithContainedCenter(mesh.Mesh.GeometryFrame,
+                mesh.Mesh.GeometryVertices, mesh.Mesh.Triangles, cylinder.Center, cylinder.Rotation,
+                cylinder.Height, cylinder.ScaledRadius, out FixedContactAnchors contact))
+        {
+            pair.Manifold.SetContact(new ContactAnchor(contact.FirstAnchor), new ContactAnchor(contact.SecondAnchor),
+                contact.Depth, contact.Normal, contact.DepthIsClamped);
+            return true;
+        }
+        return MeshTriangleContactGenerator.TryBuildMeshCylinderManifold(pair, mesh, cylinder,
             pair.Context.CollisionScratch.MeshTriangleCandidatesA);
     }
 
