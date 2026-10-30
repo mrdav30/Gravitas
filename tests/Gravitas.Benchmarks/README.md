@@ -141,6 +141,16 @@ configuration: to check Lean, replace `Release` with `ReleaseLean` in both
 commands. CLI job choices such as `Dry` still apply. Dry runs validate execution,
 not throughput. Package mode remains the default and is a separate release gate.
 
+For ordinary .NET 10 jobs and explicit `--runtimes net10.0`, the generated host
+uses the project path recorded when the runner was built. Archived projects
+with the same name therefore do not affect discovery. Source mode also supplies
+explicit compile/runtime references to the dependencies resolved by the runner,
+while retaining the versioned source graph and stock SDK/JIT validation.
+`--cli` and `--packages` retain their normal meanings. In-process, CoreRun and
+other explicitly selected runtime toolchains remain under BenchmarkDotNet's
+control, including their own project-discovery behavior. Rebuild the runner
+after relocating its source project.
+
 ### Fast development check
 
 Use BenchmarkDotNet's short in-process job for quick local smoke runs. This

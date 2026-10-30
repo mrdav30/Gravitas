@@ -55,75 +55,7 @@ resolutions or documented investigation closures.
 
 ### Ordered Queue
 
-### GRV-Issue-111 - Local-stack benchmark hosts can omit FixedMathSharp compile references
-
-- **Confirmed:** 2026-10-12 during #101's unchanged rotational interval control.
-  `RotationalCcdIntervalBenchmarks` builds in the ordinary benchmark project,
-  but its generated out-of-process host fails `CS0246` for `FixedMathSharp` and
-  executes zero benchmarks with `UseLocalLsfStack=true`.
-- **Root cause:** The host references the benchmark assembly with
-  `DisableTransitiveProjectReferences=true`, preserving the coordinated source
-  graph, but its generated delegates mention public `Fixed64` and
-  `FixedQuaternion` return types without a direct compile reference to their
-  assembly. This is an existing benchmark-host defect, not a physics failure.
-  New #101 rows return observable raw `long` values and complete successfully.
-- **Reproduction:** After a local-stack Release benchmark build, run
-  `dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll --filter '*RotationalCcdIntervalBenchmarks*' --job Dry --artifacts artifacts/grv-issue-101/existing-interval-bdn`.
-  Ignored `existing-interval-bdn.log` retains the compiler failures and zero
-  executed rows. Matched reflection timings of those unchanged methods do run;
-  they are smoke measurements, not BenchmarkDotNet results.
-- **Reconfirmed, 2026-10-17:** The unchanged
-  `RotationalCcdIntervalBenchmarks.DenseUnresolved2DRotationalNearMiss` fails
-  the same stock local-stack Dry launch with `CS0246` and zero executed rows.
-  Phase 2 surface timings use an ignored child-only MSBuild reference import
-  bound to the tested eight-DLL snapshot; all live child bindings are verified.
-  This validates the captures without repairing the stock launcher. Current
-  evidence is under
-  `artifacts/grv-issue-133/phase2/stock-existing-fixed64-launch*`.
-- **Follow-up:** Audit generated-host compile inputs and dependency-bearing
-  benchmark signatures. Preserve coordinated assembly identities and source
-  selection; do not globally restore transitive project references without
-  verifying the complete graph. Cover representative parameters and return
-  types, then rerun affected out-of-process jobs in source and package modes.
-
-### GRV-Issue-125 - Isolated native access violation during mesh inertia benchmarking
-
-- **Observed:** 2026-10-13 on Windows x64, during local-stack Release benchmark
-  validation of the `EnclosedQ96Coefficient` ownership cleanup. The failing
-  process used the frozen pre-cleanup binary, not the extracted implementation.
-- **Status:** Low priority, non-blocking; no reliable reproducer. Defer further
-  investigation unless the crash recurs, appears in CI or normal simulation, or
-  a reliable reproducer becomes available.
-- **Evidence:** One fractional-surface changing-mass benchmark process failed
-  with `AccessViolationException` inside `MeshRuntimeInertia.TryMaterialize`
-  after six warmups and two measured iterations. Its dump shows a scalar-result
-  write through an invalid native address containing a coefficient fraction. The
-  failed process's timing results are invalid.
-- **Uncertainty:** A bounded two-launch follow-up using the same frozen binary
-  completed without reproducing the crash. The small dump omits the preceding
-  native instructions needed to establish how the invalid address arose. A JIT
-  defect is a hypothesis, not a confirmed cause; source review found no unsafe
-  operation or escaping reference in the affected path. The observation does not
-  establish a defect in the struct extraction.
-- **Disposition:** Preserve the failure log, dump and binary identities; do not
-  pursue further hardening solely on this observation. An experimental
-  raw-output variant passed stress checks, but those checks neither establish
-  the original cause nor prove that the variant fixes it.
-- **Artifacts:** Ignored
-  `artifacts/grv-122-123/perf/accepted-cleanup-reverse.log`,
-  `perf/accepted-rca-default-jit.log`, and `perf/rca/` under the same artifact
-  root retain the failure, follow-up, dump, binary hashes and diagnostic notes.
-- **Additional observation, 2026-10-19:** One #142 two-payload timing launch
-  terminated with `Fatal error. Internal CLR error. (0x80131506)` before
-  producing results. An isolated retry, two complete paired runs and subsequent
-  identical-payload/order controls completed. The failed capture is invalid;
-  there is no dump or established cause, and no evidence connecting this CLR
-  failure to the earlier inertia access violation. Ignored
-  `artifacts/grv-issue-142/timing-accepted-a.log`, the retained
-  `candidate-before-domain-simplification/` snapshot, and
-  `timing-final-verified-*`, `timing-identical-*` and `timing-confirm-*`
-  preserve the failure and bounded follow-up. Do not infer a runtime fix from
-  the successful reruns.
+No active issues.
 
 Remaining measured performance costs are tracked in the benchmark backlog.
 
@@ -140,6 +72,8 @@ validation, tradeoffs and links to focused records.
 
 | Issue                                                                                                                                                                                           | Resolved/closed | Outcome                                                                                                                                                                                                                                                                                               | Evidence                                                                                                                                                                                                                                                                                                                                         |
 | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| <a id="grv-issue-125---isolated-native-access-violation-during-mesh-inertia-benchmarking"></a><a id="grv-issue-125"></a>GRV-Issue-125 | 2026-10-30 | Investigation closed, not reproduced: Retained the existing raw-output mitigation; bounded frozen/current inertia and separate CLR-host replays pass. Historical native causes remain unproved. | [Closeout](done/2026-10-30-benchmark-host-and-native-crash-closeout.md#grv-issue-125) |
+| <a id="grv-issue-111---local-stack-benchmark-hosts-can-omit-fixedmathsharp-compile-references"></a><a id="grv-issue-111"></a>GRV-Issue-111 | 2026-10-30 | Fixed: Canonical project discovery and exact local dependency references preserve stock validation and CLI choices. Enabled diagnostics optimization in its declared Lean configuration; source/package launcher probes and real Release/Lean jobs pass. | [Closeout](done/2026-10-30-benchmark-host-and-native-crash-closeout.md#grv-issue-111) |
 | <a id="grv-issue-148---closed-convex-mesh-containment-is-missed-for-mixed-circle-and-capsule-slabs"></a><a id="grv-issue-148"></a>GRV-Issue-148 | 2026-10-30 | Fixed: Select exact whole-hull contact for contained mixed circles and complete capsule slabs, preserving finite witnesses, materials, compound identity, query/CCD admission and existing planar mobility. | [Closeout](done/2026-10-30-mixed-curved-slab-containment-closeout.md), [host-step and witness regressions](../../tests/Gravitas.Tests/CollisionHandling/ConvexMeshCurvedSlabContainmentTests.cs) |
 | <a id="grv-issue-147---closed-convex-mesh-containment-is-missed-for-cylinders"></a><a id="grv-issue-147"></a>GRV-Issue-147 | 2026-10-30 | Fixed: Select exact whole-hull finite-cylinder contact for interior/boundary centers, preserving exterior and open/Concave surface behavior. Exact early certification reduces common contained-step cost; mixed curved-slab containment remains tracked as #148. | [Closeout](done/2026-10-30-convex-mesh-cylinder-containment-closeout.md), [host-step and witness regressions](../../tests/Gravitas.Tests/CollisionHandling/ConvexMeshCylinderContactTests.cs) |
 | <a id="grv-issue-146---joined-mixed-capsule-contacts-can-eject-a-body-along-an-unrelated-axis"></a>GRV-Issue-146                                                                                | 2026-10-28      | Fixed: Choose coherent exact native/finite-cut responses for capsules, spheres and zero-core capsules; retain independent regions, actual suppliers, overlap events and selected-only recovery. The small measured warm correctness cost was explicitly accepted.                                     | [Closeout](done/2026-10-15-static-surface-continuity-and-heightfield-plan.md#grv-issue-146-closeout)                                                                                                                                                                                                                                                  |

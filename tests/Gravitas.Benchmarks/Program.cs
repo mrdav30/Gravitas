@@ -96,6 +96,10 @@ internal static class Program
         build = build.WithMsBuildArguments("/p:UseLocalLsfStack=true",
             "/p:DisableTransitiveProjectReferences=true", "/p:BuildInParallel=false");
 #endif
+        // Keep explicit alternative toolchains; this project targets only .NET 10.
+        if (!options.RunInProcess && !options.CoreRunPaths.Any() && string.IsNullOrEmpty(options.ClrVersion)
+            && options.Runtimes.All(runtime => string.Equals(runtime, "net10.0", StringComparison.OrdinalIgnoreCase)))
+            build = build.WithToolchain(new BenchmarkProjectToolchain(options.CliPath?.FullName, options.RestorePath?.FullName));
         // Mutate build settings only: a custom default job would override --job Dry.
         var config = DefaultConfig.Instance.AddJob(build.AsMutator());
         return GetExitCode(switcher.Run(args, config), helpOrVersion || options.PrintInformation ||

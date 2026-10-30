@@ -23,6 +23,12 @@
     <PackageReference Include="BenchmarkDotNet" Version="0.15.8" />
     <!-- The Test SDK is required only for the VSTest Adapter to work -->
   </ItemGroup>
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>BenchmarkProjectPath</_Parameter1>
+      <_Parameter2>$(MSBuildProjectFullPath)</_Parameter2>
+    </AssemblyAttribute>
+  </ItemGroup>
   <ItemGroup Condition="'$(UseLocalLsfStack)' == 'true'">
     <ProjectReference Include="..\..\..\Chronicler\src\Chronicler\Chronicler.csproj"
       AdditionalProperties="Configuration=$(Configuration);SemVer=0.4.0;AssemblySemVer=0.4.0.0" />
