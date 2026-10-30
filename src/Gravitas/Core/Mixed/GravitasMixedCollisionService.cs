@@ -173,11 +173,11 @@ internal sealed partial class GravitasMixedCollisionService
         _queryColliderIds.FastClear();
         _queryColliderRedundancy.Clear();
         _pairs.Clear();
-        _pairsToRemove.FastClear();
+        _pairsToRemove.Clear(clearRetainedReferences: true);
         _cachedPairs.Clear();
-        _mixedResponsePairs.FastClear();
-        _mixedIslandNodes.FastClear();
-        _mixedIslandConstraints.FastClear();
+        _mixedResponsePairs.Clear(clearRetainedReferences: true);
+        _mixedIslandNodes.Clear(clearRetainedReferences: true);
+        _mixedIslandConstraints.Clear(clearRetainedReferences: true);
         _cached3DQueryRefreshFrame = -1;
         _cached3DQueryRefreshLateToken = -1;
         _cached2DQueryRefreshFrame = -1;

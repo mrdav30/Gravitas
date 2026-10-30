@@ -203,7 +203,7 @@ public sealed partial class GravitasPhysics2DService
     internal void ReleaseStaticSurfaces()
     {
         foreach (StaticSurface2D surface in _staticSurfaces) surface.Release();
-        _staticSurfaces.FastClear();
+        _staticSurfaces.Clear();
     }
 
     /// <summary>Runs the authoritative pure 2D simulation phase.</summary>
@@ -325,23 +325,27 @@ public sealed partial class GravitasPhysics2DService
         _collisionPositionPublicationPending = false;
         ReleaseStaticSurfaces();
         DiscardContinuousCollisionHandoffQueue();
+        // FastClear during simulation can leave references beyond the current count.
+        _continuousCollisionHandoffQueue.Clear(clearRetainedReferences: true);
         _dynamicBodies.Clear();
         _colliders.Clear();
-        _serviceRefreshColliders.FastClear();
+        _serviceRefreshColliders.Clear();
+        _groundingBodySnapshot.Clear(clearRetainedReferences: true);
+        _groundingPairSnapshot.Clear(clearRetainedReferences: true);
         _processedPairKeys.Clear();
         _pairs.Clear();
         _pairsToRemove.FastClear();
-        _pairsPendingSeparation.FastClear();
+        _pairsPendingSeparation.Clear(clearRetainedReferences: true);
         _cachedPairs.Clear();
-        _discreteResponsePairs.FastClear();
-        _existingResponsePairCandidates.FastClear();
+        _discreteResponsePairs.Clear(clearRetainedReferences: true);
+        _existingResponsePairCandidates.Clear(clearRetainedReferences: true);
         _discreteResponseBodyKeys.Clear();
         _discreteResponseBodyQueue.FastClear();
-        _discreteIslandNodes.FastClear();
-        _discreteIslandConstraints.FastClear();
+        _discreteIslandNodes.Clear(clearRetainedReferences: true);
+        _discreteIslandConstraints.Clear(clearRetainedReferences: true);
         _planarContinuousCollisionCandidates.Clear();
         _dirtyPlanarContinuousCollisionCandidates.Clear();
-        _dirtyPlanarContinuousCollisionBodies.FastClear();
+        _dirtyPlanarContinuousCollisionBodies.Clear(clearRetainedReferences: true);
         _dirtyPlanarContinuousCollisionBodySet.Clear();
         _mixedContinuousCollisionCandidates.Clear();
         _dirtyMixedContinuousCollisionCandidates.Clear();

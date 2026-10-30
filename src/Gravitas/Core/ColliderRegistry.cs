@@ -67,8 +67,9 @@ internal sealed class ColliderRegistry<TCollider>
         for (int i = 0; i < _liveColliders.Count; i++)
             _liveColliders[i].ClearRegistryState();
 
-        _liveColliders.FastClear();
-        _replayColliders.FastClear();
+        _liveColliders.Clear();
+        // Replay gathers can leave a larger previous snapshot beyond Count.
+        _replayColliders.Clear(clearRetainedReferences: true);
         _byId.Clear();
         _nextReplayOrder = 0;
     }

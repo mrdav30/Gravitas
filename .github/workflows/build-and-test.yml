@@ -56,7 +56,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           repository: mrdav30/SwiftCollections
-          ref: 89dfa2311a45113fbcef7187052663e17efa926a
+          ref: 22c0de88c7449e1cd15d54007876bceade643b44
           path: SwiftCollections
           persist-credentials: false
       - if: env.UseLocalLsfStack == 'true'

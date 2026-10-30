@@ -55,35 +55,6 @@ resolutions or documented investigation closures.
 
 ### Ordered Queue
 
-### GRV-Issue-144 - Context reset retains ended collider references in reusable storage
-
-- **Recorded:** 2026-10-27. **Priority:** P2. **Owner:** Gravitas
-  context/service reset.
-- **Verified on:** `3f0b759` (.NET 10, coordinated local stack), before Phase 9
-  runtime changes. This is bounded retention through old capacity, not evidence
-  of an unbounded allocation leak or a collision-result defect.
-- **Reproducer:** Keep a `GravitasWorldContext` alive, initialize a dynamic 3D
-  sphere (or zero-core capsule) and bodyless static 2D members, obtain mixed
-  contacts, then call `context.Reset()` and retire the host references. A
-  no-inline factory returning weak collider references followed by
-  `GC.Collect()`, `GC.WaitForPendingFinalizers()`, `GC.Collect()` still finds
-  the retired mover alive. Explicit deactivation before disposal releases the
-  same fixture. Keeping a disposed internal declaration alive also retains its
-  context and exposes the same pre-existing reset ownership boundary.
-- **Cause:** `ColliderRegistry.Clear()` clears indexed lookup but uses
-  `_liveColliders.FastClear()`, retaining collider references in its backing
-  array. Dimensional service refresh/snapshot buffers also use `FastClear()`.
-  Declaration invalidation already releases its own cached mover/member roots;
-  clearing the declaration alone cannot release these context-owned roots.
-- **Impact:** A retained reusable context can keep ended collider/body/host
-  graphs alive until the old reference slots are overwritten or the context is
-  collected. Audit pure 2D, 3D and mixed reset parity together.
-- **Next action:** Reproduce registry/service ownership independently through
-  public lifecycle behavior, release populated reference slots at reset while
-  retaining capacity, and verify reset/reuse, pool ownership and warm baselines.
-  Do not broaden #143's completed-query contract into an unmeasured reset
-  rewrite.
-
 ### GRV-Issue-147 - Closed convex mesh containment is missed for cylinders
 
 - **Recorded:** 2026-10-29. **Priority:** P2. **Owner:** ordinary 3D closed-convex
@@ -208,6 +179,7 @@ validation, tradeoffs and links to focused records.
 | Issue                                                                                                                                                                                           | Resolved/closed | Outcome                                                                                                                                                                                                                                                                                               | Evidence                                                                                                                                                                                                                                                                                                                                         |
 | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | <a id="grv-issue-146---joined-mixed-capsule-contacts-can-eject-a-body-along-an-unrelated-axis"></a>GRV-Issue-146                                                                                | 2026-10-28      | Fixed: Choose coherent exact native/finite-cut responses for capsules, spheres and zero-core capsules; retain independent regions, actual suppliers, overlap events and selected-only recovery. The small measured warm correctness cost was explicitly accepted.                                     | [Closeout](done/2026-10-15-static-surface-continuity-and-heightfield-plan.md#grv-issue-146-closeout)                                                                                                                                                                                                                                                  |
+| <a id="grv-issue-144---context-reset-retains-ended-collider-references-in-reusable-storage"></a><a id="grv-issue-144"></a>GRV-Issue-144 | 2026-10-29 | Fixed: Reset releases registry, response, grounding and CCD reference tails across 2D/3D/Mixed while preserving reusable capacity and the existing 24-byte clock-token allocation. Normal-step clearing is unchanged. | [Closeout](done/2026-10-29-context-reset-reference-closeout.md), [lifetime regressions](../../tests/Gravitas.Tests/Runtime/ContextResetLifetimeTests.cs) |
 | <a id="grv-issue-145---post-step-3d-queries-can-read-the-pre-response-collider-pose"></a><a id="grv-issue-145"></a>GRV-Issue-145 | 2026-10-29 | Fixed: Publish corrected 3D poses and spatial membership after response bookkeeping; remove repeated coverage checks while preserving solver snapshots, replay observations and zero warm allocations. Remaining measured cost retained under delegated judgment. Light follow-up aligns 2D membership publication while retaining immediate recovery geometry. | [Closeout](done/2026-10-29-post-step-query-pose-closeout.md), [3D query regressions](../../tests/Gravitas.Tests/Queries/PostResponseQueryPoseTests.cs), [2D publication regressions](../../tests/Gravitas.Tests/Physics2D/ResponsePosePublication2DTests.cs) |
 | <a id="grv-issue-143---completed-3d-queries-retain-their-last-excluded-collider"></a><a id="grv-issue-143---query-services-retain-retired-colliders-through-reusable-scratch"></a>GRV-Issue-143 | 2026-10-26      | Fixed: Released query source/exclusion, 2D/mixed candidates, all-dimensional batch-hit and 3D trace references at completion/reset, including exceptions. Replacing outputs releases prior hits without hidden tails; current caller results, batch preparation, counters and capacity remain intact. | [Buffer lifetime regressions](../../tests/Gravitas.Tests/Queries/QueryBufferLifetimeTests.cs), [source lifetime regressions](../../tests/Gravitas.Tests/Queries/QuerySourceLifetimeTests.cs): 48 GC/ownership cases; exact full coverage, unchanged replay and zero warm allocation. Detailed validation follows Phase 8 in the continuity plan. |
 | <a id="grv-issue-142---single-mesh-cylinder-response-can-select-a-covered-triangle-diagonal"></a>GRV-Issue-142                                                                                  | 2026-10-19      | Fixed: Reused exact filled-surface cylinder reduction for trusted patches, rejecting covered diagonals while preserving real perimeters, independent surfaces and isolated-triangle behavior.                                                                                                         | [Closeout](https://github.com/mrdav30/Gravitas/blob/071b25ac2b758f6c1992a769e0713ed27b2c34dc/docs/feature-work/issue-tracker.md#grv-issue-142---single-mesh-cylinder-response-can-select-a-covered-triangle-diagonal)                                                                                                                            |

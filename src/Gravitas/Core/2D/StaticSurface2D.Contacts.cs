@@ -34,17 +34,13 @@ public sealed partial class StaticSurface2D
         _current = false;
         _mixedCurrent = false;
         _mixedMoving = null;
-        Array.Clear(_mixedLocal.InnerArray, 0, _mixedLocal.InnerArray.Length);
-        _mixedLocal.FastClear();
+        _mixedLocal.Clear(clearRetainedReferences: true);
         _moving = _carrier = null;
         // FastClear leaves reference tails beyond Count; ended member lifetimes
         // must be released even when this declaration becomes empty or is retained after disposal.
-        Array.Clear(_candidates.InnerArray, 0, _candidates.InnerArray.Length);
-        Array.Clear(_local.InnerArray, 0, _local.InnerArray.Length);
-        Array.Clear(_prepared.InnerArray, 0, _prepared.InnerArray.Length);
-        _candidates.FastClear();
-        _local.FastClear();
-        _prepared.FastClear();
+        _candidates.Clear(clearRetainedReferences: true);
+        _local.Clear(clearRetainedReferences: true);
+        _prepared.Clear(clearRetainedReferences: true);
     }
 
     internal void Reduce(LSCollider2D mover, LSCollider2D overlapMember, ContactManifold2D destination, bool reverse)

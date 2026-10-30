@@ -903,7 +903,10 @@ collider ID.
 
 Use `context.Reset()` for a reusable session context. Reset detaches Gravitas
 partition payloads from GridForge voxels and clears context-local runtime state
-while preserving the world and its grids. Use `context.Dispose()` when the
+while preserving the world and its grids. Registration and simulation buffers
+release references from the ended session, including stale scratch slots beyond
+their current counts, while retaining reusable capacity. Caller-owned results
+and host references retain their own lifetimes. Use `context.Dispose()` when the
 context is finished.
 
 ## Rules That Matter

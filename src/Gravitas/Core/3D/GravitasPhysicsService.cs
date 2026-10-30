@@ -225,23 +225,25 @@ public sealed partial class GravitasPhysicsService
         _collisionPositionPublicationPending = false;
         ReleaseStaticSurfaces();
         DiscardContinuousCollisionHandoffQueue();
+        // FastClear during simulation can leave references beyond the current count.
+        _continuousCollisionHandoffQueue.Clear(clearRetainedReferences: true);
         _dynamicBodies.Clear();
         _colliders.Clear();
-        _serviceRefreshColliders.FastClear();
-        _cachedCollisionPairs.FastClear();
-        _activeCollisionPairs.FastClear();
-        _activeCollisionPairSnapshot.FastClear();
-        _pairsPendingDeactivation.FastClear();
-        _discreteResponsePairs.FastClear();
-        _discreteIslandNodes.FastClear();
-        _discreteIslandConstraints.FastClear();
+        _serviceRefreshColliders.Clear();
+        _cachedCollisionPairs.Clear();
+        _activeCollisionPairs.Clear();
+        _activeCollisionPairSnapshot.Clear(clearRetainedReferences: true);
+        _pairsPendingDeactivation.Clear(clearRetainedReferences: true);
+        _discreteResponsePairs.Clear(clearRetainedReferences: true);
+        _discreteIslandNodes.Clear(clearRetainedReferences: true);
+        _discreteIslandConstraints.Clear(clearRetainedReferences: true);
         _continuousCollisionCandidates.Clear();
         _dirtyContinuousCollisionCandidates.Clear();
         _continuousCollisionCandidateLifetimes.Clear();
         _continuousCollisionCandidateIds.FastClear();
         _dirtyContinuousCollisionCandidateIds.FastClear();
         _dirtyContinuousCollisionBodyIds.Clear();
-        _dirtyContinuousCollisionBodies.FastClear();
+        _dirtyContinuousCollisionBodies.Clear(clearRetainedReferences: true);
         _processedContinuousCollisionBodies.Clear();
         _continuousCollisionPreparedToken = -1;
         LastContinuousCollisionIslandCount = 0;
@@ -270,7 +272,7 @@ public sealed partial class GravitasPhysicsService
     internal void ReleaseStaticSurfaces()
     {
         foreach (StaticSurface surface in _staticSurfaces) surface.Release();
-        _staticSurfaces.FastClear();
+        _staticSurfaces.Clear();
     }
 
     internal int AssimilateBody(SolidBody body, BodyMotionType motionType)
