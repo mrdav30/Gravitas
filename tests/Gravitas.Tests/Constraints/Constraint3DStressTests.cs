@@ -98,6 +98,34 @@ public sealed class Constraint3DStressTests
         SumMotorImpulse(joints).Should().BeGreaterThan(Fixed64.Zero);
     }
 
+    [Fact]
+    public void ConstraintStressSolve_ShouldNotAllocateAfterWarmup()
+    {
+        using GravitasWorldContext context = CreateHumanoidRagdollOnFloor(
+            out SolidBody[] bodies, out Joint3D[] joints, sleepEnabled: false);
+        foreach (SolidBody body in bodies)
+            body.UseAutomaticGrounding(checkGroundImmediately: false);
+        // Warm the falling contact topology and two eight-second pair-retirement cycles.
+        Step(context, context.FrameRate * 16);
+
+        long allocatedBytes = AllocationTestHelper.MeasureSteadyState(
+            () =>
+            {
+                context.Simulate();
+                context.LateSimulate();
+            },
+            warmupIterations: 8,
+            stabilizationIterations: 4,
+            measurementIterations: 128);
+
+        allocatedBytes.Should().Be(0);
+        SumSolvedRows(joints).Should().BeGreaterThan(0);
+        MaxAnchorError(joints).Should().BeLessThan((Fixed64)3);
+        MaxPositionMagnitude(bodies).Should().BeLessThan((Fixed64)96);
+        foreach (SolidBody body in bodies)
+            body.Position3d.Y.Should().BeGreaterThan(-Fixed64.Half);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

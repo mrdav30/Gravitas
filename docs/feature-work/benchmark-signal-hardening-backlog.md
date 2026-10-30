@@ -61,58 +61,20 @@ dotnet test Gravitas.slnx --configuration ReleaseLean
 
 ## Active Signals
 
-### GRV-Benchmark-025 — Debug Ragdoll Steady-State Allocations
-
-**Discovered:** 2026-10-06, during full-lifecycle replay Phase 1 validation.  
-**Source:** `Constraint3DStressTests.ConstraintStressSolve_ShouldNotAllocateAfterWarmup`.  
-**Status:** Confirmed Debug-only allocation guard failure; allocation owner not
-yet attributed. This does not establish a Release performance regression.  
-**Owner:** Gravitas constraint/contact workload; involve lower-stack owners only
-after an allocation trace identifies their contribution.
-
-The unchanged guard warms a humanoid ragdoll, then measures 128 complete
-`Simulate()`/`LateSimulate()` frames. Debug measured **4,318,560 managed bytes**
-in the broader focused suite and again when run alone, against its 0-byte
-expectation. Release focused and full Release/Lean suites passed the same guard.
-The guard calls
-the context phases directly and does not use the modified replay helper; its
-body and setup were not changed by this work.
-
-Reproduce on Windows x64 with SDK 10.0.302 and the unreleased local stack:
-
-```powershell
-$env:UseLocalLsfStack = 'true'
-$env:DOTNET_PROCESSOR_COUNT = '2'
-dotnet build tests/Gravitas.Tests/Gravitas.Tests.csproj -c Debug -p:UseLocalLsfStack=true -m:1 -p:BuildInParallel=false -p:UseSharedCompilation=false -nr:false
-dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj -c Debug --no-build --no-restore -p:UseLocalLsfStack=true --filter 'FullyQualifiedName~ConstraintStressSolve_ShouldNotAllocateAfterWarmup' -- RunConfiguration.MaxCpuCount=1 xUnit.MaxParallelThreads=1
-```
-
-Evidence remains in the ignored
-`artifacts/replay-conformance-phase1/debug-allocation-repro.log` and its paired
-TRX, plus the initial Debug focused capture. Other Debug replay/lifecycle checks
-can proceed separately; the guard remains unchanged and runs in full Release
-and Lean validation.
-
-**Next isolation:** Capture allocation types and stacks for this exact warmed
-window in Debug and Release. Distinguish runtime allocation from optimization
-or instrumentation effects before changing solver code or its test contract.
-Do not relax the expectation or attribute the bytes to a dependency without
-evidence. Check a comparable planar workload only after identifying the owner.
-
 ### GRV-Benchmark-026 — Initial Generic Convex Mesh Contact Resolution Cost
 
-**Discovered:** 2026-10-07 during GRV-Issue-094 correctness validation.  
-**Status:** Measured correctness cost; ordinary impacts unchanged.  
-**Owner:** Gravitas prepared convex sweep initial-contact resolution and its
-FixedMathSharp complete contact/projection operations.
+**Discovered:** 2026-10-07 during GRV-Issue-094 correctness validation.
+**Status:** Measured correctness cost; ordinary impacts unchanged. **Owner:**
+Gravitas prepared convex sweep initial-contact resolution and its FixedMathSharp
+complete contact/projection operations.
 
 The warmed public `ConvexMeshInitialContactBenchmarks.SweepCuboidAll` compares
-ordinary impacts with initially overlapping, separating cuboids. On this
-Windows x64 i7-9700K host (.NET 8.0.29), the corrected geometric initial normal
-costs **59.01 us** for a convex quad, **151.38 us** for a concave quad, and
-**59.59 us** for a compound convex mesh leaf, versus the incorrect baseline's
-**16.51 / 39.42 / 16.21 us**. Ordinary impacts remain **27.56 / 83.36 / 27.30 us**
-versus **26.89 / 82.57 / 27.09 us**. All six cases allocate **0 B/op**.
+ordinary impacts with initially overlapping, separating cuboids. On this Windows
+x64 i7-9700K host (.NET 8.0.29), the corrected geometric initial normal costs
+**59.01 us** for a convex quad, **151.38 us** for a concave quad, and **59.59
+us** for a compound convex mesh leaf, versus the incorrect baseline's **16.51 /
+39.42 / 16.21 us**. Ordinary impacts remain **27.56 / 83.36 / 27.30 us** versus
+**26.89 / 82.57 / 27.09 us**. All six cases allocate **0 B/op**.
 
 ```powershell
 $env:UseLocalLsfStack = 'true'
@@ -135,29 +97,29 @@ frequency before assigning a host capacity budget.
 certify contact against the finite trusted filled surface, including nonconvex
 patches, before accepting a covered seam witness. The existing distance/authored
 index comparator also rejects candidates that could not win even at distance
-zero. This removes repeated GJK and face-admission work after an admitted initial
-hit, without caches or a different geometric answer path.
+zero. This removes repeated GJK and face-admission work after an admitted
+initial hit, without caches or a different geometric answer path.
 
-The isolated before/after fixtures use the same benchmark source and exclude
-the cuboid and capsule query sources from each other's target layer. Native
-Release means on the same host, with three warmups and five measurements, are:
+The isolated before/after fixtures use the same benchmark source and exclude the
+cuboid and capsule query sources from each other's target layer. Native Release
+means on the same host, with three warmups and five measurements, are:
 
-| Public query workload | Before | After |
-| --------------------- | -----: | ----: |
-| Concave quad, initially overlapping cuboid | 128.79 us | 75.53 us |
+| Public query workload                       |    Before |     After |
+| ------------------------------------------- | --------: | --------: |
+| Concave quad, initially overlapping cuboid  | 128.79 us |  75.53 us |
 | Concave quad, initially overlapping capsule | 230.27 us | 129.49 us |
-| Capsule, filled quad at subdivision 2 | 1.551 ms | 0.701 ms |
-| Capsule, notched patch at subdivision 2 | 1.184 ms | 0.693 ms |
-| Capsule, filled quad at subdivision 8 | 10.590 ms | 4.953 ms |
-| Capsule, notched patch at subdivision 8 | 6.387 ms | 4.973 ms |
+| Capsule, filled quad at subdivision 2       |  1.551 ms |  0.701 ms |
+| Capsule, notched patch at subdivision 2     |  1.184 ms |  0.693 ms |
+| Capsule, filled quad at subdivision 8       | 10.590 ms |  4.953 ms |
+| Capsule, notched patch at subdivision 8     |  6.387 ms |  4.973 ms |
 
 All 16 ordinary/initial, convex/concave/compound and dense-patch rows report
 `0 B/op`. Ordinary concave cuboid/capsule controls are 74.29/583.60 us before
 and 76.02/587.35 us after; convex and compound controls remain within about 2%
 of their isolated baselines. These short-run means are not gameplay-frame
-latency or capacity guarantees. Dense initial capsule sweeps still approach
-5 ms, so this existing signal remains active. Profile candidate ordering, GJK
-and finite-contact work separately before another optimization; keep nonconvex
+latency or capacity guarantees. Dense initial capsule sweeps still approach 5
+ms, so this existing signal remains active. Profile candidate ordering, GJK and
+finite-contact work separately before another optimization; keep nonconvex
 holes, exposed rims, initial closing admission and authored tie ordering intact.
 
 Reproduce both maintained benchmark classes with `UseLocalLsfStack=true`:
@@ -169,44 +131,45 @@ dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Rel
 ```
 
 Ignored `artifacts/grv-issue-108/isolated-baseline` and `final-confirmation`
-retain the matched measurements. The preliminary unisolated source capture
-and the pre-pruning correctness capture are not the retained comparison.
+retain the matched measurements. The preliminary unisolated source capture and
+the pre-pruning correctness capture are not the retained comparison.
 
 **2026-10-29 small mixed CCD control:** A millisecond-scale capacity boundary
 also appears without dense subdivision. The existing
 `JoinedStaticSurfaceMixedSimulationBenchmarks`, `Shape=Circle`,
-`Layout=Continuous`, with its body switched to `ContinuousCollisionMode.Continuous`
-after setup, costs **6.607/6.896 ms per full frame** on committed Gravitas
-`9175653` and **6.816/6.772 ms** on the Phase 13 candidate in normal/reversed
-paired runs. Both use the same driver, preserve physical witnesses and allocate
-**0 B/frame**; the combined difference is +0.63%, with opposite order effects.
-This records an existing cost, not a Phase 13 regression or a speedup claim.
+`Layout=Continuous`, with its body switched to
+`ContinuousCollisionMode.Continuous` after setup, costs **6.607/6.896 ms per
+full frame** on committed Gravitas `9175653` and **6.816/6.772 ms** on the Phase
+13 candidate in normal/reversed paired runs. Both use the same driver, preserve
+physical witnesses and allocate **0 B/frame**; the combined difference is
++0.63%, with opposite order effects. This records an existing cost, not a Phase
+13 regression or a speedup claim.
 
 The source is a radius-0.5 circle slab, half-thickness 0.5, centered at host
-Y=0.25, sliding against one bodyless two-triangle wall at Z=0,
-X=[-8,8], Y=[-2,2]. Use the fixture's 16-Hz Mixed settings, frozen rotation,
-manual grounding, disabled sleep and alternating X speed +/-1 with inward
-impulse -1/16; advance 64 complete host frames per invocation. Windows x64,
-i7-9700K, .NET 10.0.10 Release and `UseLocalLsfStack=true`; each order uses
-24 alternating paired windows after warmup. Profile the complete mixed CCD
-call chain before attributing this to initial-contact math or indexing.
-Ignored `artifacts/static-surface/phase13/ccd-controls-ba-{forward,reverse}.json`
+Y=0.25, sliding against one bodyless two-triangle wall at Z=0, X=[-8,8],
+Y=[-2,2]. Use the fixture's 16-Hz Mixed settings, frozen rotation, manual
+grounding, disabled sleep and alternating X speed +/-1 with inward impulse
+-1/16; advance 64 complete host frames per invocation. Windows x64, i7-9700K,
+.NET 10.0.10 Release and `UseLocalLsfStack=true`; each order uses 24 alternating
+paired windows after warmup. Profile the complete mixed CCD call chain before
+attributing this to initial-contact math or indexing. Ignored
+`artifacts/static-surface/phase13/ccd-controls-ba-{forward,reverse}.json`
 retains loaded module hashes and raw windows.
 
 ### GRV-Benchmark-027 — Nonconvex Rotational CCD Step Cost
 
-**Discovered:** 2026-10-12 during GRV-Issue-101 validation.  
-**Status:** Correct first-impact timing retained; demanding angular fixtures
-remain expensive after the measured local refinements.  
-**Owner:** Gravitas bounded rotational interval search and exact finite-contact
-admission; FixedMathSharp only where profiles identify reusable geometry work.
+**Discovered:** 2026-10-12 during GRV-Issue-101 validation. **Status:** Correct
+first-impact timing retained; demanding angular fixtures remain expensive after
+the measured local refinements. **Owner:** Gravitas bounded rotational interval
+search and exact finite-contact admission; FixedMathSharp only where profiles
+identify reusable geometry work.
 
-`NonconvexRotationalCcdBenchmarks` runs complete `Simulate`/`LateSimulate`
-steps with an authored 90-degree rotation at frame rate 1, disabled forces and
+`NonconvexRotationalCcdBenchmarks` runs complete `Simulate`/`LateSimulate` steps
+with an authored 90-degree rotation at frame rate 1, disabled forces and
 frictionless geometry. These are deliberately demanding fixtures, not a
 representative game-capacity measurement. The original implementation freezes
-inside empty aggregate bounds; its faster zero-angle answer is not an
-acceptable optimization baseline.
+inside empty aggregate bounds; its faster zero-angle answer is not an acceptable
+optimization baseline.
 
 The first corrected mixed triangle/prism fixture cost **125.916 ms** per step.
 Exact Boolean mesh/slab admission, one retained-witness manifold build, and
@@ -215,31 +178,32 @@ omitting impulse rows for rotating kinematic/immovable pairs reduce it to
 restarts then lowers it to **7.007 ms**, with a **0.2803 ms** half-width 99.9%
 confidence interval over two launches: approximately **94% below the first
 correct implementation**. Dynamic stopping, movable-target response and
-translational fallback still build the complete matched manifold.
-FixedMathSharp also removes duplicate point seeds from the existing planar
-contact reducer; required-manifold smoke measurements improved from 29.59 to
-25.57 ms before the immovable-pair refinement. That intermediate comparison is
-an isolated timing smoke, not the final BDN job.
+translational fallback still build the complete matched manifold. FixedMathSharp
+also removes duplicate point seeds from the existing planar contact reducer;
+required-manifold smoke measurements improved from 29.59 to 25.57 ms before the
+immovable-pair refinement. That intermediate comparison is an isolated timing
+smoke, not the final BDN job.
 
 Final Release results on Windows x64, i7-9700K, .NET 8.0.29 / SDK 10.0.302:
 
-| Complete host-step fixture | Mean | Allocated |
-| -------------------------- | ---: | --------: |
-| Joined floor/wall mesh, cone first impact | 7.153 ms | 0 B/op |
-| Floor-only cone first-impact control | 5.707 ms | 0 B/op |
-| Empty finite triangle corner, rotating 3D cuboid | 212.18 us | 0 B/op |
-| Compound-wall first impact, pure 2D | 726.29 us | 0 B/op |
-| Empty compound bounds, pure 2D | 32.37 us | 0 B/op |
-| Finite triangle first impact, moving 3D mesh against a 2D prism | 7.007 ms | 0 B/op |
-| Empty finite triangle corner, rotating 2D prism against a mesh | 190.0 us | 0 B/op |
+| Complete host-step fixture                                      |      Mean | Allocated |
+| --------------------------------------------------------------- | --------: | --------: |
+| Joined floor/wall mesh, cone first impact                       |  7.153 ms |    0 B/op |
+| Floor-only cone first-impact control                            |  5.707 ms |    0 B/op |
+| Empty finite triangle corner, rotating 3D cuboid                | 212.18 us |    0 B/op |
+| Compound-wall first impact, pure 2D                             | 726.29 us |    0 B/op |
+| Empty compound bounds, pure 2D                                  |  32.37 us |    0 B/op |
+| Finite triangle first impact, moving 3D mesh against a 2D prism |  7.007 ms |    0 B/op |
+| Empty finite triangle corner, rotating 2D prism against a mesh  |  190.0 us |    0 B/op |
 
 Both mixed rows use longer two-launch confirmations; other rows use three
 warmups and five measurements. The empty-corner confirmation uses 1,024
 invocations per iteration after the short job reported insufficient iteration
-time; its 9.07 us confidence half-width contains the prior 188.09 us result. Matched smoke controls at 1/32 ordinary unresolved
-candidates retain their poses and 0 B/op without a material 32-candidate slowdown.
-Those control methods' out-of-process BDN build defect is recorded separately as
-GRV-Issue-111; do not present reflection timings as BDN results.
+time; its 9.07 us confidence half-width contains the prior 188.09 us result.
+Matched smoke controls at 1/32 ordinary unresolved candidates retain their poses
+and 0 B/op without a material 32-candidate slowdown. Those control methods'
+out-of-process BDN build defect is recorded separately as GRV-Issue-111; do not
+present reflection timings as BDN results.
 
 ```powershell
 $env:UseLocalLsfStack = 'true'
@@ -251,18 +215,19 @@ dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll --fi
 
 Ignored `artifacts/grv-issue-101/bench-confirmation`, `bench-final`,
 `bench-mixed-confirmation`, `bench-final-mixed-confirmation`,
-`bench-final-empty-confirmation`, `timing-complete.log`, `timing-reuse.log` and paired baseline captures
-retain the evidence. The initial mixed profile attributes 87% to repeated full
-manifold construction and less than 1% to the new separation certificate; the
-retained refinement removes that repetition. The next mixed profile puts 30%
-in candidate gathering / typed GridForge partition lookup. That capture includes
-19% setup samples, so those percentages guide isolation rather than establish
-a steady-step cost share. Exact-zero-displacement conservative restarts reuse
-their existing body-owned candidate lists. Translation and response still regather, since a
-rounded shortened chord does not guarantee identical query bounds. The cone
-profile attributes 62%
-to complete mesh/cone contact construction, including 53% in cone-plane ray
-events; its exact curved-contact frequency also belongs to GRV-Benchmark-024.
+`bench-final-empty-confirmation`, `timing-complete.log`, `timing-reuse.log` and
+paired baseline captures retain the evidence. The initial mixed profile
+attributes 87% to repeated full manifold construction and less than 1% to the
+new separation certificate; the retained refinement removes that repetition. The
+next mixed profile puts 30% in candidate gathering / typed GridForge partition
+lookup. That capture includes 19% setup samples, so those percentages guide
+isolation rather than establish a steady-step cost share.
+Exact-zero-displacement conservative restarts reuse their existing body-owned
+candidate lists. Translation and response still regather, since a rounded
+shortened chord does not guarantee identical query bounds. The cone profile
+attributes 62% to complete mesh/cone contact construction, including 53% in
+cone-plane ray events; its exact curved-contact frequency also belongs to
+GRV-Benchmark-024.
 
 **Next isolation:** Measure smaller per-frame angular changes, dynamic/movable
 counterparts, moving-target trajectories and increasing facet counts before
@@ -273,29 +238,29 @@ anchors, authored ties and 0 B/op; never replace an unresolved interval with a
 sample-only miss or weaken the manifold to one support pair.
 
 **Small-angle isolation, 2026-10-28:** The static-continuity CCD regressions
-also reproduce limited progress on the unchanged `9175653` payload, without
-any continuity declaration. Use one bodyless concave quad at Z=0, X in
-`[-8,8]`, Y in `[-2,2]` (vertices bottom-left, top-left, bottom-right,
-top-right; triangles `0,1,2,2,1,3`). In Mixed mode at 16 Hz, place a mass-one
-planar capsule of radius `1/2`, total height 2 and mixed half-thickness `1/2`
-at `(-1/4,1)` with zero yaw. Disable gravity, air drag and damping, use manual
-grounding, disable sleep, enable continuous mode and use frictionless materials.
-Apply X impulse 1 and angular impulse `1/64` once, then planar Y impulse
-`-1/16` before each of 12 complete host steps.
+also reproduce limited progress on the unchanged `9175653` payload, without any
+continuity declaration. Use one bodyless concave quad at Z=0, X in `[-8,8]`, Y
+in `[-2,2]` (vertices bottom-left, top-left, bottom-right, top-right; triangles
+`0,1,2,2,1,3`). In Mixed mode at 16 Hz, place a mass-one planar capsule of
+radius `1/2`, total height 2 and mixed half-thickness `1/2` at `(-1/4,1)` with
+zero yaw. Disable gravity, air drag and damping, use manual grounding, disable
+sleep, enable continuous mode and use frictionless materials. Apply X impulse 1
+and angular impulse `1/64` once, then planar Y impulse `-1/16` before each of 12
+complete host steps.
 
 The committed control and the coordinated implementation before T0 contact
-sampling both ended at
-`(0.125, 0.999922429677099)`, yaw `0.01788772107101977`, with velocity
-`(1, -0.00038653193041682243)`. Uninterrupted free tangential integration
-would reach X=0.5. The trace retains real floor witnesses but repeatedly reaches
-the fixed interval-depth frontier; the documented conservative terminal clamp
-can consume the remaining frame while retaining momentum. This is an existing
-refinement/capacity limit, not evidence of a new missed collision or a new issue
-ID. The maintained continuity regression supplies the workload; ignored
+sampling both ended at `(0.125, 0.999922429677099)`, yaw `0.01788772107101977`,
+with velocity `(1, -0.00038653193041682243)`. Uninterrupted free tangential
+integration would reach X=0.5. The trace retains real floor witnesses but
+repeatedly reaches the fixed interval-depth frontier; the documented
+conservative terminal clamp can consume the remaining frame while retaining
+momentum. This is an existing refinement/capacity limit, not evidence of a new
+missed collision or a new issue ID. The maintained continuity regression
+supplies the workload; ignored
 `artifacts/static-surface/phase13/rotation-unsplit-committed-control.log` and
 `rotation-frontier.txt` supplement these inputs. Test-run elapsed time is not a
-benchmark: isolate warm frame time, allocation and limit frequency before
-making a cost claim or changing the search budget.
+benchmark: isolate warm frame time, allocation and limit frequency before making
+a cost claim or changing the search budget.
 
 The same isolation also covers a **3D capsule against embedded 2D solids**.
 Declare two bodyless AABBs with X ranges `[-8,0]` and `[0,8]`, planar Z range
@@ -310,38 +275,38 @@ X `[-8,8]`, with the same Z range and finite Y band.
 
 All values below are exact Q32.32 raw integers:
 
-| Payload and geometry | Final X | Final Z | Final angular velocity (X,Y,Z) | Conservative limits |
-| --- | ---: | ---: | --- | --- |
-| Committed `9175653`, declared split | -1073741824 | 2147483648 | (53,0,221847484) | All 12 frames |
-| Committed `9175653`, unsplit | 2147483648 | 2147459072 | (0,0,221847484) | None |
-| Phase 13, declared split | -1073348608 | 2147483648 | (1,-19,221847484) | All 12 frames |
+| Payload and geometry                |     Final X |    Final Z | Final angular velocity (X,Y,Z) | Conservative limits |
+| ----------------------------------- | ----------: | ---------: | ------------------------------ | ------------------- |
+| Committed `9175653`, declared split | -1073741824 | 2147483648 | (53,0,221847484)               | All 12 frames       |
+| Committed `9175653`, unsplit        |  2147483648 | 2147459072 | (0,0,221847484)                | None                |
+| Phase 13, declared split            | -1073348608 | 2147483648 | (1,-19,221847484)              | All 12 frames       |
 
 The committed split control never advances from its initial X or identity
 orientation. Phase 13 advances X to raw `-1073709056` in frame 0, then reaches
-small conservative frontiers; its final quaternion is
-`(0,0,10152,4294967296)`, final velocity is `(4294967296,0,1)`, and its last
-frame consumes two TOI iterations. It retains Z angular velocity instead of
-inventing a stopping impulse from a geometric witness with no closing row.
-Small transverse angular velocities can still change an intermediate quaternion
-by one raw unit while the contact speed remains below the existing response
-deadband, defeating the exact invariant-plane certificate and limiting progress.
+small conservative frontiers; its final quaternion is `(0,0,10152,4294967296)`,
+final velocity is `(4294967296,0,1)`, and its last frame consumes two TOI
+iterations. It retains Z angular velocity instead of inventing a stopping
+impulse from a geometric witness with no closing row. Small transverse angular
+velocities can still change an intermediate quaternion by one raw unit while the
+contact speed remains below the existing response deadband, defeating the exact
+invariant-plane certificate and limiting progress.
 
 This **pre-existing general rotational-refinement capacity limit remains
 unsolved**; it is not a newly introduced deferral. The maintained
 `SpatialCapsuleWithFreeTransverseRotation_ShouldRetainMomentumAtConservativeFrontiers`
 regression preserves the linear and angular velocity, floor blocking and limit
 checks. Separate parallel-rotation and raised-wall regressions freeze RotationX
-and RotationY and require actual seam crossing and a later closing wall response.
-The inputs and raw states above are the retained reproduction; ignored
+and RotationY and require actual seam crossing and a later closing wall
+response. The inputs and raw states above are the retained reproduction; ignored
 `artifacts/static-surface/phase13/rotational-control-baseline-p.txt` and
 `free-capsule-after-t0.txt` contain the supplemental traces.
 
 ### GRV-Benchmark-028 — Mixed Broad-Phase Work With An Empty Opposite Dimension
 
-**Discovered:** 2026-10-15 during #135/#136 warm validation.  
-**Status:** Profiled pre-existing opportunity; the benefit of a distribution
-gate has not been measured.  
-**Owner:** Gravitas mixed candidate distribution and partition maintenance.
+**Discovered:** 2026-10-15 during #135/#136 warm validation. **Status:**
+Profiled pre-existing opportunity; the benefit of a distribution gate has not
+been measured. **Owner:** Gravitas mixed candidate distribution and partition
+maintenance.
 
 The isolated `QueryOnly136WarmBenchmarks.Stable64Frame(Domain: "Mixed")`
 contains 64 sleeping 3D spheres and their 3D static floors, with **zero 2D
@@ -379,32 +344,32 @@ stack (`89C15FBD...` core), unchanged fixture inputs, native rows,
 
 ### GRV-Benchmark-029 — Dense Mesh Sweep Cost After Exact Contact Hardening
 
-**Discovered:** 2026-10-18 during #141 ordinary-consumer validation.  
-**Status:** Confirmed on the complete frozen pre-#141 stack; ownership requires
-profiling. This is separate from #026's initially overlapping sources and #006's
-completed benchmark instrumentation.  
-**Owner:** Gravitas 3D/mixed mesh sweeps and the executed FixedMathSharp finite
-query operations.
+**Discovered:** 2026-10-18 during #141 ordinary-consumer validation. **Status:**
+Confirmed on the complete frozen pre-#141 stack; ownership requires profiling.
+This is separate from #026's initially overlapping sources and #006's completed
+benchmark instrumentation. **Owner:** Gravitas 3D/mixed mesh sweeps and the
+executed FixedMathSharp finite query operations.
 
 Existing `MeshQuery3DTriangleScalingBenchmarks` and
 `MixedMeshTriangleScalingBenchmarks` keep the physical quad fixed while changing
 subdivision from 8 to 32 (128 to 2,048 triangles). The sources travel from X=-3
-to X=3; sphere/circle radius is 0.5, and the mixed circle has half-thickness 0.5.
-The convex source is the maintained cube fixture. These are ordinary impacts,
-not initial overlap.
+to X=3; sphere/circle radius is 0.5, and the mixed circle has half-thickness
+0.5. The convex source is the maintained cube fixture. These are ordinary
+impacts, not initial overlap.
 
 Frozen-stack Release controls on Windows x64/.NET 8.0.29 measure approximately:
 
-| Public all-hit query | 128 triangles | 2,048 triangles |
-| --- | ---: | ---: |
-| Sphere against dense mesh | 2.1–2.3 ms | 28.8–30.2 ms |
-| Convex mesh against dense concave mesh | 5.5–5.7 ms | 88.6–92.0 ms |
-| Mixed circle against dense mesh | 3.0–3.2 ms | 46.1–47.3 ms |
+| Public all-hit query                   | 128 triangles | 2,048 triangles |
+| -------------------------------------- | ------------: | --------------: |
+| Sphere against dense mesh              |    2.1–2.3 ms |    28.8–30.2 ms |
+| Convex mesh against dense concave mesh |    5.5–5.7 ms |    88.6–92.0 ms |
+| Mixed circle against dense mesh        |    3.0–3.2 ms |    46.1–47.3 ms |
 
 All warmed windows allocate 0 B. Matched #141 controls reproduce the same
 millisecond-scale cost; this entry does not defer an introduced regression. The
-ranges are independent run means, not frame-tail latency or capacity claims. Captures and complete
-loaded-module hashes are under `artifacts/grv-issue-141/consumer-{refined,final,witness}-*.json`.
+ranges are independent run means, not frame-tail latency or capacity claims.
+Captures and complete loaded-module hashes are under
+`artifacts/grv-issue-141/consumer-{refined,final,witness}-*.json`.
 
 Reproduce the maintained fixtures with `UseLocalLsfStack=true`:
 
@@ -413,8 +378,8 @@ $env:UseLocalLsfStack = 'true'
 dotnet run --project tests/Gravitas.Benchmarks/Gravitas.Benchmarks.csproj -c Release -p:UseLocalLsfStack=true -- --filter '*MeshQuery3DTriangleScalingBenchmarks*' '*MixedMeshTriangleScalingBenchmarks*' --job short
 ```
 
-**Next isolation:** Capture the existing collider/triangle candidate counters and
-profile ordinary query work separately from finite initial-contact recovery.
+**Next isolation:** Capture the existing collider/triangle candidate counters
+and profile ordinary query work separately from finite initial-contact recovery.
 Compare filled coplanar controls, genuine rims and false-positive candidates
 before proposing pruning or arithmetic changes. Preserve earliest distance,
 authored tie order, finite witnesses and zero warm allocation. Check the current
@@ -423,30 +388,30 @@ reopening the already-closed upstream signal.
 
 ### GRV-Benchmark-030 — Pure 2D Bodyless Static Population Refresh Cost
 
-**Discovered:** 2026-10-19 during static-continuity Phase 6 density controls.  
+**Discovered:** 2026-10-19 during static-continuity Phase 6 density controls.
 **Status:** Confirmed on the frozen pre-Phase-6 stack; not an introduced
-continuity regression. Detailed cost attribution remains open.  
-**Owner:** Gravitas pure 2D bodyless service refresh; involve GridForge or math
-owners only after profiling their executed contribution.
+continuity regression. Detailed cost attribution remains open. **Owner:**
+Gravitas pure 2D bodyless service refresh; involve GridForge or math owners only
+after profiling their executed contribution.
 
-One frictionless circle runs over one unchanged 16-unit floor at 16 Hz. Add
-63 remote bodyless two-unit static pieces, all loaded and outside its local
-contact neighborhood. Both counts use the same loaded world bounds, manual
-grounding, drive, 32 settling frames and 64 full host steps per invocation.
-No surface membership is declared in this control. Windows x64/.NET 8.0.29
-Release measurements, 24 warmed windows with zero allocation:
+One frictionless circle runs over one unchanged 16-unit floor at 16 Hz. Add 63
+remote bodyless two-unit static pieces, all loaded and outside its local contact
+neighborhood. Both counts use the same loaded world bounds, manual grounding,
+drive, 32 settling frames and 64 full host steps per invocation. No surface
+membership is declared in this control. Windows x64/.NET 8.0.29 Release
+measurements, 24 warmed windows with zero allocation:
 
-| Stack | 1 static piece | 64 static pieces |
-| --- | ---: | ---: |
-| Frozen pre-Phase-6 | 21.57 us/frame | 77.09 us/frame |
-| Phase 6 final | 22.13 us/frame | 79.92 us/frame |
+| Stack              | 1 static piece | 64 static pieces |
+| ------------------ | -------------: | ---------------: |
+| Frozen pre-Phase-6 | 21.57 us/frame |   77.09 us/frame |
+| Phase 6 final      | 22.13 us/frame |   79.92 us/frame |
 
 Physical position/velocity/rotation witnesses match all four rows. This is a
-population-scaling signal, not a universal throughput or frame-tail claim.
-The original `PrepareCollisionPartitions` bodyless refresh loop and
-`LSCollider2D.Simulate` -> `Rebuild` path are unchanged by Phase 6. Loaded-module
-hashes identify the frozen pre-phase Gravitas payload (`B500F130...`), matching
-source `071b25ac2b758f6c1992a769e0713ed27b2c34dc`.
+population-scaling signal, not a universal throughput or frame-tail claim. The
+original `PrepareCollisionPartitions` bodyless refresh loop and
+`LSCollider2D.Simulate` -> `Rebuild` path are unchanged by Phase 6.
+Loaded-module hashes identify the frozen pre-phase Gravitas payload
+(`B500F130...`), matching source `071b25ac2b758f6c1992a769e0713ed27b2c34dc`.
 
 Ignored `artifacts/static-surface/phase6/population/` holds the unchanged public
 consumer fixture; `population-{baseline,final}.json` contains the windows and
@@ -459,16 +424,17 @@ dotnet artifacts/static-surface/phase6/host/bin/Release/net8.0/Host.dll single a
 ```
 
 **Next isolation:** Promote the bounded population fixture into maintained
-benchmarks, profile refresh/rebuild separately from contact response, and compare
-bodyless with explicit-static owners in pure 2D, 3D and mixed mode. Preserve
-host-transform freshness, mutation/filter invalidation, deterministic order and
-zero warm allocation before changing refresh policy. Do not add another index
-or infer that an entire static rebuild can be skipped without that evidence.
+benchmarks, profile refresh/rebuild separately from contact response, and
+compare bodyless with explicit-static owners in pure 2D, 3D and mixed mode.
+Preserve host-transform freshness, mutation/filter invalidation, deterministic
+order and zero warm allocation before changing refresh policy. Do not add
+another index or infer that an entire static rebuild can be skipped without that
+evidence.
 
 ### GRV-Benchmark-031 — Ordinary Open-Mesh Mixed Full-Step Cost
 
-**Discovered:** 2026-10-28 during static-continuity Phase 12 validation.  
-**Status:** Measured on the committed pre-phase runtime; attribution open.  
+**Discovered:** 2026-10-28 during static-continuity Phase 12 validation.
+**Status:** Measured on the committed pre-phase runtime; attribution open.
 **Owner:** Gravitas ordinary mixed mesh/prism contact generation and response;
 involve FixedMathSharp after profiling the executed contribution.
 
@@ -483,20 +449,20 @@ regression or a scene-capacity measurement.
 
 Normal/reversed paired means are **4.682/4.736 ms** before/after, and a fresh
 process gives **4.717/4.754 ms**. An identical-baseline A/A control measures
-**4.721/4.782 ms (+1.29%)**, comparable to the 0.74%/1.60%/0.79% contrasts.
-This exposes load-context/code-placement uncertainty; it proves neither new
-runtime overhead nor exact zero overhead. The joined selection branch is not
-executed in this row, and review found no additional ordinary collision work.
+**4.721/4.782 ms (+1.29%)**, comparable to the 0.74%/1.60%/0.79% contrasts. This
+exposes load-context/code-placement uncertainty; it proves neither new runtime
+overhead nor exact zero overhead. The joined selection branch is not executed in
+this row, and review found no additional ordinary collision work.
 
 The workload is one mass-one, frictionless, open two-triangle X/Z quad with
 local coordinates `X/Z=+-0.5`, concave mode and surface-approximation inertia.
-It starts at `(-2,0,0.5)` against one bodyless rectangle
-`X=[-8,8], Z=[-2,0]`, mixed half-thickness `2`, without continuity membership.
-Use Mixed mode at 16 Hz, zero gravity/air/damping/minimum speed, frozen Y and
-rotation, manual grounding and sleep disabled. Settle 32 full host frames, then
-advance 64 frames per invocation: X velocity alternates `+1/-1` at `X=+-2`,
-with inward Z impulse `-1/16` before every `Simulate`/`LateSimulate` step.
-Initialization and settling are outside the warmed window.
+It starts at `(-2,0,0.5)` against one bodyless rectangle `X=[-8,8], Z=[-2,0]`,
+mixed half-thickness `2`, without continuity membership. Use Mixed mode at 16
+Hz, zero gravity/air/damping/minimum speed, frozen Y and rotation, manual
+grounding and sleep disabled. Settle 32 full host frames, then advance 64 frames
+per invocation: X velocity alternates `+1/-1` at `X=+-2`, with inward Z impulse
+`-1/16` before every `Simulate`/`LateSimulate` step. Initialization and settling
+are outside the warmed window.
 
 The maintained fixture includes the ordinary row and native joined controls:
 
@@ -513,27 +479,29 @@ finite suppliers, nonconvex holes, exposed edges, per-member query/event
 identity or deterministic ordering. Check 3D parity through its existing owner;
 do not add a second contact solver or infer identical response from timing.
 Supplemental paired windows and loaded-module hashes are retained in ignored
-`artifacts/static-surface/phase12/ordinary-openmesh*.json`; the inputs above
-and maintained fixture are sufficient to reproduce the workload.
+`artifacts/static-surface/phase12/ordinary-openmesh*.json`; the inputs above and
+maintained fixture are sufficient to reproduce the workload.
 
 ## Experimental Signals
 
-| Signal                                                                                 | Status                                           | Revisit When                                                                                                            |
-| -------------------------------------------------------------------------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| Signal                                                                                                                                     | Status                                                | Revisit When                                                                                                                                    |
+| ------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
 | [GRV-Benchmark-024 — Curved-contact workload frequency and step cost](#grv-benchmark-024--curved-contact-workload-frequency-and-step-cost) | Experimental; scene frequency and capacity unmeasured | Representative deterministic scenes or host traces can establish whether exact curved-feature work materially consumes the intended step budget |
-| GRV-Benchmark-014 — Exact triangle-pair contacts regress dense concave-mesh throughput | Capacity-sensitive; local optimization exhausted | A topology or exact classifier design can reduce complete triangle-pair SAT evaluations without a competing answer path |
+| GRV-Benchmark-014 — Exact triangle-pair contacts regress dense concave-mesh throughput                                                     | Capacity-sensitive; local optimization exhausted      | A topology or exact classifier design can reduce complete triangle-pair SAT evaluations without a competing answer path                         |
 
 ### GRV-Benchmark-024 — Curved-Contact Workload Frequency And Step Cost
 
-**Discovered:** 2026-10-06, during the workload-budget follow-up to #020.  
-**Source:** closed [GRV-Benchmark-018](#grv-benchmark-018--complete-trianglecylinder-contact-cost),
+**Discovered:** 2026-10-06, during the workload-budget follow-up to #020.
+**Source:** closed
+[GRV-Benchmark-018](#grv-benchmark-018--complete-trianglecylinder-contact-cost),
 [GRV-Benchmark-019](#grv-benchmark-019--complete-trianglecone-contact-cost),
 [GRV-Benchmark-020](#grv-benchmark-020--complete-capsulecircle-slab-contact-cost)
-and [GRV-Benchmark-021](#grv-benchmark-021--complete-capsulestadium-slab-curved-contact-cost)
-timings and stage profiles, including shared triangle/cylinder controls.  
+and
+[GRV-Benchmark-021](#grv-benchmark-021--complete-capsulestadium-slab-curved-contact-cost)
+timings and stage profiles, including shared triangle/cylinder controls.
 **Status:** Experimental evidence gap; representative scene frequency and
 complete-step capacity have not been measured. This does not reopen these
-isolated-query investigations or establish a release-blocking regression.  
+isolated-query investigations or establish a release-blocking regression.
 **Owner:** Gravitas benchmark workloads and stage attribution; FixedMathSharp
 only if workload evidence justifies further shared geometry optimization.
 
@@ -541,19 +509,19 @@ only if workload evidence justifies further shared geometry optimization.
 [`Evolving Game Capacity And Soak`](2026-10-06-evolving-game-capacity-and-soak-plan.md)
 uses one evolving strategy scene, comparable 3D controls and shared frame/memory
 measurement support. It starts after complete replay stepping and a shared trace
-format. The plan owns implementation sequencing; this signal retains its measured
-cost context and decision gate. Neither scene capacity nor contact frequency is
-established merely by creating that plan.
+format. The plan owns implementation sequencing; this signal retains its
+measured cost context and decision gate. Neither scene capacity nor contact
+frequency is established merely by creating that plan.
 
 **Additional bounded evidence (2026-10-15):** The supported-geometry closeout's
 single-sphere, flat-mesh traversal measured `162.980 / 157.305 / 170.034 us`
-derived mean per frame for continuous floor / chunk interior / chunk seam,
-all at `0 B/op`. Each native observation times reset plus 64 full steps and
-excludes initialization, buffer priming and 32 settling frames. This is a small
+derived mean per frame for continuous floor / chunk interior / chunk seam, all
+at `0 B/op`. Each native observation times reset plus 64 full steps and excludes
+initialization, buffer priming and 32 settling frames. This is a small
 scene-cost sample, not capacity or frame-tail evidence. Pre-existing seam
 response differences are tracked as #133; physical outputs differ between
-layouts, so these means are not an equivalent-work optimization comparison.
-The [supported-geometry closeout](done/2026-10-12-supported-geometry-range-plan.md#phase-4-compatibility-performance-and-096-closeout)
+layouts, so these means are not an equivalent-work optimization comparison. The
+[supported-geometry closeout](done/2026-10-12-supported-geometry-range-plan.md#phase-4-compatibility-performance-and-096-closeout)
 retains the bounded workload and timing provenance. Use it as context for the
 representative workload rather than creating a separate speculative signal.
 
@@ -563,25 +531,29 @@ at **0 B/op**, for one six-unit capsule and three unequal-height static members.
 Every invocation resets to quarter-unit penetration, so this measures forced
 contact reconstruction rather than a settled scene. Named maintained
 `JoinedStaticRoundedMixedContactBenchmarks` capsule `ConcaveL` / `HeightStep`
-fixtures additionally measured **1.440 / 0.942 ms per pose-refresh/contact build**
-at `0 B/op`. The [#146 record](done/2026-10-15-static-surface-continuity-and-heightfield-plan.md#grv-issue-146-closeout)
+fixtures additionally measured **1.440 / 0.942 ms per pose-refresh/contact
+build** at `0 B/op`. The
+[#146 record](done/2026-10-15-static-surface-continuity-and-heightfield-plan.md#grv-issue-146-closeout)
 retains the complete reproducible geometry, original/corrected behavior,
 regressions, frozen dependencies and measurement protocol. These costs extend
 this existing frequency/capacity signal; they do not establish a representative
 game workload or justify comparing incorrect responses as speed baselines.
 
 The final #020 two-launch fixture costs **696.036 / 699.465 microseconds** per
-complete mixed / 3D oblique query, at **0 B/op**, while ordinary cap/side/zero-core
-contacts cost roughly 10–11.5 microseconds. #021 retains roughly 0.53–1.05 ms
-for its distinct curved fixtures. The [#020 refinement report](done/2026-10-05-capsule-circle-cost-refinement.md)
+complete mixed / 3D oblique query, at **0 B/op**, while ordinary
+cap/side/zero-core contacts cost roughly 10–11.5 microseconds. #021 retains
+roughly 0.53–1.05 ms for its distinct curved fixtures. The
+[#020 refinement report](done/2026-10-05-capsule-circle-cost-refinement.md)
 records the commands, confidence intervals, final-source checks and profiles.
-The [#019 final refinement](done/2026-10-06-triangle-cone-final-refinement.md) publishes
-about 0.93/0.67/0.63 ms for interior/oblique/touch triangle-cone rim queries and
-89 us for near-rim gap rejection, at 0 B/op. The [#018 refinement](done/2026-10-06-triangle-cylinder-cost-refinement.md)
+The [#019 final refinement](done/2026-10-06-triangle-cone-final-refinement.md)
+publishes about 0.93/0.67/0.63 ms for interior/oblique/touch triangle-cone rim
+queries and 89 us for near-rim gap rejection, at 0 B/op. The
+[#018 refinement](done/2026-10-06-triangle-cylinder-cost-refinement.md)
 subsequently lowers triangle/cylinder and circle-slab oblique costs to about
-0.54 ms and publishes stationary interior-rim costs of about 0.76 ms. These exact geometry
-consumers belong in the same frequency and complete-step investigation.
-The #020 full matrix can be reproduced after a fresh local-stack Release build:
+0.54 ms and publishes stationary interior-rim costs of about 0.76 ms. These
+exact geometry consumers belong in the same frequency and complete-step
+investigation. The #020 full matrix can be reproduced after a fresh local-stack
+Release build:
 
 ```powershell
 $env:UseLocalLsfStack = 'true'
@@ -591,58 +563,61 @@ dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll --fi
 These fixtures establish cost when the configuration occurs, not its prevalence
 in games. Oblique and interior-rim contacts arise from relative configurations
 of ordinary cones, capsules, cylinders, mesh facets or embedded slabs, rather
-than separate collider types.
-Tilt, relative position, dimensions and contact evolution determine the work.
-Counting only final rim contacts can miss expensive feature candidates evaluated
-before an ordinary feature wins or the query rejects contact. Neither rarity nor
-common occurrence is established by the current evidence. Multiplying isolated
-query time by a hypothetical count is illustrative, not measured world capacity.
+than separate collider types. Tilt, relative position, dimensions and contact
+evolution determine the work. Counting only final rim contacts can miss
+expensive feature candidates evaluated before an ordinary feature wins or the
+query rejects contact. Neither rarity nor common occurrence is established by
+the current evidence. Multiplying isolated query time by a hypothetical count is
+illustrative, not measured world capacity.
 
-**Next experiment:** Reuse the existing contact fixtures and world-step benchmark
-support to characterize deterministic moving scenes before changing the solver:
+**Next experiment:** Reuse the existing contact fixtures and world-step
+benchmark support to characterize deterministic moving scenes before changing
+the solver:
 
 1. Establish the geometric envelope with reproducible pose/orientation sweeps
-   around the rim, including ordinary contacts and separated near-rim candidates.
-   Then run explicit upright-agent, tilted/tumbling, rim-sliding and dense-contact
-   scenarios across shape dimensions and local density. Synthetic sweep frequency
-   must remain separate from observed host frequency; publish scene assumptions.
-   Include cone/triangle and cylinder/triangle mesh contacts, varying facet
-   orientation, cone tilt and relative position as well as slab/capsule poses.
+   around the rim, including ordinary contacts and separated near-rim
+   candidates. Then run explicit upright-agent, tilted/tumbling, rim-sliding and
+   dense-contact scenarios across shape dimensions and local density. Synthetic
+   sweep frequency must remain separate from observed host frequency; publish
+   scene assumptions. Include cone/triangle and cylinder/triangle mesh contacts,
+   varying facet orientation, cone tilt and relative position as well as
+   slab/capsule poses.
 2. In benchmark-only support, distinguish dispatched pair queries, expensive
    root-path entries, admitted curved candidates and final winning features.
    Reuse existing hooks where sufficient. Count repeated work across frames as
-   well as unique pairs; a final contact label alone is insufficient attribution.
+   well as unique pairs; a final contact label alone is insufficient
+   attribution.
 3. Measure complete `Simulate` plus `LateSimulate` steps over sustained frames:
    mean, p95/p99 and maximum observed time, warmed allocations, candidate counts
    and expensive-path rate. Profile stages separately from clean timing runs;
    keep counters and wall-clock timing outside authoritative simulation state.
    Assess explicit host tick budgets with headroom for the rest of the host.
 4. Retain cone/triangle and cylinder/triangle mesh cases as well as
-   capsule/cylinder and mixed circle/stadium-slab cases with their
-   distinct root policies. Pure 2D workloads provide a dimensional control, not
-   an assumed consumer of the 3D oblique solver. Use fixed initial state/input,
-   repeatable seeds, contact preflight and replay checks; verify instrumentation
-   preserves answers. Use `UseLocalLsfStack=true` throughout coordinated runs.
+   capsule/cylinder and mixed circle/stadium-slab cases with their distinct root
+   policies. Pure 2D workloads provide a dimensional control, not an assumed
+   consumer of the 3D oblique solver. Use fixed initial state/input, repeatable
+   seeds, contact preflight and replay checks; verify instrumentation preserves
+   answers. Use `UseLocalLsfStack=true` throughout coordinated runs.
 
 **Decision gate:** Publish a capacity characterization or written no-change
 decision if the expensive path has a small measured contribution in the target
-scenes. Promote a focused optimization or workload/API plan only when reproducible
-complete-step evidence shows material budget pressure. Preserve exact contacts,
-stable ordering, zero warmed allocations and 100% reachable line/branch/method
-coverage for any implementation changes. Do not add approximate collision,
-speculative caches, public instrumentation or merged root solvers merely because
-the isolated worst fixture is expensive. #018 through #021 remain closed.
+scenes. Promote a focused optimization or workload/API plan only when
+reproducible complete-step evidence shows material budget pressure. Preserve
+exact contacts, stable ordering, zero warmed allocations and 100% reachable
+line/branch/method coverage for any implementation changes. Do not add
+approximate collision, speculative caches, public instrumentation or merged root
+solvers merely because the isolated worst fixture is expensive. #018 through
+#021 remain closed.
 
 ### GRV-Benchmark-014 — Exact Triangle-Pair Contacts Regress Dense Concave-Mesh Throughput
 
-**Discovered:** 2026-08-01  
-**Source:** full-domain triangle-pair Phase 2 comparison against its preserved
-scalar mesh/mesh baseline  
-**Status:** Experimental capacity guidance. Shared exact-projection and
-depth-ranking duplication plus the retained signed one-limb specialization
-recovered substantial throughput. A final bounded pass found no further local
-change worth retaining; dense dynamic concave mesh/mesh contact is not a
-competitive release path.
+**Discovered:** 2026-08-01 **Source:** full-domain triangle-pair Phase 2
+comparison against its preserved scalar mesh/mesh baseline **Status:**
+Experimental capacity guidance. Shared exact-projection and depth-ranking
+duplication plus the retained signed one-limb specialization recovered
+substantial throughput. A final bounded pass found no further local change worth
+retaining; dense dynamic concave mesh/mesh contact is not a competitive release
+path.
 
 The unchanged 64-pair Short in-process rows reported:
 
@@ -724,39 +699,161 @@ and
 
 ## Closed Signals
 
-| Signal                                                                                  | Status | Closed     | Resolution                                                                                                                                                                                                                                                                                      |
-| --------------------------------------------------------------------------------------- | ------ | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [GRV-Benchmark-018 — Complete triangle/cylinder contact cost](#grv-benchmark-018--complete-trianglecylinder-contact-cost) | Closed | 2026-10-06 | Exact reciprocal-chart and opposite-direction reuse cut rim-heavy queries by 9-20% and 64-pair batches by 6.5-8.1%, at 0 B/op and 100% coverage. Root retention is reverted; scene capacity remains GRV-Benchmark-024. |
-| [GRV-Benchmark-019 — Complete triangle/cone contact cost](#grv-benchmark-019--complete-trianglecone-contact-cost) | Closed | 2026-10-06 | Four measured passes retain exact complete contact geometry at 0 B/op and 100% coverage. Final root-sign refinement lowers interior rim by 4.1%; remaining costs and workload-frequency gate are published in GRV-Benchmark-024. |
-| [GRV-Benchmark-020 — Complete capsule/circle-slab contact cost](#grv-benchmark-020--complete-capsulecircle-slab-contact-cost) | Closed | 2026-10-05 | Exact output bounds, invariant normal products and certified Sturm signs reduce endpoint output to 37–39 µs and representative oblique contacts to 0.70 ms, with shared-consumer gains, 0 B/op and 100% coverage. Remaining exact root cost is published without a host-rate guarantee. |
-| [GRV-Benchmark-021 — Complete capsule/stadium-slab curved contact cost](#grv-benchmark-021--complete-capsulestadium-slab-curved-contact-cost) | Closed | 2026-10-05 | Shared exact root isolation and negative global-minimum certificates improve four fixtures by 11.5-26.4%, at 0 B/op and 100% coverage. Committed in Gravitas `989c7f9` / FixedMathSharp `bd8f6a2`; remaining costs are published without a host-rate guarantee. |
-| [GRV-Benchmark-023 — Circle workload partition and grounding scaling](#grv-benchmark-023--circle-workload-partition-and-grounding-scaling) | Closed | 2026-10-04 | Ownership/storage/math repairs and lean 2D gathering retained; repeated controls, 100% coverage and published configuration costs support the no-further-change decision. Latest refinement remains unstaged for review; no fixed-Hz guarantee. |
-| GRV-Benchmark-022 — Exact pure-2D circle contact cost | Closed | 2026-10-02 | Shared normalization optimization committed; retain exact contact owner under documented no-further-change decision. Scene partition/grounding costs are documented separately in closed GRV-Benchmark-023. |
-| GRV-Benchmark-012 — Mixed discrete broad-phase allocation at 32 pairs                   | Closed | 2026-08-04 | Two independent rotational runs and corrected sparse, dense, and churn broad-phase rows reproduce `0 B/op`; the stale benchmark lifecycle and unrepresentative 4,096-collider monolithic-grid row were repaired without speculative runtime preallocation                                       |
-| GRV-Benchmark-017 — Mixed public sweep traversal on extreme sparse-grid spans           | Closed | 2026-08-04 | GridForge's two-tier hash/BVH index replaces 64-billion-cell registration with active-grid scaling; Gravitas completes the exact public sweep in 14.8-16.0 us at 0 B with deterministic candidate and hit order; full evidence is retained in GridForge's completed two-tier spatial-index plan |
-| GRV-Benchmark-013 — Mesh scale rebuild allocation                                       | Closed | 2026-08-03 | Convex support topology is built once and scale changes refit transactional node bounds in linear time; subdivision 8/16 rows fall from 4,032/16,320 B to 0 B and improve by 7.9%/7.8%                                                                                                          |
-| GRV-Benchmark-015 — Exact 3D contact-response ordinary throughput                       | Closed | 2026-08-03 | Exact aligned-frame point anchors improve direct rows by 61.0-95.9% and the unchanged 24-row Gravitas matrix by 46.4% median versus the exact baseline; confirmation remains within 0.7% median at 0 B and 100% coverage                                                                        |
-| GRV-Benchmark-016 — Exact canonical OBB ordinary throughput                             | Closed | 2026-08-03 | One exact relative-frame kernel per relation improves matched direct rows by 35.3-64.0% and Gravitas rows by 30.9-55.7%; full DefaultJob confirmations remain at 0 B and 100% reachable coverage                                                                                                |
-| GRV-Benchmark-011 — Physics-material combine numeric hardening                          | Closed | 2026-07-13 | Overflow-safe average and geometric-mean edge handling preserve deterministic coefficient semantics; the default geometric-material response benchmark remains allocation-free with no credible timing regression                                                                               |
-| GRV-Benchmark-010 — Checked mesh scale and thin-shell cache cost                        | Closed | 2026-07-12 | Scale changes retain deterministic O(triangle-count) checked rebuilding, while successfully validated shell and volume properties are cached and repeated cached reads remain allocation-free                                                                                                  |
-| GRV-Benchmark-009 — Replay hash collider-ID churn scaling                               | Closed | 2026-07-05 | 2D and 3D collider registration now uses a shared reusable-slot registry; authoritative replay hashes traverse canonical live registration order with dense replay ordinals, while deleted ID history remains outside replay identity                                                           |
-| GRV-Benchmark-008 — Pure 2D response position-correction repartition allocation         | Closed | 2026-06-28 | Gravitas reuses empty retained partitions for immediate repartitioning; GridForge stores the common single voxel partition inline and keeps diagnostic names off success paths                                                                                                                  |
-| GRV-Benchmark-005 — SwiftCollections sort hot-path allocation                           | Closed | 2026-06-24 | SwiftCollections owns allocation-free sort and sorted-key APIs; Gravitas removed `SwiftListSortUtility`                                                                                                                                                                                         |
-| GRV-Benchmark-006 — Mixed mesh finite-slab triangle scaling signal                      | Closed | 2026-06-24 | Mixed and pure 3D query services expose mesh-triangle candidate counts, dedicated triangle-volume benchmarks cover dense and false-positive mesh targets, and pure 3D convex-source mesh sweeps use ordered lower-bound triangle candidates                                                     |
-| GRV-Benchmark-001 — Pure 2D dynamic CCD candidate asymmetry                             | Closed | 2026-06-23 | 2D uses a planar candidate index, skips mixed CCD indexing outside mixed mode, and benchmark resets use 2D reset parity                                                                                                                                                                         |
-| GRV-Benchmark-002 — 3D shape-exact false-positive cost                                  | Closed | 2026-06-23 | Static CCD uses exact-source sweeps for non-sphere convex movers before conservative sphere fallback refinement                                                                                                                                                                                 |
-| GRV-Benchmark-007 — 3D dynamic shape-exact BDN allocation signal                        | Closed | 2026-06-23 | Shared exact-sweep bounds prefilters removed the scaling allocation/time signal from 3D dynamic false-positive rows                                                                                                                                                                             |
-| GRV-Benchmark-003 — 3D full-runtime CCD allocation                                      | Closed | 2026-06-23 | GridForge allocation-free line tracing plus Gravitas 3D raycast adoption                                                                                                                                                                                                                        |
-| GRV-Benchmark-004 — Grounding raycast probe allocation                                  | Closed | 2026-06-23 | Same raycast trace fix removed automatic ray-grounding allocation                                                                                                                                                                                                                               |
+| Signal                                                                                                                                        | Status | Closed     | Resolution                                                                                                                                                                                                                                                                                      |
+| --------------------------------------------------------------------------------------------------------------------------------------------- | ------ | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [GRV-Benchmark-025 — Debug ragdoll steady-state allocations](#grv-benchmark-025--debug-ragdoll-steady-state-allocations)                      | Closed | 2026-10-30 | Current Debug/Release allocation stacks agree; restore the strict warmed humanoid guard without a runtime change. Historical 4.3 MB remains unattributed.                                                                                                                                       |
+| [GRV-Benchmark-018 — Complete triangle/cylinder contact cost](#grv-benchmark-018--complete-trianglecylinder-contact-cost)                     | Closed | 2026-10-06 | Exact reciprocal-chart and opposite-direction reuse cut rim-heavy queries by 9-20% and 64-pair batches by 6.5-8.1%, at 0 B/op and 100% coverage. Root retention is reverted; scene capacity remains GRV-Benchmark-024.                                                                          |
+| [GRV-Benchmark-019 — Complete triangle/cone contact cost](#grv-benchmark-019--complete-trianglecone-contact-cost)                             | Closed | 2026-10-06 | Four measured passes retain exact complete contact geometry at 0 B/op and 100% coverage. Final root-sign refinement lowers interior rim by 4.1%; remaining costs and workload-frequency gate are published in GRV-Benchmark-024.                                                                |
+| [GRV-Benchmark-020 — Complete capsule/circle-slab contact cost](#grv-benchmark-020--complete-capsulecircle-slab-contact-cost)                 | Closed | 2026-10-05 | Exact output bounds, invariant normal products and certified Sturm signs reduce endpoint output to 37–39 µs and representative oblique contacts to 0.70 ms, with shared-consumer gains, 0 B/op and 100% coverage. Remaining exact root cost is published without a host-rate guarantee.         |
+| [GRV-Benchmark-021 — Complete capsule/stadium-slab curved contact cost](#grv-benchmark-021--complete-capsulestadium-slab-curved-contact-cost) | Closed | 2026-10-05 | Shared exact root isolation and negative global-minimum certificates improve four fixtures by 11.5-26.4%, at 0 B/op and 100% coverage. Committed in Gravitas `989c7f9` / FixedMathSharp `bd8f6a2`; remaining costs are published without a host-rate guarantee.                                 |
+| [GRV-Benchmark-023 — Circle workload partition and grounding scaling](#grv-benchmark-023--circle-workload-partition-and-grounding-scaling)    | Closed | 2026-10-04 | Ownership/storage/math repairs and lean 2D gathering retained; repeated controls, 100% coverage and published configuration costs support the no-further-change decision. Latest refinement remains unstaged for review; no fixed-Hz guarantee.                                                 |
+| GRV-Benchmark-022 — Exact pure-2D circle contact cost                                                                                         | Closed | 2026-10-02 | Shared normalization optimization committed; retain exact contact owner under documented no-further-change decision. Scene partition/grounding costs are documented separately in closed GRV-Benchmark-023.                                                                                     |
+| GRV-Benchmark-012 — Mixed discrete broad-phase allocation at 32 pairs                                                                         | Closed | 2026-08-04 | Two independent rotational runs and corrected sparse, dense, and churn broad-phase rows reproduce `0 B/op`; the stale benchmark lifecycle and unrepresentative 4,096-collider monolithic-grid row were repaired without speculative runtime preallocation                                       |
+| GRV-Benchmark-017 — Mixed public sweep traversal on extreme sparse-grid spans                                                                 | Closed | 2026-08-04 | GridForge's two-tier hash/BVH index replaces 64-billion-cell registration with active-grid scaling; Gravitas completes the exact public sweep in 14.8-16.0 us at 0 B with deterministic candidate and hit order; full evidence is retained in GridForge's completed two-tier spatial-index plan |
+| GRV-Benchmark-013 — Mesh scale rebuild allocation                                                                                             | Closed | 2026-08-03 | Convex support topology is built once and scale changes refit transactional node bounds in linear time; subdivision 8/16 rows fall from 4,032/16,320 B to 0 B and improve by 7.9%/7.8%                                                                                                          |
+| GRV-Benchmark-015 — Exact 3D contact-response ordinary throughput                                                                             | Closed | 2026-08-03 | Exact aligned-frame point anchors improve direct rows by 61.0-95.9% and the unchanged 24-row Gravitas matrix by 46.4% median versus the exact baseline; confirmation remains within 0.7% median at 0 B and 100% coverage                                                                        |
+| GRV-Benchmark-016 — Exact canonical OBB ordinary throughput                                                                                   | Closed | 2026-08-03 | One exact relative-frame kernel per relation improves matched direct rows by 35.3-64.0% and Gravitas rows by 30.9-55.7%; full DefaultJob confirmations remain at 0 B and 100% reachable coverage                                                                                                |
+| GRV-Benchmark-011 — Physics-material combine numeric hardening                                                                                | Closed | 2026-07-13 | Overflow-safe average and geometric-mean edge handling preserve deterministic coefficient semantics; the default geometric-material response benchmark remains allocation-free with no credible timing regression                                                                               |
+| GRV-Benchmark-010 — Checked mesh scale and thin-shell cache cost                                                                              | Closed | 2026-07-12 | Scale changes retain deterministic O(triangle-count) checked rebuilding, while successfully validated shell and volume properties are cached and repeated cached reads remain allocation-free                                                                                                   |
+| GRV-Benchmark-009 — Replay hash collider-ID churn scaling                                                                                     | Closed | 2026-07-05 | 2D and 3D collider registration now uses a shared reusable-slot registry; authoritative replay hashes traverse canonical live registration order with dense replay ordinals, while deleted ID history remains outside replay identity                                                           |
+| GRV-Benchmark-008 — Pure 2D response position-correction repartition allocation                                                               | Closed | 2026-06-28 | Gravitas reuses empty retained partitions for immediate repartitioning; GridForge stores the common single voxel partition inline and keeps diagnostic names off success paths                                                                                                                  |
+| GRV-Benchmark-005 — SwiftCollections sort hot-path allocation                                                                                 | Closed | 2026-06-24 | SwiftCollections owns allocation-free sort and sorted-key APIs; Gravitas removed `SwiftListSortUtility`                                                                                                                                                                                         |
+| GRV-Benchmark-006 — Mixed mesh finite-slab triangle scaling signal                                                                            | Closed | 2026-06-24 | Mixed and pure 3D query services expose mesh-triangle candidate counts, dedicated triangle-volume benchmarks cover dense and false-positive mesh targets, and pure 3D convex-source mesh sweeps use ordered lower-bound triangle candidates                                                     |
+| GRV-Benchmark-001 — Pure 2D dynamic CCD candidate asymmetry                                                                                   | Closed | 2026-06-23 | 2D uses a planar candidate index, skips mixed CCD indexing outside mixed mode, and benchmark resets use 2D reset parity                                                                                                                                                                         |
+| GRV-Benchmark-002 — 3D shape-exact false-positive cost                                                                                        | Closed | 2026-06-23 | Static CCD uses exact-source sweeps for non-sphere convex movers before conservative sphere fallback refinement                                                                                                                                                                                 |
+| GRV-Benchmark-007 — 3D dynamic shape-exact BDN allocation signal                                                                              | Closed | 2026-06-23 | Shared exact-sweep bounds prefilters removed the scaling allocation/time signal from 3D dynamic false-positive rows                                                                                                                                                                             |
+| GRV-Benchmark-003 — 3D full-runtime CCD allocation                                                                                            | Closed | 2026-06-23 | GridForge allocation-free line tracing plus Gravitas 3D raycast adoption                                                                                                                                                                                                                        |
+| GRV-Benchmark-004 — Grounding raycast probe allocation                                                                                        | Closed | 2026-06-23 | Same raycast trace fix removed automatic ray-grounding allocation                                                                                                                                                                                                                               |
+
+### GRV-Benchmark-025 — Debug Ragdoll Steady-State Allocations
+
+**Discovered:** 2026-10-06, during full-lifecycle replay Phase 1 validation.
+**Status:** Closed 2026-10-30 by current-source attribution, restored strict
+runtime coverage and a no-runtime-change decision. The historical 4,318,560-byte
+Debug observation is not reproduced or retrospectively attributed. **Owner:**
+Gravitas contact/partition capacity and warmed workload admission.
+
+The original `ConstraintStressSolve_ShouldNotAllocateAfterWarmup` used six
+humanoid links, five joints, a bodyless cuboid floor, disabled sleep, automatic
+grounding and twelve solver iterations. It stepped 80 frames, warmed eight more,
+stabilized four and measured 128 complete `Simulate`/`LateSimulate` frames. The
+October 6 capture reported **4,318,560 bytes in Debug**, with Release/Lean
+passing. Those observations remain historical evidence, not proof of a current
+Debug-only defect.
+
+Commit `1a6d864` replaced that test with the bounded
+`ContactAndJointIsland_ShouldNotAllocateAfterWarmup` floor variants during the
+bodyless-static response repair, and switched the shared humanoid fixture to
+manual grounding. Its two floor variants and the motorized guard pass unchanged
+in the current Debug and Release stress suites. Running only the old method-name
+filter before restoring the guard would not execute its former workload.
+
+**Current-source isolation, 2026-10-30:** Windows x64, i7-9700K, SDK 10.0.302,
+.NET 10.0.10 and `UseLocalLsfStack=true`. Maintained test runs advertise two
+processors; disposable probes use the host processor count. Baselines: Gravitas
+`7cce2b01bb328eafd121da6908382b780a415cd1`, FixedMathSharp
+`0e7a8e5760c506db8050714b72fad2421dcd46e6`, SwiftCollections
+`47a184b1e6dc5480e65295f2228cf8d77b647422`, GridForge
+`76e2bd46380664cfa5403d3b57eca6a82cb6b88a` and Chronicler
+`af513b2ad9014cfb96a643de11dfe06bb8e4a132`. These IDs identify checkout HEADs.
+Concurrent uncommitted Chronicler work was observed at final inspection; the
+executions are not represented as a clean commit-only stack or validation of
+those later edits. The allocation probes use copied payloads, with these SHA-256
+identities for that mutable dependency:
+
+| Probe configuration | Assembly                 | SHA-256                                                            |
+| ------------------- | ------------------------ | ------------------------------------------------------------------ |
+| Debug               | `Chronicler`             | `e298a717315cb7810dc94e41ecec5c3adf165afb2e63a16a714758ae8fc592ec` |
+| Debug               | `Chronicler.Diagnostics` | `d0b1211078022c537c9f558490e5087b08757e339832c55bbc92d583bd4295ce` |
+| Release             | `Chronicler`             | `27380b52e03cdfff750b59cf2eeffdbc8554ecabfd5636ae641051c400049f23` |
+| Release             | `Chronicler.Diagnostics` | `893b08a6ee64379265c2733dde1ec69e3137ba5682c9a601282724caf0525ed8` |
+
+A disposable probe invokes the existing humanoid fixture, restores automatic
+grounding without an immediate probe, and measures the original frame window.
+Debug and Release both allocate **13,728 bytes**, at the same measured frame
+offsets `0`, `1`, `30` and `69`; the other 124 frames allocate zero.
+
+`dotnet-trace` 10.0.750501 collected runtime allocation events with provider
+`Microsoft-Windows-DotNETRuntime:0x3200001:5` and explicit measurement-window
+markers. TraceEvent 3.1.21 analysis filters to that window and its simulation
+thread. Allocation-event sizes sum to the exact thread-counter total in both
+configurations; allocations on diagnostic/background threads are excluded. The
+matched stacks attribute the bytes to:
+
+| Allocation owner during the original window         |      Bytes |
+| --------------------------------------------------- | ---------: |
+| New collision pair and contact manifold             |      2,752 |
+| Collider pair-holder and integer-set capacity       |      4,584 |
+| Partition dynamic/awake membership sets             |        432 |
+| `WorldVoxelIndex` list growth during repartitioning |      5,168 |
+| Discrete-island node buffer growth                  |        792 |
+| **Total in each configuration**                     | **13,728** |
+
+This window still contains new contact topology and capacity growth as the
+ragdoll falls and spreads. The trace does not identify recurring joint-math,
+Debug assertion or lower-stack arithmetic allocation. It does not explain the
+historical 4.3 MB result, and no claim is made that a particular earlier change
+fixed that observation.
+
+**Resolution:** Restore the named humanoid guard alongside the bounded floor and
+motorized guards. Explicitly enable its original automatic grounding and warm
+the falling topology for 16 simulation seconds, covering two eight-second
+pair-retention intervals. At the fixture's 32 Hz this is 512 frames, followed by
+the unchanged eight warmup and four stabilization frames. The next 128 complete
+frames allocate **0 bytes in Debug and Release** in the isolated probes. The
+maintained guard retains the exact zero-byte assertion and also requires solved
+joint rows, bounded anchors/positions and links supported above the floor. No
+production code, allocation threshold or measurement helper changes. The
+maintained stress suite passes all **9 cases in each of Debug, Release and
+ReleaseLean**, including the restored humanoid guard. All three builds report
+zero warnings and errors. Full Release validation passes **8,242 tests**. The
+first full Lean attempt ends with native exit `0xC0000005` after 4,087 completed
+tests; it is incomplete and is excluded from passing validation. A bounded rerun
+of the same built payload with `--no-build --no-restore`,
+`--blame-crash --blame-crash-dump-type mini` and a TRX logger passes all **8,171
+tests**, with no crash dump produced. The first native failure remains
+unexplained; this allocation closeout does not establish its cause or a fix. If
+it recurs, retain crash/last-test evidence and investigate it separately.
+
+A manual-grounding control at the same longer warmup still encounters a new
+collider-pair dictionary at measured offset 93: **312 bytes in both Debug and
+Release**. Its Debug allocation stacks identify pair-dictionary creation; this
+is another topology/capacity event, not evidence of a Debug-only solver leak.
+The restored guard covers its original automatic-grounding contract. The
+existing bounded manual-grounding contact/joint guards remain separate.
+
+Reproduce the maintained stress suite from a sibling-source checkout (repeat
+with `Release` and `ReleaseLean`):
+
+```powershell
+$env:UseLocalLsfStack = 'true'
+$env:DOTNET_PROCESSOR_COUNT = '2'
+dotnet build tests/Gravitas.Tests/Gravitas.Tests.csproj -c Debug -p:UseLocalLsfStack=true -p:DisableTransitiveProjectReferences=true -m:1 -p:BuildInParallel=false -p:UseSharedCompilation=false -nr:false
+dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj -c Debug --no-build --no-restore -p:UseLocalLsfStack=true -p:DisableTransitiveProjectReferences=true --filter 'FullyQualifiedName~Constraint3DStressTests' -- RunConfiguration.MaxCpuCount=1 xUnit.MaxParallelThreads=1
+```
+
+Ignored `artifacts/grv-benchmark-025` contains the disposable probe/analyzer,
+exact frame counters, marked Debug/Release traces and build/test logs. The
+fixture parameters, revision identities, measured window, stack attribution and
+conclusion above do not depend on those files surviving. No maintained test or
+benchmark-infrastructure verification harness was added.
+
+**Closure criteria:** Met for the current source: retain strict warmed humanoid,
+bounded contact/joint and motorized guards, and document the historical limit.
+Reopen if the same warmed automatic-grounding workload allocates again, a
+matched Debug/Release comparison develops a persistent difference, or a trace
+shows recurring runtime allocations after topology and retained capacity have
+stabilized. New contacts and larger spatial coverage can still require capacity.
 
 ### GRV-Benchmark-018 — Complete Triangle/Cylinder Contact Cost
 
-**Discovered:** 2026-09-27; final aggregate capture 2026-09-28.  
-**Status:** Closed 2026-10-06 under the verified-gains and published-cost criterion.  
+**Discovered:** 2026-09-27; final aggregate capture 2026-09-28. **Status:**
+Closed 2026-10-06 under the verified-gains and published-cost criterion.
 **Owners:** FixedMathSharp's triangle/cylinder contact selection and witness
 materialization; Gravitas's mesh candidate traversal and cap enrichment.
 
-The [completed refinement report](done/2026-10-06-triangle-cylinder-cost-refinement.md)
+The
+[completed refinement report](done/2026-10-06-triangle-cylinder-cost-refinement.md)
 records the fresh committed baseline, independent profiling, two retained exact
 construction optimizations and the reverted root-retention experiment.
 Reciprocal charts share their normalized algebra after independent admission;
@@ -776,11 +873,13 @@ Fresh Release/ReleaseLean reachable line, branch and method coverage, focused
 Debug/resource/allocation tests, both target frameworks and API documentation
 checks are recorded in the completed report. The winning-root retention trial
 was reverted: its apparent one-launch improvement did not repeat in matched
-controls and did not justify another 6,773 bytes of persistent traversal scratch.
+controls and did not justify another 6,773 bytes of persistent traversal
+scratch.
 
 Ordinary contacts remain tens of microseconds; complete rim-heavy queries remain
 several hundred microseconds. Closure makes no complete-step or fixed-Hz
-capacity promise. [GRV-Benchmark-024](#grv-benchmark-024--curved-contact-workload-frequency-and-step-cost)
+capacity promise.
+[GRV-Benchmark-024](#grv-benchmark-024--curved-contact-workload-frequency-and-step-cost)
 retains scene-frequency and step-cost evidence before more geometry work.
 
 **Historical correctness-repair evidence (2026-09-27/28):**
@@ -796,10 +895,10 @@ five warmups and fifteen measured iterations per launch. Means are **per batch
 of 64 collider pairs**, not per contact or simulation frame. All rows measured
 zero managed allocation.
 
-| Row | Previous incomplete path | Unpruned implementation | Face certificate / pruning | Final |
-| --- | ---: | ---: | ---: | ---: |
-| `CheckMeshCylinderPairs` | 3.812 ms | 32.664 ms | 8.348 ms | **6.064 ms** |
-| `CheckConcaveMeshCylinderPairs` | 2.835 ms | 62.688 ms | 5.469 ms | **3.825 ms** |
+| Row                             | Previous incomplete path | Unpruned implementation | Face certificate / pruning |        Final |
+| ------------------------------- | -----------------------: | ----------------------: | -------------------------: | -----------: |
+| `CheckMeshCylinderPairs`        |                 3.812 ms |               32.664 ms |                   8.348 ms | **6.064 ms** |
+| `CheckConcaveMeshCylinderPairs` |                 2.835 ms |               62.688 ms |                   5.469 ms | **3.825 ms** |
 
 Final standard deviations were 0.1549 and 0.1034 ms; 99.9% confidence-interval
 half-widths were 0.1035 and 0.0691 ms. The final path takes about **59% / 35%
@@ -825,23 +924,23 @@ dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll mesh
 
 Also constrain process affinity to two cores when comparing with this capture;
 the environment variable alone is not a CPU-affinity setting. The focused rows
-preflight expected classification and certified depths outside measurement.
-They distinguish cap/side faces, the original intrusion, oblique rim contact,
-rim touch and a rim gap for cylinder and mixed circle-slab consumers. Cylinder
-cap contacts may build a four-point manifold; mixed circle slabs return one
-contact, so those columns are not identical workloads.
+preflight expected classification and certified depths outside measurement. They
+distinguish cap/side faces, the original intrusion, oblique rim contact, rim
+touch and a rim gap for cylinder and mixed circle-slab consumers. Cylinder cap
+contacts may build a four-point manifold; mixed circle slabs return one contact,
+so those columns are not identical workloads.
 
-Final focused means, **microseconds per query**, with zero managed allocation
-in all twelve rows:
+Final focused means, **microseconds per query**, with zero managed allocation in
+all twelve rows:
 
-| Geometry | Cylinder / triangle | Circle slab / triangle |
-| --- | ---: | ---: |
-| Cap face | 57.05 us | 21.63 us |
-| Side face | 31.94 us | 31.83 us |
-| Original cap intrusion | 1,055.12 us | 1,053.47 us |
-| Oblique rim | 1,179.01 us | 1,160.16 us |
-| Rim touch | 846.88 us | 833.32 us |
-| Rim gap | 44.24 us | 44.01 us |
+| Geometry               | Cylinder / triangle | Circle slab / triangle |
+| ---------------------- | ------------------: | ---------------------: |
+| Cap face               |            57.05 us |               21.63 us |
+| Side face              |            31.94 us |               31.83 us |
+| Original cap intrusion |         1,055.12 us |            1,053.47 us |
+| Oblique rim            |         1,179.01 us |            1,160.16 us |
+| Rim touch              |           846.88 us |              833.32 us |
+| Rim gap                |            44.24 us |               44.01 us |
 
 The unpruned cylinder cap/side rows were 269.91 / 828.68 us. Those ordinary
 features benefited substantially from the retained certificates and work
@@ -865,46 +964,47 @@ Further work is gated on representative scene evidence under GRV-Benchmark-024.
 
 ### GRV-Benchmark-019 — Complete Triangle/Cone Contact Cost
 
-**Discovered:** 2026-09-29.  
-**Status:** Closed 2026-10-06 after four measured refinement passes.  
-**Owners:** FixedMathSharp's triangle/cone support selection, rim roots and paired
-witnesses; Gravitas's mesh candidate traversal.
+**Discovered:** 2026-09-29. **Status:** Closed 2026-10-06 after four measured
+refinement passes. **Owners:** FixedMathSharp's triangle/cone support selection,
+rim roots and paired witnesses; Gravitas's mesh candidate traversal.
 
 Correctness, resource proofs and shared-owner control evidence are retained in
-the [completed contact plan](done/2026-09-28-complete-triangle-cone-contact-plan.md).
+the
+[completed contact plan](done/2026-09-28-complete-triangle-cone-contact-plan.md).
 
 The complete contact query replaces missed intersections and inconsistent
-normal/depth/anchor output. Its exact geometry is the correctness baseline.
-The bounded optimization pass reused the existing face-disk certificate and
-principal-axis depth reducer; it did not introduce an approximate fallback,
-new arithmetic engine, cache or allocation.
+normal/depth/anchor output. Its exact geometry is the correctness baseline. The
+bounded optimization pass reused the existing face-disk certificate and
+principal-axis depth reducer; it did not introduce an approximate fallback, new
+arithmetic engine, cache or allocation.
 
-Matched Windows/i7-9700K measurements use .NET 8.0.29, SDK 10.0.302, two launches,
-five warmups and fifteen measured iterations per launch. The launcher is
-BelowNormal with affinity mask 3 and `DOTNET_PROCESSOR_COUNT=2`; only one heavy
-workload runs at a time. Values below are **microseconds per dispatched query**,
-not batches or simulation frames. Every row reports zero managed allocation.
+Matched Windows/i7-9700K measurements use .NET 8.0.29, SDK 10.0.302, two
+launches, five warmups and fifteen measured iterations per launch. The launcher
+is BelowNormal with affinity mask 3 and `DOTNET_PROCESSOR_COUNT=2`; only one
+heavy workload runs at a time. Values below are **microseconds per dispatched
+query**, not batches or simulation frames. Every row reports zero managed
+allocation.
 
-| Geometry | Old incomplete path | Initial complete solver | September optimized mean | September standard deviation |
-| --- | ---: | ---: | ---: | ---: |
-| Base face | 19.983 | 152.1 | 33.89 | 0.676 |
-| Side face | 17.525 | 567.4 | 62.57 | 1.193 |
-| Apex face | 28.838 — wrong depth | 169.3 | 55.67 | 1.331 |
-| Side intrusion | 15.407 — missed contact | 301.5 | 283.08 | 6.321 |
-| Oblique rim | 17.403 — missed contact | 905.3 | 850.98 | 31.440 |
-| Interior stationary rim | Not captured | Not captured | 1,407.39 | 32.889 |
-| Rim touch | 17.932 — missed touch | 703.1 | 692.58 | 13.452 |
-| Rim gap | 17.652 | 122.0 | 120.78 | 2.479 |
-| Unrepresentable relative center | 6.069 — missed contact | 1,708.7 | 1,652.05 | 31.686 |
+| Geometry                        |     Old incomplete path | Initial complete solver | September optimized mean | September standard deviation |
+| ------------------------------- | ----------------------: | ----------------------: | -----------------------: | ---------------------------: |
+| Base face                       |                  19.983 |                   152.1 |                    33.89 |                        0.676 |
+| Side face                       |                  17.525 |                   567.4 |                    62.57 |                        1.193 |
+| Apex face                       |    28.838 — wrong depth |                   169.3 |                    55.67 |                        1.331 |
+| Side intrusion                  | 15.407 — missed contact |                   301.5 |                   283.08 |                        6.321 |
+| Oblique rim                     | 17.403 — missed contact |                   905.3 |                   850.98 |                       31.440 |
+| Interior stationary rim         |            Not captured |            Not captured |                 1,407.39 |                       32.889 |
+| Rim touch                       |   17.932 — missed touch |                   703.1 |                   692.58 |                       13.452 |
+| Rim gap                         |                  17.652 |                   122.0 |                   120.78 |                        2.479 |
+| Unrepresentable relative center |  6.069 — missed contact |                 1,708.7 |                 1,652.05 |                       31.686 |
 
 September base/side/apex costs are about 78% / 89% / 67% lower than the initial
-complete implementation. The old base/side/gap rows had the correct answers
-for these fixtures and remain cheaper: the final costs are approximately
-1.70x / 3.57x / 6.84x theirs. Five other old rows returned the wrong result and
-are repair-cost comparisons, not equivalent-correctness speed regressions.
-The interior-rim row was added with its independent exact-depth oracle after
-the old baseline. General curved/full-domain work near 0.7–1.7 ms per query is
-still a meaningful cost; ordinary paths also merit further profiling.
+complete implementation. The old base/side/gap rows had the correct answers for
+these fixtures and remain cheaper: the final costs are approximately 1.70x /
+3.57x / 6.84x theirs. Five other old rows returned the wrong result and are
+repair-cost comparisons, not equivalent-correctness speed regressions. The
+interior-rim row was added with its independent exact-depth oracle after the old
+baseline. General curved/full-domain work near 0.7–1.7 ms per query is still a
+meaningful cost; ordinary paths also merit further profiling.
 
 All eighteen final cone child launches passed their semantic setup checks.
 BenchmarkDotNet flags multimodal apex and oblique-rim distributions. Small
@@ -924,27 +1024,30 @@ classification and certified depths before measurement. Original and final
 reports are under `artifacts/grv086/baseline`, `initial-complete`, `final`
 (certificate-only) and `optimized-and-controls`.
 
-The [2026-10-06 refinement](done/2026-10-06-triangle-cone-cost-refinement.md) refreshes
-the baseline after shared-owner changes and removes duplicate horizontal-face
-axes, rational witness search, wholly inadmissible charts and nonwinning root
-mapping. It also canonicalizes zero-radius radical signs before accumulation.
-Matched two-launch base/apex/side means fall from 28.95/49.29/55.37 us to
-22.71/23.60/30.00 us; unrepresentable-center cost falls from 1,444.04 to
-463.18 us. Oblique/interior rim fall from 826.45/1,229.16 to 651.08/1,046.86 us.
-All nine rows retain zero managed allocation. The linked report records the
-complete matrix, uncertainty, private child IL identities, exact-bound proofs,
-shared controls, resource tests and coverage gates.
+The [2026-10-06 refinement](done/2026-10-06-triangle-cone-cost-refinement.md)
+refreshes the baseline after shared-owner changes and removes duplicate
+horizontal-face axes, rational witness search, wholly inadmissible charts and
+nonwinning root mapping. It also canonicalizes zero-radius radical signs before
+accumulation. Matched two-launch base/apex/side means fall from
+28.95/49.29/55.37 us to 22.71/23.60/30.00 us; unrepresentable-center cost falls
+from 1,444.04 to 463.18 us. Oblique/interior rim fall from 826.45/1,229.16 to
+651.08/1,046.86 us. All nine rows retain zero managed allocation. The linked
+report records the complete matrix, uncertainty, private child IL identities,
+exact-bound proofs, shared controls, resource tests and coverage gates.
 
-The [generator refinement](done/2026-10-06-triangle-cone-generator-refinement.md)
+The
+[generator refinement](done/2026-10-06-triangle-cone-generator-refinement.md)
 retains one local winner, transforms only final analytic normals, shares
 generator branch coefficients/denominators and directly squares quadratic gaps
 with canonical coefficient signs. A fresh two-launch comparison lowers gap
 rejection from 94.95 to 88.70 us/query, apex face from 24.91 to 22.81 us and
-side face from 31.10 to 28.32 us. All rows remain 0 B/op. Fresh cylinder/circle-slab
-controls differ by less than 2%; stationary interior-rim cost remains about
-1.09 ms/query. The linked report records the full matrix and verification.
+side face from 31.10 to 28.32 us. All rows remain 0 B/op. Fresh
+cylinder/circle-slab controls differ by less than 2%; stationary interior-rim
+cost remains about 1.09 ms/query. The linked report records the full matrix and
+verification.
 
-The [shared root-normal refinement](done/2026-10-06-triangle-cone-normal-refinement.md)
+The
+[shared root-normal refinement](done/2026-10-06-triangle-cone-normal-refinement.md)
 uses conservative compact Horner bounds to narrow the existing exact integer
 search while preserving exact half-raw rounding. A fresh two-launch interior-rim
 comparison falls from 1,052.85 to 918.32 us/query (12.8%); all nine cone rows
@@ -953,7 +1056,8 @@ removed. Paired cylinder/slab controls retain small visible differences without
 establishing a material regression. The linked report records the full matrices,
 proofs, profiles and validation.
 
-The [final root-sign refinement](done/2026-10-06-triangle-cone-final-refinement.md)
+The
+[final root-sign refinement](done/2026-10-06-triangle-cone-final-refinement.md)
 strengthens the existing retained-cell certificate and defers unused defining
 height scans. A fresh matched two-launch interior-rim mean falls from 966.98 to
 927.41 us/query (4.1%), with separated 99.9% confidence intervals; other cone
@@ -984,12 +1088,11 @@ signal. The cone-volume-query correctness repair remains GRV-Issue-087.
 
 ### GRV-Benchmark-020 — Complete Capsule/Circle-Slab Contact Cost
 
-**Discovered:** 2026-09-29.  
-**Status:** Closed 2026-10-05; coordinated refinements are verified for review.
-Remaining exact oblique-root cost is published under the judgment-based closure bar.  
-**Owner:** FixedMathSharp's shared cylinder/capsule feature selection and exact
-output materialization; Gravitas consumes that owner for mixed circle slabs and 3D
-cylinders.
+**Discovered:** 2026-09-29. **Status:** Closed 2026-10-05; coordinated
+refinements are verified for review. Remaining exact oblique-root cost is
+published under the judgment-based closure bar. **Owner:** FixedMathSharp's
+shared cylinder/capsule feature selection and exact output materialization;
+Gravitas consumes that owner for mixed circle slabs and 3D cylinders.
 
 The complete query rejects separated cap rims and selects minimum depth before
 rounding. The previous mixed direction subset could return a false contact or
@@ -1003,76 +1106,81 @@ BelowNormal with affinity mask 3 and `DOTNET_PROCESSOR_COUNT=2`; only one heavy
 workload runs at a time. Values are **microseconds per dispatched query**, not
 batches or simulation frames. Every row reports **0 B/op**.
 
-| Geometry | Old mixed path | Complete mixed, first run | Complete mixed, confirmation | Equivalent 3D cylinder, confirmation |
-| --- | ---: | ---: | ---: | ---: |
-| Cap | 12.27 | 19.32 | 19.07 | 21.51 |
-| Side | 16.70 | 25.66 | 25.12 | 26.35 |
-| Zero capsule core | 16.67 | 25.78 | 24.75 | 26.01 |
-| Endpoint rim | 30.54 — nonminimum depth | 106.69 | 108.18 | 108.30 |
-| Separated endpoint rim | 30.62 — false contact | 25.78 | 25.54 | 25.90 |
-| Oblique interior rim | 36.70 — nonminimum depth | 1,224.40 | 1,191.51 | 1,196.17 |
+| Geometry               |           Old mixed path | Complete mixed, first run | Complete mixed, confirmation | Equivalent 3D cylinder, confirmation |
+| ---------------------- | -----------------------: | ------------------------: | ---------------------------: | -----------------------------------: |
+| Cap                    |                    12.27 |                     19.32 |                        19.07 |                                21.51 |
+| Side                   |                    16.70 |                     25.66 |                        25.12 |                                26.35 |
+| Zero capsule core      |                    16.67 |                     25.78 |                        24.75 |                                26.01 |
+| Endpoint rim           | 30.54 — nonminimum depth |                    106.69 |                       108.18 |                               108.30 |
+| Separated endpoint rim |    30.62 — false contact |                     25.78 |                        25.54 |                                25.90 |
+| Oblique interior rim   | 36.70 — nonminimum depth |                  1,224.40 |                     1,191.51 |                             1,196.17 |
 
-The mixed confirmation's standard deviations are 0.099 / 0.080 / 0.103 /
-1.051 / 0.159 / 8.028 microseconds in table order. Equivalent 3D controls show
-the same expensive curved-feature behavior. These are complete wrapper costs:
-3D also validates public inputs and updates a manifold, while mixed constructs
-its canonical contact. Their difference does not isolate adapter overhead, and
-there is no historical 3D baseline for these new fixtures.
+The mixed confirmation's standard deviations are 0.099 / 0.080 / 0.103 / 1.051 /
+0.159 / 8.028 microseconds in table order. Equivalent 3D controls show the same
+expensive curved-feature behavior. These are complete wrapper costs: 3D also
+validates public inputs and updates a manifold, while mixed constructs its
+canonical contact. Their difference does not isolate adapter overhead, and there
+is no historical 3D baseline for these new fixtures.
 
-**2026-10-05 progress:** [Exact output refinement](done/2026-10-05-capsule-circle-cost-refinement.md)
+**2026-10-05 progress:**
+[Exact output refinement](done/2026-10-05-capsule-circle-cost-refinement.md)
 reuses rigorous magnitude-floor bounds and one jointly scaled depth-polynomial
-reduction. Fresh committed/retained mixed oblique means improve from
-1,186.47 to **745.01 microseconds**; equivalent 3D improves from 1,124.91 to
-**724.62 microseconds** (37.2% / 35.6%). All twelve rows remain 0 B/op and both
+reduction. Fresh committed/retained mixed oblique means improve from 1,186.47 to
+**745.01 microseconds**; equivalent 3D improves from 1,124.91 to **724.62
+microseconds** (37.2% / 35.6%). All twelve rows remain 0 B/op and both
 repositories retain exact 100% standard/Lean line, branch and method coverage.
 The report records small, incompletely isolated ordinary-row shifts, targeted
 cap repeats, resource proofs and actual timed-child assembly verification;
 stale-cache captures are excluded. The signal remained open after that phase.
 
-**2026-10-05 closure:** The same [refinement report](done/2026-10-05-capsule-circle-cost-refinement.md)
-now records certified Sturm point signs, hoisted invariant normal products and
-factored radical bounds, all in existing FixedMathSharp owners. The final mixed /
-3D endpoint means are **36.578 / 38.962 µs**, versus the fresh committed control's
-86.95 / 88.25 µs (about **57.9% / 55.9%** lower). Cap, side and zero-core output
-are roughly **10–11.5 µs**. Representative oblique means are **696.036 / 699.465
-µs**; across the full investigation they fall from the first phase's fresh
-1,186.47 / 1,124.91 µs control by about **41.3% / 37.8%**. These cumulative
-figures compare recorded captures across refinements, not one new paired run;
-the report retains the stage-specific confidence intervals and repeats.
+**2026-10-05 closure:** The same
+[refinement report](done/2026-10-05-capsule-circle-cost-refinement.md) now
+records certified Sturm point signs, hoisted invariant normal products and
+factored radical bounds, all in existing FixedMathSharp owners. The final mixed
+/ 3D endpoint means are **36.578 / 38.962 µs**, versus the fresh committed
+control's 86.95 / 88.25 µs (about **57.9% / 55.9%** lower). Cap, side and
+zero-core output are roughly **10–11.5 µs**. Representative oblique means are
+**696.036 / 699.465 µs**; across the full investigation they fall from the first
+phase's fresh 1,186.47 / 1,124.91 µs control by about **41.3% / 37.8%**. These
+cumulative figures compare recorded captures across refinements, not one new
+paired run; the report retains the stage-specific confidence intervals and
+repeats.
 
 All twelve final circle/slab rows, all thirty-two before/after shared controls
 and the sixteen-row final-source shared recheck report **0 B/op**. The paired
 stadium ordinary output improves another 36–54%, and its straight-rim output
 improves 23%; the paired separated/oblique/triangle controls show small mean
-shifts with overlapping intervals. Final Release/Lean suites retain exact
-**100% reachable line, branch and method coverage**, exclusions unchanged;
-Debug stack/allocation checks, both target frameworks and both DocFX/local-link
-gates pass. Source reviews found no actionable correctness or simplicity issues.
-A measured retained-cell certificate was removed because it established no gain.
+shifts with overlapping intervals. Final Release/Lean suites retain exact **100%
+reachable line, branch and method coverage**, exclusions unchanged; Debug
+stack/allocation checks, both target frameworks and both DocFX/local-link gates
+pass. Source reviews found no actionable correctness or simplicity issues. A
+measured retained-cell certificate was removed because it established no gain.
 
 **Closure decision:** Proven correctness, reproduced gains across mixed/3D and
 shared consumers, zero allocation and bounded resources meet the same bar used
-for #021. Remaining root acquisition and exact quartic signs are documented;
-no cheaper demonstrated refinement remains in this investigation. The roughly
+for #021. Remaining root acquisition and exact quartic signs are documented; no
+cheaper demonstrated refinement remains in this investigation. The roughly
 0.70-ms representative oblique query is a workload-budget consideration, not a
 fixed-rate host guarantee or proof of an unavoidable lower bound. Preserve
 full-domain classification, nearest-even depth, deterministic ties and canonical
 anchors. Further work should start from new measured workload evidence, without
 restoring incomplete directions or adding an approximate solver.
 
-**Original fixture capture:** Build `Gravitas.slnx -c Release -p:UseLocalLsfStack=true`, then:
+**Original fixture capture:** Build
+`Gravitas.slnx -c Release -p:UseLocalLsfStack=true`, then:
 
 ```powershell
 dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll capsule-circle-contact --warmupCount 3 --iterationCount 10 --launchCount 1 --exporters json --artifacts artifacts/grv085/after-confirm
 ```
 
-Baseline source: Gravitas `04805b8` and FixedMathSharp `9833123`. Fixture geometry
-and the measured mixed method were unchanged between captures; corrected-answer
-setup assertions and the paired 3D control were added after the legacy capture.
-Setup checks classification, known quarter-unit depths and cross-path depth
-agreement. Reports and raw measurements are under `artifacts/grv085/before`,
-`after` and `after-confirm`; retain the individual rows rather than an average
-that hides the curved-feature cost. Correctness evidence is retained in
+Baseline source: Gravitas `04805b8` and FixedMathSharp `9833123`. Fixture
+geometry and the measured mixed method were unchanged between captures;
+corrected-answer setup assertions and the paired 3D control were added after the
+legacy capture. Setup checks classification, known quarter-unit depths and
+cross-path depth agreement. Reports and raw measurements are under
+`artifacts/grv085/before`, `after` and `after-confirm`; retain the individual
+rows rather than an average that hides the curved-feature cost. Correctness
+evidence is retained in
 [GRV-Issue-085](issue-tracker.md#grv-issue-085---mixed-capsulecircle-slab-contact-bypasses-the-complete-upstream-query).
 
 #### Capsule Rim Cost Relationship (GRV-Benchmark-020 And 021)
@@ -1085,25 +1193,27 @@ endpoint/straight-rim output materialization.
 The 2026-10-04 coordinated profiles now distinguish their expensive owners:
 circle/cylinder ellipse magnitude-to-raw comparison takes about 53-55% inclusive
 sampled CPU, while stadium constrained root acquisition, sign refinement and
-value mapping remain expensive. The [refinement evidence](done/2026-10-04-capsule-slab-cost-refinement.md)
-retains both profiles and mixed/3D/triangle controls. This does not establish a
-single shared dominant leaf or justify merging the specialized solvers.
-The 2026-10-05 [certified-sign refinement](done/2026-10-05-capsule-slab-sign-refinement.md)
+value mapping remain expensive. The
+[refinement evidence](done/2026-10-04-capsule-slab-cost-refinement.md) retains
+both profiles and mixed/3D/triangle controls. This does not establish a single
+shared dominant leaf or justify merging the specialized solvers. The 2026-10-05
+[certified-sign refinement](done/2026-10-05-capsule-slab-sign-refinement.md)
 moves the stadium analytic-winner bottleneck toward root acquisition, while
 circle mixed/3D controls retain their distinct ellipse path. The subsequent
 [root-isolation refinement](done/2026-10-05-capsule-slab-root-isolation-refinement.md)
 closes #021 with reproduced gains, bounded resources and published remaining
-cost. The subsequent circle/slab [output refinement](done/2026-10-05-capsule-circle-cost-refinement.md)
-closes #020 with both dimensional controls and measured shared-consumer gains.
-Both signals are closed; shared algebra does not imply shared root-selection policy.
+cost. The subsequent circle/slab
+[output refinement](done/2026-10-05-capsule-circle-cost-refinement.md) closes
+#020 with both dimensional controls and measured shared-consumer gains. Both
+signals are closed; shared algebra does not imply shared root-selection policy.
 
 The fixture names describe different features:
 
-| Fixture | Capsule feature | Slab feature |
-| --- | --- | --- |
-| `EndpointRim` (020) | Core endpoint | Circular cap rim |
-| `StraightRim` (021) | Core endpoint | Straight cap edge |
-| Oblique interior rim (both) | Interior of tilted core | Curved cap rim |
+| Fixture                     | Capsule feature         | Slab feature      |
+| --------------------------- | ----------------------- | ----------------- |
+| `EndpointRim` (020)         | Core endpoint           | Circular cap rim  |
+| `StraightRim` (021)         | Core endpoint           | Straight cap edge |
+| Oblique interior rim (both) | Interior of tilted core | Curved cap rim    |
 
 Both endpoint/straight-rim fixtures have analytic whole-shape closest-point
 certificates and reuse `MaterializeCylinderCapsulePenetration` for exact depth
@@ -1116,94 +1226,94 @@ The oblique paths both require wide arithmetic, polynomial roots, exact
 comparisons and final rounding, but use different specialized root-selection
 paths. The cylinder ellipse solver selects a largest-positive parameter root
 under an unrestricted-domain proof. The stadium solver admits constrained
-end-region roots and maps/compares their signed gaps through value roots, reusing
-circular-rim algebra also consumed by triangle contacts. Copying the cylinder's
-reflection/root-selection shortcut could discard a valid stadium contact.
+end-region roots and maps/compares their signed gaps through value roots,
+reusing circular-rim algebra also consumed by triangle contacts. Copying the
+cylinder's reflection/root-selection shortcut could discard a valid stadium
+contact.
 
-Future profiling should identify the affected stages before attributing cost to a
-shared leaf or merging solvers. Prefer demonstrated shared arithmetic and
-materialization wins or proved feature certificates; retain ordinary mixed/3D and affected triangle
-controls. Similar exact algebra does not yet prove the same dominant function,
-an unavoidable correctness cost, or an optimization that will benefit both.
+Future profiling should identify the affected stages before attributing cost to
+a shared leaf or merging solvers. Prefer demonstrated shared arithmetic and
+materialization wins or proved feature certificates; retain ordinary mixed/3D
+and affected triangle controls. Similar exact algebra does not yet prove the
+same dominant function, an unavoidable correctness cost, or an optimization that
+will benefit both.
 
 ### GRV-Benchmark-021 — Complete Capsule/Stadium-Slab Curved Contact Cost
 
-**Discovered:** 2026-09-30.  
-**Status:** Closed 2026-10-05; Gravitas `989c7f9` and coordinated
-FixedMathSharp `bd8f6a2` are committed.
-Closure uses reproduced gains, preserved full-domain behavior and published
-remaining cost; it does not certify a fixed-rate host budget.  
-**Owner:** FixedMathSharp's complete capsule/stadium-slab feature selection,
-shared circular-rim algebra and signed value-root comparison.
+**Discovered:** 2026-09-30. **Status:** Closed 2026-10-05; Gravitas `989c7f9`
+and coordinated FixedMathSharp `bd8f6a2` are committed. Closure uses reproduced
+gains, preserved full-domain behavior and published remaining cost; it does not
+certify a fixed-rate host budget. **Owner:** FixedMathSharp's complete
+capsule/stadium-slab feature selection, shared circular-rim algebra and signed
+value-root comparison.
 
 The complete query fixes false contacts and nonminimum penetration. Subsequent
 [retained-root/positive-certificate](done/2026-10-04-capsule-slab-cost-refinement.md),
 [certified-sign](done/2026-10-05-capsule-slab-sign-refinement.md), and
 [root-isolation/global-minimum refinements](done/2026-10-05-capsule-slab-root-isolation-refinement.md)
-retain every constrained chart and exact classification/rounding contract.
-The [correctness repair history](done/2026-09-29-complete-capsule-slab-contact-plan.md#refined-matched-performance)
+retain every constrained chart and exact classification/rounding contract. The
+[correctness repair history](done/2026-09-29-complete-capsule-slab-contact-plan.md#refined-matched-performance)
 retains the older complete and incorrect/incomplete baselines.
 
 The final phase borrows existing evaluation scratch for certified Sturm signs,
 shares batch subdivision counts and reciprocal-chart Sturm chains, and proves
 when a negative stationary gap is the complete shape's global minimum before
 ending traversal. No speculative cache, second solver or accuracy setting is
-added. The matched final confirmation against committed FixedMathSharp
-`9b1f173` gives the following microseconds per dispatched query:
+added. The matched final confirmation against committed FixedMathSharp `9b1f173`
+gives the following microseconds per dispatched query:
 
-| Stadium fixture | Fresh committed baseline | Final | Mean reduction |
-| --- | ---: | ---: | ---: |
-| Oblique analytic winner | 1,407.0 ± 7.42 | 1,052.1 ± 11.54 | 25.2% |
-| Original oblique rim | 716.7 ± 5.16 | 527.3 ± 2.89 | 26.4% |
-| Irrational oblique rim | 897.0 ± 7.68 | 794.1 ± 5.06 | 11.5% |
-| Positive oblique rim | 841.9 ± 8.42 | 734.7 ± 6.39 | 12.7% |
+| Stadium fixture         | Fresh committed baseline |           Final | Mean reduction |
+| ----------------------- | -----------------------: | --------------: | -------------: |
+| Oblique analytic winner |           1,407.0 ± 7.42 | 1,052.1 ± 11.54 |          25.2% |
+| Original oblique rim    |             716.7 ± 5.16 |    527.3 ± 2.89 |          26.4% |
+| Irrational oblique rim  |             897.0 ± 7.68 |    794.1 ± 5.06 |          11.5% |
+| Positive oblique rim    |             841.9 ± 8.42 |    734.7 ± 6.39 |          12.7% |
 
-Error is the 99.9% confidence half-width. Both final accepted confirmations
-have intervals disjoint from both committed captures in every fixture. All
-four rows and all 28 separate ordinary stadium, mixed circle-slab, equivalent
-3D cylinder and triangle controls report **0 B/op** and pass behavior preflight.
-The final evidence records resource proofs, independent regression oracles,
-rejected experiments, profiles and raw capture locations. Both repositories
-pass full Release/ReleaseLean suites with exact **100% reachable line, branch
-and method coverage**, focused Debug/resource checks and both DocFX gates.
+Error is the 99.9% confidence half-width. Both final accepted confirmations have
+intervals disjoint from both committed captures in every fixture. All four rows
+and all 28 separate ordinary stadium, mixed circle-slab, equivalent 3D cylinder
+and triangle controls report **0 B/op** and pass behavior preflight. The final
+evidence records resource proofs, independent regression oracles, rejected
+experiments, profiles and raw capture locations. Both repositories pass full
+Release/ReleaseLean suites with exact **100% reachable line, branch and method
+coverage**, focused Debug/resource checks and both DocFX gates.
 
 **Closure boundary:** The residual roughly **0.53–1.05 ms/query** curved cost
-remains significant. Root isolation and exact sign/arithmetic work still
-consume much of the sampled CPU. Dense curved-contact workloads require their
-own complete-step capacity measurements; these microbenchmarks do not establish
+remains significant. Root isolation and exact sign/arithmetic work still consume
+much of the sampled CPU. Dense curved-contact workloads require their own
+complete-step capacity measurements; these microbenchmarks do not establish
 MMO/strategy throughput or cross-platform replay. The focused investigation
-closes under the user's judgement-based performance bar. GRV-Benchmark-020
-is also closed after its distinct ellipse-depth and shared-output investigation;
+closes under the user's judgement-based performance bar. GRV-Benchmark-020 is
+also closed after its distinct ellipse-depth and shared-output investigation;
 related algebra alone does not establish one common dominant hotspot.
 Released-package validation remains a release gate after the coordinated
 FixedMathSharp release.
 
 **Reproduce:** after a Release local-stack benchmark build, run
 `dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll --filter '*CapsuleSlabContactBenchmarks*Oblique*' --launchCount 2 --warmupCount 5 --iterationCount 15 --invocationCount 512 --affinity 3 --exporters json --artifacts artifacts/grv-benchmark-021/reproduce`.
-Use `DOTNET_PROCESSOR_COUNT=2`, BelowNormal priority and one heavy workload.
-Set `UseLocalLsfStack=true` in MSBuild and the environment for child builds.
-The command requests affinity 3; these exports display `Affinity=11`, so no
-claim of independently verified effective affinity is made.
+Use `DOTNET_PROCESSOR_COUNT=2`, BelowNormal priority and one heavy workload. Set
+`UseLocalLsfStack=true` in MSBuild and the environment for child builds. The
+command requests affinity 3; these exports display `Affinity=11`, so no claim of
+independently verified effective affinity is made.
 
 ### GRV-Benchmark-023 — Circle Workload Partition And Grounding Scaling
 
-**Discovered:** 2026-10-02 during GRV-Benchmark-022 isolation.  
-**Status:** Closed 2026-10-04 under the predictable-scaling/published-cost
-criterion and documented no-further-change decision below. The latest 2D query
-gathering, bounds-first rejection, characterization and documentation changes
-remain unstaged/uncommitted for user review.
-Partition phase committed as `f23d836`; shared radial-math and planar
-capture refinements committed as FixedMathSharp `6789c09` and Gravitas `ee613db`.
-Prepared 2D query and grounding-selection refinement committed as `6c0c2f0`.
-The centered-transform and locked lookup refinements are committed as
-FixedMathSharp `5447b34` and GridForge `3f34f8b`; Gravitas's characterization,
-benchmarks and documentation are committed as `bf11409`.
-Streamed 3D grounding was rejected after repeated sparse-ray regressions;
-its public characterization tests and benchmark fixture are retained.
-Warmed full-step costs are published below, separate from exact contact-query cost.  
-**Owner:** Gravitas retained partition rental/distribution and collider refresh,
-2D query preparation and ground-hit selection, plus GridForge voxel partition
-lookup used by planar grounding.
+**Discovered:** 2026-10-02 during GRV-Benchmark-022 isolation. **Status:**
+Closed 2026-10-04 under the predictable-scaling/published-cost criterion and
+documented no-further-change decision below. The latest 2D query gathering,
+bounds-first rejection, characterization and documentation changes remain
+unstaged/uncommitted for user review. Partition phase committed as `f23d836`;
+shared radial-math and planar capture refinements committed as FixedMathSharp
+`6789c09` and Gravitas `ee613db`. Prepared 2D query and grounding-selection
+refinement committed as `6c0c2f0`. The centered-transform and locked lookup
+refinements are committed as FixedMathSharp `5447b34` and GridForge `3f34f8b`;
+Gravitas's characterization, benchmarks and documentation are committed as
+`bf11409`. Streamed 3D grounding was rejected after repeated sparse-ray
+regressions; its public characterization tests and benchmark fixture are
+retained. Warmed full-step costs are published below, separate from exact
+contact-query cost. **Owner:** Gravitas retained partition rental/distribution
+and collider refresh, 2D query preparation and ground-hit selection, plus
+GridForge voxel partition lookup used by planar grounding.
 
 **Closure criterion:** Predictable scaling and published costs, selected by the
 repository owner, replace a fixed-Hz/frame-budget target for this signal.
@@ -1214,44 +1324,44 @@ Release/Lean coverage gates, with material tradeoffs documented. Closure does
 not mean that every scene fits a particular host frame budget.
 
 An exploratory `circle-contact-simulation` capture with default unit cells
-measured 64 diagonal pairs at 13.35 ms/step and 1024 axis pairs at 42.59 ms/step.
-The 1024 diagonal setup was stopped after more than 160 seconds of child CPU
-time and approximately 800 MB working set. These are diagnostic signals, not a
-completed matched benchmark: the initial grid also clipped the first diagonal
-row after positional correction. Raw partial output is retained in
-`artifacts/grv-benchmark-022/workload-before.log`; the live process observation
-is transcribed in `unit-cell-process-observation.txt` alongside it.
+measured 64 diagonal pairs at 13.35 ms/step and 1024 axis pairs at 42.59
+ms/step. The 1024 diagonal setup was stopped after more than 160 seconds of
+child CPU time and approximately 800 MB working set. These are diagnostic
+signals, not a completed matched benchmark: the initial grid also clipped the
+first diagonal row after positional correction. Raw partial output is retained
+in `artifacts/grv-benchmark-022/workload-before.log`; the live process
+observation is transcribed in `unit-cell-process-observation.txt` alongside it.
 
 A separate, padded-grid EventPipe capture of 64 diagonal pairs puts 43.0% of
 actual-iteration sampled CPU in `Voxel.TryGetPartition` and 15.4% in partition
 distribution (exclusive). Positional correction/repartition contributes 27.4%
-inclusive and grounding 15.0% inclusive; these overlap. Contact generation
-and lever materialization are small in this workload. Traces and actual-only
+inclusive and grounding 15.0% inclusive; these overlap. Contact generation and
+lever materialization are small in this workload. Traces and actual-only
 analysis are in `artifacts/grv-benchmark-022/workload-profile*`.
 
-Source inspection identifies an additional setup risk: when the inactive pool
-is empty, `RetainedPartitionLifecycle.TryRetireEmptyForReuse` scans all retained
-partitions before each new rental. A fully occupied initial scene has nothing
-to retire, allowing quadratic registration work. Per-partition sparse sets also
-grow with the highest global collider ID. The rental owner is shared by 2D,
-3D and mixed services; dimension parity matters for any repair.
+Source inspection identifies an additional setup risk: when the inactive pool is
+empty, `RetainedPartitionLifecycle.TryRetireEmptyForReuse` scans all retained
+partitions before each new rental. A fully occupied initial scene has nothing to
+retire, allowing quadratic registration work. Per-partition sparse sets also
+grow with the highest global collider ID. The rental owner is shared by 2D, 3D
+and mixed services; dimension parity matters for any repair.
 
-**Original isolation step:** Measure registration and warmed refresh/distribution
-separately while varying cell size, covered voxels and collider count. Profile
-registration to distinguish rental scans from sparse-set growth. Preserve
-deterministic reuse, empty-partition reclamation and allocation guards; do not
-remove GridForge locking based on this trace. GRV-Benchmark-022 now uses explicit
-16-by-1-by-16 cells to isolate sustained contact work; that fixture choice is
-not a runtime fix for this signal.
+**Original isolation step:** Measure registration and warmed
+refresh/distribution separately while varying cell size, covered voxels and
+collider count. Profile registration to distinguish rental scans from sparse-set
+growth. Preserve deterministic reuse, empty-partition reclamation and allocation
+guards; do not remove GridForge locking based on this trace. GRV-Benchmark-022
+now uses explicit 16-by-1-by-16 cells to isolate sustained contact work; that
+fixture choice is not a runtime fix for this signal.
 
-With explicit 16-by-1-by-16 cells, the completed 1024-pair diagonal workload still
-measures 35.99 +/- 0.47 ms/step, versus 4.22 +/- 0.09 ms for reset plus direct
-queries. A separate actual-iteration profile puts grounding at 29.6% inclusive,
-partition lookup at 18.7% exclusive, and partition distribution at 14.8%
-inclusive. The complete capsule contact owner contributes 7.9% inclusive and
-anchor offset materialization 1.6%. These are overlapping sampled paths, not a
-stage-time decomposition. Fine cells amplify the problem but do not explain all
-large-scene cost. The full-step distributions include bimodality and short
+With explicit 16-by-1-by-16 cells, the completed 1024-pair diagonal workload
+still measures 35.99 +/- 0.47 ms/step, versus 4.22 +/- 0.09 ms for reset plus
+direct queries. A separate actual-iteration profile puts grounding at 29.6%
+inclusive, partition lookup at 18.7% exclusive, and partition distribution at
+14.8% inclusive. The complete capsule contact owner contributes 7.9% inclusive
+and anchor offset materialization 1.6%. These are overlapping sampled paths, not
+a stage-time decomposition. Fine cells amplify the problem but do not explain
+all large-scene cost. The full-step distributions include bimodality and short
 iteration warnings; preserve the raw results when assessing the published-cost
 and predictable-scaling criterion above. Final coarse results and traces are in
 `artifacts/grv-benchmark-022/after` and `coarse-profile*`.
@@ -1282,16 +1392,16 @@ Mobility changes replace the old role; surviving dynamic memberships synchronize
 awake state, and freeze/unfreeze transitions refresh awake membership directly.
 Bounds, geometry/version publication, planar candidate indexing, deferred
 refresh and topology rebuild semantics remain covered. Pure distribution paths
-reuse their existing sorted static-style copy helpers. No upstream source change,
-new collection owner, math kernel or voxel cache is needed.
+reuse their existing sorted static-style copy helpers. No upstream source
+change, new collection owner, math kernel or voxel cache is needed.
 
 **Collection tradeoff:** `partition-membership` compares existing owners with
-global IDs starting at 65536. Add/remove plus sorted copy takes 15.06/11.78/19.39
-ns for sparse/hash/packed storage at one member; at 64 members it takes
-169.56/277.44/239.50 ns. All are 0 B/op after warmup. Hash storage addresses the
-global-ID memory failure and wins the one-member row, but its denser copy cost
-is a real tradeoff, not a universal collection speedup. Integrated scene rows
-remain the evidence for the affected workload.
+global IDs starting at 65536. Add/remove plus sorted copy takes
+15.06/11.78/19.39 ns for sparse/hash/packed storage at one member; at 64 members
+it takes 169.56/277.44/239.50 ns. All are 0 B/op after warmup. Hash storage
+addresses the global-ID memory failure and wins the one-member row, but its
+denser copy cost is a real tradeoff, not a universal collection speedup.
+Integrated scene rows remain the evidence for the affected workload.
 
 **Matched cold registration:** `ColliderCount` is the total number of dynamic
 plus static colliders, half as many independent radius-five diagonal pairs.
@@ -1299,12 +1409,12 @@ Context/grid/array creation and cleanup are outside the measured registration.
 Error is half of the 99.9% confidence interval; allocations are KB/op.
 
 | Total colliders / XZ cell edge | Before mean +/- error (ms) | After mean +/- error (ms) | Before / after allocation (KB) |
-| --- | --- | --- | --- |
-| 64 / 1 | 118.890 +/- 2.1111 | 12.096 +/- 1.7149 | 5728.29 / 4107.09 |
-| 64 / 16 | 2.947 +/- 0.0492 | 2.975 +/- 0.0730 | 256.47 / 237.95 |
-| 256 / 1 | 2753.815 +/- 179.1855 | 41.426 +/- 39.1938 | 46411.04 / 16403.90 |
-| 256 / 16 | 11.940 +/- 0.6168 | 11.812 +/- 0.1554 | 1220.05 / 912.28 |
-| 1024 / 16 | 40.773 +/- 23.1878 | 33.453 +/- 21.3649 | 7982.59 / 3616.41 |
+| ------------------------------ | -------------------------- | ------------------------- | ------------------------------ |
+| 64 / 1                         | 118.890 +/- 2.1111         | 12.096 +/- 1.7149         | 5728.29 / 4107.09              |
+| 64 / 16                        | 2.947 +/- 0.0492           | 2.975 +/- 0.0730          | 256.47 / 237.95                |
+| 256 / 1                        | 2753.815 +/- 179.1855      | 41.426 +/- 39.1938        | 46411.04 / 16403.90            |
+| 256 / 16                       | 11.940 +/- 0.6168          | 11.812 +/- 0.1554         | 1220.05 / 912.28               |
+| 1024 / 16                      | 40.773 +/- 23.1878         | 33.453 +/- 21.3649        | 7982.59 / 3616.41              |
 
 The fine-cell 256-collider mean improves about 66 times and allocation falls
 64.7%; the after distribution is noisy (median 29.306 ms), so preserve the full
@@ -1319,28 +1429,30 @@ voxel. Artifacts: `artifacts/grv-benchmark-023/cold-before`, `cold-verified`.
 `$env:DOTNET_PROCESSOR_COUNT = '2'`, use BelowNormal priority and one heavy
 workload. Build with
 `dotnet build Gravitas.slnx -c Release -p:UseLocalLsfStack=true -m:1 -p:BuildInParallel=false`.
-Run `cold-circle-registration --filter '*' --launchCount 1 --warmupCount 3 --iterationCount 8 --affinity 3 --exporters json`
+Run
+`cold-circle-registration --filter '*' --launchCount 1 --warmupCount 3 --iterationCount 8 --affinity 3 --exporters json`
 through the compiled benchmark DLL. The historical before capture filters out
 1024 unit-cell colliders. Warmed stage selections use
 `circle-partition-maintenance --filter '*ColliderCount: 64, CellSize: 1)*' '*ColliderCount: 1024, CellSize: 16)*' --launchCount 2 --warmupCount 5 --iterationCount 15 --iterationTime 250 --affinity 3 --exporters json`.
 The integrated control uses
 `circle-contact-simulation --filter '*ResetAndFullSimulationStep*Diagonal*'`
-with the same warmed job settings. Hardware is an i7-9700K on Windows 11,
-.NET SDK 10.0.302 / runtime 8.0.29, BenchmarkDotNet 0.15.8. Both source stacks
-use FixedMathSharp `00a38bd`; Gravitas before is `05ddcac`, after is the
+with the same warmed job settings. Hardware is an i7-9700K on Windows 11, .NET
+SDK 10.0.302 / runtime 8.0.29, BenchmarkDotNet 0.15.8. Both source stacks use
+FixedMathSharp `00a38bd`; Gravitas before is `05ddcac`, after is the
 partition-hardening change committed as `f23d836`.
 
 **Grounding decision and remaining scope:** Preserve automatic ground probing
-when contact normals reject support. The paired above-body targets do not provide
-ground, and zero gravity or a rejected response normal does not prove that the
-probe can be omitted. Existing public support queries differ in allowed phases,
-tiny probes, compound-normal filtering and physical-pair policy; replacing the
-automatic sweep with them would change behavior. The remaining ground work uses
-the existing exact sweep owner. Do not remove GridForge synchronization or add
-another cache based on sampled attribution alone. The fresh full-step profile
-and warmed stage results below keep the remaining work explicit. Closure uses
-published costs and predictable scaling, without a fixed-Hz target. Runtime mass
-mutation discovered in the awake review is independently tracked as GRV-Issue-089.
+when contact normals reject support. The paired above-body targets do not
+provide ground, and zero gravity or a rejected response normal does not prove
+that the probe can be omitted. Existing public support queries differ in allowed
+phases, tiny probes, compound-normal filtering and physical-pair policy;
+replacing the automatic sweep with them would change behavior. The remaining
+ground work uses the existing exact sweep owner. Do not remove GridForge
+synchronization or add another cache based on sampled attribution alone. The
+fresh full-step profile and warmed stage results below keep the remaining work
+explicit. Closure uses published costs and predictable scaling, without a
+fixed-Hz target. Runtime mass mutation discovered in the awake review is
+independently tracked as GRV-Issue-089.
 
 **Matched warmed stages:** The translated row includes pose reset plus coverage
 refresh; retained distribution deliberately keeps processed pair keys and skips
@@ -1349,70 +1461,71 @@ without a complete simulation step. Every row reports 0 B/op. These are separate
 stage workloads, not additive components of the full-step measurement.
 
 | Stage / total colliders / XZ cell edge | Before mean +/- error (us) | After mean +/- error (us) |
-| --- | --- | --- |
-| Translated refresh / 64 / 1 | 763.6 +/- 15.00 | 665.1 +/- 13.88 |
-| Retained distribution / 64 / 1 | 1340.9 +/- 11.89 | 1268.5 +/- 18.01 |
-| Forced automatic probes / 64 / 1 | 565.0 +/- 21.49 | 523.1 +/- 2.58 |
-| Translated refresh / 1024 / 16 | 2678.6 +/- 35.39 | 2605.6 +/- 11.46 |
-| Retained distribution / 1024 / 16 | 401.8 +/- 3.62 | 399.0 +/- 2.45 |
-| Forced automatic probes / 1024 / 16 | 1638.7 +/- 70.66 | 1467.9 +/- 7.71 |
+| -------------------------------------- | -------------------------- | ------------------------- |
+| Translated refresh / 64 / 1            | 763.6 +/- 15.00            | 665.1 +/- 13.88           |
+| Retained distribution / 64 / 1         | 1340.9 +/- 11.89           | 1268.5 +/- 18.01          |
+| Forced automatic probes / 64 / 1       | 565.0 +/- 21.49            | 523.1 +/- 2.58            |
+| Translated refresh / 1024 / 16         | 2678.6 +/- 35.39           | 2605.6 +/- 11.46          |
+| Retained distribution / 1024 / 16      | 401.8 +/- 3.62             | 399.0 +/- 2.45            |
+| Forced automatic probes / 1024 / 16    | 1638.7 +/- 70.66           | 1467.9 +/- 7.71           |
 
 Fine-cell translated refresh improves 12.9% and retained distribution 5.4%.
 Coarse distribution intervals overlap. Grounding benefits from the partition
-storage change; its physical acceptance rules and exact sweep are unchanged.
-Raw results are in `artifacts/grv-benchmark-023/maintenance-before`,
+storage change; its physical acceptance rules and exact sweep are unchanged. Raw
+results are in `artifacts/grv-benchmark-023/maintenance-before`,
 `maintenance-verified`, and `distribution-complete` (the final distribution
 confirmation after helper deduplication).
 
-**Integrated control:** `PairCount` here means independent dynamic/static
-pairs, twice as many total colliders; XZ cells have edge 16.
+**Integrated control:** `PairCount` here means independent dynamic/static pairs,
+twice as many total colliders; XZ cells have edge 16.
 
 | Diagonal pairs | Before full step mean +/- error (ms) | After full step mean +/- error (ms) | Allocation |
-| --- | --- | --- | --- |
-| 64 | 1.6085 +/- 0.11412 | 1.548 +/- 0.1146 | 0 B/op |
-| 1024 | 35.9930 +/- 0.46672 | 35.573 +/- 0.3858 | 0 B/op |
+| -------------- | ------------------------------------ | ----------------------------------- | ---------- |
+| 64             | 1.6085 +/- 0.11412                   | 1.548 +/- 0.1146                    | 0 B/op     |
+| 1024           | 35.9930 +/- 0.46672                  | 35.573 +/- 0.3858                   | 0 B/op     |
 
-These intervals overlap. Intermediate after captures range from 35.21 to
-35.50 ms for 1024 pairs; do not turn the small point-estimate difference into a
-stable full-frame speedup claim. Short-iteration warnings and bimodality remain
-in the raw distributions. Before results are in
-`artifacts/grv-benchmark-022/after`; final controls are in
-`artifacts/grv-benchmark-023/fullstep-complete`.
+These intervals overlap. Intermediate after captures range from 35.21 to 35.50
+ms for 1024 pairs; do not turn the small point-estimate difference into a stable
+full-frame speedup claim. Short-iteration warnings and bimodality remain in the
+raw distributions. Before results are in `artifacts/grv-benchmark-022/after`;
+final controls are in `artifacts/grv-benchmark-023/fullstep-complete`.
 
 The final actual-iteration-only EventPipe capture still attributes 31.0%
 inclusive to grounding refresh, 19.3% to generic swept-circle detection and
 12.5% to circle sweep geometry. Partition distribution accounts for 16.4%
 inclusive, with voxel partition lookup at 11.0% exclusive. These are overlapping
-sampled paths, not measured stage durations or proof of a lock bottleneck.
-The complete contact owner contributes 4.9% inclusive in this sample. Capture
-with the integrated 1024-pair filter, `--profiler EP --launchCount 1 --warmupCount 3 --iterationCount 5 --iterationTime 500`;
+sampled paths, not measured stage durations or proof of a lock bottleneck. The
+complete contact owner contributes 4.9% inclusive in this sample. Capture with
+the integrated 1024-pair filter,
+`--profiler EP --launchCount 1 --warmupCount 3 --iterationCount 5 --iterationTime 500`;
 artifacts are `fullstep-profile-complete` and
 `fullstep-profile-complete-actual-only.json` under the same directory.
 
-**Partition-phase validation:** Final local-stack Release/ReleaseLean solution builds cover both
-`netstandard2.1` and `net8.0`; all 4401/4342 tests pass with no failures or skips.
-Final OpenCover/Cobertura root counts are exactly 44,491/44,491 sequence points,
-13,278/13,278 branches and 4,589/4,589 methods in Release; Lean has
-44,489/44,489 points, 13,278/13,278 branches and 4,588/4,588 methods.
-ReportGenerator also confirms zero uncovered lines, branches and methods.
-DocFX passes with warnings as errors; API-site branding, repository links and
-the workflow's local-link checks also pass. Logs, TRX and raw coverage are in
-`artifacts/grv-benchmark-023/*-final-review`; rendered reports are in
-`report-Release` and `report-ReleaseLean`. Regression coverage
-includes empty-registry swap-back/reset/reuse, all-dimension high-ID storage,
-sorted inspection, negative-ID validation, coverage deltas, retained identities,
+**Partition-phase validation:** Final local-stack Release/ReleaseLean solution
+builds cover both `netstandard2.1` and `net8.0`; all 4401/4342 tests pass with
+no failures or skips. Final OpenCover/Cobertura root counts are exactly
+44,491/44,491 sequence points, 13,278/13,278 branches and 4,589/4,589 methods in
+Release; Lean has 44,489/44,489 points, 13,278/13,278 branches and 4,588/4,588
+methods. ReportGenerator also confirms zero uncovered lines, branches and
+methods. DocFX passes with warnings as errors; API-site branding, repository
+links and the workflow's local-link checks also pass. Logs, TRX and raw coverage
+are in `artifacts/grv-benchmark-023/*-final-review`; rendered reports are in
+`report-Release` and `report-ReleaseLean`. Regression coverage includes
+empty-registry swap-back/reset/reuse, all-dimension high-ID storage, sorted
+inspection, negative-ID validation, coverage deltas, retained identities,
 mobility changes, awake transitions, foreign contexts and strict allocation
-gates. Source review reports no remaining findings. No coverage exclusion changes
-or upstream source edits were made. This is Windows source-stack evidence;
-released-package validation remains deferred until the upstream release.
+gates. Source review reports no remaining findings. No coverage exclusion
+changes or upstream source edits were made. This is Windows source-stack
+evidence; released-package validation remains deferred until the upstream
+release.
 
 **Experiment refinement, 2026-10-02:** The shared FixedMathSharp distance solver
-now evaluates unit-interval endpoint signs as `C`, `A + 2B + C`, `B`, and `A + B`
-for `f(t) = A*t*t + 2B*t + C`. Widened sums replace general rational endpoint
-products only on `[0, 1]`. Bounded intervals, discriminants, root construction,
-rounding and final distance mapping retain the existing owner. Circle, sphere,
-capsule caps and rounded-cylinder cap consumers share this change; no physics
-policy or second math kernel moves upstream.
+now evaluates unit-interval endpoint signs as `C`, `A + 2B + C`, `B`, and
+`A + B` for `f(t) = A*t*t + 2B*t + C`. Widened sums replace general rational
+endpoint products only on `[0, 1]`. Bounded intervals, discriminants, root
+construction, rounding and final distance mapping retain the existing owner.
+Circle, sphere, capsule caps and rounded-cylinder cap consumers share this
+change; no physics policy or second math kernel moves upstream.
 
 Gravitas also omits host-yaw materialization when a body-owned requested pose
 replaces it, or when the caller only needs scale. Exact matrix composition,
@@ -1421,71 +1534,72 @@ are unchanged. Bodyless poses still capture host yaw. Tests exercise nonidentity
 parented transforms, requested-pose ownership and invalid transform hierarchies.
 
 The new `circle-automatic-grounding` control probes after positional response,
-matching the full-step geometry. The paired circle remains an initial full-radius
-probe overlap because correction retains slop, but its normal rejects support.
-Rows after the first can find the preceding row's circle below them: setup checks
-exactly `PairCount - 32` supported bodies and repeatable probe results. Independent
-contact pairs do not imply independent support probes. The older maintenance
-control resets poses into overlap and remains a separate unsupported workload.
+matching the full-step geometry. The paired circle remains an initial
+full-radius probe overlap because correction retains slop, but its normal
+rejects support. Rows after the first can find the preceding row's circle below
+them: setup checks exactly `PairCount - 32` supported bodies and repeatable
+probe results. Independent contact pairs do not imply independent support
+probes. The older maintenance control resets poses into overlap and remains a
+separate unsupported workload.
 
 Fresh matched radial controls use two launches, five warmups, fifteen 250-ms
 iterations and the environment above. Error is half the 99.9% interval; all rows
 report 0 B/op.
 
 | Shared distance interval / scale | Before mean +/- error (ns) | After mean +/- error (ns) |
-| --- | --- | --- |
-| Circle / 1 | 3828.9 +/- 18.00 | 3304.82 +/- 17.454 |
-| Sphere / 1 | 3866.7 +/- 30.14 | 3302.94 +/- 26.690 |
-| Circle moving away / 1 | 539.1 +/- 3.72 | 87.88 +/- 1.661 |
-| Sphere moving away / 1 | 576.6 +/- 7.16 | 120.68 +/- 1.388 |
-| Circle / 100000 | 5455.9 +/- 27.68 | 4921.34 +/- 24.061 |
-| Sphere / 100000 | 5514.1 +/- 69.26 | 4980.02 +/- 53.401 |
-| Circle moving away / 100000 | 554.3 +/- 17.01 | 89.89 +/- 0.490 |
-| Sphere moving away / 100000 | 569.5 +/- 5.26 | 122.01 +/- 0.208 |
+| -------------------------------- | -------------------------- | ------------------------- |
+| Circle / 1                       | 3828.9 +/- 18.00           | 3304.82 +/- 17.454        |
+| Sphere / 1                       | 3866.7 +/- 30.14           | 3302.94 +/- 26.690        |
+| Circle moving away / 1           | 539.1 +/- 3.72             | 87.88 +/- 1.661           |
+| Sphere moving away / 1           | 576.6 +/- 7.16             | 120.68 +/- 1.388          |
+| Circle / 100000                  | 5455.9 +/- 27.68           | 4921.34 +/- 24.061        |
+| Sphere / 100000                  | 5514.1 +/- 69.26           | 4980.02 +/- 53.401        |
+| Circle moving away / 100000      | 554.3 +/- 17.01            | 89.89 +/- 0.490           |
+| Sphere moving away / 100000      | 569.5 +/- 5.26             | 122.01 +/- 0.208          |
 
-Regular interval cost falls 9.7-14.6%; moving-away misses fall 78.6-83.8%.
-The direct planar capture control measures 813.7 +/- 8.88 versus
-674.4 +/- 9.17 ns at zero host yaw, and 1175.9 +/- 16.23 versus
-792.9 +/- 5.11 ns at one radian (17.1% / 32.6% lower, 0 B/op).
-For corrected automatic probes, the math-only 1024-pair control changes from
-9929.9 +/- 250.65 us to 9233.5 +/- 168.92 us (7.0% lower). The 64-pair
-411.2 +/- 2.77 us and 406.4 +/- 7.00 us intervals overlap. The math-only full
-step also overlaps its baseline: 36.695 +/- 0.710 versus 35.980 +/- 0.938 ms.
+Regular interval cost falls 9.7-14.6%; moving-away misses fall 78.6-83.8%. The
+direct planar capture control measures 813.7 +/- 8.88 versus 674.4 +/- 9.17 ns
+at zero host yaw, and 1175.9 +/- 16.23 versus 792.9 +/- 5.11 ns at one radian
+(17.1% / 32.6% lower, 0 B/op). For corrected automatic probes, the math-only
+1024-pair control changes from 9929.9 +/- 250.65 us to 9233.5 +/- 168.92 us
+(7.0% lower). The 64-pair 411.2 +/- 2.77 us and 406.4 +/- 7.00 us intervals
+overlap. The math-only full step also overlaps its baseline: 36.695 +/- 0.710
+versus 35.980 +/- 0.938 ms.
 
-With both refinements the fresh 1024-pair full-step control measures
-34.469 +/- 0.3244 ms at 0 B/op. Its matched fresh baseline is
-36.695 +/- 0.710 ms (6.1% lower point estimate); the committed partition-phase
-capture was already faster at 35.573 +/- 0.3858 ms. Preserve baseline drift,
-short-iteration warnings and multimodal distributions rather than treating a
-single capture as a universal frame-time gain. The 64-pair combined result is
-1.503 +/- 0.1040 ms and supports no small-scene speedup claim.
-An independent two-launch confirmation with 500-ms iterations measures
-34.404 +/- 0.5312 ms at 0 B/op, consistent with the final capture. It confirms
-the after result under a longer iteration protocol; it is not a new matched
-before/after pair.
-The final corrected-pose 1024-pair probe confirmation measures
-9005.3 +/- 71.88 us at 0 B/op (9.3% below its fresh baseline).
+With both refinements the fresh 1024-pair full-step control measures 34.469 +/-
+0.3244 ms at 0 B/op. Its matched fresh baseline is 36.695 +/- 0.710 ms (6.1%
+lower point estimate); the committed partition-phase capture was already faster
+at 35.573 +/- 0.3858 ms. Preserve baseline drift, short-iteration warnings and
+multimodal distributions rather than treating a single capture as a universal
+frame-time gain. The 64-pair combined result is 1.503 +/- 0.1040 ms and supports
+no small-scene speedup claim. An independent two-launch confirmation with 500-ms
+iterations measures 34.404 +/- 0.5312 ms at 0 B/op, consistent with the final
+capture. It confirms the after result under a longer iteration protocol; it is
+not a new matched before/after pair. The final corrected-pose 1024-pair probe
+confirmation measures 9005.3 +/- 71.88 us at 0 B/op (9.3% below its fresh
+baseline).
 
-Raw results live under `artifacts/grv-benchmark-023/`: `refinement-math-before-verified`,
-`refinement-math-after`, `refinement-corrected-before-verified`,
-`refinement-corrected-math-after`, `refinement-full-before`,
-`refinement-full-math-after`, `refinement-full-final`, `refinement-full-confirmation`,
-`refinement-planar-control-verified`, and `refinement-corrected-final`. Failed setup/build
-captures are preserved separately and supply no timing evidence. The initial
-short full-step pilot reported 3.44 KB/op; the longer matched controls report
-0 B/op and existing strict allocation gates remain authoritative.
+Raw results live under `artifacts/grv-benchmark-023/`:
+`refinement-math-before-verified`, `refinement-math-after`,
+`refinement-corrected-before-verified`, `refinement-corrected-math-after`,
+`refinement-full-before`, `refinement-full-math-after`, `refinement-full-final`,
+`refinement-full-confirmation`, `refinement-planar-control-verified`, and
+`refinement-corrected-final`. Failed setup/build captures are preserved
+separately and supply no timing evidence. The initial short full-step pilot
+reported 3.44 KB/op; the longer matched controls report 0 B/op and existing
+strict allocation gates remain authoritative.
 
 **Refinement validation:** Both local-stack solutions build for `netstandard2.1`
 and `net8.0` in Release/ReleaseLean with zero warnings/errors. Gravitas passes
 4403/4344 tests; FixedMathSharp passes 4138/4117 core tests plus 49 Chronicler
 tests per configuration, with no failures or skips. Exact OpenCover counts are:
 
-| Repository / configuration | Covered sequence points | Covered branches | Covered methods |
-| --- | --- | --- | --- |
-| Gravitas / Release | 44496 / 44496 | 13280 / 13280 | 4589 / 4589 |
-| Gravitas / ReleaseLean | 44494 / 44494 | 13280 / 13280 | 4588 / 4588 |
-| FixedMathSharp / Release | 52675 / 52675 | 12138 / 12138 | 3935 / 3935 |
-| FixedMathSharp / ReleaseLean | 52768 / 52768 | 12138 / 12138 | 3931 / 3931 |
+| Repository / configuration   | Covered sequence points | Covered branches | Covered methods |
+| ---------------------------- | ----------------------- | ---------------- | --------------- |
+| Gravitas / Release           | 44496 / 44496           | 13280 / 13280    | 4589 / 4589     |
+| Gravitas / ReleaseLean       | 44494 / 44494           | 13280 / 13280    | 4588 / 4588     |
+| FixedMathSharp / Release     | 52675 / 52675           | 12138 / 12138    | 3935 / 3935     |
+| FixedMathSharp / ReleaseLean | 52768 / 52768           | 12138 / 12138    | 3931 / 3931     |
 
 No coverage exclusions or allocation gates were changed. All 32 raw final
 benchmark GC records have zero allocation and collection counters. Independent
@@ -1495,25 +1609,26 @@ Rendered reports verify core/FluentAssertions from the core suite and Chronicler
 from its owning suite (85/85 lines, 12/12 branches, 18/18 fully covered methods
 in both configurations). Merging Chronicler's partial core dependency capture
 into the complete core report lost three covered lines in the Lean aggregation;
-the raw complete capture and core-only rendered control both remain fully covered.
-The failed merged-format control is retained, without modifying raw visits.
-ReportGenerator confirms zero uncovered lines, branches and fully covered methods
-for every owning assembly/configuration; see `refinement-coverage-summary.json`.
-All 463 upstream Short smoke cases have successful child exits and populated
-statistics, including 62 zero-allocation finite-axis controls. The smoke uses
-one launch, three warmups and three 10-ms iterations; its timings are not
-performance evidence. Both DocFX builds pass with warnings as errors, and API
-resources, branding, repository actions and local links pass. Logs and exports
-are `refinement-math-smoke*` and `refinement-<repository>-docfx.log`.
-FixedMathSharp must release before Gravitas's released-package revalidation;
-this evidence uses Windows sibling source with `UseLocalLsfStack=true`.
+the raw complete capture and core-only rendered control both remain fully
+covered. The failed merged-format control is retained, without modifying raw
+visits. ReportGenerator confirms zero uncovered lines, branches and fully
+covered methods for every owning assembly/configuration; see
+`refinement-coverage-summary.json`. All 463 upstream Short smoke cases have
+successful child exits and populated statistics, including 62 zero-allocation
+finite-axis controls. The smoke uses one launch, three warmups and three 10-ms
+iterations; its timings are not performance evidence. Both DocFX builds pass
+with warnings as errors, and API resources, branding, repository actions and
+local links pass. Logs and exports are `refinement-math-smoke*` and
+`refinement-<repository>-docfx.log`. FixedMathSharp must release before
+Gravitas's released-package revalidation; this evidence uses Windows sibling
+source with `UseLocalLsfStack=true`.
 
 **Prepared-query refinement (2026-10-03):** Closest/all-hit 2D services now pass
 their admitted exact segment and representable length through the existing
 detector and compound parts. Circle CCD reuses its admitted displacement after
 exact endpoint addition. Raw entry points retain their rejection order;
-normalization, authored support distance, and the saturating reverse-convex
-path are unchanged. No new runtime type, math owner or upstream edit is needed.
+normalization, authored support distance, and the saturating reverse-convex path
+are unchanged. No new runtime type, math owner or upstream edit is needed.
 
 Automatic 2D grounding reuses the closest-hit loops with the body's existing
 pure acceptance policy. Only accepted aggregate collider witnesses enter the
@@ -1521,78 +1636,80 @@ distance/owner-ID reducer. Compound parts still reduce before support filtering;
 ray candidate counts and static-style sweep exclusions are unchanged. This
 removes the per-body hit collection, retained capacity and additional hit sort.
 Diagnostics, support writes and callback lifetime validation still follow
-selection. Public all-hit buffers and explicit `QuerySupport` keep their contracts.
+selection. Public all-hit buffers and explicit `QuerySupport` keep their
+contracts.
 
 Fresh controls start from Gravitas `ee613db` and FixedMathSharp `6789c09`, using
 the same Windows/local-stack environment above. The requested CLI argument is
 `--affinity 3`; BenchmarkDotNet records the job display as `Affinity=11` in
-every capture. Preserve that command/display pair when reproducing the run.
-The 1024-pair scenes contain 2048 colliders. Timings below are ms/op, with the
+every capture. Preserve that command/display pair when reproducing the run. The
+1024-pair scenes contain 2048 colliders. Timings below are ms/op, with the
 half-width of the 99.9% confidence interval; every row reports 0 B/op.
 
-| Capture | Corrected-pose automatic probes | Full diagonal simulation step |
-| --- | --- | --- |
-| Fresh committed baseline | 10.3778 +/- 0.1907 | 39.3280 +/- 0.6776 |
-| Prepared segment only | 10.1208 +/- 0.1868 | 38.2636 +/- 0.5886 |
-| Prepared segment plus nearest accepted | 9.8572 +/- 0.2201 | 38.8105 +/- 0.7148 |
+| Capture                                | Corrected-pose automatic probes | Full diagonal simulation step |
+| -------------------------------------- | ------------------------------- | ----------------------------- |
+| Fresh committed baseline               | 10.3778 +/- 0.1907              | 39.3280 +/- 0.6776            |
+| Prepared segment only                  | 10.1208 +/- 0.1868              | 38.2636 +/- 0.5886            |
+| Prepared segment plus nearest accepted | 9.8572 +/- 0.2201               | 38.8105 +/- 0.7148            |
 
 These use two launches, five warmups and fifteen iterations: 250 ms for probes,
 500 ms for full steps. The probe baseline/length captures have short observed
 iterations; length/combined distributions are multimodal. The length/combined
-full runs also include the detection-only control (4.4819 +/- 0.0606 and
-4.5939 +/- 0.0672 ms); the fresh full baseline selects only the full step.
-Probe point estimates improve 5.0% from today's baseline, but neither the
-isolated length nor selection increment establishes a standalone speedup.
-Full-step intervals overlap, including the combined result's higher point
-estimate than length alone. No stable full-step gain is claimed. These fresh
-baselines are slower than the preceding phase; preserve that drift.
+full runs also include the detection-only control (4.4819 +/- 0.0606 and 4.5939
++/- 0.0672 ms); the fresh full baseline selects only the full step. Probe point
+estimates improve 5.0% from today's baseline, but neither the isolated length
+nor selection increment establishes a standalone speedup. Full-step intervals
+overlap, including the combined result's higher point estimate than length
+alone. No stable full-step gain is claimed. These fresh baselines are slower
+than the preceding phase; preserve that drift.
 
 `circle-ground-query-selection` pairs collect/sort/filter against nearest
-accepted selection at identical corrected poses, with prepared segment reuse
-in both paths. Setup compares the complete witness for every body and checks
-32/992 supported bodies at 64/1024 pairs. With the same two-launch job and
-500-ms iterations, its ms/op results are:
+accepted selection at identical corrected poses, with prepared segment reuse in
+both paths. Setup compares the complete witness for every body and checks 32/992
+supported bodies at 64/1024 pairs. With the same two-launch job and 500-ms
+iterations, its ms/op results are:
 
-| Pairs | Collect/sort/filter | Nearest accepted | Allocation |
-| --- | --- | --- | --- |
-| 64 | 0.4099 +/- 0.00675 | 0.4017 +/- 0.00612 | 0 B/op |
-| 1024 | 9.2889 +/- 0.12977 | 9.1682 +/- 0.16019 | 0 B/op |
+| Pairs | Collect/sort/filter | Nearest accepted   | Allocation |
+| ----- | ------------------- | ------------------ | ---------- |
+| 64    | 0.4099 +/- 0.00675  | 0.4017 +/- 0.00612 | 0 B/op     |
+| 1024  | 9.2889 +/- 0.12977  | 9.1682 +/- 0.16019 | 0 B/op     |
 
 Intervals overlap in both sizes; the paired run also reports multimodality and
 outliers, so retain the raw samples. Retain the existing-owner streaming design
-for its removed per-body storage and hit sort, with exact witness parity and
-no measured material regression; do not claim an isolated selection speedup.
-Raw JSON, logs and summaries are under `artifacts/grv-benchmark-023/` as
-`refinement3-ground-{before,length,stream}`, `refinement3-full-{before,length,stream}`,
-`refinement3-selection-paired`, `refinement3-timing-summary.json` and
-`refinement3-selection-summary.json`.
+for its removed per-body storage and hit sort, with exact witness parity and no
+measured material regression; do not claim an isolated selection speedup. Raw
+JSON, logs and summaries are under `artifacts/grv-benchmark-023/` as
+`refinement3-ground-{before,length,stream}`,
+`refinement3-full-{before,length,stream}`, `refinement3-selection-paired`,
+`refinement3-timing-summary.json` and `refinement3-selection-summary.json`.
 
 **Prepared-query validation:** Release/ReleaseLean solution builds cover both
 targets with zero warnings/errors. All 4430/4371 tests pass without skips,
-including 27 new prepared-query and automatic-probe regression cases.
-Exact OpenCover counts are:
+including 27 new prepared-query and automatic-probe regression cases. Exact
+OpenCover counts are:
 
 | Configuration | Covered sequence points | Covered branches | Covered methods |
-| --- | --- | --- | --- |
-| Release | 44492 / 44492 | 13284 / 13284 | 4595 / 4595 |
-| ReleaseLean | 44490 / 44490 | 13284 / 13284 | 4594 / 4594 |
+| ------------- | ----------------------- | ---------------- | --------------- |
+| Release       | 44492 / 44492           | 13284 / 13284    | 4595 / 4595     |
+| ReleaseLean   | 44490 / 44490           | 13284 / 13284    | 4594 / 4594     |
 
 ReportGenerator also verifies zero uncovered lines, branches and fully covered
-methods (56222/56220 lines, 16290 branches, 5405/5404 methods). Existing collector
-exclusions and strict allocation gates are unchanged. The first complete capture
-found a missing public all-hit geometric-miss branch after grounding stopped
-using that path; a direct overlapping-bounds/missed-circle regression closes it.
-The failed coverage control is retained separately. Final builds, TRX, raw
-coverage and rendered reports use `refinement3-final-Gravitas-<configuration>-*`;
-the exact rendered counts are in `refinement3-coverage-summary.json`.
-All ten affected public 2D raycast/sweep Short smoke rows have populated
-statistics, successful child exits and 0 B/op; short timings are not performance
-evidence. Across the before/length/combined, paired and smoke captures, all 34
-raw GC records have zero allocation/collection counters. Exports and validation
-counts are `refinement3-query-smoke*` and `refinement3-benchmark-validation.json`.
-Independent source, evidence and ponytail review found no remaining actionable issues.
-Gravitas DocFX builds with warnings as errors and passes API resource, branding,
-repository-action and local-link checks; log: `refinement3-Gravitas-docfx.log`.
+methods (56222/56220 lines, 16290 branches, 5405/5404 methods). Existing
+collector exclusions and strict allocation gates are unchanged. The first
+complete capture found a missing public all-hit geometric-miss branch after
+grounding stopped using that path; a direct overlapping-bounds/missed-circle
+regression closes it. The failed coverage control is retained separately. Final
+builds, TRX, raw coverage and rendered reports use
+`refinement3-final-Gravitas-<configuration>-*`; the exact rendered counts are in
+`refinement3-coverage-summary.json`. All ten affected public 2D raycast/sweep
+Short smoke rows have populated statistics, successful child exits and 0 B/op;
+short timings are not performance evidence. Across the before/length/combined,
+paired and smoke captures, all 34 raw GC records have zero allocation/collection
+counters. Exports and validation counts are `refinement3-query-smoke*` and
+`refinement3-benchmark-validation.json`. Independent source, evidence and
+ponytail review found no remaining actionable issues. Gravitas DocFX builds with
+warnings as errors and passes API resource, branding, repository-action and
+local-link checks; log: `refinement3-Gravitas-docfx.log`.
 
 **Further refinement (2026-10-04):** A fresh actual-iteration-only CPU profile
 of the committed `6c0c2f0` workload still attributes 15.666% exclusive CPU to
@@ -1601,10 +1718,11 @@ correction/repartition (43.02%, including fixture reset), planar sweeps (29.64%)
 and collider distribution (27.33%). Automatic 2D grounding contributes 27.072%
 inclusive; complete shape capture contributes 14.712%, including 7.517% in the
 forward-scaled planar transform. These shares overlap and are not independent
-frame costs. `refinement4-full-profile-actual-only.json` retains the attribution.
-That profiled child reports 24,624 raw allocated bytes over 12 operations;
-its cause was not attributed. Preserve this exception separately from the
-successful repeated allocation gates rather than assigning it to instrumentation.
+frame costs. `refinement4-full-profile-actual-only.json` retains the
+attribution. That profiled child reports 24,624 raw allocated bytes over 12
+operations; its cause was not attributed. Preserve this exception separately
+from the successful repeated allocation gates rather than assigning it to
+instrumentation.
 
 Centered 2D collider snapshots repeatedly transform zero local coordinates.
 FixedMathSharp's existing wide transform now returns the exact origin when both
@@ -1615,26 +1733,26 @@ origin/yaw ranges. Nonzero input keeps the existing fused arithmetic and final
 rounding. Host scale admission and snapshot ownership remain unchanged.
 
 With two launches, five warmups and fifteen 500-ms iterations, the centered
-256-operation microbenchmark changes from 1196.942 +/- 12.674 to
-16.280 +/- 0.229 ns per transform; the nonzero control is
-1536.411 +/- 15.456 / 1500.423 +/- 18.673 ns. Both report 0 B/op.
-Two matched physics captures isolate only this math change:
+256-operation microbenchmark changes from 1196.942 +/- 12.674 to 16.280 +/-
+0.229 ns per transform; the nonzero control is 1536.411 +/- 15.456 / 1500.423
++/- 18.673 ns. Both report 0 B/op. Two matched physics captures isolate only
+this math change:
 
-| Capture | Corrected-pose automatic probes, ms | Full 1024-pair diagonal step, ms |
-| --- | --- | --- |
-| Initial before | 9.478350 +/- 0.121474 | 36.543975 +/- 0.468481 |
-| Initial after | 9.963933 +/- 0.202656 | 34.223361 +/- 0.549934 |
-| Repeat before | 9.926890 +/- 0.167635 | 39.031101 +/- 0.605361 |
-| Repeat after | 9.767688 +/- 0.210000 | 33.779813 +/- 0.583872 |
+| Capture        | Corrected-pose automatic probes, ms | Full 1024-pair diagonal step, ms |
+| -------------- | ----------------------------------- | -------------------------------- |
+| Initial before | 9.478350 +/- 0.121474               | 36.543975 +/- 0.468481           |
+| Initial after  | 9.963933 +/- 0.202656               | 34.223361 +/- 0.549934           |
+| Repeat before  | 9.926890 +/- 0.167635               | 39.031101 +/- 0.605361           |
+| Repeat after   | 9.767688 +/- 0.210000               | 33.779813 +/- 0.583872           |
 
-All summaries report 0 B/op. One initial after grounding child reports
-24,624 raw allocated bytes over 53 operations despite the final-launch zero
-summary; both repeat captures have exact zero raw bytes/collections in every
-child. Preserve the initial exception rather than inferring allocation from
-the last-launch summary. Both full-step pairs improve, but the before values
-vary materially; do not collapse them into one precise speedup percentage.
-Automatic grounding does not perform this transform work. Its repeat intervals
-overlap, preserving the control after the initial shift. Logs and JSON are
+All summaries report 0 B/op. One initial after grounding child reports 24,624
+raw allocated bytes over 53 operations despite the final-launch zero summary;
+both repeat captures have exact zero raw bytes/collections in every child.
+Preserve the initial exception rather than inferring allocation from the
+last-launch summary. Both full-step pairs improve, but the before values vary
+materially; do not collapse them into one precise speedup percentage. Automatic
+grounding does not perform this transform work. Its repeat intervals overlap,
+preserving the control after the initial shift. Logs and JSON are
 `refinement4-transform-{before,after}`, `refinement4-{before,math-after}` and
 `refinement4-math-repeat-{before,after}`.
 
@@ -1644,25 +1762,25 @@ including boxed value copies, stays inside the lock. `HasPartition` and default
 lookup reuse this owner. Reset callbacks can clear or pool a still-published
 payload, so an unlocked positive-hit shortcut would weaken the current contract.
 No cache or synchronization redesign is introduced. Initial first-slot lookup
-means change from 19.550/19.555 ns to 18.682/18.516 ns at one/256 voxels, but the
-generic provider control also shifts. Native inlining removes a generic call
+means change from 19.550/19.555 ns to 18.682/18.516 ns at one/256 voxels, but
+the generic provider control also shifts. Native inlining removes a generic call
 while growing the voxel machine-code body from 191 to 416 bytes. A fresh
 runtime-only toggle confirms retrieval at 256 voxels, 19.6266 +/- 0.2135 to
-18.6804 +/- 0.1832 ns; presence checks, 20.0508 +/- 0.2773 to
-18.5102 +/- 0.2138 ns; and default lookup, 19.4804 +/- 0.2300 to
-18.9223 +/- 0.2364 ns. The untouched type-key control remains
-2.0077 +/- 0.0230 / 2.0146 +/- 0.0224 ns. The full 1024-pair step remains
-34.0187 +/- 0.4391 / 33.9997 +/- 0.4845 ms and corrected-pose probes remain
-9.7303 +/- 0.1491 / 9.7157 +/- 0.1252 ms, with overlapping intervals.
-Retain the small lookup improvement; no measurable full-step or grounding gain
-is claimed. All 24 child records in these matched micro/consumer captures have
-zero raw allocated bytes and collections, alongside 0 B/op summaries.
-The controls use the same two-launch/five-warmup/fifteen-500-ms-iteration job
-and CLI `--affinity 3`. Evidence is `refinement4-grid-repeat-{before,after}`
-and `refinement4-grid-consumer-{before,after}`. GridForge tracks the coordinated experiment as
-`GF-Benchmark-013`. Its benchmark runner also propagates the source-stack build
-properties explicitly, preserving Release/Lean and CLI job settings after two
-reproduced generated-child build failures.
+18.6804 +/- 0.1832 ns; presence checks, 20.0508 +/- 0.2773 to 18.5102 +/- 0.2138
+ns; and default lookup, 19.4804 +/- 0.2300 to 18.9223 +/- 0.2364 ns. The
+untouched type-key control remains 2.0077 +/- 0.0230 / 2.0146 +/- 0.0224 ns. The
+full 1024-pair step remains 34.0187 +/- 0.4391 / 33.9997 +/- 0.4845 ms and
+corrected-pose probes remain 9.7303 +/- 0.1491 / 9.7157 +/- 0.1252 ms, with
+overlapping intervals. Retain the small lookup improvement; no measurable
+full-step or grounding gain is claimed. All 24 child records in these matched
+micro/consumer captures have zero raw allocated bytes and collections, alongside
+0 B/op summaries. The controls use the same
+two-launch/five-warmup/fifteen-500-ms-iteration job and CLI `--affinity 3`.
+Evidence is `refinement4-grid-repeat-{before,after}` and
+`refinement4-grid-consumer-{before,after}`. GridForge tracks the coordinated
+experiment as `GF-Benchmark-013`. Its benchmark runner also propagates the
+source-stack build properties explicitly, preserving Release/Lean and CLI job
+settings after two reproduced generated-child build failures.
 
 **Rejected 3D grounding experiment:** Streaming accepted supports through the
 existing ray/sphere traversal removed the all-hit buffer and sort, while
@@ -1677,24 +1795,26 @@ grounding and query workers have been restored to `6c0c2f0`.
 Representative matched results use two launches, five warmups, fifteen 500-ms
 iterations and CLI `--affinity 3`. Errors are 99.9% confidence half-widths:
 
-| 64-probe workload | Existing implementation, microseconds | Rejected final candidate, microseconds |
-| --- | --- | --- |
-| Ray, one target, unsupported | 179.834 +/- 2.892 | 194.275 +/- 3.036 |
-| Ray, one target, supported | 259.449 +/- 3.627 | 283.795 +/- 5.292 |
-| Public closest ray control | 169.820 +/- 2.688 | 167.119 +/- 4.718 |
-| Ray, eight targets, unsupported | 759.658 +/- 12.927 | 597.001 +/- 9.941 |
-| Ray, eight targets, supported | 838.863 +/- 12.895 | 686.102 +/- 10.794 |
+| 64-probe workload               | Existing implementation, microseconds | Rejected final candidate, microseconds |
+| ------------------------------- | ------------------------------------- | -------------------------------------- |
+| Ray, one target, unsupported    | 179.834 +/- 2.892                     | 194.275 +/- 3.036                      |
+| Ray, one target, supported      | 259.449 +/- 3.627                     | 283.795 +/- 5.292                      |
+| Public closest ray control      | 169.820 +/- 2.688                     | 167.119 +/- 4.718                      |
+| Ray, eight targets, unsupported | 759.658 +/- 12.927                    | 597.001 +/- 9.941                      |
+| Ray, eight targets, supported   | 838.863 +/- 12.895                    | 686.102 +/- 10.794                     |
 
 The one-target unsupported/control baselines are the old-runtime control repeat;
 supported and dense baselines are the initial old-runtime capture. Dense ray
 grounding improves about 18-21%, but repeated sparse ray grounding regresses
-about 8-10% with disjoint intervals. Sphere results do not establish a consistent
-dense-case gain; public closest-sphere control intervals overlap. This is a poor
-default tradeoff. All 20 children in the rejected final candidate have zero raw
-allocated bytes/collections and successful exits. Evidence retains
-`refinement4-ground3d-before-boolean`, `refinement4-ground3d-control-repeat-before`,
-the superseded variants, and `refinement4-ground3d-guarded`. The ignored
-`refinement4-ground3d-rejected-runtime.patch` preserves the rejected runtime diff.
+about 8-10% with disjoint intervals. Sphere results do not establish a
+consistent dense-case gain; public closest-sphere control intervals overlap.
+This is a poor default tradeoff. All 20 children in the rejected final candidate
+have zero raw allocated bytes/collections and successful exits. Evidence retains
+`refinement4-ground3d-before-boolean`,
+`refinement4-ground3d-control-repeat-before`, the superseded variants, and
+`refinement4-ground3d-guarded`. The ignored
+`refinement4-ground3d-rejected-runtime.patch` preserves the rejected runtime
+diff.
 
 The retained public-only `ground-probe-selection3-d` fixture checks 64 identical
 probe workloads across ray/sphere, one/eight targets and supported/unsupported
@@ -1711,74 +1831,73 @@ failed captures remain separate from valid results.
 tests. Solution builds cover both library target frameworks with zero
 warnings/errors. Owning raw OpenCover counts are:
 
-| Owner | Tests, Release / Lean | Sequence points, Release / Lean | Branches, each | Methods, Release / Lean |
-| --- | --- | --- | --- | --- |
-| FixedMathSharp core/FluentAssertions | 4140 / 4119 | 52678 / 52771 | 12142 | 3935 / 3931 |
-| GridForge | 1171 / 1171 | 9333 / 9333 | 4171 | 1145 / 1145 |
-| Gravitas | 4467 / 4408 | 44492 / 44490 | 13284 | 4595 / 4594 |
+| Owner                                | Tests, Release / Lean | Sequence points, Release / Lean | Branches, each | Methods, Release / Lean |
+| ------------------------------------ | --------------------- | ------------------------------- | -------------- | ----------------------- |
+| FixedMathSharp core/FluentAssertions | 4140 / 4119           | 52678 / 52771                   | 12142          | 3935 / 3931             |
+| GridForge                            | 1171 / 1171           | 9333 / 9333                     | 4171           | 1145 / 1145             |
+| Gravitas                             | 4467 / 4408           | 44492 / 44490                   | 13284          | 4595 / 4594             |
 
 Every listed point, branch and method is covered. FixedMathSharp's Chronicler
-suite adds 49 passing tests per configuration and an independently filtered
-100% report. Rendered reports confirm 100% lines, branches and fully covered
-methods without changing exclusions: FixedMathSharp/FluentAssertions and
-GridForge match the counts above; Gravitas' report aggregation totals
-56222/56220 lines, 16290 branches and 5405/5404 methods, all covered. Preserve
-raw and rendered counts separately. Evidence is
-`refinement4-coverage-summary.json`, `refinement4-<owner>-<configuration>-*`
-and `refinement4-retained-Gravitas-<configuration>-*`. Candidate-era captures
-remain historical evidence, not validation of the restored runtime.
+suite adds 49 passing tests per configuration and an independently filtered 100%
+report. Rendered reports confirm 100% lines, branches and fully covered methods
+without changing exclusions: FixedMathSharp/FluentAssertions and GridForge match
+the counts above; Gravitas' report aggregation totals 56222/56220 lines, 16290
+branches and 5405/5404 methods, all covered. Preserve raw and rendered counts
+separately. Evidence is `refinement4-coverage-summary.json`,
+`refinement4-<owner>-<configuration>-*` and
+`refinement4-retained-Gravitas-<configuration>-*`. Candidate-era captures remain
+historical evidence, not validation of the restored runtime.
 
-All 30 lookup smoke cases, one Lean generated-runner Dry case, five existing
-3D all-hit query cases and all 16 retained grounding fixture cases complete
-with successful child exits and exact zero raw allocated bytes/GC collections.
-The Lean runner retains its configuration and all three source-stack child
+All 30 lookup smoke cases, one Lean generated-runner Dry case, five existing 3D
+all-hit query cases and all 16 retained grounding fixture cases complete with
+successful child exits and exact zero raw allocated bytes/GC collections. The
+Lean runner retains its configuration and all three source-stack child
 properties. `refinement4-benchmark-validation.json` audits populated statistics,
 summary allocation and every raw child record, retaining the documented initial
 math-capture exception. Independent source, evidence and ponytail review found
 no actionable issues. These local source-stack results precede release-package
-validation; release FixedMathSharp first.
-All three DocFX builds pass with warnings as errors, API resources, branding,
-repository actions and local links verified. Logs are
-`refinement4-<owner>-docfx.log`.
+validation; release FixedMathSharp first. All three DocFX builds pass with
+warnings as errors, API resources, branding, repository actions and local links
+verified. Logs are `refinement4-<owner>-docfx.log`.
 
 A fresh actual-iteration-only profile after the retained upstream changes
 attributes 16.151% exclusive sampled CPU to typed voxel lookup and 12.626%
-exclusive / 20.006% inclusive to 2D collider distribution. Automatic 2D grounding
-is 31.764% inclusive. The centered-transform arithmetic frame is effectively
-removed. These overlapping attribution shares are not matched timing gains;
-the profile child has zero raw allocation/collections. Evidence is
+exclusive / 20.006% inclusive to 2D collider distribution. Automatic 2D
+grounding is 31.764% inclusive. The centered-transform arithmetic frame is
+effectively removed. These overlapping attribution shares are not matched timing
+gains; the profile child has zero raw allocation/collections. Evidence is
 `refinement4-final-profile-actual-only.json` and its trace capture.
 
-**Refinement 5 (2026-10-04), retained and ready for review:** Pure 2D candidate gathering now
-visits partition membership directly instead of sorting partitions and copied
-IDs before deduplication. The final candidate collider-ID sort remains, keeping
-the narrow-phase/hit reduction order stable. No public result ordering changes.
-Three-dimensional ray/sweep partition gathering already has direct membership
-traversal; the separate planar candidate-index rebuild still uses sorted member
-copies, so those paths must not be conflated.
+**Refinement 5 (2026-10-04), retained and ready for review:** Pure 2D candidate
+gathering now visits partition membership directly instead of sorting partitions
+and copied IDs before deduplication. The final candidate collider-ID sort
+remains, keeping the narrow-phase/hit reduction order stable. No public result
+ordering changes. Three-dimensional ray/sweep partition gathering already has
+direct membership traversal; the separate planar candidate-index rebuild still
+uses sorted member copies, so those paths must not be conflated.
 
 Matched query controls use two launches, five warmups and fifteen 250-ms
 iterations, CLI `--affinity 3`, the local source stack and environment above.
 Errors are half of the 99.9% intervals; every summary reports 0 B/op:
 
-| Query-gather control | Before mean +/- error | After mean +/- error |
-| --- | --- | --- |
-| Full diagonal step, 64 pairs | 1.507 +/- 0.2240 ms | 1.350 +/- 0.1643 ms |
-| Full diagonal step, 1024 pairs | 32.233 +/- 0.3401 ms | 31.567 +/- 0.3489 ms |
-| Corrected automatic probes, 64 pairs | 407.6 +/- 7.18 us | 394.9 +/- 5.53 us |
-| Corrected automatic probes, 1024 pairs | 9297.6 +/- 124.25 us | 9111.8 +/- 138.72 us |
+| Query-gather control                   | Before mean +/- error | After mean +/- error |
+| -------------------------------------- | --------------------- | -------------------- |
+| Full diagonal step, 64 pairs           | 1.507 +/- 0.2240 ms   | 1.350 +/- 0.1643 ms  |
+| Full diagonal step, 1024 pairs         | 32.233 +/- 0.3401 ms  | 31.567 +/- 0.3489 ms |
+| Corrected automatic probes, 64 pairs   | 407.6 +/- 7.18 us     | 394.9 +/- 5.53 us    |
+| Corrected automatic probes, 1024 pairs | 9297.6 +/- 124.25 us  | 9111.8 +/- 138.72 us |
 
 Full-step and 1024-probe intervals overlap; this capture does not establish a
 stable full-step gain. The paired selection control preserves both complete
-witness paths; its 1024 nearest-accepted row is 8951.9 +/- 233.13 versus
-8819.0 +/- 404.23 us, also overlapping. Retain the lean gather for removed
-redundant work and ordering parity; final correctness and coverage gates pass. Short
+witness paths; its 1024 nearest-accepted row is 8951.9 +/- 233.13 versus 8819.0
++/- 404.23 us, also overlapping. Retain the lean gather for removed redundant
+work and ordering parity; final correctness and coverage gates pass. Short
 observed iterations, outliers and multimodality remain in the raw capture and
 audit; do not discard them when interpreting the reported intervals.
 
-The density probe replays compiled admission/canonical owners outside timing.
-At 1024 diagonal pairs, unit cells produce 123904 active partitions, 123904
-dynamic memberships, 57344 static memberships and 57344 emitted links; canonical
+The density probe replays compiled admission/canonical owners outside timing. At
+1024 diagonal pairs, unit cells produce 123904 active partitions, 123904 dynamic
+memberships, 57344 static memberships and 57344 emitted links; canonical
 ownership rejects 56320, leaving 1024 accepted pairs. Sixteen-unit cells produce
 1024 active partitions and 3969 links, of which bounds reject 2945, also leaving
 1024 accepted pairs. At 256 pairs, unit cells produce 30976 active partitions
@@ -1788,100 +1907,101 @@ reject 689, leaving the same 256 pairs. The 64-pair cases produce 7744 fine-cell
 partitions and 3584 links, or 64 coarse-cell partitions and 189 links; canonical
 ownership and bounds reject 3520 and 125 links respectively. All 12 final probe
 cases pass witness and candidate checks. Fine-cell memberships and links scale
-exactly with pair count in this fixture. These are sparse local memberships replicated over coverage, not
-dense collision neighborhoods. Known correction counts are fixture invariants,
-not instrumented counts of production correction calls.
+exactly with pair count in this fixture. These are sparse local memberships
+replicated over coverage, not dense collision neighborhoods. Known correction
+counts are fixture invariants, not instrumented counts of production correction
+calls.
 
-Bounds-first pure 2D rejection is retained: disjoint bounds skip
-costly physical admission before canonical ownership, while bounds-accepted
-pairs retain the existing physical filters. Six matched full-step controls use
-the same job and 0 B/op summaries. Representative means +/- errors are
-200.219 +/- 1.825 -> 194.252 +/- 1.330 ms for 1024 diagonal pairs/unit cells,
-31.542 +/- 0.207 -> 29.849 +/- 0.708 ms for 1024 diagonal pairs/16-unit cells,
-and 23.902 +/- 0.467 -> 22.804 +/- 0.162 ms for 1024 axis pairs/16-unit cells.
-Do not copy this gate into 3D: retained pair culling/lifecycle rules require a
-different admission boundary. Public filtering, notifications and stale-pair
-cleanup must retain their dimensional contracts.
+Bounds-first pure 2D rejection is retained: disjoint bounds skip costly physical
+admission before canonical ownership, while bounds-accepted pairs retain the
+existing physical filters. Six matched full-step controls use the same job and 0
+B/op summaries. Representative means +/- errors are 200.219 +/- 1.825 -> 194.252
++/- 1.330 ms for 1024 diagonal pairs/unit cells, 31.542 +/- 0.207 -> 29.849 +/-
+0.708 ms for 1024 diagonal pairs/16-unit cells, and 23.902 +/- 0.467 -> 22.804
++/- 0.162 ms for 1024 axis pairs/16-unit cells. Do not copy this gate into 3D:
+retained pair culling/lifecycle rules require a different admission boundary.
+Public filtering, notifications and stale-pair cleanup must retain their
+dimensional contracts.
 
 A second runtime-only bounds-gate toggle preserves the query-gather change in
-both versions and repeats the same six full-step rows. Representative first
-and repeated captures are:
+both versions and repeats the same six full-step rows. Representative first and
+repeated captures are:
 
-| Bounds-first control | Initial before / after, ms +/- error | Repeat before / after, ms +/- error |
-| --- | --- | --- |
-| 1024 diagonal pairs, unit cells | 200.219 +/- 1.825 / 194.252 +/- 1.330 | 201.122 +/- 1.795 / 200.645 +/- 4.248 |
-| 1024 diagonal pairs, 16-unit cells | 31.542 +/- 0.207 / 29.849 +/- 0.708 | 30.448 +/- 0.627 / 29.967 +/- 0.682 |
-| 1024 axis pairs, 16-unit cells | 23.902 +/- 0.467 / 22.804 +/- 0.162 | 23.718 +/- 0.529 / 23.333 +/- 0.465 |
+| Bounds-first control               | Initial before / after, ms +/- error  | Repeat before / after, ms +/- error   |
+| ---------------------------------- | ------------------------------------- | ------------------------------------- |
+| 1024 diagonal pairs, unit cells    | 200.219 +/- 1.825 / 194.252 +/- 1.330 | 201.122 +/- 1.795 / 200.645 +/- 4.248 |
+| 1024 diagonal pairs, 16-unit cells | 31.542 +/- 0.207 / 29.849 +/- 0.708   | 30.448 +/- 0.627 / 29.967 +/- 0.682   |
+| 1024 axis pairs, 16-unit cells     | 23.902 +/- 0.467 / 22.804 +/- 0.162   | 23.718 +/- 0.529 / 23.333 +/- 0.465   |
 
-The repeat intervals overlap in these rows; initial gains are not stable
-speedup evidence. Retain the cheap exact disjoint rejection for avoiding
-unnecessary admission work, with no measured material regression and behavior
-parity. Final correctness and coverage gates pass. Small-scene baseline drift further limits
+The repeat intervals overlap in these rows; initial gains are not stable speedup
+evidence. Retain the cheap exact disjoint rejection for avoiding unnecessary
+admission work, with no measured material regression and behavior parity. Final
+correctness and coverage gates pass. Small-scene baseline drift further limits
 attribution. Repeat artifacts are `refinement5-admission-repeat-{before,after}`.
-The complete fixture now exposes 36 rows: 64/256/1024 pairs, Axis/Diagonal/Rotated,
-one-/16-unit X/Z cells and two measured methods. All 36 smoke rows pass.
-The final nine-row full-step count-scaling matrix uses two launches, five
-warmups and fifteen 250-ms iterations, CLI `--affinity 3` (displayed as `11`),
-and the local source stack. Every row reports 0 B/op:
+The complete fixture now exposes 36 rows: 64/256/1024 pairs,
+Axis/Diagonal/Rotated, one-/16-unit X/Z cells and two measured methods. All 36
+smoke rows pass. The final nine-row full-step count-scaling matrix uses two
+launches, five warmups and fifteen 250-ms iterations, CLI `--affinity 3`
+(displayed as `11`), and the local source stack. Every row reports 0 B/op:
 
 | Geometry / X/Z cell size | 64 pairs, ms +/- error | 256 pairs, ms +/- error | 1024 pairs, ms +/- error |
-| --- | --- | --- | --- |
-| Axis / 16 | 0.9574 +/- 0.0537 | 3.9249 +/- 0.0265 | 23.0800 +/- 0.1873 |
-| Diagonal / 16 | 1.1440 +/- 0.0105 | 5.5369 +/- 0.0864 | 30.0562 +/- 0.5735 |
-| Diagonal / 1 | 9.7818 +/- 0.1831 | 45.0489 +/- 0.4199 | 201.9929 +/- 4.3606 |
+| ------------------------ | ---------------------- | ----------------------- | ------------------------ |
+| Axis / 16                | 0.9574 +/- 0.0537      | 3.9249 +/- 0.0265       | 23.0800 +/- 0.1873       |
+| Diagonal / 16            | 1.1440 +/- 0.0105      | 5.5369 +/- 0.0864       | 30.0562 +/- 0.5735       |
+| Diagonal / 1             | 9.7818 +/- 0.1831      | 45.0489 +/- 0.4199      | 201.9929 +/- 4.3606      |
 
 Full-frame cost is not uniformly linear. Retained distribution sorts active
-partitions with `SortInPlace`, an O(P log P) operation required for deterministic
-callback order. The timings are consistent with an increasing ordered working
-set alongside covered memberships; this source-based explanation is not a
-profiled attribution of the measured scaling. Fine-cell coverage remains a
-substantial configuration cost. Evidence is `refinement5-final-scaling`.
+partitions with `SortInPlace`, an O(P log P) operation required for
+deterministic callback order. The timings are consistent with an increasing
+ordered working set alongside covered memberships; this source-based explanation
+is not a profiled attribution of the measured scaling. Fine-cell coverage
+remains a substantial configuration cost. Evidence is
+`refinement5-final-scaling`.
 
 An early accepted-key `Contains` before canonical ownership was tested and
 rejected. Despite 56320 potential repeated-key hits in the fine 1024 diagonal
-probe, the measured full step regresses from 194.252 +/- 1.330 to
-236.215 +/- 2.768 ms, a 21.60% regression with disjoint intervals.
-Coarse axis also regresses, 22.804 +/- 0.162 to
-24.146 +/- 0.114 ms. Preserve these observations; avoid an extra hot-path hash
-probe based only on potential skip counts. No runtime early-Contains candidate
-is retained.
+probe, the measured full step regresses from 194.252 +/- 1.330 to 236.215 +/-
+2.768 ms, a 21.60% regression with disjoint intervals. Coarse axis also
+regresses, 22.804 +/- 0.162 to 24.146 +/- 0.114 ms. Preserve these observations;
+avoid an extra hot-path hash probe based only on potential skip counts. No
+runtime early-Contains candidate is retained.
 
 Evidence: `artifacts/grv-benchmark-023/refinement5-query-{before,after}`,
 `refinement5-density-probe/density.json`, `refinement5-admission-{before,after}`
 and `refinement5-dedup-after`, plus the admission repeats, final scaling and
 smoke captures. `refinement5-audit-captures.py --include-final` passes;
 `refinement5-capture-audit.json` verifies 10 captures, 96 positive rows and 151
-successful children. All 151 raw GC records contain exactly zero allocated
-bytes and Gen0/1/2 collections, all memory summaries are zero, and every child
-uses the local-stack build flags. Small-scene baseline drift prevents claiming
-a large portable gain from the initial admission capture. Revisit 3D streaming only
-after profiling explains its sparse-ray regression. Released-package
+successful children. All 151 raw GC records contain exactly zero allocated bytes
+and Gen0/1/2 collections, all memory summaries are zero, and every child uses
+the local-stack build flags. Small-scene baseline drift prevents claiming a
+large portable gain from the initial admission capture. Revisit 3D streaming
+only after profiling explains its sparse-ray regression. Released-package
 validation remains a later release gate for the coordinated upstream changes.
 
 **Refinement-5 final correctness/coverage gates:** Local-stack Release and
 ReleaseLean solution builds cover `netstandard2.1` and `net8.0` with zero
-warnings/errors. Release passes **4473 tests** and Lean **4414**, with no failures
-or skips. Raw and rendered coverage independently retain 100% coverage:
+warnings/errors. Release passes **4473 tests** and Lean **4414**, with no
+failures or skips. Raw and rendered coverage independently retain 100% coverage:
 
-| Configuration | Raw sequence points | Raw branches | Raw methods | Rendered lines | Rendered branches | Rendered fully covered methods |
-| --- | --- | --- | --- | --- | --- | --- |
-| Release | 44495 / 44495 | 13286 / 13286 | 4596 / 4596 | 56225 / 56225 | 16292 / 16292 | 5406 / 5406 |
-| ReleaseLean | 44493 / 44493 | 13286 / 13286 | 4595 / 4595 | 56223 / 56223 | 16292 / 16292 | 5405 / 5405 |
+| Configuration | Raw sequence points | Raw branches  | Raw methods | Rendered lines | Rendered branches | Rendered fully covered methods |
+| ------------- | ------------------- | ------------- | ----------- | -------------- | ----------------- | ------------------------------ |
+| Release       | 44495 / 44495       | 13286 / 13286 | 4596 / 4596 | 56225 / 56225  | 16292 / 16292     | 5406 / 5406                    |
+| ReleaseLean   | 44493 / 44493       | 13286 / 13286 | 4595 / 4595 | 56223 / 56223  | 16292 / 16292     | 5405 / 5405                    |
 
 Evidence is `refinement5-final-Gravitas-{Release,ReleaseLean}*`. Upstream edits
-in this pass are documentation-only; the previously committed FixedMathSharp
-and GridForge changes retain their recorded full owning-suite coverage.
-The final nine-row scaling capture, 36-row circle fixture smoke and five public
-3D query controls all pass. The 41 short smoke rows verify execution, contracts
-and allocation behavior; they do not establish timing improvements. The joint
-audit includes these final captures. Gravitas, FixedMathSharp and GridForge
-DocFX gates pass with warnings as errors, zero warnings/errors and verified
-local API links, resources, branding and repository actions; evidence is
+in this pass are documentation-only; the previously committed FixedMathSharp and
+GridForge changes retain their recorded full owning-suite coverage. The final
+nine-row scaling capture, 36-row circle fixture smoke and five public 3D query
+controls all pass. The 41 short smoke rows verify execution, contracts and
+allocation behavior; they do not establish timing improvements. The joint audit
+includes these final captures. Gravitas, FixedMathSharp and GridForge DocFX
+gates pass with warnings as errors, zero warnings/errors and verified local API
+links, resources, branding and repository actions; evidence is
 `refinement5-doc-gates.ps1` and its logs.
 
 **Closure decision, 2026-10-04:** Close this signal under the selected
-predictable-scaling/published-cost criterion with the final captures, audits
-and correctness/coverage gates passed. Retain the measured ownership/storage/math
+predictable-scaling/published-cost criterion with the final captures, audits and
+correctness/coverage gates passed. Retain the measured ownership/storage/math
 repairs and lean query gathering; retain exact cheap bounds rejection without
 claiming a stable full-step speedup. Reject the regressing early duplicate hash
 probe and streamed 3D grounding. Fine-cell coverage has a high configuration
@@ -1893,12 +2013,12 @@ validation remains a future release gate.
 
 ### GRV-Benchmark-022 — Exact Pure-2D Circle Contact Cost
 
-**Discovered:** 2026-09-30 while implementing GRV-Issue-083.  
-**Status:** Closed 2026-10-02: shared-owner optimization is committed upstream;
-retain the exact contact path under the no-further-change decision below.
-Larger-scene scaling is documented separately in closed GRV-Benchmark-023.  
-**Owner:** FixedMathSharp's existing centered-capsule relation with two zero
-core lengths; Gravitas forwards complete contact anchors, normal, depth and clamp.
+**Discovered:** 2026-09-30 while implementing GRV-Issue-083. **Status:** Closed
+2026-10-02: shared-owner optimization is committed upstream; retain the exact
+contact path under the no-further-change decision below. Larger-scene scaling is
+documented separately in closed GRV-Benchmark-023. **Owner:** FixedMathSharp's
+existing centered-capsule relation with two zero core lengths; Gravitas forwards
+complete contact anchors, normal, depth and clamp.
 
 Replacing saturated scalar circle arithmetic fixes large-coordinate false hits,
 tiny-distance underflow and incorrect depth/clamping. However, the complete
@@ -1910,50 +2030,52 @@ anchor-representation equivalence with the old rounded-offset implementation.
 Windows 11 / i7-9700K, .NET 8.0.29, SDK 10.0.302; two launches, five warmups,
 fifteen 250 ms iterations, CPU mask 3, BelowNormal launcher and
 `DOTNET_PROCESSOR_COUNT=2`, with one heavy workload at a time. Values are
-**microseconds per direct query**, not simulation frames. All rows allocate
-**0 B/op**. Error is the half-width of the 99.9% confidence interval.
+**microseconds per direct query**, not simulation frames. All rows allocate **0
+B/op**. Error is the half-width of the 99.9% confidence interval.
 
-| Geometry | Previous scalar path | Initial complete query | Optimized complete query | Optimized error |
-| --- | ---: | ---: | ---: | ---: |
-| Axis | 0.06659 | 5.4363 | 0.9125 | 0.00248 |
-| Coincident | 0.04828 | 2.6035 | 0.6277 | 0.00371 |
-| Diagonal | 0.11101 | 4.3406 | 1.4513 | 0.00853 |
-| Large axis | 0.10016 | 5.4263 | 0.9548 | 0.00236 |
-| Rotated | 0.06712 | 5.8454 | 1.6113 | 0.00974 |
-| Bounds-admitted separation | 0.02542 | 0.9027 | 0.2182 | 0.00077 |
+| Geometry                   | Previous scalar path | Initial complete query | Optimized complete query | Optimized error |
+| -------------------------- | -------------------: | ---------------------: | -----------------------: | --------------: |
+| Axis                       |              0.06659 |                 5.4363 |                   0.9125 |         0.00248 |
+| Coincident                 |              0.04828 |                 2.6035 |                   0.6277 |         0.00371 |
+| Diagonal                   |              0.11101 |                 4.3406 |                   1.4513 |         0.00853 |
+| Large axis                 |              0.10016 |                 5.4263 |                   0.9548 |         0.00236 |
+| Rotated                    |              0.06712 |                 5.8454 |                   1.6113 |         0.00974 |
+| Bounds-admitted separation |              0.02542 |                 0.9027 |                   0.2182 |         0.00077 |
 
 The initial slowdown was 35.5-87.1x. Shared-owner work removes 66.6-83.2% of
-that complete-query time, but the remaining cost is still 8.6-24.0x the old scalar
-path. This is a substantial reduction, not scalar-cost parity or an accepted
-full-simulation budget. Retain the raw distributions, including a baseline
-bimodality warning; the final Gravitas run reported no multimodality warning.
-The old path is not a full-domain correctness target. In particular, comparing
-an exact squared distance alone would not repair normal, depth or anchor terms.
+that complete-query time, but the remaining cost is still 8.6-24.0x the old
+scalar path. This is a substantial reduction, not scalar-cost parity or an
+accepted full-simulation budget. Retain the raw distributions, including a
+baseline bimodality warning; the final Gravitas run reported no multimodality
+warning. The old path is not a full-domain correctness target. In particular,
+comparing an exact squared distance alone would not repair normal, depth or
+anchor terms.
 
 **Shared-owner optimization, 2026-09-30:** EventPipe sampling of the complete
 circle query's Axis fixture put approximately 45% of inclusive query samples in
-depth reduction and 29% in its product square root; these overlap and are not additive. Parameter
-construction, local offsets, normalization and retained radial terms added work.
-FixedMathSharp now represents point cores directly over denominator one, reuses
-its narrower exact root, classifies conceptual depth before rounding, and skips
-irrelevant axis rotations/zero offsets. Cardinal normalization skips roots and
-division. Both dimensions share the existing residual owner, whose retained low
-word is computed directly with equivalent unchecked integer arithmetic. No
-second Gravitas solver, approximation, cache, public API or dependency was added.
+depth reduction and 29% in its product square root; these overlap and are not
+additive. Parameter construction, local offsets, normalization and retained
+radial terms added work. FixedMathSharp now represents point cores directly over
+denominator one, reuses its narrower exact root, classifies conceptual depth
+before rounding, and skips irrelevant axis rotations/zero offsets. Cardinal
+normalization skips roots and division. Both dimensions share the existing
+residual owner, whose retained low word is computed directly with equivalent
+unchecked integer arithmetic. No second Gravitas solver, approximation, cache,
+public API or dependency was added.
 
 Matched upstream `zero-core-contact` runs use the same settings and geometry as
 above, plus a nonzero-core capsule control. Values remain **microseconds per
 query**, with **0 B/op** throughout:
 
-| Geometry | Circle before | Circle optimized | Sphere before | Sphere optimized |
-| --- | ---: | ---: | ---: | ---: |
-| Axis | 5.3077 | 0.9135 | 9.4406 | 1.1843 |
-| Coincident | 2.6306 | 0.6104 | 6.6275 | 0.7644 |
-| Diagonal | 4.4942 | 1.4536 | 8.7157 | 1.7991 |
-| Large axis | 5.6523 | 0.9243 | 9.8707 | 1.2599 |
-| Rotated | 6.1178 | 1.6234 | 8.9603 | 1.7449 |
-| Separation | 0.9026 | 0.2007 | 2.3985 | 0.1489 |
-| Nonzero capsule control | 6.0087 | 3.8004 | 10.1398 | 7.7200 |
+| Geometry                | Circle before | Circle optimized | Sphere before | Sphere optimized |
+| ----------------------- | ------------: | ---------------: | ------------: | ---------------: |
+| Axis                    |        5.3077 |           0.9135 |        9.4406 |           1.1843 |
+| Coincident              |        2.6306 |           0.6104 |        6.6275 |           0.7644 |
+| Diagonal                |        4.4942 |           1.4536 |        8.7157 |           1.7991 |
+| Large axis              |        5.6523 |           0.9243 |        9.8707 |           1.2599 |
+| Rotated                 |        6.1178 |           1.6234 |        8.9603 |           1.7449 |
+| Separation              |        0.9026 |           0.2007 |        2.3985 |           0.1489 |
+| Nonzero capsule control |        6.0087 |           3.8004 |       10.1398 |           7.7200 |
 
 The axis-sphere distribution is bimodal; its 99.9% interval is
 `1.1843 +/- 0.03092 us`, still well separated from the old result. Full upstream
@@ -1966,41 +2088,43 @@ GRV-Benchmark-020/021.
 **Reproduce:** Build the Release benchmark project with
 `-p:UseLocalLsfStack=true -m:1 -p:BuildInParallel=false`, then run
 `dotnet tests/Gravitas.Benchmarks/bin/Release/net8.0/Gravitas.Benchmarks.dll circle-contact --launchCount 2 --warmupCount 5 --iterationCount 15 --iterationTime 250 --affinity 3 --exporters json --artifacts artifacts/grv083/optimized`.
-Baseline runtime source is Gravitas `b8b4115` with FixedMathSharp `787afae`;
-the `after` capture adds only the Gravitas zero-core delegation; `optimized`
-also includes the upstream changes described above. Reports and raw measurements
-are in `artifacts/grv083/before`, `after` and `optimized`; build logs are alongside.
+Baseline runtime source is Gravitas `b8b4115` with FixedMathSharp `787afae`; the
+`after` capture adds only the Gravitas zero-core delegation; `optimized` also
+includes the upstream changes described above. Reports and raw measurements are
+in `artifacts/grv083/before`, `after` and `optimized`; build logs are alongside.
 
 **Shared normalization follow-up, 2026-10-02:** The current local stack already
 contains the first optimization above. Actual-iteration EventPipe samples put
-local radial-feature work at 41.7% of the diagonal query and 48.5% of the rotated
-query, with normalization at 27.6% and 21.5% respectively; inclusive shares
-overlap. Depth now contributes only 4.1% and 2.4%. FixedMathSharp's existing
-`Vector2d.GetScaleNormalized` and `Vector3d.GetScaleNormalized` rescaled their
-already bounded vectors a second time through `GetScaledMagnitude`.
+local radial-feature work at 41.7% of the diagonal query and 48.5% of the
+rotated query, with normalization at 27.6% and 21.5% respectively; inclusive
+shares overlap. Depth now contributes only 4.1% and 2.4%. FixedMathSharp's
+existing `Vector2d.GetScaleNormalized` and `Vector3d.GetScaleNormalized`
+rescaled their already bounded vectors a second time through
+`GetScaledMagnitude`.
 
 Both helpers now take the square root of the same rounded component squares
 directly. The dominant scaled component rounds to exactly +/-One, including
-`MinValue` whose excess over the saturated absolute-value scale is below half
-a raw unit. The removed divisions and multiplication were therefore identities;
-sum order, square-root input, rounding, zero-input preconditions and all retained
-anchor terms are unchanged. No new branch, arithmetic owner, circle kernel,
-cache, public API or dependency was added. The upstream tests compare the prior
-path across 4913 raw-edge triples and 2048 deterministic unequal-scale triples,
-with independent BigInteger nearest-even ratio checks.
+`MinValue` whose excess over the saturated absolute-value scale is below half a
+raw unit. The removed divisions and multiplication were therefore identities;
+sum order, square-root input, rounding, zero-input preconditions and all
+retained anchor terms are unchanged. No new branch, arithmetic owner, circle
+kernel, cache, public API or dependency was added. The upstream tests compare
+the prior path across 4913 raw-edge triples and 2048 deterministic unequal-scale
+triples, with independent BigInteger nearest-even ratio checks.
 
 Matched direct queries use the same machine/settings as above. Before sources
-are Gravitas `e4ebf1d` and FixedMathSharp `6a6a7e3`; after adds only the upstream
-normalization change. Values are **microseconds/query**, all **0 B/op**:
+are Gravitas `e4ebf1d` and FixedMathSharp `6a6a7e3`; after adds only the
+upstream normalization change. Values are **microseconds/query**, all **0
+B/op**:
 
-| Geometry | Current-stack before | After | After error |
-| --- | ---: | ---: | ---: |
-| Axis | 0.9344 | 0.8944 | 0.00361 |
-| Coincident | 0.6396 | 0.6309 | 0.00660 |
-| Diagonal | 1.4753 | 1.3685 | 0.01076 |
-| Large axis | 0.9574 | 0.9478 | 0.00973 |
-| Rotated | 1.6330 | 1.5728 | 0.01852 |
-| Separation | 0.2223 | 0.2191 | 0.00211 |
+| Geometry   | Current-stack before |  After | After error |
+| ---------- | -------------------: | -----: | ----------: |
+| Axis       |               0.9344 | 0.8944 |     0.00361 |
+| Coincident |               0.6396 | 0.6309 |     0.00660 |
+| Diagonal   |               1.4753 | 1.3685 |     0.01076 |
+| Large axis |               0.9574 | 0.9478 |     0.00973 |
+| Rotated    |               1.6330 | 1.5728 |     0.01852 |
+| Separation |               0.2223 | 0.2191 |     0.00211 |
 
 Diagonal improves 7.2% and rotated 3.7%. Coincident, large-axis and separation
 intervals overlap; do not claim a measured gain there. The direct before capture
@@ -2015,26 +2139,27 @@ independent dynamic/static pairs through the real context `Simulate` and
 disabled and retains pair state. Setup verifies expected normal/depth, actual
 positional response, stable candidate/contact counts and repeated body state.
 Explicit 16-by-1-by-16 cells and padded coverage isolate contact work from
-fine-voxel fanout. This measures repeated penetration from zero initial velocity;
-it is not a moving-impact, sliding or restitution workload.
+fine-voxel fanout. This measures repeated penetration from zero initial
+velocity; it is not a moving-impact, sliding or restitution workload.
 
 Both full-step and direct-dispatcher attribution rows include body reset. The
 full step includes partition refresh/distribution, contact response, grounding
 and bookkeeping. Values below are **milliseconds/invocation**, all **0 B/op**:
 
 | Pairs | Geometry | Full step before | Full step after | After error |
-| --- | --- | ---: | ---: | ---: |
-| 64 | Axis | 1.1483 | 1.1898 | 0.03229 |
-| 64 | Diagonal | 1.5143 | 1.6085 | 0.11412 |
-| 64 | Rotated | 1.4777 | 1.5043 | 0.13951 |
-| 1024 | Axis | 29.4562 | 28.4869 | 0.74434 |
-| 1024 | Diagonal | 36.8367 | 35.9930 | 0.46672 |
-| 1024 | Rotated | 31.2055 | 31.4762 | 0.62095 |
+| ----- | -------- | ---------------: | --------------: | ----------: |
+| 64    | Axis     |           1.1483 |          1.1898 |     0.03229 |
+| 64    | Diagonal |           1.5143 |          1.6085 |     0.11412 |
+| 64    | Rotated  |           1.4777 |          1.5043 |     0.13951 |
+| 1024  | Axis     |          29.4562 |         28.4869 |     0.74434 |
+| 1024  | Diagonal |          36.8367 |         35.9930 |     0.46672 |
+| 1024  | Rotated  |          31.2055 |         31.4762 |     0.62095 |
 
 Full-step changes are mixed, with overlapping intervals, bimodality in after
 rows and short-iteration warnings. They do not establish an overall simulation
 speedup or an accepted frame budget. The follow-up profile identifies grounding
-and partition work as larger targets than contact anchors; see GRV-Benchmark-023.
+and partition work as larger targets than contact anchors; see
+GRV-Benchmark-023.
 
 **Closure decision, 2026-10-02:** Retain the exact shared contact owner and the
 normalization improvement. Further circle-specific kernels, anchor shortcuts or
@@ -2042,39 +2167,40 @@ caches are not justified by the full-step profile. The premium over the
 incomplete scalar predecessor remains reference evidence, not a parity target.
 Revisit shared circle geometry when a representative host workload and explicit
 budget identify it as a material bottleneck. Investigate the separately measured
-partition/grounding scaling before accepting the large-scene frame cost.
-This closes the direct-query investigation, not an acceptance of whole-frame
-cost. GRV-Benchmark-023 has different owners and scaling failure modes across
-partition rental, distribution and grounding; it remains a separate signal
-even though the circle workload exposed it.
+partition/grounding scaling before accepting the large-scene frame cost. This
+closes the direct-query investigation, not an acceptance of whole-frame cost.
+GRV-Benchmark-023 has different owners and scaling failure modes across
+partition rental, distribution and grounding; it remains a separate signal even
+though the circle workload exposed it.
 
 **Reproduce this follow-up:** Set `UseLocalLsfStack=true` and
-`DOTNET_PROCESSOR_COUNT=2`, build Release with `-p:UseLocalLsfStack=true -m:1
--p:BuildInParallel=false`, then run each selection with `--launchCount 2
---warmupCount 5 --iterationCount 15 --iterationTime 250 --affinity 3 --exporters
-json`, a BelowNormal launcher and one heavy workload. The direct before is
-`artifacts/grv-benchmark-022/direct-before`, full-step before is `coarse-before`,
-and matched after is `after`. Uninstrumented captures are the timing/allocation
-evidence; `direct-profile`, `workload-profile` and `coarse-profile` retain separate
-EventPipe traces and actual-iteration sampled-CPU analysis. The exploratory
-unit-cell run is partial and must not be mixed into the matched table. Upstream
-controls and focused test logs are in FixedMathSharp's
-`artifacts/grv-benchmark-022`.
+`DOTNET_PROCESSOR_COUNT=2`, build Release with
+`-p:UseLocalLsfStack=true -m:1 -p:BuildInParallel=false`, then run each
+selection with
+`--launchCount 2 --warmupCount 5 --iterationCount 15 --iterationTime 250 --affinity 3 --exporters json`,
+a BelowNormal launcher and one heavy workload. The direct before is
+`artifacts/grv-benchmark-022/direct-before`, full-step before is
+`coarse-before`, and matched after is `after`. Uninstrumented captures are the
+timing/allocation evidence; `direct-profile`, `workload-profile` and
+`coarse-profile` retain separate EventPipe traces and actual-iteration
+sampled-CPU analysis. The exploratory unit-cell run is partial and must not be
+mixed into the matched table. Upstream controls and focused test logs are in
+FixedMathSharp's `artifacts/grv-benchmark-022`.
 
-**Final validation, 2026-10-02:** With `UseLocalLsfStack=true`, both repositories'
-full solution builds pass for `netstandard2.1` and `net8.0` in Release and
-ReleaseLean with zero warnings/errors. Gravitas passes 4363/4304 tests and
-FixedMathSharp passes 4125/4104 core tests respectively, plus 49 Chronicler
-integration tests in each configuration; all have zero failures/skips. Each
-repository/configuration retains exact 100% reachable line, branch and method
-coverage. OpenCover reports no unvisited sequence points, branches or methods;
-CI-style ReportGenerator gates independently report zero uncovered counts.
-Raw collector XML, TRX, build/test logs and HTML/JSON summaries are under each
-repository's `artifacts/grv-benchmark-022`, including `coverage-Release`,
-`coverage-ReleaseLean`, `report-Release` and `report-ReleaseLean`. Independent
-correctness and simplification review found no actionable issues. FixedMathSharp's
-normalization change is committed as `00a38bd`; Gravitas benchmark/docs changes
-remain pending review.
+**Final validation, 2026-10-02:** With `UseLocalLsfStack=true`, both
+repositories' full solution builds pass for `netstandard2.1` and `net8.0` in
+Release and ReleaseLean with zero warnings/errors. Gravitas passes 4363/4304
+tests and FixedMathSharp passes 4125/4104 core tests respectively, plus 49
+Chronicler integration tests in each configuration; all have zero
+failures/skips. Each repository/configuration retains exact 100% reachable line,
+branch and method coverage. OpenCover reports no unvisited sequence points,
+branches or methods; CI-style ReportGenerator gates independently report zero
+uncovered counts. Raw collector XML, TRX, build/test logs and HTML/JSON
+summaries are under each repository's `artifacts/grv-benchmark-022`, including
+`coverage-Release`, `coverage-ReleaseLean`, `report-Release` and
+`report-ReleaseLean`. Independent correctness and simplification review found no
+actionable issues. FixedMathSharp's normalization change is committed as
+`00a38bd`; Gravitas benchmark/docs changes remain pending review.
 
 ### GRV-Benchmark-012 — Mixed Discrete Broad-Phase Allocation At 32 Pairs
 
@@ -2849,12 +2975,3 @@ Promote a signal from this backlog into a dedicated dated plan when it has:
 - API, architecture, or multi-workstream design decisions.
 - correctness or ordering invariants that need staged implementation.
 - benchmark and allocation evidence that should move with the new plan.
-
-## Current Recommendation
-
-GRV-Benchmark-018 through GRV-Benchmark-023 are closed. Preserve their complete
-exact contact and runtime contracts; use GRV-Benchmark-024 to establish scene
-frequency and complete-step budget pressure before further curved-contact work. Dense concave
-mesh/mesh throughput remains experimental capacity guidance; prefer primitive,
-convex, compound, or partitioned static-concave authoring. Promote broader work
-into a dated feature plan only when the scope outgrows a focused patch.
