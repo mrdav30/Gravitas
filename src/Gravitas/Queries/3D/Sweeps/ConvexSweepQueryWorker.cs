@@ -312,6 +312,8 @@ internal sealed partial class ConvexSweepQueryWorker
             new FixedBoundVolume(min, max),
             _triangleCandidates);
         LastMeshTriangleCandidateCount += _triangleCandidates.Count;
+        if (TrySweepCertifiedConvexPatch(sourceShape, mesh, out hit, out hitNumerator))
+            return true;
         BuildOrderedSweepTriangleCandidates(sourceShape, mesh);
 
         for (int i = 0; i < _sweepTriangleCandidates.Count; i++)
@@ -767,7 +769,7 @@ internal sealed partial class ConvexSweepQueryWorker
 
         FixedPointAnchor movedSourceCenter = movedSource.GetCenterAnchor();
         FixedPointAnchor targetCenter = targetShape.GetCenterAnchor();
-        if (movedSourceCenter.TryGetOffsetFrom(
+        if (!targetShape.IsConvexPatch && movedSourceCenter.TryGetOffsetFrom(
                 targetCenter,
                 out Vector3d centerDifference)
             && centerDifference.MagnitudeSquared <= Fixed64.Epsilon)

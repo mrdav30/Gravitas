@@ -209,6 +209,15 @@ mesh hit requires a normal resolved by complete contact geometry or certified
 by exact support intervals; a bounded GJK intersection alone cannot establish
 that contact.
 
+An ordinary, initially separated convex-source sweep may treat a whole concave
+mesh as one support-mapped surface when its existing topology certificate proves
+a filled convex coplanar patch. This requires a finite center-chord crossing
+and all mesh triangles in the BVH candidate set. Initial contacts, declared
+surface admission, source meshes, local triangle subsets and uncertified domains
+retain triangle selection. The patch uses the authored geometry frame and finite
+boundary, with the existing query tolerances and raw-distance hit ordering;
+equivalent triangulations need not select identical physical witnesses.
+
 A 2D circle sweep that starts touching or overlapping a target reports zero
 travel distance but still retains the **target's surface witness**, not the
 probe's starting center. It preserves the anchor even when that point cannot

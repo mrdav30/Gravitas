@@ -44,6 +44,20 @@ public partial class PhysicsMesh
                 _convexCoplanarPatchCornerOffsets[patch + 1] - _convexCoplanarPatchCornerOffsets[patch]);
     }
 
+    internal bool HasSingleConvexCoplanarPatch
+    {
+        get
+        {
+            if (GetConvexCoplanarPatchCornerVertexIndices(0).IsEmpty)
+                return false;
+            int owner = _manifoldPatchIds[0];
+            for (int triangle = 1; triangle < _triangleCount; triangle++)
+                if (_manifoldPatchIds[triangle] != owner)
+                    return false;
+            return true;
+        }
+    }
+
     private static void EnsureTopologyBuffer<T>(ref T[] buffer, int count)
     {
         if (buffer.Length < count)

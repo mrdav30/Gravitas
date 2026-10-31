@@ -16,7 +16,7 @@ this backlog.
 ## Intake Rules
 
 - Signal IDs use `GRV-Benchmark-NNN`. The next available ID is
-  `GRV-Benchmark-032`.
+  `GRV-Benchmark-033`.
 - Assign an ID at intake and never reuse it, including after a signal closes or
   moves into a dated plan. Check this file's Git history before advancing or
   repairing the counter.
@@ -622,11 +622,56 @@ with more local special cases. The focused plans and evidence are preserved in
 and
 [`2026-08-02-experimental-triangle-pair-throughput-plan.md`](done/2026-08-02-experimental-triangle-pair-throughput-plan.md).
 
+### GRV-Benchmark-032 — First Isolated 2D Pair-Owner Deactivation Allocation
+
+**Discovered:** 2026-10-30 during the ordinary coplanar-sweep follow-up.
+**Status:** Open; reproduced on the unchanged committed control. **Owner:**
+Gravitas 2D pair-owner teardown and its collection/pool consumers, pending
+allocation-site attribution.
+
+`Collider2DStateParityTests.DeactivatePairOwner_AfterWarmup_ShouldNotAllocate`
+measures **24 bytes**, against a zero-byte assertion at
+`tests/Gravitas.Tests/Physics2D/Collider2DStateParityTests.cs:358`. Reproduce with
+32 radius-0.5 dynamic circles at X=0,2,...,62 in a 128-extent pure-2D test world,
+each paired with a static radius-0.5 circle offset by +0.5 X. Run the existing
+complete `Step(context)`, force collection through `AllocationTestHelper`, then
+measure the first dynamic owner's `Collider.Deactivate()` on that thread.
+
+Windows x64/i7-9700K, SDK 10.0.302, .NET 10.0.10, two advertised processors,
+blocking GC and the frozen lower-stack revisions recorded under
+GRV-Benchmark-026. An isolated `ReleaseLean` run fails twice with coverage and
+once without coverage on **each** payload: committed Gravitas
+`44607adddc6d191aa681fc0370ff238b14ed679e`, and the ordinary-patch candidate.
+The previous frozen control's entire `src` and test source was compared with
+that commit's archive before reuse. The candidate's full Lean run passes
+8,186/8,187 tests, failing only this assertion; full Release passes 8,258/8,258.
+Earlier complete runs passed the guard; predecessor warmup/order still needs
+isolation.
+Neither a 3D-sweep regression nor an instrumentation-only cause is supported.
+
+```powershell
+$env:DOTNET_PROCESSOR_COUNT = '2'
+dotnet test tests/Gravitas.Tests/Gravitas.Tests.csproj -c ReleaseLean -p:UseLocalLsfStack=true -p:DisableTransitiveProjectReferences=true --filter 'FullyQualifiedName=Gravitas.Tests.Physics2D.Collider2DStateParityTests.DeactivatePairOwner_AfterWarmup_ShouldNotAllocate' -- RunConfiguration.MaxCpuCount=1 xUnit.MaxParallelThreads=1
+```
+
+Repeat with `--collect 'XPlat Code Coverage' --settings
+tests/Gravitas.Tests/coverlet.runsettings` before the final `--` for the
+instrumented control. Do not weaken the allocation assertion, infer a recurring
+24-byte cost from this first teardown, or add tests around test infrastructure.
+**Next isolation:** identify the allocation stack in the actual source teardown;
+distinguish missing production initialization/reservation from one-time CLR or
+collection initialization before changing runtime or warmup policy. The
+ordinary-patch refinement leaves 2D source and this guard unchanged.
+
+Ignored `artifacts/ordinary-convex-patch/lean-allocation-*` captures the six
+isolated controls; the fixture inputs, committed revisions, failing assertion
+and bounded next action above remain sufficient without those captures.
+
 ## Closed Signals
 
 | Signal                                                                                                                                        | Status | Closed     | Resolution                                                                                                                                                                                                                                                                                      |
 | --------------------------------------------------------------------------------------------------------------------------------------------- | ------ | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [GRV-Benchmark-026 — Initial generic convex mesh contact cost](#grv-benchmark-026--initial-generic-convex-mesh-contact-resolution-cost) | Closed | 2026-10-30 | Deferred GJK witnesses preserve exact outputs and 0 B; dense initial patches improve 6–7% and ordinary capsule controls 9–14% in balanced warmed runs. Residual costs remain published. |
+| [GRV-Benchmark-026 — Initial generic convex mesh contact cost](#grv-benchmark-026--initial-generic-convex-mesh-contact-resolution-cost) | Closed | 2026-10-30 | Deferred witnesses improve initial sweeps; a certified whole-patch follow-up lowers the ordinary concave capsule row by about 80%, at 0 B/op. Output tolerances, control variation and the pre-existing #032 validation exception are published. |
 | [GRV-Benchmark-025 — Debug ragdoll steady-state allocations](#grv-benchmark-025--debug-ragdoll-steady-state-allocations)                      | Closed | 2026-10-30 | Current Debug/Release allocation stacks agree; restore the strict warmed humanoid guard without a runtime change. Historical 4.3 MB remains unattributed.                                                                                                                                       |
 | [GRV-Benchmark-018 — Complete triangle/cylinder contact cost](#grv-benchmark-018--complete-trianglecylinder-contact-cost)                     | Closed | 2026-10-06 | Exact reciprocal-chart and opposite-direction reuse cut rim-heavy queries by 9-20% and 64-pair batches by 6.5-8.1%, at 0 B/op and 100% coverage. Root retention is reverted; scene capacity remains GRV-Benchmark-024.                                                                          |
 | [GRV-Benchmark-019 — Complete triangle/cone contact cost](#grv-benchmark-019--complete-trianglecone-contact-cost)                             | Closed | 2026-10-06 | Four measured passes retain exact complete contact geometry at 0 B/op and 100% coverage. Final root-sign refinement lowers interior rim by 4.1%; remaining costs and workload-frequency gate are published in GRV-Benchmark-024.                                                                |
@@ -654,8 +699,8 @@ and
 ### GRV-Benchmark-026 — Initial Generic Convex Mesh Contact Resolution Cost
 
 **Discovered:** 2026-10-07 during GRV-Issue-094 correctness validation.
-**Status:** Closed 2026-10-30 with deferred GJK witness construction, unchanged
-exact outputs and published residual costs. **Owner:** Gravitas prepared convex
+**Status:** Closed 2026-10-30 with deferred GJK witness construction, a scoped
+ordinary coplanar-patch refinement and published residual costs. **Owner:** Gravitas prepared convex
 sweeps; complete contact/projection mathematics remains in FixedMathSharp.
 
 **Historical signal and earlier refinements:**
@@ -860,6 +905,122 @@ localization trace, preliminary BDN results, the disposable exact-output/timing
 driver, raw order-balanced windows and validation reports. The inputs, frozen
 revisions, workload admission, results and conclusion above remain sufficient
 when those captures are removed.
+
+**2026-10-30 ordinary coplanar follow-up:** The ordinary concave capsule row
+still costs roughly five times its convex counterpart even though both targets
+are the same four-vertex, two-triangle flat quad. The concave path separately
+sweeps the finite triangles; its first diagonal-edge candidate performs curved
+support work before the second triangle supplies the earlier filled-face hit.
+This is call-path attribution, not a measured split of each triangle's time.
+
+The retained refinement borrows the existing exact convex coplanar certificate
+only when the **entire mesh** is one certified patch, the BVH has returned every
+triangle, and an exact finite center-chord crossing proves an impact opportunity.
+It uses the certified boundary corners as support vertices in the matching
+`GeometryFrame`/`GeometryVertices` chart, then calls the existing GJK advancement
+and endpoint solver once. A patch is a surface target; its inspection center
+does not establish solid containment or authorize an arbitrary corner witness.
+
+Padded initial bounds must be separated and representable. Initial overlap,
+coplanar travel, admission callbacks, source meshes, partial BVH candidates,
+holes, notches, disconnected patches and center-chord misses keep triangle
+selection. Failed or zero-time patch results also fall back: the rounded GJK
+working scale can reduce an exact gap just beyond `ContactTolerance` to that
+tolerance. No cache, new solver, public API or lower-stack change is added.
+
+The frozen comparison starts at Gravitas
+`44607adddc6d191aa681fc0370ff238b14ed679e`, with the same committed lower-stack
+revisions and host/runtime settings as the closeout above. The same 16 maintained
+fixture methods, disposable driver, one-second per-row warmup, 24 approximately
+20-ms windows and separate ABBA launches are used. Builds, tests and profiling
+remain serialized and do not overlap timing. The measured ordinary capsule has
+committed radius **0.5** and core length **2**, centered at **(-3, 0.3, 0.3)**,
+axis **(-1, 0, 0)**, travelling **(6, 0, 0)** toward the X=0 quad with Y/Z in
+[-0.5, 0.5]. The fixture's later authored height-2 assignment has not been
+published by its setup's `Simulate` call; this comparison deliberately retains
+the existing committed fixture geometry on both sides.
+
+Final matched public-query means, microseconds per operation:
+
+| Workload (target kind; initial overlap) | Baseline us | Candidate us | Change |
+| --- | ---: | ---: | ---: |
+| Cuboid, convex (ordinary) | 20.73 | 20.96 | +1.11% |
+| Capsule, convex (ordinary) | 314.84 | 310.43 | -1.40% |
+| Cuboid, convex (initial) | 50.66 | 50.77 | +0.22% |
+| Capsule, convex (initial) | 211.71 | 210.32 | -0.66% |
+| Cuboid, concave (ordinary) | 62.21 | 35.26 | -43.31% |
+| Capsule, concave (ordinary) | 1596.64 | 325.68 | -79.60% |
+| Cuboid, concave (initial) | 72.51 | 72.62 | +0.15% |
+| Capsule, concave (initial) | 138.83 | 137.92 | -0.65% |
+| Cuboid, compound convex leaf (ordinary) | 20.58 | 21.03 | +2.20% |
+| Capsule, compound convex leaf (ordinary) | 316.02 | 312.97 | -0.97% |
+| Cuboid, compound convex leaf (initial) | 50.76 | 51.40 | +1.26% |
+| Capsule, compound convex leaf (initial) | 210.45 | 210.18 | -0.13% |
+| Initial capsule, filled patch, subdivision 2 | 494.09 | 493.69 | -0.08% |
+| Initial capsule, notched patch, subdivision 2 | 488.22 | 488.21 | -0.00% |
+| Initial capsule, filled patch, subdivision 8 | 689.99 | 689.81 | -0.03% |
+| Initial capsule, notched patch, subdivision 8 | 756.20 | 763.76 | +1.00% |
+
+All 64 measured row/launch combinations allocate **zero bytes in every window**.
+The two ordinary concave gains agree in both launch orders. The preceding ABBA
+repeat, before the final rejected-output cleanup, measured 62.66 to 34.84 us for
+the cuboid and 1622.99 to 326.34 us for the capsule, with other controls ranging
+from -2.02% to +0.83%. Small control costs remain uncertain: the ordinary
+compound-cuboid row rises 0.45 us (+2.20%) in the final repeat versus 0.10 us
+(+0.48%) in the preceding one. These measurements cannot separate a small
+dispatch cost from launch/code-placement variation and do not establish zero
+overhead or general throughput. This is an isolated public-query result, not a
+scene throughput, frame-latency or fixed-Hz guarantee.
+
+Exactly **78 of 80** raw hit snapshots agree. The ordinary concave cuboid keeps
+the same distance and normal but selects another valid face witness. The
+ordinary concave capsule changes distance from **6,442,452,056** to
+**6,442,450,944** raw units, a **0.00000025891-unit** difference, below the
+existing 1/1,048,576 distance tolerance. Its normal is unchanged and both
+witnesses lie on the finite target within the source-clearance tolerance.
+This refinement preserves geometric query correctness and deterministic
+raw-distance/ID reduction; it does **not** promise identical witness fields or
+cross-version replay hashes for eligible sweeps. Initial contacts and the other
+78 controls retain their exact snapshots.
+
+Focused source-behavior tests cover analytic capsule TOI and physical clearance,
+three equivalent triangulations, repeated closest/all-hit ordering for cuboids
+and capsules, point-center witnesses, real outer-rim impacts before the center
+crosses, coplanar entry, holes, disconnected islands, grazing bodies whose
+center misses, scalar-boundary fallback, rounded-tolerance fallback, exhausted
+advancement, fractional affine scale/rotation and zero warm allocation. The
+affine witness oracle checks the finite plane/domain and moving sphere's radius;
+query tolerance does not require an exact tangential center coordinate.
+
+Final frozen-source validation passes **8,258/8,258 Release** tests.
+**ReleaseLean passes 8,186/8,187**, with only the pre-existing 24-byte 2D
+deactivation guard failure reproduced separately on the committed control;
+see [GRV-Benchmark-032](#grv-benchmark-032--first-isolated-2d-pair-owner-deactivation-allocation).
+All 16 new sweep cases pass in both profiles. No 2D source, guard or allocation
+expectation was changed. Raw OpenCover reports retain complete reachable
+coverage in both profiles, independently of that assertion failure:
+
+| Profile | Lines visited/total | Branches visited/total | Methods visited/total |
+| --- | ---: | ---: | ---: |
+| Release | 53,448 / 53,448 | 21,670 / 21,670 | 5,599 / 5,599 |
+| ReleaseLean | 53,446 / 53,446 | 21,670 / 21,670 | 5,598 / 5,598 |
+
+Library builds pass for both `netstandard2.1` and `net10.0` in Release and
+ReleaseLean. The archived graph inherits duplicate analyzer configuration from
+the outer checkout; builds report `MultipleGlobalAnalyzerKeys` and, in the
+standard netstandard build, CS1591 warnings exclusively in MemoryPack-generated
+sources. There are no build errors or new hand-written public APIs. Independent
+read-only review reports no remaining findings after the witness, rounding,
+finite-rim, false-result cleanup and support-dispatch checks.
+
+Ignored `artifacts/ordinary-convex-patch` retains source archives, the frozen
+sibling graph, baseline/candidate payloads, original and final ABBA windows,
+snapshots, the disposable geometry inspection and validation reports. The
+original inline patch-support prototype showed small control slowdowns; its
+corner loop was separated from the common support dispatcher before final
+acceptance. These captures are supplemental; the inputs and conclusions above
+remain tracked. GRV-Benchmark-029's dense source-mesh and analytic sphere paths
+are outside this gate and receive no speedup claim.
 
 **Closure criteria:** Met under the measured-gain and published-cost criterion.
 Retain the complete exact contact contract and zero warm allocation. Reopen for

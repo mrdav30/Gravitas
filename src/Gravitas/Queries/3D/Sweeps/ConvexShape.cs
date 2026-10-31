@@ -23,7 +23,8 @@ internal readonly partial struct ConvexShape
         Collider,
         Triangle,
         CircleSlab,
-        Sphere
+        Sphere,
+        ConvexPatch
     }
 
     private readonly ConvexShapeKind _kind;
@@ -38,9 +39,9 @@ internal readonly partial struct ConvexShape
     private readonly Fixed64 _radius;
     private readonly Fixed64 _halfHeight;
 
-    public ConvexShape(LSCollider collider, Vector3d offset)
+    public ConvexShape(LSCollider collider, Vector3d offset, bool convexPatch = false)
     {
-        _kind = ConvexShapeKind.Collider;
+        _kind = convexPatch ? ConvexShapeKind.ConvexPatch : ConvexShapeKind.Collider;
         _collider = collider;
         _triangleOwner = null;
         _triangleIndex = -1;
@@ -93,8 +94,9 @@ internal readonly partial struct ConvexShape
         _halfHeight = halfHeight;
     }
 
-    public bool ContainsCenter =>
-        _kind != ConvexShapeKind.Collider || _collider is not LSMeshCollider;
+    public bool ContainsCenter => _collider is not LSMeshCollider;
+
+    public bool IsConvexPatch => _kind == ConvexShapeKind.ConvexPatch;
 
     public FixedPointAnchor GetCenterAnchor()
     {
@@ -244,6 +246,8 @@ internal readonly partial struct ConvexShape
 
     public FixedPointAnchor GetSupportAnchor(Vector3d direction, bool preferAxialCenter = false)
     {
+        if (_kind == ConvexShapeKind.ConvexPatch)
+            return GetConvexPatchSupportAnchor(direction);
         if (_kind == ConvexShapeKind.Triangle)
         {
             return _triangleOwner!.Mesh.CreatePointAnchor(GetTriangleSupportLocalPoint(direction));
@@ -274,6 +278,19 @@ internal readonly partial struct ConvexShape
             direction,
             _offset,
             preferAxialCenter);
+    }
+
+    private FixedPointAnchor GetConvexPatchSupportAnchor(Vector3d direction)
+    {
+        PhysicsMesh mesh = ((LSMeshCollider)_collider!).Mesh;
+        ReadOnlySpan<int> corners = mesh.GetConvexCoplanarPatchCornerVertexIndices(0);
+        ReadOnlySpan<Vector3d> vertices = mesh.GeometryVertices;
+        WideAxis3 axis = mesh.GeometryFrame.GetSourceDirectionNumerators(direction);
+        Vector3d best = vertices[corners[0]];
+        for (int index = 1; index < corners.Length; index++)
+            if (CompareSupportProjection(vertices[corners[index]], best, axis) > 0)
+                best = vertices[corners[index]];
+        return mesh.CreatePointAnchor(best);
     }
 
     public FixedPointAnchor GetFallbackSurfaceAnchor(Vector3d direction)
@@ -402,6 +419,11 @@ internal readonly partial struct ConvexShape
 
     public bool TryGetPlanarSurfaceNormal(Vector3d point, out Vector3d normal)
     {
+        if (_kind == ConvexShapeKind.ConvexPatch)
+        {
+            normal = ((LSMeshCollider)_collider!).Mesh.GetFaceNormalWorld(0);
+            return true;
+        }
         if (_kind == ConvexShapeKind.CircleSlab)
         {
             throw new InvalidOperationException(
@@ -474,8 +496,8 @@ internal readonly partial struct ConvexShape
         {
             WideAxis3 axis = _triangleOwner.Mesh.GeometryFrame.GetSourceDirectionNumerators(direction);
             Vector3d selected = _triangleA;
-            if (Compare(_triangleB, selected, axis) > 0) selected = _triangleB;
-            if (Compare(_triangleC, selected, axis) > 0) selected = _triangleC;
+            if (CompareSupportProjection(_triangleB, selected, axis) > 0) selected = _triangleB;
+            if (CompareSupportProjection(_triangleC, selected, axis) > 0) selected = _triangleC;
             return selected;
         }
         Vector3d localDirection =
@@ -488,10 +510,10 @@ internal readonly partial struct ConvexShape
             best = _triangleC;
 
         return best;
+    }
 
-        static int Compare(Vector3d point, Vector3d current, in WideAxis3 axis) => WideAxis3.Dot(axis, new WideAxis3(
+    private static int CompareSupportProjection(Vector3d point, Vector3d current, in WideAxis3 axis) => WideAxis3.Dot(axis, new WideAxis3(
             Signed320.ExtendValue(WideArithmetic.Difference(point.X, current.X)),
             Signed320.ExtendValue(WideArithmetic.Difference(point.Y, current.Y)),
             Signed320.ExtendValue(WideArithmetic.Difference(point.Z, current.Z)))).Sign;
-    }
 }
